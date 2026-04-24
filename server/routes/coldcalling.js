@@ -1,5 +1,12 @@
 const express = require('express');
 const { validateColdcallingStartConfirmPin } = require('../security/coldcalling-start-confirm-pin');
+const {
+  countFailedColdcallingResults,
+  countSkippedColdcallingResults,
+  countStartedColdcallingResults,
+  filterColdcallingLeadsByDatabaseStatus,
+  parseCustomerDatabaseRowsFromUiState,
+} = require('../services/coldcalling-lead-eligibility');
 
 const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
 const DEFAULT_USD_TO_EUR_RATE = 0.92;
@@ -258,6 +265,64 @@ function createSendColdcallingStatusResponse(deps) {
   };
 }
 
+async function loadCustomerDatabaseRowsForColdcalling(deps) {
+  if (!deps || typeof deps.getUiStateValues !== 'function') return [];
+
+  async function loadRows(scope, key) {
+    if (!scope || !key) return [];
+    const state = await deps.getUiStateValues(scope);
+    return parseCustomerDatabaseRowsFromUiState(state?.values || {}, key);
+  }
+
+  try {
+    const customerRows = await loadRows(
+      deps.premiumCustomersScope || 'premium_customers_database',
+      deps.premiumCustomersKey || 'softora_customers_premium_v1'
+    );
+    const activeOrderRows = await loadRows(
+      deps.premiumActiveOrdersScope || '',
+      deps.premiumActiveCustomOrdersKey || ''
+    );
+    return customerRows.concat(activeOrderRows);
+  } catch (error) {
+    if (deps.logger && typeof deps.logger.error === 'function') {
+      deps.logger.error('[Coldcalling][DatabaseEligibilityError]', error?.message || error);
+    }
+    return [];
+  }
+}
+
+function buildColdcallingSummary({
+  leads,
+  selectedLeads,
+  results,
+  provider,
+  campaign,
+  queuedRemaining = 0,
+  sequentialWaitForCallEnd = false,
+  queueId = '',
+}) {
+  const started = countStartedColdcallingResults(results);
+  const skipped = countSkippedColdcallingResults(results);
+  const failed = countFailedColdcallingResults(results);
+
+  return {
+    requested: leads.length,
+    attempted: selectedLeads.length - skipped,
+    skipped,
+    started,
+    failed,
+    provider,
+    coldcallingStack: campaign.coldcallingStack,
+    coldcallingStackLabel: campaign.coldcallingStackLabel,
+    dispatchMode: campaign.dispatchMode,
+    dispatchDelaySeconds: campaign.dispatchMode === 'delay' ? campaign.dispatchDelaySeconds : 0,
+    sequentialWaitForCallEnd,
+    queueId,
+    queuedRemaining,
+  };
+}
+
 function registerColdcallingWebhookRoutes(app, deps) {
   app.get('/api/twilio/voice', deps.handleTwilioInboundVoice);
   app.post('/api/twilio/voice', express.urlencoded({ extended: false }), deps.handleTwilioInboundVoice);
@@ -282,6 +347,26 @@ function registerColdcallingRoutes(app, deps) {
     const { campaign, leads } = validated;
     campaign.publicBaseUrl = deps.getEffectivePublicBaseUrl(req);
     const provider = deps.resolveColdcallingProviderForCampaign(campaign);
+    const selectedLeads = leads.slice(0, Math.min(campaign.amount, leads.length));
+    const customerRows = await loadCustomerDatabaseRowsForColdcalling(deps);
+    const eligibility = filterColdcallingLeadsByDatabaseStatus(selectedLeads, customerRows);
+    const leadsToProcess = eligibility.allowed;
+    const skippedResults = eligibility.skippedResults;
+
+    if (!leadsToProcess.length) {
+      return res.status(200).json({
+        ok: true,
+        summary: buildColdcallingSummary({
+          leads,
+          selectedLeads,
+          results: skippedResults,
+          provider,
+          campaign,
+        }),
+        results: skippedResults,
+      });
+    }
+
     const missingEnv = deps.getMissingEnvVars(provider);
 
     if (missingEnv.length > 0) {
@@ -294,49 +379,45 @@ function registerColdcallingRoutes(app, deps) {
       });
     }
 
-    const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
-
     console.log(
-      `[Coldcalling] Start campagne ontvangen via ${provider} (stack=${campaign.coldcallingStack}): ${leadsToProcess.length}/${leads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
+      `[Coldcalling] Start campagne ontvangen via ${provider} (stack=${campaign.coldcallingStack}): ${leadsToProcess.length}/${leads.length} leads, ${skippedResults.length} database-skip(s), sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
     );
 
     let results = [];
 
     if (campaign.dispatchMode === 'parallel') {
       results = await Promise.all(
-        leadsToProcess.map((lead, index) => deps.processColdcallingLead(lead, campaign, index))
+        leadsToProcess.map(({ lead, index }) => deps.processColdcallingLead(lead, campaign, index))
       );
     } else if (campaign.dispatchMode === 'sequential' && leadsToProcess.length > 1) {
-      const queue = deps.createSequentialDispatchQueue(campaign, leadsToProcess);
+      const queue = deps.createSequentialDispatchQueue(
+        campaign,
+        leadsToProcess.map(({ lead }) => lead)
+      );
       await deps.advanceSequentialDispatchQueue(queue.id, 'start-request');
-      results = queue.results.slice();
+      results = skippedResults.concat(queue.results.slice());
 
-      const startedNow = results.filter((item) => item.success).length;
-      const failedNow = results.length - startedNow;
+      const startedNow = countStartedColdcallingResults(queue.results);
       const queuedRemaining = Math.max(0, queue.leads.length - queue.results.length);
 
       console.log(
-        `[Coldcalling][Sequential Queue] ${queue.id} gestart: direct ${results.length}/${queue.leads.length} verwerkt, ${queuedRemaining} wachtend`
+        `[Coldcalling][Sequential Queue] ${queue.id} gestart: direct ${startedNow}/${queue.leads.length} call(s), ${skippedResults.length} database-skip(s), ${queuedRemaining} wachtend`
       );
 
       await deps.waitForQueuedRuntimeStatePersist();
 
       return res.status(200).json({
         ok: true,
-        summary: {
-          requested: leads.length,
-          attempted: leadsToProcess.length,
-          started: startedNow,
-          failed: failedNow,
+        summary: buildColdcallingSummary({
+          leads,
+          selectedLeads,
+          results,
           provider,
-          coldcallingStack: campaign.coldcallingStack,
-          coldcallingStackLabel: campaign.coldcallingStackLabel,
-          dispatchMode: campaign.dispatchMode,
-          dispatchDelaySeconds: 0,
+          campaign,
+          queuedRemaining,
           sequentialWaitForCallEnd: true,
           queueId: queue.id,
-          queuedRemaining,
-        },
+        }),
         results,
       });
     } else {
@@ -345,8 +426,8 @@ function registerColdcallingRoutes(app, deps) {
         campaign.dispatchMode === 'delay' ? Math.round(campaign.dispatchDelaySeconds * 1000) : 0;
 
       for (let index = 0; index < leadsToProcess.length; index += 1) {
-        const lead = leadsToProcess[index];
-        const result = await deps.processColdcallingLead(lead, campaign, index);
+        const leadEntry = leadsToProcess[index];
+        const result = await deps.processColdcallingLead(leadEntry.lead, campaign, leadEntry.index);
         results.push(result);
 
         const isLast = index === leadsToProcess.length - 1;
@@ -359,24 +440,19 @@ function registerColdcallingRoutes(app, deps) {
       }
     }
 
-    const started = results.filter((item) => item.success).length;
-    const failed = results.length - started;
+    results = skippedResults.concat(results);
 
     await deps.waitForQueuedRuntimeStatePersist();
 
     return res.status(200).json({
       ok: true,
-      summary: {
-        requested: leads.length,
-        attempted: leadsToProcess.length,
-        started,
-        failed,
+      summary: buildColdcallingSummary({
+        leads,
+        selectedLeads,
+        results,
         provider,
-        coldcallingStack: campaign.coldcallingStack,
-        coldcallingStackLabel: campaign.coldcallingStackLabel,
-        dispatchMode: campaign.dispatchMode,
-        dispatchDelaySeconds: campaign.dispatchMode === 'delay' ? campaign.dispatchDelaySeconds : 0,
-      },
+        campaign,
+      }),
       results,
     });
   });

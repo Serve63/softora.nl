@@ -110,7 +110,10 @@ function createAgendaTravelService(deps = {}) {
   }
 
   function extractTravelReadyAtFromSummary(summary) {
-    const match = normalizeString(summary).match(/weer beschikbaar[^:\n]*:\s*(\d{1,2}:\d{2})/i);
+    const normalizedSummary = normalizeString(summary);
+    const match =
+      normalizedSummary.match(/weer beschikbaar[^:\n]*:\s*(\d{1,2}:\d{2})/i) ||
+      normalizedSummary.match(/\bbeschikbaar[^:\n]*:\s*(\d{1,2}:\d{2})/i);
     return normalizeTimeHhMm(match?.[1] || '');
   }
 

@@ -186,6 +186,14 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     dashboardSource,
     /addUiLog\(\s*'success',[\s\S]*Coldcalling afgerond[\s\S]*activeSequentialClientDispatch = null;[\s\S]*clearCompletedSequentialClientDispatchUi\(\);/
   );
+  assert.match(dashboardSource, /function buildCampaignStartedMessage\(startedCount, campaign, failedCount = 0, skippedCount = 0\)/);
+  assert.match(dashboardSource, /skipped:\s*0,/);
+  assert.match(dashboardSource, /else if \(result\.skipped\) \{[\s\S]*Overgeslagen:/);
+  assert.match(dashboardSource, /const skipped = Number\(summary\.skipped \|\| 0\);/);
+  assert.match(
+    dashboardSource,
+    /Geen calls gestart, omdat alle geselecteerde leads al een database-status hebben die nieuwe outreach blokkeert\./
+  );
   assert.doesNotMatch(dashboardSource, /Bezig met coldcallen via \$\{stackLabel\}\.\.\./);
   assert.doesNotMatch(dashboardSource, /Wacht tot het huidige gesprek is afgelopen/);
   assert.doesNotMatch(dashboardSource, /Volgende call wordt voorbereid\.\.\./);

@@ -1048,14 +1048,18 @@
     return new Date(Date.now() + estimateSeconds * 1000);
   }
 
-  function buildCampaignStartedMessage(startedCount, campaign, failedCount = 0) {
+  function buildCampaignStartedMessage(startedCount, campaign, failedCount = 0, skippedCount = 0) {
     const started = Math.max(0, Number(startedCount) || 0);
     const failed = Math.max(0, Number(failedCount) || 0);
+    const skipped = Math.max(0, Number(skippedCount) || 0);
     const personWord = started === 1 ? 'persoon' : 'personen';
     const eta = estimateCampaignCompletionTime(started, campaign);
     const etaText = eta ? ` Verwachte voltooiingstijd is rond ${formatClockTime(eta)}.` : '';
-    const failedText = failed > 0 ? ` (${failed} niet gestart)` : '';
-    return `Gestart met het bellen van ${started} ${personWord}${failedText}.${etaText}`;
+    const detailParts = [];
+    if (skipped > 0) detailParts.push(`${skipped} overgeslagen`);
+    if (failed > 0) detailParts.push(`${failed} niet gestart`);
+    const detailText = detailParts.length > 0 ? ` (${detailParts.join(', ')})` : '';
+    return `Gestart met het bellen van ${started} ${personWord}${detailText}.${etaText}`;
   }
 
   function syncSequentialClientDispatchButtonState() {
@@ -7236,6 +7240,9 @@
       if (result.success) {
         const callId = result?.call?.callId ? ` (callId: ${escapeHtml(result.call.callId)})` : '';
         addUiLog('success', `<strong>${company}</strong> - Outbound call gestart${callId}.`);
+      } else if (result.skipped) {
+        const reason = result?.causeExplanation || result?.error || 'Lead hoeft niet opnieuw benaderd te worden.';
+        addUiLog('skip', `<strong>${company}</strong> - Overgeslagen: ${escapeHtml(reason)}`);
       } else {
         const cause = result?.cause ? ` Oorzaak: ${escapeHtml(result.cause)}.` : '';
         const causeExplanation = result?.causeExplanation ? ` ${escapeHtml(result.causeExplanation)}` : '';
@@ -7250,6 +7257,12 @@
     if (!primaryResult) {
       run.failed += 1;
       return { success: false };
+    }
+
+    if (primaryResult.skipped) {
+      run.skipped += 1;
+      updateStats({ started: run.started });
+      return { success: false, skipped: true };
     }
 
     if (!primaryResult.success) {
@@ -7307,16 +7320,31 @@
         run.completed = true;
         const completedCount = run.started;
         if (run.started > 0) {
+          const skippedText = run.skipped > 0 ? `, ${run.skipped} overgeslagen` : '';
           const failedText = run.failed > 0 ? `, ${run.failed} mislukt` : '';
           addUiLog(
             'success',
             `<strong>Campagne</strong> - Coldcalling afgerond (${escapeHtml(
               `${completedCount}/${run.total}`
-            )} gestart${escapeHtml(failedText)}).`
+            )} gestart${escapeHtml(skippedText)}${escapeHtml(failedText)}).`
           );
           activeSequentialClientDispatch = null;
           clearCompletedSequentialClientDispatchUi();
           void refreshDashboardStatsFromSupabase({ silent: true, force: true });
+        } else if (run.skipped > 0 && run.failed === 0) {
+          setStatusPill('success', 'Geen belbare leads');
+          setStatusMessage(
+            'success',
+            'Geen calls gestart, omdat alle geselecteerde leads al een database-status hebben die nieuwe outreach blokkeert.'
+          );
+          addUiLog(
+            'skip',
+            `<strong>Campagne</strong> - Coldcalling afgerond (0/${escapeHtml(
+              String(run.total)
+            )} gestart, ${escapeHtml(String(run.skipped))} overgeslagen).`
+          );
+          activeSequentialClientDispatch = null;
+          syncSequentialClientDispatchButtonState();
         } else {
           setStatusPill('error', 'Fout');
           setStatusMessage('error', 'Geen calls gestart. Controleer outbound-configuratie en logs.');
@@ -7856,6 +7884,7 @@
           nextLeadIndex: 0,
           started: 0,
           failed: 0,
+          skipped: 0,
           waiting: false,
           waitingCallId: '',
           waitingPhoneKey: '',
@@ -7894,6 +7923,7 @@
       const summary = data.summary || {};
       const started = Number(summary.started || 0);
       const failed = Number(summary.failed || 0);
+      const skipped = Number(summary.skipped || 0);
       const plannedCount = Number(
         summary.sequentialWaitForCallEnd ? summary.attempted || summary.requested || started : started
       );
@@ -7910,6 +7940,9 @@
             'success',
             `<strong>${company}</strong> - Outbound call gestart${callId}.`
           );
+        } else if (result.skipped) {
+          const reason = result?.causeExplanation || result?.error || 'Lead hoeft niet opnieuw benaderd te worden.';
+          addUiLog('skip', `<strong>${company}</strong> - Overgeslagen: ${escapeHtml(reason)}`);
         } else {
           const cause = result?.cause ? ` Oorzaak: ${escapeHtml(result.cause)}.` : '';
           const causeExplanation = result?.causeExplanation
@@ -7923,14 +7956,20 @@
       });
 
       if (started > 0 && failed === 0) {
-        setStatusPill('success', 'Campagne gestart');
-        setStatusMessage('success', buildCampaignStartedMessage(plannedCount, campaign, failed));
+        setStatusPill('success', skipped > 0 ? 'Campagne gestart (deels)' : 'Campagne gestart');
+        setStatusMessage('success', buildCampaignStartedMessage(plannedCount, campaign, failed, skipped));
       } else if (started > 0) {
         setStatusPill('success', 'Campagne gestart (deels)');
-        setStatusMessage('success', buildCampaignStartedMessage(plannedCount, campaign, failed));
+        setStatusMessage('success', buildCampaignStartedMessage(plannedCount, campaign, failed, skipped));
+      } else if (skipped > 0 && failed === 0) {
+        setStatusPill('success', 'Geen belbare leads');
+        setStatusMessage(
+          'success',
+          'Geen calls gestart, omdat alle geselecteerde leads al een database-status hebben die nieuwe outreach blokkeert.'
+        );
       } else {
         setStatusPill('error', 'Fout');
-        const firstFailure = results.find((item) => !item.success);
+        const firstFailure = results.find((item) => !item.success && !item.skipped);
         const failMessage = firstFailure?.error ? ` Exacte fout: ${firstFailure.error}.` : '';
         const failCause = firstFailure?.cause ? ` Oorzaak: ${firstFailure.cause}.` : '';
         setStatusMessage(

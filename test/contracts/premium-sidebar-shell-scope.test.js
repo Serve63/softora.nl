@@ -92,6 +92,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*none;/);
   assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\] \.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*auto;/);
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*transform:\s*none !important;/);
+  assert.match(themeSource, /\.sidebar,\s*\.sidebar \*,\s*\.sidebar \*::before,\s*\.sidebar \*::after\s*\{[\s\S]*transition:\s*none !important;/);
+  assert.match(themeSource, /\.sidebar\s*\{[\s\S]*contain:\s*layout paint style !important;/);
   assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords"\]\);/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
@@ -116,6 +118,9 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /\.sidebar-user-name[\s\S]*text-overflow:\s*ellipsis !important;/);
   assert.match(prefillSource, /data-sidebar-profile-render-key/);
   assert.match(prefillSource, /getAttribute\("data-sidebar-profile-render-key"\)/);
+  assert.match(prefillSource, /function prefillPremiumSidebarActiveState\(\) \{/);
+  assert.match(prefillSource, /link\.classList\.toggle\("active", key === activeKey\);/);
+  assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.doesNotMatch(
     themeJsSource,
     /if \(sidebar\.dataset\.staticSidebar === "1"\) \{[\s\S]*ensureStaticSidebarLink\(sidebar, "beheer", getWebsitePreviewSidebarLink\(\), \["seo", "packages", "pdfs"\]\);/s

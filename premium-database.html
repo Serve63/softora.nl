@@ -7,7 +7,7 @@
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
     <title>Softora | Database</title>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260424a">
     <link rel="stylesheet" href="assets/custom-selects.css?v=20260421b">
     <script>
         (function () {
@@ -20,7 +20,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260423b" defer></script>
+    <script src="assets/personnel-theme.js?v=20260424a" defer></script>
     <script src="assets/custom-selects.js?v=20260421a" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -506,6 +506,8 @@
         .sf-btn[data-s="afspraak"].act { border-color: var(--green); background: rgba(22,115,60,.08); color: var(--green); }
         .sf-btn[data-s="gebeld"].act { border-color: var(--orange); background: rgba(180,90,0,.08); color: var(--orange); }
         .sf-btn[data-s="gemaild"].act { border-color: var(--crimson); background: rgba(155,35,85,.08); color: var(--crimson); }
+        .sf-btn[data-s="interesse"].act { border-color: var(--green); background: rgba(22,115,60,.08); color: var(--green); }
+        .sf-btn[data-s="afgehaakt"].act { border-color: var(--red); background: rgba(192,57,43,.08); color: var(--red); }
         .sf-btn[data-s="geblokkeerd"].act { border-color: var(--red); background: rgba(192,57,43,.08); color: var(--red); }
         .sf-btn[data-s="buiten"].act { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: var(--mid); }
         .sf-btn[data-s="benaderbaar"].act { border-color: var(--green); background: rgba(22,115,60,.1); color: var(--green); }
@@ -611,10 +613,14 @@
         .s-gebeld .s-label { color: var(--orange); }
         .s-gemaild .s-dot { background: var(--crimson); }
         .s-gemaild .s-label { color: var(--crimson); }
+        .s-interesse .s-dot { background: var(--green); }
+        .s-interesse .s-label { color: var(--green); font-weight: 700; }
         .s-afspraak .s-dot { background: var(--green); }
         .s-afspraak .s-label { color: var(--green); }
         .s-klant .s-dot { background: var(--green); }
         .s-klant .s-label { color: var(--green); font-weight: 700; }
+        .s-afgehaakt .s-dot { background: var(--red); }
+        .s-afgehaakt .s-label { color: var(--red); font-weight: 700; }
         .s-geblokkeerd .s-dot { background: var(--red); }
         .s-geblokkeerd .s-label { color: var(--red); }
         .s-buiten .s-dot { background: #bbb; }
@@ -1022,7 +1028,7 @@
             </div>
           </div>
         </aside>
-        <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
+        <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
 
         <main class="page-shell is-premium-boot-host">
             <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
@@ -1093,8 +1099,10 @@
                             <button class="sf-btn" data-s="gebeld" type="button">Gebeld</button>
                             <button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button>
                             <button class="sf-btn" data-s="gemaild" type="button">Gemaild</button>
+                            <button class="sf-btn" data-s="interesse" type="button">Interesse</button>
                             <button class="sf-btn" data-s="afspraak" type="button">Afspraak</button>
                             <button class="sf-btn" data-s="klant" type="button">Klant</button>
+                            <button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt</button>
                             <button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button>
                             <button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
@@ -1169,8 +1177,10 @@
                     <option value="gebeld">Gebeld</option>
                     <option value="geengehoor">Geen gehoor</option>
                     <option value="gemaild">Gemaild</option>
+                    <option value="interesse">Interesse</option>
                     <option value="afspraak">Afspraak</option>
                     <option value="klant">Klant</option>
+                    <option value="afgehaakt">Afgehaakt</option>
                     <option value="geblokkeerd">Geen interesse</option>
                     <option value="buiten">Buiten gebruik</option>
                 </select>
@@ -1196,7 +1206,7 @@
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
         const ORDER_SCOPE = "premium_active_orders";
         const ORDER_KEY = "softora_custom_orders_premium_v1";
-        const DATABASE_STATUS_OPTIONS = ["prospect", "gebeld", "gemaild", "afspraak", "klant", "geblokkeerd", "buiten", "benaderbaar", "geengehoor"];
+        const DATABASE_STATUS_OPTIONS = ["prospect", "gebeld", "gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten", "benaderbaar", "geengehoor"];
 
         function readCustomersBootstrapPayload() {
             const element = document.getElementById("softoraCustomersBootstrap");
@@ -1348,8 +1358,10 @@
                 gebeld: "Gebeld",
                 geengehoor: "Geen gehoor",
                 gemaild: "Mail verstuurd",
+                interesse: "Interesse getoond",
                 afspraak: "Afspraak ingepland",
                 klant: "Geworden klant",
+                afgehaakt: "Afgehaakt na interesse",
                 geblokkeerd: "Geen interesse aangegeven",
                 buiten: "Nummer buiten gebruik"
             };
@@ -1387,6 +1399,8 @@
         function normalizeDatabaseStatus(value, rawCustomer) {
             const normalized = normalizeString(value).toLowerCase();
             if (DATABASE_STATUS_OPTIONS.indexOf(normalized) !== -1) return normalized;
+            if (normalized === "interested" || normalized === "geinteresseerd" || normalized === "geïnteresseerd") return "interesse";
+            if (normalized === "no_deal" || normalized === "geendeal" || normalized === "lost") return "afgehaakt";
             if (normalized === "betaald") return "klant";
             if (normalized === "open") return "benaderbaar";
             if (normalizeString(rawCustomer && rawCustomer.actief).toLowerCase() === "nee") return "buiten";
@@ -1400,8 +1414,10 @@
                 gebeld: "Belpoging geregistreerd",
                 geengehoor: "Geen gehoor geregistreerd",
                 gemaild: "Mailcontact geregistreerd",
+                interesse: "Interesse getoond",
                 afspraak: "Afspraak ingepland",
                 klant: "Klant geworden",
+                afgehaakt: "Afgehaakt na interesse",
                 geblokkeerd: "Geen interesse aangegeven",
                 buiten: "Buiten gebruik gemarkeerd"
             };
@@ -1762,8 +1778,10 @@
                 prospect: "Prospect",
                 gebeld: "Gebeld",
                 gemaild: "Gemaild",
+                interesse: "Interesse",
                 afspraak: "Afspraak",
                 klant: "Klant",
+                afgehaakt: "Afgehaakt",
                 geblokkeerd: "Geen interesse",
                 buiten: "Buiten gebruik",
                 benaderbaar: "Benaderbaar",

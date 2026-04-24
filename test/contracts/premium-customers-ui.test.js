@@ -60,3 +60,13 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /escapeHtml\(entry\.count \+ " " \+ assignmentLabel\)/);
   assert.match(pageSource, /function updateStats\(\) \{[\s\S]*updateLeaderboard\(\);[\s\S]*\}/);
 });
+
+test('premium customers page preserves the shared database lifecycle status', () => {
+  const pagePath = path.join(__dirname, '../../premium-klanten.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /function normalizeCustomerDatabaseStatus\(raw\)/);
+  assert.match(pageSource, /if \(value === "afgehaakt"\) return "afgehaakt";/);
+  assert.match(pageSource, /databaseStatus: normalizeCustomerDatabaseStatus\(raw\),/);
+  assert.match(pageSource, /JSON\.stringify\(normalizedCustomers\)/);
+});

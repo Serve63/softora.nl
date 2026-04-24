@@ -86,7 +86,7 @@ test('page smoke: premium sidebar pages pin the refreshed personnel theme script
     const html = fs.readFileSync(path.join(repoRoot, filePath), 'utf8');
     assert.match(
       html,
-      /assets\/personnel-theme\.js\?v=20260423b/,
+      /assets\/personnel-theme\.js\?v=20260424a/,
       `Nieuwe sidebar scriptversie ontbreekt voor ${filePath}`
     );
   }
@@ -126,4 +126,10 @@ test('page smoke: premium-bevestigingsmails.html shows the five coldmailing KPI 
   assert.match(html, />Interesse<\/div>/, 'Interesse ontbreekt.');
   assert.match(html, />Lead<\/div>/, 'Lead ontbreekt.');
   assert.match(html, />Conversie<\/div>/, 'Conversie ontbreekt.');
+  assert.doesNotMatch(html, /<div class="zones-row">/, 'Zone-kaarten horen niet meer zichtbaar te zijn.');
+  assert.doesNotMatch(html, /<div class="zone-card z1"/);
+  assert.doesNotMatch(html, /<div class="zone-card z2"/);
+  assert.doesNotMatch(html, /<div class="zone-card z4"/);
+  assert.doesNotMatch(html, /<div class="zone-card z5"/);
+  assert.doesNotMatch(html, /<div class="zone-card conv-card"/);
 });

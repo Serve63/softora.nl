@@ -1,6 +1,7 @@
 const {
   buildServerAppFeatureWiringContext,
 } = require('./server-app-runtime-composition-options');
+const { createColdmailCampaignService } = require('./coldmail-campaign');
 
 function buildServerAppFeatureWiringRuntimeContext({
   app,
@@ -143,6 +144,12 @@ function buildServerAppFeatureWiringRuntimeContext({
         recentAiCallInsights: runtimeMemory.recentAiCallInsights,
         requireRuntimeDebugAccess: securityRuntime.requireRuntimeDebugAccess,
         validateStartPayload: coldcallingServiceRuntime.validateStartPayload,
+        getUiStateValues: uiSeoRuntime.getUiStateValues,
+        premiumCustomersScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
+        premiumCustomersKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
+        premiumActiveOrdersScope: bootstrapState.PREMIUM_ACTIVE_ORDERS_SCOPE,
+        premiumActiveCustomOrdersKey: bootstrapState.PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY,
+        logger: console,
         getEffectivePublicBaseUrl,
         resolveColdcallingProviderForCampaign:
           platformRuntime.resolveColdcallingProviderForCampaign,
@@ -195,6 +202,28 @@ function buildServerAppFeatureWiringRuntimeContext({
           agendaSupportRuntime.backfillInsightsAndAppointmentsFromRecentCallUpdates,
         buildCallBackedLeadDetail: agendaLeadDetailService.buildCallBackedLeadDetail,
         getOpenAiApiKey: platformRuntime.getOpenAiApiKey,
+      },
+      coldmailing: {
+        coldmailCampaignService: createColdmailCampaignService({
+          mailConfig: {
+            smtpHost: envConfig.MAIL_SMTP_HOST,
+            smtpPort: envConfig.MAIL_SMTP_PORT,
+            smtpSecure: envConfig.MAIL_SMTP_SECURE,
+            smtpUser: envConfig.MAIL_SMTP_USER,
+            smtpPass: envConfig.MAIL_SMTP_PASS,
+            mailFromAddress: envConfig.MAIL_FROM_ADDRESS,
+            mailFromName: envConfig.MAIL_FROM_NAME,
+            mailReplyTo: envConfig.MAIL_REPLY_TO,
+          },
+          getUiStateValues: uiSeoRuntime.getUiStateValues,
+          setUiStateValues: uiSeoRuntime.setUiStateValues,
+          customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
+          customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
+          normalizeString: shared.normalizeString,
+          truncateText: shared.truncateText,
+        }),
+        normalizeString: shared.normalizeString,
+        truncateText: shared.truncateText,
       },
       websiteLinkCoordinator: uiSeoRuntime.websiteLinkCoordinator,
       websitePreviewLibraryCoordinator: uiSeoRuntime.websitePreviewLibraryCoordinator,

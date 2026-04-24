@@ -333,6 +333,15 @@ test('premium user coordinator admin update accepts profielfoto (data-url) en re
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
   const { coordinator, premiumUsersStore } = createCoordinatorFixture([
     {
+      id: 'usr_admin',
+      email: 'admin@softora.nl',
+      firstName: 'Admin',
+      lastName: 'User',
+      role: 'admin',
+      status: 'active',
+      avatarDataUrl: '',
+    },
+    {
       id: 'usr_staff',
       email: 'staff@softora.nl',
       firstName: 'Staff',

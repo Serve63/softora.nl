@@ -143,6 +143,16 @@
     padding: 1.6rem 0 0 !important;
     display: flex !important;
     flex-direction: column !important;
+    contain: layout paint style !important;
+    transform: translateZ(0) !important;
+}
+
+.sidebar,
+.sidebar *,
+.sidebar *::before,
+.sidebar *::after {
+    animation: none !important;
+    transition: none !important;
 }
 
 .sidebar-nav {

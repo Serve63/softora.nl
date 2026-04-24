@@ -2,6 +2,7 @@ const {
   registerColdcallingRoutes,
   registerColdcallingWebhookRoutes,
 } = require('../routes/coldcalling');
+const { registerColdmailingRoutes } = require('../routes/coldmailing');
 const { registerAiDashboardRoutes } = require('../routes/ai-dashboard');
 const { registerAiToolRoutes } = require('../routes/ai-tools');
 const { registerWebsiteLinkRoutes } = require('../routes/website-links');
@@ -21,6 +22,7 @@ function registerFeatureRoutes(app, deps = {}) {
     handleRetellWebhook,
     premiumRouteRuntime,
     coldcalling,
+    coldmailing,
     aiDashboardCoordinator,
     aiToolsCoordinator,
     websiteLinkCoordinator,
@@ -46,6 +48,7 @@ function registerFeatureRoutes(app, deps = {}) {
   });
 
   registerColdcallingRoutes(app, coldcalling);
+  registerColdmailingRoutes(app, coldmailing);
   registerAiDashboardRoutes(app, { coordinator: aiDashboardCoordinator });
   registerAiToolRoutes(app, { coordinator: aiToolsCoordinator });
   registerWebsiteLinkRoutes(app, { coordinator: websiteLinkCoordinator });

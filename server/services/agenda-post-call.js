@@ -1,3 +1,123 @@
+const { normalizeLeadLikePhoneKey } = require('./lead-identity');
+
+function normalizeCustomerSearchText(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function parseCustomerDatabaseRows(rawValue) {
+  if (Array.isArray(rawValue)) return rawValue.filter((item) => item && typeof item === 'object');
+  try {
+    const parsed = JSON.parse(String(rawValue || '[]'));
+    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item === 'object') : [];
+  } catch {
+    return [];
+  }
+}
+
+function getAppointmentPhoneKey(appointment) {
+  return (
+    normalizeLeadLikePhoneKey(appointment?.phone || '') ||
+    normalizeLeadLikePhoneKey(appointment?.telefoon || '') ||
+    normalizeLeadLikePhoneKey(appointment?.contactPhone || '')
+  );
+}
+
+function getCustomerPhoneKey(row) {
+  return (
+    normalizeLeadLikePhoneKey(row?.phoneE164 || '') ||
+    normalizeLeadLikePhoneKey(row?.phone || '') ||
+    normalizeLeadLikePhoneKey(row?.tel || '') ||
+    normalizeLeadLikePhoneKey(row?.telefoon || '') ||
+    normalizeLeadLikePhoneKey(row?.contactPhone || '')
+  );
+}
+
+function getAppointmentCompanyKey(appointment) {
+  return normalizeCustomerSearchText(appointment?.company || appointment?.bedrijf || appointment?.contact || '');
+}
+
+function getCustomerCompanyKey(row) {
+  return normalizeCustomerSearchText(row?.bedrijf || row?.company || row?.companyName || row?.naam || row?.name || '');
+}
+
+function findCustomerDatabaseRowIndexForAppointment(rows, appointment) {
+  const phoneKey = getAppointmentPhoneKey(appointment);
+  if (phoneKey) {
+    const phoneIndex = rows.findIndex((row) => getCustomerPhoneKey(row) === phoneKey);
+    if (phoneIndex >= 0) return phoneIndex;
+  }
+
+  const companyKey = getAppointmentCompanyKey(appointment);
+  if (companyKey) {
+    const companyIndex = rows.findIndex((row) => getCustomerCompanyKey(row) === companyKey);
+    if (companyIndex >= 0) return companyIndex;
+  }
+
+  return -1;
+}
+
+function normalizeLifecycleDatabaseStatus(value) {
+  const key = String(value || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (key === 'klant' || key === 'customer') return 'klant';
+  if (key === 'afgehaakt' || key === 'geendeal' || key === 'nodeal' || key === 'lost') {
+    return 'afgehaakt';
+  }
+  return '';
+}
+
+function getLifecycleDatabaseStatusLabel(status) {
+  if (status === 'klant') return 'Klant geworden';
+  if (status === 'afgehaakt') return 'Afgehaakt na afspraak';
+  return 'Status bijgewerkt';
+}
+
+function inferAppointmentService(appointment) {
+  const hay = `${appointment?.branche || ''} ${appointment?.summary || ''}`.toLowerCase();
+  if (/bedrijfssoftware|business/.test(hay)) return 'bedrijfssoftware';
+  if (/voicesoftware|voice|belsoftware/.test(hay)) return 'voicesoftware';
+  if (/chatbot|chatbots/.test(hay)) return 'chatbot';
+  return 'website';
+}
+
+function buildCustomerDatabaseRowForLifecycleStatus(row, appointment, status, actor) {
+  const nowIso = new Date().toISOString();
+  const company = String(row?.bedrijf || row?.company || row?.companyName || appointment?.company || '').trim();
+  const contact = String(row?.naam || row?.contact || row?.contactName || appointment?.contact || company).trim();
+  const phone = String(
+    row?.telefoon || row?.tel || row?.phone || row?.contactPhone || appointment?.phone || appointment?.telefoon || ''
+  ).trim();
+  const history = Array.isArray(row?.hist) ? row.hist.filter(Boolean) : [];
+  const historyEntry = {
+    type: status,
+    label: getLifecycleDatabaseStatusLabel(status),
+    date: nowIso,
+    actor: String(actor || '').trim(),
+  };
+
+  return {
+    ...row,
+    id: String(row?.id || `customer-${Date.now().toString(36)}`).trim(),
+    naam: contact || company || 'Onbekend',
+    bedrijf: company || contact || 'Onbekend bedrijf',
+    tel: phone || row?.tel || row?.telefoon || '',
+    telefoon: phone || row?.telefoon || row?.tel || '',
+    email: String(row?.email || row?.contactEmail || appointment?.contactEmail || appointment?.email || '').trim(),
+    stad: String(row?.stad || row?.location || row?.address || appointment?.location || '').trim(),
+    branche: String(row?.branche || appointment?.branche || '').trim(),
+    website: String(row?.website || row?.dom || appointment?.domainName || appointment?.postCallDomainName || '').trim(),
+    service: String(row?.service || inferAppointmentService(appointment)).trim(),
+    databaseStatus: status,
+    updatedAt: nowIso,
+    hist: history.concat(historyEntry).slice(-20),
+  };
+}
+
 function createAgendaPostCallHelpers(deps = {}) {
   const {
     normalizeString = (value) => String(value || '').trim(),
@@ -204,6 +324,8 @@ function createAgendaPostCallCoordinator(deps = {}) {
     setUiStateValues = async () => null,
     premiumActiveOrdersScope = 'premium_active_orders',
     premiumActiveCustomOrdersKey = 'softora_custom_orders_premium_v1',
+    premiumCustomersScope = 'premium_customers_database',
+    premiumCustomersKey = 'softora_customers_premium_v1',
     logger = console,
     helpers = null,
   } = deps;
@@ -226,7 +348,65 @@ function createAgendaPostCallCoordinator(deps = {}) {
     parseCustomOrdersFromUiState,
   } = resolvedHelpers;
 
-  function updateAgendaAppointmentPostCallDataById(req, res, appointmentIdRaw) {
+  async function syncPremiumCustomerDatabaseStatusFromAppointment(appointment, lifecycleStatus, actor) {
+    const status = normalizeLifecycleDatabaseStatus(lifecycleStatus);
+    if (!status || !appointment || typeof appointment !== 'object') {
+      return { ok: false, skipped: true, reason: 'invalid_input' };
+    }
+
+    try {
+      const currentState = await getUiStateValues(premiumCustomersScope);
+      const currentValues =
+        currentState && currentState.values && typeof currentState.values === 'object'
+          ? currentState.values
+          : {};
+      const rows = parseCustomerDatabaseRows(currentValues[premiumCustomersKey]);
+      const rowIndex = findCustomerDatabaseRowIndexForAppointment(rows, appointment);
+
+      const nextRows = rows.slice();
+      const currentRow = rowIndex >= 0 ? rows[rowIndex] : {};
+      const nextRow = buildCustomerDatabaseRowForLifecycleStatus(
+        currentRow,
+        appointment,
+        status,
+        actor
+      );
+
+      if (rowIndex >= 0) {
+        nextRows[rowIndex] = nextRow;
+      } else {
+        nextRows.push(nextRow);
+      }
+
+      const nextValues = {
+        ...currentValues,
+        [premiumCustomersKey]: JSON.stringify(nextRows),
+      };
+      const saved = await setUiStateValues(premiumCustomersScope, nextValues, {
+        source: 'premium-personeel-agenda',
+        actor,
+      });
+
+      if (!saved) {
+        return { ok: false, skipped: false, reason: 'save_failed', status };
+      }
+
+      return {
+        ok: true,
+        skipped: false,
+        status,
+        matchedExisting: rowIndex >= 0,
+        customerCount: nextRows.length,
+      };
+    } catch (error) {
+      if (logger && typeof logger.error === 'function') {
+        logger.error('[Agenda][CustomerDatabaseStatusSyncError]', error?.message || error);
+      }
+      return { ok: false, skipped: false, reason: 'exception', status };
+    }
+  }
+
+  async function updateAgendaAppointmentPostCallDataById(req, res, appointmentIdRaw) {
     const idx = getGeneratedAppointmentIndexById(appointmentIdRaw);
     if (idx < 0) {
       return res.status(404).json({ ok: false, error: 'Afspraak niet gevonden' });
@@ -276,9 +456,27 @@ function createAgendaPostCallCoordinator(deps = {}) {
       'dashboard_activity_post_call_saved'
     );
 
+    const shouldMarkAfgehaakt = normalizeLifecycleDatabaseStatus(req.body?.status) === 'afgehaakt';
+    const databaseSync = shouldMarkAfgehaakt
+      ? await syncPremiumCustomerDatabaseStatusFromAppointment(
+          updated || appointment,
+          'afgehaakt',
+          payload.postCallUpdatedBy || ''
+        )
+      : null;
+    if (databaseSync && databaseSync.ok !== true) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Afspraak opgeslagen, maar database-status kon niet worden bijgewerkt.',
+        appointment: updated,
+        databaseSync,
+      });
+    }
+
     return res.status(200).json({
       ok: true,
       appointment: updated,
+      databaseSync,
     });
   }
 
@@ -449,11 +647,28 @@ function createAgendaPostCallCoordinator(deps = {}) {
       'dashboard_activity_active_order_added'
     );
 
+    const databaseSync = await syncPremiumCustomerDatabaseStatusFromAppointment(
+      updatedAppointment || appointment,
+      'klant',
+      actor
+    );
+    if (databaseSync.ok !== true) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Dossier aangemaakt, maar database-status kon niet worden bijgewerkt.',
+        order: existingOrder,
+        appointment: updatedAppointment,
+        alreadyExisted: hadExistingOrder,
+        databaseSync,
+      });
+    }
+
     return res.status(200).json({
       ok: true,
       order: existingOrder,
       appointment: updatedAppointment,
       alreadyExisted: hadExistingOrder,
+      databaseSync,
     });
   }
 

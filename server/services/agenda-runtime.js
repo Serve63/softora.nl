@@ -321,6 +321,8 @@ function createAgendaRuntime(deps = {}) {
     setUiStateValues,
     premiumActiveOrdersScope,
     premiumActiveCustomOrdersKey,
+    premiumCustomersScope: deps.premiumCustomersScope,
+    premiumCustomersKey: deps.premiumCustomersKey,
     helpers: agendaPostCallHelpers,
   });
 

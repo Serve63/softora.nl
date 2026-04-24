@@ -1294,7 +1294,8 @@
             const img = document.createElement("img");
             img.src = avatarDataUrl;
             img.alt = String((session && session.displayName) || "Profielfoto");
-            img.loading = "lazy";
+            img.loading = "eager";
+            img.decoding = "async";
             avatarEl.appendChild(img);
             return;
         }
@@ -1687,6 +1688,10 @@
         if (document.documentElement.dataset.premiumSidebarProfileInit === "1") return;
         document.documentElement.dataset.premiumSidebarProfileInit = "1";
         const triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
+        if (!triggerEl) {
+            markPremiumSidebarProfileResolved();
+            return;
+        }
         if (triggerEl && String(triggerEl.tagName || "").toLowerCase() === "button") {
             if (triggerEl.dataset.profileInit !== "1") {
                 triggerEl.dataset.profileInit = "1";

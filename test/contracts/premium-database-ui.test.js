@@ -31,7 +31,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /font-family: 'Inter', sans-serif;/);
   assert.match(pageSource, /\.page-title \{[\s\S]*font-family: 'Oswald', sans-serif;/);
   assert.match(pageSource, /<div class="page-title">Database<\/div>/);
-  assert.match(pageSource, /<button class="btn prim" id="addButton" type="button">[\s\S]*Toevoegen/);
+  assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Toevoegen/);
+  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);
@@ -55,4 +56,24 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /fetchUiStateSetWithFallback\(CUSTOMER_DB_SCOPE/);
   assert.match(pageSource, /source: "premium-database"/);
   assert.match(pageSource, /actor: "Premium database"/);
+});
+
+test('premium database page exposes interesse as a lead-status step', () => {
+  const pagePath = path.join(__dirname, '../../premium-database.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(
+    pageSource,
+    /<button class="sf-btn" data-s="gemaild" type="button">Gemaild<\/button>\s*<button class="sf-btn" data-s="interesse" type="button">Interesse<\/button>\s*<button class="sf-btn" data-s="afspraak" type="button">Afspraak<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt<\/button>/
+  );
+  assert.match(pageSource, /<option value="interesse">Interesse<\/option>/);
+  assert.match(pageSource, /<option value="afgehaakt">Afgehaakt<\/option>/);
+  assert.match(pageSource, /const DATABASE_STATUS_OPTIONS = \[[^\]]*"interesse"[^\]]*\];/);
+  assert.match(pageSource, /const DATABASE_STATUS_OPTIONS = \[[^\]]*"afgehaakt"[^\]]*\];/);
+  assert.match(pageSource, /interesse: "Interesse getoond"/);
+  assert.match(pageSource, /afgehaakt: "Afgehaakt na interesse"/);
+  assert.match(pageSource, /interesse: "Interesse"/);
+  assert.match(pageSource, /afgehaakt: "Afgehaakt"/);
+  assert.match(pageSource, /\.s-interesse \.s-label \{ color: var\(--green\); font-weight: 700; \}/);
+  assert.match(pageSource, /\.s-afgehaakt \.s-label \{ color: var\(--red\); font-weight: 700; \}/);
 });

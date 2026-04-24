@@ -31,3 +31,15 @@ test('premium boekhouding anchors deadlines to official upcoming ranges', () => 
   assert.match(pageSource, /function changeYear\(d\) \{ year = clampYear\(year \+ d\); renderList\(\); \}/);
   assert.match(pageSource, /return ALL_AANGIFTES\.filter\(a => Number\(String\(a\.deadline\)\.slice\(0,4\)\) === y\);/);
 });
+
+test('premium boekhouding bewaart gedeelde invoer via Supabase ui-state', () => {
+  const pagePath = path.join(__dirname, '../../premium-boekhouding.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /const REMOTE_UI_STATE_SCOPE = 'premium_bookkeeping';/);
+  assert.match(pageSource, /\/api\/ui-state-get\?scope=\$\{encodedScope\}/);
+  assert.match(pageSource, /\/api\/ui-state\/\$\{encodedScope\}/);
+  assert.match(pageSource, /source: 'premium-boekhouding'/);
+  assert.doesNotMatch(pageSource, /localStorage/);
+  assert.doesNotMatch(pageSource, /sessionStorage/);
+});

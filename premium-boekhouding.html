@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260424a">
 <script>
   (function () {
     document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -22,10 +22,11 @@
     }
   })();
 </script>
-<script src="assets/personnel-theme.js?v=20260423b" defer></script>
+<script src="assets/personnel-theme.js?v=20260424a" defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
+  --bg: #f6f2ec;
   --card: var(--bg-secondary);
   --tag: rgba(139, 34, 82, 0.06);
   --border: var(--border);
@@ -243,7 +244,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
             </div>
           </div>
         </aside>
-        <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
+        <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
 <main class="main-content is-premium-boot-host">
 <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
   <div class="premium-boot-spinner" aria-hidden="true">
@@ -309,11 +310,90 @@ let year = new Date().getFullYear();
 let openId = null;
 
 // STATE
-function load() { try { return JSON.parse(localStorage.getItem('bkh3')||'{}'); } catch { return {}; } }
-function save() { try { localStorage.setItem('bkh3', JSON.stringify(st)); } catch {} }
-let st = load();
+const REMOTE_UI_STATE_SCOPE = 'premium_bookkeeping';
+const REMOTE_UI_STATE_KEY = 'softora_premium_bookkeeping_state_v1';
+let st = {};
+
+async function fetchUiStateGet(scope) {
+  const encodedScope = encodeURIComponent(String(scope || ''));
+  const urls = [
+    `/api/ui-state-get?scope=${encodedScope}`,
+    `/api/ui-state/${encodedScope}`
+  ];
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+      if (!response.ok) throw new Error(`UI-state GET mislukt (${response.status})`);
+      return await response.json().catch(function () { return {}; });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('UI-state GET mislukt');
+}
+
+async function fetchUiStateSet(scope, body) {
+  const encodedScope = encodeURIComponent(String(scope || ''));
+  const urls = [
+    `/api/ui-state-set?scope=${encodedScope}`,
+    `/api/ui-state/${encodedScope}`
+  ];
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      });
+      if (!response.ok) throw new Error(`UI-state POST mislukt (${response.status})`);
+      return await response.json().catch(function () { return {}; });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('UI-state POST mislukt');
+}
+
+function parseRemoteState(raw) {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(String(raw));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+async function loadRemoteState() {
+  try {
+    const state = await fetchUiStateGet(REMOTE_UI_STATE_SCOPE);
+    st = parseRemoteState(state && state.values && state.values[REMOTE_UI_STATE_KEY]);
+  } catch (error) {
+    console.error('Boekhouding laden via Supabase mislukt:', error);
+    showToast('Boekhouding kon niet centraal laden');
+    st = {};
+  }
+}
+
+async function save() {
+  try {
+    await fetchUiStateSet(REMOTE_UI_STATE_SCOPE, {
+      patch: {
+        [REMOTE_UI_STATE_KEY]: JSON.stringify(st)
+      },
+      source: 'premium-boekhouding',
+      actor: 'browser'
+    });
+  } catch (error) {
+    console.error('Boekhouding opslaan via Supabase mislukt:', error);
+    showToast('Opslaan naar Supabase mislukt');
+  }
+}
+
 function entry(id) { return st[id] || { checked:false, files:[], notes:'' }; }
-function upd(id, d) { st[id] = { ...entry(id), ...d }; save(); }
+function upd(id, d) { st[id] = { ...entry(id), ...d }; void save(); }
 
 // AANGIFTES — BTW: kwartaalregeling Belastingdienst (Q1→30 apr, Q2→31 jul, Q3→31 okt, Q4→31 jan volgend jaar).
 // IB: belastingjaar J → uiterlijk 1 mei J+1 (standaard aangifteperiode; controleer eigen situatie op belastingdienst.nl).
@@ -567,7 +647,7 @@ function showToast(msg) {
   t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-renderList();
+void loadRemoteState().then(renderList);
 
 function finishPremiumShellBoot() {
   if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {

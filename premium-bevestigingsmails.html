@@ -28,7 +28,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260424a">
 <script>
     (function () {
         document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -57,8 +57,10 @@
         }
     })();
 </script>
-<script src="assets/personnel-theme.js?v=20260423b" defer></script>
+<script src="assets/personnel-theme.js?v=20260424a" defer></script>
 <script src="assets/ai-management-mode.js?v=20260423a" defer></script>
+<link rel="stylesheet" href="assets/custom-selects.css?v=20260421b">
+<script src="assets/custom-selects.js?v=20260421a" defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1070,7 +1072,7 @@ html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setti
             </div>
           </div>
         </aside>
-        <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
+        <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
 <main class="main-content">
 
 <!-- ══ SCHERM 0: AI BEHEER ══ -->
@@ -1156,59 +1158,7 @@ html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setti
   </div>
   <div class="page-section">
     <div class="page-section-inner">
-  <!-- ZONE KAARTEN -->
-    <div class="zones-row">
-      <div class="zone-card z1" onclick="openZone(1)">
-        <div class="zone-head">
-          <div class="zone-stat">
-            <div class="zone-badge">Zone 1</div>
-            <div class="zone-count" id="z1-count">0</div>
-          </div>
-          <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
-        </div>
-        <div class="zone-tooltip">Alle bedrijven die de eerste mail hebben ontvangen.</div>
-      </div>
-      <div class="zone-card z2" onclick="openZone(2)">
-        <div class="zone-head">
-          <div class="zone-stat">
-            <div class="zone-badge">Zone 2</div>
-            <div class="zone-count" id="z2-count">0</div>
-          </div>
-          <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
-        </div>
-        <div class="zone-tooltip">Bedrijven die een follow-up mail hebben ontvangen.</div>
-      </div>
-      <div class="zone-card z4" onclick="openZone(4)">
-        <div class="zone-head">
-          <div class="zone-stat">
-            <div class="zone-badge">Zone 4</div>
-            <div class="zone-count" id="z4-count">0</div>
-          </div>
-          <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
-        </div>
-        <div class="zone-tooltip">Bedrijven die meer dan 3 mails hebben ontvangen.</div>
-      </div>
-      <div class="zone-card z5" onclick="openZone(5)">
-        <div class="zone-head">
-          <div class="zone-stat">
-            <div class="zone-badge">Interesse</div>
-            <div class="zone-count" id="z5-count">0</div>
-          </div>
-          <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
-        </div>
-        <div class="zone-tooltip">Bedrijven die interesse hebben getoond.</div>
-      </div>
-      <div class="zone-card conv-card">
-        <div class="zone-head">
-          <div class="zone-stat">
-            <div class="zone-badge">Conversie</div>
-            <div class="zone-count" id="conv-zone-pct">0%</div>
-          </div>
-        </div>
-        <div class="zone-tooltip">Afspraken als percentage van alle verstuurde mails.</div>
-      </div>
-    </div>
-    <div style="padding-top:20px" class="bottom-grid">
+    <div class="bottom-grid">
 
     <!-- MAIL EDITOR -->
     <div class="card">
@@ -1294,7 +1244,7 @@ Softora.nl | +31 6 2991 7185</textarea>
       <!-- INSTELLINGEN -->
       <div class="mail-panel" id="mail-panel-5">
         <div class="mail-fields">
-          <div class="settings-intro">Stel hier in vanaf welk e-mailadres de coldmails worden verzonden en welke afzenderinformatie meegaat.</div>
+          <div class="settings-intro">Kies vanuit welke mailbox deze campagne verzendt en welke speciale handeling erbij hoort.</div>
           <div class="mf-row lead-generator-provider-setting">
             <div class="mf-label">AI-provider</div>
             <select class="mf-sel" id="coldcallingStack" aria-label="Coldcalling provider">
@@ -1313,46 +1263,16 @@ Softora.nl | +31 6 2991 7185</textarea>
             <div class="mf-help">Na deze looptijd ziet Softora de mailcampagne als afgerond en kan er weer een nieuwe starten.</div>
           </div>
           <div class="mf-row">
-            <div class="mf-label">Agendalimiet</div>
-            <label class="mf-check">
-              <input type="checkbox" id="campaign-full-workdays">
-              <span>Start campagne tot 10 werkdagen vol staan.</span>
-            </label>
-          </div>
-          <div class="settings-grid">
-            <div class="mf-row">
-              <div class="mf-label">Afzender naam</div>
-              <input class="mf-inp" type="text" id="sender-name" value="Servé Creusen">
-            </div>
-            <div class="mf-row">
-              <div class="mf-label">Afzender e-mail</div>
-              <input class="mf-inp" type="email" id="sender-email" value="info@softora.nl">
-            </div>
-            <div class="mf-row">
-              <div class="mf-label">Antwoordadres</div>
-              <input class="mf-inp" type="email" id="reply-email" value="info@softora.nl">
-            </div>
-            <div class="mf-row">
-              <div class="mf-label">Telefoonnummer</div>
-              <input class="mf-inp" type="text" id="sender-phone" value="+31 6 2991 7185">
-            </div>
-            <div class="mf-row">
-              <div class="mf-label">Bedrijfsnaam</div>
-              <input class="mf-inp" type="text" id="sender-company" value="Softora.nl">
-            </div>
-            <div class="mf-row">
-              <div class="mf-label">Domein / website</div>
-              <input class="mf-inp" type="text" id="sender-domain" value="www.softora.nl">
-            </div>
+            <div class="mf-label">Verzenden vanaf</div>
+            <select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">
+              <option value="info@softora.nl" selected>info@softora.nl</option>
+            </select>
           </div>
           <div class="mf-row">
-            <div class="mf-label">Handtekening</div>
-            <textarea class="mf-ta" id="sender-signature" style="height:180px">Met vriendelijke groet,
-
-Servé Creusen
-Softora.nl | +31 6 2991 7185
-info@softora.nl</textarea>
-            <div class="mf-help">Deze gegevens kun je later gebruiken als vaste afzenderinformatie voor alle coldmails.</div>
+            <div class="mf-label">Speciale handeling</div>
+            <select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">
+              <option value="webdesign" selected>webdesign</option>
+            </select>
           </div>
         </div>
       </div>
@@ -1417,9 +1337,9 @@ info@softora.nl</textarea>
           </select>
         </div>
 
-        <button class="btn-start" onclick="startCampagne()">
+        <button class="btn-start" id="start-campaign-btn" onclick="startCampagne()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          Campagne Starten
+          Mails Versturen
         </button>
       </div>
     </div>
@@ -1616,6 +1536,35 @@ function initCampaignDurationSetting() {
   });
 }
 
+async function initColdmailingMailboxOptions() {
+  if (isPremiumAiLeadGeneratorPath()) return;
+  const select = document.getElementById('campaignSenderEmail');
+  if (!select || select.dataset.mailboxOptionsLoaded === '1') return;
+  select.dataset.mailboxOptionsLoaded = '1';
+  try {
+    const response = await fetch('/api/coldmailing/mailbox-options', {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' },
+    });
+    const payload = await response.json().catch(() => null);
+    const emails = payload && Array.isArray(payload.senderEmails)
+      ? payload.senderEmails.filter(Boolean)
+      : [];
+    if (emails.length) {
+      select.innerHTML = '';
+      emails.forEach((email) => {
+        const option = document.createElement('option');
+        option.value = email;
+        option.textContent = email;
+        select.appendChild(option);
+      });
+      select.value = emails[0];
+    }
+  } catch (_) {
+    // De servermelding bij verzenden vertelt straks exact wat er ontbreekt.
+  }
+}
+
 function initLeadGeneratorProviderSetting() {
   if (!isPremiumAiLeadGeneratorPath()) return;
   const select = document.getElementById('coldcallingStack');
@@ -1775,6 +1724,7 @@ let campTotal = 0;
 let campaignTimeline = [];
 let campaignStepIndex = -1;
 let campaignFinished = false;
+let campaignSendInProgress = false;
 
 async function notifyColdmailingCampaignAfronden() {
   if (!('Notification' in window)) return;
@@ -2012,13 +1962,65 @@ function advanceCampaignTimeline() {
   if (step.complete) completeCampaign();
 }
 
-function startCampagne() {
+function setCampaignStartButtonBusy(isBusy) {
+  const button = document.getElementById('start-campaign-btn');
+  if (!button) return;
+  button.disabled = Boolean(isBusy);
+  button.style.opacity = isBusy ? '.72' : '';
+  button.style.cursor = isBusy ? 'wait' : '';
+  button.innerHTML = isBusy
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg> Verzenden...'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Mails Versturen';
+}
+
+function getColdmailCampaignPayload() {
+  const branchSelect = document.getElementById('branche');
+  const serviceSelect = document.getElementById('service');
+  const databaseSelect = document.getElementById('database');
+  const senderSelect = document.getElementById('campaignSenderEmail');
+  const specialActionSelect = document.getElementById('campaignSpecialAction');
+  return {
+    count: parseInt(document.getElementById('mail-slider').value, 10) || 10,
+    subject: document.getElementById('subj1') ? document.getElementById('subj1').value : '',
+    body: document.getElementById('body1') ? document.getElementById('body1').value : '',
+    branch: branchSelect ? branchSelect.value : '',
+    service: serviceSelect ? serviceSelect.value : '',
+    database: databaseSelect ? databaseSelect.value : '',
+    senderEmail: senderSelect ? senderSelect.value : '',
+    specialAction: specialActionSelect ? specialActionSelect.value : '',
+    durationDays: getSelectedCampaignDurationDays(),
+  };
+}
+
+async function sendColdmailCampaignNow() {
+  const response = await fetch('/api/coldmailing/campaigns/send', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(getColdmailCampaignPayload()),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload || payload.ok === false) {
+    const message = payload && payload.message
+      ? payload.message
+      : 'Mails versturen is mislukt.';
+    const error = new Error(message);
+    error.payload = payload;
+    throw error;
+  }
+  return payload;
+}
+
+async function startCampagne() {
   if (running) return;
   if (isPremiumAiLeadGeneratorPath()) {
     void startCampagneWithLeadGeneratorBoot();
     return;
   }
-  startCampagneImmediate();
+  await startCampagneImmediate();
 }
 
 async function startCampagneWithLeadGeneratorBoot() {
@@ -2031,7 +2033,7 @@ async function startCampagneWithLeadGeneratorBoot() {
   const pctEl = document.getElementById('campaign-boot-pct');
   try {
     if (!overlay) {
-      startCampagneImmediate();
+      void startCampagneImmediate();
       return;
     }
     overlay.hidden = false;
@@ -2081,25 +2083,60 @@ async function startCampagneWithLeadGeneratorBoot() {
     overlay.hidden = true;
     overlay.setAttribute('aria-hidden', 'true');
     if (barFill) barFill.style.width = '0%';
-    startCampagneImmediate();
+    void startCampagneImmediate();
   } finally {
     campaignBootInProgress = false;
   }
 }
 
-function startCampagneImmediate() {
-  if (running) return;
+async function startCampagneImmediate() {
+  if (running || campaignSendInProgress) return;
   const n = parseInt(document.getElementById('mail-slider').value, 10) || 100;
   const durationDays = getSelectedCampaignDurationDays();
   const durationLabel = formatCampaignDurationLabel(durationDays);
-  const fillWorkdays = !!document.getElementById('campaign-full-workdays')?.checked;
   const providerSuffix = isPremiumAiLeadGeneratorPath()
     ? ' Provider: ' + getSelectedColdcallingStackLabel() + '.'
     : '';
+  let sendResult = null;
 
-  bedrijven = genBedrijven(n);
-  campTotal = n;
-  campaignTimeline = buildCampaignTimeline(n, durationDays);
+  if (!isPremiumAiLeadGeneratorPath()) {
+    campaignSendInProgress = true;
+    setCampaignStartButtonBusy(true);
+    try {
+      showToast('Mails worden verstuurd...');
+      sendResult = await sendColdmailCampaignNow();
+      if (!sendResult.sent) {
+        throw new Error('Er zijn geen mails verstuurd.');
+      }
+      const failedSuffix = sendResult.failed ? ' (' + sendResult.failed + ' mislukt)' : '';
+      showToast('✓ ' + sendResult.sent + ' mails verstuurd' + failedSuffix);
+    } catch (error) {
+      showToast(String(error && error.message || 'Mails versturen is mislukt.'));
+      return;
+    } finally {
+      campaignSendInProgress = false;
+      setCampaignStartButtonBusy(false);
+    }
+  }
+
+  const actualTotal = sendResult && Number.isFinite(Number(sendResult.sent))
+    ? Number(sendResult.sent)
+    : n;
+
+  bedrijven = genBedrijven(actualTotal);
+  if (sendResult && Array.isArray(sendResult.sentItems) && sendResult.sentItems.length) {
+    bedrijven = sendResult.sentItems.map((item, index) => ({
+      id: index + 1,
+      naam: item.bedrijf || item.email || ('Bedrijf ' + (index + 1)),
+      domain: String(item.email || '').split('@')[1] || 'onbekend.nl',
+      branche: document.getElementById('branche') ? (document.getElementById('branche').value || 'Overig') : 'Overig',
+      stad: 'Database',
+      zone: 1,
+      laatste_mail: new Date().toLocaleDateString('nl-NL', {day:'2-digit',month:'short',year:'numeric'})
+    }));
+  }
+  campTotal = actualTotal;
+  campaignTimeline = buildCampaignTimeline(actualTotal, durationDays);
   campaignStepIndex = -1;
   campaignFinished = false;
   running = true;
@@ -2107,13 +2144,9 @@ function startCampagneImmediate() {
   const countMode = getCampaignCountMode();
   const timelineTitle = document.getElementById('campaign-timeline-title');
   if (timelineTitle) timelineTitle.textContent = durationLabel + ' tijdlijn';
-  document.getElementById('campaign-subtitle').textContent = fillWorkdays
-    ? countMode === 'appointments'
-      ? `${n} afspraken inplannen binnen deze campagne van ${durationLabel}, tenzij de agenda eerder al 10 werkdagen vol staat.${providerSuffix}`
-      : `${n} bedrijven doorlopen deze campagne in ${durationLabel}, tenzij de agenda eerder al 10 werkdagen vol staat.${providerSuffix}`
-    : countMode === 'appointments'
-      ? `${n} afspraken inplannen binnen deze campagne van ${durationLabel}, van eerste benadering tot laatste checkpoint.${providerSuffix}`
-      : `${n} bedrijven doorlopen deze campagne in ${durationLabel}, van eerste verzending tot laatste checkpoint.${providerSuffix}`;
+  document.getElementById('campaign-subtitle').textContent = countMode === 'appointments'
+    ? `${actualTotal} afspraken inplannen binnen deze campagne van ${durationLabel}, van eerste benadering tot laatste checkpoint.${providerSuffix}`
+    : `${actualTotal} bedrijven doorlopen deze campagne in ${durationLabel}, van eerste verzending tot laatste checkpoint.${providerSuffix}`;
 
   showScreen('screen-campaign');
   document.getElementById('campaign-progress-fill').style.width = '0%';
@@ -2419,7 +2452,7 @@ applyPremiumAiLeadGeneratorShell();
 applyPremiumAiLeadGeneratorBelmethodeRow();
 initCampaignDurationSetting();
 initLeadGeneratorProviderSetting();
-initCampaignSelects();
+initColdmailingMailboxOptions().finally(initCampaignSelects);
 </script>
 
 <!-- ZONE POPUP -->

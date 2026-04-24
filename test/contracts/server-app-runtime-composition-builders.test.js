@@ -79,6 +79,14 @@ test('server app runtime composition builders preserve feature wiring groups and
       PREMIUM_SESSION_SECRET: 'secret',
       PREMIUM_SESSION_TTL_HOURS: 8,
       PREMIUM_SESSION_REMEMBER_TTL_DAYS: 30,
+      MAIL_SMTP_HOST: 'smtp.softora.test',
+      MAIL_SMTP_PORT: 587,
+      MAIL_SMTP_SECURE: false,
+      MAIL_SMTP_USER: 'info@softora.test',
+      MAIL_SMTP_PASS: 'mail-pass',
+      MAIL_FROM_ADDRESS: 'info@softora.test',
+      MAIL_FROM_NAME: 'Softora',
+      MAIL_REPLY_TO: 'reply@softora.test',
     },
     bootstrapState: {
       PREMIUM_ACTIVE_ORDERS_SCOPE: 'premium_active_orders',
@@ -185,6 +193,7 @@ test('server app runtime composition builders preserve feature wiring groups and
     },
     uiSeoRuntime: {
       getUiStateValues: async () => ({}),
+      setUiStateValues: async () => ({}),
       websiteLinkCoordinator: {},
       websitePreviewLibraryCoordinator: {},
       runtimeOpsCoordinator: {},
@@ -237,6 +246,19 @@ test('server app runtime composition builders preserve feature wiring groups and
     context.featureRouteOptions.coldcalling.runtimeStateSupabaseSyncCooldownMs,
     4000
   );
+  assert.equal(
+    context.featureRouteOptions.coldcalling.getUiStateValues,
+    context.aiDashboardOptions.getUiStateValues
+  );
+  assert.equal(context.featureRouteOptions.coldcalling.premiumCustomersScope, 'premium_customers');
+  assert.equal(context.featureRouteOptions.coldcalling.premiumCustomersKey, 'customers_key');
+  assert.equal(context.featureRouteOptions.coldcalling.premiumActiveOrdersScope, 'premium_active_orders');
+  assert.equal(context.featureRouteOptions.coldcalling.premiumActiveCustomOrdersKey, 'custom_orders');
+  assert.equal(context.featureRouteOptions.coldcalling.logger, console);
+  assert.equal(context.featureRouteOptions.coldmailing.coldmailCampaignService.isSmtpMailConfigured(), true);
+  assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
+    'info@softora.test',
+  ]);
 
   await context.aiDashboardOptions.ensureDashboardChatRuntimeReady();
   assert.equal(hydratedAttempts, 1);

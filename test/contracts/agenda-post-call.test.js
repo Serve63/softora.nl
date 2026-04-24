@@ -224,8 +224,56 @@ test('agenda post-call coordinator adds a new active order and links it back to 
   assert.equal(res.body.order.contactPhone, '0612345678');
   assert.equal(appointments[0].activeOrderId, 1);
   assert.equal(appointments[0].activeOrderAddedBy, 'Serve');
-  assert.equal(uiStateWrites.length, 1);
+  assert.equal(uiStateWrites.length, 2);
   assert.equal(uiStateWrites[0].scope, 'premium_active_orders');
   assert.match(uiStateWrites[0].values.softora_custom_orders_premium_v1, /Softora/);
+  assert.equal(uiStateWrites[1].scope, 'premium_customers_database');
+  assert.match(uiStateWrites[1].values.softora_customers_premium_v1, /"databaseStatus":"klant"/);
   assert.equal(activityCalls[0].reason, 'dashboard_activity_active_order_added');
+});
+
+test('agenda post-call coordinator marks the premium database row as afgehaakt after no deal', async () => {
+  const { coordinator, uiStateWrites } = createFixture({
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              {
+                id: 'customer-42',
+                naam: 'Serve Creusen',
+                bedrijf: 'Softora',
+                telefoon: '0612345678',
+                databaseStatus: 'afspraak',
+                hist: [],
+              },
+            ]),
+          },
+        };
+      }
+      return { values: {} };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.updateAgendaAppointmentPostCallDataById(
+    {
+      body: {
+        status: 'no_deal',
+        actor: 'Serve',
+      },
+    },
+    res,
+    '42'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.databaseSync.ok, true);
+  assert.equal(res.body.databaseSync.status, 'afgehaakt');
+  assert.equal(uiStateWrites.length, 1);
+  assert.equal(uiStateWrites[0].scope, 'premium_customers_database');
+  const savedRows = JSON.parse(uiStateWrites[0].values.softora_customers_premium_v1);
+  assert.equal(savedRows[0].databaseStatus, 'afgehaakt');
+  assert.equal(savedRows[0].hist[0].type, 'afgehaakt');
 });

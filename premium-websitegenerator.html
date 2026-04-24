@@ -8,7 +8,7 @@
 <title>Website Generator – Softora.nl</title>
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260424a">
 <script>
   (function () {
     document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -20,7 +20,7 @@
     }
   })();
 </script>
-<script src="assets/personnel-theme.js?v=20260423b" defer></script>
+<script src="assets/personnel-theme.js?v=20260424a" defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -300,7 +300,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
             </div>
           </div>
         </aside>
-        <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
+        <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
 <main class="main-content">
 <div class="page-shell">
 <div class="page-title">Website Generator</div>
@@ -333,7 +333,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
   <div class="card">
     <div class="card-head">
       <div class="card-title">Bibliotheek</div>
-      <div class="card-sub">Elke preview die je maakt via Website Scan &amp; Preview (AI-foto-api) wordt hier automatisch opgeslagen in <strong>Supabase</strong>, gekoppeld aan je premium-account. Bij een tijdelijke serverfout kun je nog steeds een lokale kopie in je browser hebben.</div>
+      <div class="card-sub">Elke preview die je maakt via Website Scan &amp; Preview (AI-foto-api) wordt hier automatisch opgeslagen in <strong>Supabase</strong>, gekoppeld aan je premium-account.</div>
     </div>
     <div class="card-body">
       <div id="library-empty" class="empty-state" style="padding: 48px 24px;">
@@ -341,7 +341,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
         <p>Nog geen opgeslagen previews. Genereer een preview onder Website Scan &amp; Preview — die verschijnt dan hier.</p>
       </div>
       <div id="library-grid" class="library-grid" style="display: none;" aria-live="polite"></div>
-      <p style="font-size: 11px; color: var(--text-light); margin-top: 18px; line-height: 1.5;">Maximaal 50 items per account. Als de limiet bereikt is, worden oudere previews automatisch verwijderd. Lokale browseropslag dient als reservekopie.</p>
+      <p style="font-size: 11px; color: var(--text-light); margin-top: 18px; line-height: 1.5;">Maximaal 50 items per account. Als de limiet bereikt is, worden oudere previews automatisch verwijderd.</p>
     </div>
   </div>
 </div>
@@ -417,7 +417,6 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
 </div>
 
 <script>
-const LIBRARY_STORAGE_KEY = 'softora_website_preview_library_v1';
 const LIBRARY_MAX_ITEMS = 50;
 let websitePreviewLibraryRemoteEntries = null;
 let websitePreviewLibraryUseRemote = false;
@@ -436,43 +435,19 @@ function isSafeLibraryDataUrl(value) {
   return typeof value === 'string' && value.startsWith('data:image/') && value.length < 12 * 1024 * 1024;
 }
 
-function readLocalLibraryEntries() {
-  try {
-    const raw = localStorage.getItem(LIBRARY_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-function persistLocalLibraryEntries(entries) {
-  try {
-    localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(entries));
-    return true;
-  } catch (_) {
-    try {
-      const half = entries.slice(0, Math.max(1, Math.floor(entries.length / 2)));
-      localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(half));
-      showToast('Bibliotheek ingekort (browseropslag bijna vol).');
-      return true;
-    } catch (_) {
-      showToast('Preview kon niet worden opgeslagen in de bibliotheek.');
-      return false;
-    }
-  }
-}
-
 function loadLibraryEntries() {
   if (websitePreviewLibraryUseRemote && Array.isArray(websitePreviewLibraryRemoteEntries)) {
     return websitePreviewLibraryRemoteEntries.slice();
   }
-  return readLocalLibraryEntries();
+  return [];
 }
 
 async function maybeHydrateWebsitePreviewLibraryFromServer() {
-  if (!websiteGeneratorAuthState.authenticated) return;
+  if (!websiteGeneratorAuthState.authenticated) {
+    websitePreviewLibraryRemoteEntries = [];
+    websitePreviewLibraryUseRemote = true;
+    return;
+  }
   try {
     const response = await fetch('/api/website-preview-library', {
       method: 'GET',
@@ -486,12 +461,10 @@ async function maybeHydrateWebsitePreviewLibraryFromServer() {
     }
     websitePreviewLibraryRemoteEntries = Array.isArray(data.entries) ? data.entries : [];
     websitePreviewLibraryUseRemote = true;
-    try {
-      persistLocalLibraryEntries(websitePreviewLibraryRemoteEntries.slice(0, LIBRARY_MAX_ITEMS));
-    } catch (_) {}
   } catch (_) {
-    websitePreviewLibraryUseRemote = false;
-    websitePreviewLibraryRemoteEntries = null;
+    websitePreviewLibraryUseRemote = true;
+    websitePreviewLibraryRemoteEntries = [];
+    showToast('Bibliotheek kon niet centraal laden');
   }
 }
 
@@ -524,24 +497,17 @@ async function savePreviewToLibrary({ dataUrl, url, hostname, fileName, width, h
         const merged = [entry, ...(websitePreviewLibraryRemoteEntries || []).filter((x) => x.id !== entry.id)];
         websitePreviewLibraryRemoteEntries = merged.slice(0, LIBRARY_MAX_ITEMS);
         websitePreviewLibraryUseRemote = true;
-        try {
-          persistLocalLibraryEntries(loadLibraryEntries());
-        } catch (_) {}
         return;
       }
-    } catch (_) {}
+      showToast(String(data?.detail || data?.error || 'Preview opslaan mislukt'));
+      return;
+    } catch (_) {
+      showToast('Preview opslaan mislukt — controleer je verbinding.');
+      return;
+    }
   }
 
-  const list = readLocalLibraryEntries();
-  const entry = {
-    ...baseEntry,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-  };
-  list.unshift(entry);
-  const trimmed = list.slice(0, LIBRARY_MAX_ITEMS);
-  persistLocalLibraryEntries(trimmed);
-  websitePreviewLibraryUseRemote = false;
-  websitePreviewLibraryRemoteEntries = null;
+  showToast('Log eerst in om previews centraal op te slaan.');
 }
 
 function renderLibraryPanel() {
@@ -601,9 +567,6 @@ async function removeLibraryEntry(id, ev) {
         if (Array.isArray(websitePreviewLibraryRemoteEntries)) {
           websitePreviewLibraryRemoteEntries = websitePreviewLibraryRemoteEntries.filter((x) => x.id !== id);
         }
-        try {
-          persistLocalLibraryEntries(loadLibraryEntries());
-        } catch (_) {}
         renderLibraryPanel();
         showToast('Verwijderd uit bibliotheek');
         return;
@@ -621,12 +584,8 @@ async function removeLibraryEntry(id, ev) {
       return;
     }
   }
-  const next = readLocalLibraryEntries().filter((x) => x.id !== id);
-  persistLocalLibraryEntries(next);
-  websitePreviewLibraryUseRemote = false;
-  websitePreviewLibraryRemoteEntries = null;
   renderLibraryPanel();
-  showToast('Verwijderd uit bibliotheek');
+  showToast('Verwijderen kan alleen vanuit de centrale bibliotheek.');
 }
 
 function openLibraryEntry(id) {
@@ -645,9 +604,9 @@ function openLibraryEntry(id) {
       return 'preview';
     }
   })();
-  const w = Number(entry.width) || WEBSITE_PREVIEW_IMAGE_WIDTH;
-  const h = Number(entry.height) || WEBSITE_PREVIEW_IMAGE_HEIGHT;
-  mountScanPreviewUI(entry.dataUrl, entry.url, hostname, entry.fileName, w, h);
+  const previewWidth = Number(entry.width) || WEBSITE_PREVIEW_IMAGE_WIDTH;
+  const previewHeight = Number(entry.height) || WEBSITE_PREVIEW_IMAGE_HEIGHT;
+  mountScanPreviewUI(entry.dataUrl, entry.url, hostname, entry.fileName, previewWidth, previewHeight);
   showToast('Preview geopend');
 }
 
