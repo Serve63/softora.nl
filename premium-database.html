@@ -541,6 +541,27 @@
             filter: drop-shadow(0 5px 12px rgba(139, 34, 82, 0.28));
         }
 
+        .result-count-button {
+            border: 0;
+            padding: 0;
+            background: transparent;
+            color: var(--crimson);
+            cursor: pointer;
+            line-height: 0;
+            transition: transform .15s ease, filter .15s ease;
+        }
+
+        .result-count-button:hover {
+            transform: translateY(-1px) scale(1.05);
+            filter: drop-shadow(0 8px 18px rgba(139, 34, 82, 0.34));
+        }
+
+        .result-count-button:disabled {
+            cursor: wait;
+            opacity: .58;
+            transform: none;
+        }
+
         .tbl-wrap {
             padding: 0 48px 60px;
         }
@@ -1198,10 +1219,6 @@
                                     <svg class="btn-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                                 </button>
                                 <div class="add-actions-menu" id="addActionsMenu" role="menu">
-                                    <button class="add-actions-item" id="addWebdesignButton" type="button" role="menuitem">
-                                        <span class="add-actions-item-title">Webdesign</span>
-                                        <span class="add-actions-item-sub">Genereer AI-foto's voor bedrijven zonder foto</span>
-                                    </button>
                                     <button class="add-actions-item" id="addUploadButton" type="button" role="menuitem">
                                         <span class="add-actions-item-title">Uploaden</span>
                                         <span class="add-actions-item-sub">Importeer bedrijven vanuit een CSV-bestand</span>
@@ -1251,9 +1268,11 @@
                             <button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
-                            <svg class="result-count-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                <path fill="currentColor" d="M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z"/>
-                            </svg>
+                            <button class="result-count-button" id="generatePhotosButton" type="button" aria-label="Genereer AI-foto's voor bedrijven zonder foto">
+                                <svg class="result-count-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path fill="currentColor" d="M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z"/>
+                                </svg>
+                            </button>
                             <div class="f-count" id="f-count"></div>
                         </div>
                     </div>
@@ -1366,6 +1385,8 @@
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
+        const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";
+        const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";
         const ORDER_SCOPE = "premium_active_orders";
         const ORDER_KEY = "softora_custom_orders_premium_v1";
         const DATABASE_STATUS_OPTIONS = ["prospect", "gebeld", "gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten", "benaderbaar", "geengehoor"];
@@ -1408,7 +1429,7 @@
             addActions: document.getElementById("addActions"),
             addActionsMenu: document.getElementById("addActionsMenu"),
             addButton: document.getElementById("addButton"),
-            addWebdesignButton: document.getElementById("addWebdesignButton"),
+            generatePhotosButton: document.getElementById("generatePhotosButton"),
             addUploadButton: document.getElementById("addUploadButton"),
             addManualButton: document.getElementById("addManualButton"),
             importFileInput: document.getElementById("importFileInput"),
@@ -1835,7 +1856,12 @@
 
         function serializeCustomerList(customers) {
             return JSON.stringify(sortCustomers((customers || []).map(function (item, index) {
-                return normalizeCustomer(item, "serialize-" + index);
+                const normalized = normalizeCustomer(item, "serialize-" + index);
+                return {
+                    ...normalized,
+                    websitePhoto: "",
+                    websitePhotoName: ""
+                };
             })));
         }
 
@@ -1845,7 +1871,12 @@
 
         function persistCustomerList(customers) {
             const normalizedCustomers = sortCustomers(customers.map(function (item, index) {
-                return normalizeCustomer(item, "persist-" + index);
+                const normalized = normalizeCustomer(item, "persist-" + index);
+                return {
+                    ...normalized,
+                    websitePhoto: "",
+                    websitePhotoName: ""
+                };
             }));
 
             return fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
@@ -1853,6 +1884,83 @@
                     [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers)
                 },
                 source: "premium-database",
+                actor: "Premium database"
+            }).then(function () {
+                return { ok: true };
+            }).catch(function (error) {
+                return { ok: false, error: error };
+            });
+        }
+
+        function parseCustomerPhotoMap(raw) {
+            try {
+                const parsed = JSON.parse(String(raw || "{}"));
+                return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+            } catch (error) {
+                return {};
+            }
+        }
+
+        function buildCustomerPhotoMap(customers) {
+            const photoMap = {};
+            (customers || []).forEach(function (customer) {
+                const normalized = normalizeCustomer(customer, "photo-map");
+                if (!normalized.id || !shouldShowWebsitePhoto(normalized) || !isValidWebsitePhotoDataUrl(normalized.websitePhoto)) return;
+                photoMap[normalized.id] = {
+                    id: normalized.id,
+                    identityKey: buildCustomerIdentityKey(normalized),
+                    websitePhoto: normalized.websitePhoto,
+                    websitePhotoName: normalized.websitePhotoName || "Websitefoto",
+                    updatedAt: normalized.updatedAt || formatDateForStorage(new Date())
+                };
+            });
+            return photoMap;
+        }
+
+        function mergeCustomersWithPhotos(customers, photoMap) {
+            const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
+            const photosByIdentity = new Map();
+            Object.keys(photos).forEach(function (key) {
+                const item = photos[key];
+                const identityKey = normalizeString(item && item.identityKey);
+                if (identityKey && isValidWebsitePhotoDataUrl(item && item.websitePhoto)) {
+                    photosByIdentity.set(identityKey, item);
+                }
+            });
+
+            return sortCustomers((customers || []).map(function (customer, index) {
+                const normalized = normalizeCustomer(customer, "photo-merge-" + index);
+                if (!shouldShowWebsitePhoto(normalized)) {
+                    return { ...normalized, websitePhoto: "", websitePhotoName: "" };
+                }
+                const directPhoto = photos[normalized.id];
+                const identityPhoto = photosByIdentity.get(buildCustomerIdentityKey(normalized));
+                const photo = directPhoto || identityPhoto || null;
+                if (!photo || !isValidWebsitePhotoDataUrl(photo.websitePhoto)) return normalized;
+                return {
+                    ...normalized,
+                    websitePhoto: normalizeString(photo.websitePhoto),
+                    websitePhotoName: normalizeString(photo.websitePhotoName) || normalized.websitePhotoName || "Websitefoto"
+                };
+            }));
+        }
+
+        function loadCustomerPhotoMap() {
+            return fetchUiStateGetWithFallback(CUSTOMER_PHOTO_SCOPE).then(function (state) {
+                return parseCustomerPhotoMap(state && state.values && state.values[CUSTOMER_PHOTO_KEY]);
+            }).catch(function (error) {
+                console.error("Databasefoto's laden via Supabase mislukt:", error);
+                return {};
+            });
+        }
+
+        function persistCustomerPhotos(customers) {
+            const photoMap = buildCustomerPhotoMap(customers);
+            return fetchUiStateSetWithFallback(CUSTOMER_PHOTO_SCOPE, {
+                patch: {
+                    [CUSTOMER_PHOTO_KEY]: JSON.stringify(photoMap)
+                },
+                source: "premium-database-photos",
                 actor: "Premium database"
             }).then(function () {
                 return { ok: true };
@@ -2281,8 +2389,9 @@
                 }));
                 renderPage();
 
+                const photoResult = await persistCustomerPhotos(state.klanten);
                 const result = await persistCustomerList(state.klanten);
-                if (result.ok) {
+                if (photoResult.ok && result.ok) {
                     toast("Foto opgeslagen");
                     setStatusMessage("Foto opgeslagen.", "success", true);
                     return;
@@ -2353,57 +2462,67 @@
 
         async function generateWebdesignPhotos() {
             closeAddActions();
+            nodes.generatePhotosButton.disabled = true;
             const targets = getWebdesignPhotoTargets();
-            if (!targets.length) {
-                setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
-                return;
-            }
-
-            let done = 0;
-            let failed = 0;
-            setStatusMessage("Webdesign foto's genereren voor " + targets.length + " bedrijf" + (targets.length === 1 ? "" : "ven") + "...", "info");
-
-            for (const target of targets) {
-                try {
-                    setStatusMessage("AI-foto maken voor " + target.bedrijf + " (" + (done + failed + 1) + "/" + targets.length + ")...", "info");
-                    const generated = await generateWebsitePhotoData(target);
-                    state.klanten = sortCustomers(state.klanten.map(function (customer) {
-                        if (customer.id !== target.id) return customer;
-                        const nextHistory = Array.isArray(customer.hist) ? customer.hist.slice() : [];
-                        nextHistory.push({
-                            type: "webdesign_foto",
-                            label: "Webdesign AI-foto gegenereerd",
-                            date: formatDateForStorage(new Date())
-                        });
-                        return normalizeCustomer({
-                            ...customer,
-                            websitePhoto: generated.dataUrl,
-                            websitePhotoName: generated.fileName,
-                            hist: nextHistory,
-                            updatedAt: formatDateForStorage(new Date())
-                        }, customer.id);
-                    }));
-                    done += 1;
-                    renderPage();
-                } catch (error) {
-                    failed += 1;
-                    console.error("Webdesign foto genereren mislukt:", error);
+            try {
+                if (!targets.length) {
+                    setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
+                    return;
                 }
-            }
 
-            if (!done) {
-                setStatusMessage("Geen AI-foto's opgeslagen. Controleer of de websites bereikbaar zijn.", "error");
-                return;
-            }
+                let done = 0;
+                let failed = 0;
+                setStatusMessage("Webdesign foto's genereren voor " + targets.length + " bedrijf" + (targets.length === 1 ? "" : "ven") + "...", "info");
 
-            const result = await persistCustomerList(state.klanten);
-            if (!result.ok) {
-                setStatusMessage("AI-foto's staan in beeld, maar opslaan in Supabase mislukte.", "error");
-                return;
-            }
+                for (const target of targets) {
+                    try {
+                        setStatusMessage("AI-foto maken voor " + target.bedrijf + " (" + (done + failed + 1) + "/" + targets.length + ")...", "info");
+                        const generated = await generateWebsitePhotoData(target);
+                        state.klanten = sortCustomers(state.klanten.map(function (customer) {
+                            if (customer.id !== target.id) return customer;
+                            const nextHistory = Array.isArray(customer.hist) ? customer.hist.slice() : [];
+                            nextHistory.push({
+                                type: "webdesign_foto",
+                                label: "Webdesign AI-foto gegenereerd",
+                                date: formatDateForStorage(new Date())
+                            });
+                            return normalizeCustomer({
+                                ...customer,
+                                websitePhoto: generated.dataUrl,
+                                websitePhotoName: generated.fileName,
+                                hist: nextHistory,
+                                updatedAt: formatDateForStorage(new Date())
+                            }, customer.id);
+                        }));
+                        done += 1;
+                        renderPage();
+                    } catch (error) {
+                        failed += 1;
+                        console.error("Webdesign foto genereren mislukt:", error);
+                    }
+                }
 
-            toast(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen");
-            setStatusMessage(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen" + (failed ? ", " + failed + " mislukt." : "."), failed ? "info" : "success", true);
+                if (!done) {
+                    setStatusMessage("Geen AI-foto's opgeslagen. Controleer of de websites bereikbaar zijn.", "error");
+                    return;
+                }
+
+                const photoResult = await persistCustomerPhotos(state.klanten);
+                const result = await persistCustomerList(state.klanten);
+                if (!photoResult.ok) {
+                    setStatusMessage("AI-foto's staan in beeld, maar opslaan in Supabase mislukte.", "error");
+                    return;
+                }
+                if (!result.ok) {
+                    setStatusMessage("AI-foto's opgeslagen, maar databasegeschiedenis opslaan mislukte.", "info", true);
+                    return;
+                }
+
+                toast(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen");
+                setStatusMessage(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen" + (failed ? ", " + failed + " mislukt." : "."), failed ? "info" : "success", true);
+            } finally {
+                nodes.generatePhotosButton.disabled = false;
+            }
         }
 
         function resetModal() {
@@ -2709,11 +2828,14 @@
                         console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
                     }
 
-                    if (customerListsDiffer(enrichedCustomers) || !hadBootstrapCustomers) {
-                        state.klanten = enrichedCustomers;
+                    const photoMap = await loadCustomerPhotoMap();
+                    const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap);
+
+                    if (customerListsDiffer(customersWithPhotos) || !hadBootstrapCustomers) {
+                        state.klanten = customersWithPhotos;
                         renderPage();
                     } else {
-                        state.klanten = enrichedCustomers;
+                        state.klanten = customersWithPhotos;
                     }
 
                     setStatusMessage("");
@@ -2727,7 +2849,10 @@
                 const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
                 const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
                 state.orders = Array.isArray(orders) ? orders : [];
-                const importedCustomers = deriveCustomersFromOrders(orders);
+                const importedCustomers = mergeCustomersWithPhotos(
+                    deriveCustomersFromOrders(orders),
+                    await loadCustomerPhotoMap()
+                );
 
                 if (customerListsDiffer(importedCustomers) || !hadBootstrapCustomers) {
                     state.klanten = importedCustomers;
@@ -2839,7 +2964,7 @@
             event.stopPropagation();
             toggleAddActions();
         });
-        nodes.addWebdesignButton.addEventListener("click", function () {
+        nodes.generatePhotosButton.addEventListener("click", function () {
             void generateWebdesignPhotos();
         });
         nodes.addUploadButton.addEventListener("click", function () {

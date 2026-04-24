@@ -34,10 +34,12 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /thead th:nth-child\(10\), tbody td:nth-child\(10\) \{[\s\S]*width: 70px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
   assert.match(pageSource, /class="result-count-stack" aria-label="Aantal resultaten"/);
+  assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="result-count-icon"/);
   assert.match(pageSource, /<div class="page-title">Database<\/div>/);
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
-  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Webdesign[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
+  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
+  assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.match(pageSource, /<th data-sort-key="email">Mailadres<\/th>/);
   assert.match(pageSource, /<th data-sort-key="tel">Telefoonnummer<\/th>/);
@@ -49,6 +51,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /<th>Foto<\/th>/);
   assert.match(pageSource, /colspan=\\"10\\"/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
+  assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
+  assert.match(pageSource, /const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";/);
   assert.match(pageSource, /websitePhoto: normalizeString\(raw && \(raw\.websitePhoto \|\| raw\.photo \|\| raw\.websiteImage\)\)/);
   assert.match(pageSource, /function shouldShowWebsitePhoto\(customer\)/);
   assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
@@ -58,6 +62,9 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /data-has-photo=\\"/);
   assert.match(pageSource, /function openWebsitePhotoPreview\(customerId\)/);
   assert.match(pageSource, /function prepareWebsitePhotoForStorage\(dataUrl, fileName\)/);
+  assert.match(pageSource, /function persistCustomerPhotos\(customers\)/);
+  assert.match(pageSource, /function mergeCustomersWithPhotos\(customers, photoMap\)/);
+  assert.match(pageSource, /function loadCustomerPhotoMap\(\)/);
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 900, 1350, 0\.76\)/);
   assert.match(pageSource, /<div class="photo-preview" id="photoPreview"/);
   assert.match(pageSource, /function readImageFileAsDataUrl\(file\)/);
@@ -65,7 +72,7 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /function generateWebdesignPhotos\(\)/);
   assert.match(pageSource, /shouldShowWebsitePhoto\(customer\) && !isValidWebsitePhotoDataUrl\(customer\.websitePhoto\)/);
   assert.match(pageSource, /fetch\("\/api\/website-preview\/generate"/);
-  assert.match(pageSource, /nodes\.addWebdesignButton\.addEventListener\("click"/);
+  assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);
