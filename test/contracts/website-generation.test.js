@@ -44,6 +44,8 @@ test('website generation helpers build preview prompt, brief and filename from s
   };
 
   const prompt = helpers.buildWebsitePreviewPromptFromScan(scan);
+  const designDna = helpers.buildWebsitePreviewDesignDnaFromScan(scan);
+  const designDnaLock = helpers.formatWebsitePreviewDesignDnaLock(scan);
   const brief = helpers.buildWebsitePreviewBriefFromScan(scan);
   const fileName = helpers.buildWebsitePreviewDownloadFileName(scan);
 
@@ -51,6 +53,11 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /Bekijk eerst de website grondig/i);
   assert.match(prompt, /welke CTA’s belangrijk zijn/i);
   assert.match(prompt, /bestaande site daarna als de harde bron van waarheid/i);
+  assert.match(prompt, /DESIGN-DNA LOCK \(verplicht volgen, niet negeren\):/);
+  assert.match(prompt, /Bronmerk\/URL: softora\.nl\./);
+  assert.match(prompt, /Verplicht kleurenpalet\/kleurfamilie: #8b2252 \| #a62d65 \| #f8f7f4 \| #1a1a2e/);
+  assert.match(prompt, /Content\/propositie die herkenbaar terug moet komen:/);
+  assert.match(prompt, /Verboden drift: Geen rebrand, geen ander kleurenpalet/);
   assert.match(prompt, /verbeterde premium variant/i);
   assert.match(prompt, /Dit moet een verbetering zijn, geen kopie/i);
   assert.match(prompt, /60-70% herkenbaar dezelfde site\/hetzelfde merk/i);
@@ -69,6 +76,10 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /Gedetecteerde terugkerende merkkleuren: #8b2252 \| #a62d65 \| #f8f7f4 \| #1a1a2e\./);
   assert.match(prompt, /hoge verticale full-page compositie/i);
   assert.match(prompt, /exact 1 hoge portrait full-page desktop homepage screenshot/i);
+  assert.equal(designDna.brand, 'softora.nl');
+  assert.deepEqual(designDna.mandatoryPalette, ['#8b2252', '#a62d65', '#f8f7f4', '#1a1a2e']);
+  assert.match(designDnaLock, /Verbeterregel: Verbeter layout, hiërarchie, spacing/);
+  assert.match(designDnaLock, /geen copy die losstaat van de gescande site/i);
   assert.equal(
     brief,
     'Titel: Softora · Hoofdboodschap: Meer klanten met een premium site · Omschrijving: Premium websites · Secties: Diensten, Cases · Beeldreferenties: licht design, grote hero · Kleuren: #8b2252, #a62d65, #f8f7f4, #1a1a2e'

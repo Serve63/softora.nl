@@ -8,6 +8,101 @@ function createWebsiteGenerationHelpers(deps = {}) {
     sanitizeReferenceImages = () => [],
   } = deps;
 
+  function cleanWebsitePreviewList(items = [], maxItems = 6, maxLength = 180) {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : [])
+      .map((item) => truncateText(normalizeString(item || ''), maxLength))
+      .filter(Boolean)
+      .filter((item) => {
+        const key = item.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, maxItems);
+  }
+
+  function extractWebsitePreviewActionPhrases(scan = {}) {
+    const haystack = [
+      scan.h1,
+      ...(Array.isArray(scan.headings) ? scan.headings : []),
+      ...(Array.isArray(scan.paragraphs) ? scan.paragraphs : []),
+      scan.bodyTextSample,
+    ].join(' ');
+    const phrases = [];
+    const pattern = /\b(?:start|plan|vraag|boek|ontdek|bekijk|lees|neem contact|contact|offerte|demo|kennismaking|advies|strategie|project|website|software|chatbot|automatisering)[\w\s-]{0,42}/gi;
+    let match;
+    while ((match = pattern.exec(haystack))) {
+      const phrase = truncateText(normalizeString(match[0]).replace(/\s+/g, ' '), 80);
+      if (phrase) phrases.push(phrase);
+      if (phrases.length >= 8) break;
+    }
+    return cleanWebsitePreviewList(phrases, 6, 80);
+  }
+
+  function buildWebsitePreviewDesignDnaFromScan(scan = {}) {
+    const host = normalizeString(scan.host || '');
+    const title = normalizeString(scan.title || '');
+    const h1 = normalizeString(scan.h1 || '');
+    const description = normalizeString(scan.metaDescription || '');
+    const headings = cleanWebsitePreviewList(scan.headings, 6, 160);
+    const paragraphs = cleanWebsitePreviewList(scan.paragraphs, 5, 220);
+    const visualCues = cleanWebsitePreviewList(scan.visualCues, 6, 120);
+    const brandColorHints = cleanWebsitePreviewList(scan.brandColorHints, 6, 120);
+    const brandPalette = cleanWebsitePreviewList(scan.brandPalette, 8, 40);
+    const actionPhrases = extractWebsitePreviewActionPhrases(scan);
+    const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 650);
+    const contentSignals = cleanWebsitePreviewList(
+      [h1, description, ...headings, ...paragraphs, bodyTextSample],
+      10,
+      220
+    );
+
+    return {
+      brand: host || title || 'onbekende website',
+      sourceSummary: [title, h1, description].filter(Boolean).join(' | '),
+      mandatoryPalette: brandPalette.length ? brandPalette : brandColorHints,
+      brandColorHints,
+      contentSignals,
+      sectionSignals: headings,
+      actionSignals: actionPhrases,
+      visualSignals: visualCues,
+      improvementRule:
+        'Verbeter layout, hiërarchie, spacing, typografie, kaarten, CTA’s en visuele polish, maar behoud merk-DNA, kleuren, onderwerp en commerciële richting.',
+      forbiddenDrift:
+        'Geen rebrand, geen ander kleurenpalet, geen generiek SaaS/software-template, geen andere diensten, geen andere doelgroep en geen copy die losstaat van de gescande site.',
+    };
+  }
+
+  function formatWebsitePreviewDesignDnaLock(scan = {}) {
+    const dna = buildWebsitePreviewDesignDnaFromScan(scan);
+    return [
+      'DESIGN-DNA LOCK (verplicht volgen, niet negeren):',
+      `- Bronmerk/URL: ${dna.brand}.`,
+      dna.sourceSummary ? `- Begrijp eerst deze bron-samenvatting: ${dna.sourceSummary}.` : '',
+      dna.mandatoryPalette.length
+        ? `- Verplicht kleurenpalet/kleurfamilie: ${dna.mandatoryPalette.join(' | ')}. Deze kleuren moeten dominant blijven.`
+        : '',
+      dna.brandColorHints.length
+        ? `- CSS/merk-kleurhints uit de site: ${dna.brandColorHints.join(' | ')}.`
+        : '',
+      dna.contentSignals.length
+        ? `- Content/propositie die herkenbaar terug moet komen: ${dna.contentSignals.join(' | ')}.`
+        : '',
+      dna.sectionSignals.length
+        ? `- Secties/structuur-signalen uit de huidige site: ${dna.sectionSignals.join(' | ')}.`
+        : '',
+      dna.actionSignals.length
+        ? `- CTA/actie-signalen uit de huidige site: ${dna.actionSignals.join(' | ')}.`
+        : '',
+      dna.visualSignals.length ? `- Visuele signalen uit beelden/alt-teksten: ${dna.visualSignals.join(' | ')}.` : '',
+      `- Verbeterregel: ${dna.improvementRule}`,
+      `- Verboden drift: ${dna.forbiddenDrift}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
   function buildWebsitePreviewPromptFromScan(scan = {}) {
     const host = normalizeString(scan.host || '');
     const title = normalizeString(scan.title || '');
@@ -24,10 +119,12 @@ function createWebsiteGenerationHelpers(deps = {}) {
       : [];
     const referenceImageCount = Math.max(0, Number(scan.referenceImageCount || 0) || 0);
     const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 1800);
+    const designDnaLock = formatWebsitePreviewDesignDnaLock(scan);
 
     return [
       'Bekijk eerst de website grondig op basis van de scan hieronder: begrijp wat het bedrijf doet, welke diensten worden verkocht, welke doelgroep wordt aangesproken, welke CTA’s belangrijk zijn, welke secties terugkomen en welke tone-of-voice de site gebruikt.',
       'Behandel de bestaande site daarna als de harde bron van waarheid voor merkstijl, kleurgebruik, content-richting, diensten, doelgroep en tone-of-voice.',
+      designDnaLock,
       referenceImageCount
         ? `Gebruik de ${referenceImageCount} meegeleverde referentiebeeld(en) als harde visuele bron voor kleurgebruik, fotografie, contrast, materiaalgevoel, typografiegevoel en merkuitstraling. Het resultaat moet duidelijk verwant zijn aan deze visuele bron.`
         : '',
@@ -437,9 +534,11 @@ ${text}
     buildLocalWebsiteBlueprint,
     buildWebsiteGenerationContext,
     buildWebsiteGenerationPrompts,
+    buildWebsitePreviewDesignDnaFromScan,
     buildWebsitePreviewBriefFromScan,
     buildWebsitePreviewDownloadFileName,
     buildWebsitePreviewPromptFromScan,
+    formatWebsitePreviewDesignDnaLock,
     ensureHtmlDocument,
     ensureStrictAnthropicHtml,
     extractVisibleTextFromHtml,
