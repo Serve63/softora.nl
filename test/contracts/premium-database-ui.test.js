@@ -37,6 +37,10 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /\.photo-remove/);
   assert.match(pageSource, /\.photo-remove \{[\s\S]*position: absolute;[\s\S]*right: 2px;/);
   assert.match(pageSource, /class="result-count-stack" aria-label="Aantal resultaten"/);
+  assert.match(pageSource, /class="photo-cost-label" aria-label="Kosten per AI-foto"/);
+  assert.match(pageSource, /± \$0\.21\/foto/);
+  assert.match(pageSource, /Image 2 4K high · URL-scan \$0\.00/);
+  assert.match(pageSource, /\.photo-cost-label/);
   assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="result-count-icon"/);
   assert.match(pageSource, /<div class="page-title">Database<\/div>/);

@@ -534,6 +534,19 @@
             margin-left: 0;
         }
 
+        .photo-cost-label {
+            font-size: 10px;
+            line-height: 1.35;
+            color: var(--light);
+            text-align: center;
+            max-width: 132px;
+        }
+
+        .photo-cost-label strong {
+            color: var(--crimson);
+            font-weight: 700;
+        }
+
         .result-count-icon {
             width: 22px;
             height: 22px;
@@ -1338,6 +1351,10 @@
                             <button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
+                            <div class="photo-cost-label" aria-label="Kosten per AI-foto">
+                                <strong>± $0.21/foto</strong><br>
+                                Image 2 4K high · URL-scan $0.00
+                            </div>
                             <button class="result-count-button" id="generatePhotosButton" type="button" aria-label="Genereer AI-foto's voor bedrijven zonder foto">
                                 <svg class="result-count-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                     <path fill="currentColor" d="M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z"/>
