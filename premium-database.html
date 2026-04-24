@@ -1086,10 +1086,14 @@
                             </div>
                             <div class="add-actions" id="addActions">
                                 <button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">
-                                    Toevoegen
+                                    Acties
                                     <svg class="btn-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                                 </button>
                                 <div class="add-actions-menu" id="addActionsMenu" role="menu">
+                                    <button class="add-actions-item" id="addWebdesignButton" type="button" role="menuitem">
+                                        <span class="add-actions-item-title">Webdesign</span>
+                                        <span class="add-actions-item-sub">Genereer AI-foto's voor bedrijven zonder foto</span>
+                                    </button>
                                     <button class="add-actions-item" id="addUploadButton" type="button" role="menuitem">
                                         <span class="add-actions-item-title">Uploaden</span>
                                         <span class="add-actions-item-sub">Importeer bedrijven vanuit een CSV-bestand</span>
@@ -1283,6 +1287,7 @@
             addActions: document.getElementById("addActions"),
             addActionsMenu: document.getElementById("addActionsMenu"),
             addButton: document.getElementById("addButton"),
+            addWebdesignButton: document.getElementById("addWebdesignButton"),
             addUploadButton: document.getElementById("addUploadButton"),
             addManualButton: document.getElementById("addManualButton"),
             importFileInput: document.getElementById("importFileInput"),
@@ -2071,6 +2076,115 @@
             }
         }
 
+        function resolveCustomerWebsiteUrl(customer) {
+            const raw = normalizeString(customer && (customer.website || customer.dom));
+            if (!raw || raw === "—") return "";
+            const withProtocol = /^https?:\/\//i.test(raw) ? raw : "https://" + raw.replace(/^\/+/, "");
+            try {
+                const parsed = new URL(withProtocol);
+                if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+                return parsed.toString();
+            } catch (error) {
+                return "";
+            }
+        }
+
+        function getWebdesignPhotoTargets() {
+            return getSortedCustomers(getFilteredCustomers()).filter(function (customer) {
+                return !isValidWebsitePhotoDataUrl(customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
+            }).slice(0, 10);
+        }
+
+        async function generateWebsitePhotoData(customer) {
+            const url = resolveCustomerWebsiteUrl(customer);
+            if (!url) {
+                throw new Error("Geen geldige website gevonden voor " + customer.bedrijf + ".");
+            }
+
+            const response = await fetch("/api/website-preview/generate", {
+                method: "POST",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ url: url, source: "premium-database", action: "webdesign" })
+            });
+            const payload = await response.json().catch(function () {
+                return {};
+            });
+
+            if (response.status === 401) {
+                throw new Error("Log eerst in om AI-foto's te genereren.");
+            }
+            if (!response.ok || !payload || payload.ok === false) {
+                throw new Error(String(payload.detail || payload.error || "AI-foto genereren is mislukt."));
+            }
+
+            const dataUrl = normalizeString(payload && payload.image && payload.image.dataUrl);
+            if (!isValidWebsitePhotoDataUrl(dataUrl)) {
+                throw new Error("De AI gaf geen geldige afbeelding terug voor " + customer.bedrijf + ".");
+            }
+
+            return {
+                dataUrl: dataUrl,
+                fileName: normalizeString(payload && payload.image && payload.image.fileName) || customer.dom + "-webdesign.png"
+            };
+        }
+
+        async function generateWebdesignPhotos() {
+            closeAddActions();
+            const targets = getWebdesignPhotoTargets();
+            if (!targets.length) {
+                setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
+                return;
+            }
+
+            let done = 0;
+            let failed = 0;
+            setStatusMessage("Webdesign foto's genereren voor " + targets.length + " bedrijf" + (targets.length === 1 ? "" : "ven") + "...", "info");
+
+            for (const target of targets) {
+                try {
+                    setStatusMessage("AI-foto maken voor " + target.bedrijf + " (" + (done + failed + 1) + "/" + targets.length + ")...", "info");
+                    const generated = await generateWebsitePhotoData(target);
+                    state.klanten = sortCustomers(state.klanten.map(function (customer) {
+                        if (customer.id !== target.id) return customer;
+                        const nextHistory = Array.isArray(customer.hist) ? customer.hist.slice() : [];
+                        nextHistory.push({
+                            type: "webdesign_foto",
+                            label: "Webdesign AI-foto gegenereerd",
+                            date: formatDateForStorage(new Date())
+                        });
+                        return normalizeCustomer({
+                            ...customer,
+                            websitePhoto: generated.dataUrl,
+                            websitePhotoName: generated.fileName,
+                            hist: nextHistory,
+                            updatedAt: formatDateForStorage(new Date())
+                        }, customer.id);
+                    }));
+                    done += 1;
+                    renderPage();
+                } catch (error) {
+                    failed += 1;
+                    console.error("Webdesign foto genereren mislukt:", error);
+                }
+            }
+
+            if (!done) {
+                setStatusMessage("Geen AI-foto's opgeslagen. Controleer of de websites bereikbaar zijn.", "error");
+                return;
+            }
+
+            const result = await persistCustomerList(state.klanten);
+            if (!result.ok) {
+                setStatusMessage("AI-foto's staan in beeld, maar opslaan in Supabase mislukte.", "error");
+                return;
+            }
+
+            toast(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen");
+            setStatusMessage(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen" + (failed ? ", " + failed + " mislukt." : "."), failed ? "info" : "success", true);
+        }
+
         function resetModal() {
             nodes.modalCompany.value = "";
             nodes.modalContact.value = "";
@@ -2498,6 +2612,9 @@
         nodes.addButton.addEventListener("click", function (event) {
             event.stopPropagation();
             toggleAddActions();
+        });
+        nodes.addWebdesignButton.addEventListener("click", function () {
+            void generateWebdesignPhotos();
         });
         nodes.addUploadButton.addEventListener("click", function () {
             closeAddActions();

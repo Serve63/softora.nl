@@ -31,8 +31,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /font-family: 'Inter', sans-serif;/);
   assert.match(pageSource, /\.page-title \{[\s\S]*font-family: 'Oswald', sans-serif;/);
   assert.match(pageSource, /<div class="page-title">Database<\/div>/);
-  assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Toevoegen/);
-  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
+  assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
+  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Webdesign[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.match(pageSource, /<th data-sort-key="email">Mailadres<\/th>/);
   assert.match(pageSource, /<th data-sort-key="tel">Telefoonnummer<\/th>/);
@@ -49,6 +49,9 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /class=\\"photo-drop\\"/);
   assert.match(pageSource, /function readImageFileAsDataUrl\(file\)/);
   assert.match(pageSource, /function saveWebsitePhotoForCustomer\(customerId, file\)/);
+  assert.match(pageSource, /function generateWebdesignPhotos\(\)/);
+  assert.match(pageSource, /fetch\("\/api\/website-preview\/generate"/);
+  assert.match(pageSource, /nodes\.addWebdesignButton\.addEventListener\("click"/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);
