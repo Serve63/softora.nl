@@ -33,6 +33,7 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /table-layout: fixed;/);
   assert.match(pageSource, /thead th:nth-child\(10\), tbody td:nth-child\(10\) \{[\s\S]*width: 70px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
+  assert.match(pageSource, /\.company-edit/);
   assert.match(pageSource, /class="result-count-stack" aria-label="Aantal resultaten"/);
   assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="result-count-icon"/);
@@ -48,6 +49,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /escapeHtml\(customer\.email \|\| "—"\)/);
   assert.match(pageSource, /escapeHtml\(customer\.tel \|\| "—"\)/);
   assert.match(pageSource, /escapeHtml\(websiteValue\)/);
+  assert.match(pageSource, /class=\\"company-edit\\"/);
+  assert.match(pageSource, /data-edit-id=\\"/);
   assert.match(pageSource, /<th>Foto<\/th>/);
   assert.match(pageSource, /colspan=\\"10\\"/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
@@ -86,6 +89,12 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /source: "premium-database"/);
   assert.match(pageSource, /action: "webdesign"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
+  assert.match(pageSource, /function openEditCustomerModal\(customerId\)/);
+  assert.match(pageSource, /function updateCustomerFromModal\(customerId, bedrijf\)/);
+  assert.match(pageSource, /state\.modalEditId/);
+  assert.match(pageSource, /nodes\.modalTitle\.textContent = "Bedrijf aanpassen"/);
+  assert.match(pageSource, /nodes\.saveModalButton\.textContent = "Opslaan"/);
+  assert.match(pageSource, /openEditCustomerModal\(editButton\.getAttribute\("data-edit-id"\)\)/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);
@@ -125,9 +134,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /bedrijf: "Growingbyknowing"[\s\S]*status: "klant"/);
   assert.match(pageSource, /function restoreKnownCustomers\(\)/);
   assert.match(pageSource, /function syncKnownCustomerStatuses\(customers\)/);
-  assert.match(pageSource, /const statusSync = syncKnownCustomerStatuses\(customersWithPhotos\);/);
-  assert.match(pageSource, /const finalCustomers = sortCustomers\(statusSync\.customers\);/);
-  assert.match(pageSource, /if \(statusSync\.syncedCount\) \{/);
+  assert.doesNotMatch(pageSource, /const statusSync = syncKnownCustomerStatuses\(customersWithPhotos\);/);
+  assert.doesNotMatch(pageSource, /Bekende klantstatussen opslaan mislukt/);
   assert.match(pageSource, /let syncedCount = 0;/);
   assert.match(pageSource, /label: "Status hersteld"/);
   assert.match(pageSource, /function isKnownBadOrderFallbackCustomer\(customer\)/);

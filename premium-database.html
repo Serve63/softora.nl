@@ -642,6 +642,39 @@
             color: var(--dark);
         }
 
+        .company-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .company-edit {
+            width: 24px;
+            height: 24px;
+            border: 1px solid rgba(155,35,85,.16);
+            border-radius: 999px;
+            background: rgba(155,35,85,.04);
+            color: var(--crimson);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            cursor: pointer;
+            transition: background .15s ease, border-color .15s ease, transform .15s ease;
+        }
+
+        .company-edit:hover {
+            background: rgba(155,35,85,.09);
+            border-color: rgba(155,35,85,.34);
+            transform: translateY(-1px);
+        }
+
+        .company-edit svg {
+            width: 13px;
+            height: 13px;
+        }
+
         .c-mid {
             color: var(--mid);
         }
@@ -1417,6 +1450,7 @@
             sortKey: "updatedAt",
             sortAsc: false,
             openId: null,
+            modalEditId: null,
             photoTargetId: null,
             messageTimer: null
         };
@@ -2152,7 +2186,7 @@
                 const websiteValue = normalizeString(customer.website || customer.dom) || "—";
                 return [
                     "<tr data-id=\"" + escapeHtml(customer.id) + "\">",
-                        "<td><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div></td>",
+                        "<td><div class=\"company-cell\"><button class=\"company-edit\" type=\"button\" data-edit-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Bedrijfsgegevens aanpassen\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z\"/></svg></button><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div></div></td>",
                         "<td><span class=\"c-mid\">" + escapeHtml(customer.branche) + "</span></td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.stad) + "</td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.email || "—") + "</td>",
@@ -2577,6 +2611,9 @@
         }
 
         function resetModal() {
+            state.modalEditId = null;
+            nodes.modalTitle.textContent = "Bedrijf toevoegen";
+            nodes.saveModalButton.textContent = "Toevoegen";
             nodes.modalCompany.value = "";
             nodes.modalContact.value = "";
             nodes.modalDomain.value = "";
@@ -2593,7 +2630,29 @@
             nodes.modalBg.classList.add("on");
         }
 
+        function openEditCustomerModal(customerId) {
+            const customer = state.klanten.find(function (item) {
+                return item.id === customerId;
+            });
+            if (!customer) return;
+            state.modalEditId = customer.id;
+            nodes.modalTitle.textContent = "Bedrijf aanpassen";
+            nodes.saveModalButton.textContent = "Opslaan";
+            nodes.modalCompany.value = customer.bedrijf || "";
+            nodes.modalContact.value = customer.naam || "";
+            nodes.modalDomain.value = customer.dom || "";
+            nodes.modalPhone.value = customer.tel || "";
+            nodes.modalMail.value = customer.email || "";
+            nodes.modalBranch.value = customer.branche || "Overig";
+            nodes.modalCity.value = customer.stad || "";
+            nodes.modalStatus.value = normalizeDatabaseStatus(customer.status, customer);
+            if (nodes.fieldResponsible) nodes.fieldResponsible.value = customer.verantwoordelijk || "Serve";
+            nodes.modalBg.classList.add("on");
+            nodes.modalCompany.focus();
+        }
+
         function closeModal() {
+            state.modalEditId = null;
             nodes.modalBg.classList.remove("on");
         }
 
@@ -2928,6 +2987,11 @@
                 return;
             }
 
+            if (state.modalEditId) {
+                updateCustomerFromModal(state.modalEditId, bedrijf);
+                return;
+            }
+
             const dom = slugifyDomain(nodes.modalDomain.value || bedrijf);
             const customer = normalizeCustomer({
                 id: createId(),
@@ -2960,6 +3024,62 @@
                 }
                 setStatusMessage(
                     "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
+                    "error"
+                );
+            });
+        }
+
+        function updateCustomerFromModal(customerId, bedrijf) {
+            const existing = state.klanten.find(function (item) {
+                return item.id === customerId;
+            });
+            if (!existing) {
+                setStatusMessage("Bedrijf niet gevonden om aan te passen.", "error");
+                return;
+            }
+
+            const nextStatus = normalizeDatabaseStatus(nodes.modalStatus.value);
+            const currentStatus = normalizeDatabaseStatus(existing.status, existing);
+            const nextHistory = Array.isArray(existing.hist) ? existing.hist.slice() : [];
+            if (nextStatus !== currentStatus) {
+                nextHistory.push({
+                    type: nextStatus,
+                    label: "Status aangepast via database",
+                    date: formatDateForStorage(new Date())
+                });
+            }
+
+            const dom = slugifyDomain(nodes.modalDomain.value || bedrijf);
+            const updatedCustomer = normalizeCustomer({
+                ...existing,
+                naam: normalizeString(nodes.modalContact.value) || bedrijf,
+                bedrijf: bedrijf,
+                dom: dom,
+                website: normalizeString(nodes.modalDomain.value) || existing.website,
+                telefoon: normalizeString(nodes.modalPhone.value) || "—",
+                email: normalizeString(nodes.modalMail.value) || ("info@" + dom),
+                branche: normalizeString(nodes.modalBranch.value) || "Overig",
+                stad: normalizeString(nodes.modalCity.value) || "Onbekend",
+                status: nextStatus,
+                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : existing.verantwoordelijk,
+                hist: nextHistory,
+                updatedAt: formatDateForStorage(new Date())
+            }, existing.id);
+
+            state.klanten = sortCustomers(state.klanten.map(function (customer) {
+                return customer.id === customerId ? updatedCustomer : customer;
+            }));
+            renderPage();
+            closeModal();
+
+            persistCustomerList(state.klanten).then(function (result) {
+                if (result.ok) {
+                    toast("✓ " + bedrijf + " aangepast");
+                    setStatusMessage("Bedrijf aangepast.", "success", true);
+                    return;
+                }
+                setStatusMessage(
+                    "Aanpassen gelukt lokaal, maar opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
                     "error"
                 );
             });
@@ -3016,20 +3136,12 @@
 
                     const photoMap = await loadCustomerPhotoMap();
                     const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap);
-                    const statusSync = syncKnownCustomerStatuses(customersWithPhotos);
-                    const finalCustomers = sortCustomers(statusSync.customers);
 
-                    if (customerListsDiffer(finalCustomers) || !hadBootstrapCustomers) {
-                        state.klanten = finalCustomers;
+                    if (customerListsDiffer(customersWithPhotos) || !hadBootstrapCustomers) {
+                        state.klanten = customersWithPhotos;
                         renderPage();
                     } else {
-                        state.klanten = finalCustomers;
-                    }
-
-                    if (statusSync.syncedCount) {
-                        persistCustomerList(finalCustomers).catch(function (error) {
-                            console.error("Bekende klantstatussen opslaan mislukt:", error);
-                        });
+                        state.klanten = customersWithPhotos;
                     }
 
                     setStatusMessage("");
@@ -3101,6 +3213,13 @@
         });
 
         nodes.tbody.addEventListener("click", function (event) {
+            const editButton = event.target.closest(".company-edit");
+            if (editButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                openEditCustomerModal(editButton.getAttribute("data-edit-id"));
+                return;
+            }
             const photoDrop = event.target.closest(".photo-drop");
             if (photoDrop) {
                 event.preventDefault();
