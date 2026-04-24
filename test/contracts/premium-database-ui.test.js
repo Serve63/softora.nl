@@ -120,6 +120,9 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /bedrijf: "LinsZorgt"/);
   assert.match(pageSource, /bedrijf: "Growingbyknowing"/);
   assert.match(pageSource, /function restoreKnownCustomers\(\)/);
+  assert.match(pageSource, /function isKnownBadOrderFallbackCustomer\(customer\)/);
+  assert.match(pageSource, /website\.indexOf\("website opdracht"\) !== -1/);
+  assert.match(pageSource, /Vaste klanten hersteld en verkeerde rijen verwijderd\./);
 });
 
 test('premium database page exposes interesse as a lead-status step', () => {
