@@ -1227,6 +1227,10 @@
                                         <span class="add-actions-item-title">Handmatig toevoegen</span>
                                         <span class="add-actions-item-sub">Voeg zelf een bedrijf toe via het formulier</span>
                                     </button>
+                                    <button class="add-actions-item" id="restoreKnownCustomersButton" type="button" role="menuitem">
+                                        <span class="add-actions-item-title">Vaste klanten herstellen</span>
+                                        <span class="add-actions-item-sub">Zet MCV E-commerce, LinsZorgt en Growingbyknowing terug</span>
+                                    </button>
                                 </div>
                                 <input type="file" id="importFileInput" accept=".csv,text/csv" hidden>
                             </div>
@@ -1432,6 +1436,7 @@
             generatePhotosButton: document.getElementById("generatePhotosButton"),
             addUploadButton: document.getElementById("addUploadButton"),
             addManualButton: document.getElementById("addManualButton"),
+            restoreKnownCustomersButton: document.getElementById("restoreKnownCustomersButton"),
             importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
             overlay: document.getElementById("ov"),
@@ -2776,6 +2781,89 @@
             reader.readAsText(file);
         }
 
+        const KNOWN_CUSTOMER_SEEDS = [
+            {
+                bedrijf: "MCV E-commerce",
+                dom: "mcvecommerce.nl",
+                email: "info@mcvecommerce.nl",
+                stad: "Haaren",
+                branche: "Overig",
+                status: "klant",
+                verantwoordelijk: "Serve"
+            },
+            {
+                bedrijf: "LinsZorgt",
+                dom: "linszorgt.nl",
+                email: "info@linszorgt.nl",
+                stad: "Onbekend",
+                branche: "Overig",
+                status: "klant",
+                verantwoordelijk: "Serve"
+            },
+            {
+                bedrijf: "Growingbyknowing",
+                dom: "growingbyknowing.nl",
+                email: "info@growingbyknowing.nl",
+                stad: "Onbekend",
+                branche: "Overig",
+                status: "benaderbaar",
+                verantwoordelijk: "Serve"
+            }
+        ];
+
+        function restoreKnownCustomers() {
+            closeAddActions();
+            const existingKeys = new Set(state.klanten.map(function (customer) {
+                return normalizeString(customer && customer.bedrijf).toLowerCase();
+            }));
+
+            const restored = [];
+            const nowIso = formatDateForStorage(new Date());
+            KNOWN_CUSTOMER_SEEDS.forEach(function (seed) {
+                const key = normalizeString(seed.bedrijf).toLowerCase();
+                if (existingKeys.has(key)) return;
+                restored.push(normalizeCustomer({
+                    id: createId(),
+                    naam: seed.bedrijf,
+                    bedrijf: seed.bedrijf,
+                    dom: seed.dom,
+                    telefoon: "—",
+                    email: seed.email,
+                    branche: seed.branche,
+                    stad: seed.stad,
+                    status: seed.status,
+                    verantwoordelijk: seed.verantwoordelijk,
+                    hist: [{
+                        type: seed.status,
+                        label: "Hersteld in database",
+                        date: nowIso
+                    }],
+                    updatedAt: nowIso
+                }));
+            });
+
+            if (!restored.length) {
+                setStatusMessage("Alle vaste klanten staan al in de database.", "info", true);
+                return;
+            }
+
+            state.klanten = sortCustomers(restored.concat(state.klanten));
+            renderPage();
+            setStatusMessage(restored.length + " vaste klant" + (restored.length === 1 ? "" : "en") + " hersteld. Opslaan...", "info");
+
+            persistCustomerList(state.klanten).then(function (result) {
+                if (result.ok) {
+                    toast("✓ " + restored.length + " klant" + (restored.length === 1 ? "" : "en") + " hersteld");
+                    setStatusMessage("Vaste klanten hersteld en opgeslagen.", "success", true);
+                    return;
+                }
+                setStatusMessage(
+                    "Herstellen gelukt lokaal, maar opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
+                    "error"
+                );
+            });
+        }
+
         function addCustomerFromModal() {
             const bedrijf = normalizeString(nodes.modalCompany.value);
             if (!bedrijf) {
@@ -3014,6 +3102,9 @@
             closeAddActions();
             openModal();
         });
+        if (nodes.restoreKnownCustomersButton) {
+            nodes.restoreKnownCustomersButton.addEventListener("click", restoreKnownCustomers);
+        }
         nodes.importFileInput.addEventListener("change", handleImportFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
