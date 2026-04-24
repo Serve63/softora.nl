@@ -354,11 +354,11 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
   <div class="card" style="margin-bottom:24px">
     <div class="card-head">
       <div class="card-title">Website Scannen</div>
-      <div class="card-sub">Één of meerdere URL’s (max. 50 per keer) — per regel of gescheiden door komma’s. AI genereert per site een homepage preview, na elkaar.</div>
+      <div class="card-sub">Eén URL per keer. AI genereert voor die website één homepage preview.</div>
     </div>
     <div class="card-body">
       <div class="input-row" style="align-items: flex-start">
-        <textarea class="inp" id="scan-url" rows="3" placeholder="https://softora.nl&#10;https://voorbeeld.nl" spellcheck="false">https://softora.nl</textarea>
+        <input class="inp" id="scan-url" type="text" placeholder="https://softora.nl" spellcheck="false" value="https://softora.nl">
         <button class="btn" id="scan-btn" onclick="startScan()" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           AI Genereren
@@ -370,7 +370,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
   <div id="scan-output" class="workspace">
     <div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-      <p>Voer één of meerdere URL’s in en klik op &quot;AI Genereren&quot;. Bij meerdere URL’s verschijnen de previews onder elkaar (max. 50).</p>
+      <p>Voer één URL in en klik op &quot;AI Genereren&quot;. Per keer wordt één preview gemaakt.</p>
     </div>
   </div>
 </div>
@@ -756,7 +756,7 @@ async function ensureWebsiteGeneratorAuth(message) {
   return false;
 }
 
-const SCAN_URL_BATCH_MAX = 50;
+const SCAN_URL_BATCH_MAX = 1;
 
 function tokenizeScanUrlInput(raw) {
   return String(raw || '')
@@ -885,7 +885,7 @@ async function startBackgroundBatchScan(urls) {
   const out = document.getElementById('scan-output');
   if (out) {
     out.innerHTML =
-      '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Batch wordt gestart…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
+      '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Preview wordt gestart…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
   }
   const response = await fetch('/api/website-preview/batch', {
     method: 'POST',
@@ -950,7 +950,7 @@ async function pollWebsitePreviewBatch() {
     clearWebsitePreviewBatchPoll();
     const n = Number(payload.job.total || 0) || 0;
     if (payload.job.status === 'done') {
-      showToast(`${n} URL('s) verwerkt`);
+      showToast(n === 1 ? 'URL verwerkt' : `${n} URL's verwerkt`);
     } else if (payload.job.error) {
       showToast(String(payload.job.error));
     }
@@ -980,11 +980,11 @@ async function renderBatchJobProgress(job) {
   if (job.status === 'error' && job.error) {
     bar.textContent = String(job.error);
   } else if (job.status === 'done') {
-    bar.textContent = `Klaar — ${total} website(s)`;
+    bar.textContent = total === 1 ? 'Klaar — website verwerkt' : `Klaar — ${total} websites`;
   } else if (runningIdx >= 0) {
     bar.textContent = `Preview ${runningIdx + 1} van ${total} — ${runningHost || '…'}`;
   } else {
-    bar.textContent = total ? `Batch bezig… (${total} URL's)` : 'Batch bezig…';
+    bar.textContent = total ? `Preview bezig… (${total} URL)` : 'Preview bezig…';
   }
 
   if (websiteGeneratorAuthState.authenticated) {
@@ -1054,7 +1054,7 @@ async function resumeWebsitePreviewBatchIfAny() {
   const out = document.getElementById('scan-output');
   if (!out) return;
   out.innerHTML =
-    '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Batch hervatten…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
+    '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Preview hervatten…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
   scheduleWebsitePreviewBatchPoll();
 }
 
@@ -1067,7 +1067,8 @@ async function startScan() {
     return;
   }
   if (tokens.length > SCAN_URL_BATCH_MAX) {
-    showToast(`Maximaal ${SCAN_URL_BATCH_MAX} URL's per keer.`);
+    showToast('Gebruik één URL per keer.');
+    return;
   }
   const slice = tokens.slice(0, SCAN_URL_BATCH_MAX);
   const urls = buildScanUrlList(slice);

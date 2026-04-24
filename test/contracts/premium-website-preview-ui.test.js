@@ -32,6 +32,9 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.match(source, /<title>Websitedesign – Softora\.nl<\/title>/);
   assert.match(source, /<div class="page-title">Websitedesign<\/div>/);
   assert.doesNotMatch(source, /<div class="page-title">Website Generator<\/div>/);
+  assert.match(source, /Eén URL per keer\. AI genereert voor die website één homepage preview\./);
+  assert.match(source, /<input class="inp" id="scan-url" type="text" placeholder="https:\/\/softora\.nl" spellcheck="false" value="https:\/\/softora\.nl">/);
+  assert.doesNotMatch(source, /<textarea class="inp" id="scan-url"/);
   assert.doesNotMatch(source, />AI Photo Preview</);
   assert.doesNotMatch(source, />Website URL</);
   assert.doesNotMatch(source, /id="website-preview-url"/);
@@ -108,8 +111,11 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.doesNotMatch(source, /Bibliotheek kon niet centraal laden/);
   assert.match(source, /console\.warn\('Websitepreview-bibliotheek laden mislukt:', error\);/);
   assert.doesNotMatch(source, /function openPreviewNewTab\(/);
-  assert.match(source, /SCAN_URL_BATCH_MAX = 50/);
+  assert.match(source, /SCAN_URL_BATCH_MAX = 1/);
   assert.match(source, /function tokenizeScanUrlInput/);
+  assert.match(source, /showToast\('Gebruik één URL per keer\.'\);\s*return;/);
+  assert.match(source, /Preview wordt gestart/);
+  assert.match(source, /Preview bezig/);
   assert.match(source, /window\._lastPreviewImageDataUrl = previewDataUrl/);
 });
 
