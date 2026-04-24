@@ -1,8 +1,6 @@
 function primeServerAppRuntime({
-  seedDemoConfirmationTaskForUiTesting,
   ensureRuntimeStateHydratedFromSupabase,
 }) {
-  seedDemoConfirmationTaskForUiTesting();
   void ensureRuntimeStateHydratedFromSupabase();
 }
 
@@ -14,13 +12,11 @@ function startServerAppRuntime({
   isSupabaseConfigured,
   supabaseStateTable,
   supabaseStateKey,
-  seedDemoConfirmationTaskForUiTesting,
   ensureRuntimeStateHydratedFromSupabase,
   log = console.log,
   warn = console.warn,
 }) {
   primeServerAppRuntime({
-    seedDemoConfirmationTaskForUiTesting,
     ensureRuntimeStateHydratedFromSupabase,
   });
 

@@ -199,10 +199,9 @@ const {
   },
 });
 
-// In serverless (zoals Vercel) wordt startServer() niet aangeroepen, dus seed de
-// demo-taak ook bij module-load. De functie is idempotent op basis van callId.
+// In serverless (zoals Vercel) wordt startServer() niet aangeroepen, dus hydrate
+// de runtime ook bij module-load.
 primeServerAppRuntime({
-  seedDemoConfirmationTaskForUiTesting,
   ensureRuntimeStateHydratedFromSupabase,
 });
 
