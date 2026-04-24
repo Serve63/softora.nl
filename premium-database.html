@@ -2792,7 +2792,7 @@
                 email: "info@mcvecommerce.nl",
                 stad: "Haaren",
                 branche: "Overig",
-                status: "klant",
+                status: "benaderbaar",
                 verantwoordelijk: "Serve"
             },
             {
@@ -2810,7 +2810,7 @@
                 email: "info@growingbyknowing.nl",
                 stad: "Onbekend",
                 branche: "Overig",
-                status: "benaderbaar",
+                status: "klant",
                 verantwoordelijk: "Serve"
             }
         ];
@@ -2834,6 +2834,30 @@
                 return !isKnownBadOrderFallbackCustomer(customer);
             });
             const removedCount = state.klanten.length - cleanedCustomers.length;
+            const seedByKey = new Map(KNOWN_CUSTOMER_SEEDS.map(function (seed) {
+                return [normalizeString(seed.bedrijf).toLowerCase(), seed];
+            }));
+            let syncedCount = 0;
+            const syncedCustomers = cleanedCustomers.map(function (customer) {
+                const key = normalizeString(customer && customer.bedrijf).toLowerCase();
+                const seed = seedByKey.get(key);
+                if (!seed || normalizeDatabaseStatus(customer && customer.status, customer) === seed.status) {
+                    return customer;
+                }
+                syncedCount += 1;
+                const nextHistory = Array.isArray(customer && customer.hist) ? customer.hist.slice() : [];
+                nextHistory.push({
+                    type: seed.status,
+                    label: "Status hersteld",
+                    date: formatDateForStorage(new Date())
+                });
+                return normalizeCustomer({
+                    ...customer,
+                    status: seed.status,
+                    hist: nextHistory,
+                    updatedAt: formatDateForStorage(new Date())
+                }, customer && customer.id);
+            });
             const existingKeys = new Set(cleanedCustomers.map(function (customer) {
                 return normalizeString(customer && customer.bedrijf).toLowerCase();
             }));
@@ -2863,19 +2887,19 @@
                 }));
             });
 
-            if (!restored.length && !removedCount) {
+            if (!restored.length && !removedCount && !syncedCount) {
                 setStatusMessage("Alle vaste klanten staan al in de database.", "info", true);
                 return;
             }
 
-            state.klanten = sortCustomers(restored.concat(cleanedCustomers));
+            state.klanten = sortCustomers(restored.concat(syncedCustomers));
             renderPage();
-            setStatusMessage(restored.length + " vaste klant" + (restored.length === 1 ? "" : "en") + " hersteld, " + removedCount + " verkeerde rij" + (removedCount === 1 ? "" : "en") + " verwijderd. Opslaan...", "info");
+            setStatusMessage(restored.length + " vaste klant" + (restored.length === 1 ? "" : "en") + " hersteld, " + syncedCount + " status" + (syncedCount === 1 ? "" : "sen") + " bijgewerkt, " + removedCount + " verkeerde rij" + (removedCount === 1 ? "" : "en") + " verwijderd. Opslaan...", "info");
 
             persistCustomerList(state.klanten).then(function (result) {
                 if (result.ok) {
                     toast("✓ Database hersteld");
-                    setStatusMessage("Vaste klanten hersteld en verkeerde rijen verwijderd.", "success", true);
+                    setStatusMessage("Vaste klanten hersteld, statussen bijgewerkt en verkeerde rijen verwijderd.", "success", true);
                     return;
                 }
                 setStatusMessage(

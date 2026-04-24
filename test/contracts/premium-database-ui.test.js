@@ -120,13 +120,15 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /id="restoreKnownCustomersButton"/);
   assert.match(pageSource, /Vaste klanten herstellen/);
   assert.match(pageSource, /const KNOWN_CUSTOMER_SEEDS = \[/);
-  assert.match(pageSource, /bedrijf: "MCV E-commerce"/);
+  assert.match(pageSource, /bedrijf: "MCV E-commerce"[\s\S]*status: "benaderbaar"/);
   assert.match(pageSource, /bedrijf: "LinsZorgt"/);
-  assert.match(pageSource, /bedrijf: "Growingbyknowing"/);
+  assert.match(pageSource, /bedrijf: "Growingbyknowing"[\s\S]*status: "klant"/);
   assert.match(pageSource, /function restoreKnownCustomers\(\)/);
+  assert.match(pageSource, /let syncedCount = 0;/);
+  assert.match(pageSource, /label: "Status hersteld"/);
   assert.match(pageSource, /function isKnownBadOrderFallbackCustomer\(customer\)/);
   assert.match(pageSource, /website\.indexOf\("website opdracht"\) !== -1/);
-  assert.match(pageSource, /Vaste klanten hersteld en verkeerde rijen verwijderd\./);
+  assert.match(pageSource, /Vaste klanten hersteld, statussen bijgewerkt en verkeerde rijen verwijderd\./);
 });
 
 test('premium database page exposes interesse as a lead-status step', () => {
