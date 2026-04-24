@@ -41,7 +41,15 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /escapeHtml\(customer\.email \|\| "—"\)/);
   assert.match(pageSource, /escapeHtml\(customer\.tel \|\| "—"\)/);
   assert.match(pageSource, /escapeHtml\(websiteValue\)/);
-  assert.match(pageSource, /colspan=\\"9\\"/);
+  assert.match(pageSource, /<th>Foto<\/th>/);
+  assert.match(pageSource, /colspan=\\"10\\"/);
+  assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
+  assert.match(pageSource, /websitePhoto: normalizeString\(raw && \(raw\.websitePhoto \|\| raw\.photo \|\| raw\.websiteImage\)\)/);
+  assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
+  assert.match(pageSource, /class=\\"photo-drop\\"/);
+  assert.match(pageSource, /function readImageFileAsDataUrl\(file\)/);
+  assert.match(pageSource, /function saveWebsitePhotoForCustomer\(customerId, file\)/);
+  assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);
   assert.match(pageSource, /<textarea class="p-ta" id="p-nota"/);
