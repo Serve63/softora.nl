@@ -48,9 +48,14 @@ test('website generation helpers build preview prompt, brief and filename from s
   const fileName = helpers.buildWebsitePreviewDownloadFileName(scan);
 
   assert.match(prompt, /Domein of merk: softora\.nl\./);
-  assert.match(prompt, /behoud exact dezelfde hoofdkleuren, accenten, contrastverhoudingen en visuele sfeer/i);
+  assert.match(prompt, /bestaande site als de harde bron van waarheid/i);
+  assert.match(prompt, /faithful premium refresh/i);
+  assert.match(prompt, /mag niet aanvoelen als een ander merk/i);
+  assert.match(prompt, /Gebruik dezelfde kleurfamilie, accentkleur\(en\), donkere\/lichte verhoudingen/i);
   assert.match(prompt, /Gebruik de 2 meegeleverde referentiebeeld\(en\) als harde visuele bron/i);
-  assert.match(prompt, /Introduceer nadrukkelijk geen nieuw kleurenpalet/i);
+  assert.match(prompt, /Gebruik geen willekeurige blauw\/goud, zwart\/goud of SaaS-template kleuren/i);
+  assert.match(prompt, /dezelfde diensten, dezelfde belofte, dezelfde doelgroep/i);
+  assert.match(prompt, /geen volledig nieuwe propositie/i);
   assert.match(prompt, /edge-to-edge gevuld zijn zonder leeg wit canvas/i);
   assert.match(prompt, /Belangrijkste huidige heading: Meer klanten met een premium site\./);
   assert.match(prompt, /Gedetecteerde merkkleur-variabelen: accent: #8b2252 \| accent-light: #a62d65\./);
