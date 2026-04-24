@@ -328,7 +328,6 @@ html[data-softora-lead-generator-alias="1"] .zone-card.z4 { display: none !impor
 html[data-softora-lead-generator-alias="1"] .campaign-metric-zone4 { display: none !important; }
 html[data-softora-lead-generator-alias="1"] #screen-dashboard .topbar-right { display: none !important; }
 html[data-softora-lead-generator-alias="1"] #mail-subj-row { display: none !important; }
-html[data-softora-lead-generator-alias="1"] .mail-tab-group > .mail-tab:not(.mail-icon-tab) { display: none !important; }
 html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setting { display: none !important; }
 .zone-card {
   background: var(--card);
@@ -1165,8 +1164,6 @@ html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setti
       <div class="card-head">
         <div class="card-title">Prompt & AI instructies</div>
         <div class="mail-tab-group">
-          <button class="mail-tab active" onclick="switchMail(1,this)">Mail 1</button>
-          <button class="mail-tab ai-tab" onclick="switchMail(4,this)">AI Instructies</button>
           <button class="mail-tab mail-icon-tab" type="button" onclick="switchMail(5,this)" aria-label="Instellingen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
@@ -1196,15 +1193,6 @@ Zou u hier open voor staan?
 Met vriendelijke groet,
 Servé Creusen
 Softora.nl | +31 6 2991 7185</textarea>
-          </div>
-          <div class="mf-row">
-            <div class="mf-label">Antwoord snelheid</div>
-            <select class="mf-sel" id="delay1">
-              <option>30 minuten</option>
-              <option>1 uur</option>
-              <option>2,5 uur</option>
-              <option>5 uur</option>
-            </select>
           </div>
         </div>
       </div>

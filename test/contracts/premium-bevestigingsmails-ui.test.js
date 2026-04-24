@@ -134,14 +134,14 @@ test('premium bevestigingsmails hides mail onderwerp row only on lead-generator 
   );
 });
 
-test('premium bevestigingsmails hides mail 1 and ai instructies tabs on lead-generator alias', () => {
+test('premium bevestigingsmails removes mail and ai-instructions tabs while keeping settings access', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(
-    pageSource,
-    /html\[data-softora-lead-generator-alias="1"\] \.mail-tab-group > \.mail-tab:not\(\.mail-icon-tab\) \{ display: none !important; \}/
-  );
+  assert.doesNotMatch(pageSource, /onclick="switchMail\(1,this\)">Mail 1<\/button>/);
+  assert.doesNotMatch(pageSource, /onclick="switchMail\(4,this\)">AI Instructies<\/button>/);
+  assert.match(pageSource, /<button class="mail-tab mail-icon-tab" type="button" onclick="switchMail\(5,this\)" aria-label="Instellingen">/);
+  assert.match(pageSource, /<div class="mail-panel active" id="mail-panel-1">/);
   assert.match(pageSource, /function ensureLeadGeneratorSettingsBackRow/);
 });
 
@@ -165,6 +165,8 @@ test('premium bevestigingsmails replaces sender detail fields with compact dropd
   assert.match(pageSource, /<option value="info@softora\.nl" selected>info@softora\.nl<\/option>/);
   assert.match(pageSource, /<select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">/);
   assert.match(pageSource, /<option value="webdesign" selected>Webdesign<\/option>/);
+  assert.doesNotMatch(pageSource, /id="delay1"/);
+  assert.doesNotMatch(pageSource, /Antwoord snelheid/);
 });
 
 test('premium bevestigingsmails exposes coldcalling provider choice inside lead-generator settings', () => {
