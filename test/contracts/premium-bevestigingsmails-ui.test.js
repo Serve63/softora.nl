@@ -211,6 +211,14 @@ test('premium bevestigingsmails exposes campaign duration choices and uses them 
   assert.match(pageSource, /'✓ Dag ' \+ totalDurationDays \+ ' bereikt — campagne afgelopen'/);
 });
 
+test('premium bevestigingsmails keeps the branche filter as the native belmethode-style select', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /<select class="sel" id="branche" data-native-select="true">/);
+  assert.match(pageSource, /if \(String\(select\.dataset\.nativeSelect \|\| ''\)\.trim\(\) === 'true'\) return;/);
+});
+
 test('premium bevestigingsmails sends real coldmail campaigns through the backend before showing timeline', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
