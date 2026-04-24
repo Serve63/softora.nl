@@ -6,8 +6,10 @@ const path = require('path');
 test('premium ai lead generator renders campaign controls before dashboard bootstrap runs', () => {
   const pagePath = path.join(__dirname, '../../premium-ai-lead-generator.html');
   const dashboardPath = path.join(__dirname, '../../assets/coldcalling-dashboard.js');
+  const customSelectsPath = path.join(__dirname, '../../assets/custom-selects.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
+  const customSelectsSource = fs.readFileSync(customSelectsPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
@@ -34,13 +36,16 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     pageSource,
     /<\/label>\s*<span class="form-label-tip form-label-tip--info" id="campaignRegioTip">[\s\S]*?<\/span>\s*<select class="form-select magnetic" id="regio">/
   );
-  assert.match(pageSource, /if \(select\.id === 'regio'\) \{[\s\S]*?getElementById\('campaignRegioTip'\)/);
   assert.match(pageSource, /<select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">/);
   assert.match(pageSource, /<option value="websites" data-dot-color="accent" selected>Website's<\/option>/);
   assert.match(pageSource, /<option value="voice_software" data-dot-color="green" disabled>Voicesoftware<\/option>/);
   assert.match(pageSource, /<option value="business_software" data-dot-color="blue" disabled>Bedrijfssoftware<\/option>/);
   assert.match(pageSource, /<option value="ai_chatbots" data-dot-color="accent" disabled>AI Chatbots<\/option>/);
-  assert.match(pageSource, /serviceLockOptionValues = new Set\(\['voice_software', 'business_software', 'ai_chatbots'\]\)/);
+  assert.match(customSelectsSource, /serviceLockOptionValues = new Set\(\["voice_software", "business_software", "ai_chatbots"\]\)/);
+  assert.match(customSelectsSource, /if \(select\.id === "regio"\) \{[\s\S]*?getElementById\("campaignRegioTip"\)/);
+  assert.doesNotMatch(pageSource, /const customSelectInstances = \[\];/);
+  assert.doesNotMatch(pageSource, /function initCustomFormSelect\(select\)/);
+  assert.doesNotMatch(pageSource, /initCustomFormSelects\(\);/);
   assert.match(pageSource, /class="sidebar-link-lock-icon"/);
   assert.match(pageSource, /<option value="unlimited" selected>Geen limiet<\/option>/);
   assert.match(pageSource, /<option value="auto">Automatisch<\/option>/);
@@ -307,7 +312,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /async function promptForCustomCampaignRegioKm\(initialValue = ''\) \{/);
   assert.match(dashboardSource, /savedRegio === CUSTOM_CAMPAIGN_REGIO_VALUE[\s\S]*applyCampaignRegioSelection\(regioEl, CUSTOM_CAMPAIGN_REGIO_VALUE, savedCustomRegioKm\);/);
   assert.match(dashboardSource, /if \(selectedValue === CUSTOM_CAMPAIGN_REGIO_VALUE\) \{[\s\S]*const customKm = await promptForCustomCampaignRegioKm\(initialCustomKm\);/);
-  assert.match(pageSource, /const activeDotColor = String\([\s\S]*selectedOption\?\.dataset\?\.dotColor[\s\S]*wrapper\.dataset\.dotColor = activeDotColor;/);
+  assert.match(customSelectsSource, /const activeDotColor = String\([\s\S]*selectedOption && selectedOption\.dataset && selectedOption\.dataset\.dotColor[\s\S]*wrapper\.dataset\.dotColor = activeDotColor;/);
   assert.doesNotMatch(dashboardSource, /window\.localStorage/);
   assert.doesNotMatch(dashboardSource, /window\.sessionStorage/);
 });
