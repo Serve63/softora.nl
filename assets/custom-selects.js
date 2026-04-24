@@ -60,7 +60,7 @@
         if (String(select.dataset.nativeSelect || "").trim() === "true") {
             return false;
         }
-        return true;
+        return Boolean(String(select.dataset.selectVariant || "").trim() || String(select.dataset.customSelect || "").trim() === "true");
     }
 
     function closeAllCustomSelects(exceptWrapper = null) {

@@ -54,6 +54,9 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
+  assert.match(pageSource, /<select class="fsel" id="f-branche">/);
+  assert.doesNotMatch(pageSource, /id="f-branche"[^>]*data-select-variant/);
+  assert.doesNotMatch(pageSource, /id="f-branche"[^>]*data-custom-select/);
   assert.match(pageSource, /<th data-sort-key="email">Mailadres<\/th>/);
   assert.match(pageSource, /<th data-sort-key="tel">Telefoonnummer<\/th>/);
   assert.match(pageSource, /<th data-sort-key="dom">Website<\/th>/);
