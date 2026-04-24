@@ -66,7 +66,18 @@ test('premium customers page preserves the shared database lifecycle status', ()
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /function normalizeCustomerDatabaseStatus\(raw\)/);
+  assert.match(pageSource, /knownDatabaseStatuses\.indexOf\(status\) !== -1/);
+  assert.match(pageSource, /function isCustomerLifecycleRecord\(raw\)/);
+  assert.match(pageSource, /return normalizeCustomerDatabaseStatus\(raw\) === "klant";/);
   assert.match(pageSource, /if \(value === "afgehaakt"\) return "afgehaakt";/);
-  assert.match(pageSource, /databaseStatus: normalizeCustomerDatabaseStatus\(raw\),/);
-  assert.match(pageSource, /JSON\.stringify\(normalizedCustomers\)/);
+  assert.match(pageSource, /const databaseStatus = normalizeCustomerDatabaseStatus\(raw\);/);
+  assert.match(pageSource, /databaseStatus: databaseStatus,/);
+  assert.match(pageSource, /function parseCustomerStorageRows\(raw\)/);
+  assert.match(pageSource, /\.filter\(isCustomerLifecycleRecord\)/);
+  assert.match(pageSource, /const preservedDatabaseRows = \(Array\.isArray\(state\.sharedCustomerRows\) \? state\.sharedCustomerRows : \[\]\)\.filter/);
+  assert.match(pageSource, /return !isCustomerLifecycleRecord\(row\);/);
+  assert.match(pageSource, /const storageRows = preservedDatabaseRows\.concat\(normalizedCustomers\);/);
+  assert.match(pageSource, /JSON\.stringify\(storageRows\)/);
+  assert.match(pageSource, /const remoteRows = parseCustomerStorageRows/);
+  assert.match(pageSource, /if \(remoteRows\.length\) \{/);
 });

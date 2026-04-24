@@ -1314,6 +1314,7 @@
         const state = {
             klanten: [],
             orders: [],
+            sharedCustomerRows: [],
             query: "",
             editId: null,
             messageTimer: null
@@ -1444,10 +1445,30 @@
 
         function normalizeCustomerDatabaseStatus(raw) {
             const value = normalizeString(raw && raw.databaseStatus).toLowerCase();
+            const status = normalizeString(raw && raw.status).toLowerCase();
+            const knownDatabaseStatuses = [
+                "prospect",
+                "benaderbaar",
+                "gebeld",
+                "gemaild",
+                "interesse",
+                "afspraak",
+                "klant",
+                "afgehaakt",
+                "geblokkeerd",
+                "buiten"
+            ];
+            if (knownDatabaseStatuses.indexOf(value) !== -1) return value;
+            if (knownDatabaseStatuses.indexOf(status) !== -1) return status;
             if (value === "afgehaakt") return "afgehaakt";
             if (value === "interesse") return "interesse";
             if (value === "afspraak") return "afspraak";
+            if (status === "betaald" || status === "open") return "klant";
             return "klant";
+        }
+
+        function isCustomerLifecycleRecord(raw) {
+            return normalizeCustomerDatabaseStatus(raw) === "klant";
         }
 
         function getModalFieldNodes() {
@@ -1492,7 +1513,11 @@
             const type = rawType === "Onderhoud" || rawType === "Website + onderhoud"
                 ? rawType
                 : "Website";
-            const status = normalizeString(raw && raw.status) === "Open" ? "Open" : "Betaald";
+            const databaseStatus = normalizeCustomerDatabaseStatus(raw);
+            const rawStatus = normalizeString(raw && raw.status);
+            const status = rawStatus === "Open"
+                ? "Open"
+                : (rawStatus === "Betaald" || databaseStatus === "klant" ? "Betaald" : "Open");
             const websiteAmountRaw = normalizeOptionalAmount(raw && raw.websiteBedrag);
             const maintenanceAmountRaw = normalizeOptionalAmount(raw && raw.onderhoudPerMaand);
             const websiteBedrag = websiteAmountRaw !== null
@@ -1520,7 +1545,7 @@
                 onderhoudPerMaand: onderhoudPerMaand,
                 bedrag: bedrag,
                 status: status,
-                databaseStatus: normalizeCustomerDatabaseStatus(raw),
+                databaseStatus: databaseStatus,
                 actief: normalizeActiveValue(raw && raw.actief),
                 review: review,
                 verantwoordelijk: normalizeResponsibleValue(getResponsibleSourceValue(raw)),
@@ -1738,16 +1763,28 @@
             throw lastError || new Error("UI-state POST mislukt");
         }
 
-        function parseCustomers(raw) {
+        function parseCustomerStorageRows(raw) {
             try {
                 const parsed = JSON.parse(String(raw || "[]"));
                 if (!Array.isArray(parsed)) return [];
-                return sortCustomers(parsed.map(function (item, index) {
-                    return normalizeCustomer(item, "klant-import-" + index);
-                }));
+                return parsed.filter(function (item) {
+                    return item && typeof item === "object";
+                });
             } catch (error) {
                 return [];
             }
+        }
+
+        function parseCustomersFromRows(rows) {
+            return sortCustomers((Array.isArray(rows) ? rows : [])
+                .filter(isCustomerLifecycleRecord)
+                .map(function (item, index) {
+                    return normalizeCustomer(item, "klant-import-" + index);
+                }));
+        }
+
+        function parseCustomers(raw) {
+            return parseCustomersFromRows(parseCustomerStorageRows(raw));
         }
 
         function parseOrders(raw) {
@@ -1885,10 +1922,12 @@
             const rawCustomers = Array.isArray(customersBootstrapPayload && customersBootstrapPayload.customers)
                 ? customersBootstrapPayload.customers
                 : [];
-
-            return sortCustomers(rawCustomers.map(function (item, index) {
-                return normalizeCustomer(item, "klant-bootstrap-" + index);
-            }));
+            state.sharedCustomerRows = rawCustomers;
+            return sortCustomers(rawCustomers
+                .filter(isCustomerLifecycleRecord)
+                .map(function (item, index) {
+                    return normalizeCustomer(item, "klant-bootstrap-" + index);
+                }));
         }
 
         function serializeCustomerList(customers) {
@@ -1905,15 +1944,20 @@
             const normalizedCustomers = sortCustomers(customers.map(function (item, index) {
                 return normalizeCustomer(item, "klant-save-" + index);
             }));
+            const preservedDatabaseRows = (Array.isArray(state.sharedCustomerRows) ? state.sharedCustomerRows : []).filter(function (row) {
+                return !isCustomerLifecycleRecord(row);
+            });
+            const storageRows = preservedDatabaseRows.concat(normalizedCustomers);
 
             try {
                 await fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
                     patch: {
-                        [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers)
+                        [CUSTOMER_DB_KEY]: JSON.stringify(storageRows)
                     },
                     source: "premium-klanten",
                     actor: "Premium klanten database"
                 });
+                state.sharedCustomerRows = storageRows;
                 return { ok: true };
             } catch (error) {
                 return {
@@ -2250,9 +2294,11 @@
 
             try {
                 const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
-                const remoteCustomers = parseCustomers(remoteState && remoteState.values && remoteState.values[CUSTOMER_DB_KEY]);
+                const remoteRows = parseCustomerStorageRows(remoteState && remoteState.values && remoteState.values[CUSTOMER_DB_KEY]);
+                const remoteCustomers = parseCustomersFromRows(remoteRows);
+                state.sharedCustomerRows = remoteRows;
 
-                if (remoteCustomers.length) {
+                if (remoteRows.length) {
                     let enrichedCustomers = remoteCustomers;
                     try {
                         const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
@@ -2286,6 +2332,7 @@
                 const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
                 state.orders = Array.isArray(orders) ? orders : [];
                 const importedCustomers = deriveCustomersFromOrders(orders);
+                state.sharedCustomerRows = importedCustomers;
 
                 const shouldRerender = customerListsDiffer(importedCustomers);
                 state.klanten = importedCustomers;
