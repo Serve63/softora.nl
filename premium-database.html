@@ -312,17 +312,20 @@
         .filter-select-group {
             display: flex;
             flex-direction: column;
-            gap: 9px;
-            min-width: 260px;
+            flex: 0 0 210px;
+            gap: 5px;
+            min-width: 210px;
+            max-width: 210px;
         }
 
         .filter-select-label {
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 700;
-            letter-spacing: 1.8px;
+            letter-spacing: 1.4px;
             text-transform: uppercase;
             color: var(--light);
             padding-left: 2px;
+            line-height: 1;
         }
 
         .search {
@@ -391,19 +394,20 @@
         }
 
         .filter-bar .site-select {
-            min-width: 250px;
+            width: 100%;
+            min-width: 0;
         }
 
         .filter-select-group .site-select-trigger {
             position: relative;
-            min-height: 46px;
-            padding: 11px 44px 11px 14px;
-            border-radius: 12px;
+            min-height: 34px;
+            padding: 7px 34px 7px 11px;
+            border-radius: 7px;
             border: 1px solid rgba(26, 28, 40, 0.12);
             background: linear-gradient(180deg, #ffffff 0%, #f8f6f2 100%);
-            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,.9);
+            box-shadow: 0 5px 14px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255,255,255,.9);
             color: #1f2130;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             letter-spacing: 0.01em;
             transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease, background .16s ease;
@@ -413,7 +417,7 @@
         .filter-select-group .site-select.is-open .site-select-trigger {
             border-color: rgba(139, 34, 82, 0.32);
             background: #fff;
-            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.11), 0 0 0 3px rgba(139, 34, 82, 0.09);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.09), 0 0 0 2px rgba(139, 34, 82, 0.08);
             transform: translateY(-1px);
         }
 
@@ -426,16 +430,16 @@
         }
 
         .filter-select-group .site-select-trigger::after {
-            right: 15px;
-            border-left-width: 5px;
-            border-right-width: 5px;
-            border-top-width: 6px;
+            right: 12px;
+            border-left-width: 4px;
+            border-right-width: 4px;
+            border-top-width: 5px;
             border-top-color: rgba(82, 85, 102, 0.94);
             opacity: 1;
         }
 
         .filter-select-group .site-select-value {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             line-height: 1.35;
             color: #212335;
@@ -443,18 +447,18 @@
 
         .filter-select-group .site-select-menu {
             top: 0;
-            padding: 8px;
-            border-radius: 14px;
+            padding: 5px;
+            border-radius: 9px;
             border: 1px solid rgba(26, 28, 40, 0.13);
             background: rgba(255,255,255,.99);
-            box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
             backdrop-filter: blur(6px);
         }
 
         .filter-select-group .site-select-option {
-            border-radius: 10px;
-            padding: 10px 12px;
-            font-size: 13px;
+            border-radius: 7px;
+            padding: 8px 10px;
+            font-size: 12px;
             font-weight: 500;
             color: #2a2c3f;
             transition: background .14s ease, color .14s ease;
