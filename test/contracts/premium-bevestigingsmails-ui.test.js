@@ -112,14 +112,15 @@ test('premium bevestigingsmails includes lead-generator campaign boot overlay be
   );
 });
 
-test('premium bevestigingsmails campaign volume label toggles mail vs appointments with arrow controls', () => {
+test('premium bevestigingsmails campaign volume uses a fixed mail company label', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /id="campaign-count-mode-label"/);
-  assert.match(pageSource, /function cycleCampaignCountMode/);
+  assert.doesNotMatch(pageSource, /field-label-nav/);
+  assert.doesNotMatch(pageSource, /cycleCampaignCountMode/);
+  assert.doesNotMatch(pageSource, /campaign-count-mode-label/);
+  assert.doesNotMatch(pageSource, /Hoeveel afspraken inplannen\?/);
   assert.match(pageSource, /Hoeveel bedrijven mailen\?/);
-  assert.match(pageSource, /Hoeveel afspraken inplannen\?/);
   assert.doesNotMatch(pageSource, /Aantal te mailen bedrijven/);
 });
 

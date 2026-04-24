@@ -421,49 +421,6 @@ html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setti
 .field { margin-bottom: 18px; position: relative; }
 .field.is-open { z-index: 25; }
 .field-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); margin-bottom: 8px; display: block; }
-.field-label-row {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 4px;
-  margin-bottom: 8px;
-  width: fit-content;
-  max-width: 100%;
-}
-.field-label-nav {
-  flex-shrink: 0;
-  width: auto;
-  height: auto;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  color: var(--mid);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: color .15s;
-}
-.field-label-nav:hover {
-  color: var(--crimson);
-}
-.field-label-nav:focus-visible {
-  outline: none;
-  color: var(--crimson);
-}
-.field-label-nav svg { width: 18px; height: 18px; }
-.field-label--toggle {
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-bottom: 0;
-  text-transform: none;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--dark);
-  line-height: 1.35;
-}
 .field-val { font-family: 'Oswald', sans-serif; font-size: 28px; font-weight: 700; color: var(--crimson); line-height: 1; margin-bottom: 6px; }
 
 .slider { width: 100%; -webkit-appearance: none; height: 4px; border-radius: 2px; background: var(--border); outline: none; cursor: pointer; }
@@ -1273,15 +1230,7 @@ Softora.nl | +31 6 2991 7185</textarea>
       <div class="campagne-body">
 
         <div class="field">
-          <div class="field-label-row" role="group" aria-label="Doel van de campagne">
-            <button type="button" class="field-label-nav" aria-label="Vorige optie" onclick="cycleCampaignCountMode(-1)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-            <div class="field-label field-label--toggle" id="campaign-count-mode-label">Hoeveel bedrijven mailen?</div>
-            <button type="button" class="field-label-nav" aria-label="Volgende optie" onclick="cycleCampaignCountMode(1)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
-          </div>
+          <div class="field-label">Hoeveel bedrijven mailen?</div>
           <div class="field-val" id="slider-val">100</div>
           <input class="slider" type="range" min="10" max="500" step="10" value="100" id="mail-slider" oninput="updateSlider(this.value)">
           <div class="slider-row"><span>10</span><span>250</span><span>500</span></div>
@@ -1627,29 +1576,6 @@ function genBedrijven(n) {
 }
 
 // ── SLIDER ──
-const CAMPAIGN_COUNT_MODES = [
-  { id: 'mail', label: 'Hoeveel bedrijven mailen?' },
-  { id: 'appointments', label: 'Hoeveel afspraken inplannen?' },
-];
-let campaignCountModeIndex = 0;
-
-function getCampaignCountMode() {
-  return CAMPAIGN_COUNT_MODES[campaignCountModeIndex]?.id || 'mail';
-}
-
-function renderCampaignCountModeLabel() {
-  const el = document.getElementById('campaign-count-mode-label');
-  if (!el) return;
-  const mode = CAMPAIGN_COUNT_MODES[campaignCountModeIndex];
-  el.textContent = mode ? mode.label : '';
-}
-
-function cycleCampaignCountMode(delta) {
-  const len = CAMPAIGN_COUNT_MODES.length;
-  campaignCountModeIndex = (campaignCountModeIndex + delta + len) % len;
-  renderCampaignCountModeLabel();
-}
-
 function updateSlider(v) {
   document.getElementById('slider-val').textContent = v;
   const pct = ((v-10)/(500-10))*100;
@@ -1657,7 +1583,6 @@ function updateSlider(v) {
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
 }
 updateSlider(100);
-renderCampaignCountModeLabel();
 
 const KM_OPTIES = [10,20,30,40,50,75,100,130,150,175,200,250];
 function updateKm(v) {
@@ -2129,12 +2054,10 @@ async function startCampagneImmediate() {
   campaignFinished = false;
   running = true;
 
-  const countMode = getCampaignCountMode();
   const timelineTitle = document.getElementById('campaign-timeline-title');
   if (timelineTitle) timelineTitle.textContent = durationLabel + ' tijdlijn';
-  document.getElementById('campaign-subtitle').textContent = countMode === 'appointments'
-    ? `${actualTotal} afspraken inplannen binnen deze campagne van ${durationLabel}, van eerste benadering tot laatste checkpoint.${providerSuffix}`
-    : `${actualTotal} bedrijven doorlopen deze campagne in ${durationLabel}, van eerste verzending tot laatste checkpoint.${providerSuffix}`;
+  document.getElementById('campaign-subtitle').textContent =
+    `${actualTotal} bedrijven doorlopen deze campagne in ${durationLabel}, van eerste verzending tot laatste checkpoint.${providerSuffix}`;
 
   showScreen('screen-campaign');
   document.getElementById('campaign-progress-fill').style.width = '0%';
