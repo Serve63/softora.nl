@@ -47,6 +47,11 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /websitePhoto: normalizeString\(raw && \(raw\.websitePhoto \|\| raw\.photo \|\| raw\.websiteImage\)\)/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
   assert.match(pageSource, /class=\\"photo-drop\\"/);
+  assert.match(pageSource, /data-has-photo=\\"/);
+  assert.match(pageSource, /function openWebsitePhotoPreview\(customerId\)/);
+  assert.match(pageSource, /function prepareWebsitePhotoForStorage\(dataUrl, fileName\)/);
+  assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 900, 1350, 0\.76\)/);
+  assert.match(pageSource, /<div class="photo-preview" id="photoPreview"/);
   assert.match(pageSource, /function readImageFileAsDataUrl\(file\)/);
   assert.match(pageSource, /function saveWebsitePhotoForCustomer\(customerId, file\)/);
   assert.match(pageSource, /function generateWebdesignPhotos\(\)/);

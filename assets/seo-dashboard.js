@@ -458,8 +458,8 @@
 
   function renderAutomation(automation, modelOptions) {
     const safeAutomation = automation && typeof automation === 'object' ? automation : {};
-    renderSelectOptions(elements.preferredModelSelect, modelOptions, normalizeText(safeAutomation.preferredModel || 'gpt-5.1'));
-    renderSelectOptions(elements.blogModelSelect, modelOptions, normalizeText(safeAutomation.blogModel || safeAutomation.preferredModel || 'gpt-5.1'));
+    renderSelectOptions(elements.preferredModelSelect, modelOptions, normalizeText(safeAutomation.preferredModel || 'gpt-5.5'));
+    renderSelectOptions(elements.blogModelSelect, modelOptions, normalizeText(safeAutomation.blogModel || safeAutomation.preferredModel || 'gpt-5.5'));
     renderSelectOptions(elements.blogCadenceSelect, CADENCE_OPTIONS, normalizeText(safeAutomation.blogCadence || 'weekly'));
     elements.blogAutomationToggle.checked = Boolean(safeAutomation.blogAutomationEnabled);
     elements.blogAutoImagesToggle.checked = Boolean(safeAutomation.blogAutoImages);
@@ -557,7 +557,7 @@
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: normalizeText(elements.preferredModelSelect.value || 'gpt-5.1'),
+          model: normalizeText(elements.preferredModelSelect.value || 'gpt-5.5'),
           actor: 'premium-seo-dashboard',
         }),
       });
@@ -592,10 +592,10 @@
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          preferredModel: normalizeText(elements.preferredModelSelect.value || 'gpt-5.1'),
+          preferredModel: normalizeText(elements.preferredModelSelect.value || 'gpt-5.5'),
           blogAutomationEnabled: elements.blogAutomationToggle.checked,
           blogCadence: normalizeText(elements.blogCadenceSelect.value || 'weekly'),
-          blogModel: normalizeText(elements.blogModelSelect.value || 'gpt-5.1'),
+          blogModel: normalizeText(elements.blogModelSelect.value || 'gpt-5.5'),
           blogAutoImages: elements.blogAutoImagesToggle.checked,
           actor: 'premium-seo-dashboard',
         }),

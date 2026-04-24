@@ -34,7 +34,7 @@ function createAiCallInsightRuntime(deps = {}) {
     extractOpenAiTextContent = () => '',
     parseJsonLoose = () => null,
     openAiApiBaseUrl = 'https://api.openai.com/v1',
-    openAiModel = 'gpt-4o-mini',
+    openAiModel = 'gpt-5.5',
     buildLeadOwnerFields = () => ({}),
     queueRuntimeStatePersist = () => {},
     upsertRecentCallUpdate = () => null,

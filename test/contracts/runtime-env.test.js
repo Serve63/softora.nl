@@ -46,6 +46,13 @@ test('loadRuntimeEnv defaults dashboard Anthropic model to Claude Sonnet 4.6', (
   assert.equal(runtimeEnv.ai.anthropicModel, 'claude-sonnet-4-6');
 });
 
+test('loadRuntimeEnv defaults OpenAI text calls to GPT-5.5', () => {
+  const runtimeEnv = loadRuntimeEnv({});
+
+  assert.equal(runtimeEnv.ai.openaiModel, 'gpt-5.5');
+  assert.equal(runtimeEnv.ai.openaiImageModel, 'gpt-image-2');
+});
+
 test('loadRuntimeEnv preserves legacy boolean and numeric fallback rules', () => {
   const runtimeEnv = loadRuntimeEnv({
     WEBSITE_GENERATION_TIMEOUT_MS: '99999999',

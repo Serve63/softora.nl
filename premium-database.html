@@ -620,6 +620,72 @@
             display: block;
         }
 
+        .photo-drop[data-has-photo="true"] {
+            cursor: zoom-in;
+        }
+
+        .photo-preview {
+            position: fixed;
+            inset: 0;
+            z-index: 120;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+        }
+
+        .photo-preview.on {
+            display: flex;
+        }
+
+        .photo-preview-backdrop {
+            position: absolute;
+            inset: 0;
+            border: 0;
+            background: rgba(0,0,0,.76);
+            cursor: zoom-out;
+        }
+
+        .photo-preview-card {
+            position: relative;
+            z-index: 1;
+            max-width: min(1120px, 94vw);
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .photo-preview-close {
+            position: absolute;
+            top: -14px;
+            right: -14px;
+            width: 34px;
+            height: 34px;
+            border: 1px solid rgba(255,255,255,.22);
+            border-radius: 999px;
+            background: rgba(13,13,13,.92);
+            color: #fff;
+            cursor: pointer;
+            font-size: 22px;
+            line-height: 1;
+        }
+
+        .photo-preview-image {
+            max-width: min(1120px, 94vw);
+            max-height: 84vh;
+            border-radius: 12px;
+            background: #111;
+            box-shadow: 0 26px 80px rgba(0,0,0,.42);
+            object-fit: contain;
+        }
+
+        .photo-preview-meta {
+            color: rgba(255,255,255,.82);
+            font-size: 13px;
+            text-align: center;
+        }
+
         .s-wrap {
             display: flex;
             align-items: center;
@@ -1240,6 +1306,14 @@
 
     <div class="toast" id="toast"></div>
     <input type="file" id="photoFileInput" accept="image/*" hidden>
+    <div class="photo-preview" id="photoPreview" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Websitefoto bekijken">
+        <button class="photo-preview-backdrop" id="photoPreviewBackdrop" type="button" aria-label="Sluit foto"></button>
+        <div class="photo-preview-card">
+            <button class="photo-preview-close" id="photoPreviewClose" type="button" aria-label="Sluit foto">&times;</button>
+            <img class="photo-preview-image" id="photoPreviewImage" alt="">
+            <div class="photo-preview-meta" id="photoPreviewMeta"></div>
+        </div>
+    </div>
 
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
@@ -1312,6 +1386,11 @@
             fieldResponsible: document.getElementById("m-responsible"),
             cancelModalButton: document.getElementById("cancelModalButton"),
             saveModalButton: document.getElementById("saveModalButton"),
+            photoPreview: document.getElementById("photoPreview"),
+            photoPreviewBackdrop: document.getElementById("photoPreviewBackdrop"),
+            photoPreviewClose: document.getElementById("photoPreviewClose"),
+            photoPreviewImage: document.getElementById("photoPreviewImage"),
+            photoPreviewMeta: document.getElementById("photoPreviewMeta"),
             toast: document.getElementById("toast")
         };
 
@@ -1886,10 +1965,11 @@
         function renderWebsitePhotoDrop(customer) {
             const photo = normalizeString(customer && customer.websitePhoto);
             const label = normalizeString(customer && customer.websitePhotoName) || "Websitefoto";
+            const hasPhoto = isValidWebsitePhotoDataUrl(photo);
             const inner = isValidWebsitePhotoDataUrl(photo)
                 ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\">"
                 : "<span>Sleep</span>";
-            return "<div class=\"photo-drop\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto toevoegen\">" + inner + "</div>";
+            return "<div class=\"photo-drop\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" aria-label=\"" + (hasPhoto ? "Websitefoto bekijken" : "Websitefoto toevoegen") + "\">" + inner + "</div>";
         }
 
         function renderTable() {
@@ -2046,6 +2126,90 @@
             });
         }
 
+        function replacePhotoFileExtension(fileName, extension) {
+            const cleanName = normalizeString(fileName) || "websitefoto";
+            return cleanName.replace(/\.[a-z0-9]+$/i, "") + "." + extension;
+        }
+
+        function loadWebsitePhotoImage(dataUrl) {
+            return new Promise(function (resolve, reject) {
+                const image = new Image();
+                image.onload = function () {
+                    resolve(image);
+                };
+                image.onerror = function () {
+                    reject(new Error("Foto comprimeren is mislukt."));
+                };
+                image.src = dataUrl;
+            });
+        }
+
+        async function compressWebsitePhotoDataUrl(dataUrl, fileName, maxWidth, maxHeight, quality) {
+            const image = await loadWebsitePhotoImage(dataUrl);
+            const scale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+            const width = Math.max(1, Math.round(image.naturalWidth * scale));
+            const height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext("2d");
+            if (!context) throw new Error("Foto comprimeren is mislukt.");
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, width, height);
+            context.drawImage(image, 0, 0, width, height);
+            const compressed = canvas.toDataURL("image/jpeg", quality);
+            if (!isValidWebsitePhotoDataUrl(compressed)) {
+                throw new Error("Foto comprimeren is mislukt.");
+            }
+            return {
+                dataUrl: compressed,
+                fileName: replacePhotoFileExtension(fileName, "jpg")
+            };
+        }
+
+        async function prepareWebsitePhotoForStorage(dataUrl, fileName) {
+            const original = {
+                dataUrl: normalizeString(dataUrl),
+                fileName: normalizeString(fileName) || "websitefoto"
+            };
+            if (!isValidWebsitePhotoDataUrl(original.dataUrl)) {
+                throw new Error("Dit afbeeldingsbestand kan niet worden opgeslagen.");
+            }
+            if (original.dataUrl.length <= 650000) return original;
+
+            try {
+                const compressed = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 900, 1350, 0.76);
+                if (compressed.dataUrl.length <= 1200000) return compressed;
+                return compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 720, 1080, 0.68);
+            } catch (error) {
+                return original;
+            }
+        }
+
+        function openWebsitePhotoPreview(customerId) {
+            const customer = state.klanten.find(function (item) {
+                return item.id === customerId;
+            });
+            const photo = normalizeString(customer && customer.websitePhoto);
+            if (!customer || !isValidWebsitePhotoDataUrl(photo)) return false;
+
+            const label = normalizeString(customer.websitePhotoName) || "Websitefoto";
+            nodes.photoPreviewImage.src = photo;
+            nodes.photoPreviewImage.alt = label;
+            nodes.photoPreviewMeta.textContent = customer.bedrijf ? customer.bedrijf + " · " + label : label;
+            nodes.photoPreview.classList.add("on");
+            nodes.photoPreview.setAttribute("aria-hidden", "false");
+            return true;
+        }
+
+        function closeWebsitePhotoPreview() {
+            nodes.photoPreview.classList.remove("on");
+            nodes.photoPreview.setAttribute("aria-hidden", "true");
+            nodes.photoPreviewImage.removeAttribute("src");
+            nodes.photoPreviewImage.alt = "";
+            nodes.photoPreviewMeta.textContent = "";
+        }
+
         async function saveWebsitePhotoForCustomer(customerId, file) {
             const customerIndex = state.klanten.findIndex(function (item) {
                 return item.id === customerId;
@@ -2053,10 +2217,11 @@
             if (customerIndex === -1) return;
             try {
                 const dataUrl = await readImageFileAsDataUrl(file);
+                const prepared = await prepareWebsitePhotoForStorage(dataUrl, normalizeString(file && file.name) || "websitefoto");
                 const nextCustomer = normalizeCustomer({
                     ...state.klanten[customerIndex],
-                    websitePhoto: dataUrl,
-                    websitePhotoName: normalizeString(file && file.name) || "websitefoto",
+                    websitePhoto: prepared.dataUrl,
+                    websitePhotoName: prepared.fileName,
                     updatedAt: formatDateForStorage(new Date())
                 }, customerId);
                 state.klanten = sortCustomers(state.klanten.map(function (item) {
@@ -2123,10 +2288,14 @@
             if (!isValidWebsitePhotoDataUrl(dataUrl)) {
                 throw new Error("De AI gaf geen geldige afbeelding terug voor " + customer.bedrijf + ".");
             }
+            const prepared = await prepareWebsitePhotoForStorage(
+                dataUrl,
+                normalizeString(payload && payload.image && payload.image.fileName) || customer.dom + "-webdesign.png"
+            );
 
             return {
-                dataUrl: dataUrl,
-                fileName: normalizeString(payload && payload.image && payload.image.fileName) || customer.dom + "-webdesign.png"
+                dataUrl: prepared.dataUrl,
+                fileName: prepared.fileName
             };
         }
 
@@ -2569,6 +2738,9 @@
                 event.preventDefault();
                 event.stopPropagation();
                 state.photoTargetId = photoDrop.getAttribute("data-photo-id");
+                if (openWebsitePhotoPreview(state.photoTargetId)) {
+                    return;
+                }
                 nodes.photoFileInput.value = "";
                 nodes.photoFileInput.click();
                 return;
@@ -2606,6 +2778,8 @@
             void saveWebsitePhotoForCustomer(state.photoTargetId, file);
         });
 
+        nodes.photoPreviewBackdrop.addEventListener("click", closeWebsitePhotoPreview);
+        nodes.photoPreviewClose.addEventListener("click", closeWebsitePhotoPreview);
         nodes.overlay.addEventListener("click", closePanel);
         nodes.closePanelButton.addEventListener("click", closePanel);
         nodes.saveNoteButton.addEventListener("click", saveNota);
@@ -2640,6 +2814,10 @@
 
         document.addEventListener("keydown", function (event) {
             if (event.key === "Escape") {
+                if (nodes.photoPreview.classList.contains("on")) {
+                    closeWebsitePhotoPreview();
+                    return;
+                }
                 closeAddActions();
                 if (nodes.modalBg.classList.contains("on")) {
                     closeModal();
