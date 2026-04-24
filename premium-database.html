@@ -309,22 +309,6 @@
             flex-wrap: wrap;
         }
 
-        .filter-select-group {
-            display: flex;
-            flex-direction: column;
-            gap: 9px;
-            min-width: 260px;
-        }
-
-        .filter-select-label {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 1.8px;
-            text-transform: uppercase;
-            color: var(--light);
-            padding-left: 2px;
-        }
-
         .search {
             position: relative;
         }
@@ -341,7 +325,6 @@
         }
 
         .search input,
-        .fsel,
         .p-sel,
         .minp,
         .msel,
@@ -361,7 +344,6 @@
         }
 
         .search input:focus,
-        .fsel:focus,
         .p-sel:focus,
         .minp:focus,
         .msel:focus,
@@ -369,7 +351,6 @@
             border-color: var(--crimson);
         }
 
-        .fsel,
         .p-sel,
         .msel {
             padding: 8px 28px 8px 12px;
@@ -381,96 +362,6 @@
             background-repeat: no-repeat;
             background-position: right 8px center;
             cursor: pointer;
-        }
-
-        .fsel {
-            min-width: 220px;
-            background-color: var(--card);
-            border-color: rgba(139, 34, 82, 0.16);
-            box-shadow: 0 1px 0 rgba(255,255,255,.3) inset;
-        }
-
-        .filter-bar .site-select {
-            min-width: 250px;
-        }
-
-        .filter-select-group .site-select-trigger {
-            position: relative;
-            min-height: 46px;
-            padding: 11px 44px 11px 14px;
-            border-radius: 12px;
-            border: 1px solid rgba(26, 28, 40, 0.12);
-            background: linear-gradient(180deg, #ffffff 0%, #f8f6f2 100%);
-            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,.9);
-            color: #1f2130;
-            font-size: 14px;
-            font-weight: 600;
-            letter-spacing: 0.01em;
-            transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease, background .16s ease;
-        }
-
-        .filter-select-group .site-select-trigger:hover,
-        .filter-select-group .site-select.is-open .site-select-trigger {
-            border-color: rgba(139, 34, 82, 0.32);
-            background: #fff;
-            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.11), 0 0 0 3px rgba(139, 34, 82, 0.09);
-            transform: translateY(-1px);
-        }
-
-        .filter-select-group .site-select-trigger:focus-visible {
-            border-color: rgba(139, 34, 82, 0.44);
-            background: #fff;
-            box-shadow: 0 0 0 4px rgba(139, 34, 82, 0.14);
-            transform: none;
-            outline: none;
-        }
-
-        .filter-select-group .site-select-trigger::after {
-            right: 15px;
-            border-left-width: 5px;
-            border-right-width: 5px;
-            border-top-width: 6px;
-            border-top-color: rgba(82, 85, 102, 0.94);
-            opacity: 1;
-        }
-
-        .filter-select-group .site-select-value {
-            font-size: 14px;
-            font-weight: 600;
-            line-height: 1.35;
-            color: #212335;
-        }
-
-        .filter-select-group .site-select-menu {
-            top: 0;
-            padding: 8px;
-            border-radius: 14px;
-            border: 1px solid rgba(26, 28, 40, 0.13);
-            background: rgba(255,255,255,.99);
-            box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
-            backdrop-filter: blur(6px);
-        }
-
-        .filter-select-group .site-select-option {
-            border-radius: 10px;
-            padding: 10px 12px;
-            font-size: 13px;
-            font-weight: 500;
-            color: #2a2c3f;
-            transition: background .14s ease, color .14s ease;
-        }
-
-        .filter-select-group .site-select-option:hover,
-        .filter-select-group .site-select-option:focus-visible {
-            background: rgba(139, 34, 82, 0.09);
-            color: #6f2144;
-            outline: none;
-        }
-
-        .filter-select-group .site-select-option.is-selected {
-            background: rgba(139, 34, 82, 0.13);
-            color: #7f234c;
-            font-weight: 600;
         }
 
         .status-filter {
@@ -1318,20 +1209,6 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                             <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
-                        <div class="filter-select-group">
-                            <label class="filter-select-label" for="f-branche">Branche</label>
-                            <select class="fsel" id="f-branche">
-                                <option value="">Alle branches</option>
-                                <option>Horeca & Restaurants</option>
-                                <option>Retail & Winkels</option>
-                                <option>Zakelijke Dienstverlening</option>
-                                <option>Bouw & Vastgoed</option>
-                                <option>Gezondheidszorg</option>
-                                <option>Creatieve Sector</option>
-                                <option>Tech & Startups</option>
-                                <option>Overig</option>
-                            </select>
-                        </div>
                         <div class="status-filter">
                             <button class="sf-btn act" data-s="alle" type="button">Alle</button>
                             <button class="sf-btn" data-s="klant" type="button">Klant</button>
@@ -1492,7 +1369,6 @@
             orders: [],
             query: "",
             activeStatus: "alle",
-            activeBranch: "",
             sortKey: "updatedAt",
             sortAsc: false,
             openId: null,
@@ -1505,7 +1381,6 @@
             topSub: document.getElementById("top-sub"),
             statusBanner: document.getElementById("statusBanner"),
             query: document.getElementById("q"),
-            branch: document.getElementById("f-branche"),
             count: document.getElementById("f-count"),
             tbody: document.getElementById("tbody"),
             statusButtons: Array.from(document.querySelectorAll(".sf-btn")),
@@ -2120,7 +1995,6 @@
             const query = normalizeSearchValue(state.query);
             return state.klanten.filter(function (customer) {
                 if (state.activeStatus !== "alle" && customer.status !== state.activeStatus) return false;
-                if (state.activeBranch && customer.branche !== state.activeBranch) return false;
                 if (!query) return true;
 
                 const haystack = [
@@ -3184,11 +3058,6 @@
 
         nodes.query.addEventListener("input", function (event) {
             state.query = normalizeString(event.target.value);
-            renderPage();
-        });
-
-        nodes.branch.addEventListener("change", function (event) {
-            state.activeBranch = normalizeString(event.target.value);
             renderPage();
         });
 
