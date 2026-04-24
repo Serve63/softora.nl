@@ -539,7 +539,7 @@
             line-height: 1.35;
             color: var(--light);
             text-align: center;
-            max-width: 132px;
+            max-width: 150px;
         }
 
         .photo-cost-label strong {
@@ -1351,9 +1351,9 @@
                             <button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
-                            <div class="photo-cost-label" aria-label="Kosten per AI-foto">
-                                <strong>± $0.21/foto</strong><br>
-                                Image 2 4K high · URL-scan $0.00
+                            <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
+                                <strong>± €0,21/foto</strong><br>
+                                Totaal nu: €0,00
                             </div>
                             <button class="result-count-button" id="generatePhotosButton" type="button" aria-label="Genereer AI-foto's voor bedrijven zonder foto">
                                 <svg class="result-count-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -1476,6 +1476,7 @@
         const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";
         const CUSTOMER_PHOTO_DATA_PREFIX = "softora_database_photo_data_v1_";
         const CUSTOMER_PHOTO_CHUNK_SIZE = 180000;
+        const WEBSITE_PHOTO_COST_EUR = 0.21;
         const ORDER_SCOPE = "premium_active_orders";
         const ORDER_KEY = "softora_custom_orders_premium_v1";
         const DATABASE_STATUS_OPTIONS = ["prospect", "gebeld", "gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten", "benaderbaar", "geengehoor"];
@@ -1519,6 +1520,7 @@
             addActions: document.getElementById("addActions"),
             addActionsMenu: document.getElementById("addActionsMenu"),
             addButton: document.getElementById("addButton"),
+            photoCostLabel: document.getElementById("photoCostLabel"),
             generatePhotosButton: document.getElementById("generatePhotosButton"),
             addUploadButton: document.getElementById("addUploadButton"),
             addManualButton: document.getElementById("addManualButton"),
@@ -2241,6 +2243,24 @@
             return normalizeDatabaseStatus(customer && customer.status, customer) !== "klant";
         }
 
+        function isWebdesignPhotoEligible(customer) {
+            return shouldShowWebsitePhoto(customer) && !isValidWebsitePhotoDataUrl(customer && customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
+        }
+
+        function formatEuroCost(value) {
+            return "€" + Number(value || 0).toLocaleString("nl-NL", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function renderPhotoCostLabel(customers) {
+            const eligibleCount = (customers || []).filter(isWebdesignPhotoEligible).length;
+            const totalCost = eligibleCount * WEBSITE_PHOTO_COST_EUR;
+            nodes.photoCostLabel.innerHTML = "<strong>± " + formatEuroCost(WEBSITE_PHOTO_COST_EUR) + "/foto</strong><br>Totaal nu: " + formatEuroCost(totalCost);
+            nodes.photoCostLabel.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. URL-scan kost €0,00.";
+        }
+
         function renderWebsitePhotoDrop(customer) {
             if (!shouldShowWebsitePhoto(customer)) return "";
             const photo = normalizeString(customer && customer.websitePhoto);
@@ -2260,6 +2280,7 @@
 
             nodes.topSub.textContent = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben\nof niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
+            renderPhotoCostLabel(filtered);
 
             if (!filtered.length) {
                 nodes.tbody.innerHTML = "<tr><td colspan=\"10\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
@@ -2610,7 +2631,7 @@
 
         function getWebdesignPhotoTargets() {
             return getSortedCustomers(getFilteredCustomers()).filter(function (customer) {
-                return shouldShowWebsitePhoto(customer) && !isValidWebsitePhotoDataUrl(customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
+                return isWebdesignPhotoEligible(customer);
             }).slice(0, 10);
         }
 
