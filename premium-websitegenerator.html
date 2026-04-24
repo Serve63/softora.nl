@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
 <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
-<title>Website Generator – Softora.nl</title>
+<title>Websitedesign – Softora.nl</title>
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260424a">
@@ -303,7 +303,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
 <main class="main-content">
 <div class="page-shell">
-<div class="page-title">Website Generator</div>
+<div class="page-title">Websitedesign</div>
 <div class="page-sub">Scan een website en genereer een visuele preview, of maak een live paginalink aan</div>
 
 <div class="card auth-card" id="websitegenerator-auth-card">
@@ -464,10 +464,10 @@ async function maybeHydrateWebsitePreviewLibraryFromServer() {
     if (Number(data.omittedLargeItems || 0) > 0) {
       showToast('Bibliotheek geladen; een paar te grote previews zijn overgeslagen');
     }
-  } catch (_) {
+  } catch (error) {
     websitePreviewLibraryUseRemote = true;
     websitePreviewLibraryRemoteEntries = [];
-    showToast('Bibliotheek kon niet centraal laden');
+    console.warn('Websitepreview-bibliotheek laden mislukt:', error);
   }
 }
 

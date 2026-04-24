@@ -29,6 +29,9 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
+  assert.match(source, /<title>Websitedesign – Softora\.nl<\/title>/);
+  assert.match(source, /<div class="page-title">Websitedesign<\/div>/);
+  assert.doesNotMatch(source, /<div class="page-title">Website Generator<\/div>/);
   assert.doesNotMatch(source, />AI Photo Preview</);
   assert.doesNotMatch(source, />Website URL</);
   assert.doesNotMatch(source, /id="website-preview-url"/);
@@ -102,6 +105,8 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.doesNotMatch(source, /browseropslag/);
   assert.match(source, /data-tab="library"/);
   assert.match(source, /id="tab-library"/);
+  assert.doesNotMatch(source, /Bibliotheek kon niet centraal laden/);
+  assert.match(source, /console\.warn\('Websitepreview-bibliotheek laden mislukt:', error\);/);
   assert.doesNotMatch(source, /function openPreviewNewTab\(/);
   assert.match(source, /SCAN_URL_BATCH_MAX = 50/);
   assert.match(source, /function tokenizeScanUrlInput/);
