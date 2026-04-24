@@ -1118,6 +1118,9 @@
                                         <th data-sort-key="naam">Bedrijf</th>
                                         <th data-sort-key="branche">Branche</th>
                                         <th data-sort-key="stad">Adres</th>
+                                        <th data-sort-key="email">Mailadres</th>
+                                        <th data-sort-key="tel">Telefoonnummer</th>
+                                        <th data-sort-key="dom">Website</th>
                                         <th>Gebruikte kanalen</th>
                                         <th data-sort-key="status">Status</th>
                                         <th data-sort-key="updatedAt">Laatste actie</th>
@@ -1841,16 +1844,20 @@
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
 
             if (!filtered.length) {
-                nodes.tbody.innerHTML = "<tr><td colspan=\"6\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
+                nodes.tbody.innerHTML = "<tr><td colspan=\"9\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 return;
             }
 
             nodes.tbody.innerHTML = filtered.map(function (customer) {
+                const websiteValue = normalizeString(customer.website || customer.dom) || "—";
                 return [
                     "<tr data-id=\"" + escapeHtml(customer.id) + "\">",
                         "<td><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div></td>",
                         "<td><span class=\"c-mid\">" + escapeHtml(customer.branche) + "</span></td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.stad) + "</td>",
+                        "<td class=\"c-mid\">" + escapeHtml(customer.email || "—") + "</td>",
+                        "<td class=\"c-mid\">" + escapeHtml(customer.tel || "—") + "</td>",
+                        "<td class=\"c-mid\">" + escapeHtml(websiteValue) + "</td>",
                         "<td><div class=\"kanalen\">",
                             renderUsedChannelTags(customer),
                         "</div></td>",

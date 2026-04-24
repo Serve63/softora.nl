@@ -34,6 +34,14 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Toevoegen/);
   assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
+  assert.match(pageSource, /<th data-sort-key="email">Mailadres<\/th>/);
+  assert.match(pageSource, /<th data-sort-key="tel">Telefoonnummer<\/th>/);
+  assert.match(pageSource, /<th data-sort-key="dom">Website<\/th>/);
+  assert.match(pageSource, /const websiteValue = normalizeString\(customer\.website \|\| customer\.dom\) \|\| "—";/);
+  assert.match(pageSource, /escapeHtml\(customer\.email \|\| "—"\)/);
+  assert.match(pageSource, /escapeHtml\(customer\.tel \|\| "—"\)/);
+  assert.match(pageSource, /escapeHtml\(websiteValue\)/);
+  assert.match(pageSource, /colspan=\\"9\\"/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);
   assert.match(pageSource, /<textarea class="p-ta" id="p-nota"/);
