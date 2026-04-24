@@ -2390,8 +2390,7 @@
                 renderPage();
 
                 const photoResult = await persistCustomerPhotos(state.klanten);
-                const result = await persistCustomerList(state.klanten);
-                if (photoResult.ok && result.ok) {
+                if (photoResult.ok) {
                     toast("Foto opgeslagen");
                     setStatusMessage("Foto opgeslagen.", "success", true);
                     return;
@@ -2533,19 +2532,11 @@
                         const generated = await generateWebsitePhotoData(target);
                         state.klanten = sortCustomers(state.klanten.map(function (customer) {
                             if (customer.id !== target.id) return customer;
-                            const nextHistory = Array.isArray(customer.hist) ? customer.hist.slice() : [];
-                            nextHistory.push({
-                                type: "webdesign_foto",
-                                label: "Webdesign AI-foto gegenereerd",
-                                date: formatDateForStorage(new Date())
-                            });
-                            return normalizeCustomer({
+                            return {
                                 ...customer,
                                 websitePhoto: generated.dataUrl,
-                                websitePhotoName: generated.fileName,
-                                hist: nextHistory,
-                                updatedAt: formatDateForStorage(new Date())
-                            }, customer.id);
+                                websitePhotoName: generated.fileName
+                            };
                         }));
                         done += 1;
                         renderPage();
@@ -2564,13 +2555,8 @@
                 }
 
                 const photoResult = await persistCustomerPhotos(state.klanten);
-                const result = await persistCustomerList(state.klanten);
                 if (!photoResult.ok) {
                     setStatusMessage("AI-foto's staan in beeld, maar opslaan in Supabase mislukte.", "error");
-                    return;
-                }
-                if (!result.ok) {
-                    setStatusMessage("AI-foto's opgeslagen, maar databasegeschiedenis opslaan mislukte.", "info", true);
                     return;
                 }
 
@@ -2918,11 +2904,8 @@
                 }
 
                 if (importedCustomers.length) {
-                    const persistResult = await persistCustomerList(importedCustomers);
-                    if (persistResult.ok && !hadBootstrapCustomers) {
-                        setStatusMessage("Database gevuld vanuit actieve opdrachten.", "success", true);
-                    } else if (!persistResult.ok) {
-                        setStatusMessage("Import gelukt, maar Supabase-opslag mislukte.", "error");
+                    if (!hadBootstrapCustomers) {
+                        setStatusMessage("Database-voorbeeld uit actieve opdrachten. Voeg klanten toe om ze permanent op te slaan.", "info", true);
                     } else {
                         setStatusMessage("");
                     }

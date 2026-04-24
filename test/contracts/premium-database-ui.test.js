@@ -111,6 +111,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /fetchUiStateSetWithFallback\(CUSTOMER_DB_SCOPE/);
   assert.match(pageSource, /source: "premium-database"/);
   assert.match(pageSource, /actor: "Premium database"/);
+  assert.match(pageSource, /Database-voorbeeld uit actieve opdrachten\. Voeg klanten toe om ze permanent op te slaan\./);
+  assert.doesNotMatch(pageSource, /await persistCustomerList\(importedCustomers\)/);
 });
 
 test('premium database page exposes interesse as a lead-status step', () => {
