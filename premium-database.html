@@ -1306,10 +1306,6 @@
                                         <span class="add-actions-item-title">Handmatig toevoegen</span>
                                         <span class="add-actions-item-sub">Voeg zelf een bedrijf toe via het formulier</span>
                                     </button>
-                                    <button class="add-actions-item" id="restoreKnownCustomersButton" type="button" role="menuitem">
-                                        <span class="add-actions-item-title">Vaste klanten herstellen</span>
-                                        <span class="add-actions-item-sub">Zet MCV E-commerce, LinsZorgt en Growingbyknowing terug</span>
-                                    </button>
                                 </div>
                                 <input type="file" id="importFileInput" accept=".csv,text/csv" hidden>
                             </div>
@@ -1523,7 +1519,6 @@
             generatePhotosButton: document.getElementById("generatePhotosButton"),
             addUploadButton: document.getElementById("addUploadButton"),
             addManualButton: document.getElementById("addManualButton"),
-            restoreKnownCustomersButton: document.getElementById("restoreKnownCustomersButton"),
             importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
             overlay: document.getElementById("ov"),
@@ -2979,141 +2974,6 @@
             reader.readAsText(file);
         }
 
-        const KNOWN_CUSTOMER_SEEDS = [
-            {
-                bedrijf: "MCV E-commerce",
-                dom: "mcvecommerce.nl",
-                email: "info@mcvecommerce.nl",
-                stad: "Haaren",
-                branche: "Overig",
-                status: "benaderbaar",
-                verantwoordelijk: "Serve"
-            },
-            {
-                bedrijf: "LinsZorgt",
-                dom: "linszorgt.nl",
-                email: "info@linszorgt.nl",
-                stad: "Onbekend",
-                branche: "Overig",
-                status: "klant",
-                verantwoordelijk: "Serve"
-            },
-            {
-                bedrijf: "Growingbyknowing",
-                dom: "growingbyknowing.nl",
-                email: "info@growingbyknowing.nl",
-                stad: "Onbekend",
-                branche: "Overig",
-                status: "klant",
-                verantwoordelijk: "Serve"
-            }
-        ];
-
-        function isKnownBadOrderFallbackCustomer(customer) {
-            const company = normalizeString(customer && customer.bedrijf).toLowerCase();
-            const contact = normalizeString(customer && customer.naam).toLowerCase();
-            const website = normalizeString(customer && customer.website).toLowerCase();
-            const domain = normalizeString(customer && customer.dom).toLowerCase();
-            const email = normalizeString(customer && customer.email).toLowerCase();
-            const isServeCreusen = /serv[eé]\s+creusen/.test(company) || /serv[eé]\s+creusen/.test(contact);
-            if (!isServeCreusen) return false;
-            return website.indexOf("website opdracht") !== -1
-                || domain.indexOf("websiteopdracht") === 0
-                || email.indexOf("info@websiteopdracht") === 0;
-        }
-
-        function syncKnownCustomerStatuses(customers) {
-            const seedByKey = new Map(KNOWN_CUSTOMER_SEEDS.map(function (seed) {
-                return [normalizeString(seed.bedrijf).toLowerCase(), seed];
-            }));
-            let syncedCount = 0;
-            const syncedCustomers = (customers || []).map(function (customer) {
-                const key = normalizeString(customer && customer.bedrijf).toLowerCase();
-                const seed = seedByKey.get(key);
-                if (!seed || normalizeDatabaseStatus(customer && customer.status, customer) === seed.status) {
-                    return customer;
-                }
-                syncedCount += 1;
-                const nextHistory = Array.isArray(customer && customer.hist) ? customer.hist.slice() : [];
-                nextHistory.push({
-                    type: seed.status,
-                    label: "Status hersteld",
-                    date: formatDateForStorage(new Date())
-                });
-                return normalizeCustomer({
-                    ...customer,
-                    status: seed.status,
-                    hist: nextHistory,
-                    updatedAt: formatDateForStorage(new Date())
-                }, customer && customer.id);
-            });
-
-            return {
-                customers: syncedCustomers,
-                syncedCount: syncedCount
-            };
-        }
-
-        function restoreKnownCustomers() {
-            closeAddActions();
-            const cleanedCustomers = state.klanten.filter(function (customer) {
-                return !isKnownBadOrderFallbackCustomer(customer);
-            });
-            const removedCount = state.klanten.length - cleanedCustomers.length;
-            const statusSync = syncKnownCustomerStatuses(cleanedCustomers);
-            const syncedCustomers = statusSync.customers;
-            const syncedCount = statusSync.syncedCount;
-            const existingKeys = new Set(cleanedCustomers.map(function (customer) {
-                return normalizeString(customer && customer.bedrijf).toLowerCase();
-            }));
-
-            const restored = [];
-            const nowIso = formatDateForStorage(new Date());
-            KNOWN_CUSTOMER_SEEDS.forEach(function (seed) {
-                const key = normalizeString(seed.bedrijf).toLowerCase();
-                if (existingKeys.has(key)) return;
-                restored.push(normalizeCustomer({
-                    id: createId(),
-                    naam: seed.bedrijf,
-                    bedrijf: seed.bedrijf,
-                    dom: seed.dom,
-                    telefoon: "—",
-                    email: seed.email,
-                    branche: seed.branche,
-                    stad: seed.stad,
-                    status: seed.status,
-                    verantwoordelijk: seed.verantwoordelijk,
-                    hist: [{
-                        type: seed.status,
-                        label: "Hersteld in database",
-                        date: nowIso
-                    }],
-                    updatedAt: nowIso
-                }));
-            });
-
-            if (!restored.length && !removedCount && !syncedCount) {
-                setStatusMessage("Alle vaste klanten staan al in de database.", "info", true);
-                return;
-            }
-
-            state.klanten = sortCustomers(restored.concat(syncedCustomers));
-            renderPage();
-            setStatusMessage(restored.length + " vaste klant" + (restored.length === 1 ? "" : "en") + " hersteld, " + syncedCount + " status" + (syncedCount === 1 ? "" : "sen") + " bijgewerkt, " + removedCount + " verkeerde rij" + (removedCount === 1 ? "" : "en") + " verwijderd. Opslaan...", "info");
-
-            persistCustomerList(state.klanten).then(function (result) {
-                if (result.ok) {
-                    toast("✓ Database hersteld");
-                    setStatusMessage("Vaste klanten hersteld, statussen bijgewerkt en verkeerde rijen verwijderd.", "success", true);
-                    return;
-                }
-                setStatusMessage(
-                    "Herstellen gelukt lokaal, maar opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
-                    "error"
-                );
-            });
-        }
-
         function addCustomerFromModal() {
             const bedrijf = normalizeString(nodes.modalCompany.value);
             if (!bedrijf) {
@@ -3427,9 +3287,6 @@
             closeAddActions();
             openModal();
         });
-        if (nodes.restoreKnownCustomersButton) {
-            nodes.restoreKnownCustomersButton.addEventListener("click", restoreKnownCustomers);
-        }
         nodes.importFileInput.addEventListener("change", handleImportFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);

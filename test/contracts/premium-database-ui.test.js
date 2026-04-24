@@ -151,21 +151,16 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /actor: "Premium database"/);
   assert.match(pageSource, /Database-voorbeeld uit actieve opdrachten\. Voeg klanten toe om ze permanent op te slaan\./);
   assert.doesNotMatch(pageSource, /await persistCustomerList\(importedCustomers\)/);
-  assert.match(pageSource, /id="restoreKnownCustomersButton"/);
-  assert.match(pageSource, /Vaste klanten herstellen/);
-  assert.match(pageSource, /const KNOWN_CUSTOMER_SEEDS = \[/);
-  assert.match(pageSource, /bedrijf: "MCV E-commerce"[\s\S]*status: "benaderbaar"/);
-  assert.match(pageSource, /bedrijf: "LinsZorgt"/);
-  assert.match(pageSource, /bedrijf: "Growingbyknowing"[\s\S]*status: "klant"/);
-  assert.match(pageSource, /function restoreKnownCustomers\(\)/);
-  assert.match(pageSource, /function syncKnownCustomerStatuses\(customers\)/);
+  assert.doesNotMatch(pageSource, /id="restoreKnownCustomersButton"/);
+  assert.doesNotMatch(pageSource, /Vaste klanten herstellen/);
+  assert.doesNotMatch(pageSource, /function restoreKnownCustomers\(\)/);
+  assert.doesNotMatch(pageSource, /function syncKnownCustomerStatuses\(customers\)/);
   assert.doesNotMatch(pageSource, /const statusSync = syncKnownCustomerStatuses\(customersWithPhotos\);/);
   assert.doesNotMatch(pageSource, /Bekende klantstatussen opslaan mislukt/);
-  assert.match(pageSource, /let syncedCount = 0;/);
-  assert.match(pageSource, /label: "Status hersteld"/);
-  assert.match(pageSource, /function isKnownBadOrderFallbackCustomer\(customer\)/);
-  assert.match(pageSource, /website\.indexOf\("website opdracht"\) !== -1/);
-  assert.match(pageSource, /Vaste klanten hersteld, statussen bijgewerkt en verkeerde rijen verwijderd\./);
+  assert.doesNotMatch(pageSource, /let syncedCount = 0;/);
+  assert.doesNotMatch(pageSource, /label: "Status hersteld"/);
+  assert.doesNotMatch(pageSource, /function isKnownBadOrderFallbackCustomer\(customer\)/);
+  assert.doesNotMatch(pageSource, /Vaste klanten hersteld, statussen bijgewerkt en verkeerde rijen verwijderd\./);
 });
 
 test('premium database page exposes interesse as a lead-status step', () => {
