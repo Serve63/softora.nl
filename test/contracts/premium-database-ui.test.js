@@ -69,8 +69,11 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /<div class="photo-preview" id="photoPreview"/);
   assert.match(pageSource, /function readImageFileAsDataUrl\(file\)/);
   assert.match(pageSource, /function saveWebsitePhotoForCustomer\(customerId, file\)/);
+  assert.match(pageSource, /function buildWebsitePreviewUrlCandidates\(customer\)/);
+  assert.match(pageSource, /withWww\.hostname = "www\." \+ parsed\.hostname;/);
   assert.match(pageSource, /function generateWebdesignPhotos\(\)/);
   assert.match(pageSource, /shouldShowWebsitePhoto\(customer\) && !isValidWebsitePhotoDataUrl\(customer\.websitePhoto\)/);
+  assert.match(pageSource, /Geen AI-foto's opgeslagen: /);
   assert.match(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);

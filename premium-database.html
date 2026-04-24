@@ -2415,6 +2415,25 @@
             }
         }
 
+        function buildWebsitePreviewUrlCandidates(customer) {
+            const primary = resolveCustomerWebsiteUrl(customer);
+            if (!primary) return [];
+            const urls = [primary];
+            try {
+                const parsed = new URL(primary);
+                if (parsed.hostname && !/^www\./i.test(parsed.hostname)) {
+                    const withWww = new URL(primary);
+                    withWww.hostname = "www." + parsed.hostname;
+                    urls.push(withWww.toString());
+                }
+            } catch (error) {
+                /* primary URL is already validated by resolveCustomerWebsiteUrl */
+            }
+            return urls.filter(function (url, index, list) {
+                return url && list.indexOf(url) === index;
+            });
+        }
+
         function getWebdesignPhotoTargets() {
             return getSortedCustomers(getFilteredCustomers()).filter(function (customer) {
                 return shouldShowWebsitePhoto(customer) && !isValidWebsitePhotoDataUrl(customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
@@ -2422,42 +2441,52 @@
         }
 
         async function generateWebsitePhotoData(customer) {
-            const url = resolveCustomerWebsiteUrl(customer);
-            if (!url) {
+            const urls = buildWebsitePreviewUrlCandidates(customer);
+            if (!urls.length) {
                 throw new Error("Geen geldige website gevonden voor " + customer.bedrijf + ".");
             }
 
-            const response = await fetch("/api/website-preview/generate", {
-                method: "POST",
-                credentials: "same-origin",
-                cache: "no-store",
-                headers: { "Content-Type": "application/json", Accept: "application/json" },
-                body: JSON.stringify({ url: url, source: "premium-database", action: "webdesign" })
-            });
-            const payload = await response.json().catch(function () {
-                return {};
-            });
+            let lastError = null;
+            for (const url of urls) {
+                try {
+                    const response = await fetch("/api/website-preview/generate", {
+                        method: "POST",
+                        credentials: "same-origin",
+                        cache: "no-store",
+                        headers: { "Content-Type": "application/json", Accept: "application/json" },
+                        body: JSON.stringify({ url: url, source: "premium-database", action: "webdesign" })
+                    });
+                    const payload = await response.json().catch(function () {
+                        return {};
+                    });
 
-            if (response.status === 401) {
-                throw new Error("Log eerst in om AI-foto's te genereren.");
-            }
-            if (!response.ok || !payload || payload.ok === false) {
-                throw new Error(String(payload.detail || payload.error || "AI-foto genereren is mislukt."));
+                    if (response.status === 401) {
+                        throw new Error("Log eerst in om AI-foto's te genereren.");
+                    }
+                    if (!response.ok || !payload || payload.ok === false) {
+                        throw new Error(String(payload.detail || payload.error || "AI-foto genereren is mislukt."));
+                    }
+
+                    const dataUrl = normalizeString(payload && payload.image && payload.image.dataUrl);
+                    if (!isValidWebsitePhotoDataUrl(dataUrl)) {
+                        throw new Error("De AI gaf geen geldige afbeelding terug voor " + customer.bedrijf + ".");
+                    }
+                    const prepared = await prepareWebsitePhotoForStorage(
+                        dataUrl,
+                        normalizeString(payload && payload.image && payload.image.fileName) || customer.dom + "-webdesign.png"
+                    );
+
+                    return {
+                        dataUrl: prepared.dataUrl,
+                        fileName: prepared.fileName
+                    };
+                } catch (error) {
+                    lastError = error;
+                    console.error("AI-foto poging mislukt voor " + url + ":", error);
+                }
             }
 
-            const dataUrl = normalizeString(payload && payload.image && payload.image.dataUrl);
-            if (!isValidWebsitePhotoDataUrl(dataUrl)) {
-                throw new Error("De AI gaf geen geldige afbeelding terug voor " + customer.bedrijf + ".");
-            }
-            const prepared = await prepareWebsitePhotoForStorage(
-                dataUrl,
-                normalizeString(payload && payload.image && payload.image.fileName) || customer.dom + "-webdesign.png"
-            );
-
-            return {
-                dataUrl: prepared.dataUrl,
-                fileName: prepared.fileName
-            };
+            throw lastError || new Error("AI-foto genereren is mislukt voor " + customer.bedrijf + ".");
         }
 
         async function generateWebdesignPhotos() {
@@ -2472,6 +2501,7 @@
 
                 let done = 0;
                 let failed = 0;
+                let firstErrorMessage = "";
                 setStatusMessage("Webdesign foto's genereren voor " + targets.length + " bedrijf" + (targets.length === 1 ? "" : "ven") + "...", "info");
 
                 for (const target of targets) {
@@ -2498,12 +2528,15 @@
                         renderPage();
                     } catch (error) {
                         failed += 1;
+                        if (!firstErrorMessage) {
+                            firstErrorMessage = normalizeString(error && error.message);
+                        }
                         console.error("Webdesign foto genereren mislukt:", error);
                     }
                 }
 
                 if (!done) {
-                    setStatusMessage("Geen AI-foto's opgeslagen. Controleer of de websites bereikbaar zijn.", "error");
+                    setStatusMessage("Geen AI-foto's opgeslagen: " + (firstErrorMessage || "controleer of de websites bereikbaar zijn."), "error");
                     return;
                 }
 
