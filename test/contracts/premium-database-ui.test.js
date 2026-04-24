@@ -69,6 +69,9 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /<div class="photo-preview" id="photoPreview"/);
   assert.match(pageSource, /function readImageFileAsDataUrl\(file\)/);
   assert.match(pageSource, /function saveWebsitePhotoForCustomer\(customerId, file\)/);
+  assert.match(pageSource, /function normalizeWebsiteCandidateUrl\(value\)/);
+  assert.match(pageSource, /parsed\.hostname\.indexOf\("\."\) === -1/);
+  assert.match(pageSource, /customer && customer\.website,[\s\S]*customer && customer\.dom/);
   assert.match(pageSource, /function buildWebsitePreviewUrlCandidates\(customer\)/);
   assert.match(pageSource, /withWww\.hostname = "www\." \+ parsed\.hostname;/);
   assert.match(pageSource, /function generateWebdesignPhotos\(\)/);

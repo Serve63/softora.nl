@@ -2402,17 +2402,30 @@
             }
         }
 
-        function resolveCustomerWebsiteUrl(customer) {
-            const raw = normalizeString(customer && (customer.website || customer.dom));
-            if (!raw || raw === "—") return "";
+        function normalizeWebsiteCandidateUrl(value) {
+            const raw = normalizeString(value);
+            if (!raw || raw === "—" || /\s/.test(raw)) return "";
             const withProtocol = /^https?:\/\//i.test(raw) ? raw : "https://" + raw.replace(/^\/+/, "");
             try {
                 const parsed = new URL(withProtocol);
                 if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+                if (!parsed.hostname || parsed.hostname.indexOf(".") === -1) return "";
                 return parsed.toString();
             } catch (error) {
                 return "";
             }
+        }
+
+        function resolveCustomerWebsiteUrl(customer) {
+            const candidates = [
+                customer && customer.website,
+                customer && customer.dom
+            ];
+            for (const candidate of candidates) {
+                const url = normalizeWebsiteCandidateUrl(candidate);
+                if (url) return url;
+            }
+            return "";
         }
 
         function buildWebsitePreviewUrlCandidates(customer) {
