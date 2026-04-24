@@ -73,6 +73,7 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /parsed\.hostname\.indexOf\("\."\) === -1/);
   assert.match(pageSource, /function isGeneratedFallbackDomain\(customer, value\)/);
   assert.match(pageSource, /domain === slugifyDomain\(websiteText\)\.toLowerCase\(\)/);
+  assert.doesNotMatch(pageSource, /domain === slugifyDomain\(customer && customer\.bedrijf\)/);
   assert.match(pageSource, /const websiteUrl = normalizeWebsiteCandidateUrl\(customer && customer\.website\);/);
   assert.match(pageSource, /!isGeneratedFallbackDomain\(customer, customer && customer\.dom\)/);
   assert.match(pageSource, /function buildWebsitePreviewUrlCandidates\(customer\)/);
@@ -81,6 +82,9 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /shouldShowWebsitePhoto\(customer\) && !isValidWebsitePhotoDataUrl\(customer\.websitePhoto\)/);
   assert.match(pageSource, /Geen AI-foto's opgeslagen: /);
   assert.match(pageSource, /fetch\("\/api\/website-preview\/generate"/);
+  assert.match(pageSource, /company: customer\.bedrijf/);
+  assert.match(pageSource, /source: "premium-database"/);
+  assert.match(pageSource, /action: "webdesign"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);

@@ -2423,8 +2423,6 @@
         function isGeneratedFallbackDomain(customer, value) {
             const domain = normalizeString(value).toLowerCase();
             if (!domain) return true;
-            const generatedFromCompany = slugifyDomain(customer && customer.bedrijf).toLowerCase();
-            if (domain === generatedFromCompany) return true;
             const websiteText = normalizeString(customer && customer.website);
             if (websiteText && /\s/.test(websiteText) && domain === slugifyDomain(websiteText).toLowerCase()) {
                 return true;
@@ -2481,7 +2479,13 @@
                         credentials: "same-origin",
                         cache: "no-store",
                         headers: { "Content-Type": "application/json", Accept: "application/json" },
-                        body: JSON.stringify({ url: url, source: "premium-database", action: "webdesign" })
+                        body: JSON.stringify({
+                            url: url,
+                            company: customer.bedrijf,
+                            domain: customer.dom,
+                            source: "premium-database",
+                            action: "webdesign"
+                        })
                     });
                     const payload = await response.json().catch(function () {
                         return {};

@@ -151,6 +151,52 @@ test('ai tools coordinator wraps website preview failures in a stable error payl
   assert.equal(res.body.upstreamDetail, null);
 });
 
+test('ai tools coordinator lets premium database previews generate with gpt-image-2 when scanning fails', async () => {
+  const generatedScans = [];
+  const { coordinator } = createFixture({
+    fetchWebsitePreviewScanFromUrl: async () => {
+      const error = new Error('Kon deze website niet ophalen (400).');
+      error.status = 400;
+      throw error;
+    },
+    generateWebsitePreviewImageWithAi: async (scan) => {
+      generatedScans.push(scan);
+      return {
+        brief: 'Fallback briefing',
+        prompt: 'Fallback prompt',
+        dataUrl: 'data:image/png;base64,fallback',
+        mimeType: 'image/png',
+        fileName: 'fallback.png',
+        model: 'gpt-image-2',
+        revisedPrompt: '',
+        usage: null,
+      };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendWebsitePreviewGenerateResponse(
+    {
+      body: {
+        url: 'https://growingbyknowing.nl',
+        company: 'Growingbyknowing',
+        domain: 'growingbyknowing.nl',
+        source: 'premium-database',
+        action: 'webdesign',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.model, 'gpt-image-2');
+  assert.equal(res.body.scanFallback, true);
+  assert.equal(generatedScans.length, 1);
+  assert.equal(generatedScans[0].host, 'growingbyknowing.nl');
+  assert.match(generatedScans[0].bodyTextSample, /Growingbyknowing/);
+});
+
 test('ai tools coordinator validates dossier input and falls back safely on anthropic errors', async () => {
   const invalidRes = createResponseRecorder();
   const invalidFixture = createFixture();

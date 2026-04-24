@@ -47,8 +47,55 @@ function createAiToolsCoordinator(deps = {}) {
     logger = console,
   } = deps;
 
-  async function runWebsitePreviewGeneratePipeline(inputUrl) {
-    const fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
+  function shouldUseDatabasePreviewFallback(body = {}) {
+    return normalizeString(body.source).toLowerCase() === 'premium-database'
+      && normalizeString(body.action).toLowerCase() === 'webdesign';
+  }
+
+  function buildDatabasePreviewFallbackScan(inputUrl, body = {}) {
+    const company = truncateText(normalizeString(body.company || body.companyName || ''), 120);
+    const domain = truncateText(normalizeString(body.domain || ''), 120);
+    let host = domain;
+    try {
+      const parsed = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(inputUrl) ? inputUrl : `https://${inputUrl}`);
+      host = parsed.hostname || host;
+    } catch (error) {
+      // Keep the provided domain if URL parsing fails; the route already validated a non-empty URL.
+    }
+    const displayName = company || host || inputUrl;
+
+    return {
+      normalizedUrl: inputUrl,
+      finalUrl: inputUrl,
+      scan: {
+        host,
+        title: `${displayName} website`,
+        metaDescription: `AI webdesign voorstel voor ${displayName}.`,
+        h1: displayName,
+        headings: ['Home', 'Diensten', 'Over ons', 'Contact'],
+        paragraphs: [
+          `${displayName} heeft een professioneel, conversiegericht websitevoorstel nodig.`,
+          'Maak een moderne landingspagina met sterke hero, duidelijke call-to-action, vertrouwen en serviceblokken.',
+        ],
+        visualCues: ['modern', 'premium', 'clean layout', 'conversion focused'],
+        brandColorHints: [],
+        brandPalette: [],
+        imageCount: 0,
+        bodyTextSample: `Websiteconcept voor ${displayName}. Domein: ${host || domain || inputUrl}.`,
+        fetchSource: 'premium-database-fallback',
+      },
+      scanFallback: true,
+    };
+  }
+
+  async function runWebsitePreviewGeneratePipeline(inputUrl, options = {}) {
+    let fetched;
+    try {
+      fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
+    } catch (error) {
+      if (!options.allowScanFallback) throw error;
+      fetched = buildDatabasePreviewFallbackScan(inputUrl, options.body || {});
+    }
     const generated = await generateWebsitePreviewImageWithAi(fetched.scan);
 
     appendDashboardActivity(
@@ -92,6 +139,7 @@ function createAiToolsCoordinator(deps = {}) {
       revisedPrompt: generated.revisedPrompt || '',
       usage: generated.usage,
       openAiEnabled: true,
+      scanFallback: Boolean(fetched.scanFallback),
     };
   }
 
@@ -107,7 +155,10 @@ function createAiToolsCoordinator(deps = {}) {
         });
       }
 
-      const payload = await runWebsitePreviewGeneratePipeline(inputUrl);
+      const payload = await runWebsitePreviewGeneratePipeline(inputUrl, {
+        allowScanFallback: shouldUseDatabasePreviewFallback(body),
+        body,
+      });
       return res.status(200).json(payload);
     } catch (error) {
       const status = Number(error?.status) || 500;
