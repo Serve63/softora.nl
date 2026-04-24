@@ -39,6 +39,10 @@ test('website generation helpers build preview prompt, brief and filename from s
     visualCues: ['licht design', 'grote hero'],
     brandColorHints: ['accent: #8b2252', 'accent-light: #a62d65'],
     brandPalette: ['#8b2252', '#a62d65', '#f8f7f4', '#1a1a2e'],
+    navigationLabels: ['Home', 'Diensten', 'Contact'],
+    ctaLabels: ['Start project', 'Bekijk werkwijze'],
+    fontHints: ['Oswald', 'Inter'],
+    layoutHints: ['sterke hero/above-the-fold', 'split-layout met tekst en beeld'],
     referenceImageCount: 2,
     bodyTextSample: 'Wij bouwen websites die converteren.',
   };
@@ -60,9 +64,12 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /Verboden drift: Geen rebrand, geen ander kleurenpalet/);
   assert.match(prompt, /verbeterde premium variant/i);
   assert.match(prompt, /Dit moet een verbetering zijn, geen kopie/i);
-  assert.match(prompt, /60-70% herkenbaar dezelfde site\/hetzelfde merk/i);
-  assert.match(prompt, /30-40% premium verbetering/i);
+  assert.match(prompt, /75-85% herkenbaar dezelfde site\/hetzelfde merk/i);
+  assert.match(prompt, /15-25% premium verbetering/i);
   assert.match(prompt, /Evolutie, geen rebrand/i);
+  assert.match(prompt, /COPY LOCK/i);
+  assert.match(prompt, /STYLE LOCK/i);
+  assert.match(prompt, /SOURCE-FIRST RULE/i);
   assert.match(prompt, /mag niet aanvoelen als een ander merk/i);
   assert.match(prompt, /Gebruik dezelfde kleurfamilie, accentkleur\(en\), donkere\/lichte verhoudingen/i);
   assert.match(prompt, /Gebruik de 2 meegeleverde referentiebeeld\(en\) als harde visuele bron/i);
@@ -72,13 +79,24 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /niet ineens een generiek softwarebedrijf/i);
   assert.match(prompt, /edge-to-edge gevuld zijn zonder leeg wit canvas/i);
   assert.match(prompt, /Belangrijkste huidige heading: Meer klanten met een premium site\./);
+  assert.match(prompt, /Originele navigatie-labels: Home \| Diensten \| Contact\./);
+  assert.match(prompt, /Originele CTA\/knop-labels: Start project \| Bekijk werkwijze\./);
   assert.match(prompt, /Gedetecteerde merkkleur-variabelen: accent: #8b2252 \| accent-light: #a62d65\./);
   assert.match(prompt, /Gedetecteerde terugkerende merkkleuren: #8b2252 \| #a62d65 \| #f8f7f4 \| #1a1a2e\./);
+  assert.match(prompt, /Gedetecteerde typografie\/font hints: Oswald \| Inter\./);
+  assert.match(prompt, /Gedetecteerde layout\/stijl hints: sterke hero\/above-the-fold \| split-layout met tekst en beeld\./);
   assert.match(prompt, /hoge verticale full-page compositie/i);
   assert.match(prompt, /exact 1 hoge portrait full-page desktop homepage screenshot/i);
   assert.equal(designDna.brand, 'softora.nl');
   assert.deepEqual(designDna.mandatoryPalette, ['#8b2252', '#a62d65', '#f8f7f4', '#1a1a2e']);
+  assert.deepEqual(designDna.navigationSignals, ['Home', 'Diensten', 'Contact']);
+  assert.deepEqual(designDna.ctaSignals, ['Start project', 'Bekijk werkwijze']);
+  assert.deepEqual(designDna.typographySignals, ['Oswald', 'Inter']);
+  assert.deepEqual(designDna.layoutSignals, ['sterke hero/above-the-fold', 'split-layout met tekst en beeld']);
   assert.match(designDnaLock, /Verbeterregel: Verbeter layout, hiërarchie, spacing/);
+  assert.match(designDnaLock, /Navigatie-labels zo herkenbaar mogelijk behouden: Home \| Diensten \| Contact/i);
+  assert.match(designDnaLock, /CTA-knoppen\/actiecopy zo herkenbaar mogelijk behouden: Start project \| Bekijk werkwijze/i);
+  assert.match(designDnaLock, /Typografie\/font-signalen: Oswald \| Inter/i);
   assert.match(designDnaLock, /geen copy die losstaat van de gescande site/i);
   assert.equal(
     brief,

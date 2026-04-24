@@ -377,6 +377,8 @@ test('ai remote service fetches and normalizes website preview scan metadata inc
               --text-primary: #1A1A2E;
             }
             .btn { background: #8B2252; color: #ffffff; }
+            h1 { font-family: 'Oswald', sans-serif; }
+            body { font-family: Inter, system-ui, sans-serif; }
           `,
         };
       }
@@ -416,6 +418,7 @@ test('ai remote service fetches and normalizes website preview scan metadata inc
     'text-primary: #1a1a2e',
   ]);
   assert.deepEqual(result.scan.brandPalette, ['#8b2252', '#a62d65', '#f8f7f4', '#1a1a2e', '#ffffff']);
+  assert.deepEqual(result.scan.fontHints, ['Oswald', 'Inter']);
 });
 
 test('ai remote service retries website preview fetch with a compat profile after a 403', async () => {

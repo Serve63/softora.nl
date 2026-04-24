@@ -321,6 +321,93 @@ function createSeoCore(deps = {}) {
     return out;
   }
 
+  function extractInteractiveLabelsFromHtml(htmlRaw, options = {}) {
+    const html = String(htmlRaw || '');
+    const maxItems = Math.max(1, Math.min(40, Number(options.maxItems) || 12));
+    const maxLength = Math.max(20, Math.min(140, Number(options.maxLength) || 90));
+    const out = [];
+    const seen = new Set();
+    const pattern = /<(a|button)\b[^>]*>([\s\S]*?)<\/\1>/gi;
+    let match;
+    while ((match = pattern.exec(html))) {
+      const value = truncateText(
+        normalizeString(decodeBasicHtmlEntities(stripHtmlTags(match[2] || '')).replace(/\s+/g, ' ')),
+        maxLength
+      );
+      const key = value.toLowerCase();
+      if (!value || value.length < 2 || seen.has(key)) continue;
+      seen.add(key);
+      out.push(value);
+      if (out.length >= maxItems) break;
+    }
+    return out;
+  }
+
+  function extractNavigationLabelsFromHtml(htmlRaw) {
+    const html = String(htmlRaw || '');
+    const out = [];
+    const seen = new Set();
+    const blocks = [];
+    const blockPattern = /<(nav|header)\b[^>]*>([\s\S]*?)<\/\1>/gi;
+    let match;
+    while ((match = blockPattern.exec(html))) {
+      blocks.push(match[2] || '');
+      if (blocks.length >= 4) break;
+    }
+
+    const sources = blocks.length ? blocks : [html.slice(0, 12000)];
+    sources.forEach((source) => {
+      extractInteractiveLabelsFromHtml(source, { maxItems: 16, maxLength: 70 }).forEach((label) => {
+        const key = label.toLowerCase();
+        if (!label || seen.has(key)) return;
+        seen.add(key);
+        out.push(label);
+      });
+    });
+
+    return out.slice(0, 10);
+  }
+
+  function extractCtaLabelsFromHtml(htmlRaw) {
+    const labels = extractInteractiveLabelsFromHtml(htmlRaw, { maxItems: 40, maxLength: 90 });
+    const primaryCtaPattern =
+      /\b(start|offerte|plan|boek|reserveer|demo|advies|bel|mail|aanvragen|kennismaking|project|shop|koop|download|gratis|afspraak|probeer)\b/i;
+    const secondaryCtaPattern = /\b(contact|bekijk|lees|meer|prijzen)\b/i;
+    return labels
+      .map((label, index) => ({
+        label,
+        score:
+          (primaryCtaPattern.test(label)
+            ? 130
+            : secondaryCtaPattern.test(label)
+              ? 100
+              : 0) - index,
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.label)
+      .slice(0, 10);
+  }
+
+  function extractWebsitePreviewLayoutHintsFromHtml(htmlRaw) {
+    const html = String(htmlRaw || '');
+    const lower = html.toLowerCase();
+    const hints = [];
+    const add = (condition, label) => {
+      if (condition && !hints.includes(label)) hints.push(label);
+    };
+
+    add(/class=["'][^"']*\bhero\b/i.test(html) || /<section\b[^>]*>\s*<[^>]*h1/i.test(html), 'sterke hero/above-the-fold');
+    add(/\b(grid|cards|card-grid|services-grid|dienst|service-card)\b/i.test(lower), 'kaart- of gridstructuur');
+    add(/\b(split|two-col|columns|media-text|image-text)\b/i.test(lower), 'split-layout met tekst en beeld');
+    add(/\b(dark|black|night|noir|navy|slate)\b/i.test(lower), 'donkere stijlaccenten aanwezig');
+    add(/\b(light|white|cream|beige|sand|soft)\b/i.test(lower), 'lichte/warme secties aanwezig');
+    add(/\b(testimonial|review|case|project|portfolio)\b/i.test(lower), 'vertrouwen/cases-signalen aanwezig');
+    add(/\b(footer)\b/i.test(lower), 'volledige homepage met footer');
+
+    return hints.slice(0, 8);
+  }
+
   function extractVisibleTextSampleFromHtml(htmlRaw, maxLength = 2800) {
     const html = String(htmlRaw || '')
       .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
@@ -419,6 +506,9 @@ function createSeoCore(deps = {}) {
     });
     const images = extractImageEntriesFromHtml(html).slice(0, 8);
     const referenceImageUrls = extractWebsitePreviewReferenceImageUrls(source, images, normalizedUrl);
+    const navigationLabels = extractNavigationLabelsFromHtml(html);
+    const ctaLabels = extractCtaLabelsFromHtml(html);
+    const layoutHints = extractWebsitePreviewLayoutHintsFromHtml(html);
     const visualCues = Array.from(
       new Set(
         images
@@ -449,6 +539,9 @@ function createSeoCore(deps = {}) {
       headings,
       paragraphs,
       visualCues,
+      navigationLabels,
+      ctaLabels,
+      layoutHints,
       referenceImageUrls,
       imageCount: images.length,
       bodyTextSample,

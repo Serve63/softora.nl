@@ -581,6 +581,43 @@ function createAiRemoteService(deps = {}) {
     return palette.slice(0, 6);
   }
 
+  function extractCssFontFamilyHints(cssSources = []) {
+    const counts = new Map();
+    let seenIndex = 0;
+    for (const cssText of cssSources) {
+      const text = String(cssText || '');
+      const pattern = /font-family\s*:\s*([^;{}]+)/gi;
+      let match;
+      while ((match = pattern.exec(text))) {
+        const raw = normalizeString(match[1] || '')
+          .replace(/!important/gi, '')
+          .replace(/\s+/g, ' ');
+        if (!raw) continue;
+
+        const families = raw
+          .split(',')
+          .map((item) => normalizeString(item).replace(/^['"]|['"]$/g, ''))
+          .filter(Boolean)
+          .filter((item) => !/^(sans-serif|serif|monospace|system-ui|inherit|initial|unset)$/i.test(item));
+
+        for (const family of families.slice(0, 3)) {
+          const key = family.toLowerCase();
+          const existing = counts.get(key);
+          counts.set(key, {
+            label: family,
+            count: (existing?.count || 0) + 1,
+            firstIndex: existing?.firstIndex ?? seenIndex++,
+          });
+        }
+      }
+    }
+
+    return Array.from(counts.values())
+      .sort((a, b) => b.count - a.count || a.firstIndex - b.firstIndex)
+      .map((entry) => entry.label)
+      .slice(0, 5);
+  }
+
   function isSupportedOpenAiImageModel(modelRaw) {
     const model = normalizeString(modelRaw || '').toLowerCase();
     return (
@@ -923,6 +960,10 @@ function createAiRemoteService(deps = {}) {
     }
     if (brandPalette.length) {
       scan.brandPalette = brandPalette;
+    }
+    const fontHints = extractCssFontFamilyHints(cssSources);
+    if (fontHints.length) {
+      scan.fontHints = fontHints;
     }
     scan.stylesheetCount = cssSources.length;
     if (!scan.title && !scan.h1 && !scan.metaDescription && !scan.bodyTextSample) {

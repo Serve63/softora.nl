@@ -40,6 +40,31 @@ function createWebsiteGenerationHelpers(deps = {}) {
     return cleanWebsitePreviewList(phrases, 6, 80);
   }
 
+  function parseHexColorLuminance(colorRaw) {
+    const color = normalizeString(colorRaw || '').toLowerCase();
+    const match = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!match) return null;
+    const value = match[1];
+    const r = value.length === 3 ? Number.parseInt(value[0] + value[0], 16) : Number.parseInt(value.slice(0, 2), 16);
+    const g = value.length === 3 ? Number.parseInt(value[1] + value[1], 16) : Number.parseInt(value.slice(2, 4), 16);
+    const b = value.length === 3 ? Number.parseInt(value[2] + value[2], 16) : Number.parseInt(value.slice(4, 6), 16);
+    if (![r, g, b].every((n) => Number.isFinite(n))) return null;
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  }
+
+  function inferWebsitePreviewPaletteMood(colors = []) {
+    const luminances = (Array.isArray(colors) ? colors : [])
+      .map(parseHexColorLuminance)
+      .filter((value) => Number.isFinite(value));
+    if (!luminances.length) return '';
+    const dark = luminances.filter((value) => value < 0.28).length;
+    const light = luminances.filter((value) => value > 0.78).length;
+    if (dark >= 2 && light >= 1) return 'hoog contrast met donkere en lichte vlakken';
+    if (dark >= Math.max(2, light + 1)) return 'overwegend donker';
+    if (light >= Math.max(2, dark + 1)) return 'overwegend licht';
+    return 'gemengd/gebalanceerd';
+  }
+
   function buildWebsitePreviewDesignDnaFromScan(scan = {}) {
     const host = normalizeString(scan.host || '');
     const title = normalizeString(scan.title || '');
@@ -50,6 +75,10 @@ function createWebsiteGenerationHelpers(deps = {}) {
     const visualCues = cleanWebsitePreviewList(scan.visualCues, 6, 120);
     const brandColorHints = cleanWebsitePreviewList(scan.brandColorHints, 6, 120);
     const brandPalette = cleanWebsitePreviewList(scan.brandPalette, 8, 40);
+    const navigationLabels = cleanWebsitePreviewList(scan.navigationLabels, 10, 80);
+    const ctaLabels = cleanWebsitePreviewList(scan.ctaLabels, 10, 100);
+    const fontHints = cleanWebsitePreviewList(scan.fontHints, 5, 120);
+    const layoutHints = cleanWebsitePreviewList(scan.layoutHints, 8, 120);
     const actionPhrases = extractWebsitePreviewActionPhrases(scan);
     const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 650);
     const contentSignals = cleanWebsitePreviewList(
@@ -63,14 +92,19 @@ function createWebsiteGenerationHelpers(deps = {}) {
       sourceSummary: [title, h1, description].filter(Boolean).join(' | '),
       mandatoryPalette: brandPalette.length ? brandPalette : brandColorHints,
       brandColorHints,
+      paletteMood: inferWebsitePreviewPaletteMood(brandPalette),
       contentSignals,
       sectionSignals: headings,
-      actionSignals: actionPhrases,
+      navigationSignals: navigationLabels,
+      ctaSignals: ctaLabels,
+      actionSignals: cleanWebsitePreviewList([...ctaLabels, ...actionPhrases], 10, 100),
       visualSignals: visualCues,
+      typographySignals: fontHints,
+      layoutSignals: layoutHints,
       improvementRule:
         'Verbeter layout, hiërarchie, spacing, typografie, kaarten, CTA’s en visuele polish, maar behoud merk-DNA, kleuren, onderwerp en commerciële richting.',
       forbiddenDrift:
-        'Geen rebrand, geen ander kleurenpalet, geen generiek SaaS/software-template, geen andere diensten, geen andere doelgroep en geen copy die losstaat van de gescande site.',
+        'Geen rebrand, geen ander kleurenpalet, geen generiek SaaS/software-template, geen andere diensten, geen andere doelgroep, geen andere navigatie/CTA-taal en geen copy die losstaat van de gescande site.',
     };
   }
 
@@ -86,14 +120,27 @@ function createWebsiteGenerationHelpers(deps = {}) {
       dna.brandColorHints.length
         ? `- CSS/merk-kleurhints uit de site: ${dna.brandColorHints.join(' | ')}.`
         : '',
+      dna.paletteMood ? `- Licht/donker-verhouding: ${dna.paletteMood}. Behoud deze verhouding in de nieuwe variant.` : '',
       dna.contentSignals.length
         ? `- Content/propositie die herkenbaar terug moet komen: ${dna.contentSignals.join(' | ')}.`
         : '',
       dna.sectionSignals.length
         ? `- Secties/structuur-signalen uit de huidige site: ${dna.sectionSignals.join(' | ')}.`
         : '',
+      dna.navigationSignals.length
+        ? `- Navigatie-labels zo herkenbaar mogelijk behouden: ${dna.navigationSignals.join(' | ')}.`
+        : '',
+      dna.ctaSignals.length
+        ? `- CTA-knoppen/actiecopy zo herkenbaar mogelijk behouden: ${dna.ctaSignals.join(' | ')}.`
+        : '',
       dna.actionSignals.length
         ? `- CTA/actie-signalen uit de huidige site: ${dna.actionSignals.join(' | ')}.`
+        : '',
+      dna.typographySignals.length
+        ? `- Typografie/font-signalen: ${dna.typographySignals.join(' | ')}. Gebruik een vergelijkbaar typografisch gevoel.`
+        : '',
+      dna.layoutSignals.length
+        ? `- Layoutsignalen uit de huidige site: ${dna.layoutSignals.join(' | ')}.`
         : '',
       dna.visualSignals.length ? `- Visuele signalen uit beelden/alt-teksten: ${dna.visualSignals.join(' | ')}.` : '',
       `- Verbeterregel: ${dna.improvementRule}`,
@@ -117,6 +164,12 @@ function createWebsiteGenerationHelpers(deps = {}) {
     const brandPalette = Array.isArray(scan.brandPalette)
       ? scan.brandPalette.filter(Boolean).slice(0, 6)
       : [];
+    const navigationLabels = Array.isArray(scan.navigationLabels)
+      ? scan.navigationLabels.filter(Boolean).slice(0, 10)
+      : [];
+    const ctaLabels = Array.isArray(scan.ctaLabels) ? scan.ctaLabels.filter(Boolean).slice(0, 10) : [];
+    const fontHints = Array.isArray(scan.fontHints) ? scan.fontHints.filter(Boolean).slice(0, 5) : [];
+    const layoutHints = Array.isArray(scan.layoutHints) ? scan.layoutHints.filter(Boolean).slice(0, 8) : [];
     const referenceImageCount = Math.max(0, Number(scan.referenceImageCount || 0) || 0);
     const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 1800);
     const designDnaLock = formatWebsitePreviewDesignDnaLock(scan);
@@ -130,10 +183,13 @@ function createWebsiteGenerationHelpers(deps = {}) {
         : '',
       'Genereer daarna precies 1 verbeterde premium variant als full-page desktop website screenshot van header tot footer in een enkel beeld.',
       'Dit moet een verbetering zijn, geen kopie: maak de layout, hiërarchie, visual polish, spacing, typografie, kaarten, CTA’s en sectie-overgangen duidelijk mooier, sterker en commerciëler.',
-      'Tegelijk moet het nog steeds 60-70% herkenbaar dezelfde site/hetzelfde merk blijven en ongeveer 30-40% premium verbetering toevoegen. Evolutie, geen rebrand.',
+      'Tegelijk moet het nog steeds 75-85% herkenbaar dezelfde site/hetzelfde merk blijven en ongeveer 15-25% premium verbetering toevoegen. Evolutie, geen rebrand.',
       'Het resultaat mag moderner en sterker zijn, maar mag niet aanvoelen als een ander merk, andere propositie of andere website. Behoud de herkenbare visuele richting van de huidige site.',
       'Gebruik dezelfde kleurfamilie, accentkleur(en), donkere/lichte verhoudingen en algemene sfeer als de huidige site. Introduceer nadrukkelijk geen nieuw kleurenpalet.',
       'Als er merkkleuren of kleurvariabelen in de scan staan, behandel die als verplicht kleurenpalet. Gebruik geen willekeurige blauw/goud, zwart/goud of SaaS-template kleuren tenzij die exact uit de scan blijken.',
+      'COPY LOCK: behoud merknaam, navigatie-labels, CTA-labels, sectienamen, diensten en kernzinnen uit de bron waar mogelijk letterlijk of bijna letterlijk. Verbeter alleen formulering en hiërarchie; verander de boodschap niet.',
+      'STYLE LOCK: behoud typografisch gevoel, contrastniveau, dominante achtergrondkleur(en), fotografie/illustratie-richting, button-stijl en algemene compositietaal. Geen nieuw logo, geen nieuwe mascotte, geen ander visueel concept.',
+      'SOURCE-FIRST RULE: als promptfantasie botst met scaninformatie, wint de scan altijd. Gebruik liever minder spectaculaire vormgeving die klopt dan een spectaculaire rebrand die afwijkt.',
       'Gebruik een hoge verticale full-page compositie zodat de volledige desktop-homepage van header tot footer zichtbaar is in één afbeelding. Dit is geen mobiele screenshot.',
       'Toon een echte desktop navigatie en desktop lay-out met duidelijke secties, meerdere kolommen waar logisch, premium typografie en sterke visuele hiërarchie.',
       'Het beeld moet edge-to-edge gevuld zijn zonder leeg wit canvas, zonder browser chrome, zonder device mockup, zonder wireframe en zonder collage.',
@@ -147,10 +203,14 @@ function createWebsiteGenerationHelpers(deps = {}) {
       description ? `Huidige meta-omschrijving: ${description}.` : '',
       h1 ? `Belangrijkste huidige heading: ${h1}.` : '',
       headings.length ? `Overige huidige headings: ${headings.join(' | ')}.` : '',
+      navigationLabels.length ? `Originele navigatie-labels: ${navigationLabels.join(' | ')}.` : '',
+      ctaLabels.length ? `Originele CTA/knop-labels: ${ctaLabels.join(' | ')}.` : '',
       paragraphs.length ? `Inhoudelijke cues van de huidige site: ${paragraphs.join(' | ')}.` : '',
       visualCues.length ? `Visuele cues van de huidige site: ${visualCues.join(' | ')}.` : '',
       brandColorHints.length ? `Gedetecteerde merkkleur-variabelen: ${brandColorHints.join(' | ')}.` : '',
       brandPalette.length ? `Gedetecteerde terugkerende merkkleuren: ${brandPalette.join(' | ')}.` : '',
+      fontHints.length ? `Gedetecteerde typografie/font hints: ${fontHints.join(' | ')}.` : '',
+      layoutHints.length ? `Gedetecteerde layout/stijl hints: ${layoutHints.join(' | ')}.` : '',
       bodyTextSample ? `Tekstsample van de huidige site: ${bodyTextSample}` : '',
       'Lever exact 1 hoge portrait full-page desktop homepage screenshot op.',
     ]
