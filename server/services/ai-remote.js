@@ -825,12 +825,13 @@ function createAiRemoteService(deps = {}) {
     imageModel,
     prompt,
     referenceImages = [],
+    imageSize = '2160x3840',
   }) {
     if (referenceImages.length > 0 && supportsOpenAiReferenceImageEdits(imageModel)) {
       const body = new FormData();
       body.set('model', imageModel);
       body.set('prompt', prompt);
-      body.set('size', '1024x1536');
+      body.set('size', imageSize);
       body.set('quality', 'high');
       referenceImages.forEach((item) => {
         const parsed = parseImageDataUrl(item?.dataUrl || '');
@@ -858,7 +859,7 @@ function createAiRemoteService(deps = {}) {
     const requestBody = {
       model: imageModel,
       prompt,
-      size: '1024x1536',
+      size: imageSize,
       quality: 'high',
     };
     if (requiresLegacyOpenAiImageResponseFormat(imageModel)) {
@@ -877,6 +878,15 @@ function createAiRemoteService(deps = {}) {
       },
       180000
     );
+  }
+
+  function isOpenAiImageSizeError(response, data) {
+    const status = Number(response?.status || 0);
+    if (status !== 400 && status !== 422) return false;
+    const message = normalizeString(
+      data?.error?.message || data?.error?.detail || data?.error || data?.message || ''
+    ).toLowerCase();
+    return /size|resolution|dimension|width|height|pixels/.test(message);
   }
 
   async function generateWebsitePreviewImageWithAi(scan = {}) {
@@ -907,12 +917,22 @@ function createAiRemoteService(deps = {}) {
       referenceImageCount: referenceImages.length,
     });
 
-    const { response, data } = await requestOpenAiWebsitePreviewImageGeneration({
+    let { response, data } = await requestOpenAiWebsitePreviewImageGeneration({
       apiKey,
       imageModel,
       prompt,
       referenceImages,
+      imageSize: '2160x3840',
     });
+    if (!response.ok && isOpenAiImageSizeError(response, data)) {
+      ({ response, data } = await requestOpenAiWebsitePreviewImageGeneration({
+        apiKey,
+        imageModel,
+        prompt,
+        referenceImages,
+        imageSize: '1024x1536',
+      }));
+    }
 
     if (!response.ok) {
       const err = new Error(`OpenAI websitegenerator mislukt (${response.status})`);

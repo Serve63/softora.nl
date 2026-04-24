@@ -1457,6 +1457,8 @@
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
         const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";
         const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";
+        const CUSTOMER_PHOTO_DATA_PREFIX = "softora_database_photo_data_v1_";
+        const CUSTOMER_PHOTO_CHUNK_SIZE = 180000;
         const ORDER_SCOPE = "premium_active_orders";
         const ORDER_KEY = "softora_custom_orders_premium_v1";
         const DATABASE_STATUS_OPTIONS = ["prospect", "gebeld", "gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten", "benaderbaar", "geengehoor"];
@@ -1964,29 +1966,59 @@
             });
         }
 
-        function parseCustomerPhotoMap(raw) {
+        function buildCustomerPhotoDataKey(customerId) {
+            return CUSTOMER_PHOTO_DATA_PREFIX + normalizeString(customerId).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 80);
+        }
+
+        function parseCustomerPhotoMap(raw, values) {
             try {
                 const parsed = JSON.parse(String(raw || "{}"));
-                return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+                if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+                const stateValues = values && typeof values === "object" ? values : {};
+                Object.keys(parsed).forEach(function (key) {
+                    const item = parsed[key];
+                    if (!item || typeof item !== "object" || isValidWebsitePhotoDataUrl(item.websitePhoto)) return;
+                    const photoKey = normalizeString(item.photoKey);
+                    const chunkCount = Math.max(0, Math.min(80, Number(item.chunkCount || 0) || 0));
+                    if (!photoKey || !chunkCount) return;
+                    const dataUrl = Array.from({ length: chunkCount }, function (_, index) {
+                        return normalizeString(stateValues[photoKey + "_" + index]);
+                    }).join("");
+                    if (isValidWebsitePhotoDataUrl(dataUrl)) {
+                        item.websitePhoto = dataUrl;
+                    }
+                });
+                return parsed;
             } catch (error) {
                 return {};
             }
         }
 
-        function buildCustomerPhotoMap(customers) {
+        function buildCustomerPhotoStorage(customers) {
             const photoMap = {};
+            const patch = {};
             (customers || []).forEach(function (customer) {
                 const normalized = normalizeCustomer(customer, "photo-map");
                 if (!normalized.id || !shouldShowWebsitePhoto(normalized) || !isValidWebsitePhotoDataUrl(normalized.websitePhoto)) return;
+                const photoKey = buildCustomerPhotoDataKey(normalized.id);
+                const chunks = normalizeString(normalized.websitePhoto).match(new RegExp("[\\s\\S]{1," + CUSTOMER_PHOTO_CHUNK_SIZE + "}", "g")) || [];
+                chunks.forEach(function (chunk, index) {
+                    patch[photoKey + "_" + index] = chunk;
+                });
                 photoMap[normalized.id] = {
                     id: normalized.id,
                     identityKey: buildCustomerIdentityKey(normalized),
-                    websitePhoto: normalized.websitePhoto,
+                    photoKey: photoKey,
+                    chunkCount: chunks.length,
                     websitePhotoName: normalized.websitePhotoName || "Websitefoto",
                     updatedAt: normalized.updatedAt || formatDateForStorage(new Date())
                 };
             });
-            return photoMap;
+            patch[CUSTOMER_PHOTO_KEY] = JSON.stringify(photoMap);
+            return {
+                photoMap: photoMap,
+                patch: patch
+            };
         }
 
         function mergeCustomersWithPhotos(customers, photoMap) {
@@ -2019,7 +2051,8 @@
 
         function loadCustomerPhotoMap() {
             return fetchUiStateGetWithFallback(CUSTOMER_PHOTO_SCOPE).then(function (state) {
-                return parseCustomerPhotoMap(state && state.values && state.values[CUSTOMER_PHOTO_KEY]);
+                const values = state && state.values && typeof state.values === "object" ? state.values : {};
+                return parseCustomerPhotoMap(values[CUSTOMER_PHOTO_KEY], values);
             }).catch(function (error) {
                 console.error("Databasefoto's laden via Supabase mislukt:", error);
                 return {};
@@ -2027,11 +2060,9 @@
         }
 
         function persistCustomerPhotos(customers) {
-            const photoMap = buildCustomerPhotoMap(customers);
+            const photoStorage = buildCustomerPhotoStorage(customers);
             return fetchUiStateSetWithFallback(CUSTOMER_PHOTO_SCOPE, {
-                patch: {
-                    [CUSTOMER_PHOTO_KEY]: JSON.stringify(photoMap)
-                },
+                patch: photoStorage.patch,
                 source: "premium-database-photos",
                 actor: "Premium database"
             }).then(function () {
@@ -2410,12 +2441,16 @@
             if (!isValidWebsitePhotoDataUrl(original.dataUrl)) {
                 throw new Error("Dit afbeeldingsbestand kan niet worden opgeslagen.");
             }
-            if (original.dataUrl.length <= 650000) return original;
+            if (original.dataUrl.length <= 1800000) return original;
 
             try {
-                const compressed = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 900, 1350, 0.76);
-                if (compressed.dataUrl.length <= 1200000) return compressed;
-                return compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 720, 1080, 0.68);
+                const ultra = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 2160, 3840, 0.9);
+                if (ultra.dataUrl.length <= 2200000) return ultra;
+                const high = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1600, 2400, 0.88);
+                if (high.dataUrl.length <= 1600000) return high;
+                const medium = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1200, 1800, 0.84);
+                if (medium.dataUrl.length <= 1000000) return medium;
+                return compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1024, 1536, 0.82);
             } catch (error) {
                 return original;
             }

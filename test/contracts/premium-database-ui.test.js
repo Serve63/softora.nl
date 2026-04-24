@@ -58,6 +58,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";/);
+  assert.match(pageSource, /const CUSTOMER_PHOTO_DATA_PREFIX = "softora_database_photo_data_v1_";/);
+  assert.match(pageSource, /const CUSTOMER_PHOTO_CHUNK_SIZE = 180000;/);
   assert.match(pageSource, /websitePhoto: normalizeString\(raw && \(raw\.websitePhoto \|\| raw\.photo \|\| raw\.websiteImage\)\)/);
   assert.match(pageSource, /function shouldShowWebsitePhoto\(customer\)/);
   assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
@@ -72,10 +74,15 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /function removeWebsitePhotoForCustomer\(customerId\)/);
   assert.match(pageSource, /websitePhoto: ""/);
   assert.match(pageSource, /await persistCustomerPhotos\(state\.klanten\)/);
+  assert.match(pageSource, /function buildCustomerPhotoDataKey\(customerId\)/);
+  assert.match(pageSource, /function buildCustomerPhotoStorage\(customers\)/);
+  assert.match(pageSource, /photoKey \+ "_" \+ index/);
+  assert.match(pageSource, /chunkCount: chunks\.length/);
   assert.match(pageSource, /function persistCustomerPhotos\(customers\)/);
   assert.match(pageSource, /function mergeCustomersWithPhotos\(customers, photoMap\)/);
   assert.match(pageSource, /function loadCustomerPhotoMap\(\)/);
-  assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 900, 1350, 0\.76\)/);
+  assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 2160, 3840, 0\.9\)/);
+  assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 1024, 1536, 0\.82\)/);
   assert.match(pageSource, /<div class="photo-preview" id="photoPreview"/);
   assert.match(pageSource, /function readImageFileAsDataUrl\(file\)/);
   assert.match(pageSource, /function saveWebsitePhotoForCustomer\(customerId, file\)/);
