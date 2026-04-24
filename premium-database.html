@@ -521,6 +521,26 @@
             margin-left: auto;
         }
 
+        .result-count-stack {
+            margin-left: auto;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            color: var(--light);
+        }
+
+        .result-count-stack .f-count {
+            margin-left: 0;
+        }
+
+        .result-count-icon {
+            width: 22px;
+            height: 22px;
+            color: var(--crimson);
+            filter: drop-shadow(0 5px 12px rgba(139, 34, 82, 0.28));
+        }
+
         .tbl-wrap {
             padding: 0 48px 60px;
         }
@@ -1230,7 +1250,12 @@
                             <button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button>
                             <button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
-                        <div class="f-count" id="f-count"></div>
+                        <div class="result-count-stack" aria-label="Aantal resultaten">
+                            <svg class="result-count-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path fill="currentColor" d="M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z"/>
+                            </svg>
+                            <div class="f-count" id="f-count"></div>
+                        </div>
                     </div>
 
                     <div class="tbl-wrap">
