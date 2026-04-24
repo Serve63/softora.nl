@@ -555,24 +555,22 @@
         }
 
         .company-edit {
-            width: 24px;
-            height: 24px;
-            border: 1px solid rgba(155,35,85,.16);
-            border-radius: 999px;
-            background: rgba(155,35,85,.04);
-            color: var(--crimson);
+            width: 22px;
+            height: 22px;
+            border: none;
+            background: none;
+            color: var(--light);
             display: inline-flex;
             align-items: center;
             justify-content: center;
             flex: 0 0 auto;
             cursor: pointer;
-            transition: background .15s ease, border-color .15s ease, transform .15s ease;
+            padding: 0;
+            transition: color .15s ease;
         }
 
         .company-edit:hover {
-            background: rgba(155,35,85,.09);
-            border-color: rgba(155,35,85,.34);
-            transform: translateY(-1px);
+            color: var(--crimson);
         }
 
         .company-edit svg {
