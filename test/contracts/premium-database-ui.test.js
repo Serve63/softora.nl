@@ -31,7 +31,10 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /font-family: 'Inter', sans-serif;/);
   assert.match(pageSource, /\.page-title \{[\s\S]*font-family: 'Oswald', sans-serif;/);
   assert.match(pageSource, /table-layout: fixed;/);
-  assert.match(pageSource, /thead th:nth-child\(9\), tbody td:nth-child\(9\) \{[\s\S]*width: 48px;/);
+  assert.match(pageSource, /thead th \{[\s\S]*padding: 10px 9px;[\s\S]*letter-spacing: 1\.1px;/);
+  assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 14%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 9%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(9\), tbody td:nth-child\(9\) \{[\s\S]*width: 5%;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
   assert.match(pageSource, /\.photo-drop \{[\s\S]*width: 34px;[\s\S]*height: 34px;/);
   assert.match(pageSource, /\.photo-remove \{[\s\S]*width: 14px;[\s\S]*height: 14px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
