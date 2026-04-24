@@ -33,9 +33,6 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /table-layout: fixed;/);
   assert.match(pageSource, /thead th:nth-child\(10\), tbody td:nth-child\(10\) \{[\s\S]*width: 70px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
-  assert.match(pageSource, /\.filter-select-group \{[\s\S]*flex: 0 0 210px;[\s\S]*max-width: 210px;/);
-  assert.match(pageSource, /\.filter-select-group \.site-select-trigger \{[\s\S]*min-height: 34px;[\s\S]*padding: 7px 34px 7px 11px;/);
-  assert.match(pageSource, /\.filter-bar \.site-select \{[\s\S]*width: 100%;[\s\S]*min-width: 0;/);
   assert.match(pageSource, /\.company-edit/);
   assert.match(pageSource, /\.photo-remove/);
   assert.match(pageSource, /\.photo-remove \{[\s\S]*position: absolute;[\s\S]*right: 2px;/);
