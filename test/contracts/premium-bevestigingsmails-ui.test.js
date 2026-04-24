@@ -164,7 +164,7 @@ test('premium bevestigingsmails replaces sender detail fields with compact dropd
   assert.match(pageSource, /<select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">/);
   assert.match(pageSource, /<option value="info@softora\.nl" selected>info@softora\.nl<\/option>/);
   assert.match(pageSource, /<select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">/);
-  assert.match(pageSource, /<option value="webdesign" selected>webdesign<\/option>/);
+  assert.match(pageSource, /<option value="webdesign" selected>Webdesign<\/option>/);
 });
 
 test('premium bevestigingsmails exposes coldcalling provider choice inside lead-generator settings', () => {
