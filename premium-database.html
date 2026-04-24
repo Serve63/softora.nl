@@ -610,17 +610,16 @@
             text-overflow: ellipsis;
         }
 
-        thead th:nth-child(1), tbody td:nth-child(1) { width: 14%; }
-        thead th:nth-child(2), tbody td:nth-child(2) { width: 8%; }
-        thead th:nth-child(3), tbody td:nth-child(3) { width: 9%; }
-        thead th:nth-child(4), tbody td:nth-child(4) { width: 16%; }
-        thead th:nth-child(5), tbody td:nth-child(5) { width: 12%; }
-        thead th:nth-child(6), tbody td:nth-child(6) { width: 12%; }
-        thead th:nth-child(7), tbody td:nth-child(7) { width: 12%; }
-        thead th:nth-child(8), tbody td:nth-child(8) { width: 9%; }
-        thead th:nth-child(9), tbody td:nth-child(9) { width: 8%; }
-        thead th:nth-child(10), tbody td:nth-child(10) {
-            width: 70px;
+        thead th:nth-child(1), tbody td:nth-child(1) { width: 15%; }
+        thead th:nth-child(2), tbody td:nth-child(2) { width: 10%; }
+        thead th:nth-child(3), tbody td:nth-child(3) { width: 17%; }
+        thead th:nth-child(4), tbody td:nth-child(4) { width: 12%; }
+        thead th:nth-child(5), tbody td:nth-child(5) { width: 13%; }
+        thead th:nth-child(6), tbody td:nth-child(6) { width: 14%; }
+        thead th:nth-child(7), tbody td:nth-child(7) { width: 9%; }
+        thead th:nth-child(8), tbody td:nth-child(8) { width: 8%; }
+        thead th:nth-child(9), tbody td:nth-child(9) {
+            width: 56px;
             text-align: center;
         }
 
@@ -698,7 +697,7 @@
         }
 
         .photo-drop {
-            width: 58px;
+            width: 42px;
             height: 42px;
             border: 1px dashed rgba(155,35,85,.35);
             border-radius: 6px;
@@ -1365,7 +1364,6 @@
                                 <thead>
                                     <tr>
                                         <th data-sort-key="naam">Bedrijf</th>
-                                        <th data-sort-key="branche">Branche</th>
                                         <th data-sort-key="stad">Adres</th>
                                         <th data-sort-key="email">Mailadres</th>
                                         <th data-sort-key="tel">Telefoonnummer</th>
@@ -2277,7 +2275,7 @@
             renderPhotoCostLabel(filtered);
 
             if (!filtered.length) {
-                nodes.tbody.innerHTML = "<tr><td colspan=\"10\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
+                nodes.tbody.innerHTML = "<tr><td colspan=\"9\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 return;
             }
 
@@ -2286,7 +2284,6 @@
                 return [
                     "<tr data-id=\"" + escapeHtml(customer.id) + "\">",
                         "<td><div class=\"company-cell\"><button class=\"company-edit\" type=\"button\" data-edit-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Bedrijfsgegevens aanpassen\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z\"/></svg></button><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div></div></td>",
-                        "<td><span class=\"c-mid\">" + escapeHtml(customer.branche) + "</span></td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.stad) + "</td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.email || "—") + "</td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.tel || "—") + "</td>",

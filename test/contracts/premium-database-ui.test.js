@@ -31,7 +31,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /font-family: 'Inter', sans-serif;/);
   assert.match(pageSource, /\.page-title \{[\s\S]*font-family: 'Oswald', sans-serif;/);
   assert.match(pageSource, /table-layout: fixed;/);
-  assert.match(pageSource, /thead th:nth-child\(10\), tbody td:nth-child\(10\) \{[\s\S]*width: 70px;/);
+  assert.match(pageSource, /thead th:nth-child\(9\), tbody td:nth-child\(9\) \{[\s\S]*width: 56px;/);
+  assert.match(pageSource, /\.photo-drop \{[\s\S]*width: 42px;[\s\S]*height: 42px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
   assert.match(pageSource, /\.company-edit/);
   assert.match(pageSource, /\.photo-remove/);
@@ -57,6 +58,7 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /<select class="fsel" id="f-branche">/);
   assert.doesNotMatch(pageSource, /id="f-branche"[^>]*data-select-variant/);
   assert.doesNotMatch(pageSource, /id="f-branche"[^>]*data-custom-select/);
+  assert.doesNotMatch(pageSource, /<th data-sort-key="branche">Branche<\/th>/);
   assert.match(pageSource, /<th data-sort-key="email">Mailadres<\/th>/);
   assert.match(pageSource, /<th data-sort-key="tel">Telefoonnummer<\/th>/);
   assert.match(pageSource, /<th data-sort-key="dom">Website<\/th>/);
@@ -67,7 +69,7 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /class=\\"company-edit\\"/);
   assert.match(pageSource, /data-edit-id=\\"/);
   assert.match(pageSource, /<th>Foto<\/th>/);
-  assert.match(pageSource, /colspan=\\"10\\"/);
+  assert.match(pageSource, /colspan=\\"9\\"/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";/);
