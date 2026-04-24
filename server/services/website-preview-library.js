@@ -18,6 +18,8 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
   const maxItems = Math.max(1, Math.min(100, Number(websitePreviewLibraryMaxItems) || 50));
   /** ~12 MiB string cap — past bij JSON-parserlimiet voor deze route. */
   const maxDataUrlChars = Math.floor(12 * 1024 * 1024);
+  /** Houd de lijstrespons klein genoeg voor serverless/browser-limieten. */
+  const maxListDataUrlChars = Math.floor(3.2 * 1024 * 1024);
 
   function buildOwnerSlug(req) {
     const email = normalizeString(req?.premiumAuth?.email || '').toLowerCase();
@@ -89,10 +91,29 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
       }
 
       const rawRows = Array.isArray(result.body) ? result.body : [];
-      const entries = rawRows
-        .map(mapSupabaseRowToClientEntry)
-        .filter((e) => e.id && e.dataUrl && e.dataUrl.startsWith('data:image/'));
-      return res.status(200).json({ ok: true, entries });
+      const entries = [];
+      let dataUrlChars = 0;
+      let omittedLargeItems = 0;
+
+      for (const row of rawRows) {
+        const entry = mapSupabaseRowToClientEntry(row);
+        if (!entry.id || !entry.dataUrl || !entry.dataUrl.startsWith('data:image/')) continue;
+
+        const nextSize = entry.dataUrl.length;
+        if (nextSize > maxListDataUrlChars || dataUrlChars + nextSize > maxListDataUrlChars) {
+          omittedLargeItems += 1;
+          continue;
+        }
+
+        entries.push(entry);
+        dataUrlChars += nextSize;
+      }
+
+      return res.status(200).json({
+        ok: true,
+        entries,
+        omittedLargeItems,
+      });
     } catch (error) {
       logger.error('[WebsitePreviewLibrary][ListCrash]', error?.message || error);
       return res.status(500).json({

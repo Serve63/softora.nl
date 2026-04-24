@@ -461,6 +461,9 @@ async function maybeHydrateWebsitePreviewLibraryFromServer() {
     }
     websitePreviewLibraryRemoteEntries = Array.isArray(data.entries) ? data.entries : [];
     websitePreviewLibraryUseRemote = true;
+    if (Number(data.omittedLargeItems || 0) > 0) {
+      showToast('Bibliotheek geladen; een paar te grote previews zijn overgeslagen');
+    }
   } catch (_) {
     websitePreviewLibraryUseRemote = true;
     websitePreviewLibraryRemoteEntries = [];

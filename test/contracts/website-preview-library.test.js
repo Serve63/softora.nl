@@ -135,6 +135,49 @@ test('website preview library coordinator lists entries for same owner prefix', 
   assert.equal(res.body.entries[0].hostname, 'example.nl');
 });
 
+test('website preview library coordinator keeps list responses small when stored previews are huge', async () => {
+  const { coordinator, rowsByPrefix } = createFixture();
+  rowsByPrefix.push({
+    state_key: 'core:website_preview_lib:demo-at-user-nl:aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+    payload: {
+      type: 'website_preview_library',
+      id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      dataUrl: `data:image/png;base64,${'A'.repeat(4 * 1024 * 1024)}`,
+      url: 'https://large.example.nl/',
+      hostname: 'large.example.nl',
+      fileName: 'large.png',
+      width: 1024,
+      height: 1536,
+      createdAt: '2026-01-01T12:00:00.000Z',
+    },
+    updated_at: '2026-01-01T12:00:00.000Z',
+  });
+  rowsByPrefix.push({
+    state_key: 'core:website_preview_lib:demo-at-user-nl:bbbbbbbb-cccc-4ddd-8eee-ffffffffffff',
+    payload: {
+      type: 'website_preview_library',
+      id: 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff',
+      dataUrl: 'data:image/png;base64,BBB',
+      url: 'https://small.example.nl/',
+      hostname: 'small.example.nl',
+      fileName: 'small.png',
+      width: 800,
+      height: 1200,
+      createdAt: '2026-01-01T12:01:00.000Z',
+    },
+    updated_at: '2026-01-01T12:01:00.000Z',
+  });
+
+  const res = createResponseRecorder();
+  await coordinator.listLibraryResponse({ premiumAuth: { email: 'demo@user.nl' } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.entries.length, 1);
+  assert.equal(res.body.entries[0].hostname, 'small.example.nl');
+  assert.equal(res.body.omittedLargeItems, 1);
+});
+
 test('website preview library coordinator delete validates uuid id', async () => {
   const { coordinator } = createFixture();
   const res = createResponseRecorder();
