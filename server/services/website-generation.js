@@ -26,11 +26,14 @@ function createWebsiteGenerationHelpers(deps = {}) {
     const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 1800);
 
     return [
-      'Bekijk eerst de website op basis van de scan hieronder en behandel de bestaande site als de harde bron van waarheid voor merkstijl, kleurgebruik, content-richting, diensten, doelgroep en tone-of-voice.',
+      'Bekijk eerst de website grondig op basis van de scan hieronder: begrijp wat het bedrijf doet, welke diensten worden verkocht, welke doelgroep wordt aangesproken, welke CTA’s belangrijk zijn, welke secties terugkomen en welke tone-of-voice de site gebruikt.',
+      'Behandel de bestaande site daarna als de harde bron van waarheid voor merkstijl, kleurgebruik, content-richting, diensten, doelgroep en tone-of-voice.',
       referenceImageCount
         ? `Gebruik de ${referenceImageCount} meegeleverde referentiebeeld(en) als harde visuele bron voor kleurgebruik, fotografie, contrast, materiaalgevoel, typografiegevoel en merkuitstraling. Het resultaat moet duidelijk verwant zijn aan deze visuele bron.`
         : '',
-      'Genereer daarna precies 1 faithful premium refresh als full-page desktop website screenshot van header tot footer in een enkel beeld.',
+      'Genereer daarna precies 1 verbeterde premium variant als full-page desktop website screenshot van header tot footer in een enkel beeld.',
+      'Dit moet een verbetering zijn, geen kopie: maak de layout, hiërarchie, visual polish, spacing, typografie, kaarten, CTA’s en sectie-overgangen duidelijk mooier, sterker en commerciëler.',
+      'Tegelijk moet het nog steeds 60-70% herkenbaar dezelfde site/hetzelfde merk blijven en ongeveer 30-40% premium verbetering toevoegen. Evolutie, geen rebrand.',
       'Het resultaat mag moderner en sterker zijn, maar mag niet aanvoelen als een ander merk, andere propositie of andere website. Behoud de herkenbare visuele richting van de huidige site.',
       'Gebruik dezelfde kleurfamilie, accentkleur(en), donkere/lichte verhoudingen en algemene sfeer als de huidige site. Introduceer nadrukkelijk geen nieuw kleurenpalet.',
       'Als er merkkleuren of kleurvariabelen in de scan staan, behandel die als verplicht kleurenpalet. Gebruik geen willekeurige blauw/goud, zwart/goud of SaaS-template kleuren tenzij die exact uit de scan blijken.',
@@ -40,7 +43,8 @@ function createWebsiteGenerationHelpers(deps = {}) {
       'Streef naar uitzonderlijk hoge kwaliteit: pixel-perfect spacing, high-end typografie, royale witruimte, subtiele diepte, premium details en een zeer overtuigend afgewerkt eindresultaat.',
       'Gebruik Nederlandse websitecopy die inhoudelijk dicht bij de huidige site blijft: dezelfde diensten, dezelfde belofte, dezelfde doelgroep en dezelfde commerciële richting. Verbeter formuleringen, maar verander het onderwerp niet.',
       'Neem waar mogelijk woorden, diensten en sectienamen uit de scan over. Geen lorem ipsum, geen generieke placeholder-copy en geen volledig nieuwe propositie.',
-      'Maak het resultaat uitgesproken, maatwerk en commercieel sterk, alsof het een high-end versie van exact dezelfde bestaande site is.',
+      'Als de huidige site bijvoorbeeld over websites, software, automatisering of marketing gaat, moet de nieuwe variant daar ook expliciet over gaan en niet ineens een generiek softwarebedrijf of ander type bureau worden.',
+      'Maak het resultaat uitgesproken, maatwerk en commercieel sterk, alsof een senior designer exact deze bestaande site heeft geüpgraded naar een betere versie.',
       host ? `Domein of merk: ${host}.` : '',
       title ? `Huidige paginatitel: ${title}.` : '',
       description ? `Huidige meta-omschrijving: ${description}.` : '',
