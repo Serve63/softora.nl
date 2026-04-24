@@ -2416,14 +2416,24 @@
             }
         }
 
+        function isGeneratedFallbackDomain(customer, value) {
+            const domain = normalizeString(value).toLowerCase();
+            if (!domain) return true;
+            const generatedFromCompany = slugifyDomain(customer && customer.bedrijf).toLowerCase();
+            if (domain === generatedFromCompany) return true;
+            const websiteText = normalizeString(customer && customer.website);
+            if (websiteText && /\s/.test(websiteText) && domain === slugifyDomain(websiteText).toLowerCase()) {
+                return true;
+            }
+            return false;
+        }
+
         function resolveCustomerWebsiteUrl(customer) {
-            const candidates = [
-                customer && customer.website,
-                customer && customer.dom
-            ];
-            for (const candidate of candidates) {
-                const url = normalizeWebsiteCandidateUrl(candidate);
-                if (url) return url;
+            const websiteUrl = normalizeWebsiteCandidateUrl(customer && customer.website);
+            if (websiteUrl) return websiteUrl;
+
+            if (!isGeneratedFallbackDomain(customer, customer && customer.dom)) {
+                return normalizeWebsiteCandidateUrl(customer && customer.dom);
             }
             return "";
         }
