@@ -421,6 +421,75 @@ test('ai remote service fetches and normalizes website preview scan metadata inc
   assert.deepEqual(result.scan.fontHints, ['Oswald', 'Inter']);
 });
 
+test('ai remote service follows client-side redirect shells before scanning website previews', async () => {
+  const calls = [];
+  const { service } = createService({
+    fetchTextWithTimeout: async (url, options, timeoutMs) => {
+      calls.push({ url, options, timeoutMs });
+      if (url === 'https://softora.nl') {
+        return {
+          response: {
+            ok: true,
+            status: 200,
+            url: 'https://www.softora.nl/',
+            headers: {
+              get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : ''),
+            },
+          },
+          text: `
+            <html>
+              <head><title>Softora</title><script>window.location.replace('/premium-website');</script></head>
+              <body>Je wordt doorgestuurd naar Softora.</body>
+            </html>
+          `,
+        };
+      }
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url,
+          headers: {
+            get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : ''),
+          },
+        },
+        text: `
+          <html>
+            <head><title>Softora | Premium Webdesign & Development</title></head>
+            <body>
+              <nav><a>Home</a><a>Diensten</a><a>Start project</a></nav>
+              <main><h1>Digitaal Geregeld.</h1><section><h2>Wat we bouwen</h2><p>Websites, bedrijfssoftware, voicesoftware en chatbots voor ondernemers.</p></section></main>
+            </body>
+          </html>
+        `,
+      };
+    },
+    extractWebsitePreviewScanFromHtml: (html, pageUrl) => ({
+      title: html.includes('Digitaal Geregeld') ? 'Softora | Premium Webdesign & Development' : 'Softora redirect',
+      h1: html.includes('Digitaal Geregeld') ? 'Digitaal Geregeld.' : '',
+      metaDescription: '',
+      headings: html.includes('Wat we bouwen') ? ['Wat we bouwen'] : [],
+      paragraphs: html.includes('Websites, bedrijfssoftware') ? ['Websites, bedrijfssoftware, voicesoftware en chatbots voor ondernemers.'] : [],
+      bodyTextSample: html.includes('Digitaal Geregeld')
+        ? 'Digitaal Geregeld. Wat we bouwen. Websites, bedrijfssoftware, voicesoftware en chatbots voor ondernemers.'
+        : 'Je wordt doorgestuurd naar Softora.',
+      sourceUrl: pageUrl,
+    }),
+  });
+
+  const result = await service.fetchWebsitePreviewScanFromUrl('https://softora.nl');
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url, 'https://softora.nl');
+  assert.equal(calls[1].url, 'https://www.softora.nl/premium-website');
+  assert.equal(result.finalUrl, 'https://www.softora.nl/premium-website');
+  assert.equal(result.scan.fetchSource, 'client-redirect');
+  assert.equal(result.scan.clientRedirectUrl, 'https://www.softora.nl/premium-website');
+  assert.equal(result.scan.h1, 'Digitaal Geregeld.');
+  assert.match(result.scan.bodyTextSample, /Websites, bedrijfssoftware, voicesoftware en chatbots/);
+  assert.doesNotMatch(result.scan.bodyTextSample, /doorgestuurd/);
+});
+
 test('ai remote service retries website preview fetch with a compat profile after a 403', async () => {
   const calls = [];
   const { service } = createService({

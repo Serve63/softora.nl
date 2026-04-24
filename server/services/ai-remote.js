@@ -253,6 +253,66 @@ function createAiRemoteService(deps = {}) {
     );
   }
 
+  function stripWebsitePreviewHtmlNoise(htmlRaw) {
+    return String(htmlRaw || '')
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ');
+  }
+
+  function isLikelyWebsitePreviewClientRedirectShell(htmlRaw) {
+    const html = String(htmlRaw || '');
+    if (!html) return false;
+    const hasClientRedirect = /(?:window\.)?location(?:\.href|\.replace|\.assign)?|http-equiv\s*=\s*["']?refresh/i.test(html);
+    if (!hasClientRedirect) return false;
+
+    const visibleText = normalizeWebsitePreviewText(stripWebsitePreviewHtmlNoise(html));
+    if (/(je wordt doorgestuurd|wordt doorgestuurd|you are being redirected|redirecting|document has moved)/i.test(visibleText)) {
+      return true;
+    }
+
+    const hasUsefulPageStructure = /<(?:h1|h2|main|section|article|nav)\b/i.test(html);
+    return html.length < 3000 && visibleText.length < 240 && !hasUsefulPageStructure;
+  }
+
+  function resolveWebsitePreviewUrlAgainstBase(valueRaw, baseUrlRaw) {
+    const value = normalizeString(valueRaw || '');
+    const baseUrl = normalizeString(baseUrlRaw || '');
+    if (!value) return '';
+    try {
+      return new URL(value, baseUrl || undefined).toString();
+    } catch {
+      return normalizeWebsitePreviewTargetUrl(value);
+    }
+  }
+
+  function extractWebsitePreviewClientRedirectUrl(htmlRaw, pageUrlRaw) {
+    const html = String(htmlRaw || '');
+    if (!isLikelyWebsitePreviewClientRedirectShell(html)) return '';
+
+    const patterns = [
+      /(?:window\.)?location\.replace\(\s*["']([^"']+)["']\s*\)/i,
+      /(?:window\.)?location\.assign\(\s*["']([^"']+)["']\s*\)/i,
+      /(?:window\.)?location\.href\s*=\s*["']([^"']+)["']/i,
+      /(?:window\.)?location\s*=\s*["']([^"']+)["']/i,
+    ];
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      const url = resolveWebsitePreviewUrlAgainstBase(match && match[1], pageUrlRaw);
+      if (url) return url;
+    }
+
+    const metaRefreshTags = html.match(/<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi) || [];
+    for (const tag of metaRefreshTags) {
+      const contentMatch = tag.match(/\bcontent\s*=\s*["']([^"']+)["']/i);
+      const urlMatch = normalizeString(contentMatch && contentMatch[1]).match(/url\s*=\s*([^;]+)/i);
+      const url = resolveWebsitePreviewUrlAgainstBase(urlMatch && urlMatch[1], pageUrlRaw);
+      if (url) return url;
+    }
+
+    return '';
+  }
+
   function buildWebsitePreviewReaderUrl(pageUrlRaw) {
     const pageUrl = normalizeString(pageUrlRaw || '');
     if (!pageUrl) return '';
@@ -908,9 +968,33 @@ function createAiRemoteService(deps = {}) {
       ]);
     }
 
-    const response = directFetch.response;
-    const html = String(directFetch.text || '');
-    const contentType = extractResponseHeader(response, 'content-type').toLowerCase();
+    let response = directFetch.response;
+    let html = String(directFetch.text || '');
+    let contentType = extractResponseHeader(response, 'content-type').toLowerCase();
+    const clientRedirectUrl = extractWebsitePreviewClientRedirectUrl(html, response?.url || normalizedUrl);
+    if (clientRedirectUrl) {
+      const safeClientRedirectUrl = await assertWebsitePreviewUrlIsPublic(clientRedirectUrl);
+      if (safeClientRedirectUrl && safeClientRedirectUrl !== normalizedUrl) {
+        const redirectedFetch = await tryFetchWebsitePreviewDocument(safeClientRedirectUrl, 25000);
+        if (redirectedFetch.ok) {
+          response = redirectedFetch.response;
+          html = String(redirectedFetch.text || '');
+          contentType = extractResponseHeader(response, 'content-type').toLowerCase();
+        } else {
+          const readerFetch = await tryFetchWebsitePreviewViaReader(safeClientRedirectUrl, 25000);
+          if (readerFetch.ok) {
+            return {
+              normalizedUrl,
+              finalUrl: readerFetch.finalUrl,
+              scan: {
+                ...readerFetch.scan,
+                fetchSource: 'client-redirect-reader-fallback',
+              },
+            };
+          }
+        }
+      }
+    }
     if (
       contentType &&
       !contentType.includes('text/html') &&
@@ -946,6 +1030,10 @@ function createAiRemoteService(deps = {}) {
     }
 
     const scan = extractWebsitePreviewScanFromHtml(html, response.url || normalizedUrl);
+    if (clientRedirectUrl) {
+      scan.fetchSource = 'client-redirect';
+      scan.clientRedirectUrl = normalizeWebsitePreviewTargetUrl(clientRedirectUrl) || clientRedirectUrl;
+    }
     const cssSources = await fetchWebsitePreviewCssSources(html, response.url || normalizedUrl);
     const brandColorHints = extractCssVariableColorHints(cssSources);
     const brandPalette = extractCssBrandPalette(
