@@ -35,6 +35,7 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /text-overflow: ellipsis;/);
   assert.match(pageSource, /\.company-edit/);
   assert.match(pageSource, /\.photo-remove/);
+  assert.match(pageSource, /\.photo-remove \{[\s\S]*position: absolute;[\s\S]*right: 2px;/);
   assert.match(pageSource, /class="result-count-stack" aria-label="Aantal resultaten"/);
   assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="result-count-icon"/);

@@ -702,6 +702,7 @@
             letter-spacing: 1px;
             text-transform: uppercase;
             vertical-align: middle;
+            position: relative;
         }
 
         .photo-drop.is-dragover {
@@ -721,30 +722,34 @@
         }
 
         .photo-cell {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+            display: inline-block;
+            line-height: 0;
         }
 
         .photo-remove {
-            width: 20px;
-            height: 20px;
-            border: 1px solid rgba(155,35,85,.18);
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            z-index: 2;
+            width: 16px;
+            height: 16px;
+            border: 1px solid rgba(155,35,85,.34);
             border-radius: 999px;
-            background: rgba(155,35,85,.05);
+            background: rgba(255,255,255,.94);
             color: var(--crimson);
             display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
             line-height: 1;
             font-weight: 700;
-            flex: 0 0 auto;
+            padding: 0;
+            box-shadow: 0 6px 14px rgba(0,0,0,.12);
         }
 
         .photo-remove:hover {
-            background: rgba(155,35,85,.12);
+            background: #fff;
             border-color: rgba(155,35,85,.36);
         }
 
@@ -2196,11 +2201,10 @@
             const inner = isValidWebsitePhotoDataUrl(photo)
                 ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\">"
                 : "<span>Sleep</span>";
-            const drop = "<div class=\"photo-drop\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" aria-label=\"" + (hasPhoto ? "Websitefoto bekijken" : "Websitefoto toevoegen") + "\">" + inner + "</div>";
             const remove = hasPhoto
                 ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>"
                 : "";
-            return "<div class=\"photo-cell\">" + drop + remove + "</div>";
+            return "<div class=\"photo-cell\"><div class=\"photo-drop\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" aria-label=\"" + (hasPhoto ? "Websitefoto bekijken" : "Websitefoto toevoegen") + "\">" + inner + remove + "</div></div>";
         }
 
         function renderTable() {
