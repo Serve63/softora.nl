@@ -132,8 +132,11 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /<div class="campagne-head">[\s\S]*<div class="campagne-title">Nieuwe Campagne<\/div>[\s\S]*id="campaignCompanyCount"/);
+  assert.match(pageSource, /<button class="campaign-company-count" id="campaignCompanyCount" type="button"[^>]*onclick="toggleCampaignRecipientsList\(event\)"/);
   assert.match(pageSource, /<span id="campaignCompanyCountValue">0<\/span>/);
   assert.match(pageSource, /\.campaign-company-count \{[\s\S]*display: inline-flex;[\s\S]*border-radius: 999px;/);
+  assert.match(pageSource, /id="campaignRecipientList" hidden/);
+  assert.match(pageSource, /\.campaign-recipient-list \{[\s\S]*position: absolute;[\s\S]*max-height: 300px;/);
   assert.match(pageSource, /const CUSTOMER_DB_SCOPE = 'premium_customers_database';/);
   assert.match(pageSource, /const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';/);
   assert.match(pageSource, /function hydrateCampaignCompanyCountFromSupabase\(\)/);
@@ -141,16 +144,20 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /window\.addEventListener\('focus', refreshCampaignDatabaseForLatestState\);/);
   assert.match(pageSource, /document\.addEventListener\('visibilitychange'/);
   assert.match(pageSource, /window\.setInterval\(\(\) => \{[\s\S]*refreshCampaignDatabaseForLatestState\(\);[\s\S]*\}, 15000\);/);
-  assert.match(pageSource, /id="campaignRecipientPreview"/);
-  assert.match(pageSource, /function hydrateCampaignRecipientPreview\(\)/);
+  assert.doesNotMatch(pageSource, /id="campaignRecipientPreview"/);
+  assert.match(pageSource, /function hydrateCampaignRecipientList\(\)/);
+  assert.match(pageSource, /function toggleCampaignRecipientsList\(event\)/);
+  assert.match(pageSource, /function renderCampaignRecipientList\(payload\)/);
   assert.match(pageSource, /\/api\/coldmailing\/campaigns\/recipients\?/);
-  assert.match(pageSource, /<strong>Ontvanger:<\/strong> /);
+  assert.match(pageSource, /recipient\.bedrijf \|\| 'Onbekend bedrijf'/);
+  assert.match(pageSource, /recipient\.email \|\| 'Geen e-mailadres'/);
   assert.match(pageSource, /function isEligibleColdmailCampaignRow\(row\)/);
   assert.match(pageSource, /function isEligibleColdcallingCampaignRow\(row\)/);
   assert.match(pageSource, /isPremiumAiLeadGeneratorPath\(\) \? isEligibleColdcallingCampaignRow : isEligibleColdmailCampaignRow/);
   assert.match(pageSource, /Math\.min\(getCampaignRequestedCompanyCount\(\) \|\| eligibleRows\.length, eligibleRows\.length\)/);
   assert.match(pageSource, /initCampaignDatabaseAutoRefresh\(\);/);
   assert.match(pageSource, /void hydrateCampaignCompanyCountFromSupabase\(\);/);
+  assert.match(pageSource, /setCampaignRecipientListOpen\(false\);/);
   assert.match(pageSource, /renderCampaignCompanyCount\(\);[\s\S]*\}\s*updateSlider\(100\);/);
 });
 

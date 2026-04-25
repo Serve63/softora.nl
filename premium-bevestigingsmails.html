@@ -418,11 +418,19 @@ html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { dis
 .campagne-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: visible; height: 100%; display: flex; flex-direction: column; }
 .campagne-head { padding: 14px 20px; border-bottom: 1px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .campagne-title { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dark); }
-.campaign-company-count { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 5px 9px; border: 1px solid rgba(155,35,85,.16); border-radius: 999px; background: rgba(155,35,85,.06); color: var(--crimson); font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .08em; }
+.campaign-recipient-menu-wrap { position: relative; }
+.campaign-company-count { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 5px 9px; border: 1px solid rgba(155,35,85,.16); border-radius: 999px; background: rgba(155,35,85,.06); color: var(--crimson); font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .08em; cursor: pointer; }
+.campaign-company-count:hover { background: rgba(155,35,85,.1); }
 .campaign-company-count svg { width: 15px; height: 15px; stroke: currentColor; flex-shrink: 0; }
+.campaign-recipient-list { position: absolute; top: calc(100% + 10px); right: 0; z-index: 40; width: min(330px, calc(100vw - 48px)); max-height: 300px; overflow: auto; padding: 8px; border: 1px solid rgba(155,35,85,.18); border-radius: 12px; background: #fff; box-shadow: 0 18px 45px rgba(26,26,46,.16); }
+.campaign-recipient-list[hidden] { display: none; }
+.campaign-recipient-list-title { padding: 6px 8px 9px; font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--dark); border-bottom: 1px solid rgba(155,35,85,.1); margin-bottom: 4px; }
+.campaign-recipient-list-item { padding: 9px 8px; border-radius: 8px; color: var(--dark); font-size: 12px; line-height: 1.35; }
+.campaign-recipient-list-item + .campaign-recipient-list-item { border-top: 1px solid rgba(155,35,85,.08); }
+.campaign-recipient-list-company { display: block; font-weight: 700; color: var(--dark); }
+.campaign-recipient-list-email { display: block; color: var(--mid); word-break: break-word; }
+.campaign-recipient-list-empty { padding: 10px 8px; color: var(--mid); font-size: 12px; line-height: 1.4; }
 .campagne-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
-.campaign-recipient-preview { margin: -6px 0 14px; padding: 9px 10px; border: 1px solid rgba(155,35,85,.12); border-radius: 8px; background: rgba(155,35,85,.04); color: var(--mid); font-size: 11px; line-height: 1.45; }
-.campaign-recipient-preview strong { color: var(--dark); font-weight: 700; }
 
 /* INSTELLINGEN */
 .field { margin-bottom: 18px; position: relative; }
@@ -1231,18 +1239,22 @@ Softora.nl | +31 6 2991 7185</textarea>
     <div class="campagne-card">
       <div class="campagne-head">
         <div class="campagne-title">Nieuwe Campagne</div>
-        <div class="campaign-company-count" id="campaignCompanyCount" aria-label="Aantal geselecteerde bedrijven">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true">
-            <path d="M3.75 21h16.5"></path>
-            <path d="M5.25 21V5.75A1.75 1.75 0 0 1 7 4h10a1.75 1.75 0 0 1 1.75 1.75V21"></path>
-            <path d="M8.25 8h2.25M13.5 8h2.25M8.25 12h2.25M13.5 12h2.25M8.25 16h2.25M13.5 16h2.25"></path>
-          </svg>
-          <span id="campaignCompanyCountValue">0</span>
+        <div class="campaign-recipient-menu-wrap" id="campaignRecipientMenuWrap">
+          <button class="campaign-company-count" id="campaignCompanyCount" type="button" aria-label="Toon geselecteerde ontvangers" aria-expanded="false" onclick="toggleCampaignRecipientsList(event)">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true">
+              <path d="M3.75 21h16.5"></path>
+              <path d="M5.25 21V5.75A1.75 1.75 0 0 1 7 4h10a1.75 1.75 0 0 1 1.75 1.75V21"></path>
+              <path d="M8.25 8h2.25M13.5 8h2.25M8.25 12h2.25M13.5 12h2.25M8.25 16h2.25M13.5 16h2.25"></path>
+            </svg>
+            <span id="campaignCompanyCountValue">0</span>
+          </button>
+          <div class="campaign-recipient-list" id="campaignRecipientList" hidden>
+            <div class="campaign-recipient-list-title">Ontvangers</div>
+            <div class="campaign-recipient-list-empty">Klik om ontvangers te laden.</div>
+          </div>
         </div>
       </div>
       <div class="campagne-body">
-        <div class="campaign-recipient-preview" id="campaignRecipientPreview">Ontvanger laden...</div>
-
         <div class="field">
           <div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen?</div>
           <div class="field-val" id="slider-val">100</div>
@@ -1440,7 +1452,7 @@ const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 let coldmailingSettingsSaveTimer = null;
 let coldmailingDatabaseRows = [];
-let campaignRecipientPreviewTimer = null;
+let campaignRecipientListTimer = null;
 let campaignDatabaseRefreshTimer = null;
 
 function isPremiumAiLeadGeneratorPath() {
@@ -1582,12 +1594,6 @@ function renderCampaignCompanyCount() {
   wrap.setAttribute('aria-label', wrap.title);
 }
 
-function renderCampaignRecipientPreviewText(text) {
-  const preview = document.getElementById('campaignRecipientPreview');
-  if (!preview) return;
-  preview.innerHTML = text;
-}
-
 function getColdmailRecipientPreviewUrl() {
   const params = new URLSearchParams();
   params.set('count', String(getCampaignRequestedCompanyCount() || 10));
@@ -1596,9 +1602,58 @@ function getColdmailRecipientPreviewUrl() {
   return '/api/coldmailing/campaigns/recipients?' + params.toString();
 }
 
-async function hydrateCampaignRecipientPreview() {
+function isCampaignRecipientListOpen() {
+  const list = document.getElementById('campaignRecipientList');
+  return Boolean(list && !list.hidden);
+}
+
+function setCampaignRecipientListLoading(text) {
+  const list = document.getElementById('campaignRecipientList');
+  if (!list) return;
+  list.innerHTML = '<div class="campaign-recipient-list-title">Ontvangers</div><div class="campaign-recipient-list-empty"></div>';
+  const empty = list.querySelector('.campaign-recipient-list-empty');
+  if (empty) empty.textContent = text;
+}
+
+function renderCampaignRecipientList(payload) {
+  const list = document.getElementById('campaignRecipientList');
+  if (!list) return;
+  list.innerHTML = '';
+  const title = document.createElement('div');
+  title.className = 'campaign-recipient-list-title';
+  title.textContent = 'Ontvangers';
+  list.appendChild(title);
+
+  const recipients = Array.isArray(payload && payload.recipients) ? payload.recipients : [];
+  if (!recipients.length) {
+    const skipped = Array.isArray(payload && payload.failedItems) && payload.failedItems[0] ? payload.failedItems[0] : null;
+    const empty = document.createElement('div');
+    empty.className = 'campaign-recipient-list-empty';
+    empty.textContent = skipped
+      ? 'Geen geldige ontvanger: ' + (skipped.bedrijf || 'Onbekend') + ' - ' + (skipped.email || '')
+      : 'Geen ontvangers geselecteerd.';
+    list.appendChild(empty);
+    return;
+  }
+
+  recipients.forEach((recipient) => {
+    const item = document.createElement('div');
+    item.className = 'campaign-recipient-list-item';
+    const company = document.createElement('span');
+    company.className = 'campaign-recipient-list-company';
+    company.textContent = recipient.bedrijf || 'Onbekend bedrijf';
+    const email = document.createElement('span');
+    email.className = 'campaign-recipient-list-email';
+    email.textContent = recipient.email || 'Geen e-mailadres';
+    item.appendChild(company);
+    item.appendChild(email);
+    list.appendChild(item);
+  });
+}
+
+async function hydrateCampaignRecipientList() {
   if (isPremiumAiLeadGeneratorPath()) {
-    renderCampaignRecipientPreviewText('Deze pagina staat op coldcalling; echte mails verstuur je via Coldmailing.');
+    setCampaignRecipientListLoading('Deze pagina staat op coldcalling. E-mailontvangers zie je bij Coldmailing.');
     return;
   }
   try {
@@ -1610,23 +1665,33 @@ async function hydrateCampaignRecipientPreview() {
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload || payload.ok === false) throw new Error('Ontvanger laden mislukt');
-    const first = Array.isArray(payload.recipients) && payload.recipients[0] ? payload.recipients[0] : null;
-    if (first) {
-      renderCampaignRecipientPreviewText('<strong>Ontvanger:</strong> ' + first.bedrijf + ' · ' + first.email);
-      return;
-    }
-    const skipped = Array.isArray(payload.failedItems) && payload.failedItems[0] ? payload.failedItems[0] : null;
-    renderCampaignRecipientPreviewText(skipped
-      ? '<strong>Geen geldige ontvanger.</strong> ' + skipped.bedrijf + ' · ' + skipped.email
-      : '<strong>Geen ontvanger geselecteerd.</strong>');
+    renderCampaignRecipientList(payload);
   } catch (_) {
-    renderCampaignRecipientPreviewText('Ontvanger kon niet geladen worden.');
+    setCampaignRecipientListLoading('Ontvangers konden niet geladen worden.');
   }
 }
 
-function hydrateCampaignRecipientPreviewSoon() {
-  if (campaignRecipientPreviewTimer) window.clearTimeout(campaignRecipientPreviewTimer);
-  campaignRecipientPreviewTimer = window.setTimeout(hydrateCampaignRecipientPreview, 200);
+function hydrateCampaignRecipientListSoon() {
+  if (!isCampaignRecipientListOpen()) return;
+  if (campaignRecipientListTimer) window.clearTimeout(campaignRecipientListTimer);
+  campaignRecipientListTimer = window.setTimeout(hydrateCampaignRecipientList, 200);
+}
+
+function setCampaignRecipientListOpen(isOpen) {
+  const list = document.getElementById('campaignRecipientList');
+  const button = document.getElementById('campaignCompanyCount');
+  if (!list || !button) return;
+  list.hidden = !isOpen;
+  button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  if (isOpen) {
+    setCampaignRecipientListLoading('Ontvangers laden...');
+    void hydrateCampaignRecipientList();
+  }
+}
+
+function toggleCampaignRecipientsList(event) {
+  if (event) event.stopPropagation();
+  setCampaignRecipientListOpen(!isCampaignRecipientListOpen());
 }
 
 async function hydrateCampaignCompanyCountFromSupabase() {
@@ -1638,7 +1703,7 @@ async function hydrateCampaignCompanyCountFromSupabase() {
     coldmailingDatabaseRows = [];
   }
   renderCampaignCompanyCount();
-  hydrateCampaignRecipientPreviewSoon();
+  hydrateCampaignRecipientListSoon();
 }
 
 function refreshCampaignDatabaseForLatestState() {
@@ -1896,7 +1961,7 @@ function updateSlider(v) {
   document.getElementById('mail-slider').style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
   renderCampaignCompanyCount();
-  hydrateCampaignRecipientPreviewSoon();
+  hydrateCampaignRecipientListSoon();
 }
 updateSlider(100);
 
@@ -2685,10 +2750,14 @@ function showToast(msg) {
 
 document.addEventListener('click', event => {
   if (!event.target.closest('.select-shell')) closeCustomSelects();
+  if (!event.target.closest('#campaignRecipientMenuWrap')) setCampaignRecipientListOpen(false);
 });
 
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') closeCustomSelects();
+  if (event.key === 'Escape') {
+    closeCustomSelects();
+    setCampaignRecipientListOpen(false);
+  }
 });
 
 applyPremiumAiLeadGeneratorShell();
