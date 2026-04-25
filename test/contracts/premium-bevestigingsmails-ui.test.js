@@ -137,6 +137,10 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /const CUSTOMER_DB_SCOPE = 'premium_customers_database';/);
   assert.match(pageSource, /const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';/);
   assert.match(pageSource, /function hydrateCampaignCompanyCountFromSupabase\(\)/);
+  assert.match(pageSource, /id="campaignRecipientPreview"/);
+  assert.match(pageSource, /function hydrateCampaignRecipientPreview\(\)/);
+  assert.match(pageSource, /\/api\/coldmailing\/campaigns\/recipients\?/);
+  assert.match(pageSource, /<strong>Ontvanger:<\/strong> /);
   assert.match(pageSource, /function isEligibleColdmailCampaignRow\(row\)/);
   assert.match(pageSource, /function isEligibleColdcallingCampaignRow\(row\)/);
   assert.match(pageSource, /isPremiumAiLeadGeneratorPath\(\) \? isEligibleColdcallingCampaignRow : isEligibleColdmailCampaignRow/);

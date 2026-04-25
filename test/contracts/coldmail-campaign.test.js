@@ -94,6 +94,47 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[1].status, 'klant');
 });
 
+test('coldmail campaign previews selected recipients before sending', async () => {
+  const { service } = createService();
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    branch: 'Horeca & Restaurants',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.selected, 1);
+  assert.deepEqual(result.recipients, [
+    {
+      id: 'prospect-1',
+      bedrijf: 'Bakkerij Zon',
+      email: 'ruben@example.test',
+    },
+  ]);
+});
+
+test('coldmail campaign previews invalid recipient domains', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'bad-domain',
+        bedrijf: 'MCV E-commerce',
+        naam: 'MCV E-commerce',
+        email: 'info@mcvecommerce.nl',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+    invalidDomains: ['mcvecommerce.nl'],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({ count: 1 });
+
+  assert.equal(result.selected, 0);
+  assert.equal(result.failedItems[0].email, 'info@mcvecommerce.nl');
+  assert.match(result.failedItems[0].error, /mcvecommerce\.nl/);
+});
+
 test('coldmail campaign exposes the same sender accounts as mailbox', () => {
   const { service } = createService();
 

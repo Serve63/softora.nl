@@ -16,6 +16,25 @@ function registerColdmailingRoutes(app, deps = {}) {
     });
   });
 
+  app.get('/api/coldmailing/campaigns/recipients', async (req, res) => {
+    try {
+      const result = await coldmailCampaignService.getColdmailCampaignRecipients({
+        count: req.query.count,
+        branch: req.query.branch,
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'COLDMAIL_RECIPIENTS_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Ontvangers konden niet worden geladen.',
+          500
+        ),
+      });
+    }
+  });
+
   app.post('/api/coldmailing/campaigns/send', async (req, res) => {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};

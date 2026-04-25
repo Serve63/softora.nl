@@ -218,6 +218,58 @@ function createColdmailCampaignService(deps = {}) {
     return Boolean(await resolveEmailDomain(domain));
   }
 
+  async function resolveColdmailRecipients(input = {}) {
+    const count = parsePositiveInt(input.count, 10, 1, 500);
+    const state = await getUiStateValues(customerDbScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const rows = parseDatabaseRows(values);
+    const candidateRows = rows
+      .map((row, index) => ({ row, index, id: getRowId(row, index) }))
+      .filter(({ row }) => isEligibleColdmailRow(row, input.branch))
+      .slice(0, count);
+    const selectedRows = [];
+    const failed = [];
+
+    for (const item of candidateRows) {
+      const email = getRowEmail(item.row);
+      if (await isDeliverableEmailDomain(email)) {
+        selectedRows.push(item);
+      } else {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row),
+          email,
+          error: `E-maildomein bestaat niet of ontvangt geen mail: ${getEmailDomain(email) || email}`,
+        });
+      }
+    }
+
+    return {
+      count,
+      values,
+      rows,
+      candidateRows,
+      selectedRows,
+      failed,
+    };
+  }
+
+  async function getColdmailCampaignRecipients(input = {}) {
+    const resolved = await resolveColdmailRecipients(input);
+    return {
+      ok: true,
+      requested: resolved.count,
+      candidates: resolved.candidateRows.length,
+      selected: resolved.selectedRows.length,
+      recipients: resolved.selectedRows.map((item) => ({
+        id: item.id,
+        bedrijf: getRowCompany(item.row),
+        email: getRowEmail(item.row),
+      })),
+      failedItems: resolved.failed,
+    };
+  }
+
   function personalizeTemplate(template, row) {
     const company = getRowCompany(row) || 'uw bedrijf';
     const contact = getRowContact(row) || company;
@@ -297,7 +349,6 @@ function createColdmailCampaignService(deps = {}) {
     }
 
     const senderEmail = assertSenderAllowed(input.senderEmail);
-    const count = parsePositiveInt(input.count, 10, 1, 500);
     const subjectTemplate = truncateText(normalizeString(input.subject), 200);
     const bodyTemplate = normalizeString(input.body);
     if (!subjectTemplate || !bodyTemplate) {
@@ -306,13 +357,11 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
 
-    const state = await getUiStateValues(customerDbScope);
-    const values = state && typeof state.values === 'object' ? state.values : {};
-    const rows = parseDatabaseRows(values);
-    const candidateRows = rows
-      .map((row, index) => ({ row, index, id: getRowId(row, index) }))
-      .filter(({ row }) => isEligibleColdmailRow(row, input.branch))
-      .slice(0, count);
+    const resolvedRecipients = await resolveColdmailRecipients(input);
+    const count = resolvedRecipients.count;
+    const values = resolvedRecipients.values;
+    const rows = resolvedRecipients.rows;
+    const candidateRows = resolvedRecipients.candidateRows;
 
     if (!candidateRows.length) {
       const error = new Error('Geen geschikte e-mailadressen gevonden in de database.');
@@ -320,21 +369,8 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
 
-    const selectedRows = [];
-    const failed = [];
-    for (const item of candidateRows) {
-      const email = getRowEmail(item.row);
-      if (await isDeliverableEmailDomain(email)) {
-        selectedRows.push(item);
-      } else {
-        failed.push({
-          id: item.id,
-          bedrijf: getRowCompany(item.row),
-          email,
-          error: `E-maildomein bestaat niet of ontvangt geen mail: ${getEmailDomain(email) || email}`,
-        });
-      }
-    }
+    const selectedRows = resolvedRecipients.selectedRows;
+    const failed = resolvedRecipients.failed;
 
     if (!selectedRows.length) {
       const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
@@ -425,6 +461,7 @@ function createColdmailCampaignService(deps = {}) {
     getMissingSmtpMailEnv,
     isSmtpMailConfigured,
     isLikelyValidEmail,
+    getColdmailCampaignRecipients,
     sendColdmailCampaign,
   };
 }

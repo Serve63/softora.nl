@@ -421,6 +421,8 @@ html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { dis
 .campaign-company-count { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 5px 9px; border: 1px solid rgba(155,35,85,.16); border-radius: 999px; background: rgba(155,35,85,.06); color: var(--crimson); font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .08em; }
 .campaign-company-count svg { width: 15px; height: 15px; stroke: currentColor; flex-shrink: 0; }
 .campagne-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
+.campaign-recipient-preview { margin: -6px 0 14px; padding: 9px 10px; border: 1px solid rgba(155,35,85,.12); border-radius: 8px; background: rgba(155,35,85,.04); color: var(--mid); font-size: 11px; line-height: 1.45; }
+.campaign-recipient-preview strong { color: var(--dark); font-weight: 700; }
 
 /* INSTELLINGEN */
 .field { margin-bottom: 18px; position: relative; }
@@ -1239,6 +1241,7 @@ Softora.nl | +31 6 2991 7185</textarea>
         </div>
       </div>
       <div class="campagne-body">
+        <div class="campaign-recipient-preview" id="campaignRecipientPreview">Ontvanger laden...</div>
 
         <div class="field">
           <div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen?</div>
@@ -1437,6 +1440,7 @@ const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 let coldmailingSettingsSaveTimer = null;
 let coldmailingDatabaseRows = [];
+let campaignRecipientPreviewTimer = null;
 
 function isPremiumAiLeadGeneratorPath() {
   try {
@@ -1577,6 +1581,53 @@ function renderCampaignCompanyCount() {
   wrap.setAttribute('aria-label', wrap.title);
 }
 
+function renderCampaignRecipientPreviewText(text) {
+  const preview = document.getElementById('campaignRecipientPreview');
+  if (!preview) return;
+  preview.innerHTML = text;
+}
+
+function getColdmailRecipientPreviewUrl() {
+  const params = new URLSearchParams();
+  params.set('count', String(getCampaignRequestedCompanyCount() || 10));
+  const branchSelect = document.getElementById('branche');
+  if (branchSelect && branchSelect.value) params.set('branch', branchSelect.value);
+  return '/api/coldmailing/campaigns/recipients?' + params.toString();
+}
+
+async function hydrateCampaignRecipientPreview() {
+  if (isPremiumAiLeadGeneratorPath()) {
+    renderCampaignRecipientPreviewText('Deze pagina staat op coldcalling; echte mails verstuur je via Coldmailing.');
+    return;
+  }
+  try {
+    const response = await fetch(getColdmailRecipientPreviewUrl(), {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.ok === false) throw new Error('Ontvanger laden mislukt');
+    const first = Array.isArray(payload.recipients) && payload.recipients[0] ? payload.recipients[0] : null;
+    if (first) {
+      renderCampaignRecipientPreviewText('<strong>Ontvanger:</strong> ' + first.bedrijf + ' · ' + first.email);
+      return;
+    }
+    const skipped = Array.isArray(payload.failedItems) && payload.failedItems[0] ? payload.failedItems[0] : null;
+    renderCampaignRecipientPreviewText(skipped
+      ? '<strong>Geen geldige ontvanger.</strong> ' + skipped.bedrijf + ' · ' + skipped.email
+      : '<strong>Geen ontvanger geselecteerd.</strong>');
+  } catch (_) {
+    renderCampaignRecipientPreviewText('Ontvanger kon niet geladen worden.');
+  }
+}
+
+function hydrateCampaignRecipientPreviewSoon() {
+  if (campaignRecipientPreviewTimer) window.clearTimeout(campaignRecipientPreviewTimer);
+  campaignRecipientPreviewTimer = window.setTimeout(hydrateCampaignRecipientPreview, 200);
+}
+
 async function hydrateCampaignCompanyCountFromSupabase() {
   try {
     const data = await fetchColdmailingUiState(CUSTOMER_DB_SCOPE);
@@ -1586,6 +1637,7 @@ async function hydrateCampaignCompanyCountFromSupabase() {
     coldmailingDatabaseRows = [];
   }
   renderCampaignCompanyCount();
+  hydrateCampaignRecipientPreviewSoon();
 }
 
 function normalizeColdmailingSettings(value) {
@@ -1827,6 +1879,7 @@ function updateSlider(v) {
   document.getElementById('mail-slider').style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
   renderCampaignCompanyCount();
+  hydrateCampaignRecipientPreviewSoon();
 }
 updateSlider(100);
 
