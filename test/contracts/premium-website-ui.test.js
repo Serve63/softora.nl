@@ -57,6 +57,21 @@ test('premium website hero story titel staat op twee regels zonder bureau-ruis',
   assert.doesNotMatch(source, /Premium uitstraling zonder bureau-ruis\./);
 });
 
+test('premium website hero story kaart lijnt onderkant uit met hero buttons op desktop', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /\.hero-buttons\s*\{[\s\S]*margin-bottom:\s*2rem;/);
+  assert.match(
+    source,
+    /\.hero-story-card\s*\{[\s\S]*transform:\s*translateY\(calc\(-2rem - clamp\(1\.2rem,\s*2vw,\s*1\.6rem\)\)\);/
+  );
+  assert.match(
+    source,
+    /@media \(max-width: 1100px\) \{[\s\S]*\.hero-story-card\s*\{[\s\S]*transform:\s*none;/
+  );
+});
+
 test('premium website hero story gebruikt Oplevertijd als metric-label', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
