@@ -132,6 +132,12 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /<div class="campagne-head">[\s\S]*<div class="campagne-title">Nieuwe Campagne<\/div>[\s\S]*id="campaignCompanyCount"/);
+  assert.match(pageSource, /<link rel="stylesheet" href="assets\/softora-dossier-loader\.css\?v=20260424a">/);
+  assert.match(pageSource, /<main class="main-content is-premium-boot-host">/);
+  assert.match(pageSource, /<div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">/);
+  assert.match(pageSource, /<div class="premium-boot-shell is-booting" aria-busy="true">/);
+  assert.match(pageSource, /function finishPremiumShellBoot\(\)/);
+  assert.match(pageSource, /Promise\.allSettled\(campaignBootTasks\)\.finally\(finishPremiumShellBoot\);/);
   assert.match(pageSource, /<button class="campaign-company-count" id="campaignCompanyCount" type="button"[^>]*onclick="toggleCampaignRecipientsList\(event\)"/);
   assert.match(pageSource, /<span id="campaignCompanyCountValue">0<\/span>/);
   assert.match(pageSource, /\.campaign-company-count \{[\s\S]*display: inline-flex;[\s\S]*border-radius: 999px;/);
@@ -159,7 +165,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /isPremiumAiLeadGeneratorPath\(\) \? isEligibleColdcallingCampaignRow : isEligibleColdmailCampaignRow/);
   assert.match(pageSource, /Math\.min\(getCampaignRequestedCompanyCount\(\) \|\| eligibleRows\.length, eligibleRows\.length\)/);
   assert.match(pageSource, /initCampaignDatabaseAutoRefresh\(\);/);
-  assert.match(pageSource, /void hydrateCampaignCompanyCountFromSupabase\(\);/);
+  assert.match(pageSource, /const campaignBootTasks = \[/);
+  assert.match(pageSource, /hydrateCampaignCompanyCountFromSupabase\(\),/);
   assert.match(pageSource, /setCampaignRecipientListOpen\(false\);/);
   assert.match(pageSource, /renderCampaignCompanyCount\(\);[\s\S]*\}\s*updateSlider\(100\);/);
 });
@@ -249,7 +256,7 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /if \(bodyInput && normalized\.body\) bodyInput\.value = normalized\.body;/);
   assert.match(
     pageSource,
-    /initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\);/
+    /initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\)/
   );
 });
 
@@ -269,7 +276,7 @@ test('premium bevestigingsmails exposes coldcalling provider choice inside lead-
   assert.match(pageSource, /select\.value = normalizeColdcallingStack\(select\.value\);/);
   assert.match(
     pageSource,
-    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*initCampaignDatabaseAutoRefresh\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);\s*initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\);/
+    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*initCampaignDatabaseAutoRefresh\(\);\s*const campaignBootTasks = \[[\s\S]*hydrateCampaignCompanyCountFromSupabase\(\),[\s\S]*initColdmailingMailboxOptions\(\)[\s\S]*\.finally\(initCampaignSelects\),[\s\S]*\];\s*Promise\.allSettled\(campaignBootTasks\)\.finally\(finishPremiumShellBoot\);/
   );
   assert.match(pageSource, /providerLabel \+ ' wordt klaargezet voor deze campagne/);
   assert.match(pageSource, /Provider: ' \+ getSelectedColdcallingStackLabel\(\) \+ '\.'/);

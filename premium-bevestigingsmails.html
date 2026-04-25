@@ -60,6 +60,7 @@
 <script src="assets/personnel-theme.js?v=20260424a" defer></script>
 <script src="assets/ai-management-mode.js?v=20260423a" defer></script>
 <link rel="stylesheet" href="assets/custom-selects.css?v=20260421b">
+<link rel="stylesheet" href="assets/softora-dossier-loader.css?v=20260424a">
 <script src="assets/custom-selects.js?v=20260421a" defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -1045,7 +1046,15 @@ html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { dis
           </div>
         </aside>
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
-<main class="main-content">
+<main class="main-content is-premium-boot-host">
+<div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
+  <div class="premium-boot-spinner" aria-hidden="true">
+    <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+    <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+    <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+  </div>
+</div>
+<div class="premium-boot-shell is-booting" aria-busy="true">
 
 <!-- ══ SCHERM 0: AI BEHEER ══ -->
 <div class="screen ai-management-screen" id="screen-ai-management">
@@ -2785,16 +2794,25 @@ document.addEventListener('keydown', event => {
   }
 });
 
+function finishPremiumShellBoot() {
+  if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+    window.SoftoraPremiumBoot.setShellBooting(false);
+  }
+}
+
 applyPremiumAiLeadGeneratorShell();
 applyPremiumAiLeadGeneratorBelmethodeRow();
 initCampaignDurationSetting();
 initLeadGeneratorProviderSetting();
 initCampaignDatabaseAutoRefresh();
-void hydrateCampaignCompanyCountFromSupabase();
-initColdmailingMailboxOptions()
-  .then(initColdmailingSettingsPersistence)
-  .catch(initColdmailingSettingsPersistence)
-  .finally(initCampaignSelects);
+const campaignBootTasks = [
+  hydrateCampaignCompanyCountFromSupabase(),
+  initColdmailingMailboxOptions()
+    .then(initColdmailingSettingsPersistence)
+    .catch(initColdmailingSettingsPersistence)
+    .finally(initCampaignSelects),
+];
+Promise.allSettled(campaignBootTasks).finally(finishPremiumShellBoot);
 </script>
 
 <!-- ZONE POPUP -->
@@ -2818,6 +2836,7 @@ initColdmailingMailboxOptions()
   </div>
 </div>
 
+</div>
 </main>
 </div>
 <script src="assets/premium-bevestigingsmails-management.js?v=20260423a" defer></script>
