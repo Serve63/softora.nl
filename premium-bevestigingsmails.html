@@ -1676,10 +1676,6 @@ function renderCampaignRecipientList(payload) {
 }
 
 async function hydrateCampaignRecipientList() {
-  if (isPremiumAiLeadGeneratorPath()) {
-    setCampaignRecipientListLoading('Deze pagina staat op coldcalling. E-mailontvangers zie je bij Coldmailing.');
-    return;
-  }
   try {
     const response = await fetch(getColdmailRecipientPreviewUrl(), {
       method: 'GET',

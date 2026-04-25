@@ -155,6 +155,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /window\.setInterval\(\(\) => \{[\s\S]*refreshCampaignDatabaseForLatestState\(\);[\s\S]*\}, 15000\);/);
   assert.doesNotMatch(pageSource, /id="campaignRecipientPreview"/);
   assert.match(pageSource, /function hydrateCampaignRecipientList\(\)/);
+  assert.doesNotMatch(pageSource, /Deze pagina staat op coldcalling\. E-mailontvangers zie je bij Coldmailing\./);
+  assert.doesNotMatch(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{\s*setCampaignRecipientListLoading/);
   assert.match(pageSource, /function toggleCampaignRecipientsList\(event\)/);
   assert.match(pageSource, /function renderCampaignRecipientList\(payload\)/);
   assert.match(pageSource, /\/api\/coldmailing\/campaigns\/recipients\?/);
