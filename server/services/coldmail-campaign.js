@@ -217,14 +217,19 @@ function createColdmailCampaignService(deps = {}) {
 
   function getRowPhone(row) {
     const value = normalizeString(
-      row.phone ||
+      row.phoneE164 ||
+        row.phone ||
         row.tel ||
         row.telefoon ||
         row.telefoonnummer ||
+        row.telefoonNummer ||
+        row.telefoon_nummer ||
         row.mobile ||
+        row.mobilePhone ||
         row.mobiel ||
         row.phoneNumber ||
         row.contactPhone ||
+        row.contact_phone ||
         ''
     );
     return value === '—' || value === '-' ? '' : value;

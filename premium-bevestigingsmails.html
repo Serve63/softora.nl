@@ -1546,6 +1546,21 @@ function getCampaignRowEmail(row) {
   return normalizeLowerText(row && (row.email || row.contactEmail || row.mail));
 }
 
+function getCampaignRowPhone(row) {
+  return normalizeCampaignRecipientPhone(
+    row && (
+      row.phoneE164 ||
+      row.phone ||
+      row.tel ||
+      row.telefoon ||
+      row.telefoonnummer ||
+      row.contactPhone ||
+      row.mobile ||
+      row.mobiel
+    )
+  );
+}
+
 function isColdmailTestCampaignCompany(row) {
   return COLDMAIL_TEST_COMPANIES.includes(
     normalizeLowerText(row && (row.bedrijf || row.company || row.companyName || row.naam || row.name))
@@ -1579,6 +1594,7 @@ function isEligibleColdmailCampaignRow(row) {
 
 function isEligibleColdcallingCampaignRow(row) {
   if (!row || typeof row !== 'object') return false;
+  if (!getCampaignRowPhone(row)) return false;
   const status = normalizeCampaignDatabaseStatus(row.databaseStatus || row.status, row);
   if (['interesse', 'afspraak', 'klant', 'afgehaakt', 'geblokkeerd', 'buiten'].includes(status)) return false;
   if (isRowInActiveColdmailCampaign(row)) return false;
@@ -1586,7 +1602,9 @@ function isEligibleColdcallingCampaignRow(row) {
 }
 
 function isEligibleCampaignCountRow(row) {
-  return isEligibleColdmailCampaignRow(row);
+  return isPremiumAiLeadGeneratorPath()
+    ? isEligibleColdcallingCampaignRow(row)
+    : isEligibleColdmailCampaignRow(row);
 }
 
 function parseCustomerDatabaseRows(values) {
@@ -1676,9 +1694,7 @@ function renderCampaignRecipientList(payload) {
     company.textContent = recipient.bedrijf || 'Onbekend bedrijf';
     const email = document.createElement('span');
     email.className = 'campaign-recipient-list-email';
-    const recipientPhone = normalizeCampaignRecipientPhone(
-      recipient.phone || recipient.telefoon || recipient.telefoonnummer || recipient.tel || recipient.contactPhone
-    );
+    const recipientPhone = getCampaignRowPhone(recipient);
     email.textContent = showPhone
       ? (recipientPhone || 'Geen telefoonnummer ingevuld')
       : (recipient.email || 'Geen e-mailadres');

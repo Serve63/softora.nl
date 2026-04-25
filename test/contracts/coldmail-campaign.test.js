@@ -371,7 +371,7 @@ test('coldcalling recipient preview selects callable phone rows', async () => {
         id: 'callable-1',
         bedrijf: 'Belbare Lead',
         email: '',
-        tel: '+31 6 2222 3333',
+        phoneE164: '+31622223333',
         status: 'gemaild',
         mail: false,
       },
@@ -391,7 +391,7 @@ test('coldcalling recipient preview selects callable phone rows', async () => {
       id: 'callable-1',
       bedrijf: 'Belbare Lead',
       email: '',
-      phone: '+31 6 2222 3333',
+      phone: '+31622223333',
     },
   ]);
 });
