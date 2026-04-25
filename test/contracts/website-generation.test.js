@@ -71,6 +71,16 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /absoluut niet voelen als een template, standaard AI-webdesign of brave bedrijfswebsite/i);
   assert.match(prompt, /COPY LOCK/i);
   assert.match(prompt, /STYLE LOCK/i);
+  assert.match(prompt, /TEXT STABILITY LOCK/i);
+  assert.match(prompt, /alle zichtbare koppen moeten kort, stabiel, leesbaar en passend binnen hun container zijn/i);
+  assert.match(prompt, /maximaal 2-4 korte regels/i);
+  assert.match(prompt, /TYPOGRAPHY SYSTEM LOCK/i);
+  assert.match(prompt, /maximaal 2 consistente fontfamilies/i);
+  assert.match(prompt, /Wissel niet opeens naar een ander lettertype in het middenstuk/i);
+  assert.match(prompt, /CARD COPY RULE/i);
+  assert.match(prompt, /kaarttitels en sectietitels moeten kort en scanbaar blijven/i);
+  assert.match(prompt, /TEXT RENDERING RULE/i);
+  assert.match(prompt, /minder tekst met betere leesbaarheid/i);
   assert.match(prompt, /SOURCE-FIRST RULE/i);
   assert.match(prompt, /mag niet aanvoelen als een ander merk/i);
   assert.match(prompt, /Gebruik dezelfde kleurfamilie, accentkleur\(en\), donkere\/lichte verhoudingen/i);
