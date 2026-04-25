@@ -396,6 +396,9 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 <script>
 const MAILBOX_ACCOUNT_DEFAULT = 'info@softora.nl';
 let activeMailboxAccount = MAILBOX_ACCOUNT_DEFAULT;
+let mailboxAccounts = [
+  { email: 'info@softora.nl', name: 'info@softora.nl', imapConfigured: false, smtpConfigured: false },
+];
 
 const avatarColors = ['#9b2355','#1a5f8a','#16733c','#7b3f00','#4a1a6b','#b45a00','#2c6e49'];
 const getColor = str => avatarColors[str.charCodeAt(0) % avatarColors.length];
@@ -577,7 +580,7 @@ Samenvatting van de leadcall:
 };
 
 function getMailboxAccounts() {
-  return Object.keys(MAILBOX_DEMO_BY_ACCOUNT);
+  return mailboxAccounts.map((account) => account.email);
 }
 
 function getMailboxAccount() {
@@ -595,11 +598,15 @@ function renderMailboxAccountMenu() {
   const menu = document.getElementById('mailbox-account-menu');
   if (!menu) return;
   const activeEmail = getMailboxAccount();
-  menu.innerHTML = getMailboxAccounts().map((email) => `
+  menu.innerHTML = mailboxAccounts.map((account) => {
+    const email = account.email;
+    const unavailable = !account.imapConfigured && !account.smtpConfigured;
+    return `
     <button class="topbar-mailbox-option${email === activeEmail ? ' active' : ''}" type="button" data-mailbox-email="${email}" role="menuitemradio" aria-checked="${email === activeEmail ? 'true' : 'false'}">
-      <span>${email}</span>
+      <span>${email}${unavailable ? ' · niet gekoppeld' : ''}</span>
     </button>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function setMailboxAccountUi(email) {
@@ -618,10 +625,84 @@ function resetDetailEmpty() {
   document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
 }
 
-function applyMailboxAccount(email) {
-  if (!MAILBOX_DEMO_BY_ACCOUNT[email]) return;
+function formatMailDate(value) {
+  const date = value ? new Date(value) : new Date();
+  if (!Number.isFinite(date.getTime())) return { date: '', time: '' };
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  return {
+    date: sameDay ? 'Vandaag' : date.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short' }),
+    time: date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+function normalizeMailboxApiMessage(message) {
+  const when = formatMailDate(message.date);
+  return {
+    id: message.id,
+    folder: message.folder || activeFolder,
+    from: message.from || 'Onbekend',
+    email: message.email || '',
+    subject: message.subject || '(Geen onderwerp)',
+    preview: message.preview || '',
+    body: message.body || message.preview || '',
+    time: when.time,
+    date: when.date,
+    unread: Boolean(message.unread),
+    starred: Boolean(message.starred),
+    tags: [],
+  };
+}
+
+async function loadMailboxAccounts() {
+  try {
+    const response = await fetch('/api/mailbox/accounts', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && data?.ok && Array.isArray(data.accounts) && data.accounts.length) {
+      mailboxAccounts = data.accounts;
+      if (!mailboxAccounts.some((account) => account.email === activeMailboxAccount)) {
+        activeMailboxAccount = mailboxAccounts[0].email;
+      }
+      renderMailboxAccountMenu();
+      setMailboxAccountUi(activeMailboxAccount);
+    }
+  } catch (_) {
+    toast('Mailboxaccounts laden mislukt');
+  }
+}
+
+async function loadMailboxMessages() {
+  const wrap = document.getElementById('mail-items');
+  if (wrap) {
+    wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Mailbox laden…</div>`;
+  }
+  try {
+    const response = await fetch(`/api/mailbox/messages?account=${encodeURIComponent(activeMailboxAccount)}&folder=${encodeURIComponent(activeFolder)}&limit=50`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
+    }
+    mails = Array.isArray(data.messages) ? data.messages.map(normalizeMailboxApiMessage) : [];
+    renderList();
+  } catch (error) {
+    mails = [];
+    if (wrap) {
+      wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${String(error?.message || error || 'Mailbox laden mislukt')}</div>`;
+    }
+    toast(String(error?.message || error || 'Mailbox laden mislukt'));
+  }
+}
+
+async function applyMailboxAccount(email) {
   activeMailboxAccount = email;
-  mails = cloneMails(MAILBOX_DEMO_BY_ACCOUNT[email]);
   activeFolder = 'inbox';
   activeMail = null;
   const searchInput = document.getElementById('search-input');
@@ -629,7 +710,7 @@ function applyMailboxAccount(email) {
   document.querySelectorAll('.folder-item').forEach((f, i) => f.classList.toggle('active', i === 0));
   setMailboxAccountUi(email);
   resetDetailEmpty();
-  renderList();
+  await loadMailboxMessages();
 }
 
 function setFolder(folder, el) {
@@ -641,13 +722,13 @@ function setFolder(folder, el) {
   const folderLabelEl = document.getElementById('folder-label');
   if (folderLabelEl) folderLabelEl.textContent = labels[folder] || folder;
   resetDetailEmpty();
-  renderList();
+  loadMailboxMessages();
 }
 
 function getMailsForFolder(folder) {
   if (['offerte','factuur','klant'].includes(folder)) return mails.filter(m => m.tags.includes(folder));
   if (folder === 'starred') return mails.filter(m => m.starred);
-  return mails.filter(m => m.folder === folder);
+  return mails;
 }
 
 function filterMails() { renderList(); }
@@ -749,14 +830,40 @@ function closeCompose() {
   ['c-to','c-subject','c-body'].forEach(id => document.getElementById(id).value = '');
 }
 
-function sendMail() {
+async function sendMail() {
   const to = document.getElementById('c-to').value.trim();
   const subject = document.getElementById('c-subject').value.trim();
   if (!to || !subject) { toast('Vul ontvanger en onderwerp in'); return; }
   const acc = getMailboxAccount();
-  mails.push({ id: Date.now(), folder:'sent', from:'Jij (Softora.nl)', email: acc, subject, preview: document.getElementById('c-body').value.slice(0,80)+'…', body: document.getElementById('c-body').value, time:'Zojuist', date:'Vandaag', unread:false, starred:false, tags:[] });
-  closeCompose();
-  toast('✓ Mail verzonden');
+  const sendBtn = document.querySelector('.btn-send');
+  if (sendBtn) sendBtn.disabled = true;
+  try {
+    const response = await fetch('/api/mailbox/send', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        account: acc,
+        to,
+        subject,
+        body: document.getElementById('c-body').value,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.detail || data?.error || 'Mail verzenden mislukt');
+    }
+    closeCompose();
+    toast('✓ Mail verzonden');
+    if (activeFolder === 'sent') {
+      await loadMailboxMessages();
+    }
+  } catch (error) {
+    toast(String(error?.message || error || 'Mail verzenden mislukt'));
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+  }
 }
 
 function toast(msg) {
@@ -805,12 +912,10 @@ window.addEventListener('keydown', (event) => {
   closeMailboxAccountMenu();
 });
 
-(function initMailboxAccount() {
-  renderMailboxAccountMenu();
-  applyMailboxAccount(MAILBOX_ACCOUNT_DEFAULT);
+(async function initMailboxAccount() {
+  await loadMailboxAccounts();
+  await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT);
 })();
-
-renderList();
 
 function finishPremiumShellBoot() {
   if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
