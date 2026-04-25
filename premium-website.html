@@ -659,7 +659,7 @@
         }
 
         .werkwijze-copy {
-            width: min(100%, 720px);
+            width: min(100%, 920px);
         }
 
         .werkwijze-stats {
@@ -668,6 +668,7 @@
             gap: 0;
         }
 
+        .werkwijze-title-line,
         .werkwijze-lancering {
             display: inline-block;
             white-space: nowrap;
@@ -1591,6 +1592,7 @@
                 line-height: 1.05 !important;
             }
 
+            .werkwijze-title-line,
             .werkwijze-lancering {
                 white-space: normal;
             }
@@ -2534,7 +2536,12 @@
         .faq-section-inner,
         #werkwijze > div,
         #diensten-overzicht > div {
-            max-width: 1240px;
+            max-width: 1440px;
+        }
+
+        #werkwijze .werkwijze-grid {
+            grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.55fr);
+            gap: clamp(2rem, 3vw, 3.5rem);
         }
 
         .section-header p {
@@ -3012,7 +3019,7 @@
             <div class="grid-2 werkwijze-grid">
                 <div class="fade-up werkwijze-copy">
                     <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">Werkwijze</span>
-                    <h2 class="werkwijze-title" style="margin: 1rem 0 2rem; font-size: clamp(3rem, 5vw, 4.4rem); line-height: 0.95;">Van Idee<br><span class="werkwijze-lancering">Naar Lancering</span></h2>
+                    <h2 class="werkwijze-title" style="margin: 1rem 0 2rem; font-size: clamp(2.55rem, 4.1vw, 3.95rem); line-height: 0.95;"><span class="werkwijze-title-line">Van Idee Naar Lancering</span></h2>
                     <p style="color: var(--text-secondary); font-size: 1.1rem; line-height: 1.9; margin-bottom: 2rem; font-weight: 300;">
                         Een gestructureerd proces dat zorgt voor voorspelbare resultaten. Geen verrassingen, wel een website die presteert.
                     </p>
