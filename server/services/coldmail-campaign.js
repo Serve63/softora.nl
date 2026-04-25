@@ -8,7 +8,7 @@ const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const TEST_RECIPIENT_EMAILS = new Set(['servec321@gmail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce']);
 const SENDER_DISPLAY_NAMES = {
-  'serve@softora.nl': 'Servé',
+  'serve@softora.nl': 'Servé Creusen',
   'martijn@softora.nl': 'Martijn',
   'ruben@softora.nl': 'Ruben',
 };
@@ -366,7 +366,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function toHtml(text) {
-    return normalizeString(text)
+    const body = normalizeString(text)
       .split(/\n{2,}/)
       .map((paragraph) =>
         `<p>${paragraph
@@ -380,6 +380,7 @@ function createColdmailCampaignService(deps = {}) {
           .join('<br>')}</p>`
       )
       .join('\n');
+    return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
   }
 
   function appendWebdesignImageHtml(html, attachment) {
@@ -518,6 +519,7 @@ function createColdmailCampaignService(deps = {}) {
       const to = getRowEmail(row);
       const text = buildMailText(bodyTemplate, row);
       const subject = personalizeTemplate(subjectTemplate, row);
+      const entityRefId = `softora-coldmail-${item.id}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
         failed.push({
@@ -546,6 +548,9 @@ function createColdmailCampaignService(deps = {}) {
           to,
           bcc: senderEmail || undefined,
           replyTo: mailReplyTo || mailFromAddress || undefined,
+          headers: {
+            'X-Entity-Ref-ID': entityRefId,
+          },
           subject,
           text,
           html,

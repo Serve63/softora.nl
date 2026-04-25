@@ -95,6 +95,8 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(sentMessages[0].bcc, 'info@softora.nl');
   assert.equal(sentMessages[0].subject, 'Nieuwe website voor Bakkerij Zon');
   assert.match(sentMessages[0].text, /Goedemorgen Ruben/);
+  assert.match(sentMessages[0].headers['X-Entity-Ref-ID'], /^softora-coldmail-prospect-1-/);
+  assert.match(sentMessages[0].html, /font-family:Arial,sans-serif/);
   assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
 
   const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
@@ -303,7 +305,7 @@ test('coldmail campaign uses personal sender name for Serve mailbox', async () =
     senderEmail: 'serve@softora.nl',
   });
 
-  assert.equal(sentMessages[0].from, 'Servé <serve@softora.nl>');
+  assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
 });
 
 test('coldmail campaign refuses to send when SMTP is not configured', async () => {
