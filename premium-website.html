@@ -1891,13 +1891,17 @@
             }
 
             .werkwijze-title {
-                max-width: 11ch;
-                margin-bottom: 1.4rem !important;
+                max-width: 100%;
+                margin: 0.75rem 0 1.25rem !important;
+                font-size: clamp(1.75rem, 8vw, 2.35rem) !important;
+                line-height: 1.02 !important;
+                overflow-wrap: normal;
+                word-break: normal;
             }
 
             .werkwijze-title-line,
             .werkwijze-lancering {
-                display: inline;
+                display: block;
                 white-space: normal;
             }
 
@@ -1995,16 +1999,27 @@
             .werkwijze-grid {
                 grid-template-columns: 1fr;
                 gap: 18px;
+                width: 100%;
+                min-width: 0;
             }
 
             .werkwijze-copy {
                 width: 100%;
+                max-width: 100%;
+                min-width: 0;
+                box-sizing: border-box;
+                overflow: hidden;
                 background: rgba(255,255,255,0.92);
                 border: 1px solid rgba(139, 34, 82, 0.10);
                 border-radius: var(--mobile-radius-xl);
                 padding: 24px 20px;
                 box-shadow: var(--mobile-card-shadow);
                 text-align: left !important;
+            }
+
+            .werkwijze-copy ul {
+                margin: 0 !important;
+                padding: 0 !important;
             }
 
             .werkwijze-copy .eyebrow,
@@ -2014,9 +2029,12 @@
             }
 
             .werkwijze-copy ul li {
+                align-items: flex-start !important;
                 padding: 1rem 0 !important;
                 font-size: 0.9rem !important;
                 line-height: 1.45;
+                min-width: 0;
+                overflow-wrap: anywhere;
             }
 
             .werkwijze-stats {

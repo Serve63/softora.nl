@@ -57,11 +57,23 @@ test('premium website laat werkwijze titel natuurlijk wrappen op mobiel', () => 
 
   assert.match(
     source,
-    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title\s*\{[\s\S]*max-width:\s*11ch;[\s\S]*margin-bottom:\s*1\.4rem !important;/
+    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title\s*\{[\s\S]*max-width:\s*100%;[\s\S]*margin:\s*0\.75rem 0 1\.25rem !important;[\s\S]*font-size:\s*clamp\(1\.75rem,\s*8vw,\s*2\.35rem\) !important;/
   );
   assert.match(
     source,
-    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title-line,[\s\S]*\.werkwijze-lancering\s*\{[\s\S]*display:\s*inline;[\s\S]*white-space:\s*normal;/
+    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title-line,[\s\S]*\.werkwijze-lancering\s*\{[\s\S]*display:\s*block;[\s\S]*white-space:\s*normal;/
+  );
+  assert.match(
+    source,
+    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-copy\s*\{[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*box-sizing:\s*border-box;[\s\S]*overflow:\s*hidden;/
+  );
+  assert.match(
+    source,
+    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-copy ul\s*\{[\s\S]*margin:\s*0 !important;[\s\S]*padding:\s*0 !important;/
+  );
+  assert.match(
+    source,
+    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-copy ul li\s*\{[\s\S]*align-items:\s*flex-start !important;[\s\S]*min-width:\s*0;[\s\S]*overflow-wrap:\s*anywhere;/
   );
 });
 
