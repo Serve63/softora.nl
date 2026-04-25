@@ -94,6 +94,34 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[1].status, 'klant');
 });
 
+test('coldmail campaign sends test recipient without marking database row as mailed', async () => {
+  const { service, sentMessages, getSavedState } = createService({
+    rows: [
+      {
+        id: 'test-recipient',
+        bedrijf: 'MCV E-commerce',
+        naam: 'MCV E-commerce',
+        email: 'servec321@gmail.com',
+        status: 'benaderbaar',
+        mail: true,
+        hist: [],
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Test voor {{bedrijf}}',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.persisted, 0);
+  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
+  assert.equal(getSavedState(), null);
+});
+
 test('coldmail campaign previews selected recipients before sending', async () => {
   const { service } = createService();
 

@@ -3,6 +3,7 @@ const dns = require('node:dns').promises;
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
+const TEST_RECIPIENT_EMAILS = new Set(['servec321@gmail.com']);
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -155,6 +156,10 @@ function createColdmailCampaignService(deps = {}) {
     const normalized = normalizeEmailAddress(email);
     const parts = normalized.split('@');
     return parts.length === 2 ? parts[1] : '';
+  }
+
+  function isTestRecipientEmail(email) {
+    return TEST_RECIPIENT_EMAILS.has(normalizeEmailAddress(email));
   }
 
   function getAllowedSenderEmails() {
@@ -382,7 +387,6 @@ function createColdmailCampaignService(deps = {}) {
 
     const transporter = getSmtpTransporter();
     const sent = [];
-    const sentRowIds = new Set();
 
     for (const item of selectedRows) {
       const row = item.row;
@@ -406,7 +410,6 @@ function createColdmailCampaignService(deps = {}) {
           messageId: normalizeString(info && info.messageId),
           response: truncateText(normalizeString(info && info.response), 500),
         });
-        sentRowIds.add(item.id);
       } catch (error) {
         failed.push({
           id: item.id,
@@ -425,10 +428,14 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
 
-    if (sent.length) {
+    const sentPersistableRowIds = new Set(
+      sent.filter((item) => !isTestRecipientEmail(item.email)).map((item) => item.id)
+    );
+
+    if (sentPersistableRowIds.size) {
       const actor = normalizeString(input.actor || 'Coldmailing');
       const updatedRows = rows.map((row, index) =>
-        sentRowIds.has(getRowId(row, index)) ? markRowAsMailed(row, actor, input.durationDays) : row
+        sentPersistableRowIds.has(getRowId(row, index)) ? markRowAsMailed(row, actor, input.durationDays) : row
       );
       await setUiStateValues(
         customerDbScope,
@@ -449,6 +456,7 @@ function createColdmailCampaignService(deps = {}) {
       selected: selectedRows.length,
       sent: sent.length,
       failed: failed.length,
+      persisted: sentPersistableRowIds.size,
       senderEmail,
       specialAction: normalizeString(input.specialAction || ''),
       sentItems: sent,
