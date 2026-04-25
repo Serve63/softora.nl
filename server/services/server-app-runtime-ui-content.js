@@ -191,7 +191,6 @@ function createServerAppUiContentRuntime(context, dependencies = {}) {
       resolveLegacyPrettyPageRedirect,
       getPublicBaseUrlFromRequest: getEffectivePublicBaseUrl,
       websiteLinkStateKeyPrefix: `${supabaseStateKey}:website_link:`,
-      websitePreviewLibraryMaxItems: 50,
       seoConfigScope: uiSeoConfig.seoConfigScope,
       seoConfigKey: uiSeoConfig.seoConfigKey,
       seoConfigCacheTtlMs: uiSeoConfig.seoConfigCacheTtlMs,

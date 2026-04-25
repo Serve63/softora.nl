@@ -233,13 +233,15 @@ function createSupabaseStateStore(deps = {}) {
   async function fetchSupabaseRowsByStateKeyPrefixViaRest(
     prefix,
     limit = 100,
-    selectColumns = 'state_key,payload,updated_at'
+    selectColumns = 'state_key,payload,updated_at',
+    offset = 0
   ) {
     const normalizedPrefix = normalizeString(prefix || '');
     if (!normalizedPrefix) {
       return { ok: false, status: null, body: null, error: 'Ongeldige state key-prefix.' };
     }
     const safeLimit = Math.max(1, Math.min(500, Number(limit) || 100));
+    const safeOffset = Math.max(0, Number(offset) || 0);
     const baseUrl = supabaseUrl.replace(/\/+$/, '');
     const likePattern = `${normalizedPrefix}%`;
     const url =
@@ -247,7 +249,8 @@ function createSupabaseStateStore(deps = {}) {
       `?select=${encodeURIComponent(selectColumns)}` +
       `&state_key=like.${encodeURIComponent(likePattern)}` +
       '&order=updated_at.desc' +
-      `&limit=${safeLimit}`;
+      `&limit=${safeLimit}` +
+      `&offset=${safeOffset}`;
 
     return performRestRequest(url, {
       method: 'GET',

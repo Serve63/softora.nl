@@ -116,6 +116,7 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /data-tab="library"/);
   assert.match(source, /id="tab-library"/);
   assert.doesNotMatch(source, /Bibliotheek kon niet centraal laden/);
+  assert.match(source, /Alle previews van alle accounts worden zonder vaste itemlimiet centraal opgeslagen in Supabase/);
   assert.match(source, /console\.warn\('Websitepreview-bibliotheek laden mislukt:', error\);/);
   assert.doesNotMatch(source, /function openPreviewNewTab\(/);
   assert.match(source, /SCAN_URL_BATCH_MAX = 1/);
@@ -124,6 +125,7 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /Preview wordt gestart/);
   assert.match(source, /Preview bezig/);
   assert.doesNotMatch(source, /Maximaal 50 items per account/);
+  assert.doesNotMatch(source, /gekoppeld aan je premium-account/);
   assert.doesNotMatch(source, /LIBRARY_MAX_ITEMS/);
   assert.match(source, /window\._lastPreviewImageDataUrl = previewDataUrl/);
 });

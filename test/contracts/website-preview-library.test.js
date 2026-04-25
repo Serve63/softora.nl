@@ -38,9 +38,11 @@ function createFixture(overrides = {}) {
     isSupabaseConfigured: overrides.isSupabaseConfigured || (() => true),
     fetchSupabaseRowsByStateKeyPrefixViaRest:
       overrides.fetchSupabaseRowsByStateKeyPrefixViaRest ||
-      (async (prefix) => ({
+      (async (prefix, limit = 500, _selectColumns = 'state_key,payload,updated_at', offset = 0) => ({
         ok: true,
-        body: rowsByPrefix.filter((r) => String(r.state_key || '').startsWith(prefix)),
+        body: rowsByPrefix
+          .filter((r) => String(r.state_key || '').startsWith(prefix))
+          .slice(offset, offset + limit),
       })),
     fetchSupabaseRowByKeyViaRest:
       overrides.fetchSupabaseRowByKeyViaRest ||
@@ -67,7 +69,6 @@ function createFixture(overrides = {}) {
         return { ok: true };
       }),
     supabaseStateKey: 'core',
-    websitePreviewLibraryMaxItems: 50,
   });
 
   return { coordinator, rowsByPrefix, deletedKeys };
@@ -143,7 +144,7 @@ test('website preview library coordinator does not prune old previews on save', 
   assert.deepEqual(deletedKeys, []);
 });
 
-test('website preview library coordinator lists entries for same owner prefix', async () => {
+test('website preview library coordinator lists entries for all owner prefixes', async () => {
   const { coordinator, rowsByPrefix } = createFixture();
   rowsByPrefix.push({
     state_key: 'core:website_preview_lib:demo-at-user-nl:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
@@ -160,14 +161,57 @@ test('website preview library coordinator lists entries for same owner prefix', 
     },
     updated_at: '2026-01-01T12:00:00.000Z',
   });
+  rowsByPrefix.push({
+    state_key: 'core:website_preview_lib:ander-at-user-nl:bbbbbbbb-cccc-dddd-eeee-ffffffffffff',
+    payload: {
+      type: 'website_preview_library',
+      id: 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff',
+      dataUrl: 'data:image/png;base64,CCC',
+      url: 'https://other.example.nl/',
+      hostname: 'other.example.nl',
+      fileName: 'y.png',
+      width: 800,
+      height: 1200,
+      createdAt: '2026-01-01T12:01:00.000Z',
+    },
+    updated_at: '2026-01-01T12:01:00.000Z',
+  });
 
   const res = createResponseRecorder();
   await coordinator.listLibraryResponse({ premiumAuth: { email: 'demo@user.nl' } }, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
-  assert.equal(res.body.entries.length, 1);
+  assert.equal(res.body.entries.length, 2);
   assert.equal(res.body.entries[0].hostname, 'example.nl');
+  assert.equal(res.body.entries[1].hostname, 'other.example.nl');
+});
+
+test('website preview library coordinator paginates all supabase preview rows', async () => {
+  const { coordinator, rowsByPrefix } = createFixture();
+  for (let i = 0; i < 505; i += 1) {
+    const id = `aaaaaaaa-bbbb-4ccc-8ddd-${String(i).padStart(12, '0')}`;
+    rowsByPrefix.push({
+      state_key: `core:website_preview_lib:user-${i % 3}:${id}`,
+      payload: {
+        type: 'website_preview_library',
+        id,
+        dataUrl: 'data:image/png;base64,BBB',
+        url: `https://example-${i}.nl/`,
+        hostname: `example-${i}.nl`,
+        fileName: 'x.png',
+        createdAt: '2026-01-01T12:00:00.000Z',
+      },
+      updated_at: '2026-01-01T12:00:00.000Z',
+    });
+  }
+
+  const res = createResponseRecorder();
+  await coordinator.listLibraryResponse({ premiumAuth: { email: 'demo@user.nl' } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.entries.length, 505);
 });
 
 test('website preview library coordinator loads one full entry by id', async () => {

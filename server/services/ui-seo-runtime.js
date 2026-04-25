@@ -55,7 +55,6 @@ function createUiSeoRuntime(deps = {}) {
     resolveLegacyPrettyPageRedirect,
     getPublicBaseUrlFromRequest,
     websiteLinkStateKeyPrefix,
-    websitePreviewLibraryMaxItems = 50,
     seoConfigScope,
     seoConfigKey,
     seoConfigCacheTtlMs,
@@ -213,7 +212,6 @@ function createUiSeoRuntime(deps = {}) {
     upsertSupabaseRowViaRest,
     deleteSupabaseRowByStateKeyViaRest,
     supabaseStateKey,
-    websitePreviewLibraryMaxItems,
   });
 
   const websiteLinkCoordinator = createWebsiteLinkCoordinator({

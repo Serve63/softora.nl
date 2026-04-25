@@ -8,13 +8,12 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     slugifyAutomationText = (value, fallback = 'gebruiker') => String(value || '').trim() || fallback,
     isSupabaseConfigured = () => false,
     fetchSupabaseRowsByStateKeyPrefixViaRest = async () => ({ ok: false, body: null }),
-    fetchSupabaseRowByKeyViaRest = async () => ({ ok: false, body: null }),
     upsertSupabaseRowViaRest = async () => ({ ok: false, body: null }),
     deleteSupabaseRowByStateKeyViaRest = async () => ({ ok: false, body: null }),
     supabaseStateKey = '',
   } = deps;
 
-  const listFetchLimit = 500;
+  const supabasePageSize = 500;
   /** ~12 MiB string cap — past bij JSON-parserlimiet voor deze route. */
   const maxDataUrlChars = Math.floor(12 * 1024 * 1024);
   /** Houd de lijstrespons klein genoeg voor serverless/browser-limieten. */
@@ -36,6 +35,11 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
   function buildUserKeyPrefix(ownerSlug) {
     const sk = normalizeString(supabaseStateKey);
     return `${sk}:website_preview_lib:${ownerSlug}:`;
+  }
+
+  function buildGlobalKeyPrefix() {
+    const sk = normalizeString(supabaseStateKey);
+    return `${sk}:website_preview_lib:`;
   }
 
   function buildStateKey(ownerSlug, entryId) {
@@ -64,6 +68,41 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     };
   }
 
+  async function fetchAllRowsByPrefix(prefix, selectColumns = 'state_key,payload,updated_at') {
+    const rows = [];
+    let offset = 0;
+
+    while (true) {
+      const result = await fetchSupabaseRowsByStateKeyPrefixViaRest(
+        prefix,
+        supabasePageSize,
+        selectColumns,
+        offset
+      );
+      if (!result.ok) return result;
+
+      const pageRows = Array.isArray(result.body) ? result.body : [];
+      rows.push(...pageRows);
+      if (pageRows.length < supabasePageSize) {
+        return { ok: true, body: rows };
+      }
+
+      offset += supabasePageSize;
+    }
+  }
+
+  async function fetchStoredPreviewRowById(entryId, selectColumns = 'state_key,payload,updated_at') {
+    const result = await fetchAllRowsByPrefix(buildGlobalKeyPrefix(), selectColumns);
+    if (!result.ok) return { ok: false, result, row: null };
+
+    const row = (Array.isArray(result.body) ? result.body : []).find((candidate) => {
+      const payload = candidate?.payload && typeof candidate.payload === 'object' ? candidate.payload : {};
+      return payload.type === 'website_preview_library' && normalizeString(payload.id) === entryId;
+    });
+
+    return { ok: true, result, row: row || null };
+  }
+
   async function listLibraryResponse(req, res) {
     if (!isSupabaseConfigured()) {
       return res.status(503).json({
@@ -74,9 +113,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     }
 
     try {
-      const ownerSlug = buildOwnerSlug(req);
-      const prefix = buildUserKeyPrefix(ownerSlug);
-      const result = await fetchSupabaseRowsByStateKeyPrefixViaRest(prefix, listFetchLimit);
+      const result = await fetchAllRowsByPrefix(buildGlobalKeyPrefix());
       if (!result.ok) {
         logger.error(
           '[WebsitePreviewLibrary][List]',
@@ -266,10 +303,19 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     }
 
     try {
-      const ownerSlug = buildOwnerSlug(req);
-      const stateKey = buildStateKey(ownerSlug, entryId);
-      const verify = await fetchSupabaseRowByKeyViaRest(stateKey, 'state_key,payload');
-      if (!verify.ok || !Array.isArray(verify.body) || verify.body.length === 0) {
+      const verify = await fetchStoredPreviewRowById(entryId, 'state_key,payload');
+      if (!verify.ok) {
+        logger.error(
+          '[WebsitePreviewLibrary][DeleteVerify]',
+          verify.result?.error || verify.result?.status || verify.result?.body
+        );
+        return res.status(500).json({
+          ok: false,
+          error: 'Verwijderen mislukt',
+          detail: 'Kon het item niet uit Supabase controleren.',
+        });
+      }
+      if (!verify.row) {
         return res.status(404).json({
           ok: false,
           error: 'Niet gevonden',
@@ -277,7 +323,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
         });
       }
 
-      const payload = verify.body[0]?.payload;
+      const payload = verify.row?.payload;
       if (!payload || payload.type !== 'website_preview_library' || normalizeString(payload.id) !== entryId) {
         return res.status(404).json({
           ok: false,
@@ -286,6 +332,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
         });
       }
 
+      const stateKey = normalizeString(verify.row?.state_key || '');
       const del = await deleteSupabaseRowByStateKeyViaRest(stateKey);
       if (!del.ok) {
         logger.error('[WebsitePreviewLibrary][Delete]', del.error || del.status || del.body);
@@ -328,10 +375,8 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     }
 
     try {
-      const ownerSlug = buildOwnerSlug(req);
-      const stateKey = buildStateKey(ownerSlug, entryId);
-      const result = await fetchSupabaseRowByKeyViaRest(stateKey, 'state_key,payload,updated_at');
-      const row = Array.isArray(result.body) ? result.body[0] || null : null;
+      const result = await fetchStoredPreviewRowById(entryId, 'state_key,payload,updated_at');
+      const row = result.row;
       if (!result.ok || !row) {
         return res.status(404).json({
           ok: false,
