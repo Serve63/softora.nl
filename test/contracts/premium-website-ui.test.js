@@ -70,7 +70,7 @@ test('premium website hero story kaart staat duidelijk hoger op desktop', () => 
   assert.match(source, /\.hero-buttons\s*\{[\s\S]*margin-bottom:\s*2rem;/);
   assert.match(
     source,
-    /\.hero-story-card\s*\{[\s\S]*transform:\s*translateY\(calc\(-5\.5rem - clamp\(1\.2rem,\s*2vw,\s*1\.6rem\)\)\);/
+    /\.hero-story-card\s*\{[\s\S]*transform:\s*translateY\(calc\(-11rem - clamp\(1\.2rem,\s*2vw,\s*1\.6rem\)\)\);/
   );
   assert.match(
     source,
