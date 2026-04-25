@@ -258,6 +258,9 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(context.featureRouteOptions.coldmailing.coldmailCampaignService.isSmtpMailConfigured(), true);
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
     'info@softora.test',
+    'info@softora.nl',
+    'zakelijk@softora.nl',
+    'ruben@softora.nl',
     'serve@softora.nl',
     'martijn@softora.nl',
   ]);

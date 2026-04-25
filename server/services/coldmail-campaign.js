@@ -128,7 +128,15 @@ function createColdmailCampaignService(deps = {}) {
   function getAllowedSenderEmails() {
     return Array.from(
       new Set(
-        [mailFromAddress, smtpUser, 'serve@softora.nl', 'martijn@softora.nl']
+        [
+          mailFromAddress,
+          smtpUser,
+          'info@softora.nl',
+          'zakelijk@softora.nl',
+          'ruben@softora.nl',
+          'serve@softora.nl',
+          'martijn@softora.nl',
+        ]
           .map(normalizeEmailAddress)
           .filter(isLikelyValidEmail)
       )

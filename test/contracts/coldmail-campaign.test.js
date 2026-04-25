@@ -88,6 +88,18 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[1].status, 'klant');
 });
 
+test('coldmail campaign exposes the same sender accounts as mailbox', () => {
+  const { service } = createService();
+
+  assert.deepEqual(service.getAllowedSenderEmails(), [
+    'info@softora.nl',
+    'zakelijk@softora.nl',
+    'ruben@softora.nl',
+    'serve@softora.nl',
+    'martijn@softora.nl',
+  ]);
+});
+
 test('coldmail campaign refuses to send when SMTP is not configured', async () => {
   const { service } = createService({ smtpHost: '' });
 
