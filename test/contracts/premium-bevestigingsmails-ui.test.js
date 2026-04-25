@@ -127,6 +127,24 @@ test('premium bevestigingsmails campaign volume uses a fixed mail company label'
   assert.doesNotMatch(pageSource, /Aantal te mailen bedrijven/);
 });
 
+test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuwe Campagne', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /<div class="campagne-head">[\s\S]*<div class="campagne-title">Nieuwe Campagne<\/div>[\s\S]*id="campaignCompanyCount"/);
+  assert.match(pageSource, /<span id="campaignCompanyCountValue">0<\/span>/);
+  assert.match(pageSource, /\.campaign-company-count \{[\s\S]*display: inline-flex;[\s\S]*border-radius: 999px;/);
+  assert.match(pageSource, /const CUSTOMER_DB_SCOPE = 'premium_customers_database';/);
+  assert.match(pageSource, /const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';/);
+  assert.match(pageSource, /function hydrateCampaignCompanyCountFromSupabase\(\)/);
+  assert.match(pageSource, /function isEligibleColdmailCampaignRow\(row\)/);
+  assert.match(pageSource, /function isEligibleColdcallingCampaignRow\(row\)/);
+  assert.match(pageSource, /isPremiumAiLeadGeneratorPath\(\) \? isEligibleColdcallingCampaignRow : isEligibleColdmailCampaignRow/);
+  assert.match(pageSource, /Math\.min\(getCampaignRequestedCompanyCount\(\) \|\| eligibleRows\.length, eligibleRows\.length\)/);
+  assert.match(pageSource, /void hydrateCampaignCompanyCountFromSupabase\(\);/);
+  assert.match(pageSource, /renderCampaignCompanyCount\(\);[\s\S]*\}\s*updateSlider\(100\);/);
+});
+
 test('premium bevestigingsmails hides mail onderwerp row only on lead-generator alias', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -226,7 +244,7 @@ test('premium bevestigingsmails exposes coldcalling provider choice inside lead-
   assert.match(pageSource, /select\.value = normalizeColdcallingStack\(select\.value\);/);
   assert.match(
     pageSource,
-    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\);/
+    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);\s*initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\);/
   );
   assert.match(pageSource, /providerLabel \+ ' wordt klaargezet voor deze campagne/);
   assert.match(pageSource, /Provider: ' \+ getSelectedColdcallingStackLabel\(\) \+ '\.'/);

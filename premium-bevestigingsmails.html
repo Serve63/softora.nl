@@ -416,8 +416,10 @@ html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { dis
 
 /* CAMPAGNE KAART */
 .campagne-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: visible; height: 100%; display: flex; flex-direction: column; }
-.campagne-head { padding: 14px 20px; border-bottom: 1px solid var(--border); background: transparent; }
+.campagne-head { padding: 14px 20px; border-bottom: 1px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .campagne-title { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dark); }
+.campaign-company-count { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 5px 9px; border: 1px solid rgba(155,35,85,.16); border-radius: 999px; background: rgba(155,35,85,.06); color: var(--crimson); font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .08em; }
+.campaign-company-count svg { width: 15px; height: 15px; stroke: currentColor; flex-shrink: 0; }
 .campagne-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
 
 /* INSTELLINGEN */
@@ -1225,7 +1227,17 @@ Softora.nl | +31 6 2991 7185</textarea>
 
     <!-- CAMPAGNE INSTELLINGEN -->
     <div class="campagne-card">
-      <div class="campagne-head"><div class="campagne-title">Nieuwe Campagne</div></div>
+      <div class="campagne-head">
+        <div class="campagne-title">Nieuwe Campagne</div>
+        <div class="campaign-company-count" id="campaignCompanyCount" aria-label="Aantal geselecteerde bedrijven">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true">
+            <path d="M3.75 21h16.5"></path>
+            <path d="M5.25 21V5.75A1.75 1.75 0 0 1 7 4h10a1.75 1.75 0 0 1 1.75 1.75V21"></path>
+            <path d="M8.25 8h2.25M13.5 8h2.25M8.25 12h2.25M13.5 12h2.25M8.25 16h2.25M13.5 16h2.25"></path>
+          </svg>
+          <span id="campaignCompanyCountValue">0</span>
+        </div>
+      </div>
       <div class="campagne-body">
 
         <div class="field">
@@ -1419,9 +1431,12 @@ Softora.nl | +31 6 2991 7185</textarea>
 // ── DATA ──
 let bedrijven = [];
 let activeZone = 0;
+const CUSTOMER_DB_SCOPE = 'premium_customers_database';
+const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 let coldmailingSettingsSaveTimer = null;
+let coldmailingDatabaseRows = [];
 
 function isPremiumAiLeadGeneratorPath() {
   try {
@@ -1463,6 +1478,114 @@ function formatCampaignDurationLabel(value) {
 function getSelectedCampaignDurationDays() {
   const select = document.getElementById('campaignDurationDays');
   return normalizeCampaignDurationDays(select ? select.value : 14);
+}
+
+function normalizeText(value) {
+  return String(value == null ? '' : value).trim();
+}
+
+function normalizeLowerText(value) {
+  return normalizeText(value).toLowerCase();
+}
+
+function parseCampaignTimestampMs(value) {
+  const parsed = Date.parse(normalizeText(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeCampaignDatabaseStatus(value, row) {
+  const normalized = normalizeLowerText(value);
+  if (normalized === 'interested' || normalized === 'geinteresseerd' || normalized === 'geïnteresseerd') return 'interesse';
+  if (normalized === 'appointment' || normalized === 'meeting') return 'afspraak';
+  if (normalized === 'customer' || normalized === 'closed' || normalized === 'won' || normalized === 'betaald') return 'klant';
+  if (normalized === 'no_deal' || normalized === 'geendeal' || normalized === 'lost') return 'afgehaakt';
+  if (normalized === 'do_not_call' || normalized === 'dnc' || normalized === 'blocked') return 'geblokkeerd';
+  if (normalized === 'open') return 'benaderbaar';
+  if (normalizeLowerText(row && row.actief) === 'nee') return 'buiten';
+  return normalized || 'prospect';
+}
+
+function isLikelyCampaignEmail(value) {
+  const email = normalizeLowerText(value);
+  return Boolean(email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+}
+
+function getCampaignRowEmail(row) {
+  return normalizeLowerText(row && (row.email || row.contactEmail || row.mail));
+}
+
+function isRowInActiveColdmailCampaign(row) {
+  const untilMs = Math.max(
+    parseCampaignTimestampMs(row && row.activeColdmailCampaignUntil),
+    parseCampaignTimestampMs(row && row.coldmailCampaignEndsAt),
+    parseCampaignTimestampMs(row && row.mailCampaignEndsAt),
+    parseCampaignTimestampMs(row && row.mailCampaignUntil)
+  );
+  if (untilMs > Date.now()) return true;
+  const startedAtMs = Math.max(
+    parseCampaignTimestampMs(row && row.coldmailCampaignStartedAt),
+    parseCampaignTimestampMs(row && row.lastColdmailSentAt)
+  );
+  const durationDays = Number((row && (row.coldmailCampaignDurationDays || row.mailCampaignDurationDays)) || 0);
+  return Boolean(startedAtMs && Number.isFinite(durationDays) && durationDays > 0 && startedAtMs + durationDays * 86400000 > Date.now());
+}
+
+function isEligibleColdmailCampaignRow(row) {
+  if (!row || typeof row !== 'object') return false;
+  const status = normalizeCampaignDatabaseStatus(row.databaseStatus || row.status, row);
+  if (['gemaild', 'interesse', 'afspraak', 'klant', 'afgehaakt', 'geblokkeerd', 'buiten'].includes(status)) return false;
+  if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
+  return isLikelyCampaignEmail(getCampaignRowEmail(row));
+}
+
+function isEligibleColdcallingCampaignRow(row) {
+  if (!row || typeof row !== 'object') return false;
+  const status = normalizeCampaignDatabaseStatus(row.databaseStatus || row.status, row);
+  if (['interesse', 'afspraak', 'klant', 'afgehaakt', 'geblokkeerd', 'buiten'].includes(status)) return false;
+  if (isRowInActiveColdmailCampaign(row)) return false;
+  return row.call !== false && row.canCall !== false && row.doNotCall !== true;
+}
+
+function parseCustomerDatabaseRows(values) {
+  const raw = values && values[CUSTOMER_DB_KEY];
+  if (Array.isArray(raw)) return raw.filter((item) => item && typeof item === 'object');
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(String(raw));
+    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item === 'object') : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function getCampaignRequestedCompanyCount() {
+  const slider = document.getElementById('mail-slider');
+  const value = Number.parseInt(slider ? slider.value : '0', 10);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function renderCampaignCompanyCount() {
+  const valueEl = document.getElementById('campaignCompanyCountValue');
+  const wrap = document.getElementById('campaignCompanyCount');
+  if (!valueEl || !wrap) return;
+  const eligibleRows = coldmailingDatabaseRows.filter(
+    isPremiumAiLeadGeneratorPath() ? isEligibleColdcallingCampaignRow : isEligibleColdmailCampaignRow
+  );
+  const count = Math.min(getCampaignRequestedCompanyCount() || eligibleRows.length, eligibleRows.length);
+  valueEl.textContent = String(count);
+  wrap.title = count + ' ' + (count === 1 ? 'bedrijf wordt' : 'bedrijven worden') + (isPremiumAiLeadGeneratorPath() ? ' gebeld.' : ' gemaild.');
+  wrap.setAttribute('aria-label', wrap.title);
+}
+
+async function hydrateCampaignCompanyCountFromSupabase() {
+  try {
+    const data = await fetchColdmailingUiState(CUSTOMER_DB_SCOPE);
+    const values = data && data.values && typeof data.values === 'object' ? data.values : {};
+    coldmailingDatabaseRows = parseCustomerDatabaseRows(values);
+  } catch (_) {
+    coldmailingDatabaseRows = [];
+  }
+  renderCampaignCompanyCount();
 }
 
 function normalizeColdmailingSettings(value) {
@@ -1703,6 +1826,7 @@ function updateSlider(v) {
   const pct = ((v-10)/(500-10))*100;
   document.getElementById('mail-slider').style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
+  renderCampaignCompanyCount();
 }
 updateSlider(100);
 
@@ -2483,6 +2607,7 @@ applyPremiumAiLeadGeneratorShell();
 applyPremiumAiLeadGeneratorBelmethodeRow();
 initCampaignDurationSetting();
 initLeadGeneratorProviderSetting();
+void hydrateCampaignCompanyCountFromSupabase();
 initColdmailingMailboxOptions()
   .then(initColdmailingSettingsPersistence)
   .catch(initColdmailingSettingsPersistence)
