@@ -2434,13 +2434,19 @@
             justify-self: end;
             width: min(100%, 380px);
             padding: 1.35rem;
+            --hero-story-lift: calc(-14rem - clamp(1.2rem, 2vw, 1.6rem));
             background: linear-gradient(180deg, rgba(255, 250, 246, 0.96) 0%, rgba(244, 234, 225, 0.92) 100%);
             border: 1px solid rgba(139, 34, 82, 0.12);
             border-radius: 30px;
             box-shadow: 0 26px 60px rgba(17, 13, 10, 0.18);
             position: relative;
-            transform: translateY(calc(-14rem - clamp(1.2rem, 2vw, 1.6rem)));
+            transform: translateY(var(--hero-story-lift));
             overflow: hidden;
+        }
+
+        .hero-story-card.fade-up,
+        .hero-story-card.fade-up.visible {
+            transform: translateY(var(--hero-story-lift));
         }
 
         .hero-story-card::before {
@@ -2776,7 +2782,8 @@
             .hero-story-card {
                 justify-self: start;
                 max-width: 560px;
-                transform: none;
+                --hero-story-lift: -3rem;
+                transform: translateY(var(--hero-story-lift));
             }
 
             .hero-proof-strip {
@@ -2847,6 +2854,7 @@
             .hero-story-card {
                 width: 100%;
                 max-width: none;
+                --hero-story-lift: -1.5rem;
                 padding: 1.1rem;
                 border-radius: 28px;
             }

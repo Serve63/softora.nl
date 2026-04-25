@@ -82,11 +82,15 @@ test('premium website hero story kaart staat duidelijk hoger op desktop', () => 
   assert.match(source, /\.hero-buttons\s*\{[\s\S]*margin-bottom:\s*2rem;/);
   assert.match(
     source,
-    /\.hero-story-card\s*\{[\s\S]*transform:\s*translateY\(calc\(-14rem - clamp\(1\.2rem,\s*2vw,\s*1\.6rem\)\)\);/
+    /\.hero-story-card\s*\{[\s\S]*--hero-story-lift:\s*calc\(-14rem - clamp\(1\.2rem,\s*2vw,\s*1\.6rem\)\);[\s\S]*transform:\s*translateY\(var\(--hero-story-lift\)\);/
   );
   assert.match(
     source,
-    /@media \(max-width: 1100px\) \{[\s\S]*\.hero-story-card\s*\{[\s\S]*transform:\s*none;/
+    /\.hero-story-card\.fade-up,\s*\.hero-story-card\.fade-up\.visible\s*\{[\s\S]*transform:\s*translateY\(var\(--hero-story-lift\)\);/
+  );
+  assert.match(
+    source,
+    /@media \(max-width: 1100px\) \{[\s\S]*\.hero-story-card\s*\{[\s\S]*--hero-story-lift:\s*-3rem;[\s\S]*transform:\s*translateY\(var\(--hero-story-lift\)\);/
   );
 });
 
