@@ -1890,6 +1890,17 @@
                 line-height: 0.95 !important;
             }
 
+            .werkwijze-title {
+                max-width: 11ch;
+                margin-bottom: 1.4rem !important;
+            }
+
+            .werkwijze-title-line,
+            .werkwijze-lancering {
+                display: inline;
+                white-space: normal;
+            }
+
             .grid-3,
             #diensten .diensten-product-grid {
                 grid-template-columns: 1fr;
@@ -2852,6 +2863,7 @@
             }
 
             .hero-story-card {
+                display: none;
                 width: 100%;
                 max-width: none;
                 --hero-story-lift: 0rem;
@@ -2886,6 +2898,55 @@
 
             .werkwijze-stats {
                 gap: 12px;
+            }
+
+            #faq,
+            .faq-section {
+                padding-left: 18px !important;
+                padding-right: 18px !important;
+                overflow-x: hidden;
+            }
+
+            .faq-section-inner,
+            .faq-split,
+            .faq-aside,
+            .faq-split-main,
+            .faq-contact-card {
+                width: 100%;
+                max-width: 100%;
+                min-width: 0;
+                box-sizing: border-box;
+            }
+
+            .faq-split-main {
+                padding: 22px 18px !important;
+            }
+
+            .faq-title,
+            .faq-contact-card h3 {
+                white-space: normal !important;
+                overflow-wrap: anywhere;
+            }
+
+            .faq-question {
+                min-width: 0;
+            }
+
+            .faq-q-text {
+                min-width: 0;
+            }
+
+            .faq-contact-head,
+            .faq-contact-form {
+                padding-left: 18px !important;
+                padding-right: 18px !important;
+            }
+
+            .faq-field input,
+            .faq-field textarea,
+            .faq-contact-form .magnetic-btn {
+                min-width: 0;
+                box-sizing: border-box;
             }
 
             .pricing-card.featured {
@@ -3022,7 +3083,7 @@
     </section>
 
     <!-- WERKWIJZE -->
-    <section id="werkwijze" class="perf-deferred-section" style="background: var(--bg-primary); padding: 0.5rem 4rem 8rem;">
+    <section id="werkwijze" class="perf-deferred-section" style="background: var(--bg-primary); padding: 2.5rem 4rem 8rem;">
         <div style="max-width: 1200px; margin: 0 auto;">
             <div class="grid-2 werkwijze-grid">
                 <div class="fade-up werkwijze-copy">

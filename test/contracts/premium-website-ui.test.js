@@ -42,12 +42,27 @@ test('premium website houdt Van Idee Naar Lancering op desktop op één regel', 
   const source = fs.readFileSync(filePath, 'utf8');
 
   assert.match(source, /<h2 class="werkwijze-title"[\s\S]*font-size:\s*clamp\(2\.55rem,\s*4\.1vw,\s*3\.95rem\);[\s\S]*<span class="werkwijze-title-line">Van Idee Naar Lancering<\/span><\/h2>/);
+  assert.match(source, /<section id="werkwijze" class="perf-deferred-section" style="background: var\(--bg-primary\); padding: 2\.5rem 4rem 8rem;">/);
   assert.doesNotMatch(source, /Van Idee<br><span class="werkwijze-lancering">Naar Lancering<\/span>/);
   assert.match(source, /\.werkwijze-copy\s*\{[\s\S]*width:\s*min\(100%,\s*920px\);/);
   assert.match(source, /#werkwijze > div,[\s\S]*#diensten-overzicht > div \{[\s\S]*max-width:\s*1440px;/);
   assert.match(source, /#werkwijze \.werkwijze-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1\.45fr\) minmax\(300px,\s*0\.55fr\);/);
   assert.match(source, /\.werkwijze-title-line,[\s\S]*\.werkwijze-lancering\s*\{[\s\S]*display:\s*inline-block;[\s\S]*white-space:\s*nowrap;/);
   assert.match(source, /@media \(max-width: 680px\) \{[\s\S]*\.werkwijze-title-line,[\s\S]*\.werkwijze-lancering \{[\s\S]*white-space:\s*normal;/);
+});
+
+test('premium website laat werkwijze titel natuurlijk wrappen op mobiel', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(
+    source,
+    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title\s*\{[\s\S]*max-width:\s*11ch;[\s\S]*margin-bottom:\s*1\.4rem !important;/
+  );
+  assert.match(
+    source,
+    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title-line,[\s\S]*\.werkwijze-lancering\s*\{[\s\S]*display:\s*inline;[\s\S]*white-space:\s*normal;/
+  );
 });
 
 test('premium website werkwijze gebruikt langere nederlandse procesregels', () => {
@@ -91,6 +106,16 @@ test('premium website hero story kaart staat net boven de buttons', () => {
   assert.match(
     source,
     /@media \(max-width: 1100px\) \{[\s\S]*\.hero-story-card\s*\{[\s\S]*--hero-story-lift:\s*0rem;[\s\S]*transform:\s*translateY\(var\(--hero-story-lift\)\);/
+  );
+});
+
+test('premium website verbergt hero story kaart op mobiel', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(
+    source,
+    /@media \(max-width: 768px\) \{[\s\S]*\.hero-story-card\s*\{[\s\S]*display:\s*none;[\s\S]*width:\s*100%;/
   );
 });
 
@@ -205,6 +230,28 @@ test('premium website contactkaart gebruikt korte andere vraag titel', () => {
 
   assert.match(source, /<h3 id="faq-contact-title">Andere vraag\?<\/h3>/);
   assert.doesNotMatch(source, /Staat je vraag er niet bij\?/);
+});
+
+test('premium website houdt faq en andere vraag binnen mobiel scherm', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(
+    source,
+    /@media \(max-width: 768px\) \{[\s\S]*#faq,[\s\S]*\.faq-section\s*\{[\s\S]*padding-left:\s*18px !important;[\s\S]*padding-right:\s*18px !important;[\s\S]*overflow-x:\s*hidden;/
+  );
+  assert.match(
+    source,
+    /@media \(max-width: 768px\) \{[\s\S]*\.faq-section-inner,[\s\S]*\.faq-split,[\s\S]*\.faq-aside,[\s\S]*\.faq-split-main,[\s\S]*\.faq-contact-card\s*\{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*box-sizing:\s*border-box;/
+  );
+  assert.match(
+    source,
+    /@media \(max-width: 768px\) \{[\s\S]*\.faq-title,[\s\S]*\.faq-contact-card h3\s*\{[\s\S]*white-space:\s*normal !important;[\s\S]*overflow-wrap:\s*anywhere;/
+  );
+  assert.match(
+    source,
+    /@media \(max-width: 768px\) \{[\s\S]*\.faq-field input,[\s\S]*\.faq-field textarea,[\s\S]*\.faq-contact-form \.magnetic-btn\s*\{[\s\S]*min-width:\s*0;[\s\S]*box-sizing:\s*border-box;/
+  );
 });
 
 test('premium website hero gebruikt lokaal gegenereerde studiofotografie met donkere overlay en leesbare tekst', () => {
