@@ -47,7 +47,7 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
   );
 });
 
-test('premium dashboard toont AI beheer dropdown boven de datumfilters', () => {
+test('premium dashboard toont alleen personeel beheer boven de datumfilters', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -60,10 +60,8 @@ test('premium dashboard toont AI beheer dropdown boven de datumfilters', () => {
     /<span class="ai-management-status-dot ai-management-status-dot--green" id="aiManagementStatusDot"[^>]*><\/span>/
   );
   assert.match(pageSource, /id="aiManagementLabel">PERSONEEL BEHEER<\/span>/);
-  assert.match(
-    pageSource,
-    /data-ai-management-value="software"[\s\S]*aria-checked="false"[\s\S]*ai-management-status-dot--red[\s\S]*AI BEHEER/
-  );
+  assert.doesNotMatch(pageSource, /data-ai-management-value="software"/);
+  assert.doesNotMatch(pageSource, />AI BEHEER<\/span>/);
   assert.match(
     pageSource,
     /data-ai-management-value="personnel"[\s\S]*aria-checked="true"[\s\S]*ai-management-status-dot--green[\s\S]*PERSONEEL BEHEER/
@@ -77,6 +75,8 @@ test('premium dashboard toont AI beheer dropdown boven de datumfilters', () => {
   assert.match(pageSource, /window\.SoftoraDashboardAiManagement = \{/);
   assert.match(pageSource, /window\.SoftoraAiManagement &&/);
   assert.match(pageSource, /let aiManagementMode = initialAiManagementMode === 'software' \? 'software' : 'personnel';/);
+  assert.match(pageSource, /function normalizeAiManagementMode\(value\) \{\s*return 'personnel';\s*\}/);
+  assert.match(pageSource, /if \(aiManagementOptions\.length < 2\) return;/);
   assert.match(pageSource, /aiManagementMode: managementContext\.mode/);
   assert.match(pageSource, /softora-ai-management-change/);
 });

@@ -633,6 +633,10 @@
             gap: 0.75rem;
         }
 
+        .manual-appointment-choice-grid--who {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
         .manual-appointment-choice {
             border: 1px solid var(--border);
             background: rgba(255,255,255,0.82);
@@ -1150,6 +1154,9 @@
             .modal-footer { padding: 0.35rem 1rem 1rem; }
             .modal-details { grid-template-columns: 1fr; }
             .modal-workspace-grid { grid-template-columns: 1fr; }
+            .manual-appointment-choice-grid--who { gap: 0.45rem; }
+            .manual-appointment-choice-grid--who .manual-appointment-choice { padding: 0.8rem 0.65rem; }
+            .manual-appointment-choice-grid--who .manual-appointment-choice-title { font-size: 0.7rem; }
         }
 
         @media print {
@@ -1365,7 +1372,7 @@
                     <input type="hidden" id="manualAppointmentLegendChoice" autocomplete="off">
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Voor wie?</div>
-                        <div class="manual-appointment-choice-grid" role="group" aria-label="Voor wie is deze afspraak?">
+                        <div class="manual-appointment-choice-grid manual-appointment-choice-grid--who" role="group" aria-label="Voor wie is deze afspraak?">
                             <button class="manual-appointment-choice" type="button" data-manual-who="serve">
                                 <span class="manual-appointment-choice-title">Servé</span>
                             </button>

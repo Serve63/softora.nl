@@ -19,18 +19,7 @@
                 var storageKey = isPremiumPersonnel
                     ? "softora_premium_personnel_theme_mode"
                     : "softora_software_personnel_theme_mode";
-                var aiManagementStorageKey = isPremiumPersonnel
-                    ? "softora_premium_ai_management_mode"
-                    : "softora_software_ai_management_mode";
                 var aiManagementMode = "personnel";
-                try {
-                    var storedAiManagementMode = localStorage.getItem(aiManagementStorageKey);
-                    if (storedAiManagementMode === "software" || storedAiManagementMode === "personnel") {
-                        aiManagementMode = storedAiManagementMode;
-                    }
-                } catch (storageError) {
-                    /* ignore storage errors */
-                }
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
                 document.documentElement.setAttribute("data-ai-management-mode", aiManagementMode);
@@ -1982,15 +1971,6 @@
                             </span>
                         </button>
                         <div class="topbar-select-menu" id="aiManagementMenu" role="menu" hidden>
-                            <button type="button" class="topbar-select-option" data-ai-management-value="software" role="menuitemradio" aria-checked="false" title="Rood: werkt nog niet.">
-                                <span class="ai-management-option-label">
-                                    <span class="ai-management-status-dot ai-management-status-dot--red" aria-hidden="true"></span>
-                                    <span>AI BEHEER</span>
-                                </span>
-                                <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
-                                </svg>
-                            </button>
                             <button type="button" class="topbar-select-option" data-ai-management-value="personnel" role="menuitemradio" aria-checked="true" title="Groen: werkt perfect.">
                                 <span class="ai-management-option-label">
                                     <span class="ai-management-status-dot ai-management-status-dot--green" aria-hidden="true"></span>
@@ -2348,13 +2328,11 @@
         }
 
         function normalizeAiManagementMode(value) {
-            return value === 'personnel' ? 'personnel' : 'software';
+            return 'personnel';
         }
 
         function getAiManagementLabel(value) {
-            return normalizeAiManagementMode(value) === 'personnel'
-                ? 'PERSONEEL BEHEER'
-                : 'AI BEHEER';
+            return 'PERSONEEL BEHEER';
         }
 
         function normalizeAiManagementGoal(value) {
@@ -2593,6 +2571,7 @@
 
         function openAiManagementMenu() {
             if (!aiManagementDropdown || !aiManagementTrigger || !aiManagementMenu) return;
+            if (aiManagementOptions.length < 2) return;
             aiManagementDropdown.classList.add('open');
             aiManagementTrigger.setAttribute('aria-expanded', 'true');
             aiManagementMenu.hidden = false;
@@ -2633,6 +2612,7 @@
             syncAiManagementUi();
 
             aiManagementTrigger.addEventListener('click', () => {
+                if (aiManagementOptions.length < 2) return;
                 const isOpen = aiManagementDropdown.classList.contains('open');
                 closeDashboardPeriodMenu();
                 if (isOpen) closeAiManagementMenu();
