@@ -36,7 +36,11 @@ function registerColdmailingRoutes(app, deps = {}) {
       res.json(result);
     } catch (error) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_SEND_FAILED';
-      const status = code === 'SMTP_NOT_CONFIGURED' ? 503 : code === 'NO_RECIPIENTS' ? 422 : 400;
+      const status = code === 'SMTP_NOT_CONFIGURED'
+        ? 503
+        : code === 'NO_RECIPIENTS' || code === 'NO_VALID_RECIPIENT_DOMAINS'
+          ? 422
+          : 400;
       res.status(status).json({
         ok: false,
         code,

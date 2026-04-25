@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const dns = require('node:dns').promises;
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -12,6 +13,30 @@ const EXCLUDED_DATABASE_STATUSES = new Set([
   'buiten',
 ]);
 
+async function resolveEmailDomainWithDns(domain) {
+  const value = String(domain || '').trim().toLowerCase();
+  if (!value) return false;
+  try {
+    const mxRecords = await dns.resolveMx(value);
+    if (Array.isArray(mxRecords) && mxRecords.length) return true;
+  } catch (error) {
+    if (error && error.code !== 'ENODATA' && error.code !== 'ENOTFOUND') throw error;
+  }
+  try {
+    const addresses = await dns.resolve4(value);
+    if (Array.isArray(addresses) && addresses.length) return true;
+  } catch (error) {
+    if (error && error.code !== 'ENODATA' && error.code !== 'ENOTFOUND') throw error;
+  }
+  try {
+    const addresses = await dns.resolve6(value);
+    return Array.isArray(addresses) && addresses.length > 0;
+  } catch (error) {
+    if (error && error.code !== 'ENODATA' && error.code !== 'ENOTFOUND') throw error;
+    return false;
+  }
+}
+
 function createColdmailCampaignService(deps = {}) {
   const {
     mailConfig = {},
@@ -20,6 +45,7 @@ function createColdmailCampaignService(deps = {}) {
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
     createTransport = (config) => nodemailer.createTransport(config),
+    resolveEmailDomain = resolveEmailDomainWithDns,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     now = () => new Date(),
@@ -125,6 +151,12 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeEmailAddress(row.email || row.contactEmail || row.mail || '');
   }
 
+  function getEmailDomain(email) {
+    const normalized = normalizeEmailAddress(email);
+    const parts = normalized.split('@');
+    return parts.length === 2 ? parts[1] : '';
+  }
+
   function getAllowedSenderEmails() {
     return Array.from(
       new Set(
@@ -178,6 +210,12 @@ function createColdmailCampaignService(deps = {}) {
     if (!matchesBranch(row, branchFilter)) return false;
     const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
     return !EXCLUDED_DATABASE_STATUSES.has(status);
+  }
+
+  async function isDeliverableEmailDomain(email) {
+    const domain = getEmailDomain(email);
+    if (!domain) return false;
+    return Boolean(await resolveEmailDomain(domain));
   }
 
   function personalizeTemplate(template, row) {
@@ -271,20 +309,43 @@ function createColdmailCampaignService(deps = {}) {
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = parseDatabaseRows(values);
-    const selectedRows = rows
+    const candidateRows = rows
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
       .filter(({ row }) => isEligibleColdmailRow(row, input.branch))
       .slice(0, count);
 
-    if (!selectedRows.length) {
+    if (!candidateRows.length) {
       const error = new Error('Geen geschikte e-mailadressen gevonden in de database.');
       error.code = 'NO_RECIPIENTS';
       throw error;
     }
 
+    const selectedRows = [];
+    const failed = [];
+    for (const item of candidateRows) {
+      const email = getRowEmail(item.row);
+      if (await isDeliverableEmailDomain(email)) {
+        selectedRows.push(item);
+      } else {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row),
+          email,
+          error: `E-maildomein bestaat niet of ontvangt geen mail: ${getEmailDomain(email) || email}`,
+        });
+      }
+    }
+
+    if (!selectedRows.length) {
+      const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
+      const error = new Error(firstFailure || 'Geen geldige e-maildomeinen gevonden in de database.');
+      error.code = 'NO_VALID_RECIPIENT_DOMAINS';
+      error.failedItems = failed;
+      throw error;
+    }
+
     const transporter = getSmtpTransporter();
     const sent = [];
-    const failed = [];
     const sentRowIds = new Set();
 
     for (const item of selectedRows) {
