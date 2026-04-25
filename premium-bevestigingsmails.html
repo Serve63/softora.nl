@@ -2285,6 +2285,8 @@ async function startCampagneImmediate() {
       }
       const failedSuffix = sendResult.failed ? ' (' + sendResult.failed + ' mislukt)' : '';
       showToast('✓ ' + sendResult.sent + ' mails verstuurd' + failedSuffix);
+      await hydrateCampaignCompanyCountFromSupabase();
+      return;
     } catch (error) {
       showToast(String(error && error.message || 'Mails versturen is mislukt.'));
       return;

@@ -285,7 +285,7 @@ test('premium ai lead generator alias replaces branche with belmethode', () => {
   assert.match(pageSource, /<option value="parallel">Alles tegelijk<\/option>/);
 });
 
-test('premium bevestigingsmails sends real coldmail campaigns through the backend before showing timeline', () => {
+test('premium bevestigingsmails sends real coldmail campaigns without opening timeline page', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -300,5 +300,6 @@ test('premium bevestigingsmails sends real coldmail campaigns through the backen
   assert.match(pageSource, /function buildSendErrorMessage\(defaultMessage\)/);
   assert.match(pageSource, /payload && Array\.isArray\(payload\.failedItems\) && payload\.failedItems\[0\]/);
   assert.match(pageSource, /if \(!payload\.sent && payload\.failed\) \{/);
-  assert.match(pageSource, /bedrijven = sendResult\.sentItems\.map/);
+  assert.match(pageSource, /showToast\('✓ ' \+ sendResult\.sent \+ ' mails verstuurd' \+ failedSuffix\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
+  assert.match(pageSource, /showScreen\('screen-campaign'\);/);
 });
