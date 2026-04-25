@@ -121,6 +121,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /withWww\.hostname = "www\." \+ parsed\.hostname;/);
   assert.match(pageSource, /function generateWebdesignPhotos\(\)/);
   assert.match(pageSource, /return isWebdesignPhotoEligible\(customer\);/);
+  assert.match(pageSource, /Webdesign maken voor " \+ target\.bedrijf/);
+  assert.doesNotMatch(pageSource, /AI-foto maken voor " \+ target\.bedrijf/);
   assert.match(pageSource, /Geen AI-foto's opgeslagen: /);
   assert.match(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /company: customer\.bedrijf/);

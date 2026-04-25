@@ -2525,7 +2525,7 @@
 
                 for (const target of targets) {
                     try {
-                        setStatusMessage("AI-foto maken voor " + target.bedrijf + " (" + (done + failed + 1) + "/" + targets.length + ")...", "info");
+                        setStatusMessage("Webdesign maken voor " + target.bedrijf + " (" + (done + failed + 1) + "/" + targets.length + ")...", "info");
                         const generated = await generateWebsitePhotoData(target);
                         state.klanten = sortCustomers(state.klanten.map(function (customer) {
                             if (customer.id !== target.id) return customer;
