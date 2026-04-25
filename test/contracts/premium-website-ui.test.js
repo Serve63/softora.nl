@@ -55,6 +55,14 @@ test('premium website hero story titel staat op twee regels zonder bureau-ruis',
   assert.doesNotMatch(source, /Premium uitstraling zonder bureau-ruis\./);
 });
 
+test('premium website hero story gebruikt Oplevertijd als metric-label', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<span class="story-metric-label">Oplevertijd<\/span>/);
+  assert.doesNotMatch(source, /Gemiddelde livegang/);
+});
+
 test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
