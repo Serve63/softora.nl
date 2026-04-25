@@ -1300,6 +1300,7 @@
         const CUSTOMER_PHOTO_DATA_PREFIX = "softora_database_photo_data_v1_";
         const CUSTOMER_PHOTO_CHUNK_SIZE = 180000;
         const WEBSITE_PHOTO_COST_EUR = 0.21;
+        const COLDMAIL_TEST_COMPANIES = ["mcv e-commerce"];
         const ORDER_SCOPE = "premium_active_orders";
         const ORDER_KEY = "softora_custom_orders_premium_v1";
         const DATABASE_STATUS_OPTIONS = ["prospect", "gebeld", "gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten", "benaderbaar", "geengehoor"];
@@ -1511,6 +1512,14 @@
             return "prospect";
         }
 
+        function normalizeColdmailTestCompanyName(value) {
+            return normalizeString(value).toLowerCase();
+        }
+
+        function isColdmailTestCompany(customer) {
+            return COLDMAIL_TEST_COMPANIES.indexOf(normalizeColdmailTestCompanyName(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam))) !== -1;
+        }
+
         function createStatusTimelineLabel(status) {
             const labelMap = {
                 prospect: "Toegevoegd als prospect",
@@ -1533,7 +1542,8 @@
             const naam = normalizeString(raw && (raw.naam || raw.contact || raw.contactName || raw.clientName)) || bedrijf;
             const dom = slugifyDomain(raw && (raw.dom || raw.domain || raw.website || bedrijf));
             const email = normalizeString(raw && (raw.email || raw.contactEmail)) || ("info@" + dom);
-            const status = normalizeDatabaseStatus(raw && (raw.databaseStatus || raw.status), raw);
+            const storedStatus = normalizeDatabaseStatus(raw && (raw.databaseStatus || raw.status), raw);
+            const status = isColdmailTestCompany({ bedrijf: bedrijf, naam: naam }) && storedStatus === "gemaild" ? "benaderbaar" : storedStatus;
             const updatedAt = normalizeString(raw && (raw.updatedAt || raw.updated || raw.datum || raw.paidAt)) || formatDateForStorage(new Date());
             const parsedHistory = Array.isArray(raw && raw.hist)
                 ? raw.hist.map(normalizeHistoryItem).filter(Boolean)
@@ -2035,6 +2045,7 @@
         }
 
         function hasUsedColdMailing(customer) {
+            if (isColdmailTestCompany(customer)) return false;
             const status = normalizeDatabaseStatus(customer && customer.status, customer);
             if (status === "gemaild") return true;
             if (normalizeString(customer && (customer.lastColdmailSentAt || customer.lastMailSentAt || customer.lastMailedAt))) return true;

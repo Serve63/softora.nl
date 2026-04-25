@@ -122,6 +122,39 @@ test('coldmail campaign sends test recipient without marking database row as mai
   assert.equal(getSavedState(), null);
 });
 
+test('coldmail campaign keeps MCV E-commerce reusable even after earlier mailed status', async () => {
+  const { service, sentMessages, getSavedState } = createService({
+    rows: [
+      {
+        id: 'mcv-test-company',
+        bedrijf: 'MCV E-commerce',
+        naam: 'MCV E-commerce',
+        email: 'mcv-test@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        lastColdmailSentAt: '2026-04-24T12:00:00.000Z',
+        mail: true,
+      },
+    ],
+  });
+
+  const preview = await service.getColdmailCampaignRecipients({ count: 1 });
+  assert.equal(preview.selected, 1);
+  assert.equal(preview.recipients[0].email, 'mcv-test@example.test');
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Test voor {{bedrijf}}',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.persisted, 0);
+  assert.equal(sentMessages[0].to, 'mcv-test@example.test');
+  assert.equal(getSavedState(), null);
+});
+
 test('coldmail campaign previews selected recipients before sending', async () => {
   const { service } = createService();
 

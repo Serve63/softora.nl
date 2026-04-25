@@ -4,6 +4,7 @@ const dns = require('node:dns').promises;
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const TEST_RECIPIENT_EMAILS = new Set(['servec321@gmail.com']);
+const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce']);
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -162,6 +163,11 @@ function createColdmailCampaignService(deps = {}) {
     return TEST_RECIPIENT_EMAILS.has(normalizeEmailAddress(email));
   }
 
+  function isTestRecipientRow(row, email) {
+    const company = getRowCompany(row).toLowerCase();
+    return isTestRecipientEmail(email || getRowEmail(row)) || TEST_RECIPIENT_COMPANIES.has(company);
+  }
+
   function getAllowedSenderEmails() {
     return Array.from(
       new Set(
@@ -213,6 +219,7 @@ function createColdmailCampaignService(deps = {}) {
     if (!isLikelyValidEmail(email)) return false;
     if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
     if (!matchesBranch(row, branchFilter)) return false;
+    if (isTestRecipientRow(row, email)) return true;
     const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
     return !EXCLUDED_DATABASE_STATUSES.has(status);
   }
@@ -429,7 +436,12 @@ function createColdmailCampaignService(deps = {}) {
     }
 
     const sentPersistableRowIds = new Set(
-      sent.filter((item) => !isTestRecipientEmail(item.email)).map((item) => item.id)
+      sent
+        .filter((item) => {
+          const selected = selectedRows.find((selectedItem) => selectedItem.id === item.id);
+          return !isTestRecipientRow(selected && selected.row, item.email);
+        })
+        .map((item) => item.id)
     );
 
     if (sentPersistableRowIds.size) {

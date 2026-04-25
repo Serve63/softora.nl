@@ -157,6 +157,10 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /function exportCSV\(\)/);
   assert.match(pageSource, /function renderUsedChannelTags\(customer\)/);
+  assert.match(pageSource, /const COLDMAIL_TEST_COMPANIES = \["mcv e-commerce"\];/);
+  assert.match(pageSource, /function isColdmailTestCompany\(customer\)/);
+  assert.match(pageSource, /storedStatus === "gemaild" \? "benaderbaar" : storedStatus/);
+  assert.match(pageSource, /if \(isColdmailTestCompany\(customer\)\) return false;/);
   assert.match(pageSource, /Cold calling/);
   assert.match(pageSource, /Cold mailing/);
   assert.match(pageSource, /Nog geen acties/);
