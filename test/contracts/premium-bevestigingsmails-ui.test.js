@@ -143,6 +143,7 @@ test('premium bevestigingsmails removes mail and ai-instructions tabs while keep
   assert.doesNotMatch(pageSource, /onclick="switchMail\(4,this\)">AI Instructies<\/button>/);
   assert.match(pageSource, /<button class="mail-tab mail-icon-tab" type="button" onclick="switchMail\(5,this\)" aria-label="Instellingen">/);
   assert.match(pageSource, /<div class="mail-panel active" id="mail-panel-1">/);
+  assert.match(pageSource, /#body1 \{ height: clamp\(420px, 52vh, 520px\); \}/);
   assert.match(pageSource, /function ensureLeadGeneratorSettingsBackRow/);
 });
 
