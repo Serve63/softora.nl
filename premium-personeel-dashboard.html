@@ -587,6 +587,149 @@
             color: var(--text-primary);
         }
 
+        .ai-management-config-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 220;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: rgba(245, 241, 232, 0.74);
+            backdrop-filter: blur(10px);
+        }
+
+        .ai-management-config-backdrop[hidden] {
+            display: none;
+        }
+
+        .ai-management-config-modal {
+            width: min(680px, 100%);
+            max-height: calc(100vh - 4rem);
+            overflow-y: auto;
+            background: var(--bg-secondary);
+            border: 1px solid rgba(139, 34, 82, 0.24);
+            box-shadow: 0 28px 70px rgba(15, 17, 28, 0.18);
+            padding: 1.6rem;
+        }
+
+        .ai-management-config-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .ai-management-config-kicker,
+        .ai-management-config-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--text-tertiary);
+        }
+
+        .ai-management-config-title {
+            margin-top: 0.25rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 500;
+            line-height: 1;
+            color: var(--text-primary);
+        }
+
+        .ai-management-config-close {
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 1.35rem;
+            line-height: 1;
+        }
+
+        .ai-management-config-close:hover,
+        .ai-management-config-close:focus-visible {
+            border-color: rgba(139, 34, 82, 0.34);
+            color: var(--accent);
+            outline: none;
+        }
+
+        .ai-management-config-field {
+            margin-bottom: 1.1rem;
+        }
+
+        .ai-management-goal-input {
+            width: 100%;
+            min-height: 96px;
+            margin-top: 0.45rem;
+            padding: 0.9rem 1rem;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.72);
+            color: var(--text-primary);
+            font: inherit;
+            line-height: 1.55;
+            resize: vertical;
+            outline: none;
+        }
+
+        .ai-management-goal-input:focus {
+            border-color: rgba(139, 34, 82, 0.45);
+            box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.08);
+        }
+
+        .ai-management-config-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem;
+            margin-top: 0.5rem;
+        }
+
+        .ai-management-config-check {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.78rem 0.85rem;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.5);
+            color: var(--text-secondary);
+            font-size: 0.86rem;
+        }
+
+        .ai-management-config-check input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .ai-management-config-foot {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.7rem;
+            margin-top: 1.35rem;
+        }
+
+        .ai-management-config-btn {
+            min-height: 40px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 0 1rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .ai-management-config-btn--primary {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #fff;
+        }
+
         /* KPI Cards */
         .kpi-grid {
             display: grid;
@@ -1730,6 +1873,46 @@
                 </div>
             </div>
 
+            <div class="ai-management-config-backdrop" id="aiManagementConfigModal" role="dialog" aria-modal="true" aria-labelledby="aiManagementConfigTitle" hidden>
+                <div class="ai-management-config-modal">
+                    <div class="ai-management-config-head">
+                        <div>
+                            <div class="ai-management-config-kicker">AI beheer instellen</div>
+                            <div class="ai-management-config-title" id="aiManagementConfigTitle">Doel en middelen</div>
+                        </div>
+                        <button type="button" class="ai-management-config-close" data-ai-config-close aria-label="Sluiten">&times;</button>
+                    </div>
+                    <div class="ai-management-config-field">
+                        <label class="ai-management-config-label" for="aiManagementGoalInput">Doel:</label>
+                        <textarea class="ai-management-goal-input" id="aiManagementGoalInput" placeholder="Bijvoorbeeld: meer kwalitatieve afspraken en klanten binnenhalen."></textarea>
+                    </div>
+                    <div class="ai-management-config-field">
+                        <div class="ai-management-config-label">Wat mag AI gebruiken om dat te behalen?</div>
+                        <div class="ai-management-config-grid">
+                            <label class="ai-management-config-check"><input type="checkbox" data-ai-config-channel="coldcalling"> Coldcalling</label>
+                            <label class="ai-management-config-check"><input type="checkbox" data-ai-config-channel="coldmailing"> Coldmailing</label>
+                            <label class="ai-management-config-check"><input type="checkbox" data-ai-config-channel="ads_trustoo"> Trustoo advertenties</label>
+                            <label class="ai-management-config-check"><input type="checkbox" data-ai-config-channel="ads_pinterest"> Pinterest advertenties</label>
+                            <label class="ai-management-config-check"><input type="checkbox" data-ai-config-channel="ads_facebook"> Facebook advertenties</label>
+                            <label class="ai-management-config-check"><input type="checkbox" data-ai-config-channel="ads_twitter"> X / Twitter advertenties</label>
+                            <label class="ai-management-config-check"><input type="checkbox" data-ai-config-channel="ads_google"> Google advertenties</label>
+                            <label class="ai-management-config-check"><input type="checkbox" data-ai-config-channel="ads_linkedin"> LinkedIn advertenties</label>
+                        </div>
+                    </div>
+                    <div class="ai-management-config-field">
+                        <div class="ai-management-config-label">Dynamisch bijhouden</div>
+                        <div class="ai-management-config-grid">
+                            <label class="ai-management-config-check"><input type="checkbox" data-ai-config-toggle="databaseDynamic"> Database volgen en dynamisch bijhouden</label>
+                            <label class="ai-management-config-check"><input type="checkbox" data-ai-config-toggle="agendaDynamic"> Agenda volgen en dynamisch volhouden</label>
+                        </div>
+                    </div>
+                    <div class="ai-management-config-foot">
+                        <button type="button" class="ai-management-config-btn" data-ai-config-close>Annuleren</button>
+                        <button type="button" class="ai-management-config-btn ai-management-config-btn--primary" id="aiManagementConfigSave">Opslaan</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="kpi-grid">
                 <div class="kpi-card">
                     <div class="kpi-label">Totale Omzet</div>
@@ -1859,6 +2042,20 @@
         const aiManagementStatusDot = document.getElementById('aiManagementStatusDot');
         const aiManagementMenu = document.getElementById('aiManagementMenu');
         const aiManagementOptions = Array.from(document.querySelectorAll('[data-ai-management-value]'));
+        const aiManagementConfigModal = document.getElementById('aiManagementConfigModal');
+        const aiManagementGoalInput = document.getElementById('aiManagementGoalInput');
+        const aiManagementConfigSave = document.getElementById('aiManagementConfigSave');
+        const aiManagementConfigCloseButtons = Array.from(document.querySelectorAll('[data-ai-config-close]'));
+        const aiManagementConfigChannelInputs = Array.from(document.querySelectorAll('[data-ai-config-channel]'));
+        const aiManagementConfigToggleInputs = Array.from(document.querySelectorAll('[data-ai-config-toggle]'));
+        const AI_MANAGEMENT_CONFIG_SCOPE = 'premium_dashboard_ai_management';
+        const AI_MANAGEMENT_CONFIG_KEY = 'softora_dashboard_ai_management_config_v1';
+        const DEFAULT_AI_MANAGEMENT_CONFIG = {
+            goal: 'Meer kwalitatieve afspraken en klanten binnenhalen.',
+            channels: ['coldcalling', 'coldmailing'],
+            databaseDynamic: true,
+            agendaDynamic: true,
+        };
         const initialAiManagementMode = (
             window.SoftoraAiManagement &&
             typeof window.SoftoraAiManagement.getMode === 'function'
@@ -1866,6 +2063,7 @@
             ? window.SoftoraAiManagement.getMode()
             : document.documentElement.getAttribute('data-ai-management-mode');
         let aiManagementMode = initialAiManagementMode === 'software' ? 'software' : 'personnel';
+        let aiManagementConfig = normalizeAiManagementConfig(null);
         const AI_MANAGEMENT_STATUS = {
             software: {
                 tone: 'red',
@@ -1920,10 +2118,51 @@
                 : 'AI BEHEER';
         }
 
+        function normalizeAiManagementConfig(value) {
+            const raw = value && typeof value === 'object' ? value : {};
+            const channels = Array.isArray(raw.channels)
+                ? raw.channels.map((item) => String(item || '').trim()).filter(Boolean)
+                : DEFAULT_AI_MANAGEMENT_CONFIG.channels.slice();
+            return {
+                goal: normalizeDashboardString(raw.goal) || DEFAULT_AI_MANAGEMENT_CONFIG.goal,
+                channels: channels.length ? Array.from(new Set(channels)) : DEFAULT_AI_MANAGEMENT_CONFIG.channels.slice(),
+                databaseDynamic: raw.databaseDynamic !== false,
+                agendaDynamic: raw.agendaDynamic !== false,
+            };
+        }
+
+        async function hydrateAiManagementConfigFromServer() {
+            try {
+                const data = await fetchPremiumUiState(AI_MANAGEMENT_CONFIG_SCOPE);
+                const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
+                aiManagementConfig = normalizeAiManagementConfig(JSON.parse(String(values[AI_MANAGEMENT_CONFIG_KEY] || '{}')));
+                syncAiManagementConfigForm();
+                emitAiManagementContextChange();
+            } catch (_) {
+                aiManagementConfig = normalizeAiManagementConfig(aiManagementConfig);
+            }
+        }
+
+        function persistAiManagementConfig() {
+            fetchPremiumUiStateSet(AI_MANAGEMENT_CONFIG_SCOPE, {
+                [AI_MANAGEMENT_CONFIG_KEY]: JSON.stringify(aiManagementConfig),
+            }).catch(() => {
+                /* ignore save errors */
+            });
+        }
+
+        function getAiManagementConfigSummary(config) {
+            const safeConfig = normalizeAiManagementConfig(config);
+            const channels = safeConfig.channels.length ? safeConfig.channels.join(', ') : 'geen kanalen';
+            const databaseLine = safeConfig.databaseDynamic ? 'database dynamisch bijhouden' : 'database niet aanpassen';
+            const agendaLine = safeConfig.agendaDynamic ? 'agenda dynamisch volhouden' : 'agenda niet aanpassen';
+            return `Doel: ${safeConfig.goal}. Toegestaan: ${channels}. ${databaseLine}; ${agendaLine}.`;
+        }
+
         function getAiManagementInstruction(value) {
             return normalizeAiManagementMode(value) === 'personnel'
                 ? 'AI-beheermodus: personeel. Focus op medewerkers, planning, agenda, rollen, bevestigingsmails en personeelsprocessen.'
-                : 'AI-beheermodus: autonoom. Focus op het behalen van het doel via alle beschikbare tools, zoals coldcalling, coldmailing, advertenties, agenda, leads en software-acties. Laat de AI zelf bepalen welke route nodig is.';
+                : `AI-beheermodus: autonoom. ${getAiManagementConfigSummary(aiManagementConfig)}`;
         }
 
         function getAiManagementStatus(value) {
@@ -1936,6 +2175,7 @@
                 mode: aiManagementMode,
                 label: getAiManagementLabel(aiManagementMode),
                 instruction: getAiManagementInstruction(aiManagementMode),
+                config: normalizeAiManagementConfig(aiManagementConfig),
                 status,
             };
         }
@@ -1944,6 +2184,12 @@
             getContext: getActiveAiManagementContext,
             getMode() {
                 return aiManagementMode;
+            },
+            getConfig() {
+                return normalizeAiManagementConfig(aiManagementConfig);
+            },
+            openConfig() {
+                openAiManagementConfigModal();
             },
             setMode(value) {
                 applyAiManagementMode(value);
@@ -1987,6 +2233,59 @@
                 option.classList.toggle('is-active', isActive);
                 option.setAttribute('aria-checked', isActive ? 'true' : 'false');
             });
+        }
+
+        function syncAiManagementConfigForm() {
+            const config = normalizeAiManagementConfig(aiManagementConfig);
+            if (aiManagementGoalInput) {
+                aiManagementGoalInput.value = config.goal;
+            }
+            aiManagementConfigChannelInputs.forEach((input) => {
+                input.checked = config.channels.includes(input.getAttribute('data-ai-config-channel'));
+            });
+            aiManagementConfigToggleInputs.forEach((input) => {
+                const key = input.getAttribute('data-ai-config-toggle');
+                input.checked = config[key] !== false;
+            });
+        }
+
+        function readAiManagementConfigForm() {
+            const channels = aiManagementConfigChannelInputs
+                .filter((input) => input.checked)
+                .map((input) => input.getAttribute('data-ai-config-channel'))
+                .filter(Boolean);
+            const nextConfig = {
+                goal: aiManagementGoalInput ? aiManagementGoalInput.value : '',
+                channels,
+                databaseDynamic: true,
+                agendaDynamic: true,
+            };
+            aiManagementConfigToggleInputs.forEach((input) => {
+                const key = input.getAttribute('data-ai-config-toggle');
+                if (key) nextConfig[key] = input.checked;
+            });
+            return normalizeAiManagementConfig(nextConfig);
+        }
+
+        function openAiManagementConfigModal() {
+            if (!aiManagementConfigModal) return;
+            syncAiManagementConfigForm();
+            aiManagementConfigModal.hidden = false;
+            window.setTimeout(() => {
+                if (aiManagementGoalInput) aiManagementGoalInput.focus();
+            }, 0);
+        }
+
+        function closeAiManagementConfigModal() {
+            if (!aiManagementConfigModal) return;
+            aiManagementConfigModal.hidden = true;
+        }
+
+        function saveAiManagementConfigFromForm() {
+            aiManagementConfig = readAiManagementConfigForm();
+            persistAiManagementConfig();
+            closeAiManagementConfigModal();
+            emitAiManagementContextChange();
         }
 
         function closeDashboardPeriodMenu() {
@@ -2060,8 +2359,12 @@
 
             aiManagementOptions.forEach((option) => {
                 option.addEventListener('click', () => {
-                    applyAiManagementMode(option.getAttribute('data-ai-management-value'));
+                    const nextMode = option.getAttribute('data-ai-management-value');
+                    applyAiManagementMode(nextMode);
                     closeAiManagementMenu();
+                    if (normalizeAiManagementMode(nextMode) === 'software') {
+                        openAiManagementConfigModal();
+                    }
                 });
             });
 
@@ -2073,8 +2376,23 @@
 
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape') {
+                    closeAiManagementConfigModal();
                     closeAiManagementMenu();
                 }
+            });
+        }
+
+        if (aiManagementConfigModal) {
+            syncAiManagementConfigForm();
+            hydrateAiManagementConfigFromServer();
+            aiManagementConfigCloseButtons.forEach((button) => {
+                button.addEventListener('click', closeAiManagementConfigModal);
+            });
+            if (aiManagementConfigSave) {
+                aiManagementConfigSave.addEventListener('click', saveAiManagementConfigFromForm);
+            }
+            aiManagementConfigModal.addEventListener('click', (event) => {
+                if (event.target === aiManagementConfigModal) closeAiManagementConfigModal();
             });
         }
 
@@ -2157,6 +2475,31 @@
             }
 
             throw lastError || new Error('UI-state GET mislukt');
+        }
+
+        async function fetchPremiumUiStateSet(scope, values) {
+            const encodedScope = encodeURIComponent(String(scope || ''));
+            const urls = [
+                `/api/ui-state-set?scope=${encodedScope}`,
+                `/api/ui-state/${encodedScope}`
+            ];
+            let lastError = null;
+
+            for (const url of urls) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ values: values && typeof values === 'object' ? values : {} }),
+                    });
+                    if (!res.ok) throw new Error(`UI-state SET mislukt (${res.status})`);
+                    return await res.json().catch(() => ({}));
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error('UI-state SET mislukt');
         }
 
         function parsePremiumOrdersFromState(values) {
