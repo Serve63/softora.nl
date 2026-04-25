@@ -24,26 +24,29 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
     /class="dashboard-lead-legend-strip"[\s\S]*class="lead-type-legend"[\s\S]*Bedrijfssoftware[\s\S]*Voicesoftware[\s\S]*Chatbots/s
   );
   assert.match(pageSource, /class="dashboard-ai-management-status-panel"/);
-  assert.match(pageSource, /Dit is AI aan het doen/);
+  assert.match(pageSource, /AI beheer · live simulatie/);
+  assert.match(pageSource, /Autopilot cockpit voor een volle agenda/);
+  assert.match(pageSource, /Mockdata actief/);
+  assert.match(pageSource, /Geen echte calls/);
+  assert.match(pageSource, /Geen agenda-mutaties/);
   assert.doesNotMatch(pageSource, /AI geeft ieder uur 1 update over haar plan/);
   assert.doesNotMatch(pageSource, /zodat klanten niet zomaar lastiggevallen worden/);
   assert.doesNotMatch(pageSource, /dashboard-ai-management-status-text/);
-  assert.match(pageSource, /class="dashboard-ai-management-timeline"/);
-  assert.match(pageSource, /Template tijdlijn AI updates/);
-  assert.match(pageSource, /13:00[\s\S]*14:00[\s\S]*15:00[\s\S]*16:00[\s\S]*17:00[\s\S]*18:00/);
-  assert.match(pageSource, /AI sluit af met een dagrapport/);
-  assert.match(pageSource, /\.dashboard-ai-management-timeline-item::before \{[\s\S]*border-left:\s*1px dashed/s);
+  assert.match(pageSource, /class="ai-operator-stage-list"/);
+  assert.match(pageSource, /Agenda-capaciteit lezen[\s\S]*Fictieve leads scoren[\s\S]*Mock coldcalling plannen[\s\S]*Concept-afspraken vullen/s);
+  assert.match(pageSource, /function renderAiOperatorSimulation\(forceFeed = false\) \{/);
+  assert.match(pageSource, /function syncAiOperatorRuntime\(\) \{/);
   assert.match(
     pageSource,
-    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-ai-management-status-panel \{[\s\S]*display:\s*block;[\s\S]*order:\s*5;[\s\S]*margin-top:\s*1\.5rem;/s
+    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-ai-management-status-panel \{[\s\S]*display:\s*block;[\s\S]*order:\s*2;[\s\S]*margin-top:\s*0;/s
   );
   assert.match(
     pageSource,
-    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-lead-legend-strip \{[\s\S]*order:\s*2;[\s\S]*margin-bottom:\s*1\.5rem;/s
+    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.kpi-grid,[\s\S]*html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.content-grid,[\s\S]*html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-lead-legend-strip,[\s\S]*html\[data-ai-management-mode="software"\] #dashboardPeriodDropdown \{[\s\S]*display:\s*none;/s
   );
   assert.match(
     pageSource,
-    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.kpi-grid \{[\s\S]*order:\s*3;/s
+    /Live autopilot-simulatie met fictieve klanten en mock-acties/
   );
 });
 
@@ -138,7 +141,6 @@ test('premium dashboard opent AI beheer configuratie met doel en toegestane midd
   assert.match(pageSource, /async function fetchPremiumUiStateSet\(scope, values\)/);
   assert.match(pageSource, /function openAiManagementConfigModal\(\)/);
   assert.match(pageSource, /function saveAiManagementConfigFromForm\(\)/);
-  assert.match(pageSource, /if \(normalizeAiManagementMode\(nextMode\) === 'software'\) \{/);
-  assert.match(pageSource, /openAiManagementConfigModal\(\);/);
+  assert.doesNotMatch(pageSource, /if \(normalizeAiManagementMode\(nextMode\) === 'software'\) \{[\s\S]*openAiManagementConfigModal\(\);[\s\S]*\}/);
   assert.match(pageSource, /config: normalizeAiManagementConfig\(aiManagementConfig\)/);
 });
