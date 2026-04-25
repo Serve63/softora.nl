@@ -237,6 +237,10 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
 
   assert.match(pageSource, /const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';/);
   assert.match(pageSource, /const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';/);
+  assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';/);
+  assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';/);
+  assert.match(pageSource, /function getCampaignSettingsScope\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_SCOPE : COLDMAILING_SETTINGS_SCOPE;\s*\}/);
+  assert.match(pageSource, /function getCampaignSettingsKey\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_KEY : COLDMAILING_SETTINGS_KEY;\s*\}/);
   assert.match(pageSource, /function collectColdmailingSettings\(\)/);
   assert.match(pageSource, /senderEmail: senderSelect \? senderSelect\.value : ''/);
   assert.match(pageSource, /specialAction: specialActionSelect \? specialActionSelect\.value : ''/);
@@ -248,7 +252,10 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /\/api\/ui-state\//);
   assert.match(pageSource, /function saveColdmailingUiState\(scope, values\)/);
   assert.match(pageSource, /\/api\/ui-state-set\?scope=/);
-  assert.match(pageSource, /\[COLDMAILING_SETTINGS_KEY\]: JSON\.stringify\(settings\)/);
+  assert.match(pageSource, /\[getCampaignSettingsKey\(\)\]: JSON\.stringify\(settings\)/);
+  assert.match(pageSource, /saveColdmailingUiState\(getCampaignSettingsScope\(\),/);
+  assert.match(pageSource, /fetchColdmailingUiState\(getCampaignSettingsScope\(\)\)/);
+  assert.match(pageSource, /values\[getCampaignSettingsKey\(\)\]/);
   assert.match(pageSource, /function hydrateColdmailingSettingsFromSupabase\(\)/);
   assert.match(pageSource, /function bindColdmailingSettingsPersistence\(\)/);
   assert.match(pageSource, /\['campaignSenderEmail', 'campaignSpecialAction', 'coldcallingStack'\]/);

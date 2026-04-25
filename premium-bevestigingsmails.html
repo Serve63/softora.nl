@@ -1459,6 +1459,8 @@ const CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
+const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';
+const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';
 const COLDMAIL_TEST_COMPANIES = ['mcv e-commerce'];
 const COLDMAIL_AUTO_REPLY_ENABLED = false;
 let coldmailingSettingsSaveTimer = null;
@@ -1821,6 +1823,14 @@ function collectColdmailingSettings() {
   });
 }
 
+function getCampaignSettingsScope() {
+  return isPremiumAiLeadGeneratorPath() ? LEAD_GENERATOR_SETTINGS_SCOPE : COLDMAILING_SETTINGS_SCOPE;
+}
+
+function getCampaignSettingsKey() {
+  return isPremiumAiLeadGeneratorPath() ? LEAD_GENERATOR_SETTINGS_KEY : COLDMAILING_SETTINGS_KEY;
+}
+
 async function fetchColdmailingUiState(scope) {
   const encodedScope = encodeURIComponent(String(scope || ''));
   const urls = [
@@ -1867,8 +1877,8 @@ function persistColdmailingSettingsSoon() {
   if (coldmailingSettingsSaveTimer) window.clearTimeout(coldmailingSettingsSaveTimer);
   coldmailingSettingsSaveTimer = window.setTimeout(() => {
     const settings = collectColdmailingSettings();
-    saveColdmailingUiState(COLDMAILING_SETTINGS_SCOPE, {
-      [COLDMAILING_SETTINGS_KEY]: JSON.stringify(settings),
+    saveColdmailingUiState(getCampaignSettingsScope(), {
+      [getCampaignSettingsKey()]: JSON.stringify(settings),
     }).catch(() => {
       /* De campagne zelf blijft werken; alleen voorkeur bewaren is mislukt. */
     });
@@ -1888,9 +1898,9 @@ function applyColdmailingSettings(settings) {
 
 async function hydrateColdmailingSettingsFromSupabase() {
   try {
-    const data = await fetchColdmailingUiState(COLDMAILING_SETTINGS_SCOPE);
+    const data = await fetchColdmailingUiState(getCampaignSettingsScope());
     const values = data && data.values && typeof data.values === 'object' ? data.values : {};
-    const rawSettings = JSON.parse(String(values[COLDMAILING_SETTINGS_KEY] || '{}'));
+    const rawSettings = JSON.parse(String(values[getCampaignSettingsKey()] || '{}'));
     applyColdmailingSettings(rawSettings);
   } catch (_) {
     /* Voorkeuren zijn optioneel; default formulier blijft bruikbaar. */
