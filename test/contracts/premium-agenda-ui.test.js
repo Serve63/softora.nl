@@ -94,6 +94,9 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /data-manual-kind="meeting"/);
   assert.match(pageSource, /data-manual-kind="overig"/);
   assert.doesNotMatch(pageSource, /id="manualAppointmentCancelBtn"/);
+  assert.match(pageSource, /class="modal manual-appointment-modal"[^>]*data-manual-step="kind"/);
+  assert.match(pageSource, /\.manual-appointment-modal\[data-manual-step="meeting"\] #manualAppointmentCancelBtn \{[\s\S]*display: none !important;/);
+  assert.match(pageSource, /manualAppointmentModal\.setAttribute\('data-manual-step', manualAppointmentStep\);/);
   assert.match(pageSource, /Welke meeting\?/);
   assert.match(pageSource, /data-manual-meeting-type="website"/);
   assert.match(pageSource, /data-manual-meeting-type="business"/);

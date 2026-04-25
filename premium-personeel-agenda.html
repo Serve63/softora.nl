@@ -278,6 +278,9 @@
         .manual-appointment-modal .modal-footer {
             padding: 0.5rem 1.35rem 1.15rem;
         }
+        .manual-appointment-modal[data-manual-step="meeting"] #manualAppointmentCancelBtn {
+            display: none !important;
+        }
 
         .day-number {
             font-family: 'Oswald', sans-serif; font-size: 0.78rem; font-weight: 500;
@@ -1301,7 +1304,7 @@
 </div>
 
 <div class="modal-overlay" id="manualAppointmentOverlay" aria-hidden="true">
-    <div class="modal manual-appointment-modal" role="dialog" aria-modal="true" aria-labelledby="manualAppointmentTitle">
+    <div class="modal manual-appointment-modal" role="dialog" aria-modal="true" aria-labelledby="manualAppointmentTitle" data-manual-step="kind">
         <div class="modal-top">
             <div>
                 <div class="modal-type-badge meeting" id="manualAppointmentTitle">Afspraak toevoegen</div>
@@ -1551,6 +1554,7 @@
     const modalSecondaryBtn = document.getElementById('modalSecondaryBtn');
     const modalCloseBtn = document.getElementById('modalCloseBtn');
     const manualAppointmentOverlay = document.getElementById('manualAppointmentOverlay');
+    const manualAppointmentModal = manualAppointmentOverlay ? manualAppointmentOverlay.querySelector('.manual-appointment-modal') : null;
     const manualAppointmentDateLine = document.getElementById('manualAppointmentDateLine');
     const manualAppointmentTimeEl = document.getElementById('manualAppointmentTime');
     const manualAppointmentActivityTimeEl = document.getElementById('manualAppointmentActivityTime');
@@ -2320,6 +2324,9 @@
         Object.keys(panels).forEach(function (key) {
             if (panels[key]) panels[key].hidden = key !== manualAppointmentStep;
         });
+        if (manualAppointmentModal) {
+            manualAppointmentModal.setAttribute('data-manual-step', manualAppointmentStep);
+        }
         if (manualAppointmentBackBtn) {
             manualAppointmentBackBtn.hidden = manualAppointmentStep === 'kind';
         }
