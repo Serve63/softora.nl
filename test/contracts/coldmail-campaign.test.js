@@ -138,10 +138,10 @@ test('coldmail campaign attaches webdesign photo inline and as attachment', asyn
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
-  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments.length, 1);
   assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-prospect-1@softora');
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
   assert.equal(sentMessages[0].attachments[0].contentType, 'image/png');
-  assert.equal(sentMessages[0].attachments[1].filename, sentMessages[0].attachments[0].filename);
 });
 
 test('coldmail campaign refuses webdesign action when photo is missing', async () => {

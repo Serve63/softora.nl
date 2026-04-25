@@ -531,11 +531,7 @@ function createColdmailCampaignService(deps = {}) {
               content: webdesignPhoto.content,
               contentType: webdesignPhoto.contentType,
               cid: webdesignPhoto.cid,
-            },
-            {
-              filename: webdesignPhoto.filename,
-              content: webdesignPhoto.content,
-              contentType: webdesignPhoto.contentType,
+              contentDisposition: 'inline',
             },
           ]
         : undefined;
