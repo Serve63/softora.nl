@@ -101,6 +101,8 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /preview-media" style="max-width:\$\{frameW\}px;"/);
   assert.match(source, /id="preview-image" alt="Website preview \$\{safeHost\}" style="width:100%;height:auto;display:block;"/);
   assert.match(source, /\/api\/website-preview-library/);
+  assert.match(source, /function fetchLibraryEntryById/);
+  assert.match(source, /\/api\/website-preview-library\/\$\{encodeURIComponent\(entryId\)\}/);
   assert.doesNotMatch(source, /softora_website_preview_library_v1/);
   assert.doesNotMatch(source, /LIBRARY_STORAGE_KEY/);
   assert.doesNotMatch(source, /readLocalLibraryEntries/);
@@ -144,6 +146,9 @@ test('website preview batch runs server-side and exposes poll route', () => {
 
   assert.match(batchSvc, /createWebsitePreviewBatchCoordinator/);
   assert.match(batchSvc, /persistPreviewLibraryEntry/);
+  assert.match(batchSvc, /ITEM_TIMEOUT_MS/);
+  assert.match(batchSvc, /queueJobProcessing/);
+  assert.match(batchSvc, /withTimeout/);
   assert.match(batchRoutes, /app\.post\('\/api\/website-preview\/batch'/);
   assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/current'/);
   assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/:jobId'/);
@@ -151,4 +156,5 @@ test('website preview batch runs server-side and exposes poll route', () => {
   assert.match(aiTools, /runWebsitePreviewGeneratePipeline/);
   assert.match(featureRoutes, /registerWebsitePreviewBatchRoutes/);
   assert.match(library, /persistPreviewLibraryEntry/);
+  assert.match(library, /getLibraryEntryResponse/);
 });

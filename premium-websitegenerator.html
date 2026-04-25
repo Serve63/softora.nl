@@ -590,6 +590,28 @@ async function removeLibraryEntry(id, ev) {
   showToast('Verwijderen kan alleen vanuit de centrale bibliotheek.');
 }
 
+async function fetchLibraryEntryById(id) {
+  const entryId = String(id || '').trim();
+  if (!entryId || !websiteGeneratorAuthState.authenticated) return null;
+  try {
+    const response = await fetch(`/api/website-preview-library/${encodeURIComponent(entryId)}`, {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && data?.ok && data.entry?.id) {
+      const entry = data.entry;
+      const merged = [entry, ...(websitePreviewLibraryRemoteEntries || []).filter((x) => x.id !== entry.id)];
+      websitePreviewLibraryRemoteEntries = merged;
+      websitePreviewLibraryUseRemote = true;
+      return entry;
+    }
+  } catch (_) {}
+  return null;
+}
+
 function openLibraryEntry(id) {
   const entry = loadLibraryEntries().find((x) => x.id === id);
   if (!entry || !entry.dataUrl) {
@@ -1017,7 +1039,10 @@ async function renderBatchJobProgress(job) {
       stack.appendChild(row);
     } else if (st === 'done') {
       const entryId = String(it.libraryEntryId || '').trim();
-      const entry = entryId ? entries.find((e) => String(e.id) === entryId) : null;
+      let entry = entryId ? entries.find((e) => String(e.id) === entryId) : null;
+      if (entryId && (!entry || !isSafeLibraryDataUrl(entry.dataUrl))) {
+        entry = await fetchLibraryEntryById(entryId);
+      }
       if (entry && isSafeLibraryDataUrl(entry.dataUrl)) {
         const blockId = newPreviewBlockId();
         const w = Number(entry.width) || WEBSITE_PREVIEW_IMAGE_WIDTH;
@@ -1031,7 +1056,12 @@ async function renderBatchJobProgress(job) {
           entry.fileName || `${host}-preview.png`
         );
       } else {
-        stack.appendChild(createBatchLoadingRow(`${host} (preview laden…)`));
+        const row = document.createElement('div');
+        row.className = 'preview-zone';
+        row.innerHTML = `<div class="empty-state" style="padding:20px;margin:0;border:1px solid var(--border);border-radius:8px">
+          <p><strong>${escapeHtml(host)}</strong><br><span style="color:var(--text-mid)">Preview is opgeslagen, maar kon niet direct worden geladen. Open hem via Bibliotheek.</span></p>
+        </div>`;
+        stack.appendChild(row);
       }
     }
   }

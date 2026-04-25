@@ -307,8 +307,62 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     }
   }
 
+  async function getLibraryEntryResponse(req, res) {
+    const rawId = normalizeString(req.params?.id || '');
+    const entryId = decodeURIComponent(rawId);
+
+    if (!isValidEntryId(entryId)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Ongeldig item',
+        detail: 'Geen geldige bibliotheek-id.',
+      });
+    }
+
+    if (!isSupabaseConfigured()) {
+      return res.status(503).json({
+        ok: false,
+        error: 'Bibliotheek is niet beschikbaar',
+        detail: 'Supabase is niet geconfigureerd voor deze omgeving.',
+      });
+    }
+
+    try {
+      const ownerSlug = buildOwnerSlug(req);
+      const stateKey = buildStateKey(ownerSlug, entryId);
+      const result = await fetchSupabaseRowByKeyViaRest(stateKey, 'state_key,payload,updated_at');
+      const row = Array.isArray(result.body) ? result.body[0] || null : null;
+      if (!result.ok || !row) {
+        return res.status(404).json({
+          ok: false,
+          error: 'Niet gevonden',
+          detail: 'Dit item bestaat niet (meer) in je bibliotheek.',
+        });
+      }
+
+      const entry = mapSupabaseRowToClientEntry(row);
+      if (!entry.id || !entry.dataUrl || !entry.dataUrl.startsWith('data:image/')) {
+        return res.status(404).json({
+          ok: false,
+          error: 'Niet gevonden',
+          detail: 'Dit item bevat geen geldige previewafbeelding.',
+        });
+      }
+
+      return res.status(200).json({ ok: true, entry });
+    } catch (error) {
+      logger.error('[WebsitePreviewLibrary][GetCrash]', error?.message || error);
+      return res.status(500).json({
+        ok: false,
+        error: 'Bibliotheekitem laden mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
   return {
     listLibraryResponse,
+    getLibraryEntryResponse,
     saveLibraryResponse,
     deleteLibraryResponse,
     persistPreviewLibraryEntry,

@@ -12,6 +12,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
   const JOB_TTL_MS = 6 * 60 * 60 * 1000;
   const MAX_JOBS = 200;
   const MAX_URLS = 50;
+  const ITEM_TIMEOUT_MS = 2 * 60 * 1000;
 
   function ownerKeyFromReq(req) {
     const email = normalizeString(req?.premiumAuth?.email || '').toLowerCase();
@@ -97,6 +98,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       error: job.error || null,
       createdAt: job.createdAt,
       finishedAt: job.finishedAt || null,
+      processing: Boolean(job.processing),
     };
   }
 
@@ -111,6 +113,35 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     return latest;
   }
 
+  function withTimeout(promise, timeoutMs, message) {
+    let timer = null;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    });
+    return Promise.race([promise, timeout]).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+  }
+
+  function queueJobProcessing(jobId) {
+    const job = jobs.get(jobId);
+    if (!job || job.status !== 'running' || job.processing) return;
+    job.processing = true;
+    job.processingStartedAt = Date.now();
+    setImmediate(() => {
+      processJob(jobId).catch((err) => {
+        const currentJob = jobs.get(jobId);
+        if (currentJob && currentJob.status === 'running') {
+          currentJob.status = 'error';
+          currentJob.error = String(err?.message || err || 'Batch mislukt');
+          currentJob.finishedAt = Date.now();
+          currentJob.processing = false;
+        }
+        logger.error('[WebsitePreviewBatch][processJob]', err?.message || err);
+      });
+    });
+  }
+
   async function processJob(jobId) {
     const job = jobs.get(jobId);
     if (!job || job.status !== 'running') return;
@@ -120,6 +151,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       job.status = 'error';
       job.error = 'Serverconfiguratie ontbreekt voor batchverwerking.';
       job.finishedAt = Date.now();
+      job.processing = false;
       return;
     }
 
@@ -128,6 +160,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       job.status = 'error';
       job.error = 'Bibliotheek-coördinator ontbreekt.';
       job.finishedAt = Date.now();
+      job.processing = false;
       return;
     }
 
@@ -138,7 +171,11 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
         job.currentIndex = i;
 
         try {
-          const payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(item.url);
+          const payload = await withTimeout(
+            aiToolsCoordinator.runWebsitePreviewGeneratePipeline(item.url),
+            ITEM_TIMEOUT_MS,
+            'Preview genereren duurde te lang. Probeer opnieuw of scan een lichtere URL.'
+          );
           const img = payload?.image;
           const dataUrl = String(img?.dataUrl || '').trim();
           if (!dataUrl) {
@@ -178,6 +215,8 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       job.error = String(fatal?.message || fatal || 'Batch mislukt');
       job.finishedAt = Date.now();
       logger.error('[WebsitePreviewBatch][Fatal]', fatal?.message || fatal);
+    } finally {
+      job.processing = false;
     }
   }
 
@@ -238,15 +277,13 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       error: null,
       createdAt: Date.now(),
       finishedAt: null,
+      processing: false,
+      processingStartedAt: null,
     };
 
     jobs.set(jobId, job);
 
-    setImmediate(() => {
-      processJob(jobId).catch((err) => {
-        logger.error('[WebsitePreviewBatch][processJob]', err?.message || err);
-      });
-    });
+    queueJobProcessing(jobId);
 
     return res.status(202).json({
       ok: true,
@@ -283,6 +320,10 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       });
     }
 
+    if (job.status === 'running' && !job.processing) {
+      queueJobProcessing(job.id);
+    }
+
     return res.status(200).json({
       ok: true,
       job: serializeJob(job),
@@ -292,6 +333,9 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
   async function getCurrentBatchResponse(req, res) {
     pruneJobs();
     const job = findLatestRunningJobForOwner(ownerKeyFromReq(req));
+    if (job && !job.processing) {
+      queueJobProcessing(job.id);
+    }
     return res.status(200).json({
       ok: true,
       job: job ? serializeJob(job) : null,

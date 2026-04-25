@@ -170,6 +170,39 @@ test('website preview library coordinator lists entries for same owner prefix', 
   assert.equal(res.body.entries[0].hostname, 'example.nl');
 });
 
+test('website preview library coordinator loads one full entry by id', async () => {
+  const { coordinator, rowsByPrefix } = createFixture();
+  rowsByPrefix.push({
+    state_key: 'core:website_preview_lib:demo-at-user-nl:aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+    payload: {
+      type: 'website_preview_library',
+      id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      dataUrl: `data:image/png;base64,${'A'.repeat(4 * 1024 * 1024)}`,
+      url: 'https://full.example.nl/',
+      hostname: 'full.example.nl',
+      fileName: 'full.png',
+      width: 1024,
+      height: 1536,
+      createdAt: '2026-01-01T12:00:00.000Z',
+    },
+    updated_at: '2026-01-01T12:00:00.000Z',
+  });
+
+  const res = createResponseRecorder();
+  await coordinator.getLibraryEntryResponse(
+    {
+      params: { id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' },
+      premiumAuth: { email: 'demo@user.nl' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.entry.hostname, 'full.example.nl');
+  assert.match(res.body.entry.dataUrl, /^data:image\/png;base64,A+/);
+});
+
 test('website preview library coordinator keeps list responses small when stored previews are huge', async () => {
   const { coordinator, rowsByPrefix } = createFixture();
   rowsByPrefix.push({
