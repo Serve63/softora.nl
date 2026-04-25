@@ -183,6 +183,31 @@ test('premium bevestigingsmails replaces sender detail fields with compact dropd
   assert.doesNotMatch(pageSource, /Antwoord snelheid/);
 });
 
+test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';/);
+  assert.match(pageSource, /const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';/);
+  assert.match(pageSource, /function collectColdmailingSettings\(\)/);
+  assert.match(pageSource, /senderEmail: senderSelect \? senderSelect\.value : ''/);
+  assert.match(pageSource, /specialAction: specialActionSelect \? specialActionSelect\.value : ''/);
+  assert.match(pageSource, /coldcallingStack: stackSelect \? stackSelect\.value : ''/);
+  assert.match(pageSource, /function fetchColdmailingUiState\(scope\)/);
+  assert.match(pageSource, /\/api\/ui-state-get\?scope=/);
+  assert.match(pageSource, /\/api\/ui-state\//);
+  assert.match(pageSource, /function saveColdmailingUiState\(scope, values\)/);
+  assert.match(pageSource, /\/api\/ui-state-set\?scope=/);
+  assert.match(pageSource, /\[COLDMAILING_SETTINGS_KEY\]: JSON\.stringify\(settings\)/);
+  assert.match(pageSource, /function hydrateColdmailingSettingsFromSupabase\(\)/);
+  assert.match(pageSource, /function bindColdmailingSettingsPersistence\(\)/);
+  assert.match(pageSource, /\['campaignSenderEmail', 'campaignSpecialAction', 'coldcallingStack'\]/);
+  assert.match(
+    pageSource,
+    /initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\);/
+  );
+});
+
 test('premium bevestigingsmails exposes coldcalling provider choice inside lead-generator settings', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -199,7 +224,7 @@ test('premium bevestigingsmails exposes coldcalling provider choice inside lead-
   assert.match(pageSource, /select\.value = normalizeColdcallingStack\(select\.value\);/);
   assert.match(
     pageSource,
-    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*initColdmailingMailboxOptions\(\)\.finally\(initCampaignSelects\);/
+    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\);/
   );
   assert.match(pageSource, /providerLabel \+ ' wordt klaargezet voor deze campagne/);
   assert.match(pageSource, /Provider: ' \+ getSelectedColdcallingStackLabel\(\) \+ '\.'/);

@@ -1417,6 +1417,9 @@ Softora.nl | +31 6 2991 7185</textarea>
 // ── DATA ──
 let bedrijven = [];
 let activeZone = 0;
+const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
+const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
+let coldmailingSettingsSaveTimer = null;
 
 function isPremiumAiLeadGeneratorPath() {
   try {
@@ -1458,6 +1461,121 @@ function formatCampaignDurationLabel(value) {
 function getSelectedCampaignDurationDays() {
   const select = document.getElementById('campaignDurationDays');
   return normalizeCampaignDurationDays(select ? select.value : 14);
+}
+
+function normalizeColdmailingSettings(value) {
+  const raw = value && typeof value === 'object' ? value : {};
+  return {
+    senderEmail: String(raw.senderEmail || '').trim().toLowerCase(),
+    specialAction: String(raw.specialAction || '').trim().toLowerCase(),
+    coldcallingStack: normalizeColdcallingStack(raw.coldcallingStack || 'retell_ai'),
+  };
+}
+
+function setSelectValueIfAvailable(select, value) {
+  if (!select || !value) return false;
+  const safeValue = String(value || '').trim();
+  if (!Array.from(select.options || []).some((option) => String(option.value) === safeValue)) return false;
+  select.value = safeValue;
+  if (typeof syncCustomSelect === 'function') syncCustomSelect(select);
+  return true;
+}
+
+function collectColdmailingSettings() {
+  const senderSelect = document.getElementById('campaignSenderEmail');
+  const specialActionSelect = document.getElementById('campaignSpecialAction');
+  const stackSelect = document.getElementById('coldcallingStack');
+  return normalizeColdmailingSettings({
+    senderEmail: senderSelect ? senderSelect.value : '',
+    specialAction: specialActionSelect ? specialActionSelect.value : '',
+    coldcallingStack: stackSelect ? stackSelect.value : '',
+  });
+}
+
+async function fetchColdmailingUiState(scope) {
+  const encodedScope = encodeURIComponent(String(scope || ''));
+  const urls = [
+    '/api/ui-state-get?scope=' + encodedScope,
+    '/api/ui-state/' + encodedScope
+  ];
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+      if (!response.ok) throw new Error('UI-state GET mislukt (' + response.status + ')');
+      return await response.json().catch(() => ({}));
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('UI-state GET mislukt');
+}
+
+async function saveColdmailingUiState(scope, values) {
+  const encodedScope = encodeURIComponent(String(scope || ''));
+  const urls = [
+    '/api/ui-state-set?scope=' + encodedScope,
+    '/api/ui-state/' + encodedScope
+  ];
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: values && typeof values === 'object' ? values : {} }),
+      });
+      if (!response.ok) throw new Error('UI-state SET mislukt (' + response.status + ')');
+      return await response.json().catch(() => ({}));
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('UI-state SET mislukt');
+}
+
+function persistColdmailingSettingsSoon() {
+  if (coldmailingSettingsSaveTimer) window.clearTimeout(coldmailingSettingsSaveTimer);
+  coldmailingSettingsSaveTimer = window.setTimeout(() => {
+    const settings = collectColdmailingSettings();
+    saveColdmailingUiState(COLDMAILING_SETTINGS_SCOPE, {
+      [COLDMAILING_SETTINGS_KEY]: JSON.stringify(settings),
+    }).catch(() => {
+      /* De campagne zelf blijft werken; alleen voorkeur bewaren is mislukt. */
+    });
+  }, 250);
+}
+
+function applyColdmailingSettings(settings) {
+  const normalized = normalizeColdmailingSettings(settings);
+  setSelectValueIfAvailable(document.getElementById('campaignSenderEmail'), normalized.senderEmail);
+  setSelectValueIfAvailable(document.getElementById('campaignSpecialAction'), normalized.specialAction);
+  setSelectValueIfAvailable(document.getElementById('coldcallingStack'), normalized.coldcallingStack);
+}
+
+async function hydrateColdmailingSettingsFromSupabase() {
+  try {
+    const data = await fetchColdmailingUiState(COLDMAILING_SETTINGS_SCOPE);
+    const values = data && data.values && typeof data.values === 'object' ? data.values : {};
+    const rawSettings = JSON.parse(String(values[COLDMAILING_SETTINGS_KEY] || '{}'));
+    applyColdmailingSettings(rawSettings);
+  } catch (_) {
+    /* Voorkeuren zijn optioneel; default formulier blijft bruikbaar. */
+  }
+}
+
+function bindColdmailingSettingsPersistence() {
+  ['campaignSenderEmail', 'campaignSpecialAction', 'coldcallingStack'].forEach((id) => {
+    const select = document.getElementById(id);
+    if (!select || select.dataset.supabaseSettingsBound === '1') return;
+    select.dataset.supabaseSettingsBound = '1';
+    select.addEventListener('change', persistColdmailingSettingsSoon);
+  });
+}
+
+async function initColdmailingSettingsPersistence() {
+  await hydrateColdmailingSettingsFromSupabase();
+  bindColdmailingSettingsPersistence();
 }
 
 function initCampaignDurationSetting() {
@@ -2363,7 +2481,10 @@ applyPremiumAiLeadGeneratorShell();
 applyPremiumAiLeadGeneratorBelmethodeRow();
 initCampaignDurationSetting();
 initLeadGeneratorProviderSetting();
-initColdmailingMailboxOptions().finally(initCampaignSelects);
+initColdmailingMailboxOptions()
+  .then(initColdmailingSettingsPersistence)
+  .catch(initColdmailingSettingsPersistence)
+  .finally(initCampaignSelects);
 </script>
 
 <!-- ZONE POPUP -->
