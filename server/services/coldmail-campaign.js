@@ -519,7 +519,6 @@ function createColdmailCampaignService(deps = {}) {
       const to = getRowEmail(row);
       const text = buildMailText(bodyTemplate, row);
       const subject = personalizeTemplate(subjectTemplate, row);
-      const entityRefId = `softora-coldmail-${item.id}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
         failed.push({
@@ -548,9 +547,6 @@ function createColdmailCampaignService(deps = {}) {
           to,
           bcc: senderEmail || undefined,
           replyTo: mailReplyTo || mailFromAddress || undefined,
-          headers: {
-            'X-Entity-Ref-ID': entityRefId,
-          },
           subject,
           text,
           html,
