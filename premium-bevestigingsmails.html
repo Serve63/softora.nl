@@ -1464,6 +1464,8 @@ let coldmailingSettingsSaveTimer = null;
 let coldmailingDatabaseRows = [];
 let campaignRecipientListTimer = null;
 let campaignDatabaseRefreshTimer = null;
+let coldmailReplySyncTimer = null;
+let coldmailReplySyncInProgress = false;
 
 function isPremiumAiLeadGeneratorPath() {
   try {
@@ -1737,6 +1739,48 @@ function initCampaignDatabaseAutoRefresh() {
   campaignDatabaseRefreshTimer = window.setInterval(() => {
     if (!document.hidden) refreshCampaignDatabaseForLatestState();
   }, 15000);
+}
+
+async function syncColdmailRepliesFromMailbox(options) {
+  if (isPremiumAiLeadGeneratorPath() || coldmailReplySyncInProgress) return null;
+  coldmailReplySyncInProgress = true;
+  try {
+    const response = await fetch('/api/coldmailing/replies/sync', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        force: Boolean(options && options.force),
+        maxMessages: 30,
+      }),
+    });
+    const payload = await response.json().catch(function () { return null; });
+    if (payload && payload.replied) {
+      showToast('✓ AI heeft ' + payload.replied + ' mailreactie(s) beantwoord');
+    }
+    return payload;
+  } catch (_) {
+    return null;
+  } finally {
+    coldmailReplySyncInProgress = false;
+  }
+}
+
+function initColdmailReplyAutoSync() {
+  if (isPremiumAiLeadGeneratorPath() || coldmailReplySyncTimer) return;
+  window.addEventListener('focus', function () {
+    void syncColdmailRepliesFromMailbox({ force: true });
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) void syncColdmailRepliesFromMailbox({ force: true });
+  });
+  coldmailReplySyncTimer = window.setInterval(function () {
+    if (!document.hidden) void syncColdmailRepliesFromMailbox();
+  }, 45000);
+  void syncColdmailRepliesFromMailbox({ force: true });
 }
 
 function normalizeColdmailingSettings(value) {
@@ -2805,6 +2849,7 @@ applyPremiumAiLeadGeneratorBelmethodeRow();
 initCampaignDurationSetting();
 initLeadGeneratorProviderSetting();
 initCampaignDatabaseAutoRefresh();
+initColdmailReplyAutoSync();
 const campaignBootTasks = [
   hydrateCampaignCompanyCountFromSupabase(),
   initColdmailingMailboxOptions()

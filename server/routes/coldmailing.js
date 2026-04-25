@@ -12,6 +12,10 @@ function registerColdmailingRoutes(app, deps = {}) {
       ok: true,
       configured: coldmailCampaignService.isSmtpMailConfigured(),
       missing: coldmailCampaignService.getMissingSmtpMailEnv(),
+      imapConfigured:
+        typeof coldmailCampaignService.isImapMailConfigured === 'function'
+          ? coldmailCampaignService.isImapMailConfigured()
+          : false,
       senderEmails: coldmailCampaignService.getAllowedSenderEmails(),
     });
   });
@@ -72,6 +76,35 @@ function registerColdmailingRoutes(app, deps = {}) {
         allowedSenderEmails: Array.isArray(error && error.allowedSenderEmails)
           ? error.allowedSenderEmails
           : undefined,
+      });
+    }
+  });
+
+  app.post('/api/coldmailing/replies/sync', async (req, res) => {
+    try {
+      if (typeof coldmailCampaignService.syncInboundColdmailRepliesFromImap !== 'function') {
+        res.status(404).json({
+          ok: false,
+          code: 'COLDMAIL_REPLY_SYNC_UNAVAILABLE',
+          message: 'Coldmail reply-sync is niet beschikbaar.',
+        });
+        return;
+      }
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await coldmailCampaignService.syncInboundColdmailRepliesFromImap({
+        force: Boolean(body.force),
+        maxMessages: body.maxMessages,
+      });
+      res.json(result);
+    } catch (error) {
+      const code = normalizeString(error && error.code) || 'COLDMAIL_REPLY_SYNC_FAILED';
+      res.status(code === 'ANTHROPIC_NOT_CONFIGURED' ? 503 : 400).json({
+        ok: false,
+        code,
+        message: truncateText(
+          normalizeString(error && error.message) || 'Coldmail replies konden niet worden verwerkt.',
+          500
+        ),
       });
     }
   });

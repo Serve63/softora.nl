@@ -276,7 +276,7 @@ test('premium bevestigingsmails exposes coldcalling provider choice inside lead-
   assert.match(pageSource, /select\.value = normalizeColdcallingStack\(select\.value\);/);
   assert.match(
     pageSource,
-    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*initCampaignDatabaseAutoRefresh\(\);\s*const campaignBootTasks = \[[\s\S]*hydrateCampaignCompanyCountFromSupabase\(\),[\s\S]*initColdmailingMailboxOptions\(\)[\s\S]*\.finally\(initCampaignSelects\),[\s\S]*\];\s*Promise\.allSettled\(campaignBootTasks\)\.finally\(finishPremiumShellBoot\);/
+    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*initCampaignDatabaseAutoRefresh\(\);\s*initColdmailReplyAutoSync\(\);\s*const campaignBootTasks = \[[\s\S]*hydrateCampaignCompanyCountFromSupabase\(\),[\s\S]*initColdmailingMailboxOptions\(\)[\s\S]*\.finally\(initCampaignSelects\),[\s\S]*\];\s*Promise\.allSettled\(campaignBootTasks\)\.finally\(finishPremiumShellBoot\);/
   );
   assert.match(pageSource, /providerLabel \+ ' wordt klaargezet voor deze campagne/);
   assert.match(pageSource, /Provider: ' \+ getSelectedColdcallingStackLabel\(\) \+ '\.'/);

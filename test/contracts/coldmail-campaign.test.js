@@ -9,6 +9,7 @@ const TINY_PNG_DATA_URL =
 function createService(overrides = {}) {
   const sentMessages = [];
   let savedState = null;
+  let replyState = overrides.replyState || { processed: {} };
   const rows = overrides.rows || [
     {
       id: 'prospect-1',
@@ -37,12 +38,25 @@ function createService(overrides = {}) {
       mailFromAddress: 'info@softora.nl',
       mailFromName: 'Softora',
       mailReplyTo: 'reply@softora.nl',
+      imapHost: overrides.imapHost || '',
+      imapPort: 993,
+      imapSecure: true,
+      imapUser: overrides.imapUser || '',
+      imapPass: overrides.imapPass || '',
+      imapMailbox: 'INBOX',
     },
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
         return {
           values: overrides.photoValues || {
             softora_database_photos_v1: JSON.stringify(overrides.photoMap || {}),
+          },
+        };
+      }
+      if (scope === 'premium_coldmail_auto_replies') {
+        return {
+          values: {
+            softora_coldmail_auto_replies_v1: JSON.stringify(replyState),
           },
         };
       }
@@ -54,6 +68,9 @@ function createService(overrides = {}) {
     },
     setUiStateValues: async (scope, values, meta) => {
       savedState = { scope, values, meta };
+      if (scope === 'premium_coldmail_auto_replies') {
+        replyState = JSON.parse(values.softora_coldmail_auto_replies_v1);
+      }
       return { ok: true };
     },
     createTransport: () => ({
@@ -63,6 +80,14 @@ function createService(overrides = {}) {
         return { messageId: `msg-${sentMessages.length}`, response: '250 ok' };
       },
     }),
+    createImapClient: overrides.createImapClient,
+    parseMailSource: overrides.parseMailSource,
+    getAnthropicApiKey: () => overrides.anthropicApiKey || '',
+    fetchJsonWithTimeout: overrides.fetchJsonWithTimeout,
+    extractAnthropicTextContent: (content) =>
+      Array.isArray(content) ? content.map((item) => item.text || '').join('\n') : String(content || ''),
+    anthropicApiBaseUrl: 'https://anthropic.example.test/v1',
+    coldmailAutoReplyModel: 'claude-sonnet-4-6',
     resolveEmailDomain: async (domain) => {
       if (overrides.invalidDomains && overrides.invalidDomains.includes(domain)) return false;
       return true;
@@ -72,7 +97,7 @@ function createService(overrides = {}) {
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
   });
 
-  return { service, sentMessages, getSavedState: () => savedState };
+  return { service, sentMessages, getSavedState: () => savedState, getReplyState: () => replyState };
 }
 
 test('coldmail campaign sends only eligible database rows and marks them as mailed', async () => {
@@ -206,6 +231,70 @@ test('coldmail campaign sends test recipient without marking database row as mai
   assert.equal(result.persisted, 0);
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');
   assert.equal(getSavedState(), null);
+});
+
+test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-1@example.test>',
+    subject: 'Re: Nieuw webdesign gemaakt!',
+    text: 'Hoi Servé, klinkt interessant. Wat zou dit ongeveer inhouden?',
+    from: { value: [{ address: 'servec321@gmail.com', name: 'Servec Test' }] },
+    to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
+    cc: { value: [] },
+    references: '<sent-1@softora>',
+  };
+  let requestedModel = '';
+  const { service, sentMessages, getReplyState } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    anthropicApiKey: 'anthropic-secret',
+    rows: [
+      {
+        id: 'test-recipient',
+        bedrijf: 'MCV E-commerce',
+        naam: 'MCV E-commerce',
+        email: 'servec321@gmail.com',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [1],
+      fetch: async function* () {
+        yield { uid: 1, source: 'raw-message', flags: new Set() };
+      },
+      messageFlagsAdd: async () => {},
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async (_url, request) => {
+      requestedModel = JSON.parse(request.body).model;
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          model: requestedModel,
+          content: [{ type: 'text', text: 'Hoi, leuk dat je reageert. Zullen we kort bellen?' }],
+          usage: { input_tokens: 10, output_tokens: 12 },
+        },
+      };
+    },
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+
+  assert.equal(result.replied, 1);
+  assert.equal(requestedModel, 'claude-sonnet-4-6');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
+  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
+  assert.equal(sentMessages[0].subject, 'Re: Nieuw webdesign gemaakt!');
+  assert.equal(sentMessages[0].inReplyTo, '<incoming-1@example.test>');
+  assert.match(sentMessages[0].text, /Zullen we kort bellen/);
+  assert.equal(Object.keys(getReplyState().processed).length, 1);
 });
 
 test('coldmail campaign keeps MCV E-commerce reusable even after earlier mailed status', async () => {
