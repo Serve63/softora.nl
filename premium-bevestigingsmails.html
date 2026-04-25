@@ -1441,6 +1441,7 @@ const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 let coldmailingSettingsSaveTimer = null;
 let coldmailingDatabaseRows = [];
 let campaignRecipientPreviewTimer = null;
+let campaignDatabaseRefreshTimer = null;
 
 function isPremiumAiLeadGeneratorPath() {
   try {
@@ -1638,6 +1639,22 @@ async function hydrateCampaignCompanyCountFromSupabase() {
   }
   renderCampaignCompanyCount();
   hydrateCampaignRecipientPreviewSoon();
+}
+
+function refreshCampaignDatabaseForLatestState() {
+  void hydrateCampaignCompanyCountFromSupabase();
+}
+
+function initCampaignDatabaseAutoRefresh() {
+  if (campaignDatabaseRefreshTimer) window.clearInterval(campaignDatabaseRefreshTimer);
+  window.addEventListener('focus', refreshCampaignDatabaseForLatestState);
+  window.addEventListener('pageshow', refreshCampaignDatabaseForLatestState);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshCampaignDatabaseForLatestState();
+  });
+  campaignDatabaseRefreshTimer = window.setInterval(() => {
+    if (!document.hidden) refreshCampaignDatabaseForLatestState();
+  }, 15000);
 }
 
 function normalizeColdmailingSettings(value) {
@@ -2678,6 +2695,7 @@ applyPremiumAiLeadGeneratorShell();
 applyPremiumAiLeadGeneratorBelmethodeRow();
 initCampaignDurationSetting();
 initLeadGeneratorProviderSetting();
+initCampaignDatabaseAutoRefresh();
 void hydrateCampaignCompanyCountFromSupabase();
 initColdmailingMailboxOptions()
   .then(initColdmailingSettingsPersistence)

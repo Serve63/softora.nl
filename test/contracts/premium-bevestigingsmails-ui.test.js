@@ -137,6 +137,10 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /const CUSTOMER_DB_SCOPE = 'premium_customers_database';/);
   assert.match(pageSource, /const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';/);
   assert.match(pageSource, /function hydrateCampaignCompanyCountFromSupabase\(\)/);
+  assert.match(pageSource, /function initCampaignDatabaseAutoRefresh\(\)/);
+  assert.match(pageSource, /window\.addEventListener\('focus', refreshCampaignDatabaseForLatestState\);/);
+  assert.match(pageSource, /document\.addEventListener\('visibilitychange'/);
+  assert.match(pageSource, /window\.setInterval\(\(\) => \{[\s\S]*refreshCampaignDatabaseForLatestState\(\);[\s\S]*\}, 15000\);/);
   assert.match(pageSource, /id="campaignRecipientPreview"/);
   assert.match(pageSource, /function hydrateCampaignRecipientPreview\(\)/);
   assert.match(pageSource, /\/api\/coldmailing\/campaigns\/recipients\?/);
@@ -145,6 +149,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function isEligibleColdcallingCampaignRow\(row\)/);
   assert.match(pageSource, /isPremiumAiLeadGeneratorPath\(\) \? isEligibleColdcallingCampaignRow : isEligibleColdmailCampaignRow/);
   assert.match(pageSource, /Math\.min\(getCampaignRequestedCompanyCount\(\) \|\| eligibleRows\.length, eligibleRows\.length\)/);
+  assert.match(pageSource, /initCampaignDatabaseAutoRefresh\(\);/);
   assert.match(pageSource, /void hydrateCampaignCompanyCountFromSupabase\(\);/);
   assert.match(pageSource, /renderCampaignCompanyCount\(\);[\s\S]*\}\s*updateSlider\(100\);/);
 });
@@ -248,7 +253,7 @@ test('premium bevestigingsmails exposes coldcalling provider choice inside lead-
   assert.match(pageSource, /select\.value = normalizeColdcallingStack\(select\.value\);/);
   assert.match(
     pageSource,
-    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);\s*initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\);/
+    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*initCampaignDatabaseAutoRefresh\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);\s*initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\);/
   );
   assert.match(pageSource, /providerLabel \+ ' wordt klaargezet voor deze campagne/);
   assert.match(pageSource, /Provider: ' \+ getSelectedColdcallingStackLabel\(\) \+ '\.'/);
