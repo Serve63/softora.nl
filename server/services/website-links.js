@@ -5,6 +5,7 @@ function createWebsiteLinkCoordinator(deps = {}) {
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     slugifyAutomationText = (value, fallback = 'pagina') => String(value || '').trim() || fallback,
     isSupabaseConfigured = () => false,
+    fetchSupabaseRowsByStateKeyPrefixViaRest = async () => ({ ok: false, body: null }),
     fetchSupabaseRowByKeyViaRest = async () => ({ ok: false, body: null }),
     upsertSupabaseRowViaRest = async () => ({ ok: false, body: null }),
     websiteLinkStateKeyPrefix = 'website_link:',
@@ -171,6 +172,55 @@ function createWebsiteLinkCoordinator(deps = {}) {
       createdAt: normalizeString(payload.createdAt || row?.updated_at || ''),
       updatedAt: normalizeString(payload.updatedAt || row?.updated_at || ''),
     };
+  }
+
+  function mapWebsiteLinkRowToClient(row) {
+    const payload = row?.payload && typeof row.payload === 'object' ? row.payload : {};
+    const slug = normalizeWebsiteLinkSlug(payload.slug || '');
+    if (!slug) return null;
+    return {
+      slug,
+      title: truncateText(normalizeString(payload.title || ''), 160) || `Softora pagina ${slug}`,
+      url: '',
+      createdAt: normalizeString(payload.createdAt || row?.updated_at || ''),
+      updatedAt: normalizeString(payload.updatedAt || row?.updated_at || ''),
+    };
+  }
+
+  async function listWebsiteLinksResponse(req, res) {
+    if (!isSupabaseConfigured()) {
+      return res.status(503).json({
+        ok: false,
+        error: 'Websitelinks laden is niet beschikbaar',
+        detail: 'Supabase is niet geconfigureerd voor deze omgeving.',
+      });
+    }
+
+    try {
+      const result = await fetchSupabaseRowsByStateKeyPrefixViaRest(websiteLinkStateKeyPrefix, 500);
+      if (!result.ok) {
+        logger.error('[WebsiteLinks][ListError]', result.error || result.status || result.body);
+        return res.status(500).json({
+          ok: false,
+          error: 'Websitelinks laden mislukt',
+          detail: 'Kon opgeslagen websitelinks niet ophalen.',
+        });
+      }
+
+      const links = (Array.isArray(result.body) ? result.body : [])
+        .map(mapWebsiteLinkRowToClient)
+        .filter(Boolean)
+        .map((link) => ({ ...link, url: buildPublishedWebsiteLinkUrl(req, link.slug) }));
+
+      return res.status(200).json({ ok: true, links });
+    } catch (error) {
+      logger.error('[WebsiteLinks][ListCrash]', error?.message || error);
+      return res.status(500).json({
+        ok: false,
+        error: 'Websitelinks laden mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
   }
 
   async function isWebsiteLinkSlugAvailable(slugRaw) {
@@ -385,6 +435,7 @@ function createWebsiteLinkCoordinator(deps = {}) {
     buildSafeHtmlDocument,
     buildWebsiteLinkStateKey,
     getPublishedWebsiteLinkBySlug,
+    listWebsiteLinksResponse,
     normalizeWebsiteLinkSlug,
     saveWebsiteLinkResponse,
     sendPublishedWebsiteLinkResponse,

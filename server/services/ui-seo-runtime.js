@@ -222,6 +222,7 @@ function createUiSeoRuntime(deps = {}) {
     truncateText,
     slugifyAutomationText,
     isSupabaseConfigured,
+    fetchSupabaseRowsByStateKeyPrefixViaRest,
     fetchSupabaseRowByKeyViaRest,
     upsertSupabaseRowViaRest,
     websiteLinkStateKeyPrefix,

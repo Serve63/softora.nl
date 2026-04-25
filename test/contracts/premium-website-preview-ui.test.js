@@ -42,7 +42,10 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.doesNotMatch(source, /id="website-link-html"/);
   assert.doesNotMatch(source, /id="website-link-slug"/);
   assert.doesNotMatch(source, /Gegenereerde websitegenerator preview/);
-  assert.match(source, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*\) \{\s*return;\s*\}/);
+  assert.match(source, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*!websiteLinkListEl[\s\S]*\) \{\s*return;\s*\}/);
+  assert.match(source, /id="website-link-list"/);
+  assert.match(source, /window\.open\('about:blank', '_blank'\)/);
+  assert.match(source, /\/api\/website-links'/);
   assert.match(source, /\/api\/website-links\/create/);
 });
 

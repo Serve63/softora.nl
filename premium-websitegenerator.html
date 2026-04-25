@@ -162,6 +162,13 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
 .textarea-code { width: 100%; min-height: 280px; padding: 14px; border: 1px solid var(--border); border-radius: 5px; font-family: monospace; font-size: 12px; color: var(--text-dark); background: #fafafa; outline: none; resize: vertical; transition: border-color .15s; line-height: 1.6; }
 .textarea-code:focus { border-color: var(--crimson); background: #fff; }
 .link-url { font-family: monospace; font-size: 13px; color: var(--crimson); flex: 1; word-break: break-all; }
+.website-link-list { margin-top: 18px; display: grid; gap: 10px; }
+.website-link-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 7px; background: #fff; }
+.website-link-row-main { min-width: 0; display: grid; gap: 4px; }
+.website-link-row-title { font-size: 13px; font-weight: 700; color: var(--text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.website-link-row-url { font-family: monospace; font-size: 11px; color: var(--crimson); overflow-wrap: anywhere; }
+.website-link-row-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.website-link-row-actions .btn { padding: 7px 11px; font-size: 10px; letter-spacing: .7px; }
 
 /* BIBLIOTHEEK (opgeslagen preview-foto's) */
 .library-grid {
@@ -407,6 +414,12 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
         <button class="btn outline" id="website-link-copy" type="button" hidden>Kopieer websitelink</button>
       </div>
       <div id="website-link-status" style="margin-top:12px;font-size:12px;color:#c0392b;">Log in om websitelinks aan te maken.</div>
+      <div style="margin-top:24px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-light);">Aangemaakte websitelinks</div>
+      <div id="website-link-list" class="website-link-list">
+        <div class="empty-state" style="padding:22px;">
+          <p>Log in om opgeslagen websitelinks te bekijken.</p>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1376,13 +1389,63 @@ loadWebsiteGeneratorAuthState();
   const websiteLinkCreateEl = document.getElementById('website-link-create-btn');
   const websiteLinkStatusEl = document.getElementById('website-link-status');
   const websiteLinkCopyEl = document.getElementById('website-link-copy');
-  if (!urlInput || !htmlInput || !websiteLinkCreateEl || !websiteLinkStatusEl || !websiteLinkCopyEl) { return; }
+  const websiteLinkListEl = document.getElementById('website-link-list');
+  if (!urlInput || !htmlInput || !websiteLinkCreateEl || !websiteLinkStatusEl || !websiteLinkCopyEl || !websiteLinkListEl) { return; }
 
   let latestWebsiteLinkUrl = '';
 
   function setWebsiteLinkStatus(message, isError = false) {
     websiteLinkStatusEl.textContent = String(message || '');
     websiteLinkStatusEl.style.color = isError ? '#c0392b' : 'var(--text-mid)';
+  }
+
+  function renderWebsiteLinks(links) {
+    const normalizedLinks = Array.isArray(links) ? links : [];
+    if (!websiteGeneratorAuthState.authenticated) {
+      websiteLinkListEl.innerHTML = '<div class="empty-state" style="padding:22px;"><p>Log in om opgeslagen websitelinks te bekijken.</p></div>';
+      return;
+    }
+    if (!normalizedLinks.length) {
+      websiteLinkListEl.innerHTML = '<div class="empty-state" style="padding:22px;"><p>Nog geen websitelinks. Plak HTML-code en maak je eerste live pagina aan.</p></div>';
+      return;
+    }
+    websiteLinkListEl.innerHTML = normalizedLinks.map((link) => {
+      const title = escapeHtml(link.title || link.slug || 'Softora pagina');
+      const url = escapeHtml(link.url || '');
+      return `
+        <div class="website-link-row">
+          <div class="website-link-row-main">
+            <div class="website-link-row-title" title="${title}">${title}</div>
+            <a class="website-link-row-url" href="${url}" target="_blank" rel="noopener">${url}</a>
+          </div>
+          <div class="website-link-row-actions">
+            <a class="btn outline" href="${url}" target="_blank" rel="noopener">Live pagina</a>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function loadWebsiteLinks() {
+    if (!websiteGeneratorAuthState.authenticated) {
+      renderWebsiteLinks([]);
+      return;
+    }
+    websiteLinkListEl.innerHTML = '<div class="empty-state" style="padding:22px;"><p>Websitelinks laden...</p></div>';
+    try {
+      const response = await fetch('/api/website-links', {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload || payload.ok === false) {
+        throw new Error(String(payload?.detail || payload?.error || 'Websitelinks laden mislukt'));
+      }
+      renderWebsiteLinks(payload.links || []);
+    } catch (error) {
+      websiteLinkListEl.innerHTML = `<div class="empty-state" style="padding:22px;"><p>${escapeHtml(String(error?.message || 'Websitelinks laden mislukt'))}</p></div>`;
+    }
   }
 
   websiteLinkCopyEl.addEventListener('click', async function () {
@@ -1396,11 +1459,21 @@ loadWebsiteGeneratorAuthState();
   });
 
   websiteLinkCreateEl.addEventListener('click', async function () {
-    if (!(await ensureWebsiteGeneratorAuth('Log eerst in om websitelinks aan te maken.'))) return;
+    const openedTab = window.open('about:blank', '_blank');
+    if (openedTab) {
+      openedTab.document.write('<!DOCTYPE html><title>Websitelink wordt aangemaakt...</title><body style="font-family:system-ui,sans-serif;padding:32px">Websitelink wordt aangemaakt...</body>');
+      openedTab.document.close();
+      openedTab.opener = null;
+    }
+    if (!(await ensureWebsiteGeneratorAuth('Log eerst in om websitelinks aan te maken.'))) {
+      if (openedTab && !openedTab.closed) openedTab.close();
+      return;
+    }
     const html = String(htmlInput.value || '').trim();
     if (!html) {
       setWebsiteLinkStatus('Plak eerst HTML code in.', true);
       htmlInput.focus();
+      if (openedTab && !openedTab.closed) openedTab.close();
       return;
     }
 
@@ -1430,14 +1503,22 @@ loadWebsiteGeneratorAuthState();
       websiteLinkCopyEl.hidden = !latestWebsiteLinkUrl;
       setWebsiteLinkStatus(latestWebsiteLinkUrl || 'Websitelink aangemaakt.');
       if (latestWebsiteLinkUrl) {
-        window.open(latestWebsiteLinkUrl, '_blank', 'noopener');
+        if (openedTab && !openedTab.closed) {
+          openedTab.location.href = latestWebsiteLinkUrl;
+        } else {
+          window.open(latestWebsiteLinkUrl, '_blank', 'noopener');
+        }
       }
+      await loadWebsiteLinks();
     } catch (error) {
+      if (openedTab && !openedTab.closed) openedTab.close();
       setWebsiteLinkStatus(String(error?.message || 'Websitelink aanmaken mislukt'), true);
     } finally {
       applyWebsiteGeneratorAuthState();
     }
   });
+
+  void loadWebsiteGeneratorAuthState().then(() => loadWebsiteLinks());
 })();
 
 (function initWebsiteGeneratorLibraryHash() {

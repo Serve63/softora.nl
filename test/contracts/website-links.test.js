@@ -50,6 +50,18 @@ function createFixture(overrides = {}) {
           ? [{ payload: rows.get(rowKey), updated_at: rows.get(`${rowKey}:updated_at`) || '' }]
           : [],
       })),
+    fetchSupabaseRowsByStateKeyPrefixViaRest:
+      overrides.fetchSupabaseRowsByStateKeyPrefixViaRest ||
+      (async (prefix) => ({
+        ok: true,
+        body: [...rows.entries()]
+          .filter(([key]) => String(key).startsWith(prefix) && !String(key).endsWith(':updated_at'))
+          .map(([key, payload]) => ({
+            state_key: key,
+            payload,
+            updated_at: rows.get(`${key}:updated_at`) || '',
+          })),
+      })),
     upsertSupabaseRowViaRest:
       overrides.upsertSupabaseRowViaRest ||
       (async (row) => {
@@ -181,4 +193,30 @@ test('website link coordinator serves stored pages with safe public headers', as
   assert.match(String(res.body || ''), /<h1>Demo<\/h1>/);
   assert.match(String(res.headers['content-security-policy'] || ''), /script-src 'none'/);
   assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow, noarchive');
+});
+
+test('website link coordinator lists stored public links', async () => {
+  const { coordinator, rows } = createFixture();
+  const res = createResponseRecorder();
+
+  rows.set('core:website_link:demo-link', {
+    slug: 'demo-link',
+    title: 'Demo link',
+    html: '<html><body>Demo</body></html>',
+    createdAt: '2026-04-25T20:00:00.000Z',
+  });
+
+  await coordinator.listWebsiteLinksResponse({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.deepEqual(res.body.links, [
+    {
+      slug: 'demo-link',
+      title: 'Demo link',
+      url: 'https://www.softora.nl/demo-link',
+      createdAt: '2026-04-25T20:00:00.000Z',
+      updatedAt: '',
+    },
+  ]);
 });
