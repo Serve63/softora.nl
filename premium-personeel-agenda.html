@@ -634,7 +634,14 @@
         }
 
         .manual-appointment-choice-grid--who {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 0.75rem;
+        }
+
+        .manual-appointment-choice-grid--who .manual-appointment-choice {
+            flex: 1 1 0;
+            min-width: 0;
         }
 
         .manual-appointment-choice {
@@ -1372,7 +1379,7 @@
                     <input type="hidden" id="manualAppointmentLegendChoice" autocomplete="off">
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Voor wie?</div>
-                        <div class="manual-appointment-choice-grid manual-appointment-choice-grid--who" role="group" aria-label="Voor wie is deze afspraak?">
+                        <div class="manual-appointment-choice-grid manual-appointment-choice-grid--who" id="manualAppointmentWhoChoices" role="group" aria-label="Voor wie is deze afspraak?">
                             <button class="manual-appointment-choice" type="button" data-manual-who="serve">
                                 <span class="manual-appointment-choice-title">Servé</span>
                             </button>

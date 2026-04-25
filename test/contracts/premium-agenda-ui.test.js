@@ -105,6 +105,8 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /data-manual-meeting-type="chatbot"/);
   assert.match(pageSource, /id="manualAppointmentActivity"/);
   assert.match(pageSource, /Voor wie\?/);
+  assert.match(pageSource, /id="manualAppointmentWhoChoices"/);
+  assert.match(pageSource, /\.manual-appointment-choice-grid--who \{[\s\S]*display: flex;[\s\S]*flex-wrap: nowrap;/);
   assert.match(pageSource, /data-manual-who="serve"/);
   assert.match(pageSource, /data-manual-who="martijn"/);
   assert.match(pageSource, /data-manual-who="both"/);
