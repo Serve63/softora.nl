@@ -1018,6 +1018,37 @@
             animation: fadeUp 0.6s var(--ease-out-expo) 0.55s forwards;
         }
 
+        .dashboard-ai-management-status-panel {
+            display: none;
+            background: rgba(255,255,255,0.88);
+            border: 1px solid rgba(178, 47, 112, 0.22);
+            border-left: 3px solid var(--accent-light);
+            padding: 1.25rem 1.45rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 12px 28px rgba(20, 18, 40, 0.04);
+            opacity: 0;
+            transform: translateY(12px);
+            animation: fadeUp 0.6s var(--ease-out-expo) 0.48s forwards;
+        }
+
+        .dashboard-ai-management-status-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            margin-bottom: 0.45rem;
+        }
+
+        .dashboard-ai-management-status-text {
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            font-weight: 300;
+            line-height: 1.65;
+            max-width: 760px;
+        }
+
         html[data-ai-management-mode="software"] .premium-boot-shell {
             display: flex;
             flex-direction: column;
@@ -1031,18 +1062,23 @@
             order: 1;
         }
 
-        html[data-ai-management-mode="software"] .premium-boot-shell > .dashboard-lead-legend-strip {
+        html[data-ai-management-mode="software"] .premium-boot-shell > .dashboard-ai-management-status-panel {
+            display: block;
             order: 2;
+        }
+
+        html[data-ai-management-mode="software"] .premium-boot-shell > .dashboard-lead-legend-strip {
+            order: 3;
             margin-top: 0;
             margin-bottom: 1.5rem;
         }
 
         html[data-ai-management-mode="software"] .premium-boot-shell > .kpi-grid {
-            order: 3;
+            order: 4;
         }
 
         html[data-ai-management-mode="software"] .premium-boot-shell > .content-grid {
-            order: 4;
+            order: 5;
         }
 
         .lead-type-legend {
@@ -2016,6 +2052,13 @@
                     </div>
                 </div>
             </div>
+
+            <section class="dashboard-ai-management-status-panel" aria-label="AI beheer status">
+                <div class="dashboard-ai-management-status-title">Dit is AI aan het doen</div>
+                <div class="dashboard-ai-management-status-text">
+                    AI geeft ieder uur 1 update over haar plan, welke acties ze gaat uitvoeren, of alles goed loopt en of er fouten of risico's actief zijn. Zo blijft duidelijk zichtbaar wat AI doet voordat er iets gebeurt, zodat klanten niet zomaar lastiggevallen worden en rare acties direct opvallen.
+                </div>
+            </section>
 
             <div class="kpi-grid">
                 <div class="kpi-card">

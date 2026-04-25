@@ -23,13 +23,21 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
     pageSource,
     /class="dashboard-lead-legend-strip"[\s\S]*class="lead-type-legend"[\s\S]*Bedrijfssoftware[\s\S]*Voicesoftware[\s\S]*Chatbots/s
   );
+  assert.match(pageSource, /class="dashboard-ai-management-status-panel"/);
+  assert.match(pageSource, /Dit is AI aan het doen/);
+  assert.match(pageSource, /AI geeft ieder uur 1 update over haar plan/);
+  assert.match(pageSource, /zodat klanten niet zomaar lastiggevallen worden/);
   assert.match(
     pageSource,
-    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-lead-legend-strip \{[\s\S]*order:\s*2;[\s\S]*margin-bottom:\s*1\.5rem;/s
+    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-ai-management-status-panel \{[\s\S]*display:\s*block;[\s\S]*order:\s*2;/s
   );
   assert.match(
     pageSource,
-    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.kpi-grid \{[\s\S]*order:\s*3;/s
+    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-lead-legend-strip \{[\s\S]*order:\s*3;[\s\S]*margin-bottom:\s*1\.5rem;/s
+  );
+  assert.match(
+    pageSource,
+    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.kpi-grid \{[\s\S]*order:\s*4;/s
   );
 });
 
