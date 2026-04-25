@@ -120,7 +120,8 @@ test('premium bevestigingsmails campaign volume uses a fixed mail company label'
   assert.doesNotMatch(pageSource, /cycleCampaignCountMode/);
   assert.doesNotMatch(pageSource, /campaign-count-mode-label/);
   assert.doesNotMatch(pageSource, /Hoeveel afspraken inplannen\?/);
-  assert.match(pageSource, /Hoeveel bedrijven mailen\?/);
+  assert.match(pageSource, /<div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen\?<\/div>/);
+  assert.match(pageSource, /campaignVolumeLabel\.textContent = 'Hoeveel bedrijven bellen\?';/);
   assert.doesNotMatch(pageSource, /Aantal te mailen bedrijven/);
 });
 

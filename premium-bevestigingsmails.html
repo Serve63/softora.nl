@@ -1225,7 +1225,7 @@ Softora.nl | +31 6 2991 7185</textarea>
       <div class="campagne-body">
 
         <div class="field">
-          <div class="field-label">Hoeveel bedrijven mailen?</div>
+          <div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen?</div>
           <div class="field-val" id="slider-val">100</div>
           <input class="slider" type="range" min="10" max="500" step="10" value="100" id="mail-slider" oninput="updateSlider(this.value)">
           <div class="slider-row"><span>10</span><span>250</span><span>500</span></div>
@@ -1534,6 +1534,8 @@ function applyPremiumAiLeadGeneratorShell() {
     var inhoudLabel = bodyRow && bodyRow.querySelector('.mf-label');
     if (inhoudLabel) inhoudLabel.textContent = 'Prompt / Instructiebrief';
   }
+  var campaignVolumeLabel = document.getElementById('campaignVolumeLabel');
+  if (campaignVolumeLabel) campaignVolumeLabel.textContent = 'Hoeveel bedrijven bellen?';
 }
 
 function applyPremiumAiLeadGeneratorBelmethodeRow() {
