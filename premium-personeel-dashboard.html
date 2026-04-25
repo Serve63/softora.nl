@@ -1049,6 +1049,68 @@
             max-width: 760px;
         }
 
+        .dashboard-ai-management-timeline {
+            margin-top: 1.1rem;
+            display: grid;
+            gap: 0;
+            max-width: 860px;
+        }
+
+        .dashboard-ai-management-timeline-item {
+            display: grid;
+            grid-template-columns: 4.2rem 1fr;
+            gap: 1rem;
+            position: relative;
+            padding: 0 0 1rem;
+        }
+
+        .dashboard-ai-management-timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 4.75rem;
+            top: 0.75rem;
+            bottom: -0.35rem;
+            border-left: 1px dashed rgba(139, 34, 82, 0.35);
+        }
+
+        .dashboard-ai-management-timeline-item:last-child {
+            padding-bottom: 0;
+        }
+
+        .dashboard-ai-management-timeline-item:last-child::before {
+            display: none;
+        }
+
+        .dashboard-ai-management-timeline-time {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            color: var(--accent-light);
+            padding-top: 0.08rem;
+        }
+
+        .dashboard-ai-management-timeline-copy {
+            position: relative;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            line-height: 1.5;
+            padding-left: 1rem;
+        }
+
+        .dashboard-ai-management-timeline-copy::before {
+            content: '';
+            position: absolute;
+            left: -0.62rem;
+            top: 0.32rem;
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 50%;
+            background: var(--bg-primary);
+            border: 2px solid var(--accent-light);
+            box-shadow: 0 0 0 4px rgba(178, 47, 112, 0.08);
+        }
+
         html[data-ai-management-mode="software"] .premium-boot-shell {
             display: flex;
             flex-direction: column;
@@ -2059,6 +2121,32 @@
                 <div class="dashboard-ai-management-status-title">Dit is AI aan het doen</div>
                 <div class="dashboard-ai-management-status-text">
                     AI geeft ieder uur 1 update over haar plan, welke acties ze gaat uitvoeren, of alles goed loopt en of er fouten of risico's actief zijn. Zo blijft duidelijk zichtbaar wat AI doet voordat er iets gebeurt, zodat klanten niet zomaar lastiggevallen worden en rare acties direct opvallen.
+                </div>
+                <div class="dashboard-ai-management-timeline" aria-label="Template tijdlijn AI updates">
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">13:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">Template update: AI controleert de agenda, huidige doelen en actieve middelen voordat er acties worden gepland.</div>
+                    </div>
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">14:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">AI meldt welk plan klaarstaat, welke doelgroep geraakt zou worden en welke acties nog alleen voorbereid zijn.</div>
+                    </div>
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">15:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">AI controleert of alles normaal loopt en markeert blokkades, fouten of ontbrekende gegevens voordat er verder wordt gegaan.</div>
+                    </div>
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">16:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">AI vat samen welke acties veilig zijn, welke acties beter handmatig nagekeken worden en of klantcontact gepauzeerd moet blijven.</div>
+                    </div>
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">17:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">AI geeft een tussenstand van resultaten, risico's en geplande vervolgstappen voor het laatste uur.</div>
+                    </div>
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">18:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">AI sluit af met een dagrapport: wat is gedaan, wat is niet gedaan, welke fouten zijn gezien en wat morgen aandacht nodig heeft.</div>
+                    </div>
                 </div>
             </section>
 
