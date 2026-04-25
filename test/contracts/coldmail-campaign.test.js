@@ -293,6 +293,19 @@ test('coldmail campaign exposes the same sender accounts as mailbox', () => {
   ]);
 });
 
+test('coldmail campaign uses personal sender name for Serve mailbox', async () => {
+  const { service, sentMessages } = createService();
+
+  await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Test',
+    body: 'Test',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(sentMessages[0].from, 'Servé <serve@softora.nl>');
+});
+
 test('coldmail campaign refuses to send when SMTP is not configured', async () => {
   const { service } = createService({ smtpHost: '' });
 

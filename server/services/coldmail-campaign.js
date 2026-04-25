@@ -7,6 +7,11 @@ const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const TEST_RECIPIENT_EMAILS = new Set(['servec321@gmail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce']);
+const SENDER_DISPLAY_NAMES = {
+  'serve@softora.nl': 'Servé',
+  'martijn@softora.nl': 'Martijn',
+  'ruben@softora.nl': 'Ruben',
+};
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -225,7 +230,7 @@ function createColdmailCampaignService(deps = {}) {
 
   function formatMailFromHeader(senderEmail) {
     const address = normalizeEmailAddress(senderEmail || mailFromAddress);
-    const name = normalizeString(mailFromName || 'Softora');
+    const name = normalizeString(SENDER_DISPLAY_NAMES[address] || mailFromName || 'Softora');
     return name ? `${name} <${address}>` : address;
   }
 
