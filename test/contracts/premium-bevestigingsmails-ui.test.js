@@ -162,7 +162,9 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /recipient\.email \|\| 'Geen e-mailadres'/);
   assert.match(pageSource, /function isEligibleColdmailCampaignRow\(row\)/);
   assert.match(pageSource, /function isEligibleColdcallingCampaignRow\(row\)/);
-  assert.match(pageSource, /isPremiumAiLeadGeneratorPath\(\) \? isEligibleColdcallingCampaignRow : isEligibleColdmailCampaignRow/);
+  assert.match(pageSource, /function isEligibleCampaignCountRow\(row\) \{\s*return isEligibleColdmailCampaignRow\(row\);\s*\}/);
+  assert.match(pageSource, /const eligibleRows = coldmailingDatabaseRows\.filter\(isEligibleCampaignCountRow\);/);
+  assert.doesNotMatch(pageSource, /isPremiumAiLeadGeneratorPath\(\) \? isEligibleColdcallingCampaignRow : isEligibleColdmailCampaignRow/);
   assert.match(pageSource, /Math\.min\(getCampaignRequestedCompanyCount\(\) \|\| eligibleRows\.length, eligibleRows\.length\)/);
   assert.match(pageSource, /initCampaignDatabaseAutoRefresh\(\);/);
   assert.match(pageSource, /const campaignBootTasks = \[/);

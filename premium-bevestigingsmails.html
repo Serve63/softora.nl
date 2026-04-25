@@ -1583,6 +1583,10 @@ function isEligibleColdcallingCampaignRow(row) {
   return row.call !== false && row.canCall !== false && row.doNotCall !== true;
 }
 
+function isEligibleCampaignCountRow(row) {
+  return isEligibleColdmailCampaignRow(row);
+}
+
 function parseCustomerDatabaseRows(values) {
   const raw = values && values[CUSTOMER_DB_KEY];
   if (Array.isArray(raw)) return raw.filter((item) => item && typeof item === 'object');
@@ -1605,9 +1609,7 @@ function renderCampaignCompanyCount() {
   const valueEl = document.getElementById('campaignCompanyCountValue');
   const wrap = document.getElementById('campaignCompanyCount');
   if (!valueEl || !wrap) return;
-  const eligibleRows = coldmailingDatabaseRows.filter(
-    isPremiumAiLeadGeneratorPath() ? isEligibleColdcallingCampaignRow : isEligibleColdmailCampaignRow
-  );
+  const eligibleRows = coldmailingDatabaseRows.filter(isEligibleCampaignCountRow);
   const count = Math.min(getCampaignRequestedCompanyCount() || eligibleRows.length, eligibleRows.length);
   valueEl.textContent = String(count);
   wrap.title = count + ' ' + (count === 1 ? 'bedrijf wordt' : 'bedrijven worden') + (isPremiumAiLeadGeneratorPath() ? ' gebeld.' : ' gemaild.');
