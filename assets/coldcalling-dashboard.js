@@ -2742,8 +2742,8 @@
         controlWrap.style.gridRow = '3';
       }
       if (dispatchWrap) {
-        dispatchWrap.style.gridColumn = '1';
-        dispatchWrap.style.gridRow = '4';
+        dispatchWrap.style.gridColumn = brancheGroup ? '1' : '2';
+        dispatchWrap.style.gridRow = brancheGroup ? '4' : '3';
       }
       if (brancheGroup) {
         brancheGroup.style.gridColumn = '2';
@@ -2765,8 +2765,8 @@
       controlWrap.style.gridRow = '4';
     }
     if (dispatchWrap) {
-      dispatchWrap.style.gridColumn = '1';
-      dispatchWrap.style.gridRow = '5';
+      dispatchWrap.style.gridColumn = brancheGroup ? '1' : '2';
+      dispatchWrap.style.gridRow = brancheGroup ? '5' : '4';
     }
     if (brancheGroup) {
       brancheGroup.style.gridColumn = '2';
@@ -2812,10 +2812,10 @@
       dispatchWrap.id = 'callDispatchControlWrap';
       dispatchWrap.style.marginTop = '12px';
       dispatchWrap.innerHTML = [
-        '<label class="form-label" for="callDispatchMode">Belstrategie</label>',
+        '<label class="form-label" for="callDispatchMode">Belmethode</label>',
         '<select class="form-select magnetic" id="callDispatchMode">',
+        '  <option value="sequential">Apart</option>',
         '  <option value="parallel">Alles tegelijk</option>',
-        '  <option value="sequential">1 voor 1</option>',
         '</select>',
         '<div id="callDispatchDelayWrap" style="margin-top:10px; display:none;">',
         '  <label class="form-label" for="callDispatchDelaySeconds">Wachttijd tussen starts (seconden)</label>',
@@ -7541,7 +7541,7 @@
 
     return {
       amount,
-      sector: getSelectedText('branche'),
+      sector: getSelectedText('branche') || 'Alles',
       region: getCampaignRegioLabelForApi(),
       minProjectValue,
       maxDiscountPct,

@@ -24,8 +24,13 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     pageSource,
     /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window\.openLeadDatabaseModalFromCampaign && window\.openLeadDatabaseModalFromCampaign\(\)"/
   );
+  assert.doesNotMatch(pageSource, /id="branche"/);
+  assert.doesNotMatch(pageSource, /<label class="form-label">Branche<\/label>/);
   assert.match(pageSource, /<div class="form-group form-group--dispatch" id="callDispatchControlWrap">/);
+  assert.match(pageSource, /<label class="form-label" for="callDispatchMode">Belmethode<\/label>/);
   assert.match(pageSource, /<select class="form-select magnetic" id="callDispatchMode">/);
+  assert.match(pageSource, /<option value="sequential" selected>Apart<\/option>/);
+  assert.match(pageSource, /<option value="parallel">Alles tegelijk<\/option>/);
   assert.match(pageSource, /<select class="form-select magnetic" id="regio">/);
   assert.match(pageSource, /<label class="form-label form-label--regio" for="regio">/);
   assert.match(
@@ -73,9 +78,14 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--agenda-capacity\s*\{[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*grid-row:\s*2;/);
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--slider\s*\{[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*grid-row:\s*3;/);
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--lead-list\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*4;/);
-  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--dispatch\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*5;/);
-  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--branche\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*4;/);
+  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--dispatch\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*4;/);
+  assert.doesNotMatch(pageSource, /\.generator-grid > \.panel:only-child \.form-group--branche/);
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--regio\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*5;/);
+  assert.match(dashboardSource, /dispatchWrap\.style\.gridColumn = brancheGroup \? '1' : '2';/);
+  assert.match(dashboardSource, /dispatchWrap\.style\.gridRow = brancheGroup \? '5' : '4';/);
+  assert.match(dashboardSource, /<label class="form-label" for="callDispatchMode">Belmethode<\/label>/);
+  assert.match(dashboardSource, /<option value="sequential">Apart<\/option>/);
+  assert.match(dashboardSource, /sector: getSelectedText\('branche'\) \|\| 'Alles'/);
   assert.match(dashboardSource, /function ensureStartCampaignConfirmModal\(\)/);
   assert.match(dashboardSource, /confirmPin:\s*startConfirmPin/);
   assert.match(dashboardSource, /openStartCampaignConfirmModal\(\);/);

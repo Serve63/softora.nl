@@ -659,14 +659,9 @@
             grid-row: 4;
         }
 
-        .generator-grid > .panel:only-child .form-group--branche {
+        .generator-grid > .panel:only-child .form-group--dispatch {
             grid-column: 2;
             grid-row: 4;
-        }
-
-        .generator-grid > .panel:only-child .form-group--dispatch {
-            grid-column: 1;
-            grid-row: 5;
         }
 
         .generator-grid > .panel:only-child .form-group--regio {
@@ -2315,26 +2310,11 @@
                         <div id="leadListHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85; display:none;"></div>
                     </div>
 
-                    <div class="form-group form-group--branche">
-                        <label class="form-label">Branche</label>
-                        <select class="form-select magnetic" id="branche">
-                            <option value="all" selected>Alles</option>
-                            <option value="horeca">Horeca & Restaurants</option>
-                            <option value="retail">Retail & Winkels</option>
-                            <option value="zakelijk">Zakelijke Dienstverlening</option>
-                            <option value="bouw">Bouw & Vastgoed</option>
-                            <option value="gezondheid">Gezondheidszorg</option>
-                            <option value="creatief">Creatieve Sector</option>
-                            <option value="tech">Tech & Startups</option>
-                            <option value="overig">Overig</option>
-                        </select>
-                    </div>
-
                     <div class="form-group form-group--dispatch" id="callDispatchControlWrap">
-                        <label class="form-label" for="callDispatchMode">Belstrategie</label>
+                        <label class="form-label" for="callDispatchMode">Belmethode</label>
                         <select class="form-select magnetic" id="callDispatchMode">
+                            <option value="sequential" selected>Apart</option>
                             <option value="parallel">Alles tegelijk</option>
-                            <option value="sequential" selected>1 voor 1</option>
                         </select>
                         <div id="callDispatchDelayWrap" style="margin-top:10px; display:none;">
                             <label class="form-label" for="callDispatchDelaySeconds">Wachttijd tussen starts (seconden)</label>
