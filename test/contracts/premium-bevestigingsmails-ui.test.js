@@ -224,7 +224,9 @@ test('premium ai lead generator alias replaces branche with belmethode', () => {
 
   assert.match(pageSource, /html\[data-softora-lead-generator-alias="1"\] \.lead-generator-branch-field \{ display: none !important; \}/);
   assert.match(pageSource, /html:not\(\[data-softora-lead-generator-alias="1"\]\) \.lead-generator-belmethod-field \{ display: none !important; \}/);
-  assert.match(pageSource, /<div class="field lead-generator-belmethod-field">\s*<div class="field-label">Belmethode<\/div>\s*<select class="sel" id="callDispatchMode" data-native-select="true">/);
+  assert.match(pageSource, /<div class="field lead-generator-belmethod-field">\s*<div class="field-label">Belmethode<\/div>\s*<select class="sel" id="callDispatchMode">/);
+  assert.doesNotMatch(pageSource, /id="callDispatchMode" data-native-select="true"/);
+  assert.match(pageSource, /document\.querySelectorAll\('select\.sel, select\.mf-sel'\)\.forEach\(enhanceCampaignSelect\);/);
   assert.match(pageSource, /<option value="sequential" selected>Apart<\/option>/);
   assert.match(pageSource, /<option value="parallel">Alles tegelijk<\/option>/);
 });
