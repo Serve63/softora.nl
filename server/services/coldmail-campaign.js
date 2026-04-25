@@ -70,6 +70,7 @@ function createColdmailCampaignService(deps = {}) {
     extractAnthropicTextContent = null,
     anthropicApiBaseUrl = 'https://api.anthropic.com/v1',
     coldmailAutoReplyModel = 'claude-sonnet-4-6',
+    coldmailAutoReplyEnabled = false,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     now = () => new Date(),
@@ -945,6 +946,13 @@ function createColdmailCampaignService(deps = {}) {
   async function syncInboundColdmailRepliesFromImap(options = {}) {
     const force = Boolean(options.force);
     const maxMessages = Math.max(5, Math.min(100, Number(options.maxMessages || 30) || 30));
+    if (!coldmailAutoReplyEnabled) {
+      return {
+        ok: true,
+        skipped: true,
+        reason: 'coldmail_autoreply_disabled',
+      };
+    }
     if (!isImapMailConfigured()) {
       return {
         ok: false,

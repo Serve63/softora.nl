@@ -1460,6 +1460,7 @@ const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const COLDMAIL_TEST_COMPANIES = ['mcv e-commerce'];
+const COLDMAIL_AUTO_REPLY_ENABLED = false;
 let coldmailingSettingsSaveTimer = null;
 let coldmailingDatabaseRows = [];
 let campaignRecipientListTimer = null;
@@ -1770,7 +1771,7 @@ async function syncColdmailRepliesFromMailbox(options) {
 }
 
 function initColdmailReplyAutoSync() {
-  if (isPremiumAiLeadGeneratorPath() || coldmailReplySyncTimer) return;
+  if (!COLDMAIL_AUTO_REPLY_ENABLED || isPremiumAiLeadGeneratorPath() || coldmailReplySyncTimer) return;
   window.addEventListener('focus', function () {
     void syncColdmailRepliesFromMailbox({ force: true });
   });

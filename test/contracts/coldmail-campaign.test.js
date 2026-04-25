@@ -88,6 +88,7 @@ function createService(overrides = {}) {
       Array.isArray(content) ? content.map((item) => item.text || '').join('\n') : String(content || ''),
     anthropicApiBaseUrl: 'https://anthropic.example.test/v1',
     coldmailAutoReplyModel: 'claude-sonnet-4-6',
+    coldmailAutoReplyEnabled: Boolean(overrides.coldmailAutoReplyEnabled),
     resolveEmailDomain: async (domain) => {
       if (overrides.invalidDomains && overrides.invalidDomains.includes(domain)) return false;
       return true;
@@ -250,6 +251,7 @@ test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', asy
     imapUser: 'serve@softora.nl',
     imapPass: 'secret',
     anthropicApiKey: 'anthropic-secret',
+    coldmailAutoReplyEnabled: true,
     rows: [
       {
         id: 'test-recipient',

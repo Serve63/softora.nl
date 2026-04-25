@@ -230,6 +230,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           coldmailAutoReplyModel: shared.normalizeString(
             env.COLDMAIL_AUTOREPLY_ANTHROPIC_MODEL || env.COLDMAIL_AUTOREPLY_MODEL || 'claude-sonnet-4-6'
           ),
+          coldmailAutoReplyEnabled: /^true$/i.test(shared.normalizeString(env.COLDMAIL_AUTOREPLY_ENABLED || '')),
           getUiStateValues: uiSeoRuntime.getUiStateValues,
           setUiStateValues: uiSeoRuntime.setUiStateValues,
           customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
