@@ -25,8 +25,9 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
   );
   assert.match(pageSource, /class="dashboard-ai-management-status-panel"/);
   assert.match(pageSource, /Dit is AI aan het doen/);
-  assert.match(pageSource, /AI geeft ieder uur 1 update over haar plan/);
-  assert.match(pageSource, /zodat klanten niet zomaar lastiggevallen worden/);
+  assert.doesNotMatch(pageSource, /AI geeft ieder uur 1 update over haar plan/);
+  assert.doesNotMatch(pageSource, /zodat klanten niet zomaar lastiggevallen worden/);
+  assert.doesNotMatch(pageSource, /dashboard-ai-management-status-text/);
   assert.match(pageSource, /class="dashboard-ai-management-timeline"/);
   assert.match(pageSource, /Template tijdlijn AI updates/);
   assert.match(pageSource, /13:00[\s\S]*14:00[\s\S]*15:00[\s\S]*16:00[\s\S]*17:00[\s\S]*18:00/);
