@@ -1374,7 +1374,6 @@
         </div>
         <div class="modal-footer">
             <button class="modal-btn secondary magnetic" id="manualAppointmentBackBtn" type="button" hidden>Terug</button>
-            <button class="modal-btn secondary magnetic" id="manualAppointmentCancelBtn" type="button">Annuleren</button>
             <button class="modal-btn primary magnetic" id="manualAppointmentSubmitBtn" type="button">Volgende</button>
         </div>
     </div>
@@ -1562,7 +1561,6 @@
     const manualAppointmentStatusEl = document.getElementById('manualAppointmentStatus');
     const manualAppointmentCloseBtn = document.getElementById('manualAppointmentCloseBtn');
     const manualAppointmentBackBtn = document.getElementById('manualAppointmentBackBtn');
-    const manualAppointmentCancelBtn = document.getElementById('manualAppointmentCancelBtn');
     const manualAppointmentSubmitBtn = document.getElementById('manualAppointmentSubmitBtn');
     const calendarGridEl = document.getElementById('calendarGrid');
     let manualAppointmentSelectedDate = '';
@@ -3506,9 +3504,6 @@
     if (manualAppointmentCloseBtn) {
         manualAppointmentCloseBtn.addEventListener('click', () => closeManualAppointmentModal());
     }
-    if (manualAppointmentCancelBtn) {
-        manualAppointmentCancelBtn.addEventListener('click', () => closeManualAppointmentModal());
-    }
     if (manualAppointmentBackBtn) {
         manualAppointmentBackBtn.addEventListener('click', () => goBackManualAppointmentStep());
     }
@@ -3517,14 +3512,12 @@
             manualAppointmentKind = String(button.getAttribute('data-manual-kind') || '').trim();
             if (manualAppointmentKind !== 'meeting') manualAppointmentMeetingType = '';
             setManualAppointmentActiveChoices();
-            advanceManualAppointmentStep();
         });
     });
     document.querySelectorAll('[data-manual-meeting-type]').forEach((button) => {
         button.addEventListener('click', () => {
             manualAppointmentMeetingType = String(button.getAttribute('data-manual-meeting-type') || '').trim();
             setManualAppointmentActiveChoices();
-            advanceManualAppointmentStep();
         });
     });
     if (manualAppointmentSubmitBtn) {

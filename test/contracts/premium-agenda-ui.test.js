@@ -93,6 +93,7 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /Wat wil je inplannen\?/);
   assert.match(pageSource, /data-manual-kind="meeting"/);
   assert.match(pageSource, /data-manual-kind="overig"/);
+  assert.doesNotMatch(pageSource, /id="manualAppointmentCancelBtn"/);
   assert.match(pageSource, /Welke meeting\?/);
   assert.match(pageSource, /data-manual-meeting-type="website"/);
   assert.match(pageSource, /data-manual-meeting-type="business"/);
@@ -112,6 +113,23 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /\/api\/agenda\/appointments\/manual/);
   assert.match(pageSource, /data-calendar-date=/);
   assert.match(pageSource, /function advanceManualAppointmentStep\(/);
+  assert.match(
+    pageSource,
+    /document\.querySelectorAll\('\[data-manual-kind\]'\)\.forEach\(\(button\) => \{[\s\S]*setManualAppointmentActiveChoices\(\);[\s\S]*\}\);\s*\}\);/
+  );
+  assert.doesNotMatch(
+    pageSource,
+    /document\.querySelectorAll\('\[data-manual-kind\]'\)\.forEach\(\(button\) => \{[\s\S]*advanceManualAppointmentStep\(\);[\s\S]*\}\);\s*\}\);/
+  );
+  assert.match(
+    pageSource,
+    /document\.querySelectorAll\('\[data-manual-meeting-type\]'\)\.forEach\(\(button\) => \{[\s\S]*setManualAppointmentActiveChoices\(\);[\s\S]*\}\);\s*\}\);/
+  );
+  assert.doesNotMatch(
+    pageSource,
+    /document\.querySelectorAll\('\[data-manual-meeting-type\]'\)\.forEach\(\(button\) => \{[\s\S]*advanceManualAppointmentStep\(\);[\s\S]*\}\);\s*\}\);/
+  );
+  assert.match(pageSource, /manualAppointmentSubmitBtn\.addEventListener\('click', \(\) => advanceManualAppointmentStep\(\)\);/);
   assert.match(pageSource, /function getManualAppointmentLegendChoice\(/);
   assert.match(pageSource, /legend-dot manual-serve/);
   assert.match(pageSource, /Activiteit Servé/);
