@@ -40,6 +40,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     normalizeTimeHhMm,
     sanitizeAppointmentLocation,
     truncateText,
+    createGoogleCalendarEventForAppointment = async () => ({ ok: true, skipped: true }),
   } = deps;
 
   const {
@@ -159,6 +160,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       coldcallingStack: 'manual',
       manualPlannerWho: whoLabel === 'Martijn' ? 'martijn' : 'serve',
       manualAllDayUnavailable: allDayUnavailable,
+      manualAvailableAgain: availableAgain,
       summary,
       summaryFormatVersion: 4,
       branche: '',
@@ -234,10 +236,25 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     );
     if (!persistOk) return res;
 
+    let finalAppointment = updatedAppointment;
+    let googleCalendarSync = null;
+    try {
+      googleCalendarSync = await createGoogleCalendarEventForAppointment(updatedAppointment);
+      if (googleCalendarSync && googleCalendarSync.appointment) {
+        finalAppointment = googleCalendarSync.appointment;
+      }
+    } catch (error) {
+      googleCalendarSync = {
+        ok: false,
+        error: truncateText(String(error && error.message ? error.message : error), 300),
+      };
+    }
+
     return res.status(persistOk === 'pending' ? 202 : 200).json({
       ok: true,
       persistencePending: persistOk === 'pending',
-      appointment: updatedAppointment,
+      appointment: finalAppointment,
+      googleCalendarSync,
     });
   }
 

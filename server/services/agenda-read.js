@@ -95,6 +95,9 @@ function createAgendaReadCoordinator(deps) {
         await deps.syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
       }
       deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
+      if (typeof deps.syncGoogleCalendarEvents === 'function') {
+        await deps.syncGoogleCalendarEvents({ force: freshSharedState });
+      }
       await deps.refreshAgendaAppointmentCallSourcesIfNeeded();
       deps.backfillGeneratedAgendaAppointmentsMetadataIfNeeded();
       await deps.refreshGeneratedAgendaSummariesIfNeeded();

@@ -75,6 +75,15 @@ function buildAgendaSupportRuntimeCompositionOptions({
       imapExtraMailboxes: envConfig.MAIL_IMAP_EXTRA_MAILBOXES,
       imapPollCooldownMs: envConfig.MAIL_IMAP_POLL_COOLDOWN_MS,
     },
+    googleCalendarConfig: {
+      enabled: envConfig.GOOGLE_CALENDAR_SYNC_ENABLED,
+      clientEmail: envConfig.GOOGLE_CALENDAR_CLIENT_EMAIL,
+      privateKey: envConfig.GOOGLE_CALENDAR_PRIVATE_KEY,
+      serveCalendarId: envConfig.GOOGLE_CALENDAR_SERVE_ID,
+      martijnCalendarId: envConfig.GOOGLE_CALENDAR_MARTIJN_ID,
+      timezone: envConfig.GOOGLE_CALENDAR_TIMEZONE,
+      syncCooldownMs: envConfig.GOOGLE_CALENDAR_SYNC_COOLDOWN_MS,
+    },
     resolveAppointmentCallId: platformRuntime.resolveAppointmentCallId,
   });
 }
@@ -301,12 +310,15 @@ function buildServerAppAgendaWiringRuntimeContext({
         agendaSupportRuntime.backfillGeneratedAgendaAppointmentsMetadataIfNeeded,
       refreshGeneratedAgendaSummariesIfNeeded:
         agendaSupportRuntime.refreshGeneratedAgendaSummariesIfNeeded,
+      syncGoogleCalendarEvents: agendaSupportRuntime.syncGoogleCalendarEvents,
       isGeneratedAppointmentVisibleForAgenda:
         agendaSupportRuntime.isGeneratedAppointmentVisibleForAgenda,
       compareAgendaAppointments: agendaSupportRuntime.compareAgendaAppointments,
       parseIntSafe: shared.parseIntSafe,
       hasNegativeInterestSignal: agendaSupportRuntime.hasNegativeInterestSignal,
       hasPositiveInterestSignal: agendaSupportRuntime.hasPositiveInterestSignal,
+      createGoogleCalendarEventForAppointment:
+        agendaSupportRuntime.createGoogleCalendarEventForAppointment,
     },
   });
 }

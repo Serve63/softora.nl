@@ -7,6 +7,7 @@ const { createPremiumPublicHtmlFilesSet } = require('../config/premium-public-ht
 const { createRuntimeMemoryState } = require('./runtime-memory');
 
 function buildServerAppEnvConfig(runtimeEnv) {
+  const googleCalendar = runtimeEnv.googleCalendar || {};
   return {
     PORT: runtimeEnv.app.port,
     IS_PRODUCTION: runtimeEnv.app.isProduction,
@@ -72,6 +73,13 @@ function buildServerAppEnvConfig(runtimeEnv) {
     MAIL_IMAP_MAILBOX: runtimeEnv.mail.imapMailbox,
     MAIL_IMAP_EXTRA_MAILBOXES: runtimeEnv.mail.imapExtraMailboxes,
     MAIL_IMAP_POLL_COOLDOWN_MS: runtimeEnv.mail.imapPollCooldownMs,
+    GOOGLE_CALENDAR_SYNC_ENABLED: Boolean(googleCalendar.enabled),
+    GOOGLE_CALENDAR_CLIENT_EMAIL: googleCalendar.clientEmail || '',
+    GOOGLE_CALENDAR_PRIVATE_KEY: googleCalendar.privateKey || '',
+    GOOGLE_CALENDAR_SERVE_ID: googleCalendar.serveCalendarId || '',
+    GOOGLE_CALENDAR_MARTIJN_ID: googleCalendar.martijnCalendarId || '',
+    GOOGLE_CALENDAR_TIMEZONE: googleCalendar.timezone || 'Europe/Amsterdam',
+    GOOGLE_CALENDAR_SYNC_COOLDOWN_MS: googleCalendar.syncCooldownMs || 60000,
     SECURITY_CONTACT_EMAIL: runtimeEnv.securityContactEmail,
     DEMO_CONFIRMATION_TASK_ENABLED: runtimeEnv.demoConfirmationTaskEnabled,
   };

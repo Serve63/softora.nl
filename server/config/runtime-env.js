@@ -224,6 +224,24 @@ function loadRuntimeEnv(env = process.env) {
         300_000
       ),
     },
+    googleCalendar: {
+      enabled: readBooleanEnvFlag(safeEnv.GOOGLE_CALENDAR_SYNC_ENABLED),
+      clientEmail: normalizeString(safeEnv.GOOGLE_CALENDAR_CLIENT_EMAIL || ''),
+      privateKey: normalizeString(safeEnv.GOOGLE_CALENDAR_PRIVATE_KEY || ''),
+      serveCalendarId: normalizeString(
+        safeEnv.GOOGLE_CALENDAR_SERVE_ID || safeEnv.GOOGLE_CALENDAR_SERVE_CALENDAR_ID || ''
+      ),
+      martijnCalendarId: normalizeString(
+        safeEnv.GOOGLE_CALENDAR_MARTIJN_ID || safeEnv.GOOGLE_CALENDAR_MARTIJN_CALENDAR_ID || ''
+      ),
+      timezone: normalizeString(safeEnv.GOOGLE_CALENDAR_TIMEZONE || 'Europe/Amsterdam'),
+      syncCooldownMs: readBoundedNumberEnv(
+        safeEnv.GOOGLE_CALENDAR_SYNC_COOLDOWN_MS,
+        60_000,
+        10_000,
+        600_000
+      ),
+    },
     securityContactEmail: normalizeString(safeEnv.SECURITY_CONTACT_EMAIL || 'info@softora.nl'),
     demoConfirmationTaskEnabled: readBooleanEnvFlag(safeEnv.ENABLE_DEMO_CONFIRMATION_TASK),
   };

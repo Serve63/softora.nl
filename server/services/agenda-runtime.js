@@ -116,8 +116,10 @@ function createAgendaRuntime(deps = {}) {
     refreshAgendaAppointmentCallSourcesIfNeeded,
     backfillGeneratedAgendaAppointmentsMetadataIfNeeded,
     refreshGeneratedAgendaSummariesIfNeeded,
+    syncGoogleCalendarEvents,
     isGeneratedAppointmentVisibleForAgenda,
     compareAgendaAppointments,
+    createGoogleCalendarEventForAppointment,
   } = deps;
 
   async function syncConfirmationMailResponse(req, res) {
@@ -257,6 +259,7 @@ function createAgendaRuntime(deps = {}) {
     normalizeTimeHhMm,
     sanitizeAppointmentLocation,
     truncateText,
+    createGoogleCalendarEventForAppointment,
   });
 
   const agendaInterestedLeadsCoordinator = createAgendaInterestedLeadsCoordinator({
@@ -405,6 +408,7 @@ function createAgendaRuntime(deps = {}) {
     refreshAgendaAppointmentCallSourcesIfNeeded,
     backfillGeneratedAgendaAppointmentsMetadataIfNeeded,
     refreshGeneratedAgendaSummariesIfNeeded,
+    syncGoogleCalendarEvents,
     getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
     isGeneratedAppointmentVisibleForAgenda,
     compareAgendaAppointments,

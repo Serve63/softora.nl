@@ -53,6 +53,26 @@ test('loadRuntimeEnv defaults OpenAI text calls to GPT-5.5', () => {
   assert.equal(runtimeEnv.ai.openaiImageModel, 'gpt-image-2');
 });
 
+test('loadRuntimeEnv reads Google Calendar sync configuration', () => {
+  const runtimeEnv = loadRuntimeEnv({
+    GOOGLE_CALENDAR_SYNC_ENABLED: 'true',
+    GOOGLE_CALENDAR_CLIENT_EMAIL: ' calendar-sync@example.iam.gserviceaccount.com ',
+    GOOGLE_CALENDAR_PRIVATE_KEY: '---PRIVATE---',
+    GOOGLE_CALENDAR_SERVE_ID: 'serve-calendar@example.com',
+    GOOGLE_CALENDAR_MARTIJN_ID: 'martijn-calendar@example.com',
+    GOOGLE_CALENDAR_TIMEZONE: 'Europe/Amsterdam',
+    GOOGLE_CALENDAR_SYNC_COOLDOWN_MS: '30000',
+  });
+
+  assert.equal(runtimeEnv.googleCalendar.enabled, true);
+  assert.equal(runtimeEnv.googleCalendar.clientEmail, 'calendar-sync@example.iam.gserviceaccount.com');
+  assert.equal(runtimeEnv.googleCalendar.privateKey, '---PRIVATE---');
+  assert.equal(runtimeEnv.googleCalendar.serveCalendarId, 'serve-calendar@example.com');
+  assert.equal(runtimeEnv.googleCalendar.martijnCalendarId, 'martijn-calendar@example.com');
+  assert.equal(runtimeEnv.googleCalendar.timezone, 'Europe/Amsterdam');
+  assert.equal(runtimeEnv.googleCalendar.syncCooldownMs, 30000);
+});
+
 test('loadRuntimeEnv preserves legacy boolean and numeric fallback rules', () => {
   const runtimeEnv = loadRuntimeEnv({
     WEBSITE_GENERATION_TIMEOUT_MS: '99999999',

@@ -3,6 +3,7 @@ const { createAgendaAppointmentStateService } = require('./agenda-appointment-st
 const { createAgendaMetadataService } = require('./agenda-metadata');
 const { createAgendaTaskHelpers } = require('./agenda-task-helpers');
 const { createConfirmationMailService } = require('./confirmation-mail');
+const { createGoogleCalendarSyncService } = require('./google-calendar-sync');
 
 function createAgendaSupportRuntime(deps = {}) {
   let agendaMetadataService = null;
@@ -45,6 +46,7 @@ function createAgendaSupportRuntime(deps = {}) {
     confirmationMailRuntimeState,
     appendDashboardActivity,
     mailConfig,
+    googleCalendarConfig = {},
     resolveAppointmentCallId,
   } = deps;
 
@@ -206,6 +208,18 @@ function createAgendaSupportRuntime(deps = {}) {
     syncInboundConfirmationEmailsFromImap,
   } = confirmationMailService;
 
+  const googleCalendarSyncService = createGoogleCalendarSyncService({
+    config: googleCalendarConfig,
+    upsertGeneratedAgendaAppointment: (...args) => upsertGeneratedAgendaAppointment(...args),
+    getGeneratedAppointmentIndexById,
+    setGeneratedAgendaAppointmentAtIndex,
+    normalizeString,
+    normalizeDateYyyyMmDd,
+    normalizeTimeHhMm,
+    sanitizeAppointmentLocation,
+    truncateText,
+  });
+
   return {
     backfillGeneratedAgendaAppointmentsMetadataIfNeeded,
     backfillInsightsAndAppointmentsFromRecentCallUpdates,
@@ -245,6 +259,11 @@ function createAgendaSupportRuntime(deps = {}) {
     sendConfirmationEmailViaSmtp,
     setGeneratedAgendaAppointmentAtIndex,
     syncInboundConfirmationEmailsFromImap,
+    syncGoogleCalendarEvents: googleCalendarSyncService.syncGoogleCalendarEvents,
+    createGoogleCalendarEventForAppointment:
+      googleCalendarSyncService.createGoogleCalendarEventForAppointment,
+    isGoogleCalendarConfigured: googleCalendarSyncService.isConfigured,
+    getMissingGoogleCalendarConfig: googleCalendarSyncService.getMissingConfig,
     upsertAiCallInsight,
   };
 }
