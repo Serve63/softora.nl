@@ -7,6 +7,8 @@ test('premium agenda modal uses dossier flow for appointments that already have 
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
+  assert.match(pageSource, /Agenda\. De centrale basis van het bedrijf/);
+  assert.doesNotMatch(pageSource, /Meetings ingepland door AI Lead Generator/);
   assert.match(
     pageSource,
     /function getLinkedOrderIdForAppointment\(apt\)\s*\{[\s\S]*const orderId = Number\(apt\?\.activeOrderId \|\| 0\);[\s\S]*return orderId;/
