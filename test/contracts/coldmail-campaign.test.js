@@ -121,9 +121,11 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(sentMessages[0].bcc, undefined);
   assert.equal(sentMessages[0].subject, 'Nieuwe website voor Bakkerij Zon');
   assert.match(sentMessages[0].text, /Goedemorgen Ruben/);
-  assert.match(sentMessages[0].text, /Referentie: SF-20260424-PROSPECT/);
+  assert.doesNotMatch(sentMessages[0].text, /Referentie: SF-/);
   assert.match(sentMessages[0].html, /font-family:Arial,sans-serif/);
   assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
+  assert.match(sentMessages[0].html, /<!-- Softora referentie SF-20260424-PROSPECT/);
+  assert.doesNotMatch(sentMessages[0].html, />Referentie: SF-/);
 
   const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
   assert.equal(savedRows[0].status, 'gemaild');

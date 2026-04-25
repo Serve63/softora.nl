@@ -513,6 +513,12 @@ function createColdmailCampaignService(deps = {}) {
     return `${cleanText}\n\nReferentie: ${cleanReference}`;
   }
 
+  function appendHiddenColdmailReferenceHtml(html, reference) {
+    const cleanReference = normalizeString(reference);
+    if (!cleanReference) return html;
+    return `${html}\n<!-- Softora referentie ${escapeHtml(cleanReference)} -->`;
+  }
+
   function escapeHtml(value) {
     return normalizeString(value)
       .replace(/&/g, '&amp;')
@@ -843,7 +849,7 @@ function createColdmailCampaignService(deps = {}) {
       const row = item.row;
       const to = getRowEmail(row);
       const reference = buildColdmailReference(row, item.id);
-      const text = appendColdmailReference(buildMailText(bodyTemplate, row), reference);
+      const text = buildMailText(bodyTemplate, row);
       const subject = personalizeTemplate(subjectTemplate, row);
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
@@ -855,7 +861,8 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
-      const html = webdesignPhoto ? appendWebdesignImageHtml(toHtml(text), webdesignPhoto) : toHtml(text);
+      const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(text), reference);
+      const html = webdesignPhoto ? appendWebdesignImageHtml(htmlBase, webdesignPhoto) : htmlBase;
       const attachments = webdesignPhoto
         ? [
             {
