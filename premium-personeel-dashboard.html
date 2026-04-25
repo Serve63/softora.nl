@@ -705,6 +705,61 @@
             flex-shrink: 0;
         }
 
+        .ai-management-schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 0.45rem;
+            margin-top: 0.5rem;
+        }
+
+        .ai-management-schedule-day {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            min-height: 42px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.5);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .ai-management-schedule-day input {
+            width: 15px;
+            height: 15px;
+            accent-color: var(--accent);
+        }
+
+        .ai-management-time-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem;
+            margin-top: 0.65rem;
+        }
+
+        .ai-management-time-field {
+            display: grid;
+            gap: 0.35rem;
+        }
+
+        .ai-management-time-field label {
+            font-size: 0.72rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .ai-management-time-field input {
+            width: 100%;
+            min-height: 42px;
+            padding: 0 0.8rem;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.72);
+            color: var(--text-primary);
+            font: inherit;
+            outline: none;
+        }
+
         .ai-management-config-foot {
             display: flex;
             justify-content: flex-end;
@@ -1906,6 +1961,28 @@
                             <label class="ai-management-config-check"><input type="checkbox" data-ai-config-toggle="agendaDynamic"> Agenda volgen en dynamisch volhouden</label>
                         </div>
                     </div>
+                    <div class="ai-management-config-field">
+                        <div class="ai-management-config-label">Afspraken plannen</div>
+                        <div class="ai-management-schedule-grid" aria-label="Dagen waarop AI afspraken mag inplannen">
+                            <label class="ai-management-schedule-day"><input type="checkbox" data-ai-schedule-day="monday"> Ma</label>
+                            <label class="ai-management-schedule-day"><input type="checkbox" data-ai-schedule-day="tuesday"> Di</label>
+                            <label class="ai-management-schedule-day"><input type="checkbox" data-ai-schedule-day="wednesday"> Wo</label>
+                            <label class="ai-management-schedule-day"><input type="checkbox" data-ai-schedule-day="thursday"> Do</label>
+                            <label class="ai-management-schedule-day"><input type="checkbox" data-ai-schedule-day="friday"> Vr</label>
+                            <label class="ai-management-schedule-day"><input type="checkbox" data-ai-schedule-day="saturday"> Za</label>
+                            <label class="ai-management-schedule-day"><input type="checkbox" data-ai-schedule-day="sunday"> Zo</label>
+                        </div>
+                        <div class="ai-management-time-grid">
+                            <div class="ai-management-time-field">
+                                <label for="aiManagementScheduleStart">Van</label>
+                                <input type="time" id="aiManagementScheduleStart" value="08:30">
+                            </div>
+                            <div class="ai-management-time-field">
+                                <label for="aiManagementScheduleEnd">Tot</label>
+                                <input type="time" id="aiManagementScheduleEnd" value="17:00">
+                            </div>
+                        </div>
+                    </div>
                     <div class="ai-management-config-foot">
                         <button type="button" class="ai-management-config-btn" data-ai-config-close>Annuleren</button>
                         <button type="button" class="ai-management-config-btn ai-management-config-btn--primary" id="aiManagementConfigSave">Opslaan</button>
@@ -2048,13 +2125,20 @@
         const aiManagementConfigCloseButtons = Array.from(document.querySelectorAll('[data-ai-config-close]'));
         const aiManagementConfigChannelInputs = Array.from(document.querySelectorAll('[data-ai-config-channel]'));
         const aiManagementConfigToggleInputs = Array.from(document.querySelectorAll('[data-ai-config-toggle]'));
+        const aiManagementScheduleDayInputs = Array.from(document.querySelectorAll('[data-ai-schedule-day]'));
+        const aiManagementScheduleStartInput = document.getElementById('aiManagementScheduleStart');
+        const aiManagementScheduleEndInput = document.getElementById('aiManagementScheduleEnd');
         const AI_MANAGEMENT_CONFIG_SCOPE = 'premium_dashboard_ai_management';
         const AI_MANAGEMENT_CONFIG_KEY = 'softora_dashboard_ai_management_config_v1';
+        const AI_MANAGEMENT_SCHEDULE_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         const DEFAULT_AI_MANAGEMENT_CONFIG = {
             goal: '',
             channels: ['coldcalling', 'coldmailing'],
             databaseDynamic: true,
             agendaDynamic: true,
+            scheduleDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+            scheduleStart: '08:30',
+            scheduleEnd: '17:00',
         };
         const initialAiManagementMode = (
             window.SoftoraAiManagement &&
@@ -2086,6 +2170,11 @@
 
         function normalizeDashboardString(value) {
             return String(value || '').trim();
+        }
+
+        function normalizeDashboardTime(value, fallback) {
+            const raw = normalizeDashboardString(value);
+            return /^\d{2}:\d{2}$/.test(raw) ? raw : fallback;
         }
 
         function normalizeDashboardDate(value) {
@@ -2123,12 +2212,33 @@
             const channels = Array.isArray(raw.channels)
                 ? raw.channels.map((item) => String(item || '').trim()).filter(Boolean)
                 : DEFAULT_AI_MANAGEMENT_CONFIG.channels.slice();
+            const scheduleDays = Array.isArray(raw.scheduleDays)
+                ? raw.scheduleDays
+                    .map((item) => normalizeDashboardString(item).toLowerCase())
+                    .filter((item) => AI_MANAGEMENT_SCHEDULE_DAYS.includes(item))
+                : DEFAULT_AI_MANAGEMENT_CONFIG.scheduleDays.slice();
             return {
                 goal: normalizeDashboardString(raw.goal),
                 channels: channels.length ? Array.from(new Set(channels)) : DEFAULT_AI_MANAGEMENT_CONFIG.channels.slice(),
                 databaseDynamic: raw.databaseDynamic !== false,
                 agendaDynamic: raw.agendaDynamic !== false,
+                scheduleDays: scheduleDays.length ? Array.from(new Set(scheduleDays)) : DEFAULT_AI_MANAGEMENT_CONFIG.scheduleDays.slice(),
+                scheduleStart: normalizeDashboardTime(raw.scheduleStart, DEFAULT_AI_MANAGEMENT_CONFIG.scheduleStart),
+                scheduleEnd: normalizeDashboardTime(raw.scheduleEnd, DEFAULT_AI_MANAGEMENT_CONFIG.scheduleEnd),
             };
+        }
+
+        function getAiManagementScheduleDayLabel(value) {
+            const labels = {
+                monday: 'maandag',
+                tuesday: 'dinsdag',
+                wednesday: 'woensdag',
+                thursday: 'donderdag',
+                friday: 'vrijdag',
+                saturday: 'zaterdag',
+                sunday: 'zondag',
+            };
+            return labels[value] || value;
         }
 
         async function hydrateAiManagementConfigFromServer() {
@@ -2156,7 +2266,8 @@
             const channels = safeConfig.channels.length ? safeConfig.channels.join(', ') : 'geen kanalen';
             const databaseLine = safeConfig.databaseDynamic ? 'database dynamisch bijhouden' : 'database niet aanpassen';
             const agendaLine = safeConfig.agendaDynamic ? 'agenda dynamisch volhouden' : 'agenda niet aanpassen';
-            return `Doel: ${safeConfig.goal}. Toegestaan: ${channels}. ${databaseLine}; ${agendaLine}.`;
+            const scheduleLine = `afspraken plannen op ${safeConfig.scheduleDays.map(getAiManagementScheduleDayLabel).join(', ')} tussen ${safeConfig.scheduleStart} en ${safeConfig.scheduleEnd}`;
+            return `Doel: ${safeConfig.goal}. Toegestaan: ${channels}. ${databaseLine}; ${agendaLine}; ${scheduleLine}.`;
         }
 
         function getAiManagementInstruction(value) {
@@ -2247,6 +2358,15 @@
                 const key = input.getAttribute('data-ai-config-toggle');
                 input.checked = config[key] !== false;
             });
+            aiManagementScheduleDayInputs.forEach((input) => {
+                input.checked = config.scheduleDays.includes(input.getAttribute('data-ai-schedule-day'));
+            });
+            if (aiManagementScheduleStartInput) {
+                aiManagementScheduleStartInput.value = config.scheduleStart;
+            }
+            if (aiManagementScheduleEndInput) {
+                aiManagementScheduleEndInput.value = config.scheduleEnd;
+            }
         }
 
         function readAiManagementConfigForm() {
@@ -2254,11 +2374,18 @@
                 .filter((input) => input.checked)
                 .map((input) => input.getAttribute('data-ai-config-channel'))
                 .filter(Boolean);
+            const scheduleDays = aiManagementScheduleDayInputs
+                .filter((input) => input.checked)
+                .map((input) => input.getAttribute('data-ai-schedule-day'))
+                .filter(Boolean);
             const nextConfig = {
                 goal: aiManagementGoalInput ? aiManagementGoalInput.value : '',
                 channels,
                 databaseDynamic: true,
                 agendaDynamic: true,
+                scheduleDays,
+                scheduleStart: aiManagementScheduleStartInput ? aiManagementScheduleStartInput.value : DEFAULT_AI_MANAGEMENT_CONFIG.scheduleStart,
+                scheduleEnd: aiManagementScheduleEndInput ? aiManagementScheduleEndInput.value : DEFAULT_AI_MANAGEMENT_CONFIG.scheduleEnd,
             };
             aiManagementConfigToggleInputs.forEach((input) => {
                 const key = input.getAttribute('data-ai-config-toggle');
