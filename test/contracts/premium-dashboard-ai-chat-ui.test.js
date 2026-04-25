@@ -23,6 +23,14 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
     pageSource,
     /class="dashboard-lead-legend-strip"[\s\S]*class="lead-type-legend"[\s\S]*Bedrijfssoftware[\s\S]*Voicesoftware[\s\S]*Chatbots/s
   );
+  assert.match(
+    pageSource,
+    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-lead-legend-strip \{[\s\S]*order:\s*2;[\s\S]*margin-bottom:\s*1\.5rem;/s
+  );
+  assert.match(
+    pageSource,
+    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.kpi-grid \{[\s\S]*order:\s*3;/s
+  );
 });
 
 test('premium dashboard toont AI beheer dropdown boven de datumfilters', () => {

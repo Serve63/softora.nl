@@ -1018,6 +1018,33 @@
             animation: fadeUp 0.6s var(--ease-out-expo) 0.55s forwards;
         }
 
+        html[data-ai-management-mode="software"] .premium-boot-shell {
+            display: flex;
+            flex-direction: column;
+        }
+
+        html[data-ai-management-mode="software"] .premium-boot-shell > .topbar {
+            order: 0;
+        }
+
+        html[data-ai-management-mode="software"] .premium-boot-shell > .ai-management-config-backdrop {
+            order: 1;
+        }
+
+        html[data-ai-management-mode="software"] .premium-boot-shell > .dashboard-lead-legend-strip {
+            order: 2;
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+        }
+
+        html[data-ai-management-mode="software"] .premium-boot-shell > .kpi-grid {
+            order: 3;
+        }
+
+        html[data-ai-management-mode="software"] .premium-boot-shell > .content-grid {
+            order: 4;
+        }
+
         .lead-type-legend {
             display: flex;
             align-items: center;
