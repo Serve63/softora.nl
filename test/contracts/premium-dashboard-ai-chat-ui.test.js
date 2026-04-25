@@ -78,7 +78,10 @@ test('premium dashboard opent AI beheer configuratie met doel en toegestane midd
   assert.match(pageSource, /<label class="ai-management-config-label" for="aiManagementGoalInput">Doel:<\/label>/);
   assert.match(pageSource, /id="aiManagementGoalInput" placeholder="Ben specifiek\. AI doet letterlijk wat je zegt\."/);
   assert.match(pageSource, /goal: '',/);
-  assert.match(pageSource, /goal: normalizeDashboardString\(raw\.goal\),/);
+  assert.match(pageSource, /const LEGACY_AI_MANAGEMENT_GOAL_PARTS = \['Meer kwalitatieve afspraken', 'en klanten binnenhalen\.'\];/);
+  assert.match(pageSource, /function normalizeAiManagementGoal\(value\)/);
+  assert.match(pageSource, /return goal === LEGACY_AI_MANAGEMENT_GOAL_PARTS\.join\(' '\) \? '' : goal;/);
+  assert.match(pageSource, /goal: normalizeAiManagementGoal\(raw\.goal\),/);
   assert.doesNotMatch(pageSource, /Meer kwalitatieve afspraken en klanten binnenhalen\./);
   assert.match(pageSource, /data-ai-config-channel="coldcalling"/);
   assert.match(pageSource, /data-ai-config-channel="coldmailing"/);

@@ -2131,6 +2131,7 @@
         const AI_MANAGEMENT_CONFIG_SCOPE = 'premium_dashboard_ai_management';
         const AI_MANAGEMENT_CONFIG_KEY = 'softora_dashboard_ai_management_config_v1';
         const AI_MANAGEMENT_SCHEDULE_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const LEGACY_AI_MANAGEMENT_GOAL_PARTS = ['Meer kwalitatieve afspraken', 'en klanten binnenhalen.'];
         const DEFAULT_AI_MANAGEMENT_CONFIG = {
             goal: '',
             channels: ['coldcalling', 'coldmailing'],
@@ -2207,6 +2208,11 @@
                 : 'AI BEHEER';
         }
 
+        function normalizeAiManagementGoal(value) {
+            const goal = normalizeDashboardString(value);
+            return goal === LEGACY_AI_MANAGEMENT_GOAL_PARTS.join(' ') ? '' : goal;
+        }
+
         function normalizeAiManagementConfig(value) {
             const raw = value && typeof value === 'object' ? value : {};
             const channels = Array.isArray(raw.channels)
@@ -2218,7 +2224,7 @@
                     .filter((item) => AI_MANAGEMENT_SCHEDULE_DAYS.includes(item))
                 : DEFAULT_AI_MANAGEMENT_CONFIG.scheduleDays.slice();
             return {
-                goal: normalizeDashboardString(raw.goal),
+                goal: normalizeAiManagementGoal(raw.goal),
                 channels: channels.length ? Array.from(new Set(channels)) : DEFAULT_AI_MANAGEMENT_CONFIG.channels.slice(),
                 databaseDynamic: raw.databaseDynamic !== false,
                 agendaDynamic: raw.agendaDynamic !== false,
