@@ -496,6 +496,22 @@ function createColdmailCampaignService(deps = {}) {
       .trim();
   }
 
+  function buildColdmailReference(row, id) {
+    const seed = sanitizeFilename(id || getRowCompany(row) || getRowEmail(row) || 'mail', 'mail')
+      .replace(/-/g, '')
+      .slice(0, 8)
+      .toUpperCase();
+    const stamp = now().toISOString().slice(0, 10).replace(/-/g, '');
+    return `SF-${stamp}-${seed || 'MAIL'}`;
+  }
+
+  function appendColdmailReference(text, reference) {
+    const cleanText = normalizeString(text);
+    const cleanReference = normalizeString(reference);
+    if (!cleanReference) return cleanText;
+    return `${cleanText}\n\nReferentie: ${cleanReference}`;
+  }
+
   function escapeHtml(value) {
     return normalizeString(value)
       .replace(/&/g, '&amp;')
@@ -825,7 +841,8 @@ function createColdmailCampaignService(deps = {}) {
     for (const item of selectedRows) {
       const row = item.row;
       const to = getRowEmail(row);
-      const text = buildMailText(bodyTemplate, row);
+      const reference = buildColdmailReference(row, item.id);
+      const text = appendColdmailReference(buildMailText(bodyTemplate, row), reference);
       const subject = personalizeTemplate(subjectTemplate, row);
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {

@@ -120,6 +120,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(sentMessages[0].bcc, undefined);
   assert.equal(sentMessages[0].subject, 'Nieuwe website voor Bakkerij Zon');
   assert.match(sentMessages[0].text, /Goedemorgen Ruben/);
+  assert.match(sentMessages[0].text, /Referentie: SF-20260424-PROSPECT/);
   assert.match(sentMessages[0].html, /font-family:Arial,sans-serif/);
   assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
 
