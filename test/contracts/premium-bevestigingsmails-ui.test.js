@@ -232,6 +232,8 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /senderEmail: senderSelect \? senderSelect\.value : ''/);
   assert.match(pageSource, /specialAction: specialActionSelect \? specialActionSelect\.value : ''/);
   assert.match(pageSource, /coldcallingStack: stackSelect \? stackSelect\.value : ''/);
+  assert.match(pageSource, /subject: subjectInput \? subjectInput\.value : ''/);
+  assert.match(pageSource, /body: bodyInput \? bodyInput\.value : ''/);
   assert.match(pageSource, /function fetchColdmailingUiState\(scope\)/);
   assert.match(pageSource, /\/api\/ui-state-get\?scope=/);
   assert.match(pageSource, /\/api\/ui-state\//);
@@ -241,6 +243,10 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /function hydrateColdmailingSettingsFromSupabase\(\)/);
   assert.match(pageSource, /function bindColdmailingSettingsPersistence\(\)/);
   assert.match(pageSource, /\['campaignSenderEmail', 'campaignSpecialAction', 'coldcallingStack'\]/);
+  assert.match(pageSource, /\['subj1', 'body1'\]/);
+  assert.match(pageSource, /input\.addEventListener\('input', persistColdmailingSettingsSoon\);/);
+  assert.match(pageSource, /if \(subjectInput && normalized\.subject\) subjectInput\.value = normalized\.subject;/);
+  assert.match(pageSource, /if \(bodyInput && normalized\.body\) bodyInput\.value = normalized\.body;/);
   assert.match(
     pageSource,
     /initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\);/

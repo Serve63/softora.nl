@@ -1736,6 +1736,8 @@ function normalizeColdmailingSettings(value) {
     senderEmail: String(raw.senderEmail || '').trim().toLowerCase(),
     specialAction: String(raw.specialAction || '').trim().toLowerCase(),
     coldcallingStack: normalizeColdcallingStack(raw.coldcallingStack || 'retell_ai'),
+    subject: String(raw.subject || ''),
+    body: String(raw.body || ''),
   };
 }
 
@@ -1752,10 +1754,14 @@ function collectColdmailingSettings() {
   const senderSelect = document.getElementById('campaignSenderEmail');
   const specialActionSelect = document.getElementById('campaignSpecialAction');
   const stackSelect = document.getElementById('coldcallingStack');
+  const subjectInput = document.getElementById('subj1');
+  const bodyInput = document.getElementById('body1');
   return normalizeColdmailingSettings({
     senderEmail: senderSelect ? senderSelect.value : '',
     specialAction: specialActionSelect ? specialActionSelect.value : '',
     coldcallingStack: stackSelect ? stackSelect.value : '',
+    subject: subjectInput ? subjectInput.value : '',
+    body: bodyInput ? bodyInput.value : '',
   });
 }
 
@@ -1815,9 +1821,13 @@ function persistColdmailingSettingsSoon() {
 
 function applyColdmailingSettings(settings) {
   const normalized = normalizeColdmailingSettings(settings);
+  const subjectInput = document.getElementById('subj1');
+  const bodyInput = document.getElementById('body1');
   setSelectValueIfAvailable(document.getElementById('campaignSenderEmail'), normalized.senderEmail);
   setSelectValueIfAvailable(document.getElementById('campaignSpecialAction'), normalized.specialAction);
   setSelectValueIfAvailable(document.getElementById('coldcallingStack'), normalized.coldcallingStack);
+  if (subjectInput && normalized.subject) subjectInput.value = normalized.subject;
+  if (bodyInput && normalized.body) bodyInput.value = normalized.body;
 }
 
 async function hydrateColdmailingSettingsFromSupabase() {
@@ -1837,6 +1847,13 @@ function bindColdmailingSettingsPersistence() {
     if (!select || select.dataset.supabaseSettingsBound === '1') return;
     select.dataset.supabaseSettingsBound = '1';
     select.addEventListener('change', persistColdmailingSettingsSoon);
+  });
+  ['subj1', 'body1'].forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input || input.dataset.supabaseSettingsBound === '1') return;
+    input.dataset.supabaseSettingsBound = '1';
+    input.addEventListener('input', persistColdmailingSettingsSoon);
+    input.addEventListener('change', persistColdmailingSettingsSoon);
   });
 }
 
