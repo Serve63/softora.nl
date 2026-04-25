@@ -6,6 +6,9 @@ function resolveManualPlannerLabel(body, normalizeString) {
   const raw = normalizeString(body?.who || body?.manualWho || '').toLowerCase();
   if (raw === 'serve' || raw === 'servé') return 'Servé';
   if (raw === 'martijn') return 'Martijn';
+  if (raw === 'both' || raw === 'allebei' || raw === 'beide' || raw === 'serve-martijn') {
+    return 'Servé en Martijn';
+  }
   if (raw === 'overig' || raw === 'other') return 'Overig';
   return '';
 }
@@ -168,7 +171,14 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       provider: 'manual',
       providerLabel: 'Handmatig',
       coldcallingStack: 'manual',
-      manualPlannerWho: whoLabel === 'Martijn' ? 'martijn' : whoLabel === 'Overig' ? 'overig' : 'serve',
+      manualPlannerWho:
+        whoLabel === 'Martijn'
+          ? 'martijn'
+          : whoLabel === 'Servé en Martijn'
+            ? 'both'
+            : whoLabel === 'Overig'
+              ? 'overig'
+              : 'serve',
       manualLegendChoice: legendChoice,
       manualActivityTime: activityTime,
       manualNotes: notes,

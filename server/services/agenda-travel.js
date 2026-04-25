@@ -55,6 +55,7 @@ function createAgendaTravelService(deps = {}) {
     if (!raw) return '';
     if (raw === 'servé' || raw === 'serve') return 'serve';
     if (raw === 'martijn') return 'martijn';
+    if (raw === 'both' || raw === 'allebei' || raw === 'beide' || raw === 'serve-martijn') return 'both';
     return raw;
   }
 
@@ -74,6 +75,7 @@ function createAgendaTravelService(deps = {}) {
     if (!normalizedPlanner) return true;
     const appointmentPlanner = resolveAppointmentPlannerKey(appointment);
     if (!appointmentPlanner) return true;
+    if (appointmentPlanner === 'both') return normalizedPlanner === 'serve' || normalizedPlanner === 'martijn' || normalizedPlanner === 'both';
     return appointmentPlanner === normalizedPlanner;
   }
 

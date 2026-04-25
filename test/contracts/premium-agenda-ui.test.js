@@ -104,6 +104,10 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /data-manual-meeting-type="voice"/);
   assert.match(pageSource, /data-manual-meeting-type="chatbot"/);
   assert.match(pageSource, /id="manualAppointmentActivity"/);
+  assert.match(pageSource, /Voor wie\?/);
+  assert.match(pageSource, /data-manual-who="serve"/);
+  assert.match(pageSource, /data-manual-who="martijn"/);
+  assert.match(pageSource, /data-manual-who="both"/);
   assert.match(pageSource, /Titel/);
   assert.match(pageSource, /id="manualAppointmentTime"/);
   assert.match(pageSource, /Tijdstip/);
@@ -139,15 +143,21 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /Activiteit Servé/);
   assert.match(pageSource, /legend-dot manual-martijn/);
   assert.match(pageSource, /Activiteit Martijn/);
+  assert.match(pageSource, /legend-dot manual-both/);
+  assert.match(pageSource, /Activiteit allebei/);
   assert.match(pageSource, /legend-dot manual-overig/);
   assert.match(pageSource, /Overig/);
   assert.match(pageSource, /\.legend-dot\.manual-overig \{ background: #ec4899; \}/);
   assert.match(pageSource, /\.appointment\.manual-overig \{[\s\S]*border-left: 3px solid #ec4899;/);
   assert.match(pageSource, /activityTime: timeVal/);
+  assert.match(pageSource, /const who = String\(manualAppointmentWho \|\| ''\)\.trim\(\);/);
+  assert.match(pageSource, /Kies voor wie deze afspraak is\./);
   assert.match(pageSource, /legendChoice,/);
+  assert.match(pageSource, /who,/);
   assert.match(pageSource, /notes,/);
   assert.match(pageSource, /if \(manualLegendChoice === 'business'\) return 'appointment meeting magnetic meeting--business';/);
   assert.match(pageSource, /if \(who === 'overig'\) return 'appointment manual-overig magnetic';/);
+  assert.match(pageSource, /if \(who === 'both' \|\| who === 'allebei' \|\| who === 'beide'\) return 'appointment manual-both magnetic';/);
 });
 
 test('premium agenda handmatige afspraak-modal slaat locatie en opmerkingen op', () => {

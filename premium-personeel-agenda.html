@@ -334,6 +334,12 @@
             border-left: 3px solid #7c3aed;
         }
 
+        .appointment.manual-both {
+            background: linear-gradient(135deg, rgba(13, 148, 136, 0.18), rgba(124, 58, 237, 0.18));
+            color: #312e81;
+            border-left: 3px solid #6366f1;
+        }
+
         .appointment.manual-overig {
             background: rgba(236, 72, 153, 0.18);
             color: #831843;
@@ -373,6 +379,7 @@
         .legend-dot.completed { background: #64748b; }
         .legend-dot.manual-serve { background: #0d9488; }
         .legend-dot.manual-martijn { background: #7c3aed; }
+        .legend-dot.manual-both { background: linear-gradient(135deg, #0d9488 0 50%, #7c3aed 50% 100%); }
         .legend-dot.manual-overig { background: #ec4899; }
 
         /* Ruben-planning uitleg: platte tekst, geen kader (onder de agenda) */
@@ -1357,6 +1364,20 @@
                     <input type="hidden" id="manualAppointmentActivityTime" autocomplete="off">
                     <input type="hidden" id="manualAppointmentLegendChoice" autocomplete="off">
                     <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Voor wie?</div>
+                        <div class="manual-appointment-choice-grid" role="group" aria-label="Voor wie is deze afspraak?">
+                            <button class="manual-appointment-choice" type="button" data-manual-who="serve">
+                                <span class="manual-appointment-choice-title">Servé</span>
+                            </button>
+                            <button class="manual-appointment-choice" type="button" data-manual-who="martijn">
+                                <span class="manual-appointment-choice-title">Martijn</span>
+                            </button>
+                            <button class="manual-appointment-choice" type="button" data-manual-who="both">
+                                <span class="manual-appointment-choice-title">Allebei</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Titel</div>
                         <input type="text" class="modal-workspace-input" id="manualAppointmentActivity" placeholder="Titel van de afspraak" maxlength="500" autocomplete="off">
                     </div>
@@ -1503,6 +1524,7 @@
                 <div class="legend-item"><div class="legend-dot chatbot"></div> Chatbot Meeting</div>
                 <div class="legend-item"><div class="legend-dot manual-serve"></div> Activiteit Servé</div>
                 <div class="legend-item"><div class="legend-dot manual-martijn"></div> Activiteit Martijn</div>
+                <div class="legend-item"><div class="legend-dot manual-both"></div> Activiteit allebei</div>
                 <div class="legend-item"><div class="legend-dot manual-overig"></div> Overig</div>
                 <div class="legend-item"><div class="legend-dot completed"></div> Activiteit afgerond</div>
             </div>
@@ -1573,6 +1595,7 @@
     let manualAppointmentStep = 'kind';
     let manualAppointmentKind = '';
     let manualAppointmentMeetingType = '';
+    let manualAppointmentWho = '';
     const modalAudioBlock = document.getElementById('modalAudioBlock');
     const modalAudioPlayer = document.getElementById('modalAudioPlayer');
     const modalAudioEmpty = document.getElementById('modalAudioEmpty');
@@ -2294,6 +2317,7 @@
         if (raw === 'voice' || raw === 'voicesoftware') return 'voice';
         if (raw === 'chatbot' || raw === 'chatbots') return 'chatbot';
         if (raw === 'manual-martijn' || raw === 'martijn') return 'manual-martijn';
+        if (raw === 'manual-both' || raw === 'both' || raw === 'allebei' || raw === 'beide') return 'manual-both';
         if (raw === 'manual-overig' || raw === 'overig' || raw === 'other') return 'manual-overig';
         if (raw === 'completed' || raw === 'afgerond') return 'completed';
         if (raw === 'manual-serve' || raw === 'serve' || raw === 'servé') return 'manual-serve';
@@ -2307,6 +2331,9 @@
         });
         document.querySelectorAll('[data-manual-meeting-type]').forEach(function (button) {
             button.classList.toggle('is-active', String(button.getAttribute('data-manual-meeting-type') || '') === manualAppointmentMeetingType);
+        });
+        document.querySelectorAll('[data-manual-who]').forEach(function (button) {
+            button.classList.toggle('is-active', String(button.getAttribute('data-manual-who') || '') === manualAppointmentWho);
         });
     }
 
@@ -2341,6 +2368,7 @@
     function resetManualAppointmentWizard() {
         manualAppointmentKind = '';
         manualAppointmentMeetingType = '';
+        manualAppointmentWho = '';
         if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '';
         if (manualAppointmentActivityTimeEl) manualAppointmentActivityTimeEl.value = '';
         if (manualAppointmentLegendChoiceEl) manualAppointmentLegendChoiceEl.value = '';
@@ -2361,6 +2389,13 @@
                 const first = document.querySelector('[data-manual-meeting-type]');
                 if (first) first.focus();
                 return;
+            }
+            if (manualAppointmentStep === 'details' && !manualAppointmentWho) {
+                const first = document.querySelector('[data-manual-who]');
+                if (first) {
+                    first.focus();
+                    return;
+                }
             }
             if (manualAppointmentActivityEl) manualAppointmentActivityEl.focus();
         }, 30);
@@ -2438,7 +2473,7 @@
         const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
         const location = manualAppointmentLocationEl ? String(manualAppointmentLocationEl.value || '').trim() : '';
         const notes = manualAppointmentNotesEl ? String(manualAppointmentNotesEl.value || '').trim() : '';
-        const who = manualAppointmentKind === 'overig' ? 'overig' : 'serve';
+        const who = String(manualAppointmentWho || '').trim();
 
         if (manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
             setManualAppointmentStatus('Kies eerst wat je wilt inplannen.', 'error');
@@ -2446,6 +2481,10 @@
         }
         if (!legendChoice) {
             setManualAppointmentStatus('Kies welke meeting je wilt inplannen.', 'error');
+            return;
+        }
+        if (who !== 'serve' && who !== 'martijn' && who !== 'both') {
+            setManualAppointmentStatus('Kies voor wie deze afspraak is.', 'error');
             return;
         }
         if (!activity) {
@@ -2882,10 +2921,18 @@
             if (manualLegendChoice === 'chatbot') return 'appointment meeting magnetic meeting--chatbot';
             if (manualLegendChoice === 'website') return 'appointment meeting magnetic';
             if (manualLegendChoice === 'manual-martijn') return 'appointment manual-martijn magnetic';
+            if (manualLegendChoice === 'manual-both') return 'appointment manual-both magnetic';
+            if (manualLegendChoice === 'manual-overig') {
+                const manualWho = String(apt?.manualPlannerWho || apt?.manualWho || '').toLowerCase();
+                if (manualWho === 'martijn') return 'appointment manual-martijn magnetic';
+                if (manualWho === 'both' || manualWho === 'allebei' || manualWho === 'beide') return 'appointment manual-both magnetic';
+                if (manualWho === 'serve' || manualWho === 'servé') return 'appointment manual-serve magnetic';
+            }
             if (manualLegendChoice === 'manual-overig') return 'appointment manual-overig magnetic';
             if (manualLegendChoice === 'manual-serve') return 'appointment manual-serve magnetic';
             const who = String(apt?.manualPlannerWho || apt?.manualWho || '').toLowerCase();
             if (who === 'martijn') return 'appointment manual-martijn magnetic';
+            if (who === 'both' || who === 'allebei' || who === 'beide') return 'appointment manual-both magnetic';
             if (who === 'overig') return 'appointment manual-overig magnetic';
             return 'appointment manual-serve magnetic';
         }
@@ -3525,6 +3572,12 @@
     document.querySelectorAll('[data-manual-meeting-type]').forEach((button) => {
         button.addEventListener('click', () => {
             manualAppointmentMeetingType = String(button.getAttribute('data-manual-meeting-type') || '').trim();
+            setManualAppointmentActiveChoices();
+        });
+    });
+    document.querySelectorAll('[data-manual-who]').forEach((button) => {
+        button.addEventListener('click', () => {
+            manualAppointmentWho = String(button.getAttribute('data-manual-who') || '').trim();
             setManualAppointmentActiveChoices();
         });
     });

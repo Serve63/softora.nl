@@ -109,3 +109,27 @@ test('agenda manual appointment stores stepped modal details', async () => {
   assert.match(res.body.appointment.summary, /Locatie: Kantoor/);
   assert.match(res.body.appointment.summary, /Opmerkingen: Voorbereiden voor klantgesprek\./);
 });
+
+test('agenda manual appointment can be assigned to Serve and Martijn together', async () => {
+  const { coordinator } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        who: 'both',
+        title: 'Gezamenlijke klantmeeting',
+        time: '14:00',
+        legendChoice: 'business',
+        location: 'Teams',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.appointment.manualPlannerWho, 'both');
+  assert.match(res.body.appointment.summary, /Wie: Servé en Martijn/);
+});

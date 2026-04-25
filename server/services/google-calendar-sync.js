@@ -271,6 +271,9 @@ function createGoogleCalendarSyncService(deps = {}) {
     if (rawOwner === 'overig' || rawOwner === 'other') {
       return { ok: true, skipped: true, reason: 'calendar_not_required_for_other', owner: 'overig' };
     }
+    if (rawOwner === 'both' || rawOwner === 'allebei' || rawOwner === 'beide' || rawOwner === 'serve-martijn') {
+      return { ok: true, skipped: true, reason: 'calendar_owner_is_both', owner: 'both' };
+    }
     const owner = resolveOwner(appointment.manualPlannerWho || appointment.googleCalendarOwner || '');
     const calendarId = calendarByOwner[owner];
     if (!calendarId) return { ok: false, skipped: true, reason: 'calendar_missing_for_owner', owner };

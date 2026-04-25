@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#8B2252">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Softora Agenda">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
+  <title>Softora Agenda App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f6f2f4;
+      --card: rgba(255,255,255,0.88);
+      --ink: #171727;
+      --muted: #777586;
+      --accent: #8B2252;
+      --accent-light: #b52c70;
+      --green: #24b26b;
+      --border: rgba(23,23,39,0.1);
+      --shadow: 0 24px 80px rgba(31, 17, 35, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% -10%, rgba(181,44,112,0.22), transparent 34%),
+        radial-gradient(circle at 100% 12%, rgba(36,178,107,0.12), transparent 28%),
+        var(--bg);
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .app-shell {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      padding: max(1rem, env(safe-area-inset-top)) 1rem max(1.4rem, env(safe-area-inset-bottom));
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 410px);
+      gap: 1.5rem;
+      align-items: center;
+      min-height: calc(100vh - 2rem);
+    }
+
+    .copy-card,
+    .phone-frame {
+      background: var(--card);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .copy-card {
+      padding: clamp(1.35rem, 4vw, 3rem);
+      border-radius: 2rem;
+    }
+
+    .kicker,
+    h1,
+    .section-title,
+    .mini-label,
+    .appointment-time,
+    .primary-btn {
+      font-family: 'Oswald', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .kicker {
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-bottom: 0.8rem;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 12ch;
+      font-size: clamp(2.6rem, 8vw, 5.4rem);
+      line-height: 0.88;
+      letter-spacing: 0.02em;
+    }
+
+    .lead {
+      max-width: 42rem;
+      margin: 1.25rem 0 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 2vw, 1.15rem);
+      line-height: 1.75;
+    }
+
+    .feature-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.8rem;
+      margin-top: 1.5rem;
+    }
+
+    .feature {
+      border: 1px solid var(--border);
+      border-radius: 1.1rem;
+      background: rgba(255,255,255,0.62);
+      padding: 0.9rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .feature strong {
+      display: block;
+      color: var(--ink);
+      margin-bottom: 0.22rem;
+    }
+
+    .store-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-top: 1.6rem;
+    }
+
+    .store-pill {
+      border: 1px solid rgba(139,34,82,0.22);
+      color: var(--accent);
+      background: rgba(139,34,82,0.08);
+      border-radius: 999px;
+      padding: 0.65rem 0.9rem;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .phone-frame {
+      border-radius: 2.3rem;
+      padding: 0.9rem;
+      max-width: 430px;
+      width: 100%;
+      justify-self: center;
+    }
+
+    .phone-screen {
+      min-height: 720px;
+      border-radius: 1.8rem;
+      background: #fbfaf8;
+      border: 1px solid rgba(0,0,0,0.08);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .app-top {
+      padding: 1.25rem 1.1rem 0.9rem;
+      background:
+        linear-gradient(135deg, rgba(139,34,82,0.12), rgba(255,255,255,0)),
+        #fff;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .app-brand {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .app-brand-title {
+      font-family: 'Oswald', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 1.45rem;
+      line-height: 1;
+    }
+
+    .status-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: 1px solid rgba(36,178,107,0.22);
+      color: #12643b;
+      background: rgba(36,178,107,0.1);
+      border-radius: 999px;
+      padding: 0.35rem 0.55rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status-dot::before {
+      content: '';
+      width: 0.48rem;
+      height: 0.48rem;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(36,178,107,0.13);
+    }
+
+    .app-sub {
+      margin-top: 0.45rem;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .app-body {
+      flex: 1;
+      padding: 1rem;
+      overflow: auto;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.8rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .refresh-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 0.45rem 0.65rem;
+      font-weight: 700;
+      font-size: 0.78rem;
+    }
+
+    .appointment-list {
+      display: grid;
+      gap: 0.65rem;
+      min-height: 7rem;
+    }
+
+    .appointment-card {
+      display: grid;
+      grid-template-columns: 4.2rem 1fr;
+      gap: 0.75rem;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 1.1rem;
+      padding: 0.8rem;
+    }
+
+    .appointment-time {
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+
+    .appointment-title {
+      font-weight: 800;
+      font-size: 0.95rem;
+      line-height: 1.25;
+    }
+
+    .appointment-meta {
+      margin-top: 0.25rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .empty-state {
+      border: 1px dashed rgba(139,34,82,0.24);
+      border-radius: 1rem;
+      padding: 1rem;
+      color: var(--muted);
+      background: rgba(139,34,82,0.04);
+      line-height: 1.5;
+    }
+
+    .quick-add {
+      margin-top: 1rem;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 1.25rem;
+      padding: 1rem;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 0.7rem;
+      margin-top: 0.8rem;
+    }
+
+    .field {
+      display: grid;
+      gap: 0.28rem;
+    }
+
+    .mini-label {
+      color: var(--muted);
+      font-size: 0.65rem;
+      font-weight: 700;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 0.82rem;
+      background: #fbfaf8;
+      color: var(--ink);
+      padding: 0.78rem 0.82rem;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 5.2rem;
+      resize: vertical;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 0.8fr;
+      gap: 0.65rem;
+    }
+
+    .primary-btn {
+      border: 0;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      color: #fff;
+      padding: 0.88rem 1rem;
+      font-weight: 700;
+      margin-top: 0.2rem;
+    }
+
+    .primary-btn:disabled {
+      opacity: 0.55;
+    }
+
+    .form-status {
+      min-height: 1.2rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.45;
+    }
+
+    .form-status.ok { color: #12643b; }
+    .form-status.error { color: #b42318; }
+
+    @media (max-width: 860px) {
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: 0;
+      }
+
+      .copy-card {
+        padding: 1.35rem;
+      }
+
+      .feature-list {
+        grid-template-columns: 1fr;
+      }
+
+      .phone-screen {
+        min-height: 680px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <div class="copy-card">
+        <div class="kicker">Softora Agenda App</div>
+        <h1>Agenda op zak voor je team</h1>
+        <p class="lead">
+          Deze web-app is de basis voor de App Store versie. Personeel kan via telefoon afspraken bekijken en toevoegen,
+          terwijl dezelfde afspraken direct zichtbaar zijn in de agenda op de Softora-site.
+        </p>
+        <div class="feature-list">
+          <div class="feature"><strong>Zelfde agenda-data</strong>Leest de bestaande `/api/agenda/appointments` feed.</div>
+          <div class="feature"><strong>Mobiel toevoegen</strong>Schrijft afspraken via `/api/agenda/appointments/manual`.</div>
+          <div class="feature"><strong>Personeel-keuze</strong>Kies Servé, Martijn of allebei bij het inplannen.</div>
+          <div class="feature"><strong>App Store-ready basis</strong>Geschikt als PWA/prototype voor een native wrapper.</div>
+        </div>
+        <div class="store-row" aria-label="App status">
+          <span class="store-pill">PWA prototype</span>
+          <span class="store-pill">iPhone-first</span>
+          <span class="store-pill">Agenda sync API</span>
+        </div>
+      </div>
+
+      <div class="phone-frame" aria-label="Softora Agenda App preview">
+        <div class="phone-screen">
+          <header class="app-top">
+            <div class="app-brand">
+              <div>
+                <div class="app-brand-title">Softora Agenda</div>
+                <div class="app-sub">Bekijk en plan afspraken voor het personeel.</div>
+              </div>
+              <span class="status-dot" id="agendaAppSyncStatus">Live sync</span>
+            </div>
+          </header>
+
+          <div class="app-body">
+            <div class="section-head">
+              <div class="section-title">Aankomende afspraken</div>
+              <button class="refresh-btn" type="button" id="agendaAppRefreshBtn">Ververs</button>
+            </div>
+            <div class="appointment-list" id="agendaAppAppointments" aria-live="polite">
+              <div class="empty-state">Agenda laden...</div>
+            </div>
+
+            <section class="quick-add" aria-label="Afspraak toevoegen">
+              <div class="section-title">Afspraak toevoegen</div>
+              <form class="form-grid" id="agendaAppForm">
+                <div class="field">
+                  <label class="mini-label" for="agendaAppWho">Voor wie?</label>
+                  <select id="agendaAppWho" required>
+                    <option value="serve">Servé</option>
+                    <option value="martijn">Martijn</option>
+                    <option value="both">Allebei</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label class="mini-label" for="agendaAppTitle">Titel</label>
+                  <input id="agendaAppTitle" type="text" placeholder="Bijv. klantmeeting" maxlength="500" required>
+                </div>
+                <div class="split">
+                  <div class="field">
+                    <label class="mini-label" for="agendaAppDate">Datum</label>
+                    <input id="agendaAppDate" type="date" required>
+                  </div>
+                  <div class="field">
+                    <label class="mini-label" for="agendaAppTime">Tijd</label>
+                    <input id="agendaAppTime" type="time" step="300" required>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="mini-label" for="agendaAppLocation">Locatie</label>
+                  <input id="agendaAppLocation" type="text" placeholder="Kantoor, Teams of klantlocatie" maxlength="220" required>
+                </div>
+                <div class="field">
+                  <label class="mini-label" for="agendaAppNotes">Opmerkingen</label>
+                  <textarea id="agendaAppNotes" placeholder="Extra context voor de afspraak" maxlength="1000"></textarea>
+                </div>
+                <button class="primary-btn" type="submit" id="agendaAppSubmitBtn">Toevoegen</button>
+                <div class="form-status" id="agendaAppFormStatus"></div>
+              </form>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const listEl = document.getElementById('agendaAppAppointments');
+      const statusEl = document.getElementById('agendaAppSyncStatus');
+      const refreshBtn = document.getElementById('agendaAppRefreshBtn');
+      const form = document.getElementById('agendaAppForm');
+      const submitBtn = document.getElementById('agendaAppSubmitBtn');
+      const formStatus = document.getElementById('agendaAppFormStatus');
+      const dateInput = document.getElementById('agendaAppDate');
+      const timeInput = document.getElementById('agendaAppTime');
+      const titleInput = document.getElementById('agendaAppTitle');
+      const whoInput = document.getElementById('agendaAppWho');
+      const locationInput = document.getElementById('agendaAppLocation');
+      const notesInput = document.getElementById('agendaAppNotes');
+
+      function pad(value) {
+        return String(value).padStart(2, '0');
+      }
+
+      function todayYmd() {
+        const d = new Date();
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      }
+
+      function escapeHtml(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function formatDateLabel(dateYmd) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateYmd || ''));
+        if (!match) return dateYmd || '';
+        const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        return d.toLocaleDateString('nl-NL', { weekday: 'short', day: '2-digit', month: 'short' });
+      }
+
+      function resolveWhoLabel(value) {
+        const raw = String(value || '').toLowerCase();
+        if (raw === 'martijn') return 'Martijn';
+        if (raw === 'both' || raw === 'allebei' || raw === 'beide') return 'Allebei';
+        if (raw === 'overig') return 'Overig';
+        return 'Servé';
+      }
+
+      function normalizeAppointments(payload) {
+        const rawList = Array.isArray(payload?.appointments)
+          ? payload.appointments
+          : Array.isArray(payload?.items)
+            ? payload.items
+            : [];
+        const today = todayYmd();
+        return rawList
+          .map((item) => ({
+            title: String(item.company || item.title || 'Afspraak').trim() || 'Afspraak',
+            date: String(item.date || '').trim(),
+            time: String(item.time || '09:00').trim(),
+            location: String(item.location || item.appointmentLocation || '').trim(),
+            who: String(item.manualPlannerWho || item.manualWho || '').trim(),
+          }))
+          .filter((item) => item.date >= today)
+          .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`))
+          .slice(0, 8);
+      }
+
+      function renderAppointments(items) {
+        if (!listEl) return;
+        if (!items.length) {
+          listEl.innerHTML = '<div class="empty-state">Geen aankomende afspraken gevonden. Voeg hieronder een afspraak toe.</div>';
+          return;
+        }
+        listEl.innerHTML = items.map((item) => `
+          <article class="appointment-card">
+            <div class="appointment-time">${escapeHtml(formatDateLabel(item.date))}<br>${escapeHtml(item.time)}</div>
+            <div>
+              <div class="appointment-title">${escapeHtml(item.title)}</div>
+              <div class="appointment-meta">${escapeHtml(resolveWhoLabel(item.who))}${item.location ? ' · ' + escapeHtml(item.location) : ''}</div>
+            </div>
+          </article>
+        `).join('');
+      }
+
+      function setFormStatus(message, variant) {
+        if (!formStatus) return;
+        formStatus.textContent = String(message || '');
+        formStatus.className = `form-status${variant ? ` ${variant}` : ''}`;
+      }
+
+      async function loadAppointments() {
+        if (statusEl) statusEl.textContent = 'Sync...';
+        try {
+          const response = await fetch('/api/agenda/appointments?fresh=1&limit=80', { cache: 'no-store' });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || data?.ok === false) {
+            throw new Error(String(data?.error || 'Agenda kon niet geladen worden.'));
+          }
+          renderAppointments(normalizeAppointments(data));
+          if (statusEl) statusEl.textContent = 'Live sync';
+        } catch (error) {
+          renderAppointments([]);
+          if (statusEl) statusEl.textContent = 'Offline';
+          setFormStatus(String(error?.message || 'Agenda laden mislukt.'), 'error');
+        }
+      }
+
+      async function submitAppointment(event) {
+        event.preventDefault();
+        const payload = {
+          date: dateInput.value,
+          time: timeInput.value,
+          activityTime: timeInput.value,
+          who: whoInput.value,
+          title: titleInput.value,
+          activity: titleInput.value,
+          location: locationInput.value,
+          notes: notesInput.value,
+          legendChoice: 'manual-overig',
+          actor: 'agendaapp',
+        };
+
+        submitBtn.disabled = true;
+        setFormStatus('Afspraak opslaan...', '');
+        try {
+          const response = await fetch('/api/agenda/appointments/manual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || data?.ok === false) {
+            throw new Error(String(data?.error || 'Afspraak opslaan mislukt.'));
+          }
+          form.reset();
+          dateInput.value = todayYmd();
+          timeInput.value = '09:00';
+          setFormStatus('Afspraak toegevoegd. Hij staat nu ook in de webagenda.', 'ok');
+          await loadAppointments();
+        } catch (error) {
+          setFormStatus(String(error?.message || 'Afspraak opslaan mislukt.'), 'error');
+        } finally {
+          submitBtn.disabled = false;
+        }
+      }
+
+      if (dateInput) dateInput.value = todayYmd();
+      if (timeInput) timeInput.value = '09:00';
+      if (refreshBtn) refreshBtn.addEventListener('click', loadAppointments);
+      if (form) form.addEventListener('submit', submitAppointment);
+      void loadAppointments();
+      window.setInterval(loadAppointments, 30000);
+    })();
+  </script>
+</body>
+</html>
