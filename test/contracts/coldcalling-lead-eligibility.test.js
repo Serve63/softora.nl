@@ -70,6 +70,7 @@ test('coldcalling lead eligibility filters blocked premium database rows by phon
     { company: 'Open Prospect', phone: '06 2222 2222' },
     { company: 'Inactive Prospect', phone: '06 3333 3333' },
     { company: 'Lost Prospect', phone: '06 4444 4444' },
+    { company: 'Active Campaign', phone: '06 5555 5555' },
   ];
   const databaseRows = [
     { bedrijf: 'Servé Creusen', telefoon: '+31629917185', status: 'interesse' },
@@ -77,6 +78,12 @@ test('coldcalling lead eligibility filters blocked premium database rows by phon
     { bedrijf: 'Open Prospect', telefoon: '+31622222222', status: 'Gemaild' },
     { bedrijf: 'Inactive Prospect', telefoon: '+31633333333', status: 'Benaderbaar', actief: 'Nee' },
     { bedrijf: 'Lost Prospect', telefoon: '+31644444444', databaseStatus: 'afgehaakt' },
+    {
+      bedrijf: 'Active Campaign',
+      telefoon: '+31655555555',
+      status: 'gemaild',
+      activeColdmailCampaignUntil: '2999-01-01T00:00:00.000Z',
+    },
   ];
 
   const result = filterColdcallingLeadsByDatabaseStatus(leads, databaseRows);
@@ -84,10 +91,10 @@ test('coldcalling lead eligibility filters blocked premium database rows by phon
   assert.equal(result.allowed.length, 1);
   assert.equal(result.allowed[0].lead.company, 'Open Prospect');
   assert.equal(result.allowed[0].index, 2);
-  assert.equal(result.skippedResults.length, 4);
+  assert.equal(result.skippedResults.length, 5);
   assert.deepEqual(
     result.skippedResults.map((item) => item.details.databaseStatus),
-    ['interesse', 'afspraak', 'buiten', 'afgehaakt']
+    ['interesse', 'afspraak', 'buiten', 'afgehaakt', 'mailcampagne']
   );
 });
 

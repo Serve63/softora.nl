@@ -2,6 +2,7 @@ const { normalizeLeadLikePhoneKey } = require('./lead-identity');
 
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const BLOCKED_DATABASE_STATUSES = new Set([
+  'mailcampagne',
   'interesse',
   'afspraak',
   'klant',
@@ -70,6 +71,7 @@ function normalizeDatabaseContactStatus(value) {
 
 function getStatusLabel(status) {
   const labels = {
+    mailcampagne: 'Actieve mailcampagne',
     interesse: 'Interesse',
     afspraak: 'Afspraak',
     klant: 'Klant',
@@ -78,6 +80,30 @@ function getStatusLabel(status) {
     buiten: 'Buiten gebruik',
   };
   return labels[status] || status || 'Onbekend';
+}
+
+function parseTimestampMs(value) {
+  const raw = normalizeString(value);
+  if (!raw) return 0;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isRowInActiveColdmailCampaign(row) {
+  if (!row || typeof row !== 'object') return false;
+  const explicitUntilMs = Math.max(
+    parseTimestampMs(row.activeColdmailCampaignUntil),
+    parseTimestampMs(row.coldmailCampaignEndsAt),
+    parseTimestampMs(row.mailCampaignEndsAt),
+    parseTimestampMs(row.mailCampaignUntil)
+  );
+  if (explicitUntilMs > Date.now()) return true;
+
+  const startedAtMs = Math.max(parseTimestampMs(row.coldmailCampaignStartedAt), parseTimestampMs(row.lastColdmailSentAt));
+  if (!startedAtMs) return false;
+  const durationDays = Number(row.coldmailCampaignDurationDays || row.mailCampaignDurationDays || 0);
+  if (!Number.isFinite(durationDays) || durationDays <= 0) return false;
+  return startedAtMs + durationDays * 24 * 60 * 60 * 1000 > Date.now();
 }
 
 function isPremiumCustomerListRecord(row) {
@@ -163,6 +189,9 @@ function createBlockedContact(record, matchedBy) {
     : isPremiumCustomerListRecord(record)
       ? 'klant'
       : normalizeDatabaseContactStatus(record?.databaseStatus || record?.status || record?.type || '');
+  if (isRowInActiveColdmailCampaign(record)) {
+    status = 'mailcampagne';
+  }
   const activeValue = normalizeCompactStatus(record?.actief ?? record?.active ?? record?.isActive ?? '');
   if (['nee', 'no', 'false', '0', 'inactive'].includes(activeValue)) {
     status = 'buiten';

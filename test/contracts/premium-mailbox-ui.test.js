@@ -17,6 +17,8 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(pageSource, /'zakelijk@softora\.nl': \[/);
   assert.match(pageSource, /'ruben@softora\.nl': \[/);
+  assert.match(pageSource, /'serve@softora\.nl': \[/);
+  assert.match(pageSource, /'martijn@softora\.nl': \[/);
   assert.match(pageSource, /'info@softora\.nl': \[/);
   assert.doesNotMatch(pageSource, /'software@softora\.nl': \[/);
   assert.match(pageSource, /function getMailboxAccounts\(\) \{\s*return Object\.keys\(MAILBOX_DEMO_BY_ACCOUNT\);\s*\}/);

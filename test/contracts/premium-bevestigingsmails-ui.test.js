@@ -175,6 +175,8 @@ test('premium bevestigingsmails replaces sender detail fields with compact dropd
   assert.match(pageSource, /html\[data-softora-lead-generator-alias="1"\] \.lead-generator-hidden-setting \{ display: none !important; \}/);
   assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Verzenden vanaf<\/div>\s*<select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">/);
   assert.match(pageSource, /<option value="info@softora\.nl" selected>info@softora\.nl<\/option>/);
+  assert.match(pageSource, /<option value="serve@softora\.nl">serve@softora\.nl<\/option>/);
+  assert.match(pageSource, /<option value="martijn@softora\.nl">martijn@softora\.nl<\/option>/);
   assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Speciale handeling<\/div>\s*<select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">/);
   assert.match(pageSource, /<option value="webdesign" selected>Webdesign<\/option>/);
   assert.doesNotMatch(pageSource, /id="delay1"/);

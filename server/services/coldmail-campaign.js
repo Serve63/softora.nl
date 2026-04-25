@@ -127,7 +127,11 @@ function createColdmailCampaignService(deps = {}) {
 
   function getAllowedSenderEmails() {
     return Array.from(
-      new Set([mailFromAddress, smtpUser].map(normalizeEmailAddress).filter(isLikelyValidEmail))
+      new Set(
+        [mailFromAddress, smtpUser, 'serve@softora.nl', 'martijn@softora.nl']
+          .map(normalizeEmailAddress)
+          .filter(isLikelyValidEmail)
+      )
     );
   }
 
@@ -203,8 +207,16 @@ function createColdmailCampaignService(deps = {}) {
       .join('\n');
   }
 
-  function markRowAsMailed(row, actor) {
+  function addDaysIso(date, days) {
+    const next = new Date(date.getTime());
+    next.setUTCDate(next.getUTCDate() + days);
+    return next.toISOString();
+  }
+
+  function markRowAsMailed(row, actor, durationDays) {
     const date = now().toISOString();
+    const safeDurationDays = parsePositiveInt(durationDays, 14, 1, 90);
+    const campaignEndsAt = addDaysIso(new Date(date), safeDurationDays);
     const existingHistory = Array.isArray(row.hist) ? row.hist : [];
     return {
       ...row,
@@ -213,6 +225,10 @@ function createColdmailCampaignService(deps = {}) {
       mail: true,
       lastMailSentAt: date,
       lastColdmailSentAt: date,
+      coldmailCampaignStartedAt: date,
+      coldmailCampaignDurationDays: safeDurationDays,
+      coldmailCampaignEndsAt: campaignEndsAt,
+      activeColdmailCampaignUntil: campaignEndsAt,
       updatedAt: date.slice(0, 10),
       hist: [
         {
@@ -298,7 +314,7 @@ function createColdmailCampaignService(deps = {}) {
     if (sent.length) {
       const actor = normalizeString(input.actor || 'Coldmailing');
       const updatedRows = rows.map((row, index) =>
-        sentRowIds.has(getRowId(row, index)) ? markRowAsMailed(row, actor) : row
+        sentRowIds.has(getRowId(row, index)) ? markRowAsMailed(row, actor, input.durationDays) : row
       );
       await setUiStateValues(
         customerDbScope,

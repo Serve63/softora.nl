@@ -83,6 +83,8 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[0].status, 'gemaild');
   assert.equal(savedRows[0].databaseStatus, 'gemaild');
   assert.equal(savedRows[0].lastColdmailSentAt, '2026-04-24T12:00:00.000Z');
+  assert.equal(savedRows[0].coldmailCampaignDurationDays, 14);
+  assert.equal(savedRows[0].activeColdmailCampaignUntil, '2026-05-08T12:00:00.000Z');
   assert.equal(savedRows[1].status, 'klant');
 });
 
