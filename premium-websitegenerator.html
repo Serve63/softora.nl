@@ -690,34 +690,36 @@ function applyWebsiteGeneratorAuthState() {
   const scanBtn = document.getElementById('scan-btn');
   const websiteLinkCreateEl = document.getElementById('website-link-create-btn');
   const websiteLinkStatusEl = document.getElementById('website-link-status');
+  const authLoaded = Boolean(websiteGeneratorAuthState.loaded);
+  const isAuthenticated = Boolean(authLoaded && websiteGeneratorAuthState.authenticated);
 
   if (loginLinkEl) {
     loginLinkEl.href = getWebsiteGeneratorLoginHref();
   }
 
-  if (authMessageEl && !websiteGeneratorAuthState.authenticated) {
+  if (authMessageEl && authLoaded && !isAuthenticated) {
     authMessageEl.textContent = 'Log in met je premium account om scans te genereren en websitelinks te publiceren.';
   }
 
   if (authCard) {
-    authCard.hidden = Boolean(websiteGeneratorAuthState.authenticated);
+    authCard.hidden = !authLoaded || isAuthenticated;
   }
 
   if (scanBtn) {
-    scanBtn.disabled = !websiteGeneratorAuthState.authenticated;
+    scanBtn.disabled = !isAuthenticated;
   }
 
   if (websiteLinkCreateEl) {
-    websiteLinkCreateEl.disabled = !websiteGeneratorAuthState.authenticated;
+    websiteLinkCreateEl.disabled = !isAuthenticated;
   }
 
   if (websiteLinkStatusEl) {
-    if (websiteGeneratorAuthState.authenticated) {
+    if (isAuthenticated) {
       if (String(websiteLinkStatusEl.textContent || '').trim() === 'Log in om websitelinks aan te maken.') {
         websiteLinkStatusEl.textContent = '';
       }
       websiteLinkStatusEl.style.color = 'var(--text-mid)';
-    } else if (!String(websiteLinkStatusEl.textContent || '').trim()) {
+    } else if (authLoaded && !String(websiteLinkStatusEl.textContent || '').trim()) {
       websiteLinkStatusEl.textContent = 'Log in om websitelinks aan te maken.';
       websiteLinkStatusEl.style.color = '#c0392b';
     }

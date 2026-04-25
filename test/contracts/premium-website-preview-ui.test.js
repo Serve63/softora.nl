@@ -76,6 +76,9 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
 
   assert.match(source, /id="websitegenerator-auth-card"/);
   assert.match(source, /id="websitegenerator-auth-card" hidden/);
+  assert.match(source, /const authLoaded = Boolean\(websiteGeneratorAuthState\.loaded\);/);
+  assert.match(source, /authCard\.hidden = !authLoaded \|\| isAuthenticated;/);
+  assert.doesNotMatch(source, /authCard\.hidden = Boolean\(websiteGeneratorAuthState\.authenticated\)/);
   assert.match(source, /id="websitegenerator-login-link"/);
   assert.match(source, /\/api\/auth\/session/);
   assert.match(source, /premium-personeel-login\?next=/);
