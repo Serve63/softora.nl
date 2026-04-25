@@ -46,6 +46,15 @@ test('premium website houdt Naar Lancering op desktop op één regel', () => {
   assert.match(source, /@media \(max-width: 680px\) \{[\s\S]*\.werkwijze-lancering \{[\s\S]*white-space:\s*normal;/);
 });
 
+test('premium website hero story titel staat op twee regels zonder bureau-ruis', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<h2 class="story-title">Premium uitstraling<br><span class="story-title-line">zonder ruis\.<\/span><\/h2>/);
+  assert.match(source, /\.story-title-line\s*\{[\s\S]*white-space:\s*nowrap;/);
+  assert.doesNotMatch(source, /Premium uitstraling zonder bureau-ruis\./);
+});
+
 test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
