@@ -57,6 +57,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="result-count-icon"/);
   assert.match(pageSource, /<div class="page-title">Database<\/div>/);
+  assert.doesNotMatch(pageSource, /AI-database/i);
+  assert.doesNotMatch(pageSource, /ai-database-badge/);
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
   assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);

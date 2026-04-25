@@ -124,43 +124,6 @@
             align-items: flex-end;
         }
 
-        .ai-database-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0;
-            margin: 0;
-            border: none;
-            border-radius: 0;
-            background: none;
-            box-shadow: none;
-            min-width: 0;
-        }
-
-        .ai-database-badge-head {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .ai-database-dot {
-            width: 9px;
-            height: 9px;
-            border-radius: 999px;
-            background: var(--red);
-            box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.2);
-            flex-shrink: 0;
-        }
-
-        .ai-database-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 1.3px;
-            text-transform: uppercase;
-            color: var(--crimson);
-            line-height: 1;
-        }
-
         .add-actions {
             position: relative;
         }
@@ -1061,10 +1024,6 @@
                 justify-content: flex-start;
             }
 
-            .ai-database-badge {
-                align-self: flex-start;
-            }
-
             .f-count {
                 margin-left: 0;
                 width: 100%;
@@ -1176,12 +1135,6 @@
                             <div class="page-sub" id="top-sub"></div>
                         </div>
                         <div class="top-right">
-                            <div class="ai-database-badge" title="Nog niet ingesteld. Zodra de AI-database live staat, worden databronnen en opvolgregels hier automatisch gekoppeld." role="status" aria-label="AI-database: nog niet ingesteld">
-                                <div class="ai-database-badge-head">
-                                    <span class="ai-database-dot" aria-hidden="true"></span>
-                                    <span class="ai-database-label">AI-database</span>
-                                </div>
-                            </div>
                             <div class="add-actions" id="addActions">
                                 <button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">
                                     Acties
