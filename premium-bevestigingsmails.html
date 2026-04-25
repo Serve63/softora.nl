@@ -1621,9 +1621,16 @@ function renderCampaignCompanyCount() {
 function getColdmailRecipientPreviewUrl() {
   const params = new URLSearchParams();
   params.set('count', String(getCampaignRequestedCompanyCount() || 10));
+  if (isPremiumAiLeadGeneratorPath()) params.set('mode', 'call');
   const branchSelect = document.getElementById('branche');
   if (branchSelect && branchSelect.value) params.set('branch', branchSelect.value);
   return '/api/coldmailing/campaigns/recipients?' + params.toString();
+}
+
+function normalizeCampaignRecipientPhone(value) {
+  const text = String(value || '').trim();
+  if (!text || text === '—' || text === '-') return '';
+  return text.replace(/\D/g, '').length >= 8 ? text : '';
 }
 
 function isCampaignRecipientListOpen() {
@@ -1669,8 +1676,11 @@ function renderCampaignRecipientList(payload) {
     company.textContent = recipient.bedrijf || 'Onbekend bedrijf';
     const email = document.createElement('span');
     email.className = 'campaign-recipient-list-email';
+    const recipientPhone = normalizeCampaignRecipientPhone(
+      recipient.phone || recipient.telefoon || recipient.telefoonnummer || recipient.tel || recipient.contactPhone
+    );
     email.textContent = showPhone
-      ? (recipient.phone || recipient.telefoon || recipient.telefoonnummer || 'Geen telefoonnummer')
+      ? (recipientPhone || 'Geen telefoonnummer ingevuld')
       : (recipient.email || 'Geen e-mailadres');
     item.appendChild(company);
     item.appendChild(email);

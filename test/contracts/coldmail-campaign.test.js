@@ -356,6 +356,46 @@ test('coldmail campaign previews selected recipients before sending', async () =
   ]);
 });
 
+test('coldcalling recipient preview selects callable phone rows', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'no-phone',
+        bedrijf: 'MCV E-commerce',
+        email: 'mcv@example.test',
+        telefoon: '—',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'callable-1',
+        bedrijf: 'Belbare Lead',
+        email: '',
+        tel: '+31 6 2222 3333',
+        status: 'gemaild',
+        mail: false,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    mode: 'call',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.mode, 'call');
+  assert.equal(result.selected, 1);
+  assert.deepEqual(result.recipients, [
+    {
+      id: 'callable-1',
+      bedrijf: 'Belbare Lead',
+      email: '',
+      phone: '+31 6 2222 3333',
+    },
+  ]);
+});
+
 test('coldmail campaign previews invalid recipient domains', async () => {
   const { service } = createService({
     rows: [

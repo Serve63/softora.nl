@@ -216,7 +216,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function getRowPhone(row) {
-    return normalizeString(
+    const value = normalizeString(
       row.phone ||
         row.tel ||
         row.telefoon ||
@@ -227,6 +227,12 @@ function createColdmailCampaignService(deps = {}) {
         row.contactPhone ||
         ''
     );
+    return value === '—' || value === '-' ? '' : value;
+  }
+
+  function isLikelyCallablePhone(value) {
+    const phone = getRowPhone({ phone: value });
+    return phone.replace(/\D/g, '').length >= 8;
   }
 
   function buildRowIdentityKey(row) {
@@ -431,6 +437,14 @@ function createColdmailCampaignService(deps = {}) {
     return !EXCLUDED_DATABASE_STATUSES.has(status);
   }
 
+  function isEligibleColdcallingRow(row, branchFilter) {
+    if (!isLikelyCallablePhone(getRowPhone(row))) return false;
+    if (row.call === false || row.canCall === false || row.doNotCall === true) return false;
+    if (!matchesBranch(row, branchFilter)) return false;
+    const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
+    return !new Set(['interesse', 'afspraak', 'klant', 'afgehaakt', 'geblokkeerd', 'buiten']).has(status);
+  }
+
   async function isDeliverableEmailDomain(email) {
     const domain = getEmailDomain(email);
     if (!domain) return false;
@@ -439,17 +453,22 @@ function createColdmailCampaignService(deps = {}) {
 
   async function resolveColdmailRecipients(input = {}) {
     const count = parsePositiveInt(input.count, 10, 1, 500);
+    const mode = normalizeString(input.mode || '').toLowerCase() === 'call' ? 'call' : 'mail';
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = parseDatabaseRows(values);
     const candidateRows = rows
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
-      .filter(({ row }) => isEligibleColdmailRow(row, input.branch))
+      .filter(({ row }) => (mode === 'call' ? isEligibleColdcallingRow(row, input.branch) : isEligibleColdmailRow(row, input.branch)))
       .slice(0, count);
     const selectedRows = [];
     const failed = [];
 
     for (const item of candidateRows) {
+      if (mode === 'call') {
+        selectedRows.push(item);
+        continue;
+      }
       const email = getRowEmail(item.row);
       if (await isDeliverableEmailDomain(email)) {
         selectedRows.push(item);
@@ -465,6 +484,7 @@ function createColdmailCampaignService(deps = {}) {
 
     return {
       count,
+      mode,
       values,
       rows,
       candidateRows,
@@ -477,6 +497,7 @@ function createColdmailCampaignService(deps = {}) {
     const resolved = await resolveColdmailRecipients(input);
     return {
       ok: true,
+      mode: resolved.mode,
       requested: resolved.count,
       candidates: resolved.candidateRows.length,
       selected: resolved.selectedRows.length,

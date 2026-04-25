@@ -25,6 +25,7 @@ function registerColdmailingRoutes(app, deps = {}) {
       const result = await coldmailCampaignService.getColdmailCampaignRecipients({
         count: req.query.count,
         branch: req.query.branch,
+        mode: req.query.mode,
       });
       res.json(result);
     } catch (error) {
