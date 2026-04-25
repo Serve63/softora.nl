@@ -81,7 +81,8 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /Log eerst in om AI previews te genereren\./);
   assert.match(source, /Log eerst in om websitelinks aan te maken\./);
   assert.match(source, /\/api\/website-preview\/batch/);
-  assert.match(source, /BATCH_JOB_STORAGE_KEY/);
+  assert.match(source, /\/api\/website-preview\/batch\/current/);
+  assert.match(source, /websitePreviewActiveBatchJobId/);
 });
 
 test('premium websitegenerator behoudt hoge full-page previews zonder portrait-crop', () => {
@@ -105,6 +106,7 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.doesNotMatch(source, /readLocalLibraryEntries/);
   assert.doesNotMatch(source, /persistLocalLibraryEntries/);
   assert.doesNotMatch(source, /localStorage/);
+  assert.doesNotMatch(source, /sessionStorage/);
   assert.doesNotMatch(source, /browseropslag/);
   assert.match(source, /data-tab="library"/);
   assert.match(source, /id="tab-library"/);
@@ -116,6 +118,8 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /showToast\('Gebruik één URL per keer\.'\);\s*return;/);
   assert.match(source, /Preview wordt gestart/);
   assert.match(source, /Preview bezig/);
+  assert.doesNotMatch(source, /Maximaal 50 items per account/);
+  assert.doesNotMatch(source, /LIBRARY_MAX_ITEMS/);
   assert.match(source, /window\._lastPreviewImageDataUrl = previewDataUrl/);
 });
 
@@ -141,7 +145,9 @@ test('website preview batch runs server-side and exposes poll route', () => {
   assert.match(batchSvc, /createWebsitePreviewBatchCoordinator/);
   assert.match(batchSvc, /persistPreviewLibraryEntry/);
   assert.match(batchRoutes, /app\.post\('\/api\/website-preview\/batch'/);
+  assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/current'/);
   assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/:jobId'/);
+  assert.match(batchSvc, /getCurrentBatchResponse/);
   assert.match(aiTools, /runWebsitePreviewGeneratePipeline/);
   assert.match(featureRoutes, /registerWebsitePreviewBatchRoutes/);
   assert.match(library, /persistPreviewLibraryEntry/);

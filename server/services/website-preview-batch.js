@@ -100,6 +100,17 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     };
   }
 
+  function findLatestRunningJobForOwner(ownerKey) {
+    let latest = null;
+    for (const job of jobs.values()) {
+      if (job.ownerKey !== ownerKey || job.status !== 'running') continue;
+      if (!latest || job.createdAt > latest.createdAt) {
+        latest = job;
+      }
+    }
+    return latest;
+  }
+
   async function processJob(jobId) {
     const job = jobs.get(jobId);
     if (!job || job.status !== 'running') return;
@@ -278,9 +289,19 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     });
   }
 
+  async function getCurrentBatchResponse(req, res) {
+    pruneJobs();
+    const job = findLatestRunningJobForOwner(ownerKeyFromReq(req));
+    return res.status(200).json({
+      ok: true,
+      job: job ? serializeJob(job) : null,
+    });
+  }
+
   return {
     startBatchResponse,
     getBatchResponse,
+    getCurrentBatchResponse,
   };
 }
 

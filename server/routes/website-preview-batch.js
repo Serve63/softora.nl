@@ -5,6 +5,9 @@ function registerWebsitePreviewBatchRoutes(app, deps = {}) {
   app.post('/api/website-preview/batch', (req, res) =>
     coordinator.startBatchResponse(req, res)
   );
+  app.get('/api/website-preview/batch/current', (req, res) =>
+    coordinator.getCurrentBatchResponse(req, res)
+  );
   app.get('/api/website-preview/batch/:jobId', (req, res) =>
     coordinator.getBatchResponse(req, res)
   );

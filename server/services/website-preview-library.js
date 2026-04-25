@@ -12,10 +12,9 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     upsertSupabaseRowViaRest = async () => ({ ok: false, body: null }),
     deleteSupabaseRowByStateKeyViaRest = async () => ({ ok: false, body: null }),
     supabaseStateKey = '',
-    websitePreviewLibraryMaxItems = 50,
   } = deps;
 
-  const maxItems = Math.max(1, Math.min(100, Number(websitePreviewLibraryMaxItems) || 50));
+  const listFetchLimit = 500;
   /** ~12 MiB string cap — past bij JSON-parserlimiet voor deze route. */
   const maxDataUrlChars = Math.floor(12 * 1024 * 1024);
   /** Houd de lijstrespons klein genoeg voor serverless/browser-limieten. */
@@ -77,7 +76,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     try {
       const ownerSlug = buildOwnerSlug(req);
       const prefix = buildUserKeyPrefix(ownerSlug);
-      const result = await fetchSupabaseRowsByStateKeyPrefixViaRest(prefix, maxItems + 25);
+      const result = await fetchSupabaseRowsByStateKeyPrefixViaRest(prefix, listFetchLimit);
       if (!result.ok) {
         logger.error(
           '[WebsitePreviewLibrary][List]',
@@ -172,32 +171,6 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     const reqLike = { premiumAuth };
     try {
       const ownerSlug = buildOwnerSlug(reqLike);
-      const prefix = buildUserKeyPrefix(ownerSlug);
-      const listResult = await fetchSupabaseRowsByStateKeyPrefixViaRest(prefix, maxItems + 25);
-      if (!listResult.ok) {
-        logger.error(
-          '[WebsitePreviewLibrary][SaveList]',
-          listResult.error || listResult.status || listResult.body
-        );
-        return {
-          ok: false,
-          status: 500,
-          error: 'Bibliotheek opslaan mislukt',
-          detail: 'Kon bestaande items niet ophalen.',
-        };
-      }
-
-      const existingRows = Array.isArray(listResult.body) ? listResult.body : [];
-      const victims = existingRows.slice(maxItems - 1);
-      for (const row of victims) {
-        const key = normalizeString(row?.state_key || '');
-        if (!key.startsWith(prefix)) continue;
-        const del = await deleteSupabaseRowByStateKeyViaRest(key);
-        if (!del.ok) {
-          logger.error('[WebsitePreviewLibrary][Prune]', del.error || del.status || del.body);
-        }
-      }
-
       const entryId = randomUUID();
       const stateKey = buildStateKey(ownerSlug, entryId);
       const hostname = truncateText(normalizeString(bodyObj.hostname || ''), 200);

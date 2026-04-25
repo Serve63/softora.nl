@@ -108,6 +108,41 @@ test('website preview library coordinator stores preview row scoped to user', as
   assert.match(rowsByPrefix[0].state_key, /^core:website_preview_lib:preview-user-at-softora-nl:/);
 });
 
+test('website preview library coordinator does not prune old previews on save', async () => {
+  const { coordinator, rowsByPrefix, deletedKeys } = createFixture();
+  for (let i = 0; i < 55; i += 1) {
+    rowsByPrefix.push({
+      state_key: `core:website_preview_lib:preview-user-at-softora-nl:aaaaaaaa-bbbb-4ccc-8ddd-${String(i).padStart(12, '0')}`,
+      payload: {
+        type: 'website_preview_library',
+        id: `aaaaaaaa-bbbb-4ccc-8ddd-${String(i).padStart(12, '0')}`,
+        dataUrl: 'data:image/png;base64,OLD',
+        url: `https://old-${i}.example.nl/`,
+        hostname: `old-${i}.example.nl`,
+        fileName: 'old.png',
+      },
+      updated_at: new Date(2026, 0, 1, 0, i).toISOString(),
+    });
+  }
+
+  const res = createResponseRecorder();
+  await coordinator.saveLibraryResponse(
+    {
+      body: {
+        dataUrl: 'data:image/png;base64,NEW',
+        url: 'https://softora.nl/',
+        hostname: 'softora.nl',
+      },
+      premiumAuth: { email: 'preview.user@softora.nl' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(rowsByPrefix.length, 56);
+  assert.deepEqual(deletedKeys, []);
+});
+
 test('website preview library coordinator lists entries for same owner prefix', async () => {
   const { coordinator, rowsByPrefix } = createFixture();
   rowsByPrefix.push({
