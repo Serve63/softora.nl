@@ -50,6 +50,18 @@ test('premium website houdt Van Idee Naar Lancering op desktop op één regel', 
   assert.match(source, /@media \(max-width: 680px\) \{[\s\S]*\.werkwijze-title-line,[\s\S]*\.werkwijze-lancering \{[\s\S]*white-space:\s*normal;/);
 });
 
+test('premium website werkwijze gebruikt langere nederlandse procesregels', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /Strategie, structuur en conversiedoel scherpstellen/);
+  assert.match(source, /Premium design uitwerken met duidelijke klantreis/);
+  assert.match(source, /Bouwen, testen en lanceren zonder losse eindjes/);
+  assert.doesNotMatch(source, /Strategie & Discovery/);
+  assert.doesNotMatch(source, /Design & Prototyping/);
+  assert.doesNotMatch(source, /Development & Testing/);
+});
+
 test('premium website hero story titel staat op twee regels zonder bureau-ruis', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
