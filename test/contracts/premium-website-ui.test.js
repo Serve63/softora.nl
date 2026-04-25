@@ -50,6 +50,8 @@ test('premium website hero story titel staat op twee regels zonder bureau-ruis',
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
+  assert.doesNotMatch(source, /Nieuw homepage concept/);
+  assert.doesNotMatch(source, /class="story-label"/);
   assert.match(source, /<h2 class="story-title"><span class="story-title-line">Premium uitstraling<\/span><br><span class="story-title-line">zonder ruis\.<\/span><\/h2>/);
   assert.match(source, /\.story-title\s*\{[\s\S]*font-size:\s*clamp\(1\.38rem,\s*2\.2vw,\s*1\.95rem\);/);
   assert.match(source, /\.story-title-line\s*\{[\s\S]*display:\s*inline-block;/);
