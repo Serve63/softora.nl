@@ -63,6 +63,18 @@ test('premium website hero story gebruikt Oplevertijd als metric-label', () => {
   assert.doesNotMatch(source, /Gemiddelde livegang/);
 });
 
+test('premium website hero story gebruikt korte usp regels', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<li>Strategie, design en bouw\.<\/li>/);
+  assert.match(source, /<li>Snel, mobiel en overtuigend\.<\/li>/);
+  assert.match(source, /<li>Van wireframe tot livegang\.<\/li>/);
+  assert.doesNotMatch(source, /Positionering, design en development lopen in een traject door\./);
+  assert.doesNotMatch(source, /Mobiel eerst, snel geladen en gericht op vertrouwen en aanvragen\./);
+  assert.doesNotMatch(source, /Van eerste wireframe tot livegang met directe, heldere feedbackrondes\./);
+});
+
 test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
