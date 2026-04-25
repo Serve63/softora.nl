@@ -94,6 +94,14 @@ function createMailboxService(deps = {}) {
     };
   }
 
+  function deriveImapHostFromSmtpHost(value) {
+    const host = normalizeString(value);
+    if (!host) return '';
+    if (/strato/i.test(host)) return 'imap.strato.com';
+    if (/^smtp\./i.test(host)) return host.replace(/^smtp\./i, 'imap.');
+    return '';
+  }
+
   function buildAccounts() {
     const fromJson = readJsonAccounts(mailboxAccountsRaw);
     const emails = Array.from(
@@ -108,27 +116,36 @@ function createMailboxService(deps = {}) {
       const json = fromJson.find((item) => normalizeEmail(item.email || item.address) === email) || {};
       const envAccount = envAccountForEmail(email);
       const useBase = email === baseAccount.email || email === normalizeEmail(baseAccount.smtpUser) || email === normalizeEmail(baseAccount.imapUser);
+      const smtpHost = normalizeString(json.smtpHost || envAccount.smtpHost || (useBase ? baseAccount.smtpHost : ''));
+      const smtpUser = normalizeString(json.smtpUser || envAccount.smtpUser || (useBase ? baseAccount.smtpUser : email));
+      const smtpPass = normalizeString(json.smtpPass || envAccount.smtpPass || (useBase ? baseAccount.smtpPass : ''));
+      const imapHost = normalizeString(
+        json.imapHost ||
+          envAccount.imapHost ||
+          (useBase ? baseAccount.imapHost : '') ||
+          deriveImapHostFromSmtpHost(smtpHost)
+      );
       const account = {
         email,
         name: normalizeString(json.name || envAccount.name || (useBase ? baseAccount.name : '')) || email,
-        smtpHost: normalizeString(json.smtpHost || envAccount.smtpHost || (useBase ? baseAccount.smtpHost : '')),
+        smtpHost,
         smtpPort: Number(json.smtpPort || envAccount.smtpPort || (useBase ? baseAccount.smtpPort : 587)) || 587,
         smtpSecure: Boolean(
           json.smtpSecure !== undefined
             ? json.smtpSecure
             : envAccount.smtpSecure || (useBase ? baseAccount.smtpSecure : false)
         ),
-        smtpUser: normalizeString(json.smtpUser || envAccount.smtpUser || (useBase ? baseAccount.smtpUser : email)),
-        smtpPass: normalizeString(json.smtpPass || envAccount.smtpPass || (useBase ? baseAccount.smtpPass : '')),
-        imapHost: normalizeString(json.imapHost || envAccount.imapHost || (useBase ? baseAccount.imapHost : '')),
+        smtpUser,
+        smtpPass,
+        imapHost,
         imapPort: Number(json.imapPort || envAccount.imapPort || (useBase ? baseAccount.imapPort : 993)) || 993,
         imapSecure: Boolean(
           json.imapSecure !== undefined
             ? json.imapSecure
             : envAccount.imapSecure || (useBase ? baseAccount.imapSecure : true)
         ),
-        imapUser: normalizeString(json.imapUser || envAccount.imapUser || (useBase ? baseAccount.imapUser : email)),
-        imapPass: normalizeString(json.imapPass || envAccount.imapPass || (useBase ? baseAccount.imapPass : '')),
+        imapUser: normalizeString(json.imapUser || envAccount.imapUser || (useBase ? baseAccount.imapUser : '') || smtpUser || email),
+        imapPass: normalizeString(json.imapPass || envAccount.imapPass || (useBase ? baseAccount.imapPass : '') || smtpPass),
       };
       account.imapConfigured = Boolean(account.imapHost && account.imapUser && account.imapPass);
       account.smtpConfigured = Boolean(account.smtpHost && account.smtpUser && account.smtpPass);

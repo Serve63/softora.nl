@@ -57,6 +57,13 @@ function loadRuntimeEnv(env = process.env) {
   const mailSmtpPass = normalizeString(
     safeEnv.MAIL_SMTP_PASS || safeEnv.SMTP_PASS || safeEnv.STRATO_SMTP_PASS || ''
   );
+  const derivedImapHostFromSmtp = (() => {
+    const host = normalizeString(mailSmtpHostSource);
+    if (!host) return '';
+    if (/strato/i.test(host)) return 'imap.strato.com';
+    if (/^smtp\./i.test(host)) return host.replace(/^smtp\./i, 'imap.');
+    return '';
+  })();
   const mailImapPort = Number(
     safeEnv.MAIL_IMAP_PORT || safeEnv.IMAP_PORT || safeEnv.STRATO_IMAP_PORT || 993
   );
@@ -200,7 +207,7 @@ function loadRuntimeEnv(env = process.env) {
         safeEnv.MAIL_IMAP_HOST ||
           safeEnv.IMAP_HOST ||
           safeEnv.STRATO_IMAP_HOST ||
-          (/strato/i.test(String(mailSmtpHostSource)) ? 'imap.strato.com' : '')
+          derivedImapHostFromSmtp
       ),
       imapPort: mailImapPort,
       imapSecure: readBooleanEnvFlag(

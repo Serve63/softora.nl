@@ -40,6 +40,18 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.imapPass, 'secret');
 });
 
+test('loadRuntimeEnv derives generic imap host from smtp subdomain', () => {
+  const runtimeEnv = loadRuntimeEnv({
+    MAIL_SMTP_HOST: 'smtp.softora.nl',
+    MAIL_SMTP_USER: 'info@softora.nl',
+    MAIL_SMTP_PASS: 'secret',
+  });
+
+  assert.equal(runtimeEnv.mail.imapHost, 'imap.softora.nl');
+  assert.equal(runtimeEnv.mail.imapUser, 'info@softora.nl');
+  assert.equal(runtimeEnv.mail.imapPass, 'secret');
+});
+
 test('loadRuntimeEnv defaults dashboard Anthropic model to Claude Sonnet 4.6', () => {
   const runtimeEnv = loadRuntimeEnv({});
 

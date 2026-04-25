@@ -100,6 +100,42 @@ test('mailbox service sends mail through selected account smtp', async () => {
   assert.equal(sent[0].message.to, 'klant@example.nl');
 });
 
+test('mailbox service derives imap settings from smtp settings when possible', async () => {
+  const service = createMailboxService({
+    mailConfig: {
+      mailFromAddress: 'info@softora.nl',
+      smtpHost: 'smtp.softora.nl',
+      smtpUser: 'info@softora.nl',
+      smtpPass: 'secret',
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.accountsResponse({}, res);
+
+  const info = res.body.accounts.find((account) => account.email === 'info@softora.nl');
+  assert.equal(info.imapConfigured, true);
+  assert.equal(info.smtpConfigured, true);
+});
+
+test('mailbox service derives per-account imap settings from per-account smtp env', async () => {
+  const oldEnv = { ...process.env };
+  process.env.MAILBOX_INFO_SMTP_HOST = 'smtp.softora.nl';
+  process.env.MAILBOX_INFO_SMTP_USER = 'info@softora.nl';
+  process.env.MAILBOX_INFO_SMTP_PASS = 'secret';
+  try {
+    const service = createMailboxService({ mailConfig: {} });
+    const res = createResponseRecorder();
+
+    await service.accountsResponse({}, res);
+
+    const info = res.body.accounts.find((account) => account.email === 'info@softora.nl');
+    assert.equal(info.imapConfigured, true);
+  } finally {
+    process.env = oldEnv;
+  }
+});
+
 test('mailbox routes expose accounts, messages and send endpoints', () => {
   const routes = [];
   const app = {
