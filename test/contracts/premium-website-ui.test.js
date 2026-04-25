@@ -72,6 +72,17 @@ test('premium website hero story kaart lijnt onderkant uit met hero buttons op d
   );
 });
 
+test('premium website diensten intro houdt tweede zin volledig op eigen regel', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /\.diensten-intro-line\s*\{[\s\S]*display:\s*block;/);
+  assert.match(
+    source,
+    /Vier losse producten\. Of een digitaal ecosysteem dat als een geheel aanvoelt\. <span class="diensten-intro-line">Jij kiest waar we beginnen\.<\/span>/
+  );
+});
+
 test('premium website hero story gebruikt Oplevertijd als metric-label', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
