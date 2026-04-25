@@ -3,6 +3,9 @@ const assert = require('node:assert/strict');
 
 const { createColdmailCampaignService } = require('../../server/services/coldmail-campaign');
 
+const TINY_PNG_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+
 function createService(overrides = {}) {
   const sentMessages = [];
   let savedState = null;
@@ -35,11 +38,20 @@ function createService(overrides = {}) {
       mailFromName: 'Softora',
       mailReplyTo: 'reply@softora.nl',
     },
-    getUiStateValues: async () => ({
-      values: {
-        softora_customers_premium_v1: JSON.stringify(rows),
-      },
-    }),
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_database_photos') {
+        return {
+          values: overrides.photoValues || {
+            softora_database_photos_v1: JSON.stringify(overrides.photoMap || {}),
+          },
+        };
+      }
+      return {
+        values: {
+          softora_customers_premium_v1: JSON.stringify(rows),
+        },
+      };
+    },
     setUiStateValues: async (scope, values, meta) => {
       savedState = { scope, values, meta };
       return { ok: true };
@@ -72,7 +84,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
     body: 'Goedemorgen {{naam}},\n\nZou u openstaan voor webdesign?',
     senderEmail: 'info@softora.nl',
     branch: 'Horeca & Restaurants',
-    specialAction: 'webdesign',
+    specialAction: '',
     actor: 'Servé',
   });
 
@@ -92,6 +104,79 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[0].coldmailCampaignDurationDays, 14);
   assert.equal(savedRows[0].activeColdmailCampaignUntil, '2026-05-08T12:00:00.000Z');
   assert.equal(savedRows[1].status, 'klant');
+});
+
+test('coldmail campaign attaches webdesign photo inline and as attachment', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-prospect-1@softora');
+  assert.equal(sentMessages[0].attachments[0].contentType, 'image/png');
+  assert.equal(sentMessages[0].attachments[1].filename, sentMessages[0].attachments[0].filename);
+});
+
+test('coldmail campaign refuses webdesign action when photo is missing', async () => {
+  const { service, sentMessages, getSavedState } = createService({
+    rows: [
+      {
+        id: 'prospect-no-photo',
+        bedrijf: 'Bakkerij Zonder Foto',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Nieuwe website voor {{bedrijf}}',
+        body: 'Goedemorgen {{naam}}',
+        senderEmail: 'info@softora.nl',
+        specialAction: 'webdesign',
+      }),
+    (error) => {
+      assert.equal(error.code, 'SMTP_SEND_FAILED');
+      assert.match(error.message, /Geen webdesign-foto gevonden voor Bakkerij Zonder Foto/);
+      assert.equal(error.failedItems[0].email, 'ruben@example.test');
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+  assert.equal(getSavedState(), null);
 });
 
 test('coldmail campaign sends test recipient without marking database row as mailed', async () => {

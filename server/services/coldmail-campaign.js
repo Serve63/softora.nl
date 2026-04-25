@@ -3,6 +3,8 @@ const dns = require('node:dns').promises;
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
+const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
+const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const TEST_RECIPIENT_EMAILS = new Set(['servec321@gmail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce']);
 const EXCLUDED_DATABASE_STATUSES = new Set([
@@ -46,6 +48,8 @@ function createColdmailCampaignService(deps = {}) {
     setUiStateValues = async () => null,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
+    customerPhotoScope = DEFAULT_CUSTOMER_PHOTO_SCOPE,
+    customerPhotoKey = DEFAULT_CUSTOMER_PHOTO_KEY,
     createTransport = (config) => nodemailer.createTransport(config),
     resolveEmailDomain = resolveEmailDomainWithDns,
     normalizeString = (value) => String(value || '').trim(),
@@ -133,6 +137,19 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
+  function safeJsonParse(value, fallback) {
+    try {
+      return JSON.parse(normalizeString(value));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function isWebdesignSpecialAction(value) {
+    const normalized = normalizeString(value).toLowerCase();
+    return normalized === 'webdesign' || normalized === 'website-design' || normalized === 'website_design';
+  }
+
   function getRowId(row, index) {
     return normalizeString(row.id || row.customerId || row.databaseId || '') || `row-${index}`;
   }
@@ -151,6 +168,16 @@ function createColdmailCampaignService(deps = {}) {
 
   function getRowEmail(row) {
     return normalizeEmailAddress(row.email || row.contactEmail || row.mail || '');
+  }
+
+  function getRowPhone(row) {
+    return normalizeString(row.tel || row.telefoon || row.phone || row.contactPhone || '');
+  }
+
+  function buildRowIdentityKey(row) {
+    return [getRowCompany(row), getRowContact(row), getRowPhone(row)]
+      .map((value) => normalizeString(value).toLowerCase())
+      .join('|');
   }
 
   function getEmailDomain(email) {
@@ -300,6 +327,39 @@ function createColdmailCampaignService(deps = {}) {
       .trim();
   }
 
+  function escapeHtml(value) {
+    return normalizeString(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function parseDataUrlImage(value) {
+    const match = normalizeString(value).match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-z0-9+/=\s]+)$/i);
+    if (!match) return null;
+    return {
+      contentType: match[1].toLowerCase(),
+      content: Buffer.from(match[2].replace(/\s+/g, ''), 'base64'),
+    };
+  }
+
+  function getImageExtension(contentType) {
+    if (contentType === 'image/jpeg' || contentType === 'image/jpg') return 'jpg';
+    if (contentType === 'image/webp') return 'webp';
+    if (contentType === 'image/gif') return 'gif';
+    return 'png';
+  }
+
+  function sanitizeFilename(value, fallback = 'webdesign') {
+    const normalized = normalizeString(value)
+      .replace(/\.[a-z0-9]{2,5}$/i, '')
+      .replace(/[^a-z0-9_-]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80);
+    return normalized || fallback;
+  }
+
   function toHtml(text) {
     return normalizeString(text)
       .split(/\n{2,}/)
@@ -315,6 +375,57 @@ function createColdmailCampaignService(deps = {}) {
           .join('<br>')}</p>`
       )
       .join('\n');
+  }
+
+  function appendWebdesignImageHtml(html, attachment) {
+    if (!attachment || !attachment.cid) return html;
+    return `${html}\n<p style="margin-top:24px;"><img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
+      attachment.alt || 'Webdesign'
+    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>`;
+  }
+
+  function parseCustomerPhotoMap(raw, values = {}) {
+    const parsed = safeJsonParse(raw || '{}', {});
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const stateValues = values && typeof values === 'object' ? values : {};
+    Object.keys(parsed).forEach((key) => {
+      const item = parsed[key];
+      if (!item || typeof item !== 'object' || parseDataUrlImage(item.websitePhoto)) return;
+      const photoKey = normalizeString(item.photoKey);
+      const chunkCount = Math.max(0, Math.min(80, Number(item.chunkCount || 0) || 0));
+      if (!photoKey || !chunkCount) return;
+      const dataUrl = Array.from({ length: chunkCount }, (_, index) => normalizeString(stateValues[`${photoKey}_${index}`])).join('');
+      if (parseDataUrlImage(dataUrl)) item.websitePhoto = dataUrl;
+    });
+    return parsed;
+  }
+
+  async function loadCustomerPhotoMap() {
+    const state = await getUiStateValues(customerPhotoScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    return parseCustomerPhotoMap(values[customerPhotoKey], values);
+  }
+
+  function resolveRowWebdesignPhoto(row, photoMap) {
+    const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
+    const direct = photos[getRowId(row, 0)];
+    const identityKey = buildRowIdentityKey(row);
+    const identity = Object.keys(photos)
+      .map((key) => photos[key])
+      .find((item) => normalizeString(item && item.identityKey) === identityKey);
+    const photo = direct || identity || null;
+    const parsed = parseDataUrlImage(photo && photo.websitePhoto);
+    if (!parsed) return null;
+    const baseName = sanitizeFilename(photo.websitePhotoName || `${getRowCompany(row)} webdesign`, 'webdesign');
+    const extension = getImageExtension(parsed.contentType);
+    const filename = `${baseName}.${extension}`;
+    const cid = `webdesign-${sanitizeFilename(getRowId(row, 0), 'image')}@softora`;
+    return {
+      ...parsed,
+      filename,
+      cid,
+      alt: `${getRowCompany(row) || 'Bedrijf'} webdesign`,
+    };
   }
 
   function addDaysIso(date, days) {
@@ -383,6 +494,8 @@ function createColdmailCampaignService(deps = {}) {
 
     const selectedRows = resolvedRecipients.selectedRows;
     const failed = resolvedRecipients.failed;
+    const shouldIncludeWebdesignPhoto = isWebdesignSpecialAction(input.specialAction);
+    const customerPhotoMap = shouldIncludeWebdesignPhoto ? await loadCustomerPhotoMap() : {};
 
     if (!selectedRows.length) {
       const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
@@ -400,6 +513,32 @@ function createColdmailCampaignService(deps = {}) {
       const to = getRowEmail(row);
       const text = buildMailText(bodyTemplate, row);
       const subject = personalizeTemplate(subjectTemplate, row);
+      const webdesignPhoto = shouldIncludeWebdesignPhoto ? resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
+      if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(row),
+          email: to,
+          error: `Geen webdesign-foto gevonden voor ${getRowCompany(row) || to}.`,
+        });
+        continue;
+      }
+      const html = webdesignPhoto ? appendWebdesignImageHtml(toHtml(text), webdesignPhoto) : toHtml(text);
+      const attachments = webdesignPhoto
+        ? [
+            {
+              filename: webdesignPhoto.filename,
+              content: webdesignPhoto.content,
+              contentType: webdesignPhoto.contentType,
+              cid: webdesignPhoto.cid,
+            },
+            {
+              filename: webdesignPhoto.filename,
+              content: webdesignPhoto.content,
+              contentType: webdesignPhoto.contentType,
+            },
+          ]
+        : undefined;
       try {
         const info = await transporter.sendMail({
           from: formatMailFromHeader(senderEmail),
@@ -408,7 +547,8 @@ function createColdmailCampaignService(deps = {}) {
           replyTo: mailReplyTo || mailFromAddress || undefined,
           subject,
           text,
-          html: toHtml(text),
+          html,
+          attachments,
         });
         sent.push({
           id: item.id,
