@@ -331,6 +331,7 @@ html[data-softora-lead-generator-alias="1"] #mail-subj-row { display: none !impo
 html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setting { display: none !important; }
 html[data-softora-lead-generator-alias="1"] .lead-generator-branch-field { display: none !important; }
 html:not([data-softora-lead-generator-alias="1"]) .lead-generator-belmethod-field { display: none !important; }
+html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { display: none !important; }
 .zone-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1201,13 +1202,13 @@ Softora.nl | +31 6 2991 7185</textarea>
             </select>
             <div class="mf-help">Kies welke AI-stack de software gebruikt voor coldcalling.</div>
           </div>
-          <div class="mf-row">
+          <div class="mf-row lead-generator-hidden-setting">
             <div class="mf-label">Verzenden vanaf</div>
             <select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">
               <option value="info@softora.nl" selected>info@softora.nl</option>
             </select>
           </div>
-          <div class="mf-row">
+          <div class="mf-row lead-generator-hidden-setting">
             <div class="mf-label">Speciale handeling</div>
             <select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">
               <option value="webdesign" selected>Webdesign</option>
@@ -2202,19 +2203,7 @@ function goBack() {
 
 
 function ensureLeadGeneratorSettingsBackRow() {
-  if (!isPremiumAiLeadGeneratorPath()) return;
-  var p5 = document.getElementById('mail-panel-5');
-  if (!p5 || p5.querySelector('.lead-gen-back-to-script')) return;
-  var fields = p5.querySelector('.mail-fields');
-  if (!fields) return;
-  var wrap = document.createElement('div');
-  wrap.className = 'mf-row lead-gen-back-to-script';
-  wrap.innerHTML =
-    '<button type="button" class="mail-tab" style="cursor:pointer" id="leadGenBackToScriptBtn">Terug naar script</button>';
-  fields.insertBefore(wrap, fields.firstChild);
-  document.getElementById('leadGenBackToScriptBtn').addEventListener('click', function () {
-    switchMail(1, null);
-  });
+  return;
 }
 
 function toggleMailSettings(el) {

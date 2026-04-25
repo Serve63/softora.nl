@@ -148,6 +148,9 @@ test('premium bevestigingsmails removes mail and ai-instructions tabs while keep
   assert.match(pageSource, /if \(el\) el\.classList\.add\('active'\);/);
   assert.match(pageSource, /#body1 \{ height: clamp\(420px, 52vh, 520px\); \}/);
   assert.match(pageSource, /function ensureLeadGeneratorSettingsBackRow/);
+  assert.match(pageSource, /function ensureLeadGeneratorSettingsBackRow\(\) \{\s*return;\s*\}/);
+  assert.doesNotMatch(pageSource, /lead-gen-back-to-script/);
+  assert.doesNotMatch(pageSource, /Terug naar script/);
 });
 
 test('premium bevestigingsmails replaces sender detail fields with compact dropdown settings', () => {
@@ -166,9 +169,10 @@ test('premium bevestigingsmails replaces sender detail fields with compact dropd
   assert.doesNotMatch(pageSource, /Handtekening/);
   assert.doesNotMatch(pageSource, /Deze gegevens kun je later gebruiken als vaste afzenderinformatie voor alle coldmails\./);
 
-  assert.match(pageSource, /<select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">/);
+  assert.match(pageSource, /html\[data-softora-lead-generator-alias="1"\] \.lead-generator-hidden-setting \{ display: none !important; \}/);
+  assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Verzenden vanaf<\/div>\s*<select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">/);
   assert.match(pageSource, /<option value="info@softora\.nl" selected>info@softora\.nl<\/option>/);
-  assert.match(pageSource, /<select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">/);
+  assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Speciale handeling<\/div>\s*<select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">/);
   assert.match(pageSource, /<option value="webdesign" selected>Webdesign<\/option>/);
   assert.doesNotMatch(pageSource, /id="delay1"/);
   assert.doesNotMatch(pageSource, /Antwoord snelheid/);
