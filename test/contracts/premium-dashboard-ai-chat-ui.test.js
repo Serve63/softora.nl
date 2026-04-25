@@ -29,15 +29,15 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
   assert.match(pageSource, /zodat klanten niet zomaar lastiggevallen worden/);
   assert.match(
     pageSource,
-    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-ai-management-status-panel \{[\s\S]*display:\s*block;[\s\S]*order:\s*2;/s
+    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-ai-management-status-panel \{[\s\S]*display:\s*block;[\s\S]*order:\s*5;[\s\S]*margin-top:\s*1\.5rem;/s
   );
   assert.match(
     pageSource,
-    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-lead-legend-strip \{[\s\S]*order:\s*3;[\s\S]*margin-bottom:\s*1\.5rem;/s
+    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-lead-legend-strip \{[\s\S]*order:\s*2;[\s\S]*margin-bottom:\s*1\.5rem;/s
   );
   assert.match(
     pageSource,
-    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.kpi-grid \{[\s\S]*order:\s*4;/s
+    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.kpi-grid \{[\s\S]*order:\s*3;/s
   );
 });
 
