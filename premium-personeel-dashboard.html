@@ -2729,6 +2729,27 @@
             }
         }
 
+        function normalizePremiumDashboardCustomerDatabaseStatus(item) {
+            const value = normalizeDashboardString(item && item.databaseStatus).toLowerCase();
+            const status = normalizeDashboardString(item && item.status).toLowerCase();
+            const knownDatabaseStatuses = [
+                'prospect',
+                'benaderbaar',
+                'gebeld',
+                'gemaild',
+                'interesse',
+                'afspraak',
+                'klant',
+                'afgehaakt',
+                'geblokkeerd',
+                'buiten'
+            ];
+            if (knownDatabaseStatuses.includes(value)) return value;
+            if (knownDatabaseStatuses.includes(status)) return status;
+            if (status === 'betaald') return 'klant';
+            return value || status || 'prospect';
+        }
+
         function parsePremiumCustomers(raw) {
             try {
                 const parsed = JSON.parse(String(raw || '[]'));
@@ -2747,7 +2768,11 @@
                             : (type === 'Onderhoud' && Number.isFinite(legacyAmount) && legacyAmount >= 0
                                 ? Math.round(legacyAmount)
                                 : null);
-                        const status = normalizeDashboardString(item && item.status) === 'Open' ? 'Open' : 'Betaald';
+                        const databaseStatus = normalizePremiumDashboardCustomerDatabaseStatus(item);
+                        const rawStatus = normalizeDashboardString(item && item.status);
+                        const status = rawStatus === 'Open'
+                            ? 'Open'
+                            : (rawStatus === 'Betaald' || databaseStatus === 'klant' ? 'Betaald' : 'Open');
                         return {
                             id: normalizeDashboardString(item && item.id) || `dashboard-customer-${index}`,
                             naam: normalizeDashboardString(item && item.naam) || 'Onbekend',
@@ -2759,9 +2784,11 @@
                                 ? Math.round(legacyAmount)
                                 : (websiteBedrag || onderhoudPerMaand || 0),
                             status,
+                            databaseStatus,
                             datum: normalizeDashboardDate(item && item.datum)
                         };
                     })
+                    .filter((customer) => customer.databaseStatus === 'klant')
                     .filter((customer) => customer.id);
             } catch (_) {
                 return [];

@@ -59,6 +59,17 @@ test('premium dashboard toont AI beheer dropdown boven de datumfilters', () => {
   assert.match(pageSource, /softora-ai-management-change/);
 });
 
+test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
+  assert.match(pageSource, /const databaseStatus = normalizePremiumDashboardCustomerDatabaseStatus\(item\);/);
+  assert.match(pageSource, /databaseStatus,/);
+  assert.match(pageSource, /\.filter\(\(customer\) => customer\.databaseStatus === 'klant'\)/);
+  assert.match(pageSource, /totalClientsEl\.textContent = String\(hasCustomerDatabase \? customers\.length : uniqueClients\.size\);/);
+});
+
 test('premium dashboard opent AI beheer configuratie met doel en toegestane middelen', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
