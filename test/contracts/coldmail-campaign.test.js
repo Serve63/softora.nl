@@ -205,6 +205,7 @@ test('coldmail campaign sends test recipient without marking database row as mai
   assert.equal(result.sent, 1);
   assert.equal(result.persisted, 0);
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');
+  assert.match(sentMessages[0].subject, /^Test voor MCV E-commerce \[test [a-z0-9]+-[a-f0-9]{4}\]$/);
   assert.equal(getSavedState(), null);
 });
 
@@ -238,6 +239,7 @@ test('coldmail campaign keeps MCV E-commerce reusable even after earlier mailed 
   assert.equal(result.sent, 1);
   assert.equal(result.persisted, 0);
   assert.equal(sentMessages[0].to, 'mcv-test@example.test');
+  assert.match(sentMessages[0].subject, /^Test voor MCV E-commerce \[test [a-z0-9]+-[a-f0-9]{4}\]$/);
   assert.equal(getSavedState(), null);
 });
 

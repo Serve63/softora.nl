@@ -234,6 +234,13 @@ function createColdmailCampaignService(deps = {}) {
     return name ? `${name} <${address}>` : address;
   }
 
+  function formatCampaignSubject(subject, row, email) {
+    const personalizedSubject = personalizeTemplate(subject, row);
+    if (!isTestRecipientRow(row, email)) return personalizedSubject;
+    const testSuffix = `${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`;
+    return truncateText(`${personalizedSubject} [test ${testSuffix}]`, 200);
+  }
+
   function parsePositiveInt(value, fallback, min, max) {
     const parsed = Number.parseInt(String(value || ''), 10);
     const safe = Number.isFinite(parsed) ? parsed : fallback;
@@ -518,7 +525,7 @@ function createColdmailCampaignService(deps = {}) {
       const row = item.row;
       const to = getRowEmail(row);
       const text = buildMailText(bodyTemplate, row);
-      const subject = personalizeTemplate(subjectTemplate, row);
+      const subject = formatCampaignSubject(subjectTemplate, row, to);
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
         failed.push({
