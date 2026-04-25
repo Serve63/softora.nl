@@ -37,6 +37,15 @@ test('premium website werkwijze stats gebruiken een vaste paarse lijn zonder hov
   assert.doesNotMatch(source, /\.stat-item:hover \.stat-number\s*\{/);
 });
 
+test('premium website houdt Naar Lancering op desktop op één regel', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<h2 class="werkwijze-title"[\s\S]*Van Idee<br><span class="werkwijze-lancering">Naar Lancering<\/span><\/h2>/);
+  assert.match(source, /\.werkwijze-lancering\s*\{[\s\S]*display:\s*inline-block;[\s\S]*white-space:\s*nowrap;/);
+  assert.match(source, /@media \(max-width: 680px\) \{[\s\S]*\.werkwijze-lancering \{[\s\S]*white-space:\s*normal;/);
+});
+
 test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
