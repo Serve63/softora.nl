@@ -1884,7 +1884,7 @@
                     </div>
                     <div class="ai-management-config-field">
                         <label class="ai-management-config-label" for="aiManagementGoalInput">Doel:</label>
-                        <textarea class="ai-management-goal-input" id="aiManagementGoalInput" placeholder="Bijvoorbeeld: meer kwalitatieve afspraken en klanten binnenhalen."></textarea>
+                        <textarea class="ai-management-goal-input" id="aiManagementGoalInput" placeholder="Ben specifiek. AI doet letterlijk wat je zegt."></textarea>
                     </div>
                     <div class="ai-management-config-field">
                         <div class="ai-management-config-label">Wat mag AI gebruiken om dat te behalen?</div>
@@ -2051,7 +2051,7 @@
         const AI_MANAGEMENT_CONFIG_SCOPE = 'premium_dashboard_ai_management';
         const AI_MANAGEMENT_CONFIG_KEY = 'softora_dashboard_ai_management_config_v1';
         const DEFAULT_AI_MANAGEMENT_CONFIG = {
-            goal: 'Meer kwalitatieve afspraken en klanten binnenhalen.',
+            goal: '',
             channels: ['coldcalling', 'coldmailing'],
             databaseDynamic: true,
             agendaDynamic: true,
@@ -2124,7 +2124,7 @@
                 ? raw.channels.map((item) => String(item || '').trim()).filter(Boolean)
                 : DEFAULT_AI_MANAGEMENT_CONFIG.channels.slice();
             return {
-                goal: normalizeDashboardString(raw.goal) || DEFAULT_AI_MANAGEMENT_CONFIG.goal,
+                goal: normalizeDashboardString(raw.goal),
                 channels: channels.length ? Array.from(new Set(channels)) : DEFAULT_AI_MANAGEMENT_CONFIG.channels.slice(),
                 databaseDynamic: raw.databaseDynamic !== false,
                 agendaDynamic: raw.agendaDynamic !== false,

@@ -65,7 +65,10 @@ test('premium dashboard opent AI beheer configuratie met doel en toegestane midd
 
   assert.match(pageSource, /id="aiManagementConfigModal" role="dialog" aria-modal="true"/);
   assert.match(pageSource, /<label class="ai-management-config-label" for="aiManagementGoalInput">Doel:<\/label>/);
-  assert.match(pageSource, /id="aiManagementGoalInput"/);
+  assert.match(pageSource, /id="aiManagementGoalInput" placeholder="Ben specifiek\. AI doet letterlijk wat je zegt\."/);
+  assert.match(pageSource, /goal: '',/);
+  assert.match(pageSource, /goal: normalizeDashboardString\(raw\.goal\),/);
+  assert.doesNotMatch(pageSource, /Meer kwalitatieve afspraken en klanten binnenhalen\./);
   assert.match(pageSource, /data-ai-config-channel="coldcalling"/);
   assert.match(pageSource, /data-ai-config-channel="coldmailing"/);
   assert.match(pageSource, /data-ai-config-channel="ads_trustoo"/);
