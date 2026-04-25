@@ -330,6 +330,12 @@
             border-left: 3px solid #7c3aed;
         }
 
+        .appointment.manual-overig {
+            background: rgba(236, 72, 153, 0.18);
+            color: #831843;
+            border-left: 3px solid #ec4899;
+        }
+
         .appointment.completed {
             background: rgba(100, 116, 139, 0.2);
             color: #334155;
@@ -363,6 +369,7 @@
         .legend-dot.completed { background: #64748b; }
         .legend-dot.manual-serve { background: #0d9488; }
         .legend-dot.manual-martijn { background: #7c3aed; }
+        .legend-dot.manual-overig { background: #ec4899; }
 
         /* Ruben-planning uitleg: platte tekst, geen kader (onder de agenda) */
         .agenda-routing-bubble-wrap {
@@ -1283,6 +1290,10 @@
                             <input type="radio" name="manualAppointmentWho" value="martijn">
                             Martijn
                         </label>
+                        <label class="modal-workspace-radio">
+                            <input type="radio" name="manualAppointmentWho" value="overig">
+                            Overig
+                        </label>
                     </div>
                 </div>
                 <div class="manual-appointment-detail-fields" id="manualAppointmentDetailFields">
@@ -1428,6 +1439,7 @@
                 <div class="legend-item"><div class="legend-dot chatbot"></div> Chatbot Meeting</div>
                 <div class="legend-item"><div class="legend-dot manual-serve"></div> Activiteit Servé</div>
                 <div class="legend-item"><div class="legend-dot manual-martijn"></div> Activiteit Martijn</div>
+                <div class="legend-item"><div class="legend-dot manual-overig"></div> Overig</div>
                 <div class="legend-item"><div class="legend-dot completed"></div> Activiteit afgerond</div>
             </div>
         </div>
@@ -2289,8 +2301,8 @@
             : '';
 
         const who = getManualAppointmentWho();
-        if (who !== 'serve' && who !== 'martijn') {
-            setManualAppointmentStatus('Kies Servé of Martijn bij wie ben je.', 'error');
+        if (who !== 'serve' && who !== 'martijn' && who !== 'overig') {
+            setManualAppointmentStatus('Kies Servé, Martijn of Overig bij wie ben je.', 'error');
             return;
         }
 
@@ -2729,6 +2741,7 @@
         if (isManual) {
             const who = String(apt?.manualPlannerWho || apt?.manualWho || '').toLowerCase();
             if (who === 'martijn') return 'appointment manual-martijn magnetic';
+            if (who === 'overig') return 'appointment manual-overig magnetic';
             return 'appointment manual-serve magnetic';
         }
         const line = resolveAgendaMeetingProductLine(apt);

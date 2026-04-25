@@ -9,6 +9,7 @@ function resolveManualPlannerLabel(body, normalizeString) {
   const raw = normalizeString(body?.who || body?.manualWho || '').toLowerCase();
   if (raw === 'serve' || raw === 'servé') return 'Servé';
   if (raw === 'martijn') return 'Martijn';
+  if (raw === 'overig' || raw === 'other') return 'Overig';
   return '';
 }
 
@@ -112,7 +113,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     if (!whoLabel) {
       return res.status(400).json({
         ok: false,
-        error: 'Kies wie de afspraak plant: Servé of Martijn.',
+        error: 'Kies wie de afspraak plant: Servé, Martijn of Overig.',
       });
     }
     if (!allDayUnavailable) {
@@ -158,7 +159,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       provider: 'manual',
       providerLabel: 'Handmatig',
       coldcallingStack: 'manual',
-      manualPlannerWho: whoLabel === 'Martijn' ? 'martijn' : 'serve',
+      manualPlannerWho: whoLabel === 'Martijn' ? 'martijn' : whoLabel === 'Overig' ? 'overig' : 'serve',
       manualAllDayUnavailable: allDayUnavailable,
       manualAvailableAgain: availableAgain,
       summary,

@@ -92,6 +92,8 @@ test('premium agenda offers manual add flow on day click with business-hour noti
   assert.match(pageSource, /Servé/);
   assert.match(pageSource, /value="martijn"/);
   assert.match(pageSource, /Martijn/);
+  assert.match(pageSource, /value="overig"/);
+  assert.match(pageSource, /Overig/);
   assert.match(pageSource, /type="time"[^>]*id="manualAppointmentAvailableAgain"/);
   assert.match(pageSource, /\/api\/agenda\/appointments\/manual/);
   assert.match(pageSource, /data-calendar-date=/);
@@ -104,6 +106,11 @@ test('premium agenda offers manual add flow on day click with business-hour noti
   assert.match(pageSource, /Activiteit Servé/);
   assert.match(pageSource, /legend-dot manual-martijn/);
   assert.match(pageSource, /Activiteit Martijn/);
+  assert.match(pageSource, /legend-dot manual-overig/);
+  assert.match(pageSource, /Overig/);
+  assert.match(pageSource, /\.legend-dot\.manual-overig \{ background: #ec4899; \}/);
+  assert.match(pageSource, /\.appointment\.manual-overig \{[\s\S]*border-left: 3px solid #ec4899;/);
+  assert.match(pageSource, /if \(who === 'overig'\) return 'appointment manual-overig magnetic';/);
 });
 
 test('premium agenda handmatige afspraak-modal heeft geen locatieveld', () => {

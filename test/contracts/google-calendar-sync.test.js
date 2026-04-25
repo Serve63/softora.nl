@@ -119,3 +119,24 @@ test('google calendar sync exports manual appointments to the selected owner cal
   assert.equal(setCalls[0].reason, 'google_calendar_manual_export');
   assert.equal(setCalls[0].appointment.googleCalendarEventId, 'created-event-1');
 });
+
+test('google calendar sync skips overig manual appointments', async () => {
+  const { fetchCalls, service, setCalls } = createService();
+
+  const result = await service.createGoogleCalendarEventForAppointment({
+    id: 89,
+    callId: 'manual_89',
+    company: 'Blok overig',
+    date: '2026-04-29',
+    time: '13:00',
+    manualAvailableAgain: '15:00',
+    manualPlannerWho: 'overig',
+    summary: 'Blok overig\n\nWie: Overig',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'calendar_not_required_for_other');
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(setCalls.length, 0);
+});

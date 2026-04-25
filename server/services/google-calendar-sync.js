@@ -267,6 +267,10 @@ function createGoogleCalendarSyncService(deps = {}) {
 
   async function createGoogleCalendarEventForAppointment(appointment) {
     if (!isConfigured()) return { ok: true, skipped: true, reason: 'google_calendar_not_configured' };
+    const rawOwner = normalizeString(appointment.manualPlannerWho || appointment.googleCalendarOwner || '').toLowerCase();
+    if (rawOwner === 'overig' || rawOwner === 'other') {
+      return { ok: true, skipped: true, reason: 'calendar_not_required_for_other', owner: 'overig' };
+    }
     const owner = resolveOwner(appointment.manualPlannerWho || appointment.googleCalendarOwner || '');
     const calendarId = calendarByOwner[owner];
     if (!calendarId) return { ok: false, skipped: true, reason: 'calendar_missing_for_owner', owner };
