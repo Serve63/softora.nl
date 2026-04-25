@@ -75,6 +75,7 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   const source = fs.readFileSync(filePath, 'utf8');
 
   assert.match(source, /id="websitegenerator-auth-card"/);
+  assert.match(source, /id="websitegenerator-auth-card" hidden/);
   assert.match(source, /id="websitegenerator-login-link"/);
   assert.match(source, /\/api\/auth\/session/);
   assert.match(source, /premium-personeel-login\?next=/);
