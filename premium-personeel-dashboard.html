@@ -1118,302 +1118,23 @@
 
         html[data-ai-management-mode="software"] .premium-boot-shell > .dashboard-ai-management-status-panel {
             display: block;
-            order: 2;
-            margin-top: 0;
+            order: 5;
+            margin-top: 1.5rem;
             margin-bottom: 0;
         }
 
-        html[data-ai-management-mode="software"] .premium-boot-shell > .kpi-grid,
-        html[data-ai-management-mode="software"] .premium-boot-shell > .content-grid,
-        html[data-ai-management-mode="software"] .premium-boot-shell > .dashboard-lead-legend-strip,
-        html[data-ai-management-mode="software"] #dashboardPeriodDropdown {
-            display: none;
-        }
-
         html[data-ai-management-mode="software"] .premium-boot-shell > .dashboard-lead-legend-strip {
-            order: 3;
+            order: 2;
             margin-top: 0;
             margin-bottom: 1.5rem;
         }
 
         html[data-ai-management-mode="software"] .premium-boot-shell > .kpi-grid {
-            order: 4;
+            order: 3;
         }
 
         html[data-ai-management-mode="software"] .premium-boot-shell > .content-grid {
-            order: 5;
-        }
-
-        .ai-operator-shell {
-            display: grid;
-            gap: 1.15rem;
-        }
-
-        .ai-operator-hero {
-            display: grid;
-            grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
-            gap: 1.2rem;
-            align-items: stretch;
-        }
-
-        .ai-operator-copy {
-            border: 1px solid rgba(139,34,82,0.18);
-            background:
-                radial-gradient(circle at 12% 8%, rgba(139,34,82,0.16), transparent 34%),
-                rgba(255,255,255,0.72);
-            padding: 1.35rem;
-        }
-
-        .ai-operator-kicker,
-        .ai-operator-label,
-        .ai-operator-feed-time,
-        .ai-operator-stage-index {
-            font-family: 'Oswald', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.11em;
-        }
-
-        .ai-operator-kicker {
-            color: var(--accent-light);
-            font-size: 0.72rem;
-            font-weight: 600;
-            margin-bottom: 0.7rem;
-        }
-
-        .ai-operator-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: clamp(1.55rem, 3vw, 2.65rem);
-            line-height: 0.95;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-            margin-bottom: 0.75rem;
-        }
-
-        .ai-operator-text {
-            max-width: 48rem;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            line-height: 1.6;
-        }
-
-        .ai-operator-safety {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.55rem;
-            margin-top: 1.1rem;
-        }
-
-        .ai-operator-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.38rem;
-            border: 1px solid rgba(139,34,82,0.22);
-            background: rgba(139,34,82,0.07);
-            color: var(--accent-light);
-            padding: 0.35rem 0.58rem;
-            font-size: 0.72rem;
-            font-weight: 600;
-        }
-
-        .ai-operator-pulse {
-            width: 0.48rem;
-            height: 0.48rem;
-            border-radius: 50%;
-            background: var(--green);
-            box-shadow: 0 0 0 4px rgba(46,204,113,0.12);
-            flex-shrink: 0;
-        }
-
-        .ai-operator-status-card {
-            border: 1px solid rgba(255,255,255,0.08);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            padding: 1.25rem;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            gap: 1rem;
-            min-height: 100%;
-        }
-
-        .ai-operator-status-top {
-            display: flex;
-            justify-content: space-between;
-            gap: 1rem;
-            align-items: flex-start;
-        }
-
-        .ai-operator-label {
-            color: var(--text-tertiary);
-            font-size: 0.68rem;
-            font-weight: 600;
-        }
-
-        .ai-operator-state {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1.35rem;
-            line-height: 1.05;
-            text-transform: uppercase;
-            margin-top: 0.4rem;
-        }
-
-        .ai-operator-clock {
-            color: var(--accent-light);
-            font-family: 'Oswald', sans-serif;
-            font-size: 1.05rem;
-        }
-
-        .ai-operator-progress {
-            height: 0.7rem;
-            border: 1px solid rgba(255,255,255,0.08);
-            background: rgba(255,255,255,0.04);
-            overflow: hidden;
-        }
-
-        .ai-operator-progress-fill {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent), var(--green));
-            transition: width 0.6s var(--ease-out-expo);
-        }
-
-        .ai-operator-metrics {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 0.85rem;
-        }
-
-        .ai-operator-metric {
-            border: 1px solid rgba(139,34,82,0.14);
-            background: rgba(255,255,255,0.58);
-            padding: 0.95rem;
-        }
-
-        .ai-operator-metric-value {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1.65rem;
-            line-height: 1;
-            color: var(--text-primary);
-            margin-top: 0.45rem;
-        }
-
-        .ai-operator-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1.1fr) minmax(18rem, 0.9fr);
-            gap: 1.15rem;
-        }
-
-        .ai-operator-panel {
-            border: 1px solid rgba(139,34,82,0.16);
-            background: rgba(255,255,255,0.64);
-            padding: 1.1rem;
-            min-height: 17rem;
-        }
-
-        .ai-operator-panel-head {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .ai-operator-panel-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        .ai-operator-stage-list,
-        .ai-operator-feed {
-            display: grid;
-            gap: 0.72rem;
-        }
-
-        .ai-operator-stage {
-            display: grid;
-            grid-template-columns: 2.2rem 1fr auto;
-            align-items: center;
-            gap: 0.8rem;
-            border: 1px solid rgba(0,0,0,0.06);
-            background: rgba(255,255,255,0.62);
-            padding: 0.78rem;
-        }
-
-        .ai-operator-stage.is-active {
-            border-color: rgba(139,34,82,0.28);
-            background: rgba(139,34,82,0.08);
-        }
-
-        .ai-operator-stage-index {
-            color: var(--accent-light);
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-
-        .ai-operator-stage-title {
-            color: var(--text-primary);
-            font-weight: 600;
-            font-size: 0.85rem;
-        }
-
-        .ai-operator-stage-copy,
-        .ai-operator-feed-copy {
-            color: var(--text-secondary);
-            font-size: 0.76rem;
-            line-height: 1.45;
-        }
-
-        .ai-operator-stage-status {
-            color: var(--green);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.68rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        .ai-operator-feed-item {
-            display: grid;
-            grid-template-columns: 3.6rem 1fr;
-            gap: 0.75rem;
-            border-bottom: 1px solid rgba(0,0,0,0.06);
-            padding-bottom: 0.72rem;
-        }
-
-        .ai-operator-feed-item:last-child {
-            border-bottom: 0;
-            padding-bottom: 0;
-        }
-
-        .ai-operator-feed-time {
-            color: var(--accent-light);
-            font-size: 0.66rem;
-            font-weight: 600;
-        }
-
-        .ai-operator-slots {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            gap: 0.35rem;
-        }
-
-        .ai-operator-slot {
-            height: 1.9rem;
-            border: 1px solid rgba(139,34,82,0.18);
-            background: rgba(255,255,255,0.55);
-            position: relative;
-        }
-
-        .ai-operator-slot.is-filled {
-            background: rgba(46,204,113,0.2);
-            border-color: rgba(46,204,113,0.35);
-        }
-
-        .ai-operator-slot.is-target {
-            background: rgba(139,34,82,0.16);
-            border-color: rgba(139,34,82,0.35);
+            order: 4;
         }
 
         .lead-type-legend {
@@ -2133,13 +1854,6 @@
             .content-grid {
                 grid-template-columns: 1fr;
             }
-            .ai-operator-hero,
-            .ai-operator-grid {
-                grid-template-columns: 1fr;
-            }
-            .ai-operator-metrics {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
         }
 
         @media (max-width: 1024px) {
@@ -2162,10 +1876,6 @@
             .confirm-task-statuses { justify-content: flex-start; }
             .confirm-task-detail-grid { grid-template-columns: 1fr; }
             .confirm-task-detail-actions { flex-direction: column; }
-            .ai-operator-metrics { grid-template-columns: 1fr; }
-            .ai-operator-stage { grid-template-columns: 1.8rem 1fr; }
-            .ai-operator-stage-status { grid-column: 2; }
-            .ai-operator-slots { grid-template-columns: repeat(5, 1fr); }
             .dashboard-ai-chat {
                 right: 0.7rem;
                 bottom: 0.7rem;
@@ -2272,7 +1982,7 @@
                             </span>
                         </button>
                         <div class="topbar-select-menu" id="aiManagementMenu" role="menu" hidden>
-                            <button type="button" class="topbar-select-option" data-ai-management-value="software" role="menuitemradio" aria-checked="false" title="Rood: live simulatie, geen echte acties.">
+                            <button type="button" class="topbar-select-option" data-ai-management-value="software" role="menuitemradio" aria-checked="false" title="Rood: werkt nog niet.">
                                 <span class="ai-management-option-label">
                                     <span class="ai-management-status-dot ai-management-status-dot--red" aria-hidden="true"></span>
                                     <span>AI BEHEER</span>
@@ -2399,119 +2109,32 @@
                 </div>
             </div>
 
-            <section class="dashboard-ai-management-status-panel" aria-label="AI beheer simulatie">
-                <div class="ai-operator-shell">
-                    <div class="ai-operator-hero">
-                        <div class="ai-operator-copy">
-                            <div class="ai-operator-kicker">AI beheer · live simulatie</div>
-                            <div class="ai-operator-title">Autopilot cockpit voor een volle agenda</div>
-                            <p class="ai-operator-text">
-                                Deze modus voelt live, maar draait veilig op fictieve leads, agenda-slots en mock-acties.
-                                De AI mag hier denken, prioriteren en acties loggen zonder echte klanten te bellen, mailen of in te plannen.
-                            </p>
-                            <div class="ai-operator-safety" aria-label="Veiligheidsstatus AI beheer">
-                                <span class="ai-operator-pill"><span class="ai-operator-pulse"></span>Mockdata actief</span>
-                                <span class="ai-operator-pill">Geen echte calls</span>
-                                <span class="ai-operator-pill">Geen echte mails</span>
-                                <span class="ai-operator-pill">Geen agenda-mutaties</span>
-                            </div>
-                        </div>
-                        <div class="ai-operator-status-card">
-                            <div class="ai-operator-status-top">
-                                <div>
-                                    <div class="ai-operator-label">Huidige AI-status</div>
-                                    <div class="ai-operator-state" id="aiOperatorState">Agenda scannen</div>
-                                </div>
-                                <div class="ai-operator-clock" id="aiOperatorClock">--:--:--</div>
-                            </div>
-                            <div>
-                                <div class="ai-operator-label">Doelvulling komende 10 werkdagen</div>
-                                <div class="ai-operator-progress" aria-label="Fictieve agendavulling">
-                                    <div class="ai-operator-progress-fill" id="aiOperatorProgressBar"></div>
-                                </div>
-                            </div>
-                        </div>
+            <section class="dashboard-ai-management-status-panel" aria-label="AI beheer status">
+                <div class="dashboard-ai-management-status-title">Dit is AI aan het doen</div>
+                <div class="dashboard-ai-management-timeline" aria-label="Template tijdlijn AI updates">
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">13:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">Template update: AI controleert de agenda, huidige doelen en actieve middelen voordat er acties worden gepland.</div>
                     </div>
-
-                    <div class="ai-operator-metrics" aria-label="Fictieve AI beheer KPI's">
-                        <div class="ai-operator-metric">
-                            <div class="ai-operator-label">Agenda gevuld</div>
-                            <div class="ai-operator-metric-value" id="aiOperatorAgendaFill">0%</div>
-                        </div>
-                        <div class="ai-operator-metric">
-                            <div class="ai-operator-label">Leadpool</div>
-                            <div class="ai-operator-metric-value" id="aiOperatorLeadPool">0</div>
-                        </div>
-                        <div class="ai-operator-metric">
-                            <div class="ai-operator-label">Verwachte conversie</div>
-                            <div class="ai-operator-metric-value" id="aiOperatorConversion">0%</div>
-                        </div>
-                        <div class="ai-operator-metric">
-                            <div class="ai-operator-label">Risico</div>
-                            <div class="ai-operator-metric-value" id="aiOperatorRisk">Laag</div>
-                        </div>
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">14:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">AI meldt welk plan klaarstaat, welke doelgroep geraakt zou worden en welke acties nog alleen voorbereid zijn.</div>
                     </div>
-
-                    <div class="ai-operator-grid">
-                        <div class="ai-operator-panel">
-                            <div class="ai-operator-panel-head">
-                                <div class="ai-operator-panel-title">Beslisroute AI</div>
-                                <span class="ai-operator-pill">Simulatie draait</span>
-                            </div>
-                            <div class="ai-operator-stage-list" id="aiOperatorStageList">
-                                <div class="ai-operator-stage is-active" data-ai-stage="0">
-                                    <div class="ai-operator-stage-index">01</div>
-                                    <div>
-                                        <div class="ai-operator-stage-title">Agenda-capaciteit lezen</div>
-                                        <div class="ai-operator-stage-copy">AI zoekt lege plekken en blokkeert overvolle dagen.</div>
-                                    </div>
-                                    <div class="ai-operator-stage-status">Nu</div>
-                                </div>
-                                <div class="ai-operator-stage" data-ai-stage="1">
-                                    <div class="ai-operator-stage-index">02</div>
-                                    <div>
-                                        <div class="ai-operator-stage-title">Fictieve leads scoren</div>
-                                        <div class="ai-operator-stage-copy">AI kiest mock-leads met hoogste kans op afspraak.</div>
-                                    </div>
-                                    <div class="ai-operator-stage-status">Wacht</div>
-                                </div>
-                                <div class="ai-operator-stage" data-ai-stage="2">
-                                    <div class="ai-operator-stage-index">03</div>
-                                    <div>
-                                        <div class="ai-operator-stage-title">Mock coldcalling plannen</div>
-                                        <div class="ai-operator-stage-copy">AI logt welke calls hij zou starten, zonder provider-call.</div>
-                                    </div>
-                                    <div class="ai-operator-stage-status">Wacht</div>
-                                </div>
-                                <div class="ai-operator-stage" data-ai-stage="3">
-                                    <div class="ai-operator-stage-index">04</div>
-                                    <div>
-                                        <div class="ai-operator-stage-title">Concept-afspraken vullen</div>
-                                        <div class="ai-operator-stage-copy">AI simuleert afspraken tot de doelvulling bereikt is.</div>
-                                    </div>
-                                    <div class="ai-operator-stage-status">Wacht</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="ai-operator-panel">
-                            <div class="ai-operator-panel-head">
-                                <div class="ai-operator-panel-title">Live actielog</div>
-                                <span class="ai-operator-pill">Alleen mock</span>
-                            </div>
-                            <div class="ai-operator-feed" id="aiOperatorActionFeed" aria-live="polite"></div>
-                        </div>
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">15:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">AI controleert of alles normaal loopt en markeert blokkades, fouten of ontbrekende gegevens voordat er verder wordt gegaan.</div>
                     </div>
-
-                    <div class="ai-operator-panel">
-                        <div class="ai-operator-panel-head">
-                            <div>
-                                <div class="ai-operator-panel-title">Fictieve agenda komende 10 werkdagen</div>
-                                <div class="ai-operator-stage-copy" id="aiOperatorDecision">AI wacht op de eerste simulatiecyclus.</div>
-                            </div>
-                            <span class="ai-operator-pill">Groen = gevuld</span>
-                        </div>
-                        <div class="ai-operator-slots" id="aiOperatorSlotGrid" aria-label="Fictieve agenda-slots"></div>
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">16:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">AI vat samen welke acties veilig zijn, welke acties beter handmatig nagekeken worden en of klantcontact gepauzeerd moet blijven.</div>
+                    </div>
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">17:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">AI geeft een tussenstand van resultaten, risico's en geplande vervolgstappen voor het laatste uur.</div>
+                    </div>
+                    <div class="dashboard-ai-management-timeline-item">
+                        <div class="dashboard-ai-management-timeline-time">18:00</div>
+                        <div class="dashboard-ai-management-timeline-copy">AI sluit af met een dagrapport: wat is gedaan, wat is niet gedaan, welke fouten zijn gezien en wat morgen aandacht nodig heeft.</div>
                     </div>
                 </div>
             </section>
@@ -2607,10 +2230,6 @@
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
         document.getElementById('currentDate').textContent = now.toLocaleDateString('nl-NL', options);
-        const topbarTitleEl = document.querySelector('.topbar-left h1');
-        const topbarSubtitleEl = document.querySelector('.topbar-left p');
-        const defaultDashboardTitle = topbarTitleEl ? String(topbarTitleEl.textContent || 'Dashboard') : 'Dashboard';
-        const defaultDashboardSubtitle = topbarSubtitleEl ? String(topbarSubtitleEl.textContent || 'Overzicht van je bedrijfsprestaties') : 'Overzicht van je bedrijfsprestaties';
         const PREMIUM_ACTIVE_ORDERS_SCOPE = 'premium_active_orders';
         const PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
         const PREMIUM_ACTIVE_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
@@ -2658,19 +2277,6 @@
         const aiManagementScheduleDayInputs = Array.from(document.querySelectorAll('[data-ai-schedule-day]'));
         const aiManagementScheduleStartInput = document.getElementById('aiManagementScheduleStart');
         const aiManagementScheduleEndInput = document.getElementById('aiManagementScheduleEnd');
-        const aiOperatorEls = {
-            clock: document.getElementById('aiOperatorClock'),
-            state: document.getElementById('aiOperatorState'),
-            agendaFill: document.getElementById('aiOperatorAgendaFill'),
-            leadPool: document.getElementById('aiOperatorLeadPool'),
-            conversion: document.getElementById('aiOperatorConversion'),
-            risk: document.getElementById('aiOperatorRisk'),
-            progressBar: document.getElementById('aiOperatorProgressBar'),
-            actionFeed: document.getElementById('aiOperatorActionFeed'),
-            decision: document.getElementById('aiOperatorDecision'),
-            slotGrid: document.getElementById('aiOperatorSlotGrid'),
-            stages: Array.from(document.querySelectorAll('[data-ai-stage]')),
-        };
         const AI_MANAGEMENT_CONFIG_SCOPE = 'premium_dashboard_ai_management';
         const AI_MANAGEMENT_CONFIG_KEY = 'softora_dashboard_ai_management_config_v1';
         const AI_MANAGEMENT_SCHEDULE_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -2695,31 +2301,13 @@
         const AI_MANAGEMENT_STATUS = {
             software: {
                 tone: 'red',
-                text: 'Rood: live simulatie, geen echte acties.',
+                text: 'Rood: werkt nog niet.',
             },
             personnel: {
                 tone: 'green',
                 text: 'Groen: werkt perfect.',
             },
         };
-        const AI_OPERATOR_STATES = [
-            'Agenda scannen',
-            'Leads prioriteren',
-            'Mock calls klaarzetten',
-            'Concept-afspraken vullen',
-            'Campagne afremmen',
-        ];
-        const AI_OPERATOR_ACTIONS = [
-            'AI ziet 6 open slots en verhoogt fictieve leadopvolging.',
-            'Mock-campagne geselecteerd: 8 dakdekkers met hoge afspraakkans.',
-            'AI plant 2 concept-afspraken in lege ochtendblokken.',
-            'Risico-check: geen echte provider-call, alleen actielog bijgewerkt.',
-            'Coldmail concept staat klaar voor 3 fictieve leads.',
-            'Agenda nadert doelvulling; AI verlaagt mock-call tempo.',
-            'AI markeert 4 leads als later opvolgen om overbelasting te voorkomen.',
-        ];
-        let aiOperatorTick = 0;
-        let aiOperatorTimer = null;
 
         function escapeHtml(str) {
             return String(str || '')
@@ -2840,7 +2428,7 @@
         function getAiManagementInstruction(value) {
             return normalizeAiManagementMode(value) === 'personnel'
                 ? 'AI-beheermodus: personeel. Focus op medewerkers, planning, agenda, rollen, bevestigingsmails en personeelsprocessen.'
-                : `AI-beheermodus: veilige live simulatie. Gebruik alleen fictieve klanten, mock-acties en actielogs; start geen echte calls, mails of agenda-mutaties. ${getAiManagementConfigSummary(aiManagementConfig)}`;
+                : `AI-beheermodus: autonoom. ${getAiManagementConfigSummary(aiManagementConfig)}`;
         }
 
         function getAiManagementStatus(value) {
@@ -2895,15 +2483,6 @@
 
         function syncAiManagementUi() {
             const status = getAiManagementStatus(aiManagementMode);
-            const isAiMode = normalizeAiManagementMode(aiManagementMode) === 'software';
-            if (topbarTitleEl) {
-                topbarTitleEl.textContent = isAiMode ? 'AI Beheer' : defaultDashboardTitle;
-            }
-            if (topbarSubtitleEl) {
-                topbarSubtitleEl.textContent = isAiMode
-                    ? 'Live autopilot-simulatie met fictieve klanten en mock-acties'
-                    : defaultDashboardSubtitle;
-            }
             if (aiManagementLabel) {
                 aiManagementLabel.textContent = getAiManagementLabel(aiManagementMode);
             }
@@ -2920,103 +2499,6 @@
                 option.classList.toggle('is-active', isActive);
                 option.setAttribute('aria-checked', isActive ? 'true' : 'false');
             });
-            syncAiOperatorRuntime();
-        }
-
-        function formatAiOperatorTime(dateLike = new Date()) {
-            return dateLike.toLocaleTimeString('nl-NL', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-            });
-        }
-
-        function renderAiOperatorSlots(fillPct) {
-            if (!aiOperatorEls.slotGrid) return;
-            const totalSlots = 30;
-            const filledSlots = Math.round((Math.max(0, Math.min(100, fillPct)) / 100) * totalSlots);
-            aiOperatorEls.slotGrid.innerHTML = Array.from({ length: totalSlots }, (_, index) => {
-                const className = index < filledSlots
-                    ? 'ai-operator-slot is-filled'
-                    : (index === filledSlots ? 'ai-operator-slot is-target' : 'ai-operator-slot');
-                const label = index < filledSlots ? 'Fictief gevuld' : 'Fictief open';
-                return `<span class="${className}" title="${label} slot ${index + 1}"></span>`;
-            }).join('');
-        }
-
-        function renderAiOperatorFeed(actionText) {
-            if (!aiOperatorEls.actionFeed) return;
-            const existing = Array.from(aiOperatorEls.actionFeed.querySelectorAll('.ai-operator-feed-item'))
-                .slice(0, 5)
-                .map((item) => item.outerHTML);
-            const nextItem = `
-                <div class="ai-operator-feed-item">
-                    <div class="ai-operator-feed-time">${escapeHtml(formatAiOperatorTime())}</div>
-                    <div class="ai-operator-feed-copy">${escapeHtml(actionText)}</div>
-                </div>
-            `;
-            aiOperatorEls.actionFeed.innerHTML = [nextItem, ...existing].slice(0, 6).join('');
-        }
-
-        function updateAiOperatorStages(activeIndex) {
-            aiOperatorEls.stages.forEach((stage, index) => {
-                const isActive = index === activeIndex;
-                const isDone = index < activeIndex;
-                const statusEl = stage.querySelector('.ai-operator-stage-status');
-                stage.classList.toggle('is-active', isActive);
-                if (statusEl) {
-                    statusEl.textContent = isActive ? 'Nu' : (isDone ? 'Klaar' : 'Wacht');
-                }
-            });
-        }
-
-        function renderAiOperatorSimulation(forceFeed = false) {
-            const tick = aiOperatorTick;
-            const fillPct = Math.min(94, 42 + ((tick * 7) % 48));
-            const leadPool = Math.max(18, 64 - ((tick * 3) % 32));
-            const conversionPct = 18 + (tick % 7);
-            const activeStage = tick % 4;
-            const action = AI_OPERATOR_ACTIONS[tick % AI_OPERATOR_ACTIONS.length];
-            const stateText = AI_OPERATOR_STATES[tick % AI_OPERATOR_STATES.length];
-            const riskText = fillPct > 86 ? 'Middel' : 'Laag';
-
-            if (aiOperatorEls.clock) aiOperatorEls.clock.textContent = formatAiOperatorTime();
-            if (aiOperatorEls.state) aiOperatorEls.state.textContent = stateText;
-            if (aiOperatorEls.agendaFill) aiOperatorEls.agendaFill.textContent = `${fillPct}%`;
-            if (aiOperatorEls.leadPool) aiOperatorEls.leadPool.textContent = String(leadPool);
-            if (aiOperatorEls.conversion) aiOperatorEls.conversion.textContent = `${conversionPct}%`;
-            if (aiOperatorEls.risk) aiOperatorEls.risk.textContent = riskText;
-            if (aiOperatorEls.progressBar) aiOperatorEls.progressBar.style.width = `${fillPct}%`;
-            if (aiOperatorEls.decision) {
-                aiOperatorEls.decision.textContent = fillPct >= 88
-                    ? 'AI remt fictieve acquisitie af omdat de mock-agenda bijna vol zit.'
-                    : 'AI zoekt extra fictieve afspraken tot de agenda voldoende gevuld is.';
-            }
-
-            updateAiOperatorStages(activeStage);
-            renderAiOperatorSlots(fillPct);
-            if (forceFeed || tick % 2 === 0) {
-                renderAiOperatorFeed(action);
-            }
-        }
-
-        function syncAiOperatorRuntime() {
-            const isAiMode = normalizeAiManagementMode(aiManagementMode) === 'software';
-            if (!isAiMode) {
-                if (aiOperatorTimer) {
-                    window.clearInterval(aiOperatorTimer);
-                    aiOperatorTimer = null;
-                }
-                return;
-            }
-
-            renderAiOperatorSimulation(aiOperatorTick === 0);
-            if (!aiOperatorTimer) {
-                aiOperatorTimer = window.setInterval(() => {
-                    aiOperatorTick += 1;
-                    renderAiOperatorSimulation();
-                }, 4200);
-            }
         }
 
         function syncAiManagementConfigForm() {
@@ -3162,6 +2644,9 @@
                     const nextMode = option.getAttribute('data-ai-management-value');
                     applyAiManagementMode(nextMode);
                     closeAiManagementMenu();
+                    if (normalizeAiManagementMode(nextMode) === 'software') {
+                        openAiManagementConfigModal();
+                    }
                 });
             });
 
