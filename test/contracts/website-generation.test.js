@@ -65,6 +65,12 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /veel negative space, sterke visual hierarchy, hoogwaardige beeldregie/i);
   assert.match(prompt, /asymmetrische layout, subtiele diepte, verfijnde CTA’s, premium typografie/i);
   assert.match(prompt, /maximaal 5 grote ademende contentmomenten/i);
+  assert.match(prompt, /UI-ONLY OUTPUT/i);
+  assert.match(prompt, /duidelijk een gerenderde desktop website-interface/i);
+  assert.match(prompt, /zichtbare navigatie, hero, typografie, secties, knoppen en footer/i);
+  assert.match(prompt, /Maak géén losse stockfoto, kantoorinterieur, teamfoto, lifestylebeeld, mockup-scene of fotografische sfeerplaat/i);
+  assert.match(prompt, /Fotografie mag alleen klein en ingebed binnen het website-ontwerp voorkomen/i);
+  assert.match(prompt, /kies altijd de website-screenshot met duidelijke UI-elementen/i);
   assert.match(prompt, /Er zijn 2 referentiebeeld\(en\) meegegeven; behandel die uitsluitend als moodboard/i);
   assert.doesNotMatch(prompt, /DESIGN-DNA LOCK/);
   assert.doesNotMatch(prompt, /COPY LOCK/);

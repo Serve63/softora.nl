@@ -179,6 +179,8 @@ function createWebsiteGenerationHelpers(deps = {}) {
         ? `Er zijn ${referenceImageCount} referentiebeeld(en) meegegeven; behandel die uitsluitend als moodboard voor merkidentiteit, kleuren, sfeer en doelgroep.`
         : '',
       'Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept waarbij de aangeleverde screenshot alleen dient als moodboard voor merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep, maar ontwerp vanaf nul een radicaal andere Awwwards-level website met een totaal nieuwe informatiearchitectuur, geen herkenbare kopie van layout, hero, sectievolgorde, grids, kaartenrijen, iconenblokken, USP-blokken of footerstructuur, en creëer in plaats daarvan een rustige, ruimtelijke, branche-passende editorial compositie met veel negative space, sterke visual hierarchy, hoogwaardige beeldregie, asymmetrische layout, subtiele diepte, verfijnde CTA’s, premium typografie en maximaal 5 grote ademende contentmomenten.',
+      'UI-ONLY OUTPUT: de afbeelding moet duidelijk een gerenderde desktop website-interface zijn, met zichtbare navigatie, hero, typografie, secties, knoppen en footer als onderdeel van één full-page webdesign. Maak géén losse stockfoto, kantoorinterieur, teamfoto, lifestylebeeld, mockup-scene of fotografische sfeerplaat als eindresultaat. Fotografie mag alleen klein en ingebed binnen het website-ontwerp voorkomen, nooit als volledige afbeelding.',
+      'Als je twijfelt tussen een mooie foto en een website-screenshot: kies altijd de website-screenshot met duidelijke UI-elementen.',
       host ? `Domein of merk: ${host}.` : '',
       title ? `Huidige paginatitel: ${title}.` : '',
       description ? `Huidige meta-omschrijving: ${description}.` : '',
