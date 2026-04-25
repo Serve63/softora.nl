@@ -149,6 +149,17 @@ test('premium agenda shows klantwerk label on Saturdays', () => {
   assert.match(pageSource, /if \(isYmdCalendarSaturday\(picked\)\) return;/);
 });
 
+test('premium agenda toont Ruben planning uitleg alleen in AI beheer modus', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /Ruben Nijhuis plant afspraken in/);
+  assert.match(
+    pageSource,
+    /html:not\(\[data-ai-management-mode="software"\]\) \.agenda-routing-bubble-wrap \{\s*display: none;\s*\}/
+  );
+});
+
 test('premium agenda does not render fictive fallback appointments when bootstrap and api return nothing', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
