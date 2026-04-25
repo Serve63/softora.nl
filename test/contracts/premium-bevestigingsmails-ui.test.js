@@ -139,6 +139,9 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /\.campaign-recipient-list \{[\s\S]*position: absolute;[\s\S]*max-height: 300px;/);
   assert.match(pageSource, /const CUSTOMER_DB_SCOPE = 'premium_customers_database';/);
   assert.match(pageSource, /const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';/);
+  assert.match(pageSource, /const COLDMAIL_TEST_COMPANIES = \['mcv e-commerce'\];/);
+  assert.match(pageSource, /function isColdmailTestCampaignCompany\(row\)/);
+  assert.match(pageSource, /if \(isColdmailTestCampaignCompany\(row\)\) return isLikelyCampaignEmail\(getCampaignRowEmail\(row\)\);/);
   assert.match(pageSource, /function hydrateCampaignCompanyCountFromSupabase\(\)/);
   assert.match(pageSource, /function initCampaignDatabaseAutoRefresh\(\)/);
   assert.match(pageSource, /window\.addEventListener\('focus', refreshCampaignDatabaseForLatestState\);/);

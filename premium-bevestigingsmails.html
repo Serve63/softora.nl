@@ -1450,6 +1450,7 @@ const CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
+const COLDMAIL_TEST_COMPANIES = ['mcv e-commerce'];
 let coldmailingSettingsSaveTimer = null;
 let coldmailingDatabaseRows = [];
 let campaignRecipientListTimer = null;
@@ -1531,6 +1532,12 @@ function getCampaignRowEmail(row) {
   return normalizeLowerText(row && (row.email || row.contactEmail || row.mail));
 }
 
+function isColdmailTestCampaignCompany(row) {
+  return COLDMAIL_TEST_COMPANIES.includes(
+    normalizeLowerText(row && (row.bedrijf || row.company || row.companyName || row.naam || row.name))
+  );
+}
+
 function isRowInActiveColdmailCampaign(row) {
   const untilMs = Math.max(
     parseCampaignTimestampMs(row && row.activeColdmailCampaignUntil),
@@ -1549,6 +1556,7 @@ function isRowInActiveColdmailCampaign(row) {
 
 function isEligibleColdmailCampaignRow(row) {
   if (!row || typeof row !== 'object') return false;
+  if (isColdmailTestCampaignCompany(row)) return isLikelyCampaignEmail(getCampaignRowEmail(row));
   const status = normalizeCampaignDatabaseStatus(row.databaseStatus || row.status, row);
   if (['gemaild', 'interesse', 'afspraak', 'klant', 'afgehaakt', 'geblokkeerd', 'buiten'].includes(status)) return false;
   if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
