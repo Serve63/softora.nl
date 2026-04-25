@@ -172,37 +172,13 @@ function createWebsiteGenerationHelpers(deps = {}) {
     const layoutHints = Array.isArray(scan.layoutHints) ? scan.layoutHints.filter(Boolean).slice(0, 8) : [];
     const referenceImageCount = Math.max(0, Number(scan.referenceImageCount || 0) || 0);
     const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 1800);
-    const designDnaLock = formatWebsitePreviewDesignDnaLock(scan);
 
     return [
-      'Bekijk eerst de website grondig op basis van de scan hieronder: begrijp wat het bedrijf doet, welke diensten worden verkocht, welke doelgroep wordt aangesproken, welke CTA’s belangrijk zijn, welke secties terugkomen en welke tone-of-voice de site gebruikt.',
-      'Behandel de bestaande site daarna als de harde bron van waarheid voor merkstijl, kleurgebruik, content-richting, diensten, doelgroep en tone-of-voice.',
-      designDnaLock,
+      'Bekijk eerst de website grondig op basis van de URL-scan hieronder: begrijp merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep. Gebruik deze scan en eventuele referentiebeelden alleen als moodboard/context, niet als layout-template.',
       referenceImageCount
-        ? `Gebruik de ${referenceImageCount} meegeleverde referentiebeeld(en) als harde visuele bron voor kleurgebruik, fotografie, contrast, materiaalgevoel, typografiegevoel en merkuitstraling. Het resultaat moet duidelijk verwant zijn aan deze visuele bron.`
+        ? `Er zijn ${referenceImageCount} referentiebeeld(en) meegegeven; behandel die uitsluitend als moodboard voor merkidentiteit, kleuren, sfeer en doelgroep.`
         : '',
-      'Genereer daarna precies 1 volledig nieuwe ultra-premium redesign als full-page desktop website screenshot van header tot footer in één beeld.',
-      'Behoud dezelfde hoofdkleuren, accenten, contrastverhoudingen, visuele sfeer, diensten, doelgroep en commerciële richting, maar geef de pagina een veel sterkere nieuwe layout, compositie en art direction. Evolutie van het merk, geen rebrand.',
-      'Het design moet voelen als een bespoke, award-worthy elite website van top-agency niveau: editorial art direction, sterke typografische hiërarchie, asymmetrische grid, visual storytelling, royale ruimte, immersive depth, luxe details, een iconische hero en een krachtige high-end brand experience.',
-      'Het mag absoluut niet voelen als een template, standaard AI-webdesign of brave bedrijfswebsite. Maak het uitgesproken, maatwerk, duur, commercieel scherp en visueel memorabel.',
-      'Het resultaat mag moderner en sterker zijn, maar mag niet aanvoelen als een ander merk, andere propositie of andere website. Behoud de herkenbare visuele richting van de huidige site.',
-      'Gebruik dezelfde kleurfamilie, accentkleur(en), donkere/lichte verhoudingen en algemene sfeer als de huidige site. Introduceer nadrukkelijk geen nieuw kleurenpalet.',
-      'Als er merkkleuren of kleurvariabelen in de scan staan, behandel die als verplicht kleurenpalet. Gebruik geen willekeurige blauw/goud, zwart/goud of SaaS-template kleuren tenzij die exact uit de scan blijken.',
-      'COPY LOCK: behoud merknaam, navigatie-labels, CTA-labels, sectienamen, diensten en kernzinnen uit de bron waar mogelijk letterlijk of bijna letterlijk. Verbeter alleen formulering en hiërarchie; verander de boodschap niet.',
-      'STYLE LOCK: behoud typografisch gevoel, contrastniveau, dominante achtergrondkleur(en), fotografie/illustratie-richting, button-stijl en algemene compositietaal. Geen nieuw logo, geen nieuwe mascotte, geen ander visueel concept.',
-      'TEXT STABILITY LOCK: alle zichtbare koppen moeten kort, stabiel, leesbaar en passend binnen hun container zijn. Maak hero-headlines krachtig maar compact: maximaal 2-4 korte regels, geen extreem lange zin in één titelblok en geen woorden die buiten het kader vallen.',
-      'TYPOGRAPHY SYSTEM LOCK: gebruik maximaal 2 consistente fontfamilies of fontstijlen door de hele pagina: één duidelijke display/headline stijl en één body/interface stijl. Wissel niet opeens naar een ander lettertype in het middenstuk of in kaartsecties.',
-      'CARD COPY RULE: kaarttitels en sectietitels moeten kort en scanbaar blijven, liefst 1-3 woorden per titel. Bodyteksten in kaarten moeten rustig, klein en consistent zijn; geen lange alinea’s, geen rommelige tekstblokken en geen typografische chaos.',
-      'TEXT RENDERING RULE: vermijd overvolle tekst, rare letterspatiëring, kapotte woorden, pseudo-tekst, onleesbare microcopy en willekeurige fontmixes. Als exacte tekst lastig is, kies minder tekst met betere leesbaarheid.',
-      'SOURCE-FIRST RULE: als promptfantasie botst met scaninformatie, wint de scan altijd. Gebruik liever minder spectaculaire vormgeving die klopt dan een spectaculaire rebrand die afwijkt.',
-      'Gebruik een hoge verticale full-page compositie zodat de volledige desktop-homepage van header tot footer zichtbaar is in één afbeelding. Dit is geen mobiele screenshot.',
-      'Toon een echte desktop navigatie en desktop lay-out met duidelijke secties, meerdere kolommen waar logisch, premium typografie en sterke visuele hiërarchie.',
-      'Het beeld moet edge-to-edge gevuld zijn zonder leeg wit canvas, zonder browser chrome, zonder device mockup, zonder wireframe en zonder collage.',
-      'Streef naar uitzonderlijk hoge kwaliteit: pixel-perfect spacing, high-end typografie, royale witruimte, subtiele diepte, premium details, gedurfde maar logische compositie en een zeer overtuigend afgewerkt eindresultaat.',
-      'Gebruik Nederlandse websitecopy die inhoudelijk dicht bij de huidige site blijft: dezelfde diensten, dezelfde belofte, dezelfde doelgroep en dezelfde commerciële richting. Verbeter formuleringen, maar verander het onderwerp niet.',
-      'Gebruik sterke, realistische en premium websiteteksten met een overtuigende headline, slimme subheadings, geloofwaardige waardeproposities en conversion-focused call-to-actions. Neem waar mogelijk woorden, diensten en sectienamen uit de scan over. Geen lorem ipsum, geen generieke placeholder-copy en geen volledig nieuwe propositie.',
-      'Als de huidige site bijvoorbeeld over websites, software, automatisering of marketing gaat, moet de nieuwe variant daar ook expliciet over gaan en niet ineens een generiek softwarebedrijf of ander type bureau worden.',
-      'Maak het resultaat uitgesproken, maatwerk en commercieel sterk, alsof een senior designer exact deze bestaande site heeft geüpgraded naar een betere versie.',
+      'Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept waarbij de aangeleverde screenshot alleen dient als moodboard voor merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep, maar ontwerp vanaf nul een radicaal andere Awwwards-level website met een totaal nieuwe informatiearchitectuur, geen herkenbare kopie van layout, hero, sectievolgorde, grids, kaartenrijen, iconenblokken, USP-blokken of footerstructuur, en creëer in plaats daarvan een rustige, ruimtelijke, branche-passende editorial compositie met veel negative space, sterke visual hierarchy, hoogwaardige beeldregie, asymmetrische layout, subtiele diepte, verfijnde CTA’s, premium typografie en maximaal 5 grote ademende contentmomenten.',
       host ? `Domein of merk: ${host}.` : '',
       title ? `Huidige paginatitel: ${title}.` : '',
       description ? `Huidige meta-omschrijving: ${description}.` : '',
