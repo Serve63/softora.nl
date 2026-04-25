@@ -16,6 +16,7 @@ function createService(overrides = {}) {
       bedrijf: 'Bakkerij Zon',
       naam: 'Ruben',
       email: 'ruben@example.test',
+      telefoon: '+31 6 12345678',
       status: 'prospect',
       branche: 'Horeca & Restaurants',
       mail: true,
@@ -350,6 +351,7 @@ test('coldmail campaign previews selected recipients before sending', async () =
       id: 'prospect-1',
       bedrijf: 'Bakkerij Zon',
       email: 'ruben@example.test',
+      phone: '+31 6 12345678',
     },
   ]);
 });

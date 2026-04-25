@@ -161,6 +161,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function renderCampaignRecipientList\(payload\)/);
   assert.match(pageSource, /\/api\/coldmailing\/campaigns\/recipients\?/);
   assert.match(pageSource, /recipient\.bedrijf \|\| 'Onbekend bedrijf'/);
+  assert.match(pageSource, /const showPhone = isPremiumAiLeadGeneratorPath\(\);/);
+  assert.match(pageSource, /recipient\.phone \|\| recipient\.telefoon \|\| recipient\.telefoonnummer \|\| 'Geen telefoonnummer'/);
   assert.match(pageSource, /recipient\.email \|\| 'Geen e-mailadres'/);
   assert.match(pageSource, /function isEligibleColdmailCampaignRow\(row\)/);
   assert.match(pageSource, /function isEligibleColdcallingCampaignRow\(row\)/);

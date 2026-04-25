@@ -1642,6 +1642,7 @@ function setCampaignRecipientListLoading(text) {
 function renderCampaignRecipientList(payload) {
   const list = document.getElementById('campaignRecipientList');
   if (!list) return;
+  const showPhone = isPremiumAiLeadGeneratorPath();
   list.innerHTML = '';
   const title = document.createElement('div');
   title.className = 'campaign-recipient-list-title';
@@ -1668,7 +1669,9 @@ function renderCampaignRecipientList(payload) {
     company.textContent = recipient.bedrijf || 'Onbekend bedrijf';
     const email = document.createElement('span');
     email.className = 'campaign-recipient-list-email';
-    email.textContent = recipient.email || 'Geen e-mailadres';
+    email.textContent = showPhone
+      ? (recipient.phone || recipient.telefoon || recipient.telefoonnummer || 'Geen telefoonnummer')
+      : (recipient.email || 'Geen e-mailadres');
     item.appendChild(company);
     item.appendChild(email);
     list.appendChild(item);

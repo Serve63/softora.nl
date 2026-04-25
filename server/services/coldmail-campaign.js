@@ -216,7 +216,17 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function getRowPhone(row) {
-    return normalizeString(row.tel || row.telefoon || row.phone || row.contactPhone || '');
+    return normalizeString(
+      row.phone ||
+        row.tel ||
+        row.telefoon ||
+        row.telefoonnummer ||
+        row.mobile ||
+        row.mobiel ||
+        row.phoneNumber ||
+        row.contactPhone ||
+        ''
+    );
   }
 
   function buildRowIdentityKey(row) {
@@ -474,6 +484,7 @@ function createColdmailCampaignService(deps = {}) {
         id: item.id,
         bedrijf: getRowCompany(item.row),
         email: getRowEmail(item.row),
+        phone: getRowPhone(item.row),
       })),
       failedItems: resolved.failed,
     };
