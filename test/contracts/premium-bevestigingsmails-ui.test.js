@@ -141,8 +141,11 @@ test('premium bevestigingsmails removes mail and ai-instructions tabs while keep
 
   assert.doesNotMatch(pageSource, /onclick="switchMail\(1,this\)">Mail 1<\/button>/);
   assert.doesNotMatch(pageSource, /onclick="switchMail\(4,this\)">AI Instructies<\/button>/);
-  assert.match(pageSource, /<button class="mail-tab mail-icon-tab" type="button" onclick="switchMail\(5,this\)" aria-label="Instellingen">/);
+  assert.match(pageSource, /<button class="mail-tab mail-icon-tab" type="button" onclick="toggleMailSettings\(this\)" aria-label="Instellingen">/);
   assert.match(pageSource, /<div class="mail-panel active" id="mail-panel-1">/);
+  assert.match(pageSource, /function toggleMailSettings\(el\) \{/);
+  assert.match(pageSource, /if \(settingsPanel && settingsPanel\.classList\.contains\('active'\)\) \{[\s\S]*switchMail\(1, null\);/);
+  assert.match(pageSource, /if \(el\) el\.classList\.add\('active'\);/);
   assert.match(pageSource, /#body1 \{ height: clamp\(420px, 52vh, 520px\); \}/);
   assert.match(pageSource, /function ensureLeadGeneratorSettingsBackRow/);
 });
@@ -197,7 +200,7 @@ test('premium bevestigingsmails exposes campaign duration choices and uses them 
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
+  assert.match(pageSource, /<div class="field lead-generator-branch-field">\s*<div class="field-label">Campagne afgerond na<\/div>\s*<select class="sel" id="campaignDurationDays" aria-label="Campagneduur">/);
   assert.match(pageSource, /<option value="5">5 dagen<\/option>/);
   assert.match(pageSource, /<option value="7">7 dagen<\/option>/);
   assert.match(pageSource, /<option value="14" selected>14 dagen<\/option>/);
@@ -211,14 +214,8 @@ test('premium bevestigingsmails exposes campaign duration choices and uses them 
   assert.match(pageSource, /timelineTitle\.textContent = durationLabel \+ ' tijdlijn';/);
   assert.match(pageSource, /`Dag \$\{step\.day\} van \$\{totalDurationDays\}`/);
   assert.match(pageSource, /'✓ Dag ' \+ totalDurationDays \+ ' bereikt — campagne afgelopen'/);
-});
-
-test('premium bevestigingsmails keeps the branche filter as the native select outside lead-generator alias', () => {
-  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
-  const pageSource = fs.readFileSync(pagePath, 'utf8');
-
-  assert.match(pageSource, /<div class="field lead-generator-branch-field">\s*<div class="field-label">Branche<\/div>\s*<select class="sel" id="branche" data-native-select="true">/);
-  assert.match(pageSource, /if \(String\(select\.dataset\.nativeSelect \|\| ''\)\.trim\(\) === 'true'\) return;/);
+  assert.doesNotMatch(pageSource, /<select class="sel" id="branche"/);
+  assert.doesNotMatch(pageSource, /<div class="field-label">Branche<\/div>\s*<select class="sel"/);
 });
 
 test('premium ai lead generator alias replaces branche with belmethode', () => {

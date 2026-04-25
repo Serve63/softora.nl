@@ -1124,7 +1124,7 @@ html:not([data-softora-lead-generator-alias="1"]) .lead-generator-belmethod-fiel
       <div class="card-head">
         <div class="card-title">Prompt & AI instructies</div>
         <div class="mail-tab-group">
-          <button class="mail-tab mail-icon-tab" type="button" onclick="switchMail(5,this)" aria-label="Instellingen">
+          <button class="mail-tab mail-icon-tab" type="button" onclick="toggleMailSettings(this)" aria-label="Instellingen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.36.3.58.75.6 1.22V10a2 2 0 0 1 0 4h-.09c-.47.02-.92.24-1.22.6Z"></path>
@@ -1202,15 +1202,6 @@ Softora.nl | +31 6 2991 7185</textarea>
             <div class="mf-help">Kies welke AI-stack de software gebruikt voor coldcalling.</div>
           </div>
           <div class="mf-row">
-            <div class="mf-label">Campagne afgerond na</div>
-            <select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">
-              <option value="5">5 dagen</option>
-              <option value="7">7 dagen</option>
-              <option value="14" selected>14 dagen</option>
-            </select>
-            <div class="mf-help">Na deze looptijd ziet Softora de mailcampagne als afgerond en kan er weer een nieuwe starten.</div>
-          </div>
-          <div class="mf-row">
             <div class="mf-label">Verzenden vanaf</div>
             <select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">
               <option value="info@softora.nl" selected>info@softora.nl</option>
@@ -1240,18 +1231,13 @@ Softora.nl | +31 6 2991 7185</textarea>
         </div>
 
         <div class="field lead-generator-branch-field">
-          <div class="field-label">Branche</div>
-          <select class="sel" id="branche" data-native-select="true">
-            <option value="">Alles</option>
-            <option>Horeca & Restaurants</option>
-            <option>Retail & Winkels</option>
-            <option>Zakelijke Dienstverlening</option>
-            <option>Bouw & Vastgoed</option>
-            <option>Gezondheidszorg</option>
-            <option>Creatieve Sector</option>
-            <option>Tech & Startups</option>
-            <option>Overig</option>
+          <div class="field-label">Campagne afgerond na</div>
+          <select class="sel" id="campaignDurationDays" aria-label="Campagneduur">
+            <option value="5">5 dagen</option>
+            <option value="7">7 dagen</option>
+            <option value="14" selected>14 dagen</option>
           </select>
+          <div class="mf-help">Na deze looptijd ziet Softora de mailcampagne als afgerond en kan er weer een nieuwe starten.</div>
         </div>
 
         <div class="field lead-generator-belmethod-field">
@@ -2227,16 +2213,25 @@ function ensureLeadGeneratorSettingsBackRow() {
     '<button type="button" class="mail-tab" style="cursor:pointer" id="leadGenBackToScriptBtn">Terug naar script</button>';
   fields.insertBefore(wrap, fields.firstChild);
   document.getElementById('leadGenBackToScriptBtn').addEventListener('click', function () {
-    var m1 = document.querySelector('.mail-tab-group button.mail-tab[onclick*="switchMail(1"]');
-    if (m1) switchMail(1, m1);
+    switchMail(1, null);
   });
+}
+
+function toggleMailSettings(el) {
+  var settingsPanel = document.getElementById('mail-panel-5');
+  if (settingsPanel && settingsPanel.classList.contains('active')) {
+    switchMail(1, null);
+    return;
+  }
+  switchMail(5, el);
 }
 
 function switchMail(n, el) {
   document.querySelectorAll('.mail-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.mail-panel').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('mail-panel-' + n).classList.add('active');
+  if (el) el.classList.add('active');
+  var panel = document.getElementById('mail-panel-' + n);
+  if (panel) panel.classList.add('active');
   if (n === 5) {
     ensureLeadGeneratorSettingsBackRow();
   }
