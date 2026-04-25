@@ -213,12 +213,23 @@ test('premium bevestigingsmails exposes campaign duration choices and uses them 
   assert.match(pageSource, /'✓ Dag ' \+ totalDurationDays \+ ' bereikt — campagne afgelopen'/);
 });
 
-test('premium bevestigingsmails keeps the branche filter as the native belmethode-style select', () => {
+test('premium bevestigingsmails keeps the branche filter as the native select outside lead-generator alias', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /<select class="sel" id="branche" data-native-select="true">/);
+  assert.match(pageSource, /<div class="field lead-generator-branch-field">\s*<div class="field-label">Branche<\/div>\s*<select class="sel" id="branche" data-native-select="true">/);
   assert.match(pageSource, /if \(String\(select\.dataset\.nativeSelect \|\| ''\)\.trim\(\) === 'true'\) return;/);
+});
+
+test('premium ai lead generator alias replaces branche with belmethode', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /html\[data-softora-lead-generator-alias="1"\] \.lead-generator-branch-field \{ display: none !important; \}/);
+  assert.match(pageSource, /html:not\(\[data-softora-lead-generator-alias="1"\]\) \.lead-generator-belmethod-field \{ display: none !important; \}/);
+  assert.match(pageSource, /<div class="field lead-generator-belmethod-field">\s*<div class="field-label">Belmethode<\/div>\s*<select class="sel" id="callDispatchMode" data-native-select="true">/);
+  assert.match(pageSource, /<option value="sequential" selected>Apart<\/option>/);
+  assert.match(pageSource, /<option value="parallel">Alles tegelijk<\/option>/);
 });
 
 test('premium bevestigingsmails sends real coldmail campaigns through the backend before showing timeline', () => {

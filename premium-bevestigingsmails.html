@@ -329,6 +329,8 @@ html[data-softora-lead-generator-alias="1"] .campaign-metric-zone4 { display: no
 html[data-softora-lead-generator-alias="1"] #screen-dashboard .topbar-right { display: none !important; }
 html[data-softora-lead-generator-alias="1"] #mail-subj-row { display: none !important; }
 html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setting { display: none !important; }
+html[data-softora-lead-generator-alias="1"] .lead-generator-branch-field { display: none !important; }
+html:not([data-softora-lead-generator-alias="1"]) .lead-generator-belmethod-field { display: none !important; }
 .zone-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1237,7 +1239,7 @@ Softora.nl | +31 6 2991 7185</textarea>
           <div class="slider-row"><span>10</span><span>250</span><span>500</span></div>
         </div>
 
-        <div class="field">
+        <div class="field lead-generator-branch-field">
           <div class="field-label">Branche</div>
           <select class="sel" id="branche" data-native-select="true">
             <option value="">Alles</option>
@@ -1249,6 +1251,14 @@ Softora.nl | +31 6 2991 7185</textarea>
             <option>Creatieve Sector</option>
             <option>Tech & Startups</option>
             <option>Overig</option>
+          </select>
+        </div>
+
+        <div class="field lead-generator-belmethod-field">
+          <div class="field-label">Belmethode</div>
+          <select class="sel" id="callDispatchMode" data-native-select="true">
+            <option value="sequential" selected>Apart</option>
+            <option value="parallel">Alles tegelijk</option>
           </select>
         </div>
 
