@@ -120,6 +120,14 @@ test('premium website houdt footer-links direct klikbaar door footer buiten cont
   );
 });
 
+test('premium website contactkaart gebruikt korte andere vraag titel', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<h3 id="faq-contact-title">Andere vraag\?<\/h3>/);
+  assert.doesNotMatch(source, /Staat je vraag er niet bij\?/);
+});
+
 test('premium website hero gebruikt lokaal gegenereerde studiofotografie met donkere overlay en leesbare tekst', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
