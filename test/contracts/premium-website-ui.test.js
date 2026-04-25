@@ -75,14 +75,14 @@ test('premium website hero story titel staat op twee regels zonder bureau-ruis',
   assert.doesNotMatch(source, /Premium uitstraling zonder bureau-ruis\./);
 });
 
-test('premium website hero story kaart staat duidelijk hoger op desktop', () => {
+test('premium website hero story kaart lijnt onderkant uit met de buttons', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
   assert.match(source, /\.hero-buttons\s*\{[\s\S]*margin-bottom:\s*2rem;/);
   assert.match(
     source,
-    /\.hero-story-card\s*\{[\s\S]*--hero-story-lift:\s*calc\(-14rem - clamp\(1\.2rem,\s*2vw,\s*1\.6rem\)\);[\s\S]*transform:\s*translateY\(var\(--hero-story-lift\)\);/
+    /\.hero-story-card\s*\{[\s\S]*--hero-story-lift:\s*calc\(-2rem - clamp\(1\.2rem,\s*2vw,\s*1\.6rem\)\);[\s\S]*transform:\s*translateY\(var\(--hero-story-lift\)\);/
   );
   assert.match(
     source,
@@ -90,7 +90,7 @@ test('premium website hero story kaart staat duidelijk hoger op desktop', () => 
   );
   assert.match(
     source,
-    /@media \(max-width: 1100px\) \{[\s\S]*\.hero-story-card\s*\{[\s\S]*--hero-story-lift:\s*-3rem;[\s\S]*transform:\s*translateY\(var\(--hero-story-lift\)\);/
+    /@media \(max-width: 1100px\) \{[\s\S]*\.hero-story-card\s*\{[\s\S]*--hero-story-lift:\s*0rem;[\s\S]*transform:\s*translateY\(var\(--hero-story-lift\)\);/
   );
 });
 
