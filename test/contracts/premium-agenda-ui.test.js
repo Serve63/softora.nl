@@ -94,6 +94,11 @@ test('premium agenda offers manual add flow on day click with business-hour noti
   assert.match(pageSource, /Martijn/);
   assert.match(pageSource, /value="overig"/);
   assert.match(pageSource, /Overig/);
+  assert.match(pageSource, /id="manualAppointmentActivityTime"/);
+  assert.match(pageSource, /Tijdstip activiteit/);
+  assert.match(pageSource, /id="manualAppointmentLegendChoice"/);
+  assert.match(pageSource, /Website Meeting/);
+  assert.match(pageSource, /Bedrijfssoftware Meeting/);
   assert.match(pageSource, /type="time"[^>]*id="manualAppointmentAvailableAgain"/);
   assert.match(pageSource, /\/api\/agenda\/appointments\/manual/);
   assert.match(pageSource, /data-calendar-date=/);
@@ -110,6 +115,9 @@ test('premium agenda offers manual add flow on day click with business-hour noti
   assert.match(pageSource, /Overig/);
   assert.match(pageSource, /\.legend-dot\.manual-overig \{ background: #ec4899; \}/);
   assert.match(pageSource, /\.appointment\.manual-overig \{[\s\S]*border-left: 3px solid #ec4899;/);
+  assert.match(pageSource, /payload\.activityTime = activityTime;/);
+  assert.match(pageSource, /payload\.legendChoice = legendChoice;/);
+  assert.match(pageSource, /if \(manualLegendChoice === 'business'\) return 'appointment meeting magnetic meeting--business';/);
   assert.match(pageSource, /if \(who === 'overig'\) return 'appointment manual-overig magnetic';/);
 });
 

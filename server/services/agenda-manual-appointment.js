@@ -13,6 +13,18 @@ function resolveManualPlannerLabel(body, normalizeString) {
   return '';
 }
 
+function normalizeManualLegendChoice(body, normalizeString) {
+  const raw = normalizeString(body?.legendChoice || body?.manualLegendChoice || '').toLowerCase();
+  if (raw === 'business' || raw === 'bedrijfssoftware') return 'business';
+  if (raw === 'voice' || raw === 'voicesoftware') return 'voice';
+  if (raw === 'chatbot' || raw === 'chatbots') return 'chatbot';
+  if (raw === 'manual-martijn' || raw === 'martijn') return 'manual-martijn';
+  if (raw === 'manual-overig' || raw === 'overig' || raw === 'other') return 'manual-overig';
+  if (raw === 'completed' || raw === 'afgerond') return 'completed';
+  if (raw === 'manual-serve' || raw === 'serve' || raw === 'servé') return 'manual-serve';
+  return raw ? '' : 'manual-serve';
+}
+
 function isTruthyAllDayUnavailable(body) {
   const v = body?.allDayUnavailable ?? body?.geheleDagNietBeschikbaar;
   if (v === true || v === 1) return true;
@@ -90,21 +102,27 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     const actor = truncateText(normalizeString(body.actor || body.doneBy || ''), 120);
 
     let appointmentTime;
+    let activityTime;
     let location;
     let activity;
     let availableAgain;
+    let legendChoice;
 
     if (allDayUnavailable) {
       appointmentTime = '09:00';
+      activityTime = '';
       availableAgain = '17:00';
       location = sanitizeAppointmentLocation('—');
       activity = 'Gehele dag niet beschikbaar';
+      legendChoice = normalizeManualLegendChoice(body, normalizeString) || 'manual-serve';
     } else {
       appointmentTime = normalizeTimeHhMm(body.time || '');
+      activityTime = normalizeTimeHhMm(body.activityTime || body.activity_time || '');
       location =
         sanitizeAppointmentLocation(body.location || '') || '—';
       activity = truncateText(normalizeString(body.activity || ''), 500);
       availableAgain = normalizeTimeHhMm(body.availableAgain || '');
+      legendChoice = normalizeManualLegendChoice(body, normalizeString);
     }
 
     if (!appointmentDate) {
@@ -129,6 +147,18 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       if (!activity) {
         return res.status(400).json({ ok: false, error: 'Vul een activiteit in.' });
       }
+      if (!activityTime) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Vul een geldig tijdstip van activiteit in (HH:MM).',
+        });
+      }
+      if (!legendChoice) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Kies een geldige legenda keuze.',
+        });
+      }
       if (!availableAgain) {
         return res.status(400).json({
           ok: false,
@@ -141,8 +171,10 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     const summary = [
       activity,
       `Wie: ${whoLabel}`,
+      activityTime ? `Tijdstip activiteit: ${activityTime}` : '',
+      legendChoice ? `Legenda: ${legendChoice}` : '',
       `Weer thuis, beschikbaar voor een reis naar prospect: ${availableAgain}`,
-    ].join('\n\n');
+    ].filter(Boolean).join('\n\n');
 
     const baseAppointment = {
       callId,
@@ -160,6 +192,8 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       providerLabel: 'Handmatig',
       coldcallingStack: 'manual',
       manualPlannerWho: whoLabel === 'Martijn' ? 'martijn' : whoLabel === 'Overig' ? 'overig' : 'serve',
+      manualLegendChoice: legendChoice,
+      manualActivityTime: activityTime,
       manualAllDayUnavailable: allDayUnavailable,
       manualAvailableAgain: availableAgain,
       summary,

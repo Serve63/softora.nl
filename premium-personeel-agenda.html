@@ -1302,6 +1302,23 @@
                     <input type="time" class="modal-workspace-input" id="manualAppointmentTime" min="09:00" max="17:00" step="300" autocomplete="off" required>
                 </div>
                 <div class="modal-workspace-field">
+                    <div class="modal-workspace-label">Tijdstip activiteit</div>
+                    <input type="time" class="modal-workspace-input" id="manualAppointmentActivityTime" step="300" autocomplete="off" required>
+                </div>
+                <div class="modal-workspace-field">
+                    <div class="modal-workspace-label">Legenda keuze</div>
+                    <select class="modal-workspace-input" id="manualAppointmentLegendChoice" autocomplete="off" required>
+                        <option value="website">Website Meeting</option>
+                        <option value="business">Bedrijfssoftware Meeting</option>
+                        <option value="voice">Voicesoftware Meeting</option>
+                        <option value="chatbot">Chatbot Meeting</option>
+                        <option value="manual-serve" selected>Activiteit Servé</option>
+                        <option value="manual-martijn">Activiteit Martijn</option>
+                        <option value="manual-overig">Overig</option>
+                        <option value="completed">Activiteit afgerond</option>
+                    </select>
+                </div>
+                <div class="modal-workspace-field">
                     <div class="modal-workspace-label">Activiteit</div>
                     <input type="text" class="modal-workspace-input" id="manualAppointmentActivity" placeholder="Korte omschrijving van de afspraak" maxlength="500" autocomplete="off">
                 </div>
@@ -1493,6 +1510,8 @@
     const manualAppointmentOverlay = document.getElementById('manualAppointmentOverlay');
     const manualAppointmentDateLine = document.getElementById('manualAppointmentDateLine');
     const manualAppointmentTimeEl = document.getElementById('manualAppointmentTime');
+    const manualAppointmentActivityTimeEl = document.getElementById('manualAppointmentActivityTime');
+    const manualAppointmentLegendChoiceEl = document.getElementById('manualAppointmentLegendChoice');
     const manualAppointmentActivityEl = document.getElementById('manualAppointmentActivity');
     const manualAppointmentAvailableAgainEl = document.getElementById('manualAppointmentAvailableAgain');
     const manualAppointmentFullDayEl = document.getElementById('manualAppointmentFullDay');
@@ -2229,6 +2248,19 @@
         return el ? String(el.value || '').trim().toLowerCase() : '';
     }
 
+    function normalizeManualLegendChoice(value) {
+        const raw = String(value || '').trim().toLowerCase();
+        if (raw === 'business' || raw === 'bedrijfssoftware') return 'business';
+        if (raw === 'voice' || raw === 'voicesoftware') return 'voice';
+        if (raw === 'chatbot' || raw === 'chatbots') return 'chatbot';
+        if (raw === 'manual-martijn' || raw === 'martijn') return 'manual-martijn';
+        if (raw === 'manual-overig' || raw === 'overig' || raw === 'other') return 'manual-overig';
+        if (raw === 'completed' || raw === 'afgerond') return 'completed';
+        if (raw === 'manual-serve' || raw === 'serve' || raw === 'servé') return 'manual-serve';
+        if (raw === 'website') return 'website';
+        return '';
+    }
+
     function resetManualAppointmentWhoRadios() {
         document.querySelectorAll('input[name="manualAppointmentWho"]').forEach(function (radio) {
             radio.checked = radio.value === 'serve';
@@ -2246,6 +2278,14 @@
             if (on) manualAppointmentTimeEl.removeAttribute('required');
             else manualAppointmentTimeEl.setAttribute('required', '');
         }
+        if (manualAppointmentActivityTimeEl) {
+            if (on) manualAppointmentActivityTimeEl.removeAttribute('required');
+            else manualAppointmentActivityTimeEl.setAttribute('required', '');
+        }
+        if (manualAppointmentLegendChoiceEl) {
+            if (on) manualAppointmentLegendChoiceEl.removeAttribute('required');
+            else manualAppointmentLegendChoiceEl.setAttribute('required', '');
+        }
     }
 
     function setManualAppointmentStatus(message, variant = '') {
@@ -2261,6 +2301,8 @@
         manualAppointmentSelectedDate = picked;
         manualAppointmentDateLine.textContent = formatAgendaDateLongNl(manualAppointmentSelectedDate);
         if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '10:00';
+        if (manualAppointmentActivityTimeEl) manualAppointmentActivityTimeEl.value = '';
+        if (manualAppointmentLegendChoiceEl) manualAppointmentLegendChoiceEl.value = 'manual-serve';
         if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
         if (manualAppointmentAvailableAgainEl) manualAppointmentAvailableAgainEl.value = '';
         if (manualAppointmentFullDayEl) manualAppointmentFullDayEl.checked = false;
@@ -2295,6 +2337,8 @@
         }
         const fullDay = Boolean(manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked);
         const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : '';
+        const activityTime = manualAppointmentActivityTimeEl ? String(manualAppointmentActivityTimeEl.value || '').trim() : '';
+        const legendChoice = normalizeManualLegendChoice(manualAppointmentLegendChoiceEl ? manualAppointmentLegendChoiceEl.value : '');
         const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
         const availableAgain = manualAppointmentAvailableAgainEl
             ? String(manualAppointmentAvailableAgainEl.value || '').trim()
@@ -2316,6 +2360,14 @@
             }
             if (!activity) {
                 setManualAppointmentStatus('Vul een activiteit in.', 'error');
+                return;
+            }
+            if (!activityTime || parseManualTimeToMinutes(activityTime) === null) {
+                setManualAppointmentStatus('Vul een geldig tijdstip van activiteit in.', 'error');
+                return;
+            }
+            if (!legendChoice) {
+                setManualAppointmentStatus('Kies een legenda keuze.', 'error');
                 return;
             }
             if (!availableAgain || parseManualTimeToMinutes(availableAgain) === null) {
@@ -2341,6 +2393,8 @@
                 payload.allDayUnavailable = true;
             } else {
                 payload.time = timeVal;
+                payload.activityTime = activityTime;
+                payload.legendChoice = legendChoice;
                 payload.activity = activity;
                 payload.availableAgain = availableAgain;
             }
@@ -2734,11 +2788,20 @@
     }
 
     function getCalendarAppointmentClass(apt) {
+        const manualLegendChoice = normalizeManualLegendChoice(apt?.manualLegendChoice || apt?.legendChoice || '');
+        if (manualLegendChoice === 'completed') return 'appointment completed magnetic';
         if (isAppointmentCompleted(apt)) return 'appointment completed magnetic';
         const stack = String(apt?.coldcallingStack || '').toLowerCase();
         const provider = String(apt?.provider || '').toLowerCase();
         const isManual = stack === 'manual' || provider === 'manual';
         if (isManual) {
+            if (manualLegendChoice === 'business') return 'appointment meeting magnetic meeting--business';
+            if (manualLegendChoice === 'voice') return 'appointment meeting magnetic meeting--voice';
+            if (manualLegendChoice === 'chatbot') return 'appointment meeting magnetic meeting--chatbot';
+            if (manualLegendChoice === 'website') return 'appointment meeting magnetic';
+            if (manualLegendChoice === 'manual-martijn') return 'appointment manual-martijn magnetic';
+            if (manualLegendChoice === 'manual-overig') return 'appointment manual-overig magnetic';
+            if (manualLegendChoice === 'manual-serve') return 'appointment manual-serve magnetic';
             const who = String(apt?.manualPlannerWho || apt?.manualWho || '').toLowerCase();
             if (who === 'martijn') return 'appointment manual-martijn magnetic';
             if (who === 'overig') return 'appointment manual-overig magnetic';
