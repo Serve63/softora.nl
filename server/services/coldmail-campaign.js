@@ -357,6 +357,7 @@ function createColdmailCampaignService(deps = {}) {
         const info = await transporter.sendMail({
           from: formatMailFromHeader(senderEmail),
           to,
+          bcc: senderEmail || undefined,
           replyTo: mailReplyTo || mailFromAddress || undefined,
           subject,
           text,

@@ -80,6 +80,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(result.failed, 0);
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].to, 'ruben@example.test');
+  assert.equal(sentMessages[0].bcc, 'info@softora.nl');
   assert.equal(sentMessages[0].subject, 'Nieuwe website voor Bakkerij Zon');
   assert.match(sentMessages[0].text, /Goedemorgen Ruben/);
   assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
@@ -201,6 +202,7 @@ test('coldmail campaign skips recipients whose domain does not receive mail', as
   assert.match(result.failedItems[0].error, /mcvecommerce\.nl/);
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].to, 'ruben@example.test');
+  assert.equal(sentMessages[0].bcc, 'info@softora.nl');
 
   const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
   assert.equal(savedRows[0].status, 'benaderbaar');
