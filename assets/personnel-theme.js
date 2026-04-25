@@ -866,7 +866,7 @@
             managementLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
             "  </div>",
             '  <div class="sidebar-section">',
-            '    <div class="sidebar-section-label">Advertenties</div>',
+            "    <div class=\"sidebar-section-label\">ADVERTENTIE'S</div>",
             adsLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
             "  </div>",
             '  <div class="sidebar-section">',

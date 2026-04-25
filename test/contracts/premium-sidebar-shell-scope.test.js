@@ -213,7 +213,7 @@ test('static premium sidebars share the same section order and public labels', (
       ],
     },
     {
-      label: 'Advertenties',
+      label: "ADVERTENTIE'S",
       links: [
         'ads_trustoo:Trustoo',
         'ads_pinterest:Pinterest',
@@ -287,7 +287,7 @@ test('static premium sidebars share the same section order and public labels', (
 test('unified premium sidebar splits ad channels from social media channels', () => {
   const themeJsSource = readRepoFile('assets/personnel-theme.js');
 
-  assert.match(themeJsSource, /sidebar-section-label">Advertenties</);
+  assert.match(themeJsSource, /sidebar-section-label\\">ADVERTENTIE'S</);
   assert.match(themeJsSource, /sidebar-section-label">Socialmedia</);
   assert.match(themeJsSource, /href:\s*"\/premium-advertenties#trustoo"[\s\S]*label:\s*"Trustoo"/);
   assert.match(themeJsSource, /href:\s*"\/premium-advertenties#pinterest"[\s\S]*label:\s*"Pinterest"/);
