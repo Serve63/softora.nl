@@ -46,6 +46,7 @@ function createService(overrides = {}) {
     },
     createTransport: () => ({
       sendMail: async (message) => {
+        if (overrides.sendMailError) throw new Error(overrides.sendMailError);
         sentMessages.push(message);
         return { messageId: `msg-${sentMessages.length}`, response: '250 ok' };
       },
@@ -132,4 +133,30 @@ test('coldmail campaign refuses unconnected sender addresses', async () => {
       }),
     /afzenderadres/
   );
+});
+
+test('coldmail campaign reports SMTP failure when every selected mail fails', async () => {
+  const { service, sentMessages, getSavedState } = createService({
+    sendMailError: '535 Authentication failed',
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Test',
+        body: 'Test',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'SMTP_SEND_FAILED');
+      assert.match(error.message, /535 Authentication failed/);
+      assert.equal(error.failedItems.length, 1);
+      assert.equal(error.failedItems[0].email, 'ruben@example.test');
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+  assert.equal(getSavedState(), null);
 });

@@ -319,6 +319,14 @@ function createColdmailCampaignService(deps = {}) {
       }
     }
 
+    if (!sent.length && failed.length) {
+      const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
+      const error = new Error(firstFailure ? `Geen mails verzonden: ${firstFailure}` : 'Geen mails verzonden.');
+      error.code = 'SMTP_SEND_FAILED';
+      error.failedItems = failed;
+      throw error;
+    }
+
     if (sent.length) {
       const actor = normalizeString(input.actor || 'Coldmailing');
       const updatedRows = rows.map((row, index) =>

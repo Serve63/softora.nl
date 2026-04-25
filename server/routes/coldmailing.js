@@ -45,6 +45,7 @@ function registerColdmailingRoutes(app, deps = {}) {
           500
         ),
         missing: Array.isArray(error && error.missing) ? error.missing : undefined,
+        failedItems: Array.isArray(error && error.failedItems) ? error.failedItems : undefined,
         allowedSenderEmails: Array.isArray(error && error.allowedSenderEmails)
           ? error.allowedSenderEmails
           : undefined,

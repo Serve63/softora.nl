@@ -297,5 +297,8 @@ test('premium bevestigingsmails sends real coldmail campaigns through the backen
   assert.match(pageSource, /fetch\('\/api\/coldmailing\/campaigns\/send'/);
   assert.match(pageSource, /credentials: 'same-origin'/);
   assert.match(pageSource, /sendResult = await sendColdmailCampaignNow\(\);/);
+  assert.match(pageSource, /function buildSendErrorMessage\(defaultMessage\)/);
+  assert.match(pageSource, /payload && Array\.isArray\(payload\.failedItems\) && payload\.failedItems\[0\]/);
+  assert.match(pageSource, /if \(!payload\.sent && payload\.failed\) \{/);
   assert.match(pageSource, /bedrijven = sendResult\.sentItems\.map/);
 });

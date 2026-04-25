@@ -2162,11 +2162,27 @@ async function sendColdmailCampaignNow() {
     body: JSON.stringify(getColdmailCampaignPayload()),
   });
   const payload = await response.json().catch(() => null);
+  function buildSendErrorMessage(defaultMessage) {
+    const firstFailed = payload && Array.isArray(payload.failedItems) && payload.failedItems[0]
+      ? payload.failedItems[0]
+      : null;
+    const smtpError = firstFailed && firstFailed.error ? String(firstFailed.error).trim() : '';
+    const company = firstFailed && (firstFailed.bedrijf || firstFailed.email)
+      ? String(firstFailed.bedrijf || firstFailed.email).trim()
+      : '';
+    if (smtpError) return (company ? company + ': ' : '') + smtpError;
+    return defaultMessage;
+  }
   if (!response.ok || !payload || payload.ok === false) {
     const message = payload && payload.message
-      ? payload.message
+      ? buildSendErrorMessage(payload.message)
       : 'Mails versturen is mislukt.';
     const error = new Error(message);
+    error.payload = payload;
+    throw error;
+  }
+  if (!payload.sent && payload.failed) {
+    const error = new Error(buildSendErrorMessage('Geen mails verzonden.'));
     error.payload = payload;
     throw error;
   }
