@@ -7,7 +7,7 @@ test('premium agenda modal uses dossier flow for appointments that already have 
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /Agenda\. De centrale basis van het bedrijf/);
+  assert.match(pageSource, /AI begrijpt en scant de dynamische agenda en houd rekening met reistijden\./);
   assert.doesNotMatch(pageSource, /Meetings ingepland door AI Lead Generator/);
   assert.match(
     pageSource,
