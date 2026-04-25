@@ -82,31 +82,34 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   );
 });
 
-test('premium agenda offers manual add flow on day click with business-hour notice', () => {
+test('premium agenda offers stepped manual add flow on day click', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /id="manualAppointmentOverlay"/);
-  assert.match(pageSource, /name="manualAppointmentWho"/);
-  assert.match(pageSource, /value="serve"/);
-  assert.match(pageSource, /Servé/);
-  assert.match(pageSource, /value="martijn"/);
-  assert.match(pageSource, /Martijn/);
-  assert.match(pageSource, /value="overig"/);
+  assert.match(pageSource, /Wat wil je inplannen\?/);
+  assert.match(pageSource, /data-manual-kind="meeting"/);
+  assert.match(pageSource, /data-manual-kind="overig"/);
+  assert.match(pageSource, /Welke meeting\?/);
+  assert.match(pageSource, /data-manual-meeting-type="website"/);
+  assert.match(pageSource, /data-manual-meeting-type="business"/);
+  assert.match(pageSource, /data-manual-meeting-type="voice"/);
+  assert.match(pageSource, /data-manual-meeting-type="chatbot"/);
+  assert.match(pageSource, /id="manualAppointmentActivity"/);
+  assert.match(pageSource, /Titel/);
+  assert.match(pageSource, /id="manualAppointmentTime"/);
+  assert.match(pageSource, /Tijdstip/);
+  assert.match(pageSource, /id="manualAppointmentLocation"/);
+  assert.match(pageSource, /Locatie/);
+  assert.match(pageSource, /id="manualAppointmentNotes"/);
+  assert.match(pageSource, /Opmerkingen/);
   assert.match(pageSource, /Overig/);
   assert.match(pageSource, /id="manualAppointmentActivityTime"/);
-  assert.match(pageSource, /Tijdstip activiteit/);
   assert.match(pageSource, /id="manualAppointmentLegendChoice"/);
-  assert.match(pageSource, /Website Meeting/);
-  assert.match(pageSource, /Bedrijfssoftware Meeting/);
-  assert.match(pageSource, /type="time"[^>]*id="manualAppointmentAvailableAgain"/);
   assert.match(pageSource, /\/api\/agenda\/appointments\/manual/);
   assert.match(pageSource, /data-calendar-date=/);
-  assert.match(pageSource, /isManualAppointmentTimeAllowed/);
-  assert.match(
-    pageSource,
-    /Afspraken die geen effect hebben op de werktijden[\s\S]*09:00[\s\S]*17:00[\s\S]*maandag[\s\S]*vrijdag[\s\S]*hier niet gemeld/i
-  );
+  assert.match(pageSource, /function advanceManualAppointmentStep\(/);
+  assert.match(pageSource, /function getManualAppointmentLegendChoice\(/);
   assert.match(pageSource, /legend-dot manual-serve/);
   assert.match(pageSource, /Activiteit Servé/);
   assert.match(pageSource, /legend-dot manual-martijn/);
@@ -115,20 +118,22 @@ test('premium agenda offers manual add flow on day click with business-hour noti
   assert.match(pageSource, /Overig/);
   assert.match(pageSource, /\.legend-dot\.manual-overig \{ background: #ec4899; \}/);
   assert.match(pageSource, /\.appointment\.manual-overig \{[\s\S]*border-left: 3px solid #ec4899;/);
-  assert.match(pageSource, /payload\.activityTime = activityTime;/);
-  assert.match(pageSource, /payload\.legendChoice = legendChoice;/);
+  assert.match(pageSource, /activityTime: timeVal/);
+  assert.match(pageSource, /legendChoice,/);
+  assert.match(pageSource, /notes,/);
   assert.match(pageSource, /if \(manualLegendChoice === 'business'\) return 'appointment meeting magnetic meeting--business';/);
   assert.match(pageSource, /if \(who === 'overig'\) return 'appointment manual-overig magnetic';/);
 });
 
-test('premium agenda handmatige afspraak-modal heeft geen locatieveld', () => {
+test('premium agenda handmatige afspraak-modal slaat locatie en opmerkingen op', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.doesNotMatch(pageSource, /id="manualAppointmentLocation"/);
+  assert.match(pageSource, /id="manualAppointmentLocation"/);
+  assert.match(pageSource, /id="manualAppointmentNotes"/);
   assert.doesNotMatch(pageSource, /ensureAgendaPlacesReady/);
-  assert.match(pageSource, /payload\.activity = activity/);
-  assert.match(pageSource, /payload\.availableAgain = availableAgain/);
+  assert.match(pageSource, /location,/);
+  assert.match(pageSource, /notes,/);
 });
 
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {

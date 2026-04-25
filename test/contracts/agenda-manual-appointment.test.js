@@ -78,3 +78,34 @@ test('agenda manual appointment stores legend choice and activity time', async (
   assert.match(res.body.appointment.summary, /Tijdstip activiteit: 10:30/);
   assert.match(res.body.appointment.summary, /Legenda: business/);
 });
+
+test('agenda manual appointment stores stepped modal details', async () => {
+  const { coordinator } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        who: 'overig',
+        title: 'Interne planning',
+        time: '18:30',
+        legendChoice: 'manual-overig',
+        location: 'Kantoor',
+        notes: 'Voorbereiden voor klantgesprek.',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.appointment.company, 'Interne planning');
+  assert.equal(res.body.appointment.time, '18:30');
+  assert.equal(res.body.appointment.location, 'Kantoor');
+  assert.equal(res.body.appointment.manualActivityTime, '18:30');
+  assert.equal(res.body.appointment.manualLegendChoice, 'manual-overig');
+  assert.equal(res.body.appointment.manualNotes, 'Voorbereiden voor klantgesprek.');
+  assert.match(res.body.appointment.summary, /Locatie: Kantoor/);
+  assert.match(res.body.appointment.summary, /Opmerkingen: Voorbereiden voor klantgesprek\./);
+});

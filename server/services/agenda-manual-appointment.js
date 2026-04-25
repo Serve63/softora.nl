@@ -2,9 +2,6 @@ const crypto = require('crypto');
 
 const { createAgendaConfirmationPersistenceHelpers } = require('./agenda-confirmation-persistence');
 
-const BUSINESS_START_MIN = 9 * 60;
-const BUSINESS_END_MIN = 17 * 60;
-
 function resolveManualPlannerLabel(body, normalizeString) {
   const raw = normalizeString(body?.who || body?.manualWho || '').toLowerCase();
   if (raw === 'serve' || raw === 'servé') return 'Servé';
@@ -75,19 +72,6 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     invalidateSupabaseSyncTimestamp,
   });
 
-  function appointmentStartMinutesWithinBusinessHours(timeHm) {
-    const normalized = normalizeTimeHhMm(timeHm);
-    if (!normalized) return null;
-    const m = /^(\d{1,2}):(\d{2})$/.exec(normalized);
-    if (!m) return null;
-    const h = Number(m[1]);
-    const mins = Number(m[2]);
-    if (!Number.isFinite(h) || !Number.isFinite(mins) || mins < 0 || mins > 59) return null;
-    const total = h * 60 + mins;
-    if (total < BUSINESS_START_MIN || total > BUSINESS_END_MIN) return null;
-    return total;
-  }
-
   async function createManualAgendaAppointmentResponse(req, res) {
     if (isSupabaseConfigured() && !getSupabaseStateHydrated()) {
       await forceHydrateRuntimeStateWithRetries(3);
@@ -105,6 +89,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     let activityTime;
     let location;
     let activity;
+    let notes;
     let availableAgain;
     let legendChoice;
 
@@ -114,13 +99,15 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       availableAgain = '17:00';
       location = sanitizeAppointmentLocation('—');
       activity = 'Gehele dag niet beschikbaar';
+      notes = '';
       legendChoice = normalizeManualLegendChoice(body, normalizeString) || 'manual-serve';
     } else {
       appointmentTime = normalizeTimeHhMm(body.time || '');
-      activityTime = normalizeTimeHhMm(body.activityTime || body.activity_time || '');
+      activityTime = normalizeTimeHhMm(body.activityTime || body.activity_time || body.time || '');
       location =
         sanitizeAppointmentLocation(body.location || '') || '—';
-      activity = truncateText(normalizeString(body.activity || ''), 500);
+      activity = truncateText(normalizeString(body.title || body.activity || ''), 500);
+      notes = truncateText(normalizeString(body.notes || body.opmerkingen || ''), 1000);
       availableAgain = normalizeTimeHhMm(body.availableAgain || '');
       legendChoice = normalizeManualLegendChoice(body, normalizeString);
     }
@@ -138,14 +125,8 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       if (!appointmentTime) {
         return res.status(400).json({ ok: false, error: 'Vul een geldige tijd in (HH:MM).' });
       }
-      if (appointmentStartMinutesWithinBusinessHours(appointmentTime) === null) {
-        return res.status(400).json({
-          ok: false,
-          error: 'Afspraken zijn alleen tussen 09:00 en 17:00. Kies een tijd in dat venster.',
-        });
-      }
       if (!activity) {
-        return res.status(400).json({ ok: false, error: 'Vul een activiteit in.' });
+        return res.status(400).json({ ok: false, error: 'Vul een titel in.' });
       }
       if (!activityTime) {
         return res.status(400).json({
@@ -159,12 +140,6 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
           error: 'Kies een geldige legenda keuze.',
         });
       }
-      if (!availableAgain) {
-        return res.status(400).json({
-          ok: false,
-          error: 'Kies een geldige tijd (HH:MM) voor wanneer je weer beschikbaar bent.',
-        });
-      }
     }
 
     const callId = `manual_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
@@ -172,8 +147,10 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       activity,
       `Wie: ${whoLabel}`,
       activityTime ? `Tijdstip activiteit: ${activityTime}` : '',
+      location && location !== '—' ? `Locatie: ${location}` : '',
       legendChoice ? `Legenda: ${legendChoice}` : '',
-      `Weer thuis, beschikbaar voor een reis naar prospect: ${availableAgain}`,
+      notes ? `Opmerkingen: ${notes}` : '',
+      availableAgain ? `Weer thuis, beschikbaar voor een reis naar prospect: ${availableAgain}` : '',
     ].filter(Boolean).join('\n\n');
 
     const baseAppointment = {
@@ -194,6 +171,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       manualPlannerWho: whoLabel === 'Martijn' ? 'martijn' : whoLabel === 'Overig' ? 'overig' : 'serve',
       manualLegendChoice: legendChoice,
       manualActivityTime: activityTime,
+      manualNotes: notes,
       manualAllDayUnavailable: allDayUnavailable,
       manualAvailableAgain: availableAgain,
       summary,

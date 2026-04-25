@@ -612,6 +612,51 @@
             display: none !important;
         }
 
+        .manual-appointment-step[hidden] {
+            display: none !important;
+        }
+
+        .manual-appointment-choice-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+
+        .manual-appointment-choice {
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.82);
+            border-radius: 0.8rem;
+            padding: 0.95rem 1rem;
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        .manual-appointment-choice:hover,
+        .manual-appointment-choice.is-active {
+            border-color: var(--accent);
+            background: rgba(255,255,255,0.96);
+            box-shadow: 0 12px 28px rgba(155, 35, 85, 0.12);
+        }
+
+        .manual-appointment-choice-title {
+            display: block;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .manual-appointment-choice-sub {
+            display: block;
+            margin-top: 0.25rem;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            line-height: 1.35;
+        }
+
         .modal-workspace-field textarea {
             width: 100%;
             min-height: 130px;
@@ -1269,70 +1314,68 @@
             </div>
         </div>
         <div class="modal-body">
-            <p class="modal-workspace-help" style="margin-top:0;">
-                Afspraken die geen effect hebben op de werktijden <strong>09:00</strong> - <strong>17:00</strong> van maandag tot vrijdag hoeven hier niet gemeld te worden.
-            </p>
             <div class="modal-workspace-grid">
-                <div class="modal-workspace-field modal-workspace-field--checkbox-first">
-                    <label class="modal-workspace-check" for="manualAppointmentFullDay">
-                        <input type="checkbox" id="manualAppointmentFullDay" autocomplete="off">
-                        <span>Gehele dag niet beschikbaar</span>
-                    </label>
-                </div>
-                <div class="modal-workspace-field">
-                    <div class="modal-workspace-label">Wie ben je?</div>
-                    <div class="modal-workspace-radio-group" role="radiogroup" aria-label="Wie ben je?">
-                        <label class="modal-workspace-radio">
-                            <input type="radio" name="manualAppointmentWho" value="serve" checked>
-                            Servé
-                        </label>
-                        <label class="modal-workspace-radio">
-                            <input type="radio" name="manualAppointmentWho" value="martijn">
-                            Martijn
-                        </label>
-                        <label class="modal-workspace-radio">
-                            <input type="radio" name="manualAppointmentWho" value="overig">
-                            Overig
-                        </label>
+                <section class="manual-appointment-step" id="manualAppointmentStepKind">
+                    <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Wat wil je inplannen?</div>
+                        <div class="manual-appointment-choice-grid" role="group" aria-label="Wat wil je inplannen?">
+                            <button class="manual-appointment-choice" type="button" data-manual-kind="meeting">
+                                <span class="manual-appointment-choice-title">Meeting</span>
+                                <span class="manual-appointment-choice-sub">Plan een website-, software-, voice- of chatbotmeeting in.</span>
+                            </button>
+                            <button class="manual-appointment-choice" type="button" data-manual-kind="overig">
+                                <span class="manual-appointment-choice-title">Overig</span>
+                                <span class="manual-appointment-choice-sub">Plan een losse activiteit of herinnering in.</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="manual-appointment-detail-fields" id="manualAppointmentDetailFields">
-                <div class="modal-workspace-field">
-                    <div class="modal-workspace-label">Niet meer beschikbaar vanaf</div>
-                    <input type="time" class="modal-workspace-input" id="manualAppointmentTime" min="09:00" max="17:00" step="300" autocomplete="off" required>
-                </div>
-                <div class="modal-workspace-field">
-                    <div class="modal-workspace-label">Tijdstip activiteit</div>
-                    <input type="time" class="modal-workspace-input" id="manualAppointmentActivityTime" step="300" autocomplete="off" required>
-                </div>
-                <div class="modal-workspace-field">
-                    <div class="modal-workspace-label">Legenda keuze</div>
-                    <select class="modal-workspace-input" id="manualAppointmentLegendChoice" autocomplete="off" required>
-                        <option value="website">Website Meeting</option>
-                        <option value="business">Bedrijfssoftware Meeting</option>
-                        <option value="voice">Voicesoftware Meeting</option>
-                        <option value="chatbot">Chatbot Meeting</option>
-                        <option value="manual-serve" selected>Activiteit Servé</option>
-                        <option value="manual-martijn">Activiteit Martijn</option>
-                        <option value="manual-overig">Overig</option>
-                        <option value="completed">Activiteit afgerond</option>
-                    </select>
-                </div>
-                <div class="modal-workspace-field">
-                    <div class="modal-workspace-label">Activiteit</div>
-                    <input type="text" class="modal-workspace-input" id="manualAppointmentActivity" placeholder="Korte omschrijving van de afspraak" maxlength="500" autocomplete="off">
-                </div>
-                <div class="modal-workspace-field">
-                    <div class="modal-workspace-label">Weer thuis, beschikbaar voor een reis naar prospect</div>
-                    <input type="time" class="modal-workspace-input" id="manualAppointmentAvailableAgain" step="300" autocomplete="off" aria-label="Tijd weer beschikbaar na reis naar prospect">
-                </div>
-                </div>
+                </section>
+                <section class="manual-appointment-step" id="manualAppointmentStepMeeting" hidden>
+                    <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Welke meeting?</div>
+                        <div class="manual-appointment-choice-grid" role="group" aria-label="Welke meeting?">
+                            <button class="manual-appointment-choice" type="button" data-manual-meeting-type="website">
+                                <span class="manual-appointment-choice-title">Website</span>
+                            </button>
+                            <button class="manual-appointment-choice" type="button" data-manual-meeting-type="business">
+                                <span class="manual-appointment-choice-title">Bedrijfssoftware</span>
+                            </button>
+                            <button class="manual-appointment-choice" type="button" data-manual-meeting-type="voice">
+                                <span class="manual-appointment-choice-title">Voicesoftware</span>
+                            </button>
+                            <button class="manual-appointment-choice" type="button" data-manual-meeting-type="chatbot">
+                                <span class="manual-appointment-choice-title">Chatbot</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+                <section class="manual-appointment-step" id="manualAppointmentStepDetails" hidden>
+                    <input type="hidden" id="manualAppointmentActivityTime" autocomplete="off">
+                    <input type="hidden" id="manualAppointmentLegendChoice" autocomplete="off">
+                    <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Titel</div>
+                        <input type="text" class="modal-workspace-input" id="manualAppointmentActivity" placeholder="Titel van de afspraak" maxlength="500" autocomplete="off">
+                    </div>
+                    <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Tijdstip</div>
+                        <input type="time" class="modal-workspace-input" id="manualAppointmentTime" step="300" autocomplete="off" required>
+                    </div>
+                    <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Locatie</div>
+                        <input type="text" class="modal-workspace-input" id="manualAppointmentLocation" placeholder="Bijv. kantoor, Teams, klantlocatie" maxlength="240" autocomplete="off">
+                    </div>
+                    <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Opmerkingen</div>
+                        <textarea class="modal-workspace-input" id="manualAppointmentNotes" placeholder="Extra opmerkingen voor deze agenda-afspraak" maxlength="1000" autocomplete="off"></textarea>
+                    </div>
+                </section>
             </div>
             <div class="modal-workspace-status" id="manualAppointmentStatus"></div>
         </div>
         <div class="modal-footer">
+            <button class="modal-btn secondary magnetic" id="manualAppointmentBackBtn" type="button" hidden>Terug</button>
             <button class="modal-btn secondary magnetic" id="manualAppointmentCancelBtn" type="button">Annuleren</button>
-            <button class="modal-btn primary magnetic" id="manualAppointmentSubmitBtn" type="button">Toevoegen</button>
+            <button class="modal-btn primary magnetic" id="manualAppointmentSubmitBtn" type="button">Volgende</button>
         </div>
     </div>
 </div>
@@ -1513,15 +1556,19 @@
     const manualAppointmentActivityTimeEl = document.getElementById('manualAppointmentActivityTime');
     const manualAppointmentLegendChoiceEl = document.getElementById('manualAppointmentLegendChoice');
     const manualAppointmentActivityEl = document.getElementById('manualAppointmentActivity');
-    const manualAppointmentAvailableAgainEl = document.getElementById('manualAppointmentAvailableAgain');
-    const manualAppointmentFullDayEl = document.getElementById('manualAppointmentFullDay');
+    const manualAppointmentLocationEl = document.getElementById('manualAppointmentLocation');
+    const manualAppointmentNotesEl = document.getElementById('manualAppointmentNotes');
     const manualAppointmentStatusEl = document.getElementById('manualAppointmentStatus');
     const manualAppointmentCloseBtn = document.getElementById('manualAppointmentCloseBtn');
+    const manualAppointmentBackBtn = document.getElementById('manualAppointmentBackBtn');
     const manualAppointmentCancelBtn = document.getElementById('manualAppointmentCancelBtn');
     const manualAppointmentSubmitBtn = document.getElementById('manualAppointmentSubmitBtn');
     const calendarGridEl = document.getElementById('calendarGrid');
     let manualAppointmentSelectedDate = '';
     let manualAppointmentSaving = false;
+    let manualAppointmentStep = 'kind';
+    let manualAppointmentKind = '';
+    let manualAppointmentMeetingType = '';
     const modalAudioBlock = document.getElementById('modalAudioBlock');
     const modalAudioPlayer = document.getElementById('modalAudioPlayer');
     const modalAudioEmpty = document.getElementById('modalAudioEmpty');
@@ -2237,17 +2284,6 @@
         return h * 60 + mins;
     }
 
-    function isManualAppointmentTimeAllowed(timeStr) {
-        const total = parseManualTimeToMinutes(timeStr);
-        if (total === null) return false;
-        return total >= 9 * 60 && total <= 17 * 60;
-    }
-
-    function getManualAppointmentWho() {
-        const el = document.querySelector('input[name="manualAppointmentWho"]:checked');
-        return el ? String(el.value || '').trim().toLowerCase() : '';
-    }
-
     function normalizeManualLegendChoice(value) {
         const raw = String(value || '').trim().toLowerCase();
         if (raw === 'business' || raw === 'bedrijfssoftware') return 'business';
@@ -2261,31 +2297,98 @@
         return '';
     }
 
-    function resetManualAppointmentWhoRadios() {
-        document.querySelectorAll('input[name="manualAppointmentWho"]').forEach(function (radio) {
-            radio.checked = radio.value === 'serve';
+    function setManualAppointmentActiveChoices() {
+        document.querySelectorAll('[data-manual-kind]').forEach(function (button) {
+            button.classList.toggle('is-active', String(button.getAttribute('data-manual-kind') || '') === manualAppointmentKind);
+        });
+        document.querySelectorAll('[data-manual-meeting-type]').forEach(function (button) {
+            button.classList.toggle('is-active', String(button.getAttribute('data-manual-meeting-type') || '') === manualAppointmentMeetingType);
         });
     }
 
-    function syncManualAppointmentFullDayFields() {
-        const on = Boolean(manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked);
-        const detailWrap = document.getElementById('manualAppointmentDetailFields');
-        if (detailWrap) {
-            detailWrap.classList.toggle('is-hidden-for-fullday', on);
-            detailWrap.setAttribute('aria-hidden', on ? 'true' : 'false');
+    function getManualAppointmentLegendChoice() {
+        if (manualAppointmentKind === 'overig') return 'manual-overig';
+        return normalizeManualLegendChoice(manualAppointmentMeetingType);
+    }
+
+    function setManualAppointmentStep(step) {
+        manualAppointmentStep = step || 'kind';
+        const panels = {
+            kind: document.getElementById('manualAppointmentStepKind'),
+            meeting: document.getElementById('manualAppointmentStepMeeting'),
+            details: document.getElementById('manualAppointmentStepDetails'),
+        };
+        Object.keys(panels).forEach(function (key) {
+            if (panels[key]) panels[key].hidden = key !== manualAppointmentStep;
+        });
+        if (manualAppointmentBackBtn) {
+            manualAppointmentBackBtn.hidden = manualAppointmentStep === 'kind';
         }
-        if (manualAppointmentTimeEl) {
-            if (on) manualAppointmentTimeEl.removeAttribute('required');
-            else manualAppointmentTimeEl.setAttribute('required', '');
+        if (manualAppointmentSubmitBtn) {
+            manualAppointmentSubmitBtn.textContent = manualAppointmentStep === 'details' ? 'Toevoegen' : 'Volgende';
         }
-        if (manualAppointmentActivityTimeEl) {
-            if (on) manualAppointmentActivityTimeEl.removeAttribute('required');
-            else manualAppointmentActivityTimeEl.setAttribute('required', '');
+        setManualAppointmentActiveChoices();
+        setManualAppointmentStatus('');
+    }
+
+    function resetManualAppointmentWizard() {
+        manualAppointmentKind = '';
+        manualAppointmentMeetingType = '';
+        if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '';
+        if (manualAppointmentActivityTimeEl) manualAppointmentActivityTimeEl.value = '';
+        if (manualAppointmentLegendChoiceEl) manualAppointmentLegendChoiceEl.value = '';
+        if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
+        if (manualAppointmentLocationEl) manualAppointmentLocationEl.value = '';
+        if (manualAppointmentNotesEl) manualAppointmentNotesEl.value = '';
+        setManualAppointmentStep('kind');
+    }
+
+    function focusManualAppointmentStep() {
+        window.setTimeout(() => {
+            if (manualAppointmentStep === 'kind') {
+                const first = document.querySelector('[data-manual-kind]');
+                if (first) first.focus();
+                return;
+            }
+            if (manualAppointmentStep === 'meeting') {
+                const first = document.querySelector('[data-manual-meeting-type]');
+                if (first) first.focus();
+                return;
+            }
+            if (manualAppointmentActivityEl) manualAppointmentActivityEl.focus();
+        }, 30);
+    }
+
+    function goBackManualAppointmentStep() {
+        if (manualAppointmentStep === 'details') {
+            setManualAppointmentStep(manualAppointmentKind === 'meeting' ? 'meeting' : 'kind');
+            focusManualAppointmentStep();
+        } else if (manualAppointmentStep === 'meeting') {
+            setManualAppointmentStep('kind');
+            focusManualAppointmentStep();
         }
-        if (manualAppointmentLegendChoiceEl) {
-            if (on) manualAppointmentLegendChoiceEl.removeAttribute('required');
-            else manualAppointmentLegendChoiceEl.setAttribute('required', '');
+    }
+
+    function advanceManualAppointmentStep() {
+        if (manualAppointmentStep === 'kind') {
+            if (manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
+                setManualAppointmentStatus('Kies eerst Meeting of Overig.', 'error');
+                return;
+            }
+            setManualAppointmentStep(manualAppointmentKind === 'meeting' ? 'meeting' : 'details');
+            focusManualAppointmentStep();
+            return;
         }
+        if (manualAppointmentStep === 'meeting') {
+            if (!normalizeManualLegendChoice(manualAppointmentMeetingType)) {
+                setManualAppointmentStatus('Kies welke meeting je wilt inplannen.', 'error');
+                return;
+            }
+            setManualAppointmentStep('details');
+            focusManualAppointmentStep();
+            return;
+        }
+        void submitManualAppointment();
     }
 
     function setManualAppointmentStatus(message, variant = '') {
@@ -2300,24 +2403,11 @@
         if (isYmdCalendarSaturday(picked)) return;
         manualAppointmentSelectedDate = picked;
         manualAppointmentDateLine.textContent = formatAgendaDateLongNl(manualAppointmentSelectedDate);
-        if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '10:00';
-        if (manualAppointmentActivityTimeEl) manualAppointmentActivityTimeEl.value = '';
-        if (manualAppointmentLegendChoiceEl) manualAppointmentLegendChoiceEl.value = 'manual-serve';
-        if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
-        if (manualAppointmentAvailableAgainEl) manualAppointmentAvailableAgainEl.value = '';
-        if (manualAppointmentFullDayEl) manualAppointmentFullDayEl.checked = false;
-        syncManualAppointmentFullDayFields();
-        resetManualAppointmentWhoRadios();
+        resetManualAppointmentWizard();
         setManualAppointmentStatus('');
         manualAppointmentOverlay.classList.add('show');
         manualAppointmentOverlay.setAttribute('aria-hidden', 'false');
-        window.setTimeout(() => {
-            if (manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked) {
-                manualAppointmentFullDayEl.focus();
-            } else if (manualAppointmentTimeEl) {
-                manualAppointmentTimeEl.focus();
-            }
-        }, 30);
+        focusManualAppointmentStep();
     }
 
     function closeManualAppointmentModal() {
@@ -2326,6 +2416,7 @@
         manualAppointmentOverlay.classList.remove('show');
         manualAppointmentOverlay.setAttribute('aria-hidden', 'true');
         manualAppointmentSelectedDate = '';
+        resetManualAppointmentWizard();
         setManualAppointmentStatus('');
     }
 
@@ -2335,48 +2426,32 @@
             setManualAppointmentStatus('Op zaterdag staan geen afspraken in de agenda.', 'error');
             return;
         }
-        const fullDay = Boolean(manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked);
         const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : '';
-        const activityTime = manualAppointmentActivityTimeEl ? String(manualAppointmentActivityTimeEl.value || '').trim() : '';
-        const legendChoice = normalizeManualLegendChoice(manualAppointmentLegendChoiceEl ? manualAppointmentLegendChoiceEl.value : '');
+        const legendChoice = getManualAppointmentLegendChoice();
         const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
-        const availableAgain = manualAppointmentAvailableAgainEl
-            ? String(manualAppointmentAvailableAgainEl.value || '').trim()
-            : '';
+        const location = manualAppointmentLocationEl ? String(manualAppointmentLocationEl.value || '').trim() : '';
+        const notes = manualAppointmentNotesEl ? String(manualAppointmentNotesEl.value || '').trim() : '';
+        const who = manualAppointmentKind === 'overig' ? 'overig' : 'serve';
 
-        const who = getManualAppointmentWho();
-        if (who !== 'serve' && who !== 'martijn' && who !== 'overig') {
-            setManualAppointmentStatus('Kies Servé, Martijn of Overig bij wie ben je.', 'error');
+        if (manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
+            setManualAppointmentStatus('Kies eerst wat je wilt inplannen.', 'error');
             return;
         }
-
-        if (!fullDay) {
-            if (!isManualAppointmentTimeAllowed(timeVal)) {
-                setManualAppointmentStatus(
-                    'Kies een tijd tussen 09:00 en 17:00. Andere tijden worden niet in de agenda gezet.',
-                    'error'
-                );
-                return;
-            }
-            if (!activity) {
-                setManualAppointmentStatus('Vul een activiteit in.', 'error');
-                return;
-            }
-            if (!activityTime || parseManualTimeToMinutes(activityTime) === null) {
-                setManualAppointmentStatus('Vul een geldig tijdstip van activiteit in.', 'error');
-                return;
-            }
-            if (!legendChoice) {
-                setManualAppointmentStatus('Kies een legenda keuze.', 'error');
-                return;
-            }
-            if (!availableAgain || parseManualTimeToMinutes(availableAgain) === null) {
-                setManualAppointmentStatus(
-                    'Kies een geldige tijd waarop je weer beschikbaar bent voor een reis naar prospect.',
-                    'error'
-                );
-                return;
-            }
+        if (!legendChoice) {
+            setManualAppointmentStatus('Kies welke meeting je wilt inplannen.', 'error');
+            return;
+        }
+        if (!activity) {
+            setManualAppointmentStatus('Vul een titel in.', 'error');
+            return;
+        }
+        if (!timeVal || parseManualTimeToMinutes(timeVal) === null) {
+            setManualAppointmentStatus('Vul een geldig tijdstip in.', 'error');
+            return;
+        }
+        if (!location) {
+            setManualAppointmentStatus('Vul een locatie in.', 'error');
+            return;
         }
 
         manualAppointmentSaving = true;
@@ -2387,17 +2462,17 @@
             const payload = {
                 date: manualAppointmentSelectedDate,
                 who,
+                title: activity,
+                time: timeVal,
+                activityTime: timeVal,
+                legendChoice,
+                activity,
+                location,
+                notes,
                 actor: 'premium-personeel-agenda',
             };
-            if (fullDay) {
-                payload.allDayUnavailable = true;
-            } else {
-                payload.time = timeVal;
-                payload.activityTime = activityTime;
-                payload.legendChoice = legendChoice;
-                payload.activity = activity;
-                payload.availableAgain = availableAgain;
-            }
+            if (manualAppointmentActivityTimeEl) manualAppointmentActivityTimeEl.value = timeVal;
+            if (manualAppointmentLegendChoiceEl) manualAppointmentLegendChoiceEl.value = legendChoice;
             const result = await postJsonWithFallback('/api/agenda/appointments/manual', payload);
             const created = result?.appointment;
             if (created && mergeServerAppointments([created])) {
@@ -3433,13 +3508,26 @@
     if (manualAppointmentCancelBtn) {
         manualAppointmentCancelBtn.addEventListener('click', () => closeManualAppointmentModal());
     }
-    if (manualAppointmentFullDayEl) {
-        manualAppointmentFullDayEl.addEventListener('change', () => syncManualAppointmentFullDayFields());
+    if (manualAppointmentBackBtn) {
+        manualAppointmentBackBtn.addEventListener('click', () => goBackManualAppointmentStep());
     }
-    if (manualAppointmentSubmitBtn) {
-        manualAppointmentSubmitBtn.addEventListener('click', () => {
-            void submitManualAppointment();
+    document.querySelectorAll('[data-manual-kind]').forEach((button) => {
+        button.addEventListener('click', () => {
+            manualAppointmentKind = String(button.getAttribute('data-manual-kind') || '').trim();
+            if (manualAppointmentKind !== 'meeting') manualAppointmentMeetingType = '';
+            setManualAppointmentActiveChoices();
+            advanceManualAppointmentStep();
         });
+    });
+    document.querySelectorAll('[data-manual-meeting-type]').forEach((button) => {
+        button.addEventListener('click', () => {
+            manualAppointmentMeetingType = String(button.getAttribute('data-manual-meeting-type') || '').trim();
+            setManualAppointmentActiveChoices();
+            advanceManualAppointmentStep();
+        });
+    });
+    if (manualAppointmentSubmitBtn) {
+        manualAppointmentSubmitBtn.addEventListener('click', () => advanceManualAppointmentStep());
     }
     if (manualAppointmentOverlay) {
         manualAppointmentOverlay.addEventListener('click', (event) => {
