@@ -174,7 +174,11 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function isEligibleColdcallingCampaignRow\(row\)/);
   assert.match(pageSource, /function isEligibleCampaignCountRow\(row\) \{\s*return isPremiumAiLeadGeneratorPath\(\)[\s\S]*isEligibleColdcallingCampaignRow\(row\)[\s\S]*isEligibleColdmailCampaignRow\(row\);/);
   assert.match(pageSource, /const eligibleRows = coldmailingDatabaseRows\.filter\(isEligibleCampaignCountRow\);/);
-  assert.match(pageSource, /Math\.min\(getCampaignRequestedCompanyCount\(\) \|\| eligibleRows\.length, eligibleRows\.length\)/);
+  assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
+  assert.match(pageSource, /Number\.isFinite\(Number\(countOverride\)\)/);
+  assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{[\s\S]*fetch\(getColdmailRecipientPreviewUrl\(\), \{ cache: 'no-store' \}\)[\s\S]*renderCampaignCompanyCount\(Number\(data && data\.selected\) \|\| recipients\.length\);/);
+  assert.match(pageSource, /Math\.min\(requestedCount \|\| eligibleRows\.length, eligibleRows\.length\)/);
+  assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);
   assert.match(pageSource, /initCampaignDatabaseAutoRefresh\(\);/);
   assert.match(pageSource, /const campaignBootTasks = \[/);
   assert.match(pageSource, /hydrateCampaignCompanyCountFromSupabase\(\),/);

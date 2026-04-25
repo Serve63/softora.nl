@@ -54,6 +54,13 @@ function createService(overrides = {}) {
           },
         };
       }
+      if (scope === 'coldcalling') {
+        return {
+          values: {
+            softora_coldcalling_lead_rows_json: JSON.stringify(overrides.leadRows || []),
+          },
+        };
+      }
       if (scope === 'premium_coldmail_auto_replies') {
         return {
           values: {
@@ -358,22 +365,19 @@ test('coldmail campaign previews selected recipients before sending', async () =
 
 test('coldcalling recipient preview selects callable phone rows', async () => {
   const { service } = createService({
-    rows: [
+    rows: [],
+    leadRows: [
       {
         id: 'no-phone',
-        bedrijf: 'MCV E-commerce',
-        email: 'mcv@example.test',
+        company: 'MCV E-commerce',
         telefoon: '—',
         status: 'prospect',
-        mail: true,
       },
       {
         id: 'callable-1',
-        bedrijf: 'Belbare Lead',
-        email: '',
-        phoneE164: '+31622223333',
+        company: 'Belbare Lead',
+        phone: '+31622223333',
         status: 'gemaild',
-        mail: false,
       },
     ],
   });

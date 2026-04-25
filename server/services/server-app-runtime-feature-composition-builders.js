@@ -235,6 +235,8 @@ function buildServerAppFeatureWiringRuntimeContext({
           setUiStateValues: uiSeoRuntime.setUiStateValues,
           customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
           customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
+          leadDbScope: 'coldcalling',
+          leadDbKey: 'softora_coldcalling_lead_rows_json',
           normalizeString: shared.normalizeString,
           truncateText: shared.truncateText,
         }),

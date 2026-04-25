@@ -5,6 +5,8 @@ const { simpleParser } = require('mailparser');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
+const DEFAULT_LEAD_DB_SCOPE = 'coldcalling';
+const DEFAULT_LEAD_DB_KEY = 'softora_coldcalling_lead_rows_json';
 const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_COLDMAIL_REPLY_SCOPE = 'premium_coldmail_auto_replies';
@@ -57,6 +59,8 @@ function createColdmailCampaignService(deps = {}) {
     setUiStateValues = async () => null,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
+    leadDbScope = DEFAULT_LEAD_DB_SCOPE,
+    leadDbKey = DEFAULT_LEAD_DB_KEY,
     customerPhotoScope = DEFAULT_CUSTOMER_PHOTO_SCOPE,
     customerPhotoKey = DEFAULT_CUSTOMER_PHOTO_KEY,
     coldmailReplyScope = DEFAULT_COLDMAIL_REPLY_SCOPE,
@@ -177,6 +181,33 @@ function createColdmailCampaignService(deps = {}) {
     try {
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed.filter((row) => row && typeof row === 'object') : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function parseLeadDatabaseRows(values = {}) {
+    const raw = normalizeString(values && values[leadDbKey]);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter((row) => row && typeof row === 'object')
+        .map((row, index) => ({
+          id: normalizeString(row.id || row.leadId || '') || `lead-${index}`,
+          bedrijf: normalizeString(row.company || row.name || row.bedrijf || row.naam || '') || `Lead ${index + 1}`,
+          naam: normalizeString(row.contactPerson || row.contact || row.naam || ''),
+          phone: normalizeString(row.phone || row.phoneE164 || row.tel || row.telefoon || ''),
+          branche: normalizeString(row.branche || row.branch || ''),
+          region: normalizeString(row.region || row.regio || row.province || ''),
+          address: normalizeString(row.address || row.adres || ''),
+          website: normalizeString(row.website || ''),
+          call: row.call,
+          canCall: row.canCall,
+          doNotCall: row.doNotCall,
+          status: normalizeString(row.status || row.databaseStatus || ''),
+        }));
     } catch (_) {
       return [];
     }
@@ -459,9 +490,9 @@ function createColdmailCampaignService(deps = {}) {
   async function resolveColdmailRecipients(input = {}) {
     const count = parsePositiveInt(input.count, 10, 1, 500);
     const mode = normalizeString(input.mode || '').toLowerCase() === 'call' ? 'call' : 'mail';
-    const state = await getUiStateValues(customerDbScope);
+    const state = await getUiStateValues(mode === 'call' ? leadDbScope : customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
-    const rows = parseDatabaseRows(values);
+    const rows = mode === 'call' ? parseLeadDatabaseRows(values) : parseDatabaseRows(values);
     const candidateRows = rows
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
       .filter(({ row }) => (mode === 'call' ? isEligibleColdcallingRow(row, input.branch) : isEligibleColdmailRow(row, input.branch)))

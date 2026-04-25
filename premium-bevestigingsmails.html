@@ -1625,12 +1625,15 @@ function getCampaignRequestedCompanyCount() {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-function renderCampaignCompanyCount() {
+function renderCampaignCompanyCount(countOverride) {
   const valueEl = document.getElementById('campaignCompanyCountValue');
   const wrap = document.getElementById('campaignCompanyCount');
   if (!valueEl || !wrap) return;
   const eligibleRows = coldmailingDatabaseRows.filter(isEligibleCampaignCountRow);
-  const count = Math.min(getCampaignRequestedCompanyCount() || eligibleRows.length, eligibleRows.length);
+  const requestedCount = getCampaignRequestedCompanyCount();
+  const count = Number.isFinite(Number(countOverride))
+    ? Math.max(0, Number(countOverride))
+    : Math.min(requestedCount || eligibleRows.length, eligibleRows.length);
   valueEl.textContent = String(count);
   wrap.title = count + ' ' + (count === 1 ? 'bedrijf wordt' : 'bedrijven worden') + (isPremiumAiLeadGeneratorPath() ? ' gebeld.' : ' gemaild.');
   wrap.setAttribute('aria-label', wrap.title);
@@ -1744,6 +1747,19 @@ function toggleCampaignRecipientsList(event) {
 }
 
 async function hydrateCampaignCompanyCountFromSupabase() {
+  if (isPremiumAiLeadGeneratorPath()) {
+    try {
+      const response = await fetch(getColdmailRecipientPreviewUrl(), { cache: 'no-store' });
+      if (!response.ok) throw new Error('Kon coldcalling ontvangers niet laden.');
+      const data = await response.json();
+      const recipients = Array.isArray(data && data.recipients) ? data.recipients : [];
+      renderCampaignCompanyCount(Number(data && data.selected) || recipients.length);
+    } catch (_) {
+      renderCampaignCompanyCount(0);
+    }
+    hydrateCampaignRecipientListSoon();
+    return;
+  }
   try {
     const data = await fetchColdmailingUiState(CUSTOMER_DB_SCOPE);
     const values = data && data.values && typeof data.values === 'object' ? data.values : {};
@@ -2076,7 +2092,11 @@ function updateSlider(v) {
   const pct = ((v-10)/(500-10))*100;
   document.getElementById('mail-slider').style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
-  renderCampaignCompanyCount();
+  if (isPremiumAiLeadGeneratorPath()) {
+    void hydrateCampaignCompanyCountFromSupabase();
+  } else {
+    renderCampaignCompanyCount();
+  }
   hydrateCampaignRecipientListSoon();
 }
 updateSlider(100);
