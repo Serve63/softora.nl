@@ -42,4 +42,7 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /id="entry-modal"/);
   assert.match(pageSource, /id="entry-user"/);
   assert.match(pageSource, /id="entry-password"/);
+  assert.doesNotMatch(pageSource, /const PIN\s*=\s*['"][0-9]{6}['"]/);
+  assert.match(pageSource, /fetch\('\/api\/premium-users\/verify-pin'/);
+  assert.match(pageSource, /body:\s*JSON\.stringify\(\{\s*actionConfirmPin:\s*pin\s*\}\)/);
 });

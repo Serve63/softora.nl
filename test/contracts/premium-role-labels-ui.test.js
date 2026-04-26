@@ -39,3 +39,12 @@ test('premium instellingen gebruikt merk-kleuren in de verwijderpopup', () => {
   assert.match(source, /\.confirm-title\s*\{[\s\S]*color:\s*var\(--crimson\);/);
   assert.match(source, /\.btn-del\s*\{[\s\S]*background:\s*linear-gradient\(135deg,\s*var\(--crimson\),\s*var\(--crimson-light\)\);/);
 });
+
+test('premium instellingen valideert de pagina-pin server-side zonder hardcoded pincode', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../premium-instellingen.html'), 'utf8');
+
+  assert.doesNotMatch(source, /SETTINGS_PAGE_PIN\s*=\s*['"][0-9]{6}['"]/);
+  assert.match(source, /fetch\('\/api\/premium-users\/verify-pin'/);
+  assert.match(source, /body:\s*JSON\.stringify\(\{\s*actionConfirmPin:\s*pin\s*\}\)/);
+  assert.match(source, /window\.__premiumSettingsUnlockedPin\s*=\s*unlockedPin/);
+});

@@ -13,7 +13,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260421d" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260427b" defer><\/script>/);
   assert.match(pageSource, /id="leadAmountQuestionLabel"/);
   assert.match(pageSource, /Hoeveel mensen wil je bellen\?/);
   assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
@@ -88,6 +88,8 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /sector: getSelectedText\('branche'\) \|\| 'Alles'/);
   assert.match(dashboardSource, /function ensureStartCampaignConfirmModal\(\)/);
   assert.match(dashboardSource, /confirmPin:\s*startConfirmPin/);
+  assert.doesNotMatch(dashboardSource, /CAMPAIGN_START_CONFIRM_PIN\s*=\s*['"][0-9]{6}['"]/);
+  assert.match(dashboardSource, /pendingStartConfirmPin\s*=\s*entered;/);
   assert.match(dashboardSource, /openStartCampaignConfirmModal\(\);/);
   assert.match(
     dashboardSource,
