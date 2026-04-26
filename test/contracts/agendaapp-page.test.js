@@ -26,6 +26,9 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /actor: 'agendaapp'/);
   assert.match(pageSource, /renderMobileAgendaApp/);
   assert.match(pageSource, /--purple:#8B2252/);
+  assert.match(pageSource, /body\{font-family:'Inter',sans-serif;/);
+  assert.match(pageSource, /\.topbar-week\{font-family:'Oswald',sans-serif;/);
+  assert.doesNotMatch(pageSource, /DM Sans|DM Serif Display/);
   assert.doesNotMatch(pageSource, /id="clock"/);
   assert.doesNotMatch(pageSource, /topbar-time/);
   assert.doesNotMatch(pageSource, /<footer class="footer">/);
