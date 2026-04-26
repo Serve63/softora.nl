@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   countAddedInlineScriptLines,
   buildGuardrailViolations,
@@ -13,6 +15,12 @@ const {
   listAddedBrowserStorageApis,
   listAddedTestWeakeningPatterns,
 } = require('../../scripts/lib/agent-guardrails-core');
+
+const repoRoot = path.resolve(__dirname, '../..');
+
+function readRepoFile(relativePath) {
+  return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+}
 
 test('agent guardrails detect high-risk changes without tests and recent backup', () => {
   const violations = buildGuardrailViolations({
@@ -274,6 +282,21 @@ test('agent guardrails block broad behavior changes in one step', () => {
   assert.match(violations[0], /Productiewijziging is te groot voor één veilige stap/i);
 });
 
+test('agent guardrails keep local cleanliness checks in the critical path', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  const verifyCriticalSource = readRepoFile('scripts/verify-critical.js');
+  const hygieneSource = readRepoFile('scripts/check-repo-hygiene.sh');
+  const cleanSource = readRepoFile('scripts/clean-local-artifacts.sh');
+
+  assert.equal(packageJson.scripts['check:repo-hygiene'], 'bash scripts/check-repo-hygiene.sh');
+  assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
+  assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
+  assert.match(hygieneSource, /\.vercel\/output/);
+  assert.match(hygieneSource, /npm run clean:local/);
+  assert.match(cleanSource, /\.vercel\/output/);
+  assert.doesNotMatch(cleanSource, /rm -rf -- "\.vercel"/);
+});
+
 test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isAllowedNewServerPath('server/services/new-service.js'), true);
   assert.equal(isAllowedNewServerPath('server/helpers/new-helper.js'), false);
@@ -286,9 +309,11 @@ test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isProtectedFrontendShellPath('assets/coldcalling-dashboard.js'), false);
   assert.equal(isProtectedQualityGatePath('scripts/check-agent-guardrails.js'), true);
   assert.equal(isProtectedQualityGatePath('AGENTS.md'), true);
+  assert.equal(isProtectedQualityGatePath('package.json'), true);
   assert.equal(isProtectedQualityGatePath('.github/workflows/repo-hygiene.yml'), true);
   assert.equal(isProtectedQualityGatePath('docs/quality-protocol.md'), true);
   assert.equal(isProtectedQualityGatePath('docs/repo-map.md'), true);
+  assert.equal(isProtectedQualityGatePath('scripts/clean-local-artifacts.sh'), true);
   assert.equal(isProtectedQualityGatePath('scripts/export-runtime-backup.js'), false);
   assert.equal(isHighRiskPath('docs/repo-map.md'), false);
 });

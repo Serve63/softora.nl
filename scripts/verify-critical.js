@@ -4,6 +4,7 @@ const { spawnSync } = require('child_process');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const steps = [
   ['run', 'check:guardrails'],
+  ['run', 'check:repo-hygiene'],
   ['run', 'test:contracts'],
   ['run', 'test:smoke'],
   ['run', 'check:secrets'],
