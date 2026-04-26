@@ -4,11 +4,14 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const {
   buildGuardrailViolations,
+  countAddedInlineScriptLines,
   countAddedServerJsFunctions,
   countDiffLines,
   isBehaviorChangePath,
   isFrontendProductionPath,
   isHighRiskPath,
+  isProtectedFrontendShellPath,
+  isProtectedQualityGatePath,
   isTestPath,
   listAddedBrowserStorageApis,
   normalizeRepoPath,
@@ -154,6 +157,38 @@ const browserStorageViolations = changedFiles
   })
   .filter(Boolean);
 
+const inlineScriptLimit = Number(process.env.GUARDRAILS_MAX_INLINE_SCRIPT_ADDITIONS || 80);
+const largeInlineScriptViolations = changedFiles
+  .filter((filePath) => /^[^/]+\.html$/i.test(filePath))
+  .map((filePath) => {
+    const diffArgs = getDiffArgsForPath(filePath);
+    const diffText = diffArgs ? tryRunGit(diffArgs) : '';
+    const absolutePath = path.join(repoRoot, filePath);
+    const fileSource = fs.existsSync(absolutePath) ? fs.readFileSync(absolutePath, 'utf8') : '';
+    const addedInlineScriptLines = countAddedInlineScriptLines(diffText, fileSource);
+    if (addedInlineScriptLines <= inlineScriptLimit) return '';
+    return `${filePath} (${addedInlineScriptLines} inline scriptregels toegevoegd; limiet ${inlineScriptLimit})`;
+  })
+  .filter(Boolean);
+
+function diffTouchesPremiumShell(filePath) {
+  const normalized = normalizeRepoPath(filePath);
+  if (isProtectedFrontendShellPath(normalized)) return true;
+  if (!/^premium-[^/]+\.html$/i.test(normalized)) return false;
+  const diffArgs = getDiffArgsForPath(normalized);
+  const diffText = diffArgs ? tryRunGit(diffArgs) : '';
+  return /sidebar|data-sidebar-shell|data-static-sidebar|premium-sidebar-profile-prefill|dashboard-layout/i.test(diffText);
+}
+
+const protectedFrontendShellFiles = changedFiles.filter(diffTouchesPremiumShell);
+const protectedQualityGateFiles = changedFiles.filter(isProtectedQualityGatePath);
+const behaviorDiffLineCount = behaviorFiles.reduce((total, filePath) => {
+  const diffArgs = getDiffArgsForPath(filePath);
+  const diffText = diffArgs ? tryRunGit(diffArgs) : '';
+  const counts = countDiffLines(diffText);
+  return total + counts.additions + counts.deletions;
+}, 0);
+
 const violations = buildGuardrailViolations({
   changedFiles,
   addedFiles,
@@ -172,12 +207,21 @@ const violations = buildGuardrailViolations({
   maxServerJsNetGrowth: Number(process.env.GUARDRAILS_MAX_SERVER_JS_NET_GROWTH || 25),
   addedServerJsFunctions: countAddedServerJsFunctions(serverJsDiffText),
   browserStorageViolations,
+  largeInlineScriptViolations,
+  protectedFrontendShellFiles,
+  protectedQualityGateFiles,
+  behaviorDiffLineCount,
+  maxBehaviorDiffLineCount: Number(process.env.GUARDRAILS_MAX_BEHAVIOR_DIFF_LINES || 900),
   allowUntestedChanges: toBooleanEnv('ALLOW_UNTESTED_CHANGES'),
   allowNoRuntimeBackup: toBooleanEnv('SKIP_RUNTIME_BACKUP_CHECK'),
   allowServerJsGrowth: toBooleanEnv('ALLOW_SERVER_JS_GROWTH'),
   allowServerJsFunctions: toBooleanEnv('ALLOW_SERVER_JS_FUNCTIONS'),
   allowNonstandardServerFiles: toBooleanEnv('ALLOW_NONSTANDARD_SERVER_FILES'),
   allowBrowserStorage: toBooleanEnv('ALLOW_BROWSER_STORAGE'),
+  allowLargeInlineScript: toBooleanEnv('ALLOW_LARGE_INLINE_SCRIPT'),
+  allowUntestedShellChange: toBooleanEnv('ALLOW_UNTESTED_SHELL_CHANGE'),
+  allowUntestedQualityGateChange: toBooleanEnv('ALLOW_UNTESTED_QUALITY_GATE_CHANGE'),
+  allowLargeBehaviorChange: toBooleanEnv('ALLOW_LARGE_BEHAVIOR_CHANGE'),
 });
 
 if (changedFiles.length > 0) {

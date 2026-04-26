@@ -48,8 +48,12 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Productiegedrag krijgt of behoudt contract- of smoke-testdekking.
 - `npm run check:guardrails` blijft groen.
 - `npm run verify:critical` is groen voor afronding.
+- Grote wijzigingen landen in kleine stappen; brede productiediffs en grote inline scripts worden door guardrails geblokkeerd tenzij bewust overruled.
+- Premium shell/sidebar wijzigingen houden `test/contracts/premium-sidebar-shell-scope.test.js` actueel.
+- Quality-gate wijzigingen houden `test/contracts/agent-guardrails.test.js` actueel.
 - Voor high-risk wijzigingen bestaat een verse rollback-backup.
 - Nieuwe code landt op de juiste architectuurplek en maakt bestaande centrale bestanden niet weer zwaarder.
+- Succesvolle wijzigingen worden direct gecommit en gepusht, tenzij de gebruiker expliciet om lokaal werk vraagt.
 
 ## Handhaving
 Dit protocol wordt geborgd via:
@@ -58,3 +62,5 @@ Dit protocol wordt geborgd via:
 - [docs/architecture.md](architecture.md)
 - [scripts/check-agent-guardrails.js](../scripts/check-agent-guardrails.js)
 - [server/routes/manifest.js](../server/routes/manifest.js)
+- [.github/workflows/agent-guardrails.yml](../.github/workflows/agent-guardrails.yml)
+- [.github/workflows/verify-critical.yml](../.github/workflows/verify-critical.yml)

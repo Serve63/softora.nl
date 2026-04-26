@@ -23,6 +23,20 @@ const ALLOWED_NEW_SERVER_PREFIXES = Object.freeze([
   'server/services/',
 ]);
 
+const PROTECTED_FRONTEND_SHELL_PATHS = Object.freeze([
+  'assets/personnel-theme.css',
+  'assets/personnel-theme.js',
+  'assets/premium-sidebar-profile-prefill.js',
+]);
+
+const PROTECTED_QUALITY_GATE_PATHS = Object.freeze([
+  '.github/workflows/agent-guardrails.yml',
+  '.github/workflows/verify-critical.yml',
+  'scripts/check-agent-guardrails.js',
+  'scripts/lib/agent-guardrails-core.js',
+  'scripts/verify-critical.js',
+]);
+
 const DISALLOWED_BROWSER_STORAGE_PATTERNS = Object.freeze([
   {
     label: 'localStorage',
@@ -51,6 +65,8 @@ function isBehaviorChangePath(filePath) {
   const normalized = normalizeRepoPath(filePath);
   return (
     normalized === 'server.js' ||
+    normalized.startsWith('scripts/') ||
+    normalized.startsWith('.github/workflows/') ||
     normalized.startsWith('server/') ||
     normalized.startsWith('api/') ||
     normalized.startsWith('assets/') ||
@@ -66,6 +82,16 @@ function isFrontendProductionPath(filePath) {
 function isHighRiskPath(filePath) {
   const normalized = normalizeRepoPath(filePath);
   return HIGH_RISK_PATH_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function isProtectedFrontendShellPath(filePath) {
+  const normalized = normalizeRepoPath(filePath);
+  return PROTECTED_FRONTEND_SHELL_PATHS.includes(normalized);
+}
+
+function isProtectedQualityGatePath(filePath) {
+  const normalized = normalizeRepoPath(filePath);
+  return PROTECTED_QUALITY_GATE_PATHS.includes(normalized);
 }
 
 function isAllowedNewServerPath(filePath) {
@@ -121,6 +147,98 @@ function listAddedBrowserStorageApis(diffText = '') {
   return Array.from(hits).sort();
 }
 
+function getAddedLineNumbersFromDiff(diffText = '') {
+  const addedLineNumbers = [];
+  let nextNewLineNumber = 0;
+
+  String(diffText || '')
+    .split('\n')
+    .forEach((line) => {
+      const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (hunkMatch) {
+        nextNewLineNumber = Number(hunkMatch[1]) || 0;
+        return;
+      }
+
+      if (!nextNewLineNumber) return;
+      if (line.startsWith('+++') || line.startsWith('---')) return;
+
+      if (line.startsWith('+')) {
+        addedLineNumbers.push(nextNewLineNumber);
+        nextNewLineNumber += 1;
+        return;
+      }
+
+      if (line.startsWith('-')) {
+        return;
+      }
+
+      if (line.startsWith(' ') || line === '') {
+        nextNewLineNumber += 1;
+      }
+    });
+
+  return addedLineNumbers;
+}
+
+function getInlineScriptLineSet(htmlSource = '') {
+  const inlineScriptLines = new Set();
+  let inInlineScript = false;
+
+  String(htmlSource || '')
+    .split('\n')
+    .forEach((line, index) => {
+      const lineNumber = index + 1;
+      const source = String(line || '');
+      const scriptOpenMatch = source.match(/<script\b([^>]*)>/i);
+      const scriptCloseIndex = source.search(/<\/script>/i);
+
+      if (inInlineScript) {
+        if (scriptCloseIndex === -1) {
+          inlineScriptLines.add(lineNumber);
+          return;
+        }
+
+        if (source.slice(0, scriptCloseIndex).trim()) {
+          inlineScriptLines.add(lineNumber);
+        }
+        inInlineScript = false;
+        return;
+      }
+
+      if (!scriptOpenMatch) return;
+
+      const attrs = scriptOpenMatch[1] || '';
+      const isExternal = /\bsrc\s*=/i.test(attrs);
+      if (isExternal) return;
+
+      const openEndIndex = source.indexOf('>', scriptOpenMatch.index);
+      const inlineTail = openEndIndex >= 0 ? source.slice(openEndIndex + 1) : '';
+      const closesOnSameLine = /<\/script>/i.test(inlineTail);
+      const inlineCode = closesOnSameLine
+        ? inlineTail.replace(/<\/script>[\s\S]*$/i, '').trim()
+        : inlineTail.trim();
+
+      if (inlineCode) {
+        inlineScriptLines.add(lineNumber);
+      }
+
+      if (!closesOnSameLine) {
+        inInlineScript = true;
+      }
+    });
+
+  return inlineScriptLines;
+}
+
+function countAddedInlineScriptLines(diffText = '', htmlSource = '') {
+  const inlineScriptLines = getInlineScriptLineSet(htmlSource);
+  if (inlineScriptLines.size === 0) return 0;
+  return getAddedLineNumbersFromDiff(diffText)
+    .filter((lineNumber) => inlineScriptLines.has(lineNumber))
+    .length;
+}
+
 function formatAgeMs(ageMs) {
   if (!Number.isFinite(ageMs) || ageMs < 0) return 'onbekend';
   const minutes = Math.round(ageMs / 60000);
@@ -148,12 +266,21 @@ function buildGuardrailViolations(options = {}) {
     maxServerJsNetGrowth = 25,
     addedServerJsFunctions = 0,
     browserStorageViolations = [],
+    largeInlineScriptViolations = [],
+    protectedFrontendShellFiles = [],
+    protectedQualityGateFiles = [],
+    behaviorDiffLineCount = 0,
+    maxBehaviorDiffLineCount = 900,
     allowUntestedChanges = false,
     allowNoRuntimeBackup = false,
     allowServerJsGrowth = false,
     allowServerJsFunctions = false,
     allowNonstandardServerFiles = false,
     allowBrowserStorage = false,
+    allowLargeInlineScript = false,
+    allowUntestedShellChange = false,
+    allowUntestedQualityGateChange = false,
+    allowLargeBehaviorChange = false,
   } = options;
 
   const violations = [];
@@ -219,6 +346,36 @@ function buildGuardrailViolations(options = {}) {
     );
   }
 
+  if (!allowLargeInlineScript && largeInlineScriptViolations.length > 0) {
+    violations.push(
+      `[guardrails] Grote inline frontend-script toevoeging gedetecteerd: ${largeInlineScriptViolations.join(', ')}. Zet paginalogica in assets/* of gebruik ALLOW_LARGE_INLINE_SCRIPT=1 voor een bewuste uitzondering.`
+    );
+  }
+
+  const hasSidebarShellTest = changedTests.includes('test/contracts/premium-sidebar-shell-scope.test.js');
+  if (!allowUntestedShellChange && protectedFrontendShellFiles.length > 0 && !hasSidebarShellTest) {
+    violations.push(
+      `[guardrails] Premium shell/sidebar gewijzigd zonder gerichte shell-contracttest. Pas test/contracts/premium-sidebar-shell-scope.test.js aan voor: ${protectedFrontendShellFiles.join(', ')}.`
+    );
+  }
+
+  const hasGuardrailTest = changedTests.includes('test/contracts/agent-guardrails.test.js');
+  if (!allowUntestedQualityGateChange && protectedQualityGateFiles.length > 0 && !hasGuardrailTest) {
+    violations.push(
+      `[guardrails] Quality-gate bestanden gewijzigd zonder guardrail-test. Pas test/contracts/agent-guardrails.test.js aan voor: ${protectedQualityGateFiles.join(', ')}.`
+    );
+  }
+
+  if (
+    !allowLargeBehaviorChange &&
+    Number.isFinite(behaviorDiffLineCount) &&
+    behaviorDiffLineCount > maxBehaviorDiffLineCount
+  ) {
+    violations.push(
+      `[guardrails] Productiewijziging is te groot voor één veilige stap (${behaviorDiffLineCount} gewijzigde regels; limiet ${maxBehaviorDiffLineCount}). Knip dit op of gebruik ALLOW_LARGE_BEHAVIOR_CHANGE=1 voor een bewuste uitzondering.`
+    );
+  }
+
   if (!isCi && !allowNoRuntimeBackup && highRiskFiles.length > 0) {
     if (!Number.isFinite(newestBackupAgeMs)) {
       violations.push(
@@ -236,13 +393,17 @@ function buildGuardrailViolations(options = {}) {
 
 module.exports = {
   countAddedServerJsFunctions,
+  countAddedInlineScriptLines,
   countDiffLines,
   buildGuardrailViolations,
   formatAgeMs,
+  getAddedLineNumbersFromDiff,
   isAllowedNewServerPath,
   isBehaviorChangePath,
   isFrontendProductionPath,
   isHighRiskPath,
+  isProtectedFrontendShellPath,
+  isProtectedQualityGatePath,
   isTestPath,
   listAddedBrowserStorageApis,
   normalizeRepoPath,

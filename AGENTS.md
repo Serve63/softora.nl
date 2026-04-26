@@ -5,6 +5,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 ## Altijd eerst
 - Lees bij grotere refactors ook [docs/quality-protocol.md](docs/quality-protocol.md).
 - Draai `npm run verify:critical` voor je afrondt.
+- Commit en push elke succesvolle wijziging direct naar de huidige branch, tenzij de gebruiker expliciet vraagt om lokaal te blijven.
 - Draai bij wijzigingen in `server.js`, `server/routes`, `server/security`, `agenda`, `auth`, `leads` of `coldcalling` eerst `npm run backup:runtime`.
 - Gebruik [server/routes/manifest.js](server/routes/manifest.js) als lijst van kritieke flows.
 - Behandel agenda, leads, call-insights en auth als hoog-risico domeinen.
@@ -23,6 +24,10 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Houd [server/services/server-app-runtime.js](server/services/server-app-runtime.js) en `server/services/server-app-runtime-*.js` compositie-only; nieuwe domeinlogica hoort daar niet thuis.
 - Nieuwe servercode hoort niet in nieuwe ad-hoc mappen onder `server/`; gebruik de bestaande architectuurmappen.
 - Productiecodewijzigingen horen samen te gaan met contract- of smoke-testupdates.
+- Grote productiewijzigingen moeten worden opgeknipt; `check:guardrails` blokkeert brede diffs boven de ingestelde limiet.
+- Grote nieuwe inline scripts in HTML zijn niet toegestaan; verplaats paginalogica naar `assets/*`.
+- Wijzigingen aan premium shell/sidebar bestanden vragen een gerichte update in `test/contracts/premium-sidebar-shell-scope.test.js`.
+- Wijzigingen aan guardrail- of verificatiescripts vragen een gerichte update in `test/contracts/agent-guardrails.test.js`.
 
 ## Rollback
 - Voor risicovolle veranderingen: eerst `npm run backup:runtime`.
