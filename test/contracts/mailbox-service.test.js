@@ -136,6 +136,86 @@ test('mailbox service derives per-account imap settings from per-account smtp en
   }
 });
 
+test('mailbox service connects softora accounts from shared mail hosts and compact account passwords', async () => {
+  const oldEnv = { ...process.env };
+  process.env.MAILBOX_INFO_PASS = 'secret';
+  try {
+    const service = createMailboxService({
+      mailConfig: {
+        smtpHost: 'smtp.strato.com',
+        smtpPort: 465,
+        smtpSecure: true,
+      },
+    });
+    const accounts = service.getAccounts();
+    const info = accounts.find((account) => account.email === 'info@softora.nl');
+
+    assert.equal(info.smtpConfigured, true);
+    assert.equal(info.imapConfigured, true);
+    assert.equal(info.smtpHost, 'smtp.strato.com');
+    assert.equal(info.smtpPort, 465);
+    assert.equal(info.smtpSecure, true);
+    assert.equal(info.smtpUser, 'info@softora.nl');
+    assert.equal(info.imapHost, 'imap.strato.com');
+    assert.equal(info.imapUser, 'info@softora.nl');
+  } finally {
+    process.env = oldEnv;
+  }
+});
+
+test('mailbox service supports domain-level softora mailbox provider defaults', async () => {
+  const oldEnv = { ...process.env };
+  process.env.MAILBOX_SOFTORA_NL_SMTP_HOST = 'smtp.strato.com';
+  process.env.MAILBOX_SOFTORA_NL_SMTP_PORT = '465';
+  process.env.MAILBOX_SOFTORA_NL_SMTP_SECURE = 'true';
+  process.env.MAILBOX_SOFTORA_NL_IMAP_HOST = 'imap.strato.com';
+  process.env.MAILBOX_SOFTORA_NL_IMAP_PORT = '993';
+  process.env.MAILBOX_SOFTORA_NL_IMAP_SECURE = 'true';
+  process.env.MAILBOX_RUBEN_PASS = 'secret';
+  try {
+    const service = createMailboxService({ mailConfig: {} });
+    const ruben = service.getAccounts().find((account) => account.email === 'ruben@softora.nl');
+
+    assert.equal(ruben.smtpConfigured, true);
+    assert.equal(ruben.imapConfigured, true);
+    assert.equal(ruben.smtpHost, 'smtp.strato.com');
+    assert.equal(ruben.smtpPort, 465);
+    assert.equal(ruben.smtpSecure, true);
+    assert.equal(ruben.imapHost, 'imap.strato.com');
+    assert.equal(ruben.imapPort, 993);
+    assert.equal(ruben.imapSecure, true);
+  } finally {
+    process.env = oldEnv;
+  }
+});
+
+test('mailbox service can intentionally expose aliases through the base mailbox credentials', async () => {
+  const oldEnv = { ...process.env };
+  process.env.MAILBOX_SOFTORA_NL_USE_BASE_CREDENTIALS = 'true';
+  try {
+    const service = createMailboxService({
+      mailConfig: {
+        mailFromAddress: 'zakelijk@theimpactbox.co',
+        mailFromName: 'Impactbox',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'zakelijk@theimpactbox.co',
+        smtpPass: 'secret',
+        imapHost: 'imap.strato.com',
+        imapUser: 'zakelijk@theimpactbox.co',
+        imapPass: 'secret',
+      },
+    });
+    const info = service.getAccounts().find((account) => account.email === 'info@softora.nl');
+
+    assert.equal(info.smtpConfigured, true);
+    assert.equal(info.imapConfigured, true);
+    assert.equal(info.smtpUser, 'zakelijk@theimpactbox.co');
+    assert.equal(info.imapUser, 'zakelijk@theimpactbox.co');
+  } finally {
+    process.env = oldEnv;
+  }
+});
+
 test('mailbox routes expose accounts, messages and send endpoints', () => {
   const routes = [];
   const app = {
