@@ -661,6 +661,7 @@
     let premiumSidebarFitFrame = 0;
     let premiumSidebarStabilityFrame = 0;
     let premiumSidebarNavScrollTop = 0;
+    const warmedSidebarNavigationTargets = new Set();
 
     function getPremiumSidebarNav(sidebar) {
         const targetSidebar = sidebar || document.querySelector(".sidebar");
@@ -1310,6 +1311,55 @@
         window.location.assign(href);
     }
 
+    function canWarmSidebarNavigationTarget(href) {
+        if (!href || href.charAt(0) === "#") return false;
+        try {
+            const targetUrl = new URL(href, window.location.origin);
+            if (targetUrl.origin !== window.location.origin) return false;
+            if (targetUrl.pathname === window.location.pathname && targetUrl.hash === window.location.hash) return false;
+            return targetUrl.pathname.indexOf("/premium-") === 0;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function warmSidebarNavigationTarget(url) {
+        const href = normalizeSidebarNavigationTarget(url);
+        if (!canWarmSidebarNavigationTarget(href)) return;
+        const absoluteHref = new URL(href, window.location.origin).href;
+        if (warmedSidebarNavigationTargets.has(absoluteHref)) return;
+        warmedSidebarNavigationTargets.add(absoluteHref);
+        try {
+            const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            if (connection && connection.saveData) return;
+        } catch (_) {
+            /* ignore network hint errors */
+        }
+        const link = document.createElement("link");
+        link.rel = "prefetch";
+        link.href = absoluteHref;
+        link.as = "document";
+        link.setAttribute("data-sidebar-prefetch", "1");
+        document.head.appendChild(link);
+    }
+
+    function warmVisibleSidebarNavigationTargets() {
+        if (!isPremiumPersonnelContext) return;
+        const run = function () {
+            document
+                .querySelectorAll(".sidebar a[data-sidebar-href], .sidebar a[href^='/premium-']")
+                .forEach(function (anchor, index) {
+                    if (index > 10) return;
+                    warmSidebarNavigationTarget(anchor.dataset.sidebarHref || anchor.getAttribute("href"));
+                });
+        };
+        if (typeof window.requestIdleCallback === "function") {
+            window.requestIdleCallback(run, { timeout: 1800 });
+            return;
+        }
+        window.setTimeout(run, 600);
+    }
+
     function neutralizeSidebarAnchors() {
         if (!isPremiumPersonnelContext) return;
         let initializedCount = 0;
@@ -1335,8 +1385,18 @@
                 anchor.setAttribute("tabindex", "0");
                 anchor.addEventListener("click", function (event) {
                     event.preventDefault();
+                    warmSidebarNavigationTarget(anchor.dataset.sidebarHref);
                     openSidebarNavigationTarget(anchor.dataset.sidebarHref, event);
                 });
+                anchor.addEventListener("pointerenter", function () {
+                    warmSidebarNavigationTarget(anchor.dataset.sidebarHref);
+                }, { passive: true });
+                anchor.addEventListener("focus", function () {
+                    warmSidebarNavigationTarget(anchor.dataset.sidebarHref);
+                }, { passive: true });
+                anchor.addEventListener("touchstart", function () {
+                    warmSidebarNavigationTarget(anchor.dataset.sidebarHref);
+                }, { passive: true });
                 anchor.addEventListener("auxclick", function (event) {
                     if (event.button !== 1) return;
                     event.preventDefault();
@@ -1351,6 +1411,7 @@
             });
         if (initializedCount > 0) {
             document.body.setAttribute("data-sidebar-nav-ready", "1");
+            warmVisibleSidebarNavigationTargets();
         }
     }
 
