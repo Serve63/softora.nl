@@ -174,6 +174,41 @@ test('html page coordinator renders SEO-managed html and respects handled premiu
   assert.doesNotMatch(res.body, /fonts\.gstatic\.com/);
 });
 
+test('html page coordinator injects critical premium sidebar shell before theme stylesheet', async () => {
+  const { coordinator, pagesDir } = createFixture();
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-personeel-agenda.html'),
+    [
+      '<!DOCTYPE html><html><head>',
+      '<title>Agenda</title>',
+      '<link rel="stylesheet" href="assets/personnel-theme.css?v=20260427a">',
+      '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">',
+      '</head><body>',
+      '<aside class="sidebar" data-static-sidebar="1"><a class="sidebar-logo">SOFTORA.NL</a><nav class="sidebar-nav"><a class="sidebar-link"><span class="sidebar-link-text">Dashboard</span></a></nav></aside>',
+      '<main class="main-content">Agenda</main>',
+      '</body></html>',
+    ].join('')
+  );
+
+  const req = { originalUrl: '/premium-personeel-agenda' };
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(req, res, () => {}, 'premium-personeel-agenda.html');
+
+  assert.equal(res.statusCode, 200);
+  const criticalIndex = res.body.indexOf('id="softora-premium-sidebar-critical"');
+  const themeIndex = res.body.indexOf('assets/personnel-theme.css');
+  const interPreloadIndex = res.body.indexOf('/assets/fonts/inter-latin.woff2?v=20260409a');
+  assert.ok(criticalIndex > -1, 'premium sidebar critical css hoort geinjecteerd te worden');
+  assert.ok(themeIndex > -1, 'personnel theme stylesheet hoort te blijven bestaan');
+  assert.ok(criticalIndex < themeIndex, 'kritieke sidebar css hoort voor de gewone theme css te staan');
+  assert.ok(interPreloadIndex < themeIndex, 'lokale sidebar fonts horen voor de theme css te preloaden');
+  assert.match(res.body, /softora-personnel-first-paint/);
+  assert.match(res.body, /data-personnel-loading/);
+  assert.match(res.body, /\.sidebar\[data-static-sidebar="1"\]\{position:fixed !important;/);
+  assert.doesNotMatch(res.body, /fonts\.googleapis\.com\/css2\?family=Inter/);
+});
+
 test('html page coordinator falls back to sendFile when rendering throws', async () => {
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-fallback-'));
   const pagePath = path.join(pagesDir, 'premium-personeel-login.html');

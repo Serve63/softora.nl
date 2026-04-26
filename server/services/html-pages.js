@@ -3,10 +3,33 @@ const path = require('path');
 
 const LOCAL_FONT_VERSION = '20260409a';
 const LOCAL_FONT_STYLESHEET_HREF = `/assets/fonts.css?v=${LOCAL_FONT_VERSION}`;
-const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
+const LOCAL_FONT_PRELOAD_LINKS = [
   `<link rel="preload" href="/assets/fonts/inter-latin.woff2?v=${LOCAL_FONT_VERSION}" as="font" type="font/woff2" crossorigin>`,
   `<link rel="preload" href="/assets/fonts/oswald-latin.woff2?v=${LOCAL_FONT_VERSION}" as="font" type="font/woff2" crossorigin>`,
-  `<link rel="stylesheet" href="${LOCAL_FONT_STYLESHEET_HREF}">`,
+];
+const LOCAL_FONT_STYLESHEET_LINK = `<link rel="stylesheet" href="${LOCAL_FONT_STYLESHEET_HREF}">`;
+const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
+  ...LOCAL_FONT_PRELOAD_LINKS,
+  LOCAL_FONT_STYLESHEET_LINK,
+].join('\n');
+const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
+  `<script id="softora-personnel-first-paint">(function(){try{document.documentElement.setAttribute("data-personnel-loading","true");document.documentElement.setAttribute("data-theme-mode","light");document.documentElement.setAttribute("data-theme","light");}catch(_){}})();</script>`,
+  ...LOCAL_FONT_PRELOAD_LINKS,
+  `<style id="softora-premium-sidebar-critical">
+@font-face{font-family:'SoftoraSidebarInter';font-style:normal;font-weight:300 700;font-display:block;src:url('/assets/fonts/inter-latin.woff2?v=${LOCAL_FONT_VERSION}') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'SoftoraSidebarOswald';font-style:normal;font-weight:400 700;font-display:block;src:url('/assets/fonts/oswald-latin.woff2?v=${LOCAL_FONT_VERSION}') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+:root{--premium-sidebar-width:320px;--premium-sidebar-font-sans:'SoftoraSidebarInter','Inter',system-ui,sans-serif;--premium-sidebar-font-display:'SoftoraSidebarOswald','Oswald',sans-serif;}
+@media (min-width:901px){
+html,body{min-height:100vh;}
+.sidebar[data-static-sidebar="1"]{position:fixed !important;inset:0 auto 0 0 !important;width:var(--premium-sidebar-width,320px) !important;height:100vh !important;z-index:40 !important;display:flex !important;flex-direction:column !important;overflow:hidden !important;background:#fff !important;border-right:1px solid rgba(0,0,0,.08) !important;opacity:1 !important;visibility:visible !important;transform:none !important;contain:layout paint style !important;font-family:var(--premium-sidebar-font-sans) !important;letter-spacing:0 !important;}
+.sidebar[data-static-sidebar="1"],.sidebar[data-static-sidebar="1"] *,.sidebar[data-static-sidebar="1"] *::before,.sidebar[data-static-sidebar="1"] *::after{box-sizing:border-box !important;transition:none !important;animation-duration:.001ms !important;animation-delay:0ms !important;}
+.sidebar[data-static-sidebar="1"] .sidebar-logo{display:block !important;font-family:var(--premium-sidebar-font-display) !important;font-size:2rem !important;font-weight:700 !important;line-height:1 !important;letter-spacing:0 !important;color:#8b2252 !important;text-transform:uppercase !important;white-space:nowrap !important;font-synthesis:none !important;}
+.sidebar[data-static-sidebar="1"] .sidebar-nav{flex:1 1 auto !important;overflow-y:auto !important;overflow-x:hidden !important;scrollbar-gutter:stable !important;}
+.sidebar[data-static-sidebar="1"] .sidebar-link{display:flex !important;align-items:center !important;width:100% !important;min-height:2.35rem !important;font-family:var(--premium-sidebar-font-sans) !important;white-space:nowrap !important;transform:none !important;}
+.main,.page-shell,.main-content,.dashboard-layout[data-sidebar-shell="canonical"]>.main-content{margin-left:var(--premium-sidebar-width,320px) !important;}
+}
+</style>`,
+  LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
 const HOMEPAGE_HERO_IMAGE_URL = '/assets/home-hero-generated-v2.jpg';
 const HOMEPAGE_HERO_IMAGE_PRELOAD = `<link rel="preload" as="image" href="${HOMEPAGE_HERO_IMAGE_URL}">`;
@@ -135,6 +158,46 @@ function createHtmlPageCoordinator(options = {}) {
     return `${snippet}\n${sourceHtml}`;
   }
 
+  function injectSnippetAfterHeadOpen(html, snippet, marker) {
+    const sourceHtml = String(html || '');
+    if (!snippet || (marker && sourceHtml.includes(marker)) || sourceHtml.includes(snippet)) return sourceHtml;
+    if (/<head[^>]*>/i.test(sourceHtml)) {
+      return sourceHtml.replace(/<head[^>]*>/i, (match) => `${match}\n${snippet}`);
+    }
+    return `${snippet}\n${sourceHtml}`;
+  }
+
+  function hasPremiumStaticSidebar(html) {
+    const sourceHtml = String(html || '');
+    return /<aside[^>]+\bclass=["'][^"']*\bsidebar\b[^"']*["'][^>]*>/i.test(sourceHtml)
+      && /<aside[^>]+\bdata-static-sidebar=["']1["'][^>]*>/i.test(sourceHtml);
+  }
+
+  function isLocalGoogleFontStylesheetTag(tag) {
+    return /fonts\.googleapis\.com\/css2/i.test(String(tag || ''))
+      && /\bfamily=(?:[^"']*)?(?:Inter|Oswald)\b/i.test(String(tag || ''));
+  }
+
+  function optimizeLocalFontDelivery(html, { preferHeadStart = false } = {}) {
+    let renderedHtml = String(html || '');
+
+    renderedHtml = renderedHtml.replace(
+      /[ \t]*<link[^>]+href=["']https:\/\/fonts\.googleapis\.com\/css2\?[^"']+["'][^>]*>\s*/gi,
+      (tag) => {
+        if (!isLocalGoogleFontStylesheetTag(tag)) return tag;
+        return '';
+      }
+    );
+
+    if (!renderedHtml.includes(LOCAL_FONT_STYLESHEET_HREF)) {
+      renderedHtml = preferHeadStart
+        ? injectSnippetAfterHeadOpen(renderedHtml, LOCAL_FONT_PRELOAD_AND_STYLESHEET, LOCAL_FONT_STYLESHEET_HREF)
+        : injectSnippetBeforeHeadClose(renderedHtml, LOCAL_FONT_PRELOAD_AND_STYLESHEET);
+    }
+
+    return renderedHtml;
+  }
+
   function inlinePremiumSidebarProfilePrefill(html) {
     const sourceHtml = String(html || '');
     const scriptPattern =
@@ -206,14 +269,15 @@ function createHtmlPageCoordinator(options = {}) {
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.googleapis\.com"[^>]*>\s*/gim, '')
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.gstatic\.com"[^>]*>\s*/gim, '');
 
-    if (renderedHtml.includes('fonts.googleapis.com/css2')) {
-      renderedHtml = renderedHtml.replace(
-        /<link[^>]+href="https:\/\/fonts\.googleapis\.com\/css2\?[^"]+"[^>]*>\s*/i,
-        `${LOCAL_FONT_PRELOAD_AND_STYLESHEET}\n`
+    const hasStaticSidebar = hasPremiumStaticSidebar(renderedHtml);
+    if (hasStaticSidebar) {
+      renderedHtml = injectSnippetAfterHeadOpen(
+        renderedHtml,
+        PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET,
+        'id="softora-premium-sidebar-critical"'
       );
-    } else if (!renderedHtml.includes(LOCAL_FONT_STYLESHEET_HREF)) {
-      renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, LOCAL_FONT_PRELOAD_AND_STYLESHEET);
     }
+    renderedHtml = optimizeLocalFontDelivery(renderedHtml, { preferHeadStart: hasStaticSidebar });
 
     if (fileName === 'premium-website.html') {
       renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, HOMEPAGE_HERO_IMAGE_PRELOAD);
