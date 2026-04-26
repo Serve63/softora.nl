@@ -32,6 +32,17 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /data-meeting-type="chatbot">Chatbot/);
   assert.match(pageSource, /id="meeting-back"/);
   assert.match(pageSource, /id="meeting-next"/);
+  assert.match(pageSource, /Afspraak toevoegen/);
+  assert.match(pageSource, /Voor wie\?/);
+  assert.match(pageSource, /class="planner-choice selected" type="button" data-who="serve">Servé/);
+  assert.match(pageSource, /class="planner-choice" type="button" data-who="martijn">Martijn/);
+  assert.match(pageSource, /class="planner-choice" type="button" data-who="both">Allebei/);
+  assert.match(pageSource, /placeholder="Titel van de afspraak"/);
+  assert.match(pageSource, /placeholder="--:--"/);
+  assert.match(pageSource, /Bijv\. kantoor, Teams, klantlocatie/);
+  assert.match(pageSource, /Extra opmerkingen voor deze agenda-afspraak/);
+  assert.match(pageSource, /id="btn-form-back"/);
+  assert.match(pageSource, /Toevoegen/);
   assert.match(pageSource, /id="agendaAppWho"/);
   assert.match(pageSource, /<option value="serve">Servé<\/option>/);
   assert.match(pageSource, /<option value="martijn">Martijn<\/option>/);
@@ -39,7 +50,8 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /actor: 'agendaapp'/);
   assert.match(pageSource, /legendChoice:appointmentType==='business'\?businessMeetingType:'manual-overig'/);
   assert.match(pageSource, /businessMeetingType='website'/);
-  assert.match(pageSource, /who:'serve'/);
+  assert.match(pageSource, /selectedWho='serve'/);
+  assert.match(pageSource, /who:selectedWho/);
   assert.match(pageSource, /renderMobileAgendaApp/);
   assert.match(pageSource, /--purple:#8B2252/);
   assert.match(pageSource, /body\{font-family:'Inter',sans-serif;/);
@@ -66,6 +78,6 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.doesNotMatch(pageSource, /Delen/);
   assert.doesNotMatch(pageSource, /color-dot/);
   assert.match(pageSource, /\.day-cell\.is-today\{background:var\(--purple-light\);box-shadow:inset 0 0 0 1\.5px var\(--purple-dim\)\}/);
-  assert.match(pageSource, /Hele dag/);
+  assert.doesNotMatch(pageSource, /toggle-allday/);
   assert.match(pageSource, /Week/);
 });
