@@ -434,7 +434,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   display: flex;
   padding: 0;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .a4-scale-shell,
@@ -449,7 +449,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .a4-scale-shell {
   width: calc(var(--a4-width) * var(--preview-scale));
   height: calc(var(--a4-height) * var(--preview-scale));
-  margin: 0 auto;
+  margin: 0;
 }
 
 /* ── A4 DOCUMENT ─────────────────────────────────────────── */
@@ -462,8 +462,8 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   flex-direction: column;
   font-family: 'Barlow', sans-serif;
   transform: scale(var(--preview-scale));
-  transform-origin: top center;
-  border-radius: 2px;
+  transform-origin: top left;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -727,7 +727,7 @@ function fitPreviewToViewport() {
   shell.style.height = (A4_PREVIEW_HEIGHT * scale) + 'px';
   shell.style.setProperty('--preview-scale', String(scale));
   document.getElementById('a4').style.transform = `scale(${scale})`;
-  document.getElementById('a4').style.transformOrigin = 'top center';
+  document.getElementById('a4').style.transformOrigin = 'top left';
 }
 
 function setupPreviewAutoFit() {
