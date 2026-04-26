@@ -24,4 +24,7 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /<option value="martijn">Martijn<\/option>/);
   assert.match(pageSource, /<option value="both">Allebei<\/option>/);
   assert.match(pageSource, /actor: 'agendaapp'/);
+  assert.match(pageSource, /renderMobileAgendaApp/);
+  assert.match(pageSource, /Hele dag/);
+  assert.match(pageSource, /Week/);
 });
