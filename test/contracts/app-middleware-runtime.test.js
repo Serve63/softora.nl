@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
+const express = require('express');
 
 const { applyAppMiddleware } = require('../../server/services/app-middleware-runtime');
 
@@ -96,4 +98,37 @@ test('app middleware skips Supabase hydration for non-api requests', async () =>
   });
 
   assert.equal(hydrateCalls, 0);
+});
+
+test('app middleware emits a nonce-based script csp without unsafe-inline script execution', async () => {
+  const app = express();
+  applyAppMiddleware(
+    app,
+    createDeps({
+      express,
+      isProduction: true,
+      isSupabaseConfigured: () => false,
+    })
+  );
+  app.get('/csp-test', (_req, res) => {
+    res.status(200).send('<!doctype html><html><body>CSP</body></html>');
+  });
+
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const { port } = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/csp-test`);
+    const csp = response.headers.get('content-security-policy') || '';
+    const scriptSrc = csp
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('script-src')) || '';
+
+    assert.match(scriptSrc, /^script-src 'self' 'nonce-[^']+' https:\/\/cdnjs\.cloudflare\.com$/);
+    assert.doesNotMatch(scriptSrc, /unsafe-inline/);
+    assert.match(csp, /script-src-attr 'unsafe-inline'/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });

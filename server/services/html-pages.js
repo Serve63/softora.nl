@@ -127,6 +127,13 @@ function createHtmlPageCoordinator(options = {}) {
     return `${sourceHtml}\n${scriptTag}`;
   }
 
+  function applyScriptNonceToHtml(html, nonceRaw) {
+    const nonce = escapeHtml(normalizeString(nonceRaw || ''));
+    const sourceHtml = String(html || '');
+    if (!nonce) return sourceHtml;
+    return sourceHtml.replace(/<script\b(?![^>]*\bnonce=)/gi, `<script nonce="${nonce}"`);
+  }
+
   function injectHtmlMarkerReplacements(html, bootstrapData) {
     let renderedHtml = String(html || '');
     if (!bootstrapData || typeof bootstrapData !== 'object') return renderedHtml;
@@ -380,6 +387,7 @@ function createHtmlPageCoordinator(options = {}) {
         logger.error('[HTML][BootstrapError]', fileName, error?.message || error);
       }
       rendered = optimizeHtmlDelivery(rendered, fileName, premiumPageAccess?.authState || null);
+      rendered = applyScriptNonceToHtml(rendered, res.locals?.cspScriptNonce || '');
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader(
         'Cache-Control',

@@ -1,6 +1,7 @@
 const compression = require('compression');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 
 function applyAppMiddleware(app, deps = {}) {
   const {
@@ -27,6 +28,14 @@ function applyAppMiddleware(app, deps = {}) {
 
   app.disable('x-powered-by');
 
+  app.use((_req, res, next) => {
+    res.locals = res.locals || {};
+    if (!res.locals.cspScriptNonce) {
+      res.locals.cspScriptNonce = crypto.randomBytes(16).toString('base64');
+    }
+    next();
+  });
+
   app.use(
     helmet({
       frameguard: { action: 'deny' },
@@ -51,7 +60,11 @@ function applyAppMiddleware(app, deps = {}) {
           formAction: ["'self'"],
           frameAncestors: ["'none'"],
           objectSrc: ["'none'"],
-          scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+          scriptSrc: [
+            "'self'",
+            (_req, res) => `'nonce-${res.locals?.cspScriptNonce || ''}'`,
+            'https://cdnjs.cloudflare.com',
+          ],
           scriptSrcAttr: ["'unsafe-inline'"],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           imgSrc: ["'self'", 'data:', 'blob:', 'https:'],

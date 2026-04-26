@@ -152,11 +152,12 @@ test('html page coordinator renders SEO-managed html and respects handled premiu
   const { coordinator, pagesDir } = createFixture();
   fs.writeFileSync(
     path.join(pagesDir, 'premium-website.html'),
-    '<!DOCTYPE html><html><head><title>Orig</title></head><body>Hello</body></html>'
+    '<!DOCTYPE html><html><head><title>Orig</title></head><body>Hello<script>window.softoraInline = true;</script><script src="/assets/site.js"></script></body></html>'
   );
 
   const req = { originalUrl: '/premium-website' };
   const res = createResponseRecorder();
+  res.locals = { cspScriptNonce: 'nonce-test-value' };
   let nextCalled = false;
 
   await coordinator.sendSeoManagedHtmlPageResponse(req, res, () => {
@@ -168,6 +169,8 @@ test('html page coordinator renders SEO-managed html and respects handled premiu
   assert.equal(res.headers['Content-Type'], 'text/html; charset=utf-8');
   assert.equal(res.headers['Cache-Control'], 'public, max-age=300, stale-while-revalidate=900');
   assert.match(res.body, /Softora \| SEO Test/);
+  assert.match(res.body, /<script nonce="nonce-test-value">window\.softoraInline = true;<\/script>/);
+  assert.match(res.body, /<script nonce="nonce-test-value" src="\/assets\/site\.js"><\/script>/);
   assert.match(res.body, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(res.body, /href="\/assets\/fonts\/inter-latin\.woff2\?v=20260409a"/);
   assert.doesNotMatch(res.body, /fonts\.googleapis\.com/);
