@@ -42,6 +42,28 @@
     --sidebar-logo-color: #8b2252;
 }
 
+/* Houd de sidebar visueel vast tijdens echte documentnavigatie tussen premium pagina's. */
+@view-transition {
+    navigation: auto;
+}
+
+@media (min-width: 901px) {
+    .sidebar[data-static-sidebar="1"] {
+        view-transition-name: softora-premium-sidebar;
+        backface-visibility: hidden !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    ::view-transition-group(softora-premium-sidebar),
+    ::view-transition-old(softora-premium-sidebar),
+    ::view-transition-new(softora-premium-sidebar) {
+        animation-duration: 1ms !important;
+        animation-delay: 0ms !important;
+        mix-blend-mode: normal !important;
+    }
+}
+
 :root[data-theme="light"] {
     color-scheme: light;
     --bg-primary: #f8f7f4;

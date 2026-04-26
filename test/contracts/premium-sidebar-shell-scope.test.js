@@ -94,6 +94,9 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*transform:\s*none !important;/);
   assert.match(themeSource, /font-family:\s*'SoftoraSidebarOswald';[\s\S]*font-display:\s*block;[\s\S]*oswald-latin\.woff2/);
   assert.match(themeSource, /font-family:\s*'SoftoraSidebarInter';[\s\S]*font-display:\s*block;[\s\S]*inter-latin\.woff2/);
+  assert.match(themeSource, /@view-transition\s*\{[\s\S]*navigation:\s*auto;/);
+  assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*view-transition-name:\s*softora-premium-sidebar;/);
+  assert.match(themeSource, /::view-transition-old\(softora-premium-sidebar\),[\s\S]*::view-transition-new\(softora-premium-sidebar\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
   assert.match(themeSource, /--premium-sidebar-font-display:\s*'SoftoraSidebarOswald', 'Oswald', sans-serif;/);
   assert.match(themeSource, /\.sidebar-logo\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-display\) !important;[\s\S]*font-synthesis:\s*none !important;/);
   assert.match(themeSource, /\.sidebar-link \.sidebar-link-text\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-sans\) !important;/);
@@ -102,6 +105,11 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /\.sidebar,\s*\.sidebar \*,\s*\.sidebar \*::before,\s*\.sidebar \*::after\s*\{[\s\S]*transition:\s*none !important;/);
   assert.match(themeSource, /\.sidebar\s*\{[\s\S]*contain:\s*layout paint style !important;/);
   assert.match(themeJsSource, /function resetPremiumSidebarMotionState\(sidebar, options\) \{/);
+  assert.match(themeJsSource, /const warmedSidebarNavigationTargets = new Set\(\);/);
+  assert.match(themeJsSource, /function warmSidebarNavigationTarget\(url\) \{/);
+  assert.match(themeJsSource, /link\.rel = "prefetch";/);
+  assert.match(themeJsSource, /link\.setAttribute\("data-sidebar-prefetch", "1"\);/);
+  assert.match(themeJsSource, /function warmVisibleSidebarNavigationTargets\(\) \{/);
   assert.match(themeJsSource, /function initPremiumSidebarStabilityGuards\(\) \{/);
   assert.match(themeJsSource, /document\.addEventListener\("pointerdown", function \(event\) \{/);
   assert.match(themeJsSource, /window\.addEventListener\("focus", function \(\) \{\s*schedulePremiumSidebarStability\(\);/s);
