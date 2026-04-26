@@ -76,6 +76,11 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.doesNotMatch(pageSource, /Live sync/);
   assert.doesNotMatch(pageSource, /Beschikbaarheid/);
   assert.doesNotMatch(pageSource, /Delen/);
+  assert.doesNotMatch(pageSource, /Melding 1/);
+  assert.doesNotMatch(pageSource, /Melding 2/);
+  assert.doesNotMatch(pageSource, /Melding 3/);
+  assert.doesNotMatch(pageSource, /1 dag voor aanvang/);
+  assert.doesNotMatch(pageSource, /15 minuten voor aanvang/);
   assert.doesNotMatch(pageSource, /color-dot/);
   assert.match(pageSource, /\.day-cell\.is-today\{background:var\(--purple-light\);box-shadow:inset 0 0 0 1\.5px var\(--purple-dim\)\}/);
   assert.doesNotMatch(pageSource, /toggle-allday/);
