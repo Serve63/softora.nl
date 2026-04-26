@@ -33,6 +33,8 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.doesNotMatch(pageSource, /topbar-time/);
   assert.doesNotMatch(pageSource, /<footer class="footer">/);
   assert.doesNotMatch(pageSource, /tab-btn/);
+  assert.doesNotMatch(pageSource, /id="btn-today"/);
+  assert.doesNotMatch(pageSource, /topbar-today/);
   assert.match(pageSource, /Hele dag/);
   assert.match(pageSource, /Week/);
 });
