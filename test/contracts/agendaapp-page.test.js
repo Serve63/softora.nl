@@ -38,6 +38,7 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /data-repeat="daily">Elke dag/);
   assert.match(pageSource, /data-repeat="weekly">Elke week/);
   assert.match(pageSource, /data-repeat="monthly">Elke maand/);
+  assert.match(pageSource, /data-repeat="quarterly">Per kwartaal/);
   assert.match(pageSource, /Afspraak toevoegen/);
   assert.match(pageSource, /Voor wie\?/);
   assert.match(pageSource, /\.sheet\{width:100%;max-width:430px;background:linear-gradient\(180deg,#fff 0%,#fbf6f9 100%\);/);
@@ -63,6 +64,7 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /businessMeetingType='website'/);
   assert.match(pageSource, /repeatChoice='none'/);
   assert.match(pageSource, /recurrence:repeatChoice/);
+  assert.match(pageSource, /quarterly:'Per kwartaal'/);
   assert.match(pageSource, /Herhalen: \$\{repeatText\}/);
   assert.match(pageSource, /selectedWho='serve'/);
   assert.match(pageSource, /who:selectedWho/);
