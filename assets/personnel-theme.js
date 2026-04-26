@@ -659,6 +659,91 @@
     }
 
     let premiumSidebarFitFrame = 0;
+    let premiumSidebarStabilityFrame = 0;
+    let premiumSidebarNavScrollTop = 0;
+
+    function getPremiumSidebarNav(sidebar) {
+        const targetSidebar = sidebar || document.querySelector(".sidebar");
+        return targetSidebar && typeof targetSidebar.querySelector === "function"
+            ? targetSidebar.querySelector(".sidebar-nav")
+            : null;
+    }
+
+    function bindPremiumSidebarNavStability(sidebar) {
+        const nav = getPremiumSidebarNav(sidebar);
+        if (!nav || nav.dataset.sidebarScrollGuard === "1") return;
+        nav.dataset.sidebarScrollGuard = "1";
+        premiumSidebarNavScrollTop = Number(nav.scrollTop) || 0;
+        nav.addEventListener("scroll", function () {
+            premiumSidebarNavScrollTop = Number(nav.scrollTop) || 0;
+        }, { passive: true });
+    }
+
+    function resetPremiumSidebarMotionState(sidebar, options) {
+        if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
+        sidebar.style.transform = "";
+        sidebar.style.translate = "";
+        sidebar.style.willChange = "";
+        sidebar
+            .querySelectorAll("a.sidebar-logo, a.sidebar-link, .sidebar-footer a.logout-btn")
+            .forEach(function (element) {
+                element.style.transform = "";
+                element.style.translate = "";
+                element.style.willChange = "";
+            });
+        if (options && options.restoreScroll) {
+            const nav = getPremiumSidebarNav(sidebar);
+            if (nav) {
+                nav.scrollTop = premiumSidebarNavScrollTop;
+            }
+        }
+        sidebar.dataset.sidebarStable = "1";
+    }
+
+    function schedulePremiumSidebarStability(sidebar, options) {
+        if (!isPremiumPersonnelContext) return;
+        const targetSidebar = sidebar || document.querySelector(".sidebar");
+        if (!targetSidebar) return;
+        bindPremiumSidebarNavStability(targetSidebar);
+        if (premiumSidebarStabilityFrame) {
+            cancelAnimationFrame(premiumSidebarStabilityFrame);
+        }
+        const shouldRestoreScroll = Boolean(options && options.restoreScroll);
+        premiumSidebarStabilityFrame = requestAnimationFrame(function () {
+            premiumSidebarStabilityFrame = 0;
+            resetPremiumSidebarMotionState(targetSidebar, { restoreScroll: shouldRestoreScroll });
+        });
+    }
+
+    function initPremiumSidebarStabilityGuards() {
+        if (!isPremiumPersonnelContext) return;
+        if (document.documentElement.dataset.premiumSidebarStabilityInit === "1") return;
+        document.documentElement.dataset.premiumSidebarStabilityInit = "1";
+
+        schedulePremiumSidebarStability();
+
+        document.addEventListener("pointerdown", function (event) {
+            const sidebar = document.querySelector(".sidebar");
+            if (!sidebar) return;
+            const clickedInsideSidebar = Boolean(event.target && sidebar.contains(event.target));
+            if (clickedInsideSidebar) {
+                const nav = getPremiumSidebarNav(sidebar);
+                premiumSidebarNavScrollTop = nav ? Number(nav.scrollTop) || 0 : 0;
+            }
+            schedulePremiumSidebarStability(sidebar, { restoreScroll: clickedInsideSidebar });
+        }, { capture: true, passive: true });
+
+        window.addEventListener("focus", function () {
+            schedulePremiumSidebarStability();
+        });
+        window.addEventListener("pageshow", function () {
+            schedulePremiumSidebarStability();
+        });
+        document.addEventListener("visibilitychange", function () {
+            if (document.hidden) return;
+            schedulePremiumSidebarStability();
+        });
+    }
 
     function applyPremiumSidebarFit(sidebar) {
         if (!sidebar || typeof sidebar.classList === "undefined") return;
@@ -1070,6 +1155,7 @@
         syncStaticSidebarActiveState(sidebar, activeKey);
         decorateComingSoonSidebarLinks();
         neutralizeSidebarAnchors();
+        schedulePremiumSidebarStability(sidebar);
         sidebar.dataset.sidebarReady = "true";
     }
 
@@ -2435,6 +2521,7 @@
 
     initSoftoraDialogs();
     applyUnifiedPremiumSidebar();
+    initPremiumSidebarStabilityGuards();
     if (isPremiumPersonnelContext) {
         window.addEventListener("hashchange", refreshPremiumStaticSidebarActiveState);
     }

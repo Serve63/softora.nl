@@ -144,7 +144,11 @@
     display: flex !important;
     flex-direction: column !important;
     contain: layout paint style !important;
-    transform: translateZ(0) !important;
+    transform: none !important;
+    translate: none !important;
+    will-change: auto !important;
+    overflow-anchor: none !important;
+    overscroll-behavior: contain !important;
 }
 
 .sidebar,
@@ -158,6 +162,9 @@
 .sidebar-nav {
     flex: 1 1 auto !important;
     min-height: 0 !important;
+    overflow-anchor: none !important;
+    overscroll-behavior: contain !important;
+    scrollbar-gutter: stable !important;
 }
 
 .sidebar-section {
@@ -806,6 +813,8 @@ button,
 .sidebar-footer a.logout-btn {
     pointer-events: none;
     transform: none !important;
+    translate: none !important;
+    will-change: auto !important;
 }
 
 body[data-sidebar-nav-ready="1"] .sidebar a.sidebar-logo,
@@ -823,8 +832,17 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
         width: var(--premium-sidebar-width) !important;
         height: 100vh !important;
         min-height: 100vh !important;
+        max-height: 100vh !important;
         padding-top: 1.18rem !important;
         overflow: hidden !important;
+    }
+
+    @supports (height: 100svh) {
+        .sidebar {
+            height: 100svh !important;
+            min-height: 100svh !important;
+            max-height: 100svh !important;
+        }
     }
 
     .sidebar-logo {

@@ -92,8 +92,14 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*none;/);
   assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\] \.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*auto;/);
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*transform:\s*none !important;/);
+  assert.match(themeSource, /\.sidebar\s*\{[\s\S]*transform:\s*none !important;[\s\S]*overflow-anchor:\s*none !important;[\s\S]*overscroll-behavior:\s*contain !important;/);
+  assert.match(themeSource, /\.sidebar-nav\s*\{[\s\S]*overflow-anchor:\s*none !important;[\s\S]*scrollbar-gutter:\s*stable !important;/);
   assert.match(themeSource, /\.sidebar,\s*\.sidebar \*,\s*\.sidebar \*::before,\s*\.sidebar \*::after\s*\{[\s\S]*transition:\s*none !important;/);
   assert.match(themeSource, /\.sidebar\s*\{[\s\S]*contain:\s*layout paint style !important;/);
+  assert.match(themeJsSource, /function resetPremiumSidebarMotionState\(sidebar, options\) \{/);
+  assert.match(themeJsSource, /function initPremiumSidebarStabilityGuards\(\) \{/);
+  assert.match(themeJsSource, /document\.addEventListener\("pointerdown", function \(event\) \{/);
+  assert.match(themeJsSource, /window\.addEventListener\("focus", function \(\) \{\s*schedulePremiumSidebarStability\(\);/s);
   assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords"\]\);/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
