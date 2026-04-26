@@ -32,6 +32,10 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /data-meeting-type="chatbot">Chatbot/);
   assert.match(pageSource, /id="meeting-back"/);
   assert.match(pageSource, /id="meeting-next"/);
+  assert.match(pageSource, /id="repeat-overlay"/);
+  assert.match(pageSource, /data-repeat="daily">Elke dag/);
+  assert.match(pageSource, /data-repeat="weekly">Elke week/);
+  assert.match(pageSource, /data-repeat="monthly">Elke maand/);
   assert.match(pageSource, /Afspraak toevoegen/);
   assert.match(pageSource, /Voor wie\?/);
   assert.match(pageSource, /class="planner-choice selected" type="button" data-who="serve">Servé/);
@@ -39,6 +43,8 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /class="planner-choice" type="button" data-who="both">Allebei/);
   assert.match(pageSource, /placeholder="Titel van de afspraak"/);
   assert.match(pageSource, /placeholder="--:--"/);
+  assert.match(pageSource, /id="repeat-row"/);
+  assert.match(pageSource, /id="repeat-label">Nooit/);
   assert.match(pageSource, /Bijv\. kantoor, Teams, klantlocatie/);
   assert.match(pageSource, /Extra opmerkingen voor deze agenda-afspraak/);
   assert.match(pageSource, /id="btn-form-back"/);
@@ -50,6 +56,9 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /actor: 'agendaapp'/);
   assert.match(pageSource, /legendChoice:appointmentType==='business'\?businessMeetingType:'manual-overig'/);
   assert.match(pageSource, /businessMeetingType='website'/);
+  assert.match(pageSource, /repeatChoice='none'/);
+  assert.match(pageSource, /recurrence:repeatChoice/);
+  assert.match(pageSource, /Herhalen: \$\{repeatText\}/);
   assert.match(pageSource, /selectedWho='serve'/);
   assert.match(pageSource, /who:selectedWho/);
   assert.match(pageSource, /renderMobileAgendaApp/);
