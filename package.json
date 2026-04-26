@@ -12,6 +12,7 @@
     "check:secrets": "node scripts/check-tracked-secrets.js",
     "check:guardrails": "node scripts/check-agent-guardrails.js",
     "check:repo-hygiene": "bash scripts/check-repo-hygiene.sh",
+    "check:quality-lock": "node scripts/check-quality-lock.js",
     "clean:local": "bash scripts/clean-local-artifacts.sh",
     "check:deps": "npm audit --omit=dev",
     "verify:critical": "node scripts/verify-critical.js",

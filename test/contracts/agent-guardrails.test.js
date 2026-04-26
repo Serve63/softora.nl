@@ -289,8 +289,10 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const cleanSource = readRepoFile('scripts/clean-local-artifacts.sh');
 
   assert.equal(packageJson.scripts['check:repo-hygiene'], 'bash scripts/check-repo-hygiene.sh');
+  assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
+  assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);
   assert.match(hygieneSource, /\.vercel\/output/);
   assert.match(hygieneSource, /npm run clean:local/);
   assert.match(cleanSource, /\.vercel\/output/);
@@ -308,6 +310,7 @@ test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isProtectedFrontendShellPath('assets/personnel-theme.js'), true);
   assert.equal(isProtectedFrontendShellPath('assets/coldcalling-dashboard.js'), false);
   assert.equal(isProtectedQualityGatePath('scripts/check-agent-guardrails.js'), true);
+  assert.equal(isProtectedQualityGatePath('scripts/check-quality-lock.js'), true);
   assert.equal(isProtectedQualityGatePath('AGENTS.md'), true);
   assert.equal(isProtectedQualityGatePath('package.json'), true);
   assert.equal(isProtectedQualityGatePath('.github/workflows/repo-hygiene.yml'), true);
