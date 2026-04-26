@@ -40,6 +40,8 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /@media \(max-width: 900px\) \{[\s\S]*\.main-content \{[\s\S]*margin-left:\s*0;[\s\S]*width:\s*100%;[\s\S]*\.pdf-builder-shell \{[\s\S]*min-height:\s*auto;[\s\S]*max-height:\s*none;[\s\S]*\.split \{[\s\S]*flex-direction:\s*column;/);
   assert.match(pageSource, /function fmtEur\(n\) \{ return '€\\u00a0'/);
   assert.match(pageSource, /function fitPreviewToViewport\(\) \{[\s\S]*const availableWidth = Math\.max\(240, stage\.clientWidth - 48\);[\s\S]*const availableHeight = Math\.max\(320, stage\.clientHeight - 36\);[\s\S]*const maxScale = Number\.parseFloat\(getComputedStyle\(document\.documentElement\)\.getPropertyValue\('--preview-max-scale'\)\) \|\| 1;[\s\S]*const scale = Math\.min\(maxScale, availableWidth \/ A4_PREVIEW_WIDTH, availableHeight \/ A4_PREVIEW_HEIGHT\);/);
+  assert.match(pageSource, /const hcols\s+= \{ 1:'#d97706', 2:'#b45a00', 3:'#c0392b' \};/);
+  assert.match(pageSource, /const hcols=\{1:\[217,119,6\],2:\[180,90,0\],3:\[192,57,43\]\};/);
   assert.match(pageSource, /function setupPreviewAutoFit\(\) \{[\s\S]*new ResizeObserver\(\(\) => fitPreviewToViewport\(\)\);/);
   assert.match(pageSource, /buildForm\(\);\s*setupPreviewAutoFit\(\);\s*fitPreviewToViewport\(\);/);
   assert.doesNotMatch(pageSource, /EUR /);

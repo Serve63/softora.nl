@@ -961,7 +961,7 @@ function update() {
 
   } else {
     const htype = fields['htype'] ? parseInt(fields['htype'].value) : 1;
-    const hcols  = { 1:'#16733c', 2:'#b45a00', 3:'#c0392b' };
+    const hcols  = { 1:'#d97706', 2:'#b45a00', 3:'#c0392b' };
     const hlabels= { 1:'1e Betalingsherinnering', 2:'2e Betalingsherinnering - Dringend', 3:'Aanmaning' };
     const col = hcols[htype];
     const msgs = {
@@ -1090,7 +1090,7 @@ function downloadPDF() {
 
   } else {
     const htype=fields['htype']?parseInt(fields['htype'].value):1;
-    const hcols={1:[22,115,60],2:[180,90,0],3:[192,57,43]};
+    const hcols={1:[217,119,6],2:[180,90,0],3:[192,57,43]};
     const hlabels={1:'1E BETALINGSHERINNERING',2:'2E BETALINGSHERINNERING - DRINGEND',3:'AANMANING'};
     const hc=hcols[htype];
 
