@@ -29,6 +29,7 @@ function createCallWebhookRuntime(deps = {}) {
     waitForQueuedRuntimeStatePersist = async () => true,
     recentWebhookEvents = [],
     verboseCallWebhookLogs = false,
+    isProduction = false,
     timingSafeEqualStrings = (left, right) => left === right,
     logger = console,
   } = deps;
@@ -51,9 +52,9 @@ function createCallWebhookRuntime(deps = {}) {
 
     const headerCandidates = [req.get('x-retell-signature'), req.get('authorization')].filter(Boolean);
     for (const candidate of headerCandidates) {
-      if (candidate === secret) return true;
-      if (String(candidate).toLowerCase().startsWith('bearer ') && String(candidate).slice(7).trim() === secret) {
-        return true;
+      if (timingSafeEqualStrings(candidate, secret)) return true;
+      if (String(candidate).toLowerCase().startsWith('bearer ')) {
+        return timingSafeEqualStrings(String(candidate).slice(7).trim(), secret);
       }
     }
     return false;
@@ -109,7 +110,7 @@ function createCallWebhookRuntime(deps = {}) {
     if (hasRetellSignature) {
       return signatureAuthorized;
     }
-    return true;
+    return !isProduction;
   }
 
   function buildTwilioAllowedCallerSet() {
@@ -224,7 +225,11 @@ function createCallWebhookRuntime(deps = {}) {
     const bearerSecret = /^bearer\s+/i.test(authorizationHeader)
       ? normalizeString(authorizationHeader.replace(/^bearer\s+/i, ''))
       : '';
-    return secret === headerSecret || secret === querySecret || secret === bearerSecret;
+    return (
+      timingSafeEqualStrings(headerSecret, secret) ||
+      timingSafeEqualStrings(querySecret, secret) ||
+      timingSafeEqualStrings(bearerSecret, secret)
+    );
   }
 
   function handleTwilioInboundVoice(req, res) {

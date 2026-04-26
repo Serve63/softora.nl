@@ -265,6 +265,7 @@ test('server app runtime operational phase wires runtime sync, middleware and co
     runtimeSyncRuntime.ensureRuntimeStateHydratedFromSupabase
   );
   assert.equal(capturedColdcallingOptions.verboseCallWebhookLogs, true);
+  assert.equal(capturedColdcallingOptions.isProduction, false);
   assert.equal(capturedColdcallingOptions.createQueueId(), 'queue-1');
   assert.equal(result.runtimeSyncRuntime, runtimeSyncRuntime);
   assert.equal(result.coldcallingServiceRuntime, coldcallingServiceRuntime);

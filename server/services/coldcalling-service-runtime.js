@@ -44,6 +44,7 @@ function createColdcallingServiceRuntime(deps = {}) {
     extractCallUpdateFromRetellPayload,
     recentWebhookEvents,
     verboseCallWebhookLogs,
+    isProduction,
     timingSafeEqualStrings,
   } = deps;
 
@@ -117,6 +118,7 @@ function createColdcallingServiceRuntime(deps = {}) {
     waitForQueuedRuntimeStatePersist,
     recentWebhookEvents,
     verboseCallWebhookLogs,
+    isProduction,
     timingSafeEqualStrings,
     logger,
   });

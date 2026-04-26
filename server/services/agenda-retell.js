@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { timingSafeEqualStrings } = require('../security/crypto-utils');
 
 function createAgendaRetellCoordinator(deps = {}) {
   const {
@@ -68,9 +69,9 @@ function createAgendaRetellCoordinator(deps = {}) {
     ].filter(Boolean);
 
     return headerCandidates.some((candidate) => {
-      if (candidate === secret) return true;
+      if (timingSafeEqualStrings(candidate, secret)) return true;
       if (/^bearer\s+/i.test(candidate)) {
-        return normalizeString(candidate.replace(/^bearer\s+/i, '')) === secret;
+        return timingSafeEqualStrings(normalizeString(candidate.replace(/^bearer\s+/i, '')), secret);
       }
       return false;
     });

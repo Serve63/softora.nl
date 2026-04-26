@@ -113,6 +113,7 @@ function createRuntime(overrides = {}) {
     waitForQueuedRuntimeStatePersist: async () => true,
     recentWebhookEvents,
     verboseCallWebhookLogs: Boolean(overrides.verboseCallWebhookLogs),
+    isProduction: Boolean(overrides.isProduction),
     timingSafeEqualStrings: (left, right) => left === right,
     logger: { log() {}, error() {} },
   });
@@ -138,6 +139,46 @@ test('call webhooks verify retell signatures against raw webhook payloads', () =
     timestamp,
     digest,
   });
+});
+
+test('call webhooks reject unsigned retell webhooks in production', async () => {
+  const context = createRuntime({ isProduction: true });
+  const req = createReq({
+    path: '/api/retell/webhook',
+    body: {
+      event: 'call_ended',
+      call: { call_id: 'call_unsigned' },
+    },
+  });
+  const res = createRes();
+
+  assert.equal(context.runtime.isRetellWebhookAuthorized(req), false);
+
+  await context.runtime.handleRetellWebhook(req, res);
+
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.jsonBody?.ok, false);
+  assert.equal(context.auditEvents.length, 1);
+  assert.equal(context.upserts.length, 0);
+});
+
+test('call webhooks accept retell webhook secret authorization', () => {
+  const context = createRuntime({
+    isProduction: true,
+    env: {
+      RETELL_API_KEY: '',
+      WEBHOOK_SECRET: 'retell-secret',
+      TWILIO_WEBHOOK_SECRET: 'twilio-secret',
+    },
+  });
+  const req = createReq({
+    path: '/api/retell/webhook',
+    headers: {
+      authorization: 'Bearer retell-secret',
+    },
+  });
+
+  assert.equal(context.runtime.isRetellWebhookAuthorized(req), true);
 });
 
 test('call webhooks handle inbound twilio voice selection and start an inbound call update', () => {

@@ -239,3 +239,23 @@ test('agenda retell coordinator refreshes shared state without waiting on persis
     skipPendingPersistWait: true,
   });
 });
+
+test('agenda retell coordinator accepts webhook secret authorization', () => {
+  const { coordinator } = createFixture({
+    env: {
+      RETELL_API_KEY: '',
+      WEBHOOK_SECRET: 'retell-secret',
+    },
+  });
+  const req = {
+    rawBody: '{}',
+    body: {},
+    get: createHeaderReader({
+      authorization: 'Bearer retell-secret',
+    }),
+  };
+  const res = createResponseRecorder();
+
+  assert.equal(coordinator.ensureRetellAgendaRequestAuthorized(req, res), true);
+  assert.equal(res.statusCode, null);
+});

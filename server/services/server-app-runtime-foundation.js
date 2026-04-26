@@ -492,6 +492,7 @@ function createServerAppOperationalRuntime(context, dependencies = {}) {
       extractCallUpdateFromRetellPayload,
       recentWebhookEvents,
       verboseCallWebhookLogs,
+      isProduction,
       timingSafeEqualStrings,
     })
   );

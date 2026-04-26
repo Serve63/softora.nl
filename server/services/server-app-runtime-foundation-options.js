@@ -327,6 +327,7 @@ function buildColdcallingServiceRuntimeOptions({
   extractCallUpdateFromRetellPayload,
   recentWebhookEvents,
   verboseCallWebhookLogs,
+  isProduction,
   timingSafeEqualStrings,
 }) {
   return {
@@ -370,6 +371,7 @@ function buildColdcallingServiceRuntimeOptions({
     extractCallUpdateFromRetellPayload,
     recentWebhookEvents,
     verboseCallWebhookLogs,
+    isProduction,
     timingSafeEqualStrings,
   };
 }

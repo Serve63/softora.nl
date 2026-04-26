@@ -184,13 +184,27 @@ test('agent guardrails block large inline scripts in html pages', () => {
 
 test('agent guardrails require targeted tests for protected quality gates and sidebar shell', () => {
   const violations = buildGuardrailViolations({
-    changedFiles: ['assets/personnel-theme.css', 'scripts/check-agent-guardrails.js', 'scripts/check-quality-lock.js'],
+    changedFiles: [
+      'assets/personnel-theme.css',
+      'package.json',
+      'scripts/check-agent-guardrails.js',
+      'scripts/check-quality-lock.js',
+    ],
     addedFiles: [],
     changedTests: ['test/contracts/example.test.js'],
     highRiskFiles: [],
-    behaviorFiles: ['assets/personnel-theme.css', 'scripts/check-agent-guardrails.js', 'scripts/check-quality-lock.js'],
+    behaviorFiles: [
+      'assets/personnel-theme.css',
+      'package.json',
+      'scripts/check-agent-guardrails.js',
+      'scripts/check-quality-lock.js',
+    ],
     protectedFrontendShellFiles: ['assets/personnel-theme.css'],
-    protectedQualityGateFiles: ['scripts/check-agent-guardrails.js', 'scripts/check-quality-lock.js'],
+    protectedQualityGateFiles: [
+      'package.json',
+      'scripts/check-agent-guardrails.js',
+      'scripts/check-quality-lock.js',
+    ],
     newestBackupAgeMs: 5 * 60 * 1000,
     isCi: false,
     serverJsLineCount: 7200,
@@ -204,6 +218,7 @@ test('agent guardrails require targeted tests for protected quality gates and si
   const covered = buildGuardrailViolations({
     changedFiles: [
       'assets/personnel-theme.css',
+      'package.json',
       'scripts/check-agent-guardrails.js',
       'scripts/check-quality-lock.js',
       'test/contracts/premium-sidebar-shell-scope.test.js',
@@ -215,9 +230,18 @@ test('agent guardrails require targeted tests for protected quality gates and si
       'test/contracts/agent-guardrails.test.js',
     ],
     highRiskFiles: [],
-    behaviorFiles: ['assets/personnel-theme.css', 'scripts/check-agent-guardrails.js', 'scripts/check-quality-lock.js'],
+    behaviorFiles: [
+      'assets/personnel-theme.css',
+      'package.json',
+      'scripts/check-agent-guardrails.js',
+      'scripts/check-quality-lock.js',
+    ],
     protectedFrontendShellFiles: ['assets/personnel-theme.css'],
-    protectedQualityGateFiles: ['scripts/check-agent-guardrails.js', 'scripts/check-quality-lock.js'],
+    protectedQualityGateFiles: [
+      'package.json',
+      'scripts/check-agent-guardrails.js',
+      'scripts/check-quality-lock.js',
+    ],
     newestBackupAgeMs: 5 * 60 * 1000,
     isCi: false,
     serverJsLineCount: 7200,
