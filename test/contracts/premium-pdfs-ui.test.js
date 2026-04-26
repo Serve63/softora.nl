@@ -22,7 +22,7 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /\.topbar-logo \{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.btn-dl \{[\s\S]*font-family:\s*'Oswald', sans-serif;/);
   assert.match(pageSource, /--preview-scale:\s*1;/);
-  assert.match(pageSource, /--preview-max-scale:\s*1\.6;/);
+  assert.match(pageSource, /--preview-max-scale:\s*2\.2;/);
   assert.match(pageSource, /--preview-overscan:\s*1\.08;/);
   assert.match(pageSource, /--pdf-builder-zoom:\s*1\.15;/);
   assert.match(pageSource, /--a4-width:\s*595px;/);
@@ -40,8 +40,7 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /@media \(max-width: 1180px\) \{[\s\S]*\.split \{[\s\S]*flex-direction:\s*column;[\s\S]*overflow:\s*auto;[\s\S]*\.form-panel \{[\s\S]*width:\s*100%;[\s\S]*max-height:\s*44vh;/);
   assert.match(pageSource, /@media \(max-width: 900px\) \{[\s\S]*:root \{[\s\S]*--pdf-builder-zoom:\s*1;[\s\S]*\}[\s\S]*\.main-content \{[\s\S]*margin-left:\s*0;[\s\S]*width:\s*100%;[\s\S]*\.pdf-builder-shell \{[\s\S]*min-height:\s*auto;[\s\S]*max-height:\s*none;[\s\S]*\.split \{[\s\S]*flex-direction:\s*column;/);
   assert.match(pageSource, /function fmtEur\(n\) \{ return '€\\u00a0'/);
-  assert.match(pageSource, /function fitPreviewToViewport\(\) \{[\s\S]*const availableWidth = Math\.max\(240, stage\.clientWidth\);[\s\S]*const maxScale = Number\.parseFloat\(getComputedStyle\(document\.documentElement\)\.getPropertyValue\('--preview-max-scale'\)\) \|\| 1;[\s\S]*const overscan = Number\.parseFloat\(getComputedStyle\(document\.documentElement\)\.getPropertyValue\('--preview-overscan'\)\) \|\| 1;[\s\S]*const scale = Math\.min\(maxScale, \(availableWidth \/ A4_PREVIEW_WIDTH\) \* overscan\);/);
-  assert.doesNotMatch(pageSource, /availableHeight \/ A4_PREVIEW_HEIGHT/);
+  assert.match(pageSource, /function fitPreviewToViewport\(\) \{[\s\S]*const availableWidth = Math\.max\(240, stage\.clientWidth\);[\s\S]*const availableHeight = Math\.max\(240, stage\.clientHeight\);[\s\S]*const maxScale = Number\.parseFloat\(getComputedStyle\(document\.documentElement\)\.getPropertyValue\('--preview-max-scale'\)\) \|\| 1;[\s\S]*const overscan = Number\.parseFloat\(getComputedStyle\(document\.documentElement\)\.getPropertyValue\('--preview-overscan'\)\) \|\| 1;[\s\S]*const coverScale = Math\.max\(availableWidth \/ A4_PREVIEW_WIDTH, availableHeight \/ A4_PREVIEW_HEIGHT\);[\s\S]*const scale = Math\.min\(maxScale, coverScale \* overscan\);/);
   assert.match(pageSource, /function setupPreviewAutoFit\(\) \{[\s\S]*new ResizeObserver\(\(\) => fitPreviewToViewport\(\)\);/);
   assert.match(pageSource, /buildForm\(\);\s*setupPreviewAutoFit\(\);\s*fitPreviewToViewport\(\);/);
   assert.doesNotMatch(pageSource, /EUR /);

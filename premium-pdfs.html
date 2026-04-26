@@ -43,7 +43,7 @@
   --a4-width: 595px;
   --a4-height: 842px;
   --preview-scale: 1;
-  --preview-max-scale: 1.6;
+  --preview-max-scale: 2.2;
   --preview-overscan: 1.08;
   --pdf-builder-zoom: 1.15;
 }
@@ -718,9 +718,11 @@ function fitPreviewToViewport() {
   const shell = document.getElementById('a4ScaleShell');
   if (!stage || !shell) return;
   const availableWidth = Math.max(240, stage.clientWidth);
+  const availableHeight = Math.max(240, stage.clientHeight);
   const maxScale = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preview-max-scale')) || 1;
   const overscan = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preview-overscan')) || 1;
-  const scale = Math.min(maxScale, (availableWidth / A4_PREVIEW_WIDTH) * overscan);
+  const coverScale = Math.max(availableWidth / A4_PREVIEW_WIDTH, availableHeight / A4_PREVIEW_HEIGHT);
+  const scale = Math.min(maxScale, coverScale * overscan);
   shell.style.width = (A4_PREVIEW_WIDTH * scale) + 'px';
   shell.style.height = (A4_PREVIEW_HEIGHT * scale) + 'px';
   shell.style.setProperty('--preview-scale', String(scale));
