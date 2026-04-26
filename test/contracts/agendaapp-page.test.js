@@ -38,6 +38,9 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /data-repeat="monthly">Elke maand/);
   assert.match(pageSource, /Afspraak toevoegen/);
   assert.match(pageSource, /Voor wie\?/);
+  assert.match(pageSource, /\.sheet\{width:100%;max-width:430px;background:linear-gradient\(180deg,#fff 0%,#fbf6f9 100%\);/);
+  assert.match(pageSource, /\.sheet-title\{font-family:'Oswald',sans-serif;/);
+  assert.match(pageSource, /\.form-input:focus,\.form-textarea:focus\{border-color:var\(--purple-dim\);/);
   assert.match(pageSource, /class="planner-choice selected" type="button" data-who="serve">Servé/);
   assert.match(pageSource, /class="planner-choice" type="button" data-who="martijn">Martijn/);
   assert.match(pageSource, /class="planner-choice" type="button" data-who="both">Allebei/);
