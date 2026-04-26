@@ -4,7 +4,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
-const PREMIUM_SIDEBAR_THEME_VERSION = '20260426b';
+const PREMIUM_SIDEBAR_THEME_VERSION = '20260427a';
 
 const REQUIRED_QUALITY_FILES = Object.freeze([
   'AGENTS.md',

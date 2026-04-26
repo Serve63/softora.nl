@@ -76,6 +76,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   const themeSource = readRepoFile('assets/personnel-theme.css');
   const themeJsSource = readRepoFile('assets/personnel-theme.js');
   const prefillSource = readRepoFile('assets/premium-sidebar-profile-prefill.js');
+  const htmlPagesSource = readRepoFile('server/services/html-pages.js');
 
   assert.match(
     themeSource,
@@ -92,8 +93,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*none;/);
   assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\] \.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*auto;/);
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*transform:\s*none !important;/);
-  assert.match(themeSource, /font-family:\s*'SoftoraSidebarOswald';[\s\S]*font-display:\s*block;[\s\S]*oswald-latin\.woff2/);
-  assert.match(themeSource, /font-family:\s*'SoftoraSidebarInter';[\s\S]*font-display:\s*block;[\s\S]*inter-latin\.woff2/);
+  assert.match(themeSource, /font-family:\s*'SoftoraSidebarOswald';[\s\S]*font-display:\s*block;[\s\S]*oswald-latin\.woff2\?v=20260409a/);
+  assert.match(themeSource, /font-family:\s*'SoftoraSidebarInter';[\s\S]*font-display:\s*block;[\s\S]*inter-latin\.woff2\?v=20260409a/);
   assert.match(themeSource, /@view-transition\s*\{[\s\S]*navigation:\s*auto;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*view-transition-name:\s*softora-premium-sidebar;/);
   assert.match(themeSource, /::view-transition-old\(softora-premium-sidebar\),[\s\S]*::view-transition-new\(softora-premium-sidebar\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
@@ -140,6 +141,11 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /function prefillPremiumSidebarActiveState\(\) \{/);
   assert.match(prefillSource, /link\.classList\.toggle\("active", key === activeKey\);/);
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
+  assert.match(htmlPagesSource, /id="softora-premium-sidebar-critical"/);
+  assert.match(htmlPagesSource, /function injectSnippetAfterHeadOpen\(html, snippet, marker\) \{/);
+  assert.match(htmlPagesSource, /function hasPremiumStaticSidebar\(html\) \{/);
+  assert.match(htmlPagesSource, /margin-left:var\(--premium-sidebar-width,320px\) !important;/);
   assert.doesNotMatch(
     themeJsSource,
     /if \(sidebar\.dataset\.staticSidebar === "1"\) \{[\s\S]*ensureStaticSidebarLink\(sidebar, "beheer", getWebsitePreviewSidebarLink\(\), \["seo", "packages", "pdfs"\]\);/s
