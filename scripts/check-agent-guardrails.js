@@ -142,6 +142,7 @@ function getQualityBaselineViolations() {
   const requiredScripts = {
     'check:guardrails': 'node scripts/check-agent-guardrails.js',
     'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
+    'check:quality-lock': 'node scripts/check-quality-lock.js',
     'clean:local': 'bash scripts/clean-local-artifacts.sh',
     'test:contracts': 'node --test test/contracts/*.test.js',
     'test:smoke': 'node --test test/smoke/*.test.js',
@@ -160,6 +161,7 @@ function getQualityBaselineViolations() {
   [
     'check:guardrails',
     'check:repo-hygiene',
+    'check:quality-lock',
     'test:contracts',
     'test:smoke',
     'check:secrets',
@@ -202,15 +204,15 @@ function getQualityBaselineViolations() {
   const protocolExpectations = [
     {
       filePath: 'AGENTS.md',
-      required: [/npm run verify:critical/, /Commit en push elke succesvolle wijziging/, /npm run check:guardrails/],
+      required: [/npm run verify:critical/, /Commit en push elke succesvolle wijziging/, /npm run check:guardrails/, /npm run check:quality-lock/],
     },
     {
       filePath: 'docs/quality-protocol.md',
-      required: [/Definition Of Done/, /npm run verify:critical/, /check:guardrails/, /direct gecommit en gepusht/],
+      required: [/Definition Of Done/, /npm run verify:critical/, /check:guardrails/, /check:quality-lock/, /direct gecommit en gepusht/],
     },
     {
       filePath: 'docs/repo-map.md',
-      required: [/scripts\/check-agent-guardrails\.js/, /\.github\/workflows\/verify-critical\.yml/],
+      required: [/scripts\/check-agent-guardrails\.js/, /scripts\/check-quality-lock\.js/, /\.github\/workflows\/verify-critical\.yml/],
     },
   ];
 

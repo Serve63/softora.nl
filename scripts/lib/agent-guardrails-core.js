@@ -39,6 +39,7 @@ const PROTECTED_QUALITY_GATE_PATHS = Object.freeze([
   'docs/repo-map.md',
   'package.json',
   'scripts/check-agent-guardrails.js',
+  'scripts/check-quality-lock.js',
   'scripts/check-repo-hygiene.sh',
   'scripts/clean-local-artifacts.sh',
   'scripts/lib/agent-guardrails-core.js',

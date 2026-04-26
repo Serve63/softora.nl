@@ -50,6 +50,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Productiegedrag krijgt of behoudt contract- of smoke-testdekking.
 - `npm run check:guardrails` blijft groen.
 - `npm run check:repo-hygiene` blijft groen; lokale rommel kan worden opgeschoond met `npm run clean:local`.
+- `npm run check:quality-lock` blijft groen; CI-bypasses, testverzwakking en premium sidebar asset-drift worden geblokkeerd.
 - `npm run verify:critical` is groen voor afronding.
 - De kwaliteitsbaseline blijft intact: guardrails, contracttests, smoke-tests en secrets-checks blijven onderdeel van `verify:critical`.
 - `main` blijft beschermd via de GitHub ruleset "Softora main quality gate"; wijzigingen landen via PR vanaf `codex/*` branches.
@@ -60,6 +61,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Voor high-risk wijzigingen bestaat een verse rollback-backup.
 - Nieuwe code landt op de juiste architectuurplek en maakt bestaande centrale bestanden niet weer zwaarder.
 - Succesvolle wijzigingen worden direct gecommit en gepusht, tenzij de gebruiker expliciet om lokaal werk vraagt.
+- GitHub Actions mogen kwaliteitschecks niet omzeilen met `continue-on-error`, `|| true`, `exit 0` of guardrail-bypass env vars.
 
 ## Handhaving
 Dit protocol wordt geborgd via:
@@ -67,6 +69,7 @@ Dit protocol wordt geborgd via:
 - [docs/repo-map.md](repo-map.md)
 - [docs/architecture.md](architecture.md)
 - [scripts/check-agent-guardrails.js](../scripts/check-agent-guardrails.js)
+- [scripts/check-quality-lock.js](../scripts/check-quality-lock.js)
 - [scripts/check-repo-hygiene.sh](../scripts/check-repo-hygiene.sh)
 - [scripts/clean-local-artifacts.sh](../scripts/clean-local-artifacts.sh)
 - [server/routes/manifest.js](../server/routes/manifest.js)
