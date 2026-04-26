@@ -11,6 +11,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Gebruik [server/routes/manifest.js](server/routes/manifest.js) als lijst van kritieke flows.
 - Behandel agenda, leads, call-insights en auth als hoog-risico domeinen.
 - Laat `npm run check:guardrails` groen blijven; die check draait ook mee in `verify:critical`.
+- Laat `npm run check:repo-hygiene` groen blijven; ruim lokale build-cache en OS-bestanden op met `npm run clean:local`.
 - Verzwak tests nooit met `.only`, `.skip` of `todo` in vaste testbestanden; de guardrails blokkeren dit.
 - Beschouw workflows, verificatiescripts en protocoldocs als beschermde kwaliteitscode.
 

@@ -141,6 +141,8 @@ function getQualityBaselineViolations() {
 
   const requiredScripts = {
     'check:guardrails': 'node scripts/check-agent-guardrails.js',
+    'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
+    'clean:local': 'bash scripts/clean-local-artifacts.sh',
     'test:contracts': 'node --test test/contracts/*.test.js',
     'test:smoke': 'node --test test/smoke/*.test.js',
     'check:secrets': 'node scripts/check-tracked-secrets.js',
@@ -157,6 +159,7 @@ function getQualityBaselineViolations() {
   const verifyCriticalSource = readRepoFile('scripts/verify-critical.js');
   [
     'check:guardrails',
+    'check:repo-hygiene',
     'test:contracts',
     'test:smoke',
     'check:secrets',

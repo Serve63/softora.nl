@@ -49,6 +49,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 ## Definition Of Done
 - Productiegedrag krijgt of behoudt contract- of smoke-testdekking.
 - `npm run check:guardrails` blijft groen.
+- `npm run check:repo-hygiene` blijft groen; lokale rommel kan worden opgeschoond met `npm run clean:local`.
 - `npm run verify:critical` is groen voor afronding.
 - De kwaliteitsbaseline blijft intact: guardrails, contracttests, smoke-tests en secrets-checks blijven onderdeel van `verify:critical`.
 - `main` blijft beschermd via de GitHub ruleset "Softora main quality gate"; wijzigingen landen via PR vanaf `codex/*` branches.
@@ -66,6 +67,8 @@ Dit protocol wordt geborgd via:
 - [docs/repo-map.md](repo-map.md)
 - [docs/architecture.md](architecture.md)
 - [scripts/check-agent-guardrails.js](../scripts/check-agent-guardrails.js)
+- [scripts/check-repo-hygiene.sh](../scripts/check-repo-hygiene.sh)
+- [scripts/clean-local-artifacts.sh](../scripts/clean-local-artifacts.sh)
 - [server/routes/manifest.js](../server/routes/manifest.js)
 - GitHub ruleset "Softora main quality gate" op `main`: PR verplicht, deletion/force-push geblokkeerd, en `agent-guardrails`, `verify-critical` en `repo-hygiene` verplicht groen.
 - [.github/workflows/agent-guardrails.yml](../.github/workflows/agent-guardrails.yml)

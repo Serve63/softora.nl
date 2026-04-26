@@ -43,6 +43,8 @@ Gebruik voor deze domeinen altijd eerst:
 
 ## Tests en safety net
 - [scripts/check-agent-guardrails.js](../scripts/check-agent-guardrails.js): snelle architectuur- en workflow-guardrails voor AI/developers.
+- [scripts/check-repo-hygiene.sh](../scripts/check-repo-hygiene.sh): bewaakt machine-specifieke paden en lokale rommel.
+- [scripts/clean-local-artifacts.sh](../scripts/clean-local-artifacts.sh): ruimt lokale build-cache, debuglogs en OS-bestanden op.
 - [scripts/verify-critical.js](../scripts/verify-critical.js): draait de minimale kritieke verificatieset.
 - [test/contracts](../test/contracts): API- en schema-contracten.
 - [test/smoke](../test/smoke): pagina-smokechecks.
