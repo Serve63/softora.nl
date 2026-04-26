@@ -54,6 +54,10 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 /* ── LAYOUT ─────────────────────────────────────────────── */
 .dashboard-layout { display: flex; min-height: 100vh; }
 
+.dashboard-layout > .sidebar {
+  display: none !important;
+}
+
 .main-content,
 .pdf-main {
   flex: 1;
