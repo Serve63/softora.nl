@@ -14,6 +14,10 @@ function normalizeSearchText(value) {
     .trim();
 }
 
+function isTruthyFlag(value) {
+  return /^(1|true|yes)$/i.test(normalizeString(value || ''));
+}
+
 function hasLeadTraceContext(trace) {
   return Boolean(trace && trace.enabled);
 }
@@ -21,9 +25,7 @@ function hasLeadTraceContext(trace) {
 function buildLeadTraceContext(req = {}) {
   const headers = req?.headers || {};
   const query = req?.query || {};
-  const enabled = /^(1|true|yes)$/i.test(
-    normalizeString(query.traceLead || headers['x-softora-lead-trace'] || '')
-  );
+  const enabled = isTruthyFlag(query.traceLead || headers['x-softora-lead-trace'] || '');
   if (!enabled) return null;
   return {
     enabled: true,
@@ -76,7 +78,13 @@ function safeStringify(value) {
   }
 }
 
+function shouldLogLeadTrace(payload = {}) {
+  if (isTruthyFlag(process.env.SOFTORA_LEAD_TRACE_LOGS || '')) return true;
+  return Boolean(normalizeString(payload?.traceId || ''));
+}
+
 function logLeadTrace(scope, event, payload = {}) {
+  if (!shouldLogLeadTrace(payload)) return;
   console.log(`[LeadTrace][${scope}][${event}] ${safeStringify(payload)}`);
 }
 
@@ -84,6 +92,7 @@ module.exports = {
   buildLeadTraceContext,
   hasLeadTraceContext,
   logLeadTrace,
+  shouldLogLeadTrace,
   summarizeLeadRow,
   traceMatchesLead,
 };
