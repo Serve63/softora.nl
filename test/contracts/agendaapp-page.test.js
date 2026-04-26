@@ -33,6 +33,8 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /id="meeting-back"/);
   assert.match(pageSource, /id="meeting-next"/);
   assert.match(pageSource, /id="repeat-overlay"/);
+  assert.match(pageSource, /#repeat-overlay\{z-index:120;align-items:center;padding:18px\}/);
+  assert.match(pageSource, /#repeat-overlay \.type-card\{border-radius:24px;transform:translateY\(18px\) scale\(\.98\);max-width:390px;/);
   assert.match(pageSource, /data-repeat="daily">Elke dag/);
   assert.match(pageSource, /data-repeat="weekly">Elke week/);
   assert.match(pageSource, /data-repeat="monthly">Elke maand/);
