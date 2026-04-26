@@ -6,6 +6,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Lees bij grotere refactors ook [docs/quality-protocol.md](docs/quality-protocol.md).
 - Draai `npm run verify:critical` voor je afrondt.
 - Commit en push elke succesvolle wijziging direct naar de huidige branch, tenzij de gebruiker expliciet vraagt om lokaal te blijven.
+- `main` is beschermd via de GitHub ruleset "Softora main quality gate"; werk vanaf `codex/*` branches en merge naar `main` alleen via PR nadat verplichte checks groen zijn.
 - Draai bij wijzigingen in `server.js`, `server/routes`, `server/security`, `agenda`, `auth`, `leads` of `coldcalling` eerst `npm run backup:runtime`.
 - Gebruik [server/routes/manifest.js](server/routes/manifest.js) als lijst van kritieke flows.
 - Behandel agenda, leads, call-insights en auth als hoog-risico domeinen.
@@ -31,6 +32,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Wijzigingen aan premium shell/sidebar bestanden vragen een gerichte update in `test/contracts/premium-sidebar-shell-scope.test.js`.
 - Wijzigingen aan guardrail- of verificatiescripts vragen een gerichte update in `test/contracts/agent-guardrails.test.js`.
 - Wijzigingen aan CI-workflows, protocoldocs of kwaliteitschecks mogen de baseline niet verlagen: `verify:critical`, `check:guardrails`, contracttests, smoke-tests en secrets-checks moeten onderdeel blijven van de automatische poort.
+- Direct pushen naar `main` hoort geblokkeerd te zijn; als dat niet zo is, behandel dat als kwaliteitsincident en herstel de ruleset.
 
 ## Rollback
 - Voor risicovolle veranderingen: eerst `npm run backup:runtime`.

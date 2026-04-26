@@ -288,6 +288,7 @@ test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isProtectedQualityGatePath('AGENTS.md'), true);
   assert.equal(isProtectedQualityGatePath('.github/workflows/repo-hygiene.yml'), true);
   assert.equal(isProtectedQualityGatePath('docs/quality-protocol.md'), true);
+  assert.equal(isProtectedQualityGatePath('docs/repo-map.md'), true);
   assert.equal(isProtectedQualityGatePath('scripts/export-runtime-backup.js'), false);
   assert.equal(isHighRiskPath('docs/repo-map.md'), false);
 });

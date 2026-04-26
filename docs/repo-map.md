@@ -46,6 +46,7 @@ Gebruik voor deze domeinen altijd eerst:
 - [scripts/verify-critical.js](../scripts/verify-critical.js): draait de minimale kritieke verificatieset.
 - [test/contracts](../test/contracts): API- en schema-contracten.
 - [test/smoke](../test/smoke): pagina-smokechecks.
+- GitHub ruleset "Softora main quality gate": beschermt `main` tegen direct pushen, verwijderen, force-pushes en merges zonder verplichte checks.
 - [.github/workflows/agent-guardrails.yml](../.github/workflows/agent-guardrails.yml): snelle CI-poort voor guardrails.
 - [.github/workflows/verify-critical.yml](../.github/workflows/verify-critical.yml): CI voor kritieke checks.
 - [.github/workflows/repo-hygiene.yml](../.github/workflows/repo-hygiene.yml): CI voor machine-specifieke padvervuiling.
