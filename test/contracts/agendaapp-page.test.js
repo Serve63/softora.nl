@@ -17,13 +17,15 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /id="agendaAppAppointments"/);
   assert.match(pageSource, /id="agendaAppForm"/);
   assert.match(pageSource, /data|zelfde agenda-data/i);
-  assert.match(pageSource, /\/api\/agenda\/appointments\?fresh=1&limit=80/);
+  assert.match(pageSource, /\/api\/agenda\/appointments\?limit=250&fresh=1/);
   assert.match(pageSource, /\/api\/agenda\/appointments\/manual/);
   assert.match(pageSource, /id="agendaAppWho"/);
   assert.match(pageSource, /<option value="serve">Servé<\/option>/);
   assert.match(pageSource, /<option value="martijn">Martijn<\/option>/);
   assert.match(pageSource, /<option value="both">Allebei<\/option>/);
   assert.match(pageSource, /actor: 'agendaapp'/);
+  assert.match(pageSource, /legendChoice:'manual-overig'/);
+  assert.match(pageSource, /who:'serve'/);
   assert.match(pageSource, /renderMobileAgendaApp/);
   assert.match(pageSource, /--purple:#8B2252/);
   assert.match(pageSource, /body\{font-family:'Inter',sans-serif;/);
