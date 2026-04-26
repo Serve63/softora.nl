@@ -44,7 +44,7 @@
   --a4-height: 842px;
   --preview-scale: 1;
   --preview-max-scale: 1.6;
-  --pdf-builder-zoom: 1.07;
+  --pdf-builder-zoom: 1.15;
 }
 
 html, body { height: 100%; overflow: hidden; }
@@ -86,8 +86,6 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   min-width: 0;
   transform: scale(var(--pdf-builder-zoom));
   transform-origin: top left;
-  width: calc(100% / var(--pdf-builder-zoom));
-  height: calc(100% / var(--pdf-builder-zoom));
 }
 
 /* ── TOPBAR ──────────────────────────────────────────────── */

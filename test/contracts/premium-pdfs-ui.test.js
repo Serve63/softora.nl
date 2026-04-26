@@ -16,14 +16,14 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">/);
   assert.match(pageSource, /<a href="\/premium-pdfs" class="sidebar-link magnetic active" data-sidebar-key="pdfs">/);
   assert.match(pageSource, /\.main-content \{[\s\S]*margin-left:\s*280px;[\s\S]*width:\s*calc\(100% - 280px\);[\s\S]*min-width:\s*0;[\s\S]*padding:\s*0 !important;[\s\S]*overflow:\s*hidden;/);
-  assert.match(pageSource, /\.pdf-builder-shell \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*transform:\s*scale\(var\(--pdf-builder-zoom\)\);[\s\S]*transform-origin:\s*top left;[\s\S]*width:\s*calc\(100% \/ var\(--pdf-builder-zoom\)\);/);
+  assert.match(pageSource, /\.pdf-builder-shell \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*transform:\s*scale\(var\(--pdf-builder-zoom\)\);[\s\S]*transform-origin:\s*top left;/);
   assert.match(pageSource, /\.dashboard-layout\[data-sidebar-shell="canonical"\] > \.main-content \{[\s\S]*padding:\s*0 !important;/);
   assert.match(pageSource, /<div class="topbar">/);
   assert.match(pageSource, /\.topbar-logo \{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.btn-dl \{[\s\S]*font-family:\s*'Oswald', sans-serif;/);
   assert.match(pageSource, /--preview-scale:\s*1;/);
   assert.match(pageSource, /--preview-max-scale:\s*1\.6;/);
-  assert.match(pageSource, /--pdf-builder-zoom:\s*1\.07;/);
+  assert.match(pageSource, /--pdf-builder-zoom:\s*1\.15;/);
   assert.match(pageSource, /--a4-width:\s*595px;/);
   assert.match(pageSource, /--a4-height:\s*842px;/);
   assert.match(pageSource, /<div class="preview-panel" id="previewPanel">/);
