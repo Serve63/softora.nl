@@ -66,6 +66,7 @@ function buildDependencyHealthPayload(deps) {
         configured: Boolean(sessions.configured),
         cookieName: sessions.cookieName || null,
         mfaConfigured: Boolean(sessions.mfaConfigured),
+        mfaRequired: Boolean(sessions.mfaRequired),
       },
     },
   };

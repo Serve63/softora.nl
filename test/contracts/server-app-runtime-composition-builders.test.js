@@ -79,6 +79,7 @@ test('server app runtime composition builders preserve feature wiring groups and
       PREMIUM_SESSION_SECRET: 'secret',
       PREMIUM_SESSION_TTL_HOURS: 8,
       PREMIUM_SESSION_REMEMBER_TTL_DAYS: 30,
+      PREMIUM_REQUIRE_MFA: true,
       MAIL_SMTP_HOST: 'smtp.softora.test',
       MAIL_SMTP_PORT: 587,
       MAIL_SMTP_SECURE: false,
@@ -242,6 +243,7 @@ test('server app runtime composition builders preserve feature wiring groups and
     context.featureRouteOptions.premiumRouteRuntime.sessionSecret,
     'secret'
   );
+  assert.equal(context.featureRouteOptions.premiumRouteRuntime.requirePremiumMfa, true);
   assert.equal(
     context.featureRouteOptions.coldcalling.runtimeStateSupabaseSyncCooldownMs,
     4000
@@ -423,6 +425,7 @@ test('server app runtime composition builders preserve app ops callbacks and met
       MAIL_IMAP_POLL_COOLDOWN_MS: 1000,
       PREMIUM_SESSION_SECRET: 'secret',
       PREMIUM_SESSION_COOKIE_NAME: 'softora_session',
+      PREMIUM_REQUIRE_MFA: true,
       SECURITY_CONTACT_EMAIL: 'security@softora.test',
       DEMO_CONFIRMATION_TASK_ENABLED: true,
       IS_PRODUCTION: false,
@@ -481,6 +484,7 @@ test('server app runtime composition builders preserve app ops callbacks and met
   });
 
   assert.equal(context.appOpsOptions.securityContactEmail, 'security@softora.test');
+  assert.equal(context.appOpsOptions.premiumRequireMfa, true);
   assert.equal(
     context.appOpsOptions.buildRuntimeStateSnapshotPayloadWithLimits,
     buildRuntimeStateSnapshotPayloadWithLimits

@@ -35,6 +35,7 @@ test('runtime status service exposes stable dependency and runtime payloads', ()
     premiumSessionSecret: 'secret',
     premiumSessionCookieName: 'softora_session',
     isPremiumMfaConfigured: () => true,
+    premiumRequireMfa: true,
     recentWebhookEvents: [{ id: 1 }],
     recentCallUpdates: [{ callId: 'call-1' }, { callId: 'demo-seed' }],
     recentAiCallInsights: [{ id: 2 }],
@@ -71,6 +72,7 @@ test('runtime status service exposes stable dependency and runtime payloads', ()
     configured: true,
     cookieName: 'softora_session',
     mfaConfigured: true,
+    mfaRequired: true,
   });
   assert.deepEqual(service.getRuntimeStatus(), {
     webhookEvents: 1,

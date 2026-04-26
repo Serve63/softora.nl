@@ -49,6 +49,7 @@ function buildServerAppOpsWiringRuntimeContext({
       premiumSessionSecret: envConfig.PREMIUM_SESSION_SECRET,
       premiumSessionCookieName: envConfig.PREMIUM_SESSION_COOKIE_NAME,
       isPremiumMfaConfigured: securityRuntime.isPremiumMfaConfigured,
+      premiumRequireMfa: envConfig.PREMIUM_REQUIRE_MFA,
       recentWebhookEvents: runtimeMemory.recentWebhookEvents,
       recentCallUpdates: runtimeMemory.recentCallUpdates,
       recentAiCallInsights: runtimeMemory.recentAiCallInsights,

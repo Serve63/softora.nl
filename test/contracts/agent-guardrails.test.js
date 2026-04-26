@@ -315,6 +315,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
 
   assert.equal(packageJson.scripts['check:repo-hygiene'], 'bash scripts/check-repo-hygiene.sh');
   assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
+  assert.equal(packageJson.scripts['check:production-security'], 'node scripts/check-production-security.js');
+  assert.match(packageJson.scripts['verify:security'], /check:production-security/);
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);

@@ -82,6 +82,7 @@ function createFixture(options = {}) {
     normalizeString,
     isPremiumMfaConfigured: () => Boolean(options.mfaConfigured),
     isPremiumMfaCodeValid: (code) => code === (options.validOtp || '123456'),
+    requirePremiumMfa: Boolean(options.requirePremiumMfa),
     getSafePremiumRedirectPath: (value) => {
       const target = normalizeString(value);
       return target.startsWith('/') && !target.startsWith('//') && !target.includes('://')
@@ -298,6 +299,25 @@ test('premium auth login rejects inactive users and invalid mfa codes', async ()
   assert.equal(mfaRes.statusCode, 401);
   assert.equal(mfaRes.body.error, 'Ongeldige of ontbrekende 2FA-code.');
   assert.equal(mfaRes.body.mfaRequired, true);
+});
+
+test('premium auth login fails closed when required mfa is not configured', async () => {
+  const { auditEvents, coordinator, tokenCalls } = createFixture({
+    requirePremiumMfa: true,
+    mfaConfigured: false,
+  });
+  const req = createRequest({
+    body: { email: 'admin@softora.nl', password: 'secret123' },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.loginResponse(req, res);
+
+  assert.equal(res.statusCode, 503);
+  assert.match(res.body.error, /PREMIUM_MFA_TOTP_SECRET/i);
+  assert.equal(res.body.mfaRequired, true);
+  assert.equal(tokenCalls.length, 0);
+  assert.equal(auditEvents.at(-1).reason, 'security_login_rejected');
 });
 
 test('premium auth login sets a remembered session cookie and returns next path', async () => {

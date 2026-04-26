@@ -13,10 +13,11 @@
     "check:guardrails": "node scripts/check-agent-guardrails.js",
     "check:repo-hygiene": "bash scripts/check-repo-hygiene.sh",
     "check:quality-lock": "node scripts/check-quality-lock.js",
+    "check:production-security": "node scripts/check-production-security.js",
     "clean:local": "bash scripts/clean-local-artifacts.sh",
     "check:deps": "npm audit --omit=dev",
     "verify:critical": "node scripts/verify-critical.js",
-    "verify:security": "npm run check:secrets && npm run check:deps",
+    "verify:security": "npm run check:secrets && npm run check:deps && npm run check:production-security",
     "backup:runtime": "node scripts/export-runtime-backup.js"
   },
   "engines": {

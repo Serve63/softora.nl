@@ -46,6 +46,7 @@ function buildTwilioApiBaseUrl(env) {
 
 function loadRuntimeEnv(env = process.env) {
   const safeEnv = env && typeof env === 'object' ? env : {};
+  const isProduction = String(safeEnv.NODE_ENV || '').toLowerCase() === 'production';
   const mailSmtpHostSource =
     safeEnv.MAIL_SMTP_HOST || safeEnv.SMTP_HOST || safeEnv.STRATO_SMTP_HOST || '';
   const mailSmtpPort = Number(
@@ -72,7 +73,7 @@ function loadRuntimeEnv(env = process.env) {
   return {
     app: {
       port: Number(safeEnv.PORT) || 3000,
-      isProduction: String(safeEnv.NODE_ENV || '').toLowerCase() === 'production',
+      isProduction,
       publicBaseUrl: normalizeString(safeEnv.PUBLIC_BASE_URL || safeEnv.APP_BASE_URL || ''),
     },
     ai: {
@@ -177,6 +178,7 @@ function loadRuntimeEnv(env = process.env) {
       ),
       sessionCookieName: 'softora_premium_session',
       mfaTotpSecret: normalizeString(safeEnv.PREMIUM_MFA_TOTP_SECRET || ''),
+      requireMfa: readNegatedBooleanEnvFlag(safeEnv.PREMIUM_REQUIRE_MFA, isProduction),
       adminIpAllowlist: normalizeString(safeEnv.PREMIUM_ADMIN_IP_ALLOWLIST || ''),
       enforceSameOriginRequests: readNegatedBooleanEnvFlag(
         safeEnv.PREMIUM_ENFORCE_SAME_ORIGIN_REQUESTS,

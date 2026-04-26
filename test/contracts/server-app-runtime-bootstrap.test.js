@@ -61,6 +61,7 @@ test('server app runtime bootstrap flattens env config without changing values',
       sessionRememberTtlDays: 30,
       sessionCookieName: 'premium_session',
       mfaTotpSecret: 'totp',
+      requireMfa: true,
       adminIpAllowlist: ['127.0.0.1'],
       enforceSameOriginRequests: true,
       enableRuntimeDebugRoutes: true,
@@ -91,6 +92,7 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.OPENAI_MODEL, 'gpt-test');
   assert.equal(envConfig.SUPABASE_STATE_TABLE, 'runtime_state');
   assert.deepEqual(envConfig.PREMIUM_LOGIN_EMAILS, ['serve@softora.test']);
+  assert.equal(envConfig.PREMIUM_REQUIRE_MFA, true);
   assert.equal(envConfig.MAIL_IMAP_MAILBOX, 'INBOX');
   assert.equal(envConfig.SECURITY_CONTACT_EMAIL, 'security@test.invalid');
 });
@@ -188,6 +190,7 @@ test('server app runtime bootstrap creates app, runtime state and known page map
       sessionRememberTtlDays: 30,
       sessionCookieName: 'premium_session',
       mfaTotpSecret: '',
+      requireMfa: false,
       adminIpAllowlist: [],
       enforceSameOriginRequests: true,
       enableRuntimeDebugRoutes: false,

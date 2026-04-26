@@ -120,6 +120,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         truncateText: shared.truncateText,
         isPremiumMfaConfigured: securityRuntime.isPremiumMfaConfigured,
         isPremiumMfaCodeValid: securityRuntime.isPremiumMfaCodeValid,
+        requirePremiumMfa: envConfig.PREMIUM_REQUIRE_MFA,
         getSafePremiumRedirectPath: securityRuntime.getSafePremiumRedirectPath,
         getResolvedPremiumAuthState: securityRuntime.getResolvedPremiumAuthState,
         isPremiumAdminIpAllowed: securityRuntime.isPremiumAdminIpAllowed,

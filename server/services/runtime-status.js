@@ -16,6 +16,7 @@ function createRuntimeStatusService(deps = {}) {
     premiumSessionSecret = '',
     premiumSessionCookieName = '',
     isPremiumMfaConfigured = () => false,
+    premiumRequireMfa = false,
     recentWebhookEvents = [],
     recentCallUpdates = [],
     recentAiCallInsights = [],
@@ -75,6 +76,7 @@ function createRuntimeStatusService(deps = {}) {
       configured: Boolean(premiumSessionSecret),
       cookieName: premiumSessionCookieName,
       mfaConfigured: isPremiumMfaConfigured(),
+      mfaRequired: Boolean(premiumRequireMfa),
     };
   }
 

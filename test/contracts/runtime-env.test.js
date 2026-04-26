@@ -17,6 +17,7 @@ test('loadRuntimeEnv normalizes premium auth and supabase-derived keys', () => {
     'admin@softora.nl',
     'second@example.com',
   ]);
+  assert.equal(runtimeEnv.premiumAuth.requireMfa, true);
   assert.equal(runtimeEnv.supabase.stateKey, 'core-v2');
   assert.equal(runtimeEnv.supabase.callUpdateStateKeyPrefix, 'core-v2:call_update:');
   assert.equal(runtimeEnv.supabase.dismissedLeadsStateKey, 'core-v2:dismissed_leads');
@@ -109,6 +110,19 @@ test('loadRuntimeEnv preserves legacy boolean and numeric fallback rules', () =>
   assert.equal(runtimeEnv.premiumAuth.sessionRememberTtlDays, 365);
   assert.equal(runtimeEnv.mail.imapPollCooldownMs, 5_000);
   assert.equal(runtimeEnv.demoConfirmationTaskEnabled, true);
+});
+
+test('loadRuntimeEnv requires premium MFA by default only in production', () => {
+  const localRuntimeEnv = loadRuntimeEnv({});
+  const productionRuntimeEnv = loadRuntimeEnv({ NODE_ENV: 'production' });
+  const explicitlyDisabledRuntimeEnv = loadRuntimeEnv({
+    NODE_ENV: 'production',
+    PREMIUM_REQUIRE_MFA: 'false',
+  });
+
+  assert.equal(localRuntimeEnv.premiumAuth.requireMfa, false);
+  assert.equal(productionRuntimeEnv.premiumAuth.requireMfa, true);
+  assert.equal(explicitlyDisabledRuntimeEnv.premiumAuth.requireMfa, false);
 });
 
 test('loadRuntimeEnv derives the Twilio IE1 API host from region and edge env vars', () => {

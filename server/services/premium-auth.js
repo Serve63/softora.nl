@@ -8,6 +8,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     isPremiumMfaConfigured = () => false,
     isPremiumMfaCodeValid = () => false,
+    requirePremiumMfa = false,
     getSafePremiumRedirectPath = (value) => value,
     getResolvedPremiumAuthState = async () => ({
       configured: false,
@@ -201,7 +202,28 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       });
     }
 
-    if (isPremiumMfaConfigured() && !isPremiumMfaCodeValid(otp)) {
+    const mfaConfigured = isPremiumMfaConfigured();
+    if (requirePremiumMfa && !mfaConfigured) {
+      appendAuditEvent(
+        req,
+        {
+          type: 'login_rejected',
+          severity: 'error',
+          success: false,
+          email,
+          detail: 'Premium login geweigerd: 2FA is verplicht maar niet geconfigureerd.',
+        },
+        'security_login_rejected'
+      );
+      return res.status(503).json({
+        ok: false,
+        error:
+          'Premium login vereist 2FA, maar 2FA is nog niet geconfigureerd op de server. Zet PREMIUM_MFA_TOTP_SECRET in de productie-omgeving.',
+        mfaRequired: true,
+      });
+    }
+
+    if ((requirePremiumMfa || mfaConfigured) && !isPremiumMfaCodeValid(otp)) {
       appendAuditEvent(
         req,
         {

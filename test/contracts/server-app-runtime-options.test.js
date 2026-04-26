@@ -140,6 +140,7 @@ test('server app runtime option builders preserve app ops callbacks and metadata
     premiumSessionSecret: 'secret',
     premiumSessionCookieName: 'cookie',
     isPremiumMfaConfigured: () => false,
+    premiumRequireMfa: true,
     recentWebhookEvents: [],
     recentCallUpdates: [],
     recentAiCallInsights: [],
@@ -175,6 +176,7 @@ test('server app runtime option builders preserve app ops callbacks and metadata
 
   assert.equal(options.appVersion, '1.2.3');
   assert.equal(options.supabaseStateTable, 'state_table');
+  assert.equal(options.premiumRequireMfa, true);
   assert.equal(options.securityContactEmail, 'security@test.invalid');
   assert.equal(options.sendPublishedWebsiteLinkResponse, sendPublishedWebsiteLinkResponse);
   assert.equal(options.ensureRuntimeStateHydratedFromSupabase, ensureRuntimeStateHydratedFromSupabase);

@@ -54,6 +54,7 @@ function buildServerAppEnvConfig(runtimeEnv) {
     PREMIUM_SESSION_REMEMBER_TTL_DAYS: runtimeEnv.premiumAuth.sessionRememberTtlDays,
     PREMIUM_SESSION_COOKIE_NAME: runtimeEnv.premiumAuth.sessionCookieName,
     PREMIUM_MFA_TOTP_SECRET: runtimeEnv.premiumAuth.mfaTotpSecret,
+    PREMIUM_REQUIRE_MFA: runtimeEnv.premiumAuth.requireMfa,
     PREMIUM_ADMIN_IP_ALLOWLIST: runtimeEnv.premiumAuth.adminIpAllowlist,
     PREMIUM_ENFORCE_SAME_ORIGIN_REQUESTS: runtimeEnv.premiumAuth.enforceSameOriginRequests,
     PREMIUM_ENABLE_RUNTIME_DEBUG_ROUTES: runtimeEnv.premiumAuth.enableRuntimeDebugRoutes,
