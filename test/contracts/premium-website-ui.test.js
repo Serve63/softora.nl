@@ -308,8 +308,8 @@ test('premium website whatsapp-widget gebruikt een verfijnde stijl en opent het 
   assert.doesNotMatch(source, /\.whatsapp-widget-btn::before\s*\{/);
   assert.match(
     source,
-    /href="https:\/\/wa\.me\/31629917185"/
+    /href="https:\/\/wa\.me\/31643262792"/
   );
-  assert.doesNotMatch(source, /wa\.me\/31629917185\?text=/);
-  assert.match(source, /aria-label="Open WhatsApp chat met Softora op 06 29 91 71 85"/);
+  assert.doesNotMatch(source, /wa\.me\/31643262792\?text=/);
+  assert.match(source, /aria-label="Open WhatsApp chat met Softora op \+31 6 43 26 27 92"/);
 });

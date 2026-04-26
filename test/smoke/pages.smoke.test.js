@@ -92,6 +92,12 @@ test('page smoke: premium sidebar pages pin the refreshed personnel theme script
   }
 });
 
+test('page smoke: premium-website.html uses the current WhatsApp number', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
+  assert.match(html, /https:\/\/wa\.me\/31643262792/, 'WhatsApp-link hoort naar het actuele nummer te wijzen.');
+  assert.match(html, /Open WhatsApp chat met Softora op \+31 6 43 26 27 92/, 'WhatsApp-label mist het actuele nummer.');
+});
+
 test('page smoke: premium-ai-coldmailing.html promotes suppression after lead removal regardless of persistence state', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
   assert.match(html, /promoteLeadRowSuppression\(lead\)/, 'Lead suppression promotion na verwijdering ontbreekt.');
