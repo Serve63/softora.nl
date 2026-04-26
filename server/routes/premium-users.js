@@ -16,6 +16,14 @@ function registerPremiumUserManagementRoutes(app, deps) {
     return deps.coordinator.createPremiumUserResponse(req, res);
   });
 
+  app.post('/api/premium-users/verify-pin', deps.requirePremiumAdminApiAccess, (req, res) => {
+    const pinCheck = validatePremiumAdminActionPin(req.body);
+    if (!pinCheck.ok) {
+      return res.status(403).json({ ok: false, error: pinCheck.error });
+    }
+    return res.json({ ok: true });
+  });
+
   app.patch('/api/premium-users/:id', deps.requirePremiumAdminApiAccess, (req, res) => {
     const pinCheck = validatePremiumAdminActionPin(req.body);
     if (!pinCheck.ok) {

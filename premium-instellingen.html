@@ -2110,11 +2110,10 @@ body {
 
 <script>
 (function () {
-  /* Zelfde demo-PIN als premium-wachtwoordenregister.html (client-side gate). */
-  var SETTINGS_PAGE_PIN = '123456';
   var settingsPageInput = '';
   var settingsPageAttempts = 0;
   var settingsPageBlocked = false;
+  var settingsPageChecking = false;
 
   function clearSettingsPinBlockTimer() {
     if (window.__settingsPinBlockTimer) {
@@ -2132,7 +2131,7 @@ body {
   }
 
   function settingsPagePinDigit(d) {
-    if (settingsPageBlocked || settingsPageInput.length >= 6) return;
+    if (settingsPageBlocked || settingsPageChecking || settingsPageInput.length >= 6) return;
     settingsPageInput += d;
     settingsPagePinDots();
     if (settingsPageInput.length === 6) setTimeout(settingsPagePinCheck, 120);
@@ -2141,7 +2140,7 @@ body {
   window.settingsPagePinDigit = settingsPagePinDigit;
 
   function settingsPagePinBack() {
-    if (!settingsPageBlocked) {
+    if (!settingsPageBlocked && !settingsPageChecking) {
       settingsPageInput = settingsPageInput.slice(0, -1);
       settingsPagePinDots();
     }
@@ -2149,7 +2148,7 @@ body {
   window.settingsPagePinBack = settingsPagePinBack;
 
   function settingsPagePinClear() {
-    if (settingsPageBlocked) return;
+    if (settingsPageBlocked || settingsPageChecking) return;
     settingsPageInput = '';
     settingsPagePinDots();
     var msg = document.getElementById('settings-pin-msg');
@@ -2157,17 +2156,43 @@ body {
   }
   window.settingsPagePinClear = settingsPagePinClear;
 
-  function settingsPagePinCheck() {
+  async function verifySettingsPagePin(pin) {
+    var response = await fetch('/api/premium-users/verify-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionConfirmPin: pin })
+    });
+    var data = {};
+    try {
+      data = await response.json();
+    } catch (e) {
+      data = {};
+    }
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || 'Bevestigingspin is onjuist of ontbreekt.');
+    }
+    return data;
+  }
+
+  async function settingsPagePinCheck() {
+    if (settingsPageChecking) return;
     var msgEl = document.getElementById('settings-pin-msg');
-    if (settingsPageInput === SETTINGS_PAGE_PIN) {
+    var attemptedPin = settingsPageInput;
+    settingsPageChecking = true;
+    if (msgEl) msgEl.textContent = 'Controleren...';
+    try {
+      await verifySettingsPagePin(attemptedPin);
       settingsPagePinDots('success');
-      var unlockedPin = settingsPageInput;
+      var unlockedPin = attemptedPin;
       setTimeout(function () {
         window.__premiumSettingsSessionActive = true;
         window.__premiumSettingsUnlockedPin = unlockedPin;
+        settingsPageChecking = false;
         unlockSettingsApp();
       }, 350);
       return;
+    } catch (error) {
+      settingsPageChecking = false;
     }
     settingsPageAttempts += 1;
     settingsPagePinDots('error');
@@ -2203,6 +2228,7 @@ body {
     if (pinEl) pinEl.hidden = true;
     if (appEl) appEl.hidden = false;
     settingsPageInput = '';
+    settingsPageChecking = false;
     settingsPageAttempts = 0;
     settingsPagePinDots();
     var msg = document.getElementById('settings-pin-msg');
@@ -2224,6 +2250,7 @@ body {
     if (appEl) appEl.hidden = true;
     if (pinEl) pinEl.hidden = false;
     settingsPageInput = '';
+    settingsPageChecking = false;
     settingsPageAttempts = 0;
     settingsPageBlocked = false;
     clearSettingsPinBlockTimer();
@@ -2238,6 +2265,7 @@ body {
     delete window.__premiumSettingsUnlockedPin;
     window.__settingsPinAwaitingPersoneelNav = false;
     settingsPageInput = '';
+    settingsPageChecking = false;
     settingsPageAttempts = 0;
     settingsPageBlocked = false;
     clearSettingsPinBlockTimer();
@@ -2263,6 +2291,7 @@ body {
     if (appEl) appEl.hidden = true;
     if (pinEl) pinEl.hidden = false;
     settingsPageInput = '';
+    settingsPageChecking = false;
     settingsPageAttempts = 0;
     settingsPageBlocked = false;
     clearSettingsPinBlockTimer();

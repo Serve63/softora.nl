@@ -7587,8 +7587,6 @@
     if (overlay) return overlay;
 
     const CAMPAIGN_CONFIRM_PIN_DIGITS = 6;
-    /** Zelfde vaste pin als wachtwoordenregister; moet overeenkomen met COLDCALLING_START_CONFIRM_PIN op de server (indien gezet). */
-    const CAMPAIGN_START_CONFIRM_PIN = '123456';
     let pinBuffer = '';
 
     overlay = document.createElement('div');
@@ -7741,14 +7739,8 @@
 
     function confirmPinAndStart() {
       const entered = String(pinBuffer || '').trim();
-      if (entered !== CAMPAIGN_START_CONFIRM_PIN) {
-        setPinError('Onjuiste pin. Probeer opnieuw.');
-        pinBuffer = '';
-        flashStartCampaignPinDotsError();
-        return;
-      }
       setPinError('');
-      pendingStartConfirmPin = CAMPAIGN_START_CONFIRM_PIN;
+      pendingStartConfirmPin = entered;
       closeOverlay();
       void startCampaignRequest();
     }

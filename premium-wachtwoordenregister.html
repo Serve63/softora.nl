@@ -973,25 +973,42 @@ body {
 </div>
 
 <script>
-const PIN = '123456';
-let input = '', attempts = 0, blocked = false;
+let input = '', attempts = 0, blocked = false, checking = false;
+
+async function verifyPin(pin) {
+  const response = await fetch('/api/premium-users/verify-pin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actionConfirmPin: pin })
+  });
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (e) {
+    data = {};
+  }
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || 'Bevestigingspin is onjuist of ontbreekt.');
+  }
+  return data;
+}
 
 function p(d) {
-  if (blocked || input.length >= 6) return;
+  if (blocked || checking || input.length >= 6) return;
   input += d;
   dots();
   if (input.length === 6) setTimeout(check, 120);
 }
 
 function pb() {
-  if (!blocked) {
+  if (!blocked && !checking) {
     input = input.slice(0, -1);
     dots();
   }
 }
 
 function pClear() {
-  if (blocked) return;
+  if (blocked || checking) return;
   input = '';
   dots();
   const msg = document.getElementById('pin-msg');
@@ -1006,15 +1023,23 @@ function dots(state) {
   });
 }
 
-function check() {
-  if (input === PIN) {
+async function check() {
+  if (checking) return;
+  const attemptedPin = input;
+  const msg = document.getElementById('pin-msg');
+  checking = true;
+  if (msg) msg.textContent = 'Controleren...';
+  try {
+    await verifyPin(attemptedPin);
     dots('success');
     setTimeout(() => {
       unlockRegister().catch(() => {
+        checking = false;
         document.getElementById('pin-msg').textContent = 'Laden mislukt';
       });
     }, 350);
-  } else {
+  } catch (error) {
+    checking = false;
     attempts++;
     dots('error');
     setTimeout(() => {
