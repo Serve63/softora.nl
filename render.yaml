@@ -7,8 +7,12 @@ services:
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: PORT
         value: 10000
+      - key: PUBLIC_BASE_URL
+        value: https://www.softora.nl
       - key: COLDCALLING_PROVIDER
         value: retell
       - key: RETELL_API_KEY
@@ -23,6 +27,18 @@ services:
         sync: false
       - key: PREMIUM_SETTINGS_CONFIRM_PIN
         sync: false
+      - key: PREMIUM_SESSION_SECRET
+        sync: false
+      - key: PREMIUM_MFA_TOTP_SECRET
+        sync: false
+      - key: PREMIUM_REQUIRE_MFA
+        value: true
+      - key: PREMIUM_ADMIN_IP_ALLOWLIST
+        sync: false
+      - key: PREMIUM_ENFORCE_SAME_ORIGIN_REQUESTS
+        value: true
+      - key: PREMIUM_ENABLE_RUNTIME_DEBUG_ROUTES
+        value: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
@@ -36,6 +52,12 @@ services:
       - key: TWILIO_API_KEY_SID
         sync: false
       - key: TWILIO_API_KEY_SECRET
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: TWILIO_WEBHOOK_SECRET
         sync: false
       - key: TWILIO_API_REGION
         value: ie1
