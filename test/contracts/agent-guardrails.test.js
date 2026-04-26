@@ -11,6 +11,7 @@ const {
   isProtectedFrontendShellPath,
   isProtectedQualityGatePath,
   listAddedBrowserStorageApis,
+  listAddedTestWeakeningPatterns,
 } = require('../../scripts/lib/agent-guardrails-core');
 
 test('agent guardrails detect high-risk changes without tests and recent backup', () => {
@@ -217,6 +218,43 @@ test('agent guardrails require targeted tests for protected quality gates and si
   assert.equal(covered.length, 0);
 });
 
+test('agent guardrails block test weakening and quality-baseline regressions', () => {
+  const focusedTestLine = 'test' + ".only('temporary focus', () => {});";
+  const skippedTestLine = 'test' + ".skip('temporary bypass', () => {});";
+  const todoTestLine = '+test("todo bypass", { to' + 'do: true }, () => {});';
+  const diffText = [
+    '@@ -10,0 +11,4 @@',
+    `+${focusedTestLine}`,
+    `+${skippedTestLine}`,
+    todoTestLine,
+    '+const untouched = 1;',
+  ].join('\n');
+
+  assert.deepEqual(listAddedTestWeakeningPatterns(diffText), [
+    'only-test',
+    'skip-test',
+    'todo-option',
+  ]);
+
+  const violations = buildGuardrailViolations({
+    changedFiles: ['test/contracts/example.test.js'],
+    addedFiles: [],
+    changedTests: ['test/contracts/example.test.js'],
+    highRiskFiles: [],
+    behaviorFiles: [],
+    testWeakeningViolations: ['test/contracts/example.test.js (only-test, skip-test, todo-option)'],
+    qualityBaselineViolations: ['scripts/verify-critical.js mist npm run check:guardrails'],
+    newestBackupAgeMs: 5 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 7200,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(violations.length, 2);
+  assert.match(violations[0], /Quality-baseline is verzwakt/i);
+  assert.match(violations[1], /Test-verzwakking gedetecteerd/i);
+});
+
 test('agent guardrails block broad behavior changes in one step', () => {
   const violations = buildGuardrailViolations({
     changedFiles: ['assets/big-feature.js', 'test/contracts/example.test.js'],
@@ -247,6 +285,9 @@ test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isProtectedFrontendShellPath('assets/personnel-theme.js'), true);
   assert.equal(isProtectedFrontendShellPath('assets/coldcalling-dashboard.js'), false);
   assert.equal(isProtectedQualityGatePath('scripts/check-agent-guardrails.js'), true);
+  assert.equal(isProtectedQualityGatePath('AGENTS.md'), true);
+  assert.equal(isProtectedQualityGatePath('.github/workflows/repo-hygiene.yml'), true);
+  assert.equal(isProtectedQualityGatePath('docs/quality-protocol.md'), true);
   assert.equal(isProtectedQualityGatePath('scripts/export-runtime-backup.js'), false);
   assert.equal(isHighRiskPath('docs/repo-map.md'), false);
 });

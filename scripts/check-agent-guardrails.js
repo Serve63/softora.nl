@@ -14,6 +14,7 @@ const {
   isProtectedQualityGatePath,
   isTestPath,
   listAddedBrowserStorageApis,
+  listAddedTestWeakeningPatterns,
   normalizeRepoPath,
 } = require('./lib/agent-guardrails-core');
 
@@ -122,6 +123,111 @@ function readRepoFileLineCount(relativePath) {
   return fs.readFileSync(filePath, 'utf8').split('\n').length;
 }
 
+function readRepoFile(relativePath) {
+  const filePath = path.join(repoRoot, relativePath);
+  if (!fs.existsSync(filePath)) return '';
+  return fs.readFileSync(filePath, 'utf8');
+}
+
+function getQualityBaselineViolations() {
+  const violations = [];
+
+  let packageJson = null;
+  try {
+    packageJson = JSON.parse(readRepoFile('package.json') || '{}');
+  } catch (_error) {
+    violations.push('package.json is geen geldige JSON');
+  }
+
+  const requiredScripts = {
+    'check:guardrails': 'node scripts/check-agent-guardrails.js',
+    'test:contracts': 'node --test test/contracts/*.test.js',
+    'test:smoke': 'node --test test/smoke/*.test.js',
+    'check:secrets': 'node scripts/check-tracked-secrets.js',
+    'verify:critical': 'node scripts/verify-critical.js',
+  };
+
+  Object.entries(requiredScripts).forEach(([name, expected]) => {
+    const actual = packageJson?.scripts?.[name];
+    if (actual !== expected) {
+      violations.push(`package.json script "${name}" moet "${expected}" blijven`);
+    }
+  });
+
+  const verifyCriticalSource = readRepoFile('scripts/verify-critical.js');
+  [
+    'check:guardrails',
+    'test:contracts',
+    'test:smoke',
+    'check:secrets',
+  ].forEach((scriptName) => {
+    const pattern = new RegExp(`\\['run',\\s*'${scriptName.replace(':', '\\:')}'\\]`);
+    if (!pattern.test(verifyCriticalSource)) {
+      violations.push(`scripts/verify-critical.js mist npm run ${scriptName}`);
+    }
+  });
+
+  const workflowExpectations = [
+    {
+      filePath: '.github/workflows/agent-guardrails.yml',
+      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /npm run check:guardrails/],
+    },
+    {
+      filePath: '.github/workflows/verify-critical.yml',
+      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /npm run verify:critical/],
+    },
+    {
+      filePath: '.github/workflows/repo-hygiene.yml',
+      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /bash scripts\/check-repo-hygiene\.sh/],
+    },
+  ];
+
+  workflowExpectations.forEach(({ filePath, required }) => {
+    const source = readRepoFile(filePath);
+    if (!source) {
+      violations.push(`${filePath} ontbreekt`);
+      return;
+    }
+
+    required.forEach((pattern) => {
+      if (!pattern.test(source)) {
+        violations.push(`${filePath} mist verplichte workflow-baseline ${pattern}`);
+      }
+    });
+  });
+
+  const protocolExpectations = [
+    {
+      filePath: 'AGENTS.md',
+      required: [/npm run verify:critical/, /Commit en push elke succesvolle wijziging/, /npm run check:guardrails/],
+    },
+    {
+      filePath: 'docs/quality-protocol.md',
+      required: [/Definition Of Done/, /npm run verify:critical/, /check:guardrails/, /direct gecommit en gepusht/],
+    },
+    {
+      filePath: 'docs/repo-map.md',
+      required: [/scripts\/check-agent-guardrails\.js/, /\.github\/workflows\/verify-critical\.yml/],
+    },
+  ];
+
+  protocolExpectations.forEach(({ filePath, required }) => {
+    const source = readRepoFile(filePath);
+    if (!source) {
+      violations.push(`${filePath} ontbreekt`);
+      return;
+    }
+
+    required.forEach((pattern) => {
+      if (!pattern.test(source)) {
+        violations.push(`${filePath} mist verplichte protocol-baseline ${pattern}`);
+      }
+    });
+  });
+
+  return violations;
+}
+
 function getMissingRequiredRepoFiles() {
   return [
     'AGENTS.md',
@@ -154,6 +260,17 @@ const browserStorageViolations = changedFiles
     const apis = listAddedBrowserStorageApis(diffText);
     if (apis.length === 0) return '';
     return `${filePath} (${apis.join(', ')})`;
+  })
+  .filter(Boolean);
+
+const testWeakeningViolations = changedFiles
+  .filter(isTestPath)
+  .map((filePath) => {
+    const diffArgs = getDiffArgsForPath(filePath);
+    const diffText = diffArgs ? tryRunGit(diffArgs) : '';
+    const hits = listAddedTestWeakeningPatterns(diffText);
+    if (hits.length === 0) return '';
+    return `${filePath} (${hits.join(', ')})`;
   })
   .filter(Boolean);
 
@@ -207,9 +324,11 @@ const violations = buildGuardrailViolations({
   maxServerJsNetGrowth: Number(process.env.GUARDRAILS_MAX_SERVER_JS_NET_GROWTH || 25),
   addedServerJsFunctions: countAddedServerJsFunctions(serverJsDiffText),
   browserStorageViolations,
+  testWeakeningViolations,
   largeInlineScriptViolations,
   protectedFrontendShellFiles,
   protectedQualityGateFiles,
+  qualityBaselineViolations: getQualityBaselineViolations(),
   behaviorDiffLineCount,
   maxBehaviorDiffLineCount: Number(process.env.GUARDRAILS_MAX_BEHAVIOR_DIFF_LINES || 900),
   allowUntestedChanges: toBooleanEnv('ALLOW_UNTESTED_CHANGES'),
@@ -218,6 +337,7 @@ const violations = buildGuardrailViolations({
   allowServerJsFunctions: toBooleanEnv('ALLOW_SERVER_JS_FUNCTIONS'),
   allowNonstandardServerFiles: toBooleanEnv('ALLOW_NONSTANDARD_SERVER_FILES'),
   allowBrowserStorage: toBooleanEnv('ALLOW_BROWSER_STORAGE'),
+  allowTestWeakening: toBooleanEnv('ALLOW_TEST_WEAKENING'),
   allowLargeInlineScript: toBooleanEnv('ALLOW_LARGE_INLINE_SCRIPT'),
   allowUntestedShellChange: toBooleanEnv('ALLOW_UNTESTED_SHELL_CHANGE'),
   allowUntestedQualityGateChange: toBooleanEnv('ALLOW_UNTESTED_QUALITY_GATE_CHANGE'),

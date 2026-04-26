@@ -31,8 +31,14 @@ const PROTECTED_FRONTEND_SHELL_PATHS = Object.freeze([
 
 const PROTECTED_QUALITY_GATE_PATHS = Object.freeze([
   '.github/workflows/agent-guardrails.yml',
+  '.github/workflows/repo-hygiene.yml',
   '.github/workflows/verify-critical.yml',
+  'AGENTS.md',
+  'docs/architecture.md',
+  'docs/quality-protocol.md',
+  'docs/repo-map.md',
   'scripts/check-agent-guardrails.js',
+  'scripts/check-repo-hygiene.sh',
   'scripts/lib/agent-guardrails-core.js',
   'scripts/verify-critical.js',
 ]);
@@ -49,6 +55,25 @@ const DISALLOWED_BROWSER_STORAGE_PATTERNS = Object.freeze([
   {
     label: 'indexedDB',
     pattern: /\b(?:window\.)?indexedDB\b/,
+  },
+]);
+
+const TEST_WEAKENING_PATTERNS = Object.freeze([
+  {
+    label: 'only-test',
+    pattern: /\b(?:test|it|describe)\.only\s*\(/,
+  },
+  {
+    label: 'skip-test',
+    pattern: /\b(?:test|it|describe)\.skip\s*\(/,
+  },
+  {
+    label: 'skip-option',
+    pattern: /\bskip\s*:\s*true\b/,
+  },
+  {
+    label: 'todo-option',
+    pattern: /\btodo\s*:\s*true\b/,
   },
 ]);
 
@@ -138,6 +163,24 @@ function listAddedBrowserStorageApis(diffText = '') {
       if (!/^\+(?!\+\+\+)/.test(line)) return;
       const source = line.slice(1);
       DISALLOWED_BROWSER_STORAGE_PATTERNS.forEach(({ label, pattern }) => {
+        if (pattern.test(source)) {
+          hits.add(label);
+        }
+      });
+    });
+
+  return Array.from(hits).sort();
+}
+
+function listAddedTestWeakeningPatterns(diffText = '') {
+  const hits = new Set();
+
+  String(diffText || '')
+    .split('\n')
+    .forEach((line) => {
+      if (!/^\+(?!\+\+\+)/.test(line)) return;
+      const source = line.slice(1);
+      TEST_WEAKENING_PATTERNS.forEach(({ label, pattern }) => {
         if (pattern.test(source)) {
           hits.add(label);
         }
@@ -266,9 +309,11 @@ function buildGuardrailViolations(options = {}) {
     maxServerJsNetGrowth = 25,
     addedServerJsFunctions = 0,
     browserStorageViolations = [],
+    testWeakeningViolations = [],
     largeInlineScriptViolations = [],
     protectedFrontendShellFiles = [],
     protectedQualityGateFiles = [],
+    qualityBaselineViolations = [],
     behaviorDiffLineCount = 0,
     maxBehaviorDiffLineCount = 900,
     allowUntestedChanges = false,
@@ -277,6 +322,7 @@ function buildGuardrailViolations(options = {}) {
     allowServerJsFunctions = false,
     allowNonstandardServerFiles = false,
     allowBrowserStorage = false,
+    allowTestWeakening = false,
     allowLargeInlineScript = false,
     allowUntestedShellChange = false,
     allowUntestedQualityGateChange = false,
@@ -289,6 +335,12 @@ function buildGuardrailViolations(options = {}) {
   if (missingRequiredRepoFiles.length > 0) {
     violations.push(
       `[guardrails] Verplichte repo-protocolfiles ontbreken: ${missingRequiredRepoFiles.join(', ')}. Herstel de architectuur- en kwaliteitsdocs voordat je afrondt.`
+    );
+  }
+
+  if (qualityBaselineViolations.length > 0) {
+    violations.push(
+      `[guardrails] Quality-baseline is verzwakt of incompleet: ${qualityBaselineViolations.join('; ')}. Herstel de automatische checks voordat je afrondt.`
     );
   }
 
@@ -343,6 +395,12 @@ function buildGuardrailViolations(options = {}) {
   if (!allowBrowserStorage && browserStorageViolations.length > 0) {
     violations.push(
       `[guardrails] Nieuwe browser-opslag in productiecode gedetecteerd: ${browserStorageViolations.join(', ')}. Gebruik gedeelde opslag via server/Supabase of gebruik ALLOW_BROWSER_STORAGE=1 voor een bewuste uitzondering.`
+    );
+  }
+
+  if (!allowTestWeakening && testWeakeningViolations.length > 0) {
+    violations.push(
+      `[guardrails] Test-verzwakking gedetecteerd: ${testWeakeningViolations.join(', ')}. Gebruik geen .only/.skip/todo in vaste tests of gebruik ALLOW_TEST_WEAKENING=1 voor een bewuste uitzondering.`
     );
   }
 
@@ -406,5 +464,6 @@ module.exports = {
   isProtectedQualityGatePath,
   isTestPath,
   listAddedBrowserStorageApis,
+  listAddedTestWeakeningPatterns,
   normalizeRepoPath,
 };

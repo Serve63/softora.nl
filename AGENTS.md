@@ -10,6 +10,8 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Gebruik [server/routes/manifest.js](server/routes/manifest.js) als lijst van kritieke flows.
 - Behandel agenda, leads, call-insights en auth als hoog-risico domeinen.
 - Laat `npm run check:guardrails` groen blijven; die check draait ook mee in `verify:critical`.
+- Verzwak tests nooit met `.only`, `.skip` of `todo` in vaste testbestanden; de guardrails blokkeren dit.
+- Beschouw workflows, verificatiescripts en protocoldocs als beschermde kwaliteitscode.
 
 ## Bron van waarheid
 - Database en formele repositories zijn leidend zodra een pad is gemigreerd.
@@ -28,6 +30,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Grote nieuwe inline scripts in HTML zijn niet toegestaan; verplaats paginalogica naar `assets/*`.
 - Wijzigingen aan premium shell/sidebar bestanden vragen een gerichte update in `test/contracts/premium-sidebar-shell-scope.test.js`.
 - Wijzigingen aan guardrail- of verificatiescripts vragen een gerichte update in `test/contracts/agent-guardrails.test.js`.
+- Wijzigingen aan CI-workflows, protocoldocs of kwaliteitschecks mogen de baseline niet verlagen: `verify:critical`, `check:guardrails`, contracttests, smoke-tests en secrets-checks moeten onderdeel blijven van de automatische poort.
 
 ## Rollback
 - Voor risicovolle veranderingen: eerst `npm run backup:runtime`.

@@ -48,6 +48,7 @@ Gebruik voor deze domeinen altijd eerst:
 - [test/smoke](../test/smoke): pagina-smokechecks.
 - [.github/workflows/agent-guardrails.yml](../.github/workflows/agent-guardrails.yml): snelle CI-poort voor guardrails.
 - [.github/workflows/verify-critical.yml](../.github/workflows/verify-critical.yml): CI voor kritieke checks.
+- [.github/workflows/repo-hygiene.yml](../.github/workflows/repo-hygiene.yml): CI voor machine-specifieke padvervuiling.
 
 ## Werkafspraken
 - Verander bestaande response-shapes niet stilletjes.

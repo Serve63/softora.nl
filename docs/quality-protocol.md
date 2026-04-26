@@ -31,6 +31,8 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Geen nieuwe ad-hoc mappen onder `server/`.
 - Geen browser-opslag als systeem-van-record voor productiegedrag.
 - Geen debug- of adminpaden zonder bestaande auth-, rol- en auditcontroles.
+- Geen `.only`, `.skip` of `todo` in vaste tests om falende dekking te ontwijken.
+- Geen verzwakking van package scripts, CI-workflows of protocoldocs zonder gerichte guardrail-test.
 
 ## Security baseline
 - Secrets blijven uit tracked files en service-role keys blijven server-side.
@@ -48,9 +50,11 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Productiegedrag krijgt of behoudt contract- of smoke-testdekking.
 - `npm run check:guardrails` blijft groen.
 - `npm run verify:critical` is groen voor afronding.
+- De kwaliteitsbaseline blijft intact: guardrails, contracttests, smoke-tests en secrets-checks blijven onderdeel van `verify:critical`.
 - Grote wijzigingen landen in kleine stappen; brede productiediffs en grote inline scripts worden door guardrails geblokkeerd tenzij bewust overruled.
 - Premium shell/sidebar wijzigingen houden `test/contracts/premium-sidebar-shell-scope.test.js` actueel.
 - Quality-gate wijzigingen houden `test/contracts/agent-guardrails.test.js` actueel.
+- Tests worden niet verzwakt met `.only`, `.skip` of `todo`.
 - Voor high-risk wijzigingen bestaat een verse rollback-backup.
 - Nieuwe code landt op de juiste architectuurplek en maakt bestaande centrale bestanden niet weer zwaarder.
 - Succesvolle wijzigingen worden direct gecommit en gepusht, tenzij de gebruiker expliciet om lokaal werk vraagt.
@@ -64,3 +68,4 @@ Dit protocol wordt geborgd via:
 - [server/routes/manifest.js](../server/routes/manifest.js)
 - [.github/workflows/agent-guardrails.yml](../.github/workflows/agent-guardrails.yml)
 - [.github/workflows/verify-critical.yml](../.github/workflows/verify-critical.yml)
+- [.github/workflows/repo-hygiene.yml](../.github/workflows/repo-hygiene.yml)
