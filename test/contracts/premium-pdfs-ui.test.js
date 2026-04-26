@@ -16,7 +16,8 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">/);
   assert.match(pageSource, /<a href="\/premium-pdfs" class="sidebar-link magnetic active" data-sidebar-key="pdfs">/);
   assert.match(pageSource, /\.main-content \{[\s\S]*margin-left:\s*280px;[\s\S]*width:\s*calc\(100% - 280px\);[\s\S]*min-width:\s*0;[\s\S]*padding:\s*0 !important;[\s\S]*overflow:\s*hidden;/);
-  assert.match(pageSource, /\.pdf-builder-shell \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
+  assert.match(pageSource, /\.pdf-builder-shell \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*flex:\s*1 1 auto;[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*min-height:\s*0;/);
+  assert.match(pageSource, /\.pdf-main > \.premium-boot-shell \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;[\s\S]*flex-direction:\s*column;[\s\S]*min-height:\s*0;/);
   assert.match(pageSource, /\.dashboard-layout\[data-sidebar-shell="canonical"\] > \.main-content \{[\s\S]*padding:\s*0 !important;/);
   assert.match(pageSource, /<div class="topbar">/);
   assert.match(pageSource, /\.topbar-logo \{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*text-transform:\s*uppercase;/);
