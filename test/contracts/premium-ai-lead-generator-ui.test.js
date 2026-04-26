@@ -7,12 +7,15 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   const pagePath = path.join(__dirname, '../../premium-ai-lead-generator.html');
   const dashboardPath = path.join(__dirname, '../../assets/coldcalling-dashboard.js');
   const customSelectsPath = path.join(__dirname, '../../assets/custom-selects.js');
+  const siteInputDialogPath = path.join(__dirname, '../../assets/site-input-dialog.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
   const customSelectsSource = fs.readFileSync(customSelectsPath, 'utf8');
+  const siteInputDialogSource = fs.readFileSync(siteInputDialogPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
+  assert.match(pageSource, /<script src="assets\/site-input-dialog\.js\?v=20260427a" defer><\/script>/);
   assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260421d" defer><\/script>/);
   assert.match(pageSource, /id="leadAmountQuestionLabel"/);
   assert.match(pageSource, /Hoeveel mensen wil je bellen\?/);
@@ -64,7 +67,11 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     /<div class="slider-labels">\s*<span data-slider-label-value="1">1<\/span>\s*<span data-slider-label-value="50">50<\/span>\s*<span data-slider-label-value="100">100<\/span>\s*<span data-slider-label-value="150">150<\/span>\s*<span data-slider-label-value="200">200<\/span>\s*<span class="slider-label-infinity" data-slider-label-value="250">&infin;<\/span>\s*<\/div>/
   );
   assert.match(pageSource, /<div class="slider-container" id="leadSliderStage" data-slider-ready="0" aria-hidden="true">/);
-  assert.match(pageSource, /window\.openSiteInputDialog = openSiteInputDialog;/);
+  assert.doesNotMatch(pageSource, /function openSiteInputDialog\(/);
+  assert.doesNotMatch(pageSource, /window\.openSiteInputDialog = openSiteInputDialog;/);
+  assert.match(siteInputDialogSource, /function openSiteInputDialog\(/);
+  assert.match(siteInputDialogSource, /window\.openSiteInputDialog = openSiteInputDialog;/);
+  assert.match(siteInputDialogSource, /site-dialog-backdrop/);
   assert.match(pageSource, /\.slider-container\[data-slider-ready="0"\]\s*\{[\s\S]*visibility:\s*hidden;[\s\S]*pointer-events:\s*none;/);
   assert.match(pageSource, /\.slider-labels\s*\{[\s\S]*position:\s*relative;[\s\S]*height:\s*1\.4rem;/);
   assert.match(pageSource, /\.slider-labels span\s*\{[\s\S]*position:\s*absolute;[\s\S]*left:\s*var\(--slider-label-position, 0%\);[\s\S]*transform:\s*translateX\(-50%\);/);
@@ -130,8 +137,10 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /if \(statsResetBaseline\) \{\s*setStatsResetBaselineState\(statsResetBaseline\);\s*\}/);
   assert.match(
     dashboardSource,
-    /SoftoraDialogs\.confirm\(message, \{\s*title:\s*'Statistieken resetten'/
+    /askDashboardConfirm\(message, \{\s*title:\s*'Statistieken resetten'/
   );
+  assert.match(dashboardSource, /async function askDashboardConfirm\(message, options = \{\}\)/);
+  assert.doesNotMatch(dashboardSource, /window\.(alert|confirm|prompt)\(/);
   assert.match(dashboardSource, /primeStatsFromBootstrap\(\);\s*setStatusPill\('idle', ''\);\s*setStatusMessage\('', ''\);\s*activeBusinessMode = await loadSavedStatusPillModeFromSupabase\(\);/);
   assert.match(dashboardSource, /function setLeadSliderReadyState\(isReady\) \{[\s\S]*sliderStage\.dataset\.sliderReady = isReady \? '1' : '0';/);
   assert.match(dashboardSource, /const uiStateLoaded = await loadRemoteUiState\(\);[\s\S]*ensureLeadListPanel\(\);\s*setLeadSliderReadyState\(true\);/);

@@ -3641,6 +3641,19 @@
                 .slice(0, 80);
         }
 
+        async function showPremiumOrderAlert(message, options = {}) {
+            if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
+                await window.SoftoraDialogs.alert(message, options);
+            }
+        }
+
+        async function confirmPremiumOrderAction(message, options = {}) {
+            if (window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function') {
+                return Boolean(await window.SoftoraDialogs.confirm(message, options));
+            }
+            return false;
+        }
+
         function getOrderClaimInfo(id) {
             const activeId = selectActiveOrderId(id);
             const runtime = orders[activeId] || {};
@@ -3697,15 +3710,12 @@
                     '</svg></a>',
                     '</div>',
                 ].join('');
-                const confirmed =
-                    window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
-                        ? await window.SoftoraDialogs.confirm(invoicePaidReviewReminder, {
-                            title: 'Factuur betaald bevestigen',
-                            confirmText: 'Bevestigen',
-                            cancelText: 'Annuleren',
-                            bodyHtml: invoicePaidConfirmBodyHtml,
-                        })
-                        : window.confirm(invoicePaidReviewReminder);
+                const confirmed = await confirmPremiumOrderAction(invoicePaidReviewReminder, {
+                    title: 'Factuur betaald bevestigen',
+                    confirmText: 'Bevestigen',
+                    cancelText: 'Annuleren',
+                    bodyHtml: invoicePaidConfirmBodyHtml,
+                });
                 if (!confirmed) return false;
             }
 
@@ -3758,14 +3768,10 @@
                     // ignore rollback flush errors
                 }
                 applyOrderUiStateToCard(id);
-                if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
-                    await window.SoftoraDialogs.alert('Factuurstatus opslaan mislukt. Probeer het opnieuw.', {
-                        title: 'Opslaan mislukt',
-                        confirmText: 'Sluiten',
-                    });
-                } else {
-                    window.alert('Factuurstatus opslaan mislukt. Probeer het opnieuw.');
-                }
+                await showPremiumOrderAlert('Factuurstatus opslaan mislukt. Probeer het opnieuw.', {
+                    title: 'Opslaan mislukt',
+                    confirmText: 'Sluiten',
+                });
                 return false;
             }
         }
@@ -4574,27 +4580,22 @@
             const numericId = Number(id);
             const record = getCustomOrderById(numericId);
             if (!record) {
-                if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
-                    await window.SoftoraDialogs.alert('Dit project kan hier niet verwijderd worden.', {
-                        title: 'Actieve opdrachten',
-                        confirmText: 'Sluiten',
-                    });
-                }
+                await showPremiumOrderAlert('Dit project kan hier niet verwijderd worden.', {
+                    title: 'Actieve opdrachten',
+                    confirmText: 'Sluiten',
+                });
                 return;
             }
 
             const projectLabel = String(record.title || record.clientName || 'dit project').trim();
-            const confirmed =
-                window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
-                    ? await window.SoftoraDialogs.confirm(
-                        `Project "${projectLabel}" volledig uit het systeem halen? Dit verwijdert het ook uit het klantenbestand en dashboard.`,
-                        {
-                            title: 'Project verwijderen',
-                            confirmText: 'Verwijderen',
-                            cancelText: 'Annuleren',
-                        }
-                    )
-                    : false;
+            const confirmed = await confirmPremiumOrderAction(
+                `Project "${projectLabel}" volledig uit het systeem halen? Dit verwijdert het ook uit het klantenbestand en dashboard.`,
+                {
+                    title: 'Project verwijderen',
+                    confirmText: 'Verwijderen',
+                    cancelText: 'Annuleren',
+                }
+            );
             if (!confirmed) return;
 
             const previousCustomOrders = customOrders.slice();
@@ -4648,12 +4649,10 @@
                 await flushRemoteUiStateSave();
                 if (previousOrder) applyOrderUiStateToCard(numericId);
                 setModalDeleteButtonState('Project uit systeem halen', false);
-                if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
-                    await window.SoftoraDialogs.alert('Project verwijderen mislukt. Probeer het opnieuw.', {
-                        title: 'Fout bij verwijderen',
-                        confirmText: 'Sluiten',
-                    });
-                }
+                await showPremiumOrderAlert('Project verwijderen mislukt. Probeer het opnieuw.', {
+                    title: 'Fout bij verwijderen',
+                    confirmText: 'Sluiten',
+                });
             }
         }
 

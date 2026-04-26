@@ -156,6 +156,26 @@
     return String(value || '').replace(/\s+/g, ' ').trim();
   }
 
+  async function showDashboardAlert(message, options = {}) {
+    if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
+      await window.SoftoraDialogs.alert(message, options);
+    }
+  }
+
+  async function askDashboardConfirm(message, options = {}) {
+    if (window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function') {
+      return Boolean(await window.SoftoraDialogs.confirm(message, options));
+    }
+    return false;
+  }
+
+  async function askDashboardPrompt(message, defaultValue = '', options = {}) {
+    if (window.SoftoraDialogs && typeof window.SoftoraDialogs.prompt === 'function') {
+      return window.SoftoraDialogs.prompt(message, defaultValue, options);
+    }
+    return null;
+  }
+
   function normalizeSearchText(value) {
     return normalizeFreeText(value)
       .toLowerCase()
@@ -741,13 +761,22 @@
       return Math.round(Number(String(rawValue).trim().replace(',', '.')));
     }
 
-    const fallbackValue = window.prompt('Vul het aantal kilometer in voor deze campagne.', normalizedInitialValue);
+    const fallbackValue = await askDashboardPrompt(
+      'Vul het aantal kilometer in voor deze campagne.',
+      normalizedInitialValue,
+      {
+        title: 'Aangepaste straal',
+        confirmText: 'Opslaan',
+        cancelText: 'Annuleren',
+      }
+    );
     if (fallbackValue == null) return null;
     const validationMessage = validateCustomKm(fallbackValue);
     if (validationMessage) {
-      if (typeof window.alert === 'function') {
-        window.alert(validationMessage);
-      }
+      await showDashboardAlert(validationMessage, {
+        title: 'Ongeldige invoer',
+        confirmText: 'Sluiten',
+      });
       return null;
     }
     return Math.round(Number(String(fallbackValue).trim().replace(',', '.')));
@@ -1861,16 +1890,11 @@
 
       const message =
         'Weet je zeker dat je de statistieken wilt resetten? De tellers (zoals Totaal gebeld) worden op nul gezet en dit wordt opgeslagen.';
-      let confirmed = false;
-      if (window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function') {
-        confirmed = await window.SoftoraDialogs.confirm(message, {
-          title: 'Statistieken resetten',
-          confirmText: 'Resetten',
-          cancelText: 'Annuleren',
-        });
-      } else {
-        confirmed = window.confirm(message);
-      }
+      const confirmed = await askDashboardConfirm(message, {
+        title: 'Statistieken resetten',
+        confirmText: 'Resetten',
+        cancelText: 'Annuleren',
+      });
       if (!confirmed) return;
 
       button.disabled = true;
@@ -3273,16 +3297,7 @@
 
   async function promptForManualLeadDetails(defaults = {}) {
     if (typeof document === 'undefined' || !document.body) {
-      const company = normalizeFreeText(window.prompt('Bedrijf', normalizeFreeText(defaults.company || '')));
-      if (!company) return { ok: false, cancelled: true };
-      const address = normalizeFreeText(window.prompt('Adres', normalizeFreeText(defaults.address || '')));
-      const phone = normalizeFreeText(window.prompt('Telefoonnummer', normalizeFreeText(defaults.phone || '')));
-      if (!phone) return { ok: false, cancelled: true };
-      const website = normalizeFreeText(window.prompt('Website', normalizeFreeText(defaults.website || '')));
-      return {
-        ok: true,
-        values: { company, address, phone, website },
-      };
+      return { ok: false, cancelled: true };
     }
 
     return new Promise((resolve) => {

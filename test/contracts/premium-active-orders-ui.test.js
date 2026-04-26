@@ -36,6 +36,9 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /companyName,\s*contactName: contactPerson,\s*contactPhone: linkedContactPhone,\s*contactEmail: linkedContactEmail,/);
   assert.match(source, /const companyName = String\(item\?\.companyName \|\| ''\)\.trim\(\);/);
   assert.match(source, /const contactName = String\(item\?\.contactName \|\| ''\)\.trim\(\);/);
+  assert.match(source, /async function showPremiumOrderAlert\(message, options = \{\}\)/);
+  assert.match(source, /async function confirmPremiumOrderAction\(message, options = \{\}\)/);
+  assert.doesNotMatch(source, /window\.(alert|confirm)\(/);
 });
 
 test('premium actieve opdrachten gebruiken expliciete customer identity voor koppeling naar klanten', () => {
