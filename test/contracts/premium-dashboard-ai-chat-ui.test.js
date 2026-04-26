@@ -47,29 +47,26 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
   );
 });
 
-test('premium dashboard toont alleen personeel beheer boven de datumfilters', () => {
+test('premium dashboard verbergt de personeel beheer selector boven de datumfilters', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
-  assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
+  assert.doesNotMatch(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /class="topbar-right dashboard-topbar-right"/);
-  assert.match(pageSource, /id="aiManagementDropdown"/);
-  assert.match(
-    pageSource,
-    /<span class="ai-management-status-dot ai-management-status-dot--green" id="aiManagementStatusDot"[^>]*><\/span>/
-  );
-  assert.match(pageSource, /id="aiManagementLabel">PERSONEEL BEHEER<\/span>/);
+  assert.doesNotMatch(pageSource, /id="aiManagementDropdown"/);
+  assert.doesNotMatch(pageSource, /id="aiManagementTrigger"/);
+  assert.doesNotMatch(pageSource, /id="aiManagementStatusDot"/);
+  assert.doesNotMatch(pageSource, /id="aiManagementLabel"/);
+  assert.doesNotMatch(pageSource, /class="topbar-select-wrap ai-management-select-wrap magnetic"/);
   assert.doesNotMatch(pageSource, /data-ai-management-value="software"/);
   assert.doesNotMatch(pageSource, />AI BEHEER<\/span>/);
-  assert.match(
-    pageSource,
-    /data-ai-management-value="personnel"[\s\S]*aria-checked="true"[\s\S]*ai-management-status-dot--green[\s\S]*PERSONEEL BEHEER/
-  );
+  assert.doesNotMatch(pageSource, /data-ai-management-value="personnel"/);
+  assert.doesNotMatch(pageSource, />PERSONEEL BEHEER<\/span>/);
   assert.match(pageSource, /class="dashboard-topbar-controls"/);
   assert.match(pageSource, /class="topbar-date"/);
   assert.match(pageSource, /id="dashboardPeriodDropdown"/);
-  assert.match(pageSource, /\.ai-management-status-dot--red \{/);
+  assert.doesNotMatch(pageSource, /\.ai-management-status-dot--red \{/);
   assert.match(pageSource, /const initialAiManagementMode =/);
   assert.match(pageSource, /const AI_MANAGEMENT_STATUS = \{/);
   assert.match(pageSource, /window\.SoftoraDashboardAiManagement = \{/);

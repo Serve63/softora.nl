@@ -46,7 +46,7 @@ test('premium website houdt Van Idee Naar Lancering op desktop op één regel', 
   assert.doesNotMatch(source, /Van Idee<br><span class="werkwijze-lancering">Naar Lancering<\/span>/);
   assert.match(source, /\.werkwijze-copy\s*\{[\s\S]*width:\s*min\(100%,\s*920px\);/);
   assert.match(source, /#werkwijze > div,[\s\S]*#diensten-overzicht > div \{[\s\S]*max-width:\s*1440px;/);
-  assert.match(source, /#werkwijze \.werkwijze-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1\.45fr\) minmax\(300px,\s*0\.55fr\);/);
+  assert.match(source, /@media \(min-width: 769px\) \{[\s\S]*#werkwijze \.werkwijze-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1\.45fr\) minmax\(300px,\s*0\.55fr\);/);
   assert.match(source, /\.werkwijze-title-line,[\s\S]*\.werkwijze-lancering\s*\{[\s\S]*display:\s*inline-block;[\s\S]*white-space:\s*nowrap;/);
   assert.match(source, /@media \(max-width: 680px\) \{[\s\S]*\.werkwijze-title-line,[\s\S]*\.werkwijze-lancering \{[\s\S]*white-space:\s*normal;/);
 });
@@ -74,6 +74,10 @@ test('premium website laat werkwijze titel natuurlijk wrappen op mobiel', () => 
   assert.match(
     source,
     /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-copy ul li\s*\{[\s\S]*align-items:\s*flex-start !important;[\s\S]*min-width:\s*0;[\s\S]*overflow-wrap:\s*anywhere;/
+  );
+  assert.match(
+    source,
+    /@media \(min-width: 769px\) \{[\s\S]*#werkwijze \.werkwijze-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1\.45fr\) minmax\(300px,\s*0\.55fr\);/
   );
 });
 
