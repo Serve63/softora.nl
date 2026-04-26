@@ -42,6 +42,10 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.doesNotMatch(pageSource, /icon-btn/);
   assert.doesNotMatch(pageSource, /id="dots"/);
   assert.doesNotMatch(pageSource, /updateDots/);
+  assert.doesNotMatch(pageSource, /agendaAppSyncStatus/);
+  assert.doesNotMatch(pageSource, /sync-status/);
+  assert.doesNotMatch(pageSource, /Offline/);
+  assert.doesNotMatch(pageSource, /Live sync/);
   assert.doesNotMatch(pageSource, /Beschikbaarheid/);
   assert.doesNotMatch(pageSource, /Delen/);
   assert.doesNotMatch(pageSource, /color-dot/);
