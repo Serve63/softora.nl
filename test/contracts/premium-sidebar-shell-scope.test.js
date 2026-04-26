@@ -101,6 +101,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /--premium-sidebar-font-display:\s*'SoftoraSidebarOswald', 'Oswald', sans-serif;/);
   assert.match(themeSource, /\.sidebar-logo\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-display\) !important;[\s\S]*font-synthesis:\s*none !important;/);
   assert.match(themeSource, /\.sidebar-link \.sidebar-link-text\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-sans\) !important;/);
+  assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*font-size:\s*14px !important;[\s\S]*line-height:\s*1\.2 !important;/);
+  assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-logo\s*\{[\s\S]*margin:\s*0 0 11px !important;[\s\S]*font-size:\s*25px !important;/);
+  assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-link\s*\{[\s\S]*min-height:\s*0 !important;[\s\S]*font-size:\s*14px !important;[\s\S]*line-height:\s*1\.12 !important;/);
+  assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-flow-section::before\s*\{[\s\S]*top:\s*59px !important;/);
   assert.match(themeSource, /\.sidebar\s*\{[\s\S]*transform:\s*none !important;[\s\S]*overflow-anchor:\s*none !important;[\s\S]*overscroll-behavior:\s*contain !important;/);
   assert.match(themeSource, /\.sidebar-nav\s*\{[\s\S]*overflow-anchor:\s*none !important;[\s\S]*scrollbar-gutter:\s*stable !important;/);
   assert.match(themeSource, /\.sidebar,\s*\.sidebar \*,\s*\.sidebar \*::before,\s*\.sidebar \*::after\s*\{[\s\S]*transition:\s*none !important;/);

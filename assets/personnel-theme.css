@@ -333,6 +333,90 @@
     opacity: 1 !important;
 }
 
+/* Static premium sidebars must not inherit page-specific rem sizing or first-paint fallbacks. */
+.sidebar[data-static-sidebar="1"] {
+    width: var(--premium-sidebar-width) !important;
+    background: var(--bg-secondary) !important;
+    border-right: 1px solid var(--border) !important;
+    padding: 19px 0 0 !important;
+    font-family: var(--premium-sidebar-font-sans) !important;
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-logo {
+    padding: 0 24px !important;
+    margin: 0 0 11px !important;
+    font-size: 25px !important;
+    line-height: 1 !important;
+    letter-spacing: 0.02em !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-section {
+    margin-bottom: 6px !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-section-label {
+    padding: 0 24px !important;
+    margin-bottom: 2px !important;
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+    letter-spacing: 0.13em !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-link {
+    min-height: 0 !important;
+    height: auto !important;
+    gap: 9px !important;
+    padding: 4px 24px !important;
+    font-size: 14px !important;
+    line-height: 1.12 !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-flow-section .sidebar-link {
+    padding-left: 31px !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-link .sidebar-link-text {
+    line-height: 1.16 !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-link svg {
+    width: 17px !important;
+    height: 17px !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-flow-section::before {
+    top: 59px !important;
+    bottom: 9px !important;
+    left: 10px !important;
+    width: 10px !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-footer {
+    padding: 12px 24px !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-user {
+    gap: 11px !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-avatar {
+    width: 38px !important;
+    height: 38px !important;
+    font-size: 13px !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-user-name {
+    font-size: 14px !important;
+    line-height: 1.15 !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-footer .sidebar-user .sidebar-user-role {
+    font-size: 12px !important;
+    line-height: 1.12 !important;
+}
+
 /* Coming soon / toegangsslot: alleen slot, lagere opacity, niet klikbaar */
 .sidebar-link.sidebar-link--coming-soon {
     opacity: 0.58 !important;

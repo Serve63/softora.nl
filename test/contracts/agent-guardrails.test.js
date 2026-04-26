@@ -183,6 +183,10 @@ test('agent guardrails block large inline scripts in html pages', () => {
 });
 
 test('agent guardrails require targeted tests for protected quality gates and sidebar shell', () => {
+  const qualityLockSource = readRepoFile('scripts/check-quality-lock.js');
+  assert.match(qualityLockSource, /PREMIUM_SIDEBAR_THEME_VERSION = '20260427b'/);
+  assert.equal(isProtectedQualityGatePath('scripts/check-quality-lock.js'), true);
+
   const violations = buildGuardrailViolations({
     changedFiles: ['assets/personnel-theme.css', 'scripts/check-agent-guardrails.js', 'scripts/check-quality-lock.js'],
     addedFiles: [],
