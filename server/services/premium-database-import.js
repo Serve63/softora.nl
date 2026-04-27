@@ -1110,8 +1110,9 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
     'Neem alleen actieve bedrijven of bedrijven die duidelijk operationeel lijken mee.',
     'Neem geen verenigingen, scholen, overheidsinstanties of stichtingen mee, tenzij ze commercieel interessant zijn.',
     'Vermijd dubbele bedrijven en verzin nooit ontbrekende gegevens.',
-    'Bepaal zelf of de plaats klaar is: zet placeComplete op true wanneer je na live web search geen extra nieuwe complete en verifieerbare bedrijven voor deze plaats meer kunt vinden.',
-    'Zet placeComplete op false wanneer er waarschijnlijk nog meer complete bedrijven zijn voor een volgende batch.',
+    'Werk in vervolgbatches: dit is niet één chatsessie maar een doorlopende zoekrun met eerder gevonden resultaten als uitsluitlijst.',
+    'Zet placeComplete altijd op false wanneer je in deze response één of meer bedrijven aanlevert. Softora vraagt daarna automatisch om de volgende lading.',
+    'Zet placeComplete alleen op true wanneer je in deze response nul nieuwe complete bedrijven aanlevert én na live web search geen extra nieuwe complete en verifieerbare bedrijven voor deze plaats meer kunt vinden.',
     'Gebruik geen placeholders zoals onbekend, niet gevonden, n.v.t. of lege waarden.',
     'Geef uitsluitend JSON terug volgens het schema.',
   ].join('\n');
@@ -1129,8 +1130,9 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
     '- Website mag een domein of volledige URL zijn, maar moet echt bij het bedrijf horen.',
     '- Vermijd dubbele bedrijven, handelsnamen met dezelfde website en eerder gevonden resultaten.',
     '- Gebruik bronnen als URL-lijst per bedrijf, zodat de controle zichtbaar blijft.',
-    '- Vul placeComplete zorgvuldig in. Als je minder dan gevraagd teruggeeft omdat er geen extra complete bedrijven meer vindbaar zijn, zet placeComplete op true en leg kort uit waarom in completionReason.',
-    '- Als je nog niet zeker bent dat de plaats leeg is, zet placeComplete op false.',
+    '- Als je bedrijven teruggeeft, zet placeComplete op false, ook als je denkt dat dit misschien de laatste lading is.',
+    '- Alleen als je nul nieuwe complete bedrijven kunt vinden na breder doorzoeken, zet je placeComplete op true en leg je kort uit waarom in completionReason.',
+    '- Als je nog niet zeker bent dat de plaats leeg is, of als je slechts de eerste zichtbare lading hebt, zet placeComplete op false.',
     '',
     'Eerder gevonden of al bestaande resultaten die je moet vermijden:',
     exclusionText,
@@ -1418,7 +1420,7 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const usage = extractOpenAiUsage(data);
   const webSearchCalls = countOpenAiWebSearchCalls(data);
   const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls });
-  const placeComplete = Boolean(parsed && parsed.placeComplete) || businesses.length === 0;
+  const placeComplete = businesses.length > 0 ? false : Boolean(parsed && parsed.placeComplete);
   const completionReason = truncateText(
     (parsed && (parsed.completionReason || parsed.notes)) ||
       (placeComplete ? 'Geen extra complete en verifieerbare bedrijven gevonden.' : ''),

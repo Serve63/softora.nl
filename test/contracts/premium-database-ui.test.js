@@ -266,7 +266,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /count: DEEP_SEARCH_BATCH_SIZE/);
   assert.match(deepSearchScriptSource, /function runTargetBatch\(target\)/);
   assert.match(deepSearchScriptSource, /function runTargetUntilComplete\(target\)/);
+  assert.match(deepSearchScriptSource, /REQUIRED_EMPTY_COMPLETION_ROUNDS = 1/);
+  assert.match(deepSearchScriptSource, /function isTargetCompletionConfirmed\(target, result\)/);
   assert.match(deepSearchScriptSource, /AI gaat automatisch door met dezelfde locatie/);
+  assert.match(deepSearchScriptSource, /AI gaf al klaar aan/);
   assert.match(deepSearchScriptSource, /Deze locatie loopt al\. Wacht tot de AI hem automatisch afrondt\./);
   assert.doesNotMatch(deepSearchScriptSource, /100 bedrijven toevoegen/);
   assert.match(deepSearchScriptSource, /\? "Nu: " \+ target\.label/);
@@ -441,7 +444,7 @@ test('premium database deep search client finishes the current location automati
       rows,
       businesses: [{ bedrijfsnaam: 'Almkerk Test BV', email: 'info@almkerktest.nl', website: 'almkerktest.nl' }],
       found: 1,
-      placeComplete: false,
+      placeComplete: true,
       cost: { estimatedUsd: 0.12 },
       sources: [],
     },
@@ -494,7 +497,7 @@ test('premium database deep search client finishes the current location automati
   assert.equal(calls[1].target, calls[0].target);
   assert.equal(calls[1].batchNumber, 2);
   assert.equal(customers.length, 1);
-  assert.match(messages.join('\n'), /AI gaat automatisch door met dezelfde locatie/);
+  assert.match(messages.join('\n'), /AI gaf al klaar aan/);
   assert.match(messages.join('\n'), /Deze plaats is automatisch afgerond/);
   assert.ok(persisted.length >= 2);
 });

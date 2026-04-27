@@ -491,6 +491,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
         assert.match(payload.input[1].content, /Almkerk/);
         assert.match(payload.input[1].content, /Bakkerij Oud/);
         assert.match(payload.input[1].content, /placeComplete/);
+        assert.match(payload.input[1].content, /Als je bedrijven teruggeeft, zet placeComplete op false/);
         return {
           ok: true,
           async json() {
@@ -559,6 +560,54 @@ test('premium database deep search uses OpenAI web search and returns complete r
     'bakkerijzon.nl',
   ]);
   assert.equal(result.sources[0].url, 'https://bakkerijzon.nl/contact');
+});
+
+test('premium database deep search keeps productive batches open for follow-up', async () => {
+  const result = await fetchDeepSearchBusinessRows(
+    {
+      target: 'Nederland | Noord-Brabant | Altena | Almkerk',
+      count: 100,
+      batchNumber: 1,
+    },
+    {
+      env: { OPENAI_API_KEY: 'openai-key' },
+      fetchImpl: async (_url, options = {}) => {
+        const payload = JSON.parse(options.body);
+        assert.match(payload.input[0].content, /Zet placeComplete altijd op false wanneer je in deze response/);
+        return {
+          ok: true,
+          async json() {
+            return {
+              output_text: JSON.stringify({
+                target: 'Almkerk',
+                businesses: [
+                  {
+                    bedrijfsnaam: 'Installatiebedrijf Altena',
+                    adres: 'Voorstraat 10, 4286 AL Almkerk',
+                    email: 'info@installatie-altena.nl',
+                    telefoonnummer: '0183 555 555',
+                    website: 'https://installatie-altena.nl',
+                    bronnen: ['https://installatie-altena.nl/contact'],
+                  },
+                ],
+                placeComplete: true,
+                completionReason: 'Model dacht dat dit alles was.',
+                notes: '',
+              }),
+              output: [],
+              usage: {
+                input_tokens: 100,
+                output_tokens: 80,
+              },
+            };
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(result.found, 1);
+  assert.equal(result.placeComplete, false);
 });
 
 test('premium database deep search route reports missing OpenAI key', async () => {

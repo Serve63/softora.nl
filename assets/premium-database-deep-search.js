@@ -17,6 +17,7 @@
     };
     const DEEP_SEARCH_BATCH_SIZE = 100;
     const AUTO_CONTINUE_DELAY_MS = 750;
+    const REQUIRED_EMPTY_COMPLETION_ROUNDS = 1;
     // Generated from the supplied work order, extended with CBS 2025 woonplaatsen.
     const DEFAULT_TARGET_TEXT_BASE64 = [
         "TmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFsbWtlcmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFuZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBCYWJ5bG9uacOrbmJyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBEcm9uZ2VsZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IER1c3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgRWV0aGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBHZW5kZXJlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgR2llc3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgSGFuawpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTWVldXdlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTmlldXdlbmRpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFJpanN3aWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBTbGVldXdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFVpdHdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFZlZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdhYXJkaHVpemVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBXZXJrZW5kYW0KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdpamsgZW4gQWFsYnVyZwpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgV291ZHJpY2hlbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBBc3RlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBIZXVzZGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBc3RlbiB8IE9tbWVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCYWFybGUtTmFzc2F1IHwgQmFhcmxlLU5hc3NhdQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IENhc3RlbHLDqQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IFVsaWNvdGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEJlcmdlaWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEx1eWtzZ2VzdGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IFJpZXRob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VpamsgfCBXZXN0ZXJob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBCZXJnZW4gb3AgWm9vbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBIYWxzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcmdlbiBvcCBab29tIHwgTGVwZWxzdHJhYXQKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgSGVlc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IEhlZXN3aWprLURpbnRoZXIKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgTG9vc2Jyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IE5pc3RlbHJvZGUKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgVmlua2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IFZvcnN0ZW5ib3NjaApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVzdCB8IEJlc3QKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEJsYWRlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgQ2FzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEhhcGVydApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgSG9vZ2Vsb29uCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCbGFkZWwgfCBOZXRlcnNlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm9la2VsIHwgQm9la2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb2VrZWwgfCBWZW5ob3JzdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm94dGVsIHwgQm94dGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBFc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBMaWVtcGRlCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJhdmVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJyZWRhCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFByaW5zZW5iZWVrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFRldGVyaW5nZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJyZWRhIHwgVWx2ZW5ob3V0Ck5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLURvcnBsZWluCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLVNjaG9vdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQ3JhbmVuZG9uY2sgfCBHYXN0ZWwKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IENyYW5lbmRvbmNrIHwgTWFhcmhlZXplCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IFNvZXJlbmRvbmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IERldXJuZSB8IERldXJuZQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwgSGVsZW5hdmVlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwg",
@@ -185,6 +186,7 @@
             costUsd: 0,
             placeComplete: false,
             completionReason: "",
+            completionChecks: 0,
             seen: [],
             lastSources: [],
             updatedAt: ""
@@ -207,6 +209,7 @@
             costUsd: Math.max(0, Number(raw && raw.costUsd) || 0),
             placeComplete: Boolean(raw && raw.placeComplete),
             completionReason: normalizeString(raw && raw.completionReason),
+            completionChecks: Math.max(0, Number(raw && raw.completionChecks) || 0),
             seen: uniqueStrings(raw && raw.seen, 180),
             lastSources: Array.isArray(raw && raw.lastSources) ? raw.lastSources.slice(0, 40) : [],
             updatedAt: normalizeString(raw && raw.updatedAt)
@@ -453,6 +456,14 @@
             return true;
         }
 
+        function isTargetCompletionConfirmed(target, result) {
+            const hasNewInformation = result.found > 0 || result.addedCount > 0;
+            const emptyCompletion = result.completed && !hasNewInformation;
+            target.completionChecks = emptyCompletion ? Math.max(0, Number(target.completionChecks) || 0) + 1 : 0;
+            target.placeComplete = emptyCompletion && target.completionChecks >= REQUIRED_EMPTY_COMPLETION_ROUNDS;
+            return target.placeComplete;
+        }
+
         function runTargetBatch(target) {
             const beforeCount = Array.isArray(getCustomers()) ? getCustomers().length : 0;
             return fetchDeepSearchRows({
@@ -486,7 +497,7 @@
                     render();
                     if (result.addedCount) toast("+" + result.addedCount + " bedrijven");
                     const baseMessage = "AI vond " + result.found + " complete bedrijven voor " + startedLabel + ". " + result.addedCount + " nieuw toegevoegd. API-kosten: " + formatUsdAsEuro(result.costUsd) + ".";
-                    if (result.completed) {
+                    if (isTargetCompletionConfirmed(target, result)) {
                         advanceCompletedTarget(target);
                         render();
                         return persistState().then(function () {
@@ -500,7 +511,10 @@
                         });
                     }
                     return persistState().then(function () {
-                        setStatusMessage(baseMessage + " AI gaat automatisch door met dezelfde locatie.", "info");
+                        const nextReason = result.completed
+                            ? " AI gaf al klaar aan, maar omdat deze ronde nog iets opleverde doen we automatisch nog een vervolgronde."
+                            : " AI gaat automatisch door met dezelfde locatie.";
+                        setStatusMessage(baseMessage + nextReason, "info");
                         return wait(autoContinueDelayMs).then(nextBatch);
                     });
                 });
