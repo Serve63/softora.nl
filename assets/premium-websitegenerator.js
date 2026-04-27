@@ -960,6 +960,24 @@ async function startScan() {
   }
 }
 
+function bindWebsiteGeneratorPageActions() {
+  document.querySelectorAll('.tab[data-tab]').forEach((button) => {
+    if (button.dataset.websitegeneratorTabBound === '1') return;
+    button.dataset.websitegeneratorTabBound = '1';
+    button.addEventListener('click', () => {
+      void switchTab(button.dataset.tab || 'scan', button);
+    });
+  });
+
+  const scanButton = document.querySelector('[data-websitegenerator-action="scan"]');
+  if (scanButton && scanButton.dataset.websitegeneratorScanBound !== '1') {
+    scanButton.dataset.websitegeneratorScanBound = '1';
+    scanButton.addEventListener('click', () => {
+      void startScan();
+    });
+  }
+}
+
 function samplePreviewEdgeReference(pixels, width, height, side) {
   const stripWidth = Math.max(4, Math.round(width * 0.01));
   const startX = side === 'right' ? Math.max(0, width - stripWidth) : 0;
@@ -1380,6 +1398,8 @@ loadWebsiteGeneratorAuthState();
 
   void loadWebsiteGeneratorAuthState().then(() => loadWebsiteLinks());
 })();
+
+bindWebsiteGeneratorPageActions();
 
 (function initWebsiteGeneratorLibraryHash() {
   function applyLibraryHash() {

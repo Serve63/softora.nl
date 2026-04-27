@@ -328,9 +328,9 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
 </div>
 
 <div class="tabs">
-  <button type="button" class="tab" data-tab="library" onclick="switchTab('library', this)">Bibliotheek</button>
-  <button type="button" class="tab active" data-tab="scan" onclick="switchTab('scan', this)">Website Scan & Preview</button>
-  <button type="button" class="tab" data-tab="link" onclick="switchTab('link', this)">Maak Website Link Aan</button>
+  <button type="button" class="tab" data-tab="library">Bibliotheek</button>
+  <button type="button" class="tab active" data-tab="scan">Website Scan & Preview</button>
+  <button type="button" class="tab" data-tab="link">Maak Website Link Aan</button>
 </div>
 
 <!-- ═══════════════════════════════════════
@@ -366,7 +366,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
     <div class="card-body">
       <div class="input-row" style="align-items: flex-start">
         <input class="inp" id="scan-url" type="text" placeholder="softora.nl" spellcheck="false" value="softora.nl">
-        <button class="btn" id="scan-btn" onclick="startScan()" disabled>
+        <button class="btn" id="scan-btn" type="button" data-websitegenerator-action="scan" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           AI Genereren
         </button>

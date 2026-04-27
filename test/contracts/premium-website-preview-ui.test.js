@@ -43,6 +43,10 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.doesNotMatch(source, /<div class="page-title">Website Generator<\/div>/);
   assert.match(source, /Eén URL per keer\. AI genereert voor die website één homepage preview\./);
   assert.match(source, /<input class="inp" id="scan-url" type="text" placeholder="softora\.nl" spellcheck="false" value="softora\.nl">/);
+  assert.match(source, /<button type="button" class="tab" data-tab="library">Bibliotheek<\/button>/);
+  assert.match(source, /<button type="button" class="tab active" data-tab="scan">Website Scan & Preview<\/button>/);
+  assert.match(source, /data-websitegenerator-action="scan"/);
+  assert.doesNotMatch(source, /onclick=/);
   assert.doesNotMatch(source, /<textarea class="inp" id="scan-url"/);
   assert.doesNotMatch(source, />AI Photo Preview</);
   assert.doesNotMatch(source, />Website URL</);
@@ -55,6 +59,9 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.match(source, /id="website-link-list"/);
   assert.match(websiteGeneratorSource, /window\.open\('about:blank', '_blank'\)/);
   assert.match(websiteGeneratorSource, /function createWebsiteLinkRow\(link\) \{/);
+  assert.match(websiteGeneratorSource, /function bindWebsiteGeneratorPageActions\(\) \{/);
+  assert.match(websiteGeneratorSource, /button\.addEventListener\('click', \(\) => \{[\s\S]*void switchTab\(button\.dataset\.tab \|\| 'scan', button\);/);
+  assert.match(websiteGeneratorSource, /scanButton\.addEventListener\('click', \(\) => \{[\s\S]*void startScan\(\);/);
   assert.match(websiteGeneratorSource, /websiteLinkListEl\.replaceChildren\(\.\.\.normalizedLinks\.map\(\(link\) => createWebsiteLinkRow\(link\)\)\);/);
   assert.match(websiteGeneratorSource, /return url\.protocol === 'http:' \|\| url\.protocol === 'https:' \? url\.href : '';/);
   assert.doesNotMatch(websiteGeneratorSource, /websiteLinkListEl\.innerHTML/);
