@@ -51,7 +51,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
     assert.match(source, /class="premium-boot-shell is-booting"/, file);
     if (file !== 'premium-instellingen.html') {
       if (file === 'premium-actieve-opdrachten.html') {
-        assert.match(source, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427a"><\/script>/, file);
+        assert.match(source, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427b"><\/script>/, file);
         const activeOrdersPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
         const activeOrdersSource = fs.readFileSync(activeOrdersPath, 'utf8');
         assert.match(activeOrdersSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);

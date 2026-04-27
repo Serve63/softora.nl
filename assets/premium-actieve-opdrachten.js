@@ -3051,7 +3051,70 @@ async function bootActiveOrdersPage() {
     }
 }
 
+function initActiveOrdersCursor() {
+    const cursor = document.querySelector('.cursor');
+    const cursorDot = document.querySelector('.cursor-dot');
+    const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
+
+    function disable() {
+        document.body.style.cursor = 'auto';
+        if (cursor) cursor.style.display = 'none';
+        if (cursorDot) cursorDot.style.display = 'none';
+    }
+
+    if (!cursor || !cursorDot || !enablePointerFx) {
+        disable();
+        return;
+    }
+
+    let mouseX = 0;
+    let mouseY = 0;
+    let cursorX = 0;
+    let cursorY = 0;
+    let dotX = 0;
+    let dotY = 0;
+    let cursorRafId = null;
+    document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    }, { passive: true });
+
+    function animateCursor() {
+        cursorX += (mouseX - cursorX) * 1;
+        cursorY += (mouseY - cursorY) * 1;
+        cursor.style.left = cursorX + 'px';
+        cursor.style.top = cursorY + 'px';
+        dotX += (mouseX - dotX) * 1;
+        dotY += (mouseY - dotY) * 1;
+        cursorDot.style.left = dotX + 'px';
+        cursorDot.style.top = dotY + 'px';
+        cursorRafId = requestAnimationFrame(animateCursor);
+    }
+    cursorRafId = requestAnimationFrame(animateCursor);
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            if (cursorRafId) cancelAnimationFrame(cursorRafId);
+            cursorRafId = null;
+        } else if (!cursorRafId) {
+            cursorRafId = requestAnimationFrame(animateCursor);
+        }
+    });
+
+    document.addEventListener('mouseover', (e) => {
+        if (e.target.closest('.magnetic')) cursor.classList.add('hover');
+    });
+    document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('.magnetic')) cursor.classList.remove('hover');
+    });
+
+    window.addEventListener('error', disable);
+}
+
 void bootActiveOrdersPage();
+initActiveOrdersCursor();
 
 window.addEventListener('pagehide', () => {
     void flushRemoteUiStateSave();

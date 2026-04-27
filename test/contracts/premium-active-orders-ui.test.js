@@ -18,7 +18,7 @@ function readActiveOrdersSources() {
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427b"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -45,6 +45,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.doesNotMatch(pageSource, /async function removeProjectFromSystem\(id\) \{/);
   assert.doesNotMatch(pageSource, /function bindActiveOrdersPageUi\(\) \{/);
   assert.doesNotMatch(pageSource, /async function initializeActiveOrdersPageState\(\) \{/);
+  assert.doesNotMatch(pageSource, /function initActiveOrdersCursor\(\) \{/);
+  assert.doesNotMatch(pageSource, /Cursor \(robust\)/);
   assert.match(scriptSource, /function normalizeOrderStatus\(value\) \{/);
   assert.match(scriptSource, /function persistOrdersRuntime\(\) \{/);
   assert.match(scriptSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -75,6 +77,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /async function removeProjectFromSystem\(id\) \{/);
   assert.match(scriptSource, /function bindActiveOrdersPageUi\(\) \{/);
   assert.match(scriptSource, /async function initializeActiveOrdersPageState\(\) \{/);
+  assert.match(scriptSource, /function initActiveOrdersCursor\(\) \{/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
