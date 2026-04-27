@@ -306,15 +306,6 @@ function normalizeOrderAssignee(value) {
     return '';
 }
 
-function escapeHtml(str) {
-    return String(str || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
 function normalizeDataUrlImage(value) {
     const raw = String(value || '').replace(/\s+/g, '').trim();
     if (!raw) return '';
@@ -2439,7 +2430,7 @@ function refreshOpenModalOverview(id) {
     if (Number(currentModalId) !== Number(id)) return;
     const overview = document.getElementById('modalOverview');
     if (overview) {
-        overview.innerHTML = renderModalOverviewHtml(id);
+        renderModalOverview(overview, id);
     }
 }
 
@@ -2739,7 +2730,80 @@ function formatModalDateTime(value) {
     return date.toLocaleString('nl-NL');
 }
 
-function renderModalOverviewHtml(id) {
+function normalizeModalLinkUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    try {
+        const url = new URL(raw);
+        return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
+    } catch (_) {
+        return '';
+    }
+}
+
+function appendModalOverviewItem(grid, item) {
+    const row = document.createElement('div');
+    row.className = 'modal-overview-item';
+    appendTextElement(row, 'div', 'modal-overview-label', item.label || '—');
+
+    const valueEl = document.createElement('div');
+    valueEl.className = 'modal-overview-value';
+    const value = String(item.value || '—');
+    if (item.href) {
+        const link = document.createElement('a');
+        link.href = item.href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = value;
+        valueEl.appendChild(link);
+    } else {
+        valueEl.textContent = value;
+    }
+
+    row.appendChild(valueEl);
+    grid.appendChild(row);
+    return row;
+}
+
+function appendModalOverviewBlock(grid, label, value) {
+    const row = document.createElement('div');
+    row.className = 'modal-overview-item full';
+    appendTextElement(row, 'div', 'modal-overview-label', label);
+    appendTextElement(row, 'div', 'modal-overview-value modal-overview-block', value || '—');
+    grid.appendChild(row);
+    return row;
+}
+
+function appendModalOverviewAttachments(grid, referenceImages) {
+    const row = document.createElement('div');
+    row.className = 'modal-overview-item full';
+    appendTextElement(row, 'div', 'modal-overview-label', 'Foto-bijlagen preview');
+
+    if (!referenceImages.length) {
+        appendTextElement(row, 'div', 'modal-overview-value', 'Geen foto-bijlagen gekoppeld.');
+        grid.appendChild(row);
+        return row;
+    }
+
+    const attachmentsGrid = document.createElement('div');
+    attachmentsGrid.className = 'modal-attachments-grid';
+    referenceImages.forEach((img) => {
+        const thumb = document.createElement('div');
+        thumb.className = 'modal-attachment-thumb';
+        const image = document.createElement('img');
+        image.src = img.dataUrl;
+        image.alt = img.name || 'Bijlage';
+        thumb.appendChild(image);
+        attachmentsGrid.appendChild(thumb);
+    });
+
+    row.appendChild(attachmentsGrid);
+    grid.appendChild(row);
+    return row;
+}
+
+function renderModalOverview(container, id) {
+    if (!container) return;
     const runtimeOrder = orders[id] || {};
     const customOrder = getCustomOrderById(id);
     const ui = resolveOrderUiState({
@@ -2758,6 +2822,8 @@ function renderModalOverviewHtml(id) {
     const claimInfo = getOrderClaimInfo(id);
     const launchDeploymentUrl = String(customOrder?.launchDeploymentUrl || '').trim();
     const launchRepoUrl = String(customOrder?.launchRepoUrl || '').trim();
+    const launchDeploymentHref = normalizeModalLinkUrl(launchDeploymentUrl);
+    const launchRepoHref = normalizeModalLinkUrl(launchRepoUrl);
     const launchDomainStatus = String(customOrder?.launchDomainStatus || '').trim();
     const launchDomainMessage = String(customOrder?.launchDomainMessage || '').trim();
     const lastRunAt = String(customOrder?.lastRunAt || '').trim();
@@ -2783,66 +2849,22 @@ function renderModalOverviewHtml(id) {
         { label: 'Foto-bijlagen', value: referenceImages.length ? String(referenceImages.length) : '0' },
         { label: 'Laatste build run', value: formatModalDateTime(lastRunAt) },
         { label: 'Launch afgerond', value: formatModalDateTime(launchedAt) },
-        {
-            label: 'Live URL',
-            value: launchDeploymentUrl
-                ? `<a href="${escapeHtml(launchDeploymentUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(launchDeploymentUrl)}</a>`
-                : '—',
-            raw: true
-        },
-        {
-            label: 'GitHub repo',
-            value: launchRepoUrl
-                ? `<a href="${escapeHtml(launchRepoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(launchRepoUrl)}</a>`
-                : '—',
-            raw: true
-        },
+        { label: 'Live URL', value: launchDeploymentUrl || '—', href: launchDeploymentHref },
+        { label: 'GitHub repo', value: launchRepoUrl || '—', href: launchRepoHref },
         { label: 'Domeinstatus', value: launchDomainStatus || '—' },
         { label: 'Domeinmelding', value: launchDomainMessage || '—' }
     ];
 
-    const itemsHtml = infoItems
-        .map((item) => `
-            <div class="modal-overview-item">
-                <div class="modal-overview-label">${escapeHtml(item.label)}</div>
-                <div class="modal-overview-value">${item.raw ? String(item.value || '') : escapeHtml(item.value || '—')}</div>
-            </div>
-        `)
-        .join('');
+    const grid = document.createElement('div');
+    grid.className = 'modal-overview-grid';
+    infoItems.forEach((item) => appendModalOverviewItem(grid, item));
+    appendModalOverviewBlock(grid, 'Omschrijving opdracht', description || '—');
+    appendModalOverviewBlock(grid, 'Meeting notities', transcript || '—');
+    appendModalOverviewBlock(grid, 'AI bouwprompt', prompt || '—');
+    appendModalOverviewAttachments(grid, referenceImages);
 
-    const attachmentsHtml = referenceImages.length
-        ? `
-            <div class="modal-attachments-grid">
-                ${referenceImages.map((img) => `
-                    <div class="modal-attachment-thumb">
-                        <img src="${escapeHtml(img.dataUrl)}" alt="${escapeHtml(img.name || 'Bijlage')}">
-                    </div>
-                `).join('')}
-            </div>
-        `
-        : `<div class="modal-overview-value">Geen foto-bijlagen gekoppeld.</div>`;
-
-    return `
-        <div class="modal-overview-grid">
-            ${itemsHtml}
-            <div class="modal-overview-item full">
-                <div class="modal-overview-label">Omschrijving opdracht</div>
-                <div class="modal-overview-value modal-overview-block">${escapeHtml(description || '—')}</div>
-            </div>
-            <div class="modal-overview-item full">
-                <div class="modal-overview-label">Meeting notities</div>
-                <div class="modal-overview-value modal-overview-block">${escapeHtml(transcript || '—')}</div>
-            </div>
-            <div class="modal-overview-item full">
-                <div class="modal-overview-label">AI bouwprompt</div>
-                <div class="modal-overview-value modal-overview-block">${escapeHtml(prompt || '—')}</div>
-            </div>
-            <div class="modal-overview-item full">
-                <div class="modal-overview-label">Foto-bijlagen preview</div>
-                ${attachmentsHtml}
-            </div>
-        </div>
-    `;
+    container.replaceChildren(grid);
+    container.hidden = false;
 }
 
 function openModal(id) {
@@ -2859,9 +2881,8 @@ function openModal(id) {
     title.textContent = orders[id]?.type || 'Opdracht';
     subtitle.textContent = orders[id]?.name || '';
     if (overview) {
-        overview.innerHTML = '';
+        renderModalOverview(overview, id);
         overview.scrollTop = 0;
-        overview.hidden = true;
     }
 
     const pctValue = Number(orders[id]?.progressPct) || 0;
