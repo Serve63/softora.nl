@@ -973,22 +973,11 @@ body {
 </div>
 
 <script src="assets/premium-password-register-renderer.js?v=20260427a"></script>
+<script src="assets/premium-password-register-store.js?v=20260427a"></script>
 <script src="assets/premium-password-register-pin.js?v=20260427a"></script>
 <script>
-const PASSWORD_REGISTER_SCOPE = 'premium_password_register';
-const PASSWORD_REGISTER_ENTRIES_KEY = 'entries_json';
-const DEFAULT_PASSWORD_ENTRIES = [
-  { id: 1, naam: 'Hostinger', url: 'hostinger.com', user: 'hosting@example.test', pw: 'voorbeeld-hosting', cat: 'Hosting' },
-  { id: 2, naam: 'TransIP', url: 'transip.nl', user: 'dns@example.test', pw: 'voorbeeld-domein', cat: 'Hosting' },
-  { id: 3, naam: 'Google Workspace', url: 'workspace.google.com', user: 'workspace@example.test', pw: 'voorbeeld-tools', cat: 'Tools' },
-  { id: 4, naam: 'Instagram', url: 'instagram.com', user: 'socials@example.test', pw: 'voorbeeld-socials', cat: 'Socials' },
-  { id: 5, naam: 'LinkedIn', url: 'linkedin.com', user: 'sales@example.test', pw: 'voorbeeld-linkedin', cat: 'Socials' },
-];
-
 let entries = [];
 const visible = {};
-let passwordEntriesLoaded = false;
-let passwordEntriesLoadPromise = null;
 /** @type {'closed' | 'edit' | 'create'} */
 let entryModalMode = 'closed';
 let currentEditEntryId = null;
@@ -1015,6 +1004,9 @@ const pwDeleteModalOverlay = document.getElementById('pw-delete-modal-overlay');
 const pwDeleteModalTextEl = document.getElementById('pw-delete-modal-text');
 const pwDeleteModalCancelEl = document.getElementById('pw-delete-modal-cancel');
 const pwDeleteModalConfirmEl = document.getElementById('pw-delete-modal-confirm');
+const passwordRegisterStore = window.SoftoraPasswordRegisterStore.create({
+  setStatus: setRegisterStatus,
+});
 const passwordRegisterPin = window.SoftoraPasswordRegisterPin.create({
   pinScreen: 'screen-pin',
   registerScreen: 'screen-register',
@@ -1028,48 +1020,15 @@ const passwordRegisterPin = window.SoftoraPasswordRegisterPin.create({
 });
 
 function normalizeString(value) {
-  return String(value == null ? '' : value).trim();
+  return passwordRegisterStore.normalizeString(value);
 }
 
 function sanitizePasswordEntry(entry, index) {
-  const safeIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
-  const safeId = Number(entry && entry.id);
-  const name = normalizeString(entry && entry.naam) || `Inlog ${safeIndex + 1}`;
-  const url = normalizeString(entry && entry.url) || 'onbekend';
-  const user = normalizeString(entry && entry.user);
-  const pw = normalizeString(entry && entry.pw);
-  const cat = normalizeString(entry && entry.cat) || 'Overig';
-
-  return {
-    id: Number.isFinite(safeId) && safeId > 0 ? safeId : safeIndex + 1,
-    naam: name,
-    url,
-    user,
-    pw,
-    cat,
-  };
-}
-
-function sanitizePasswordEntries(rawEntries) {
-  if (!Array.isArray(rawEntries)) {
-    return DEFAULT_PASSWORD_ENTRIES.map((entry, index) => sanitizePasswordEntry(entry, index));
-  }
-
-  const dedupedIds = new Set();
-  const sanitized = rawEntries
-    .map((entry, index) => sanitizePasswordEntry(entry, index))
-    .filter((entry) => {
-      if (dedupedIds.has(entry.id)) return false;
-      dedupedIds.add(entry.id);
-      return true;
-    });
-
-  if (sanitized.length) return sanitized;
-  return DEFAULT_PASSWORD_ENTRIES.map((entry, index) => sanitizePasswordEntry(entry, index));
+  return passwordRegisterStore.sanitizeEntry(entry, index);
 }
 
 function getNextPasswordEntryId() {
-  return entries.reduce((maxId, entry) => Math.max(maxId, Number(entry && entry.id) || 0), 0) + 1;
+  return passwordRegisterStore.getNextId(entries);
 }
 
 function setRegisterStatus(message, tone = '') {
@@ -1078,146 +1037,15 @@ function setRegisterStatus(message, tone = '') {
   registerStatusEl.style.color = tone === 'warning' ? 'var(--red)' : 'var(--text-tertiary)';
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-}
-
-async function fetchUiStateGetWithFallback(scope) {
-  const encodedScope = encodeURIComponent(String(scope || ''));
-  const urls = [`/api/ui-state-get?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
-  let lastError = null;
-
-  for (const url of urls) {
-    try {
-      const response = await fetchWithTimeout(
-        url,
-        {
-          method: 'GET',
-          cache: 'no-store',
-        },
-        12000
-      );
-      if (!response.ok) {
-        throw new Error(`UI state GET mislukt (${response.status})`);
-      }
-      return await response.json().catch(() => ({}));
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError || new Error('UI state GET mislukt');
-}
-
-async function fetchUiStateSetWithFallback(scope, body) {
-  const encodedScope = encodeURIComponent(String(scope || ''));
-  const urls = [`/api/ui-state-set?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
-  let lastError = null;
-
-  for (const url of urls) {
-    try {
-      const response = await fetchWithTimeout(
-        url,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body || {}),
-        },
-        12000
-      );
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(normalizeString(data && data.error) || `UI state POST mislukt (${response.status})`);
-      }
-      return data;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError || new Error('UI state POST mislukt');
-}
-
 async function persistPasswordEntries(actor = 'save') {
-  const sanitized = sanitizePasswordEntries(entries).map((entry) => ({ ...entry }));
-  entries = sanitized;
-  const payload = {
-    patch: {
-      [PASSWORD_REGISTER_ENTRIES_KEY]: JSON.stringify(sanitized),
-      updated_at: new Date().toISOString(),
-      updated_by: String(actor || 'save'),
-    },
-  };
-  const result = await fetchUiStateSetWithFallback(PASSWORD_REGISTER_SCOPE, payload);
-  const source = normalizeString(result && result.source);
-  if (source === 'supabase') {
-    setRegisterStatus('Wijzigingen zijn opgeslagen in Supabase.');
-  } else {
-    setRegisterStatus('Wijzigingen zijn tijdelijk opgeslagen, maar nog niet bevestigd vanuit Supabase.', 'warning');
-  }
-  return result;
+  const result = await passwordRegisterStore.persist(entries, actor);
+  entries = result.entries;
+  return result.response;
 }
 
 async function ensurePasswordEntriesLoaded() {
-  if (passwordEntriesLoaded) return entries;
-  if (passwordEntriesLoadPromise) return passwordEntriesLoadPromise;
-
-  passwordEntriesLoadPromise = (async () => {
-    try {
-      const result = await fetchUiStateGetWithFallback(PASSWORD_REGISTER_SCOPE);
-      let remoteEntries = null;
-      const serializedEntries = normalizeString(
-        result && result.values && result.values[PASSWORD_REGISTER_ENTRIES_KEY]
-      );
-
-      if (serializedEntries) {
-        try {
-          const parsedEntries = JSON.parse(serializedEntries);
-          if (Array.isArray(parsedEntries)) {
-            remoteEntries = parsedEntries;
-          }
-        } catch (_) {
-          remoteEntries = null;
-        }
-      }
-
-      if (remoteEntries && remoteEntries.length) {
-        entries = sanitizePasswordEntries(remoteEntries);
-        const source = normalizeString(result && result.source);
-        if (source === 'supabase') {
-          setRegisterStatus('Inloggegevens geladen vanuit Supabase.');
-        } else {
-          setRegisterStatus('Inloggegevens geladen uit fallback-opslag.');
-        }
-      } else {
-        entries = sanitizePasswordEntries(DEFAULT_PASSWORD_ENTRIES);
-        setRegisterStatus(
-          'Voorbeeldgegevens geladen. Vervang deze en sla daarna op om echte gegevens veilig te bewaren.',
-          'warning'
-        );
-      }
-    } catch (_) {
-      entries = sanitizePasswordEntries(DEFAULT_PASSWORD_ENTRIES);
-      setRegisterStatus(
-        'Kon Supabase niet laden. Veilige voorbeeldgegevens zijn lokaal geladen totdat je later opslaat.',
-        'warning'
-      );
-    }
-
-    passwordEntriesLoaded = true;
-    passwordEntriesLoadPromise = null;
-    return entries;
-  })();
-
-  return passwordEntriesLoadPromise;
+  entries = await passwordRegisterStore.load();
+  return entries;
 }
 
 function getEntryById(id) {
