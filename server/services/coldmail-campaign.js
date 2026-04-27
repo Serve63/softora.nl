@@ -733,6 +733,10 @@ function createColdmailCampaignService(deps = {}) {
     return `${cleanText}\n\n${COLDMAIL_OPT_OUT_TEXT}`;
   }
 
+  function shouldAppendColdmailOptOutText(text) {
+    return !/(afmelden|uitschrijven|unsubscribe)/i.test(normalizeString(text));
+  }
+
   function buildColdmailReference(row, id) {
     const seed = sanitizeFilename(id || getRowCompany(row) || getRowEmail(row) || 'mail', 'mail')
       .replace(/-/g, '')
@@ -806,11 +810,17 @@ function createColdmailCampaignService(deps = {}) {
     return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
   }
 
-  function appendWebdesignImageHtml(html, attachment) {
+  function appendWebdesignImageHtml(html, attachment, options = {}) {
     if (!attachment || !attachment.cid) return html;
-    return `${html}\n<p style="margin-top:24px;"><img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
+    const optOutText = normalizeString(options.optOutText || '');
+    const optOutHtml = optOutText
+      ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;">${escapeHtml(
+          optOutText
+        )}</p>`
+      : '';
+    return `${html}\n<p style="margin:24px 0 0 0;"><img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
       attachment.alt || 'Webdesign'
-    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>`;
+    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>${optOutHtml}`;
   }
 
   async function loadColdmailReplyState() {
@@ -1106,7 +1116,8 @@ function createColdmailCampaignService(deps = {}) {
       const row = item.row;
       const to = getRowEmail(row);
       const reference = buildColdmailReference(row, item.id);
-      const text = appendColdmailOptOutText(buildMailText(bodyTemplate, row));
+      const baseText = buildMailText(bodyTemplate, row);
+      const text = appendColdmailOptOutText(baseText);
       const subject = personalizeTemplate(subjectTemplate, row);
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
@@ -1118,8 +1129,13 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
-      const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(text), reference);
-      const html = webdesignPhoto ? appendWebdesignImageHtml(htmlBase, webdesignPhoto) : htmlBase;
+      const htmlBodyText = webdesignPhoto ? baseText : text;
+      const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(htmlBodyText), reference);
+      const html = webdesignPhoto
+        ? appendWebdesignImageHtml(htmlBase, webdesignPhoto, {
+            optOutText: shouldAppendColdmailOptOutText(baseText) ? COLDMAIL_OPT_OUT_TEXT : '',
+          })
+        : htmlBase;
       const attachments = webdesignPhoto
         ? [
             {
