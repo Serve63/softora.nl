@@ -938,8 +938,7 @@
           ) : ''
         ].join('');
 
-        document.body.innerHTML = '';
-        document.body.appendChild(shell);
+        document.body.replaceChildren(shell);
         document.body.setAttribute('data-preview-mode', 'frame');
 
         state.shell = shell;
