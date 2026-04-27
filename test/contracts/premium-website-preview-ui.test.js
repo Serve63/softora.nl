@@ -92,6 +92,12 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /websitePreviewActiveBatchJobId/);
   assert.match(source, /encodeURIComponent\(jobId\)/);
   assert.match(source, /resumeWebsitePreviewBatchIfAny/);
+  assert.match(source, /WEBSITE_PREVIEW_BATCH_MAX_STALLED_POLLS/);
+  assert.match(source, /WEBSITE_PREVIEW_BATCH_POLL_INTERVAL_MS/);
+  assert.match(source, /WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES/);
+  assert.match(source, /stopScanBatchPollWithMessage/);
+  assert.match(source, /buildWebsitePreviewJobFingerprint/);
+  assert.match(source, /Scanstatus kon niet worden opgehaald\./);
 });
 
 test('premium websitegenerator behoudt hoge full-page previews zonder portrait-crop', () => {

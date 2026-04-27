@@ -434,6 +434,12 @@ let websitePreviewLibraryRemoteEntries = null;
 let websitePreviewLibraryUseRemote = false;
 let websitePreviewBatchPollTimer = null;
 let websitePreviewActiveBatchJobId = '';
+const WEBSITE_PREVIEW_BATCH_MAX_STALLED_POLLS = 30;
+const WEBSITE_PREVIEW_BATCH_POLL_INTERVAL_MS = 1400;
+const WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES = 12;
+let websitePreviewBatchPollFailures = 0;
+let websitePreviewBatchPollNoProgress = 0;
+let websitePreviewBatchPollLastFingerprint = '';
 
 function escapeHtml(str) {
   return String(str || '')
@@ -894,6 +900,9 @@ function clearWebsitePreviewBatchPoll() {
     clearInterval(websitePreviewBatchPollTimer);
     websitePreviewBatchPollTimer = null;
   }
+  websitePreviewBatchPollFailures = 0;
+  websitePreviewBatchPollNoProgress = 0;
+  websitePreviewBatchPollLastFingerprint = '';
 }
 
 function getStoredWebsitePreviewBatchJobId() {
@@ -927,8 +936,24 @@ function scheduleWebsitePreviewBatchPoll() {
   clearWebsitePreviewBatchPoll();
   websitePreviewBatchPollTimer = setInterval(() => {
     void pollWebsitePreviewBatch();
-  }, 1400);
+  }, WEBSITE_PREVIEW_BATCH_POLL_INTERVAL_MS);
   void pollWebsitePreviewBatch();
+}
+
+function stopScanBatchPollWithMessage(message) {
+  clearWebsitePreviewBatchPoll();
+  clearStoredWebsitePreviewBatchJobId();
+  const out = document.getElementById('scan-output');
+  if (!out) return;
+  out.innerHTML = `<div class="empty-state"><p>${escapeHtml(message)}</p></div>`;
+}
+
+function buildWebsitePreviewJobFingerprint(job) {
+  const items = Array.isArray(job?.items) ? job.items : [];
+  const itemState = items
+    .map((item) => `${String(item?.status || '').trim()}:${String(item?.libraryEntryId || '').trim()}`)
+    .join('|');
+  return `${String(job?.status || '').trim()}|${Number(job?.currentIndex || 0)}|${itemState}`;
 }
 
 async function startBackgroundBatchScan(urls) {
@@ -962,40 +987,80 @@ async function pollWebsitePreviewBatch() {
     clearWebsitePreviewBatchPoll();
     return;
   }
-  const res = await fetch(`/api/website-preview/batch/${encodeURIComponent(jobId)}`, {
-    credentials: 'same-origin',
-    cache: 'no-store',
-    headers: { Accept: 'application/json' },
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (res.status === 401) {
-    clearWebsitePreviewBatchPoll();
-    return;
-  }
-  if (res.status === 403 || res.status === 404) {
-    clearStoredWebsitePreviewBatchJobId();
-    clearWebsitePreviewBatchPoll();
-    if (res.status === 403 && payload?.detail) {
-      showToast(String(payload.detail));
+  try {
+    const res = await fetch(`/api/website-preview/batch/${encodeURIComponent(jobId)}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      stopScanBatchPollWithMessage('Sessie verlopen. Log opnieuw in en probeer de scan nogmaals.');
+      return;
     }
-    return;
-  }
-  if (!res.ok || !payload || !payload.job) {
-    return;
-  }
-  await renderBatchJobProgress(payload.job);
-  if (payload.job.status === 'done' || payload.job.status === 'error') {
-    clearStoredWebsitePreviewBatchJobId();
-    clearWebsitePreviewBatchPoll();
-    const n = Number(payload.job.total || 0) || 0;
-    if (payload.job.status === 'done') {
-      showToast(n === 1 ? 'URL verwerkt' : `${n} URL's verwerkt`);
-    } else if (payload.job.error) {
-      showToast(String(payload.job.error));
+    if (res.status === 403 || res.status === 404) {
+      if (res.status === 403) {
+        stopScanBatchPollWithMessage('Toegang verlopen. Log opnieuw in om de scanstatus te laden.');
+      } else {
+        clearStoredWebsitePreviewBatchJobId();
+        clearWebsitePreviewBatchPoll();
+        const out = document.getElementById('scan-output');
+        if (out && payload?.detail) {
+          out.innerHTML = `<div class="empty-state"><p>${escapeHtml(String(payload.detail))}</p></div>`;
+        }
+      }
+      if (res.status === 403 && payload?.detail) {
+        showToast(String(payload.detail));
+      }
+      return;
     }
-    await maybeHydrateWebsitePreviewLibraryFromServer();
-    if (typeof renderLibraryPanel === 'function') {
-      renderLibraryPanel();
+    if (!res.ok || !payload || !payload.job) {
+      websitePreviewBatchPollFailures += 1;
+      if (websitePreviewBatchPollFailures >= WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES) {
+        stopScanBatchPollWithMessage(
+          'Scanstatus kon niet worden opgehaald. De foto-generatie is mogelijk onstabiel. Probeer het opnieuw.'
+        );
+      }
+      return;
+    }
+    websitePreviewBatchPollFailures = 0;
+    const fingerprint = buildWebsitePreviewJobFingerprint(payload.job);
+    if (fingerprint === websitePreviewBatchPollLastFingerprint) {
+      websitePreviewBatchPollNoProgress += 1;
+    } else {
+      websitePreviewBatchPollNoProgress = 0;
+      websitePreviewBatchPollLastFingerprint = fingerprint;
+    }
+    if (
+      websitePreviewBatchPollNoProgress >= WEBSITE_PREVIEW_BATCH_MAX_STALLED_POLLS &&
+      payload.job.status === 'running'
+    ) {
+      stopScanBatchPollWithMessage(
+        'De scan loopt vast. Start de preview opnieuw of controleer de pagina later in de bibliotheek.'
+      );
+      return;
+    }
+    await renderBatchJobProgress(payload.job);
+    if (payload.job.status === 'done' || payload.job.status === 'error') {
+      clearStoredWebsitePreviewBatchJobId();
+      clearWebsitePreviewBatchPoll();
+      const n = Number(payload.job.total || 0) || 0;
+      if (payload.job.status === 'done') {
+        showToast(n === 1 ? 'URL verwerkt' : `${n} URL's verwerkt`);
+      } else if (payload.job.error) {
+        showToast(String(payload.job.error));
+      }
+      await maybeHydrateWebsitePreviewLibraryFromServer();
+      if (typeof renderLibraryPanel === 'function') {
+        renderLibraryPanel();
+      }
+    }
+  } catch (_) {
+    websitePreviewBatchPollFailures += 1;
+    if (websitePreviewBatchPollFailures >= WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES) {
+      stopScanBatchPollWithMessage(
+        'Scanstatus kon niet worden opgehaald. De foto-generatie is mogelijk onstabiel. Probeer het opnieuw.'
+      );
     }
   }
 }
