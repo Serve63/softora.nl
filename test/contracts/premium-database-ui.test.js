@@ -86,10 +86,12 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /<strong>€0,00<\/strong>/);
   assert.match(pageSource, /\.photo-cost-label/);
   assert.match(pageSource, /<div class="modal-bg" id="photoBatchModal" aria-hidden="true">/);
-  assert.match(pageSource, /id="photoBatchTitle">AI-foto's maken<\/div>/);
+  assert.match(pageSource, /id="photoBatchTitle">Webdesigns maken<\/div>/);
   assert.match(pageSource, /data-photo-batch-mode="all"/);
+  assert.match(pageSource, />Alle bedrijven<\/span>/);
   assert.match(pageSource, /data-photo-batch-mode="custom"/);
-  assert.match(pageSource, /id="photoBatchLimitInput" type="number" inputmode="numeric" min="1" step="1"/);
+  assert.match(pageSource, /id="photoBatchLimitInput" type="text" inputmode="numeric" pattern="\[0-9\]\*"/);
+  assert.doesNotMatch(pageSource, /id="photoBatchLimitInput" type="number"/);
   assert.match(pageSource, /id="photoBatchSummary" aria-live="polite"/);
   assert.match(pageSource, /\.photo-batch-option\.is-active/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);
