@@ -173,7 +173,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427b"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
-  assert.match(pageSource, /const CUSTOMER_DB_SYNC_INTERVAL_MS = 10 \* 60 \* 1000;/);
+  assert.match(pageSource, /const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 \* 1000;/);
   assert.match(pageSource, /const pickRecordValue = window\.SoftoraDatabaseImport\.pickRecordValue;/);
   assert.match(pageSource, /const databaseImportController = window\.SoftoraDatabaseImport\.createController\(\{/);
   assert.match(pageSource, /syncRows: syncCustomersFromRows/);
