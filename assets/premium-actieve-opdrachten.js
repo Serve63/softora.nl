@@ -2838,3 +2838,64 @@ function renderModalOverviewHtml(id) {
         </div>
     `;
 }
+
+function openModal(id) {
+    const modal = document.getElementById('modal');
+    const overview = document.getElementById('modalOverview');
+    const title = document.getElementById('modalTitle');
+    const subtitle = document.getElementById('modalSubtitle');
+    const primaryBtn = document.getElementById('modalBtn');
+    const deleteBtn = document.getElementById('modalDeleteBtn');
+    const isCustomOrder = Boolean(getCustomOrderById(id));
+
+    currentModalId = id;
+
+    title.textContent = orders[id]?.type || 'Opdracht';
+    subtitle.textContent = orders[id]?.name || '';
+    if (overview) {
+        overview.innerHTML = '';
+        overview.scrollTop = 0;
+        overview.hidden = true;
+    }
+
+    const pctValue = Number(orders[id]?.progressPct) || 0;
+    if (pctValue === 100 && hasGeneratedPreviewHtml(id)) {
+        primaryBtn.style.display = 'block';
+        primaryBtn.onclick = () => {
+            openPreview(id);
+            closeModal();
+        };
+    } else {
+        primaryBtn.style.display = 'none';
+        primaryBtn.onclick = null;
+    }
+
+    if (deleteBtn) {
+        if (isCustomOrder) {
+            setModalDeleteButtonState('Project uit systeem halen', false);
+            deleteBtn.style.display = 'block';
+            deleteBtn.onclick = () => {
+                void removeProjectFromSystem(id);
+            };
+        } else {
+            deleteBtn.style.display = 'none';
+            deleteBtn.onclick = null;
+        }
+    }
+
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeModal() {
+    const modal = document.getElementById('modal');
+    const deleteBtn = document.getElementById('modalDeleteBtn');
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    currentModalId = null;
+    if (deleteBtn) {
+        deleteBtn.style.display = 'none';
+        deleteBtn.onclick = null;
+        setModalDeleteButtonState('Project uit systeem halen', false);
+    }
+}
