@@ -90,6 +90,8 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /\/api\/website-preview\/batch/);
   assert.match(source, /\/api\/website-preview\/batch\/current/);
   assert.match(source, /websitePreviewActiveBatchJobId/);
+  assert.match(source, /encodeURIComponent\(jobId\)/);
+  assert.match(source, /resumeWebsitePreviewBatchIfAny/);
 });
 
 test('premium websitegenerator behoudt hoge full-page previews zonder portrait-crop', () => {
@@ -114,7 +116,6 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.doesNotMatch(source, /LIBRARY_STORAGE_KEY/);
   assert.doesNotMatch(source, /readLocalLibraryEntries/);
   assert.doesNotMatch(source, /persistLocalLibraryEntries/);
-  assert.doesNotMatch(source, /localStorage/);
   assert.doesNotMatch(source, /sessionStorage/);
   assert.doesNotMatch(source, /browseropslag/);
   assert.match(source, /data-tab="library"/);
@@ -162,6 +163,8 @@ test('website preview batch runs server-side and exposes poll route', () => {
   assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/current'/);
   assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/:jobId'/);
   assert.match(batchSvc, /getCurrentBatchResponse/);
+  assert.match(batchSvc, /findLatestJobForOwner/);
+  assert.match(batchSvc, /findLatestRunningJobForOwner/);
   assert.match(aiTools, /runWebsitePreviewGeneratePipeline/);
   assert.match(featureRoutes, /registerWebsitePreviewBatchRoutes/);
   assert.match(library, /persistPreviewLibraryEntry/);

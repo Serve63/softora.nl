@@ -897,7 +897,9 @@ function clearWebsitePreviewBatchPoll() {
 }
 
 function getStoredWebsitePreviewBatchJobId() {
-  return String(websitePreviewActiveBatchJobId || '').trim();
+  const inMemory = String(websitePreviewActiveBatchJobId || '').trim();
+  if (inMemory) return inMemory;
+  return '';
 }
 
 function setStoredWebsitePreviewBatchJobId(jobId) {
@@ -1093,7 +1095,33 @@ async function resumeWebsitePreviewBatchIfAny() {
   if (!out) return;
 
   let jobId = getStoredWebsitePreviewBatchJobId();
-  if (!jobId) {
+  let hasResumed = false;
+
+  if (jobId) {
+    try {
+      const response = await fetch(`/api/website-preview/batch/${encodeURIComponent(jobId)}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      });
+      if (response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        if (payload?.job?.id) {
+          hasResumed = true;
+        } else if (response.status === 404) {
+          clearStoredWebsitePreviewBatchJobId();
+          jobId = '';
+        }
+      } else if (response.status === 404 || response.status === 403) {
+        clearStoredWebsitePreviewBatchJobId();
+        jobId = '';
+      }
+    } catch (_) {
+      hasResumed = false;
+    }
+  }
+
+  if (!jobId || !hasResumed) {
     try {
       const response = await fetch('/api/website-preview/batch/current', {
         credentials: 'same-origin',
@@ -1104,11 +1132,14 @@ async function resumeWebsitePreviewBatchIfAny() {
       if (response.ok && payload?.job?.id) {
         jobId = String(payload.job.id);
         setStoredWebsitePreviewBatchJobId(jobId);
+      } else {
+        clearStoredWebsitePreviewBatchJobId();
+        jobId = '';
       }
     } catch (_) {}
   }
 
-  if (!jobId) return;
+  if (!hasResumed && !jobId) return;
   out.innerHTML =
     '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Preview hervatten…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
   scheduleWebsitePreviewBatchPoll();
