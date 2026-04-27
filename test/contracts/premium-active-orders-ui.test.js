@@ -21,8 +21,11 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427a"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
+  assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
   assert.match(scriptSource, /function normalizeOrderStatus\(value\) \{/);
   assert.match(scriptSource, /function persistOrdersRuntime\(\) \{/);
+  assert.match(scriptSource, /function applyOrderUiStateToCard\(id\) \{/);
+  assert.match(scriptSource, /function renderCustomOrderCardHtml\(record\) \{/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);

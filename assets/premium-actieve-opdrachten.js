@@ -1109,3 +1109,240 @@ function cloneOrderRuntimeForRollback(order) {
     };
 }
 
+function applyOrderUiStateToCard(id) {
+    const order = orders[id];
+    if (!order) return;
+
+    const cardEl = document.getElementById(`order-${id}`);
+    const progressEl = document.getElementById(`progress-${id}`);
+    const barEl = document.getElementById(`bar-${id}`);
+    const btnEl = document.getElementById(`btn-${id}`);
+    const completeBtnEl = document.getElementById(`complete-btn-${id}`);
+    const assigneeEl = document.getElementById(`assignee-${id}`);
+    const ui = resolveOrderUiState(order);
+    const pct = ui.pct;
+    const status = ui.status;
+    const isDelivered = ui.isBuilt;
+    const claimInfo = getOrderClaimInfo(id);
+
+    order.statusKey = status.key;
+
+    if (cardEl) {
+        cardEl.classList.toggle('delivered', isDelivered);
+        cardEl.classList.toggle('paid', ui.isPaid);
+        cardEl.setAttribute('role', 'button');
+        cardEl.setAttribute('tabindex', '0');
+    }
+
+    if (progressEl) {
+        progressEl.classList.toggle('show', pct > 0 && !isDelivered);
+    }
+    if (barEl) {
+        barEl.style.width = pct + '%';
+        barEl.classList.toggle('green', pct >= 100);
+    }
+    for (let s = 1; s <= 5; s += 1) {
+        const stepEl = document.getElementById(`step-${id}-${s}`);
+        if (!stepEl) continue;
+        if (isDelivered) {
+            stepEl.className = 'progress-step';
+            continue;
+        }
+        if (pct >= 100) {
+            stepEl.className = 'progress-step done';
+        } else if (pct > 0) {
+            const approxStep = Math.max(1, Math.min(5, Math.ceil(pct / 20)));
+            if (s < approxStep) stepEl.className = 'progress-step done';
+            else if (s === approxStep) stepEl.className = 'progress-step active';
+            else stepEl.className = 'progress-step';
+        } else {
+            stepEl.className = 'progress-step';
+        }
+    }
+    if (btnEl) {
+        btnEl.style.display = 'flex';
+        btnEl.classList.remove('running');
+        btnEl.classList.remove('done');
+        btnEl.disabled = false;
+        if (claimInfo.isClaimed) {
+            btnEl.classList.add('claimed');
+        } else {
+            btnEl.classList.remove('claimed');
+        }
+        btnEl.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5h18M5.25 7.5v10.5A1.5 1.5 0 0 0 6.75 19.5h10.5a1.5 1.5 0 0 0 1.5-1.5V7.5M9 7.5V6a3 3 0 1 1 6 0v1.5"></path></svg> Open dossier';
+    }
+
+    if (assigneeEl) {
+        assigneeEl.textContent = claimInfo.by || 'Nog niet geclaimd';
+    }
+
+    if (completeBtnEl) {
+        completeBtnEl.textContent = 'Factuur betaald';
+        completeBtnEl.hidden = isDelivered;
+        completeBtnEl.style.display = isDelivered ? 'none' : '';
+        completeBtnEl.disabled = isDelivered || ui.isPaid;
+        completeBtnEl.classList.toggle('done', ui.isPaid);
+    }
+
+    refreshOrderSummaryCards();
+}
+
+function reconcileOrdersRuntimeAfterRestore() {
+    let changed = false;
+
+    Object.keys(orders).forEach((idRaw) => {
+        const id = Number(idRaw);
+        const order = orders[id];
+        if (!order) return;
+
+        const pct = Math.max(0, Math.min(100, Number(order.progressPct) || 0));
+        const status = normalizeOrderStatus(order.statusKey || '');
+        const hasPreview = hasGeneratedPreviewHtml(id);
+        let nextPct = pct;
+        let nextStatus = status.key;
+        let note = '';
+        const paidAt = String(order.paidAt || '').trim();
+        const isPaidOrder = Boolean(paidAt) || status.key === 'betaald';
+        const claimInfo = getOrderClaimInfo(id);
+
+        if (isPaidOrder) {
+            nextStatus = 'betaald';
+            if (nextPct >= 100 && !hasPreview) nextPct = 0;
+        } else if (claimInfo.isClaimed && !hasPreview) {
+            if (nextStatus !== 'betaald') nextStatus = 'bezig';
+            if (nextPct >= 100) nextPct = 0;
+        } else if (pct >= 100 && hasPreview) {
+            nextPct = 100;
+            nextStatus = paidAt ? 'betaald' : 'klaar';
+        } else if (pct >= 100 && !hasPreview) {
+            nextPct = 0;
+            nextStatus = 'actief';
+            note = 'Vorige run had geen opgeslagen preview en is teruggezet. Voer de opdracht opnieuw uit.';
+        } else if (pct > 0) {
+            nextPct = 0;
+            nextStatus = 'actief';
+            note = 'Vorige run was onderbroken na refresh/sluiten. Voer de opdracht opnieuw uit.';
+        } else if (status.key === 'bezig') {
+            nextStatus = 'actief';
+            note = 'Vorige run stond nog op bezig maar draaide niet meer. Voer de opdracht opnieuw uit.';
+        } else if (status.key === 'klaar' && !hasPreview) {
+            nextStatus = 'actief';
+            note = 'Opdracht stond op klaar zonder preview en is teruggezet.';
+        }
+
+        if (nextPct !== pct || nextStatus !== status.key) {
+            order.progressPct = nextPct;
+            order.statusKey = nextStatus;
+            order.updatedAt = Date.now();
+            changed = true;
+        }
+
+        if (note) {
+            const lastLog = Array.isArray(order.logs) && order.logs.length ? String(order.logs[order.logs.length - 1]?.msg || '') : '';
+            if (lastLog !== note) {
+                appendOrderLog(id, note, true);
+                changed = true;
+            }
+        }
+    });
+
+    if (changed) {
+        persistOrdersRuntime();
+    }
+}
+
+function restoreOrdersRuntimeFromState() {
+    try {
+        const raw = readStateValue(ORDER_RUNTIME_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+
+        Object.entries(parsed).forEach(([id, value]) => {
+            const numericId = Number(id);
+            if (!Number.isFinite(numericId) || numericId <= 0) return;
+            const prev = orders[numericId] || {};
+            orders[numericId] = {
+                ...prev,
+                name: String(value?.name || prev.name || ''),
+                type: String(value?.type || prev.type || ''),
+                logs: Array.isArray(value?.logs) ? value.logs.slice(-200) : (Array.isArray(prev.logs) ? prev.logs : []),
+                progressPct: Math.max(0, Math.min(100, Number(value?.progressPct) || 0)),
+                statusKey: normalizeOrderStatus(value?.statusKey || '').key,
+                paidAt: String(value?.paidAt || prev.paidAt || '').trim() || null,
+                claimedBy: String(value?.claimedBy || prev.claimedBy || '').trim() || null,
+                claimedAt: String(value?.claimedAt || prev.claimedAt || '').trim() || null,
+                updatedAt: Number(value?.updatedAt) || prev.updatedAt || null
+            };
+        });
+
+        reconcileOrdersRuntimeAfterRestore();
+        Object.keys(orders).forEach((id) => applyOrderUiStateToCard(Number(id)));
+    } catch (_) {
+        // ignore broken state
+    }
+}
+
+function renderCustomOrderCardHtml(record) {
+    const id = Number(record.id);
+    const ui = resolveOrderUiState({
+        status: record.status,
+        paidAt: record.paidAt,
+        progressPct: record.status === 'klaar' || record.status === 'betaald' ? 100 : 0
+    });
+    const isDelivered = ui.isBuilt;
+    const isPaid = ui.isPaid;
+    const clientLine = [record.clientName, record.location].filter(Boolean).join(' — ');
+    const claimInfo = getOrderClaimInfo(id);
+    const deliveryTime = String(record.deliveryTime || '').trim();
+    const amountText = Math.max(1, Math.round(Number(record.amount) || 0)).toLocaleString('nl-NL');
+    const deliveryLabel = deliveryTime || 'Nog niet opgegeven';
+    const title = String(record.title || 'Opdracht').trim() || 'Opdracht';
+    const description = String(record.description || 'Geen extra omschrijving.').trim() || 'Geen extra omschrijving.';
+    const deliveryHtml = `<div class="order-delivery"><strong>Oplevertijd</strong>${escapeHtml(deliveryLabel)}</div>`;
+    const paymentButtonHtml = ui.isBuilt
+        ? ''
+        : `
+                            <button class="complete-btn magnetic" id="complete-btn-${id}" type="button" data-order-complete="${id}">
+                                Factuur betaald
+                            </button>`;
+
+    return `
+                <div class="order-card has-claim ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
+                    <div class="order-main">
+                        <div class="order-info">
+                            <div class="order-client">${escapeHtml(clientLine || 'Nieuwe opdracht')}</div>
+                            <div class="order-title">${escapeHtml(title)}</div>
+                            <div class="order-desc">${escapeHtml(description)}</div>
+                            ${deliveryHtml}
+                        </div>
+                        <div class="order-price">
+                            <div class="order-price-label">Bedrag</div>
+                            <div class="order-price-value"><span class="currency">€</span>${amountText}</div>
+                        </div>
+                        <div class="order-actions">
+                            <button class="execute-btn magnetic" id="btn-${id}" type="button" data-order="${id}">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5h18M5.25 7.5v10.5A1.5 1.5 0 0 0 6.75 19.5h10.5a1.5 1.5 0 0 0 1.5-1.5V7.5M9 7.5V6a3 3 0 1 1 6 0v1.5"></path></svg>
+                                Open dossier
+                            </button>
+                            ${paymentButtonHtml}
+                            <div class="order-assignee" id="assignee-${id}">${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</div>
+                        </div>
+                    </div>
+                    <div class="order-progress" id="progress-${id}">
+                        <div class="progress-meta">
+                            <span class="progress-label">Voortgang</span>
+                            <span class="progress-percent" id="pct-${id}">${Math.round(ui.pct)}%</span>
+                        </div>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-${id}"></div></div>
+                        <div class="progress-steps">
+                            <span class="progress-step" id="step-${id}-1">Analyse</span>
+                            <span class="progress-step" id="step-${id}-2">Design</span>
+                            <span class="progress-step" id="step-${id}-3">Development</span>
+                            <span class="progress-step" id="step-${id}-4">Testing</span>
+                            <span class="progress-step" id="step-${id}-5">Oplevering</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+}
