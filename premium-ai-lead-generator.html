@@ -2304,7 +2304,7 @@
 
                     <div class="form-group form-group--lead-list" id="leadListControlWrap">
                         <label class="form-label" id="leadListControlLabel">Database</label>
-                        <button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window.openLeadDatabaseModalFromCampaign && window.openLeadDatabaseModalFromCampaign()" style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">
+                        <button type="button" class="form-input magnetic" id="openLeadListModalBtn" data-lead-database-open style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">
                             <span id="leadListOpenLabel">Bedrijvenregister</span>
                         </button>
                         <div id="leadListHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85; display:none;"></div>
@@ -2360,7 +2360,7 @@
             </div>
 
             <div class="launch-section management-mode-scope management-mode-scope--personnel" data-management-display="block">
-                <button class="launch-btn magnetic" id="launchBtn" onclick="toggleCampaign()">
+                <button class="launch-btn magnetic" id="launchBtn" data-campaign-toggle type="button">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     Start Campagne
                 </button>
@@ -2740,6 +2740,19 @@
                     pill.innerHTML = '<span class="dot"></span> Gepauzeerd';
                 }
             }
+        }
+
+        const launchBtn = document.getElementById('launchBtn');
+        if (launchBtn) {
+            launchBtn.addEventListener('click', toggleCampaign);
+        }
+
+        const openLeadListModalBtn = document.getElementById('openLeadListModalBtn');
+        if (openLeadListModalBtn) {
+            openLeadListModalBtn.addEventListener('click', () => {
+                if (typeof window.openLeadDatabaseModalFromCampaign !== 'function') return;
+                window.openLeadDatabaseModalFromCampaign();
+            });
         }
 
         // Cursor

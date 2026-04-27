@@ -22,8 +22,13 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /id="statConversion"><!-- SOFTORA_COLDCALLING_STAT_CONVERSION --><\/div>/);
   assert.match(
     pageSource,
-    /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window\.openLeadDatabaseModalFromCampaign && window\.openLeadDatabaseModalFromCampaign\(\)"/
+    /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" data-lead-database-open/
   );
+  assert.match(pageSource, /openLeadListModalBtn\.addEventListener\('click'/);
+  assert.match(pageSource, /window\.openLeadDatabaseModalFromCampaign\(\);/);
+  assert.match(pageSource, /id="launchBtn" data-campaign-toggle type="button"/);
+  assert.match(pageSource, /launchBtn\.addEventListener\('click', toggleCampaign\);/);
+  assert.doesNotMatch(pageSource, /\son(?:click|input|change|keydown|submit)=/i);
   assert.doesNotMatch(pageSource, /id="branche"/);
   assert.doesNotMatch(pageSource, /<label class="form-label">Branche<\/label>/);
   assert.match(pageSource, /<div class="form-group form-group--dispatch" id="callDispatchControlWrap">/);
