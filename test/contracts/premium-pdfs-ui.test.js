@@ -25,11 +25,16 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /<div class="pdf-download-actions">/);
   assert.match(pageSource, /href="\/assets\/algemene-voorwaarden-softora-vof\.pdf" download="algemene-voorwaarden-softora-vof\.pdf"/);
   assert.match(pageSource, /Algemene voorwaarden downloaden \(PDF\)/);
+  assert.match(pageSource, /data-doc="opleveringsmail"[\s\S]*Opleveringsmail/);
   assert.match(pageSource, /<div class="pdf-process-notice" role="note" aria-labelledby="pdf-process-notice-title">/);
   assert.match(pageSource, /Standaard werkwijze bij nieuwe opdrachten/);
   assert.match(pageSource, /Akkoord met de offerte en algemene voorwaarden\./);
   assert.match(pageSource, /const DEFAULT_OFFERTE_NOTITIES = 'In de bijlage vind je de offerte en de algemene voorwaarden van Softora VOF\. Door akkoord te geven op deze offerte verklaar je ook akkoord te gaan met de algemene voorwaarden\. Reageer bij akkoord altijd expliciet met: "Akkoord met de offerte en algemene voorwaarden\."';/);
   assert.match(pageSource, /id:'notities'[\s\S]*default:\s*DEFAULT_OFFERTE_NOTITIES/);
+  assert.match(pageSource, /const DEFAULT_OPLEVERINGSMAIL_NOTITIES = 'Je hebt 7 kalenderdagen om concrete gebreken te melden\. Daarna geldt het project als geaccepteerd\.';/);
+  assert.match(pageSource, /opleveringsmail:\s*\[[\s\S]*label:'Standaard opmerking'[\s\S]*default:\s*DEFAULT_OPLEVERINGSMAIL_NOTITIES/);
+  assert.match(pageSource, /docType === 'opleveringsmail'[\s\S]*<div class="pdf-doctype">Opleveringsmail<\/div>/);
+  assert.match(pageSource, /docType==='opleveringsmail'\?'OPLEVERINGSMAIL'/);
   assert.match(pageSource, /--preview-scale:\s*1;/);
   assert.match(pageSource, /--preview-max-scale:\s*1\.16;/);
   assert.match(pageSource, /--a4-width:\s*595px;/);

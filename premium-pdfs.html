@@ -734,6 +734,10 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
           Betalingsherinnering
         </button>
+        <button class="pdf-tab" onclick="setDoc('opleveringsmail',this)" data-doc="opleveringsmail">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h8M8 11h8M8 15h5M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg>
+          Opleveringsmail
+        </button>
       </div>
       <div class="pdf-download-actions">
         <a class="btn-dl btn-download btn-download--terms" href="/assets/algemene-voorwaarden-softora-vof.pdf" download="algemene-voorwaarden-softora-vof.pdf">
@@ -801,6 +805,7 @@ const A4_PREVIEW_WIDTH = 595;
 const A4_PREVIEW_HEIGHT = 842;
 let resizeObs = null;
 const DEFAULT_OFFERTE_NOTITIES = 'In de bijlage vind je de offerte en de algemene voorwaarden van Softora VOF. Door akkoord te geven op deze offerte verklaar je ook akkoord te gaan met de algemene voorwaarden. Reageer bij akkoord altijd expliciet met: "Akkoord met de offerte en algemene voorwaarden."';
+const DEFAULT_OPLEVERINGSMAIL_NOTITIES = 'Je hebt 7 kalenderdagen om concrete gebreken te melden. Daarna geldt het project als geaccepteerd.';
 
 const fields = {};
 const v = id => (fields[id] && fields[id].value) || '';
@@ -912,6 +917,17 @@ const docConfigs = {
     { id:'htype',     label:'Type herinnering',         select: ['1e Herinnering - vriendelijk','2e Herinnering - dringend','Aanmaning - formeel'] },
     { section: 'Toelichting' },
     { id:'notities',  label:'Persoonlijke boodschap (optioneel)', textarea: true, placeholder:'Bijv. mochten er vragen zijn...' },
+  ],
+  opleveringsmail: [
+    { section: 'Klantgegevens' },
+    { id:'bedrijf',   label:'Bedrijfsnaam',             placeholder:'De Vries B.V.' },
+    { id:'contact',   label:'Contactpersoon',            placeholder:'Dhr. De Vries' },
+    { id:'email',     label:'E-mailadres',               placeholder:'info@devries.nl', type:'email' },
+    { section: 'Projectgegevens' },
+    { id:'project',   label:'Project / onderwerp',       placeholder:'Website Business pakket' },
+    { row: [{ id:'datum', label:'Opleverdatum', type:'date', default: today() }, { id:'deadline', label:'Gebreken melden tot', type:'date', default: addDays(7) }] },
+    { section: 'Opmerking' },
+    { id:'notities',  label:'Standaard opmerking',       textarea: true, placeholder:'Opleveringsafspraak...', default: DEFAULT_OPLEVERINGSMAIL_NOTITIES },
   ],
 };
 
@@ -1051,7 +1067,7 @@ function update() {
       </div>
       <div class="pdf-footer">Softora.nl &nbsp;·&nbsp; info@softora.nl &nbsp;·&nbsp; www.softora.nl &nbsp;·&nbsp; KvK: 12345678</div>`;
 
-  } else {
+  } else if (docType === 'herinnering') {
     const htype = fields['htype'] ? parseInt(fields['htype'].value) : 1;
     const hcols  = { 1:'#d97706', 2:'#b45a00', 3:'#c0392b' };
     const hlabels= { 1:'1e Betalingsherinnering', 2:'2e Betalingsherinnering - Dringend', 3:'Aanmaning' };
@@ -1101,6 +1117,30 @@ function update() {
         ${v('notities') ? `<div class="pdf-notes"><div class="pdf-notes-label">Toelichting</div><div class="pdf-notes-text">${v('notities').replace(/\n/g,'<br>')}</div></div>` : ''}
       </div>
       <div class="pdf-footer">Softora.nl &nbsp;·&nbsp; info@softora.nl &nbsp;·&nbsp; www.softora.nl &nbsp;·&nbsp; KvK: 12345678</div>`;
+  } else if (docType === 'opleveringsmail') {
+    const notes = v('notities') ? `<div class="pdf-notes"><div class="pdf-notes-label">Opmerking</div><div class="pdf-notes-text">${v('notities').replace(/\n/g,'<br>')}</div></div>` : '';
+    const intro = `Geachte ${v('contact')||'relatie'},<br><br>Hierbij leveren wij het project <strong>${v('project')||'het project'}</strong> op. Controleer de oplevering zorgvuldig en laat het ons schriftelijk weten als je concrete gebreken ziet.`;
+
+    a4.innerHTML = `
+      <div class="pdf-top">
+        <div class="pdf-logo">SOFTORA.NL</div>
+        <div class="pdf-doctype">Opleveringsmail</div>
+      </div>
+      <div class="pdf-body">
+        <div class="pdf-addresses">
+          <div class="pdf-addr"><div class="pdf-addr-label">Van</div><div class="pdf-addr-name">Softora.nl</div><div class="pdf-addr-line">info@softora.nl</div><div class="pdf-addr-line">www.softora.nl</div></div>
+          <div class="pdf-addr"><div class="pdf-addr-label">Aan</div><div class="pdf-addr-name">${v('bedrijf')||'-'}</div>${v('contact') ? `<div class="pdf-addr-line">${v('contact')}</div>` : ''}${v('email') ? `<div class="pdf-addr-line">${v('email')}</div>` : ''}</div>
+        </div>
+        <div class="pdf-meta" style="margin-bottom:18px">
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">Document</div><div class="pdf-meta-val">Opleveringsmail</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">Project</div><div class="pdf-meta-val">${v('project')||'-'}</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">Opleverdatum</div><div class="pdf-meta-val">${fmtDate(v('datum'))}</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">Melden tot</div><div class="pdf-meta-val">${fmtDate(v('deadline'))}</div></div>
+        </div>
+        <div style="font-size:10.5px;color:#555;line-height:1.9;margin-bottom:18px">${intro}</div>
+        ${notes}
+      </div>
+      <div class="pdf-footer">Softora.nl &nbsp;·&nbsp; info@softora.nl &nbsp;·&nbsp; www.softora.nl &nbsp;·&nbsp; KvK: 12345678</div>`;
   }
 }
 
@@ -1116,7 +1156,7 @@ function downloadPDF() {
   doc.setFillColor(...CR); doc.rect(0,0,W,26,'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(255,255,255);
   doc.text('SOFTORA.NL', PL, 16);
-  const dtLabel = docType==='offerte'?'OFFERTE':docType==='factuur'?'FACTUUR':'BETALINGSHERINNERING';
+  const dtLabel = docType==='offerte'?'OFFERTE':docType==='factuur'?'FACTUUR':docType==='opleveringsmail'?'OPLEVERINGSMAIL':'BETALINGSHERINNERING';
   doc.setFontSize(8); doc.setTextColor(255,200,220); doc.text(dtLabel, PR, 16, {align:'right'});
 
   let y = 34;
@@ -1180,7 +1220,7 @@ function downloadPDF() {
       const ls=doc.splitTextToSize(v('notities'),164);doc.text(ls,PL+3,y+5);
     }
 
-  } else {
+  } else if (docType==='herinnering') {
     const htype=fields['htype']?parseInt(fields['htype'].value):1;
     const hcols={1:[217,119,6],2:[180,90,0],3:[192,57,43]};
     const hlabels={1:'1E BETALINGSHERINNERING',2:'2E BETALINGSHERINNERING - DRINGEND',3:'AANMANING'};
@@ -1206,6 +1246,37 @@ function downloadPDF() {
     doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
     doc.text('Betaal uiterlijk: '+fmtD(v('nieuwdat')),PL+4,y+5);doc.text('IBAN: '+(v('iban')||'-'),PL+4,y+9.5);
     doc.text(v('bedrag')||'-',188,y+7,{align:'right'});
+  } else if (docType==='opleveringsmail') {
+    const van = ['Softora.nl','info@softora.nl','www.softora.nl'];
+    const aan = [v('bedrijf')||'-',v('contact'),v('email')].filter(Boolean);
+
+    [[PL,van,'VAN'],[112,aan,'AAN']].forEach(([x,lines,lbl])=>{
+      doc.setFillColor(...BG);doc.rect(x,y,78,30,'F');
+      doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setTextColor(...MD);doc.text(lbl,x+3,y+4.5);
+      lines.forEach((l,i)=>{if(i===0){doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(...DK);}else{doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(...MD);}doc.text(String(l),x+3,y+9+i*5);});
+    });
+    y+=36;
+
+    doc.setFillColor(...BG); doc.rect(PL,y,170,14,'F');
+    [['DOCUMENT','Opleveringsmail'],['PROJECT',v('project')||'-'],['OPLEVERDATUM',fmtD(v('datum'))],['MELDEN TOT',fmtD(v('deadline'))]].forEach(([k,val],i) => {
+      const x=PL+3+i*43;
+      doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setTextColor(...MD); doc.text(k,x,y+4.5);
+      doc.setFontSize(8.5);doc.setFont('helvetica','normal');doc.setTextColor(...DK); doc.text(String(val),x,y+11);
+    });
+    y += 24;
+
+    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(...DK);
+    const intro = `Geachte ${v('contact')||'relatie'}, hierbij leveren wij het project ${v('project')||'het project'} op. Controleer de oplevering zorgvuldig en laat het ons schriftelijk weten als je concrete gebreken ziet.`;
+    const introLines = doc.splitTextToSize(intro,170);
+    doc.text(introLines,PL,y);
+    y += introLines.length*5+10;
+
+    if(v('notities')){
+      doc.setFillColor(...BG);doc.rect(PL,y,170,6,'F');
+      doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(...MD);doc.text('OPMERKING',PL+3,y+4);y+=6;
+      doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(70,70,80);
+      const ls=doc.splitTextToSize(v('notities'),164);doc.text(ls,PL+3,y+5);
+    }
   }
 
   doc.setFillColor(...BG);doc.rect(0,284,W,13,'F');
