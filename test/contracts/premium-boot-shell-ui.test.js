@@ -70,6 +70,11 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const wordPath = path.join(__dirname, '../../assets/premium-word.js');
         const wordSource = fs.readFileSync(wordPath, 'utf8');
         assert.match(wordSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
+      } else if (file === 'premium-boekhouding.html') {
+        assert.match(source, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script>\s*<script src="assets\/premium-bookkeeping\.js\?v=20260427a"><\/script>/, file);
+        const bookkeepingPath = path.join(__dirname, '../../assets/premium-bookkeeping.js');
+        const bookkeepingSource = fs.readFileSync(bookkeepingPath, 'utf8');
+        assert.match(bookkeepingSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else {
         assert.match(source, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       }
