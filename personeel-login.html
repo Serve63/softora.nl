@@ -556,7 +556,7 @@
                 <span>Vul je e-mailadres en wachtwoord in.</span>
             </div>
 
-            <form class="login-form" id="loginForm" onsubmit="return handleLogin(event)">
+            <form class="login-form" id="loginForm" data-login-form>
                 <div class="form-group">
                     <label class="form-label" for="email">E-mailadres</label>
                     <input type="email" id="email" class="form-input magnetic" placeholder="naam@softora.nl" autocomplete="email">
@@ -670,6 +670,11 @@
             }, 450);
 
             return false;
+        }
+
+        const loginForm = document.querySelector('[data-login-form]');
+        if (loginForm) {
+            loginForm.addEventListener('submit', handleLogin);
         }
     </script>
 </body>
