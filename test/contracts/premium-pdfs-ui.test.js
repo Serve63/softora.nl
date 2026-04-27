@@ -76,3 +76,21 @@ test('premium pdf builder exposes the algemene voorwaarden pdf asset', () => {
   assert.equal(pdf.subarray(0, 4).toString('ascii'), '%PDF');
   assert.ok(pdf.length > 100000, 'Algemene voorwaarden PDF hoort een echte downloadbare PDF te zijn.');
 });
+
+test('premium pdf builder gebruikt veilige delegated form-actions', () => {
+  const builderPath = path.join(__dirname, '../../assets/premium-pdfs-builder.js');
+  const builderSource = fs.readFileSync(builderPath, 'utf8');
+
+  assert.match(builderSource, /function escapeHtml\(value\)/);
+  assert.match(builderSource, /function htmlWithLineBreaks\(value\)/);
+  assert.match(builderSource, /function bindFormPanelActions\(panel\)/);
+  assert.match(builderSource, /panel\.addEventListener\('input', handleValueChange\);/);
+  assert.match(builderSource, /panel\.addEventListener\('change', handleValueChange\);/);
+  assert.match(builderSource, /data-pdf-field/);
+  assert.match(builderSource, /data-regel-field/);
+  assert.match(builderSource, /data-pdf-add-regel/);
+  assert.match(builderSource, /data-pdf-remove-regel/);
+  assert.match(builderSource, /htmlWithLineBreaks\(v\('notities'\)\)/);
+  assert.match(builderSource, /escapeHtml\(v\('bedrijf'\) \|\| '-'\)/);
+  assert.doesNotMatch(builderSource, /\son(?:click|input|change)=/);
+});

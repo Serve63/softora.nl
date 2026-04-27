@@ -16,6 +16,20 @@ const fmtDate = s => { if(!s) return '-'; const[y,m,d]=s.split('-'); return `${d
 const today = () => new Date().toISOString().split('T')[0];
 const addDays = n => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; };
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[char]);
+}
+
+function htmlWithLineBreaks(value) {
+  return escapeHtml(value).replace(/\n/g, '<br>');
+}
+
 // ── SCALE ──────────────────────────────────────────────────
 function fitPreviewToViewport() {
   const stage = document.getElementById('previewStage');
@@ -134,13 +148,55 @@ const docConfigs = {
 };
 
 function buildField(f) {
+  const id = escapeHtml(f.id);
+  const label = escapeHtml(f.label);
+  const placeholder = escapeHtml(f.placeholder || '');
+  const defaultValue = escapeHtml(f.default || '');
+
   if (f.select) {
-    return `<div class="field"><label>${f.label}</label><select id="f-${f.id}" onchange="update()">${f.select.map((o,i)=>`<option value="${i+1}">${o}</option>`).join('')}</select></div>`;
+    return `<div class="field"><label>${label}</label><select id="f-${id}" data-pdf-field>${f.select.map((o,i)=>`<option value="${i+1}">${escapeHtml(o)}</option>`).join('')}</select></div>`;
   }
   if (f.textarea) {
-    return `<div class="field"><label>${f.label}</label><textarea id="f-${f.id}" placeholder="${f.placeholder||''}" oninput="update()">${f.default||''}</textarea></div>`;
+    return `<div class="field"><label>${label}</label><textarea id="f-${id}" placeholder="${placeholder}" data-pdf-field>${defaultValue}</textarea></div>`;
   }
-  return `<div class="field"><label>${f.label}</label><input type="${f.type||'text'}" id="f-${f.id}" placeholder="${f.placeholder||''}" oninput="update()"${f.default?` value="${f.default}"`:''}></div>`;
+  return `<div class="field"><label>${label}</label><input type="${escapeHtml(f.type || 'text')}" id="f-${id}" placeholder="${placeholder}" data-pdf-field${f.default?` value="${defaultValue}"`:''}></div>`;
+}
+
+function bindFormPanelActions(panel) {
+  if (panel.dataset.pdfBuilderActionsBound === '1') return;
+  panel.dataset.pdfBuilderActionsBound = '1';
+
+  const handleValueChange = (event) => {
+    const target = event.target;
+    if (!target || typeof target.matches !== 'function') return;
+
+    if (target.matches('[data-regel-field]')) {
+      updateRegel(
+        Number.parseInt(target.dataset.regelId, 10),
+        target.dataset.regelField,
+        target.value
+      );
+      return;
+    }
+
+    if (target.matches('[data-pdf-field]')) {
+      update();
+    }
+  };
+
+  panel.addEventListener('input', handleValueChange);
+  panel.addEventListener('change', handleValueChange);
+  panel.addEventListener('click', (event) => {
+    const actionButton = event.target && event.target.closest('[data-pdf-add-regel],[data-pdf-remove-regel]');
+    if (!actionButton || !panel.contains(actionButton)) return;
+
+    if (actionButton.matches('[data-pdf-add-regel]')) {
+      addRegel();
+      return;
+    }
+
+    removeRegel(Number.parseInt(actionButton.dataset.regelId, 10));
+  });
 }
 
 function buildForm() {
@@ -148,11 +204,15 @@ function buildForm() {
   const config = docConfigs[docType];
   let html = '';
 
+  Object.keys(fields).forEach((key) => {
+    delete fields[key];
+  });
+
   config.forEach(f => {
     if (f.section && !f.isRegels) {
       html += `<div class="form-section-head">${f.section}</div>`;
     } else if (f.isRegels) {
-      html += `<div class="form-section-head">Regelomschrijvingen</div><div id="regels-wrap"></div><button class="btn-add-regel" onclick="addRegel()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Regel toevoegen</button>`;
+      html += `<div class="form-section-head">Regelomschrijvingen</div><div id="regels-wrap"></div><button class="btn-add-regel" type="button" data-pdf-add-regel><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Regel toevoegen</button>`;
       html += `<div class="form-section-head" style="margin-top:18px">Totaal</div><div class="form-totaal" id="form-totaal"><div class="form-totaal-row"><span>Subtotaal excl. BTW</span><span id="ft-sub">€ 0,00</span></div><div class="form-totaal-row"><span>BTW (21%)</span><span id="ft-btw">€ 0,00</span></div><div class="form-totaal-row grand"><span>Totaal incl. BTW</span><span id="ft-grand">€ 0,00</span></div></div>`;
     } else if (f.row) {
       html += `<div class="field-row">${f.row.map(buildField).join('')}</div>`;
@@ -162,6 +222,7 @@ function buildForm() {
   });
 
   panel.innerHTML = html;
+  bindFormPanelActions(panel);
 
   panel.querySelectorAll('input,textarea,select').forEach(el => {
     fields[el.id.replace('f-','')] = el;
@@ -179,10 +240,10 @@ function renderRegels() {
     <div class="regels-header"><span>Omschrijving</span><span>Aantal</span><span>Prijs (€)</span><span></span></div>
     ${regels.map(r => `
       <div class="regel-row">
-        <input type="text" value="${r.omschrijving}" placeholder="Dienst..." oninput="updateRegel(${r.id},'omschrijving',this.value)">
-        <input type="number" value="${r.aantal}" min="1" oninput="updateRegel(${r.id},'aantal',this.value)">
-        <input type="number" value="${r.prijs||''}" placeholder="0,00" step="0.01" oninput="updateRegel(${r.id},'prijs',this.value)">
-        <button class="btn-remove-regel" onclick="removeRegel(${r.id})" title="Verwijder">×</button>
+        <input type="text" value="${escapeHtml(r.omschrijving)}" placeholder="Dienst..." data-regel-id="${r.id}" data-regel-field="omschrijving">
+        <input type="number" value="${escapeHtml(r.aantal)}" min="1" data-regel-id="${r.id}" data-regel-field="aantal">
+        <input type="number" value="${escapeHtml(r.prijs || '')}" placeholder="0,00" step="0.01" data-regel-id="${r.id}" data-regel-field="prijs">
+        <button class="btn-remove-regel" type="button" data-pdf-remove-regel data-regel-id="${r.id}" title="Verwijder">×</button>
       </div>`).join('')}`;
   updateTotaalBar();
 }
@@ -213,17 +274,17 @@ function update() {
     const isOff = docType === 'offerte';
     const sub = getSubtotal(), btw = sub*.21, grand = sub+btw;
 
-    const addr2extra = !isOff && v('btwnum') ? `<div class="pdf-addr-line">BTW: ${v('btwnum')}</div>` : '';
-    const ibanLine   = !isOff && v('iban')   ? `<div class="pdf-addr-line">IBAN: ${v('iban')}</div>` : '';
+    const addr2extra = !isOff && v('btwnum') ? `<div class="pdf-addr-line">BTW: ${escapeHtml(v('btwnum'))}</div>` : '';
+    const ibanLine   = !isOff && v('iban')   ? `<div class="pdf-addr-line">IBAN: ${escapeHtml(v('iban'))}</div>` : '';
 
     const rows = regels.map(r=>`<tr>
-      <td>${r.omschrijving||'-'}</td>
+      <td>${escapeHtml(r.omschrijving || '-')}</td>
       <td style="text-align:right">${r.aantal}</td>
       <td style="text-align:right">${fmtEur(r.prijs)}</td>
       <td style="text-align:right;font-weight:600">${fmtEur(r.aantal*r.prijs)}</td>
     </tr>`).join('');
 
-    const notes = v('notities') ? `<div class="pdf-notes"><div class="pdf-notes-label">Opmerkingen</div><div class="pdf-notes-text">${v('notities').replace(/\n/g,'<br>')}</div></div>` : '';
+    const notes = v('notities') ? `<div class="pdf-notes"><div class="pdf-notes-label">Opmerkingen</div><div class="pdf-notes-text">${htmlWithLineBreaks(v('notities'))}</div></div>` : '';
 
     a4.innerHTML = `
       <div class="pdf-top">
@@ -242,19 +303,19 @@ function update() {
           </div>
           <div class="pdf-addr">
             <div class="pdf-addr-label">Aan</div>
-            <div class="pdf-addr-name">${v('bedrijf')||'-'}</div>
-            ${v('contact') ? `<div class="pdf-addr-line">${v('contact')}</div>` : ''}
-            ${v('adres')   ? `<div class="pdf-addr-line">${v('adres')}</div>` : ''}
-            ${v('email')   ? `<div class="pdf-addr-line">${v('email')}</div>` : ''}
-            ${v('kvk')     ? `<div class="pdf-addr-line">KvK: ${v('kvk')}</div>` : ''}
+            <div class="pdf-addr-name">${escapeHtml(v('bedrijf') || '-')}</div>
+            ${v('contact') ? `<div class="pdf-addr-line">${escapeHtml(v('contact'))}</div>` : ''}
+            ${v('adres')   ? `<div class="pdf-addr-line">${escapeHtml(v('adres'))}</div>` : ''}
+            ${v('email')   ? `<div class="pdf-addr-line">${escapeHtml(v('email'))}</div>` : ''}
+            ${v('kvk')     ? `<div class="pdf-addr-line">KvK: ${escapeHtml(v('kvk'))}</div>` : ''}
             ${addr2extra}
           </div>
         </div>
         <div class="pdf-meta">
-          <div class="pdf-meta-cell"><div class="pdf-meta-key">${isOff?'Offertenummer':'Factuurnummer'}</div><div class="pdf-meta-val">${v('nummer')||'-'}</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">${isOff?'Offertenummer':'Factuurnummer'}</div><div class="pdf-meta-val">${escapeHtml(v('nummer') || '-')}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">${isOff?'Datum':'Factuurdatum'}</div><div class="pdf-meta-val">${fmtDate(v('datum'))}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">${isOff?'Geldig tot':'Vervaldatum'}</div><div class="pdf-meta-val">${isOff?fmtDate(v('geldig')):fmtDate(v('verval'))}</div></div>
-          <div class="pdf-meta-cell"><div class="pdf-meta-key">${isOff?'Onderwerp':'Referentie'}</div><div class="pdf-meta-val">${isOff?(v('onderwerp')||'-'):(v('ref')||'-')}</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">${isOff?'Onderwerp':'Referentie'}</div><div class="pdf-meta-val">${escapeHtml(isOff ? (v('onderwerp') || '-') : (v('ref') || '-'))}</div></div>
         </div>
         <table class="pdf-table">
           <thead><tr><th>Omschrijving</th><th style="text-align:right">Aantal</th><th style="text-align:right">Prijs</th><th style="text-align:right">Totaal</th></tr></thead>
@@ -270,14 +331,15 @@ function update() {
       <div class="pdf-footer">Softora.nl &nbsp;·&nbsp; info@softora.nl &nbsp;·&nbsp; www.softora.nl &nbsp;·&nbsp; KvK: 12345678</div>`;
 
   } else if (docType === 'herinnering') {
-    const htype = fields['htype'] ? parseInt(fields['htype'].value) : 1;
+    const selectedHtype = fields['htype'] ? parseInt(fields['htype'].value) : 1;
+    const htype = [1, 2, 3].includes(selectedHtype) ? selectedHtype : 1;
     const hcols  = { 1:'#d97706', 2:'#b45a00', 3:'#c0392b' };
     const hlabels= { 1:'1e Betalingsherinnering', 2:'2e Betalingsherinnering - Dringend', 3:'Aanmaning' };
     const col = hcols[htype];
     const msgs = {
-      1:`Geachte ${v('contact')||'relatie'},\n\nWij attenderen u er vriendelijk op dat onderstaande factuur nog niet is voldaan. Wellicht is de betaling al onderweg – in dat geval kunt u dit bericht als niet verzonden beschouwen.`,
-      2:`Geachte ${v('contact')||'relatie'},\n\nOndanks onze eerdere herinnering hebben wij uw betaling nog niet ontvangen. Wij verzoeken u dringend het openstaande bedrag zo spoedig mogelijk te voldoen.`,
-      3:`Geachte ${v('contact')||'relatie'},\n\nNadat wij u meerdere malen hebben verzocht te betalen, is betaling uitgebleven. Wij sommeren u het verschuldigde bedrag uiterlijk op de vermelde datum te voldoen. Bij uitblijven treffen wij verdere incassomaatregelen.`
+      1:`Geachte ${escapeHtml(v('contact') || 'relatie')},\n\nWij attenderen u er vriendelijk op dat onderstaande factuur nog niet is voldaan. Wellicht is de betaling al onderweg – in dat geval kunt u dit bericht als niet verzonden beschouwen.`,
+      2:`Geachte ${escapeHtml(v('contact') || 'relatie')},\n\nOndanks onze eerdere herinnering hebben wij uw betaling nog niet ontvangen. Wij verzoeken u dringend het openstaande bedrag zo spoedig mogelijk te voldoen.`,
+      3:`Geachte ${escapeHtml(v('contact') || 'relatie')},\n\nNadat wij u meerdere malen hebben verzocht te betalen, is betaling uitgebleven. Wij sommeren u het verschuldigde bedrag uiterlijk op de vermelde datum te voldoen. Bij uitblijven treffen wij verdere incassomaatregelen.`
     };
 
     a4.innerHTML = `
@@ -295,33 +357,33 @@ function update() {
           </div>
           <div class="pdf-addr">
             <div class="pdf-addr-label">Aan</div>
-            <div class="pdf-addr-name">${v('bedrijf')||'-'}</div>
-            ${v('contact') ? `<div class="pdf-addr-line">${v('contact')}</div>` : ''}
-            ${v('adres')   ? `<div class="pdf-addr-line">${v('adres')}</div>` : ''}
-            ${v('email')   ? `<div class="pdf-addr-line">${v('email')}</div>` : ''}
+            <div class="pdf-addr-name">${escapeHtml(v('bedrijf') || '-')}</div>
+            ${v('contact') ? `<div class="pdf-addr-line">${escapeHtml(v('contact'))}</div>` : ''}
+            ${v('adres')   ? `<div class="pdf-addr-line">${escapeHtml(v('adres'))}</div>` : ''}
+            ${v('email')   ? `<div class="pdf-addr-line">${escapeHtml(v('email'))}</div>` : ''}
           </div>
         </div>
         <div style="background:${col};color:#fff;border-radius:4px;padding:9px 14px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:14px">${hlabels[htype]}</div>
         <div style="font-size:10.5px;color:#555;line-height:1.9;margin-bottom:18px">${msgs[htype].replace(/\n/g,'<br>')}</div>
         <div class="pdf-meta" style="margin-bottom:14px">
-          <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurnummer</div><div class="pdf-meta-val">${v('factnr')||'-'}</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurnummer</div><div class="pdf-meta-val">${escapeHtml(v('factnr') || '-')}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurdatum</div><div class="pdf-meta-val">${fmtDate(v('factdatum'))}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">Vervallen op</div><div class="pdf-meta-val">${fmtDate(v('verval'))}</div></div>
-          <div class="pdf-meta-cell"><div class="pdf-meta-key">Openstaand</div><div class="pdf-meta-val" style="color:${col}">${v('bedrag')||'-'}</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">Openstaand</div><div class="pdf-meta-val" style="color:${col}">${escapeHtml(v('bedrag') || '-')}</div></div>
         </div>
         <div style="background:${col};color:#fff;border-radius:4px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div style="font-size:10.5px;line-height:1.7">
             <div style="font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.7;margin-bottom:2px">Betaal uiterlijk</div>
-            <strong>${fmtDate(v('nieuwdat'))}</strong> &nbsp;·&nbsp; IBAN: ${v('iban')||'-'}
+            <strong>${fmtDate(v('nieuwdat'))}</strong> &nbsp;·&nbsp; IBAN: ${escapeHtml(v('iban') || '-')}
           </div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800">${v('bedrag')||'-'}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800">${escapeHtml(v('bedrag') || '-')}</div>
         </div>
-        ${v('notities') ? `<div class="pdf-notes"><div class="pdf-notes-label">Toelichting</div><div class="pdf-notes-text">${v('notities').replace(/\n/g,'<br>')}</div></div>` : ''}
+        ${v('notities') ? `<div class="pdf-notes"><div class="pdf-notes-label">Toelichting</div><div class="pdf-notes-text">${htmlWithLineBreaks(v('notities'))}</div></div>` : ''}
       </div>
       <div class="pdf-footer">Softora.nl &nbsp;·&nbsp; info@softora.nl &nbsp;·&nbsp; www.softora.nl &nbsp;·&nbsp; KvK: 12345678</div>`;
   } else if (docType === 'opleveringsmail') {
-    const notes = v('notities') ? `<div class="pdf-notes"><div class="pdf-notes-label">Opmerking</div><div class="pdf-notes-text">${v('notities').replace(/\n/g,'<br>')}</div></div>` : '';
-    const intro = `Geachte ${v('contact')||'relatie'},<br><br>Hierbij leveren wij het project <strong>${v('project')||'het project'}</strong> op. Controleer de oplevering zorgvuldig en laat het ons schriftelijk weten als je concrete gebreken ziet.`;
+    const notes = v('notities') ? `<div class="pdf-notes"><div class="pdf-notes-label">Opmerking</div><div class="pdf-notes-text">${htmlWithLineBreaks(v('notities'))}</div></div>` : '';
+    const intro = `Geachte ${escapeHtml(v('contact') || 'relatie')},<br><br>Hierbij leveren wij het project <strong>${escapeHtml(v('project') || 'het project')}</strong> op. Controleer de oplevering zorgvuldig en laat het ons schriftelijk weten als je concrete gebreken ziet.`;
 
     a4.innerHTML = `
       <div class="pdf-top">
@@ -331,11 +393,11 @@ function update() {
       <div class="pdf-body">
         <div class="pdf-addresses">
           <div class="pdf-addr"><div class="pdf-addr-label">Van</div><div class="pdf-addr-name">Softora.nl</div><div class="pdf-addr-line">info@softora.nl</div><div class="pdf-addr-line">www.softora.nl</div></div>
-          <div class="pdf-addr"><div class="pdf-addr-label">Aan</div><div class="pdf-addr-name">${v('bedrijf')||'-'}</div>${v('contact') ? `<div class="pdf-addr-line">${v('contact')}</div>` : ''}${v('email') ? `<div class="pdf-addr-line">${v('email')}</div>` : ''}</div>
+          <div class="pdf-addr"><div class="pdf-addr-label">Aan</div><div class="pdf-addr-name">${escapeHtml(v('bedrijf') || '-')}</div>${v('contact') ? `<div class="pdf-addr-line">${escapeHtml(v('contact'))}</div>` : ''}${v('email') ? `<div class="pdf-addr-line">${escapeHtml(v('email'))}</div>` : ''}</div>
         </div>
         <div class="pdf-meta" style="margin-bottom:18px">
           <div class="pdf-meta-cell"><div class="pdf-meta-key">Document</div><div class="pdf-meta-val">Opleveringsmail</div></div>
-          <div class="pdf-meta-cell"><div class="pdf-meta-key">Project</div><div class="pdf-meta-val">${v('project')||'-'}</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">Project</div><div class="pdf-meta-val">${escapeHtml(v('project') || '-')}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">Opleverdatum</div><div class="pdf-meta-val">${fmtDate(v('datum'))}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">Melden tot</div><div class="pdf-meta-val">${fmtDate(v('deadline'))}</div></div>
         </div>
