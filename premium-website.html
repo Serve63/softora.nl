@@ -1469,6 +1469,91 @@
             fill: currentColor;
         }
 
+        .cookie-consent {
+            position: fixed;
+            left: 24px;
+            bottom: 24px;
+            z-index: 1300;
+            width: min(580px, calc(100vw - 48px));
+            padding: 18px 18px 16px;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(24, 27, 44, 0.1);
+            border-left: 4px solid var(--accent);
+            border-radius: 8px;
+            box-shadow: 0 18px 42px rgba(20, 22, 34, 0.16);
+            backdrop-filter: blur(14px);
+            color: var(--text-secondary);
+        }
+
+        .cookie-consent[hidden] {
+            display: none !important;
+        }
+
+        .cookie-consent-title {
+            margin: 0 0 7px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.92rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .cookie-consent-text {
+            margin: 0;
+            font-size: 0.84rem;
+            line-height: 1.65;
+            color: var(--text-secondary);
+        }
+
+        .cookie-consent-text a {
+            color: var(--accent);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .cookie-consent-text a:hover {
+            text-decoration: underline;
+        }
+
+        .cookie-consent-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .cookie-consent-btn {
+            min-height: 40px;
+            padding: 0.72rem 1rem;
+            border: 1px solid var(--accent);
+            border-radius: 7px;
+            background: var(--accent);
+            color: #fff;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+
+        .cookie-consent-btn:hover {
+            background: var(--accent-light);
+            border-color: var(--accent-light);
+        }
+
+        .cookie-consent-btn.secondary {
+            background: transparent;
+            color: var(--accent);
+        }
+
+        .cookie-consent-btn.secondary:hover {
+            background: rgba(139, 34, 82, 0.08);
+            border-color: var(--accent);
+        }
+
         .footer-bottom {
             display: flex;
             align-items: center;
@@ -1492,15 +1577,21 @@
             gap: 24px;
         }
 
-        .footer-legal a {
+        .footer-legal a,
+        .footer-legal button {
             font-family: 'Inter', sans-serif;
             font-size: 12px;
             color: var(--text-tertiary);
             text-decoration: none;
+            background: none;
+            border: 0;
+            padding: 0;
+            cursor: pointer;
             transition: color 0.15s;
         }
 
-        .footer-legal a:hover {
+        .footer-legal a:hover,
+        .footer-legal button:hover {
             color: #9b2355;
         }
 
@@ -1712,6 +1803,20 @@
             .footer-legal { gap: 14px; flex-wrap: wrap; }
             .footer-legal a[href*="premium-personeel-login"] { display: none; }
             h1 { font-size: 3rem; }
+            .cookie-consent {
+                left: 16px;
+                right: 16px;
+                bottom: 88px;
+                width: auto;
+                padding: 16px;
+            }
+            .cookie-consent-actions {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+            .cookie-consent-btn {
+                width: 100%;
+            }
             .whatsapp-widget {
                 right: 16px;
                 bottom: 16px;
@@ -3344,6 +3449,7 @@
             <div class="footer-copy">© 2026 <span>Softora.nl</span> - Alle rechten voorbehouden</div>
             <div class="footer-legal">
                 <a href="/premium-privacy-policy">Privacybeleid</a>
+                <button type="button" data-cookie-settings>Cookie-instellingen</button>
                 <a href="/premium-algemene-voorwaarden">Algemene voorwaarden</a>
                 <a href="/premium-blog">Artikelen</a>
                 <a href="/premium-over-softora">Over Softora.nl</a>
@@ -3368,6 +3474,17 @@
         </a>
     </div>
 
+    <div class="cookie-consent" id="cookieConsent" role="dialog" aria-labelledby="cookie-consent-title" hidden>
+        <div class="cookie-consent-title" id="cookie-consent-title">Cookies op Softora.nl</div>
+        <p class="cookie-consent-text">
+            We gebruiken noodzakelijke cookies om de website goed te laten werken. Met jouw akkoord mogen we ook analytische cookies gebruiken om de site te verbeteren. Lees meer in ons <a href="/premium-privacy-policy">privacybeleid</a>.
+        </p>
+        <div class="cookie-consent-actions">
+            <button type="button" class="cookie-consent-btn secondary" data-cookie-choice="declined">Weigeren</button>
+            <button type="button" class="cookie-consent-btn" data-cookie-choice="accepted">Akkoord</button>
+        </div>
+    </div>
+
     <script>
         (function () {
             try {
@@ -3375,6 +3492,9 @@
                 const cursorDot = document.querySelector(".cursor-dot");
                 const progressBar = document.querySelector(".scroll-progress");
                 const navbar = document.getElementById("navbar");
+                const cookieConsent = document.getElementById("cookieConsent");
+                const cookieChoiceButtons = document.querySelectorAll("[data-cookie-choice]");
+                const cookieSettingsButtons = document.querySelectorAll("[data-cookie-settings]");
                 const magneticElements = document.querySelectorAll(".magnetic");
                 const tiltCards = document.querySelectorAll("[data-tilt]");
                 const faqListEl = document.getElementById("faq-list");
@@ -3413,6 +3533,55 @@
                             link.setAttribute("target", "_blank");
                             link.setAttribute("rel", "noopener noreferrer");
                         }
+                    });
+                }
+
+                function getCookieValue(name) {
+                    const target = name + "=";
+                    return String(document.cookie || "")
+                        .split(";")
+                        .map(function (part) {
+                            return part.trim();
+                        })
+                        .find(function (part) {
+                            return part.indexOf(target) === 0;
+                        })
+                        ?.slice(target.length) || "";
+                }
+
+                function setCookieConsentChoice(choice) {
+                    const safeChoice = choice === "accepted" ? "accepted" : "declined";
+                    document.cookie = "softora_cookie_consent=" + safeChoice + "; Max-Age=15552000; Path=/; SameSite=Lax";
+                }
+
+                function showCookieConsent() {
+                    if (!cookieConsent) return;
+                    cookieConsent.hidden = false;
+                }
+
+                function hideCookieConsent() {
+                    if (!cookieConsent) return;
+                    cookieConsent.hidden = true;
+                }
+
+                function setupCookieConsent() {
+                    if (!cookieConsent) return;
+
+                    if (!getCookieValue("softora_cookie_consent")) {
+                        showCookieConsent();
+                    }
+
+                    cookieChoiceButtons.forEach(function (button) {
+                        button.addEventListener("click", function () {
+                            setCookieConsentChoice(button.getAttribute("data-cookie-choice"));
+                            hideCookieConsent();
+                        });
+                    });
+
+                    cookieSettingsButtons.forEach(function (button) {
+                        button.addEventListener("click", function () {
+                            showCookieConsent();
+                        });
                     });
                 }
 
@@ -3580,6 +3749,7 @@
                 window.addEventListener("resize", syncCtaLinksForViewport, { passive: true });
                 updateScrollUi();
                 syncCtaLinksForViewport();
+                setupCookieConsent();
 
                 document.querySelectorAll(".fade-up").forEach(function (element) {
                     if (element && element.classList) element.classList.add("visible");

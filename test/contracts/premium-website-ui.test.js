@@ -390,3 +390,21 @@ test('premium homepage start- en offerteknoppen starten een WhatsApp-chat', () =
     /<a href="https:\/\/wa\.me\/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig<\/a>/
   );
 });
+
+test('premium homepage heeft een werkende cookie melding', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<div class="cookie-consent" id="cookieConsent" role="dialog" aria-labelledby="cookie-consent-title" hidden>/);
+  assert.match(source, /<div class="cookie-consent-title" id="cookie-consent-title">Cookies op Softora\.nl<\/div>/);
+  assert.match(source, /data-cookie-choice="declined"[\s\S]*Weigeren<\/button>/);
+  assert.match(source, /data-cookie-choice="accepted"[\s\S]*Akkoord<\/button>/);
+  assert.match(source, /<button type="button" data-cookie-settings>Cookie-instellingen<\/button>/);
+  assert.match(source, /softora_cookie_consent/);
+  assert.match(source, /document\.cookie = "softora_cookie_consent="/);
+  assert.match(source, /setupCookieConsent\(\);/);
+  assert.match(source, /\.cookie-consent\s*\{[\s\S]*position:\s*fixed;[\s\S]*bottom:\s*24px;[\s\S]*border-left:\s*4px solid var\(--accent\);/);
+  assert.match(source, /@media \(max-width: 768px\) \{[\s\S]*\.cookie-consent\s*\{[\s\S]*bottom:\s*88px;/);
+  assert.doesNotMatch(source, /localStorage/);
+  assert.doesNotMatch(source, /sessionStorage/);
+});
