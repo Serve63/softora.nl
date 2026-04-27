@@ -5,7 +5,10 @@ const path = require('path');
 
 test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente editflow', () => {
   const pagePath = path.join(__dirname, '../../premium-wachtwoordenregister.html');
+  const rendererPath = path.join(__dirname, '../../assets/premium-password-register-renderer.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
+  const combinedSource = `${pageSource}\n${rendererSource}`;
 
   assert.match(pageSource, /family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700/);
   assert.doesNotMatch(pageSource, /Barlow/);
@@ -23,6 +26,8 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /fetchUiStateGetWithFallback\(PASSWORD_REGISTER_SCOPE\)/);
   assert.match(pageSource, /fetchUiStateSetWithFallback\(PASSWORD_REGISTER_SCOPE, payload\)/);
   assert.match(pageSource, /\[PASSWORD_REGISTER_ENTRIES_KEY\]: JSON\.stringify\(sanitized\)/);
+  assert.match(pageSource, /assets\/premium-password-register-renderer\.js\?v=20260427a/);
+  assert.match(rendererSource, /global\.SoftoraPasswordRegisterRenderer/);
   assert.match(pageSource, /hosting@example\.test/);
   assert.match(pageSource, /Voorbeeldgegevens geladen\. Vervang deze en sla daarna op om echte gegevens veilig te bewaren\./);
   assert.doesNotMatch(pageSource, /persistPasswordEntries\('bootstrap'\)/);
@@ -32,22 +37,27 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /openCreateModal\(/);
   assert.match(pageSource, /class="add-entry-btn"/);
   assert.match(pageSource, /id="add-entry-btn"/);
-  assert.match(pageSource, /class="btn-edit"/);
-  assert.match(pageSource, /class="btn-del"/);
+  assert.match(rendererSource, /className:\s*"btn-edit"/);
+  assert.match(rendererSource, /className:\s*"btn-del"/);
   assert.match(pageSource, /openDeleteEntryModal\(/);
   assert.match(pageSource, /confirmDeletePasswordEntry/);
-  assert.doesNotMatch(pageSource, /onclick=/);
+  assert.doesNotMatch(combinedSource, /onclick=/);
+  assert.doesNotMatch(combinedSource, /innerHTML/);
   assert.match(pageSource, /data-pin-digit="1"/);
   assert.match(pageSource, /data-pin-action="clear"/);
   assert.match(pageSource, /data-pin-action="backspace"/);
   assert.match(pageSource, /id="lock-register-btn"/);
-  assert.match(pageSource, /data-entry-action="toggle"/);
-  assert.match(pageSource, /data-entry-action="edit"/);
-  assert.match(pageSource, /data-entry-action="delete"/);
+  assert.match(rendererSource, /button\.dataset\.entryAction = config\.action/);
+  assert.match(rendererSource, /action:\s*"toggle"/);
+  assert.match(rendererSource, /action:\s*"edit"/);
+  assert.match(rendererSource, /action:\s*"delete"/);
+  assert.match(pageSource, /renderer\.createEntryRow\(entry, Boolean\(visible\[entry\.id\]\)\)/);
+  assert.match(pageSource, /passwordListEl\.replaceChildren/);
+  assert.match(rendererSource, /textContent = isVisible \? normalize\(entry && entry\.pw\)/);
   assert.match(pageSource, /pinNumpadEl\.addEventListener\('click'/);
   assert.match(pageSource, /passwordListEl\.addEventListener\('click'/);
   assert.match(pageSource, /searchInputEl\.addEventListener\('input', render\)/);
-  assert.match(pageSource, /a2\.12 2\.12 0 113 3L7 19l-4 1 1-4 12\.5-12\.5z/);
+  assert.match(rendererSource, /a2\.12 2\.12 0 113 3L7 19l-4 1 1-4 12\.5-12\.5z/);
   assert.match(pageSource, /entryModalMode === 'create'/);
   assert.match(pageSource, /persistPasswordEntries\('create'\)/);
   assert.match(pageSource, /saveEntryFromModal/);

@@ -972,6 +972,7 @@ body {
   </div>
 </div>
 
+<script src="assets/premium-password-register-renderer.js?v=20260427a"></script>
 <script>
 let input = '', attempts = 0, blocked = false, checking = false;
 
@@ -1326,16 +1327,9 @@ function getEntryById(id) {
   return entries.find((entry) => Number(entry && entry.id) === Number(id)) || null;
 }
 
-function escapeHtml(value) {
-  return String(value == null ? '' : value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 function render() {
+  const renderer = window.SoftoraPasswordRegisterRenderer;
+  if (!passwordListEl || !renderer) return;
   const q = normalizeString(searchInputEl && searchInputEl.value).toLowerCase();
   const filtered = entries.filter((entry) => {
     if (!q) return true;
@@ -1345,43 +1339,15 @@ function render() {
   });
 
   if (!filtered.length) {
-    passwordListEl.innerHTML = '<div class="empty">Geen resultaten gevonden.</div>';
+    passwordListEl.replaceChildren(renderer.createEmptyState('Geen resultaten gevonden.'));
     return;
   }
 
-  passwordListEl.innerHTML = filtered.map((entry) => {
-    const show = Boolean(visible[entry.id]);
-    const safeName = escapeHtml(entry.naam);
-    const safeUrl = escapeHtml(entry.url);
-    const safeUser = escapeHtml(entry.user);
-    const passwordMarkup = show ? escapeHtml(entry.pw) : '••••••••••';
-    return `<div class="t-row">
-      <div class="t-name">
-        <div>
-          <div class="t-label">${safeName}</div>
-          <div class="t-url">${safeUrl}</div>
-        </div>
-      </div>
-      <div class="t-user">${safeUser}</div>
-      <div class="t-pw-wrap">
-        <span class="t-pw ${show ? '' : 'hidden'}" id="pw-${entry.id}">${passwordMarkup}</span>
-        <button class="btn-icon" type="button" data-entry-action="toggle" data-entry-id="${entry.id}" title="${show ? 'Verbergen' : 'Tonen'}" aria-label="${show ? 'Wachtwoord verbergen' : 'Wachtwoord tonen'}">
-          ${show
-            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
-            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
-          }
-        </button>
-      </div>
-      <div class="row-actions">
-        <button class="btn-edit" type="button" data-entry-action="edit" data-entry-id="${entry.id}" title="Bewerken" aria-label="Inloggegevens bewerken">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-        </button>
-        <button class="btn-del" type="button" data-entry-action="delete" data-entry-id="${entry.id}" title="Verwijderen" aria-label="Inloggegevens verwijderen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
-        </button>
-      </div>
-    </div>`;
-  }).join('');
+  const fragment = document.createDocumentFragment();
+  filtered.forEach((entry) => {
+    fragment.appendChild(renderer.createEntryRow(entry, Boolean(visible[entry.id])));
+  });
+  passwordListEl.replaceChildren(fragment);
 }
 
 function toggleVis(id) {
