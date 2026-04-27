@@ -185,11 +185,15 @@
     function indexCustomersBySyncKeys(customers) {
         const index = new Map();
         (customers || []).forEach(function (customer, customerIndex) {
-            collectCustomerSyncKeys(customer).forEach(function (key) {
-                if (!index.has(key)) index.set(key, customerIndex);
-            });
+            addCustomerSyncKeysToIndex(index, customer, customerIndex);
         });
         return index;
+    }
+
+    function addCustomerSyncKeysToIndex(index, customer, customerIndex) {
+        collectCustomerSyncKeys(customer).forEach(function (key) {
+            if (!index.has(key)) index.set(key, customerIndex);
+        });
     }
 
     function findExistingCustomerIndex(index, customer) {
@@ -238,9 +242,7 @@
             if (existingIndex === -1) {
                 const newIndex = mergedCustomers.length;
                 mergedCustomers.push(customer);
-                collectCustomerSyncKeys(customer).forEach(function (key) {
-                    if (!keyIndex.has(key)) keyIndex.set(key, newIndex);
-                });
+                addCustomerSyncKeysToIndex(keyIndex, customer, newIndex);
                 addedCount += 1;
                 return;
             }
@@ -249,6 +251,7 @@
             const updated = mergeCustomerForSync(mergedCustomers[existingIndex], customer);
             if (updated !== mergedCustomers[existingIndex]) {
                 mergedCustomers[existingIndex] = updated;
+                addCustomerSyncKeysToIndex(keyIndex, updated, existingIndex);
                 updatedCount += 1;
             }
         });

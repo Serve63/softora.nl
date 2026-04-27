@@ -2,6 +2,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const vm = require('node:vm');
+
+function loadDatabaseImportClient() {
+  const importScriptPath = path.join(__dirname, '../../assets/premium-database-import.js');
+  const source = fs.readFileSync(importScriptPath, 'utf8');
+  const sandbox = { window: {} };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseImport;
+}
 
 test('premium database page bootstraps customer rows before async sync runs', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
@@ -231,4 +240,61 @@ test('premium database page exposes interesse as a lead-status step', () => {
   assert.match(pageSource, /afgehaakt: "Afgehaakt"/);
   assert.match(pageSource, /\.s-interesse \.s-label \{ color: var\(--green\); font-weight: 700; \}/);
   assert.match(pageSource, /\.s-afgehaakt \.s-label \{ color: var\(--red\); font-weight: 700; \}/);
+});
+
+test('premium database sync merge updates contact fields and preserves CRM fields', () => {
+  const importClient = loadDatabaseImportClient();
+  const existingCustomers = [
+    {
+      id: 'customer-1',
+      bedrijf: 'Acme BV',
+      naam: 'Acme BV',
+      dom: 'old-acme.nl',
+      website: 'https://old-acme.nl',
+      tel: '06 12 34 56 78',
+      email: 'oud@acme.nl',
+      branche: 'Overig',
+      stad: 'Breda',
+      service: 'website',
+      verantwoordelijk: 'Serve',
+    },
+  ];
+  const importedCustomers = [
+    {
+      bedrijf: 'Acme BV',
+      naam: 'Acme Team',
+      dom: 'acme.nl',
+      website: 'https://www.acme.nl/nieuw',
+      tel: '0612345678',
+      email: 'info@acme.nl',
+      branche: 'Bouw',
+      stad: 'Breda',
+      service: 'software',
+      verantwoordelijk: 'Martijn',
+    },
+    {
+      bedrijf: 'Acme BV',
+      dom: 'acme.nl',
+      website: 'https://www.acme.nl/nieuw',
+      tel: '',
+      email: 'info@acme.nl',
+      stad: '',
+      verantwoordelijk: 'Martijn',
+    },
+  ];
+
+  const result = importClient.mergeCustomers(existingCustomers, importedCustomers, {
+    updateExisting: true,
+  });
+
+  assert.equal(result.addedCount, 0);
+  assert.equal(result.updatedCount, 1);
+  assert.equal(result.customers.length, 1);
+  assert.equal(result.customers[0].id, 'customer-1');
+  assert.equal(result.customers[0].email, 'info@acme.nl');
+  assert.equal(result.customers[0].website, 'https://www.acme.nl/nieuw');
+  assert.equal(result.customers[0].naam, 'Acme BV');
+  assert.equal(result.customers[0].branche, 'Overig');
+  assert.equal(result.customers[0].service, 'website');
+  assert.equal(result.customers[0].verantwoordelijk, 'Serve');
 });
