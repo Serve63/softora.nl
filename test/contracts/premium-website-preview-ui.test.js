@@ -3,6 +3,16 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
+const websiteGeneratorHtmlSource = fs.readFileSync(
+  path.join(__dirname, '../../premium-websitegenerator.html'),
+  'utf8'
+);
+const websiteGeneratorScriptSource = fs.readFileSync(
+  path.join(__dirname, '../../assets/premium-websitegenerator.js'),
+  'utf8'
+);
+const websiteGeneratorSource = `${websiteGeneratorHtmlSource}\n${websiteGeneratorScriptSource}`;
+
 [
   '../../premium-websitegenerator.html',
   '../../premium-websitepreview.html',
@@ -26,8 +36,7 @@ const path = require('path');
 });
 
 test('premium websitegenerator biedt een websitelink-aanmaken flow met html input', () => {
-  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const source = websiteGeneratorHtmlSource;
 
   assert.match(source, /<title>Websitedesign – Softora\.nl<\/title>/);
   assert.match(source, /<div class="page-title">Websitedesign<\/div>/);
@@ -42,11 +51,11 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.doesNotMatch(source, /id="website-link-html"/);
   assert.doesNotMatch(source, /id="website-link-slug"/);
   assert.doesNotMatch(source, /Gegenereerde websitegenerator preview/);
-  assert.match(source, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*!websiteLinkListEl[\s\S]*\) \{\s*return;\s*\}/);
+  assert.match(websiteGeneratorSource, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*!websiteLinkListEl[\s\S]*\) \{\s*return;\s*\}/);
   assert.match(source, /id="website-link-list"/);
-  assert.match(source, /window\.open\('about:blank', '_blank'\)/);
-  assert.match(source, /\/api\/website-links'/);
-  assert.match(source, /\/api\/website-links\/create/);
+  assert.match(websiteGeneratorSource, /window\.open\('about:blank', '_blank'\)/);
+  assert.match(websiteGeneratorSource, /\/api\/website-links'/);
+  assert.match(websiteGeneratorSource, /\/api\/website-links\/create/);
 });
 
 test('premium websitegenerator shows no recent scans section anymore', () => {
@@ -62,8 +71,7 @@ test('premium websitegenerator shows no recent scans section anymore', () => {
 });
 
 test('premium websitegenerator removes the legacy openen button but keeps download actions', () => {
-  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const source = websiteGeneratorSource;
 
   assert.doesNotMatch(source, />Openen</);
   assert.match(source, /Download PNG/);
@@ -71,8 +79,7 @@ test('premium websitegenerator removes the legacy openen button but keeps downlo
 });
 
 test('premium websitegenerator toont een login-fallback voor protected acties', () => {
-  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const source = websiteGeneratorSource;
 
   assert.match(source, /id="websitegenerator-auth-card"/);
   assert.match(source, /id="websitegenerator-auth-card" hidden/);
@@ -101,8 +108,7 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
 });
 
 test('premium websitegenerator behoudt hoge full-page previews zonder portrait-crop', () => {
-  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const source = websiteGeneratorSource;
 
   assert.match(source, /const WEBSITE_PREVIEW_IMAGE_WIDTH = 1024;/);
   assert.match(source, /const WEBSITE_PREVIEW_IMAGE_HEIGHT = 1536;/);

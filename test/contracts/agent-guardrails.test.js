@@ -229,6 +229,22 @@ test('agent guardrails require targeted tests for protected quality gates and si
   });
 
   assert.equal(covered.length, 0);
+
+  const workflowCovered = buildGuardrailViolations({
+    changedFiles: ['.github/workflows/agent-guardrails.yml'],
+    addedFiles: [],
+    changedTests: ['test/contracts/agent-guardrails.test.js'],
+    highRiskFiles: [],
+    behaviorFiles: ['.github/workflows/agent-guardrails.yml'],
+    protectedQualityGateFiles: ['.github/workflows/agent-guardrails.yml'],
+    protectedFrontendShellFiles: [],
+    newestBackupAgeMs: 5 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 7200,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(workflowCovered.length, 0);
 });
 
 test('agent guardrails block test weakening and quality-baseline regressions', () => {

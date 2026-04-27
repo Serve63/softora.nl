@@ -216,6 +216,15 @@ test('static premium sidebars ship the database link in html', () => {
   }
 });
 
+test('websitegenerator page loads website preview script via shared asset', () => {
+  const pageSource = readRepoFile('premium-websitegenerator.html');
+  assert.match(
+    pageSource,
+    /<script src="assets\/premium-websitegenerator\.js\?v=20260427b" defer><\/script>/,
+    'premium-websitegenerator.html moet de website-generator script uit assets laden'
+  );
+});
+
 test('static premium sidebars share the same section order and public labels', () => {
   const expectedSections = [
     {

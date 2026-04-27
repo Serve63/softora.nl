@@ -1,0 +1,1210 @@
+let websitePreviewLibraryRemoteEntries = null;
+let websitePreviewLibraryUseRemote = false;
+let websitePreviewBatchPollTimer = null;
+let websitePreviewActiveBatchJobId = '';
+const WEBSITE_PREVIEW_BATCH_MAX_STALLED_POLLS = 30;
+const WEBSITE_PREVIEW_BATCH_POLL_INTERVAL_MS = 1400;
+const WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES = 12;
+let websitePreviewBatchPollFailures = 0;
+let websitePreviewBatchPollNoProgress = 0;
+let websitePreviewBatchPollLastFingerprint = '';
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function isSafeLibraryDataUrl(value) {
+  return typeof value === 'string' && value.startsWith('data:image/') && value.length < 12 * 1024 * 1024;
+}
+
+function loadLibraryEntries() {
+  if (websitePreviewLibraryUseRemote && Array.isArray(websitePreviewLibraryRemoteEntries)) {
+    return websitePreviewLibraryRemoteEntries.slice();
+  }
+  return [];
+}
+
+async function maybeHydrateWebsitePreviewLibraryFromServer() {
+  if (!websiteGeneratorAuthState.authenticated) {
+    websitePreviewLibraryRemoteEntries = [];
+    websitePreviewLibraryUseRemote = true;
+    return;
+  }
+  try {
+    const response = await fetch('/api/website-preview-library', {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data || data.ok === false) {
+      throw new Error(String(data?.detail || data?.error || 'Bibliotheek laden mislukt'));
+    }
+    websitePreviewLibraryRemoteEntries = Array.isArray(data.entries) ? data.entries : [];
+    websitePreviewLibraryUseRemote = true;
+    if (Number(data.omittedLargeItems || 0) > 0) {
+      showToast('Bibliotheek geladen; een paar te grote previews zijn overgeslagen');
+    }
+  } catch (error) {
+    websitePreviewLibraryUseRemote = true;
+    websitePreviewLibraryRemoteEntries = [];
+    console.warn('Websitepreview-bibliotheek laden mislukt:', error);
+  }
+}
+
+async function savePreviewToLibrary({ dataUrl, url, hostname, fileName, width, height }) {
+  if (!dataUrl || !url) return;
+  const baseEntry = {
+    dataUrl,
+    url,
+    hostname: String(hostname || '').trim(),
+    fileName: String(fileName || `${hostname || 'preview'}-preview.png`).trim(),
+    width: Number(width) || WEBSITE_PREVIEW_IMAGE_WIDTH,
+    height: Number(height) || WEBSITE_PREVIEW_IMAGE_HEIGHT,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (websiteGeneratorAuthState.authenticated) {
+    try {
+      const response = await fetch('/api/website-preview-library', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(baseEntry),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        await loadWebsiteGeneratorAuthState(true);
+      }
+      if (response.ok && data && data.ok && data.entry && data.entry.id) {
+        const entry = data.entry;
+        const merged = [entry, ...(websitePreviewLibraryRemoteEntries || []).filter((x) => x.id !== entry.id)];
+        websitePreviewLibraryRemoteEntries = merged;
+        websitePreviewLibraryUseRemote = true;
+        return;
+      }
+      showToast(String(data?.detail || data?.error || 'Preview opslaan mislukt'));
+      return;
+    } catch (_) {
+      showToast('Preview opslaan mislukt — controleer je verbinding.');
+      return;
+    }
+  }
+
+  showToast('Log eerst in om previews centraal op te slaan.');
+}
+
+function renderLibraryPanel() {
+  const grid = document.getElementById('library-grid');
+  const empty = document.getElementById('library-empty');
+  if (!grid || !empty) return;
+  const items = loadLibraryEntries();
+  if (!items.length) {
+    grid.style.display = 'none';
+    grid.innerHTML = '';
+    empty.style.display = 'flex';
+    return;
+  }
+  empty.style.display = 'none';
+  grid.style.display = 'grid';
+  grid.innerHTML = items.map((entry) => {
+    const when = entry.createdAt
+      ? new Date(entry.createdAt).toLocaleString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '';
+    const host = escapeHtml(entry.hostname || '—');
+    const idJson = JSON.stringify(entry.id);
+    const thumbSrc = isSafeLibraryDataUrl(entry.dataUrl) ? entry.dataUrl : '';
+    const thumbInner = thumbSrc
+      ? `<img src="${thumbSrc}" alt="" loading="lazy" width="200" height="300" />`
+      : '<span style="font-size:11px;color:#9aa3b5;padding:12px;text-align:center">Geen geldige afbeelding</span>';
+    return `
+      <div class="library-card" data-library-id="${escapeHtml(entry.id)}" role="button" tabindex="0" onclick="openLibraryEntry(${idJson})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLibraryEntry(${idJson});}">
+        <div class="library-thumb-wrap">
+          ${thumbInner}
+        </div>
+        <div class="library-card-meta">
+          <div class="library-card-host" title="${host}">${host}</div>
+          <div class="library-card-date">${escapeHtml(when)}</div>
+          <div class="library-card-actions">
+            <button type="button" class="btn outline" style="padding:6px 12px;font-size:10px" onclick="removeLibraryEntry(${idJson}, event)">Verwijderen</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function removeLibraryEntry(id, ev) {
+  if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+  if (websiteGeneratorAuthState.authenticated && websitePreviewLibraryUseRemote) {
+    try {
+      const response = await fetch(`/api/website-preview-library/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        await loadWebsiteGeneratorAuthState(true);
+      }
+      if (response.ok && data && data.ok) {
+        if (Array.isArray(websitePreviewLibraryRemoteEntries)) {
+          websitePreviewLibraryRemoteEntries = websitePreviewLibraryRemoteEntries.filter((x) => x.id !== id);
+        }
+        renderLibraryPanel();
+        showToast('Verwijderd uit bibliotheek');
+        return;
+      }
+      if (response.status === 404) {
+        await maybeHydrateWebsitePreviewLibraryFromServer();
+        renderLibraryPanel();
+        showToast('Item bestond niet meer; bibliotheek vernieuwd.');
+        return;
+      }
+      showToast(String(data?.detail || data?.error || 'Verwijderen mislukt'));
+      return;
+    } catch (_) {
+      showToast('Verwijderen mislukt — controleer je verbinding.');
+      return;
+    }
+  }
+  renderLibraryPanel();
+  showToast('Verwijderen kan alleen vanuit de centrale bibliotheek.');
+}
+
+async function fetchLibraryEntryById(id) {
+  const entryId = String(id || '').trim();
+  if (!entryId || !websiteGeneratorAuthState.authenticated) return null;
+  try {
+    const response = await fetch(`/api/website-preview-library/${encodeURIComponent(entryId)}`, {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && data?.ok && data.entry?.id) {
+      const entry = data.entry;
+      const merged = [entry, ...(websitePreviewLibraryRemoteEntries || []).filter((x) => x.id !== entry.id)];
+      websitePreviewLibraryRemoteEntries = merged;
+      websitePreviewLibraryUseRemote = true;
+      return entry;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function openLibraryEntry(id) {
+  const entry = loadLibraryEntries().find((x) => x.id === id);
+  if (!entry || !entry.dataUrl) {
+    showToast('Item niet gevonden');
+    return;
+  }
+  const scanTab = document.querySelector('.tab[data-tab="scan"]');
+  switchTab('scan', scanTab);
+  document.getElementById('scan-url').value = entry.url || '';
+  const hostname = entry.hostname || (() => {
+    try {
+      return new URL(entry.url).hostname;
+    } catch (_) {
+      return 'preview';
+    }
+  })();
+  const previewWidth = Number(entry.width) || WEBSITE_PREVIEW_IMAGE_WIDTH;
+  const previewHeight = Number(entry.height) || WEBSITE_PREVIEW_IMAGE_HEIGHT;
+  mountScanPreviewUI(entry.dataUrl, entry.url, hostname, entry.fileName, previewWidth, previewHeight);
+  showToast('Preview geopend');
+}
+
+async function switchTab(name, el) {
+  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+  const tabBtn = el || document.querySelector(`.tab[data-tab="${name}"]`);
+  const panel = document.getElementById('tab-' + name);
+  if (panel) panel.classList.add('active');
+  if (tabBtn) tabBtn.classList.add('active');
+  if (name === 'library') {
+    await maybeHydrateWebsitePreviewLibraryFromServer();
+    renderLibraryPanel();
+  }
+  try {
+    const base = `${window.location.pathname || '/premium-websitegenerator'}${window.location.search || ''}`;
+    if (name === 'library') {
+      if (window.location.hash !== '#bibliotheek') {
+        window.location.hash = 'bibliotheek';
+      }
+    } else if (window.location.hash) {
+      window.history.replaceState(null, '', base);
+      const refresh = window.SoftoraPersonnelTheme && window.SoftoraPersonnelTheme.refreshPremiumStaticSidebarActiveState;
+      if (typeof refresh === 'function') refresh();
+    }
+  } catch (_) {}
+}
+
+let websiteGeneratorAuthState = {
+  loaded: false,
+  authenticated: false,
+};
+let websiteGeneratorAuthPromise = null;
+
+function getWebsiteGeneratorLoginHref() {
+  const nextPath = `${window.location.pathname || '/premium-websitegenerator'}${window.location.search || ''}`;
+  return `/premium-personeel-login?next=${encodeURIComponent(nextPath)}`;
+}
+
+function applyWebsiteGeneratorAuthState() {
+  const authCard = document.getElementById('websitegenerator-auth-card');
+  const authMessageEl = document.getElementById('websitegenerator-auth-message');
+  const loginLinkEl = document.getElementById('websitegenerator-login-link');
+  const scanBtn = document.getElementById('scan-btn');
+  const websiteLinkCreateEl = document.getElementById('website-link-create-btn');
+  const websiteLinkStatusEl = document.getElementById('website-link-status');
+  const authLoaded = Boolean(websiteGeneratorAuthState.loaded);
+  const isAuthenticated = Boolean(authLoaded && websiteGeneratorAuthState.authenticated);
+
+  if (loginLinkEl) {
+    loginLinkEl.href = getWebsiteGeneratorLoginHref();
+  }
+
+  if (authMessageEl && authLoaded && !isAuthenticated) {
+    authMessageEl.textContent = 'Log in met je premium account om scans te genereren en websitelinks te publiceren.';
+  }
+
+  if (authCard) {
+    authCard.hidden = !authLoaded || isAuthenticated;
+  }
+
+  if (scanBtn) {
+    scanBtn.disabled = !isAuthenticated;
+  }
+
+  if (websiteLinkCreateEl) {
+    websiteLinkCreateEl.disabled = !isAuthenticated;
+  }
+
+  if (websiteLinkStatusEl) {
+    if (isAuthenticated) {
+      if (String(websiteLinkStatusEl.textContent || '').trim() === 'Log in om websitelinks aan te maken.') {
+        websiteLinkStatusEl.textContent = '';
+      }
+      websiteLinkStatusEl.style.color = 'var(--text-mid)';
+    } else if (authLoaded && !String(websiteLinkStatusEl.textContent || '').trim()) {
+      websiteLinkStatusEl.textContent = 'Log in om websitelinks aan te maken.';
+      websiteLinkStatusEl.style.color = '#c0392b';
+    }
+  }
+}
+
+async function loadWebsiteGeneratorAuthState(force = false) {
+  if (websiteGeneratorAuthPromise && !force) return websiteGeneratorAuthPromise;
+
+  websiteGeneratorAuthPromise = (async function () {
+    try {
+      const response = await fetch('/api/auth/session', {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+      const payload = await response.json().catch(() => ({}));
+      websiteGeneratorAuthState = {
+        loaded: true,
+        authenticated: Boolean(response.ok && payload && payload.authenticated),
+      };
+    } catch (_) {
+      websiteGeneratorAuthState = {
+        loaded: true,
+        authenticated: false,
+      };
+    }
+
+    applyWebsiteGeneratorAuthState();
+    if (websiteGeneratorAuthState.authenticated) {
+      await maybeHydrateWebsitePreviewLibraryFromServer();
+      const libPanel = document.getElementById('tab-library');
+      if (libPanel && libPanel.classList.contains('active') && typeof renderLibraryPanel === 'function') {
+        renderLibraryPanel();
+      }
+      await resumeWebsitePreviewBatchIfAny();
+    } else {
+      clearWebsitePreviewBatchPoll();
+    }
+    return websiteGeneratorAuthState;
+  })();
+
+  try {
+    return await websiteGeneratorAuthPromise;
+  } finally {
+    websiteGeneratorAuthPromise = null;
+  }
+}
+
+async function ensureWebsiteGeneratorAuth(message) {
+  const authState = websiteGeneratorAuthState.loaded
+    ? websiteGeneratorAuthState
+    : await loadWebsiteGeneratorAuthState();
+  if (authState.authenticated) return true;
+
+  applyWebsiteGeneratorAuthState();
+  const authCard = document.getElementById('websitegenerator-auth-card');
+  const authMessageEl = document.getElementById('websitegenerator-auth-message');
+  if (authMessageEl && message) {
+    authMessageEl.textContent = String(message);
+  }
+  if (authCard) {
+    authCard.hidden = false;
+    authCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  if (message) showToast(message);
+  return false;
+}
+
+const SCAN_URL_BATCH_MAX = 1;
+
+function tokenizeScanUrlInput(raw) {
+  return String(raw || '')
+    .split(/[\r\n;,]+/g)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function normalizeScanUrlToken(chunk) {
+  let u = String(chunk || '').trim();
+  if (!u) return null;
+  if (!/^https?:\/\//i.test(u)) {
+    u = `https://${u.replace(/^\/+/, '')}`;
+  }
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    return parsed.toString();
+  } catch (_) {
+    return null;
+  }
+}
+
+function buildScanUrlList(tokens) {
+  const seen = new Set();
+  const out = [];
+  for (const t of tokens) {
+    const u = normalizeScanUrlToken(t);
+    if (!u || seen.has(u)) continue;
+    seen.add(u);
+    out.push(u);
+    if (out.length >= SCAN_URL_BATCH_MAX) break;
+  }
+  return out;
+}
+
+function newPreviewBlockId() {
+  return `pv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function previewZoneHtml(blockId, hostname, previewWidth, useStablePreviewImageId) {
+  const safeHost = escapeHtml(hostname);
+  const frameW = Math.min(window.innerWidth - 100, previewWidth);
+  const imgTag = useStablePreviewImageId
+    ? `<img id="preview-image" alt="Website preview ${safeHost}" style="width:100%;height:auto;display:block;" />`
+    : `<img class="preview-image-pixel" alt="Website preview ${safeHost}" style="width:100%;height:auto;display:block;" />`;
+  return `<div class="preview-zone" id="${blockId}">
+      <div class="preview-label">
+        <span>Preview - ${safeHost}</span>
+        <div class="preview-actions">
+          <button type="button" class="btn" style="padding:6px 14px;font-size:11px" onclick="downloadPreviewBlock('${blockId}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download PNG
+          </button>
+        </div>
+      </div>
+      <div class="preview-media" style="max-width:${frameW}px;">
+        ${imgTag}
+      </div>
+    </div>`;
+}
+
+function wirePreviewBlock(blockId, previewDataUrl, url, hostname, fileName) {
+  const root = document.getElementById(blockId);
+  if (!root) return;
+  const img = root.querySelector('img');
+  if (img) img.src = previewDataUrl;
+  window.__pvDownloads = window.__pvDownloads || {};
+  const fn = String(fileName || `${hostname}-preview.png`).trim();
+  window.__pvDownloads[blockId] = { dataUrl: previewDataUrl, fileName: fn };
+  window._lastPreviewImageDataUrl = previewDataUrl;
+  window._lastPreviewImageFileName = fn;
+  window._lastPreviewUrl = url;
+}
+
+function downloadPreviewBlock(blockId) {
+  const p = window.__pvDownloads && window.__pvDownloads[blockId];
+  if (!p || !p.dataUrl) return;
+  const a = document.createElement('a');
+  a.href = p.dataUrl;
+  a.download = p.fileName || 'website-preview.png';
+  a.click();
+  showToast('Preview gedownload');
+}
+
+function mountScanPreviewUI(previewDataUrl, url, hostname, fileName, previewWidth, previewHeight) {
+  const blockId = newPreviewBlockId();
+  document.getElementById('scan-output').innerHTML = `<div class="scan-previews-stack" id="scan-previews-stack">${previewZoneHtml(
+    blockId,
+    hostname,
+    previewWidth,
+    true
+  )}</div>`;
+  wirePreviewBlock(blockId, previewDataUrl, url, hostname, fileName);
+}
+
+function clearWebsitePreviewBatchPoll() {
+  if (websitePreviewBatchPollTimer) {
+    clearInterval(websitePreviewBatchPollTimer);
+    websitePreviewBatchPollTimer = null;
+  }
+  websitePreviewBatchPollFailures = 0;
+  websitePreviewBatchPollNoProgress = 0;
+  websitePreviewBatchPollLastFingerprint = '';
+}
+
+function getStoredWebsitePreviewBatchJobId() {
+  const inMemory = String(websitePreviewActiveBatchJobId || '').trim();
+  if (inMemory) return inMemory;
+  return '';
+}
+
+function setStoredWebsitePreviewBatchJobId(jobId) {
+  websitePreviewActiveBatchJobId = String(jobId || '').trim();
+}
+
+function clearStoredWebsitePreviewBatchJobId() {
+  websitePreviewActiveBatchJobId = '';
+}
+
+function createBatchLoadingRow(hostname) {
+  const ph = document.createElement('div');
+  ph.className = 'preview-loading-row';
+  ph.innerHTML = `
+      <div class="premium-boot-spinner" aria-hidden="true" style="--loader-size:28px">
+        <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+        <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+        <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+      </div>
+      <div>Bezig met <strong>${escapeHtml(hostname)}</strong>…</div>`;
+  return ph;
+}
+
+function scheduleWebsitePreviewBatchPoll() {
+  clearWebsitePreviewBatchPoll();
+  websitePreviewBatchPollTimer = setInterval(() => {
+    void pollWebsitePreviewBatch();
+  }, WEBSITE_PREVIEW_BATCH_POLL_INTERVAL_MS);
+  void pollWebsitePreviewBatch();
+}
+
+function stopScanBatchPollWithMessage(message) {
+  clearWebsitePreviewBatchPoll();
+  clearStoredWebsitePreviewBatchJobId();
+  const out = document.getElementById('scan-output');
+  if (!out) return;
+  out.innerHTML = `<div class="empty-state"><p>${escapeHtml(message)}</p></div>`;
+}
+
+function buildWebsitePreviewJobFingerprint(job) {
+  const items = Array.isArray(job?.items) ? job.items : [];
+  const itemState = items
+    .map((item) => `${String(item?.status || '').trim()}:${String(item?.libraryEntryId || '').trim()}`)
+    .join('|');
+  return `${String(job?.status || '').trim()}|${Number(job?.currentIndex || 0)}|${itemState}`;
+}
+
+async function startBackgroundBatchScan(urls) {
+  const out = document.getElementById('scan-output');
+  if (out) {
+    out.innerHTML =
+      '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Preview wordt gestart…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
+  }
+  const response = await fetch('/api/website-preview/batch', {
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ urls }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    await loadWebsiteGeneratorAuthState(true);
+    throw new Error('Log eerst in om AI previews te genereren.');
+  }
+  if (!response.ok || !data || !data.ok || !data.jobId) {
+    throw new Error(String(data?.detail || data?.error || 'Batch start mislukt'));
+  }
+  setStoredWebsitePreviewBatchJobId(data.jobId);
+  scheduleWebsitePreviewBatchPoll();
+}
+
+async function pollWebsitePreviewBatch() {
+  const jobId = getStoredWebsitePreviewBatchJobId();
+  if (!jobId) {
+    clearWebsitePreviewBatchPoll();
+    return;
+  }
+  try {
+    const res = await fetch(`/api/website-preview/batch/${encodeURIComponent(jobId)}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      stopScanBatchPollWithMessage('Sessie verlopen. Log opnieuw in en probeer de scan nogmaals.');
+      return;
+    }
+    if (res.status === 403 || res.status === 404) {
+      if (res.status === 403) {
+        stopScanBatchPollWithMessage('Toegang verlopen. Log opnieuw in om de scanstatus te laden.');
+      } else {
+        clearStoredWebsitePreviewBatchJobId();
+        clearWebsitePreviewBatchPoll();
+        const out = document.getElementById('scan-output');
+        if (out && payload?.detail) {
+          out.innerHTML = `<div class="empty-state"><p>${escapeHtml(String(payload.detail))}</p></div>`;
+        }
+      }
+      if (res.status === 403 && payload?.detail) {
+        showToast(String(payload.detail));
+      }
+      return;
+    }
+    if (!res.ok || !payload || !payload.job) {
+      websitePreviewBatchPollFailures += 1;
+      if (websitePreviewBatchPollFailures >= WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES) {
+        stopScanBatchPollWithMessage(
+          'Scanstatus kon niet worden opgehaald. De foto-generatie is mogelijk onstabiel. Probeer het opnieuw.'
+        );
+      }
+      return;
+    }
+    websitePreviewBatchPollFailures = 0;
+    const fingerprint = buildWebsitePreviewJobFingerprint(payload.job);
+    if (fingerprint === websitePreviewBatchPollLastFingerprint) {
+      websitePreviewBatchPollNoProgress += 1;
+    } else {
+      websitePreviewBatchPollNoProgress = 0;
+      websitePreviewBatchPollLastFingerprint = fingerprint;
+    }
+    if (
+      websitePreviewBatchPollNoProgress >= WEBSITE_PREVIEW_BATCH_MAX_STALLED_POLLS &&
+      payload.job.status === 'running'
+    ) {
+      stopScanBatchPollWithMessage(
+        'De scan loopt vast. Start de preview opnieuw of controleer de pagina later in de bibliotheek.'
+      );
+      return;
+    }
+    await renderBatchJobProgress(payload.job);
+    if (payload.job.status === 'done' || payload.job.status === 'error') {
+      clearStoredWebsitePreviewBatchJobId();
+      clearWebsitePreviewBatchPoll();
+      const n = Number(payload.job.total || 0) || 0;
+      if (payload.job.status === 'done') {
+        showToast(n === 1 ? 'URL verwerkt' : `${n} URL's verwerkt`);
+      } else if (payload.job.error) {
+        showToast(String(payload.job.error));
+      }
+      await maybeHydrateWebsitePreviewLibraryFromServer();
+      if (typeof renderLibraryPanel === 'function') {
+        renderLibraryPanel();
+      }
+    }
+  } catch (_) {
+    websitePreviewBatchPollFailures += 1;
+    if (websitePreviewBatchPollFailures >= WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES) {
+      stopScanBatchPollWithMessage(
+        'Scanstatus kon niet worden opgehaald. De foto-generatie is mogelijk onstabiel. Probeer het opnieuw.'
+      );
+    }
+  }
+}
+
+async function renderBatchJobProgress(job) {
+  const stack = document.getElementById('scan-previews-stack');
+  const bar = document.getElementById('scan-batch-bar');
+  if (!stack || !bar) return;
+
+  const items = Array.isArray(job.items) ? job.items : [];
+  const total = items.length || Number(job.total || 0) || 0;
+  let runningIdx = -1;
+  let runningHost = '';
+  items.forEach((it, idx) => {
+    if (it && it.status === 'running') {
+      runningIdx = idx;
+      runningHost = String(it.hostname || '').trim();
+    }
+  });
+
+  if (job.status === 'error' && job.error) {
+    bar.textContent = String(job.error);
+  } else if (job.status === 'done') {
+    bar.textContent = total === 1 ? 'Klaar — website verwerkt' : `Klaar — ${total} websites`;
+  } else if (runningIdx >= 0) {
+    bar.textContent = `Preview ${runningIdx + 1} van ${total} — ${runningHost || '…'}`;
+  } else {
+    bar.textContent = total ? `Preview bezig… (${total} URL)` : 'Preview bezig…';
+  }
+
+  if (websiteGeneratorAuthState.authenticated) {
+    await maybeHydrateWebsitePreviewLibraryFromServer().catch(() => {});
+  }
+  const entries = loadLibraryEntries();
+
+  stack.innerHTML = '';
+  for (let idx = 0; idx < items.length; idx += 1) {
+    const it = items[idx];
+    if (!it) continue;
+    const st = String(it.status || '').trim();
+    const host = String(it.hostname || '').trim() || 'site';
+    if (st === 'pending') {
+      const row = document.createElement('div');
+      row.className = 'preview-pending-row';
+      row.style.cssText = 'padding:12px 0;font-size:13px;color:var(--text-mid)';
+      row.innerHTML = `Wachtend — <strong>${escapeHtml(host)}</strong>`;
+      stack.appendChild(row);
+    } else if (st === 'running') {
+      stack.appendChild(createBatchLoadingRow(host));
+    } else if (st === 'error') {
+      const row = document.createElement('div');
+      row.className = 'preview-zone';
+      row.innerHTML = `<div class="empty-state" style="padding:20px;margin:0;border:1px solid var(--border);border-radius:8px">
+        <p><strong>${escapeHtml(host)}</strong><br><span style="color:var(--text-mid)">${escapeHtml(
+          String(it.error || 'Onbekende fout')
+        )}</span></p>
+      </div>`;
+      stack.appendChild(row);
+    } else if (st === 'done') {
+      const entryId = String(it.libraryEntryId || '').trim();
+      let entry = entryId ? entries.find((e) => String(e.id) === entryId) : null;
+      if (entryId && (!entry || !isSafeLibraryDataUrl(entry.dataUrl))) {
+        entry = await fetchLibraryEntryById(entryId);
+      }
+      if (entry && isSafeLibraryDataUrl(entry.dataUrl)) {
+        const blockId = newPreviewBlockId();
+        const w = Number(entry.width) || WEBSITE_PREVIEW_IMAGE_WIDTH;
+        const h = Number(entry.height) || WEBSITE_PREVIEW_IMAGE_HEIGHT;
+        stack.insertAdjacentHTML('beforeend', previewZoneHtml(blockId, entry.hostname || host, w, false));
+        wirePreviewBlock(
+          blockId,
+          entry.dataUrl,
+          entry.url || it.url || '',
+          entry.hostname || host,
+          entry.fileName || `${host}-preview.png`
+        );
+      } else {
+        const row = document.createElement('div');
+        row.className = 'preview-zone';
+        row.innerHTML = `<div class="empty-state" style="padding:20px;margin:0;border:1px solid var(--border);border-radius:8px">
+          <p><strong>${escapeHtml(host)}</strong><br><span style="color:var(--text-mid)">Preview is opgeslagen, maar kon niet direct worden geladen. Open hem via Bibliotheek.</span></p>
+        </div>`;
+        stack.appendChild(row);
+      }
+    }
+  }
+  const last = stack.lastElementChild;
+  if (last && job.status === 'running') {
+    last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+async function resumeWebsitePreviewBatchIfAny() {
+  const path = String(window.location.pathname || '');
+  if (path.indexOf('premium-websitegenerator') === -1) return;
+  const out = document.getElementById('scan-output');
+  if (!out) return;
+
+  let jobId = getStoredWebsitePreviewBatchJobId();
+  let hasResumed = false;
+
+  if (jobId) {
+    try {
+      const response = await fetch(`/api/website-preview/batch/${encodeURIComponent(jobId)}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      });
+      if (response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        if (payload?.job?.id) {
+          hasResumed = true;
+        } else if (response.status === 404) {
+          clearStoredWebsitePreviewBatchJobId();
+          jobId = '';
+        }
+      } else if (response.status === 404 || response.status === 403) {
+        clearStoredWebsitePreviewBatchJobId();
+        jobId = '';
+      }
+    } catch (_) {
+      hasResumed = false;
+    }
+  }
+
+  if (!jobId || !hasResumed) {
+    try {
+      const response = await fetch('/api/website-preview/batch/current', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && payload?.job?.id) {
+        jobId = String(payload.job.id);
+        setStoredWebsitePreviewBatchJobId(jobId);
+      } else {
+        clearStoredWebsitePreviewBatchJobId();
+        jobId = '';
+      }
+    } catch (_) {}
+  }
+
+  if (!hasResumed && !jobId) return;
+  out.innerHTML =
+    '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Preview hervatten…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
+  scheduleWebsitePreviewBatchPoll();
+}
+
+async function startScan() {
+  if (!(await ensureWebsiteGeneratorAuth('Log eerst in om AI previews te genereren.'))) return;
+  const raw = document.getElementById('scan-url').value;
+  const tokens = tokenizeScanUrlInput(raw);
+  if (!tokens.length) {
+    showToast('Voer minimaal één URL in');
+    return;
+  }
+  if (tokens.length > SCAN_URL_BATCH_MAX) {
+    showToast('Gebruik één URL per keer.');
+    return;
+  }
+  const slice = tokens.slice(0, SCAN_URL_BATCH_MAX);
+  const urls = buildScanUrlList(slice);
+  if (!urls.length) {
+    showToast('Geen geldige URL’s.');
+    return;
+  }
+
+  const btn = document.getElementById('scan-btn');
+  btn.disabled = true;
+  clearWebsitePreviewBatchPoll();
+
+  try {
+    await startBackgroundBatchScan(urls);
+  } catch (e) {
+    showToast(String(e?.message || e || 'Batch mislukt'));
+    const out = document.getElementById('scan-output');
+    if (out) {
+      out.innerHTML = `<div class="empty-state"><p>${escapeHtml(String(e?.message || e || 'Batch mislukt'))}</p></div>`;
+    }
+    clearStoredWebsitePreviewBatchJobId();
+  } finally {
+    btn.disabled = false;
+    applyWebsiteGeneratorAuthState();
+  }
+}
+
+function samplePreviewEdgeReference(pixels, width, height, side) {
+  const stripWidth = Math.max(4, Math.round(width * 0.01));
+  const startX = side === 'right' ? Math.max(0, width - stripWidth) : 0;
+  const endX = side === 'right' ? width : Math.min(width, stripWidth);
+  let totalR = 0;
+  let totalG = 0;
+  let totalB = 0;
+  let totalA = 0;
+  let count = 0;
+
+  for (let x = startX; x < endX; x += 1) {
+    for (let y = 0; y < height; y += 3) {
+      const offset = (y * width + x) * 4;
+      const alpha = Number(pixels[offset + 3]);
+      if (alpha <= 10) continue;
+      totalR += Number(pixels[offset]);
+      totalG += Number(pixels[offset + 1]);
+      totalB += Number(pixels[offset + 2]);
+      totalA += alpha;
+      count += 1;
+    }
+  }
+
+  if (!count) return null;
+  return {
+    r: totalR / count,
+    g: totalG / count,
+    b: totalB / count,
+    a: totalA / count,
+  };
+}
+
+function isPreviewPixelCloseToReference(r, g, b, a, reference) {
+  if (!reference) return false;
+  if (Number(a) <= 10) return false;
+  const diffR = Math.abs(Number(r) - reference.r);
+  const diffG = Math.abs(Number(g) - reference.g);
+  const diffB = Math.abs(Number(b) - reference.b);
+  const totalDiff = diffR + diffG + diffB;
+  const maxDiff = Math.max(diffR, diffG, diffB);
+  return totalDiff <= 66 && maxDiff <= 28;
+}
+
+function getPreviewColumnActivity(pixels, width, height, x) {
+  if (x < 0 || x >= width) return 0;
+  let totalDiff = 0;
+  let count = 0;
+  for (let y = 3; y < height; y += 3) {
+    const offset = (y * width + x) * 4;
+    const topOffset = ((y - 3) * width + x) * 4;
+
+    totalDiff +=
+      Math.abs(Number(pixels[offset]) - Number(pixels[topOffset])) +
+      Math.abs(Number(pixels[offset + 1]) - Number(pixels[topOffset + 1])) +
+      Math.abs(Number(pixels[offset + 2]) - Number(pixels[topOffset + 2]));
+    count += 3;
+
+    if (x > 0) {
+      const leftOffset = (y * width + (x - 1)) * 4;
+      totalDiff +=
+        Math.abs(Number(pixels[offset]) - Number(pixels[leftOffset])) +
+        Math.abs(Number(pixels[offset + 1]) - Number(pixels[leftOffset + 1])) +
+        Math.abs(Number(pixels[offset + 2]) - Number(pixels[leftOffset + 2]));
+      count += 3;
+    }
+  }
+  return count ? totalDiff / count : 0;
+}
+
+function getPreviewReferenceMatchRatio(pixels, width, height, x, reference) {
+  if (!reference || x < 0 || x >= width) return 0;
+  let matches = 0;
+  let total = 0;
+
+  for (let y = 0; y < height; y += 3) {
+    const offset = (y * width + x) * 4;
+    const alpha = Number(pixels[offset + 3]);
+    if (alpha <= 10) continue;
+    total += 1;
+    if (
+      isPreviewPixelCloseToReference(
+        pixels[offset],
+        pixels[offset + 1],
+        pixels[offset + 2],
+        pixels[offset + 3],
+        reference
+      )
+    ) {
+      matches += 1;
+    }
+  }
+
+  return total ? matches / total : 0;
+}
+
+function measurePreviewRightGutterWidth(pixels, width, height, reference) {
+  if (!reference) return 0;
+
+  const maxCropWidth = Math.max(120, Math.round(width * 0.34));
+  let gutterWidth = 0;
+
+  while (gutterWidth < maxCropWidth) {
+    const x = width - 1 - gutterWidth;
+    if (x < 0 || x >= width) break;
+
+    const matchRatio = getPreviewReferenceMatchRatio(pixels, width, height, x, reference);
+    const activity = getPreviewColumnActivity(pixels, width, height, x);
+    if (matchRatio < 0.78 || activity > 13) break;
+
+    gutterWidth += 1;
+  }
+
+  if (gutterWidth < 70) return 0;
+
+  let breakSignals = 0;
+  const confirmDepth = 18;
+  for (let i = 0; i < confirmDepth; i += 1) {
+    const x = width - gutterWidth - 1 - i;
+    if (x < 0 || x >= width) break;
+
+    const matchRatio = getPreviewReferenceMatchRatio(pixels, width, height, x, reference);
+    const activity = getPreviewColumnActivity(pixels, width, height, x);
+    if (matchRatio < 0.66 || activity > 17) {
+      breakSignals += 1;
+    }
+  }
+
+  return breakSignals >= 6 ? gutterWidth : 0;
+}
+
+function loadPreviewImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Previewafbeelding kon niet worden geladen.'));
+    image.src = dataUrl;
+  });
+}
+
+const WEBSITE_PREVIEW_IMAGE_WIDTH = 1024;
+const WEBSITE_PREVIEW_IMAGE_HEIGHT = 1536;
+
+async function cropPreviewImageDataUrl(dataUrl) {
+  const raw = String(dataUrl || '').trim();
+  if (!raw.startsWith('data:image/')) {
+    return {
+      dataUrl: raw,
+      width: WEBSITE_PREVIEW_IMAGE_WIDTH,
+      height: WEBSITE_PREVIEW_IMAGE_HEIGHT,
+    };
+  }
+
+  const image = await loadPreviewImage(raw);
+  const width = Number(image.naturalWidth || image.width || 0);
+  const height = Number(image.naturalHeight || image.height || 0);
+  if (!width || !height) {
+    return {
+      dataUrl: raw,
+      width: WEBSITE_PREVIEW_IMAGE_WIDTH,
+      height: WEBSITE_PREVIEW_IMAGE_HEIGHT,
+    };
+  }
+  if (height > width) {
+    return { dataUrl: raw, width, height };
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) {
+    return { dataUrl: raw, width, height };
+  }
+
+  context.drawImage(image, 0, 0);
+  const imageData = context.getImageData(0, 0, width, height);
+  const pixels = imageData.data;
+
+  const rightReference = samplePreviewEdgeReference(pixels, width, height, 'right');
+  const rightCrop = measurePreviewRightGutterWidth(pixels, width, height, rightReference);
+  const croppedWidth = width - rightCrop;
+  if (croppedWidth <= Math.round(width * 0.55)) {
+    return { dataUrl: raw, width, height };
+  }
+  if (rightCrop < 70) {
+    return { dataUrl: raw, width, height };
+  }
+
+  const croppedCanvas = document.createElement('canvas');
+  croppedCanvas.width = croppedWidth;
+  croppedCanvas.height = height;
+  const croppedContext = croppedCanvas.getContext('2d');
+  if (!croppedContext) {
+    return { dataUrl: raw, width, height };
+  }
+
+  croppedContext.drawImage(
+    canvas,
+    0,
+    0,
+    croppedWidth,
+    height,
+    0,
+    0,
+    croppedWidth,
+    height
+  );
+
+  return {
+    dataUrl: croppedCanvas.toDataURL('image/png'),
+    width: croppedWidth,
+    height,
+  };
+}
+
+function downloadPreview() {
+  if (!window._lastPreviewImageDataUrl) return;
+  const a = document.createElement('a');
+  a.href = window._lastPreviewImageDataUrl;
+  a.download = window._lastPreviewImageFileName || 'website-preview.png';
+  a.click();
+  showToast('Preview gedownload');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg;
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+applyWebsiteGeneratorAuthState();
+loadWebsiteGeneratorAuthState();
+
+(function () {
+  const urlInput = document.getElementById('scan-url');
+  const htmlInput = document.getElementById('html-code');
+  const websiteLinkCreateEl = document.getElementById('website-link-create-btn');
+  const websiteLinkStatusEl = document.getElementById('website-link-status');
+  const websiteLinkCopyEl = document.getElementById('website-link-copy');
+  const websiteLinkListEl = document.getElementById('website-link-list');
+  if (!urlInput || !htmlInput || !websiteLinkCreateEl || !websiteLinkStatusEl || !websiteLinkCopyEl || !websiteLinkListEl) { return; }
+
+  let latestWebsiteLinkUrl = '';
+
+  function setWebsiteLinkStatus(message, isError = false) {
+    websiteLinkStatusEl.textContent = String(message || '');
+    websiteLinkStatusEl.style.color = isError ? '#c0392b' : 'var(--text-mid)';
+  }
+
+  function renderWebsiteLinks(links) {
+    const normalizedLinks = Array.isArray(links) ? links : [];
+    if (!websiteGeneratorAuthState.authenticated) {
+      websiteLinkListEl.innerHTML = '<div class="empty-state" style="padding:22px;"><p>Log in om opgeslagen websitelinks te bekijken.</p></div>';
+      return;
+    }
+    if (!normalizedLinks.length) {
+      websiteLinkListEl.innerHTML = '<div class="empty-state" style="padding:22px;"><p>Nog geen websitelinks. Plak HTML-code en maak je eerste live pagina aan.</p></div>';
+      return;
+    }
+    websiteLinkListEl.innerHTML = normalizedLinks.map((link) => {
+      const title = escapeHtml(link.title || link.slug || 'Softora pagina');
+      const url = escapeHtml(link.url || '');
+      return `
+        <div class="website-link-row">
+          <div class="website-link-row-main">
+            <div class="website-link-row-title" title="${title}">${title}</div>
+            <a class="website-link-row-url" href="${url}" target="_blank" rel="noopener">${url}</a>
+          </div>
+          <div class="website-link-row-actions">
+            <a class="btn outline" href="${url}" target="_blank" rel="noopener">Live pagina</a>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function loadWebsiteLinks() {
+    if (!websiteGeneratorAuthState.authenticated) {
+      renderWebsiteLinks([]);
+      return;
+    }
+    websiteLinkListEl.innerHTML = '<div class="empty-state" style="padding:22px;"><p>Websitelinks laden...</p></div>';
+    try {
+      const response = await fetch('/api/website-links', {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload || payload.ok === false) {
+        throw new Error(String(payload?.detail || payload?.error || 'Websitelinks laden mislukt'));
+      }
+      renderWebsiteLinks(payload.links || []);
+    } catch (error) {
+      websiteLinkListEl.innerHTML = `<div class="empty-state" style="padding:22px;"><p>${escapeHtml(String(error?.message || 'Websitelinks laden mislukt'))}</p></div>`;
+    }
+  }
+
+  websiteLinkCopyEl.addEventListener('click', async function () {
+    if (!latestWebsiteLinkUrl) return;
+    try {
+      await navigator.clipboard.writeText(latestWebsiteLinkUrl);
+      showToast('Websitelink gekopieerd');
+    } catch (_) {
+      showToast('Kopieren mislukt');
+    }
+  });
+
+  websiteLinkCreateEl.addEventListener('click', async function () {
+    const openedTab = window.open('about:blank', '_blank');
+    if (openedTab) {
+      openedTab.document.write('<!DOCTYPE html><title>Websitelink wordt aangemaakt...</title><body style="font-family:system-ui,sans-serif;padding:32px">Websitelink wordt aangemaakt...</body>');
+      openedTab.document.close();
+      openedTab.opener = null;
+    }
+    if (!(await ensureWebsiteGeneratorAuth('Log eerst in om websitelinks aan te maken.'))) {
+      if (openedTab && !openedTab.closed) openedTab.close();
+      return;
+    }
+    const html = String(htmlInput.value || '').trim();
+    if (!html) {
+      setWebsiteLinkStatus('Plak eerst HTML code in.', true);
+      htmlInput.focus();
+      if (openedTab && !openedTab.closed) openedTab.close();
+      return;
+    }
+
+    websiteLinkCreateEl.disabled = true;
+    websiteLinkCopyEl.hidden = true;
+    latestWebsiteLinkUrl = '';
+    setWebsiteLinkStatus('Websitelink wordt aangemaakt...');
+
+    try {
+      const response = await fetch('/api/website-links/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          html,
+          title: String(urlInput.value || '').trim()
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        await loadWebsiteGeneratorAuthState(true);
+        throw new Error('Log eerst in om websitelinks aan te maken.');
+      }
+      if (!response.ok || !payload || payload.ok === false) {
+        throw new Error(String(payload?.detail || payload?.error || 'Websitelink aanmaken mislukt'));
+      }
+      latestWebsiteLinkUrl = String(payload.url || '').trim();
+      websiteLinkCopyEl.hidden = !latestWebsiteLinkUrl;
+      setWebsiteLinkStatus(latestWebsiteLinkUrl || 'Websitelink aangemaakt.');
+      if (latestWebsiteLinkUrl) {
+        if (openedTab && !openedTab.closed) {
+          openedTab.location.href = latestWebsiteLinkUrl;
+        } else {
+          window.open(latestWebsiteLinkUrl, '_blank', 'noopener');
+        }
+      }
+      await loadWebsiteLinks();
+    } catch (error) {
+      if (openedTab && !openedTab.closed) openedTab.close();
+      setWebsiteLinkStatus(String(error?.message || 'Websitelink aanmaken mislukt'), true);
+    } finally {
+      applyWebsiteGeneratorAuthState();
+    }
+  });
+
+  void loadWebsiteGeneratorAuthState().then(() => loadWebsiteLinks());
+})();
+
+(function initWebsiteGeneratorLibraryHash() {
+  function applyLibraryHash() {
+    const raw = String(window.location.hash || "")
+      .replace(/^#/, "")
+      .trim()
+      .toLowerCase();
+    if (raw !== "bibliotheek" && raw !== "library") return;
+    const libBtn = document.querySelector('.tab[data-tab="library"]');
+    void (async () => {
+      if (libBtn) await switchTab("library", libBtn);
+      else if (typeof renderLibraryPanel === "function") renderLibraryPanel();
+    })();
+  }
+  window.addEventListener("hashchange", applyLibraryHash);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", applyLibraryHash);
+  } else {
+    applyLibraryHash();
+  }
+})();
+
