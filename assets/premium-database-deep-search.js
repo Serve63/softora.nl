@@ -187,6 +187,31 @@
         return result.slice(0, maxItems || 180);
     }
 
+    function normalizeWebsiteHref(value) {
+        const raw = normalizeString(value);
+        if (!raw) return "";
+        return /^https?:\/\//i.test(raw) ? raw : "https://" + raw.replace(/^\/+/, "");
+    }
+
+    function normalizeWebsiteDisplayValue(value) {
+        const raw = normalizeString(value);
+        if (!raw) return "";
+        return raw.replace(/^https?:\/\/www\./i, "https://").replace(/\/$/, "");
+    }
+
+    function uniqueWebsiteValues(values, maxItems) {
+        const seen = new Set();
+        const result = [];
+        (values || []).forEach(function (value) {
+            const normalized = normalizeWebsiteDisplayValue(value && value.url || value);
+            const key = normalizeKey(normalized.replace(/^https?:\/\//i, ""));
+            if (!normalized || !key || seen.has(key)) return;
+            seen.add(key);
+            result.push(normalized.slice(0, 180));
+        });
+        return result.slice(0, maxItems || 200);
+    }
+
     function createTarget(label, index) {
         return {
             id: "deep-" + normalizeKey(label).replace(/[^a-z0-9]+/g, "-").slice(0, 60) + "-" + index,
@@ -200,6 +225,7 @@
             completionReason: "",
             completionChecks: 0,
             seen: [],
+            foundWebsites: [],
             lastSources: [],
             updatedAt: ""
         };
@@ -223,6 +249,7 @@
             completionReason: normalizeString(raw && raw.completionReason),
             completionChecks: Math.max(0, Number(raw && raw.completionChecks) || 0),
             seen: uniqueStrings(raw && raw.seen, 180),
+            foundWebsites: uniqueWebsiteValues((raw && (raw.foundWebsites || raw.websites)) || raw && raw.lastSources, 200),
             lastSources: Array.isArray(raw && raw.lastSources) ? raw.lastSources.slice(0, 40) : [],
             updatedAt: normalizeString(raw && raw.updatedAt)
         };
@@ -372,15 +399,14 @@
 
         function renderSources(target) {
             if (!nodes.deepSearchSources) return;
-            const sources = Array.isArray(target && target.lastSources) ? target.lastSources : [];
-            if (!sources.length) {
-                nodes.deepSearchSources.innerHTML = "<div class=\"deep-search-empty\">Nog geen bronnen voor deze plek.</div>";
+            const websites = uniqueWebsiteValues(target && target.foundWebsites, 200);
+            if (!websites.length) {
+                nodes.deepSearchSources.innerHTML = "<div class=\"deep-search-empty\">Nog geen websites voor deze plek.</div>";
                 return;
             }
-            nodes.deepSearchSources.innerHTML = sources.slice(0, 10).map(function (source) {
-                const url = normalizeString(source && source.url || source);
-                const title = normalizeString(source && source.title) || url;
-                return "<a href=\"" + escapeHtml(url) + "\" target=\"_blank\" rel=\"noopener\">" + escapeHtml(title) + "</a>";
+            nodes.deepSearchSources.innerHTML = websites.map(function (website) {
+                const href = normalizeWebsiteHref(website);
+                return "<a href=\"" + escapeHtml(href) + "\" target=\"_blank\" rel=\"noopener\">" + escapeHtml(website) + "</a>";
             }).join("");
         }
 
@@ -439,6 +465,11 @@
             state.totalCostUsd = Math.max(0, Number(state.totalCostUsd) || 0) + costUsd;
             target.updatedAt = new Date().toISOString();
             target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
+            target.foundWebsites = uniqueWebsiteValues((target.foundWebsites || [])
+                .concat(businesses.map(function (business) {
+                    return business && business.website;
+                }))
+                .concat(target.lastSources), 200);
             target.seen = uniqueStrings(target.seen.concat(businesses.map(function (business) {
                 return [
                     business && business.bedrijfsnaam,

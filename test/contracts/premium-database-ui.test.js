@@ -209,7 +209,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427f/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427g/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -259,7 +259,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427f"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427g"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -275,6 +275,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /Leegmaken/);
   assert.doesNotMatch(pageSource, />Sluiten<\/button>/);
   assert.match(pageSource, /class="deep-search-close" id="closeDeepSearchButton" type="button" aria-label="Sluit bedrijvenlijst"/);
+  assert.match(pageSource, />Gevonden website's<\/label>/);
+  assert.doesNotMatch(pageSource, /Bronnen laatste batch/);
   assert.match(pageSource, /id="deepSearchTitle">Bedrijvenlijst<\/div>/);
   assert.match(pageSource, /\.deep-search-target\.is-done span \{[\s\S]*text-decoration: line-through;/);
   assert.match(pageSource, /\.deep-search-tools \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
@@ -329,6 +331,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /ESTIMATED_BATCH_PRICING/);
   assert.match(deepSearchScriptSource, /function advanceCompletedTarget\(target\)/);
   assert.match(deepSearchScriptSource, /Boolean\(body && body\.placeComplete\)/);
+  assert.match(deepSearchScriptSource, /foundWebsites: \[\]/);
+  assert.match(deepSearchScriptSource, /function uniqueWebsiteValues\(values, maxItems\)/);
+  assert.match(deepSearchScriptSource, /target\.foundWebsites = uniqueWebsiteValues/);
+  assert.match(deepSearchScriptSource, /Nog geen websites voor deze plek\./);
   assert.match(deepSearchScriptSource, /nodes\.closeDeepSearchButton\.disabled = busy;/);
   assert.match(deepSearchScriptSource, /nodes\.deepSearchModal\.classList\.toggle\("is-running", busy\);/);
   assert.match(deepSearchScriptSource, /DEEP_SEARCH_BUSY_STYLE_ID/);
@@ -505,7 +511,7 @@ test('premium database deep search client finishes the current location automati
       found: 1,
       placeComplete: true,
       cost: { estimatedUsd: 0.12 },
-      sources: [],
+      sources: [{ url: 'https://almkerktest.nl/contact', title: 'Contact' }],
     },
     {
       ok: true,
@@ -514,7 +520,7 @@ test('premium database deep search client finishes the current location automati
       found: 0,
       placeComplete: true,
       cost: { estimatedUsd: 0.08 },
-      sources: [],
+      sources: [{ url: 'https://almkerktest.nl/over-ons', title: 'Over ons' }],
     },
   ];
   const controller = deepSearchClient.createController({
@@ -558,6 +564,13 @@ test('premium database deep search client finishes the current location automati
   assert.match(messages.join('\n'), /AI gaf al klaar aan/);
   assert.match(messages.join('\n'), /Deze plaats is automatisch afgerond/);
   assert.ok(persisted.length >= 2);
+  const finalStatePatch = persisted[persisted.length - 1].patch.deep_search_state;
+  const finalState = JSON.parse(finalStatePatch);
+  assert.deepEqual(finalState.targets[0].foundWebsites, [
+    'almkerktest.nl',
+    'https://almkerktest.nl/contact',
+    'https://almkerktest.nl/over-ons',
+  ]);
 });
 
 test('premium database deep search locks the modal while a batch is running', async () => {
