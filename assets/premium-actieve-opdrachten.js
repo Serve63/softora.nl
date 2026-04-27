@@ -1320,7 +1320,15 @@ function restoreOrdersRuntimeFromState() {
     }
 }
 
-function renderCustomOrderCardHtml(record) {
+function appendTextElement(parent, tagName, className, text) {
+    const el = document.createElement(tagName);
+    if (className) el.className = className;
+    el.textContent = text;
+    parent.appendChild(el);
+    return el;
+}
+
+function createCustomOrderCardElement(record) {
     const id = Number(record.id);
     const ui = resolveOrderUiState({
         status: record.status,
@@ -1336,52 +1344,97 @@ function renderCustomOrderCardHtml(record) {
     const deliveryLabel = deliveryTime || 'Nog niet opgegeven';
     const title = String(record.title || 'Opdracht').trim() || 'Opdracht';
     const description = String(record.description || 'Geen extra omschrijving.').trim() || 'Geen extra omschrijving.';
-    const deliveryHtml = `<div class="order-delivery"><strong>Oplevertijd</strong>${escapeHtml(deliveryLabel)}</div>`;
-    const paymentButtonHtml = ui.isBuilt
-        ? ''
-        : `
-                            <button class="complete-btn magnetic" id="complete-btn-${id}" type="button" data-order-complete="${id}">
-                                Factuur betaald
-                            </button>`;
 
-    return `
-                <div class="order-card has-claim ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
-                    <div class="order-main">
-                        <div class="order-info">
-                            <div class="order-client">${escapeHtml(clientLine || 'Nieuwe opdracht')}</div>
-                            <div class="order-title">${escapeHtml(title)}</div>
-                            <div class="order-desc">${escapeHtml(description)}</div>
-                            ${deliveryHtml}
-                        </div>
-                        <div class="order-price">
-                            <div class="order-price-label">Bedrag</div>
-                            <div class="order-price-value"><span class="currency">€</span>${amountText}</div>
-                        </div>
-                        <div class="order-actions">
-                            <button class="execute-btn magnetic" id="btn-${id}" type="button" data-order="${id}">
-                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5h18M5.25 7.5v10.5A1.5 1.5 0 0 0 6.75 19.5h10.5a1.5 1.5 0 0 0 1.5-1.5V7.5M9 7.5V6a3 3 0 1 1 6 0v1.5"></path></svg>
-                                Open dossier
-                            </button>
-                            ${paymentButtonHtml}
-                            <div class="order-assignee" id="assignee-${id}">${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</div>
-                        </div>
-                    </div>
-                    <div class="order-progress" id="progress-${id}">
-                        <div class="progress-meta">
-                            <span class="progress-label">Voortgang</span>
-                            <span class="progress-percent" id="pct-${id}">${Math.round(ui.pct)}%</span>
-                        </div>
-                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-${id}"></div></div>
-                        <div class="progress-steps">
-                            <span class="progress-step" id="step-${id}-1">Analyse</span>
-                            <span class="progress-step" id="step-${id}-2">Design</span>
-                            <span class="progress-step" id="step-${id}-3">Development</span>
-                            <span class="progress-step" id="step-${id}-4">Testing</span>
-                            <span class="progress-step" id="step-${id}-5">Oplevering</span>
-                        </div>
-                    </div>
-                </div>
-            `;
+    const card = document.createElement('div');
+    card.className = [
+        'order-card',
+        'has-claim',
+        isDelivered ? 'delivered' : '',
+        isPaid ? 'paid' : ''
+    ].filter(Boolean).join(' ');
+    card.id = `order-${id}`;
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', `Opdracht ${id}`);
+
+    const main = document.createElement('div');
+    main.className = 'order-main';
+
+    const info = document.createElement('div');
+    info.className = 'order-info';
+    appendTextElement(info, 'div', 'order-client', clientLine || 'Nieuwe opdracht');
+    appendTextElement(info, 'div', 'order-title', title);
+    appendTextElement(info, 'div', 'order-desc', description);
+
+    const delivery = document.createElement('div');
+    delivery.className = 'order-delivery';
+    appendTextElement(delivery, 'strong', '', 'Oplevertijd');
+    delivery.appendChild(document.createTextNode(deliveryLabel));
+    info.appendChild(delivery);
+
+    const price = document.createElement('div');
+    price.className = 'order-price';
+    appendTextElement(price, 'div', 'order-price-label', 'Bedrag');
+    const priceValue = document.createElement('div');
+    priceValue.className = 'order-price-value';
+    appendTextElement(priceValue, 'span', 'currency', '€');
+    priceValue.appendChild(document.createTextNode(amountText));
+    price.appendChild(priceValue);
+
+    const actions = document.createElement('div');
+    actions.className = 'order-actions';
+    const executeBtn = document.createElement('button');
+    executeBtn.className = 'execute-btn magnetic';
+    executeBtn.id = `btn-${id}`;
+    executeBtn.type = 'button';
+    executeBtn.dataset.order = String(id);
+    setOpenDossierButtonContent(executeBtn);
+    actions.appendChild(executeBtn);
+
+    if (!ui.isBuilt) {
+        const completeBtn = document.createElement('button');
+        completeBtn.className = 'complete-btn magnetic';
+        completeBtn.id = `complete-btn-${id}`;
+        completeBtn.type = 'button';
+        completeBtn.dataset.orderComplete = String(id);
+        completeBtn.textContent = 'Factuur betaald';
+        actions.appendChild(completeBtn);
+    }
+
+    const assignee = appendTextElement(actions, 'div', 'order-assignee', claimInfo.by || 'Nog niet geclaimd');
+    assignee.id = `assignee-${id}`;
+
+    main.append(info, price, actions);
+    card.appendChild(main);
+
+    const progress = document.createElement('div');
+    progress.className = 'order-progress';
+    progress.id = `progress-${id}`;
+
+    const progressMeta = document.createElement('div');
+    progressMeta.className = 'progress-meta';
+    appendTextElement(progressMeta, 'span', 'progress-label', 'Voortgang');
+    const progressPercent = appendTextElement(progressMeta, 'span', 'progress-percent', `${Math.round(ui.pct)}%`);
+    progressPercent.id = `pct-${id}`;
+
+    const progressBarBg = document.createElement('div');
+    progressBarBg.className = 'progress-bar-bg';
+    const progressBarFill = document.createElement('div');
+    progressBarFill.className = 'progress-bar-fill';
+    progressBarFill.id = `bar-${id}`;
+    progressBarBg.appendChild(progressBarFill);
+
+    const progressSteps = document.createElement('div');
+    progressSteps.className = 'progress-steps';
+    ['Analyse', 'Design', 'Development', 'Testing', 'Oplevering'].forEach((label, index) => {
+        const step = appendTextElement(progressSteps, 'span', 'progress-step', label);
+        step.id = `step-${id}-${index + 1}`;
+    });
+
+    progress.append(progressMeta, progressBarBg, progressSteps);
+    card.appendChild(progress);
+
+    return card;
 }
 
 function bindDynamicOrderCard(card) {
@@ -1435,9 +1488,7 @@ function appendCustomOrderCard(record, options = {}) {
 
     ensureOrderRuntimeState(record);
 
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = renderCustomOrderCardHtml(record).trim();
-    const card = wrapper.firstElementChild;
+    const card = createCustomOrderCardElement(record);
     if (!card) return null;
 
     grid.appendChild(card);
