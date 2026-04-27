@@ -365,7 +365,7 @@ test('premium ai lead generator toont een aparte AI beheer workspace', () => {
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const managementUiSource = fs.readFileSync(managementUiPath, 'utf8');
 
-  assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
+  assert.match(pageSource, /<script src="assets\/premium-boot-init\.js\?v=20260427a" data-ai-management="1"><\/script>/);
   assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-ai-lead-generator-management\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /id="aiManagementWorkspace"/);

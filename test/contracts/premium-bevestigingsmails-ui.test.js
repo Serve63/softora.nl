@@ -33,7 +33,7 @@ test('premium bevestigingsmails toont een aparte AI beheer pagina wanneer de mod
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const managementSource = fs.readFileSync(managementPath, 'utf8');
 
-  assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
+  assert.match(pageSource, /<script src="assets\/premium-boot-init\.js\?v=20260427a" data-ai-management="1"><\/script>/);
   assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /id="screen-ai-management"/);
   assert.match(pageSource, /AI bepaalt zelf of coldmailing nu nodig is/);

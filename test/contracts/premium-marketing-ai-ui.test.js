@@ -12,7 +12,7 @@ test('premium advertenties toont een aparte AI beheer workspace boven de persone
   const assetSource = readPage('assets/premium-marketing-management.js');
   const cssSource = readPage('assets/premium-marketing-management.css');
 
-  assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
+  assert.match(pageSource, /<script src="assets\/premium-boot-init\.js\?v=20260427a" data-ai-management="1"><\/script>/);
   assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-marketing-management\.css\?v=20260423a">/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-management\.js\?v=20260423a" defer><\/script>/);
@@ -30,7 +30,7 @@ test('premium socialmedia toont een aparte AI beheer workspace boven de personee
   const pageSource = readPage('premium-socialmedia.html');
   const assetSource = readPage('assets/premium-marketing-management.js');
 
-  assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
+  assert.match(pageSource, /<script src="assets\/premium-boot-init\.js\?v=20260427a" data-ai-management="1"><\/script>/);
   assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-marketing-management\.css\?v=20260423a">/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-management\.js\?v=20260423a" defer><\/script>/);

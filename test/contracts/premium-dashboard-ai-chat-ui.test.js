@@ -51,7 +51,7 @@ test('premium dashboard verbergt de personeel beheer selector boven de datumfilt
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
+  assert.match(pageSource, /<script src="assets\/premium-boot-init\.js\?v=20260427a" data-ai-management="1"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /class="topbar-right dashboard-topbar-right"/);
   assert.doesNotMatch(pageSource, /id="aiManagementDropdown"/);

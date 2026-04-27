@@ -10,21 +10,7 @@
 
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260427a">
 <link rel="stylesheet" href="assets/custom-selects.css?v=20260421b">
-<script>
-    (function () {
-        document.documentElement.setAttribute("data-personnel-loading", "true");
-        try {
-            var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
-            var storageKey = isPremiumPersonnel
-                ? "softora_premium_personnel_theme_mode"
-                : "softora_software_personnel_theme_mode";
-                document.documentElement.setAttribute("data-theme-mode", "light");
-                document.documentElement.setAttribute("data-theme", "light");
-        } catch (error) {
-            /* ignore storage errors */
-        }
-    })();
-</script>
+<script src="assets/premium-boot-init.js?v=20260427a"></script>
 <script src="assets/personnel-theme.js?v=20260427a" defer></script>
 <script src="assets/custom-selects.js?v=20260421a" defer></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">

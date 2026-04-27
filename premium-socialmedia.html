@@ -10,31 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260427a">
 <link rel="stylesheet" href="assets/premium-marketing-management.css?v=20260423a">
-<script>
-  (function () {
-    document.documentElement.setAttribute("data-personnel-loading", "true");
-    try {
-      var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
-      var aiManagementStorageKey = isPremiumPersonnel
-        ? "softora_premium_ai_management_mode"
-        : "softora_software_ai_management_mode";
-      var aiManagementMode = "personnel";
-      try {
-        var storedAiManagementMode = localStorage.getItem(aiManagementStorageKey);
-        if (storedAiManagementMode === "software" || storedAiManagementMode === "personnel") {
-          aiManagementMode = storedAiManagementMode;
-        }
-      } catch (storageError) {
-        /* ignore storage errors */
-      }
-      document.documentElement.setAttribute("data-theme-mode", "light");
-      document.documentElement.setAttribute("data-theme", "light");
-      document.documentElement.setAttribute("data-ai-management-mode", aiManagementMode);
-    } catch (_) {
-      /* ignore */
-    }
-  })();
-</script>
+<script src="assets/premium-boot-init.js?v=20260427a" data-ai-management="1"></script>
 <script src="assets/personnel-theme.js?v=20260427a" defer></script>
 <script src="assets/ai-management-mode.js?v=20260423a" defer></script>
 <style>

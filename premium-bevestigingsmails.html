@@ -29,34 +29,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260427a">
-<script>
-    (function () {
-        document.documentElement.setAttribute("data-personnel-loading", "true");
-        try {
-            var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
-            var storageKey = isPremiumPersonnel
-                ? "softora_premium_personnel_theme_mode"
-                : "softora_software_personnel_theme_mode";
-            var aiManagementStorageKey = isPremiumPersonnel
-                ? "softora_premium_ai_management_mode"
-                : "softora_software_ai_management_mode";
-            var aiManagementMode = "personnel";
-            try {
-                var storedAiManagementMode = localStorage.getItem(aiManagementStorageKey);
-                if (storedAiManagementMode === "software" || storedAiManagementMode === "personnel") {
-                    aiManagementMode = storedAiManagementMode;
-                }
-            } catch (storageError) {
-                /* ignore storage errors */
-            }
-            document.documentElement.setAttribute("data-theme-mode", "light");
-            document.documentElement.setAttribute("data-theme", "light");
-            document.documentElement.setAttribute("data-ai-management-mode", aiManagementMode);
-        } catch (error) {
-            /* ignore storage errors */
-        }
-    })();
-</script>
+<script src="assets/premium-boot-init.js?v=20260427a" data-ai-management="1"></script>
 <script src="assets/personnel-theme.js?v=20260427a" defer></script>
 <script src="assets/ai-management-mode.js?v=20260423a" defer></script>
 <link rel="stylesheet" href="assets/custom-selects.css?v=20260421b">
