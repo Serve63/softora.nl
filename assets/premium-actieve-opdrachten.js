@@ -1583,3 +1583,258 @@ function syncOrderClaimsFromAgendaOwners() {
     persistOrdersRuntime();
     Object.keys(orders).forEach((id) => applyOrderUiStateToCard(Number(id)));
 }
+
+function renderCreateOrderAgendaLeadOptions(selectedId) {
+    const select = document.getElementById('newOrderAgendaLeadId');
+    if (!select) return;
+
+    const previous = Number(selectedId || select.value);
+    select.innerHTML = '';
+
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Geen koppeling';
+    select.appendChild(defaultOption);
+
+    agendaLeadOptions.forEach((lead) => {
+        const option = document.createElement('option');
+        option.value = String(lead.id);
+        option.textContent = getAgendaLeadOptionLabel(lead);
+        select.appendChild(option);
+    });
+
+    if (Number.isFinite(previous) && previous > 0) {
+        select.value = String(previous);
+    }
+}
+
+function hydrateCreateOrderFormFromLead(lead) {
+    if (!lead) return;
+
+    const companyInput = document.getElementById('newOrderCompany');
+    const contactInput = document.getElementById('newOrderContact');
+    const titleInput = document.getElementById('newOrderTitle');
+    const descInput = document.getElementById('newOrderDesc');
+    const deliveryInput = document.getElementById('newOrderDeliveryTime');
+    const assigneeInput = document.getElementById('newOrderAssignee');
+    const amountInput = document.getElementById('newOrderAmount');
+
+    if (companyInput) {
+        companyInput.value = lead.company;
+        companyInput.dataset.agendaAutofill = '1';
+    }
+    if (contactInput) {
+        contactInput.value = lead.contact || '';
+        contactInput.dataset.agendaAutofill = '1';
+    }
+    if (titleInput) {
+        if (!titleInput.value.trim() || titleInput.dataset.agendaAutofill === '1') {
+            titleInput.value = `Website traject voor ${lead.company}`;
+            titleInput.dataset.agendaAutofill = '1';
+        }
+    }
+    if (descInput) {
+        if (lead.summary && (!descInput.value.trim() || descInput.dataset.agendaAutofill === '1')) {
+            descInput.value = lead.summary;
+            descInput.dataset.agendaAutofill = '1';
+        }
+    }
+    if (deliveryInput) {
+        const deliveryLabel = formatAgendaLeadDateTimeLabel(lead.date, lead.time);
+        if (deliveryLabel && (!deliveryInput.value.trim() || deliveryInput.dataset.agendaAutofill === '1')) {
+            deliveryInput.value = `Volgens afspraak op ${deliveryLabel}`;
+            deliveryInput.dataset.agendaAutofill = '1';
+        }
+    }
+    if (assigneeInput) {
+        const suggestedAssignee = normalizeOrderAssignee(lead.leadOwnerName || lead.leadOwnerFullName || '');
+        if (suggestedAssignee && (!assigneeInput.value || assigneeInput.dataset.agendaAutofill === '1')) {
+            assigneeInput.value = suggestedAssignee;
+            assigneeInput.dataset.agendaAutofill = '1';
+        }
+    }
+    if (amountInput) {
+        const amount = moneyToNumber(lead.value);
+        if (amount && (!String(amountInput.value || '').trim() || amountInput.dataset.agendaAutofill === '1')) {
+            amountInput.value = String(amount);
+            amountInput.dataset.agendaAutofill = '1';
+        }
+    }
+}
+
+function handleCreateOrderAgendaLeadChange() {
+    const select = document.getElementById('newOrderAgendaLeadId');
+    if (!select) return;
+    const lead = getAgendaLeadById(select.value);
+    if (!lead) {
+        setCreateOrderAgendaHint('Koppel optioneel aan een bestaande agenda-afspraak of lead.', '');
+        return;
+    }
+
+    hydrateCreateOrderFormFromLead(lead);
+    const hasPrompt = Boolean(String(lead.postCallPrompt || '').trim());
+    const hasTranscript = Boolean(String(lead.postCallNotesTranscript || '').trim());
+    const parts = [`Gekoppeld: afspraak #${lead.id}`];
+    const dateLabel = formatAgendaLeadDateTimeLabel(lead.date, lead.time);
+    if (dateLabel) parts.push(dateLabel);
+    if (hasPrompt) parts.push('prompt beschikbaar');
+    if (hasTranscript) parts.push('transcript beschikbaar');
+    if (lead.activeOrderId) parts.push(`staat al bij actieve opdracht #${lead.activeOrderId}`);
+    setCreateOrderAgendaHint(parts.join(' · '), lead.activeOrderId ? 'warning' : '');
+}
+
+async function populateCreateOrderAgendaLeadOptions(force) {
+    const select = document.getElementById('newOrderAgendaLeadId');
+    if (!select) return;
+    const selectedId = select.value;
+
+    setCreateOrderAgendaHint('Agenda-leads laden...', '');
+    await fetchAgendaLeadOptions(force);
+    renderCreateOrderAgendaLeadOptions(selectedId);
+
+    if (!agendaLeadOptions.length) {
+        setCreateOrderAgendaHint('Geen agenda-afspraken gevonden om aan te koppelen.', '');
+        return;
+    }
+    if (select.value) {
+        handleCreateOrderAgendaLeadChange();
+        return;
+    }
+    setCreateOrderAgendaHint('Koppel optioneel aan een bestaande agenda-afspraak of lead.', '');
+}
+
+async function openCreateOrderModal() {
+    const modal = document.getElementById('createOrderModal');
+    if (!modal) return;
+    const form = document.getElementById('createOrderForm');
+    if (form) form.reset();
+    [
+        'newOrderCompany',
+        'newOrderContact',
+        'newOrderTitle',
+        'newOrderDesc',
+        'newOrderDeliveryTime',
+        'newOrderAssignee',
+        'newOrderAmount'
+    ].forEach((fieldId) => {
+        const field = document.getElementById(fieldId);
+        if (field && field.dataset) {
+            delete field.dataset.agendaAutofill;
+        }
+    });
+    setCreateOrderMessage('', '');
+    setCreateOrderAgendaHint('Agenda-leads laden...', '');
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    void populateCreateOrderAgendaLeadOptions(false);
+    window.setTimeout(() => {
+        document.getElementById('newOrderAgendaLeadId')?.focus();
+    }, 40);
+}
+
+function closeCreateOrderModal() {
+    const modal = document.getElementById('createOrderModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    setCreateOrderMessage('', '');
+}
+
+function handleCreateOrderSubmit(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const data = new FormData(form);
+
+    const companyName = String(data.get('companyName') || '').trim();
+    const contactPerson = String(data.get('contactPerson') || '').trim();
+    const title = String(data.get('title') || '').trim();
+    const description = String(data.get('description') || '').trim();
+    const deliveryTime = String(data.get('deliveryTime') || '').trim();
+    const domainName = String(data.get('domainName') || '').trim();
+    const amount = Math.round(Number(data.get('amount')));
+    const selectedAppointmentId = Number(data.get('agendaLeadId'));
+    const includeSampleDesign = String(data.get('includeSampleDesign') || 'no').trim().toLowerCase() === 'yes';
+    const linkedLead = Number.isFinite(selectedAppointmentId) && selectedAppointmentId > 0
+        ? getAgendaLeadById(selectedAppointmentId)
+        : null;
+    const sourceAppointmentId = linkedLead
+        ? Number(linkedLead.id)
+        : (Number.isFinite(selectedAppointmentId) && selectedAppointmentId > 0 ? selectedAppointmentId : null);
+    const sourceCallId = String(linkedLead?.callId || '').trim() || null;
+    const sourceAppointmentLabel = linkedLead
+        ? getAgendaLeadReferenceLabel(linkedLead)
+        : null;
+    const linkedPrompt = String(linkedLead?.postCallPrompt || '').trim();
+    const linkedTranscript = String(linkedLead?.postCallNotesTranscript || '').trim();
+    const linkedLeadOwnerName = normalizeClaimEmployeeName(linkedLead?.leadOwnerName || linkedLead?.leadOwnerFullName || '');
+    const selectedAssignee = normalizeOrderAssignee(data.get('assignee') || linkedLeadOwnerName);
+    const linkedContactPhone = String(linkedLead?.phone || '').trim();
+    const linkedContactEmail = String(linkedLead?.contactEmail || linkedLead?.email || '').trim();
+    const status = 'wacht';
+    const claimedAtIso = selectedAssignee ? new Date().toISOString() : null;
+
+    if (!companyName || !contactPerson || !title || !description || !deliveryTime) {
+        setCreateOrderMessage('Vul alle velden in.', 'error');
+        return;
+    }
+    if (!selectedAssignee || !ORDER_ASSIGNEE_OPTIONS.includes(selectedAssignee)) {
+        setCreateOrderMessage('Kies wie deze opdracht krijgt toegewezen.', 'error');
+        return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+        setCreateOrderMessage('Vul een geldig bedrag in.', 'error');
+        return;
+    }
+
+    const record = {
+        id: getNextOrderId(),
+        clientName: companyName,
+        location: contactPerson,
+        companyName,
+        contactName: contactPerson,
+        contactPhone: linkedContactPhone,
+        contactEmail: linkedContactEmail,
+        title,
+        description,
+        deliveryTime,
+        domainName,
+        amount,
+        status,
+        prompt: linkedPrompt,
+        transcript: linkedTranscript,
+        includeSampleDesign,
+        apiCostEur: null,
+        apiCostUsd: null,
+        apiTokensInput: null,
+        apiTokensOutput: null,
+        apiModel: '',
+        estimatedApiCostEur: null,
+        estimatedApiCostUsd: null,
+        estimatedApiTokensInput: null,
+        estimatedApiTokensOutput: null,
+        estimatedApiModel: '',
+        estimatedApiBuildMode: null,
+        estimatedApiGeneratedAt: null,
+        lastRunAt: null,
+        paidAt: null,
+        launchRepoUrl: null,
+        launchDeploymentUrl: null,
+        launchDomainStatus: null,
+        launchDomainMessage: null,
+        launchedAt: null,
+        claimedBy: selectedAssignee || null,
+        claimedAt: claimedAtIso,
+        referenceImages: [],
+        sourceAppointmentId,
+        sourceCallId,
+        sourceAppointmentLabel
+    };
+
+    customOrders.push(record);
+    persistCustomOrders();
+    appendCustomOrderCard(record, { scrollIntoView: true });
+    persistOrdersRuntime();
+    form.reset();
+    closeCreateOrderModal();
+}
