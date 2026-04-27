@@ -9,10 +9,27 @@ test('premium seo NL UI: tabs, paginas, blogcampagne', () => {
   const source = fs.readFileSync(filePath, 'utf8');
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
 
-  assert.match(
-    source,
-    /<button class="tab active" onclick="switchTab\('scan', this\)">SEO Scan<\/button>\s*<button class="tab" onclick="switchTab\('paginas', this\)">Pagina's<\/button>\s*<button class="tab" onclick="switchTab\('blogs', this\)">Blogs<\/button>\s*<button class="tab" onclick="switchTab\('analytics', this\)">Google Analytics<\/button>/
-  );
+  assert.match(source, /<button class="tab active" type="button" data-seo-tab="scan">SEO Scan<\/button>/);
+  assert.match(source, /<button class="tab" type="button" data-seo-tab="paginas">Pagina's<\/button>/);
+  assert.match(source, /<button class="tab" type="button" data-seo-tab="blogs">Blogs<\/button>/);
+  assert.match(source, /<button class="tab" type="button" data-seo-tab="analytics">Google Analytics<\/button>/);
+  assert.match(source, /id="scan-btn" type="button" data-seo-action="scan"/);
+  assert.match(source, /id="blog-activate-btn" data-seo-action="activate-blog-campaign"/);
+  assert.match(source, /id="blog-pause-btn" data-seo-action="pause-blog-campaign"/);
+  assert.match(source, /data-seo-action="close-goal-modal"/);
+  assert.match(source, /data-seo-action="confirm-goal-modal"/);
+  assert.match(source, /data-seo-lock-input/);
+  assert.match(source, /data-seo-lock-submit/);
+  assert.match(source, /function bindSeoStaticActions\(\)/);
+  assert.match(source, /button\.addEventListener\('click', \(\) => \{[\s\S]*switchTab\(button\.dataset\.seoTab \|\| 'scan', button\);/);
+  assert.match(source, /lockSubmit\.addEventListener\('click', unlockSeoContentArea\)/);
+  assert.doesNotMatch(source, /onclick="switchTab\(/);
+  assert.doesNotMatch(source, /onclick="startScan\(/);
+  assert.doesNotMatch(source, /onclick="activateBlogCampaign\(/);
+  assert.doesNotMatch(source, /onclick="pauseBlogCampaignDemo\(/);
+  assert.doesNotMatch(source, /onclick="closeSeoGoalModal\(/);
+  assert.doesNotMatch(source, /onclick="confirmSeoGoalAndOptimise\(/);
+  assert.doesNotMatch(source, /onkeydown="if\(event\.key==='Enter'\)unlockSeoContentArea\(\)"/);
   assert.doesNotMatch(source, /tab-productpaginas/);
   assert.match(source, /<div class="tab-panel" id="tab-analytics">/);
   assert.doesNotMatch(source, /id="tab-keywords"/);
