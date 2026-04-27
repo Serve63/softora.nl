@@ -113,6 +113,10 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /WEBSITE_PREVIEW_BATCH_POLL_INTERVAL_MS/);
   assert.match(source, /WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES/);
   assert.match(source, /stopScanBatchPollWithMessage/);
+  assert.match(source, /function renderScanOutputMessage\(container, message\) \{/);
+  assert.match(source, /renderScanOutputMessage\(out, String\(payload\.detail\)\);/);
+  assert.match(source, /renderScanOutputMessage\(out, String\(e\?\.message \|\| e \|\| 'Batch mislukt'\)\);/);
+  assert.doesNotMatch(source, /out\.innerHTML/);
   assert.match(source, /buildWebsitePreviewJobFingerprint/);
   assert.match(source, /Scanstatus kon niet worden opgehaald\./);
 });

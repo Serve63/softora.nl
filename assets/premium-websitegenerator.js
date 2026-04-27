@@ -649,6 +649,14 @@ function createPreviewMessageZone(hostname, message) {
   return row;
 }
 
+function renderScanOutputMessage(container, message) {
+  if (!container) return;
+  const emptyState = document.createElement('div');
+  emptyState.className = 'empty-state';
+  appendWebsiteGeneratorTextElement(emptyState, 'p', '', message);
+  container.replaceChildren(emptyState);
+}
+
 function scheduleWebsitePreviewBatchPoll() {
   clearWebsitePreviewBatchPoll();
   websitePreviewBatchPollTimer = setInterval(() => {
@@ -662,7 +670,7 @@ function stopScanBatchPollWithMessage(message) {
   clearStoredWebsitePreviewBatchJobId();
   const out = document.getElementById('scan-output');
   if (!out) return;
-  out.innerHTML = `<div class="empty-state"><p>${escapeHtml(message)}</p></div>`;
+  renderScanOutputMessage(out, message);
 }
 
 function buildWebsitePreviewJobFingerprint(job) {
@@ -720,7 +728,7 @@ async function pollWebsitePreviewBatch() {
         clearWebsitePreviewBatchPoll();
         const out = document.getElementById('scan-output');
         if (out && payload?.detail) {
-          out.innerHTML = `<div class="empty-state"><p>${escapeHtml(String(payload.detail))}</p></div>`;
+          renderScanOutputMessage(out, String(payload.detail));
         }
       }
       if (res.status === 403 && payload?.detail) {
@@ -943,7 +951,7 @@ async function startScan() {
     showToast(String(e?.message || e || 'Batch mislukt'));
     const out = document.getElementById('scan-output');
     if (out) {
-      out.innerHTML = `<div class="empty-state"><p>${escapeHtml(String(e?.message || e || 'Batch mislukt'))}</p></div>`;
+      renderScanOutputMessage(out, String(e?.message || e || 'Batch mislukt'));
     }
     clearStoredWebsitePreviewBatchJobId();
   } finally {
