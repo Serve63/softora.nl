@@ -805,6 +805,7 @@ const A4_PREVIEW_WIDTH = 595;
 const A4_PREVIEW_HEIGHT = 842;
 let resizeObs = null;
 const DEFAULT_OFFERTE_NOTITIES = 'In de bijlage vind je de offerte en de algemene voorwaarden van Softora VOF. Door akkoord te geven op deze offerte verklaar je ook akkoord te gaan met de algemene voorwaarden. Reageer bij akkoord altijd expliciet met: "Akkoord met de offerte en algemene voorwaarden."';
+const DEFAULT_FACTUUR_NOTITIES = 'Op deze factuur en de onderliggende opdracht zijn de algemene voorwaarden en, indien van toepassing, de verwerkersovereenkomst van Softora VOF van toepassing, zoals vóór akkoord verstrekt en geaccepteerd bij akkoord op de offerte/opdrachtbevestiging.';
 const DEFAULT_OPLEVERINGSMAIL_NOTITIES = 'Je hebt 7 kalenderdagen om concrete gebreken te melden. Daarna geldt het project als geaccepteerd.';
 
 const fields = {};
@@ -895,7 +896,7 @@ const docConfigs = {
     { id:'ref',       label:'Referentie / Project',     placeholder:'Website Business pakket' },
     { section: 'Regelomschrijvingen', isRegels: true },
     { section: 'Opmerkingen' },
-    { id:'notities',  label:'Notities (optioneel)',      textarea: true, placeholder:'Bijv. betaalverzoek...' },
+    { id:'notities',  label:'Notities (optioneel)',      textarea: true, placeholder:'Bijv. betaalverzoek...', default: DEFAULT_FACTUUR_NOTITIES },
   ],
   herinnering: [
     { section: 'Klantgegevens' },

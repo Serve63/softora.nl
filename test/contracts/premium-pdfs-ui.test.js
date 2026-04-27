@@ -31,6 +31,8 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /Akkoord met de offerte en algemene voorwaarden\./);
   assert.match(pageSource, /const DEFAULT_OFFERTE_NOTITIES = 'In de bijlage vind je de offerte en de algemene voorwaarden van Softora VOF\. Door akkoord te geven op deze offerte verklaar je ook akkoord te gaan met de algemene voorwaarden\. Reageer bij akkoord altijd expliciet met: "Akkoord met de offerte en algemene voorwaarden\."';/);
   assert.match(pageSource, /id:'notities'[\s\S]*default:\s*DEFAULT_OFFERTE_NOTITIES/);
+  assert.match(pageSource, /const DEFAULT_FACTUUR_NOTITIES = 'Op deze factuur en de onderliggende opdracht zijn de algemene voorwaarden en, indien van toepassing, de verwerkersovereenkomst van Softora VOF van toepassing, zoals vóór akkoord verstrekt en geaccepteerd bij akkoord op de offerte\/opdrachtbevestiging\.';/);
+  assert.match(pageSource, /factuur:\s*\[[\s\S]*label:'Notities \(optioneel\)'[\s\S]*default:\s*DEFAULT_FACTUUR_NOTITIES/);
   assert.match(pageSource, /const DEFAULT_OPLEVERINGSMAIL_NOTITIES = 'Je hebt 7 kalenderdagen om concrete gebreken te melden\. Daarna geldt het project als geaccepteerd\.';/);
   assert.match(pageSource, /opleveringsmail:\s*\[[\s\S]*label:'Standaard opmerking'[\s\S]*default:\s*DEFAULT_OPLEVERINGSMAIL_NOTITIES/);
   assert.match(pageSource, /docType === 'opleveringsmail'[\s\S]*<div class="pdf-doctype">Opleveringsmail<\/div>/);
