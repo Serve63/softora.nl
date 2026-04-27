@@ -38,6 +38,7 @@
             color-scheme: light;
             --bg-primary: #f8f7f4;
             --header-surface: #f8f7f4;
+            --meta-bar-surface: #f8f7f4;
             --bg-secondary: #ffffff;
             --bg-tertiary: #efeee9;
             --bg-card: rgba(15, 23, 42, 0.03);
@@ -59,16 +60,34 @@
 
         html {
             scroll-behavior: smooth;
-            background-color: var(--bg-primary);
+            background-color: var(--header-surface);
+            background: var(--header-surface);
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--bg-primary);
+            background-color: var(--header-surface);
             color: var(--text-primary);
             line-height: 1.6;
             overflow-x: hidden;
             cursor: auto;
+        }
+
+        .ios-statusbar-fill {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: env(safe-area-inset-top);
+            background: var(--meta-bar-surface);
+            z-index: 1002;
+            pointer-events: none;
+        }
+
+        @supports not (padding: env(safe-area-inset-top)) {
+            .ios-statusbar-fill {
+                height: 0;
+            }
         }
 
         h1, h2, h3, h4 {
@@ -2934,6 +2953,11 @@
                 background: #ffffff !important;
             }
 
+            #werkwijze .werkwijze-grid,
+            #werkwijze .werkwijze-stats {
+                background: #ffffff !important;
+            }
+
             #faq,
             .faq-section {
                 padding-left: 18px !important;
@@ -2994,6 +3018,7 @@
     </style>
 </head>
 <body>
+    <div class="ios-statusbar-fill" aria-hidden="true"></div>
 
     <div class="noise-overlay"></div>
     <div class="cursor"></div>
