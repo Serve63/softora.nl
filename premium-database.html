@@ -1489,18 +1489,6 @@
             <div class="mrow"><label class="mlabel" for="m-dom">Domein</label><input class="minp" id="m-dom" placeholder="bakkerijdezon.nl"></div>
             <div class="mrow"><label class="mlabel" for="m-tel">Telefoon</label><input class="minp" id="m-tel" placeholder="+31 6 …"></div>
             <div class="mrow"><label class="mlabel" for="m-mail">E-mail</label><input class="minp" id="m-mail" placeholder="info@…"></div>
-            <div class="mrow"><label class="mlabel" for="m-branche">Branche</label>
-                <select class="msel" id="m-branche">
-                    <option>Horeca & Restaurants</option>
-                    <option>Retail & Winkels</option>
-                    <option>Zakelijke Dienstverlening</option>
-                    <option>Bouw & Vastgoed</option>
-                    <option>Gezondheidszorg</option>
-                    <option>Creatieve Sector</option>
-                    <option>Tech & Startups</option>
-                    <option selected>Overig</option>
-                </select>
-            </div>
             <div class="mrow"><label class="mlabel" for="m-stad">Adres</label><input class="minp" id="m-stad" placeholder="Tilburg"></div>
             <div class="mrow"><label class="mlabel" for="m-status">Status</label>
                 <select class="msel" id="m-status">
@@ -1515,12 +1503,6 @@
                     <option value="afgehaakt">Afgehaakt</option>
                     <option value="geblokkeerd">Geen interesse</option>
                     <option value="buiten">Buiten gebruik</option>
-                </select>
-            </div>
-            <div class="mrow"><label class="mlabel" for="m-responsible">Toegewezen aan</label>
-                <select class="msel" id="m-responsible">
-                    <option value="Serve" selected>Servé</option>
-                    <option value="Martijn">Martijn</option>
                 </select>
             </div>
             <div class="mbtns">
@@ -1667,10 +1649,8 @@
             modalDomain: document.getElementById("m-dom"),
             modalPhone: document.getElementById("m-tel"),
             modalMail: document.getElementById("m-mail"),
-            modalBranch: document.getElementById("m-branche"),
             modalCity: document.getElementById("m-stad"),
             modalStatus: document.getElementById("m-status"),
-            fieldResponsible: document.getElementById("m-responsible"),
             cancelModalButton: document.getElementById("cancelModalButton"),
             saveModalButton: document.getElementById("saveModalButton"),
             photoPreview: document.getElementById("photoPreview"),
@@ -2951,10 +2931,8 @@
             nodes.modalDomain.value = "";
             nodes.modalPhone.value = "";
             nodes.modalMail.value = "";
-            nodes.modalBranch.value = "Overig";
             nodes.modalCity.value = "";
             nodes.modalStatus.value = "benaderbaar";
-            if (nodes.fieldResponsible) nodes.fieldResponsible.value = "Serve";
         }
 
         function openModal() {
@@ -2975,10 +2953,8 @@
             nodes.modalDomain.value = customer.dom || "";
             nodes.modalPhone.value = customer.tel || "";
             nodes.modalMail.value = customer.email || "";
-            nodes.modalBranch.value = customer.branche || "Overig";
             nodes.modalCity.value = customer.stad || "";
             nodes.modalStatus.value = normalizeDatabaseStatus(customer.status, customer);
-            if (nodes.fieldResponsible) nodes.fieldResponsible.value = customer.verantwoordelijk || "Serve";
             nodes.modalBg.classList.add("on");
             nodes.modalCompany.focus();
         }
@@ -3137,10 +3113,10 @@
                 dom: dom,
                 telefoon: normalizeString(nodes.modalPhone.value) || "—",
                 email: normalizeString(nodes.modalMail.value) || ("info@" + dom),
-                branche: normalizeString(nodes.modalBranch.value) || "Overig",
+                branche: "Overig",
                 stad: normalizeString(nodes.modalCity.value) || "Onbekend",
                 status: normalizeDatabaseStatus(nodes.modalStatus.value),
-                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : "Serve",
+                verantwoordelijk: "",
                 hist: [{
                     type: normalizeDatabaseStatus(nodes.modalStatus.value),
                     label: "Toegevoegd aan database",
@@ -3195,10 +3171,10 @@
                 website: normalizeString(nodes.modalDomain.value) || existing.website,
                 telefoon: normalizeString(nodes.modalPhone.value) || "—",
                 email: normalizeString(nodes.modalMail.value) || ("info@" + dom),
-                branche: normalizeString(nodes.modalBranch.value) || "Overig",
+                branche: existing.branche || "Overig",
                 stad: normalizeString(nodes.modalCity.value) || "Onbekend",
                 status: nextStatus,
-                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : existing.verantwoordelijk,
+                verantwoordelijk: existing.verantwoordelijk,
                 hist: nextHistory,
                 updatedAt: formatDateForStorage(new Date())
             }, existing.id);

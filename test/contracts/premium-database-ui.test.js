@@ -116,8 +116,14 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.doesNotMatch(pageSource, /id="f-branche"/);
+  assert.doesNotMatch(pageSource, /id="m-branche"/);
+  assert.doesNotMatch(pageSource, /id="m-responsible"/);
+  assert.doesNotMatch(pageSource, /<label class="mlabel" for="m-branche">Branche<\/label>/);
+  assert.doesNotMatch(pageSource, /<label class="mlabel" for="m-responsible">Toegewezen aan<\/label>/);
   assert.doesNotMatch(pageSource, /class="filter-select-group"/);
   assert.doesNotMatch(pageSource, /nodes\.branch/);
+  assert.doesNotMatch(pageSource, /nodes\.modalBranch/);
+  assert.doesNotMatch(pageSource, /nodes\.fieldResponsible/);
   assert.doesNotMatch(pageSource, /activeBranch/);
   assert.doesNotMatch(pageSource, /<th data-sort-key="branche">Branche<\/th>/);
   assert.match(pageSource, /<th data-sort-key="email">Mailadres<\/th>/);
@@ -210,7 +216,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /<div class="p-s-title">Gegevens<\/div>/);
   assert.doesNotMatch(pageSource, /<div class="p-s-title">Status wijzigen<\/div>/);
   assert.doesNotMatch(pageSource, /<div class="p-s-title">Tijdlijn<\/div>/);
-  assert.match(pageSource, /<select class="msel" id="m-responsible">[\s\S]*Servé[\s\S]*Martijn/);
+  assert.doesNotMatch(pageSource, /<select class="msel" id="m-responsible">/);
   assert.match(pageSource, /function parseResponsibleValue\(value\)/);
   assert.match(pageSource, /function normalizeResponsibleValue\(value\)/);
   assert.match(pageSource, /function formatResponsibleDisplayName\(value\)/);
