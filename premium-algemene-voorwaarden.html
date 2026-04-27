@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
 <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
-<title>Algemene Voorwaarden – Softora.nl</title>
+<title>Algemene voorwaarden Softora VOF - Softora.nl</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -90,7 +90,11 @@ nav {
 .toc-list li a:hover { color: var(--crimson); border-left-color: var(--crimson); }
 .toc-list li a.active { color: var(--crimson); border-left-color: var(--crimson); font-weight: 600; }
 
-.content { max-width: 680px; }
+.content { max-width: 740px; }
+.terms-intro { background: var(--white); border: 1px solid var(--border); border-radius: 8px; padding: 26px 30px; margin-bottom: 42px; }
+.terms-title { font-family: 'Oswald', sans-serif; font-size: 38px; line-height: 1.05; font-weight: 700; text-transform: uppercase; letter-spacing: -.02em; color: var(--dark); margin-bottom: 16px; }
+.terms-meta { display: grid; gap: 6px; margin-bottom: 18px; font-size: 13px; color: var(--mid); line-height: 1.7; }
+.terms-intro p { font-size: 14px; color: var(--mid); line-height: 1.85; }
 .av-section { margin-bottom: 48px; }
 .av-section-num { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--crimson); margin-bottom: 6px; }
 .av-section-title { font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--dark); margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
@@ -101,6 +105,21 @@ nav {
 .av-section strong { color: var(--dark); font-weight: 600; }
 .info-box { background: var(--white); border: 1px solid var(--border); border-left: 3px solid var(--crimson); border-radius: 0 6px 6px 0; padding: 14px 18px; margin-bottom: 14px; font-size: 13px; color: var(--mid); line-height: 1.7; }
 .info-box strong { color: var(--dark); }
+
+@media (max-width: 860px) {
+  body { padding-top: 74px; }
+  nav { padding: 1rem 1.4rem; }
+  .layout { display: block; padding: 34px 20px 72px; }
+  .toc { position: static; padding-right: 0; margin-bottom: 30px; }
+  .toc-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+  .terms-title { font-size: 31px; }
+}
+
+@media (max-width: 560px) {
+  .nav-start-btn { display: none; }
+  .toc-list { grid-template-columns: 1fr; }
+  .terms-intro { padding: 22px 20px; }
+}
 
 </style>
 </head>
@@ -119,142 +138,551 @@ nav {
     <ul class="toc-list">
       <li><a href="#art1">1. Definities</a></li>
       <li><a href="#art2">2. Toepasselijkheid</a></li>
-      <li><a href="#art3">3. Offertes & Overeenkomsten</a></li>
-      <li><a href="#art4">4. Uitvoering van de Opdracht</a></li>
-      <li><a href="#art5">5. Prijzen & Betaling</a></li>
-      <li><a href="#art6">6. Leveringstermijnen</a></li>
-      <li><a href="#art7">7. Intellectueel Eigendom</a></li>
-      <li><a href="#art8">8. Aansprakelijkheid</a></li>
-      <li><a href="#art9">9. Overmacht</a></li>
-      <li><a href="#art10">10. Opzegging & Ontbinding</a></li>
-      <li><a href="#art11">11. Geheimhouding</a></li>
-      <li><a href="#art12">12. Privacy & Gegevens</a></li>
-      <li><a href="#art13">13. Klachten</a></li>
-      <li><a href="#art14">14. Toepasselijk Recht</a></li>
+      <li><a href="#art3">3. Offertes en overeenkomst</a></li>
+      <li><a href="#art4">4. Scope van de opdracht</a></li>
+      <li><a href="#art5">5. Uitvoering</a></li>
+      <li><a href="#art6">6. Verplichtingen opdrachtgever</a></li>
+      <li><a href="#art7">7. Meerwerk</a></li>
+      <li><a href="#art8">8. Revisies en feedback</a></li>
+      <li><a href="#art9">9. Oplevering en acceptatie</a></li>
+      <li><a href="#art10">10. Bugs en herstel</a></li>
+      <li><a href="#art11">11. Betaling</a></li>
+      <li><a href="#art12">12. Eigendomsvoorbehoud</a></li>
+      <li><a href="#art13">13. Intellectueel eigendom</a></li>
+      <li><a href="#art14">14. Aangeleverde materialen</a></li>
+      <li><a href="#art15">15. Hosting en e-mail</a></li>
+      <li><a href="#art16">16. Derde partijen</a></li>
+      <li><a href="#art17">17. Onderhoud en support</a></li>
+      <li><a href="#art18">18. Beveiliging</a></li>
+      <li><a href="#art19">19. Back-ups en data</a></li>
+      <li><a href="#art20">20. AI en koppelingen</a></li>
+      <li><a href="#art21">21. Resultaten en garanties</a></li>
+      <li><a href="#art22">22. Persoonsgegevens en AVG</a></li>
+      <li><a href="#art23">23. Geheimhouding</a></li>
+      <li><a href="#art24">24. Aansprakelijkheid</a></li>
+      <li><a href="#art25">25. Vrijwaring</a></li>
+      <li><a href="#art26">26. Overmacht</a></li>
+      <li><a href="#art27">27. Annulering en beëindiging</a></li>
+      <li><a href="#art28">28. Klachten</a></li>
+      <li><a href="#art29">29. Communicatie en bewijs</a></li>
+      <li><a href="#art30">30. Non-solicitation</a></li>
+      <li><a href="#art31">31. Portfolio en referenties</a></li>
+      <li><a href="#art32">32. Recht en geschillen</a></li>
+      <li><a href="#art33">33. Slotbepaling</a></li>
     </ul>
   </aside>
 
   <main class="content">
+    <header class="terms-intro">
+      <h1 class="terms-title">Algemene voorwaarden Softora VOF</h1>
+      <div class="terms-meta">
+        <div><strong>Versie:</strong> 27 april 2026</div>
+        <div><strong>Softora VOF</strong></div>
+        <div><strong>Gevestigd te:</strong> Oisterwijk, Nederland</div>
+        <div><strong>KvK-nummer:</strong> 12345678</div>
+        <div><strong>E-mail:</strong> info@softora.nl</div>
+      </div>
+      <p>Deze algemene voorwaarden zijn van toepassing op alle offertes, overeenkomsten, werkzaamheden, diensten en leveringen van Softora VOF.</p>
+    </header>
 
     <div class="av-section" id="art1">
       <div class="av-section-num">Artikel 1</div>
       <div class="av-section-title">Definities</div>
       <p>In deze algemene voorwaarden wordt verstaan onder:</p>
-      <ul>
-        <li><strong>Softora.nl:</strong> de eenmanszaak/VOF geregistreerd onder de naam Softora.nl, gevestigd te Oisterwijk, ingeschreven in het Handelsregister van de Kamer van Koophandel.</li>
-        <li><strong>Opdrachtgever:</strong> de natuurlijke persoon of rechtspersoon die met Softora.nl een overeenkomst sluit of een offerte aanvraagt.</li>
-        <li><strong>Opdracht:</strong> de werkzaamheden die Softora.nl uitvoert, waaronder maar niet beperkt tot het bouwen van websites, ontwikkelen van software, verzorgen van onderhoud en verlenen van overige diensten.</li>
-        <li><strong>Overeenkomst:</strong> de schriftelijke of digitale afspraak tussen Softora.nl en de opdrachtgever over de te verrichten diensten.</li>
-        <li><strong>Offerte:</strong> een schriftelijk of digitaal aanbod van Softora.nl aan de opdrachtgever.</li>
-      </ul>
+      <ol>
+        <li><strong>Softora:</strong> Softora VOF, gevestigd in Nederland, gebruiker van deze algemene voorwaarden.</li>
+        <li><strong>Opdrachtgever:</strong> iedere zakelijke klant, onderneming, organisatie of rechtspersoon die met Softora een overeenkomst sluit of daarover onderhandelt.</li>
+        <li><strong>Overeenkomst:</strong> iedere afspraak tussen Softora en opdrachtgever, waaronder offertes, opdrachtbevestigingen, e-mailakkoorden, WhatsApp-akkoorden en schriftelijke overeenkomsten.</li>
+        <li><strong>Werkzaamheden:</strong> alle diensten van Softora, waaronder websitebouw, webdesign, webontwikkeling, bedrijfssoftware, automatiseringen, AI-koppelingen, dashboards, technische ondersteuning, onderhoud, advies, hostingbegeleiding, koppelingen en overige digitale diensten.</li>
+        <li><strong>Oplevering:</strong> het moment waarop Softora het werk beschikbaar stelt, overdraagt, live zet of meldt dat het gereed is voor beoordeling.</li>
+        <li><strong>Meerwerk:</strong> alle werkzaamheden die buiten de oorspronkelijke opdracht, offerte of afgesproken scope vallen.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art2">
       <div class="av-section-num">Artikel 2</div>
       <div class="av-section-title">Toepasselijkheid</div>
-      <p>Deze algemene voorwaarden zijn van toepassing op alle aanbiedingen, offertes, overeenkomsten en leveringen van Softora.nl, tenzij schriftelijk anders is overeengekomen.</p>
-      <p>De toepasselijkheid van eventuele inkoop- of andere voorwaarden van de opdrachtgever wordt uitdrukkelijk van de hand gewezen.</p>
-      <p>Indien één of meerdere bepalingen in deze voorwaarden nietig zijn of vernietigd worden, blijven de overige bepalingen volledig van toepassing.</p>
+      <ol>
+        <li>Deze algemene voorwaarden zijn van toepassing op alle offertes, overeenkomsten, werkzaamheden en leveringen van Softora.</li>
+        <li>Afwijkingen van deze algemene voorwaarden zijn alleen geldig als deze schriftelijk door Softora zijn bevestigd.</li>
+        <li>Algemene voorwaarden van opdrachtgever worden uitdrukkelijk van de hand gewezen.</li>
+        <li>Als &eacute;&eacute;n bepaling uit deze algemene voorwaarden ongeldig of niet afdwingbaar blijkt, blijven de overige bepalingen volledig van kracht.</li>
+        <li>Deze voorwaarden zijn bedoeld voor zakelijke opdrachtgevers. Softora levert in principe niet aan consumenten, tenzij schriftelijk anders overeengekomen.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art3">
       <div class="av-section-num">Artikel 3</div>
-      <div class="av-section-title">Offertes & Overeenkomsten</div>
-      <p>Alle offertes van Softora.nl zijn vrijblijvend en geldig gedurende <strong>30 dagen</strong> na dagtekening, tenzij anders vermeld.</p>
-      <p>Een overeenkomst komt tot stand op het moment dat de opdrachtgever een offerte schriftelijk of digitaal aanvaardt, dan wel wanneer Softora.nl een opdracht schriftelijk bevestigt.</p>
-      <p>Wijzigingen in de opdracht na het sluiten van de overeenkomst zijn slechts geldig indien schriftelijk overeengekomen. Meerwerk wordt apart geoffreerd en gefactureerd.</p>
-      <p>Softora.nl behoudt zich het recht voor een opdracht te weigeren zonder opgave van reden.</p>
+      <div class="av-section-title">Offertes en totstandkoming van de overeenkomst</div>
+      <ol>
+        <li>Alle offertes van Softora zijn vrijblijvend, tenzij schriftelijk anders vermeld.</li>
+        <li>Een overeenkomst komt tot stand zodra opdrachtgever schriftelijk, per e-mail, digitaal, via WhatsApp of op andere aantoonbare wijze akkoord geeft op een offerte of opdrachtbevestiging.</li>
+        <li>Mondelinge afspraken zijn alleen bindend als Softora deze schriftelijk heeft bevestigd.</li>
+        <li>Softora mag een opdracht weigeren zonder opgave van reden.</li>
+        <li>Prijzen zijn exclusief btw, tenzij anders vermeld.</li>
+        <li>Offertes zijn geldig gedurende 14 dagen, tenzij in de offerte een andere termijn staat.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art4">
       <div class="av-section-num">Artikel 4</div>
-      <div class="av-section-title">Uitvoering van de Opdracht</div>
-      <p>Softora.nl voert de opdracht naar beste inzicht en vermogen uit, overeenkomstig de eisen van goed vakmanschap. Alle diensten worden uitgevoerd op basis van een inspanningsverplichting, tenzij uitdrukkelijk een resultaatsverplichting is overeengekomen.</p>
-      <p>De opdrachtgever is verplicht tijdig alle informatie, materialen en toegangsgegevens te verstrekken die Softora.nl nodig heeft. Vertraging als gevolg van het niet of niet tijdig aanleveren van benodigde informatie komt voor rekening en risico van de opdrachtgever.</p>
-      <p>Softora.nl heeft het recht werkzaamheden te laten uitvoeren door derden, mits dit de kwaliteit van de dienstverlening niet schaadt.</p>
+      <div class="av-section-title">Scope van de opdracht</div>
+      <ol>
+        <li>Softora voert uitsluitend de werkzaamheden uit die expliciet in de offerte of opdrachtbevestiging staan.</li>
+        <li>Alles wat niet expliciet is opgenomen in de offerte, valt buiten de opdracht.</li>
+        <li>Niet inbegrepen, tenzij schriftelijk anders overeengekomen, zijn onder andere:
+          <ul>
+            <li>teksten;</li>
+            <li>fotografie;</li>
+            <li>video;</li>
+            <li>branding;</li>
+            <li>logo-ontwerp;</li>
+            <li>SEO;</li>
+            <li>advertenties;</li>
+            <li>hosting;</li>
+            <li>domeinnamen;</li>
+            <li>e-mailinstellingen;</li>
+            <li>onderhoud;</li>
+            <li>support;</li>
+            <li>beveiligingsmonitoring;</li>
+            <li>back-ups;</li>
+            <li>API-kosten;</li>
+            <li>plug-ins;</li>
+            <li>betaalde licenties;</li>
+            <li>CRM-koppelingen;</li>
+            <li>automatiseringen;</li>
+            <li>dashboards;</li>
+            <li>migraties;</li>
+            <li>trainingen;</li>
+            <li>juridische teksten;</li>
+            <li>privacyverklaringen;</li>
+            <li>cookieverklaringen;</li>
+            <li>verwerkersovereenkomsten;</li>
+            <li>contentinvoer.</li>
+          </ul>
+        </li>
+        <li>Gesprekken, voorbeelden, schetsen, idee&euml;n of verwachtingen gelden niet als onderdeel van de opdracht, tenzij deze schriftelijk in de offerte zijn opgenomen.</li>
+        <li>Bij twijfel of werkzaamheden binnen de opdracht vallen, bepaalt Softora redelijkerwijs of sprake is van meerwerk.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art5">
       <div class="av-section-num">Artikel 5</div>
-      <div class="av-section-title">Prijzen & Betaling</div>
-      <p>Alle genoemde prijzen zijn exclusief btw en andere heffingen van overheidswege, tenzij uitdrukkelijk anders vermeld.</p>
-      <p>Bij opdrachten met een langere doorlooptijd kan Softora.nl een aanbetaling van maximaal <strong>50%</strong> van de totale opdrachtwaarde verlangen vóór aanvang van de werkzaamheden.</p>
-      <p>Betaling dient te geschieden binnen <strong>14 dagen</strong> na factuurdatum, tenzij schriftelijk anders overeengekomen. Bij overschrijding van de betalingstermijn is de opdrachtgever van rechtswege in verzuim en is Softora.nl gerechtigd wettelijke rente en incassokosten in rekening te brengen.</p>
-      <p>Indien de opdrachtgever na aanmaning in gebreke blijft, is Softora.nl gerechtigd de werkzaamheden op te schorten totdat de openstaande bedragen zijn voldaan.</p>
+      <div class="av-section-title">Uitvoering van werkzaamheden</div>
+      <ol>
+        <li>Softora voert de werkzaamheden naar beste inzicht en vermogen uit.</li>
+        <li>Softora heeft een inspanningsverplichting en geen resultaatsverplichting, tenzij schriftelijk anders overeengekomen.</li>
+        <li>Softora bepaalt op welke technische manier de werkzaamheden worden uitgevoerd, tenzij schriftelijk anders afgesproken.</li>
+        <li>Softora mag derden inschakelen voor de uitvoering van de opdracht.</li>
+        <li>Alle genoemde termijnen zijn indicatief, tenzij schriftelijk uitdrukkelijk een fatale termijn is afgesproken.</li>
+        <li>Vertraging geeft opdrachtgever geen recht op schadevergoeding, ontbinding of opschorting, tenzij sprake is van opzet of bewuste roekeloosheid van Softora.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art6">
       <div class="av-section-num">Artikel 6</div>
-      <div class="av-section-title">Leveringstermijnen</div>
-      <p>Genoemde oplever- en levertijden zijn indicatief en gelden niet als fatale termijn, tenzij uitdrukkelijk schriftelijk overeengekomen. Overschrijding van een termijn geeft de opdrachtgever geen recht op schadevergoeding of ontbinding, tenzij sprake is van opzet of bewuste roekeloosheid.</p>
-      <p>Softora.nl zal de opdrachtgever tijdig informeren indien een levertijd niet gehaald kan worden en zal in overleg een nieuwe termijn vaststellen.</p>
+      <div class="av-section-title">Verplichtingen van opdrachtgever</div>
+      <ol>
+        <li>Opdrachtgever verstrekt tijdig alle informatie, content, accounts, toegang, bestanden, feedback en goedkeuringen die nodig zijn voor uitvoering van de opdracht.</li>
+        <li>Opdrachtgever staat in voor de juistheid, volledigheid en rechtmatigheid van alle aangeleverde informatie en materialen.</li>
+        <li>Vertraging door te late of onvolledige aanlevering komt voor rekening en risico van opdrachtgever.</li>
+        <li>Extra werkzaamheden door foutieve, late of onvolledige aanlevering gelden als meerwerk.</li>
+        <li>Opdrachtgever is verantwoordelijk voor het bewaren van eigen kopie&euml;n van bestanden, content, data, accounts en inloggegevens.</li>
+        <li>Opdrachtgever is verantwoordelijk voor de inhoud van zijn website, software, teksten, aanbiedingen, prijzen, claims, juridische informatie, privacy-informatie en bedrijfsinformatie.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art7">
       <div class="av-section-num">Artikel 7</div>
-      <div class="av-section-title">Intellectueel Eigendom</div>
-      <p>Alle door Softora.nl ontwikkelde werken — waaronder websites, software, designs, code en overige materialen — zijn en blijven het intellectueel eigendom van Softora.nl, tenzij schriftelijk anders overeengekomen.</p>
-      <p>Na volledige betaling verleent Softora.nl aan de opdrachtgever een niet-exclusief gebruiksrecht op de geleverde werken voor het overeengekomen doel.</p>
-      <p>Het is de opdrachtgever niet toegestaan geleverde werken te verkopen, te verhuren of over te dragen aan derden zonder toestemming van Softora.nl.</p>
-      <p>Softora.nl behoudt het recht om geleverde werken te gebruiken voor eigen promotionele en portfoliodoeleinden, tenzij de opdrachtgever hier schriftelijk bezwaar tegen maakt.</p>
+      <div class="av-section-title">Meerwerk</div>
+      <ol>
+        <li>Alle werkzaamheden buiten de afgesproken scope worden beschouwd als meerwerk.</li>
+        <li>Meerwerk wordt apart gefactureerd tegen het geldende uurtarief van Softora of op basis van een aanvullende offerte.</li>
+        <li>Onder meerwerk vallen onder andere:
+          <ul>
+            <li>extra pagina's;</li>
+            <li>extra functies;</li>
+            <li>extra revisies;</li>
+            <li>spoedwerk;</li>
+            <li>nieuwe wensen;</li>
+            <li>koerswijzigingen;</li>
+            <li>extra koppelingen;</li>
+            <li>correcties door foutieve input van opdrachtgever;</li>
+            <li>werkzaamheden na oplevering.</li>
+          </ul>
+        </li>
+        <li>Softora mag uitvoering van meerwerk opschorten totdat opdrachtgever akkoord geeft op prijs en planning.</li>
+        <li>Kleine noodzakelijke werkzaamheden mogen direct worden uitgevoerd en achteraf worden gefactureerd als dit redelijk is voor de voortgang van het project.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art8">
       <div class="av-section-num">Artikel 8</div>
-      <div class="av-section-title">Aansprakelijkheid</div>
-      <p>De aansprakelijkheid van Softora.nl is beperkt tot het bedrag dat in het kader van de betreffende opdracht door de opdrachtgever is betaald in de drie maanden voorafgaand aan het schadeveroorzakende voorval.</p>
-      <p>Softora.nl is niet aansprakelijk voor:</p>
-      <ul>
-        <li>Indirecte schade, gevolgschade, gederfde winst of omzetderving;</li>
-        <li>Schade als gevolg van onjuiste of onvolledige informatie verstrekt door de opdrachtgever;</li>
-        <li>Schade veroorzaakt door derden, waaronder hostingproviders en externe platformen;</li>
-        <li>Schade als gevolg van cyberaanvallen of beveiligingsincidenten buiten de schuld van Softora.nl;</li>
-        <li>Verlies van gegevens of het niet beschikbaar zijn van systemen.</li>
-      </ul>
+      <div class="av-section-title">Revisies en feedback</div>
+      <ol>
+        <li>Het aantal revisierondes staat in de offerte.</li>
+        <li>Als geen aantal revisierondes is genoemd, geldt maximaal &eacute;&eacute;n revisieronde.</li>
+        <li>Revisies hebben alleen betrekking op aanpassingen binnen de oorspronkelijke opdracht.</li>
+        <li>Nieuwe wensen, extra functionaliteiten of grote koerswijzigingen vallen onder meerwerk.</li>
+        <li>Feedback moet duidelijk, concreet, gebundeld en schriftelijk worden aangeleverd.</li>
+        <li>Tegenstrijdige, vage of verspreide feedback kan leiden tot vertraging en meerwerk.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art9">
       <div class="av-section-num">Artikel 9</div>
-      <div class="av-section-title">Overmacht</div>
-      <p>Softora.nl is niet gehouden tot het nakomen van enige verplichting indien zij daartoe verhinderd wordt als gevolg van overmacht — waaronder stroomstoringen, internetstoringen, brand, ziekte, stakingen en overheidsmaatregelen.</p>
-      <p>Indien de overmachtsituatie langer dan 60 dagen duurt, hebben beide partijen het recht de overeenkomst schriftelijk te ontbinden zonder schadevergoedingsplicht.</p>
+      <div class="av-section-title">Oplevering en acceptatie</div>
+      <ol>
+        <li>Softora bepaalt wanneer het werk gereed is voor oplevering.</li>
+        <li>Oplevering vindt plaats zodra Softora het werk beschikbaar stelt, overdraagt, live zet of meldt dat het gereed is voor beoordeling.</li>
+        <li>Opdrachtgever heeft na oplevering 7 kalenderdagen om concrete gebreken schriftelijk te melden.</li>
+        <li>Als opdrachtgever binnen deze termijn geen concrete gebreken meldt, geldt het werk als volledig geaccepteerd.</li>
+        <li>Ingebruikname van het werk geldt altijd als acceptatie.</li>
+        <li>Kleine gebreken die normaal gebruik niet wezenlijk verhinderen, zijn geen reden om betaling, oplevering of acceptatie te weigeren.</li>
+        <li>Na acceptatie is Softora niet verplicht gratis wijzigingen, correcties of aanvullingen uit te voeren.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art10">
       <div class="av-section-num">Artikel 10</div>
-      <div class="av-section-title">Opzegging & Ontbinding</div>
-      <p>Abonnementen en doorlopende diensten kunnen door de opdrachtgever maandelijks worden opgezegd, tenzij een minimale contractduur is overeengekomen. Opzegging dient schriftelijk of per e-mail te geschieden.</p>
-      <p>Softora.nl kan de overeenkomst met onmiddellijke ingang ontbinden indien de opdrachtgever zijn verplichtingen niet nakomt, surseance van betaling aanvraagt of failliet wordt verklaard.</p>
-      <p>Bij vroegtijdige beëindiging door de opdrachtgever is hij gehouden de reeds verrichte werkzaamheden en gemaakte kosten te vergoeden.</p>
+      <div class="av-section-title">Bugs, fouten en herstel</div>
+      <ol>
+        <li>Digitale producten kunnen fouten, bugs of beperkingen bevatten.</li>
+        <li>Softora garandeert niet dat websites, software, automatiseringen of koppelingen altijd foutloos, ononderbroken of zonder beperkingen werken.</li>
+        <li>Aantoonbare gebreken die binnen de afgesproken scope vallen en tijdig zijn gemeld, zal Softora naar redelijkheid herstellen.</li>
+        <li>Herstel geldt niet voor problemen veroorzaakt door:
+          <ul>
+            <li>opdrachtgever;</li>
+            <li>gebruikers;</li>
+            <li>derden;</li>
+            <li>hostingproviders;</li>
+            <li>plug-ins;</li>
+            <li>updates;</li>
+            <li>externe software;</li>
+            <li>API-wijzigingen;</li>
+            <li>verkeerd gebruik;</li>
+            <li>ontbrekend onderhoud;</li>
+            <li>hacks;</li>
+            <li>malware;</li>
+            <li>browserwijzigingen;</li>
+            <li>gewijzigde wetgeving;</li>
+            <li>gewijzigde omstandigheden.</li>
+          </ul>
+        </li>
+        <li>Herstel buiten de scope of na acceptatie geldt als meerwerk.</li>
+        <li>Softora bepaalt de wijze van herstel.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art11">
       <div class="av-section-num">Artikel 11</div>
-      <div class="av-section-title">Geheimhouding</div>
-      <p>Beide partijen verplichten zich tot geheimhouding van alle vertrouwelijke informatie die zij in het kader van de overeenkomst van elkaar ontvangen. Informatie geldt als vertrouwelijk indien dit door de andere partij is medegedeeld of redelijkerwijs als zodanig kan worden beschouwd.</p>
-      <p>Deze geheimhoudingsplicht geldt niet voor informatie die reeds openbaar is of die verplicht verstrekt moet worden op grond van een wettelijk voorschrift of rechterlijk bevel.</p>
+      <div class="av-section-title">Betaling</div>
+      <ol>
+        <li>Betaling vindt plaats volgens de offerte of factuur.</li>
+        <li>Als geen betalingstermijn is genoemd, geldt betaling binnen 14 dagen na factuurdatum.</li>
+        <li>Softora mag vooruitbetaling of deelbetalingen verlangen.</li>
+        <li>Bij niet-tijdige betaling is opdrachtgever automatisch in verzuim zonder dat een ingebrekestelling nodig is.</li>
+        <li>Softora mag werkzaamheden, oplevering, overdracht, support, onderhoud, hosting, toegang en verdere dienstverlening opschorten zolang facturen openstaan.</li>
+        <li>Bezwaren tegen een factuur schorten de betalingsverplichting niet op.</li>
+        <li>Alle redelijke incassokosten, wettelijke rente, gerechtelijke kosten en buitengerechtelijke kosten komen voor rekening van opdrachtgever.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art12">
       <div class="av-section-num">Artikel 12</div>
-      <div class="av-section-title">Privacy & Gegevensverwerking</div>
-      <p>Softora.nl verwerkt persoonsgegevens conform de Algemene Verordening Gegevensbescherming (AVG). Persoonsgegevens worden uitsluitend verwerkt voor zover noodzakelijk voor de uitvoering van de dienstverlening.</p>
-      <p>Softora.nl verstrekt persoonsgegevens niet zonder toestemming aan derden, tenzij dit wettelijk verplicht is. Voor meer informatie verwijzen wij naar ons privacybeleid op <strong>softora.nl/privacy</strong>.</p>
+      <div class="av-section-title">Eigendomsvoorbehoud en gebruiksrecht</div>
+      <ol>
+        <li>Alle rechten, bestanden, ontwerpen, code, systemen, documenten en opleveringen blijven eigendom van Softora totdat opdrachtgever volledig heeft betaald.</li>
+        <li>Zolang opdrachtgever niet volledig heeft betaald, mag opdrachtgever het geleverde werk niet gebruiken, kopi&euml;ren, publiceren, aanpassen of door derden laten gebruiken.</li>
+        <li>Na volledige betaling krijgt opdrachtgever een gebruiksrecht op het opgeleverde werk voor het doel waarvoor het is gemaakt.</li>
+        <li>Generieke onderdelen, templates, werkwijzen, technische oplossingen, herbruikbare code, idee&euml;n, methodes en knowhow blijven eigendom van Softora.</li>
+        <li>Softora mag algemene kennis, componenten en technieken hergebruiken voor andere klanten.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art13">
       <div class="av-section-num">Artikel 13</div>
-      <div class="av-section-title">Klachten</div>
-      <p>Klachten over de geleverde diensten dienen binnen <strong>14 dagen</strong> na ontdekking schriftelijk of per e-mail te worden ingediend, met een duidelijke omschrijving van de klacht.</p>
-      <p>Softora.nl reageert binnen 5 werkdagen op een klacht. Het indienen van een klacht schort de betalingsverplichting niet op.</p>
-      <p>Indien de klacht gegrond wordt bevonden, zal Softora.nl naar keuze de diensten opnieuw uitvoeren, een creditnota versturen of een gedeeltelijke terugbetaling doen.</p>
+      <div class="av-section-title">Intellectueel eigendom</div>
+      <ol>
+        <li>Alle intellectuele eigendomsrechten op door Softora gemaakte ontwerpen, code, teksten, systemen, concepten, documentatie, structuren en werkwijzen blijven bij Softora, tenzij schriftelijk anders overeengekomen.</li>
+        <li>Opdrachtgever krijgt uitsluitend het gebruiksrecht dat nodig is voor normaal gebruik van het geleverde werk binnen de eigen onderneming.</li>
+        <li>Opdrachtgever mag het werk niet doorverkopen, sublicenti&euml;ren, verspreiden of hergebruiken buiten de eigen onderneming zonder schriftelijke toestemming van Softora.</li>
+        <li>Rechten op materialen van derden, zoals plug-ins, thema's, lettertypes, software, stockmateriaal en externe tools, vallen onder de voorwaarden van die derde partijen.</li>
+        <li>Softora mag het project gebruiken als portfolio of referentie, tenzij opdrachtgever vooraf schriftelijk bezwaar maakt.</li>
+      </ol>
     </div>
 
     <div class="av-section" id="art14">
       <div class="av-section-num">Artikel 14</div>
-      <div class="av-section-title">Toepasselijk Recht & Geschillen</div>
-      <p>Op alle overeenkomsten tussen Softora.nl en de opdrachtgever is uitsluitend Nederlands recht van toepassing.</p>
-      <p>Geschillen worden in eerste instantie in overleg opgelost. Indien partijen er niet in slagen het geschil op te lossen, wordt het voorgelegd aan de bevoegde rechter in het arrondissement Zeeland-West-Brabant.</p>
+      <div class="av-section-title">Aangeleverde materialen</div>
+      <ol>
+        <li>Opdrachtgever garandeert dat alle aangeleverde teksten, foto's, video's, logo's, merken, data, bestanden en overige materialen rechtmatig gebruikt mogen worden.</li>
+        <li>Opdrachtgever vrijwaart Softora volledig tegen aanspraken van derden wegens aangeleverde materialen.</li>
+        <li>Softora is niet verplicht om aangeleverde materialen juridisch te controleren.</li>
+        <li>Claims wegens auteursrecht, merkrecht, portretrecht, privacyrecht, misleidende informatie of onrechtmatige content komen volledig voor rekening van opdrachtgever.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art15">
+      <div class="av-section-num">Artikel 15</div>
+      <div class="av-section-title">Hosting, domeinnamen en e-mail</div>
+      <ol>
+        <li>Hosting, domeinnamen en e-maildiensten zijn alleen inbegrepen als dit expliciet schriftelijk is overeengekomen.</li>
+        <li>Softora is niet aansprakelijk voor storingen, beperkingen, prijswijzigingen, dataverlies, downtime of fouten van hostingproviders, domeinregistrars, e-mailproviders of andere externe partijen.</li>
+        <li>Kosten voor hosting, domeinen, e-mail, licenties en externe diensten zijn voor rekening van opdrachtgever, tenzij schriftelijk anders overeengekomen.</li>
+        <li>Opdrachtgever is zelf verantwoordelijk voor het tijdig betalen, beheren en verlengen van externe accounts, licenties, domeinen en abonnementen.</li>
+        <li>Softora mag hosting, toegang, ondersteuning of beheer opschorten bij openstaande facturen.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art16">
+      <div class="av-section-num">Artikel 16</div>
+      <div class="av-section-title">Derde partijen en externe systemen</div>
+      <ol>
+        <li>Softora kan gebruikmaken van externe diensten, software, plug-ins, API's, hostingproviders, betaalproviders, CRM-systemen, AI-modellen, communicatieplatformen en andere derde partijen.</li>
+        <li>Softora is niet aansprakelijk voor storingen, fouten, prijswijzigingen, beperkingen, dataverlies, wijzigingen of be&euml;indiging van diensten van derde partijen.</li>
+        <li>Derde partijen kunnen hun voorwaarden, functionaliteiten, prijzen of beschikbaarheid wijzigen. Softora is daarvoor niet verantwoordelijk.</li>
+        <li>Extra werkzaamheden door wijzigingen of fouten van derde partijen gelden als meerwerk.</li>
+        <li>Opdrachtgever accepteert dat digitale systemen afhankelijk kunnen zijn van externe leveranciers.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art17">
+      <div class="av-section-num">Artikel 17</div>
+      <div class="av-section-title">Onderhoud, support en updates</div>
+      <ol>
+        <li>Na oplevering is Softora niet verantwoordelijk voor onderhoud, updates, beveiliging, back-ups, monitoring, support, doorontwikkeling of storingsherstel, tenzij hiervoor een aparte onderhoudsovereenkomst is gesloten.</li>
+        <li>Zonder onderhoudsovereenkomst ligt het risico van veroudering, beveiligingsproblemen, plug-inconflicten, API-wijzigingen, technische storingen en hacks bij opdrachtgever.</li>
+        <li>Support wordt alleen geleverd binnen de afgesproken supportvorm en supporttijden.</li>
+        <li>Spoedwerk, avondwerk, weekendwerk en herstel buiten de onderhoudsovereenkomst vallen onder meerwerk.</li>
+        <li>Softora mag onderhoud of support opschorten bij openstaande facturen.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art18">
+      <div class="av-section-num">Artikel 18</div>
+      <div class="av-section-title">Beveiliging</div>
+      <ol>
+        <li>Softora zal redelijke beveiligingsmaatregelen treffen binnen de overeengekomen scope.</li>
+        <li>Softora garandeert geen volledige beveiliging, hackvrij systeem, permanente beschikbaarheid of volledige bescherming tegen datalekken.</li>
+        <li>Opdrachtgever is verantwoordelijk voor veilig gebruik van accounts, wachtwoorden, toegangsrechten, apparaten en eigen systemen.</li>
+        <li>Schade door zwakke wachtwoorden, gedeelde accounts, phishing, malware, onzorgvuldig gebruik, ontbrekend onderhoud of nalatigheid van opdrachtgever komt voor rekening van opdrachtgever.</li>
+        <li>Extra beveiligingsmaatregelen, monitoring, penetratietesten, audits of security-abonnementen zijn alleen inbegrepen als dit expliciet schriftelijk is overeengekomen.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art19">
+      <div class="av-section-num">Artikel 19</div>
+      <div class="av-section-title">Back-ups en data</div>
+      <ol>
+        <li>Opdrachtgever is zelf verantwoordelijk voor het bewaren van back-ups, tenzij schriftelijk anders overeengekomen.</li>
+        <li>Softora is niet aansprakelijk voor verlies, beschadiging of onbeschikbaarheid van data, tenzij sprake is van opzet of bewuste roekeloosheid van Softora.</li>
+        <li>Als Softora back-ups verzorgt, betreft dit een inspanningsverplichting en geen garantie dat alle data altijd volledig herstelbaar is.</li>
+        <li>Datamigraties worden uitgevoerd op basis van de door opdrachtgever aangeleverde gegevens.</li>
+        <li>Softora is niet verantwoordelijk voor fouten, onvolledigheden of beperkingen in brondata.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art20">
+      <div class="av-section-num">Artikel 20</div>
+      <div class="av-section-title">AI, automatiseringen en softwarekoppelingen</div>
+      <ol>
+        <li>Als Softora AI-functionaliteiten, automatiseringen, chatbots, voice-agents, workflows, API-koppelingen of bedrijfssoftware levert, gelden deze als ondersteunende systemen.</li>
+        <li>Softora garandeert niet dat AI-systemen, automatiseringen of koppelingen altijd foutloos, volledig, correct, veilig, beschikbaar of geschikt zijn voor iedere situatie.</li>
+        <li>Opdrachtgever blijft verantwoordelijk voor controle, gebruik, beslissingen, opvolging en uitkomsten van AI-systemen, automatiseringen en software.</li>
+        <li>Softora is niet aansprakelijk voor foutieve output, gemiste leads, verkeerde interpretaties, stilgevallen koppelingen, API-limieten, providerstoringen, modelwijzigingen, hallucinerende AI-output of onjuist gebruik.</li>
+        <li>Kritieke handelingen, zoals betalingen, juridische communicatie, personeelsbesluiten, financi&euml;le beslissingen, medische beslissingen of bindende klantcommunicatie, mogen alleen automatisch worden uitgevoerd als opdrachtgever dit expliciet schriftelijk accepteert.</li>
+        <li>Softora adviseert menselijke controle bij alle belangrijke bedrijfsprocessen.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art21">
+      <div class="av-section-num">Artikel 21</div>
+      <div class="av-section-title">Resultaten en garanties</div>
+      <ol>
+        <li>Softora garandeert niet dat een website, software, automatisering, AI-systeem of digitaal product leidt tot meer omzet, meer klanten, hogere conversie, betere vindbaarheid in Google, betere prestaties, lagere kosten of commerci&euml;le resultaten.</li>
+        <li>Adviezen, inschattingen, voorbeelden, ontwerpen en voorstellen van Softora zijn geen garanties.</li>
+        <li>Softora garandeert niet dat een website of systeem volledig foutloos, ononderbroken, permanent beschikbaar of volledig beveiligd is.</li>
+        <li>Eventuele resultaten zijn mede afhankelijk van opdrachtgever, markt, aanbod, content, prijsstelling, concurrentie, advertenties, opvolging, externe systemen en overige factoren buiten de invloed van Softora.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art22">
+      <div class="av-section-num">Artikel 22</div>
+      <div class="av-section-title">Persoonsgegevens en AVG</div>
+      <ol>
+        <li>Partijen houden zich aan toepasselijke privacywetgeving.</li>
+        <li>Als Softora persoonsgegevens verwerkt namens opdrachtgever, sluiten partijen indien nodig een verwerkersovereenkomst.</li>
+        <li>Opdrachtgever blijft verantwoordelijk voor de persoonsgegevens die via zijn website, software, formulieren, CRM, systemen of bedrijfsprocessen worden verwerkt.</li>
+        <li>Opdrachtgever is verantwoordelijk voor correcte privacyteksten, cookiemeldingen, toestemmingen, grondslagen en informatieplichten richting betrokkenen, tenzij schriftelijk anders overeengekomen.</li>
+        <li>Softora verwerkt persoonsgegevens alleen voor zover nodig voor uitvoering van de opdracht of op basis van instructies van opdrachtgever.</li>
+        <li>Softora is niet aansprakelijk voor AVG-schendingen die voortkomen uit keuzes, instructies, systemen, content, nalatigheid of bedrijfsvoering van opdrachtgever.</li>
+        <li>Als opdrachtgever bijzondere persoonsgegevens of gevoelige data laat verwerken, moet opdrachtgever dit vooraf schriftelijk melden.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art23">
+      <div class="av-section-num">Artikel 23</div>
+      <div class="av-section-title">Geheimhouding</div>
+      <ol>
+        <li>Partijen houden vertrouwelijke informatie geheim.</li>
+        <li>Softora mag vertrouwelijke informatie delen met ingeschakelde derden als dit nodig is voor uitvoering van de opdracht.</li>
+        <li>Geheimhouding geldt niet voor informatie die openbaar is, al bekend was, zelfstandig is ontwikkeld of wettelijk moet worden verstrekt.</li>
+        <li>Deze geheimhoudingsplicht blijft ook na be&euml;indiging van de overeenkomst bestaan.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art24">
+      <div class="av-section-num">Artikel 24</div>
+      <div class="av-section-title">Aansprakelijkheid</div>
+      <ol>
+        <li>Softora is alleen aansprakelijk voor directe schade die het rechtstreekse gevolg is van een aantoonbare toerekenbare tekortkoming van Softora.</li>
+        <li>Softora is niet aansprakelijk voor indirecte schade, gevolgschade, bedrijfsschade, omzetverlies, winstderving, gemiste leads, gemiste besparingen, reputatieschade, verlies van klanten, verlies van data, bedrijfsstagnatie, verminderde vindbaarheid, lagere conversie, claims van derden, boetes of schade door uitval van systemen.</li>
+        <li>De totale aansprakelijkheid van Softora is per opdracht beperkt tot maximaal het bedrag dat opdrachtgever voor de betreffende opdracht aan Softora heeft betaald, exclusief btw.</li>
+        <li>Bij abonnementen, onderhoud, support of doorlopende dienstverlening is de aansprakelijkheid beperkt tot maximaal het bedrag dat opdrachtgever in de drie maanden voorafgaand aan de schadeveroorzakende gebeurtenis aan Softora heeft betaald, exclusief btw.</li>
+        <li>Als een verzekering van Softora dekking biedt, is de aansprakelijkheid altijd beperkt tot het bedrag dat de verzekeraar daadwerkelijk uitkeert.</li>
+        <li>Softora is niet aansprakelijk voor schade veroorzaakt door opdrachtgever, gebruikers, derden, hostingproviders, domeinproviders, plug-ins, API's, externe software, updates, malware, hacks, onjuist gebruik, ontbrekend onderhoud, foutieve content of niet-tijdige medewerking.</li>
+        <li>Iedere aanspraak op schadevergoeding vervalt als opdrachtgever de schade niet binnen 14 dagen na ontdekking schriftelijk en gemotiveerd meldt.</li>
+        <li>Iedere rechtsvordering tegen Softora vervalt uiterlijk 12 maanden na oplevering of na de gebeurtenis waarop de vordering is gebaseerd.</li>
+        <li>De beperkingen in dit artikel gelden niet voor zover schade het gevolg is van opzet of bewuste roekeloosheid van Softora.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art25">
+      <div class="av-section-num">Artikel 25</div>
+      <div class="av-section-title">Vrijwaring</div>
+      <ol>
+        <li>Opdrachtgever vrijwaart Softora tegen alle aanspraken van derden die verband houden met:
+          <ul>
+            <li>de opdracht;</li>
+            <li>aangeleverde materialen;</li>
+            <li>gebruik van het geleverde werk;</li>
+            <li>persoonsgegevens;</li>
+            <li>content;</li>
+            <li>producten of diensten van opdrachtgever;</li>
+            <li>bedrijfsvoering van opdrachtgever;</li>
+            <li>claims, beloftes of uitingen van opdrachtgever.</li>
+          </ul>
+        </li>
+        <li>Opdrachtgever vergoedt alle schade, kosten, boetes, juridische kosten en redelijke advocaatkosten die Softora hierdoor lijdt.</li>
+        <li>Deze vrijwaring blijft ook na be&euml;indiging van de overeenkomst bestaan.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art26">
+      <div class="av-section-num">Artikel 26</div>
+      <div class="av-section-title">Overmacht</div>
+      <ol>
+        <li>Softora is niet aansprakelijk voor tekortkomingen door overmacht.</li>
+        <li>Onder overmacht vallen onder andere:
+          <ul>
+            <li>internetstoringen;</li>
+            <li>hostingstoringen;</li>
+            <li>datacenterstoringen;</li>
+            <li>API-storingen;</li>
+            <li>softwarestoringen;</li>
+            <li>stroomuitval;</li>
+            <li>ziekte;</li>
+            <li>cyberaanvallen;</li>
+            <li>hacks;</li>
+            <li>malware;</li>
+            <li>brand;</li>
+            <li>oorlog;</li>
+            <li>stakingen;</li>
+            <li>overheidsmaatregelen;</li>
+            <li>uitval van leveranciers;</li>
+            <li>storingen bij derde partijen;</li>
+            <li>andere omstandigheden buiten de redelijke invloed van Softora.</li>
+          </ul>
+        </li>
+        <li>Bij overmacht mag Softora de uitvoering opschorten of de overeenkomst be&euml;indigen zonder schadevergoeding verschuldigd te zijn.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art27">
+      <div class="av-section-num">Artikel 27</div>
+      <div class="av-section-title">Annulering en beëindiging</div>
+      <ol>
+        <li>Opdrachtgever kan een opdracht alleen schriftelijk annuleren.</li>
+        <li>Bij annulering moet opdrachtgever alle reeds uitgevoerde werkzaamheden, gereserveerde capaciteit, ingekochte licenties, externe kosten en gemaakte uren betalen.</li>
+        <li>Als een vaste projectprijs is afgesproken, mag Softora bij annulering minimaal 50% van de projectprijs in rekening brengen, tenzij de reeds gemaakte kosten hoger zijn.</li>
+        <li>Softora mag de overeenkomst be&euml;indigen bij:
+          <ul>
+            <li>wanbetaling;</li>
+            <li>gebrek aan medewerking;</li>
+            <li>onredelijk gedrag;</li>
+            <li>illegale activiteiten;</li>
+            <li>reputatierisico;</li>
+            <li>vertrouwensbreuk;</li>
+            <li>misbruik van diensten;</li>
+            <li>strijd met wet- en regelgeving.</li>
+          </ul>
+        </li>
+        <li>Bij be&euml;indiging blijven betalingsverplichtingen, aansprakelijkheidsbeperkingen, vrijwaringen en geheimhouding bestaan.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art28">
+      <div class="av-section-num">Artikel 28</div>
+      <div class="av-section-title">Klachten</div>
+      <ol>
+        <li>Klachten moeten binnen 7 dagen na ontdekking schriftelijk en concreet worden gemeld.</li>
+        <li>Een klacht schort de betalingsverplichting niet op.</li>
+        <li>Opdrachtgever moet Softora de kans geven een klacht te onderzoeken en, indien nodig, te herstellen.</li>
+        <li>Als opdrachtgever Softora niet tijdig in staat stelt een gebrek te onderzoeken of herstellen, vervalt iedere aanspraak.</li>
+        <li>Klachten na acceptatie of ingebruikname worden alleen behandeld als meerwerk, tenzij Softora schriftelijk anders beslist.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art29">
+      <div class="av-section-num">Artikel 29</div>
+      <div class="av-section-title">Communicatie en bewijs</div>
+      <ol>
+        <li>E-mail, WhatsApp, digitale handtekeningen, projecttools en andere elektronische communicatie gelden als schriftelijk bewijs.</li>
+        <li>Administratie, logbestanden, e-mails, facturen, projectdocumentatie en communicatie van Softora leveren bewijs op, tenzij opdrachtgever tegenbewijs levert.</li>
+        <li>Opdrachtgever moet wijzigingen, klachten, gebreken en bezwaren altijd schriftelijk melden.</li>
+        <li>Softora mag belangrijke communicatie sturen naar het laatst bekende e-mailadres van opdrachtgever.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art30">
+      <div class="av-section-num">Artikel 30</div>
+      <div class="av-section-title">Non-solicitation</div>
+      <ol>
+        <li>Opdrachtgever mag gedurende de overeenkomst en 12 maanden daarna geen medewerkers, freelancers, leveranciers of ingeschakelde derden van Softora direct of indirect benaderen, inhuren of inzetten buiten Softora om.</li>
+        <li>Bij overtreding is opdrachtgever een direct opeisbare boete verschuldigd van &euro;10.000 per overtreding, plus &euro;500 per dag dat de overtreding voortduurt.</li>
+        <li>Deze boete laat het recht van Softora op aanvullende schadevergoeding onverlet.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art31">
+      <div class="av-section-num">Artikel 31</div>
+      <div class="av-section-title">Portfolio en referenties</div>
+      <ol>
+        <li>Softora mag naam, logo, screenshots, projectomschrijving en resultaten van opdrachtgever gebruiken als portfolio of referentie, tenzij opdrachtgever vooraf schriftelijk bezwaar maakt.</li>
+        <li>Softora mag een discrete vermelding of link in de footer van een website plaatsen, tenzij schriftelijk anders overeengekomen.</li>
+        <li>Opdrachtgever mag zonder toestemming van Softora geen vertrouwelijke projectinformatie openbaar maken.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art32">
+      <div class="av-section-num">Artikel 32</div>
+      <div class="av-section-title">Toepasselijk recht en geschillen</div>
+      <ol>
+        <li>Op alle overeenkomsten met Softora is Nederlands recht van toepassing.</li>
+        <li>Geschillen worden voorgelegd aan de bevoegde rechter in het arrondissement waar Softora gevestigd is.</li>
+        <li>Partijen proberen eerst in overleg tot een oplossing te komen, tenzij spoedeisende omstandigheden directe juridische stappen noodzakelijk maken.</li>
+      </ol>
+    </div>
+
+    <div class="av-section" id="art33">
+      <div class="av-section-num">Artikel 33</div>
+      <div class="av-section-title">Slotbepaling</div>
+      <ol>
+        <li>Softora mag deze algemene voorwaarden wijzigen.</li>
+        <li>Voor bestaande opdrachten gelden de voorwaarden waarmee opdrachtgever bij het aangaan van de opdracht akkoord is gegaan, tenzij partijen schriftelijk anders afspreken.</li>
+        <li>De meest recente versie van deze algemene voorwaarden staat op de website van Softora.</li>
+      </ol>
     </div>
 
   </main>
