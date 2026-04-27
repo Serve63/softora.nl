@@ -55,6 +55,11 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const activeOrdersPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
         const activeOrdersSource = fs.readFileSync(activeOrdersPath, 'utf8');
         assert.match(activeOrdersSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
+      } else if (file === 'premium-pdfs.html') {
+        assert.match(source, /<script src="assets\/premium-pdfs-builder\.js\?v=20260427a"><\/script>/, file);
+        const pdfBuilderPath = path.join(__dirname, '../../assets/premium-pdfs-builder.js');
+        const pdfBuilderSource = fs.readFileSync(pdfBuilderPath, 'utf8');
+        assert.match(pdfBuilderSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else {
         assert.match(source, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       }
