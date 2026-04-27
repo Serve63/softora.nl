@@ -237,6 +237,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT/);
   assert.match(deepSearchScriptSource, /fetch\("\/api\/premium-database\/deep-search-businesses"/);
   assert.match(deepSearchScriptSource, /count: 100/);
+  assert.match(deepSearchScriptSource, /\? "Nu: " \+ target\.label/);
+  assert.doesNotMatch(deepSearchScriptSource, /"Nu: " \+ target\.label \+ " · " \+ target\.batches/);
   assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
   assert.match(deepSearchScriptSource, /function formatUsdAsEuro\(value\)/);
   assert.match(deepSearchScriptSource, /USD_TO_EUR_RATE = 0\.93/);

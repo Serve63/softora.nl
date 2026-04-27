@@ -396,7 +396,7 @@
             }
             if (nodes.deepSearchCurrent) {
                 nodes.deepSearchCurrent.textContent = target
-                    ? "Nu: " + target.label + " · " + target.batches + " batch(es) · " + target.added + " nieuw"
+                    ? "Nu: " + target.label
                     : "Geen huidige plek";
             }
             if (nodes.deepSearchCost) {
