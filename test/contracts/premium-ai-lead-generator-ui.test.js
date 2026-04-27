@@ -6,10 +6,12 @@ const path = require('path');
 test('premium ai lead generator renders campaign controls before dashboard bootstrap runs', () => {
   const pagePath = path.join(__dirname, '../../premium-ai-lead-generator.html');
   const dashboardPath = path.join(__dirname, '../../assets/coldcalling-dashboard.js');
+  const regioRadiusPath = path.join(__dirname, '../../assets/coldcalling-regio-radius.js');
   const summaryHelpersPath = path.join(__dirname, '../../assets/coldcalling-conversation-summary.js');
   const customSelectsPath = path.join(__dirname, '../../assets/custom-selects.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
+  const regioRadiusSource = fs.readFileSync(regioRadiusPath, 'utf8');
   const summaryHelpersSource = fs.readFileSync(summaryHelpersPath, 'utf8');
   const customSelectsSource = fs.readFileSync(customSelectsPath, 'utf8');
 
@@ -17,7 +19,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
   assert.match(
     pageSource,
-    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260427c" defer><\/script>/
+    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260427d" defer><\/script>/
   );
   assert.match(pageSource, /id="leadAmountQuestionLabel"/);
   assert.match(pageSource, /Hoeveel mensen wil je bellen\?/);
@@ -129,8 +131,11 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /valueEl\.innerHTML = safeLabel;/);
   assert.match(dashboardSource, /function hookRegioLeadCountCustomSelectSync\(\)/);
   assert.match(dashboardSource, /const AUTO_CAMPAIGN_REGIO_VALUE = 'auto';/);
-  assert.match(dashboardSource, /const MAX_CAMPAIGN_REGIO_KM_CHOICE = 250;/);
-  assert.match(dashboardSource, /function resolveAutomaticCampaignRegioKm\(/);
+  assert.match(dashboardSource, /window\.SoftoraColdcallingRegioRadius/);
+  assert.match(dashboardSource, /resolveAutomaticCampaignRegioKm,\s*\} = regioRadiusHelpers;/);
+  assert.doesNotMatch(dashboardSource, /REGIO_PLACE_COORD_ENTRIES/);
+  assert.match(regioRadiusSource, /const DEFAULT_MAX_CAMPAIGN_REGIO_KM = 250;/);
+  assert.match(regioRadiusSource, /function resolveAutomaticCampaignRegioKm\(/);
   assert.match(dashboardSource, /function getCampaignRegioLabelForApi\(/);
   assert.match(dashboardSource, /function syncRegioToAutoIfFillAgendaWorkdaysEnabled\(/);
   assert.match(dashboardSource, /function refreshCampaignRegioTipLabel\(/);
