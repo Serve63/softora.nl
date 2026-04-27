@@ -21,6 +21,14 @@ function isSafeLibraryDataUrl(value) {
   return typeof value === 'string' && value.startsWith('data:image/') && value.length < 12 * 1024 * 1024;
 }
 
+function appendWebsiteGeneratorTextElement(parent, tagName, className, text) {
+  const el = document.createElement(tagName);
+  if (className) el.className = className;
+  el.textContent = String(text || '');
+  parent.appendChild(el);
+  return el;
+}
+
 function loadLibraryEntries() {
   if (websitePreviewLibraryUseRemote && Array.isArray(websitePreviewLibraryRemoteEntries)) {
     return websitePreviewLibraryRemoteEntries.slice();
@@ -99,6 +107,68 @@ async function savePreviewToLibrary({ dataUrl, url, hostname, fileName, width, h
   showToast('Log eerst in om previews centraal op te slaan.');
 }
 
+function createLibraryCardElement(entry) {
+  const id = String(entry?.id || '').trim();
+  const when = entry.createdAt
+    ? new Date(entry.createdAt).toLocaleString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '';
+  const host = String(entry.hostname || '—');
+
+  const card = document.createElement('div');
+  card.className = 'library-card';
+  card.dataset.libraryId = id;
+  card.setAttribute('role', 'button');
+  card.setAttribute('tabindex', '0');
+  card.addEventListener('click', () => openLibraryEntry(id));
+  card.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openLibraryEntry(id);
+  });
+
+  const thumbWrap = document.createElement('div');
+  thumbWrap.className = 'library-thumb-wrap';
+  const thumbSrc = isSafeLibraryDataUrl(entry.dataUrl) ? entry.dataUrl : '';
+  if (thumbSrc) {
+    const img = document.createElement('img');
+    img.src = thumbSrc;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.width = 200;
+    img.height = 300;
+    thumbWrap.appendChild(img);
+  } else {
+    const invalidImage = appendWebsiteGeneratorTextElement(thumbWrap, 'span', '', 'Geen geldige afbeelding');
+    invalidImage.style.fontSize = '11px';
+    invalidImage.style.color = '#9aa3b5';
+    invalidImage.style.padding = '12px';
+    invalidImage.style.textAlign = 'center';
+  }
+
+  const meta = document.createElement('div');
+  meta.className = 'library-card-meta';
+  const hostEl = appendWebsiteGeneratorTextElement(meta, 'div', 'library-card-host', host);
+  hostEl.title = host;
+  appendWebsiteGeneratorTextElement(meta, 'div', 'library-card-date', when);
+
+  const actions = document.createElement('div');
+  actions.className = 'library-card-actions';
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn outline';
+  removeBtn.style.padding = '6px 12px';
+  removeBtn.style.fontSize = '10px';
+  removeBtn.textContent = 'Verwijderen';
+  removeBtn.addEventListener('click', (event) => {
+    void removeLibraryEntry(id, event);
+  });
+  actions.appendChild(removeBtn);
+  meta.appendChild(actions);
+
+  card.append(thumbWrap, meta);
+  return card;
+}
+
 function renderLibraryPanel() {
   const grid = document.getElementById('library-grid');
   const empty = document.getElementById('library-empty');
@@ -106,36 +176,13 @@ function renderLibraryPanel() {
   const items = loadLibraryEntries();
   if (!items.length) {
     grid.style.display = 'none';
-    grid.innerHTML = '';
+    grid.replaceChildren();
     empty.style.display = 'flex';
     return;
   }
   empty.style.display = 'none';
   grid.style.display = 'grid';
-  grid.innerHTML = items.map((entry) => {
-    const when = entry.createdAt
-      ? new Date(entry.createdAt).toLocaleString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-      : '';
-    const host = escapeHtml(entry.hostname || '—');
-    const idJson = JSON.stringify(entry.id);
-    const thumbSrc = isSafeLibraryDataUrl(entry.dataUrl) ? entry.dataUrl : '';
-    const thumbInner = thumbSrc
-      ? `<img src="${thumbSrc}" alt="" loading="lazy" width="200" height="300" />`
-      : '<span style="font-size:11px;color:#9aa3b5;padding:12px;text-align:center">Geen geldige afbeelding</span>';
-    return `
-      <div class="library-card" data-library-id="${escapeHtml(entry.id)}" role="button" tabindex="0" onclick="openLibraryEntry(${idJson})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLibraryEntry(${idJson});}">
-        <div class="library-thumb-wrap">
-          ${thumbInner}
-        </div>
-        <div class="library-card-meta">
-          <div class="library-card-host" title="${host}">${host}</div>
-          <div class="library-card-date">${escapeHtml(when)}</div>
-          <div class="library-card-actions">
-            <button type="button" class="btn outline" style="padding:6px 12px;font-size:10px" onclick="removeLibraryEntry(${idJson}, event)">Verwijderen</button>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
+  grid.replaceChildren(...items.map((entry) => createLibraryCardElement(entry)));
 }
 
 async function removeLibraryEntry(id, ev) {
@@ -1127,8 +1174,14 @@ loadWebsiteGeneratorAuthState();
   websiteLinkCreateEl.addEventListener('click', async function () {
     const openedTab = window.open('about:blank', '_blank');
     if (openedTab) {
-      openedTab.document.write('<!DOCTYPE html><title>Websitelink wordt aangemaakt...</title><body style="font-family:system-ui,sans-serif;padding:32px">Websitelink wordt aangemaakt...</body>');
-      openedTab.document.close();
+      openedTab.document.title = 'Websitelink wordt aangemaakt...';
+      const loadingBody = openedTab.document.body || openedTab.document.createElement('body');
+      if (!openedTab.document.body) {
+        openedTab.document.documentElement.appendChild(loadingBody);
+      }
+      loadingBody.style.fontFamily = 'system-ui,sans-serif';
+      loadingBody.style.padding = '32px';
+      loadingBody.textContent = 'Websitelink wordt aangemaakt...';
       openedTab.opener = null;
     }
     if (!(await ensureWebsiteGeneratorAuth('Log eerst in om websitelinks aan te maken.'))) {
@@ -1207,4 +1260,3 @@ loadWebsiteGeneratorAuthState();
     applyLibraryHash();
   }
 })();
-

@@ -75,7 +75,12 @@ test('premium websitegenerator removes the legacy openen button but keeps downlo
 
   assert.doesNotMatch(source, />Openen</);
   assert.match(source, /Download PNG/);
-  assert.match(source, /class="library-card"[\s\S]*onclick="openLibraryEntry\(/);
+  assert.match(source, /function createLibraryCardElement\(entry\) \{/);
+  assert.match(source, /card\.addEventListener\('click', \(\) => openLibraryEntry\(id\)\);/);
+  assert.match(source, /removeBtn\.addEventListener\('click', \(event\) => \{[\s\S]*void removeLibraryEntry\(id, event\);/);
+  assert.match(source, /grid\.replaceChildren\(\.\.\.items\.map\(\(entry\) => createLibraryCardElement\(entry\)\)\);/);
+  assert.doesNotMatch(source, /onclick="openLibraryEntry\(/);
+  assert.doesNotMatch(source, /onclick="removeLibraryEntry\(/);
 });
 
 test('premium websitegenerator toont een login-fallback voor protected acties', () => {
@@ -124,6 +129,7 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /\/api\/website-preview-library/);
   assert.match(source, /function fetchLibraryEntryById/);
   assert.match(source, /\/api\/website-preview-library\/\$\{encodeURIComponent\(entryId\)\}/);
+  assert.doesNotMatch(source, /document\.write/);
   assert.doesNotMatch(source, /softora_website_preview_library_v1/);
   assert.doesNotMatch(source, /LIBRARY_STORAGE_KEY/);
   assert.doesNotMatch(source, /readLocalLibraryEntries/);
