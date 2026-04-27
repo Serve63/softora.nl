@@ -134,6 +134,15 @@ test('page smoke: premium-website.html routes non-widget CTA buttons to contact 
   assert.match(html, /\.filter\(function \(link\) {\s*return !link\.closest\(\"\.whatsapp-widget\"\);/s, 'WhatsApp widget mag niet mee-gewijzigd worden.');
 });
 
+test('page smoke: premium-personeel-login.html has a password visibility toggle', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-personeel-login.html'), 'utf8');
+  assert.match(html, /id="passwordToggle"/, 'Wachtwoord-oogknop ontbreekt.');
+  assert.match(html, /aria-label="Wachtwoord tonen"/, 'Wachtwoord-oogknop mist toegankelijk label.');
+  assert.match(html, /function setupPasswordToggle\(\)/, 'Wachtwoord toggle-script ontbreekt.');
+  assert.match(html, /password\.type = visible \? 'text' : 'password';/, 'Wachtwoordveld hoort zichtbaar/onzichtbaar te kunnen wisselen.');
+  assert.match(html, /setupPasswordToggle\(\);/, 'Wachtwoord toggle wordt niet geinitialiseerd.');
+});
+
 test('page smoke: premium-ai-coldmailing.html promotes suppression after lead removal regardless of persistence state', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
   assert.match(html, /promoteLeadRowSuppression\(lead\)/, 'Lead suppression promotion na verwijdering ontbreekt.');
