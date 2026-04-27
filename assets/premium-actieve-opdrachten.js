@@ -2245,16 +2245,33 @@ function getOrderBuildRequestPayload(id) {
 }
 
 async function postEstimateSiteCostRequest(payload) {
-    const endpoints = [
-        '/api/active-order-estimate-site-cost',
-        '/api/active-orders/estimate-site-cost'
-    ];
-    let lastError = null;
+    return postActiveOrderJsonWithFallback(
+        [
+            '/api/active-order-estimate-site-cost',
+            '/api/active-orders/estimate-site-cost'
+        ],
+        payload,
+        {
+            timeoutMs: 30000,
+            statusMessage: 'Kostenschatting mislukt',
+            timeoutMessage: 'Timeout: AI kostenschatting duurde te lang.',
+            fallbackMessage: 'AI kostenschatting mislukt.'
+        }
+    );
+}
 
-    for (let i = 0; i < endpoints.length; i++) {
-        const endpoint = endpoints[i];
+async function postActiveOrderJsonWithFallback(endpoints, payload, options = {}) {
+    const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 30000);
+    const statusMessage = String(options.statusMessage || 'Actieve opdracht verzoek mislukt').trim();
+    const timeoutMessage = String(options.timeoutMessage || `Timeout: ${statusMessage} duurde te lang.`).trim();
+    const fallbackMessage = String(options.fallbackMessage || statusMessage || 'Actieve opdracht verzoek mislukt.').trim();
+    let lastError = null;
+    const endpointList = Array.isArray(endpoints) ? endpoints : [];
+
+    for (let i = 0; i < endpointList.length; i++) {
+        const endpoint = endpointList[i];
         const controller = new AbortController();
-        const timer = window.setTimeout(() => controller.abort(), 30000);
+        const timer = window.setTimeout(() => controller.abort(), timeoutMs);
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',
@@ -2275,12 +2292,12 @@ async function postEstimateSiteCostRequest(payload) {
                     data?.detail ||
                     data?.error ||
                     raw ||
-                    `Kostenschatting mislukt (${res.status})`
+                    `${statusMessage} (${res.status})`
                 ).trim();
-                const error = new Error(message || `Kostenschatting mislukt (${res.status})`);
+                const error = new Error(message || `${statusMessage} (${res.status})`);
                 error.status = Number(res.status) || 0;
                 const canTryNextEndpoint =
-                    i < endpoints.length - 1 &&
+                    i < endpointList.length - 1 &&
                     (error.status === 404 || error.status === 405 || error.status >= 500);
                 if (canTryNextEndpoint) {
                     lastError = error;
@@ -2291,7 +2308,7 @@ async function postEstimateSiteCostRequest(payload) {
             return data;
         } catch (error) {
             if (String(error?.name || '') === 'AbortError') {
-                lastError = new Error('Timeout: AI kostenschatting duurde te lang.');
+                lastError = new Error(timeoutMessage);
             } else if (
                 Number(error?.status) >= 400 &&
                 Number(error?.status) < 500 &&
@@ -2307,7 +2324,7 @@ async function postEstimateSiteCostRequest(payload) {
         }
     }
 
-    throw lastError || new Error('AI kostenschatting mislukt.');
+    throw lastError || new Error(fallbackMessage);
 }
 
 async function refreshEstimatedApiCost(id) {
@@ -2505,135 +2522,35 @@ function startOrderProgressSimulation(id) {
 }
 
 async function postGenerateSiteRequest(payload) {
-    const endpoints = [
-        '/api/active-order-generate-site',
-        '/api/active-orders/generate-site'
-    ];
-    let lastError = null;
-
-    for (let i = 0; i < endpoints.length; i++) {
-        const endpoint = endpoints[i];
-        const controller = new AbortController();
-        const timer = window.setTimeout(() => controller.abort(), 480000);
-        try {
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload || {}),
-                signal: controller.signal,
-                cache: 'no-store'
-            });
-            const raw = await res.text();
-            let data = {};
-            try {
-                data = raw ? JSON.parse(raw) : {};
-            } catch (_) {
-                data = {};
-            }
-            if (!res.ok || !data?.ok) {
-                const message = String(
-                    data?.detail ||
-                    data?.error ||
-                    raw ||
-                    `Website generatie mislukt (${res.status})`
-                ).trim();
-                const error = new Error(message || `Website generatie mislukt (${res.status})`);
-                error.status = Number(res.status) || 0;
-                const canTryNextEndpoint =
-                    i < endpoints.length - 1 &&
-                    (error.status === 404 || error.status === 405 || error.status >= 500);
-                if (canTryNextEndpoint) {
-                    lastError = error;
-                    continue;
-                }
-                throw error;
-            }
-            return data;
-        } catch (error) {
-            if (String(error?.name || '') === 'AbortError') {
-                lastError = new Error('Timeout: AI website generatie duurde te lang.');
-            } else if (
-                Number(error?.status) >= 400 &&
-                Number(error?.status) < 500 &&
-                Number(error?.status) !== 404 &&
-                Number(error?.status) !== 405
-            ) {
-                throw error;
-            } else {
-                lastError = error;
-            }
-        } finally {
-            window.clearTimeout(timer);
+    return postActiveOrderJsonWithFallback(
+        [
+            '/api/active-order-generate-site',
+            '/api/active-orders/generate-site'
+        ],
+        payload,
+        {
+            timeoutMs: 480000,
+            statusMessage: 'Website generatie mislukt',
+            timeoutMessage: 'Timeout: AI website generatie duurde te lang.',
+            fallbackMessage: 'Website generatie mislukt.'
         }
-    }
-
-    throw lastError || new Error('Website generatie mislukt.');
+    );
 }
 
 async function postLaunchSiteRequest(payload) {
-    const endpoints = [
-        '/api/active-order-launch-site',
-        '/api/active-orders/launch-site'
-    ];
-    let lastError = null;
-
-    for (let i = 0; i < endpoints.length; i++) {
-        const endpoint = endpoints[i];
-        const controller = new AbortController();
-        const timer = window.setTimeout(() => controller.abort(), 600000);
-        try {
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload || {}),
-                signal: controller.signal,
-                cache: 'no-store'
-            });
-            const raw = await res.text();
-            let data = {};
-            try {
-                data = raw ? JSON.parse(raw) : {};
-            } catch (_) {
-                data = {};
-            }
-            if (!res.ok || !data?.ok) {
-                const message = String(
-                    data?.detail ||
-                    data?.error ||
-                    raw ||
-                    `Launch pipeline mislukt (${res.status})`
-                ).trim();
-                const error = new Error(message || `Launch pipeline mislukt (${res.status})`);
-                error.status = Number(res.status) || 0;
-                const canTryNextEndpoint =
-                    i < endpoints.length - 1 &&
-                    (error.status === 404 || error.status === 405 || error.status >= 500);
-                if (canTryNextEndpoint) {
-                    lastError = error;
-                    continue;
-                }
-                throw error;
-            }
-            return data;
-        } catch (error) {
-            if (String(error?.name || '') === 'AbortError') {
-                lastError = new Error('Timeout: launch pipeline duurde te lang.');
-            } else if (
-                Number(error?.status) >= 400 &&
-                Number(error?.status) < 500 &&
-                Number(error?.status) !== 404 &&
-                Number(error?.status) !== 405
-            ) {
-                throw error;
-            } else {
-                lastError = error;
-            }
-        } finally {
-            window.clearTimeout(timer);
+    return postActiveOrderJsonWithFallback(
+        [
+            '/api/active-order-launch-site',
+            '/api/active-orders/launch-site'
+        ],
+        payload,
+        {
+            timeoutMs: 600000,
+            statusMessage: 'Launch pipeline mislukt',
+            timeoutMessage: 'Timeout: launch pipeline duurde te lang.',
+            fallbackMessage: 'Launch pipeline mislukt.'
         }
-    }
-
-    throw lastError || new Error('Launch pipeline mislukt.');
+    );
 }
 
 function setClaimOrderMessage(message, type) {

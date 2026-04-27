@@ -64,6 +64,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /async function markOrderAsPaid\(id, options = \{\}\) \{/);
   assert.match(scriptSource, /function buildFallbackSitePrompt\(meta, customOrder\) \{/);
   assert.match(scriptSource, /async function postEstimateSiteCostRequest\(payload\) \{/);
+  assert.match(scriptSource, /async function postActiveOrderJsonWithFallback\(endpoints, payload, options = \{\}\) \{/);
   assert.match(scriptSource, /function getProgressStepForPct\(pct\) \{/);
   assert.match(scriptSource, /function startOrderProgressSimulation\(id\) \{/);
   assert.match(scriptSource, /async function postGenerateSiteRequest\(payload\) \{/);
@@ -83,6 +84,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /async function confirmActiveOrderAction\(message, options = \{\}\) \{/);
   assert.doesNotMatch(scriptSource, /window\.alert\(/);
   assert.doesNotMatch(scriptSource, /window\.confirm\(/);
+  assert.equal((scriptSource.match(/new AbortController/g) || []).length, 1);
+  assert.doesNotMatch(scriptSource, /window\.setTimeout\(\(\) => controller\.abort\(\), (30000|480000|600000)\)/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
