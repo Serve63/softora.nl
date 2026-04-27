@@ -6,9 +6,11 @@ const path = require('path');
 test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente editflow', () => {
   const pagePath = path.join(__dirname, '../../premium-wachtwoordenregister.html');
   const rendererPath = path.join(__dirname, '../../assets/premium-password-register-renderer.js');
+  const pinPath = path.join(__dirname, '../../assets/premium-password-register-pin.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');
-  const combinedSource = `${pageSource}\n${rendererSource}`;
+  const pinSource = fs.readFileSync(pinPath, 'utf8');
+  const combinedSource = `${pageSource}\n${rendererSource}\n${pinSource}`;
 
   assert.match(pageSource, /family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700/);
   assert.doesNotMatch(pageSource, /Barlow/);
@@ -27,7 +29,9 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /fetchUiStateSetWithFallback\(PASSWORD_REGISTER_SCOPE, payload\)/);
   assert.match(pageSource, /\[PASSWORD_REGISTER_ENTRIES_KEY\]: JSON\.stringify\(sanitized\)/);
   assert.match(pageSource, /assets\/premium-password-register-renderer\.js\?v=20260427a/);
+  assert.match(pageSource, /assets\/premium-password-register-pin\.js\?v=20260427a/);
   assert.match(rendererSource, /global\.SoftoraPasswordRegisterRenderer/);
+  assert.match(pinSource, /global\.SoftoraPasswordRegisterPin/);
   assert.match(pageSource, /hosting@example\.test/);
   assert.match(pageSource, /Voorbeeldgegevens geladen\. Vervang deze en sla daarna op om echte gegevens veilig te bewaren\./);
   assert.doesNotMatch(pageSource, /persistPasswordEntries\('bootstrap'\)/);
@@ -47,6 +51,14 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /data-pin-action="clear"/);
   assert.match(pageSource, /data-pin-action="backspace"/);
   assert.match(pageSource, /id="lock-register-btn"/);
+  assert.match(pageSource, /const passwordRegisterPin = window\.SoftoraPasswordRegisterPin\.create/);
+  assert.match(pageSource, /passwordRegisterPin\.bindNumpad\(pinNumpadEl\)/);
+  assert.match(pageSource, /passwordRegisterPin\.bindKeyboard\(document\)/);
+  assert.match(pageSource, /lockRegisterBtnEl\.addEventListener\('click', passwordRegisterPin\.lock\)/);
+  assert.doesNotMatch(pageSource, /function p\(|function pb\(|function pClear\(|function dots\(|function check\(/);
+  assert.match(pinSource, /function createPinController/);
+  assert.match(pinSource, /bindNumpad: bindNumpad/);
+  assert.match(pinSource, /bindKeyboard: bindKeyboard/);
   assert.match(rendererSource, /button\.dataset\.entryAction = config\.action/);
   assert.match(rendererSource, /action:\s*"toggle"/);
   assert.match(rendererSource, /action:\s*"edit"/);
@@ -54,7 +66,6 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /renderer\.createEntryRow\(entry, Boolean\(visible\[entry\.id\]\)\)/);
   assert.match(pageSource, /passwordListEl\.replaceChildren/);
   assert.match(rendererSource, /textContent = isVisible \? normalize\(entry && entry\.pw\)/);
-  assert.match(pageSource, /pinNumpadEl\.addEventListener\('click'/);
   assert.match(pageSource, /passwordListEl\.addEventListener\('click'/);
   assert.match(pageSource, /searchInputEl\.addEventListener\('input', render\)/);
   assert.match(rendererSource, /a2\.12 2\.12 0 113 3L7 19l-4 1 1-4 12\.5-12\.5z/);
@@ -65,6 +76,6 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /id="entry-user"/);
   assert.match(pageSource, /id="entry-password"/);
   assert.doesNotMatch(pageSource, /const PIN\s*=\s*['"][0-9]{6}['"]/);
-  assert.match(pageSource, /fetch\('\/api\/premium-users\/verify-pin'/);
-  assert.match(pageSource, /body:\s*JSON\.stringify\(\{\s*actionConfirmPin:\s*pin\s*\}\)/);
+  assert.match(pinSource, /fetch\("\/api\/premium-users\/verify-pin"/);
+  assert.match(pinSource, /body:\s*JSON\.stringify\(\{\s*actionConfirmPin:\s*pin\s*\}\)/);
 });

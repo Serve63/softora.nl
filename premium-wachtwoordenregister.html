@@ -973,122 +973,8 @@ body {
 </div>
 
 <script src="assets/premium-password-register-renderer.js?v=20260427a"></script>
+<script src="assets/premium-password-register-pin.js?v=20260427a"></script>
 <script>
-let input = '', attempts = 0, blocked = false, checking = false;
-
-async function verifyPin(pin) {
-  const response = await fetch('/api/premium-users/verify-pin', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ actionConfirmPin: pin })
-  });
-  let data = {};
-  try {
-    data = await response.json();
-  } catch (e) {
-    data = {};
-  }
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.error || 'Bevestigingspin is onjuist of ontbreekt.');
-  }
-  return data;
-}
-
-function p(d) {
-  if (blocked || checking || input.length >= 6) return;
-  input += d;
-  dots();
-  if (input.length === 6) setTimeout(check, 120);
-}
-
-function pb() {
-  if (!blocked && !checking) {
-    input = input.slice(0, -1);
-    dots();
-  }
-}
-
-function pClear() {
-  if (blocked || checking) return;
-  input = '';
-  dots();
-  const msg = document.getElementById('pin-msg');
-  if (msg) msg.textContent = '';
-}
-
-function dots(state) {
-  document.querySelectorAll('.pin-dot').forEach((d, i) => {
-    d.className = 'pin-dot';
-    if (state) d.classList.add(state);
-    else if (i < input.length) d.classList.add('filled');
-  });
-}
-
-async function check() {
-  if (checking) return;
-  const attemptedPin = input;
-  const msg = document.getElementById('pin-msg');
-  checking = true;
-  if (msg) msg.textContent = 'Controleren...';
-  try {
-    await verifyPin(attemptedPin);
-    dots('success');
-    setTimeout(() => {
-      unlockRegister().catch(() => {
-        checking = false;
-        document.getElementById('pin-msg').textContent = 'Laden mislukt';
-      });
-    }, 350);
-  } catch (error) {
-    checking = false;
-    attempts++;
-    dots('error');
-    setTimeout(() => {
-      input = '';
-      dots();
-    }, 450);
-    if (attempts >= 5) {
-      blocked = true;
-      let s = 30;
-      document.getElementById('pin-msg').textContent = `Geblokkeerd — wacht ${s}s`;
-      const t = setInterval(() => {
-        s--;
-        if (s <= 0) {
-          clearInterval(t);
-          blocked = false;
-          attempts = 0;
-          document.getElementById('pin-msg').textContent = '';
-        } else {
-          document.getElementById('pin-msg').textContent = `Geblokkeerd — wacht ${s}s`;
-        }
-      }, 1000);
-    } else {
-      document.getElementById('pin-msg').textContent = `Onjuist — nog ${5 - attempts} poging${5 - attempts !== 1 ? 'en' : ''}`;
-    }
-  }
-}
-
-document.addEventListener('keydown', (e) => {
-  const pinScreen = document.getElementById('screen-pin');
-  if (!pinScreen || pinScreen.style.display === 'none') return;
-  if (e.key >= '0' && e.key <= '9') p(e.key);
-  if (e.key === 'Backspace') pb();
-  if (e.key === 'Escape') {
-    e.preventDefault();
-    pClear();
-  }
-});
-
-function lock() {
-  closeEditModal();
-  closeDeleteEntryModal();
-  document.getElementById('screen-register').style.display = 'none';
-  document.getElementById('screen-pin').style.display = 'flex';
-  input = '';
-  dots();
-  document.getElementById('pin-msg').textContent = '';
-}
-
 const PASSWORD_REGISTER_SCOPE = 'premium_password_register';
 const PASSWORD_REGISTER_ENTRIES_KEY = 'entries_json';
 const DEFAULT_PASSWORD_ENTRIES = [
@@ -1129,6 +1015,17 @@ const pwDeleteModalOverlay = document.getElementById('pw-delete-modal-overlay');
 const pwDeleteModalTextEl = document.getElementById('pw-delete-modal-text');
 const pwDeleteModalCancelEl = document.getElementById('pw-delete-modal-cancel');
 const pwDeleteModalConfirmEl = document.getElementById('pw-delete-modal-confirm');
+const passwordRegisterPin = window.SoftoraPasswordRegisterPin.create({
+  pinScreen: 'screen-pin',
+  registerScreen: 'screen-register',
+  messageEl: 'pin-msg',
+  dotSelector: '.pin-dot',
+  unlock: unlockRegister,
+  onBeforeLock: () => {
+    closeEditModal();
+    closeDeleteEntryModal();
+  },
+});
 
 function normalizeString(value) {
   return String(value == null ? '' : value).trim();
@@ -1522,23 +1419,10 @@ entryModalBackdrop.addEventListener('click', closeEditModal);
 entryModalCloseEl.addEventListener('click', closeEditModal);
 entryCancelEl.addEventListener('click', closeEditModal);
 entryFormEl.addEventListener('submit', saveEntryFromModal);
-if (pinNumpadEl) {
-  pinNumpadEl.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-pin-digit], [data-pin-action]');
-    if (!button) return;
-    const digit = button.dataset.pinDigit;
-    const action = button.dataset.pinAction;
-    if (digit != null) {
-      p(digit);
-    } else if (action === 'clear') {
-      pClear();
-    } else if (action === 'backspace') {
-      pb();
-    }
-  });
-}
+passwordRegisterPin.bindNumpad(pinNumpadEl);
+passwordRegisterPin.bindKeyboard(document);
 if (lockRegisterBtnEl) {
-  lockRegisterBtnEl.addEventListener('click', lock);
+  lockRegisterBtnEl.addEventListener('click', passwordRegisterPin.lock);
 }
 if (addEntryBtnEl) {
   addEntryBtnEl.addEventListener('click', openCreateModal);
@@ -1584,10 +1468,6 @@ async function unlockRegister() {
     loaderEl.hidden = false;
     loaderEl.setAttribute('aria-hidden', 'false');
   }
-  input = '';
-  attempts = 0;
-  dots();
-  document.getElementById('pin-msg').textContent = '';
   try {
     await ensurePasswordEntriesLoaded();
     render();
