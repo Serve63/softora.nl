@@ -11,7 +11,7 @@ test('publieke ai lead generator gebruikt delegated campagne startknop', () => {
   assert.match(pageSource, /id="launchBtn" data-campaign-toggle type="button"/);
   assert.match(
     pageSource,
-    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260427d" defer><\/script>/
+    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260427e" defer><\/script>/
   );
   assert.match(pageSource, /launchBtn\.addEventListener\('click', toggleCampaign\);/);
   assert.doesNotMatch(pageSource, /\son(?:click|input|change|keydown|submit)=/i);

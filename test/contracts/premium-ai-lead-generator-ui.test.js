@@ -7,11 +7,13 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   const pagePath = path.join(__dirname, '../../premium-ai-lead-generator.html');
   const dashboardPath = path.join(__dirname, '../../assets/coldcalling-dashboard.js');
   const regioRadiusPath = path.join(__dirname, '../../assets/coldcalling-regio-radius.js');
+  const manualLeadPromptPath = path.join(__dirname, '../../assets/coldcalling-manual-lead-prompt.js');
   const summaryHelpersPath = path.join(__dirname, '../../assets/coldcalling-conversation-summary.js');
   const customSelectsPath = path.join(__dirname, '../../assets/custom-selects.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
   const regioRadiusSource = fs.readFileSync(regioRadiusPath, 'utf8');
+  const manualLeadPromptSource = fs.readFileSync(manualLeadPromptPath, 'utf8');
   const summaryHelpersSource = fs.readFileSync(summaryHelpersPath, 'utf8');
   const customSelectsSource = fs.readFileSync(customSelectsPath, 'utf8');
 
@@ -19,7 +21,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
   assert.match(
     pageSource,
-    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260427d" defer><\/script>/
+    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260427e" defer><\/script>/
   );
   assert.match(pageSource, /id="leadAmountQuestionLabel"/);
   assert.match(pageSource, /Hoeveel mensen wil je bellen\?/);
@@ -160,9 +162,12 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   );
   assert.doesNotMatch(dashboardSource, /Contactpersoon|Webiste/);
   assert.match(
-    dashboardSource,
-    /function promptForManualLeadDetails\(defaults = \{\}\) \{[\s\S]*Lead handmatig toevoegen[\s\S]*Bedrijf[\s\S]*Adres[\s\S]*Telefoonnummer[\s\S]*Website/
+    manualLeadPromptSource,
+    /function promptForManualLeadDetails\(defaults = \{\}, deps = \{\}\) \{[\s\S]*Lead handmatig toevoegen[\s\S]*Bedrijf[\s\S]*Adres[\s\S]*Telefoonnummer[\s\S]*Website/
   );
+  assert.match(dashboardSource, /window\.SoftoraColdcallingManualLeadPrompt/);
+  assert.match(dashboardSource, /manualLeadPromptHelpers\.promptForManualLeadDetails\(defaults/);
+  assert.doesNotMatch(dashboardSource, /Lead handmatig toevoegen/);
   assert.doesNotMatch(dashboardSource, /Voer telefoonnummer in \(NL formaat, bijv\. 0612345678 of \+31612345678\)\./);
   assert.doesNotMatch(dashboardSource, /Geen handmatige lead toegevoegd\./);
   assert.match(dashboardSource, /statusEl\.style\.margin = '14px 0 18px';/);
