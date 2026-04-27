@@ -1668,19 +1668,20 @@ function renderCreateOrderAgendaLeadOptions(selectedId) {
     if (!select) return;
 
     const previous = Number(selectedId || select.value);
-    select.innerHTML = '';
 
     const defaultOption = document.createElement('option');
     defaultOption.value = '';
     defaultOption.textContent = 'Geen koppeling';
-    select.appendChild(defaultOption);
+    const options = [defaultOption];
 
     agendaLeadOptions.forEach((lead) => {
         const option = document.createElement('option');
         option.value = String(lead.id);
         option.textContent = getAgendaLeadOptionLabel(lead);
-        select.appendChild(option);
+        options.push(option);
     });
+
+    select.replaceChildren(...options);
 
     if (Number.isFinite(previous) && previous > 0) {
         select.value = String(previous);
@@ -2888,25 +2889,16 @@ function openModal(id) {
     const pctValue = Number(orders[id]?.progressPct) || 0;
     if (pctValue === 100 && hasGeneratedPreviewHtml(id)) {
         primaryBtn.style.display = 'block';
-        primaryBtn.onclick = () => {
-            openPreview(id);
-            closeModal();
-        };
     } else {
         primaryBtn.style.display = 'none';
-        primaryBtn.onclick = null;
     }
 
     if (deleteBtn) {
         if (isCustomOrder) {
             setModalDeleteButtonState('Project uit systeem halen', false);
             deleteBtn.style.display = 'block';
-            deleteBtn.onclick = () => {
-                void removeProjectFromSystem(id);
-            };
         } else {
             deleteBtn.style.display = 'none';
-            deleteBtn.onclick = null;
         }
     }
 
@@ -2922,9 +2914,23 @@ function closeModal() {
     currentModalId = null;
     if (deleteBtn) {
         deleteBtn.style.display = 'none';
-        deleteBtn.onclick = null;
         setModalDeleteButtonState('Project uit systeem halen', false);
     }
+}
+
+function handleModalPrimaryAction() {
+    const activeId = Number(currentModalId) || 0;
+    if (!activeId) return;
+    const pctValue = Number(orders[activeId]?.progressPct) || 0;
+    if (pctValue !== 100 || !hasGeneratedPreviewHtml(activeId)) return;
+    openPreview(activeId);
+    closeModal();
+}
+
+function handleModalDeleteAction() {
+    const activeId = Number(currentModalId) || 0;
+    if (!activeId) return;
+    void removeProjectFromSystem(activeId);
 }
 
 async function removeProjectFromSystem(id) {
@@ -3024,6 +3030,8 @@ function bindActiveOrdersPageUi() {
 
     document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
     document.getElementById('modalSecondaryBtn').addEventListener('click', closeModal);
+    document.getElementById('modalBtn')?.addEventListener('click', handleModalPrimaryAction);
+    document.getElementById('modalDeleteBtn')?.addEventListener('click', handleModalDeleteAction);
     document.getElementById('createOrderBtn')?.addEventListener('click', openCreateOrderModal);
     document.getElementById('createOrderCloseBtn')?.addEventListener('click', closeCreateOrderModal);
     document.getElementById('createOrderCancelBtn')?.addEventListener('click', closeCreateOrderModal);

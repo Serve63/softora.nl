@@ -77,6 +77,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /function renderModalOverview\(container, id\) \{/);
   assert.match(scriptSource, /function openModal\(id\) \{/);
   assert.match(scriptSource, /function closeModal\(\) \{/);
+  assert.match(scriptSource, /function handleModalPrimaryAction\(\) \{/);
+  assert.match(scriptSource, /function handleModalDeleteAction\(\) \{/);
   assert.match(scriptSource, /async function removeProjectFromSystem\(id\) \{/);
   assert.match(scriptSource, /function setOpenDossierButtonContent\(btnEl\) \{/);
   assert.match(scriptSource, /function bindActiveOrdersPageUi\(\) \{/);
@@ -107,10 +109,15 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /renderModalOverview\(overview, id\);/);
   assert.match(source, /container\.replaceChildren\(grid\);/);
   assert.match(source, /return url\.protocol === 'http:' \|\| url\.protocol === 'https:' \? url\.href : '';/);
+  assert.match(source, /select\.replaceChildren\(\.\.\.options\);/);
+  assert.match(source, /document\.getElementById\('modalBtn'\)\?\.addEventListener\('click', handleModalPrimaryAction\);/);
+  assert.match(source, /document\.getElementById\('modalDeleteBtn'\)\?\.addEventListener\('click', handleModalDeleteAction\);/);
   assert.doesNotMatch(source, /overview\.innerHTML = renderModalOverviewHtml/);
   assert.doesNotMatch(source, /function renderModalOverviewHtml\(id\) \{/);
   assert.doesNotMatch(source, /item\.raw/);
   assert.doesNotMatch(source, /function escapeHtml\(str\) \{/);
+  assert.doesNotMatch(source, /\.innerHTML\s*=/);
+  assert.doesNotMatch(source, /\.onclick\s*=/);
   assert.match(source, /const isPaidOrder = Boolean\(paidAt\) \|\| status\.key === 'betaald';[\s\S]*if \(isPaidOrder\) \{[\s\S]*nextStatus = 'betaald';/);
   assert.match(source, /async function handleOrderPaymentAction\(id\) \{[\s\S]*if \(ui\.isPaid \|\| ui\.isBuilt\) return false;[\s\S]*return markOrderAsPaid\(id, \{ confirm: true \}\);/);
   assert.match(source, /const confirmed = await confirmActiveOrderAction\(invoicePaidReviewReminder,[\s\S]*Factuur betaald bevestigen/);
