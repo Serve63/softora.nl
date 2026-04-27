@@ -1346,3 +1346,79 @@ function renderCustomOrderCardHtml(record) {
                 </div>
             `;
 }
+
+function bindDynamicOrderCard(card) {
+    if (!card) return;
+
+    const id = Number(String(card.id || '').replace('order-', ''));
+    if (!id) return;
+
+    const executeBtn = card.querySelector('.execute-btn[data-order]');
+    if (executeBtn && !executeBtn.dataset.boundExecute) {
+        executeBtn.dataset.boundExecute = '1';
+        executeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            executeOrder(id);
+        });
+    }
+
+    const completeBtn = card.querySelector('.complete-btn[data-order-complete]');
+    if (completeBtn && !completeBtn.dataset.boundComplete) {
+        completeBtn.dataset.boundComplete = '1';
+        completeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            void handleOrderPaymentAction(id);
+        });
+    }
+
+    if (!card.dataset.boundCardOpen) {
+        card.dataset.boundCardOpen = '1';
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('button,a')) return;
+            openModal(id);
+        });
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openModal(id);
+            }
+        });
+    }
+}
+
+function appendCustomOrderCard(record, options = {}) {
+    const grid = document.getElementById('ordersGrid');
+    if (!grid || !record) return null;
+
+    const id = Number(record.id);
+    if (!Number.isFinite(id) || id <= 0) return null;
+
+    const existing = document.getElementById('order-' + id);
+    if (existing) return existing;
+
+    ensureOrderRuntimeState(record);
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderCustomOrderCardHtml(record).trim();
+    const card = wrapper.firstElementChild;
+    if (!card) return null;
+
+    grid.appendChild(card);
+    bindDynamicOrderCard(card);
+    refreshOrderSummaryCards();
+
+    if (options.scrollIntoView) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    return card;
+}
+
+function loadCustomOrderCards() {
+    customOrders = readCustomOrdersFromStorage();
+    customOrders.forEach((record) => {
+        appendCustomOrderCard(record);
+    });
+    refreshEstimatedApiCostsForOrders();
+    refreshOrderSummaryCards();
+}
