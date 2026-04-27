@@ -18,10 +18,17 @@ test('premium seo NL UI: tabs, paginas, blogcampagne', () => {
   assert.match(source, /id="blog-pause-btn" data-seo-action="pause-blog-campaign"/);
   assert.match(source, /data-seo-action="close-goal-modal"/);
   assert.match(source, /data-seo-action="confirm-goal-modal"/);
+  assert.match(source, /data-seo-action="optimise-page" data-seo-page-slug="\$\{s\}"/);
+  assert.match(source, /data-seo-char-count="\$\{s\}-meta-title-count" data-seo-char-max="60"/);
+  assert.match(source, /data-seo-char-count="\$\{s\}-meta-desc-count" data-seo-char-max="160"/);
+  assert.match(source, /data-seo-char-count="\$\{s\}-og-desc-count" data-seo-char-max="200"/);
   assert.match(source, /data-seo-lock-input/);
   assert.match(source, /data-seo-lock-submit/);
   assert.match(source, /function bindSeoStaticActions\(\)/);
   assert.match(source, /button\.addEventListener\('click', \(\) => \{[\s\S]*switchTab\(button\.dataset\.seoTab \|\| 'scan', button\);/);
+  assert.match(source, /'optimise-page': \(_event, button\) => \{[\s\S]*optimisePage\(button\.dataset\.seoPageSlug, button\);/);
+  assert.match(source, /button\.addEventListener\('click', \(event\) => handler\(event, button\)\)/);
+  assert.match(source, /input\.addEventListener\('input', \(\) => \{[\s\S]*charCount\(input\.id, countId, max\);/);
   assert.match(source, /lockSubmit\.addEventListener\('click', unlockSeoContentArea\)/);
   assert.doesNotMatch(source, /onclick="switchTab\(/);
   assert.doesNotMatch(source, /onclick="startScan\(/);
@@ -29,6 +36,8 @@ test('premium seo NL UI: tabs, paginas, blogcampagne', () => {
   assert.doesNotMatch(source, /onclick="pauseBlogCampaignDemo\(/);
   assert.doesNotMatch(source, /onclick="closeSeoGoalModal\(/);
   assert.doesNotMatch(source, /onclick="confirmSeoGoalAndOptimise\(/);
+  assert.doesNotMatch(source, /onclick="optimisePage\(/);
+  assert.doesNotMatch(source, /oninput="charCount\(/);
   assert.doesNotMatch(source, /onkeydown="if\(event\.key==='Enter'\)unlockSeoContentArea\(\)"/);
   assert.doesNotMatch(source, /tab-productpaginas/);
   assert.match(source, /<div class="tab-panel" id="tab-analytics">/);
