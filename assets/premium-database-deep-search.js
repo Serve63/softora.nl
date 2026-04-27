@@ -260,7 +260,7 @@
             body: JSON.stringify(payload || {})
         }).then(function (response) {
             return response.json().catch(function () { return {}; }).then(function (body) {
-                if (!response.ok || !body.ok) throw new Error(body.error || "AI zoeklijst ophalen mislukt.");
+                if (!response.ok || !body.ok) throw new Error(body.error || "Bedrijvenlijst ophalen mislukt.");
                 if (!Array.isArray(body.rows)) throw new Error("Geen bruikbare bedrijven ontvangen.");
                 return body;
             });
@@ -307,7 +307,7 @@
                 source: "premium-database-deep-search",
                 actor: "Premium database"
             }).catch(function (error) {
-                console.error("AI zoeklijst opslaan mislukt:", error);
+                console.error("Bedrijvenlijst opslaan mislukt:", error);
                 return { ok: false, error: error };
             });
         }
@@ -531,8 +531,8 @@
             target.status = "active";
             render();
             return runTargetUntilComplete(target).catch(function (error) {
-                console.error("AI zoeklijst mislukt:", error);
-                setStatusMessage("AI zoeklijst mislukt: " + String(error.message || "controleer de instellingen"), "error");
+                console.error("Bedrijvenlijst mislukt:", error);
+                setStatusMessage("Bedrijvenlijst mislukt: " + String(error.message || "controleer de instellingen"), "error");
                 return false;
             }).finally(function () {
                 setBusy(false);
