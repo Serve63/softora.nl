@@ -24,7 +24,8 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /\.btn-dl \{[\s\S]*font-family:\s*'Oswald', sans-serif;/);
   assert.match(pageSource, /<div class="pdf-download-actions">/);
   assert.match(pageSource, /href="\/assets\/algemene-voorwaarden-softora-vof\.pdf" download="algemene-voorwaarden-softora-vof\.pdf"/);
-  assert.match(pageSource, /Algemene voorwaarden downloaden \(PDF\)/);
+  assert.match(pageSource, /Algemene voorwaarden \(PDF\)/);
+  assert.doesNotMatch(pageSource, /Algemene voorwaarden downloaden \(PDF\)/);
   assert.match(pageSource, /data-doc="opleveringsmail"[\s\S]*Opleveringsmail/);
   assert.match(pageSource, /<div class="pdf-process-notice" role="note" aria-labelledby="pdf-process-notice-title">/);
   assert.match(pageSource, /Standaard werkwijze bij nieuwe opdrachten/);
