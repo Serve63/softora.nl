@@ -139,3 +139,12 @@ test('page smoke: premium-bevestigingsmails.html shows the five coldmailing KPI 
   assert.doesNotMatch(html, /<div class="zone-card z5"/);
   assert.doesNotMatch(html, /<div class="zone-card conv-card"/);
 });
+
+test('page smoke: premium-mailbox compose modal is centered and enlarged', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
+  assert.match(html, /\.compose-overlay \{[^}]*align-items:\s*center;/, 'Compose overlay moet gecentreerd kunnen staan.');
+  assert.match(html, /\.compose-overlay \{[^}]*justify-content:\s*center;/, 'Compose overlay moet horizontaal gecentreerd staan.');
+  assert.match(html, /\.compose-box \{[^}]*width:\s*min\(1040px, calc\(100vw - 28px\)\);/, 'Compose box moet breder worden gemaakt.');
+  assert.match(html, /\.compose-box \{[^}]*min-height:\s*min\(90vh, 700px\);/, 'Compose box moet grotere hoogte gebruiken.');
+  assert.match(html, /\.compose-field input \{[^}]*font-size:\s*16px;/, 'Compose inputs moeten vergroten.');
+});
