@@ -2986,3 +2986,73 @@ async function removeProjectFromSystem(id) {
         }
     }
 }
+
+function bindActiveOrdersPageUi() {
+    document.querySelectorAll('.mode-btn[data-build-mode]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setBuildMode(btn.getAttribute('data-build-mode'));
+        });
+    });
+
+    document.querySelectorAll('[data-order-filter]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setOrderFilter(btn.getAttribute('data-order-filter'));
+        });
+    });
+
+    document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+    document.getElementById('modalSecondaryBtn').addEventListener('click', closeModal);
+    document.getElementById('createOrderBtn')?.addEventListener('click', openCreateOrderModal);
+    document.getElementById('createOrderCloseBtn')?.addEventListener('click', closeCreateOrderModal);
+    document.getElementById('createOrderCancelBtn')?.addEventListener('click', closeCreateOrderModal);
+    document.getElementById('createOrderForm')?.addEventListener('submit', handleCreateOrderSubmit);
+    document.getElementById('createOrderModal')?.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeCreateOrderModal();
+    });
+    document.getElementById('claimOrderCloseBtn')?.addEventListener('click', closeClaimOrderModal);
+    document.getElementById('claimOrderCancelBtn')?.addEventListener('click', closeClaimOrderModal);
+    document.getElementById('claimOrderForm')?.addEventListener('submit', handleClaimOrderSubmit);
+    document.getElementById('claimOrderModal')?.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeClaimOrderModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            closeCreateOrderModal();
+            closeClaimOrderModal();
+        }
+    });
+
+    document.querySelectorAll('#ordersGrid .order-card').forEach(bindDynamicOrderCard);
+}
+
+async function initializeActiveOrdersPageState() {
+    await loadRemoteUiState();
+    buildMode = loadBuildMode();
+    setBuildMode(buildMode);
+    clearDemoOrdersOnLoad();
+    loadCustomOrderCards();
+    restoreOrdersRuntimeFromState();
+    refreshOrderSummaryCards();
+    void fetchAgendaLeadOptions().catch(() => {});
+}
+
+async function bootActiveOrdersPage() {
+    bindActiveOrdersPageUi();
+    try {
+        await initializeActiveOrdersPageState();
+    } finally {
+        if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+            window.SoftoraPremiumBoot.setShellBooting(false);
+        }
+    }
+}
+
+void bootActiveOrdersPage();
+
+window.addEventListener('pagehide', () => {
+    void flushRemoteUiStateSave();
+});

@@ -43,6 +43,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.doesNotMatch(pageSource, /function openModal\(id\) \{/);
   assert.doesNotMatch(pageSource, /function closeModal\(\) \{/);
   assert.doesNotMatch(pageSource, /async function removeProjectFromSystem\(id\) \{/);
+  assert.doesNotMatch(pageSource, /function bindActiveOrdersPageUi\(\) \{/);
+  assert.doesNotMatch(pageSource, /async function initializeActiveOrdersPageState\(\) \{/);
   assert.match(scriptSource, /function normalizeOrderStatus\(value\) \{/);
   assert.match(scriptSource, /function persistOrdersRuntime\(\) \{/);
   assert.match(scriptSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -71,6 +73,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /function openModal\(id\) \{/);
   assert.match(scriptSource, /function closeModal\(\) \{/);
   assert.match(scriptSource, /async function removeProjectFromSystem\(id\) \{/);
+  assert.match(scriptSource, /function bindActiveOrdersPageUi\(\) \{/);
+  assert.match(scriptSource, /async function initializeActiveOrdersPageState\(\) \{/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
@@ -89,7 +93,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
     /Vergeet niet om de klant op een vriendelijk en natuurlijk moment te vragen[\s\S]*bodyHtml:\s*invoicePaidConfirmBodyHtml/
   );
   assert.match(source, /await persistRequiredUiStateKeysOrThrow\(\s*\[CUSTOM_ORDERS_KEY, ORDER_RUNTIME_KEY\],/);
-  assert.match(source, /document\.querySelectorAll\('\.complete-btn'\)\.forEach\(\(b\) => \{[\s\S]*void handleOrderPaymentAction\(id\);/);
+  assert.match(source, /const completeBtn = card\.querySelector\('\.complete-btn\[data-order-complete\]'\);[\s\S]*void handleOrderPaymentAction\(id\);/);
   assert.match(source, /window\.addEventListener\('pagehide', \(\) => \{[\s\S]*void flushRemoteUiStateSave\(\);/);
   assert.match(source, /leadOwnerName: String\(item\?\.leadOwnerName \|\| item\?\.leadOwnerFullName \|\| ''\)\.trim\(\),/);
   assert.match(source, /const linkedLeadOwnerName = resolveLinkedLeadOwnerNameForOrder\(customOrder\);[\s\S]*const claimedBy = normalizeClaimEmployeeName\(customOrder\.claimedBy \|\| runtime\.claimedBy \|\| linkedLeadOwnerName \|\| ''\);/);
