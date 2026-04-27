@@ -123,6 +123,9 @@ test('premium bevestigingsmails campaign volume uses a fixed mail company label'
   assert.doesNotMatch(pageSource, /campaign-count-mode-label/);
   assert.doesNotMatch(pageSource, /Hoeveel afspraken inplannen\?/);
   assert.match(pageSource, /<div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen\?<\/div>/);
+  assert.match(pageSource, /<input class="slider" type="range" min="5" max="50" step="5" value="10" id="mail-slider"/);
+  assert.match(pageSource, /const COLDMAIL_VOLUME_CONTROL = \{ min: 5, max: 50, step: 5, value: 10/);
+  assert.match(pageSource, /const COLDCALL_VOLUME_CONTROL = \{ min: 10, max: 500, step: 10, value: 100/);
   assert.match(pageSource, /campaignVolumeLabel\.textContent = 'Hoeveel bedrijven bellen\?';/);
   assert.doesNotMatch(pageSource, /Aantal te mailen bedrijven/);
 });
@@ -183,7 +186,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /const campaignBootTasks = \[/);
   assert.match(pageSource, /hydrateCampaignCompanyCountFromSupabase\(\),/);
   assert.match(pageSource, /setCampaignRecipientListOpen\(false\);/);
-  assert.match(pageSource, /renderCampaignCompanyCount\(\);[\s\S]*\}\s*updateSlider\(100\);/);
+  assert.match(pageSource, /function configureCampaignVolumeControl\(\)/);
+  assert.match(pageSource, /configureCampaignVolumeControl\(\);\s*updateSlider\(document\.getElementById\('mail-slider'\)/);
 });
 
 test('premium bevestigingsmails hides mail onderwerp row only on lead-generator alias', () => {

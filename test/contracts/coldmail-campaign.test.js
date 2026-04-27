@@ -10,6 +10,7 @@ function createService(overrides = {}) {
   const sentMessages = [];
   let savedState = null;
   let replyState = overrides.replyState || { processed: {} };
+  let sendGuardState = overrides.sendGuardState || { entries: [] };
   const rows = overrides.rows || [
     {
       id: 'prospect-1',
@@ -45,6 +46,10 @@ function createService(overrides = {}) {
       imapUser: overrides.imapUser || '',
       imapPass: overrides.imapPass || '',
       imapMailbox: 'INBOX',
+      coldmailCampaignSendLimit: overrides.coldmailCampaignSendLimit,
+      coldmailDailySendLimit: overrides.coldmailDailySendLimit,
+      coldmailPackageDailySendLimit: overrides.coldmailPackageDailySendLimit,
+      coldmailBlockPersonalMailboxDomains: overrides.coldmailBlockPersonalMailboxDomains,
     },
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
@@ -68,6 +73,13 @@ function createService(overrides = {}) {
           },
         };
       }
+      if (scope === 'premium_coldmail_send_guard') {
+        return {
+          values: {
+            softora_coldmail_send_guard_v1: JSON.stringify(sendGuardState),
+          },
+        };
+      }
       return {
         values: {
           softora_customers_premium_v1: JSON.stringify(rows),
@@ -78,6 +90,9 @@ function createService(overrides = {}) {
       savedState = { scope, values, meta };
       if (scope === 'premium_coldmail_auto_replies') {
         replyState = JSON.parse(values.softora_coldmail_auto_replies_v1);
+      }
+      if (scope === 'premium_coldmail_send_guard') {
+        sendGuardState = JSON.parse(values.softora_coldmail_send_guard_v1);
       }
       return { ok: true };
     },
@@ -106,7 +121,13 @@ function createService(overrides = {}) {
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
   });
 
-  return { service, sentMessages, getSavedState: () => savedState, getReplyState: () => replyState };
+  return {
+    service,
+    sentMessages,
+    getSavedState: () => savedState,
+    getReplyState: () => replyState,
+    getSendGuardState: () => sendGuardState,
+  };
 }
 
 test('coldmail campaign sends only eligible database rows and marks them as mailed', async () => {
@@ -129,6 +150,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(sentMessages[0].bcc, undefined);
   assert.equal(sentMessages[0].subject, 'Nieuwe website voor Bakkerij Zon');
   assert.match(sentMessages[0].text, /Goedemorgen Ruben/);
+  assert.match(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].text, /Referentie: SF-/);
   assert.match(sentMessages[0].html, /font-family:Arial,sans-serif/);
   assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
@@ -432,6 +454,101 @@ test('coldmail campaign exposes the same sender accounts as mailbox', () => {
     'serve@softora.nl',
     'martijn@softora.nl',
   ]);
+});
+
+test('coldmail campaign caps preview volume to STRATO-safe campaign limit', async () => {
+  const rows = Array.from({ length: 40 }, (_, index) => ({
+    id: `prospect-${index + 1}`,
+    bedrijf: `Prospect ${index + 1}`,
+    naam: `Contact ${index + 1}`,
+    email: `contact${index + 1}@example.test`,
+    status: 'prospect',
+    mail: true,
+  }));
+  const { service } = createService({ rows });
+
+  const result = await service.getColdmailCampaignRecipients({ count: 100 });
+
+  assert.equal(result.selected, 30);
+  assert.equal(result.safetyLimits.campaignSendLimit, 30);
+});
+
+test('coldmail campaign enforces daily sender guard across campaigns', async () => {
+  const rows = Array.from({ length: 3 }, (_, index) => ({
+    id: `prospect-${index + 1}`,
+    bedrijf: `Prospect ${index + 1}`,
+    naam: `Contact ${index + 1}`,
+    email: `contact${index + 1}@example.test`,
+    status: 'prospect',
+    mail: true,
+  }));
+  const { service, sentMessages, getSendGuardState } = createService({
+    rows,
+    coldmailCampaignSendLimit: 10,
+    coldmailDailySendLimit: 2,
+  });
+
+  const firstResult = await service.sendColdmailCampaign({
+    count: 2,
+    subject: 'Test',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(firstResult.sent, 2);
+  assert.equal(getSendGuardState().entries[0].count, 2);
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Test',
+        body: 'Hoi {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_DAILY_LIMIT_REACHED');
+      assert.equal(error.quota.senderRemaining, 0);
+      return true;
+    }
+  );
+  assert.equal(sentMessages.length, 2);
+});
+
+test('coldmail campaign skips personal mailbox domains for non-test coldmail', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'personal-mailbox',
+        bedrijf: 'Eenmanszaak Gmail',
+        naam: 'Ruben',
+        email: 'ruben@gmail.com',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'business-domain',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 10,
+    subject: 'Test',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.failed, 1);
+  assert.equal(result.failedItems[0].email, 'ruben@gmail.com');
+  assert.match(result.failedItems[0].error, /Persoonlijke mailbox/);
+  assert.equal(sentMessages[0].to, 'ruben@example.test');
 });
 
 test('coldmail campaign uses personal sender name for Serve mailbox', async () => {

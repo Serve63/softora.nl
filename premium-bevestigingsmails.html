@@ -1266,9 +1266,9 @@ Softora.nl | +31 6 43 26 27 92</textarea>
       <div class="campagne-body">
         <div class="field">
           <div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen?</div>
-          <div class="field-val" id="slider-val">100</div>
-          <input class="slider" type="range" min="10" max="500" step="10" value="100" id="mail-slider" oninput="updateSlider(this.value)">
-          <div class="slider-row"><span>10</span><span>250</span><span>500</span></div>
+          <div class="field-val" id="slider-val">10</div>
+          <input class="slider" type="range" min="5" max="50" step="5" value="10" id="mail-slider" oninput="updateSlider(this.value)">
+          <div class="slider-row" id="campaignVolumeSliderLabels"><span>5</span><span>30</span><span>50</span></div>
         </div>
 
         <div class="field lead-generator-branch-field">
@@ -1461,6 +1461,8 @@ const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';
 const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';
+const COLDMAIL_VOLUME_CONTROL = { min: 5, max: 50, step: 5, value: 10, labels: ['5', '30', '50'] };
+const COLDCALL_VOLUME_CONTROL = { min: 10, max: 500, step: 10, value: 100, labels: ['10', '250', '500'] };
 const COLDMAIL_TEST_COMPANIES = ['mcv e-commerce'];
 const COLDMAIL_AUTO_REPLY_ENABLED = false;
 let coldmailingSettingsSaveTimer = null;
@@ -2087,10 +2089,30 @@ function genBedrijven(n) {
 }
 
 // ── SLIDER ──
+function configureCampaignVolumeControl() {
+  const slider = document.getElementById('mail-slider');
+  const labels = document.getElementById('campaignVolumeSliderLabels');
+  if (!slider) return;
+  const config = isPremiumAiLeadGeneratorPath() ? COLDCALL_VOLUME_CONTROL : COLDMAIL_VOLUME_CONTROL;
+  slider.min = String(config.min);
+  slider.max = String(config.max);
+  slider.step = String(config.step);
+  slider.value = String(config.value);
+  if (labels) {
+    labels.innerHTML = config.labels.map(function (label) {
+      return '<span>' + label + '</span>';
+    }).join('');
+  }
+}
+
 function updateSlider(v) {
-  document.getElementById('slider-val').textContent = v;
-  const pct = ((v-10)/(500-10))*100;
-  document.getElementById('mail-slider').style.background =
+  const slider = document.getElementById('mail-slider');
+  const value = Number(v || (slider && slider.value) || 0);
+  const min = Number(slider ? slider.min : 0) || 0;
+  const max = Number(slider ? slider.max : 100) || 100;
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  document.getElementById('slider-val').textContent = String(value);
+  if (slider) slider.style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
   if (isPremiumAiLeadGeneratorPath()) {
     void hydrateCampaignCompanyCountFromSupabase();
@@ -2099,7 +2121,8 @@ function updateSlider(v) {
   }
   hydrateCampaignRecipientListSoon();
 }
-updateSlider(100);
+configureCampaignVolumeControl();
+updateSlider(document.getElementById('mail-slider') ? document.getElementById('mail-slider').value : 10);
 
 const KM_OPTIES = [10,20,30,40,50,75,100,130,150,175,200,250];
 function updateKm(v) {
