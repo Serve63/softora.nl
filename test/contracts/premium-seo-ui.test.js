@@ -5,7 +5,9 @@ const path = require('path');
 
 test('premium seo NL UI: tabs, paginas, blogcampagne', () => {
   const filePath = path.join(__dirname, '../../premium-seo.html');
+  const dashboardPath = path.join(__dirname, '../../assets/seo-dashboard.js');
   const source = fs.readFileSync(filePath, 'utf8');
+  const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
 
   assert.match(
     source,
@@ -30,4 +32,7 @@ test('premium seo NL UI: tabs, paginas, blogcampagne', () => {
   assert.match(source, /id="blog-word-count"/);
   assert.match(source, /Campagne online zetten/);
   assert.match(source, /activateBlogCampaign\(\)/);
+  assert.doesNotMatch(dashboardSource, /\.innerHTML\s*=/);
+  assert.match(dashboardSource, /target\.replaceChildren\(\);/);
+  assert.match(dashboardSource, /elements\.auditList\.replaceChildren\(\);/);
 });
