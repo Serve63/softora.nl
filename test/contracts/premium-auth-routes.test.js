@@ -27,19 +27,27 @@ function normalizeString(value) {
   return String(value || '').trim();
 }
 
-function createPremiumUsersStoreStub(initialUsers = [], source = 'supabase') {
+function createPremiumUsersStoreStub(initialUsers = [], source = 'supabase', options = {}) {
   const users = initialUsers.map((user) => ({
     status: 'active',
     role: 'medewerker',
     ...user,
   }));
+  const bootstrapUsers = Array.isArray(options.bootstrapUsers) ? options.bootstrapUsers : [];
 
   return {
     async ensureUsersHydrated() {
       return { source, users };
     },
+    async persistUsersCollection(nextUsers) {
+      users.splice(0, users.length, ...nextUsers);
+      return { source: 'supabase', users };
+    },
     getCachedUsers() {
       return users;
+    },
+    findBootstrapUserByEmail(email) {
+      return bootstrapUsers.find((user) => String(user.email || '').toLowerCase() === String(email || '').toLowerCase()) || null;
     },
     findUserByEmail(list, email) {
       return list.find((user) => String(user.email || '').toLowerCase() === String(email || '').toLowerCase()) || null;
@@ -70,7 +78,8 @@ function createFixture(options = {}) {
           passwordHash: 'hash:secret123',
         },
       ],
-      options.hydrationSource || 'supabase'
+      options.hydrationSource || 'supabase',
+      options.storeOptions || {}
     );
 
   const coordinator = createPremiumAuthRouteCoordinator({
@@ -260,6 +269,42 @@ test('premium auth login requires credentials and rejects invalid passwords', as
 
   assert.equal(invalidRes.statusCode, 401);
   assert.equal(invalidRes.body.error, 'Ongeldige inloggegevens.');
+});
+
+test('premium auth login recovers stale stored hashes from bootstrap credentials', async () => {
+  const fixture = createFixture({
+    users: [
+      {
+        id: 'usr_admin',
+        email: 'admin@softora.nl',
+        role: 'admin',
+        status: 'active',
+        passwordHash: 'hash:old-password',
+      },
+    ],
+    storeOptions: {
+      bootstrapUsers: [
+        {
+          id: 'usr_bootstrap',
+          email: 'admin@softora.nl',
+          role: 'admin',
+          status: 'active',
+          passwordHash: 'hash:secret123',
+        },
+      ],
+    },
+  });
+  const req = createRequest({
+    body: { email: 'admin@softora.nl', password: 'secret123' },
+  });
+  const res = createResponseRecorder();
+
+  await fixture.coordinator.loginResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(fixture.auditEvents.some((event) => event.reason === 'security_login_bootstrap_password_recovered'), true);
+  assert.equal(fixture.auditEvents.at(-1).reason, 'security_login_success');
 });
 
 test('premium auth login rejects inactive users and invalid mfa codes', async () => {

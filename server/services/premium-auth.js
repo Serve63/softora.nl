@@ -72,6 +72,59 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     };
   }
 
+  async function recoverBootstrapLoginUser(req, users, email, password, matchedUser) {
+    if (typeof premiumUsersStore.findBootstrapUserByEmail !== 'function') return null;
+
+    const bootstrapUser = premiumUsersStore.findBootstrapUserByEmail(email);
+    if (!bootstrapUser) return null;
+    if (!premiumUsersStore.verifyPasswordHash(password, bootstrapUser.passwordHash)) return null;
+
+    const nowIso = new Date().toISOString();
+    const nextUser = matchedUser
+      ? {
+          ...matchedUser,
+          passwordHash: bootstrapUser.passwordHash,
+          updatedAt: nowIso,
+        }
+      : {
+          ...bootstrapUser,
+          createdAt: bootstrapUser.createdAt || nowIso,
+          updatedAt: nowIso,
+        };
+    const existingUsers = Array.isArray(users) ? users : [];
+    const nextUsers = matchedUser
+      ? existingUsers.map((user) =>
+          user && (user.id === matchedUser.id || user.email === matchedUser.email) ? nextUser : user
+        )
+      : existingUsers.concat(nextUser);
+
+    let savedUsers = nextUsers;
+    if (typeof premiumUsersStore.persistUsersCollection === 'function') {
+      const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
+        source: 'premium_auth_bootstrap_recovery',
+        reason: 'premium_login_bootstrap_password_sync',
+        actorEmail: email,
+      });
+      if (Array.isArray(saved?.users) && saved.users.length > 0) {
+        savedUsers = saved.users;
+      }
+    }
+
+    appendAuditEvent(
+      req,
+      {
+        type: 'login_bootstrap_password_recovered',
+        severity: 'info',
+        success: true,
+        email,
+        detail: 'Premium login wachtwoordhash hersteld vanuit bootstrap-env.',
+      },
+      'security_login_bootstrap_password_recovered'
+    );
+
+    return premiumUsersStore.findUserByEmail(savedUsers, email) || nextUser;
+  }
+
   async function loginResponse(req, res) {
     const email = normalizePremiumSessionEmail(req.body?.email || '');
     const password = String(req.body?.password || '');
@@ -161,10 +214,18 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       });
     }
 
-    const matchedUser = premiumUsersStore.findUserByEmail(users, email);
-    const isPasswordValid = matchedUser
+    let matchedUser = premiumUsersStore.findUserByEmail(users, email);
+    let isPasswordValid = matchedUser
       ? premiumUsersStore.verifyPasswordHash(password, matchedUser.passwordHash)
       : false;
+    if (!isPasswordValid) {
+      const recoveredUser = await recoverBootstrapLoginUser(req, users, email, password, matchedUser);
+      if (recoveredUser) {
+        matchedUser = recoveredUser;
+        isPasswordValid = true;
+      }
+    }
+
     if (!matchedUser || !isPasswordValid) {
       appendAuditEvent(
         req,
