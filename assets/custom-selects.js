@@ -1,12 +1,43 @@
 (function () {
     const customSelectInstances = new Map();
     const serviceLockOptionValues = new Set(["voice_software", "business_software", "ai_chatbots"]);
-    const serviceLockMarkup =
-        '<span class="sidebar-link-lock" aria-hidden="true">' +
-        '<svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-        '<path d="M7 11V7a5 5 0 0 1 10 0v4"/>' +
-        '<rect x="5" y="11" width="14" height="11" rx="2" ry="2"/>' +
-        '</svg></span>';
+
+    function createSvgElement(tagName, attributes = {}) {
+        const element = document.createElementNS("http://www.w3.org/2000/svg", tagName);
+        Object.entries(attributes).forEach(([name, value]) => {
+            element.setAttribute(name, value);
+        });
+        return element;
+    }
+
+    function createServiceLockElement() {
+        const lockWrap = document.createElement("span");
+        lockWrap.className = "sidebar-link-lock";
+        lockWrap.setAttribute("aria-hidden", "true");
+        const icon = createSvgElement("svg", {
+            class: "sidebar-link-lock-icon",
+            fill: "none",
+            viewBox: "0 0 24 24",
+            stroke: "currentColor",
+            "stroke-width": "1.5",
+            "stroke-linecap": "round",
+            "stroke-linejoin": "round",
+            "aria-hidden": "true",
+        });
+        icon.append(
+            createSvgElement("path", { d: "M7 11V7a5 5 0 0 1 10 0v4" }),
+            createSvgElement("rect", { x: "5", y: "11", width: "14", height: "11", rx: "2", ry: "2" })
+        );
+        lockWrap.appendChild(icon);
+        return lockWrap;
+    }
+
+    function createOptionLabel(text) {
+        const label = document.createElement("span");
+        label.className = "site-select-option-label";
+        label.textContent = text;
+        return label;
+    }
 
     function escapeCssIdentifier(value) {
         return String(value || "").replace(/([^\w-])/g, "\\$1");
@@ -307,7 +338,7 @@
         }
 
         function renderOptions() {
-            menu.innerHTML = "";
+            menu.replaceChildren();
             optionButtons.length = 0;
 
             Array.from(select.options).forEach((option) => {
@@ -331,8 +362,7 @@
 
                 if (useServiceLockSvg) {
                     optionButton.classList.add("site-select-option--locked");
-                    optionButton.innerHTML = `${serviceLockMarkup}<span class="site-select-option-label"></span>`;
-                    optionButton.querySelector(".site-select-option-label").textContent = rawLabel;
+                    optionButton.append(createServiceLockElement(), createOptionLabel(rawLabel));
                 } else {
                     optionButton.textContent = String(option.textContent || "").trim();
                 }
