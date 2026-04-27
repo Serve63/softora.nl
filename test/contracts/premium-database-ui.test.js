@@ -237,6 +237,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /Leegmaken/);
   assert.doesNotMatch(pageSource, />Sluiten<\/button>/);
   assert.match(pageSource, /class="deep-search-close" id="closeDeepSearchButton" type="button" aria-label="Sluit AI zoeklijst"/);
+  assert.match(pageSource, /\.deep-search-target\.is-done span \{[\s\S]*text-decoration: line-through;/);
   assert.match(pageSource, /id="deepSearchSources"/);
   assert.match(pageSource, /const pickRecordValue = window\.SoftoraDatabaseImport\.pickRecordValue;/);
   assert.match(pageSource, /const databaseImportController = window\.SoftoraDatabaseImport\.createController\(\{/);
