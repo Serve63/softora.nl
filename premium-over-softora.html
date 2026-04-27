@@ -229,9 +229,9 @@ nav {
   <div class="overlay-logo">Binnenkort beschikbaar</div>
   <div class="login-box">
     <div class="login-label">Toegangscode</div>
-    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" autocomplete="off" onkeydown="if(event.key==='Enter')login()">
+    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" autocomplete="off" data-public-lock-input>
     <div class="login-error" id="login-error"></div>
-    <button type="button" class="login-btn" onclick="login()">Doorgaan</button>
+    <button type="button" class="login-btn" data-public-lock-submit>Doorgaan</button>
   </div>
 </div>
 
@@ -345,24 +345,6 @@ nav {
   </div>
 </div>
 
-<script>
-const CODE = 'Andre2Fritz2!';
-
-if (sessionStorage.getItem('cs-auth') === '1') {
-  document.getElementById('overlay').style.display = 'none';
-}
-
-function login() {
-  const val = document.getElementById('code-inp').value;
-  if (val === CODE) {
-    sessionStorage.setItem('cs-auth', '1');
-    document.getElementById('overlay').style.display = 'none';
-  } else {
-    document.getElementById('login-error').textContent = 'Onjuiste code, probeer opnieuw.';
-    document.getElementById('code-inp').value = '';
-    document.getElementById('code-inp').focus();
-  }
-}
-</script>
+<script src="assets/premium-public-lock.js?v=20260427a" defer></script>
 </body>
 </html>
