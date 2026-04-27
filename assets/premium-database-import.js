@@ -96,6 +96,19 @@
             || normalizeString(file && file.type) === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     }
 
+    function readLinkedSpreadsheetRows(sourceUrl) {
+        return fetch("/api/premium-database/sync-spreadsheet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sourceUrl: normalizeString(sourceUrl) })
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (body) {
+                if (!response.ok || !body.ok) throw new Error(body.error || "Google Sheet synchroniseren mislukt.");
+                return Array.isArray(body.rows) ? body.rows : [];
+            });
+        });
+    }
+
     function readExcelRows(file) {
         return new Promise(function (resolve, reject) {
             if (file.size > 5 * 1024 * 1024) {
@@ -138,10 +151,136 @@
         });
     }
 
+    function normalizeSyncText(value) {
+        return normalizeString(value).toLowerCase();
+    }
+
+    function normalizeSyncDomain(value) {
+        return normalizeSyncText(value)
+            .replace(/^https?:\/\//, "")
+            .replace(/^www\./, "")
+            .replace(/\/.*$/, "")
+            .trim();
+    }
+
+    function normalizeSyncPhone(value) {
+        return normalizeString(value).replace(/\D+/g, "");
+    }
+
+    function collectCustomerSyncKeys(customer) {
+        const keys = [];
+        const email = normalizeSyncText(customer && customer.email);
+        const domain = normalizeSyncDomain((customer && (customer.website || customer.dom)) || "");
+        const phone = normalizeSyncPhone(customer && customer.tel);
+        const company = normalizeSyncText(customer && customer.bedrijf);
+        const address = normalizeSyncText(customer && customer.stad);
+
+        if (email && email !== "—") keys.push("email:" + email);
+        if (domain && domain !== "onbekend.nl") keys.push("domain:" + domain);
+        if (phone.length >= 7) keys.push("phone:" + phone);
+        if (company && address && address !== "onbekend") keys.push("company-address:" + company + "|" + address);
+        return keys;
+    }
+
+    function indexCustomersBySyncKeys(customers) {
+        const index = new Map();
+        (customers || []).forEach(function (customer, customerIndex) {
+            collectCustomerSyncKeys(customer).forEach(function (key) {
+                if (!index.has(key)) index.set(key, customerIndex);
+            });
+        });
+        return index;
+    }
+
+    function findExistingCustomerIndex(index, customer) {
+        const keys = collectCustomerSyncKeys(customer);
+        for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+            if (index.has(keys[keyIndex])) return index.get(keys[keyIndex]);
+        }
+        return -1;
+    }
+
+    function hasFieldChanges(current, incoming) {
+        return [
+            "bedrijf",
+            "dom",
+            "tel",
+            "email",
+            "stad",
+            "website"
+        ].some(function (key) {
+            return normalizeString(current && current[key]) !== normalizeString(incoming && incoming[key]);
+        });
+    }
+
+    function mergeCustomerForSync(current, incoming) {
+        const merged = {
+            ...current,
+            bedrijf: incoming.bedrijf || current.bedrijf,
+            dom: incoming.website ? incoming.dom : current.dom,
+            tel: incoming.tel && incoming.tel !== "—" ? incoming.tel : current.tel,
+            email: incoming.email || current.email,
+            stad: incoming.stad || current.stad,
+            website: incoming.website || current.website
+        };
+        return hasFieldChanges(current, merged) ? merged : current;
+    }
+
+    function mergeCustomers(existingCustomers, importedCustomers, options) {
+        const updateExisting = Boolean(options && options.updateExisting);
+        const mergedCustomers = (existingCustomers || []).slice();
+        const keyIndex = indexCustomersBySyncKeys(mergedCustomers);
+        let addedCount = 0;
+        let updatedCount = 0;
+
+        (importedCustomers || []).forEach(function (customer) {
+            const existingIndex = findExistingCustomerIndex(keyIndex, customer);
+            if (existingIndex === -1) {
+                const newIndex = mergedCustomers.length;
+                mergedCustomers.push(customer);
+                collectCustomerSyncKeys(customer).forEach(function (key) {
+                    if (!keyIndex.has(key)) keyIndex.set(key, newIndex);
+                });
+                addedCount += 1;
+                return;
+            }
+
+            if (!updateExisting) return;
+            const updated = mergeCustomerForSync(mergedCustomers[existingIndex], customer);
+            if (updated !== mergedCustomers[existingIndex]) {
+                mergedCustomers[existingIndex] = updated;
+                updatedCount += 1;
+            }
+        });
+
+        return {
+            customers: mergedCustomers,
+            addedCount: addedCount,
+            updatedCount: updatedCount
+        };
+    }
+
+    function parseSyncConfig(raw) {
+        try {
+            const parsed = JSON.parse(String(raw || "{}"));
+            return parsed && typeof parsed === "object" ? parsed : {};
+        } catch (error) {
+            return {};
+        }
+    }
+
     function createController(deps) {
         const input = deps.input;
         const setStatusMessage = deps.setStatusMessage;
         const importRows = deps.importRows;
+        const syncRows = deps.syncRows;
+        const getUiState = deps.getUiState;
+        const setUiState = deps.setUiState;
+        const syncScope = deps.syncScope;
+        const syncKey = deps.syncKey;
+        const syncIntervalMs = Math.max(60 * 1000, Number(deps.syncIntervalMs) || 10 * 60 * 1000);
+        let syncSourceUrl = "";
+        let syncTimer = null;
 
         function resetInput() {
             if (input) input.value = "";
@@ -160,15 +299,88 @@
                 .finally(resetInput);
         }
 
+        function loadSyncConfig() {
+            if (!getUiState || !syncScope || !syncKey) return Promise.resolve({});
+            return getUiState(syncScope).then(function (state) {
+                const values = state && state.values && typeof state.values === "object" ? state.values : {};
+                return parseSyncConfig(values[syncKey]);
+            }).catch(function () {
+                return {};
+            });
+        }
+
+        function saveSyncConfig(sourceUrl) {
+            syncSourceUrl = normalizeString(sourceUrl);
+            if (!setUiState || !syncScope || !syncKey) return Promise.resolve();
+            return setUiState(syncScope, {
+                patch: {
+                    [syncKey]: JSON.stringify({
+                        sourceUrl: syncSourceUrl,
+                        updatedAt: new Date().toISOString()
+                    })
+                },
+                source: "premium-database-sync",
+                actor: "Premium database"
+            });
+        }
+
+        function syncFromSource(sourceUrl, options) {
+            const silent = Boolean(options && options.silent);
+            if (!syncRows) return Promise.resolve(false);
+            if (!silent) setStatusMessage("Google Sheet synchroniseren...", "info");
+            return readLinkedSpreadsheetRows(sourceUrl).then(function (rows) {
+                return syncRows(rows, { silent: silent });
+            }).catch(function (error) {
+                console.error("Database sync mislukt:", error);
+                if (!silent) {
+                    setStatusMessage("Synchroniseren mislukt: " + String(error.message || "controleer de Google Sheets-link"), "error");
+                }
+                return false;
+            });
+        }
+
+        function scheduleAutoSync() {
+            if (syncTimer) window.clearInterval(syncTimer);
+            if (!syncSourceUrl) return;
+            syncTimer = window.setInterval(function () {
+                void syncFromSource(syncSourceUrl, { silent: true });
+            }, syncIntervalMs);
+        }
+
+        function handleSyncConnect() {
+            const current = syncSourceUrl || "";
+            const nextUrl = window.prompt("Plak hier de deelbare Google Sheets-link. Zet delen op: iedereen met de link kan bekijken.", current);
+            if (!normalizeString(nextUrl)) return;
+            saveSyncConfig(nextUrl).then(function () {
+                scheduleAutoSync();
+                return syncFromSource(nextUrl, { silent: false });
+            }).catch(function (error) {
+                setStatusMessage("Koppelen mislukt: " + String(error.message || "onbekende fout"), "error");
+            });
+        }
+
+        function startAutoSync() {
+            return loadSyncConfig().then(function (config) {
+                syncSourceUrl = normalizeString(config && config.sourceUrl);
+                if (!syncSourceUrl) return false;
+                scheduleAutoSync();
+                return syncFromSource(syncSourceUrl, { silent: true });
+            });
+        }
+
         return {
-            handleFileChange: handleFileChange
+            handleFileChange: handleFileChange,
+            handleSyncConnect: handleSyncConnect,
+            startAutoSync: startAutoSync
         };
     }
 
     global.SoftoraDatabaseImport = {
         createController: createController,
         detectDelimitedSeparator: detectDelimitedSeparator,
+        mergeCustomers: mergeCustomers,
         parseDelimitedRows: parseDelimitedRows,
-        pickRecordValue: pickRecordValue
+        pickRecordValue: pickRecordValue,
+        readLinkedSpreadsheetRows: readLinkedSpreadsheetRows
     };
 })(window);

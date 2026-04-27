@@ -32,6 +32,16 @@ function getExtension(fileName) {
   return path.extname(normalizeString(fileName)).toLowerCase();
 }
 
+function inferExtensionFromContentType(contentType) {
+  const normalized = normalizeString(contentType).toLowerCase();
+  if (normalized.includes('spreadsheetml.sheet') || normalized.includes('application/vnd.ms-excel')) {
+    return '.xlsx';
+  }
+  if (normalized.includes('tab-separated-values')) return '.tsv';
+  if (normalized.includes('csv') || normalized.includes('text/plain')) return '.csv';
+  return '';
+}
+
 function decodeUploadBuffer(dataBase64) {
   const raw = normalizeString(dataBase64).replace(/^data:[^,]+,/, '');
   if (!raw) {
@@ -459,6 +469,14 @@ function parseSpreadsheetUpload(payload = {}) {
   const extension = getExtension(fileName);
   const buffer = decodeUploadBuffer(payload.dataBase64);
 
+  return parseSpreadsheetBuffer(buffer, {
+    fileName,
+    extension,
+  });
+}
+
+function parseSpreadsheetBuffer(buffer, options = {}) {
+  const extension = normalizeString(options.extension) || getExtension(options.fileName);
   if (extension === '.xlsx') {
     return {
       ok: true,
@@ -479,7 +497,88 @@ function parseSpreadsheetUpload(payload = {}) {
   throw new Error('Gebruik een .xlsx, .csv of .tsv bestand.');
 }
 
-function createPremiumDatabaseImportCoordinator() {
+function normalizeGoogleSheetsExportUrl(sourceUrl) {
+  const input = normalizeString(sourceUrl);
+  if (!input) {
+    throw new Error('Geen Google Sheets-link ontvangen.');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(input);
+  } catch (_error) {
+    throw new Error('Gebruik een geldige Google Sheets-link.');
+  }
+
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'docs.google.com') {
+    throw new Error('Alleen Google Sheets-links van docs.google.com worden ondersteund.');
+  }
+
+  const sheetIdMatch = parsed.pathname.match(/^\/spreadsheets\/d\/([^/]+)/);
+  if (!sheetIdMatch) {
+    throw new Error('Deze Google Sheets-link wordt niet herkend.');
+  }
+
+  return `https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetIdMatch[1])}/export?format=xlsx`;
+}
+
+async function fetchSpreadsheetRowsFromSourceUrl(sourceUrl, deps = {}) {
+  const fetchImpl = deps.fetchImpl || global.fetch;
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('Spreadsheet synchroniseren is niet beschikbaar op deze server.');
+  }
+
+  const exportUrl = normalizeGoogleSheetsExportUrl(sourceUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(1000, deps.timeoutMs || 12000));
+
+  try {
+    const response = await fetchImpl(exportUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,*/*',
+      },
+    });
+
+    if (!response || !response.ok) {
+      throw new Error('Google Sheet ophalen mislukt. Controleer of delen via link aan staat.');
+    }
+
+    const contentLength = Number(response.headers && response.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > MAX_UPLOAD_BYTES) {
+      throw new Error('De Google Sheet is te groot om automatisch te synchroniseren.');
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    if (!buffer.length) {
+      throw new Error('De Google Sheet export is leeg.');
+    }
+    if (buffer.length > MAX_UPLOAD_BYTES) {
+      throw new Error('De Google Sheet is te groot om automatisch te synchroniseren.');
+    }
+
+    const contentType =
+      response.headers && typeof response.headers.get === 'function'
+        ? response.headers.get('content-type')
+        : '';
+    return {
+      ...parseSpreadsheetBuffer(buffer, {
+        fileName: 'google-sheet.xlsx',
+        extension: inferExtensionFromContentType(contentType) || '.xlsx',
+      }),
+      sourceUrl: exportUrl,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function createPremiumDatabaseImportCoordinator(deps = {}) {
+  const { fetchImpl = global.fetch } = deps;
+
   function sendImportResponse(req, res) {
     try {
       const result = parseSpreadsheetUpload(req.body || {});
@@ -499,7 +598,29 @@ function createPremiumDatabaseImportCoordinator() {
     }
   }
 
+  async function sendSyncResponse(req, res) {
+    try {
+      const result = await fetchSpreadsheetRowsFromSourceUrl(req.body && req.body.sourceUrl, {
+        fetchImpl,
+      });
+      if (!Array.isArray(result.rows) || result.rows.length < 2) {
+        return res.status(400).json({
+          ok: false,
+          error: 'De Google Sheet bevat geen bruikbare datarijen buiten de tab DATABASE.',
+        });
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      return res.status(400).json({
+        ok: false,
+        error: normalizeString(error && error.message) || 'Synchroniseren mislukt.',
+      });
+    }
+  }
+
   return {
+    sendSyncResponse,
     sendImportResponse,
   };
 }
@@ -507,7 +628,9 @@ function createPremiumDatabaseImportCoordinator() {
 module.exports = {
   createPremiumDatabaseImportCoordinator,
   detectDelimitedSeparator,
+  fetchSpreadsheetRowsFromSourceUrl,
   listWorkbookWorksheets,
+  normalizeGoogleSheetsExportUrl,
   parseDelimitedRows,
   parseSpreadsheetUpload,
   parseXlsxRows,

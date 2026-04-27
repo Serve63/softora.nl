@@ -4,7 +4,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {
+  createPremiumDatabaseImportCoordinator,
   detectDelimitedSeparator,
+  fetchSpreadsheetRowsFromSourceUrl,
+  normalizeGoogleSheetsExportUrl,
   parseDelimitedRows,
   parseSpreadsheetUpload,
 } = require('../../server/services/premium-database-import');
@@ -260,6 +263,83 @@ test('premium database import rejects workbooks with only the DATABASE overview 
   );
 });
 
+test('premium database import sync normalizes Google Sheets links and fetches xlsx rows', async () => {
+  const workbook = createWorkbookBuffer();
+  const expectedUrl = 'https://docs.google.com/spreadsheets/d/sheet-123/export?format=xlsx';
+  const result = await fetchSpreadsheetRowsFromSourceUrl(
+    'https://docs.google.com/spreadsheets/d/sheet-123/edit#gid=0',
+    {
+      fetchImpl: async (url) => {
+        assert.equal(url, expectedUrl);
+        return {
+          ok: true,
+          headers: {
+            get(name) {
+              if (name === 'content-type') {
+                return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+              }
+              if (name === 'content-length') return String(workbook.length);
+              return '';
+            },
+          },
+          async arrayBuffer() {
+            return workbook;
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(normalizeGoogleSheetsExportUrl('https://docs.google.com/spreadsheets/d/sheet-123/edit'), expectedUrl);
+  assert.equal(result.fileType, 'xlsx');
+  assert.equal(result.rows.length, 3);
+  assert.equal(result.rows[1][0], 'Augustijn Auto Expertise');
+  assert.throws(
+    () => normalizeGoogleSheetsExportUrl('https://example.com/spreadsheets/d/sheet-123/edit'),
+    /Alleen Google Sheets-links/
+  );
+});
+
+test('premium database import sync route returns fetched spreadsheet rows', async () => {
+  const workbook = createWorkbookBuffer();
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    fetchImpl: async () => ({
+      ok: true,
+      headers: {
+        get(name) {
+          return name === 'content-type'
+            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            : '';
+        },
+      },
+      async arrayBuffer() {
+        return workbook;
+      },
+    }),
+  });
+  const response = {
+    statusCode: 0,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  await coordinator.sendSyncResponse(
+    { body: { sourceUrl: 'https://docs.google.com/spreadsheets/d/sheet-123/edit' } },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.rows[1][0], 'Augustijn Auto Expertise');
+});
+
 test('premium database import route is registered behind the premium api surface', () => {
   const featureRoutesPath = path.join(__dirname, '../../server/services/feature-routes-runtime.js');
   const routePath = path.join(__dirname, '../../server/routes/premium-database-import.js');
@@ -269,4 +349,5 @@ test('premium database import route is registered behind the premium api surface
   assert.match(featureRoutesSource, /registerPremiumDatabaseImportRoutes\(app/);
   assert.match(featureRoutesSource, /createPremiumDatabaseImportCoordinator\(\)/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/import-spreadsheet'/);
+  assert.match(routeSource, /app\.post\('\/api\/premium-database\/sync-spreadsheet'/);
 });

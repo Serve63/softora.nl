@@ -1145,6 +1145,10 @@
                                         <span class="add-actions-item-title">Uploaden</span>
                                         <span class="add-actions-item-sub">Importeer bedrijven vanuit CSV, TSV of Excel</span>
                                     </button>
+                                    <button class="add-actions-item" id="addSyncButton" type="button" role="menuitem">
+                                        <span class="add-actions-item-title">Google Sheet koppelen</span>
+                                        <span class="add-actions-item-sub">Synchroniseer automatisch bij openen</span>
+                                    </button>
                                     <button class="add-actions-item" id="addManualButton" type="button" role="menuitem">
                                         <span class="add-actions-item-title">Handmatig toevoegen</span>
                                         <span class="add-actions-item-sub">Voeg zelf een bedrijf toe via het formulier</span>
@@ -1291,11 +1295,13 @@
         </div>
     </div>
 
-    <script src="assets/premium-database-import.js?v=20260427a"></script>
+    <script src="assets/premium-database-import.js?v=20260427b"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
+        const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";
+        const CUSTOMER_DB_SYNC_INTERVAL_MS = 10 * 60 * 1000;
         const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";
         const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";
         const CUSTOMER_PHOTO_DATA_PREFIX = "softora_database_photo_data_v1_";
@@ -1346,6 +1352,7 @@
             photoCostLabel: document.getElementById("photoCostLabel"),
             generatePhotosButton: document.getElementById("generatePhotosButton"),
             addUploadButton: document.getElementById("addUploadButton"),
+            addSyncButton: document.getElementById("addSyncButton"),
             addManualButton: document.getElementById("addManualButton"),
             importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
@@ -2686,10 +2693,12 @@
             }, "import-" + index);
         }
 
-        function importCustomersFromRows(rows) {
+        function applyCustomersFromRows(rows, options) {
+            const isSync = Boolean(options && options.updateExisting);
+            const silent = Boolean(options && options.silent);
             if (rows.length < 2) {
                 setStatusMessage("Het bestand bevat geen bruikbare rijen.", "error");
-                return;
+                return Promise.resolve(false);
             }
 
             const headers = rows[0].map(normalizeCsvHeader);
@@ -2699,44 +2708,52 @@
 
             if (!importedCustomers.length) {
                 setStatusMessage("Geen geldige bedrijven gevonden in het bestand.", "error");
-                return;
+                return Promise.resolve(false);
             }
 
-            const existingKeys = new Set(state.klanten.map(function (customer) {
-                return buildCustomerIdentityKey(customer);
-            }));
-
-            let importedCount = 0;
-            const mergedCustomers = state.klanten.slice();
-
-            importedCustomers.forEach(function (customer) {
-                const key = buildCustomerIdentityKey(customer);
-                if (!key || existingKeys.has(key)) {
-                    return;
-                }
-                existingKeys.add(key);
-                mergedCustomers.unshift(customer);
-                importedCount += 1;
+            const mergeResult = window.SoftoraDatabaseImport.mergeCustomers(state.klanten, importedCustomers, {
+                updateExisting: isSync
             });
+            const changedCount = mergeResult.addedCount + mergeResult.updatedCount;
 
-            if (!importedCount) {
-                setStatusMessage("Alle bedrijven uit dit bestand stonden al in de database.", "info", true);
-                return;
+            if (!changedCount) {
+                if (!silent) {
+                    setStatusMessage(isSync ? "Google Sheet is al gelijk aan de database." : "Alle bedrijven uit dit bestand stonden al in de database.", "info", true);
+                }
+                return Promise.resolve(false);
             }
 
-            state.klanten = sortCustomers(mergedCustomers);
+            state.klanten = sortCustomers(mergeResult.customers);
             renderPage();
 
-            persistCustomerList(state.klanten).then(function (result) {
+            return persistCustomerList(state.klanten).then(function (result) {
                 if (result.ok) {
-                    toast("✓ " + importedCount + " bedrijven geupload");
-                    setStatusMessage(importedCount + " bedrijven toegevoegd via upload.", "success", true);
-                    return;
+                    const labelParts = [];
+                    if (mergeResult.addedCount) labelParts.push(mergeResult.addedCount + " toegevoegd");
+                    if (mergeResult.updatedCount) labelParts.push(mergeResult.updatedCount + " bijgewerkt");
+                    const label = labelParts.join(", ");
+                    if (!silent) {
+                        toast("✓ " + label);
+                        setStatusMessage((isSync ? "Google Sheet gesynchroniseerd: " : "") + label + ".", "success", true);
+                    }
+                    return true;
                 }
                 setStatusMessage(
                     "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
                     "error"
                 );
+                return false;
+            });
+        }
+
+        function importCustomersFromRows(rows) {
+            return applyCustomersFromRows(rows, { updateExisting: false });
+        }
+
+        function syncCustomersFromRows(rows, options) {
+            return applyCustomersFromRows(rows, {
+                updateExisting: true,
+                silent: options && options.silent
             });
         }
 
@@ -2954,7 +2971,13 @@
         const databaseImportController = window.SoftoraDatabaseImport.createController({
             input: nodes.importFileInput,
             setStatusMessage: setStatusMessage,
-            importRows: importCustomersFromRows
+            importRows: importCustomersFromRows,
+            syncRows: syncCustomersFromRows,
+            getUiState: fetchUiStateGetWithFallback,
+            setUiState: fetchUiStateSetWithFallback,
+            syncScope: CUSTOMER_DB_SCOPE,
+            syncKey: CUSTOMER_DB_SYNC_KEY,
+            syncIntervalMs: CUSTOMER_DB_SYNC_INTERVAL_MS
         });
 
         nodes.query.addEventListener("input", function (event) {
@@ -3050,6 +3073,10 @@
             closeAddActions();
             nodes.importFileInput.click();
         });
+        nodes.addSyncButton.addEventListener("click", function () {
+            closeAddActions();
+            databaseImportController.handleSyncConnect();
+        });
         nodes.addManualButton.addEventListener("click", function () {
             closeAddActions();
             openModal();
@@ -3088,6 +3115,7 @@
         void (async function () {
             try {
                 await bootstrapCustomers();
+                void databaseImportController.startAutoSync();
             } finally {
                 if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === "function") {
                     window.SoftoraPremiumBoot.setShellBooting(false);

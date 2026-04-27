@@ -4,6 +4,10 @@ function registerPremiumDatabaseImportRoutes(app, deps = {}) {
   app.post('/api/premium-database/import-spreadsheet', (req, res) =>
     coordinator.sendImportResponse(req, res)
   );
+
+  app.post('/api/premium-database/sync-spreadsheet', (req, res) =>
+    coordinator.sendSyncResponse(req, res)
+  );
 }
 
 module.exports = {
