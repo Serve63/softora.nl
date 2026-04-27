@@ -1126,6 +1126,26 @@ function cloneOrderRuntimeForRollback(order) {
     };
 }
 
+function setOpenDossierButtonContent(btnEl) {
+    if (!btnEl) return;
+
+    const svgNs = 'http://www.w3.org/2000/svg';
+    const icon = document.createElementNS(svgNs, 'svg');
+    icon.setAttribute('fill', 'none');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('stroke', 'currentColor');
+    icon.setAttribute('stroke-width', '2');
+    icon.setAttribute('aria-hidden', 'true');
+
+    const path = document.createElementNS(svgNs, 'path');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('d', 'M3 7.5h18M5.25 7.5v10.5A1.5 1.5 0 0 0 6.75 19.5h10.5a1.5 1.5 0 0 0 1.5-1.5V7.5M9 7.5V6a3 3 0 1 1 6 0v1.5');
+    icon.appendChild(path);
+
+    btnEl.replaceChildren(icon, document.createTextNode(' Open dossier'));
+}
+
 function applyOrderUiStateToCard(id) {
     const order = orders[id];
     if (!order) return;
@@ -1186,7 +1206,7 @@ function applyOrderUiStateToCard(id) {
         } else {
             btnEl.classList.remove('claimed');
         }
-        btnEl.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5h18M5.25 7.5v10.5A1.5 1.5 0 0 0 6.75 19.5h10.5a1.5 1.5 0 0 0 1.5-1.5V7.5M9 7.5V6a3 3 0 1 1 6 0v1.5"></path></svg> Open dossier';
+        setOpenDossierButtonContent(btnEl);
     }
 
     if (assigneeEl) {
