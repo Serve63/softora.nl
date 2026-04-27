@@ -1201,30 +1201,74 @@ loadWebsiteGeneratorAuthState();
     websiteLinkStatusEl.style.color = isError ? '#c0392b' : 'var(--text-mid)';
   }
 
+  function normalizeWebsiteLinkHref(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    try {
+      const url = new URL(raw);
+      return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function renderWebsiteLinkEmptyState(message) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.style.padding = '22px';
+    appendWebsiteGeneratorTextElement(empty, 'p', '', message);
+    websiteLinkListEl.replaceChildren(empty);
+  }
+
+  function createWebsiteLinkRow(link) {
+    const title = String(link?.title || link?.slug || 'Softora pagina').trim() || 'Softora pagina';
+    const urlLabel = String(link?.url || '').trim() || '—';
+    const href = normalizeWebsiteLinkHref(urlLabel);
+
+    const row = document.createElement('div');
+    row.className = 'website-link-row';
+
+    const main = document.createElement('div');
+    main.className = 'website-link-row-main';
+    const titleEl = appendWebsiteGeneratorTextElement(main, 'div', 'website-link-row-title', title);
+    titleEl.title = title;
+
+    if (href) {
+      const urlLink = appendWebsiteGeneratorTextElement(main, 'a', 'website-link-row-url', urlLabel);
+      urlLink.href = href;
+      urlLink.target = '_blank';
+      urlLink.rel = 'noopener noreferrer';
+    } else {
+      appendWebsiteGeneratorTextElement(main, 'span', 'website-link-row-url', urlLabel);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'website-link-row-actions';
+    if (href) {
+      const liveLink = appendWebsiteGeneratorTextElement(actions, 'a', 'btn outline', 'Live pagina');
+      liveLink.href = href;
+      liveLink.target = '_blank';
+      liveLink.rel = 'noopener noreferrer';
+    } else {
+      const unavailable = appendWebsiteGeneratorTextElement(actions, 'span', 'btn outline', 'Geen live URL');
+      unavailable.setAttribute('aria-disabled', 'true');
+    }
+
+    row.append(main, actions);
+    return row;
+  }
+
   function renderWebsiteLinks(links) {
     const normalizedLinks = Array.isArray(links) ? links : [];
     if (!websiteGeneratorAuthState.authenticated) {
-      websiteLinkListEl.innerHTML = '<div class="empty-state" style="padding:22px;"><p>Log in om opgeslagen websitelinks te bekijken.</p></div>';
+      renderWebsiteLinkEmptyState('Log in om opgeslagen websitelinks te bekijken.');
       return;
     }
     if (!normalizedLinks.length) {
-      websiteLinkListEl.innerHTML = '<div class="empty-state" style="padding:22px;"><p>Nog geen websitelinks. Plak HTML-code en maak je eerste live pagina aan.</p></div>';
+      renderWebsiteLinkEmptyState('Nog geen websitelinks. Plak HTML-code en maak je eerste live pagina aan.');
       return;
     }
-    websiteLinkListEl.innerHTML = normalizedLinks.map((link) => {
-      const title = escapeHtml(link.title || link.slug || 'Softora pagina');
-      const url = escapeHtml(link.url || '');
-      return `
-        <div class="website-link-row">
-          <div class="website-link-row-main">
-            <div class="website-link-row-title" title="${title}">${title}</div>
-            <a class="website-link-row-url" href="${url}" target="_blank" rel="noopener">${url}</a>
-          </div>
-          <div class="website-link-row-actions">
-            <a class="btn outline" href="${url}" target="_blank" rel="noopener">Live pagina</a>
-          </div>
-        </div>`;
-    }).join('');
+    websiteLinkListEl.replaceChildren(...normalizedLinks.map((link) => createWebsiteLinkRow(link)));
   }
 
   async function loadWebsiteLinks() {
@@ -1232,7 +1276,7 @@ loadWebsiteGeneratorAuthState();
       renderWebsiteLinks([]);
       return;
     }
-    websiteLinkListEl.innerHTML = '<div class="empty-state" style="padding:22px;"><p>Websitelinks laden...</p></div>';
+    renderWebsiteLinkEmptyState('Websitelinks laden...');
     try {
       const response = await fetch('/api/website-links', {
         method: 'GET',
@@ -1246,7 +1290,7 @@ loadWebsiteGeneratorAuthState();
       }
       renderWebsiteLinks(payload.links || []);
     } catch (error) {
-      websiteLinkListEl.innerHTML = `<div class="empty-state" style="padding:22px;"><p>${escapeHtml(String(error?.message || 'Websitelinks laden mislukt'))}</p></div>`;
+      renderWebsiteLinkEmptyState(String(error?.message || 'Websitelinks laden mislukt'));
     }
   }
 

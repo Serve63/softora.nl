@@ -137,6 +137,13 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   flex: 1;
 }
 
+.pdf-download-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .pdf-tab {
   display: flex;
   align-items: center;
@@ -184,6 +191,14 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .btn-dl {
   font-family: 'Oswald', sans-serif;
 }
+.btn-download--terms {
+  background: #1a1a2e;
+  padding-left: 18px;
+  padding-right: 18px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn-download--terms:hover { opacity: .88; }
 .btn-download:hover { opacity: .88; }
 .btn-download svg { width: 14px; height: 14px; }
 
@@ -587,6 +602,9 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 
 /* ── RESPONSIVE ──────────────────────────────────────────── */
 @media (max-width: 1180px) {
+  .topbar, .pdf-topbar { height: auto; flex-wrap: wrap; padding: 12px 18px; row-gap: 10px; }
+  .pdf-tabs { order: 3; width: 100%; flex: 0 0 100%; overflow-x: auto; }
+  .pdf-download-actions { margin-left: auto; }
   .split, .pdf-split { flex-direction: column; overflow: auto; }
   .form-panel, .pdf-form-panel { width: 100%; max-height: 44vh; }
   .split { flex-direction: column; overflow: auto; }
@@ -614,6 +632,11 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   .pdf-preview-panel { min-height: 500px; }
   .main-content { margin-left: 0; width: 100%; }
   .split { flex-direction: column; }
+}
+
+@media (max-width: 640px) {
+  .pdf-download-actions { width: 100%; display: grid; grid-template-columns: 1fr; margin-left: 0; }
+  .pdf-download-actions .btn-download { width: 100%; justify-content: center; }
 }
 </style>
 </head>
@@ -712,10 +735,16 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
           Betalingsherinnering
         </button>
       </div>
-      <button class="btn-dl btn-download" onclick="downloadPDF()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        PDF Downloaden
-      </button>
+      <div class="pdf-download-actions">
+        <a class="btn-dl btn-download btn-download--terms" href="/assets/algemene-voorwaarden-softora-vof.pdf" download="algemene-voorwaarden-softora-vof.pdf">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Algemene voorwaarden downloaden (PDF)
+        </a>
+        <button class="btn-dl btn-download" onclick="downloadPDF()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          PDF Downloaden
+        </button>
+      </div>
     </div>
 
     <!-- SPLIT -->

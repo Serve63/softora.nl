@@ -54,6 +54,10 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.match(websiteGeneratorSource, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*!websiteLinkListEl[\s\S]*\) \{\s*return;\s*\}/);
   assert.match(source, /id="website-link-list"/);
   assert.match(websiteGeneratorSource, /window\.open\('about:blank', '_blank'\)/);
+  assert.match(websiteGeneratorSource, /function createWebsiteLinkRow\(link\) \{/);
+  assert.match(websiteGeneratorSource, /websiteLinkListEl\.replaceChildren\(\.\.\.normalizedLinks\.map\(\(link\) => createWebsiteLinkRow\(link\)\)\);/);
+  assert.match(websiteGeneratorSource, /return url\.protocol === 'http:' \|\| url\.protocol === 'https:' \? url\.href : '';/);
+  assert.doesNotMatch(websiteGeneratorSource, /websiteLinkListEl\.innerHTML/);
   assert.match(websiteGeneratorSource, /\/api\/website-links'/);
   assert.match(websiteGeneratorSource, /\/api\/website-links\/create/);
 });

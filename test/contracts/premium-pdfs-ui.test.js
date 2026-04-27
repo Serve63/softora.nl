@@ -22,6 +22,9 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /<div class="topbar">/);
   assert.match(pageSource, /\.topbar-logo \{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.btn-dl \{[\s\S]*font-family:\s*'Oswald', sans-serif;/);
+  assert.match(pageSource, /<div class="pdf-download-actions">/);
+  assert.match(pageSource, /href="\/assets\/algemene-voorwaarden-softora-vof\.pdf" download="algemene-voorwaarden-softora-vof\.pdf"/);
+  assert.match(pageSource, /Algemene voorwaarden downloaden \(PDF\)/);
   assert.match(pageSource, /<div class="pdf-process-notice" role="note" aria-labelledby="pdf-process-notice-title">/);
   assert.match(pageSource, /Standaard werkwijze bij nieuwe opdrachten/);
   assert.match(pageSource, /Akkoord met de offerte en algemene voorwaarden\./);
@@ -48,4 +51,12 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /function setupPreviewAutoFit\(\) \{[\s\S]*new ResizeObserver\(\(\) => fitPreviewToViewport\(\)\);/);
   assert.match(pageSource, /buildForm\(\);\s*setupPreviewAutoFit\(\);\s*fitPreviewToViewport\(\);/);
   assert.doesNotMatch(pageSource, /EUR /);
+});
+
+test('premium pdf builder exposes the algemene voorwaarden pdf asset', () => {
+  const pdfPath = path.join(__dirname, '../../assets/algemene-voorwaarden-softora-vof.pdf');
+  const pdf = fs.readFileSync(pdfPath);
+
+  assert.equal(pdf.subarray(0, 4).toString('ascii'), '%PDF');
+  assert.ok(pdf.length > 100000, 'Algemene voorwaarden PDF hoort een echte downloadbare PDF te zijn.');
 });
