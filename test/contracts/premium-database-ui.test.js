@@ -274,6 +274,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(deepSearchScriptSource, /100 bedrijven toevoegen/);
   assert.match(deepSearchScriptSource, /\? "Nu: " \+ target\.label/);
   assert.doesNotMatch(deepSearchScriptSource, /"Nu: " \+ target\.label \+ " · " \+ target\.batches/);
+  assert.doesNotMatch(deepSearchScriptSource, /STATUS_LABELS/);
+  assert.doesNotMatch(deepSearchScriptSource, /item\.batches \+ "x/);
+  assert.doesNotMatch(deepSearchScriptSource, /item\.added \+ " nieuw/);
   assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
   assert.match(deepSearchScriptSource, /function formatUsdAsEuro\(value\)/);
   assert.match(deepSearchScriptSource, /USD_TO_EUR_RATE = 0\.93/);

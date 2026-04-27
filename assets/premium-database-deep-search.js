@@ -1,11 +1,6 @@
 (function (global) {
     "use strict";
 
-    const STATUS_LABELS = {
-        pending: "Wacht",
-        active: "Bezig",
-        done: "Klaar"
-    };
     const USD_TO_EUR_RATE = 0.93;
     const ESTIMATED_BATCH_PRICING = {
         inputTokens: 6000,
@@ -395,7 +390,6 @@
                         const statusClass = " is-" + item.status;
                         return "<button class=\"deep-search-target" + activeClass + statusClass + "\" type=\"button\" data-deep-target-index=\"" + index + "\">"
                             + "<span>" + (index + 1) + ". " + escapeHtml(item.label) + "</span>"
-                            + "<strong>" + escapeHtml(STATUS_LABELS[item.status] || "Wacht") + " · " + item.batches + "x · " + item.added + " nieuw</strong>"
                             + "</button>";
                     }).join("")
                     : "<div class=\"deep-search-empty\">Geen vaste volgorde gevonden.</div>";
