@@ -158,7 +158,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427c/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427d/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -208,7 +208,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427d"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -217,7 +217,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /id="deepSearchListInput"/);
   assert.match(pageSource, /id="deepSearchCost"/);
   assert.match(pageSource, /id="deepSearchStartButton" type="button">100 bedrijven toevoegen<\/button>/);
-  assert.match(pageSource, /id="deepSearchDoneButton" type="button">Deze plek afronden<\/button>/);
+  assert.doesNotMatch(pageSource, /deepSearchDoneButton/);
+  assert.doesNotMatch(pageSource, /Deze plek afronden/);
   assert.match(pageSource, /id="deepSearchSources"/);
   assert.match(pageSource, /const pickRecordValue = window\.SoftoraDatabaseImport\.pickRecordValue;/);
   assert.match(pageSource, /const databaseImportController = window\.SoftoraDatabaseImport\.createController\(\{/);
@@ -243,7 +244,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /function formatUsdAsEuro\(value\)/);
   assert.match(deepSearchScriptSource, /USD_TO_EUR_RATE = 0\.93/);
   assert.match(deepSearchScriptSource, /ESTIMATED_BATCH_PRICING/);
-  assert.match(deepSearchScriptSource, /function markCurrentDone\(\)/);
+  assert.match(deepSearchScriptSource, /function advanceCompletedTarget\(target\)/);
+  assert.match(deepSearchScriptSource, /Boolean\(body && body\.placeComplete\)/);
+  assert.doesNotMatch(deepSearchScriptSource, /function markCurrentDone\(\)/);
   assert.match(deepSearchScriptSource, /source: "premium-database-deep-search"/);
   assert.match(importScriptSource, /function readRealBusinessRows\(query\)/);
   assert.match(importScriptSource, /fetch\("\/api\/premium-database\/add-real-businesses"/);

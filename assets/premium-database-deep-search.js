@@ -210,6 +210,8 @@
             found: 0,
             added: 0,
             costUsd: 0,
+            placeComplete: false,
+            completionReason: "",
             seen: [],
             lastSources: [],
             updatedAt: ""
@@ -230,6 +232,8 @@
             found: Math.max(0, Number(raw && raw.found) || 0),
             added: Math.max(0, Number(raw && raw.added) || 0),
             costUsd: Math.max(0, Number(raw && raw.costUsd) || 0),
+            placeComplete: Boolean(raw && raw.placeComplete),
+            completionReason: normalizeString(raw && raw.completionReason),
             seen: uniqueStrings(raw && raw.seen, 180),
             lastSources: Array.isArray(raw && raw.lastSources) ? raw.lastSources.slice(0, 40) : [],
             updatedAt: normalizeString(raw && raw.updatedAt)
@@ -355,7 +359,6 @@
             busy = Boolean(nextBusy);
             [
                 nodes.deepSearchStartButton,
-                nodes.deepSearchDoneButton,
                 nodes.deepSearchResetButton
             ].forEach(function (button) {
                 if (button) button.disabled = busy;
@@ -389,15 +392,16 @@
         function render() {
             const stats = getStats();
             const target = getCurrentTarget();
+            const canSearchTarget = target && target.status !== "done";
             if (nodes.deepSearchStats) {
                 nodes.deepSearchStats.textContent = state.targets.length
                     ? stats.done + " klaar · " + stats.pending + " in wachtrij · " + state.targets.length + " totaal · " + formatUsdAsEuro(state.totalCostUsd) + " API"
                     : "Geen vaste volgorde";
             }
             if (nodes.deepSearchCurrent) {
-                nodes.deepSearchCurrent.textContent = target
+                nodes.deepSearchCurrent.textContent = canSearchTarget
                     ? "Nu: " + target.label
-                    : "Geen huidige plek";
+                    : "Alle plekken afgerond";
             }
             if (nodes.deepSearchCost) {
                 const batchEstimate = formatEuro(usdToEur(estimateBatchUsd()));
@@ -418,8 +422,7 @@
                     : "<div class=\"deep-search-empty\">Geen vaste volgorde gevonden.</div>";
             }
             renderSources(target);
-            if (nodes.deepSearchDoneButton) nodes.deepSearchDoneButton.disabled = busy || !target;
-            if (nodes.deepSearchStartButton) nodes.deepSearchStartButton.disabled = busy || !target;
+            if (nodes.deepSearchStartButton) nodes.deepSearchStartButton.disabled = busy || !canSearchTarget;
         }
 
         function collectExistingKeys() {
@@ -441,6 +444,8 @@
             target.found += Math.max(0, Number(body.found) || 0);
             target.added += Math.max(0, Number(addedCount) || 0);
             target.costUsd = Math.max(0, Number(target.costUsd) || 0) + costUsd;
+            target.placeComplete = Boolean(body && body.placeComplete);
+            target.completionReason = normalizeString(body && body.completionReason);
             state.totalCostUsd = Math.max(0, Number(state.totalCostUsd) || 0) + costUsd;
             target.updatedAt = new Date().toISOString();
             target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
@@ -453,11 +458,34 @@
             })), 180);
         }
 
+        function advanceCompletedTarget(target) {
+            if (!target) return false;
+            target.status = "done";
+            target.placeComplete = true;
+            target.updatedAt = new Date().toISOString();
+            const currentIndex = state.targets.indexOf(target);
+            const nextIndex = state.targets.findIndex(function (item, index) {
+                return index > currentIndex && item.status !== "done";
+            });
+            const fallbackIndex = state.targets.findIndex(function (item) {
+                return item.status !== "done";
+            });
+            state.activeIndex = nextIndex !== -1 ? nextIndex : (fallbackIndex !== -1 ? fallbackIndex : currentIndex);
+            state.targets.forEach(function (item, index) {
+                if (item.status !== "done") item.status = index === state.activeIndex ? "active" : "pending";
+            });
+            return true;
+        }
+
         function runCurrentSearch() {
             if (busy) return Promise.resolve(false);
             const target = getCurrentTarget();
             if (!target) {
                 setStatusMessage("Plak eerst je zoeklijst en sla die op.", "error");
+                return Promise.resolve(false);
+            }
+            if (target.status === "done") {
+                setStatusMessage("Alle plekken zijn al afgerond.", "info", true);
                 return Promise.resolve(false);
             }
             setBusy(true);
@@ -471,18 +499,23 @@
                 batchNumber: target.batches + 1,
                 exclude: uniqueStrings(target.seen.concat(collectExistingKeys()), 180)
             }).then(function (body) {
-                return Promise.resolve(importRows(body.rows)).then(function () {
+                const rows = Array.isArray(body.rows) ? body.rows : [];
+                const importPromise = rows.length > 1 ? Promise.resolve(importRows(rows)) : Promise.resolve(false);
+                return importPromise.then(function () {
                     const afterCount = Array.isArray(getCustomers()) ? getCustomers().length : beforeCount;
                     const addedCount = Math.max(0, afterCount - beforeCount);
                     updateTargetAfterSearch(target, body, addedCount);
+                    const completed = Boolean(body && body.placeComplete);
+                    if (completed) advanceCompletedTarget(target);
                     render();
                     return persistState().then(function () {
-                        setStatusMessage(
-                            "AI vond " + Number(body.found || 0) + " complete bedrijven voor " + target.label + ". " + addedCount + " nieuw toegevoegd. API-kosten: " + formatUsdAsEuro(body && body.cost && body.cost.estimatedUsd) + ".",
-                            "success",
-                            true
-                        );
+                        const baseMessage = "AI vond " + Number(body.found || 0) + " complete bedrijven voor " + target.label + ". " + addedCount + " nieuw toegevoegd. API-kosten: " + formatUsdAsEuro(body && body.cost && body.cost.estimatedUsd) + ".";
+                        const doneMessage = completed
+                            ? baseMessage + " Deze plaats is automatisch afgerond."
+                            : baseMessage;
+                        setStatusMessage(doneMessage, "success", true);
                         if (addedCount) toast("+" + addedCount + " bedrijven");
+                        if (completed) toast("Plek afgerond");
                         return true;
                     });
                 });
@@ -493,28 +526,6 @@
             }).finally(function () {
                 setBusy(false);
                 render();
-            });
-        }
-
-        function markCurrentDone() {
-            const target = getCurrentTarget();
-            if (!target) return Promise.resolve(false);
-            target.status = "done";
-            target.updatedAt = new Date().toISOString();
-            const nextIndex = state.targets.findIndex(function (item, index) {
-                return index > state.activeIndex && item.status !== "done";
-            });
-            const fallbackIndex = state.targets.findIndex(function (item) {
-                return item.status !== "done";
-            });
-            state.activeIndex = nextIndex !== -1 ? nextIndex : (fallbackIndex !== -1 ? fallbackIndex : state.activeIndex);
-            state.targets.forEach(function (item, index) {
-                if (item.status !== "done") item.status = index === state.activeIndex ? "active" : "pending";
-            });
-            render();
-            return persistState().then(function () {
-                setStatusMessage("Plek afgerond. Volgende staat klaar.", "success", true);
-                return true;
             });
         }
 
@@ -554,11 +565,6 @@
             if (nodes.deepSearchStartButton) {
                 nodes.deepSearchStartButton.addEventListener("click", function () {
                     void runCurrentSearch();
-                });
-            }
-            if (nodes.deepSearchDoneButton) {
-                nodes.deepSearchDoneButton.addEventListener("click", function () {
-                    void markCurrentDone();
                 });
             }
             if (nodes.deepSearchResetButton) nodes.deepSearchResetButton.addEventListener("click", resetState);

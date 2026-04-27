@@ -1090,9 +1090,11 @@ function buildDeepSearchJsonSchema() {
           required: ['bedrijfsnaam', 'adres', 'email', 'telefoonnummer', 'website', 'bronnen'],
         },
       },
+      placeComplete: { type: 'boolean' },
+      completionReason: { type: 'string' },
       notes: { type: 'string' },
     },
-    required: ['target', 'businesses', 'notes'],
+    required: ['target', 'businesses', 'placeComplete', 'completionReason', 'notes'],
   };
 }
 
@@ -1108,6 +1110,8 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
     'Neem alleen actieve bedrijven of bedrijven die duidelijk operationeel lijken mee.',
     'Neem geen verenigingen, scholen, overheidsinstanties of stichtingen mee, tenzij ze commercieel interessant zijn.',
     'Vermijd dubbele bedrijven en verzin nooit ontbrekende gegevens.',
+    'Bepaal zelf of de plaats klaar is: zet placeComplete op true wanneer je na live web search geen extra nieuwe complete en verifieerbare bedrijven voor deze plaats meer kunt vinden.',
+    'Zet placeComplete op false wanneer er waarschijnlijk nog meer complete bedrijven zijn voor een volgende batch.',
     'Gebruik geen placeholders zoals onbekend, niet gevonden, n.v.t. of lege waarden.',
     'Geef uitsluitend JSON terug volgens het schema.',
   ].join('\n');
@@ -1125,6 +1129,8 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
     '- Website mag een domein of volledige URL zijn, maar moet echt bij het bedrijf horen.',
     '- Vermijd dubbele bedrijven, handelsnamen met dezelfde website en eerder gevonden resultaten.',
     '- Gebruik bronnen als URL-lijst per bedrijf, zodat de controle zichtbaar blijft.',
+    '- Vul placeComplete zorgvuldig in. Als je minder dan gevraagd teruggeeft omdat er geen extra complete bedrijven meer vindbaar zijn, zet placeComplete op true en leg kort uit waarom in completionReason.',
+    '- Als je nog niet zeker bent dat de plaats leeg is, zet placeComplete op false.',
     '',
     'Eerder gevonden of al bestaande resultaten die je moet vermijden:',
     exclusionText,
@@ -1412,6 +1418,12 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const usage = extractOpenAiUsage(data);
   const webSearchCalls = countOpenAiWebSearchCalls(data);
   const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls });
+  const placeComplete = Boolean(parsed && parsed.placeComplete) || businesses.length === 0;
+  const completionReason = truncateText(
+    (parsed && (parsed.completionReason || parsed.notes)) ||
+      (placeComplete ? 'Geen extra complete en verifieerbare bedrijven gevonden.' : ''),
+    300
+  );
 
   return {
     ok: true,
@@ -1423,6 +1435,8 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
     requested: count,
     found: businesses.length,
     rejected: Math.max(0, rawBusinesses.length - businesses.length),
+    placeComplete,
+    completionReason,
     cost,
     businesses,
     sources: collectDeepSearchSources(data, businesses),
@@ -1504,7 +1518,7 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
         fetchImpl,
         env,
       });
-      if (!Array.isArray(result.rows) || result.rows.length < 2) {
+      if ((!Array.isArray(result.rows) || result.rows.length < 2) && !result.placeComplete) {
         return res.status(422).json({
           ok: false,
           code: 'NO_DEEP_SEARCH_BUSINESSES_FOUND',

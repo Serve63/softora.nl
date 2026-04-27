@@ -481,8 +481,16 @@ test('premium database deep search uses OpenAI web search and returns complete r
         assert.equal(payload.tools[0].external_web_access, true);
         assert.deepEqual(payload.include, ['web_search_call.action.sources']);
         assert.equal(payload.text.format.type, 'json_schema');
+        assert.deepEqual(payload.text.format.schema.required, [
+          'target',
+          'businesses',
+          'placeComplete',
+          'completionReason',
+          'notes',
+        ]);
         assert.match(payload.input[1].content, /Almkerk/);
         assert.match(payload.input[1].content, /Bakkerij Oud/);
+        assert.match(payload.input[1].content, /placeComplete/);
         return {
           ok: true,
           async json() {
@@ -507,6 +515,8 @@ test('premium database deep search uses OpenAI web search and returns complete r
                     bronnen: ['https://onvolledig.nl'],
                   },
                 ],
+                placeComplete: false,
+                completionReason: '',
                 notes: '',
               }),
               output: [
@@ -535,6 +545,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
   assert.equal(result.rejected, 1);
   assert.equal(result.model, 'gpt-5.5');
   assert.equal(result.reasoningEffort, 'low');
+  assert.equal(result.placeComplete, false);
   assert.equal(result.cost.currency, 'USD');
   assert.equal(result.cost.inputTokens, 1000);
   assert.equal(result.cost.outputTokens, 500);
@@ -599,6 +610,8 @@ test('premium database deep search defaults to gpt-5.5-pro with high reasoning',
               output_text: JSON.stringify({
                 target: 'Almkerk',
                 businesses: [],
+                placeComplete: true,
+                completionReason: 'Geen extra complete bedrijven gevonden.',
                 notes: '',
               }),
               output: [],
@@ -615,7 +628,56 @@ test('premium database deep search defaults to gpt-5.5-pro with high reasoning',
 
   assert.equal(result.model, 'gpt-5.5-pro');
   assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.placeComplete, true);
+  assert.equal(result.completionReason, 'Geen extra complete bedrijven gevonden.');
   assert.equal(result.cost.estimatedUsd, 0.0066);
+});
+
+test('premium database deep search route accepts an automatically completed empty place', async () => {
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    env: { OPENAI_API_KEY: 'openai-key' },
+    fetchImpl: async () => ({
+      ok: true,
+      async json() {
+        return {
+          output_text: JSON.stringify({
+            target: 'Almkerk',
+            businesses: [],
+            placeComplete: true,
+            completionReason: 'Geen extra complete en verifieerbare bedrijven gevonden.',
+            notes: '',
+          }),
+          output: [],
+          usage: {
+            input_tokens: 100,
+            output_tokens: 20,
+          },
+        };
+      },
+    }),
+  });
+  const response = {
+    statusCode: 0,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  await coordinator.sendDeepSearchBusinessesResponse(
+    { body: { target: 'Nederland | Noord-Brabant | Altena | Almkerk', count: 100 } },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.placeComplete, true);
+  assert.equal(response.body.rows.length, 1);
 });
 
 test('premium database import route is registered behind the premium api surface', () => {
