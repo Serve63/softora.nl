@@ -34,6 +34,33 @@ function readDefaultDeepSearchTargetLines(source) {
   return Buffer.from(chunks.join(''), 'base64').toString('utf8').split(/\r?\n/).filter(Boolean);
 }
 
+function createClassListNode() {
+  const classes = new Set();
+  return {
+    attributes: {},
+    disabled: false,
+    innerHTML: '',
+    textContent: '',
+    classList: {
+      add: (name) => classes.add(name),
+      remove: (name) => classes.delete(name),
+      contains: (name) => classes.has(name),
+      toggle: (name, force) => {
+        const shouldAdd = force === undefined ? !classes.has(name) : Boolean(force);
+        if (shouldAdd) classes.add(name);
+        else classes.delete(name);
+        return shouldAdd;
+      },
+    },
+    setAttribute(name, value) {
+      this.attributes[name] = String(value);
+    },
+    getAttribute(name) {
+      return this.attributes[name];
+    },
+  };
+}
+
 test('premium database page bootstraps customer rows before async sync runs', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -182,7 +209,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427e/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427f/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -232,7 +259,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427e"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427f"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -302,6 +329,16 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /ESTIMATED_BATCH_PRICING/);
   assert.match(deepSearchScriptSource, /function advanceCompletedTarget\(target\)/);
   assert.match(deepSearchScriptSource, /Boolean\(body && body\.placeComplete\)/);
+  assert.match(deepSearchScriptSource, /nodes\.closeDeepSearchButton\.disabled = busy;/);
+  assert.match(deepSearchScriptSource, /nodes\.deepSearchModal\.classList\.toggle\("is-running", busy\);/);
+  assert.match(deepSearchScriptSource, /DEEP_SEARCH_BUSY_STYLE_ID/);
+  assert.match(deepSearchScriptSource, /ensureBusyStyles\(\);/);
+  assert.match(deepSearchScriptSource, /\.deep-search-modal\.is-running \.deep-search-close svg \{ display: none; \}/);
+  assert.match(deepSearchScriptSource, /\.deep-search-modal\.is-running \.deep-search-close::after/);
+  assert.match(deepSearchScriptSource, /@keyframes deepSearchSpin/);
+  assert.match(deepSearchScriptSource, /Batch loopt nog\. De bedrijvenlijst blijft open tot deze plek klaar is\./);
+  assert.match(deepSearchScriptSource, /function isOpen\(\)/);
+  assert.match(pageSource, /if \(databaseDeepSearchController\.isOpen\(\)\) \{[\s\S]*databaseDeepSearchController\.close\(\);/);
   assert.doesNotMatch(deepSearchScriptSource, /function markCurrentDone\(\)/);
   assert.doesNotMatch(deepSearchScriptSource, /resetState/);
   assert.match(deepSearchScriptSource, /source: "premium-database-deep-search"/);
@@ -521,4 +558,61 @@ test('premium database deep search client finishes the current location automati
   assert.match(messages.join('\n'), /AI gaf al klaar aan/);
   assert.match(messages.join('\n'), /Deze plaats is automatisch afgerond/);
   assert.ok(persisted.length >= 2);
+});
+
+test('premium database deep search locks the modal while a batch is running', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const modal = createClassListNode();
+  const closeButton = createClassListNode();
+  let resolveSearch;
+  const controller = deepSearchClient.createController({
+    nodes: {
+      closeDeepSearchButton: closeButton,
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchList: {},
+      deepSearchModal: modal,
+      deepSearchSources: {},
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    autoContinueDelayMs: 0,
+    getCustomers: () => [],
+    importRows: async () => {},
+    readDeepSearchRows: async () => new Promise((resolve) => {
+      resolveSearch = resolve;
+    }),
+  });
+
+  controller.open();
+  assert.equal(controller.isOpen(), true);
+
+  const runPromise = controller.runCurrentSearch();
+  assert.equal(controller.isBusy(), true);
+  assert.equal(closeButton.disabled, true);
+  assert.equal(closeButton.getAttribute('aria-label'), 'Bedrijvenlijst loopt');
+  assert.equal(closeButton.getAttribute('aria-disabled'), 'true');
+  assert.equal(modal.classList.contains('is-running'), true);
+  assert.equal(controller.close(), false);
+  assert.equal(controller.isOpen(), true);
+
+  resolveSearch({
+    ok: true,
+    rows: [['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website']],
+    businesses: [],
+    found: 0,
+    placeComplete: true,
+    cost: { estimatedUsd: 0.02 },
+    sources: [],
+  });
+
+  assert.equal(await runPromise, true);
+  assert.equal(controller.isBusy(), false);
+  assert.equal(closeButton.disabled, false);
+  assert.equal(closeButton.getAttribute('aria-label'), 'Sluit bedrijvenlijst');
+  assert.equal(closeButton.getAttribute('aria-disabled'), 'false');
+  assert.equal(modal.classList.contains('is-running'), false);
+  assert.equal(controller.close(), true);
+  assert.equal(controller.isOpen(), false);
 });

@@ -13,6 +13,7 @@
     const DEEP_SEARCH_BATCH_SIZE = 100;
     const AUTO_CONTINUE_DELAY_MS = 750;
     const REQUIRED_EMPTY_COMPLETION_ROUNDS = 1;
+    const DEEP_SEARCH_BUSY_STYLE_ID = "softora-deep-search-busy-style";
     // Generated from the supplied work order, extended with CBS 2025 woonplaatsen.
     const DEFAULT_TARGET_TEXT_BASE64 = [
         "TmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFsbWtlcmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFuZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBCYWJ5bG9uacOrbmJyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBEcm9uZ2VsZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IER1c3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgRWV0aGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBHZW5kZXJlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgR2llc3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgSGFuawpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTWVldXdlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTmlldXdlbmRpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFJpanN3aWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBTbGVldXdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFVpdHdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFZlZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdhYXJkaHVpemVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBXZXJrZW5kYW0KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdpamsgZW4gQWFsYnVyZwpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgV291ZHJpY2hlbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBBc3RlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBIZXVzZGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBc3RlbiB8IE9tbWVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCYWFybGUtTmFzc2F1IHwgQmFhcmxlLU5hc3NhdQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IENhc3RlbHLDqQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IFVsaWNvdGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEJlcmdlaWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEx1eWtzZ2VzdGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IFJpZXRob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VpamsgfCBXZXN0ZXJob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBCZXJnZW4gb3AgWm9vbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBIYWxzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcmdlbiBvcCBab29tIHwgTGVwZWxzdHJhYXQKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgSGVlc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IEhlZXN3aWprLURpbnRoZXIKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgTG9vc2Jyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IE5pc3RlbHJvZGUKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgVmlua2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IFZvcnN0ZW5ib3NjaApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVzdCB8IEJlc3QKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEJsYWRlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgQ2FzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEhhcGVydApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgSG9vZ2Vsb29uCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCbGFkZWwgfCBOZXRlcnNlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm9la2VsIHwgQm9la2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb2VrZWwgfCBWZW5ob3JzdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm94dGVsIHwgQm94dGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBFc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBMaWVtcGRlCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJhdmVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJyZWRhCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFByaW5zZW5iZWVrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFRldGVyaW5nZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJyZWRhIHwgVWx2ZW5ob3V0Ck5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLURvcnBsZWluCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLVNjaG9vdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQ3JhbmVuZG9uY2sgfCBHYXN0ZWwKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IENyYW5lbmRvbmNrIHwgTWFhcmhlZXplCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IFNvZXJlbmRvbmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IERldXJuZSB8IERldXJuZQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwgSGVsZW5hdmVlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwg",
@@ -148,6 +149,22 @@
         });
     }
 
+    function ensureBusyStyles() {
+        const doc = global && global.document
+            ? global.document
+            : (typeof document !== "undefined" ? document : null);
+        if (!doc || !doc.head || doc.getElementById(DEEP_SEARCH_BUSY_STYLE_ID)) return;
+        const style = doc.createElement("style");
+        style.id = DEEP_SEARCH_BUSY_STYLE_ID;
+        style.textContent = [
+            ".deep-search-modal.is-running .deep-search-close { cursor: wait; color: var(--crimson); background: rgba(139, 34, 82, 0.06); }",
+            ".deep-search-modal.is-running .deep-search-close svg { display: none; }",
+            ".deep-search-modal.is-running .deep-search-close::after { content: \"\"; width: 14px; height: 14px; border: 2px solid rgba(139, 34, 82, 0.18); border-top-color: var(--crimson); border-radius: 50%; animation: deepSearchSpin .8s linear infinite; }",
+            "@keyframes deepSearchSpin { to { transform: rotate(360deg); } }"
+        ].join("\n");
+        doc.head.appendChild(style);
+    }
+
     function safeParseJson(raw) {
         try {
             const parsed = JSON.parse(String(raw || "{}"));
@@ -268,6 +285,7 @@
     }
 
     function createController(options) {
+        ensureBusyStyles();
         const nodes = options.nodes || {};
         const getUiState = options.getUiState;
         const setUiState = options.setUiState;
@@ -339,6 +357,16 @@
             });
             if (nodes.deepSearchStartButton) {
                 nodes.deepSearchStartButton.textContent = busy ? "Batch loopt..." : "Batch starten";
+            }
+            if (nodes.closeDeepSearchButton) {
+                nodes.closeDeepSearchButton.disabled = busy;
+                if (typeof nodes.closeDeepSearchButton.setAttribute === "function") {
+                    nodes.closeDeepSearchButton.setAttribute("aria-label", busy ? "Bedrijvenlijst loopt" : "Sluit bedrijvenlijst");
+                    nodes.closeDeepSearchButton.setAttribute("aria-disabled", busy ? "true" : "false");
+                }
+            }
+            if (nodes.deepSearchModal && nodes.deepSearchModal.classList) {
+                nodes.deepSearchModal.classList.toggle("is-running", busy);
             }
         }
 
@@ -552,8 +580,21 @@
 
         function close() {
             if (!nodes.deepSearchModal) return;
+            if (busy) {
+                setStatusMessage("Batch loopt nog. De bedrijvenlijst blijft open tot deze plek klaar is.", "info");
+                return false;
+            }
             nodes.deepSearchModal.classList.remove("on");
             nodes.deepSearchModal.setAttribute("aria-hidden", "true");
+            return true;
+        }
+
+        function isOpen() {
+            return Boolean(nodes.deepSearchModal && nodes.deepSearchModal.classList && nodes.deepSearchModal.classList.contains("on"));
+        }
+
+        function isBusy() {
+            return busy;
         }
 
         function bind() {
@@ -582,6 +623,8 @@
         return {
             bind: bind,
             close: close,
+            isBusy: isBusy,
+            isOpen: isOpen,
             open: open,
             parseTargetLines: parseTargetLines,
             readDeepSearchRows: readDeepSearchRows,
