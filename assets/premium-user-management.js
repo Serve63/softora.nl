@@ -34,6 +34,153 @@ function setPrimaryButtonLoading(button, isLoading, loadingText) {
   button.textContent = isLoading ? loadingText : button.dataset.originalText;
 }
 
+function appendUserManagementTextElement(parent, tagName, className, text) {
+  var el = document.createElement(tagName);
+  if (className) el.className = className;
+  el.textContent = String(text || '');
+  parent.appendChild(el);
+  return el;
+}
+
+function renderUserManagementEmptyState(container, message) {
+  if (!container) return;
+  var empty = document.createElement('div');
+  empty.className = 'empty-state';
+  empty.textContent = String(message || '');
+  container.replaceChildren(empty);
+}
+
+function createUserManagementSvgElement(tagName, attributes) {
+  var svgNs = 'http://www.w3.org/2000/svg';
+  var el = document.createElementNS(svgNs, tagName);
+  Object.keys(attributes || {}).forEach(function (key) {
+    el.setAttribute(key, attributes[key]);
+  });
+  return el;
+}
+
+function createUserManagementIcon(kind) {
+  var svg = createUserManagementSvgElement('svg', {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '1.8',
+    'aria-hidden': 'true'
+  });
+
+  if (kind === 'delete') {
+    svg.appendChild(createUserManagementSvgElement('polyline', {
+      points: '3 6 5 6 21 6'
+    }));
+    svg.appendChild(createUserManagementSvgElement('path', {
+      d: 'M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2'
+    }));
+    return svg;
+  }
+
+  svg.appendChild(createUserManagementSvgElement('path', {
+    d: 'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7'
+  }));
+  svg.appendChild(createUserManagementSvgElement('path', {
+    d: 'M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z'
+  }));
+  return svg;
+}
+
+function createPasswordVisibilityIcon(isVisible) {
+  var svg = createUserManagementSvgElement('svg', {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '1.8',
+    'aria-hidden': 'true'
+  });
+
+  if (isVisible) {
+    svg.appendChild(createUserManagementSvgElement('path', {
+      d: 'M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24'
+    }));
+    svg.appendChild(createUserManagementSvgElement('line', {
+      x1: '1',
+      y1: '1',
+      x2: '23',
+      y2: '23'
+    }));
+    return svg;
+  }
+
+  svg.appendChild(createUserManagementSvgElement('path', {
+    d: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'
+  }));
+  svg.appendChild(createUserManagementSvgElement('circle', {
+    cx: '12',
+    cy: '12',
+    r: '3'
+  }));
+  return svg;
+}
+
+function createUserManagementIconButton(kind, label, onClick) {
+  var button = document.createElement('button');
+  button.type = 'button';
+  button.className = kind === 'delete' ? 'btn-icon del' : 'btn-icon';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.appendChild(createUserManagementIcon(kind));
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function normalizePersonStatusClass(value) {
+  return String(value || '').trim() === 'active' ? 'active' : 'inactive';
+}
+
+function normalizePersonRoleClass(value) {
+  return String(value || '').trim() === 'admin' ? 'admin' : 'medewerker';
+}
+
+function createPersonRow(persoon) {
+  var id = String(persoon && persoon.id || '');
+  var roleClass = normalizePersonRoleClass(persoon && persoon.rol);
+  var row = document.createElement('div');
+  row.className = 'person-row';
+
+  var status = document.createElement('div');
+  status.className = 'status-dot ' + normalizePersonStatusClass(persoon && persoon.status);
+  row.appendChild(status);
+
+  var avatar = document.createElement('div');
+  avatar.className = 'person-avatar';
+  avatar.style.background = getColor(id);
+  avatar.textContent = initials(persoon.voornaam || '', persoon.achternaam || '', persoon.email || '');
+  row.appendChild(avatar);
+
+  var info = document.createElement('div');
+  info.className = 'person-info';
+  appendUserManagementTextElement(info, 'div', 'person-name', getDisplayName(persoon));
+  appendUserManagementTextElement(info, 'div', 'person-email', persoon.email || '');
+  row.appendChild(info);
+
+  appendUserManagementTextElement(
+    row,
+    'span',
+    'role-badge role-' + roleClass,
+    roleClass === 'admin' ? 'Full Acces' : 'Medewerker'
+  );
+
+  var actions = document.createElement('div');
+  actions.className = 'person-actions';
+  actions.appendChild(createUserManagementIconButton('edit', 'Medewerker bewerken', function () {
+    openEdit(id);
+  }));
+  actions.appendChild(createUserManagementIconButton('delete', 'Medewerker verwijderen', function () {
+    openDelete(id);
+  }));
+  row.appendChild(actions);
+
+  return row;
+}
+
 async function fetchJson(url, options) {
   var response = await fetch(url, Object.assign({
     credentials: 'same-origin',
@@ -76,7 +223,10 @@ function backToInstellingenOverzicht() {
 function renderAccessDenied() {
   document.getElementById('list-count').textContent = '';
   document.getElementById('tegel-count').textContent = 'Geen toegang';
-  document.getElementById('personeel-list').innerHTML = '<div class="empty-state">Alleen Full Acces-accounts kunnen gebruikers beheren.</div>';
+  renderUserManagementEmptyState(
+    document.getElementById('personeel-list'),
+    'Alleen Full Acces-accounts kunnen gebruikers beheren.'
+  );
   document.querySelectorAll('#screen-personeel input, #screen-personeel select, #screen-personeel button').forEach(function (element) {
     if (element.classList.contains('modal-x') || element.classList.contains('btn-cancel')) return;
     element.disabled = true;
@@ -93,21 +243,10 @@ function render() {
     return;
   }
   if (team.length === 0) {
-    list.innerHTML = '<div class="empty-state">Nog geen medewerkers.</div>';
+    renderUserManagementEmptyState(list, 'Nog geen medewerkers.');
     return;
   }
-  list.innerHTML = team.map(function (persoon) {
-    return '<div class="person-row">'
-      + '<div class="status-dot ' + persoon.status + '"></div>'
-      + '<div class="person-avatar" style="background:' + getColor(persoon.id) + '">' + initials(persoon.voornaam || '', persoon.achternaam || '', persoon.email || '') + '</div>'
-      + '<div class="person-info"><div class="person-name">' + escapeHtml(getDisplayName(persoon)) + '</div><div class="person-email">' + escapeHtml(persoon.email) + '</div></div>'
-      + '<span class="role-badge role-' + persoon.rol + '">' + (persoon.rol === 'admin' ? 'Full Acces' : 'Medewerker') + '</span>'
-      + '<div class="person-actions">'
-      + '<button class="btn-icon" onclick="openEdit(\'' + escapeJsString(persoon.id) + '\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
-      + '<button class="btn-icon del" onclick="openDelete(\'' + escapeJsString(persoon.id) + '\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>'
-      + '</div>'
-      + '</div>';
-  }).join('');
+  list.replaceChildren(...team.map(createPersonRow));
 }
 
 async function refreshTeam() {
@@ -116,13 +255,13 @@ async function refreshTeam() {
     return;
   }
   var list = document.getElementById('personeel-list');
-  list.innerHTML = '<div class="empty-state">Gebruikers laden...</div>';
+  renderUserManagementEmptyState(list, 'Gebruikers laden...');
   try {
     var payload = await fetchJson('/api/premium-users', { method: 'GET' });
     team = Array.isArray(payload.users) ? payload.users : [];
     render();
   } catch (error) {
-    list.innerHTML = '<div class="empty-state">' + escapeHtml(error.message || 'Gebruikers laden mislukt.') + '</div>';
+    renderUserManagementEmptyState(list, error.message || 'Gebruikers laden mislukt.');
   }
 }
 
@@ -292,7 +431,7 @@ function paintEditAvatarPreview() {
   var an = document.getElementById('edit-achternaam').value.trim();
   var em = document.getElementById('edit-email').value.trim();
   var inn = initials(vn || ' ', an || ' ', em);
-  wrap.innerHTML = '';
+  wrap.replaceChildren();
   var src = '';
   var showImg = false;
   if (typeof editAvatarMutation === 'string') {
@@ -581,9 +720,7 @@ function togglePw(inputId, btn) {
   var input = document.getElementById(inputId);
   var show = input.type === 'password';
   input.type = show ? 'text' : 'password';
-  btn.innerHTML = show
-    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
-    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  btn.replaceChildren(createPasswordVisibilityIcon(show));
 }
 
 function showToast(msg) {
@@ -593,21 +730,6 @@ function showToast(msg) {
   setTimeout(function () {
     toast.classList.remove('show');
   }, 2800);
-}
-
-function escapeJsString(value) {
-  return String(value)
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'");
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 (async function bootstrapPersoneelManager() {
@@ -620,7 +742,10 @@ function escapeHtml(value) {
     }
     renderAccessDenied();
   } catch (error) {
-    document.getElementById('personeel-list').innerHTML = '<div class="empty-state">' + escapeHtml(error.message || 'Instellingen laden mislukt.') + '</div>';
+    renderUserManagementEmptyState(
+      document.getElementById('personeel-list'),
+      error.message || 'Instellingen laden mislukt.'
+    );
   } finally {
     if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
       window.SoftoraPremiumBoot.setShellBooting(false);
