@@ -358,8 +358,7 @@
         function setBusy(nextBusy) {
             busy = Boolean(nextBusy);
             [
-                nodes.deepSearchStartButton,
-                nodes.deepSearchResetButton
+                nodes.deepSearchStartButton
             ].forEach(function (button) {
                 if (button) button.disabled = busy;
             });
@@ -539,13 +538,6 @@
             void persistState();
         }
 
-        function resetState() {
-            if (!window.confirm("Voortgang van de vaste AI-zoeklijst wissen?")) return;
-            state = normalizeState({});
-            render();
-            void persistState();
-        }
-
         function open() {
             if (!nodes.deepSearchModal) return;
             nodes.deepSearchModal.classList.add("on");
@@ -567,7 +559,6 @@
                     void runCurrentSearch();
                 });
             }
-            if (nodes.deepSearchResetButton) nodes.deepSearchResetButton.addEventListener("click", resetState);
             if (nodes.closeDeepSearchButton) nodes.closeDeepSearchButton.addEventListener("click", close);
             if (nodes.deepSearchModal) {
                 nodes.deepSearchModal.addEventListener("click", function (event) {

@@ -219,6 +219,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /id="deepSearchStartButton" type="button">100 bedrijven toevoegen<\/button>/);
   assert.doesNotMatch(pageSource, /deepSearchDoneButton/);
   assert.doesNotMatch(pageSource, /Deze plek afronden/);
+  assert.doesNotMatch(pageSource, /deepSearchResetButton/);
+  assert.doesNotMatch(pageSource, /Leegmaken/);
+  assert.doesNotMatch(pageSource, />Sluiten<\/button>/);
+  assert.match(pageSource, /class="deep-search-close" id="closeDeepSearchButton" type="button" aria-label="Sluit AI zoeklijst"/);
   assert.match(pageSource, /id="deepSearchSources"/);
   assert.match(pageSource, /const pickRecordValue = window\.SoftoraDatabaseImport\.pickRecordValue;/);
   assert.match(pageSource, /const databaseImportController = window\.SoftoraDatabaseImport\.createController\(\{/);
@@ -247,6 +251,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /function advanceCompletedTarget\(target\)/);
   assert.match(deepSearchScriptSource, /Boolean\(body && body\.placeComplete\)/);
   assert.doesNotMatch(deepSearchScriptSource, /function markCurrentDone\(\)/);
+  assert.doesNotMatch(deepSearchScriptSource, /resetState/);
   assert.match(deepSearchScriptSource, /source: "premium-database-deep-search"/);
   assert.match(importScriptSource, /function readRealBusinessRows\(query\)/);
   assert.match(importScriptSource, /fetch\("\/api\/premium-database\/add-real-businesses"/);

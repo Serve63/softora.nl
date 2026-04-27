@@ -1056,6 +1056,7 @@
             width: min(760px, calc(100vw - 28px));
             max-height: 86vh;
             overflow: auto;
+            position: relative;
         }
 
         .deep-search-head {
@@ -1064,6 +1065,35 @@
             gap: 14px;
             align-items: flex-start;
             margin-bottom: 12px;
+            padding-right: 34px;
+        }
+
+        .deep-search-close {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            width: 30px;
+            height: 30px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--card);
+            color: var(--light);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .15s ease;
+        }
+
+        .deep-search-close:hover {
+            border-color: var(--crimson);
+            color: var(--crimson);
+            background: rgba(139, 34, 82, 0.06);
+        }
+
+        .deep-search-close svg {
+            width: 14px;
+            height: 14px;
         }
 
         .deep-search-stat {
@@ -1525,6 +1555,12 @@
 
     <div class="modal-bg" id="deepSearchModal" aria-hidden="true">
         <div class="modal deep-search-modal" role="dialog" aria-modal="true" aria-labelledby="deepSearchTitle">
+            <button class="deep-search-close" id="closeDeepSearchButton" type="button" aria-label="Sluit AI zoeklijst">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
             <div class="deep-search-head">
                 <div class="modal-title" id="deepSearchTitle">AI zoeklijst</div>
                 <div class="deep-search-stat" id="deepSearchStats">Nog geen zoeklijst</div>
@@ -1543,10 +1579,6 @@
                     <label class="mlabel">Bronnen laatste batch</label>
                     <div class="deep-search-sources" id="deepSearchSources"></div>
                 </div>
-            </div>
-            <div class="mbtns">
-                <button class="mbtn c" id="deepSearchResetButton" type="button">Leegmaken</button>
-                <button class="mbtn c" id="closeDeepSearchButton" type="button">Sluiten</button>
             </div>
         </div>
     </div>
@@ -1664,7 +1696,6 @@
             deepSearchStartButton: document.getElementById("deepSearchStartButton"),
             deepSearchList: document.getElementById("deepSearchList"),
             deepSearchSources: document.getElementById("deepSearchSources"),
-            deepSearchResetButton: document.getElementById("deepSearchResetButton"),
             closeDeepSearchButton: document.getElementById("closeDeepSearchButton"),
             toast: document.getElementById("toast")
         };
