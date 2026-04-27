@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
 <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
-<title>Privacy Policy – Softora.nl</title>
+<title>Privacyverklaring Softora VOF - Softora.nl</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -90,14 +90,19 @@ nav {
 .toc-list li a:hover { color: var(--crimson); border-left-color: var(--crimson); }
 .toc-list li a.active { color: var(--crimson); border-left-color: var(--crimson); font-weight: 600; }
 
-.content { max-width: 680px; }
+.content { max-width: 740px; }
+.privacy-intro { background: var(--white); border: 1px solid var(--border); border-radius: 8px; padding: 26px 30px; margin-bottom: 42px; }
+.privacy-title { font-family: 'Oswald', sans-serif; font-size: 38px; line-height: 1.05; font-weight: 700; text-transform: uppercase; letter-spacing: -.02em; color: var(--dark); margin-bottom: 16px; }
+.privacy-meta { display: grid; gap: 6px; margin-bottom: 18px; font-size: 13px; color: var(--mid); line-height: 1.7; }
+.privacy-intro p { font-size: 14px; color: var(--mid); line-height: 1.85; margin-bottom: 12px; }
+.privacy-intro p:last-child { margin-bottom: 0; }
 .av-section { margin-bottom: 48px; }
 .av-section-num { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--crimson); margin-bottom: 6px; }
 .av-section-title { font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--dark); margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .av-section p { font-size: 14px; color: var(--mid); line-height: 1.85; margin-bottom: 14px; }
 .av-section p:last-child { margin-bottom: 0; }
-.av-section ul { padding-left: 20px; margin-bottom: 14px; }
-.av-section ul li { font-size: 14px; color: var(--mid); line-height: 1.85; margin-bottom: 6px; }
+.av-section ul, .av-section ol { padding-left: 20px; margin-bottom: 14px; }
+.av-section ul li, .av-section ol li { font-size: 14px; color: var(--mid); line-height: 1.85; margin-bottom: 6px; }
 .av-section strong { color: var(--dark); font-weight: 600; }
 
 .info-box { background: var(--white); border: 1px solid var(--border); border-left: 3px solid var(--crimson); border-radius: 0 6px 6px 0; padding: 14px 18px; margin-bottom: 14px; font-size: 13px; color: var(--mid); line-height: 1.7; }
@@ -107,6 +112,22 @@ nav {
 .data-table th { text-align: left; padding: 9px 14px; background: var(--bg); border: 1px solid var(--border); font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--light); }
 .data-table td { padding: 10px 14px; border: 1px solid var(--border); color: var(--mid); background: var(--white); vertical-align: top; line-height: 1.5; }
 .data-table tr:hover td { background: var(--bg); }
+
+@media (max-width: 860px) {
+  body { padding-top: 74px; }
+  nav { padding: 1rem 1.4rem; }
+  .layout { display: block; padding: 34px 20px 72px; }
+  .toc { position: static; padding-right: 0; margin-bottom: 30px; }
+  .toc-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+  .toc-list li a { white-space: normal; }
+  .privacy-title { font-size: 31px; }
+}
+
+@media (max-width: 560px) {
+  .nav-start-btn { display: none; }
+  .toc-list { grid-template-columns: 1fr; }
+  .privacy-intro { padding: 22px 20px; }
+}
 
 </style>
 </head>
@@ -123,193 +144,251 @@ nav {
   <aside class="toc">
     <div class="toc-title">Inhoudsopgave</div>
     <ul class="toc-list">
-      <li><a href="#art1">1. Wie zijn wij?</a></li>
-      <li><a href="#art2">2. Welke gegevens verzamelen we?</a></li>
-      <li><a href="#art3">3. Waarom verwerken we gegevens?</a></li>
-      <li><a href="#art4">4. Grondslagen voor verwerking</a></li>
-      <li><a href="#art5">5. Hoe lang bewaren we gegevens?</a></li>
-      <li><a href="#art6">6. Delen met derden</a></li>
-      <li><a href="#art7">7. Cookies</a></li>
+      <li><a href="#art1">1. Verantwoordelijke</a></li>
+      <li><a href="#art2">2. Persoonsgegevens</a></li>
+      <li><a href="#art3">3. Doelen</a></li>
+      <li><a href="#art4">4. Grondslagen</a></li>
+      <li><a href="#art5">5. Derden</a></li>
+      <li><a href="#art6">6. Verwerking namens klanten</a></li>
+      <li><a href="#art7">7. Bewaartermijnen</a></li>
       <li><a href="#art8">8. Beveiliging</a></li>
-      <li><a href="#art9">9. Jouw rechten</a></li>
-      <li><a href="#art10">10. Klachten</a></li>
-      <li><a href="#art11">11. Wijzigingen</a></li>
+      <li><a href="#art9">9. Cookies</a></li>
+      <li><a href="#art10">10. Geautomatiseerde besluitvorming</a></li>
+      <li><a href="#art11">11. Buiten de EER</a></li>
+      <li><a href="#art12">12. Rechten</a></li>
+      <li><a href="#art13">13. Klachten</a></li>
+      <li><a href="#art14">14. Wijzigingen</a></li>
+      <li><a href="#art15">15. Contactgegevens</a></li>
     </ul>
   </aside>
 
   <main class="content">
+    <header class="privacy-intro">
+      <h1 class="privacy-title">Privacyverklaring Softora VOF</h1>
+      <div class="privacy-meta">
+        <div><strong>Versie:</strong> 27 april 2026</div>
+        <div><strong>Softora VOF</strong></div>
+        <div><strong>Gevestigd te:</strong> Oisterwijk, Nederland</div>
+        <div><strong>KvK-nummer:</strong> 12345678</div>
+        <div><strong>E-mail:</strong> info@softora.nl</div>
+        <div><strong>Website:</strong> www.softora.nl</div>
+      </div>
+      <p>Softora VOF hecht waarde aan de bescherming van persoonsgegevens. In deze privacyverklaring legt Softora uit welke persoonsgegevens worden verwerkt, waarom dit gebeurt, hoe lang gegevens worden bewaard en welke rechten betrokkenen hebben.</p>
+      <p>Deze privacyverklaring geldt voor alle persoonsgegevens die Softora verwerkt via de website, contactformulieren, e-mail, telefoon, offertes, facturen, klantrelaties, projectcommunicatie en overige zakelijke contacten.</p>
+    </header>
 
     <div class="av-section" id="art1">
-      <div class="av-section-num">Artikel 1</div>
-      <div class="av-section-title">Wie zijn wij?</div>
-      <p>Softora.nl is verantwoordelijk voor de verwerking van persoonsgegevens zoals beschreven in deze privacy policy.</p>
-      <p><strong>Softora.nl</strong><br>
-      Oisterwijk, Nederland<br>
-      KvK: 12345678<br>
-      E-mail: <strong>info@softora.nl</strong><br>
-      Telefoon: <strong>+31 6 43 26 27 92</strong><br>
-      Website: <strong>www.softora.nl</strong></p>
+      <div class="av-section-num">1</div>
+      <div class="av-section-title">Wie is verantwoordelijk voor de verwerking?</div>
+      <p>Softora VOF is verantwoordelijk voor de verwerking van persoonsgegevens zoals beschreven in deze privacyverklaring.</p>
+      <p>Voor vragen over privacy kan contact worden opgenomen via:</p>
+      <p><strong>E-mail:</strong> info@softora.nl<br>
+      <strong>Adres:</strong> Oisterwijk, Nederland</p>
     </div>
 
     <div class="av-section" id="art2">
-      <div class="av-section-num">Artikel 2</div>
-      <div class="av-section-title">Welke gegevens verzamelen we?</div>
-      <p>Wij verzamelen en verwerken de volgende categorieën persoonsgegevens, afhankelijk van hoe je gebruik maakt van onze diensten:</p>
-
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Categorie</th>
-            <th>Gegevens</th>
-            <th>Situatie</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Contactgegevens</strong></td>
-            <td>Naam, e-mailadres, telefoonnummer, bedrijfsnaam</td>
-            <td>Bij contactopname, offerte of opdracht</td>
-          </tr>
-          <tr>
-            <td><strong>Factuurgegevens</strong></td>
-            <td>Naam, adres, KvK-nummer, BTW-nummer, IBAN</td>
-            <td>Bij het aangaan van een zakelijke overeenkomst</td>
-          </tr>
-          <tr>
-            <td><strong>Communicatiegegevens</strong></td>
-            <td>E-mailberichten, WhatsApp-berichten, notities</td>
-            <td>Bij onderlinge communicatie</td>
-          </tr>
-          <tr>
-            <td><strong>Websitegegevens</strong></td>
-            <td>IP-adres, browsertype, bezochte pagina's, duur bezoek</td>
-            <td>Via cookies op softora.nl</td>
-          </tr>
-          <tr>
-            <td><strong>Inloggegevens</strong></td>
-            <td>Gebruikersnaam, wachtwoord (versleuteld)</td>
-            <td>Bij gebruik van het personeelsportaal</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <p>Wij verzamelen geen bijzondere persoonsgegevens zoals gezondheidsinformatie, politieke opvattingen of biometrische gegevens.</p>
+      <div class="av-section-num">2</div>
+      <div class="av-section-title">Welke persoonsgegevens verwerkt Softora?</div>
+      <p>Softora kan de volgende persoonsgegevens verwerken:</p>
+      <ul>
+        <li>naam;</li>
+        <li>bedrijfsnaam;</li>
+        <li>functie;</li>
+        <li>e-mailadres;</li>
+        <li>telefoonnummer;</li>
+        <li>adresgegevens;</li>
+        <li>factuurgegevens;</li>
+        <li>KvK-nummer;</li>
+        <li>btw-nummer;</li>
+        <li>betaalgegevens;</li>
+        <li>inhoud van berichten, e-mails of contactformulieren;</li>
+        <li>projectinformatie;</li>
+        <li>websitegegevens;</li>
+        <li>inlog- of toegangsgegevens die nodig zijn voor uitvoering van een opdracht;</li>
+        <li>IP-adres;</li>
+        <li>browser- en apparaatgegevens;</li>
+        <li>gegevens over websitegebruik;</li>
+        <li>overige gegevens die vrijwillig worden verstrekt.</li>
+      </ul>
+      <p>Softora verwerkt alleen persoonsgegevens die nodig zijn voor de doelen zoals beschreven in deze privacyverklaring.</p>
     </div>
 
     <div class="av-section" id="art3">
-      <div class="av-section-num">Artikel 3</div>
-      <div class="av-section-title">Waarom verwerken we gegevens?</div>
-      <p>Softora.nl verwerkt persoonsgegevens voor de volgende doeleinden:</p>
+      <div class="av-section-num">3</div>
+      <div class="av-section-title">Waarom verwerkt Softora persoonsgegevens?</div>
+      <p>Softora verwerkt persoonsgegevens voor de volgende doelen:</p>
       <ul>
-        <li><strong>Uitvoering van de overeenkomst</strong> — om opdrachten correct uit te kunnen voeren, offertes te sturen en facturen te verwerken.</li>
-        <li><strong>Communicatie</strong> — om contact op te nemen over lopende of toekomstige opdrachten en vragen te beantwoorden.</li>
-        <li><strong>Administratie & boekhouding</strong> — om te voldoen aan wettelijke verplichtingen op het gebied van financiële administratie.</li>
-        <li><strong>Verbetering van onze diensten</strong> — om inzicht te krijgen in het gebruik van onze website en diensten te verbeteren.</li>
-        <li><strong>Marketing</strong> — om relevante informatie over onze diensten te delen, uitsluitend met jouw toestemming of op basis van een gerechtvaardigd belang.</li>
+        <li>contact opnemen met leads, klanten en zakelijke relaties;</li>
+        <li>beantwoorden van vragen;</li>
+        <li>maken en opvolgen van offertes;</li>
+        <li>uitvoeren van opdrachten;</li>
+        <li>bouwen en opleveren van websites, software en digitale systemen;</li>
+        <li>leveren van support, onderhoud of technische ondersteuning;</li>
+        <li>facturatie en administratie;</li>
+        <li>verwerken van betalingen;</li>
+        <li>klantbeheer;</li>
+        <li>projectcommunicatie;</li>
+        <li>nakomen van wettelijke verplichtingen;</li>
+        <li>verbeteren van dienstverlening;</li>
+        <li>beveiligen van systemen en website;</li>
+        <li>oplossen van technische problemen;</li>
+        <li>behandelen van klachten of geschillen;</li>
+        <li>marketing en commerci&euml;le opvolging, voor zover toegestaan.</li>
       </ul>
     </div>
 
     <div class="av-section" id="art4">
-      <div class="av-section-num">Artikel 4</div>
-      <div class="av-section-title">Grondslagen voor verwerking</div>
-      <p>Wij verwerken persoonsgegevens op basis van de volgende rechtsgrondslagen uit de AVG:</p>
-      <ul>
-        <li><strong>Uitvoering van een overeenkomst (art. 6 lid 1 sub b AVG)</strong> — voor de verwerking die noodzakelijk is voor het uitvoeren van een opdracht of het aangaan van een overeenkomst.</li>
-        <li><strong>Wettelijke verplichting (art. 6 lid 1 sub c AVG)</strong> — voor verwerking die noodzakelijk is om te voldoen aan wettelijke verplichtingen, zoals de bewaarplicht voor facturen.</li>
-        <li><strong>Gerechtvaardigd belang (art. 6 lid 1 sub f AVG)</strong> — voor het verbeteren van onze diensten en het bijhouden van zakelijke relaties.</li>
-        <li><strong>Toestemming (art. 6 lid 1 sub a AVG)</strong> — voor het plaatsen van niet-noodzakelijke cookies en het versturen van marketingcommunicatie.</li>
-      </ul>
+      <div class="av-section-num">4</div>
+      <div class="av-section-title">Op basis waarvan verwerkt Softora persoonsgegevens?</div>
+      <p>Softora verwerkt persoonsgegevens op basis van &eacute;&eacute;n of meer van de volgende grondslagen:</p>
+      <ol>
+        <li><strong>Uitvoering van een overeenkomst</strong><br>Bijvoorbeeld wanneer Softora een website, software-oplossing of dienst levert.</li>
+        <li><strong>Wettelijke verplichting</strong><br>Bijvoorbeeld voor facturen, administratie en fiscale bewaarplichten.</li>
+        <li><strong>Gerechtvaardigd belang</strong><br>Bijvoorbeeld voor zakelijke communicatie, klantbeheer, beveiliging, bewijsvoering en verbetering van dienstverlening.</li>
+        <li><strong>Toestemming</strong><br>Bijvoorbeeld bij bepaalde marketingcookies, nieuwsbrieven of andere verwerkingen waarvoor toestemming nodig is.</li>
+      </ol>
+      <p>Wanneer verwerking gebaseerd is op toestemming, kan deze toestemming altijd worden ingetrokken.</p>
     </div>
 
     <div class="av-section" id="art5">
-      <div class="av-section-num">Artikel 5</div>
-      <div class="av-section-title">Hoe lang bewaren we gegevens?</div>
-      <p>Softora.nl bewaart persoonsgegevens niet langer dan noodzakelijk voor het doel waarvoor ze zijn verzameld, of zolang de wet dit vereist.</p>
+      <div class="av-section-num">5</div>
+      <div class="av-section-title">Delen van persoonsgegevens met derden</div>
+      <p>Softora deelt persoonsgegevens alleen met derden wanneer dit nodig is voor de uitvoering van diensten, administratie, beveiliging, communicatie of wettelijke verplichtingen.</p>
+      <p>Softora kan gegevens delen met onder andere:</p>
       <ul>
-        <li><strong>Klant- en opdrachtgegevens</strong> — 7 jaar na afloop van de opdracht (fiscale bewaarplicht).</li>
-        <li><strong>Facturen en boekhoudkundige gegevens</strong> — 7 jaar conform de wettelijke bewaarplicht.</li>
-        <li><strong>Communicatiegegevens</strong> — 2 jaar na het laatste contact, tenzij een actieve klantrelatie bestaat.</li>
-        <li><strong>Websitegegevens (cookies)</strong> — maximaal 12 maanden, afhankelijk van het type cookie.</li>
-        <li><strong>Sollicitaties</strong> — maximaal 4 weken na afwijzing, tenzij toestemming is gegeven voor een langere bewaartermijn.</li>
+        <li>boekhouder of administratiekantoor;</li>
+        <li>hostingprovider;</li>
+        <li>domeinprovider;</li>
+        <li>e-mailprovider;</li>
+        <li>betaalprovider;</li>
+        <li>CRM- of projectmanagementsoftware;</li>
+        <li>cloudopslagdiensten;</li>
+        <li>softwareleveranciers;</li>
+        <li>analytics- of marketingtools;</li>
+        <li>juridische of financi&euml;le adviseurs;</li>
+        <li>overheidsinstanties wanneer dit wettelijk verplicht is.</li>
       </ul>
-      <p>Na het verstrijken van de bewaartermijn worden gegevens veilig verwijderd of geanonimiseerd.</p>
+      <p>Softora verkoopt persoonsgegevens niet aan derden.</p>
+      <p>Wanneer derde partijen persoonsgegevens verwerken namens Softora, maakt Softora waar nodig passende afspraken met deze partijen.</p>
     </div>
 
     <div class="av-section" id="art6">
-      <div class="av-section-num">Artikel 6</div>
-      <div class="av-section-title">Delen met derden</div>
-      <p>Softora.nl verstrekt jouw persoonsgegevens niet aan derden zonder jouw toestemming, tenzij dit noodzakelijk is voor de uitvoering van de opdracht of wettelijk verplicht is.</p>
-      <p>Wij kunnen gebruik maken van de volgende categorieën verwerkers:</p>
-      <ul>
-        <li><strong>Hostingproviders</strong> — voor het hosten van onze website en systemen.</li>
-        <li><strong>Boekhoudkundige software</strong> — voor het verwerken van facturen en financiële administratie.</li>
-        <li><strong>E-maildiensten</strong> — voor het verzenden en ontvangen van e-mail (bijv. Google Workspace).</li>
-        <li><strong>Betalingsdiensten</strong> — voor het verwerken van betalingen.</li>
-      </ul>
-      <p>Met alle verwerkers die namens ons persoonsgegevens verwerken, sluiten wij een verwerkersovereenkomst af. Wij verstrekken geen gegevens aan partijen buiten de Europese Economische Ruimte (EER), tenzij passende waarborgen zijn getroffen.</p>
+      <div class="av-section-num">6</div>
+      <div class="av-section-title">Verwerking namens klanten</div>
+      <p>Bij sommige opdrachten kan Softora persoonsgegevens verwerken namens een klant, bijvoorbeeld bij contactformulieren, CRM-systemen, automatiseringen, klantportalen, websites of bedrijfssoftware.</p>
+      <p>In die situatie is de klant meestal de verwerkingsverantwoordelijke en handelt Softora als verwerker. Wanneer dat nodig is, sluiten Softora en de klant een verwerkersovereenkomst.</p>
+      <p>De klant blijft verantwoordelijk voor de rechtmatigheid van de persoonsgegevens die via zijn website, software, systemen of bedrijfsprocessen worden verwerkt, tenzij schriftelijk anders is overeengekomen.</p>
     </div>
 
     <div class="av-section" id="art7">
-      <div class="av-section-num">Artikel 7</div>
-      <div class="av-section-title">Cookies</div>
-      <p>Onze website maakt gebruik van cookies — kleine tekstbestanden die op jouw apparaat worden opgeslagen. Wij gebruiken de volgende typen cookies:</p>
+      <div class="av-section-num">7</div>
+      <div class="av-section-title">Bewaartermijnen</div>
+      <p>Softora bewaart persoonsgegevens niet langer dan noodzakelijk voor het doel waarvoor de gegevens zijn verzameld, tenzij een langere bewaartermijn wettelijk verplicht of redelijk noodzakelijk is.</p>
+      <p>Softora hanteert in principe de volgende bewaartermijnen:</p>
       <ul>
-        <li><strong>Functionele cookies</strong> — noodzakelijk voor het correct functioneren van de website. Deze cookies vereisen geen toestemming.</li>
-        <li><strong>Analytische cookies</strong> — voor het meten van websitebezoek en het verbeteren van onze diensten (bijv. Google Analytics). Hiervoor vragen wij jouw toestemming.</li>
-        <li><strong>Marketing cookies</strong> — voor het tonen van relevante advertenties. Wij plaatsen deze uitsluitend met jouw expliciete toestemming.</li>
+        <li><strong>Contactaanvragen en leads:</strong> maximaal 24 maanden na het laatste contactmoment, tenzij er eerder een klantrelatie ontstaat of verwijdering wordt gevraagd.</li>
+        <li><strong>Klantgegevens en projectcommunicatie:</strong> zolang nodig voor uitvoering van de overeenkomst en daarna zolang redelijk nodig voor administratie, bewijsvoering of support.</li>
+        <li><strong>Facturen en financi&euml;le administratie:</strong> 7 jaar vanwege fiscale bewaarplicht.</li>
+        <li><strong>Offertes:</strong> maximaal 7 jaar indien relevant voor administratie, bewijsvoering of klantrelatie.</li>
+        <li><strong>E-mailcommunicatie:</strong> zolang redelijk nodig voor zakelijke communicatie, bewijsvoering of uitvoering van diensten.</li>
+        <li><strong>Technische loggegevens:</strong> niet langer dan nodig voor beveiliging, analyse en probleemoplossing.</li>
+        <li><strong>Sollicitatiegegevens, indien van toepassing:</strong> maximaal 4 weken na afronding van de procedure, tenzij toestemming is gegeven voor langere bewaring.</li>
       </ul>
-      <p>Je kunt jouw cookievoorkeuren op elk moment aanpassen via de cookieinstellingen op onze website of via de instellingen van jouw browser.</p>
+      <p>Wanneer gegevens niet langer nodig zijn, worden deze verwijderd of geanonimiseerd.</p>
     </div>
 
     <div class="av-section" id="art8">
-      <div class="av-section-num">Artikel 8</div>
-      <div class="av-section-title">Beveiliging</div>
-      <p>Softora.nl neemt passende technische en organisatorische maatregelen om persoonsgegevens te beschermen tegen verlies, ongeautoriseerde toegang of misbruik. Dit omvat onder andere:</p>
+      <div class="av-section-num">8</div>
+      <div class="av-section-title">Beveiliging van persoonsgegevens</div>
+      <p>Softora neemt passende technische en organisatorische maatregelen om persoonsgegevens te beschermen tegen verlies, misbruik, onbevoegde toegang, openbaarmaking en ongeoorloofde wijziging.</p>
+      <p>Daarbij kan worden gedacht aan:</p>
       <ul>
-        <li>Gebruik van beveiligde HTTPS-verbindingen (SSL);</li>
-        <li>Versleuteling van wachtwoorden en gevoelige gegevens;</li>
-        <li>Toegangsbeperking — alleen bevoegde medewerkers hebben toegang tot persoonsgegevens;</li>
-        <li>Regelmatige back-ups van gegevens;</li>
-        <li>Up-to-date software en beveiligingsupdates.</li>
+        <li>beveiligde toegang tot systemen;</li>
+        <li>wachtwoordbeveiliging;</li>
+        <li>tweestapsverificatie waar mogelijk;</li>
+        <li>beperkte toegang tot persoonsgegevens;</li>
+        <li>beveiligde opslag;</li>
+        <li>updates en technische beveiligingsmaatregelen;</li>
+        <li>zorgvuldige omgang met klantgegevens;</li>
+        <li>geheimhouding waar nodig.</li>
       </ul>
-      <p>Bij een datalek dat mogelijk gevolgen heeft voor jouw rechten en vrijheden, zullen wij je hierover informeren conform de AVG-meldplicht.</p>
+      <p>Geen enkel digitaal systeem is volledig veilig. Softora spant zich in om persoonsgegevens zorgvuldig en passend te beveiligen.</p>
     </div>
 
     <div class="av-section" id="art9">
-      <div class="av-section-num">Artikel 9</div>
-      <div class="av-section-title">Jouw rechten</div>
-      <p>Op grond van de AVG heb je de volgende rechten met betrekking tot jouw persoonsgegevens:</p>
+      <div class="av-section-num">9</div>
+      <div class="av-section-title">Cookies en vergelijkbare technieken</div>
+      <p>Softora kan gebruikmaken van cookies en vergelijkbare technieken.</p>
+      <p>Cookies kunnen worden gebruikt voor:</p>
       <ul>
-        <li><strong>Recht op inzage</strong> — je kunt opvragen welke gegevens wij van jou verwerken.</li>
-        <li><strong>Recht op rectificatie</strong> — je kunt onjuiste gegevens laten corrigeren.</li>
-        <li><strong>Recht op verwijdering</strong> — je kunt verzoeken jouw gegevens te verwijderen, tenzij wij wettelijk verplicht zijn deze te bewaren.</li>
-        <li><strong>Recht op beperking van verwerking</strong> — je kunt de verwerking van jouw gegevens (tijdelijk) laten beperken.</li>
-        <li><strong>Recht op dataportabiliteit</strong> — je kunt jouw gegevens opvragen in een gestructureerd, gangbaar formaat.</li>
-        <li><strong>Recht van bezwaar</strong> — je kunt bezwaar maken tegen de verwerking van jouw gegevens op basis van gerechtvaardigd belang of voor direct marketing.</li>
-        <li><strong>Recht op intrekking van toestemming</strong> — indien verwerking is gebaseerd op toestemming, kun je deze te allen tijde intrekken.</li>
+        <li>het goed laten werken van de website;</li>
+        <li>analyseren van websitegebruik;</li>
+        <li>verbeteren van de website;</li>
+        <li>meten van prestaties;</li>
+        <li>marketing of remarketing, indien van toepassing.</li>
       </ul>
-      <p>Om gebruik te maken van jouw rechten kun je contact opnemen via <strong>info@softora.nl</strong>. Wij reageren binnen <strong>4 weken</strong> op jouw verzoek.</p>
+      <p>Noodzakelijke cookies kunnen zonder toestemming worden geplaatst. Voor analytische of marketingcookies vraagt Softora toestemming wanneer dat wettelijk vereist is.</p>
+      <p>Als Softora gebruikmaakt van tools zoals Google Analytics, Meta Pixel of vergelijkbare diensten, wordt dit vermeld in de cookie-instellingen of cookieverklaring.</p>
     </div>
 
     <div class="av-section" id="art10">
-      <div class="av-section-num">Artikel 10</div>
-      <div class="av-section-title">Klachten</div>
-      <p>Heb je een klacht over de manier waarop Softora.nl met jouw persoonsgegevens omgaat? Neem dan eerst contact met ons op via <strong>info@softora.nl</strong>. Wij proberen er samen met jou uit te komen.</p>
-      <p>Kom je er niet uit met ons? Dan heb je het recht een klacht in te dienen bij de <strong>Autoriteit Persoonsgegevens</strong> (AP), de toezichthoudende autoriteit op het gebied van privacy in Nederland:</p>
-      <div class="info-box">
-        <strong>Autoriteit Persoonsgegevens</strong><br>
-        Postbus 93374, 2509 AJ Den Haag<br>
-        Telefoon: 0900 – 2001 201<br>
-        Website: <strong>autoriteitpersoonsgegevens.nl</strong>
-      </div>
+      <div class="av-section-num">10</div>
+      <div class="av-section-title">Geautomatiseerde besluitvorming</div>
+      <p>Softora neemt geen besluiten die uitsluitend gebaseerd zijn op geautomatiseerde verwerking en die aanzienlijke gevolgen hebben voor personen.</p>
+      <p>Wanneer Softora AI, automatiseringen of software gebruikt, gebeurt dit ondersteunend. Belangrijke beslissingen worden niet volledig automatisch genomen zonder menselijke tussenkomst, tenzij dit duidelijk is afgesproken en wettelijk is toegestaan.</p>
     </div>
 
     <div class="av-section" id="art11">
-      <div class="av-section-num">Artikel 11</div>
+      <div class="av-section-num">11</div>
+      <div class="av-section-title">Doorgifte buiten de Europese Economische Ruimte</div>
+      <p>Softora kan gebruikmaken van software, cloudopslag, hosting, communicatieplatformen of andere diensten van partijen buiten de Europese Economische Ruimte.</p>
+      <p>Wanneer persoonsgegevens buiten de Europese Economische Ruimte worden verwerkt, zorgt Softora waar mogelijk voor passende waarborgen, bijvoorbeeld via contractuele afspraken of door gebruik te maken van leveranciers die passende privacymaatregelen bieden.</p>
+    </div>
+
+    <div class="av-section" id="art12">
+      <div class="av-section-num">12</div>
+      <div class="av-section-title">Rechten van betrokkenen</div>
+      <p>Personen van wie Softora persoonsgegevens verwerkt, hebben volgens de AVG verschillende rechten.</p>
+      <p>Deze rechten zijn onder andere:</p>
+      <ul>
+        <li>recht op inzage;</li>
+        <li>recht op correctie;</li>
+        <li>recht op verwijdering;</li>
+        <li>recht op beperking van verwerking;</li>
+        <li>recht op bezwaar;</li>
+        <li>recht op overdraagbaarheid van gegevens;</li>
+        <li>recht om toestemming in te trekken;</li>
+        <li>recht om een klacht in te dienen bij de Autoriteit Persoonsgegevens.</li>
+      </ul>
+      <p>Een verzoek kan worden gestuurd naar:</p>
+      <p><strong>info@softora.nl</strong></p>
+      <p>Softora kan vragen om aanvullende informatie om de identiteit van de verzoeker te controleren. Softora reageert zo snel mogelijk en in ieder geval binnen de wettelijke termijn.</p>
+    </div>
+
+    <div class="av-section" id="art13">
+      <div class="av-section-num">13</div>
+      <div class="av-section-title">Klachten</div>
+      <p>Als iemand vindt dat Softora niet zorgvuldig omgaat met persoonsgegevens, kan contact worden opgenomen via:</p>
+      <p><strong>info@softora.nl</strong></p>
+      <p>Daarnaast bestaat het recht om een klacht in te dienen bij de Autoriteit Persoonsgegevens.</p>
+    </div>
+
+    <div class="av-section" id="art14">
+      <div class="av-section-num">14</div>
       <div class="av-section-title">Wijzigingen</div>
-      <p>Softora.nl behoudt zich het recht voor deze privacy policy te wijzigen. Wijzigingen worden gepubliceerd op onze website met vermelding van de ingangsdatum. Wij raden je aan deze pagina regelmatig te raadplegen.</p>
-      <p>Bij ingrijpende wijzigingen zullen wij je hierover actief informeren via e-mail of een melding op onze website.</p>
-      <p>Deze privacy policy is voor het laatst bijgewerkt op <strong>1 januari 2026</strong>.</p>
+      <p>Softora mag deze privacyverklaring wijzigen. De meest recente versie staat altijd op de website van Softora.</p>
+      <p>Het is verstandig om deze privacyverklaring regelmatig te bekijken.</p>
+    </div>
+
+    <div class="av-section" id="art15">
+      <div class="av-section-num">15</div>
+      <div class="av-section-title">Contactgegevens</div>
+      <p>Voor vragen over deze privacyverklaring of de verwerking van persoonsgegevens kan contact worden opgenomen met:</p>
+      <p><strong>Softora VOF</strong><br>
+      Adres: Oisterwijk, Nederland<br>
+      KvK-nummer: 12345678<br>
+      E-mail: info@softora.nl<br>
+      Website: www.softora.nl</p>
     </div>
 
   </main>
