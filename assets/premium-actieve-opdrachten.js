@@ -489,6 +489,15 @@ function setModalDeleteButtonState(label, disabled) {
     deleteBtn.disabled = Boolean(disabled);
 }
 
+async function showActiveOrderAlert(message, options = {}) {
+    if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
+        await window.SoftoraDialogs.alert(message, options);
+        return true;
+    }
+    console.warn(String(message || 'Actieve opdrachten melding'));
+    return false;
+}
+
 function slugify(s) {
     return String(s || '')
         .toLowerCase()
@@ -2088,14 +2097,10 @@ async function markOrderAsPaid(id, options = {}) {
             // ignore rollback flush errors
         }
         applyOrderUiStateToCard(id);
-        if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
-            await window.SoftoraDialogs.alert('Factuurstatus opslaan mislukt. Probeer het opnieuw.', {
-                title: 'Opslaan mislukt',
-                confirmText: 'Sluiten',
-            });
-        } else {
-            window.alert('Factuurstatus opslaan mislukt. Probeer het opnieuw.');
-        }
+        await showActiveOrderAlert('Factuurstatus opslaan mislukt. Probeer het opnieuw.', {
+            title: 'Opslaan mislukt',
+            confirmText: 'Sluiten',
+        });
         return false;
     }
 }
@@ -2904,12 +2909,10 @@ async function removeProjectFromSystem(id) {
     const numericId = Number(id);
     const record = getCustomOrderById(numericId);
     if (!record) {
-        if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
-            await window.SoftoraDialogs.alert('Dit project kan hier niet verwijderd worden.', {
-                title: 'Actieve opdrachten',
-                confirmText: 'Sluiten',
-            });
-        }
+        await showActiveOrderAlert('Dit project kan hier niet verwijderd worden.', {
+            title: 'Actieve opdrachten',
+            confirmText: 'Sluiten',
+        });
         return;
     }
 
@@ -2978,12 +2981,10 @@ async function removeProjectFromSystem(id) {
         await flushRemoteUiStateSave();
         if (previousOrder) applyOrderUiStateToCard(numericId);
         setModalDeleteButtonState('Project uit systeem halen', false);
-        if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
-            await window.SoftoraDialogs.alert('Project verwijderen mislukt. Probeer het opnieuw.', {
-                title: 'Fout bij verwijderen',
-                confirmText: 'Sluiten',
-            });
-        }
+        await showActiveOrderAlert('Project verwijderen mislukt. Probeer het opnieuw.', {
+            title: 'Fout bij verwijderen',
+            confirmText: 'Sluiten',
+        });
     }
 }
 

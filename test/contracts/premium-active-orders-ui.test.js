@@ -78,6 +78,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /function bindActiveOrdersPageUi\(\) \{/);
   assert.match(scriptSource, /async function initializeActiveOrdersPageState\(\) \{/);
   assert.match(scriptSource, /function initActiveOrdersCursor\(\) \{/);
+  assert.match(scriptSource, /async function showActiveOrderAlert\(message, options = \{\}\) \{/);
+  assert.doesNotMatch(scriptSource, /window\.alert\(/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
