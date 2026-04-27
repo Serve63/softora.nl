@@ -491,6 +491,8 @@ test('premium database deep search uses OpenAI web search and returns complete r
         assert.match(payload.input[1].content, /Almkerk/);
         assert.match(payload.input[1].content, /Bakkerij Oud/);
         assert.match(payload.input[1].content, /placeComplete/);
+        assert.match(payload.input[0].content, /Harde regioregel/);
+        assert.match(payload.input[1].content, /Het adres moet de gevraagde plaats tonen/);
         assert.match(payload.input[1].content, /Als je bedrijven teruggeeft, zet placeComplete op false/);
         return {
           ok: true,
@@ -506,6 +508,14 @@ test('premium database deep search uses OpenAI web search and returns complete r
                     telefoonnummer: '0183 123 456',
                     website: 'https://bakkerijzon.nl',
                     bronnen: ['https://bakkerijzon.nl/contact'],
+                  },
+                  {
+                    bedrijfsnaam: 'Bakkerij Verkeerde Plaats',
+                    adres: 'Grote Markt 1, 4811 XP Breda',
+                    email: 'info@verkeerdeplaats.nl',
+                    telefoonnummer: '076 123 4567',
+                    website: 'https://verkeerdeplaats.nl',
+                    bronnen: ['https://verkeerdeplaats.nl/contact'],
                   },
                   {
                     bedrijfsnaam: 'Onvolledig Bedrijf',
@@ -543,7 +553,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
   assert.equal(calls.length, 1);
   assert.equal(result.fileType, 'openai-web-search');
   assert.equal(result.found, 1);
-  assert.equal(result.rejected, 1);
+  assert.equal(result.rejected, 2);
   assert.equal(result.model, 'gpt-5.5');
   assert.equal(result.reasoningEffort, 'low');
   assert.equal(result.placeComplete, false);

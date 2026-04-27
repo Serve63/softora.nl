@@ -1051,6 +1051,71 @@ function normalizeDeepSearchTarget(value) {
   return truncateText(value, 240);
 }
 
+function parseDeepSearchTargetParts(value) {
+  const parts = normalizeString(value)
+    .split('|')
+    .map((part) => normalizeString(part))
+    .filter(Boolean);
+  return {
+    country: parts[0] || '',
+    province: parts.length >= 4 ? parts[1] : '',
+    municipality: parts.length >= 4 ? parts[2] : parts.length >= 3 ? parts[1] : '',
+    place: parts.length ? parts[parts.length - 1] : '',
+  };
+}
+
+function normalizeDeepSearchLocationText(value) {
+  return normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’'`´]/g, ' ')
+    .replace(/-/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function addDeepSearchPlaceAlias(aliases, value) {
+  const normalized = normalizeDeepSearchLocationText(value);
+  if (normalized && normalized.length >= 2) aliases.add(normalized);
+}
+
+function buildDeepSearchPlaceAliases(place) {
+  const aliases = new Set();
+  const normalized = normalizeDeepSearchLocationText(place);
+  addDeepSearchPlaceAlias(aliases, normalized);
+  addDeepSearchPlaceAlias(aliases, normalized.replace(/\s+gem\s+.+$/, ''));
+
+  if (normalized.startsWith('st ')) {
+    addDeepSearchPlaceAlias(aliases, `sint ${normalized.slice(3)}`);
+  }
+  if (normalized.startsWith('sint ')) {
+    addDeepSearchPlaceAlias(aliases, `st ${normalized.slice(5)}`);
+  }
+  if (normalized === 's hertogenbosch') addDeepSearchPlaceAlias(aliases, 'den bosch');
+  if (normalized === 's gravenhage') addDeepSearchPlaceAlias(aliases, 'den haag');
+
+  const compoundBeersMatch = normalized.match(/^(?:oost\s+west\s+en\s+)(.+)$/);
+  if (compoundBeersMatch) addDeepSearchPlaceAlias(aliases, compoundBeersMatch[1]);
+
+  return Array.from(aliases);
+}
+
+function normalizedTextIncludesPhrase(text, phrase) {
+  const normalizedText = ` ${normalizeDeepSearchLocationText(text)} `;
+  const normalizedPhrase = normalizeDeepSearchLocationText(phrase);
+  if (!normalizedPhrase) return false;
+  return normalizedText.includes(` ${normalizedPhrase} `);
+}
+
+function deepSearchBusinessMatchesTarget(business, targetParts) {
+  const place = normalizeString(targetParts && targetParts.place);
+  if (!place) return true;
+  return buildDeepSearchPlaceAliases(place).some((alias) =>
+    normalizedTextIncludesPhrase(business && business.adres, alias)
+  );
+}
+
 function normalizeDeepSearchExcludeItems(items) {
   const values = Array.isArray(items) ? items : [];
   const seen = new Set();
@@ -1100,13 +1165,18 @@ function buildDeepSearchJsonSchema() {
 
 function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
   const exclusions = normalizeDeepSearchExcludeItems(excludeItems);
+  const targetParts = parseDeepSearchTargetParts(target);
   const exclusionText = exclusions.length
     ? exclusions.map((item, index) => `${index + 1}. ${item}`).join('\n')
     : 'Geen eerdere resultaten meegegeven.';
+  const strictLocationRule = targetParts.place
+    ? `Harde regioregel: lever alleen bedrijven met een fysiek adres in plaats "${targetParts.place}", gemeente "${targetParts.municipality}", provincie "${targetParts.province}", ${targetParts.country || 'Nederland'}. Bedrijven uit omliggende plaatsen, alleen servicegebieden of alleen dezelfde gemeente tellen niet mee.`
+    : 'Harde regioregel: lever alleen bedrijven met een fysiek adres binnen het opgegeven zoekgebied.';
 
   const systemPrompt = [
     'Je bent een nauwkeurige Nederlandse B2B-researchassistent voor Softora.',
     'Gebruik live web search en lever alleen bedrijven aan waarvan bedrijfsnaam, adres, e-mail, telefoonnummer en website online verifieerbaar zijn.',
+    strictLocationRule,
     'Neem alleen actieve bedrijven of bedrijven die duidelijk operationeel lijken mee.',
     'Neem geen verenigingen, scholen, overheidsinstanties of stichtingen mee, tenzij ze commercieel interessant zijn.',
     'Vermijd dubbele bedrijven en verzin nooit ontbrekende gegevens.',
@@ -1125,6 +1195,8 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
     'Bedrijfsnaam | Adres | E-mail | Telefoonnummer | Website',
     '',
     'Belangrijke regels:',
+    `- ${strictLocationRule}`,
+    '- Het adres moet de gevraagde plaats tonen. Een bedrijf in een andere plaats binnen dezelfde gemeente of provincie mag niet mee.',
     '- Als een van deze velden ontbreekt, lever het bedrijf niet aan.',
     '- Gebruik bij voorkeur de officiele bedrijfswebsite als bron voor e-mail en telefoon.',
     '- Website mag een domein of volledige URL zijn, maar moet echt bij het bedrijf horen.',
@@ -1260,12 +1332,13 @@ function normalizeDeepSearchBusiness(record) {
   };
 }
 
-function dedupeDeepSearchBusinesses(businesses) {
+function dedupeDeepSearchBusinesses(businesses, targetParts = {}) {
   const seen = new Set();
   const result = [];
   (businesses || []).forEach((business) => {
     const normalized = normalizeDeepSearchBusiness(business);
     if (!normalized) return;
+    if (!deepSearchBusinessMatchesTarget(normalized, targetParts)) return;
     const keys = [
       `email:${normalized.email.toLowerCase()}`,
       `domain:${normalized.website.toLowerCase()}`,
@@ -1415,7 +1488,8 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const text = extractOpenAiResponsesText(data);
   const parsed = parseJsonObjectFromText(text);
   const rawBusinesses = Array.isArray(parsed && parsed.businesses) ? parsed.businesses : [];
-  const businesses = dedupeDeepSearchBusinesses(rawBusinesses).slice(0, count);
+  const targetParts = parseDeepSearchTargetParts(target);
+  const businesses = dedupeDeepSearchBusinesses(rawBusinesses, targetParts).slice(0, count);
   const rows = mapDeepSearchBusinessesToRows(businesses);
   const usage = extractOpenAiUsage(data);
   const webSearchCalls = countOpenAiWebSearchCalls(data);
