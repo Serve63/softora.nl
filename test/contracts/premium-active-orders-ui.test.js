@@ -38,6 +38,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.doesNotMatch(pageSource, /async function postLaunchSiteRequest\(payload\) \{/);
   assert.doesNotMatch(pageSource, /function setClaimOrderMessage\(message, type\) \{/);
   assert.doesNotMatch(pageSource, /function executeOrder\(id\) \{/);
+  assert.doesNotMatch(pageSource, /function formatModalDateTime\(value\) \{/);
+  assert.doesNotMatch(pageSource, /function renderModalOverviewHtml\(id\) \{/);
   assert.match(scriptSource, /function normalizeOrderStatus\(value\) \{/);
   assert.match(scriptSource, /function persistOrdersRuntime\(\) \{/);
   assert.match(scriptSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -61,6 +63,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /async function postLaunchSiteRequest\(payload\) \{/);
   assert.match(scriptSource, /function setClaimOrderMessage\(message, type\) \{/);
   assert.match(scriptSource, /function executeOrder\(id\) \{/);
+  assert.match(scriptSource, /function formatModalDateTime\(value\) \{/);
+  assert.match(scriptSource, /function renderModalOverviewHtml\(id\) \{/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);

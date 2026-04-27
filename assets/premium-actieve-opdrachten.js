@@ -2715,3 +2715,126 @@ function executeOrder(id) {
     }
     openClaimOrderModal(activeId);
 }
+
+function formatModalDateTime(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '—';
+
+    const asNumber = Number(raw);
+    if (Number.isFinite(asNumber) && asNumber > 0) {
+        const d = new Date(asNumber);
+        if (!Number.isNaN(d.getTime())) {
+            return d.toLocaleString('nl-NL');
+        }
+    }
+
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleString('nl-NL');
+}
+
+function renderModalOverviewHtml(id) {
+    const runtimeOrder = orders[id] || {};
+    const customOrder = getCustomOrderById(id);
+    const ui = resolveOrderUiState({
+        status: customOrder?.status || runtimeOrder?.statusKey || 'wacht',
+        paidAt: customOrder?.paidAt || runtimeOrder?.paidAt || null,
+        progressPct: Number(runtimeOrder?.progressPct) || 0
+    });
+
+    const description = String(customOrder?.description || '').trim();
+    const transcript = String(customOrder?.transcript || '').trim();
+    const prompt = String(customOrder?.prompt || '').trim();
+    const sourceLabel = String(customOrder?.sourceAppointmentLabel || '').trim();
+    const domainName = String(customOrder?.domainName || '').trim();
+    const deliveryTime = String(customOrder?.deliveryTime || '').trim();
+    const includeSampleDesign = Boolean(customOrder?.includeSampleDesign);
+    const claimInfo = getOrderClaimInfo(id);
+    const launchDeploymentUrl = String(customOrder?.launchDeploymentUrl || '').trim();
+    const launchRepoUrl = String(customOrder?.launchRepoUrl || '').trim();
+    const launchDomainStatus = String(customOrder?.launchDomainStatus || '').trim();
+    const launchDomainMessage = String(customOrder?.launchDomainMessage || '').trim();
+    const lastRunAt = String(customOrder?.lastRunAt || '').trim();
+    const launchedAt = String(customOrder?.launchedAt || '').trim();
+    const referenceImages = normalizeReferenceImageList(customOrder?.referenceImages || []);
+    const amount = Number(customOrder?.amount);
+    const amountLabel = Number.isFinite(amount) && amount > 0
+        ? `€${Math.round(amount).toLocaleString('nl-NL')}`
+        : '—';
+
+    const infoItems = [
+        { label: 'Bedrijfsnaam', value: customOrder?.clientName || runtimeOrder?.name || '—' },
+        { label: 'Contactpersoon', value: customOrder?.location || '—' },
+        { label: 'Status', value: ui.status?.text || '—' },
+        { label: 'Voortgang', value: `${Math.round(Math.max(0, Math.min(100, Number(runtimeOrder?.progressPct) || 0)))}%` },
+        { label: 'Bedrag', value: amountLabel },
+        { label: 'Oplevertijd', value: deliveryTime || '—' },
+        { label: 'Domein', value: domainName || '—' },
+        { label: 'Agenda-koppeling', value: sourceLabel || '—' },
+        { label: 'Geclaimd door', value: claimInfo.by || 'Nog niet geclaimd' },
+        { label: 'Geclaimd op', value: formatModalDateTime(claimInfo.at) },
+        { label: 'Voorbeelddesign', value: includeSampleDesign ? 'Ja, meenemen als basis' : 'Nee' },
+        { label: 'Foto-bijlagen', value: referenceImages.length ? String(referenceImages.length) : '0' },
+        { label: 'Laatste build run', value: formatModalDateTime(lastRunAt) },
+        { label: 'Launch afgerond', value: formatModalDateTime(launchedAt) },
+        {
+            label: 'Live URL',
+            value: launchDeploymentUrl
+                ? `<a href="${escapeHtml(launchDeploymentUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(launchDeploymentUrl)}</a>`
+                : '—',
+            raw: true
+        },
+        {
+            label: 'GitHub repo',
+            value: launchRepoUrl
+                ? `<a href="${escapeHtml(launchRepoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(launchRepoUrl)}</a>`
+                : '—',
+            raw: true
+        },
+        { label: 'Domeinstatus', value: launchDomainStatus || '—' },
+        { label: 'Domeinmelding', value: launchDomainMessage || '—' }
+    ];
+
+    const itemsHtml = infoItems
+        .map((item) => `
+            <div class="modal-overview-item">
+                <div class="modal-overview-label">${escapeHtml(item.label)}</div>
+                <div class="modal-overview-value">${item.raw ? String(item.value || '') : escapeHtml(item.value || '—')}</div>
+            </div>
+        `)
+        .join('');
+
+    const attachmentsHtml = referenceImages.length
+        ? `
+            <div class="modal-attachments-grid">
+                ${referenceImages.map((img) => `
+                    <div class="modal-attachment-thumb">
+                        <img src="${escapeHtml(img.dataUrl)}" alt="${escapeHtml(img.name || 'Bijlage')}">
+                    </div>
+                `).join('')}
+            </div>
+        `
+        : `<div class="modal-overview-value">Geen foto-bijlagen gekoppeld.</div>`;
+
+    return `
+        <div class="modal-overview-grid">
+            ${itemsHtml}
+            <div class="modal-overview-item full">
+                <div class="modal-overview-label">Omschrijving opdracht</div>
+                <div class="modal-overview-value modal-overview-block">${escapeHtml(description || '—')}</div>
+            </div>
+            <div class="modal-overview-item full">
+                <div class="modal-overview-label">Meeting notities</div>
+                <div class="modal-overview-value modal-overview-block">${escapeHtml(transcript || '—')}</div>
+            </div>
+            <div class="modal-overview-item full">
+                <div class="modal-overview-label">AI bouwprompt</div>
+                <div class="modal-overview-value modal-overview-block">${escapeHtml(prompt || '—')}</div>
+            </div>
+            <div class="modal-overview-item full">
+                <div class="modal-overview-label">Foto-bijlagen preview</div>
+                ${attachmentsHtml}
+            </div>
+        </div>
+    `;
+}
