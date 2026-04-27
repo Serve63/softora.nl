@@ -250,7 +250,7 @@ function loadRuntimeEnv(env = process.env) {
       ),
       coldmailBlockPersonalMailboxDomains: readNegatedBooleanEnvFlag(
         safeEnv.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,
-        true
+        false
       ),
     },
     googleCalendar: {

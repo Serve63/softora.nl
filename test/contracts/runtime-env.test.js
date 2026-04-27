@@ -41,7 +41,7 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.coldmailCampaignSendLimit, 30);
   assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 50);
   assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 100);
-  assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, true);
+  assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, false);
 });
 
 test('loadRuntimeEnv derives generic imap host from smtp subdomain', () => {
@@ -61,13 +61,13 @@ test('loadRuntimeEnv clamps coldmail safety limits for Strato-safe sending', () 
     COLDMAIL_CAMPAIGN_SEND_LIMIT: '500',
     COLDMAIL_DAILY_SEND_LIMIT: '250',
     COLDMAIL_PACKAGE_DAILY_SEND_LIMIT: '1000',
-    COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS: 'false',
+    COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS: 'true',
   });
 
   assert.equal(runtimeEnv.mail.coldmailCampaignSendLimit, 50);
   assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 50);
   assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 100);
-  assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, false);
+  assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, true);
 });
 
 test('loadRuntimeEnv defaults dashboard Anthropic model to Claude Sonnet 4.6', () => {

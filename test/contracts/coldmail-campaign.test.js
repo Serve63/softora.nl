@@ -515,8 +515,46 @@ test('coldmail campaign enforces daily sender guard across campaigns', async () 
   assert.equal(sentMessages.length, 2);
 });
 
-test('coldmail campaign skips personal mailbox domains for non-test coldmail', async () => {
+test('coldmail campaign sends personal mailbox domains by default', async () => {
   const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'personal-mailbox',
+        bedrijf: 'Eenmanszaak Gmail',
+        naam: 'Ruben',
+        email: 'ruben@gmail.com',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'business-domain',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 10,
+    subject: 'Test',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 2);
+  assert.equal(result.failed, 0);
+  assert.deepEqual(
+    sentMessages.map((message) => message.to),
+    ['ruben@gmail.com', 'ruben@example.test']
+  );
+});
+
+test('coldmail campaign can still explicitly skip personal mailbox domains', async () => {
+  const { service, sentMessages } = createService({
+    coldmailBlockPersonalMailboxDomains: true,
     rows: [
       {
         id: 'personal-mailbox',

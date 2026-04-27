@@ -128,7 +128,7 @@ function createColdmailCampaignService(deps = {}) {
     coldmailCampaignSendLimit = DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT,
     coldmailDailySendLimit = DEFAULT_COLDMAIL_DAILY_SEND_LIMIT,
     coldmailPackageDailySendLimit = DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT,
-    coldmailBlockPersonalMailboxDomains = true,
+    coldmailBlockPersonalMailboxDomains = false,
   } = mailConfig;
 
   let smtpTransporter = null;
