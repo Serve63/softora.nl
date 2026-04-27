@@ -1267,8 +1267,8 @@ Softora.nl | +31 6 43 26 27 92</textarea>
         <div class="field">
           <div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen?</div>
           <div class="field-val" id="slider-val">10</div>
-          <input class="slider" type="range" min="5" max="50" step="5" value="10" id="mail-slider" oninput="updateSlider(this.value)">
-          <div class="slider-row" id="campaignVolumeSliderLabels"><span>5</span><span>30</span><span>50</span></div>
+          <input class="slider" type="range" min="5" max="30" step="5" value="10" id="mail-slider" oninput="updateSlider(this.value)">
+          <div class="slider-row" id="campaignVolumeSliderLabels"><span>5</span><span>20</span><span>30</span></div>
         </div>
 
         <div class="field lead-generator-branch-field">
@@ -1461,7 +1461,7 @@ const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';
 const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';
-const COLDMAIL_VOLUME_CONTROL = { min: 5, max: 50, step: 5, value: 10, labels: ['5', '30', '50'] };
+const COLDMAIL_VOLUME_CONTROL = { min: 5, max: 30, step: 5, value: 10, labels: ['5', '20', '30'] };
 const COLDCALL_VOLUME_CONTROL = { min: 10, max: 500, step: 10, value: 100, labels: ['10', '250', '500'] };
 const COLDMAIL_TEST_COMPANIES = ['mcv e-commerce'];
 const COLDMAIL_AUTO_REPLY_ENABLED = false;
