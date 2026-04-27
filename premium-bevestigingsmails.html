@@ -2483,6 +2483,25 @@ async function sendColdmailCampaignNow() {
   return payload;
 }
 
+function isDailyLimitSkippedItem(item) {
+  return Boolean(item && /Daglimiet/i.test(String(item.error || '')));
+}
+
+function buildColdmailSendSuccessMessage(sendResult) {
+  const sent = Number(sendResult && sendResult.sent) || 0;
+  const failed = Number(sendResult && sendResult.failed) || 0;
+  if (!failed) return '✓ ' + sent + ' mails verstuurd';
+  const failedItems = Array.isArray(sendResult && sendResult.failedItems) ? sendResult.failedItems : [];
+  const dailyLimitSkipped = failedItems.filter(isDailyLimitSkippedItem).length;
+  if (dailyLimitSkipped === failed) {
+    return '✓ ' + sent + ' mails verstuurd. ' + failed + ' overgeslagen door daglimiet';
+  }
+  if (dailyLimitSkipped > 0) {
+    return '✓ ' + sent + ' mails verstuurd. ' + dailyLimitSkipped + ' overgeslagen door daglimiet, ' + (failed - dailyLimitSkipped) + ' mislukt';
+  }
+  return '✓ ' + sent + ' mails verstuurd (' + failed + ' mislukt)';
+}
+
 async function startCampagne() {
   if (running) return;
   if (isPremiumAiLeadGeneratorPath()) {
@@ -2577,8 +2596,7 @@ async function startCampagneImmediate() {
       if (!sendResult.sent) {
         throw new Error('Er zijn geen mails verstuurd.');
       }
-      const failedSuffix = sendResult.failed ? ' (' + sendResult.failed + ' mislukt)' : '';
-      showToast('✓ ' + sendResult.sent + ' mails verstuurd' + failedSuffix);
+      showToast(buildColdmailSendSuccessMessage(sendResult));
       await hydrateCampaignCompanyCountFromSupabase();
       return;
     } catch (error) {

@@ -525,6 +525,55 @@ test('coldmail campaign enforces daily sender guard across campaigns', async () 
   assert.equal(sentMessages.length, 2);
 });
 
+test('coldmail campaign does not mark daily-limit skipped rows as mailed', async () => {
+  const rows = Array.from({ length: 4 }, (_, index) => ({
+    id: `prospect-${index + 1}`,
+    bedrijf: `Prospect ${index + 1}`,
+    naam: `Contact ${index + 1}`,
+    email: `contact${index + 1}@example.test`,
+    status: 'prospect',
+    databaseStatus: 'prospect',
+    mail: true,
+  }));
+  const { service, sentMessages, getSavedState } = createService({
+    rows,
+    coldmailCampaignSendLimit: 10,
+    coldmailDailySendLimit: 50,
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-04-24T11:00:00.000Z',
+          senderEmail: 'info@softora.nl',
+          count: 48,
+        },
+      ],
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 4,
+    subject: 'Test',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 2);
+  assert.equal(result.failed, 2);
+  assert.equal(result.persisted, 2);
+  assert.deepEqual(
+    sentMessages.map((message) => message.to),
+    ['contact1@example.test', 'contact2@example.test']
+  );
+  assert.match(result.failedItems[0].error, /Daglimiet/);
+  assert.match(result.failedItems[1].error, /Daglimiet/);
+
+  const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
+  assert.equal(savedRows[0].status, 'gemaild');
+  assert.equal(savedRows[1].status, 'gemaild');
+  assert.equal(savedRows[2].status, 'prospect');
+  assert.equal(savedRows[3].status, 'prospect');
+});
+
 test('coldmail campaign sends personal mailbox domains by default', async () => {
   const { service, sentMessages } = createService({
     rows: [

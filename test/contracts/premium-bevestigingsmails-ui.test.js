@@ -358,6 +358,8 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
   assert.match(pageSource, /function buildSendErrorMessage\(defaultMessage\)/);
   assert.match(pageSource, /payload && Array\.isArray\(payload\.failedItems\) && payload\.failedItems\[0\]/);
   assert.match(pageSource, /if \(!payload\.sent && payload\.failed\) \{/);
-  assert.match(pageSource, /showToast\('✓ ' \+ sendResult\.sent \+ ' mails verstuurd' \+ failedSuffix\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
+  assert.match(pageSource, /function buildColdmailSendSuccessMessage\(sendResult\)/);
+  assert.match(pageSource, /overgeslagen door daglimiet/);
+  assert.match(pageSource, /showToast\(buildColdmailSendSuccessMessage\(sendResult\)\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
   assert.match(pageSource, /showScreen\('screen-campaign'\);/);
 });
