@@ -32,8 +32,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const importScriptPath = path.join(__dirname, '../../assets/premium-database-import.js');
+  const photoBatchScriptPath = path.join(__dirname, '../../assets/premium-database-photo-batch.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
+  const photoBatchScriptSource = fs.readFileSync(photoBatchScriptPath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
   assert.match(pageSource, /family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700/);
@@ -59,6 +61,13 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = 0\.21;/);
   assert.match(pageSource, /<strong>€0,00<\/strong>/);
   assert.match(pageSource, /\.photo-cost-label/);
+  assert.match(pageSource, /<div class="modal-bg" id="photoBatchModal" aria-hidden="true">/);
+  assert.match(pageSource, /id="photoBatchTitle">AI-foto's maken<\/div>/);
+  assert.match(pageSource, /data-photo-batch-mode="all"/);
+  assert.match(pageSource, /data-photo-batch-mode="custom"/);
+  assert.match(pageSource, /id="photoBatchLimitInput" type="number" inputmode="numeric" min="1" step="1"/);
+  assert.match(pageSource, /id="photoBatchSummary" aria-live="polite"/);
+  assert.match(pageSource, /\.photo-batch-option\.is-active/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);
   assert.match(pageSource, /function formatEuroCost\(value\)/);
   assert.match(pageSource, /function renderPhotoCostLabel\(customers\)/);
@@ -130,7 +139,15 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /!isGeneratedFallbackDomain\(customer, customer && customer\.dom\)/);
   assert.match(pageSource, /function buildWebsitePreviewUrlCandidates\(customer\)/);
   assert.match(pageSource, /withWww\.hostname = "www\." \+ parsed\.hostname;/);
-  assert.match(pageSource, /function generateWebdesignPhotos\(\)/);
+  assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
+  assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
+  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
+  assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
+  assert.match(photoBatchScriptSource, /function createController\(options\)/);
+  assert.match(photoBatchScriptSource, /function open\(\)/);
+  assert.match(photoBatchScriptSource, /function resolveSelection\(\)/);
+  assert.match(photoBatchScriptSource, /void generate\(selection\.limit\);/);
+  assert.match(pageSource, /function generateWebdesignPhotos\(limit\)/);
   assert.match(pageSource, /return isWebdesignPhotoEligible\(customer\);/);
   assert.match(pageSource, /Webdesign maken voor " \+ target\.bedrijf/);
   assert.doesNotMatch(pageSource, /AI-foto maken voor " \+ target\.bedrijf/);
@@ -140,6 +157,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /source: "premium-database"/);
   assert.match(pageSource, /action: "webdesign"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
+  assert.match(pageSource, /photoBatchController\.open\(\);/);
+  assert.match(pageSource, /photoBatchController\.bind\(\);/);
+  assert.match(photoBatchScriptSource, /nodes\.startPhotoBatchButton\.addEventListener\("click", start\);/);
   assert.match(pageSource, /function openEditCustomerModal\(customerId\)/);
   assert.match(pageSource, /function updateCustomerFromModal\(customerId, bedrijf\)/);
   assert.match(pageSource, /state\.modalEditId/);

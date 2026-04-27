@@ -973,6 +973,65 @@
             color: var(--crimson);
         }
 
+        .photo-batch-modal {
+            width: 380px;
+        }
+
+        .photo-batch-options {
+            display: grid;
+            gap: 10px;
+        }
+
+        .photo-batch-option {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--card-soft);
+            color: var(--dark);
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            text-align: left;
+            transition: border-color .15s ease, background .15s ease;
+        }
+
+        .photo-batch-option span {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .photo-batch-option strong {
+            color: var(--light);
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .photo-batch-option.is-active {
+            border-color: rgba(139, 34, 82, 0.42);
+            background: rgba(139, 34, 82, 0.12);
+        }
+
+        .photo-batch-input {
+            width: 96px;
+            padding: 7px 9px;
+            border-radius: 5px;
+            text-align: right;
+            font-size: 13px;
+        }
+
+        .photo-batch-summary {
+            min-height: 18px;
+            margin-top: 12px;
+            color: var(--light);
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
         .toast {
             position: fixed;
             bottom: 20px;
@@ -1284,6 +1343,27 @@
         </div>
     </div>
 
+    <div class="modal-bg" id="photoBatchModal" aria-hidden="true">
+        <div class="modal photo-batch-modal" role="dialog" aria-modal="true" aria-labelledby="photoBatchTitle">
+            <div class="modal-title" id="photoBatchTitle">AI-foto's maken</div>
+            <div class="photo-batch-options" id="photoBatchOptions" role="group" aria-label="Aantal AI-foto's">
+                <button class="photo-batch-option" type="button" data-photo-batch-mode="all">
+                    <span>Alles</span>
+                    <strong id="photoBatchAllCount">0 bedrijven</strong>
+                </button>
+                <label class="photo-batch-option is-active" data-photo-batch-mode="custom" for="photoBatchLimitInput">
+                    <span>Specifiek aantal</span>
+                    <input class="photo-batch-input" id="photoBatchLimitInput" type="number" inputmode="numeric" min="1" step="1" value="10" aria-label="Specifiek aantal AI-foto's">
+                </label>
+            </div>
+            <div class="photo-batch-summary" id="photoBatchSummary" aria-live="polite"></div>
+            <div class="mbtns">
+                <button class="mbtn c" id="cancelPhotoBatchButton" type="button">Annuleren</button>
+                <button class="mbtn s" id="startPhotoBatchButton" type="button">Starten</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
     <input type="file" id="photoFileInput" accept="image/*" hidden>
     <div class="photo-preview" id="photoPreview" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Websitefoto bekijken">
@@ -1295,6 +1375,7 @@
         </div>
     </div>
 
+    <script src="assets/premium-database-photo-batch.js?v=20260427a"></script>
     <script src="assets/premium-database-import.js?v=20260427b"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
@@ -1381,8 +1462,21 @@
             photoPreviewClose: document.getElementById("photoPreviewClose"),
             photoPreviewImage: document.getElementById("photoPreviewImage"),
             photoPreviewMeta: document.getElementById("photoPreviewMeta"),
+            photoBatchModal: document.getElementById("photoBatchModal"),
+            photoBatchOptions: document.getElementById("photoBatchOptions"),
+            photoBatchChoiceButtons: Array.from(document.querySelectorAll("[data-photo-batch-mode]")),
+            photoBatchAllCount: document.getElementById("photoBatchAllCount"),
+            photoBatchLimitInput: document.getElementById("photoBatchLimitInput"),
+            photoBatchSummary: document.getElementById("photoBatchSummary"),
+            cancelPhotoBatchButton: document.getElementById("cancelPhotoBatchButton"),
+            startPhotoBatchButton: document.getElementById("startPhotoBatchButton"),
             toast: document.getElementById("toast")
         };
+
+        const photoBatchController = window.SoftoraDatabasePhotoBatch.createController({
+            nodes, getTargets: getWebdesignPhotoTargets, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR,
+            closeAddActions, setStatusMessage, generate: generateWebdesignPhotos
+        });
 
         function normalizeString(value) {
             return String(value || "").trim();
@@ -2466,10 +2560,15 @@
             });
         }
 
-        function getWebdesignPhotoTargets() {
-            return getSortedCustomers(getFilteredCustomers()).filter(function (customer) {
+        function getWebdesignPhotoTargets(limit) {
+            const targets = getSortedCustomers(getFilteredCustomers()).filter(function (customer) {
                 return isWebdesignPhotoEligible(customer);
-            }).slice(0, 10);
+            });
+            const parsedLimit = Math.floor(Number(limit));
+            if (Number.isFinite(parsedLimit) && parsedLimit > 0) {
+                return targets.slice(0, Math.min(parsedLimit, targets.length));
+            }
+            return targets;
         }
 
         async function generateWebsitePhotoData(customer) {
@@ -2527,10 +2626,10 @@
             throw lastError || new Error("AI-foto genereren is mislukt voor " + customer.bedrijf + ".");
         }
 
-        async function generateWebdesignPhotos() {
+        async function generateWebdesignPhotos(limit) {
             closeAddActions();
             nodes.generatePhotosButton.disabled = true;
-            const targets = getWebdesignPhotoTargets();
+            const targets = getWebdesignPhotoTargets(limit);
             try {
                 if (!targets.length) {
                     setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
@@ -3067,8 +3166,9 @@
             toggleAddActions();
         });
         nodes.generatePhotosButton.addEventListener("click", function () {
-            void generateWebdesignPhotos();
+            photoBatchController.open();
         });
+        photoBatchController.bind();
         nodes.addUploadButton.addEventListener("click", function () {
             closeAddActions();
             nodes.importFileInput.click();
@@ -3099,6 +3199,10 @@
             if (event.key === "Escape") {
                 if (nodes.photoPreview.classList.contains("on")) {
                     closeWebsitePhotoPreview();
+                    return;
+                }
+                if (photoBatchController.isOpen()) {
+                    photoBatchController.close();
                     return;
                 }
                 closeAddActions();
