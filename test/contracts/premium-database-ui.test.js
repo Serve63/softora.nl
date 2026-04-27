@@ -20,7 +20,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function deriveCustomersFromOrders\(orders\)/);
 });
 
-test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
+  test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -152,6 +152,10 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /function openPanel\(id\)/);
   assert.match(pageSource, /nodes\.panelSub\.textContent = customer\.stad;/);
   assert.doesNotMatch(pageSource, /nodes\.panelSub\.textContent = customer\.dom \+ " · " \+ customer\.stad;/);
+  assert.match(
+    pageSource,
+    /nodes\.topSub\.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging\.";/
+  );
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
