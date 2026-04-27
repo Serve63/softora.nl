@@ -117,6 +117,14 @@ test('page smoke: premium-website.html handles missing cursor elements safely', 
   );
 });
 
+test('page smoke: premium-website.html keeps mobile werkwijze background white', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
+  assert.match(html, /\.ios-statusbar-fill/, 'iOS statusbar-fill klasse ontbreekt.');
+  assert.match(html, /#werkwijze \{[^]*?background:\s*#ffffff !important;/, 'Werkwijze sectie moet mobile-compatibel wit zijn.');
+  assert.match(html, /#werkwijze \.werkwijze-copy \{[^]*?background:\s*#ffffff !important;/, 'Werkwijze copy-kaart moet mobile wit zijn.');
+  assert.match(html, /#werkwijze \.werkwijze-grid,/ , 'Werkwijze grid wit-regel hoort aanwezig te zijn.');
+});
+
 test('page smoke: premium-ai-coldmailing.html promotes suppression after lead removal regardless of persistence state', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
   assert.match(html, /promoteLeadRowSuppression\(lead\)/, 'Lead suppression promotion na verwijdering ontbreekt.');

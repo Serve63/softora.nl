@@ -8,7 +8,7 @@
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f7f4">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Softora">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
@@ -78,13 +78,14 @@
             top: 0;
             left: 0;
             width: 100%;
+            height: constant(safe-area-inset-top);
             height: env(safe-area-inset-top);
             background: var(--meta-bar-surface);
             z-index: 1002;
             pointer-events: none;
         }
 
-        @supports not (padding: env(safe-area-inset-top)) {
+        @supports not (height: env(safe-area-inset-top)) {
             .ios-statusbar-fill {
                 height: 0;
             }
@@ -1751,11 +1752,11 @@
             }
 
             html {
-                background: linear-gradient(180deg, #f7f5f0 0%, #f4f1eb 100%);
+                background: var(--header-surface) !important;
             }
 
             body {
-                background: linear-gradient(180deg, #f7f5f0 0%, #f4f1eb 100%);
+                background: var(--header-surface) !important;
                 color: var(--text-primary);
             }
 
@@ -2949,6 +2950,8 @@
                 background: #ffffff !important;
             }
 
+            #werkwijze > div,
+            #werkwijze .grid-2,
             #werkwijze .werkwijze-copy {
                 background: #ffffff !important;
             }
