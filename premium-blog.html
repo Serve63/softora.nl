@@ -331,9 +331,9 @@ nav {
   <div class="overlay-logo">Binnenkort beschikbaar</div>
   <div class="login-box">
     <div class="login-label">Toegangscode</div>
-    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" autocomplete="off" data-blog-login-input>
+    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" autocomplete="off" data-public-lock-input>
     <div class="login-error" id="login-error"></div>
-    <button class="login-btn" type="button" data-blog-action="login">Doorgaan</button>
+    <button class="login-btn" type="button" data-public-lock-submit>Doorgaan</button>
   </div>
 </div>
 
@@ -386,23 +386,6 @@ nav {
 
 <script>
 const blogs = [];
-const CODE = 'Andre2Fritz2!';
-
-if (sessionStorage.getItem('cs-auth') === '1') {
-  document.getElementById('overlay').style.display = 'none';
-}
-
-function login() {
-  const val = document.getElementById('code-inp').value;
-  if (val === CODE) {
-    sessionStorage.setItem('cs-auth', '1');
-    document.getElementById('overlay').style.display = 'none';
-  } else {
-    document.getElementById('login-error').textContent = 'Onjuiste code, probeer opnieuw.';
-    document.getElementById('code-inp').value = '';
-    document.getElementById('code-inp').focus();
-  }
-}
 
 const blogStructureTemplate = {
   id: 1,
@@ -506,16 +489,8 @@ function goOverzicht() {
 }
 
 function bindBlogActions() {
-  const loginInput = document.querySelector('[data-blog-login-input]');
-  if (loginInput) {
-    loginInput.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') login();
-    });
-  }
-
   document.querySelectorAll('[data-blog-action]').forEach((button) => {
     button.addEventListener('click', () => {
-      if (button.dataset.blogAction === 'login') login();
       if (button.dataset.blogAction === 'overview') goOverzicht();
     });
   });
@@ -539,5 +514,6 @@ function bindBlogActions() {
 bindBlogActions();
 renderGrid();
 </script>
+<script src="assets/premium-public-lock.js?v=20260427a" defer></script>
 </body>
 </html>

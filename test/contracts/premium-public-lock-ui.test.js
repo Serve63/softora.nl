@@ -10,6 +10,7 @@ const publicLockPages = [
   'premium-websites.html',
   'premium-voicesoftware.html',
   'premium-over-softora.html',
+  'premium-blog.html',
 ];
 
 function readRepoFile(relativePath) {
