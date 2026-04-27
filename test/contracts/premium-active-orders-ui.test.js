@@ -16,10 +16,13 @@ function readActiveOrdersSources() {
 }
 
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
-  const { pageSource, combinedSource: source } = readActiveOrdersSources();
+  const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
   assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427a"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
+  assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
+  assert.match(scriptSource, /function normalizeOrderStatus\(value\) \{/);
+  assert.match(scriptSource, /function persistOrdersRuntime\(\) \{/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
