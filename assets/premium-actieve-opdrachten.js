@@ -2560,7 +2560,20 @@ function setClaimOrderMessage(message, type) {
     el.className = 'claim-order-message' + (type ? ` ${type}` : '');
 }
 
-function renderClaimOrderSummary(id) {
+function appendClaimOrderSummaryRow(fragment, label, value) {
+    const titleEl = document.createElement('div');
+    titleEl.className = 'claim-order-summary-title';
+    titleEl.textContent = label;
+
+    const valueEl = document.createElement('div');
+    valueEl.className = 'claim-order-summary-value';
+    valueEl.textContent = value || '—';
+
+    fragment.append(titleEl, valueEl);
+}
+
+function renderClaimOrderSummary(container, id) {
+    if (!container) return;
     const activeId = selectActiveOrderId(id);
     const customOrder = getCustomOrderById(activeId);
     const runtime = orders[activeId] || {};
@@ -2569,17 +2582,12 @@ function renderClaimOrderSummary(id) {
     const deliveryTime = String(customOrder?.deliveryTime || '').trim();
     const domainName = String(customOrder?.domainName || '').trim();
 
-    const rows = [
-        `<div class="claim-order-summary-title">Opdracht</div><div class="claim-order-summary-value">${escapeHtml(title)}</div>`,
-        `<div class="claim-order-summary-title">Klant</div><div class="claim-order-summary-value">${escapeHtml(company)}</div>`
-    ];
-    if (deliveryTime) {
-        rows.push(`<div class="claim-order-summary-title">Oplevertijd</div><div class="claim-order-summary-value">${escapeHtml(deliveryTime)}</div>`);
-    }
-    if (domainName) {
-        rows.push(`<div class="claim-order-summary-title">Domein</div><div class="claim-order-summary-value">${escapeHtml(domainName)}</div>`);
-    }
-    return rows.join('');
+    const fragment = document.createDocumentFragment();
+    appendClaimOrderSummaryRow(fragment, 'Opdracht', title);
+    appendClaimOrderSummaryRow(fragment, 'Klant', company);
+    if (deliveryTime) appendClaimOrderSummaryRow(fragment, 'Oplevertijd', deliveryTime);
+    if (domainName) appendClaimOrderSummaryRow(fragment, 'Domein', domainName);
+    container.replaceChildren(fragment);
 }
 
 function openClaimOrderModal(id) {
@@ -2590,7 +2598,7 @@ function openClaimOrderModal(id) {
     if (!modal || !summaryEl || !input || !orders[activeId]) return;
 
     currentClaimOrderId = activeId;
-    summaryEl.innerHTML = renderClaimOrderSummary(activeId);
+    renderClaimOrderSummary(summaryEl, activeId);
     input.value = '';
     setClaimOrderMessage('', '');
 

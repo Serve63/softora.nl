@@ -70,6 +70,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /async function postGenerateSiteRequest\(payload\) \{/);
   assert.match(scriptSource, /async function postLaunchSiteRequest\(payload\) \{/);
   assert.match(scriptSource, /function setClaimOrderMessage\(message, type\) \{/);
+  assert.match(scriptSource, /function appendClaimOrderSummaryRow\(fragment, label, value\) \{/);
   assert.match(scriptSource, /function executeOrder\(id\) \{/);
   assert.match(scriptSource, /function formatModalDateTime\(value\) \{/);
   assert.match(scriptSource, /function renderModalOverviewHtml\(id\) \{/);
@@ -98,6 +99,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /assigneeEl\.textContent = claimInfo\.by \|\| 'Nog niet geclaimd';/);
   assert.match(source, /setOpenDossierButtonContent\(btnEl\);/);
   assert.doesNotMatch(source, /btnEl\.innerHTML = '<svg/);
+  assert.match(source, /renderClaimOrderSummary\(summaryEl, activeId\);/);
+  assert.doesNotMatch(source, /summaryEl\.innerHTML = renderClaimOrderSummary/);
   assert.match(source, /const isPaidOrder = Boolean\(paidAt\) \|\| status\.key === 'betaald';[\s\S]*if \(isPaidOrder\) \{[\s\S]*nextStatus = 'betaald';/);
   assert.match(source, /async function handleOrderPaymentAction\(id\) \{[\s\S]*if \(ui\.isPaid \|\| ui\.isBuilt\) return false;[\s\S]*return markOrderAsPaid\(id, \{ confirm: true \}\);/);
   assert.match(source, /const confirmed = await confirmActiveOrderAction\(invoicePaidReviewReminder,[\s\S]*Factuur betaald bevestigen/);
