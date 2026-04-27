@@ -127,6 +127,7 @@ nav {
   cursor: pointer;
   position: relative;
   line-height: 1;
+  text-decoration: none;
 }
 .nav-logo::after {
   content: '';
@@ -211,6 +212,11 @@ nav {
   transition: all .2s;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
 }
 .blog-card:hover { box-shadow: 0 8px 40px rgba(0,0,0,.1); transform: translateY(-3px); }
 
@@ -325,15 +331,15 @@ nav {
   <div class="overlay-logo">Binnenkort beschikbaar</div>
   <div class="login-box">
     <div class="login-label">Toegangscode</div>
-    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')login()">
+    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" autocomplete="off" data-blog-login-input>
     <div class="login-error" id="login-error"></div>
-    <button class="login-btn" onclick="login()">Doorgaan</button>
+    <button class="login-btn" type="button" data-blog-action="login">Doorgaan</button>
   </div>
 </div>
 
 <nav>
-  <div class="nav-logo" onclick="window.location.href='/'">SOFTORA.NL</div>
-  <button class="nav-back" id="nav-back" onclick="goOverzicht()">
+  <a class="nav-logo" href="/" aria-label="Softora homepage">SOFTORA.NL</a>
+  <button class="nav-back" id="nav-back" type="button" data-blog-action="overview">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
     Terug naar blog
   </button>
@@ -348,11 +354,11 @@ nav {
   </div>
 
   <div class="filter-bar" id="filter-bar">
-    <button class="filter-tab active" onclick="filterCat('Website\\'s', this)">Website's</button>
-    <button class="filter-tab" onclick="filterCat('Bedrijfssoftware', this)">Bedrijfssoftware</button>
-    <button class="filter-tab" onclick="filterCat('Voicesoftware', this)">Voicesoftware</button>
-    <button class="filter-tab" onclick="filterCat('AI ontwikkelingen', this)">AI ontwikkelingen</button>
-    <button class="filter-tab" onclick="filterCat('Overig', this)">Overig</button>
+    <button class="filter-tab active" type="button" data-blog-filter="Website's">Website's</button>
+    <button class="filter-tab" type="button" data-blog-filter="Bedrijfssoftware">Bedrijfssoftware</button>
+    <button class="filter-tab" type="button" data-blog-filter="Voicesoftware">Voicesoftware</button>
+    <button class="filter-tab" type="button" data-blog-filter="AI ontwikkelingen">AI ontwikkelingen</button>
+    <button class="filter-tab" type="button" data-blog-filter="Overig">Overig</button>
   </div>
 
   <div class="blog-grid-wrap" id="grid-wrap"></div>
@@ -441,7 +447,7 @@ function renderGrid() {
 }
 
 function card(b, featured) {
-  return `<div class="blog-card${featured ? ' featured' : ''}" onclick="openBlog(${b.id})">
+  return `<button type="button" class="blog-card${featured ? ' featured' : ''}" data-blog-id="${b.id}">
     <div class="blog-card-img${featured ? ' featured' : ''}" style="background:${b.kleur}">
       <div class="blog-card-img-label">${b.cat}</div>
     </div>
@@ -458,7 +464,7 @@ function card(b, featured) {
         </div>
       </div>
     </div>
-  </div>`;
+  </button>`;
 }
 
 function filterCat(cat, el) {
@@ -499,6 +505,38 @@ function goOverzicht() {
   window.scrollTo(0, 0);
 }
 
+function bindBlogActions() {
+  const loginInput = document.querySelector('[data-blog-login-input]');
+  if (loginInput) {
+    loginInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') login();
+    });
+  }
+
+  document.querySelectorAll('[data-blog-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (button.dataset.blogAction === 'login') login();
+      if (button.dataset.blogAction === 'overview') goOverzicht();
+    });
+  });
+
+  document.querySelectorAll('[data-blog-filter]').forEach((button) => {
+    button.addEventListener('click', () => {
+      filterCat(button.dataset.blogFilter || "Website's", button);
+    });
+  });
+
+  [document.getElementById('grid-wrap'), document.getElementById('meer-grid')].forEach((root) => {
+    if (!root) return;
+    root.addEventListener('click', (event) => {
+      const cardButton = event.target.closest('[data-blog-id]');
+      if (!cardButton || !root.contains(cardButton)) return;
+      openBlog(Number(cardButton.dataset.blogId));
+    });
+  });
+}
+
+bindBlogActions();
 renderGrid();
 </script>
 </body>
