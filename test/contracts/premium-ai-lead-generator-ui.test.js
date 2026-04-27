@@ -6,14 +6,19 @@ const path = require('path');
 test('premium ai lead generator renders campaign controls before dashboard bootstrap runs', () => {
   const pagePath = path.join(__dirname, '../../premium-ai-lead-generator.html');
   const dashboardPath = path.join(__dirname, '../../assets/coldcalling-dashboard.js');
+  const summaryHelpersPath = path.join(__dirname, '../../assets/coldcalling-conversation-summary.js');
   const customSelectsPath = path.join(__dirname, '../../assets/custom-selects.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
+  const summaryHelpersSource = fs.readFileSync(summaryHelpersPath, 'utf8');
   const customSelectsSource = fs.readFileSync(customSelectsPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260427b" defer><\/script>/);
+  assert.match(
+    pageSource,
+    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260427c" defer><\/script>/
+  );
   assert.match(pageSource, /id="leadAmountQuestionLabel"/);
   assert.match(pageSource, /Hoeveel mensen wil je bellen\?/);
   assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
@@ -238,7 +243,9 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /Gebruik nooit het woord "agent"\./);
   assert.match(dashboardSource, /function shouldRefreshLeadDatabaseCallDetailPayload\(detail\) \{/);
   assert.match(dashboardSource, /function buildLeadDatabaseTranscriptFallbackSummary\(call, insight, interestedLead, remoteDetail = null\) \{/);
-  assert.match(dashboardSource, /function stripActionableFollowUpSummarySentence\(value\) \{/);
+  assert.match(dashboardSource, /SoftoraColdcallingConversationSummary/);
+  assert.match(summaryHelpersSource, /function stripActionableFollowUpSummarySentence\(value\) \{/);
+  assert.match(summaryHelpersSource, /function pickReadableConversationSummary\(\) \{/);
   assert.doesNotMatch(dashboardSource, /De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen/);
   assert.doesNotMatch(dashboardSource, /wat de logische vervolgstap is als die echt is besproken/);
   assert.match(
@@ -316,7 +323,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     dashboardSource,
     /function buildLeadDatabaseCallSummarySourceText\(call, insight, interestedLead\) \{[\s\S]*insight\?\.followUpReason[\s\S]*interestedLead\?\.whatsappInfo/
   );
-  assert.match(dashboardSource, /bevestigingsmail sturen/);
+  assert.match(summaryHelpersSource, /bevestigingsmail sturen/);
   assert.match(dashboardSource, /function openLeadDatabaseFromCampaignControl\(\) \{[\s\S]*ensureLeadDatabaseModal\(\)[\s\S]*dbModal\.openLeadDatabaseModal\(\);/);
   assert.match(
     dashboardSource,
