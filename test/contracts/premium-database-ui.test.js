@@ -22,7 +22,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
 
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
+  const importScriptPath = path.join(__dirname, '../../assets/premium-database-import.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
   assert.match(pageSource, /family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700/);
@@ -60,7 +62,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /AI-database/i);
   assert.doesNotMatch(pageSource, /ai-database-badge/);
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
-  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
+  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Importeer bedrijven vanuit CSV, TSV of Excel[\s\S]*Handmatig toevoegen/);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.doesNotMatch(pageSource, /id="f-branche"/);
@@ -159,6 +161,19 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
+  assert.match(pageSource, /const pickRecordValue = window\.SoftoraDatabaseImport\.pickRecordValue;/);
+  assert.match(pageSource, /const databaseImportController = window\.SoftoraDatabaseImport\.createController\(\{/);
+  assert.match(pageSource, /nodes\.importFileInput\.addEventListener\("change", databaseImportController\.handleFileChange\)/);
+  assert.match(pageSource, /record, \["bedrijf", "bedrijfsnaam", "company", "company name", "organisatie", "naam bedrijf"\]/);
+  assert.match(pageSource, /record, \["telefoonnummer", "telefoon", "tel", "phone", "phone number"\]/);
+  assert.match(importScriptSource, /function detectDelimitedSeparator\(text, preferredSeparator\)/);
+  assert.match(importScriptSource, /function parseDelimitedRows\(raw, preferredSeparator\)/);
+  assert.match(importScriptSource, /function pickRecordValue\(record, keys\)/);
+  assert.match(importScriptSource, /function isExcelImportFile\(file\)/);
+  assert.match(importScriptSource, /fetch\("\/api\/premium-database\/import-spreadsheet"/);
+  assert.match(importScriptSource, /resolve\(Array\.isArray\(body\.rows\) \? body\.rows : \[\]\)/);
   assert.match(pageSource, /function exportCSV\(\)/);
   assert.match(pageSource, /function renderUsedChannelTags\(customer\)/);
   assert.match(pageSource, /const COLDMAIL_TEST_COMPANIES = \["mcv e-commerce"\];/);

@@ -1143,14 +1143,14 @@
                                 <div class="add-actions-menu" id="addActionsMenu" role="menu">
                                     <button class="add-actions-item" id="addUploadButton" type="button" role="menuitem">
                                         <span class="add-actions-item-title">Uploaden</span>
-                                        <span class="add-actions-item-sub">Importeer bedrijven vanuit een CSV-bestand</span>
+                                        <span class="add-actions-item-sub">Importeer bedrijven vanuit CSV, TSV of Excel</span>
                                     </button>
                                     <button class="add-actions-item" id="addManualButton" type="button" role="menuitem">
                                         <span class="add-actions-item-title">Handmatig toevoegen</span>
                                         <span class="add-actions-item-sub">Voeg zelf een bedrijf toe via het formulier</span>
                                     </button>
                                 </div>
-                                <input type="file" id="importFileInput" accept=".csv,text/csv" hidden>
+                                <input type="file" id="importFileInput" accept=".csv,text/csv,.tsv,text/tab-separated-values,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
                             </div>
                         </div>
                     </div>
@@ -1291,6 +1291,7 @@
         </div>
     </div>
 
+    <script src="assets/premium-database-import.js?v=20260427a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -2648,56 +2649,7 @@
                 .trim();
         }
 
-        function parseCsvRows(raw) {
-            const text = String(raw || "").replace(/^\uFEFF/, "");
-            const rows = [];
-            let current = "";
-            let row = [];
-            let inQuotes = false;
-
-            for (let i = 0; i < text.length; i += 1) {
-                const char = text[i];
-                const next = text[i + 1];
-
-                if (char === "\"") {
-                    if (inQuotes && next === "\"") {
-                        current += "\"";
-                        i += 1;
-                    } else {
-                        inQuotes = !inQuotes;
-                    }
-                    continue;
-                }
-
-                if (char === "," && !inQuotes) {
-                    row.push(current);
-                    current = "";
-                    continue;
-                }
-
-                if ((char === "\n" || char === "\r") && !inQuotes) {
-                    if (char === "\r" && next === "\n") {
-                        i += 1;
-                    }
-                    row.push(current);
-                    if (row.some(function (cell) { return normalizeString(cell) !== ""; })) {
-                        rows.push(row);
-                    }
-                    row = [];
-                    current = "";
-                    continue;
-                }
-
-                current += char;
-            }
-
-            row.push(current);
-            if (row.some(function (cell) { return normalizeString(cell) !== ""; })) {
-                rows.push(row);
-            }
-
-            return rows;
-        }
+        const pickRecordValue = window.SoftoraDatabaseImport.pickRecordValue;
 
         function mapCsvRowToCustomer(headers, row, index) {
             const record = {};
@@ -2705,24 +2657,26 @@
                 record[header] = normalizeString(row[headerIndex]);
             });
 
-            const bedrijf = record.bedrijf || record.company || record.organisatie;
+            const bedrijf = pickRecordValue(record, ["bedrijf", "bedrijfsnaam", "company", "company name", "organisatie", "naam bedrijf"]);
             if (!bedrijf) return null;
 
-            const status = normalizeDatabaseStatus(record.status || record.fase || "benaderbaar");
-            const updatedAt = record["laatste actie"] || record.updatedat || record.datum || formatDateForStorage(new Date());
+            const website = pickRecordValue(record, ["website", "domein", "domain", "url", "site"]);
+            const status = normalizeDatabaseStatus(pickRecordValue(record, ["status", "fase"]) || "benaderbaar");
+            const updatedAt = pickRecordValue(record, ["laatste actie", "updatedat", "updated at", "datum"]) || formatDateForStorage(new Date());
 
             return normalizeCustomer({
                 id: "import-" + index + "-" + createId(),
                 bedrijf: bedrijf,
-                naam: record.contact || record.naam || bedrijf,
-                dom: record.domein || record.domain || record.website || bedrijf,
-                telefoon: record.telefoon || record.tel || record.phone || "—",
-                email: record["e mail"] || record.email || record.mail,
-                branche: record.branche || record.branch || "Overig",
-                stad: record.adres || record.stad || record.locatie || "Onbekend",
+                naam: pickRecordValue(record, ["contact", "contactpersoon", "naam"]) || bedrijf,
+                dom: website || bedrijf,
+                website: website,
+                telefoon: pickRecordValue(record, ["telefoonnummer", "telefoon", "tel", "phone", "phone number"]) || "—",
+                email: pickRecordValue(record, ["e mail", "email", "mail", "mailadres"]),
+                branche: pickRecordValue(record, ["branche", "branch"]) || "Overig",
+                stad: pickRecordValue(record, ["adres", "stad", "plaats", "locatie", "address"]) || "Onbekend",
                 status: status,
-                verantwoordelijk: record["toegewezen aan"] || record.verantwoordelijke || record.owner || "Serve",
-                service: record.service || "website",
+                verantwoordelijk: pickRecordValue(record, ["toegewezen aan", "verantwoordelijke", "owner"]) || "Serve",
+                service: pickRecordValue(record, ["service", "dienst"]) || "website",
                 updatedAt: updatedAt,
                 hist: [{
                     type: status,
@@ -2732,10 +2686,9 @@
             }, "import-" + index);
         }
 
-        function importCustomersFromCsv(raw) {
-            const rows = parseCsvRows(raw);
+        function importCustomersFromRows(rows) {
             if (rows.length < 2) {
-                setStatusMessage("Het bestand bevat geen bruikbare CSV-rijen.", "error");
+                setStatusMessage("Het bestand bevat geen bruikbare rijen.", "error");
                 return;
             }
 
@@ -2785,28 +2738,6 @@
                     "error"
                 );
             });
-        }
-
-        function handleImportFileChange(event) {
-            const file = event.target.files && event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function () {
-                try {
-                    importCustomersFromCsv(reader.result);
-                } catch (error) {
-                    console.error("CSV import mislukt:", error);
-                    setStatusMessage("Uploaden mislukt: ongeldig CSV-bestand.", "error");
-                } finally {
-                    nodes.importFileInput.value = "";
-                }
-            };
-            reader.onerror = function () {
-                nodes.importFileInput.value = "";
-                setStatusMessage("Bestand lezen mislukt.", "error");
-            };
-            reader.readAsText(file);
         }
 
         function addCustomerFromModal() {
@@ -3020,6 +2951,12 @@
         }
         renderPage();
 
+        const databaseImportController = window.SoftoraDatabaseImport.createController({
+            input: nodes.importFileInput,
+            setStatusMessage: setStatusMessage,
+            importRows: importCustomersFromRows
+        });
+
         nodes.query.addEventListener("input", function (event) {
             state.query = normalizeString(event.target.value);
             renderPage();
@@ -3117,7 +3054,7 @@
             closeAddActions();
             openModal();
         });
-        nodes.importFileInput.addEventListener("change", handleImportFileChange);
+        nodes.importFileInput.addEventListener("change", databaseImportController.handleFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
         nodes.modalBg.addEventListener("click", function (event) {
