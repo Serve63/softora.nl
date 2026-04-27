@@ -15,7 +15,12 @@ function loadDatabaseImportClient() {
 function loadDatabaseDeepSearchClient() {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
-  const sandbox = { window: {}, Buffer, fetch: async () => ({ ok: true, json: async () => ({ ok: true, rows: [] }) }) };
+  const sandbox = {
+    window: {},
+    Buffer,
+    setTimeout,
+    fetch: async () => ({ ok: true, json: async () => ({ ok: true, rows: [] }) }),
+  };
   sandbox.window.confirm = () => true;
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseDeepSearch;
@@ -99,7 +104,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /AI-database/i);
   assert.doesNotMatch(pageSource, /ai-database-badge/);
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
-  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*100 bedrijven toevoegen[\s\S]*AI zoekt vanaf de huidige plek in de vaste volgorde/);
+  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Volgende locatie doorzoeken[\s\S]*AI werkt de huidige plek automatisch af/);
+  assert.doesNotMatch(pageSource, /100 bedrijven toevoegen/);
   assert.doesNotMatch(pageSource, />Uploaden</);
   assert.doesNotMatch(pageSource, />Google Sheet koppelen</);
   assert.doesNotMatch(pageSource, />Handmatig toevoegen</);
@@ -166,7 +172,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427d/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427e/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -216,7 +222,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427d"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427e"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -224,7 +230,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /<div class="modal-bg" id="deepSearchModal" aria-hidden="true">/);
   assert.doesNotMatch(pageSource, /id="deepSearchListInput"/);
   assert.match(pageSource, /id="deepSearchCost"/);
-  assert.match(pageSource, /id="deepSearchStartButton" type="button">100 bedrijven toevoegen<\/button>/);
+  assert.match(pageSource, /id="deepSearchStartButton" type="button">Locatie starten<\/button>/);
   assert.doesNotMatch(pageSource, /deepSearchDoneButton/);
   assert.doesNotMatch(pageSource, /Deze plek afronden/);
   assert.doesNotMatch(pageSource, /deepSearchResetButton/);
@@ -256,7 +262,13 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.ok(defaultTargetLines.includes('Nederland | Noord-Brabant | Altena | Woudrichem'));
   assert.ok(defaultTargetLines.includes('Nederland | Zuid-Holland | Zwijndrecht | Zwijndrecht'));
   assert.match(deepSearchScriptSource, /fetch\("\/api\/premium-database\/deep-search-businesses"/);
-  assert.match(deepSearchScriptSource, /count: 100/);
+  assert.match(deepSearchScriptSource, /DEEP_SEARCH_BATCH_SIZE = 100/);
+  assert.match(deepSearchScriptSource, /count: DEEP_SEARCH_BATCH_SIZE/);
+  assert.match(deepSearchScriptSource, /function runTargetBatch\(target\)/);
+  assert.match(deepSearchScriptSource, /function runTargetUntilComplete\(target\)/);
+  assert.match(deepSearchScriptSource, /AI gaat automatisch door met dezelfde locatie/);
+  assert.match(deepSearchScriptSource, /Deze locatie loopt al\. Wacht tot de AI hem automatisch afrondt\./);
+  assert.doesNotMatch(deepSearchScriptSource, /100 bedrijven toevoegen/);
   assert.match(deepSearchScriptSource, /\? "Nu: " \+ target\.label/);
   assert.doesNotMatch(deepSearchScriptSource, /"Nu: " \+ target\.label \+ " · " \+ target\.batches/);
   assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
@@ -411,4 +423,78 @@ test('premium database deep search client keeps a clean ordered target list', ()
       'Nederland | Noord-Brabant | Altena | Woudrichem',
     ]
   );
+});
+
+test('premium database deep search client finishes the current location automatically', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const calls = [];
+  const messages = [];
+  const customers = [];
+  const persisted = [];
+  const rows = [
+    ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+    ['Almkerk Test BV', 'Kerkstraat 1, Almkerk', 'info@almkerktest.nl', '0183 123 456', 'almkerktest.nl'],
+  ];
+  const responses = [
+    {
+      ok: true,
+      rows,
+      businesses: [{ bedrijfsnaam: 'Almkerk Test BV', email: 'info@almkerktest.nl', website: 'almkerktest.nl' }],
+      found: 1,
+      placeComplete: false,
+      cost: { estimatedUsd: 0.12 },
+      sources: [],
+    },
+    {
+      ok: true,
+      rows: [rows[0]],
+      businesses: [],
+      found: 0,
+      placeComplete: true,
+      cost: { estimatedUsd: 0.08 },
+      sources: [],
+    },
+  ];
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchList: {},
+      deepSearchSources: {},
+      deepSearchStartButton: {},
+      deepSearchStats: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    autoContinueDelayMs: 0,
+    getCustomers: () => customers,
+    importRows: async (receivedRows) => {
+      customers.push(...receivedRows.slice(1).map((row) => ({ bedrijf: row[0], email: row[2], website: row[4] })));
+    },
+    readDeepSearchRows: async (payload) => {
+      calls.push(payload);
+      return responses.shift();
+    },
+    setStatusMessage: (message) => {
+      messages.push(message);
+    },
+    setUiState: async (_scope, payload) => {
+      persisted.push(payload);
+      return { ok: true };
+    },
+  });
+
+  const result = await controller.runCurrentSearch();
+
+  assert.equal(result, true);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].target, 'Nederland | Noord-Brabant | Altena | Almkerk');
+  assert.equal(calls[0].count, 100);
+  assert.equal(calls[0].batchNumber, 1);
+  assert.equal(calls[1].target, calls[0].target);
+  assert.equal(calls[1].batchNumber, 2);
+  assert.equal(customers.length, 1);
+  assert.match(messages.join('\n'), /AI gaat automatisch door met dezelfde locatie/);
+  assert.match(messages.join('\n'), /Deze plaats is automatisch afgerond/);
+  assert.ok(persisted.length >= 2);
 });

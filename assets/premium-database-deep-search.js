@@ -15,6 +15,8 @@
         outputUsdPerMillion: 180,
         webSearchUsdPerCall: 0.01
     };
+    const DEEP_SEARCH_BATCH_SIZE = 100;
+    const AUTO_CONTINUE_DELAY_MS = 750;
     // Generated from the supplied work order, extended with CBS 2025 woonplaatsen.
     const DEFAULT_TARGET_TEXT_BASE64 = [
         "TmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFsbWtlcmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFuZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBCYWJ5bG9uacOrbmJyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBEcm9uZ2VsZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IER1c3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgRWV0aGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBHZW5kZXJlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgR2llc3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgSGFuawpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTWVldXdlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTmlldXdlbmRpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFJpanN3aWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBTbGVldXdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFVpdHdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFZlZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdhYXJkaHVpemVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBXZXJrZW5kYW0KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdpamsgZW4gQWFsYnVyZwpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgV291ZHJpY2hlbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBBc3RlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBIZXVzZGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBc3RlbiB8IE9tbWVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCYWFybGUtTmFzc2F1IHwgQmFhcmxlLU5hc3NhdQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IENhc3RlbHLDqQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IFVsaWNvdGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEJlcmdlaWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEx1eWtzZ2VzdGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IFJpZXRob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VpamsgfCBXZXN0ZXJob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBCZXJnZW4gb3AgWm9vbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBIYWxzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcmdlbiBvcCBab29tIHwgTGVwZWxzdHJhYXQKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgSGVlc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IEhlZXN3aWprLURpbnRoZXIKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgTG9vc2Jyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IE5pc3RlbHJvZGUKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgVmlua2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IFZvcnN0ZW5ib3NjaApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVzdCB8IEJlc3QKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEJsYWRlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgQ2FzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEhhcGVydApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgSG9vZ2Vsb29uCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCbGFkZWwgfCBOZXRlcnNlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm9la2VsIHwgQm9la2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb2VrZWwgfCBWZW5ob3JzdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm94dGVsIHwgQm94dGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBFc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBMaWVtcGRlCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJhdmVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJyZWRhCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFByaW5zZW5iZWVrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFRldGVyaW5nZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJyZWRhIHwgVWx2ZW5ob3V0Ck5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLURvcnBsZWluCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLVNjaG9vdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQ3JhbmVuZG9uY2sgfCBHYXN0ZWwKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IENyYW5lbmRvbmNrIHwgTWFhcmhlZXplCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IFNvZXJlbmRvbmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IERldXJuZSB8IERldXJuZQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwgSGVsZW5hdmVlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwg",
@@ -144,6 +146,12 @@
         return formatEuro(usdToEur(value));
     }
 
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, Math.max(0, Number(ms) || 0));
+        });
+    }
+
     function safeParseJson(raw) {
         try {
             const parsed = JSON.parse(String(raw || "{}"));
@@ -268,6 +276,10 @@
         const scope = normalizeString(options.scope);
         const stateKey = normalizeString(options.stateKey);
         const importRows = options.importRows;
+        const fetchDeepSearchRows = options.readDeepSearchRows || readDeepSearchRows;
+        const autoContinueDelayMs = options.autoContinueDelayMs === 0
+            ? 0
+            : Math.max(0, Number(options.autoContinueDelayMs) || AUTO_CONTINUE_DELAY_MS);
         const getCustomers = options.getCustomers || function () { return []; };
         const setStatusMessage = options.setStatusMessage || function () {};
         const toast = options.toast || function () {};
@@ -328,7 +340,7 @@
                 if (button) button.disabled = busy;
             });
             if (nodes.deepSearchStartButton) {
-                nodes.deepSearchStartButton.textContent = busy ? "Zoeken..." : "100 bedrijven toevoegen";
+                nodes.deepSearchStartButton.textContent = busy ? "Locatie loopt..." : "Locatie starten";
             }
         }
 
@@ -370,8 +382,8 @@
             if (nodes.deepSearchCost) {
                 const batchEstimate = formatEuro(usdToEur(estimateBatchUsd()));
                 nodes.deepSearchCost.textContent = target
-                    ? "Geschatte API-kosten: ± " + batchEstimate + " voor deze klik · " + formatUsdAsEuro(target.costUsd) + " gebruikt voor deze plek · " + formatUsdAsEuro(state.totalCostUsd) + " totaal"
-                    : "Geschatte API-kosten: ± " + batchEstimate + " per klik";
+                    ? "Geschatte API-kosten: ± " + batchEstimate + " per AI-ronde · " + formatUsdAsEuro(target.costUsd) + " gebruikt voor deze plek · " + formatUsdAsEuro(state.totalCostUsd) + " totaal"
+                    : "Geschatte API-kosten: ± " + batchEstimate + " per AI-ronde";
             }
             if (nodes.deepSearchList) {
                 nodes.deepSearchList.innerHTML = state.targets.length
@@ -441,25 +453,11 @@
             return true;
         }
 
-        function runCurrentSearch() {
-            if (busy) return Promise.resolve(false);
-            const target = getCurrentTarget();
-            if (!target) {
-                setStatusMessage("Plak eerst je zoeklijst en sla die op.", "error");
-                return Promise.resolve(false);
-            }
-            if (target.status === "done") {
-                setStatusMessage("Alle plekken zijn al afgerond.", "info", true);
-                return Promise.resolve(false);
-            }
-            setBusy(true);
-            target.status = "active";
-            render();
-            setStatusMessage("AI zoekt complete bedrijven voor " + target.label + "...", "info");
+        function runTargetBatch(target) {
             const beforeCount = Array.isArray(getCustomers()) ? getCustomers().length : 0;
-            return readDeepSearchRows({
+            return fetchDeepSearchRows({
                 target: target.label,
-                count: 100,
+                count: DEEP_SEARCH_BATCH_SIZE,
                 batchNumber: target.batches + 1,
                 exclude: uniqueStrings(target.seen.concat(collectExistingKeys()), 180)
             }).then(function (body) {
@@ -470,20 +468,61 @@
                     const addedCount = Math.max(0, afterCount - beforeCount);
                     updateTargetAfterSearch(target, body, addedCount);
                     const completed = Boolean(body && body.placeComplete);
-                    if (completed) advanceCompletedTarget(target);
+                    return {
+                        addedCount: addedCount,
+                        completed: completed,
+                        costUsd: Math.max(0, Number(body && body.cost && body.cost.estimatedUsd) || 0),
+                        found: Math.max(0, Number(body.found) || 0)
+                    };
+                });
+            });
+        }
+
+        function runTargetUntilComplete(target) {
+            const startedLabel = target.label;
+            function nextBatch() {
+                setStatusMessage("AI werkt " + startedLabel + " af. Ronde " + (target.batches + 1) + " loopt...", "info");
+                return runTargetBatch(target).then(function (result) {
                     render();
+                    if (result.addedCount) toast("+" + result.addedCount + " bedrijven");
+                    const baseMessage = "AI vond " + result.found + " complete bedrijven voor " + startedLabel + ". " + result.addedCount + " nieuw toegevoegd. API-kosten: " + formatUsdAsEuro(result.costUsd) + ".";
+                    if (result.completed) {
+                        advanceCompletedTarget(target);
+                        render();
+                        return persistState().then(function () {
+                            const nextTarget = getCurrentTarget();
+                            const nextMessage = nextTarget && nextTarget !== target && nextTarget.status !== "done"
+                                ? " Volgende locatie: " + nextTarget.label + "."
+                                : "";
+                            setStatusMessage(baseMessage + " Deze plaats is automatisch afgerond." + nextMessage, "success", true);
+                            toast("Plek afgerond");
+                            return true;
+                        });
+                    }
                     return persistState().then(function () {
-                        const baseMessage = "AI vond " + Number(body.found || 0) + " complete bedrijven voor " + target.label + ". " + addedCount + " nieuw toegevoegd. API-kosten: " + formatUsdAsEuro(body && body.cost && body.cost.estimatedUsd) + ".";
-                        const doneMessage = completed
-                            ? baseMessage + " Deze plaats is automatisch afgerond."
-                            : baseMessage;
-                        setStatusMessage(doneMessage, "success", true);
-                        if (addedCount) toast("+" + addedCount + " bedrijven");
-                        if (completed) toast("Plek afgerond");
-                        return true;
+                        setStatusMessage(baseMessage + " AI gaat automatisch door met dezelfde locatie.", "info");
+                        return wait(autoContinueDelayMs).then(nextBatch);
                     });
                 });
-            }).catch(function (error) {
+            }
+            return nextBatch();
+        }
+
+        function runCurrentSearch() {
+            if (busy) return Promise.resolve(false);
+            const target = getCurrentTarget();
+            if (!target) {
+                setStatusMessage("Geen vaste locatie gevonden.", "error");
+                return Promise.resolve(false);
+            }
+            if (target.status === "done") {
+                setStatusMessage("Alle plekken zijn al afgerond.", "info", true);
+                return Promise.resolve(false);
+            }
+            setBusy(true);
+            target.status = "active";
+            render();
+            return runTargetUntilComplete(target).catch(function (error) {
                 console.error("AI zoeklijst mislukt:", error);
                 setStatusMessage("AI zoeklijst mislukt: " + String(error.message || "controleer de instellingen"), "error");
                 return false;
@@ -494,6 +533,10 @@
         }
 
         function setActiveIndex(index) {
+            if (busy) {
+                setStatusMessage("Deze locatie loopt al. Wacht tot de AI hem automatisch afrondt.", "info");
+                return;
+            }
             const targetIndex = Math.max(0, Math.min(state.targets.length - 1, Number(index) || 0));
             state.activeIndex = targetIndex;
             state.targets.forEach(function (target, itemIndex) {
