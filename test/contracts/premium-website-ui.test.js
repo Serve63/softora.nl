@@ -8,6 +8,10 @@ test('premium website over-ons paneel gebruikt dezelfde accentrand-taal als wat 
   const source = fs.readFileSync(filePath, 'utf8');
 
   assert.match(source, /<div class="content-side about-panel fade-up">/);
+  assert.ok(
+    source.includes('/assets/home-over-office-meeting.jpg'),
+    'Nieuwe bureau-aanpak foto moet in de pagina staan'
+  );
   assert.match(source, /Vanuit Oisterwijk werken wij voor ambitieuze bedrijven door heel Nederland\./);
   assert.doesNotMatch(source, /Vanuit Tilburg werken wij voor ambitieuze bedrijven door heel Nederland\./);
   assert.match(
