@@ -1096,13 +1096,6 @@
             height: 14px;
         }
 
-        .deep-search-stat {
-            color: var(--light);
-            font-size: 12px;
-            line-height: 1.45;
-            text-align: right;
-        }
-
         .deep-search-current {
             border: 1px solid rgba(139, 34, 82, 0.18);
             background: rgba(139, 34, 82, 0.07);
@@ -1137,9 +1130,15 @@
 
         .deep-search-tools {
             display: grid;
-            grid-template-columns: minmax(0, 1.05fr) minmax(220px, .95fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 14px;
             margin-top: 12px;
+        }
+
+        .deep-search-tools > div {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
         }
 
         .deep-search-list,
@@ -1147,8 +1146,9 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             background: var(--card-soft);
-            min-height: 184px;
-            max-height: 260px;
+            height: 320px;
+            min-height: 320px;
+            max-height: 320px;
             overflow: auto;
             padding: 8px;
         }
@@ -1303,14 +1303,8 @@
                 width: min(420px, 100%);
             }
 
-            .deep-search-head,
             .deep-search-tools {
                 grid-template-columns: 1fr;
-                flex-direction: column;
-            }
-
-            .deep-search-stat {
-                text-align: left;
             }
         }
     </style>
@@ -1570,12 +1564,11 @@
             </button>
             <div class="deep-search-head">
                 <div class="modal-title" id="deepSearchTitle">Bedrijvenlijst</div>
-                <div class="deep-search-stat" id="deepSearchStats">Nog geen zoeklijst</div>
             </div>
             <div class="deep-search-current" id="deepSearchCurrent">Geen huidige plek</div>
             <div class="deep-search-cost" id="deepSearchCost">Geschatte API-kosten: wordt berekend</div>
             <div class="mbtns">
-                <button class="mbtn s" id="deepSearchStartButton" type="button">Locatie starten</button>
+                <button class="mbtn s" id="deepSearchStartButton" type="button">Batch starten</button>
             </div>
             <div class="deep-search-tools">
                 <div>
@@ -1697,7 +1690,6 @@
             cancelPhotoBatchButton: document.getElementById("cancelPhotoBatchButton"),
             startPhotoBatchButton: document.getElementById("startPhotoBatchButton"),
             deepSearchModal: document.getElementById("deepSearchModal"),
-            deepSearchStats: document.getElementById("deepSearchStats"),
             deepSearchCurrent: document.getElementById("deepSearchCurrent"),
             deepSearchCost: document.getElementById("deepSearchCost"),
             deepSearchStartButton: document.getElementById("deepSearchStartButton"),

@@ -230,7 +230,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /<div class="modal-bg" id="deepSearchModal" aria-hidden="true">/);
   assert.doesNotMatch(pageSource, /id="deepSearchListInput"/);
   assert.match(pageSource, /id="deepSearchCost"/);
-  assert.match(pageSource, /id="deepSearchStartButton" type="button">Locatie starten<\/button>/);
+  assert.match(pageSource, /id="deepSearchStartButton" type="button">Batch starten<\/button>/);
+  assert.doesNotMatch(pageSource, /id="deepSearchStats"/);
   assert.doesNotMatch(pageSource, /deepSearchDoneButton/);
   assert.doesNotMatch(pageSource, /Deze plek afronden/);
   assert.doesNotMatch(pageSource, /deepSearchResetButton/);
@@ -239,6 +240,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /class="deep-search-close" id="closeDeepSearchButton" type="button" aria-label="Sluit bedrijvenlijst"/);
   assert.match(pageSource, /id="deepSearchTitle">Bedrijvenlijst<\/div>/);
   assert.match(pageSource, /\.deep-search-target\.is-done span \{[\s\S]*text-decoration: line-through;/);
+  assert.match(pageSource, /\.deep-search-tools \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(pageSource, /\.deep-search-list,\s*\.deep-search-sources \{[\s\S]*height: 320px;[\s\S]*max-height: 320px;/);
   assert.match(pageSource, /id="deepSearchSources"/);
   assert.match(pageSource, /const pickRecordValue = window\.SoftoraDatabaseImport\.pickRecordValue;/);
   assert.match(pageSource, /const databaseImportController = window\.SoftoraDatabaseImport\.createController\(\{/);
@@ -280,6 +283,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(deepSearchScriptSource, /item\.batches \+ "x/);
   assert.doesNotMatch(deepSearchScriptSource, /item\.added \+ " nieuw/);
   assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
+  assert.match(deepSearchScriptSource, /"Geschatte API-kosten: ± " \+ batchCost/);
+  assert.doesNotMatch(deepSearchScriptSource, /per AI-ronde/);
+  assert.doesNotMatch(deepSearchScriptSource, /gebruikt voor deze plek/);
+  assert.doesNotMatch(deepSearchScriptSource, /klaar ·/);
   assert.match(deepSearchScriptSource, /function formatUsdAsEuro\(value\)/);
   assert.match(deepSearchScriptSource, /USD_TO_EUR_RATE = 0\.93/);
   assert.match(deepSearchScriptSource, /ESTIMATED_BATCH_PRICING/);
@@ -470,7 +477,6 @@ test('premium database deep search client finishes the current location automati
       deepSearchList: {},
       deepSearchSources: {},
       deepSearchStartButton: {},
-      deepSearchStats: {},
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',

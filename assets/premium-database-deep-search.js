@@ -338,15 +338,8 @@
                 if (button) button.disabled = busy;
             });
             if (nodes.deepSearchStartButton) {
-                nodes.deepSearchStartButton.textContent = busy ? "Locatie loopt..." : "Locatie starten";
+                nodes.deepSearchStartButton.textContent = busy ? "Batch loopt..." : "Batch starten";
             }
-        }
-
-        function getStats() {
-            const done = state.targets.filter(function (target) { return target.status === "done"; }).length;
-            const active = state.targets.filter(function (target) { return target.status === "active"; }).length;
-            const pending = Math.max(0, state.targets.length - done - active);
-            return { done: done, active: active, pending: pending };
         }
 
         function renderSources(target) {
@@ -364,14 +357,8 @@
         }
 
         function render() {
-            const stats = getStats();
             const target = getCurrentTarget();
             const canSearchTarget = target && target.status !== "done";
-            if (nodes.deepSearchStats) {
-                nodes.deepSearchStats.textContent = state.targets.length
-                    ? stats.done + " klaar · " + stats.pending + " in wachtrij · " + state.targets.length + " totaal · " + formatUsdAsEuro(state.totalCostUsd) + " API"
-                    : "Geen vaste volgorde";
-            }
             if (nodes.deepSearchCurrent) {
                 nodes.deepSearchCurrent.textContent = canSearchTarget
                     ? "Nu: " + target.label
@@ -379,9 +366,11 @@
             }
             if (nodes.deepSearchCost) {
                 const batchEstimate = formatEuro(usdToEur(estimateBatchUsd()));
+                const targetCost = target ? Math.max(0, Number(target.costUsd) || 0) : 0;
+                const batchCost = targetCost > 0 ? formatUsdAsEuro(targetCost) : batchEstimate;
                 nodes.deepSearchCost.textContent = target
-                    ? "Geschatte API-kosten: ± " + batchEstimate + " per AI-ronde · " + formatUsdAsEuro(target.costUsd) + " gebruikt voor deze plek · " + formatUsdAsEuro(state.totalCostUsd) + " totaal"
-                    : "Geschatte API-kosten: ± " + batchEstimate + " per AI-ronde";
+                    ? "Geschatte API-kosten: ± " + batchCost
+                    : "Geschatte API-kosten: ± " + batchEstimate;
             }
             if (nodes.deepSearchList) {
                 nodes.deepSearchList.innerHTML = state.targets.length
