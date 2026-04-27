@@ -3,9 +3,20 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt legacy kostenblokken', () => {
+function readMonthlyCostsSources() {
   const pagePath = path.join(__dirname, '../../premium-vaste-lasten.html');
+  const scriptPath = path.join(__dirname, '../../assets/premium-vaste-lasten.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+  return {
+    pageSource,
+    scriptSource,
+    combinedSource: `${pageSource}\n${scriptSource}`,
+  };
+}
+
+test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt legacy kostenblokken', () => {
+  const { pageSource, combinedSource } = readMonthlyCostsSources();
 
   assert.doesNotMatch(pageSource, /Software & Tools/);
   assert.doesNotMatch(pageSource, /Marketing & SEO/);
@@ -13,7 +24,7 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
   assert.doesNotMatch(pageSource, /Adobe Creative Cloud/);
   assert.doesNotMatch(pageSource, /Google Workspace/);
   assert.doesNotMatch(pageSource, /Boekhoudpakket/);
-  assert.match(pageSource, /'Totale kosten:'/);
+  assert.match(combinedSource, /'Totale kosten:'/);
   assert.doesNotMatch(pageSource, /'Hosting & Domeinen':/);
 
   assert.match(pageSource, /family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700/);
@@ -44,8 +55,10 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
     /<div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">/
   );
   assert.match(pageSource, /<div class="monthly-costs-stage" id="monthly-costs-stage">/);
+  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260427a"><\/script>/);
+  assert.doesNotMatch(pageSource, /let data = \{/);
   assert.match(
-    pageSource,
+    combinedSource,
     /getElementById\('monthly-costs-boot-loader'\)[\s\S]*classList\.toggle\('is-hidden', !isBooting\)/
   );
   assert.match(pageSource, /\.totaal-amount\s*\{[\s\S]*font-size:\s*2\.62rem;/);
@@ -56,83 +69,80 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
 });
 
 test('premium terugkerende kosten gebruikt modals en delegated acties voor bewerken en verwijderen', () => {
-  const pagePath = path.join(__dirname, '../../premium-vaste-lasten.html');
-  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const { pageSource, combinedSource } = readMonthlyCostsSources();
 
   assert.match(pageSource, /<div class="confirm-modal-overlay" id="delete-modal-overlay" aria-hidden="true">/);
   assert.match(pageSource, /<button class="btn-modal btn-modal-save" id="delete-modal-confirm" type="button">Verwijderen<\/button>/);
   assert.match(pageSource, /\.confirm-modal-overlay\s*\{[\s\S]*z-index:\s*1210;/);
   assert.match(pageSource, /\.confirm-modal-text\s*\{[\s\S]*line-height:\s*1\.7;/);
-  assert.match(pageSource, /function escapeHtml\(value\) \{/);
-  assert.match(pageSource, /function resolveCategoryName\(categoryKey\) \{/);
-  assert.match(pageSource, /data-action="edit" data-cat-key="\$\{escapeHtml\(key\)\}" data-item-id="\$\{item\.id\}"/);
-  assert.match(pageSource, /data-action="delete" data-cat-key="\$\{escapeHtml\(key\)\}" data-item-id="\$\{item\.id\}"/);
-  assert.match(pageSource, /data-action="add" data-cat-key="\$\{escapeHtml\(key\)\}"/);
+  assert.match(combinedSource, /function escapeHtml\(value\) \{/);
+  assert.match(combinedSource, /function resolveCategoryName\(categoryKey\) \{/);
+  assert.match(combinedSource, /data-action="edit" data-cat-key="\$\{escapeHtml\(key\)\}" data-item-id="\$\{item\.id\}"/);
+  assert.match(combinedSource, /data-action="delete" data-cat-key="\$\{escapeHtml\(key\)\}" data-item-id="\$\{item\.id\}"/);
+  assert.match(combinedSource, /data-action="add" data-cat-key="\$\{escapeHtml\(key\)\}"/);
   assert.doesNotMatch(pageSource, /onclick="editItem\(/);
   assert.doesNotMatch(pageSource, /onclick="deleteItem\(/);
   assert.doesNotMatch(pageSource, /onclick="addItem\(/);
-  assert.match(pageSource, /document\.getElementById\('categories-wrap'\)\.addEventListener\('click', \(event\) => \{/);
-  assert.match(pageSource, /const button = event\.target\.closest\('\[data-action\]'\);/);
-  assert.match(pageSource, /if \(action === 'edit' && id > 0\) \{/);
-  assert.match(pageSource, /if \(action === 'delete' && id > 0\) \{/);
-  assert.match(pageSource, /function deleteItem\(cat, id\) \{[\s\S]*delete-modal-overlay[\s\S]*delete-modal-confirm/s);
-  assert.match(pageSource, /async function confirmDeleteModal\(\) \{[\s\S]*showToast\('✓ Post verwijderd'\);/s);
-  assert.match(pageSource, /function editItem\(cat, id\) \{[\s\S]*edit-modal-overlay[\s\S]*document\.getElementById\('edit-naam'\)\.focus\(\);/s);
+  assert.match(combinedSource, /document\.getElementById\('categories-wrap'\)\.addEventListener\('click', \(event\) => \{/);
+  assert.match(combinedSource, /const button = event\.target\.closest\('\[data-action\]'\);/);
+  assert.match(combinedSource, /if \(action === 'edit' && id > 0\) \{/);
+  assert.match(combinedSource, /if \(action === 'delete' && id > 0\) \{/);
+  assert.match(combinedSource, /function deleteItem\(cat, id\) \{[\s\S]*delete-modal-overlay[\s\S]*delete-modal-confirm/s);
+  assert.match(combinedSource, /async function confirmDeleteModal\(\) \{[\s\S]*showToast\('✓ Post verwijderd'\);/s);
+  assert.match(combinedSource, /function editItem\(cat, id\) \{[\s\S]*edit-modal-overlay[\s\S]*document\.getElementById\('edit-naam'\)\.focus\(\);/s);
 });
 
 test('premium terugkerende kosten toont dynamische posten bovenaan met paarse stippelrand', () => {
-  const pagePath = path.join(__dirname, '../../premium-vaste-lasten.html');
-  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const { pageSource, combinedSource } = readMonthlyCostsSources();
 
-  assert.match(pageSource, /naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
-  assert.match(pageSource, /naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
-  assert.match(pageSource, /naam:'API kosten', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
-  assert.match(pageSource, /let nextId = 4;/);
+  assert.match(combinedSource, /naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
+  assert.match(combinedSource, /naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
+  assert.match(combinedSource, /naam:'API kosten', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
+  assert.match(combinedSource, /let nextId = 4;/);
   assert.doesNotMatch(pageSource, /naam:'Hostinger VPS'/);
   assert.doesNotMatch(pageSource, /naam:'softora\.nl domein'/);
   assert.doesNotMatch(pageSource, /naam:'TransIP backup'/);
-  assert.match(pageSource, /window\.softoraMonthlyCostsData = data;/);
-  assert.match(pageSource, /window\.softoraMonthlyCostsRender = render;/);
+  assert.match(combinedSource, /window\.softoraMonthlyCostsData = data;/);
+  assert.match(combinedSource, /window\.softoraMonthlyCostsRender = render;/);
   assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260417a" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
-  assert.match(pageSource, /const categoryHeaderMarkup = cat === 'Totale kosten:' \? '' : `[\s\S]*class="category-header"[\s\S]*category-title[\s\S]*category-total/);
-  assert.match(pageSource, /block\.innerHTML = `[\s\S]*\$\{categoryHeaderMarkup\}[\s\S]*<div class="cost-row head">/);
-  assert.match(pageSource, /const visibleItems = monthlyCostsBootstrapDone \? items : \[\];/);
-  assert.match(pageSource, /const loadingRowsMarkup = !monthlyCostsBootstrapDone \? `[\s\S]*Kosten laden\.\.\.[\s\S]*actuele coldcalling-kosten worden opgehaald/);
-  assert.match(pageSource, /const addRowMarkup = monthlyCostsBootstrapDone \? `[\s\S]*\+ Toevoegen/);
+  assert.match(combinedSource, /const categoryHeaderMarkup = cat === 'Totale kosten:' \? '' : `[\s\S]*class="category-header"[\s\S]*category-title[\s\S]*category-total/);
+  assert.match(combinedSource, /block\.innerHTML = `[\s\S]*\$\{categoryHeaderMarkup\}[\s\S]*<div class="cost-row head">/);
+  assert.match(combinedSource, /const visibleItems = monthlyCostsBootstrapDone \? items : \[\];/);
+  assert.match(combinedSource, /const loadingRowsMarkup = !monthlyCostsBootstrapDone \? `[\s\S]*Kosten laden\.\.\.[\s\S]*actuele coldcalling-kosten worden opgehaald/);
+  assert.match(combinedSource, /const addRowMarkup = monthlyCostsBootstrapDone \? `[\s\S]*\+ Toevoegen/);
   assert.match(pageSource, /\.cost-amount-wrap\.is-static\s*\{[\s\S]*justify-content:\s*flex-end;/);
-  assert.match(pageSource, /const rowClassName = item\.highlighted \? 'cost-row cost-row-accent' : 'cost-row';/);
-  assert.match(pageSource, /const displayFreqLabel = item\.highlighted && item\.freq === 'maandelijks'[\s\S]*'Deze maand'[\s\S]*freqLabel\[item\.freq\] \|\| item\.freq \|\| '-';/);
-  assert.match(pageSource, /const amountWrapClassName = item\.highlighted \? 'cost-amount-wrap is-static' : 'cost-amount-wrap';/);
-  assert.match(pageSource, /const rowActionsMarkup = item\.highlighted \? '' : `[\s\S]*class="row-actions"[\s\S]*data-action="edit"[\s\S]*data-action="delete"/);
-  assert.match(pageSource, /<div class="\$\{amountWrapClassName\}">[\s\S]*<div class="cost-amount">\$\{fmtEur\(item\.bedrag\)\}<\/div>[\s\S]*\$\{rowActionsMarkup\}/);
+  assert.match(combinedSource, /const rowClassName = item\.highlighted \? 'cost-row cost-row-accent' : 'cost-row';/);
+  assert.match(combinedSource, /const displayFreqLabel = item\.highlighted && item\.freq === 'maandelijks'[\s\S]*'Deze maand'[\s\S]*freqLabel\[item\.freq\] \|\| item\.freq \|\| '-';/);
+  assert.match(combinedSource, /const amountWrapClassName = item\.highlighted \? 'cost-amount-wrap is-static' : 'cost-amount-wrap';/);
+  assert.match(combinedSource, /const rowActionsMarkup = item\.highlighted \? '' : `[\s\S]*class="row-actions"[\s\S]*data-action="edit"[\s\S]*data-action="delete"/);
+  assert.match(combinedSource, /<div class="\$\{amountWrapClassName\}">[\s\S]*<div class="cost-amount">\$\{fmtEur\(item\.bedrag\)\}<\/div>[\s\S]*\$\{rowActionsMarkup\}/);
 });
 
 test('premium terugkerende kosten bewaart bewerkbare posten via supabase ui-state', () => {
-  const pagePath = path.join(__dirname, '../../premium-vaste-lasten.html');
-  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const { combinedSource } = readMonthlyCostsSources();
 
-  assert.match(pageSource, /const MONTHLY_COSTS_REMOTE_SCOPE = 'premium_monthly_costs';/);
-  assert.match(pageSource, /const MONTHLY_COSTS_REMOTE_KEY = 'monthly_cost_entries_v1';/);
-  assert.match(pageSource, /async function fetchUiStateGetWithFallback\(scope\) \{/);
-  assert.match(pageSource, /async function fetchUiStateSetWithFallback\(scope, body\) \{/);
-  assert.match(pageSource, /async function persistMonthlyCostEntries\(actor = 'browser'\) \{/);
-  assert.match(pageSource, /async function ensureMonthlyCostEntriesLoaded\(\) \{/);
-  assert.match(pageSource, /async function bootstrapMonthlyCostsPage\(\) \{/);
-  assert.match(pageSource, /let monthlyCostsBootstrapDone = false;/);
-  assert.match(pageSource, /function setTotalsLoading\(\) \{/);
-  assert.match(pageSource, /function setMonthlyCostsStageBooting\(isBooting\) \{[\s\S]*getElementById\('monthly-costs-boot-shell'\)/);
-  assert.match(pageSource, /if \(!monthlyCostsBootstrapDone\) \{\s*setTotalsLoading\(\);/);
-  assert.match(pageSource, /\[MONTHLY_COSTS_REMOTE_KEY\]: JSON\.stringify\(editableItems\),/);
-  assert.match(pageSource, /await ensureMonthlyCostEntriesLoaded\(\);/);
-  assert.match(pageSource, /await window\.refreshMonthlyColdcallingCosts\(\);/);
-  assert.match(pageSource, /const parsedEntries = JSON\.parse\(serializedEntries\);/);
-  assert.match(pageSource, /setMonthlyCostsStageBooting\(true\);/);
-  assert.match(pageSource, /setMonthlyCostsStageBooting\(false\);/);
-  assert.match(pageSource, /return persistMonthlyCostEntries\('browser_add'\)/);
-  assert.match(pageSource, /await persistMonthlyCostEntries\('browser_delete'\);/);
-  assert.match(pageSource, /await persistMonthlyCostEntries\('browser_edit'\);/);
-  assert.match(pageSource, /void bootstrapMonthlyCostsPage\(\);/);
+  assert.match(combinedSource, /const MONTHLY_COSTS_REMOTE_SCOPE = 'premium_monthly_costs';/);
+  assert.match(combinedSource, /const MONTHLY_COSTS_REMOTE_KEY = 'monthly_cost_entries_v1';/);
+  assert.match(combinedSource, /async function fetchUiStateGetWithFallback\(scope\) \{/);
+  assert.match(combinedSource, /async function fetchUiStateSetWithFallback\(scope, body\) \{/);
+  assert.match(combinedSource, /async function persistMonthlyCostEntries\(actor = 'browser'\) \{/);
+  assert.match(combinedSource, /async function ensureMonthlyCostEntriesLoaded\(\) \{/);
+  assert.match(combinedSource, /async function bootstrapMonthlyCostsPage\(\) \{/);
+  assert.match(combinedSource, /let monthlyCostsBootstrapDone = false;/);
+  assert.match(combinedSource, /function setTotalsLoading\(\) \{/);
+  assert.match(combinedSource, /function setMonthlyCostsStageBooting\(isBooting\) \{[\s\S]*getElementById\('monthly-costs-boot-shell'\)/);
+  assert.match(combinedSource, /if \(!monthlyCostsBootstrapDone\) \{\s*setTotalsLoading\(\);/);
+  assert.match(combinedSource, /\[MONTHLY_COSTS_REMOTE_KEY\]: JSON\.stringify\(editableItems\),/);
+  assert.match(combinedSource, /await ensureMonthlyCostEntriesLoaded\(\);/);
+  assert.match(combinedSource, /await window\.refreshMonthlyColdcallingCosts\(\);/);
+  assert.match(combinedSource, /const parsedEntries = JSON\.parse\(serializedEntries\);/);
+  assert.match(combinedSource, /setMonthlyCostsStageBooting\(true\);/);
+  assert.match(combinedSource, /setMonthlyCostsStageBooting\(false\);/);
+  assert.match(combinedSource, /return persistMonthlyCostEntries\('browser_add'\)/);
+  assert.match(combinedSource, /await persistMonthlyCostEntries\('browser_delete'\);/);
+  assert.match(combinedSource, /await persistMonthlyCostEntries\('browser_edit'\);/);
+  assert.match(combinedSource, /void bootstrapMonthlyCostsPage\(\);/);
 });
 
 test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze maand', () => {
