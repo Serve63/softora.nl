@@ -81,6 +81,7 @@ test('premium websitegenerator removes the legacy openen button but keeps downlo
   assert.match(source, /grid\.replaceChildren\(\.\.\.items\.map\(\(entry\) => createLibraryCardElement\(entry\)\)\);/);
   assert.doesNotMatch(source, /onclick="openLibraryEntry\(/);
   assert.doesNotMatch(source, /onclick="removeLibraryEntry\(/);
+  assert.doesNotMatch(source, /onclick="downloadPreviewBlock\(/);
 });
 
 test('premium websitegenerator toont een login-fallback voor protected acties', () => {
@@ -124,8 +125,15 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /async function cropPreviewImageDataUrl\(dataUrl\)/);
   assert.match(source, /const previewWidth = Number\(entry\.width\) \|\| WEBSITE_PREVIEW_IMAGE_WIDTH/);
   assert.match(source, /const frameW = Math\.min\(window\.innerWidth - 100, previewWidth\)/);
-  assert.match(source, /preview-media" style="max-width:\$\{frameW\}px;"/);
-  assert.match(source, /id="preview-image" alt="Website preview \$\{safeHost\}" style="width:100%;height:auto;display:block;"/);
+  assert.match(source, /function createPreviewZoneElement\(blockId, hostname, previewWidth, useStablePreviewImageId\) \{/);
+  assert.match(source, /media\.style\.maxWidth = `\$\{frameW\}px`;/);
+  assert.match(source, /img\.id = 'preview-image';/);
+  assert.match(source, /img\.className = 'preview-image-pixel';/);
+  assert.match(source, /downloadBtn\.addEventListener\('click', \(\) => downloadPreviewBlock\(blockId\)\);/);
+  assert.match(source, /stack\.appendChild\(createPreviewZoneElement\(blockId, entry\.hostname \|\| host, w, false\)\);/);
+  assert.match(source, /mountScanBatchShell\(out, 'Preview hervatten…'\);/);
+  assert.doesNotMatch(source, /previewZoneHtml/);
+  assert.doesNotMatch(source, /insertAdjacentHTML/);
   assert.match(source, /\/api\/website-preview-library/);
   assert.match(source, /function fetchLibraryEntryById/);
   assert.match(source, /\/api\/website-preview-library\/\$\{encodeURIComponent\(entryId\)\}/);

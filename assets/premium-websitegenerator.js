@@ -454,26 +454,72 @@ function newPreviewBlockId() {
   return `pv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function previewZoneHtml(blockId, hostname, previewWidth, useStablePreviewImageId) {
-  const safeHost = escapeHtml(hostname);
+function createDownloadIconElement() {
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNs, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('width', '12');
+  svg.setAttribute('height', '12');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const path = document.createElementNS(svgNs, 'path');
+  path.setAttribute('d', 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4');
+  const polyline = document.createElementNS(svgNs, 'polyline');
+  polyline.setAttribute('points', '7 10 12 15 17 10');
+  const line = document.createElementNS(svgNs, 'line');
+  line.setAttribute('x1', '12');
+  line.setAttribute('y1', '15');
+  line.setAttribute('x2', '12');
+  line.setAttribute('y2', '3');
+
+  svg.append(path, polyline, line);
+  return svg;
+}
+
+function createPreviewZoneElement(blockId, hostname, previewWidth, useStablePreviewImageId) {
+  const host = String(hostname || '');
   const frameW = Math.min(window.innerWidth - 100, previewWidth);
-  const imgTag = useStablePreviewImageId
-    ? `<img id="preview-image" alt="Website preview ${safeHost}" style="width:100%;height:auto;display:block;" />`
-    : `<img class="preview-image-pixel" alt="Website preview ${safeHost}" style="width:100%;height:auto;display:block;" />`;
-  return `<div class="preview-zone" id="${blockId}">
-      <div class="preview-label">
-        <span>Preview - ${safeHost}</span>
-        <div class="preview-actions">
-          <button type="button" class="btn" style="padding:6px 14px;font-size:11px" onclick="downloadPreviewBlock('${blockId}')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Download PNG
-          </button>
-        </div>
-      </div>
-      <div class="preview-media" style="max-width:${frameW}px;">
-        ${imgTag}
-      </div>
-    </div>`;
+
+  const root = document.createElement('div');
+  root.className = 'preview-zone';
+  root.id = blockId;
+
+  const label = document.createElement('div');
+  label.className = 'preview-label';
+  appendWebsiteGeneratorTextElement(label, 'span', '', `Preview - ${host}`);
+
+  const actions = document.createElement('div');
+  actions.className = 'preview-actions';
+  const downloadBtn = document.createElement('button');
+  downloadBtn.type = 'button';
+  downloadBtn.className = 'btn';
+  downloadBtn.style.padding = '6px 14px';
+  downloadBtn.style.fontSize = '11px';
+  downloadBtn.append(createDownloadIconElement(), document.createTextNode(' Download PNG'));
+  downloadBtn.addEventListener('click', () => downloadPreviewBlock(blockId));
+  actions.appendChild(downloadBtn);
+  label.appendChild(actions);
+
+  const media = document.createElement('div');
+  media.className = 'preview-media';
+  media.style.maxWidth = `${frameW}px`;
+  const img = document.createElement('img');
+  if (useStablePreviewImageId) {
+    img.id = 'preview-image';
+  } else {
+    img.className = 'preview-image-pixel';
+  }
+  img.alt = `Website preview ${host}`;
+  img.style.width = '100%';
+  img.style.height = 'auto';
+  img.style.display = 'block';
+  media.appendChild(img);
+
+  root.append(label, media);
+  return root;
 }
 
 function wirePreviewBlock(blockId, previewDataUrl, url, hostname, fileName) {
@@ -501,12 +547,18 @@ function downloadPreviewBlock(blockId) {
 
 function mountScanPreviewUI(previewDataUrl, url, hostname, fileName, previewWidth, previewHeight) {
   const blockId = newPreviewBlockId();
-  document.getElementById('scan-output').innerHTML = `<div class="scan-previews-stack" id="scan-previews-stack">${previewZoneHtml(
+  const out = document.getElementById('scan-output');
+  if (!out) return;
+  const stack = document.createElement('div');
+  stack.className = 'scan-previews-stack';
+  stack.id = 'scan-previews-stack';
+  stack.appendChild(createPreviewZoneElement(
     blockId,
     hostname,
     previewWidth,
     true
-  )}</div>`;
+  ));
+  out.replaceChildren(stack);
   wirePreviewBlock(blockId, previewDataUrl, url, hostname, fileName);
 }
 
@@ -537,14 +589,64 @@ function clearStoredWebsitePreviewBatchJobId() {
 function createBatchLoadingRow(hostname) {
   const ph = document.createElement('div');
   ph.className = 'preview-loading-row';
-  ph.innerHTML = `
-      <div class="premium-boot-spinner" aria-hidden="true" style="--loader-size:28px">
-        <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
-        <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
-        <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
-      </div>
-      <div>Bezig met <strong>${escapeHtml(hostname)}</strong>…</div>`;
+
+  const spinner = document.createElement('div');
+  spinner.className = 'premium-boot-spinner';
+  spinner.setAttribute('aria-hidden', 'true');
+  spinner.style.setProperty('--loader-size', '28px');
+  ['softora-dossier-loader__orbit--outer', 'softora-dossier-loader__orbit--inner', 'softora-dossier-loader__dot']
+    .forEach((className) => {
+      const part = document.createElement('span');
+      part.className = className;
+      part.setAttribute('aria-hidden', 'true');
+      spinner.appendChild(part);
+    });
+
+  const label = document.createElement('div');
+  label.append(document.createTextNode('Bezig met '));
+  appendWebsiteGeneratorTextElement(label, 'strong', '', hostname);
+  label.append(document.createTextNode('…'));
+
+  ph.append(spinner, label);
   return ph;
+}
+
+function mountScanBatchShell(container, message) {
+  if (!container) return null;
+  const bar = document.createElement('div');
+  bar.className = 'scan-batch-bar';
+  bar.id = 'scan-batch-bar';
+  bar.setAttribute('role', 'status');
+  bar.setAttribute('aria-live', 'polite');
+  bar.textContent = message;
+
+  const stack = document.createElement('div');
+  stack.className = 'scan-previews-stack';
+  stack.id = 'scan-previews-stack';
+  container.replaceChildren(bar, stack);
+  return stack;
+}
+
+function createPreviewMessageZone(hostname, message) {
+  const row = document.createElement('div');
+  row.className = 'preview-zone';
+
+  const emptyState = document.createElement('div');
+  emptyState.className = 'empty-state';
+  emptyState.style.padding = '20px';
+  emptyState.style.margin = '0';
+  emptyState.style.border = '1px solid var(--border)';
+  emptyState.style.borderRadius = '8px';
+
+  const text = document.createElement('p');
+  appendWebsiteGeneratorTextElement(text, 'strong', '', hostname);
+  text.appendChild(document.createElement('br'));
+  const detail = appendWebsiteGeneratorTextElement(text, 'span', '', message);
+  detail.style.color = 'var(--text-mid)';
+
+  emptyState.appendChild(text);
+  row.appendChild(emptyState);
+  return row;
 }
 
 function scheduleWebsitePreviewBatchPoll() {
@@ -573,10 +675,7 @@ function buildWebsitePreviewJobFingerprint(job) {
 
 async function startBackgroundBatchScan(urls) {
   const out = document.getElementById('scan-output');
-  if (out) {
-    out.innerHTML =
-      '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Preview wordt gestart…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
-  }
+  if (out) mountScanBatchShell(out, 'Preview wordt gestart…');
   const response = await fetch('/api/website-preview/batch', {
     method: 'POST',
     credentials: 'same-origin',
@@ -711,7 +810,7 @@ async function renderBatchJobProgress(job) {
   }
   const entries = loadLibraryEntries();
 
-  stack.innerHTML = '';
+  stack.replaceChildren();
   for (let idx = 0; idx < items.length; idx += 1) {
     const it = items[idx];
     if (!it) continue;
@@ -721,19 +820,13 @@ async function renderBatchJobProgress(job) {
       const row = document.createElement('div');
       row.className = 'preview-pending-row';
       row.style.cssText = 'padding:12px 0;font-size:13px;color:var(--text-mid)';
-      row.innerHTML = `Wachtend — <strong>${escapeHtml(host)}</strong>`;
+      row.append(document.createTextNode('Wachtend — '));
+      appendWebsiteGeneratorTextElement(row, 'strong', '', host);
       stack.appendChild(row);
     } else if (st === 'running') {
       stack.appendChild(createBatchLoadingRow(host));
     } else if (st === 'error') {
-      const row = document.createElement('div');
-      row.className = 'preview-zone';
-      row.innerHTML = `<div class="empty-state" style="padding:20px;margin:0;border:1px solid var(--border);border-radius:8px">
-        <p><strong>${escapeHtml(host)}</strong><br><span style="color:var(--text-mid)">${escapeHtml(
-          String(it.error || 'Onbekende fout')
-        )}</span></p>
-      </div>`;
-      stack.appendChild(row);
+      stack.appendChild(createPreviewMessageZone(host, String(it.error || 'Onbekende fout')));
     } else if (st === 'done') {
       const entryId = String(it.libraryEntryId || '').trim();
       let entry = entryId ? entries.find((e) => String(e.id) === entryId) : null;
@@ -743,8 +836,7 @@ async function renderBatchJobProgress(job) {
       if (entry && isSafeLibraryDataUrl(entry.dataUrl)) {
         const blockId = newPreviewBlockId();
         const w = Number(entry.width) || WEBSITE_PREVIEW_IMAGE_WIDTH;
-        const h = Number(entry.height) || WEBSITE_PREVIEW_IMAGE_HEIGHT;
-        stack.insertAdjacentHTML('beforeend', previewZoneHtml(blockId, entry.hostname || host, w, false));
+        stack.appendChild(createPreviewZoneElement(blockId, entry.hostname || host, w, false));
         wirePreviewBlock(
           blockId,
           entry.dataUrl,
@@ -753,12 +845,10 @@ async function renderBatchJobProgress(job) {
           entry.fileName || `${host}-preview.png`
         );
       } else {
-        const row = document.createElement('div');
-        row.className = 'preview-zone';
-        row.innerHTML = `<div class="empty-state" style="padding:20px;margin:0;border:1px solid var(--border);border-radius:8px">
-          <p><strong>${escapeHtml(host)}</strong><br><span style="color:var(--text-mid)">Preview is opgeslagen, maar kon niet direct worden geladen. Open hem via Bibliotheek.</span></p>
-        </div>`;
-        stack.appendChild(row);
+        stack.appendChild(createPreviewMessageZone(
+          host,
+          'Preview is opgeslagen, maar kon niet direct worden geladen. Open hem via Bibliotheek.'
+        ));
       }
     }
   }
@@ -820,8 +910,7 @@ async function resumeWebsitePreviewBatchIfAny() {
   }
 
   if (!hasResumed && !jobId) return;
-  out.innerHTML =
-    '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Preview hervatten…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
+  mountScanBatchShell(out, 'Preview hervatten…');
   scheduleWebsitePreviewBatchPoll();
 }
 
