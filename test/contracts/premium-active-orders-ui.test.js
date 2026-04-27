@@ -28,6 +28,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.doesNotMatch(pageSource, /function handleCreateOrderSubmit\(event\) \{/);
   assert.doesNotMatch(pageSource, /function selectActiveOrderId\(explicitId\) \{/);
   assert.doesNotMatch(pageSource, /function openOrderDossier\(id, options = \{\}\) \{/);
+  assert.doesNotMatch(pageSource, /function normalizeClaimEmployeeName\(value\) \{/);
+  assert.doesNotMatch(pageSource, /async function markOrderAsPaid\(id, options = \{\}\) \{/);
   assert.match(scriptSource, /function normalizeOrderStatus\(value\) \{/);
   assert.match(scriptSource, /function persistOrdersRuntime\(\) \{/);
   assert.match(scriptSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -41,6 +43,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /function handleCreateOrderSubmit\(event\) \{/);
   assert.match(scriptSource, /function selectActiveOrderId\(explicitId\) \{/);
   assert.match(scriptSource, /function openOrderDossier\(id, options = \{\}\) \{/);
+  assert.match(scriptSource, /function normalizeClaimEmployeeName\(value\) \{/);
+  assert.match(scriptSource, /async function markOrderAsPaid\(id, options = \{\}\) \{/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
