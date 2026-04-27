@@ -1462,10 +1462,10 @@ body {
   </div>
 
   <div class="tabs">
-    <button class="tab theme-website active" type="button" onclick="switchTab('website', this)">Website</button>
-    <button class="tab theme-business" type="button" onclick="switchTab('bedrijfssoftware', this)">Bedrijfssoftware</button>
-    <button class="tab theme-voice" type="button" onclick="switchTab('voicesoftware', this)">Voicesoftware</button>
-    <button class="tab theme-chatbot" type="button" onclick="switchTab('chatbots', this)">Chatbot</button>
+    <button class="tab theme-website active" type="button" data-package-tab="website">Website</button>
+    <button class="tab theme-business" type="button" data-package-tab="bedrijfssoftware">Bedrijfssoftware</button>
+    <button class="tab theme-voice" type="button" data-package-tab="voicesoftware">Voicesoftware</button>
+    <button class="tab theme-chatbot" type="button" data-package-tab="chatbots">Chatbot</button>
   </div>
 
   <div id="tab-bouwen" class="tab-panel theme-website active">
@@ -2065,39 +2065,6 @@ body {
   </div>
 </main>
 
-<script>
-  function switchTab(name, el) {
-    document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach((tab) => tab.classList.remove('active'));
-
-    const groups = {
-      website: ['bouwen', 'onderhoud'],
-      bedrijfssoftware: ['bedrijfssoftware', 'bedrijfssoftware-onderhoud'],
-      voicesoftware: ['voice-software', 'voice-software-onderhoud'],
-      chatbots: ['chatbots', 'chatbots-onderhoud'],
-    };
-
-    const panelIds = Array.isArray(groups[name]) ? groups[name] : [name];
-    panelIds.forEach((panelId) => {
-      const panelEl = document.getElementById('tab-' + panelId);
-      if (panelEl) panelEl.classList.add('active');
-    });
-
-    if (el && el.classList) {
-      el.classList.add('active');
-    }
-  }
-
-  function finishPremiumShellBoot() {
-    if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
-      window.SoftoraPremiumBoot.setShellBooting(false);
-    }
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', finishPremiumShellBoot, { once: true });
-  } else {
-    finishPremiumShellBoot();
-  }
-</script>
+<script src="assets/premium-packages.js?v=20260427a"></script>
 </body>
 </html>
