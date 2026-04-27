@@ -1838,3 +1838,126 @@ function handleCreateOrderSubmit(event) {
     form.reset();
     closeCreateOrderModal();
 }
+
+function setLastActiveOrder(orderId) {
+    writeStateValue(ORDER_STATE_KEY, JSON.stringify({
+        lastOrderId: String(orderId),
+        updatedAt: new Date().toISOString()
+    }));
+}
+
+function selectActiveOrderId(explicitId) {
+    if (explicitId && orders[explicitId]) return Number(explicitId);
+
+    try {
+        const raw = readStateValue(ORDER_STATE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            const lastId = Number(parsed?.lastOrderId);
+            if (lastId && orders[lastId]) return lastId;
+        }
+    } catch (_) {
+        // ignore
+    }
+
+    const byUpdated = Object.entries(orders)
+        .map(([id, o]) => ({ id: Number(id), ts: Number(o.updatedAt || 0) }))
+        .filter(x => Number.isFinite(x.ts) && x.ts > 0)
+        .sort((a, b) => b.ts - a.ts);
+    if (byUpdated.length) return byUpdated[0].id;
+
+    const first = Object.keys(orders).map(Number).sort((a, b) => a - b)[0];
+    return first || 1;
+}
+
+function getPreviewStorageKey(orderId) {
+    return PREVIEW_HTML_PREFIX + String(orderId);
+}
+
+function saveGeneratedPreviewHtml(orderId, html) {
+    const key = getPreviewStorageKey(orderId);
+    const content = String(html || '');
+    writeStateValue(key, content);
+    return true;
+}
+
+function hasGeneratedPreviewHtml(orderId) {
+    return Boolean(readStateValue(getPreviewStorageKey(orderId)));
+}
+
+function getPreviewUrl(id) {
+    const activeId = selectActiveOrderId(id);
+    return `/premium-opdracht-preview?id=${encodeURIComponent(String(activeId))}`;
+}
+
+function openPreview(id, options = {}) {
+    const previewUrl = getPreviewUrl(id);
+    try {
+        const anchor = document.createElement('a');
+        anchor.href = previewUrl;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        return true;
+    } catch (_) {
+        // Fall through to window.open if the anchor strategy fails.
+    }
+
+    const w = window.open(previewUrl, '_blank', 'noopener,noreferrer');
+    if (w) {
+        try {
+            w.focus();
+        } catch (_) {
+            // ignore focus errors
+        }
+        return true;
+    }
+
+    return false;
+}
+
+function getOrderDossierUrl(id, options = {}) {
+    const activeId = selectActiveOrderId(id);
+    const params = new URLSearchParams();
+    params.set('id', String(activeId));
+    if (options && options.autoPrint) {
+        params.set('autoprint', '1');
+    }
+    return `/premium-opdracht-dossier?${params.toString()}`;
+}
+
+function openOrderDossier(id, options = {}) {
+    const url = getOrderDossierUrl(id, options);
+    if (options && options.newTab) {
+        try {
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+            anchor.style.display = 'none';
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            return true;
+        } catch (_) {
+            // Fall through to window.open if the anchor strategy fails.
+        }
+
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+        if (opened) {
+            try {
+                opened.focus();
+            } catch (_) {
+                // ignore focus errors
+            }
+            return true;
+        }
+
+        return false;
+    }
+    window.location.assign(url);
+    return true;
+}
