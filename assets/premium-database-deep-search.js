@@ -6,6 +6,104 @@
         active: "Bezig",
         done: "Klaar"
     };
+    const DEFAULT_TARGET_TEXT = [
+        "Nederland | Noord-Brabant | Altena | Almkerk",
+        "Nederland | Noord-Brabant | Altena | Andel",
+        "Nederland | Noord-Brabant | Altena | Babyloniënbroek",
+        "Nederland | Noord-Brabant | Altena | Drongelen",
+        "Nederland | Noord-Brabant | Altena | Dussen",
+        "Nederland | Noord-Brabant | Altena | Eethen",
+        "Nederland | Noord-Brabant | Altena | Genderen",
+        "Nederland | Noord-Brabant | Altena | Giessen",
+        "Nederland | Noord-Brabant | Altena | Hank",
+        "Nederland | Noord-Brabant | Altena | Meeuwen",
+        "Nederland | Noord-Brabant | Altena | Nieuwendijk",
+        "Nederland | Noord-Brabant | Altena | Rijswijk",
+        "Nederland | Noord-Brabant | Altena | Sleeuwijk",
+        "Nederland | Noord-Brabant | Altena | Uitwijk",
+        "Nederland | Noord-Brabant | Altena | Veen",
+        "Nederland | Noord-Brabant | Altena | Waardhuizen",
+        "Nederland | Noord-Brabant | Altena | Werkendam",
+        "Nederland | Noord-Brabant | Altena | Wijk en Aalburg",
+        "Nederland | Noord-Brabant | Altena | Woudrichem",
+        "Nederland | Noord-Brabant | Asten | Asten",
+        "Nederland | Noord-Brabant | Asten | Heusden",
+        "Nederland | Noord-Brabant | Asten | Ommel",
+        "Nederland | Noord-Brabant | Baarle-Nassau | Baarle-Nassau",
+        "Nederland | Noord-Brabant | Baarle-Nassau | Castelré",
+        "Nederland | Noord-Brabant | Baarle-Nassau | Ulicoten",
+        "Nederland | Noord-Brabant | Bergeijk | Bergeijk",
+        "Nederland | Noord-Brabant | Bergeijk | Luyksgestel",
+        "Nederland | Noord-Brabant | Bergeijk | Riethoven",
+        "Nederland | Noord-Brabant | Bergeijk | Westerhoven",
+        "Nederland | Noord-Brabant | Bergen op Zoom | Bergen op Zoom",
+        "Nederland | Noord-Brabant | Bergen op Zoom | Halsteren",
+        "Nederland | Noord-Brabant | Bergen op Zoom | Lepelstraat",
+        "Nederland | Noord-Brabant | Bernheze | Heesch",
+        "Nederland | Noord-Brabant | Bernheze | Heeswijk-Dinther",
+        "Nederland | Noord-Brabant | Bernheze | Loosbroek",
+        "Nederland | Noord-Brabant | Bernheze | Nistelrode",
+        "Nederland | Noord-Brabant | Bernheze | Vinkel",
+        "Nederland | Noord-Brabant | Bernheze | Vorstenbosch",
+        "Nederland | Noord-Brabant | Best | Best",
+        "Nederland | Noord-Brabant | Bladel | Bladel",
+        "Nederland | Noord-Brabant | Bladel | Casteren",
+        "Nederland | Noord-Brabant | Bladel | Hapert",
+        "Nederland | Noord-Brabant | Bladel | Hoogeloon",
+        "Nederland | Noord-Brabant | Bladel | Netersel",
+        "Nederland | Noord-Brabant | Boekel | Boekel",
+        "Nederland | Noord-Brabant | Boekel | Venhorst",
+        "Nederland | Noord-Brabant | Boxtel | Boxtel",
+        "Nederland | Noord-Brabant | Boxtel | Esch",
+        "Nederland | Noord-Brabant | Boxtel | Liempde",
+        "Nederland | Noord-Brabant | Breda | Bavel",
+        "Nederland | Noord-Brabant | Breda | Breda",
+        "Nederland | Noord-Brabant | Breda | Prinsenbeek",
+        "Nederland | Noord-Brabant | Breda | Teteringen",
+        "Nederland | Noord-Brabant | Breda | Ulvenhout",
+        "Nederland | Noord-Brabant | Cranendonck | Budel",
+        "Nederland | Noord-Brabant | Cranendonck | Budel-Dorplein",
+        "Nederland | Noord-Brabant | Cranendonck | Budel-Schoot",
+        "Nederland | Noord-Brabant | Cranendonck | Gastel",
+        "Nederland | Noord-Brabant | Cranendonck | Maarheeze",
+        "Nederland | Noord-Brabant | Cranendonck | Soerendonk",
+        "Nederland | Noord-Brabant | Deurne | Deurne",
+        "Nederland | Noord-Brabant | Deurne | Helenaveen",
+        "Nederland | Noord-Brabant | Deurne | Liessel",
+        "Nederland | Noord-Brabant | Deurne | Neerkant",
+        "Nederland | Noord-Brabant | Deurne | Vlierden",
+        "Nederland | Noord-Brabant | Dongen | Dongen",
+        "Nederland | Noord-Brabant | Dongen | s Gravenmoer",
+        "Nederland | Noord-Brabant | Drimmelen | Drimmelen",
+        "Nederland | Noord-Brabant | Drimmelen | Hooge Zwaluwe",
+        "Nederland | Noord-Brabant | Drimmelen | Lage Zwaluwe",
+        "Nederland | Noord-Brabant | Drimmelen | Made",
+        "Nederland | Noord-Brabant | Drimmelen | Terheijden",
+        "Nederland | Noord-Brabant | Drimmelen | Wagenberg",
+        "Nederland | Noord-Brabant | Drimmelen | Zevenbergschen Hoek",
+        "Nederland | Noord-Brabant | Eersel | Duizel",
+        "Nederland | Noord-Brabant | Eersel | Eersel",
+        "Nederland | Noord-Brabant | Eersel | Knegsel",
+        "Nederland | Noord-Brabant | Eersel | Steensel",
+        "Nederland | Noord-Brabant | Eersel | Vessem",
+        "Nederland | Noord-Brabant | Eersel | Wintelre",
+        "Nederland | Noord-Brabant | Eindhoven | Eindhoven",
+        "Nederland | Noord-Brabant | Etten-Leur | Etten-Leur",
+        "Nederland | Zeeland | Borsele | Baarland",
+        "Nederland | Zeeland | Borsele | Borssele",
+        "Nederland | Zeeland | Goes | Goes",
+        "Nederland | Limburg | Maastricht | Maastricht",
+        "Nederland | Gelderland | Arnhem | Arnhem",
+        "Nederland | Utrecht | Utrecht | Utrecht",
+        "Nederland | Overijssel | Zwolle | Zwolle",
+        "Nederland | Flevoland | Almere | Almere",
+        "Nederland | Drenthe | Assen | Assen",
+        "Nederland | Friesland | Leeuwarden | Leeuwarden",
+        "Nederland | Groningen | Groningen | Groningen",
+        "Nederland | Noord-Holland | Amsterdam | Amsterdam",
+        "Nederland | Zuid-Holland | Rotterdam | Rotterdam",
+        "Nederland | Zuid-Holland | s-Gravenhage | s-Gravenhage"
+    ].join("\n");
 
     function normalizeString(value) {
         return String(value || "").trim();
@@ -45,6 +143,17 @@
             });
     }
 
+    function getDefaultTargetLabels() {
+        return parseTargetLines(DEFAULT_TARGET_TEXT);
+    }
+
+    function formatUsd(value) {
+        return "$" + Number(value || 0).toLocaleString("nl-NL", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 4
+        });
+    }
+
     function safeParseJson(raw) {
         try {
             const parsed = JSON.parse(String(raw || "{}"));
@@ -75,6 +184,7 @@
             batches: 0,
             found: 0,
             added: 0,
+            costUsd: 0,
             seen: [],
             lastSources: [],
             updatedAt: ""
@@ -94,17 +204,35 @@
             batches: Math.max(0, Number(raw && raw.batches) || 0),
             found: Math.max(0, Number(raw && raw.found) || 0),
             added: Math.max(0, Number(raw && raw.added) || 0),
+            costUsd: Math.max(0, Number(raw && raw.costUsd) || 0),
             seen: uniqueStrings(raw && raw.seen, 180),
             lastSources: Array.isArray(raw && raw.lastSources) ? raw.lastSources.slice(0, 40) : [],
             updatedAt: normalizeString(raw && raw.updatedAt)
         };
     }
 
+    function applyDefaultTargets(targets) {
+        const previousByKey = new Map();
+        (targets || []).forEach(function (target) {
+            previousByKey.set(normalizeKey(target.label), target);
+        });
+        const defaults = getDefaultTargetLabels().map(function (label, index) {
+            return previousByKey.get(normalizeKey(label)) || createTarget(label, index);
+        });
+        (targets || []).forEach(function (target) {
+            if (!previousByKey.has(normalizeKey(target.label))) return;
+            if (defaults.some(function (item) { return normalizeKey(item.label) === normalizeKey(target.label); })) return;
+            defaults.push(target);
+        });
+        return defaults;
+    }
+
     function normalizeState(raw) {
         const parsed = typeof raw === "string" ? safeParseJson(raw) : (raw || {});
-        const targets = Array.isArray(parsed.targets)
+        const loadedTargets = Array.isArray(parsed.targets)
             ? parsed.targets.map(normalizeTarget).filter(Boolean)
             : [];
+        const targets = applyDefaultTargets(loadedTargets);
         let activeIndex = Math.max(0, Math.min(targets.length - 1, Number(parsed.activeIndex) || 0));
         const activeFromStatus = targets.findIndex(function (target) {
             return target.status === "active";
@@ -118,6 +246,9 @@
         return {
             targets: targets,
             activeIndex: targets.length ? activeIndex : 0,
+            totalCostUsd: targets.reduce(function (sum, target) {
+                return sum + Math.max(0, Number(target.costUsd) || 0);
+            }, 0),
             updatedAt: normalizeString(parsed.updatedAt)
         };
     }
@@ -158,6 +289,7 @@
             return JSON.stringify({
                 targets: state.targets,
                 activeIndex: state.activeIndex,
+                totalCostUsd: state.totalCostUsd,
                 updatedAt: new Date().toISOString()
             });
         }
@@ -186,11 +318,6 @@
                     ? remoteState.values
                     : {};
                 state = normalizeState(values[stateKey]);
-                if (nodes.deepSearchListInput && state.targets.length) {
-                    nodes.deepSearchListInput.value = state.targets.map(function (target) {
-                        return target.label;
-                    }).join("\n");
-                }
                 render();
                 return state;
             }).catch(function () {
@@ -202,7 +329,6 @@
         function setBusy(nextBusy) {
             busy = Boolean(nextBusy);
             [
-                nodes.deepSearchSaveButton,
                 nodes.deepSearchStartButton,
                 nodes.deepSearchDoneButton,
                 nodes.deepSearchResetButton
@@ -210,7 +336,7 @@
                 if (button) button.disabled = busy;
             });
             if (nodes.deepSearchStartButton) {
-                nodes.deepSearchStartButton.textContent = busy ? "Zoeken..." : "100 zoeken";
+                nodes.deepSearchStartButton.textContent = busy ? "Zoeken..." : "100 bedrijven toevoegen";
             }
         }
 
@@ -240,13 +366,18 @@
             const target = getCurrentTarget();
             if (nodes.deepSearchStats) {
                 nodes.deepSearchStats.textContent = state.targets.length
-                    ? stats.done + " klaar · " + stats.pending + " in wachtrij · " + state.targets.length + " totaal"
-                    : "Nog geen zoeklijst";
+                    ? stats.done + " klaar · " + stats.pending + " in wachtrij · " + state.targets.length + " totaal · " + formatUsd(state.totalCostUsd) + " API"
+                    : "Geen vaste volgorde";
             }
             if (nodes.deepSearchCurrent) {
                 nodes.deepSearchCurrent.textContent = target
                     ? "Nu: " + target.label + " · " + target.batches + " batch(es) · " + target.added + " nieuw"
                     : "Geen huidige plek";
+            }
+            if (nodes.deepSearchCost) {
+                nodes.deepSearchCost.textContent = target
+                    ? "API-kosten: " + formatUsd(target.costUsd) + " voor deze plek · " + formatUsd(state.totalCostUsd) + " totaal"
+                    : "API-kosten: nog geen uitvoering";
             }
             if (nodes.deepSearchList) {
                 nodes.deepSearchList.innerHTML = state.targets.length
@@ -258,39 +389,11 @@
                             + "<strong>" + escapeHtml(STATUS_LABELS[item.status] || "Wacht") + " · " + item.batches + "x · " + item.added + " nieuw</strong>"
                             + "</button>";
                     }).join("")
-                    : "<div class=\"deep-search-empty\">Plak eerst je volgorde.</div>";
+                    : "<div class=\"deep-search-empty\">Geen vaste volgorde gevonden.</div>";
             }
             renderSources(target);
             if (nodes.deepSearchDoneButton) nodes.deepSearchDoneButton.disabled = busy || !target;
             if (nodes.deepSearchStartButton) nodes.deepSearchStartButton.disabled = busy || !target;
-        }
-
-        function saveTargetsFromInput() {
-            const labels = parseTargetLines(nodes.deepSearchListInput && nodes.deepSearchListInput.value);
-            const previousByKey = new Map();
-            state.targets.forEach(function (target) {
-                previousByKey.set(normalizeKey(target.label), target);
-            });
-            state.targets = labels.map(function (label, index) {
-                const previous = previousByKey.get(normalizeKey(label));
-                return previous ? { ...previous, label: label } : createTarget(label, index);
-            });
-            state.activeIndex = state.targets.findIndex(function (target) {
-                return target.status === "active";
-            });
-            if (state.activeIndex === -1) {
-                state.activeIndex = state.targets.findIndex(function (target) {
-                    return target.status !== "done";
-                });
-            }
-            if (state.activeIndex === -1) state.activeIndex = state.targets.length ? state.targets.length - 1 : 0;
-            state.targets.forEach(function (target, index) {
-                if (target.status !== "done") target.status = index === state.activeIndex ? "active" : "pending";
-            });
-            render();
-            return persistState().then(function () {
-                setStatusMessage("AI zoeklijst opgeslagen.", "success", true);
-            });
         }
 
         function collectExistingKeys() {
@@ -307,9 +410,12 @@
 
         function updateTargetAfterSearch(target, body, addedCount) {
             const businesses = Array.isArray(body.businesses) ? body.businesses : [];
+            const costUsd = Math.max(0, Number(body && body.cost && body.cost.estimatedUsd) || 0);
             target.batches += 1;
             target.found += Math.max(0, Number(body.found) || 0);
             target.added += Math.max(0, Number(addedCount) || 0);
+            target.costUsd = Math.max(0, Number(target.costUsd) || 0) + costUsd;
+            state.totalCostUsd = Math.max(0, Number(state.totalCostUsd) || 0) + costUsd;
             target.updatedAt = new Date().toISOString();
             target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
             target.seen = uniqueStrings(target.seen.concat(businesses.map(function (business) {
@@ -346,7 +452,7 @@
                     render();
                     return persistState().then(function () {
                         setStatusMessage(
-                            "AI vond " + Number(body.found || 0) + " complete bedrijven voor " + target.label + ". " + addedCount + " nieuw toegevoegd.",
+                            "AI vond " + Number(body.found || 0) + " complete bedrijven voor " + target.label + ". " + addedCount + " nieuw toegevoegd. API-kosten: " + formatUsd(body && body.cost && body.cost.estimatedUsd) + ".",
                             "success",
                             true
                         );
@@ -397,9 +503,8 @@
         }
 
         function resetState() {
-            if (!window.confirm("AI zoeklijst helemaal leegmaken?")) return;
+            if (!window.confirm("Voortgang van de vaste AI-zoeklijst wissen?")) return;
             state = normalizeState({});
-            if (nodes.deepSearchListInput) nodes.deepSearchListInput.value = "";
             render();
             void persistState();
         }
@@ -420,11 +525,6 @@
         function bind() {
             if (bound) return;
             bound = true;
-            if (nodes.deepSearchSaveButton) {
-                nodes.deepSearchSaveButton.addEventListener("click", function () {
-                    void saveTargetsFromInput();
-                });
-            }
             if (nodes.deepSearchStartButton) {
                 nodes.deepSearchStartButton.addEventListener("click", function () {
                     void runCurrentSearch();

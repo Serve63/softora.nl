@@ -214,6 +214,37 @@ test('coldmail campaign attaches webdesign photo inline and as attachment', asyn
   assert.equal(sentMessages[0].attachments[0].contentType, 'image/png');
 });
 
+test('coldmail campaign can disable automatic campaign end date', async () => {
+  const { service, getSavedState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        telefoon: '+31 6 12345678',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+    durationDays: 'disabled',
+  });
+
+  assert.equal(result.sent, 1);
+  const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
+  assert.equal(savedRows[0].coldmailCampaignDurationDays, 0);
+  assert.equal(savedRows[0].coldmailCampaignEndsAt, '');
+  assert.equal(savedRows[0].activeColdmailCampaignUntil, '');
+});
+
 test('coldmail campaign refuses webdesign action when photo is missing', async () => {
   const { service, sentMessages, getSavedState } = createService({
     rows: [
@@ -391,8 +422,46 @@ test('coldmail campaign previews selected recipients before sending', async () =
       bedrijf: 'Bakkerij Zon',
       email: 'ruben@example.test',
       phone: '+31 6 12345678',
+      distanceKm: null,
     },
   ]);
+});
+
+test('coldmail campaign recipient preview respects Oisterwijk radius', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'near-1',
+        bedrijf: 'Oisterwijk Winkel',
+        email: 'near@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Dorpsstraat 1, Oisterwijk',
+        mail: true,
+      },
+      {
+        id: 'far-1',
+        bedrijf: 'Breda Winkel',
+        email: 'far@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Markt 1, Breda',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    branch: 'Retail & Winkels',
+    radiusKm: 20,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.radiusKm, 20);
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].bedrijf, 'Oisterwijk Winkel');
+  assert.equal(result.recipients[0].distanceKm, 0);
 });
 
 test('coldcalling recipient preview selects callable phone rows', async () => {
@@ -428,6 +497,7 @@ test('coldcalling recipient preview selects callable phone rows', async () => {
       bedrijf: 'Belbare Lead',
       email: '',
       phone: '+31622223333',
+      distanceKm: null,
     },
   ]);
 });

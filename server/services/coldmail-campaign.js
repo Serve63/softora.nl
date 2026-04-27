@@ -534,6 +534,98 @@ function createColdmailCampaignService(deps = {}) {
     return Number.isFinite(timestamp) ? timestamp : 0;
   }
 
+  const oisterwijkCoords = { lat: 51.5792, lng: 5.1889 };
+  const campaignPlaceCoords = {
+    oisterwijk: { lat: 51.5792, lng: 5.1889 },
+    tilburg: { lat: 51.5555, lng: 5.0913 },
+    breda: { lat: 51.5719, lng: 4.7683 },
+    eindhoven: { lat: 51.4416, lng: 5.4697 },
+    'den bosch': { lat: 51.6978, lng: 5.3037 },
+    's hertogenbosch': { lat: 51.6978, lng: 5.3037 },
+    waalwijk: { lat: 51.6828, lng: 5.0707 },
+    boxtel: { lat: 51.5908, lng: 5.3293 },
+    udenhout: { lat: 51.6098, lng: 5.1436 },
+    haaren: { lat: 51.6027, lng: 5.2222 },
+    goirle: { lat: 51.5206, lng: 5.0667 },
+    hilvarenbeek: { lat: 51.4858, lng: 5.1397 },
+    vught: { lat: 51.6533, lng: 5.2875 },
+    best: { lat: 51.5075, lng: 5.3903 },
+    oirschot: { lat: 51.505, lng: 5.3139 },
+    helmond: { lat: 51.4793, lng: 5.657 },
+    dongen: { lat: 51.6265, lng: 4.9383 },
+    'etten-leur': { lat: 51.5706, lng: 4.6373 },
+    roosendaal: { lat: 51.5308, lng: 4.4653 },
+    'bergen op zoom': { lat: 51.4946, lng: 4.2872 },
+    almkerk: { lat: 51.7714, lng: 4.9597 },
+    werkendam: { lat: 51.8101, lng: 4.8944 },
+    sleeuwijk: { lat: 51.815, lng: 4.952 },
+    waalre: { lat: 51.3867, lng: 5.4447 },
+    valkenswaard: { lat: 51.3513, lng: 5.4595 },
+    veldhoven: { lat: 51.418, lng: 5.4024 },
+    oss: { lat: 51.765, lng: 5.5181 },
+    uden: { lat: 51.6608, lng: 5.6194 },
+    veghel: { lat: 51.6167, lng: 5.5486 },
+    schijndel: { lat: 51.6225, lng: 5.4319 },
+    'sint-oedenrode': { lat: 51.5675, lng: 5.4597 },
+  };
+
+  function normalizePlaceKey(value) {
+    return normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/['’]/g, ' ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function haversineKm(left, right) {
+    const toRad = (value) => (Number(value) * Math.PI) / 180;
+    const dLat = toRad(right.lat - left.lat);
+    const dLng = toRad(right.lng - left.lng);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(left.lat)) * Math.cos(toRad(right.lat)) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function resolveRowCoords(row) {
+    const explicitLat = Number(row && (row.lat || row.latitude || row.latitudeNumber));
+    const explicitLng = Number(row && (row.lng || row.lon || row.longitude || row.longitudeNumber));
+    if (Number.isFinite(explicitLat) && Number.isFinite(explicitLng)) return { lat: explicitLat, lng: explicitLng };
+    const haystack = normalizePlaceKey(
+      [
+        row && row.stad,
+        row && row.plaats,
+        row && row.city,
+        row && row.gemeente,
+        row && row.adres,
+        row && row.address,
+        row && row.location,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    );
+    const placeKey = Object.keys(campaignPlaceCoords)
+      .sort((left, right) => right.length - left.length)
+      .find((key) => haystack.includes(normalizePlaceKey(key)));
+    return placeKey ? campaignPlaceCoords[placeKey] : null;
+  }
+
+  function getRowDistanceKm(row) {
+    const existing = Number(row && (row.distanceKm || row.afstandKm || row.radiusKm));
+    if (Number.isFinite(existing) && existing >= 0) return existing;
+    const coords = resolveRowCoords(row);
+    return coords ? haversineKm(oisterwijkCoords, coords) : NaN;
+  }
+
+  function parseRadiusKm(value) {
+    const parsed = Number.parseFloat(normalizeString(value).replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed <= 0) return 250;
+    return Math.max(1, Math.min(250, parsed));
+  }
+
   function pruneColdmailSendGuardEntries(entries) {
     const cutoffMs = now().getTime() - COLDMAIL_SEND_GUARD_WINDOW_MS;
     return (Array.isArray(entries) ? entries : [])
@@ -609,20 +701,29 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeString(row.branche || row.branch || '').toLowerCase() === filter;
   }
 
-  function isEligibleColdmailRow(row, branchFilter) {
+  function matchesRadius(row, radiusKm) {
+    const radius = parseRadiusKm(radiusKm);
+    const distanceKm = getRowDistanceKm(row);
+    if (!Number.isFinite(distanceKm)) return true;
+    return distanceKm <= radius;
+  }
+
+  function isEligibleColdmailRow(row, branchFilter, radiusKm) {
     const email = getRowEmail(row);
     if (!isLikelyValidEmail(email)) return false;
     if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
     if (!matchesBranch(row, branchFilter)) return false;
+    if (!matchesRadius(row, radiusKm)) return false;
     if (isTestRecipientRow(row, email)) return true;
     const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
     return !EXCLUDED_DATABASE_STATUSES.has(status);
   }
 
-  function isEligibleColdcallingRow(row, branchFilter) {
+  function isEligibleColdcallingRow(row, branchFilter, radiusKm) {
     if (!isLikelyCallablePhone(getRowPhone(row))) return false;
     if (row.call === false || row.canCall === false || row.doNotCall === true) return false;
     if (!matchesBranch(row, branchFilter)) return false;
+    if (!matchesRadius(row, radiusKm)) return false;
     const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
     return !new Set(['interesse', 'afspraak', 'klant', 'afgehaakt', 'geblokkeerd', 'buiten']).has(status);
   }
@@ -646,7 +747,11 @@ function createColdmailCampaignService(deps = {}) {
     const rows = mode === 'call' ? parseLeadDatabaseRows(values) : parseDatabaseRows(values);
     const candidateRows = rows
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
-      .filter(({ row }) => (mode === 'call' ? isEligibleColdcallingRow(row, input.branch) : isEligibleColdmailRow(row, input.branch)))
+      .filter(({ row }) =>
+        mode === 'call'
+          ? isEligibleColdcallingRow(row, input.branch, input.radiusKm)
+          : isEligibleColdmailRow(row, input.branch, input.radiusKm)
+      )
       .slice(0, count);
     const selectedRows = [];
     const failed = [];
@@ -681,6 +786,7 @@ function createColdmailCampaignService(deps = {}) {
     return {
       count,
       mode,
+      radiusKm: parseRadiusKm(input.radiusKm),
       values,
       rows,
       candidateRows,
@@ -695,6 +801,7 @@ function createColdmailCampaignService(deps = {}) {
       ok: true,
       mode: resolved.mode,
       requested: resolved.count,
+      radiusKm: resolved.radiusKm,
       candidates: resolved.candidateRows.length,
       selected: resolved.selectedRows.length,
       safetyLimits: getColdmailSafetyLimits(),
@@ -703,6 +810,7 @@ function createColdmailCampaignService(deps = {}) {
         bedrijf: getRowCompany(item.row),
         email: getRowEmail(item.row),
         phone: getRowPhone(item.row),
+        distanceKm: Number.isFinite(getRowDistanceKm(item.row)) ? Math.round(getRowDistanceKm(item.row) * 10) / 10 : null,
       })),
       failedItems: resolved.failed,
     };
@@ -1017,10 +1125,16 @@ function createColdmailCampaignService(deps = {}) {
     return next.toISOString();
   }
 
+  function normalizeCampaignDurationDays(value) {
+    const normalized = normalizeString(value).toLowerCase();
+    if (normalized === 'disabled' || normalized === 'uitgeschakeld' || normalized === '0') return 0;
+    return parsePositiveInt(value, 14, 1, 90);
+  }
+
   function markRowAsMailed(row, actor, durationDays) {
     const date = now().toISOString();
-    const safeDurationDays = parsePositiveInt(durationDays, 14, 1, 90);
-    const campaignEndsAt = addDaysIso(new Date(date), safeDurationDays);
+    const safeDurationDays = normalizeCampaignDurationDays(durationDays);
+    const campaignEndsAt = safeDurationDays > 0 ? addDaysIso(new Date(date), safeDurationDays) : '';
     const existingHistory = Array.isArray(row.hist) ? row.hist : [];
     return {
       ...row,

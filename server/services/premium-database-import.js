@@ -20,7 +20,20 @@ const GOOGLE_PLACES_FIELD_MASK = [
   'nextPageToken',
 ].join(',');
 const DEFAULT_REAL_BUSINESS_QUERY = 'bedrijven in Noord-Brabant';
-const DEFAULT_OPENAI_MODEL = 'gpt-5.5';
+const DEFAULT_OPENAI_MODEL = 'gpt-5.5-pro';
+const OPENAI_DATABASE_SEARCH_PRICING = {
+  'gpt-5.5-pro': {
+    inputUsdPerMillion: 30,
+    outputUsdPerMillion: 180,
+    cachedInputUsdPerMillion: null,
+  },
+  'gpt-5.5': {
+    inputUsdPerMillion: 5,
+    outputUsdPerMillion: 30,
+    cachedInputUsdPerMillion: 0.5,
+  },
+};
+const OPENAI_WEB_SEARCH_USD_PER_CALL = 0.01;
 const REAL_BUSINESS_CATEGORY_PREFIXES = [
   'bedrijven',
   'winkels',
@@ -967,6 +980,73 @@ function getOpenAiDatabaseSearchModel(deps = {}) {
   );
 }
 
+function getOpenAiDatabaseSearchReasoningEffort(model, deps = {}) {
+  const env = deps.env || process.env || {};
+  const explicit = normalizeString(deps.openAiReasoningEffort || env.OPENAI_DATABASE_SEARCH_REASONING_EFFORT);
+  if (['none', 'low', 'medium', 'high', 'xhigh'].includes(explicit)) return explicit;
+  return normalizeString(model).toLowerCase().includes('pro') ? 'high' : 'low';
+}
+
+function getOpenAiDatabaseSearchPricing(model) {
+  const normalized = normalizeString(model).toLowerCase();
+  return OPENAI_DATABASE_SEARCH_PRICING[normalized] || OPENAI_DATABASE_SEARCH_PRICING[DEFAULT_OPENAI_MODEL];
+}
+
+function extractOpenAiUsage(data) {
+  const usage = data && data.usage && typeof data.usage === 'object' ? data.usage : {};
+  const inputTokens = Math.max(0, Number(usage.input_tokens || usage.prompt_tokens || 0) || 0);
+  const outputTokens = Math.max(0, Number(usage.output_tokens || usage.completion_tokens || 0) || 0);
+  const inputDetails = usage.input_tokens_details && typeof usage.input_tokens_details === 'object'
+    ? usage.input_tokens_details
+    : {};
+  const cachedInputTokens = Math.max(0, Number(inputDetails.cached_tokens || 0) || 0);
+  return {
+    inputTokens,
+    outputTokens,
+    cachedInputTokens: Math.min(inputTokens, cachedInputTokens),
+  };
+}
+
+function countOpenAiWebSearchCalls(data) {
+  const output = Array.isArray(data && data.output) ? data.output : [];
+  return output.filter((item) => normalizeString(item && item.type) === 'web_search_call').length;
+}
+
+function estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls }) {
+  const pricing = getOpenAiDatabaseSearchPricing(model);
+  const safeUsage = usage || {};
+  const inputTokens = Math.max(0, Number(safeUsage.inputTokens || 0) || 0);
+  const outputTokens = Math.max(0, Number(safeUsage.outputTokens || 0) || 0);
+  const cachedInputTokens = Math.min(inputTokens, Math.max(0, Number(safeUsage.cachedInputTokens || 0) || 0));
+  const billableInputTokens = Math.max(0, inputTokens - cachedInputTokens);
+  const cachedRate = Number.isFinite(pricing.cachedInputUsdPerMillion)
+    ? pricing.cachedInputUsdPerMillion
+    : pricing.inputUsdPerMillion;
+  const inputUsd = (billableInputTokens / 1000000) * pricing.inputUsdPerMillion;
+  const cachedInputUsd = (cachedInputTokens / 1000000) * cachedRate;
+  const outputUsd = (outputTokens / 1000000) * pricing.outputUsdPerMillion;
+  const webSearchUsd = Math.max(0, Number(webSearchCalls || 0) || 0) * OPENAI_WEB_SEARCH_USD_PER_CALL;
+  const totalUsd = inputUsd + cachedInputUsd + outputUsd + webSearchUsd;
+
+  return {
+    currency: 'USD',
+    estimatedUsd: Number(totalUsd.toFixed(6)),
+    inputUsd: Number((inputUsd + cachedInputUsd).toFixed(6)),
+    outputUsd: Number(outputUsd.toFixed(6)),
+    webSearchUsd: Number(webSearchUsd.toFixed(6)),
+    inputTokens,
+    outputTokens,
+    cachedInputTokens,
+    webSearchCalls: Math.max(0, Number(webSearchCalls || 0) || 0),
+    pricing: {
+      inputUsdPerMillion: pricing.inputUsdPerMillion,
+      outputUsdPerMillion: pricing.outputUsdPerMillion,
+      webSearchUsdPerCall: OPENAI_WEB_SEARCH_USD_PER_CALL,
+    },
+    note: 'Schatting op basis van OpenAI tokengebruik en web-search calls; exclusief eventuele regionale toeslagen.',
+  };
+}
+
 function normalizeDeepSearchTarget(value) {
   return truncateText(value, 240);
 }
@@ -1264,6 +1344,7 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   }
 
   const model = getOpenAiDatabaseSearchModel({ ...deps, env });
+  const reasoningEffort = getOpenAiDatabaseSearchReasoningEffort(model, { ...deps, env });
   const { systemPrompt, userPrompt } = buildDeepSearchPrompt({
     target,
     count,
@@ -1286,7 +1367,7 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
       signal: controller ? controller.signal : undefined,
       body: JSON.stringify({
         model,
-        reasoning: { effort: 'low' },
+        reasoning: { effort: reasoningEffort },
         tools: [
           {
             type: 'web_search',
@@ -1328,6 +1409,9 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const rawBusinesses = Array.isArray(parsed && parsed.businesses) ? parsed.businesses : [];
   const businesses = dedupeDeepSearchBusinesses(rawBusinesses).slice(0, count);
   const rows = mapDeepSearchBusinessesToRows(businesses);
+  const usage = extractOpenAiUsage(data);
+  const webSearchCalls = countOpenAiWebSearchCalls(data);
+  const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls });
 
   return {
     ok: true,
@@ -1335,9 +1419,11 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
     source: 'openai-web-search',
     target,
     model,
+    reasoningEffort,
     requested: count,
     found: businesses.length,
     rejected: Math.max(0, rawBusinesses.length - businesses.length),
+    cost,
     businesses,
     sources: collectDeepSearchSources(data, businesses),
     rows,
@@ -1452,6 +1538,7 @@ module.exports = {
   fetchDeepSearchBusinessRows,
   fetchRealBusinessRows,
   fetchSpreadsheetRowsFromSourceUrl,
+  estimateOpenAiDatabaseSearchCost,
   listWorkbookWorksheets,
   normalizeGoogleSheetsExportUrl,
   parseDelimitedRows,

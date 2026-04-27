@@ -1274,6 +1274,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
         <div class="field lead-generator-branch-field">
           <div class="field-label">Campagne afgerond na</div>
           <select class="sel" id="campaignDurationDays" aria-label="Campagneduur">
+            <option value="disabled">Uitgeschakeld</option>
             <option value="5">5 dagen</option>
             <option value="7">7 dagen</option>
             <option value="14" selected>14 dagen</option>
@@ -1451,6 +1452,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
+<script src="assets/premium-campaign-radius.js?v=20260427a"></script>
 <script>
 // ── DATA ──
 let bedrijven = [];
@@ -1500,13 +1502,16 @@ function getSelectedColdcallingStackLabel() {
 }
 
 function normalizeCampaignDurationDays(value) {
-  const raw = Number.parseInt(String(value || '').trim(), 10);
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'disabled' || normalized === 'uitgeschakeld' || normalized === '0') return 0;
+  const raw = Number.parseInt(normalized, 10);
   if (raw === 5 || raw === 7 || raw === 14) return raw;
   return 14;
 }
 
 function formatCampaignDurationLabel(value) {
-  return normalizeCampaignDurationDays(value) + ' dagen';
+  const normalized = normalizeCampaignDurationDays(value);
+  return normalized === 0 ? 'Uitgeschakeld' : normalized + ' dagen';
 }
 
 function getSelectedCampaignDurationDays() {
@@ -1627,11 +1632,31 @@ function getCampaignRequestedCompanyCount() {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
+const KM_OPTIES = [10,20,30,40,50,75,100,130,150,175,200,250];
+
+function getSelectedCampaignRadiusKm() {
+  const slider = document.getElementById('km-slider');
+  const index = Number.parseInt(slider ? slider.value : '4', 10);
+  return KM_OPTIES[index] || 50;
+}
+
+function getCampaignRowDistanceKm(row) {
+  return window.SoftoraCampaignRadius && typeof window.SoftoraCampaignRadius.getDistanceKm === 'function'
+    ? window.SoftoraCampaignRadius.getDistanceKm(row)
+    : NaN;
+}
+
+function isCampaignRowWithinRadius(row) {
+  return window.SoftoraCampaignRadius && typeof window.SoftoraCampaignRadius.isWithinRadius === 'function'
+    ? window.SoftoraCampaignRadius.isWithinRadius(row, getSelectedCampaignRadiusKm())
+    : true;
+}
+
 function renderCampaignCompanyCount(countOverride) {
   const valueEl = document.getElementById('campaignCompanyCountValue');
   const wrap = document.getElementById('campaignCompanyCount');
   if (!valueEl || !wrap) return;
-  const eligibleRows = coldmailingDatabaseRows.filter(isEligibleCampaignCountRow);
+  const eligibleRows = coldmailingDatabaseRows.filter((row) => isEligibleCampaignCountRow(row) && isCampaignRowWithinRadius(row));
   const requestedCount = getCampaignRequestedCompanyCount();
   const count = Number.isFinite(Number(countOverride))
     ? Math.max(0, Number(countOverride))
@@ -1645,6 +1670,7 @@ function getColdmailRecipientPreviewUrl() {
   const params = new URLSearchParams();
   params.set('count', String(getCampaignRequestedCompanyCount() || 10));
   if (isPremiumAiLeadGeneratorPath()) params.set('mode', 'call');
+  params.set('radiusKm', String(getSelectedCampaignRadiusKm()));
   const branchSelect = document.getElementById('branche');
   if (branchSelect && branchSelect.value) params.set('branch', branchSelect.value);
   return '/api/coldmailing/campaigns/recipients?' + params.toString();
@@ -1975,12 +2001,14 @@ function initCampaignDurationSetting() {
   const select = document.getElementById('campaignDurationDays');
   if (!select || select.dataset.durationSettingBound === '1') return;
   select.dataset.durationSettingBound = '1';
-  select.value = String(normalizeCampaignDurationDays(select.value));
+  const initialDurationDays = normalizeCampaignDurationDays(select.value);
+  select.value = initialDurationDays === 0 ? 'disabled' : String(initialDurationDays);
 
   select.addEventListener('change', function () {
     const durationDays = normalizeCampaignDurationDays(select.value);
-    if (select.value !== String(durationDays)) select.value = String(durationDays);
-    showToast('Campagne afgerond na ' + formatCampaignDurationLabel(durationDays));
+    const normalizedValue = durationDays === 0 ? 'disabled' : String(durationDays);
+    if (select.value !== normalizedValue) select.value = normalizedValue;
+    showToast(durationDays === 0 ? 'Campagne afronding uitgeschakeld' : 'Campagne afgerond na ' + formatCampaignDurationLabel(durationDays));
   });
 }
 
@@ -2124,13 +2152,18 @@ function updateSlider(v) {
 configureCampaignVolumeControl();
 updateSlider(document.getElementById('mail-slider') ? document.getElementById('mail-slider').value : 10);
 
-const KM_OPTIES = [10,20,30,40,50,75,100,130,150,175,200,250];
 function updateKm(v) {
   const km = KM_OPTIES[v] || 50;
   document.getElementById('km-val').textContent = km + ' km';
   const pct = (v/10)*100;
   document.getElementById('km-slider').style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
+  if (isPremiumAiLeadGeneratorPath()) {
+    void hydrateCampaignCompanyCountFromSupabase();
+  } else {
+    renderCampaignCompanyCount();
+  }
+  hydrateCampaignRecipientListSoon();
 }
 updateKm(4);
 
@@ -2236,6 +2269,7 @@ function buildCountPlan(total, ratios) {
 
 function resolveCampaignTimelineDays(durationDays) {
   const normalizedDays = normalizeCampaignDurationDays(durationDays);
+  if (normalizedDays === 0) return [1, 3, 5, 8, 10, 12, 14];
   if (normalizedDays === 5) return [1, 2, 3, 4, 4, 5, 5];
   if (normalizedDays === 7) return [1, 2, 3, 4, 5, 6, 7];
   return [1, 3, 5, 8, 10, 12, 14];
@@ -2243,7 +2277,8 @@ function resolveCampaignTimelineDays(durationDays) {
 
 function getCampaignTimelineTotalDays() {
   const finalStep = campaignTimeline[campaignTimeline.length - 1];
-  return normalizeCampaignDurationDays(finalStep ? finalStep.day : 14);
+  const normalized = normalizeCampaignDurationDays(finalStep ? finalStep.day : 14);
+  return normalized === 0 ? 14 : normalized;
 }
 
 function buildCampaignTimeline(total, durationDays) {
@@ -2442,6 +2477,7 @@ function getColdmailCampaignPayload() {
     senderEmail: senderSelect ? senderSelect.value : '',
     specialAction: specialActionSelect ? specialActionSelect.value : '',
     durationDays: getSelectedCampaignDurationDays(),
+    radiusKm: getSelectedCampaignRadiusKm(),
   };
 }
 
@@ -2582,6 +2618,7 @@ async function startCampagneImmediate() {
   const n = parseInt(document.getElementById('mail-slider').value, 10) || 100;
   const durationDays = getSelectedCampaignDurationDays();
   const durationLabel = formatCampaignDurationLabel(durationDays);
+  const durationCopy = durationDays === 0 ? 'zonder automatische afronding' : 'in ' + durationLabel;
   const providerSuffix = isPremiumAiLeadGeneratorPath()
     ? ' Provider: ' + getSelectedColdcallingStackLabel() + '.'
     : '';
@@ -2631,9 +2668,9 @@ async function startCampagneImmediate() {
   running = true;
 
   const timelineTitle = document.getElementById('campaign-timeline-title');
-  if (timelineTitle) timelineTitle.textContent = durationLabel + ' tijdlijn';
+  if (timelineTitle) timelineTitle.textContent = durationDays === 0 ? 'Tijdlijn voorbeeld' : durationLabel + ' tijdlijn';
   document.getElementById('campaign-subtitle').textContent =
-    `${actualTotal} bedrijven doorlopen deze campagne in ${durationLabel}, van eerste verzending tot laatste checkpoint.${providerSuffix}`;
+    `${actualTotal} bedrijven doorlopen deze campagne ${durationCopy}, van eerste verzending tot laatste checkpoint.${providerSuffix}`;
 
   showScreen('screen-campaign');
   document.getElementById('campaign-progress-fill').style.width = '0%';

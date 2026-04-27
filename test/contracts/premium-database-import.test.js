@@ -476,6 +476,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
         assert.equal(options.headers.Authorization, 'Bearer openai-key');
         const payload = JSON.parse(options.body);
         assert.equal(payload.model, 'gpt-5.5');
+        assert.equal(payload.reasoning.effort, 'low');
         assert.equal(payload.tools[0].type, 'web_search');
         assert.equal(payload.tools[0].external_web_access, true);
         assert.deepEqual(payload.include, ['web_search_call.action.sources']);
@@ -516,6 +517,11 @@ test('premium database deep search uses OpenAI web search and returns complete r
                   },
                 },
               ],
+              usage: {
+                input_tokens: 1000,
+                input_tokens_details: { cached_tokens: 200 },
+                output_tokens: 500,
+              },
             };
           },
         };
@@ -527,6 +533,13 @@ test('premium database deep search uses OpenAI web search and returns complete r
   assert.equal(result.fileType, 'openai-web-search');
   assert.equal(result.found, 1);
   assert.equal(result.rejected, 1);
+  assert.equal(result.model, 'gpt-5.5');
+  assert.equal(result.reasoningEffort, 'low');
+  assert.equal(result.cost.currency, 'USD');
+  assert.equal(result.cost.inputTokens, 1000);
+  assert.equal(result.cost.outputTokens, 500);
+  assert.equal(result.cost.webSearchCalls, 1);
+  assert.equal(result.cost.estimatedUsd, 0.0291);
   assert.deepEqual(result.rows[1].slice(0, 5), [
     'Bakkerij Zon',
     'Dorpsstraat 1, 4286 AA Almkerk',
@@ -565,6 +578,44 @@ test('premium database deep search route reports missing OpenAI key', async () =
   assert.equal(response.statusCode, 503);
   assert.equal(response.body.ok, false);
   assert.equal(response.body.code, 'OPENAI_NOT_CONFIGURED');
+});
+
+test('premium database deep search defaults to gpt-5.5-pro with high reasoning', async () => {
+  const result = await fetchDeepSearchBusinessRows(
+    {
+      target: 'Nederland | Noord-Brabant | Altena | Almkerk',
+      count: 1,
+    },
+    {
+      env: { OPENAI_API_KEY: 'openai-key' },
+      fetchImpl: async (_url, options = {}) => {
+        const payload = JSON.parse(options.body);
+        assert.equal(payload.model, 'gpt-5.5-pro');
+        assert.equal(payload.reasoning.effort, 'high');
+        return {
+          ok: true,
+          async json() {
+            return {
+              output_text: JSON.stringify({
+                target: 'Almkerk',
+                businesses: [],
+                notes: '',
+              }),
+              output: [],
+              usage: {
+                input_tokens: 100,
+                output_tokens: 20,
+              },
+            };
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(result.model, 'gpt-5.5-pro');
+  assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.cost.estimatedUsd, 0.0066);
 });
 
 test('premium database import route is registered behind the premium api surface', () => {

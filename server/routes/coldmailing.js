@@ -30,6 +30,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         count: req.query.count,
         branch: req.query.branch,
         mode: req.query.mode,
+        radiusKm: req.query.radiusKm,
       });
       res.json(result);
     } catch (error) {
@@ -57,6 +58,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         senderEmail: body.senderEmail,
         specialAction: body.specialAction,
         durationDays: body.durationDays,
+        radiusKm: body.radiusKm,
         actor:
           normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
           'Coldmailing',
