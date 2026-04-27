@@ -125,6 +125,15 @@ test('page smoke: premium-website.html keeps mobile werkwijze background white',
   assert.match(html, /#werkwijze \.werkwijze-grid,/ , 'Werkwijze grid wit-regel hoort aanwezig te zijn.');
 });
 
+test('page smoke: premium-website.html routes non-widget CTA buttons to contact form on desktop', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
+  assert.match(html, /const ctaLinks = Array\.from\(document\.querySelectorAll\('a\[href\^="https:\/\/wa\.me\/"\]/, 'CTA WA-links routing setup ontbreekt.');
+  assert.match(html, /const desktopOnlyContactFormId = "#faq-contact-form";/, 'Desktop contact-form target id ontbreekt.');
+  assert.match(html, /syncCtaLinksForViewport\(\);/, 'Desktop/mobile CTA sync aanroep ontbreekt.');
+  assert.match(html, /window\.addEventListener\("resize", syncCtaLinksForViewport/, 'Resize-resync voor CTA routing ontbreekt.');
+  assert.match(html, /\.filter\(function \(link\) {\s*return !link\.closest\(\"\.whatsapp-widget\"\);/s, 'WhatsApp widget mag niet mee-gewijzigd worden.');
+});
+
 test('page smoke: premium-ai-coldmailing.html promotes suppression after lead removal regardless of persistence state', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
   assert.match(html, /promoteLeadRowSuppression\(lead\)/, 'Lead suppression promotion na verwijdering ontbreekt.');
