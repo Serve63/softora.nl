@@ -22,6 +22,10 @@ test('premium advertenties toont een aparte AI beheer workspace boven de persone
   assert.match(assetSource, /ads_google: '\/premium-advertenties#google'/);
   assert.match(assetSource, /AI gebruikt Google Ads nu actief/);
   assert.match(assetSource, /AI gebruikt Pinterest nu niet/);
+  assert.match(assetSource, /refs\.tools\.replaceChildren\(\);/);
+  assert.match(assetSource, /label\.className = 'ai-marketing-tool';/);
+  assert.doesNotMatch(assetSource, /refs\.tools\.innerHTML\s*=/);
+  assert.doesNotMatch(assetSource, /function escapeHtml\(value\)/);
   assert.match(cssSource, /html\[data-ai-management-mode="software"\] \.page-personnel-shell \{/);
   assert.match(cssSource, /html\[data-ai-management-mode="software"\] \.content-lock-overlay \{/);
 });
