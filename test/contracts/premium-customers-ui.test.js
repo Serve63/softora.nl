@@ -23,7 +23,9 @@ test('premium customers page bootstraps customer rows before async sync runs', (
 
 test('premium customers page supports toegewezen aan in table, modal and order import', () => {
   const pagePath = path.join(__dirname, '../../premium-klanten.html');
+  const rendererPath = path.join(__dirname, '../../assets/premium-customers-renderers.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
 
   assert.match(pageSource, /<th>Toegewezen aan<\/th>/);
   assert.match(pageSource, /<th>Review\?<\/th>\s*<th>Betaaldatum<\/th>/);
@@ -54,10 +56,21 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /const counts = state\.klanten\.reduce\(function \(result, customer\)/);
   assert.match(pageSource, /displayName: formatResponsibleDisplayName\("Serve"\)/);
   assert.match(pageSource, /displayName: formatResponsibleDisplayName\("Martijn"\)/);
-  assert.match(pageSource, /nodes\.leaderboardList\.innerHTML = entries\.map\(function \(entry, index\) \{/);
-  assert.match(pageSource, /const rowClassName = index === 0 \? "leaderboard-entry is-leading" : "leaderboard-entry";/);
-  assert.match(pageSource, /escapeHtml\(entry\.displayName\)/);
-  assert.match(pageSource, /escapeHtml\(entry\.count \+ " " \+ assignmentLabel\)/);
+  assert.match(pageSource, /<script src="assets\/premium-customers-renderers\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /window\.SoftoraCustomersRenderers\.renderLeaderboard\(nodes\.leaderboardList, entries\);/);
+  assert.match(pageSource, /window\.SoftoraCustomersRenderers\.renderRows\(nodes\.body, filtered, \{/);
+  assert.match(rendererSource, /function renderLeaderboard\(target, entries\) \{/);
+  assert.match(rendererSource, /target\.replaceChildren\(\);/);
+  assert.match(rendererSource, /row\.className = index === 0 \? "leaderboard-entry is-leading" : "leaderboard-entry";/);
+  assert.match(rendererSource, /appendText\(row, "span", "leaderboard-entry-name", entry\.displayName\);/);
+  assert.match(rendererSource, /function createCell\(label, className\) \{/);
+  assert.match(rendererSource, /function renderRows\(target, customers, helpers\) \{/);
+  assert.match(pageSource, /nodes\.body\.replaceChildren\(\);/);
+  assert.match(rendererSource, /fragment\.appendChild\(row\);/);
+  assert.doesNotMatch(pageSource, /nodes\.body\.innerHTML/);
+  assert.doesNotMatch(pageSource, /nodes\.leaderboardList\.innerHTML/);
+  assert.doesNotMatch(rendererSource, /\.innerHTML\s*=/);
+  assert.doesNotMatch(pageSource, /function escapeHtml\(value\)/);
   assert.match(pageSource, /function updateStats\(\) \{[\s\S]*updateLeaderboard\(\);[\s\S]*\}/);
 });
 

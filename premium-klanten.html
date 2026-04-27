@@ -1292,6 +1292,7 @@
     </div>
 
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
+    <script src="assets/premium-customers-renderers.js?v=20260427a"></script>
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
@@ -1561,15 +1562,6 @@
             });
         }
 
-        function escapeHtml(value) {
-            return String(value || "")
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
         function formatMoney(value) {
             const amount = Number(value) || 0;
             return new Intl.NumberFormat("nl-NL", {
@@ -1617,45 +1609,6 @@
                 return normalizeOptionalAmount(customer && customer.websiteBedrag);
             }
             return normalizeOptionalAmount(customer && customer.onderhoudPerMaand);
-        }
-
-        function renderServiceCell(customer, kind) {
-            const isWebsite = kind === "website";
-            const isApplicable = isWebsite ? customerHasWebsite(customer) : customerHasMaintenance(customer);
-
-            if (!isApplicable) {
-                return isWebsite
-                    ? "<span class=\"service-na\">Niet van toepassing</span>"
-                    : "<span class=\"service-na\">Nee</span>";
-            }
-
-            const serviceName = "";
-            const serviceAmount = getServiceAmount(customer, kind);
-            const priceLabel = serviceAmount !== null
-                ? (isWebsite ? formatMoney(serviceAmount) : (formatMoney(serviceAmount) + " p/m"))
-                : "Nog niet ingevuld";
-            const priceClass = serviceAmount !== null ? "service-price" : "service-price service-na";
-
-            return [
-                "<div class=\"service-stack\">",
-                    (serviceName ? "<div class=\"service-name\">" + escapeHtml(serviceName) + "</div>" : ""),
-                    "<div class=\"" + priceClass + "\">" + escapeHtml(priceLabel) + "</div>",
-                "</div>"
-            ].join("");
-        }
-
-        function renderPrijsCell(customer) {
-            const serviceAmount = getServiceAmount(customer, "website");
-            const type = normalizeString(customer && customer.type);
-            const websiteApplicable = type === "Website" || type === "Website + onderhoud";
-
-            if (!websiteApplicable && serviceAmount === null) {
-                return "<span class=\"service-na\">—</span>";
-            }
-            if (serviceAmount === null) {
-                return "<span class=\"service-price service-na\">Nog niet ingevuld</span>";
-            }
-            return "<div class=\"service-price\">" + escapeHtml(formatMoney(serviceAmount)) + "</div>";
         }
 
         function updateAmountFieldVisibility() {
@@ -2009,16 +1962,7 @@
             });
 
             nodes.leaderboardCard.hidden = false;
-            nodes.leaderboardList.innerHTML = entries.map(function (entry, index) {
-                const assignmentLabel = entry.count === 1 ? "opdracht" : "opdrachten";
-                const rowClassName = index === 0 ? "leaderboard-entry is-leading" : "leaderboard-entry";
-                return [
-                    "<div class=\"" + rowClassName + "\">",
-                        "<span class=\"leaderboard-entry-name\">" + escapeHtml(entry.displayName) + "</span>",
-                        "<span class=\"leaderboard-entry-count\">" + escapeHtml(entry.count + " " + assignmentLabel) + "</span>",
-                    "</div>"
-                ].join("");
-            }).join("");
+            window.SoftoraCustomersRenderers.renderLeaderboard(nodes.leaderboardList, entries);
         }
 
         function updateStats() {
@@ -2029,51 +1973,22 @@
             const filtered = getFilteredCustomers();
 
             nodes.empty.hidden = filtered.length !== 0;
+            nodes.body.replaceChildren();
 
             if (!filtered.length) {
-                nodes.body.innerHTML = "";
                 return;
             }
 
-            nodes.body.innerHTML = filtered.map(function (customer) {
-                const statusClass = customer.status === "Betaald" ? "is-paid" : "is-open";
-                const activeClass = customer.actief === "Ja" ? "is-yes" : "is-no";
-                const websiteLabel = normalizeString(customer && customer.website);
-                const customerSubLabel = websiteLabel && websiteLabel !== "-"
-                    ? websiteLabel
-                    : ((customer.bedrijf && customer.bedrijf !== "-") ? customer.bedrijf : "");
-
-                return [
-                    "<tr>",
-                        "<td class=\"cell-client\" data-label=\"Klant\">",
-                            "<div class=\"client-name\">" + escapeHtml(customer.naam) + "</div>",
-                            (customerSubLabel
-                                ? "<div class=\"client-company\">" + escapeHtml(customerSubLabel) + "</div>"
-                                : ""),
-                        "</td>",
-                        "<td data-label=\"Telefoonnummer\" class=\"muted-cell cell-phone\">" + escapeHtml(customer.telefoon) + "</td>",
-                        "<td data-label=\"Service\" class=\"muted-cell\">" + escapeHtml(formatCustomerServiceLabel(customer.service)) + "</td>",
-                        "<td data-label=\"Prijs\" class=\"service-cell\">",
-                            renderPrijsCell(customer),
-                        "</td>",
-                        "<td data-label=\"Onderhoud\" class=\"service-cell\">",
-                            renderServiceCell(customer, "maintenance"),
-                        "</td>",
-                        "<td data-label=\"Status\"><span class=\"status-text " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
-                        "<td data-label=\"Toegewezen aan\" class=\"muted-cell cell-assigned\">" + escapeHtml(formatResponsibleDisplayName(customer.verantwoordelijk || "Serve")) + "</td>",
-                        "<td data-label=\"Actief\"><span class=\"active-text " + activeClass + "\">" + escapeHtml(customer.actief || "Ja") + "</span></td>",
-                        "<td data-label=\"Review?\"><span class=\"active-text " + (customer.review === "Ja" ? "is-yes" : "is-no") + "\">" + escapeHtml(customer.review || "Nee") + "</span></td>",
-                        "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
-                        "<td class=\"cell-actions\" data-label=\"Acties\">",
-                            "<div class=\"actions\">",
-                                "<button type=\"button\" class=\"btn-edit\" data-action=\"edit\" data-id=\"" + escapeHtml(customer.id) + "\" title=\"Bewerken\" aria-label=\"Klant bewerken\">",
-                                    "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z\"/></svg>",
-                                "</button>",
-                            "</div>",
-                        "</td>",
-                    "</tr>"
-                ].join("");
-            }).join("");
+            window.SoftoraCustomersRenderers.renderRows(nodes.body, filtered, {
+                formatCustomerServiceLabel: formatCustomerServiceLabel,
+                formatDate: formatDate,
+                formatMoney: formatMoney,
+                formatResponsibleDisplayName: formatResponsibleDisplayName,
+                getServiceAmount: getServiceAmount,
+                customerHasWebsite: customerHasWebsite,
+                customerHasMaintenance: customerHasMaintenance,
+                normalizeString: normalizeString
+            });
         }
 
         function renderPage() {
