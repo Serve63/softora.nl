@@ -106,7 +106,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /AI-database/i);
   assert.doesNotMatch(pageSource, /ai-database-badge/);
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
-  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Volgende locatie doorzoeken[\s\S]*AI werkt de huidige plek automatisch af/);
+  assert.match(pageSource, /<button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">Bedrijven toevoegen<\/button>/);
+  assert.doesNotMatch(pageSource, /Volgende locatie doorzoeken/);
+  assert.doesNotMatch(pageSource, /AI werkt de huidige plek automatisch af/);
   assert.doesNotMatch(pageSource, /100 bedrijven toevoegen/);
   assert.doesNotMatch(pageSource, />Uploaden</);
   assert.doesNotMatch(pageSource, />Google Sheet koppelen</);
