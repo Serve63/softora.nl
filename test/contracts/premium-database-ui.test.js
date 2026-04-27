@@ -158,7 +158,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427b/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427c/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -208,7 +208,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427c"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -237,7 +237,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT/);
   assert.match(deepSearchScriptSource, /fetch\("\/api\/premium-database\/deep-search-businesses"/);
   assert.match(deepSearchScriptSource, /count: 100/);
-  assert.match(deepSearchScriptSource, /API-kosten/);
+  assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
+  assert.match(deepSearchScriptSource, /function formatUsdAsEuro\(value\)/);
+  assert.match(deepSearchScriptSource, /USD_TO_EUR_RATE = 0\.93/);
+  assert.match(deepSearchScriptSource, /ESTIMATED_BATCH_PRICING/);
   assert.match(deepSearchScriptSource, /function markCurrentDone\(\)/);
   assert.match(deepSearchScriptSource, /source: "premium-database-deep-search"/);
   assert.match(importScriptSource, /function readRealBusinessRows\(query\)/);

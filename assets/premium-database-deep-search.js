@@ -6,6 +6,15 @@
         active: "Bezig",
         done: "Klaar"
     };
+    const USD_TO_EUR_RATE = 0.93;
+    const ESTIMATED_BATCH_PRICING = {
+        inputTokens: 6000,
+        outputTokens: 16000,
+        webSearchCalls: 1,
+        inputUsdPerMillion: 30,
+        outputUsdPerMillion: 180,
+        webSearchUsdPerCall: 0.01
+    };
     const DEFAULT_TARGET_TEXT = [
         "Nederland | Noord-Brabant | Altena | Almkerk",
         "Nederland | Noord-Brabant | Altena | Andel",
@@ -147,11 +156,27 @@
         return parseTargetLines(DEFAULT_TARGET_TEXT);
     }
 
-    function formatUsd(value) {
-        return "$" + Number(value || 0).toLocaleString("nl-NL", {
+    function estimateBatchUsd() {
+        return ((ESTIMATED_BATCH_PRICING.inputTokens / 1000000) * ESTIMATED_BATCH_PRICING.inputUsdPerMillion)
+            + ((ESTIMATED_BATCH_PRICING.outputTokens / 1000000) * ESTIMATED_BATCH_PRICING.outputUsdPerMillion)
+            + (ESTIMATED_BATCH_PRICING.webSearchCalls * ESTIMATED_BATCH_PRICING.webSearchUsdPerCall);
+    }
+
+    function usdToEur(value) {
+        return Math.max(0, Number(value || 0) || 0) * USD_TO_EUR_RATE;
+    }
+
+    function formatEuro(value) {
+        const amount = Math.max(0, Number(value || 0) || 0);
+        const visibleAmount = amount > 0 && amount < 0.01 ? 0.01 : amount;
+        return "€" + visibleAmount.toLocaleString("nl-NL", {
             minimumFractionDigits: 2,
-            maximumFractionDigits: 4
+            maximumFractionDigits: 2
         });
+    }
+
+    function formatUsdAsEuro(value) {
+        return formatEuro(usdToEur(value));
     }
 
     function safeParseJson(raw) {
@@ -366,7 +391,7 @@
             const target = getCurrentTarget();
             if (nodes.deepSearchStats) {
                 nodes.deepSearchStats.textContent = state.targets.length
-                    ? stats.done + " klaar · " + stats.pending + " in wachtrij · " + state.targets.length + " totaal · " + formatUsd(state.totalCostUsd) + " API"
+                    ? stats.done + " klaar · " + stats.pending + " in wachtrij · " + state.targets.length + " totaal · " + formatUsdAsEuro(state.totalCostUsd) + " API"
                     : "Geen vaste volgorde";
             }
             if (nodes.deepSearchCurrent) {
@@ -375,9 +400,10 @@
                     : "Geen huidige plek";
             }
             if (nodes.deepSearchCost) {
+                const batchEstimate = formatEuro(usdToEur(estimateBatchUsd()));
                 nodes.deepSearchCost.textContent = target
-                    ? "API-kosten: " + formatUsd(target.costUsd) + " voor deze plek · " + formatUsd(state.totalCostUsd) + " totaal"
-                    : "API-kosten: nog geen uitvoering";
+                    ? "Geschatte API-kosten: ± " + batchEstimate + " voor deze klik · " + formatUsdAsEuro(target.costUsd) + " gebruikt voor deze plek · " + formatUsdAsEuro(state.totalCostUsd) + " totaal"
+                    : "Geschatte API-kosten: ± " + batchEstimate + " per klik";
             }
             if (nodes.deepSearchList) {
                 nodes.deepSearchList.innerHTML = state.targets.length
@@ -452,7 +478,7 @@
                     render();
                     return persistState().then(function () {
                         setStatusMessage(
-                            "AI vond " + Number(body.found || 0) + " complete bedrijven voor " + target.label + ". " + addedCount + " nieuw toegevoegd. API-kosten: " + formatUsd(body && body.cost && body.cost.estimatedUsd) + ".",
+                            "AI vond " + Number(body.found || 0) + " complete bedrijven voor " + target.label + ". " + addedCount + " nieuw toegevoegd. API-kosten: " + formatUsdAsEuro(body && body.cost && body.cost.estimatedUsd) + ".",
                             "success",
                             true
                         );
