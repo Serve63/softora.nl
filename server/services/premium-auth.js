@@ -73,6 +73,8 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
   }
 
   async function recoverBootstrapLoginUser(req, users, email, password, matchedUser) {
+    if (!matchedUser) return null;
+    if (normalizeString(matchedUser.source || '').toLowerCase() !== 'bootstrap_env') return null;
     if (typeof premiumUsersStore.findBootstrapUserByEmail !== 'function') return null;
 
     const bootstrapUser = premiumUsersStore.findBootstrapUserByEmail(email);
@@ -80,23 +82,15 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     if (!premiumUsersStore.verifyPasswordHash(password, bootstrapUser.passwordHash)) return null;
 
     const nowIso = new Date().toISOString();
-    const nextUser = matchedUser
-      ? {
-          ...matchedUser,
-          passwordHash: bootstrapUser.passwordHash,
-          updatedAt: nowIso,
-        }
-      : {
-          ...bootstrapUser,
-          createdAt: bootstrapUser.createdAt || nowIso,
-          updatedAt: nowIso,
-        };
+    const nextUser = {
+      ...matchedUser,
+      passwordHash: bootstrapUser.passwordHash,
+      updatedAt: nowIso,
+    };
     const existingUsers = Array.isArray(users) ? users : [];
-    const nextUsers = matchedUser
-      ? existingUsers.map((user) =>
-          user && (user.id === matchedUser.id || user.email === matchedUser.email) ? nextUser : user
-        )
-      : existingUsers.concat(nextUser);
+    const nextUsers = existingUsers.map((user) =>
+      user && (user.id === matchedUser.id || user.email === matchedUser.email) ? nextUser : user
+    );
 
     let savedUsers = nextUsers;
     if (typeof premiumUsersStore.persistUsersCollection === 'function') {

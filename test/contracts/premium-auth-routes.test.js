@@ -34,12 +34,15 @@ function createPremiumUsersStoreStub(initialUsers = [], source = 'supabase', opt
     ...user,
   }));
   const bootstrapUsers = Array.isArray(options.bootstrapUsers) ? options.bootstrapUsers : [];
+  const persistCalls = [];
 
   return {
+    persistCalls,
     async ensureUsersHydrated() {
       return { source, users };
     },
     async persistUsersCollection(nextUsers) {
+      persistCalls.push(nextUsers);
       users.splice(0, users.length, ...nextUsers);
       return { source: 'supabase', users };
     },
@@ -134,6 +137,7 @@ function createFixture(options = {}) {
     cookieClears,
     cookieSets,
     coordinator,
+    premiumUsersStore,
     tokenCalls,
   };
 }
@@ -280,6 +284,7 @@ test('premium auth login recovers stale stored hashes from bootstrap credentials
         role: 'admin',
         status: 'active',
         passwordHash: 'hash:old-password',
+        source: 'bootstrap_env',
       },
     ],
     storeOptions: {
@@ -305,6 +310,78 @@ test('premium auth login recovers stale stored hashes from bootstrap credentials
   assert.equal(res.body.ok, true);
   assert.equal(fixture.auditEvents.some((event) => event.reason === 'security_login_bootstrap_password_recovered'), true);
   assert.equal(fixture.auditEvents.at(-1).reason, 'security_login_success');
+});
+
+test('premium auth login never creates a missing bootstrap user during password recovery', async () => {
+  const fixture = createFixture({
+    users: [
+      {
+        id: 'usr_staff',
+        email: 'staff@softora.nl',
+        role: 'admin',
+        status: 'active',
+        passwordHash: 'hash:secret123',
+      },
+    ],
+    storeOptions: {
+      bootstrapUsers: [
+        {
+          id: 'usr_bootstrap',
+          email: 'extra@softora.nl',
+          role: 'admin',
+          status: 'active',
+          passwordHash: 'hash:secret123',
+        },
+      ],
+    },
+  });
+  const req = createRequest({
+    body: { email: 'extra@softora.nl', password: 'secret123' },
+  });
+  const res = createResponseRecorder();
+
+  await fixture.coordinator.loginResponse(req, res);
+
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.body.error, 'Ongeldige inloggegevens.');
+  assert.equal(fixture.premiumUsersStore.persistCalls.length, 0);
+  assert.equal(fixture.premiumUsersStore.getCachedUsers().length, 1);
+});
+
+test('premium auth login does not overwrite managed users with bootstrap credentials', async () => {
+  const fixture = createFixture({
+    users: [
+      {
+        id: 'usr_admin',
+        email: 'admin@softora.nl',
+        role: 'admin',
+        status: 'active',
+        passwordHash: 'hash:managed-password',
+        source: 'managed_ui',
+      },
+    ],
+    storeOptions: {
+      bootstrapUsers: [
+        {
+          id: 'usr_bootstrap',
+          email: 'admin@softora.nl',
+          role: 'admin',
+          status: 'active',
+          passwordHash: 'hash:bootstrap-password',
+        },
+      ],
+    },
+  });
+  const req = createRequest({
+    body: { email: 'admin@softora.nl', password: 'bootstrap-password' },
+  });
+  const res = createResponseRecorder();
+
+  await fixture.coordinator.loginResponse(req, res);
+
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.body.error, 'Ongeldige inloggegevens.');
+  assert.equal(fixture.premiumUsersStore.persistCalls.length, 0);
 });
 
 test('premium auth login rejects inactive users and invalid mfa codes', async () => {

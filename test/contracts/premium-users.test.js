@@ -328,6 +328,44 @@ test('premium user coordinator detects duplicate emails on create', async () => 
   assert.equal(res.body.error, 'Dit e-mailadres bestaat al.');
 });
 
+test('premium user coordinator persists admin password updates for future logins', async () => {
+  const { coordinator, premiumUsersStore } = createCoordinatorFixture([
+    {
+      id: 'usr_staff',
+      email: 'staff@softora.nl',
+      firstName: 'Staff',
+      lastName: 'User',
+      role: 'admin',
+      status: 'active',
+      passwordHash: 'hash:old-password',
+    },
+  ]);
+
+  const req = createRequest({
+    originalUrl: '/api/premium-users/usr_staff',
+    body: {
+      voornaam: 'Staff',
+      achternaam: 'User',
+      email: 'staff@softora.nl',
+      rol: 'admin',
+      status: 'active',
+      password: 'new-password-123',
+    },
+    premiumAuth: {
+      authenticated: true,
+      isAdmin: true,
+      email: 'admin@softora.nl',
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.updatePremiumUserResponse(req, res, 'usr_staff');
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(premiumUsersStore.state.users[0].passwordHash, 'hash:new-password-123');
+  assert.equal(Object.hasOwn(res.body.user, 'passwordHash'), false);
+});
+
 test('premium user coordinator admin update accepts profielfoto (data-url) en removeAvatar', async () => {
   const tinyPng =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
