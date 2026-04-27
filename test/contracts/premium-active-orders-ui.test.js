@@ -32,6 +32,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.doesNotMatch(pageSource, /async function markOrderAsPaid\(id, options = \{\}\) \{/);
   assert.doesNotMatch(pageSource, /function buildFallbackSitePrompt\(meta, customOrder\) \{/);
   assert.doesNotMatch(pageSource, /async function postEstimateSiteCostRequest\(payload\) \{/);
+  assert.doesNotMatch(pageSource, /function getProgressStepForPct\(pct\) \{/);
+  assert.doesNotMatch(pageSource, /function startOrderProgressSimulation\(id\) \{/);
   assert.match(scriptSource, /function normalizeOrderStatus\(value\) \{/);
   assert.match(scriptSource, /function persistOrdersRuntime\(\) \{/);
   assert.match(scriptSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -49,6 +51,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /async function markOrderAsPaid\(id, options = \{\}\) \{/);
   assert.match(scriptSource, /function buildFallbackSitePrompt\(meta, customOrder\) \{/);
   assert.match(scriptSource, /async function postEstimateSiteCostRequest\(payload\) \{/);
+  assert.match(scriptSource, /function getProgressStepForPct\(pct\) \{/);
+  assert.match(scriptSource, /function startOrderProgressSimulation\(id\) \{/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
