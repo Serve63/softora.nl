@@ -6,6 +6,9 @@
     <meta name="format-detection" content="telephone=no">
     <meta name="theme-color" content="#f8f7f4">
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f7f4">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Softora">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
@@ -34,6 +37,7 @@
         :root {
             color-scheme: light;
             --bg-primary: #f8f7f4;
+            --header-surface: #f8f7f4;
             --bg-secondary: #ffffff;
             --bg-tertiary: #efeee9;
             --bg-card: rgba(15, 23, 42, 0.03);
@@ -55,6 +59,7 @@
 
         html {
             scroll-behavior: smooth;
+            background-color: var(--bg-primary);
         }
 
         body {
@@ -221,7 +226,7 @@
             text-transform: uppercase;
             font-family: 'Oswald', sans-serif;
             letter-spacing: 0.1em;
-            background: rgba(255, 255, 255, 0.92);
+            background: var(--header-surface);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             box-shadow: 0 8px 28px rgba(15, 17, 28, 0.08);
@@ -229,7 +234,7 @@
 
         nav.scrolled {
             padding: 1rem 4rem;
-            background: rgba(255, 255, 255, 0.92);
+            background: var(--header-surface);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             box-shadow: 0 8px 28px rgba(15, 17, 28, 0.08);
@@ -1748,7 +1753,7 @@
             nav,
             nav.scrolled {
                 padding: calc(14px + env(safe-area-inset-top)) var(--mobile-shell) 14px !important;
-                background: rgba(248, 247, 244, 0.92) !important;
+                background: var(--header-surface) !important;
                 backdrop-filter: blur(18px);
                 border-bottom: 1px solid rgba(0, 0, 0, 0.06);
                 box-shadow: 0 10px 24px rgba(17, 19, 30, 0.06);
@@ -2324,7 +2329,7 @@
         nav,
         nav.scrolled {
             padding-inline: clamp(1.5rem, 4vw, 4rem);
-            background: rgba(250, 246, 241, 0.78);
+            background: var(--header-surface);
             border-bottom: 1px solid rgba(27, 24, 31, 0.08);
             box-shadow: 0 14px 40px rgba(20, 16, 12, 0.08);
             backdrop-filter: blur(20px);
