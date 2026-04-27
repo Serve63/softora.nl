@@ -317,3 +317,25 @@ test('premium website whatsapp-widget gebruikt een verfijnde stijl en opent het 
   assert.doesNotMatch(source, /wa\.me\/31643262792\?text=/);
   assert.match(source, /aria-label="Open WhatsApp chat met Softora op \+31 6 43 26 27 92"/);
 });
+
+test('fonts stylesheet gebruikt font-display: block voor stabiele eerste rendering', () => {
+  const filePath = path.join(__dirname, '../../assets/fonts.css');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.doesNotMatch(source, /font-display:\s*swap;/);
+  assert.match(source, /font-display:\s*block;/);
+});
+
+test('premium homepage preloads lokaal gebruikte fonts voor eenduidige eerste paint', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(
+    source,
+    /<link rel="preload" href="\/assets\/fonts\/inter-latin\.woff2\?v=20260409a" as="font" type="font\/woff2" crossorigin="anonymous">/
+  );
+  assert.match(
+    source,
+    /<link rel="preload" href="\/assets\/fonts\/oswald-latin\.woff2\?v=20260409a" as="font" type="font\/woff2" crossorigin="anonymous">/
+  );
+});
