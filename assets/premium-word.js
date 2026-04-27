@@ -175,51 +175,14 @@
         }
     }
 
-    async function fetchUiStateGet(scope) {
-        var encodedScope = encodeURIComponent(String(scope || ""));
-        var urls = [
-            "/api/ui-state-get?scope=" + encodedScope,
-            "/api/ui-state/" + encodedScope
-        ];
-        var lastError = null;
-        for (var index = 0; index < urls.length; index += 1) {
-            try {
-                var res = await fetch(urls[index], { method: "GET", cache: "no-store" });
-                if (!res.ok) throw new Error("UI-state GET mislukt (" + res.status + ")");
-                return await res.json().catch(function () { return {}; });
-            } catch (error) {
-                lastError = error;
-            }
-        }
-        throw lastError || new Error("UI-state GET mislukt");
-    }
-
-    async function fetchUiStateSet(scope, body) {
-        var encodedScope = encodeURIComponent(String(scope || ""));
-        var urls = [
-            "/api/ui-state-set?scope=" + encodedScope,
-            "/api/ui-state/" + encodedScope
-        ];
-        var lastError = null;
-        for (var index = 0; index < urls.length; index += 1) {
-            try {
-                var res = await fetch(urls[index], {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(body || {})
-                });
-                if (!res.ok) throw new Error("UI-state POST mislukt (" + res.status + ")");
-                return await res.json().catch(function () { return {}; });
-            } catch (error) {
-                lastError = error;
-            }
-        }
-        throw lastError || new Error("UI-state POST mislukt");
+    function getUiStateClient() {
+        if (!window.SoftoraUiStateClient) throw new Error("SoftoraUiStateClient ontbreekt");
+        return window.SoftoraUiStateClient;
     }
 
     async function loadInitialValue() {
         try {
-            var state = await fetchUiStateGet(REMOTE_SCOPE);
+            var state = await getUiStateClient().get(REMOTE_SCOPE);
             var html = String(state && state.values && state.values[REMOTE_KEY] || "");
             if (html) editor.innerHTML = sanitizeWordHtml(html);
         } catch (error) {
@@ -231,7 +194,7 @@
         try {
             var patch = {};
             patch[REMOTE_KEY] = sanitizeWordHtml(editor.innerHTML);
-            await fetchUiStateSet(REMOTE_SCOPE, {
+            await getUiStateClient().set(REMOTE_SCOPE, {
                 patch: patch,
                 source: "premium-word",
                 actor: "browser"
