@@ -55,10 +55,10 @@ test('premium website laat werkwijze titel natuurlijk wrappen op mobiel', () => 
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
-  assert.match(
-    source,
-    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title\s*\{[\s\S]*max-width:\s*100%;[\s\S]*margin:\s*0\.75rem 0 1\.25rem !important;[\s\S]*font-size:\s*clamp\(1\.75rem,\s*8vw,\s*2\.35rem\) !important;/
-  );
+    assert.match(
+      source,
+      /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title\s*\{[\s\S]*max-width:\s*100%;[\s\S]*margin:\s*0\.75rem 0 1\.25rem !important;[\s\S]*font-size:\s*clamp\(2\.2rem,\s*10vw,\s*3\.1rem\) !important;/
+    );
   assert.match(
     source,
     /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title-line,[\s\S]*\.werkwijze-lancering\s*\{[\s\S]*display:\s*block;[\s\S]*white-space:\s*normal;/
