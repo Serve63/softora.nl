@@ -23,12 +23,16 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
   assert.doesNotMatch(pageSource, /function bindDynamicOrderCard\(card\) \{/);
+  assert.doesNotMatch(pageSource, /function normalizeAgendaLeadOption\(item\) \{/);
   assert.match(scriptSource, /function normalizeOrderStatus\(value\) \{/);
   assert.match(scriptSource, /function persistOrdersRuntime\(\) \{/);
   assert.match(scriptSource, /function applyOrderUiStateToCard\(id\) \{/);
   assert.match(scriptSource, /function renderCustomOrderCardHtml\(record\) \{/);
   assert.match(scriptSource, /function bindDynamicOrderCard\(card\) \{/);
   assert.match(scriptSource, /function loadCustomOrderCards\(\) \{/);
+  assert.match(scriptSource, /function setCreateOrderMessage\(message, type\) \{/);
+  assert.match(scriptSource, /function normalizeAgendaLeadOption\(item\) \{/);
+  assert.match(scriptSource, /function syncOrderClaimsFromAgendaOwners\(\) \{/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);

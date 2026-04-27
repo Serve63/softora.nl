@@ -1422,3 +1422,164 @@ function loadCustomOrderCards() {
     refreshEstimatedApiCostsForOrders();
     refreshOrderSummaryCards();
 }
+
+function setCreateOrderMessage(message, type) {
+    const el = document.getElementById('createOrderMessage');
+    if (!el) return;
+    el.textContent = message || '';
+    el.className = 'create-order-message' + (type ? ' ' + type : '');
+}
+
+function setCreateOrderAgendaHint(message, type) {
+    const el = document.getElementById('newOrderAgendaLeadHint');
+    if (!el) return;
+    el.textContent = message || '';
+    el.className = 'create-order-hint' + (type ? ' ' + type : '');
+}
+
+function formatAgendaLeadDateTimeLabel(dateValue, timeValue) {
+    const date = String(dateValue || '').trim();
+    const time = String(timeValue || '').trim() || '09:00';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+    const parsed = new Date(`${date}T${/^\d{2}:\d{2}$/.test(time) ? time : '09:00'}:00`);
+    if (Number.isNaN(parsed.getTime())) return `${date} ${time}`;
+    return parsed.toLocaleString('nl-NL', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function normalizeAgendaLeadOption(item) {
+    if (!item || typeof item !== 'object') return null;
+    const id = Number(item?.id);
+    if (!Number.isFinite(id) || id <= 0) return null;
+
+    const date = String(item?.date || '').trim();
+    const time = String(item?.time || '').trim();
+    const callId = String(item?.callId || '').trim();
+
+    return {
+        id,
+        company: String(item?.company || 'Onbekende lead').trim() || 'Onbekende lead',
+        contact: String(item?.contact || 'Onbekend').trim() || 'Onbekend',
+        date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '',
+        time: /^\d{2}:\d{2}$/.test(time) ? time : '09:00',
+        summary: String(item?.summary || '').trim(),
+        value: String(item?.value || '').trim(),
+        postCallPrompt: String(item?.postCallPrompt || '').trim(),
+        postCallNotesTranscript: String(item?.postCallNotesTranscript || '').trim(),
+        leadOwnerName: String(item?.leadOwnerName || item?.leadOwnerFullName || '').trim(),
+        leadOwnerFullName: String(item?.leadOwnerFullName || item?.leadOwnerName || '').trim(),
+        activeOrderId: Number(item?.activeOrderId) || null,
+        callId: callId || null
+    };
+}
+
+function compareAgendaLeadOptions(a, b) {
+    const aTs = Date.parse(`${String(a?.date || '1970-01-01')}T${String(a?.time || '00:00')}:00`) || 0;
+    const bTs = Date.parse(`${String(b?.date || '1970-01-01')}T${String(b?.time || '00:00')}:00`) || 0;
+    if (aTs === bTs) return Number(b?.id || 0) - Number(a?.id || 0);
+    return bTs - aTs;
+}
+
+async function fetchAgendaLeadOptions(force) {
+    const shouldForce = Boolean(force);
+    const now = Date.now();
+    if (
+        !shouldForce &&
+        agendaLeadOptions.length &&
+        (now - agendaLeadOptionsLoadedAt) < AGENDA_LEAD_CACHE_MS
+    ) {
+        return agendaLeadOptions;
+    }
+
+    if (agendaLeadOptionsPromise) return agendaLeadOptionsPromise;
+
+    agendaLeadOptionsPromise = (async () => {
+        const endpoint = '/api/agenda/appointments?limit=250';
+        try {
+            const response = await fetch(endpoint, { cache: 'no-store' });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result?.ok || !Array.isArray(result?.appointments)) {
+                throw new Error('Agenda data niet beschikbaar.');
+            }
+            agendaLeadOptions = result.appointments
+                .map(normalizeAgendaLeadOption)
+                .filter(Boolean)
+                .sort(compareAgendaLeadOptions);
+            agendaLeadOptionsLoadedAt = Date.now();
+            syncOrderClaimsFromAgendaOwners();
+        } catch (_) {
+            if (!agendaLeadOptions.length) {
+                agendaLeadOptions = [];
+                agendaLeadOptionsLoadedAt = Date.now();
+            }
+        }
+        return agendaLeadOptions;
+    })().finally(() => {
+        agendaLeadOptionsPromise = null;
+    });
+
+    return agendaLeadOptionsPromise;
+}
+
+function getAgendaLeadById(id) {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId) || numericId <= 0) return null;
+    return agendaLeadOptions.find((item) => Number(item?.id) === numericId) || null;
+}
+
+function getAgendaLeadOptionLabel(lead) {
+    if (!lead) return '';
+    const dateLabel = formatAgendaLeadDateTimeLabel(lead.date, lead.time);
+    const extras = [];
+    if (dateLabel) extras.push(dateLabel);
+    if (lead.activeOrderId) extras.push(`al gekoppeld #${lead.activeOrderId}`);
+    const base = `${lead.company} - ${lead.contact}`;
+    return extras.length ? `${base} · ${extras.join(' · ')}` : base;
+}
+
+function getAgendaLeadReferenceLabel(lead) {
+    if (!lead) return '';
+    const dateLabel = formatAgendaLeadDateTimeLabel(lead.date, lead.time);
+    return `#${lead.id} · ${lead.company}${dateLabel ? ` · ${dateLabel}` : ''}`;
+}
+
+function syncOrderClaimsFromAgendaOwners() {
+    if (!customOrders.length || !agendaLeadOptions.length) return;
+
+    let changed = false;
+
+    customOrders.forEach((record) => {
+        if (!record || typeof record !== 'object') return;
+
+        const linkedLeadOwnerName = resolveLinkedLeadOwnerNameForOrder(record);
+        if (!linkedLeadOwnerName) return;
+
+        const currentClaimedBy = normalizeClaimEmployeeName(record.claimedBy || '');
+        if (!currentClaimedBy) {
+            record.claimedBy = linkedLeadOwnerName;
+            changed = true;
+        }
+
+        const activeId = Number(record.id);
+        if (!Number.isFinite(activeId) || activeId <= 0) return;
+        if (!orders[activeId]) return;
+
+        const runtimeClaimedBy = normalizeClaimEmployeeName(orders[activeId].claimedBy || '');
+        if (!runtimeClaimedBy) {
+            orders[activeId].claimedBy = linkedLeadOwnerName;
+            orders[activeId].updatedAt = Date.now();
+            changed = true;
+        }
+    });
+
+    if (!changed) return;
+
+    persistCustomOrders();
+    persistOrdersRuntime();
+    Object.keys(orders).forEach((id) => applyOrderUiStateToCard(Number(id)));
+}
