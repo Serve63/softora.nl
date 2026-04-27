@@ -223,7 +223,10 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.match(source, /\.footer-grid\s*\{[\s\S]*grid-template-columns:\s*2fr 1fr 1fr;/s);
   assert.match(source, /\.footer-logo\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;/s);
   assert.match(source, /<div class="footer-copy">© 2026 <span>Softora\.nl<\/span> - Alle rechten voorbehouden<\/div>/);
-  assert.match(source, /<a href="#contact" class="magnetic-btn magnetic">Start Project<\/a>/);
+  assert.match(
+    source,
+    /<a href="https:\/\/wa\.me\/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic">Start Project<\/a>/
+  );
 });
 
 test('premium website houdt footer-links direct klikbaar door footer buiten content-visibility defer te houden', () => {
@@ -274,7 +277,10 @@ test('premium website hero gebruikt lokaal gegenereerde studiofotografie met don
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
-  assert.match(source, /<div class="nav-links">\s*<a href="#contact" class="magnetic-btn magnetic nav-start-btn"[\s\S]*Start Project<\/a>\s*<\/div>/);
+  assert.match(
+    source,
+    /<div class="nav-links">\s*<a href="https:\/\/wa\.me\/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic nav-start-btn"[\s\S]*Start Project<\/a>\s*<\/div>/
+  );
   assert.match(source, /@media \(max-width: 1024px\) \{[\s\S]*\.nav-start-btn \{\s*display:\s*none !important;\s*\}/);
   assert.match(
     source,
@@ -348,5 +354,24 @@ test('premium homepage gebruikt thema-kleur die matcht met de mobiele headertint
   assert.match(
     source,
     /<meta name="theme-color" media="\(prefers-color-scheme: light\)" content="#f8f7f4">/
+  );
+});
+
+test('premium homepage start- en offerteknoppen starten een WhatsApp-chat', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  const ctaWhatsappCount = (source.match(/href="https:\/\/wa\.me\/31643262792"/g) || []).length;
+  assert.equal(ctaWhatsappCount, 7);
+
+  const startProjectCount = (source.match(/>Start Project<\/a>/g) || []).length;
+  assert.equal(startProjectCount, 2);
+
+  const nodigCount = (source.match(/>Dit heb ik nodig<\/a>/g) || []).length;
+  assert.equal(nodigCount, 4);
+
+  assert.match(
+    source,
+    /<a href="https:\/\/wa\.me\/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig<\/a>/
   );
 });
