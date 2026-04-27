@@ -12,7 +12,7 @@ function loadDatabaseImportClient() {
   return sandbox.window.SoftoraDatabaseImport;
 }
 
-function loadDatabaseDeepSearchClient() {
+function loadDatabaseDeepSearchClient(options = {}) {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
   const sandbox = {
@@ -21,6 +21,7 @@ function loadDatabaseDeepSearchClient() {
     setTimeout,
     fetch: async () => ({ ok: true, json: async () => ({ ok: true, rows: [] }) }),
   };
+  if (options.document) sandbox.window.document = options.document;
   sandbox.window.confirm = () => true;
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseDeepSearch;
@@ -209,7 +210,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427g/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427h/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -258,11 +259,20 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427g"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427h"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
+  assert.match(importScriptSource, /function readChunkedStateValue\(values, baseKey\)/);
+  assert.match(importScriptSource, /function buildChunkedStatePatch\(baseKey, rawValue, chunkSize\)/);
+  assert.match(importScriptSource, /return normalizeString\(baseKey\) \+ "_chunks_v1";/);
+  assert.match(importScriptSource, /return normalizeString\(baseKey\) \+ "_chunk_";/);
+  assert.match(importScriptSource, /Number\(chunkSize\) \|\| 120000/);
+  assert.match(importScriptSource, /\[getChunkMetaKey\(normalizedKey\)\]: JSON\.stringify\(\{/);
+  assert.match(importScriptSource, /patch\[prefix \+ index\] = chunk;/);
+  assert.match(pageSource, /patch: window\.SoftoraDatabaseImport\.buildChunkedStatePatch\(CUSTOMER_DB_KEY, JSON\.stringify\(normalizedCustomers\)\)/);
+  assert.match(pageSource, /parseCustomers\(window\.SoftoraDatabaseImport\.readChunkedStateValue\(remoteState && remoteState\.values, CUSTOMER_DB_KEY\)\)/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 \* 1000;/);
   assert.match(pageSource, /<div class="modal-bg" id="deepSearchModal" aria-hidden="true">/);
   assert.doesNotMatch(pageSource, /id="deepSearchListInput"/);
@@ -335,6 +345,11 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /function uniqueWebsiteValues\(values, maxItems\)/);
   assert.match(deepSearchScriptSource, /target\.foundWebsites = uniqueWebsiteValues/);
   assert.match(deepSearchScriptSource, /Nog geen websites voor deze plek\./);
+  assert.match(deepSearchScriptSource, /persisted: Boolean\(persistResult && persistResult\.ok !== false\)/);
+  assert.match(deepSearchScriptSource, /Let op: voortgang opslaan lukte niet\./);
+  assert.match(deepSearchScriptSource, /customerPersisted: customerPersisted/);
+  assert.match(deepSearchScriptSource, /Opslaan in Supabase lukte niet/);
+  assert.doesNotMatch(deepSearchScriptSource, /localStorage/);
   assert.match(deepSearchScriptSource, /nodes\.closeDeepSearchButton\.disabled = busy;/);
   assert.match(deepSearchScriptSource, /nodes\.deepSearchModal\.classList\.toggle\("is-running", busy\);/);
   assert.match(deepSearchScriptSource, /DEEP_SEARCH_BUSY_STYLE_ID/);
@@ -539,6 +554,14 @@ test('premium database deep search client finishes the current location automati
       customers.push(...receivedRows.slice(1).map((row) => ({ bedrijf: row[0], email: row[2], website: row[4] })));
     },
     readDeepSearchRows: async (payload) => {
+      if (payload.batchNumber === 2) {
+        assert.ok(persisted.length >= 1);
+        const savedBeforeFollowUp = JSON.parse(persisted[persisted.length - 1].patch.deep_search_state);
+        assert.deepEqual(savedBeforeFollowUp.targets[0].foundWebsites, [
+          'almkerktest.nl',
+          'https://almkerktest.nl/contact',
+        ]);
+      }
       calls.push(payload);
       return responses.shift();
     },
@@ -571,6 +594,57 @@ test('premium database deep search client finishes the current location automati
     'https://almkerktest.nl/contact',
     'https://almkerktest.nl/over-ons',
   ]);
+});
+
+test('premium database deep search stops when new companies could not be saved', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const calls = [];
+  const messages = [];
+  const customers = [];
+  const rows = [
+    ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+    ['Save Fail BV', 'Kerkstraat 2, Almkerk', 'info@savefail.nl', '0183 222 222', 'savefail.nl'],
+  ];
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchList: {},
+      deepSearchSources: {},
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    autoContinueDelayMs: 0,
+    getCustomers: () => customers,
+    importRows: async (receivedRows) => {
+      customers.push(...receivedRows.slice(1).map((row) => ({ bedrijf: row[0], email: row[2], website: row[4] })));
+      return false;
+    },
+    readDeepSearchRows: async (payload) => {
+      calls.push(payload);
+      return {
+        ok: true,
+        rows,
+        businesses: [{ bedrijfsnaam: 'Save Fail BV', email: 'info@savefail.nl', website: 'savefail.nl' }],
+        found: 1,
+        placeComplete: false,
+        cost: { estimatedUsd: 0.12 },
+        sources: [{ url: 'https://savefail.nl/contact', title: 'Contact' }],
+      };
+    },
+    setStatusMessage: (message) => {
+      messages.push(message);
+    },
+    setUiState: async () => ({ ok: true }),
+  });
+
+  const result = await controller.runCurrentSearch();
+
+  assert.equal(result, false);
+  assert.equal(calls.length, 1);
+  assert.equal(customers.length, 1);
+  assert.match(messages.join('\n'), /Opslaan in Supabase lukte niet/);
 });
 
 test('premium database deep search locks the modal while a batch is running', async () => {

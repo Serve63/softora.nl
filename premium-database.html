@@ -1574,8 +1574,8 @@
     </div>
 
     <script src="assets/premium-database-photo-batch.js?v=20260427a"></script>
-    <script src="assets/premium-database-import.js?v=20260427b"></script>
-    <script src="assets/premium-database-deep-search.js?v=20260427g"></script>
+    <script src="assets/premium-database-import.js?v=20260427c"></script>
+    <script src="assets/premium-database-deep-search.js?v=20260427h"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -2138,9 +2138,7 @@
             }));
 
             return fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
-                patch: {
-                    [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers)
-                },
+                patch: window.SoftoraDatabaseImport.buildChunkedStatePatch(CUSTOMER_DB_KEY, JSON.stringify(normalizedCustomers)),
                 source: "premium-database",
                 actor: "Premium database"
             }).then(function () {
@@ -3234,7 +3232,7 @@
 
             try {
                 const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
-                const remoteCustomers = parseCustomers(remoteState && remoteState.values && remoteState.values[CUSTOMER_DB_KEY]);
+                const remoteCustomers = parseCustomers(window.SoftoraDatabaseImport.readChunkedStateValue(remoteState && remoteState.values, CUSTOMER_DB_KEY));
 
                 if (remoteCustomers.length) {
                     let enrichedCustomers = remoteCustomers;

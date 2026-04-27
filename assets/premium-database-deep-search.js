@@ -516,17 +516,25 @@
             }).then(function (body) {
                 const rows = Array.isArray(body.rows) ? body.rows : [];
                 const importPromise = rows.length > 1 ? Promise.resolve(importRows(rows)) : Promise.resolve(false);
-                return importPromise.then(function () {
+                return importPromise.then(function (importResult) {
                     const afterCount = Array.isArray(getCustomers()) ? getCustomers().length : beforeCount;
                     const addedCount = Math.max(0, afterCount - beforeCount);
                     updateTargetAfterSearch(target, body, addedCount);
                     const completed = Boolean(body && body.placeComplete);
-                    return {
+                    const customerPersisted = !(rows.length > 1 && addedCount > 0 && importResult === false);
+                    const result = {
                         addedCount: addedCount,
                         completed: completed,
+                        customerPersisted: customerPersisted,
                         costUsd: Math.max(0, Number(body && body.cost && body.cost.estimatedUsd) || 0),
                         found: Math.max(0, Number(body.found) || 0)
                     };
+                    return persistState().then(function (persistResult) {
+                        return {
+                            ...result,
+                            persisted: Boolean(persistResult && persistResult.ok !== false)
+                        };
+                    });
                 });
             });
         }
@@ -538,7 +546,12 @@
                 return runTargetBatch(target).then(function (result) {
                     render();
                     if (result.addedCount) toast("+" + result.addedCount + " bedrijven");
-                    const baseMessage = "AI vond " + result.found + " complete bedrijven voor " + startedLabel + ". " + result.addedCount + " nieuw toegevoegd. API-kosten: " + formatUsdAsEuro(result.costUsd) + ".";
+                    const storageNote = result.persisted ? "" : " Let op: voortgang opslaan lukte niet.";
+                    const baseMessage = "AI vond " + result.found + " complete bedrijven voor " + startedLabel + ". " + result.addedCount + " nieuw toegevoegd. API-kosten: " + formatUsdAsEuro(result.costUsd) + "." + storageNote;
+                    if (result.customerPersisted === false) {
+                        setStatusMessage(baseMessage + " Opslaan in Supabase lukte niet, dus deze batch is gestopt zodat er niets stilletjes verloren gaat.", "error", true);
+                        return false;
+                    }
                     if (isTargetCompletionConfirmed(target, result)) {
                         advanceCompletedTarget(target);
                         render();

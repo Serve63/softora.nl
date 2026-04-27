@@ -5,6 +5,64 @@
         return String(value || "").trim();
     }
 
+    function getChunkMetaKey(baseKey) {
+        return normalizeString(baseKey) + "_chunks_v1";
+    }
+
+    function getChunkPrefix(baseKey) {
+        return normalizeString(baseKey) + "_chunk_";
+    }
+
+    function readChunkedStateValue(values, baseKey) {
+        const stateValues = values && typeof values === "object" ? values : {};
+        const normalizedKey = normalizeString(baseKey);
+        const fallback = typeof stateValues[normalizedKey] === "string" ? stateValues[normalizedKey] : "";
+        const metaRaw = normalizeString(stateValues[getChunkMetaKey(normalizedKey)]);
+        if (!metaRaw) return fallback;
+
+        try {
+            const meta = JSON.parse(metaRaw);
+            const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0));
+            if (!count) return fallback;
+
+            const prefix = getChunkPrefix(normalizedKey);
+            const chunks = [];
+            for (let index = 0; index < count; index += 1) {
+                const chunk = stateValues[prefix + index];
+                if (typeof chunk !== "string") return fallback;
+                chunks.push(chunk);
+            }
+
+            return chunks.join("") || fallback;
+        } catch (error) {
+            return fallback;
+        }
+    }
+
+    function buildChunkedStatePatch(baseKey, rawValue, chunkSize) {
+        const normalizedKey = normalizeString(baseKey);
+        const serialized = String(rawValue || "");
+        const safeChunkSize = Math.max(10000, Math.min(180000, Number(chunkSize) || 120000));
+        const chunks = [];
+        for (let index = 0; index < serialized.length; index += safeChunkSize) {
+            chunks.push(serialized.slice(index, index + safeChunkSize));
+        }
+        if (!chunks.length) chunks.push("");
+
+        const patch = {
+            [normalizedKey]: serialized.length <= safeChunkSize ? serialized : "",
+            [getChunkMetaKey(normalizedKey)]: JSON.stringify({
+                count: chunks.length,
+                updatedAt: new Date().toISOString()
+            })
+        };
+        const prefix = getChunkPrefix(normalizedKey);
+        chunks.forEach(function (chunk, index) {
+            patch[prefix + index] = chunk;
+        });
+        return patch;
+    }
+
     function detectDelimitedSeparator(text, preferredSeparator) {
         if (preferredSeparator === "\t") return "\t";
         const sample = String(text || "").split(/\r?\n/).find(function (line) {
@@ -429,11 +487,13 @@
     }
 
     global.SoftoraDatabaseImport = {
+        buildChunkedStatePatch: buildChunkedStatePatch,
         createController: createController,
         detectDelimitedSeparator: detectDelimitedSeparator,
         mergeCustomers: mergeCustomers,
         parseDelimitedRows: parseDelimitedRows,
         pickRecordValue: pickRecordValue,
+        readChunkedStateValue: readChunkedStateValue,
         readRealBusinessRows: readRealBusinessRows,
         readLinkedSpreadsheetRows: readLinkedSpreadsheetRows
     };
