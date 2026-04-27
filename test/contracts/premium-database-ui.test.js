@@ -15,10 +15,18 @@ function loadDatabaseImportClient() {
 function loadDatabaseDeepSearchClient() {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
-  const sandbox = { window: {}, fetch: async () => ({ ok: true, json: async () => ({ ok: true, rows: [] }) }) };
+  const sandbox = { window: {}, Buffer, fetch: async () => ({ ok: true, json: async () => ({ ok: true, rows: [] }) }) };
   sandbox.window.confirm = () => true;
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseDeepSearch;
+}
+
+function readDefaultDeepSearchTargetLines(source) {
+  const match = source.match(/const DEFAULT_TARGET_TEXT_BASE64 = \[([\s\S]*?)\]\.join\(""\);/);
+  assert.ok(match, 'DEFAULT_TARGET_TEXT_BASE64 should be present');
+  const chunks = Array.from(match[1].matchAll(/"([^"]*)"/g), (chunk) => chunk[1]);
+  assert.ok(chunks.length > 1, 'DEFAULT_TARGET_TEXT_BASE64 should be chunked');
+  return Buffer.from(chunks.join(''), 'base64').toString('utf8').split(/\r?\n/).filter(Boolean);
 }
 
 test('premium database page bootstraps customer rows before async sync runs', () => {
@@ -240,6 +248,13 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /databaseDeepSearchController\.open\(\);/);
   assert.match(deepSearchScriptSource, /function parseTargetLines\(raw\)/);
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT/);
+  assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT_BASE64/);
+  assert.match(deepSearchScriptSource, /function decodeBase64Utf8\(value\)/);
+  const defaultTargetLines = readDefaultDeepSearchTargetLines(deepSearchScriptSource);
+  assert.equal(defaultTargetLines.length, 2501);
+  assert.equal(defaultTargetLines[0], 'Nederland | Noord-Brabant | Altena | Almkerk');
+  assert.ok(defaultTargetLines.includes('Nederland | Noord-Brabant | Altena | Woudrichem'));
+  assert.ok(defaultTargetLines.includes('Nederland | Zuid-Holland | Zwijndrecht | Zwijndrecht'));
   assert.match(deepSearchScriptSource, /fetch\("\/api\/premium-database\/deep-search-businesses"/);
   assert.match(deepSearchScriptSource, /count: 100/);
   assert.match(deepSearchScriptSource, /\? "Nu: " \+ target\.label/);
