@@ -1204,19 +1204,32 @@
         }
       }
 
+      function captureCopyButtonLabel(button) {
+        return Array.prototype.slice.call(button.childNodes).map(function (node) {
+          return node.cloneNode(true);
+        });
+      }
+
+      function restoreCopyButtonLabel(button, labelNodes) {
+        button.replaceChildren.apply(
+          button,
+          labelNodes.map(function (node) { return node.cloneNode(true); })
+        );
+      }
+
       async function copyHtml() {
         if (!state.copyBtn) return;
-        const originalLabel = state.copyBtn.innerHTML;
+        const originalLabel = captureCopyButtonLabel(state.copyBtn);
         try {
           await copyText(state.currentHtml);
           state.copyBtn.textContent = 'HTML gekopieerd';
           window.setTimeout(function () {
-            state.copyBtn.innerHTML = originalLabel;
+            restoreCopyButtonLabel(state.copyBtn, originalLabel);
           }, 1800);
         } catch (_) {
           state.copyBtn.textContent = 'Kopieren mislukt';
           window.setTimeout(function () {
-            state.copyBtn.innerHTML = originalLabel;
+            restoreCopyButtonLabel(state.copyBtn, originalLabel);
           }, 1800);
         }
       }
