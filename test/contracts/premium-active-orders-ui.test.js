@@ -79,7 +79,9 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /async function initializeActiveOrdersPageState\(\) \{/);
   assert.match(scriptSource, /function initActiveOrdersCursor\(\) \{/);
   assert.match(scriptSource, /async function showActiveOrderAlert\(message, options = \{\}\) \{/);
+  assert.match(scriptSource, /async function confirmActiveOrderAction\(message, options = \{\}\) \{/);
   assert.doesNotMatch(scriptSource, /window\.alert\(/);
+  assert.doesNotMatch(scriptSource, /window\.confirm\(/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
@@ -92,7 +94,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /assigneeEl\.textContent = claimInfo\.by \|\| 'Nog niet geclaimd';/);
   assert.match(source, /const isPaidOrder = Boolean\(paidAt\) \|\| status\.key === 'betaald';[\s\S]*if \(isPaidOrder\) \{[\s\S]*nextStatus = 'betaald';/);
   assert.match(source, /async function handleOrderPaymentAction\(id\) \{[\s\S]*if \(ui\.isPaid \|\| ui\.isBuilt\) return false;[\s\S]*return markOrderAsPaid\(id, \{ confirm: true \}\);/);
-  assert.match(source, /window\.SoftoraDialogs && typeof window\.SoftoraDialogs\.confirm === 'function'[\s\S]*Factuur betaald bevestigen/);
+  assert.match(source, /const confirmed = await confirmActiveOrderAction\(invoicePaidReviewReminder,[\s\S]*Factuur betaald bevestigen/);
   assert.match(
     source,
     /Vergeet niet om de klant op een vriendelijk en natuurlijk moment te vragen[\s\S]*bodyHtml:\s*invoicePaidConfirmBodyHtml/

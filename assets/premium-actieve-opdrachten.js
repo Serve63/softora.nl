@@ -498,6 +498,14 @@ async function showActiveOrderAlert(message, options = {}) {
     return false;
 }
 
+async function confirmActiveOrderAction(message, options = {}) {
+    if (window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function') {
+        return window.SoftoraDialogs.confirm(message, options);
+    }
+    console.warn(String(message || 'Actieve opdrachten bevestiging'));
+    return false;
+}
+
 function slugify(s) {
     return String(s || '')
         .toLowerCase()
@@ -2036,15 +2044,12 @@ async function markOrderAsPaid(id, options = {}) {
             '</svg></a>',
             '</div>',
         ].join('');
-        const confirmed =
-            window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
-                ? await window.SoftoraDialogs.confirm(invoicePaidReviewReminder, {
-                    title: 'Factuur betaald bevestigen',
-                    confirmText: 'Bevestigen',
-                    cancelText: 'Annuleren',
-                    bodyHtml: invoicePaidConfirmBodyHtml,
-                })
-                : window.confirm(invoicePaidReviewReminder);
+        const confirmed = await confirmActiveOrderAction(invoicePaidReviewReminder, {
+            title: 'Factuur betaald bevestigen',
+            confirmText: 'Bevestigen',
+            cancelText: 'Annuleren',
+            bodyHtml: invoicePaidConfirmBodyHtml,
+        });
         if (!confirmed) return false;
     }
 
@@ -2917,17 +2922,14 @@ async function removeProjectFromSystem(id) {
     }
 
     const projectLabel = String(record.title || record.clientName || 'dit project').trim();
-    const confirmed =
-        window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
-            ? await window.SoftoraDialogs.confirm(
-                `Project "${projectLabel}" volledig uit het systeem halen? Dit verwijdert het ook uit het klantenbestand en dashboard.`,
-                {
-                    title: 'Project verwijderen',
-                    confirmText: 'Verwijderen',
-                    cancelText: 'Annuleren',
-                }
-            )
-            : false;
+    const confirmed = await confirmActiveOrderAction(
+        `Project "${projectLabel}" volledig uit het systeem halen? Dit verwijdert het ook uit het klantenbestand en dashboard.`,
+        {
+            title: 'Project verwijderen',
+            confirmText: 'Verwijderen',
+            cancelText: 'Annuleren',
+        }
+    );
     if (!confirmed) return;
 
     const previousCustomOrders = customOrders.slice();
