@@ -6,6 +6,7 @@ const path = require('node:path');
 const {
   createPremiumDatabaseImportCoordinator,
   detectDelimitedSeparator,
+  fetchRealBusinessRows,
   fetchSpreadsheetRowsFromSourceUrl,
   normalizeGoogleSheetsExportUrl,
   parseDelimitedRows,
@@ -340,6 +341,123 @@ test('premium database import sync route returns fetched spreadsheet rows', asyn
   assert.equal(response.body.rows[1][0], 'Augustijn Auto Expertise');
 });
 
+test('premium database real businesses maps Google Places rows and discovers public email', async () => {
+  const calls = [];
+  const result = await fetchRealBusinessRows(
+    { query: 'bakkerij Breda', count: 2, enrichEmails: true },
+    {
+      env: { GOOGLE_MAPS_SERVER_API_KEY: 'maps-key' },
+      fetchImpl: async (url, options = {}) => {
+        calls.push({ url: String(url), options });
+        if (String(url).includes('places.googleapis.com')) {
+          assert.equal(options.headers['X-Goog-Api-Key'], 'maps-key');
+          assert.match(options.headers['X-Goog-FieldMask'], /places\.nationalPhoneNumber/);
+          assert.equal(JSON.parse(options.body).textQuery, 'bakkerij Breda');
+          return {
+            ok: true,
+            async json() {
+              return {
+                places: [
+                  {
+                    id: 'place-1',
+                    displayName: { text: 'Bakkerij Zon' },
+                    formattedAddress: 'Dorpsstraat 1, 4811 AA Breda',
+                    nationalPhoneNumber: '076 123 45 67',
+                    websiteUri: 'https://bakkerijzon.nl',
+                    businessStatus: 'OPERATIONAL',
+                    types: ['bakery', 'store'],
+                  },
+                  {
+                    id: 'place-2',
+                    displayName: { text: 'Studio Nova' },
+                    formattedAddress: 'Markt 2, 4811 XR Breda',
+                    nationalPhoneNumber: '076 765 43 21',
+                    websiteUri: 'https://studionova.nl',
+                    businessStatus: 'OPERATIONAL',
+                    types: ['store'],
+                  },
+                ],
+              };
+            },
+          };
+        }
+        if (String(url) === 'https://bakkerijzon.nl/') {
+          return {
+            ok: true,
+            headers: { get: () => 'text/html' },
+            async text() {
+              return '<a href="mailto:info@bakkerijzon.nl">Mail</a>';
+            },
+          };
+        }
+        return {
+          ok: true,
+          headers: { get: () => 'text/html' },
+          async text() {
+            return '<html><body>Geen e-mail</body></html>';
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(result.fileType, 'google-places');
+  assert.equal(result.found, 2);
+  assert.equal(result.emailFound, 1);
+  assert.deepEqual(result.rows[0].slice(0, 5), [
+    'Bedrijfsnaam',
+    'Adres',
+    'E-mail',
+    'Telefoonnummer',
+    'Website',
+  ]);
+  assert.deepEqual(result.rows[1].slice(0, 5), [
+    'Bakkerij Zon',
+    'Dorpsstraat 1, 4811 AA Breda',
+    'info@bakkerijzon.nl',
+    '076 123 45 67',
+    'bakkerijzon.nl',
+  ]);
+  assert.deepEqual(result.rows[2].slice(0, 5), [
+    'Studio Nova',
+    'Markt 2, 4811 XR Breda',
+    '—',
+    '076 765 43 21',
+    'studionova.nl',
+  ]);
+  assert.equal(calls.filter((call) => call.url.includes('places.googleapis.com')).length, 1);
+});
+
+test('premium database real businesses route reports missing Google Places key', async () => {
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    env: {},
+    fetchImpl: async () => {
+      throw new Error('fetch should not run without key');
+    },
+  });
+  const response = {
+    statusCode: 0,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  await coordinator.sendRealBusinessesResponse(
+    { body: { query: 'bedrijven in Breda', count: 100 } },
+    response
+  );
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.ok, false);
+  assert.equal(response.body.code, 'GOOGLE_PLACES_NOT_CONFIGURED');
+});
+
 test('premium database import route is registered behind the premium api surface', () => {
   const featureRoutesPath = path.join(__dirname, '../../server/services/feature-routes-runtime.js');
   const routePath = path.join(__dirname, '../../server/routes/premium-database-import.js');
@@ -350,4 +468,5 @@ test('premium database import route is registered behind the premium api surface
   assert.match(featureRoutesSource, /createPremiumDatabaseImportCoordinator\(\)/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/import-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/sync-spreadsheet'/);
+  assert.match(routeSource, /app\.post\('\/api\/premium-database\/add-real-businesses'/);
 });

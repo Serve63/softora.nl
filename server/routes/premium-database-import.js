@@ -8,6 +8,10 @@ function registerPremiumDatabaseImportRoutes(app, deps = {}) {
   app.post('/api/premium-database/sync-spreadsheet', (req, res) =>
     coordinator.sendSyncResponse(req, res)
   );
+
+  app.post('/api/premium-database/add-real-businesses', (req, res) =>
+    coordinator.sendRealBusinessesResponse(req, res)
+  );
 }
 
 module.exports = {

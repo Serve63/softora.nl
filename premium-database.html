@@ -1208,6 +1208,10 @@
                                         <span class="add-actions-item-title">Google Sheet koppelen</span>
                                         <span class="add-actions-item-sub">Synchroniseer automatisch bij openen</span>
                                     </button>
+                                    <button class="add-actions-item" id="addRealBusinessesButton" type="button" role="menuitem">
+                                        <span class="add-actions-item-title">100 echte bedrijven toevoegen</span>
+                                        <span class="add-actions-item-sub">Zoek via Google Places met echte contactdata</span>
+                                    </button>
                                     <button class="add-actions-item" id="addManualButton" type="button" role="menuitem">
                                         <span class="add-actions-item-title">Handmatig toevoegen</span>
                                         <span class="add-actions-item-sub">Voeg zelf een bedrijf toe via het formulier</span>
@@ -1434,6 +1438,7 @@
             generatePhotosButton: document.getElementById("generatePhotosButton"),
             addUploadButton: document.getElementById("addUploadButton"),
             addSyncButton: document.getElementById("addSyncButton"),
+            addRealBusinessesButton: document.getElementById("addRealBusinessesButton"),
             addManualButton: document.getElementById("addManualButton"),
             importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
@@ -3076,7 +3081,8 @@
             setUiState: fetchUiStateSetWithFallback,
             syncScope: CUSTOMER_DB_SCOPE,
             syncKey: CUSTOMER_DB_SYNC_KEY,
-            syncIntervalMs: CUSTOMER_DB_SYNC_INTERVAL_MS
+            syncIntervalMs: CUSTOMER_DB_SYNC_INTERVAL_MS,
+            realBusinessButton: nodes.addRealBusinessesButton
         });
 
         nodes.query.addEventListener("input", function (event) {
@@ -3176,6 +3182,10 @@
         nodes.addSyncButton.addEventListener("click", function () {
             closeAddActions();
             databaseImportController.handleSyncConnect();
+        });
+        nodes.addRealBusinessesButton.addEventListener("click", function () {
+            closeAddActions();
+            void databaseImportController.handleRealBusinessAdd();
         });
         nodes.addManualButton.addEventListener("click", function () {
             closeAddActions();

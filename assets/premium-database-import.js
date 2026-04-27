@@ -109,6 +109,24 @@
         });
     }
 
+    function readRealBusinessRows(query) {
+        return fetch("/api/premium-database/add-real-businesses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                query: normalizeString(query),
+                count: 100,
+                enrichEmails: true
+            })
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (body) {
+                if (!response.ok || !body.ok) throw new Error(body.error || "Echte bedrijven ophalen mislukt.");
+                if (!Array.isArray(body.rows)) throw new Error("Geen bruikbare bedrijven ontvangen.");
+                return body;
+            });
+        });
+    }
+
     function readExcelRows(file) {
         return new Promise(function (resolve, reject) {
             if (file.size > 5 * 1024 * 1024) {
@@ -282,6 +300,7 @@
         const syncScope = deps.syncScope;
         const syncKey = deps.syncKey;
         const syncIntervalMs = Math.max(60 * 1000, Number(deps.syncIntervalMs) || 10 * 60 * 1000);
+        const realBusinessButton = deps.realBusinessButton;
         let syncSourceUrl = "";
         let syncTimer = null;
 
@@ -362,6 +381,36 @@
             });
         }
 
+        function handleRealBusinessAdd() {
+            const query = window.prompt(
+                "Waar wil je 100 echte bedrijven zoeken? Bijvoorbeeld: bedrijven in Breda, horeca in Tilburg of bedrijven in Noord-Brabant.",
+                "bedrijven in Noord-Brabant"
+            );
+            if (!normalizeString(query)) return Promise.resolve(false);
+
+            if (realBusinessButton) realBusinessButton.disabled = true;
+            setStatusMessage("100 echte bedrijven zoeken...", "info");
+
+            return readRealBusinessRows(query).then(function (body) {
+                return importRows(body.rows).then(function (imported) {
+                    if (imported) {
+                        setStatusMessage(
+                            "Google Places heeft " + Number(body.found || 0) + " bedrijven opgehaald. " + Number(body.emailFound || 0) + " met publiek e-mailadres.",
+                            "success",
+                            true
+                        );
+                    }
+                    return imported;
+                });
+            }).catch(function (error) {
+                console.error("Echte bedrijven toevoegen mislukt:", error);
+                setStatusMessage("Echte bedrijven toevoegen mislukt: " + String(error.message || "controleer de bron"), "error");
+                return false;
+            }).finally(function () {
+                if (realBusinessButton) realBusinessButton.disabled = false;
+            });
+        }
+
         function startAutoSync() {
             return loadSyncConfig().then(function (config) {
                 syncSourceUrl = normalizeString(config && config.sourceUrl);
@@ -373,6 +422,7 @@
 
         return {
             handleFileChange: handleFileChange,
+            handleRealBusinessAdd: handleRealBusinessAdd,
             handleSyncConnect: handleSyncConnect,
             startAutoSync: startAutoSync
         };
@@ -384,6 +434,7 @@
         mergeCustomers: mergeCustomers,
         parseDelimitedRows: parseDelimitedRows,
         pickRecordValue: pickRecordValue,
+        readRealBusinessRows: readRealBusinessRows,
         readLinkedSpreadsheetRows: readLinkedSpreadsheetRows
     };
 })(window);

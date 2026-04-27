@@ -4,9 +4,54 @@ const zlib = require('zlib');
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 2000;
 const MAX_IMPORT_COLS = 50;
+const MAX_REAL_BUSINESS_ROWS = 100;
+const GOOGLE_PLACES_TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
+const GOOGLE_PLACES_FIELD_MASK = [
+  'places.id',
+  'places.displayName',
+  'places.formattedAddress',
+  'places.nationalPhoneNumber',
+  'places.internationalPhoneNumber',
+  'places.websiteUri',
+  'places.businessStatus',
+  'places.types',
+  'nextPageToken',
+].join(',');
+const DEFAULT_REAL_BUSINESS_QUERY = 'bedrijven in Noord-Brabant';
+const REAL_BUSINESS_CATEGORY_PREFIXES = [
+  'bedrijven',
+  'winkels',
+  'restaurants',
+  'kappers',
+  'bouwbedrijven',
+  'fysiotherapiepraktijken',
+  'accountants',
+  'makelaars',
+  'installateurs',
+  'tandartsen',
+  'webdesign bureaus',
+  'zorgpraktijken',
+];
 
 function normalizeString(value) {
   return String(value || '').trim();
+}
+
+function truncateText(value, maxLength = 500) {
+  return normalizeString(value).slice(0, maxLength);
+}
+
+function parsePositiveInt(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function createServiceError(message, code, statusCode = 400) {
+  const error = new Error(message);
+  error.code = code;
+  error.statusCode = statusCode;
+  return error;
 }
 
 function normalizeImportKey(value) {
@@ -576,8 +621,331 @@ async function fetchSpreadsheetRowsFromSourceUrl(sourceUrl, deps = {}) {
   }
 }
 
+function getGooglePlacesApiKey(deps = {}) {
+  const env = deps.env || process.env || {};
+  return normalizeString(
+    deps.googlePlacesApiKey ||
+      env.GOOGLE_MAPS_SERVER_API_KEY ||
+      env.GOOGLE_PLACES_API_KEY ||
+      env.GOOGLE_MAPS_API_KEY
+  );
+}
+
+function normalizeRealBusinessQuery(value) {
+  return truncateText(value || DEFAULT_REAL_BUSINESS_QUERY, 140) || DEFAULT_REAL_BUSINESS_QUERY;
+}
+
+function getLocationPhraseFromQuery(query) {
+  const normalized = normalizeRealBusinessQuery(query);
+  const match = normalized.match(/\b(in|rond|bij|near)\s+(.+)$/i);
+  if (!match) return normalized;
+  return `${match[1]} ${match[2]}`.trim();
+}
+
+function buildGooglePlacesSearchQueries(query, count) {
+  const baseQuery = normalizeRealBusinessQuery(query);
+  const locationPhrase = getLocationPhraseFromQuery(baseQuery);
+  const queries = [baseQuery];
+
+  if (count > 60 || /\b(bedrijven|ondernemingen|mkb)\b/i.test(baseQuery)) {
+    REAL_BUSINESS_CATEGORY_PREFIXES.forEach((prefix) => {
+      queries.push(`${prefix} ${locationPhrase}`);
+    });
+  }
+
+  return Array.from(new Set(queries.map(normalizeString).filter(Boolean))).slice(0, 12);
+}
+
+async function readJsonResponse(response) {
+  if (response && typeof response.json === 'function') return response.json();
+  if (response && typeof response.text === 'function') {
+    const text = await response.text();
+    try {
+      return JSON.parse(text || '{}');
+    } catch (_error) {
+      return {};
+    }
+  }
+  return {};
+}
+
+function normalizeWebsiteDomain(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return normalizeString(parsed.hostname)
+      .toLowerCase()
+      .replace(/^www\./, '');
+  } catch (_error) {
+    return '';
+  }
+}
+
+function isBlockedWebsiteHost(hostname) {
+  const host = normalizeString(hostname).toLowerCase();
+  if (!host) return true;
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
+  if (host === '::1' || host === '[::1]') return true;
+  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+  const private172 = host.match(/^172\.(\d{1,2})\./);
+  return Boolean(private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31);
+}
+
+function normalizeWebsiteUrl(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    if (isBlockedWebsiteHost(parsed.hostname)) return '';
+    parsed.hash = '';
+    return parsed.toString();
+  } catch (_error) {
+    return '';
+  }
+}
+
+function getGooglePlaceName(place) {
+  return normalizeString(
+    place &&
+      (place.displayName && typeof place.displayName === 'object'
+        ? place.displayName.text
+        : place.displayName)
+  );
+}
+
+function getGooglePlaceKeys(place) {
+  const keys = [];
+  const id = normalizeString(place && place.id);
+  const name = getGooglePlaceName(place).toLowerCase();
+  const address = normalizeString(place && place.formattedAddress).toLowerCase();
+  const domain = normalizeWebsiteDomain(place && place.websiteUri);
+
+  if (id) keys.push(`place:${id}`);
+  if (domain) keys.push(`domain:${domain}`);
+  if (name && address) keys.push(`name-address:${name}|${address}`);
+  return keys;
+}
+
+function shouldUseGooglePlace(place) {
+  if (!place || typeof place !== 'object') return false;
+  const status = normalizeString(place.businessStatus);
+  return Boolean(getGooglePlaceName(place)) && (!status || status === 'OPERATIONAL');
+}
+
+async function fetchGooglePlacesPage({ query, count, pageToken }, deps = {}) {
+  const fetchImpl = deps.fetchImpl || global.fetch;
+  const apiKey = getGooglePlacesApiKey(deps);
+  if (typeof fetchImpl !== 'function') {
+    throw createServiceError('Bedrijven ophalen is niet beschikbaar op deze server.', 'FETCH_UNAVAILABLE', 503);
+  }
+  if (!apiKey) {
+    throw createServiceError(
+      'Google Places API-key ontbreekt. Zet GOOGLE_MAPS_SERVER_API_KEY of GOOGLE_MAPS_API_KEY in de serveromgeving.',
+      'GOOGLE_PLACES_NOT_CONFIGURED',
+      503
+    );
+  }
+
+  const body = {
+    textQuery: normalizeRealBusinessQuery(query),
+    pageSize: Math.min(20, Math.max(1, count)),
+    languageCode: 'nl',
+    regionCode: 'NL',
+    includePureServiceAreaBusinesses: true,
+  };
+  if (pageToken) body.pageToken = pageToken;
+
+  const response = await fetchImpl(GOOGLE_PLACES_TEXT_SEARCH_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': GOOGLE_PLACES_FIELD_MASK,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await readJsonResponse(response);
+
+  if (!response || !response.ok) {
+    const googleMessage =
+      normalizeString(data && data.error && data.error.message) ||
+      'Google Places kon geen bedrijven ophalen.';
+    throw createServiceError(googleMessage, 'GOOGLE_PLACES_FAILED', response && response.status ? response.status : 400);
+  }
+
+  return {
+    places: Array.isArray(data && data.places) ? data.places : [],
+    nextPageToken: normalizeString(data && data.nextPageToken),
+  };
+}
+
+async function fetchGooglePlacesBusinesses(input = {}, deps = {}) {
+  const requestedCount = parsePositiveInt(input.count, MAX_REAL_BUSINESS_ROWS, 1, MAX_REAL_BUSINESS_ROWS);
+  const query = normalizeRealBusinessQuery(input.query);
+  const queries = buildGooglePlacesSearchQueries(query, requestedCount);
+  const places = [];
+  const seenKeys = new Set();
+
+  for (const searchQuery of queries) {
+    let pageToken = '';
+    for (let pageIndex = 0; pageIndex < 3 && places.length < requestedCount; pageIndex += 1) {
+      const page = await fetchGooglePlacesPage(
+        {
+          query: searchQuery,
+          count: requestedCount - places.length,
+          pageToken,
+        },
+        deps
+      );
+
+      page.places.filter(shouldUseGooglePlace).forEach((place) => {
+        const keys = getGooglePlaceKeys(place);
+        if (!keys.length || keys.some((key) => seenKeys.has(key))) return;
+        keys.forEach((key) => seenKeys.add(key));
+        places.push(place);
+      });
+
+      pageToken = page.nextPageToken;
+      if (!pageToken) break;
+    }
+    if (places.length >= requestedCount) break;
+  }
+
+  return places.slice(0, requestedCount);
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&#64;|&#x40;|%40/gi, '@')
+    .replace(/&commat;/gi, '@')
+    .replace(/&period;/gi, '.')
+    .replace(/&amp;/gi, '&');
+}
+
+function extractEmailCandidatesFromHtml(html) {
+  const decoded = decodeHtmlEntities(html);
+  const candidates = new Set();
+  decoded.replace(/mailto:([^"'\s?<>]+)/gi, (_match, value) => {
+    candidates.add(decodeURIComponent(value).toLowerCase());
+    return '';
+  });
+  decoded.replace(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi, (value) => {
+    candidates.add(value.toLowerCase());
+    return '';
+  });
+  return Array.from(candidates).filter((email) => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
+    if (/\.(png|jpe?g|gif|webp|svg|css|js)$/i.test(email)) return false;
+    if (/^(noreply|no-reply|donotreply|example)@/i.test(email)) return false;
+    return true;
+  });
+}
+
+function pickBestBusinessEmail(emails, websiteUrl) {
+  const websiteDomain = normalizeWebsiteDomain(websiteUrl);
+  const sameDomain = emails.find((email) => normalizeWebsiteDomain(email.split('@')[1]) === websiteDomain);
+  return sameDomain || emails[0] || '';
+}
+
+async function discoverBusinessEmailFromWebsite(websiteUrl, deps = {}) {
+  const fetchImpl = deps.fetchImpl || global.fetch;
+  const normalizedUrl = normalizeWebsiteUrl(websiteUrl);
+  if (!normalizedUrl || typeof fetchImpl !== 'function') return '';
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(1000, deps.timeoutMs || 4500));
+  try {
+    const response = await fetchImpl(normalizedUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        accept: 'text/html,application/xhtml+xml,text/plain;q=0.7,*/*;q=0.2',
+        'user-agent': 'SoftoraDatabaseImporter/1.0',
+      },
+    });
+    if (!response || !response.ok || typeof response.text !== 'function') return '';
+    const contentType =
+      response.headers && typeof response.headers.get === 'function'
+        ? normalizeString(response.headers.get('content-type')).toLowerCase()
+        : '';
+    const contentLength =
+      response.headers && typeof response.headers.get === 'function'
+        ? Number(response.headers.get('content-length') || 0)
+        : 0;
+    if (contentType && !/(html|text)/.test(contentType)) return '';
+    if (Number.isFinite(contentLength) && contentLength > 700000) return '';
+    const text = await response.text();
+    return pickBestBusinessEmail(extractEmailCandidatesFromHtml(text.slice(0, 350000)), normalizedUrl);
+  } catch (_error) {
+    return '';
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function inferBranchFromGoogleTypes(types = []) {
+  const normalized = new Set((Array.isArray(types) ? types : []).map((type) => normalizeString(type).toLowerCase()));
+  if (['restaurant', 'cafe', 'bakery', 'bar', 'meal_takeaway'].some((type) => normalized.has(type))) return 'Horeca & Restaurants';
+  if (['store', 'clothing_store', 'shoe_store', 'jewelry_store', 'furniture_store'].some((type) => normalized.has(type))) return 'Retail & Winkels';
+  if (['real_estate_agency', 'accounting', 'lawyer', 'insurance_agency'].some((type) => normalized.has(type))) return 'Zakelijke Dienstverlening';
+  if (['general_contractor', 'plumber', 'electrician', 'roofing_contractor'].some((type) => normalized.has(type))) return 'Bouw & Vastgoed';
+  if (['doctor', 'dentist', 'physiotherapist', 'health'].some((type) => normalized.has(type))) return 'Gezondheidszorg';
+  return 'Overig';
+}
+
+async function mapGooglePlacesToImportRows(places, deps = {}) {
+  const shouldEnrichEmails = deps.enrichEmails !== false;
+  const rows = [CANONICAL_IMPORT_COLUMNS.map((column) => column.label)];
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const place of places) {
+    const websiteUrl = normalizeWebsiteUrl(place && place.websiteUri);
+    const websiteDomain = normalizeWebsiteDomain(websiteUrl);
+    const email = shouldEnrichEmails ? await discoverBusinessEmailFromWebsite(websiteUrl, deps) : '';
+    rows.push([
+      getGooglePlaceName(place),
+      normalizeString(place && place.formattedAddress) || 'Onbekend',
+      email || '—',
+      normalizeString(place && (place.nationalPhoneNumber || place.internationalPhoneNumber)) || '—',
+      websiteDomain || websiteUrl || '',
+      '',
+      inferBranchFromGoogleTypes(place && place.types),
+      'benaderbaar',
+      'Serve',
+      'website',
+      today,
+    ]);
+  }
+
+  return rows;
+}
+
+async function fetchRealBusinessRows(input = {}, deps = {}) {
+  const count = parsePositiveInt(input.count, MAX_REAL_BUSINESS_ROWS, 1, MAX_REAL_BUSINESS_ROWS);
+  const query = normalizeRealBusinessQuery(input.query);
+  const places = await fetchGooglePlacesBusinesses({ query, count }, deps);
+  const rows = await mapGooglePlacesToImportRows(places, {
+    ...deps,
+    enrichEmails: input.enrichEmails !== false,
+  });
+
+  return {
+    ok: true,
+    fileType: 'google-places',
+    source: 'google-places',
+    query,
+    requested: count,
+    found: Math.max(0, rows.length - 1),
+    emailFound: rows.slice(1).filter((row) => normalizeString(row[2]) && normalizeString(row[2]) !== '—').length,
+    rows,
+  };
+}
+
 function createPremiumDatabaseImportCoordinator(deps = {}) {
-  const { fetchImpl = global.fetch } = deps;
+  const { fetchImpl = global.fetch, env = process.env } = deps;
 
   function sendImportResponse(req, res) {
     try {
@@ -619,15 +987,43 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     }
   }
 
+  async function sendRealBusinessesResponse(req, res) {
+    try {
+      const result = await fetchRealBusinessRows(req.body || {}, {
+        fetchImpl,
+        env,
+      });
+      if (!Array.isArray(result.rows) || result.rows.length < 2) {
+        return res.status(422).json({
+          ok: false,
+          code: 'NO_REAL_BUSINESSES_FOUND',
+          error: 'Geen echte bedrijven gevonden voor deze zoekopdracht.',
+        });
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      const code = normalizeString(error && error.code) || 'REAL_BUSINESS_IMPORT_FAILED';
+      return res.status(error && error.statusCode ? error.statusCode : 400).json({
+        ok: false,
+        code,
+        error: truncateText(normalizeString(error && error.message) || 'Bedrijven ophalen mislukt.', 500),
+      });
+    }
+  }
+
   return {
     sendSyncResponse,
     sendImportResponse,
+    sendRealBusinessesResponse,
   };
 }
 
 module.exports = {
+  buildGooglePlacesSearchQueries,
   createPremiumDatabaseImportCoordinator,
   detectDelimitedSeparator,
+  fetchRealBusinessRows,
   fetchSpreadsheetRowsFromSourceUrl,
   listWorkbookWorksheets,
   normalizeGoogleSheetsExportUrl,

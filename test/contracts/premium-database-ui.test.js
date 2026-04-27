@@ -80,7 +80,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /AI-database/i);
   assert.doesNotMatch(pageSource, /ai-database-badge/);
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
-  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Importeer bedrijven vanuit CSV, TSV of Excel[\s\S]*Google Sheet koppelen[\s\S]*Synchroniseer automatisch bij openen[\s\S]*Handmatig toevoegen/);
+  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Importeer bedrijven vanuit CSV, TSV of Excel[\s\S]*Google Sheet koppelen[\s\S]*Synchroniseer automatisch bij openen[\s\S]*100 echte bedrijven toevoegen[\s\S]*Zoek via Google Places met echte contactdata[\s\S]*Handmatig toevoegen/);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.doesNotMatch(pageSource, /id="f-branche"/);
@@ -200,6 +200,14 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /syncKey: CUSTOMER_DB_SYNC_KEY/);
   assert.match(pageSource, /nodes\.importFileInput\.addEventListener\("change", databaseImportController\.handleFileChange\)/);
   assert.match(pageSource, /nodes\.addSyncButton\.addEventListener\("click"/);
+  assert.match(pageSource, /addRealBusinessesButton: document\.getElementById\("addRealBusinessesButton"\)/);
+  assert.match(pageSource, /realBusinessButton: nodes\.addRealBusinessesButton/);
+  assert.match(importScriptSource, /function readRealBusinessRows\(query\)/);
+  assert.match(importScriptSource, /fetch\("\/api\/premium-database\/add-real-businesses"/);
+  assert.match(importScriptSource, /count: 100/);
+  assert.match(importScriptSource, /function handleRealBusinessAdd\(\)/);
+  assert.match(pageSource, /nodes\.addRealBusinessesButton\.addEventListener\("click"/);
+  assert.match(pageSource, /databaseImportController\.handleRealBusinessAdd\(\)/);
   assert.match(pageSource, /void databaseImportController\.startAutoSync\(\);/);
   assert.match(pageSource, /record, \["bedrijf", "bedrijfsnaam", "company", "company name", "organisatie", "naam bedrijf"\]/);
   assert.match(pageSource, /record, \["telefoonnummer", "telefoon", "tel", "phone", "phone number"\]/);
