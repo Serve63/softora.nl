@@ -69,17 +69,21 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
 });
 
 test('premium terugkerende kosten gebruikt modals en delegated acties voor bewerken en verwijderen', () => {
-  const { pageSource, combinedSource } = readMonthlyCostsSources();
+  const { pageSource, scriptSource, combinedSource } = readMonthlyCostsSources();
 
   assert.match(pageSource, /<div class="confirm-modal-overlay" id="delete-modal-overlay" aria-hidden="true">/);
   assert.match(pageSource, /<button class="btn-modal btn-modal-save" id="delete-modal-confirm" type="button">Verwijderen<\/button>/);
   assert.match(pageSource, /\.confirm-modal-overlay\s*\{[\s\S]*z-index:\s*1210;/);
   assert.match(pageSource, /\.confirm-modal-text\s*\{[\s\S]*line-height:\s*1\.7;/);
-  assert.match(combinedSource, /function escapeHtml\(value\) \{/);
+  assert.doesNotMatch(scriptSource, /\.innerHTML\s*=/);
+  assert.match(combinedSource, /function appendCostTextElement\(parent, tagName, className, text\) \{/);
+  assert.match(combinedSource, /function createCostActionButton\(action, key, itemId, className, title\) \{/);
   assert.match(combinedSource, /function resolveCategoryName\(categoryKey\) \{/);
-  assert.match(combinedSource, /data-action="edit" data-cat-key="\$\{escapeHtml\(key\)\}" data-item-id="\$\{item\.id\}"/);
-  assert.match(combinedSource, /data-action="delete" data-cat-key="\$\{escapeHtml\(key\)\}" data-item-id="\$\{item\.id\}"/);
-  assert.match(combinedSource, /data-action="add" data-cat-key="\$\{escapeHtml\(key\)\}"/);
+  assert.match(combinedSource, /button\.dataset\.action = action;/);
+  assert.match(combinedSource, /button\.dataset\.catKey = key;/);
+  assert.match(combinedSource, /button\.dataset\.itemId = String\(itemId\);/);
+  assert.match(combinedSource, /button\.dataset\.action = 'add';/);
+  assert.match(combinedSource, /button\.dataset\.catKey = key;/);
   assert.doesNotMatch(pageSource, /onclick="editItem\(/);
   assert.doesNotMatch(pageSource, /onclick="deleteItem\(/);
   assert.doesNotMatch(pageSource, /onclick="addItem\(/);
@@ -106,17 +110,21 @@ test('premium terugkerende kosten toont dynamische posten bovenaan met paarse st
   assert.match(combinedSource, /window\.softoraMonthlyCostsRender = render;/);
   assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260417a" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
-  assert.match(combinedSource, /const categoryHeaderMarkup = cat === 'Totale kosten:' \? '' : `[\s\S]*class="category-header"[\s\S]*category-title[\s\S]*category-total/);
-  assert.match(combinedSource, /block\.innerHTML = `[\s\S]*\$\{categoryHeaderMarkup\}[\s\S]*<div class="cost-row head">/);
+  assert.match(combinedSource, /function createCategoryHeader\(cat, catTotal\) \{/);
+  assert.match(combinedSource, /appendCostTextElement\(header, 'div', 'category-title', cat\);/);
+  assert.match(combinedSource, /appendCostTextElement\(total, 'span', '', '\/mnd'\);/);
+  assert.match(combinedSource, /function createCostRowsHead\(\) \{/);
   assert.match(combinedSource, /const visibleItems = monthlyCostsBootstrapDone \? items : \[\];/);
-  assert.match(combinedSource, /const loadingRowsMarkup = !monthlyCostsBootstrapDone \? `[\s\S]*Kosten laden\.\.\.[\s\S]*actuele coldcalling-kosten worden opgehaald/);
-  assert.match(combinedSource, /const addRowMarkup = monthlyCostsBootstrapDone \? `[\s\S]*\+ Toevoegen/);
+  assert.match(combinedSource, /function createLoadingCostRow\(\) \{[\s\S]*Kosten laden\.\.\.[\s\S]*actuele coldcalling-kosten worden opgehaald/);
+  assert.match(combinedSource, /function createAddCostRow\(key\) \{[\s\S]*button\.textContent = '\+ Toevoegen';/);
   assert.match(pageSource, /\.cost-amount-wrap\.is-static\s*\{[\s\S]*justify-content:\s*flex-end;/);
-  assert.match(combinedSource, /const rowClassName = item\.highlighted \? 'cost-row cost-row-accent' : 'cost-row';/);
+  assert.match(combinedSource, /function createCostItemRow\(item, key\) \{/);
+  assert.match(combinedSource, /row\.className = item\.highlighted \? 'cost-row cost-row-accent' : 'cost-row';/);
   assert.match(combinedSource, /const displayFreqLabel = item\.highlighted && item\.freq === 'maandelijks'[\s\S]*'Deze maand'[\s\S]*freqLabel\[item\.freq\] \|\| item\.freq \|\| '-';/);
-  assert.match(combinedSource, /const amountWrapClassName = item\.highlighted \? 'cost-amount-wrap is-static' : 'cost-amount-wrap';/);
-  assert.match(combinedSource, /const rowActionsMarkup = item\.highlighted \? '' : `[\s\S]*class="row-actions"[\s\S]*data-action="edit"[\s\S]*data-action="delete"/);
-  assert.match(combinedSource, /<div class="\$\{amountWrapClassName\}">[\s\S]*<div class="cost-amount">\$\{fmtEur\(item\.bedrag\)\}<\/div>[\s\S]*\$\{rowActionsMarkup\}/);
+  assert.match(combinedSource, /amountWrap\.className = item\.highlighted \? 'cost-amount-wrap is-static' : 'cost-amount-wrap';/);
+  assert.match(combinedSource, /appendCostTextElement\(amountWrap, 'div', 'cost-amount', fmtEur\(item\.bedrag\)\);/);
+  assert.match(combinedSource, /createCostActionButton\('edit', key, item\.id, 'btn-edit', 'Bewerken'\)/);
+  assert.match(combinedSource, /createCostActionButton\('delete', key, item\.id, 'btn-del', 'Verwijderen'\)/);
 });
 
 test('premium terugkerende kosten bewaart bewerkbare posten via supabase ui-state', () => {

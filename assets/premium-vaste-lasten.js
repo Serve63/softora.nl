@@ -134,15 +134,6 @@ function catKey(cat) {
   return String(cat).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 function resolveCategoryName(categoryKey) {
   return Object.keys(data).find((name) => catKey(name) === String(categoryKey || '')) || '';
 }
@@ -177,6 +168,176 @@ function setMonthlyCostsStageBooting(isBooting) {
   if (loader) {
     loader.classList.toggle('is-hidden', !isBooting);
   }
+}
+
+function appendCostTextElement(parent, tagName, className, text) {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  element.textContent = text;
+  parent.appendChild(element);
+  return element;
+}
+
+function createCostSvgElement(tagName, attributes = {}) {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', tagName);
+  Object.entries(attributes).forEach(([name, value]) => {
+    element.setAttribute(name, value);
+  });
+  return element;
+}
+
+function createCostActionIcon(kind) {
+  const svg = createCostSvgElement('svg', {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '1.8',
+  });
+  if (kind === 'delete') {
+    svg.append(
+      createCostSvgElement('polyline', { points: '3 6 5 6 21 6' }),
+      createCostSvgElement('path', { d: 'M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2' })
+    );
+    return svg;
+  }
+  svg.append(
+    createCostSvgElement('path', { d: 'M12 20h9' }),
+    createCostSvgElement('path', { d: 'M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z' })
+  );
+  return svg;
+}
+
+function createCostActionButton(action, key, itemId, className, title) {
+  const button = document.createElement('button');
+  button.className = className;
+  button.type = 'button';
+  button.dataset.action = action;
+  button.dataset.catKey = key;
+  if (itemId) button.dataset.itemId = String(itemId);
+  button.title = title;
+  button.appendChild(createCostActionIcon(action));
+  return button;
+}
+
+function createCostFrequencySelect(id) {
+  const select = document.createElement('select');
+  select.id = id;
+  Object.entries(freqLabel).forEach(([value, label]) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  });
+  return select;
+}
+
+function createMonthlyCostInput(type, placeholder, id) {
+  const input = document.createElement('input');
+  input.type = type;
+  input.placeholder = placeholder;
+  input.id = id;
+  if (type === 'number') {
+    input.step = '0.01';
+    input.min = '0';
+  }
+  return input;
+}
+
+function createCategoryHeader(cat, catTotal) {
+  const header = document.createElement('div');
+  header.className = 'category-header';
+  appendCostTextElement(header, 'div', 'category-title', cat);
+  const total = appendCostTextElement(header, 'div', 'category-total', fmtEur(catTotal));
+  const suffix = appendCostTextElement(total, 'span', '', '/mnd');
+  suffix.style.fontSize = '11px';
+  suffix.style.fontWeight = '400';
+  suffix.style.color = 'var(--text-light)';
+  suffix.style.marginLeft = '4px';
+  return header;
+}
+
+function createCostRowsHead() {
+  const row = document.createElement('div');
+  row.className = 'cost-row head';
+  appendCostTextElement(row, 'span', '', 'Post');
+  appendCostTextElement(row, 'span', '', 'Frequentie');
+  const amountLabel = appendCostTextElement(row, 'span', '', 'Bedrag');
+  amountLabel.style.textAlign = 'right';
+  return row;
+}
+
+function createLoadingCostRow() {
+  const row = document.createElement('div');
+  row.className = 'cost-row';
+  const content = document.createElement('div');
+  appendCostTextElement(content, 'div', 'cost-name', 'Kosten laden...');
+  appendCostTextElement(
+    content,
+    'div',
+    'cost-note',
+    'Je opgeslagen databasegegevens en actuele coldcalling-kosten worden opgehaald'
+  );
+  row.appendChild(content);
+  appendCostTextElement(row, 'div', 'cost-freq', '...');
+  const amountWrap = document.createElement('div');
+  amountWrap.className = 'cost-amount-wrap is-static';
+  appendCostTextElement(amountWrap, 'div', 'cost-amount', '...');
+  row.appendChild(amountWrap);
+  return row;
+}
+
+function createCostItemRow(item, key) {
+  const row = document.createElement('div');
+  row.className = item.highlighted ? 'cost-row cost-row-accent' : 'cost-row';
+  row.id = `item-${item.id}`;
+
+  const content = document.createElement('div');
+  appendCostTextElement(content, 'div', 'cost-name', item.naam);
+  appendCostTextElement(content, 'div', 'cost-note', item.note || '');
+  row.appendChild(content);
+
+  const displayFreqLabel = item.highlighted && item.freq === 'maandelijks'
+    ? 'Deze maand'
+    : freqLabel[item.freq] || item.freq || '-';
+  appendCostTextElement(row, 'div', 'cost-freq', displayFreqLabel);
+
+  const amountWrap = document.createElement('div');
+  amountWrap.className = item.highlighted ? 'cost-amount-wrap is-static' : 'cost-amount-wrap';
+  appendCostTextElement(amountWrap, 'div', 'cost-amount', fmtEur(item.bedrag));
+
+  if (!item.highlighted) {
+    const rowActions = document.createElement('div');
+    rowActions.className = 'row-actions';
+    rowActions.append(
+      createCostActionButton('edit', key, item.id, 'btn-edit', 'Bewerken'),
+      createCostActionButton('delete', key, item.id, 'btn-del', 'Verwijderen')
+    );
+    amountWrap.appendChild(rowActions);
+  }
+
+  row.appendChild(amountWrap);
+  return row;
+}
+
+function createAddCostRow(key) {
+  const row = document.createElement('div');
+  row.className = 'add-row';
+  const inputs = document.createElement('div');
+  inputs.className = 'add-inputs';
+  inputs.append(
+    createMonthlyCostInput('text', 'Naam', `new-naam-${key}`),
+    createCostFrequencySelect(`new-freq-${key}`),
+    createMonthlyCostInput('number', 'Bedrag', `new-bedrag-${key}`)
+  );
+  row.appendChild(inputs);
+  const button = document.createElement('button');
+  button.className = 'btn-add';
+  button.type = 'button';
+  button.dataset.action = 'add';
+  button.dataset.catKey = key;
+  button.textContent = '+ Toevoegen';
+  row.appendChild(button);
+  return row;
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
@@ -327,7 +488,7 @@ function updateTotals() {
 
 function render() {
   const wrap = document.getElementById('categories-wrap');
-  wrap.innerHTML = '';
+  wrap.replaceChildren();
 
   Object.entries(data).forEach(([cat, items]) => {
     const visibleItems = monthlyCostsBootstrapDone ? items : [];
@@ -335,72 +496,25 @@ function render() {
     const key = catKey(cat);
     const block = document.createElement('div');
     block.className = 'category';
-    const categoryHeaderMarkup = cat === 'Totale kosten:' ? '' : `
-      <div class="category-header">
-        <div class="category-title">${escapeHtml(cat)}</div>
-        <div class="category-total">${fmtEur(catTotal)}<span style="font-size:11px;font-weight:400;color:var(--text-light);margin-left:4px">/mnd</span></div>
-      </div>`;
-    const loadingRowsMarkup = !monthlyCostsBootstrapDone ? `
-      <div class="cost-row">
-        <div>
-          <div class="cost-name">Kosten laden...</div>
-          <div class="cost-note">Je opgeslagen databasegegevens en actuele coldcalling-kosten worden opgehaald</div>
-        </div>
-        <div class="cost-freq">...</div>
-        <div class="cost-amount-wrap is-static">
-          <div class="cost-amount">...</div>
-        </div>
-      </div>` : '';
-    const addRowMarkup = monthlyCostsBootstrapDone ? `
-      <div class="add-row">
-        <div class="add-inputs">
-          <input type="text" placeholder="Naam" id="new-naam-${key}">
-          <select id="new-freq-${key}">
-            <option value="maandelijks">Maandelijks</option>
-            <option value="jaarlijks">Jaarlijks</option>
-            <option value="kwartaal">Per kwartaal</option>
-          </select>
-          <input type="number" placeholder="Bedrag" step="0.01" min="0" id="new-bedrag-${key}">
-        </div>
-        <button class="btn-add" type="button" data-action="add" data-cat-key="${escapeHtml(key)}">+ Toevoegen</button>
-      </div>` : '';
-    block.innerHTML = `
-      ${categoryHeaderMarkup}
-      <div class="cost-row head">
-        <span>Post</span><span>Frequentie</span><span style="text-align:right">Bedrag</span>
-      </div>
-      <div id="rows-${key}">
-        ${loadingRowsMarkup}
-        ${visibleItems.map((item) => {
-              const rowClassName = item.highlighted ? 'cost-row cost-row-accent' : 'cost-row';
-              const displayFreqLabel = item.highlighted && item.freq === 'maandelijks'
-                ? 'Deze maand'
-                : freqLabel[item.freq] || item.freq || '-';
-              const amountWrapClassName = item.highlighted ? 'cost-amount-wrap is-static' : 'cost-amount-wrap';
-          const rowActionsMarkup = item.highlighted ? '' : `
-              <div class="row-actions">
-                <button class="btn-edit" type="button" data-action="edit" data-cat-key="${escapeHtml(key)}" data-item-id="${item.id}" title="Bewerken">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-                </button>
-                <button class="btn-del" type="button" data-action="delete" data-cat-key="${escapeHtml(key)}" data-item-id="${item.id}" title="Verwijderen">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
-                </button>
-              </div>`;
-          return `
-          <div class="${rowClassName}" id="item-${item.id}">
-            <div>
-              <div class="cost-name">${escapeHtml(item.naam)}</div>
-              <div class="cost-note">${escapeHtml(item.note || '')}</div>
-            </div>
-            <div class="cost-freq">${escapeHtml(displayFreqLabel)}</div>
-            <div class="${amountWrapClassName}">
-              <div class="cost-amount">${fmtEur(item.bedrag)}</div>
-              ${rowActionsMarkup}
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-      ${addRowMarkup}`;
+    if (cat !== 'Totale kosten:') {
+      block.appendChild(createCategoryHeader(cat, catTotal));
+    }
+    block.appendChild(createCostRowsHead());
+
+    const rows = document.createElement('div');
+    rows.id = `rows-${key}`;
+    if (!monthlyCostsBootstrapDone) {
+      rows.appendChild(createLoadingCostRow());
+    } else {
+      visibleItems.forEach((item) => {
+        rows.appendChild(createCostItemRow(item, key));
+      });
+    }
+    block.appendChild(rows);
+
+    if (monthlyCostsBootstrapDone) {
+      block.appendChild(createAddCostRow(key));
+    }
     wrap.appendChild(block);
   });
 
