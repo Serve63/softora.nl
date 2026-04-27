@@ -3328,165 +3328,186 @@
     </div>
 
     <script>
-        const cursor = document.querySelector(".cursor");
-        const cursorDot = document.querySelector(".cursor-dot");
-        const progressBar = document.querySelector(".scroll-progress");
-        const navbar = document.getElementById("navbar");
-        const magneticElements = document.querySelectorAll(".magnetic");
-        const tiltCards = document.querySelectorAll("[data-tilt]");
-        const faqListEl = document.getElementById("faq-list");
-        const anchors = document.querySelectorAll('a[href^="#"]');
-        const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
-        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
+        (function () {
+            try {
+                const cursor = document.querySelector(".cursor");
+                const cursorDot = document.querySelector(".cursor-dot");
+                const progressBar = document.querySelector(".scroll-progress");
+                const navbar = document.getElementById("navbar");
+                const magneticElements = document.querySelectorAll(".magnetic");
+                const tiltCards = document.querySelectorAll("[data-tilt]");
+                const faqListEl = document.getElementById("faq-list");
+                const anchors = document.querySelectorAll('a[href^="#"]');
+                const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
+                const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
 
-        if (!enablePointerFx) {
-            document.body.style.cursor = "auto";
-            cursor.style.display = "none";
-            cursorDot.style.display = "none";
-        } else {
-            let mouseX = 0;
-            let mouseY = 0;
-            let cursorX = 0;
-            let cursorY = 0;
-            let dotX = 0;
-            let dotY = 0;
-            let cursorRafId = null;
-
-            document.addEventListener(
-                "mousemove",
-                function (event) {
-                    mouseX = event.clientX;
-                    mouseY = event.clientY;
-                },
-                { passive: true }
-            );
-
-            function animateCursor() {
-                cursorX += (mouseX - cursorX) * 1;
-                cursorY += (mouseY - cursorY) * 1;
-                cursor.style.left = cursorX + "px";
-                cursor.style.top = cursorY + "px";
-                dotX += (mouseX - dotX) * 1;
-                dotY += (mouseY - dotY) * 1;
-                cursorDot.style.left = dotX + "px";
-                cursorDot.style.top = dotY + "px";
-                cursorRafId = requestAnimationFrame(animateCursor);
-            }
-
-            function startCursorLoop() {
-                if (cursorRafId === null) {
-                    cursorRafId = requestAnimationFrame(animateCursor);
+                function safelySetStyle(element, property, value) {
+                    if (!element || !element.style) return;
+                    element.style[property] = value;
                 }
-            }
 
-            function stopCursorLoop() {
-                if (cursorRafId !== null) {
-                    cancelAnimationFrame(cursorRafId);
-                    cursorRafId = null;
+                function safelyAddClass(element, className) {
+                    if (!element || !element.classList) return;
+                    element.classList.add(className);
                 }
-            }
 
-            startCursorLoop();
+                function safelyRemoveClass(element, className) {
+                    if (!element || !element.classList) return;
+                    element.classList.remove(className);
+                }
 
-            document.addEventListener("visibilitychange", function () {
-                if (document.hidden) {
-                    stopCursorLoop();
-                } else {
+                if (!enablePointerFx) {
+                    if (document.body && document.body.style) document.body.style.cursor = "auto";
+                    safelySetStyle(cursor, "display", "none");
+                    safelySetStyle(cursorDot, "display", "none");
+                } else if (cursor && cursorDot) {
+                    let mouseX = 0;
+                    let mouseY = 0;
+                    let cursorX = 0;
+                    let cursorY = 0;
+                    let dotX = 0;
+                    let dotY = 0;
+                    let cursorRafId = null;
+
+                    document.addEventListener(
+                        "mousemove",
+                        function (event) {
+                            mouseX = event.clientX;
+                            mouseY = event.clientY;
+                        },
+                        { passive: true }
+                    );
+
+                    function animateCursor() {
+                        cursorX += (mouseX - cursorX) * 1;
+                        cursorY += (mouseY - cursorY) * 1;
+                        dotX += (mouseX - dotX) * 1;
+                        dotY += (mouseY - dotY) * 1;
+                        safelySetStyle(cursor, "left", `${cursorX}px`);
+                        safelySetStyle(cursor, "top", `${cursorY}px`);
+                        safelySetStyle(cursorDot, "left", `${dotX}px`);
+                        safelySetStyle(cursorDot, "top", `${dotY}px`);
+                        cursorRafId = requestAnimationFrame(animateCursor);
+                    }
+
+                    function startCursorLoop() {
+                        if (cursorRafId === null) {
+                            cursorRafId = requestAnimationFrame(animateCursor);
+                        }
+                    }
+
+                    function stopCursorLoop() {
+                        if (cursorRafId !== null) {
+                            cancelAnimationFrame(cursorRafId);
+                            cursorRafId = null;
+                        }
+                    }
+
                     startCursorLoop();
+
+                    document.addEventListener("visibilitychange", function () {
+                        if (document.hidden) {
+                            stopCursorLoop();
+                        } else {
+                            startCursorLoop();
+                        }
+                    });
+
+                    magneticElements.forEach(function (element) {
+                        let magneticRaf = 0;
+                        let targetX = 0;
+                        let targetY = 0;
+
+                        element.addEventListener("mouseenter", function () {
+                            safelyAddClass(cursor, "hover");
+                        });
+
+                        element.addEventListener("mouseleave", function () {
+                            safelyRemoveClass(cursor, "hover");
+                            element.style.transform = "translate(0, 0)";
+                        });
+
+                        element.addEventListener(
+                            "mousemove",
+                            function (event) {
+                                const rect = element.getBoundingClientRect();
+                                targetX = (event.clientX - rect.left - rect.width / 2) * 0.2;
+                                targetY = (event.clientY - rect.top - rect.height / 2) * 0.2;
+
+                                if (magneticRaf) return;
+                                magneticRaf = requestAnimationFrame(function () {
+                                    element.style.transform = `translate(${targetX}px, ${targetY}px)`;
+                                    magneticRaf = 0;
+                                });
+                            },
+                            { passive: true }
+                        );
+                    });
+
+                    tiltCards.forEach(function (card) {
+                        let tiltRaf = 0;
+                        let rotateX = 0;
+                        let rotateY = 0;
+                        const isPricingCard = card.classList.contains("pricing-card");
+                        const tiltDivisor = isPricingCard ? 220 : 15;
+                        const maxTilt = isPricingCard ? 1.1 : 12;
+                        const tiltScale = isPricingCard ? 1.002 : 1.02;
+                        const tiltPerspective = isPricingCard ? 1400 : 1000;
+
+                        card.addEventListener(
+                            "mousemove",
+                            function (event) {
+                                const rect = card.getBoundingClientRect();
+                                const x = event.clientX - rect.left;
+                                const y = event.clientY - rect.top;
+                                const centerX = rect.width / 2;
+                                const centerY = rect.height / 2;
+                                rotateX = (y - centerY) / tiltDivisor;
+                                rotateY = (centerX - x) / tiltDivisor;
+                                rotateX = Math.max(-maxTilt, Math.min(maxTilt, rotateX));
+                                rotateY = Math.max(-maxTilt, Math.min(maxTilt, rotateY));
+
+                                if (tiltRaf) return;
+                                tiltRaf = requestAnimationFrame(function () {
+                                    card.style.transform = `perspective(${tiltPerspective}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(${tiltScale}, ${tiltScale}, ${tiltScale})`;
+                                    tiltRaf = 0;
+                                });
+                            },
+                            { passive: true }
+                        );
+
+                        card.addEventListener("mouseleave", function () {
+                            card.style.transform = `perspective(${tiltPerspective}px) rotateX(0) rotateY(0) scale3d(1, 1, 1)`;
+                        });
+                    });
                 }
-            });
 
-            magneticElements.forEach(function (element) {
-                let magneticRaf = 0;
-                let targetX = 0;
-                let targetY = 0;
+                let scrollRafPending = false;
+                function updateScrollUi() {
+                    const scrolled = window.scrollY;
+                    const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+                    if (progressBar && progressBar.style) {
+                        progressBar.style.transform = `scaleX(${Math.min(scrolled / maxScroll, 1)})`;
+                    }
+                    if (navbar && navbar.classList) {
+                        navbar.classList.toggle("scrolled", scrolled > 100);
+                    }
+                    scrollRafPending = false;
+                }
 
-                element.addEventListener("mouseenter", function () {
-                    cursor.classList.add("hover");
+                function onScroll() {
+                    if (scrollRafPending) return;
+                    scrollRafPending = true;
+                    requestAnimationFrame(updateScrollUi);
+                }
+
+                window.addEventListener("scroll", onScroll, { passive: true });
+                updateScrollUi();
+
+                document.querySelectorAll(".fade-up").forEach(function (element) {
+                    if (element && element.classList) element.classList.add("visible");
                 });
-
-                element.addEventListener("mouseleave", function () {
-                    cursor.classList.remove("hover");
-                    element.style.transform = "translate(0, 0)";
-                });
-
-                element.addEventListener(
-                    "mousemove",
-                    function (event) {
-                        const rect = element.getBoundingClientRect();
-                        targetX = (event.clientX - rect.left - rect.width / 2) * 0.2;
-                        targetY = (event.clientY - rect.top - rect.height / 2) * 0.2;
-
-                        if (magneticRaf) return;
-                        magneticRaf = requestAnimationFrame(function () {
-                            element.style.transform = `translate(${targetX}px, ${targetY}px)`;
-                            magneticRaf = 0;
-                        });
-                    },
-                    { passive: true }
-                );
-            });
-
-            tiltCards.forEach(function (card) {
-                let tiltRaf = 0;
-                let rotateX = 0;
-                let rotateY = 0;
-                const isPricingCard = card.classList.contains("pricing-card");
-                const tiltDivisor = isPricingCard ? 220 : 15;
-                const maxTilt = isPricingCard ? 1.1 : 12;
-                const tiltScale = isPricingCard ? 1.002 : 1.02;
-                const tiltPerspective = isPricingCard ? 1400 : 1000;
-
-                card.addEventListener(
-                    "mousemove",
-                    function (event) {
-                        const rect = card.getBoundingClientRect();
-                        const x = event.clientX - rect.left;
-                        const y = event.clientY - rect.top;
-                        const centerX = rect.width / 2;
-                        const centerY = rect.height / 2;
-                        rotateX = (y - centerY) / tiltDivisor;
-                        rotateY = (centerX - x) / tiltDivisor;
-                        rotateX = Math.max(-maxTilt, Math.min(maxTilt, rotateX));
-                        rotateY = Math.max(-maxTilt, Math.min(maxTilt, rotateY));
-
-                        if (tiltRaf) return;
-                        tiltRaf = requestAnimationFrame(function () {
-                            card.style.transform = `perspective(${tiltPerspective}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(${tiltScale}, ${tiltScale}, ${tiltScale})`;
-                            tiltRaf = 0;
-                        });
-                    },
-                    { passive: true }
-                );
-
-                card.addEventListener("mouseleave", function () {
-                    card.style.transform = `perspective(${tiltPerspective}px) rotateX(0) rotateY(0) scale3d(1, 1, 1)`;
-                });
-            });
-        }
-
-        let scrollRafPending = false;
-        function updateScrollUi() {
-            const scrolled = window.scrollY;
-            const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
-            progressBar.style.transform = `scaleX(${Math.min(scrolled / maxScroll, 1)})`;
-            navbar.classList.toggle("scrolled", scrolled > 100);
-            scrollRafPending = false;
-        }
-
-        function onScroll() {
-            if (scrollRafPending) return;
-            scrollRafPending = true;
-            requestAnimationFrame(updateScrollUi);
-        }
-
-        window.addEventListener("scroll", onScroll, { passive: true });
-        updateScrollUi();
-
-        document.querySelectorAll(".fade-up").forEach(function (element) {
-            element.classList.add("visible");
-        });
 
         const faqItems = [
             {
@@ -3570,16 +3591,21 @@
             });
         }
 
-        anchors.forEach(function (anchor) {
-            anchor.addEventListener("click", function (event) {
-                const targetSelector = String(anchor.getAttribute("href") || "").trim();
-                if (!targetSelector || targetSelector === "#") return;
-                event.preventDefault();
-                const target = document.querySelector(targetSelector);
-                if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-            });
-        });
-
+                anchors.forEach(function (anchor) {
+                    anchor.addEventListener("click", function (event) {
+                        const targetSelector = String(anchor.getAttribute("href") || "").trim();
+                        if (!targetSelector || targetSelector === "#") return;
+                        event.preventDefault();
+                        const target = document.querySelector(targetSelector);
+                        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+                    });
+                });
+            } catch (error) {
+                if (window.console && typeof window.console.error === "function") {
+                    console.error("[softora-homepage] bootstrapping script failed", error);
+                }
+            }
+        })();
     </script>
 </body>
 </html>

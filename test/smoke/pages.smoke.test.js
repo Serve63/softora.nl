@@ -98,6 +98,25 @@ test('page smoke: premium-website.html uses the current WhatsApp number', () => 
   assert.match(html, /Open WhatsApp chat met Softora op \+31 6 43 26 27 92/, 'WhatsApp-label mist het actuele nummer.');
 });
 
+test('page smoke: premium-website.html handles missing cursor elements safely', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
+  assert.match(
+    html,
+    /safelySetStyle\(cursor, "display", "none"\);/,
+    'Premium homepage moet cursor-elementen defensief wegzetten.'
+  );
+  assert.doesNotMatch(
+    html,
+    /cursor\\.style\\.display =/,
+    'Cursorstijl mag niet meer direct zonder veiligheidsguard gezet worden.'
+  );
+  assert.doesNotMatch(
+    html,
+    /cursorDot\\.style\\.display =/,
+    'Cursor-dot stijl mag niet meer direct zonder veiligheidsguard gezet worden.'
+  );
+});
+
 test('page smoke: premium-ai-coldmailing.html promotes suppression after lead removal regardless of persistence state', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
   assert.match(html, /promoteLeadRowSuppression\(lead\)/, 'Lead suppression promotion na verwijdering ontbreekt.');
