@@ -2130,3 +2130,199 @@ async function handleOrderPaymentAction(id) {
     if (ui.isPaid || ui.isBuilt) return false;
     return markOrderAsPaid(id, { confirm: true });
 }
+
+function buildFallbackSitePrompt(meta, customOrder) {
+    const company = String(meta?.clientName || customOrder?.clientName || 'bedrijf').trim();
+    const title = String(meta?.title || customOrder?.title || 'website').trim();
+    const description = String(meta?.description || customOrder?.description || '').trim();
+    const deliveryTime = String(meta?.deliveryTime || customOrder?.deliveryTime || '').trim();
+    const domainName = String(meta?.domainName || customOrder?.domainName || '').trim();
+    const sourceAppointmentLabel = String(meta?.sourceAppointmentLabel || customOrder?.sourceAppointmentLabel || '').trim();
+    const includeSampleDesign = Boolean(meta?.includeSampleDesign || customOrder?.includeSampleDesign);
+    const referenceImages = normalizeReferenceImageList(customOrder?.referenceImages || []);
+    return [
+        `Bouw een premium maatwerk HTML website voor ${company}.`,
+        `Projecttitel: ${title}.`,
+        description ? `Context: ${description}` : '',
+        deliveryTime ? `Gewenste oplevertermijn: ${deliveryTime}.` : '',
+        domainName ? `Gewenst domein: ${domainName}.` : '',
+        sourceAppointmentLabel ? `Gekoppelde agenda-afspraak: ${sourceAppointmentLabel}.` : '',
+        referenceImages.length ? `Er zijn ${referenceImages.length} referentiebeeld(en) toegevoegd; gebruik die als visuele richting.` : '',
+        includeSampleDesign
+            ? 'Gebruik het voorbeelddesign als basis voor de echte websitebouw. Behoud richting, sfeer en structuur, en werk het door naar een productieklare site.'
+            : '',
+        'Doel: maak een website die voelt als high-end maatwerk en niet als een template.',
+        'Werk als creative director, UX designer, copywriter en senior front-end developer in één.',
+        'Begin met een sterke merkhoek en heldere waardepropositie, en bouw daarna een logisch verhaal van hero naar aanbod, vertrouwen en contact.',
+        'Gebruik een onderscheidende maar kloppende stijl met sterke typografie, consistente spacing, duidelijke sectiehiërarchie en overtuigende CTA’s.',
+        'Als details ontbreken mag je logisch branche-aanbod afleiden, maar verzin geen nep-awards, nep-reviews, nep-adressen of onrealistische claims.',
+        'Lever één volledig HTML-bestand met inline CSS en alleen indien echt nodig inline JavaScript.',
+        'Technische eisen: volledig responsive, mobiel sterk, semantische HTML, goede contrasten, nette containers, geen overlap, geen losse blokken en geen slordige layout.',
+        'Structuur: hero, aanbod/diensten, onderscheidend vermogen, vertrouwen, over ons, contact/boek CTA en footer in één logisch premium geheel.',
+        'Taal van de website: Nederlands.',
+        'Output: alleen geldige HTML code zonder markdown.'
+    ].filter(Boolean).join('\n');
+}
+
+function appendSampleDesignInstruction(promptText, customOrder) {
+    const basePrompt = String(promptText || '').trim();
+    if (!basePrompt) return '';
+    if (!customOrder?.includeSampleDesign) return basePrompt;
+
+    const lower = basePrompt.toLowerCase();
+    if (lower.includes('voorbeelddesign') || lower.includes('voorbeeld design')) {
+        return basePrompt;
+    }
+
+    return [
+        basePrompt,
+        'BELANGRIJK: gebruik het voorbeelddesign als basis voor de definitieve build en behoud visuele richting + componentstructuur waar logisch.'
+    ].join('\n');
+}
+
+function getOrderBuildRequestPayload(id) {
+    const activeId = selectActiveOrderId(id);
+    const meta = getOrderMeta(activeId) || {
+        id: String(activeId),
+        clientName: orders[id]?.name || 'Bedrijf',
+        title: orders[id]?.type || 'Project',
+        description: '',
+        deliveryTime: String(getCustomOrderById(activeId)?.deliveryTime || '').trim(),
+        domainName: String(getCustomOrderById(activeId)?.domainName || '').trim(),
+        sourceAppointmentLabel: String(getCustomOrderById(activeId)?.sourceAppointmentLabel || '').trim(),
+        includeSampleDesign: Boolean(getCustomOrderById(activeId)?.includeSampleDesign),
+        referenceImages: normalizeReferenceImageList(getCustomOrderById(activeId)?.referenceImages || [])
+    };
+    const customOrder = getCustomOrderById(activeId);
+    const basePrompt = String(customOrder?.prompt || '').trim() || buildFallbackSitePrompt(meta, customOrder);
+    const prompt = appendSampleDesignInstruction(basePrompt, customOrder);
+
+    return {
+        orderId: activeId,
+        company: meta.clientName,
+        title: meta.title,
+        description: meta.description,
+        deliveryTime: meta.deliveryTime,
+        domainName: String(customOrder?.domainName || meta?.domainName || '').trim(),
+        prompt,
+        buildMode,
+        language: 'nl',
+        sourceAppointmentId: Number(customOrder?.sourceAppointmentId) || null,
+        sourceCallId: String(customOrder?.sourceCallId || '').trim() || null,
+        includeSampleDesign: Boolean(customOrder?.includeSampleDesign),
+        referenceImages: normalizeReferenceImageList(customOrder?.referenceImages || [])
+    };
+}
+
+async function postEstimateSiteCostRequest(payload) {
+    const endpoints = [
+        '/api/active-order-estimate-site-cost',
+        '/api/active-orders/estimate-site-cost'
+    ];
+    let lastError = null;
+
+    for (let i = 0; i < endpoints.length; i++) {
+        const endpoint = endpoints[i];
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 30000);
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload || {}),
+                signal: controller.signal,
+                cache: 'no-store'
+            });
+            const raw = await res.text();
+            let data = {};
+            try {
+                data = raw ? JSON.parse(raw) : {};
+            } catch (_) {
+                data = {};
+            }
+            if (!res.ok || !data?.ok) {
+                const message = String(
+                    data?.detail ||
+                    data?.error ||
+                    raw ||
+                    `Kostenschatting mislukt (${res.status})`
+                ).trim();
+                const error = new Error(message || `Kostenschatting mislukt (${res.status})`);
+                error.status = Number(res.status) || 0;
+                const canTryNextEndpoint =
+                    i < endpoints.length - 1 &&
+                    (error.status === 404 || error.status === 405 || error.status >= 500);
+                if (canTryNextEndpoint) {
+                    lastError = error;
+                    continue;
+                }
+                throw error;
+            }
+            return data;
+        } catch (error) {
+            if (String(error?.name || '') === 'AbortError') {
+                lastError = new Error('Timeout: AI kostenschatting duurde te lang.');
+            } else if (
+                Number(error?.status) >= 400 &&
+                Number(error?.status) < 500 &&
+                Number(error?.status) !== 404 &&
+                Number(error?.status) !== 405
+            ) {
+                throw error;
+            } else {
+                lastError = error;
+            }
+        } finally {
+            window.clearTimeout(timer);
+        }
+    }
+
+    throw lastError || new Error('AI kostenschatting mislukt.');
+}
+
+async function refreshEstimatedApiCost(id) {
+    const activeId = selectActiveOrderId(id);
+    const record = getCustomOrderById(activeId);
+    if (!record || hasActualApiCost(record)) return null;
+    if (
+        hasEstimatedApiCost(record) &&
+        String(record?.estimatedApiBuildMode || '').trim() === buildMode
+    ) {
+        updateApiCostLabel(activeId, record);
+        return record;
+    }
+
+    const requestKey = `${activeId}:${buildMode}`;
+    if (apiCostEstimateRequests[requestKey]) return apiCostEstimateRequests[requestKey];
+
+    const request = postEstimateSiteCostRequest(getOrderBuildRequestPayload(activeId))
+        .then((result) => {
+            const apiCost = result?.apiCost || {};
+            const patch = {
+                estimatedApiCostEur: parseNullableNumber(apiCost?.eur),
+                estimatedApiCostUsd: parseNullableNumber(apiCost?.usd),
+                estimatedApiTokensInput: parseNullableNumber(apiCost?.promptTokens),
+                estimatedApiTokensOutput: parseNullableNumber(apiCost?.completionTokens),
+                estimatedApiModel: String(result?.model || apiCost?.model || '').trim(),
+                estimatedApiBuildMode: buildMode,
+                estimatedApiGeneratedAt: new Date().toISOString(),
+            };
+            const updated = updateCustomOrderById(activeId, patch);
+            updateApiCostLabel(activeId, updated || { ...record, ...patch });
+            return updated || { ...record, ...patch };
+        })
+        .catch(() => {
+            updateApiCostLabel(activeId, record);
+            return null;
+        })
+        .finally(() => {
+            delete apiCostEstimateRequests[requestKey];
+        });
+
+    apiCostEstimateRequests[requestKey] = request;
+    return request;
+}
+
+function refreshEstimatedApiCostsForOrders() {
+    return;
+}
