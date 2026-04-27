@@ -12,6 +12,10 @@ function registerPremiumDatabaseImportRoutes(app, deps = {}) {
   app.post('/api/premium-database/add-real-businesses', (req, res) =>
     coordinator.sendRealBusinessesResponse(req, res)
   );
+
+  app.post('/api/premium-database/deep-search-businesses', (req, res) =>
+    coordinator.sendDeepSearchBusinessesResponse(req, res)
+  );
 }
 
 module.exports = {

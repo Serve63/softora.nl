@@ -6,6 +6,7 @@ const path = require('node:path');
 const {
   createPremiumDatabaseImportCoordinator,
   detectDelimitedSeparator,
+  fetchDeepSearchBusinessRows,
   fetchRealBusinessRows,
   fetchSpreadsheetRowsFromSourceUrl,
   normalizeGoogleSheetsExportUrl,
@@ -458,6 +459,114 @@ test('premium database real businesses route reports missing Google Places key',
   assert.equal(response.body.code, 'GOOGLE_PLACES_NOT_CONFIGURED');
 });
 
+test('premium database deep search uses OpenAI web search and returns complete rows only', async () => {
+  const calls = [];
+  const result = await fetchDeepSearchBusinessRows(
+    {
+      target: 'Nederland | Noord-Brabant | Altena | Almkerk',
+      count: 100,
+      batchNumber: 2,
+      exclude: ['Bakkerij Oud | oud@voorbeeld.nl | oud.nl'],
+    },
+    {
+      env: { OPENAI_API_KEY: 'openai-key', OPENAI_MODEL: 'gpt-5.5' },
+      fetchImpl: async (url, options = {}) => {
+        calls.push({ url: String(url), options });
+        assert.equal(String(url), 'https://api.openai.com/v1/responses');
+        assert.equal(options.headers.Authorization, 'Bearer openai-key');
+        const payload = JSON.parse(options.body);
+        assert.equal(payload.model, 'gpt-5.5');
+        assert.equal(payload.tools[0].type, 'web_search');
+        assert.equal(payload.tools[0].external_web_access, true);
+        assert.deepEqual(payload.include, ['web_search_call.action.sources']);
+        assert.equal(payload.text.format.type, 'json_schema');
+        assert.match(payload.input[1].content, /Almkerk/);
+        assert.match(payload.input[1].content, /Bakkerij Oud/);
+        return {
+          ok: true,
+          async json() {
+            return {
+              output_text: JSON.stringify({
+                target: 'Almkerk',
+                businesses: [
+                  {
+                    bedrijfsnaam: 'Bakkerij Zon',
+                    adres: 'Dorpsstraat 1, 4286 AA Almkerk',
+                    email: 'info@bakkerijzon.nl',
+                    telefoonnummer: '0183 123 456',
+                    website: 'https://bakkerijzon.nl',
+                    bronnen: ['https://bakkerijzon.nl/contact'],
+                  },
+                  {
+                    bedrijfsnaam: 'Onvolledig Bedrijf',
+                    adres: 'Kerkstraat 2, Almkerk',
+                    email: 'niet gevonden',
+                    telefoonnummer: '0183 000 000',
+                    website: 'https://onvolledig.nl',
+                    bronnen: ['https://onvolledig.nl'],
+                  },
+                ],
+                notes: '',
+              }),
+              output: [
+                {
+                  type: 'web_search_call',
+                  action: {
+                    sources: [{ url: 'https://bakkerijzon.nl/contact', title: 'Contact' }],
+                  },
+                },
+              ],
+            };
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(calls.length, 1);
+  assert.equal(result.fileType, 'openai-web-search');
+  assert.equal(result.found, 1);
+  assert.equal(result.rejected, 1);
+  assert.deepEqual(result.rows[1].slice(0, 5), [
+    'Bakkerij Zon',
+    'Dorpsstraat 1, 4286 AA Almkerk',
+    'info@bakkerijzon.nl',
+    '0183 123 456',
+    'bakkerijzon.nl',
+  ]);
+  assert.equal(result.sources[0].url, 'https://bakkerijzon.nl/contact');
+});
+
+test('premium database deep search route reports missing OpenAI key', async () => {
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    env: {},
+    fetchImpl: async () => {
+      throw new Error('fetch should not run without key');
+    },
+  });
+  const response = {
+    statusCode: 0,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  await coordinator.sendDeepSearchBusinessesResponse(
+    { body: { target: 'Nederland | Noord-Brabant | Altena | Almkerk', count: 100 } },
+    response
+  );
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.ok, false);
+  assert.equal(response.body.code, 'OPENAI_NOT_CONFIGURED');
+});
+
 test('premium database import route is registered behind the premium api surface', () => {
   const featureRoutesPath = path.join(__dirname, '../../server/services/feature-routes-runtime.js');
   const routePath = path.join(__dirname, '../../server/routes/premium-database-import.js');
@@ -469,4 +578,5 @@ test('premium database import route is registered behind the premium api surface
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/import-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/sync-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/add-real-businesses'/);
+  assert.match(routeSource, /app\.post\('\/api\/premium-database\/deep-search-businesses'/);
 });

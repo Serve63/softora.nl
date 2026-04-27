@@ -5,6 +5,8 @@ const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 2000;
 const MAX_IMPORT_COLS = 50;
 const MAX_REAL_BUSINESS_ROWS = 100;
+const MAX_DEEP_SEARCH_ROWS = 100;
+const MAX_DEEP_SEARCH_EXCLUDE_ITEMS = 180;
 const GOOGLE_PLACES_TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
 const GOOGLE_PLACES_FIELD_MASK = [
   'places.id',
@@ -18,6 +20,7 @@ const GOOGLE_PLACES_FIELD_MASK = [
   'nextPageToken',
 ].join(',');
 const DEFAULT_REAL_BUSINESS_QUERY = 'bedrijven in Noord-Brabant';
+const DEFAULT_OPENAI_MODEL = 'gpt-5.5';
 const REAL_BUSINESS_CATEGORY_PREFIXES = [
   'bedrijven',
   'winkels',
@@ -944,6 +947,403 @@ async function fetchRealBusinessRows(input = {}, deps = {}) {
   };
 }
 
+function getOpenAiApiKey(deps = {}) {
+  const env = deps.env || process.env || {};
+  return normalizeString(deps.openAiApiKey || env.OPENAI_API_KEY);
+}
+
+function getOpenAiApiBaseUrl(deps = {}) {
+  const env = deps.env || process.env || {};
+  return normalizeString(deps.openAiApiBaseUrl || env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1').replace(
+    /\/+$/,
+    ''
+  );
+}
+
+function getOpenAiDatabaseSearchModel(deps = {}) {
+  const env = deps.env || process.env || {};
+  return normalizeString(
+    deps.openAiModel || env.OPENAI_DATABASE_SEARCH_MODEL || env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL
+  );
+}
+
+function normalizeDeepSearchTarget(value) {
+  return truncateText(value, 240);
+}
+
+function normalizeDeepSearchExcludeItems(items) {
+  const values = Array.isArray(items) ? items : [];
+  const seen = new Set();
+  const result = [];
+  values.forEach((item) => {
+    const normalized = truncateText(item, 160);
+    const key = normalizeImportKey(normalized);
+    if (!normalized || !key || seen.has(key)) return;
+    seen.add(key);
+    result.push(normalized);
+  });
+  return result.slice(0, MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
+}
+
+function buildDeepSearchJsonSchema() {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      target: { type: 'string' },
+      businesses: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            bedrijfsnaam: { type: 'string' },
+            adres: { type: 'string' },
+            email: { type: 'string' },
+            telefoonnummer: { type: 'string' },
+            website: { type: 'string' },
+            bronnen: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+          },
+          required: ['bedrijfsnaam', 'adres', 'email', 'telefoonnummer', 'website', 'bronnen'],
+        },
+      },
+      notes: { type: 'string' },
+    },
+    required: ['target', 'businesses', 'notes'],
+  };
+}
+
+function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
+  const exclusions = normalizeDeepSearchExcludeItems(excludeItems);
+  const exclusionText = exclusions.length
+    ? exclusions.map((item, index) => `${index + 1}. ${item}`).join('\n')
+    : 'Geen eerdere resultaten meegegeven.';
+
+  const systemPrompt = [
+    'Je bent een nauwkeurige Nederlandse B2B-researchassistent voor Softora.',
+    'Gebruik live web search en lever alleen bedrijven aan waarvan bedrijfsnaam, adres, e-mail, telefoonnummer en website online verifieerbaar zijn.',
+    'Neem alleen actieve bedrijven of bedrijven die duidelijk operationeel lijken mee.',
+    'Neem geen verenigingen, scholen, overheidsinstanties of stichtingen mee, tenzij ze commercieel interessant zijn.',
+    'Vermijd dubbele bedrijven en verzin nooit ontbrekende gegevens.',
+    'Gebruik geen placeholders zoals onbekend, niet gevonden, n.v.t. of lege waarden.',
+    'Geef uitsluitend JSON terug volgens het schema.',
+  ].join('\n');
+
+  const userPrompt = [
+    `Vind maximaal ${count} nieuwe actieve bedrijven in: ${target}.`,
+    `Dit is batch ${Math.max(1, Number(batchNumber) || 1)} voor deze plek. Zoek verder dan de meest voor de hand liggende resultaten.`,
+    '',
+    'Lever exact deze velden per bedrijf:',
+    'Bedrijfsnaam | Adres | E-mail | Telefoonnummer | Website',
+    '',
+    'Belangrijke regels:',
+    '- Als een van deze velden ontbreekt, lever het bedrijf niet aan.',
+    '- Gebruik bij voorkeur de officiele bedrijfswebsite als bron voor e-mail en telefoon.',
+    '- Website mag een domein of volledige URL zijn, maar moet echt bij het bedrijf horen.',
+    '- Vermijd dubbele bedrijven, handelsnamen met dezelfde website en eerder gevonden resultaten.',
+    '- Gebruik bronnen als URL-lijst per bedrijf, zodat de controle zichtbaar blijft.',
+    '',
+    'Eerder gevonden of al bestaande resultaten die je moet vermijden:',
+    exclusionText,
+  ].join('\n');
+
+  return { systemPrompt, userPrompt };
+}
+
+function extractOpenAiResponsesText(data) {
+  if (typeof data?.output_text === 'string') return normalizeString(data.output_text);
+  const parts = [];
+
+  function visit(value) {
+    if (!value) return;
+    if (typeof value === 'string') {
+      parts.push(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value !== 'object') return;
+    if (value.type === 'output_text' && typeof value.text === 'string') {
+      parts.push(value.text);
+      return;
+    }
+    if (typeof value.output_text === 'string') parts.push(value.output_text);
+    if (typeof value.text === 'string' && (value.type === 'text' || value.type === 'message')) {
+      parts.push(value.text);
+    }
+    if (Array.isArray(value.content)) visit(value.content);
+    if (Array.isArray(value.output)) visit(value.output);
+  }
+
+  visit(data && data.output);
+  if (!parts.length) {
+    const chatContent = data?.choices?.[0]?.message?.content;
+    if (typeof chatContent === 'string') parts.push(chatContent);
+  }
+  return normalizeString(parts.join('\n'));
+}
+
+function parseJsonObjectFromText(text) {
+  const raw = normalizeString(text)
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (_error) {
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    if (start === -1 || end <= start) return null;
+    try {
+      return JSON.parse(raw.slice(start, end + 1));
+    } catch (__error) {
+      return null;
+    }
+  }
+}
+
+function isPlaceholderValue(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  if (!normalized) return true;
+  return /^(?:-|—|n\/a|na|nvt|n\.v\.t\.|null|geen|geen info|onbekend|unknown|niet gevonden|not found)$/i.test(
+    normalized
+  );
+}
+
+function normalizeDeepSearchEmail(value) {
+  const raw = normalizeString(value).toLowerCase();
+  if (isPlaceholderValue(raw)) return '';
+  const match = raw.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+  return match ? match[0].toLowerCase() : '';
+}
+
+function normalizeDeepSearchPhone(value) {
+  const raw = normalizeString(value);
+  if (isPlaceholderValue(raw)) return '';
+  const digits = raw.replace(/\D+/g, '');
+  return digits.length >= 7 ? raw : '';
+}
+
+function normalizeDeepSearchSources(value) {
+  const rawSources = Array.isArray(value) ? value : [];
+  const sources = [];
+  const seen = new Set();
+  rawSources.forEach((source) => {
+    const normalized = normalizeWebsiteUrl(source);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    sources.push(normalized);
+  });
+  return sources.slice(0, 8);
+}
+
+function normalizeDeepSearchBusiness(record) {
+  if (!record || typeof record !== 'object') return null;
+  const bedrijfsnaam = truncateText(record.bedrijfsnaam || record.bedrijf || record.company || '', 180);
+  const adres = truncateText(record.adres || record.address || '', 220);
+  const email = normalizeDeepSearchEmail(record.email || record['e-mail'] || record.mail);
+  const telefoonnummer = normalizeDeepSearchPhone(record.telefoonnummer || record.telefoon || record.phone);
+  const websiteUrl = normalizeWebsiteUrl(record.website || record.url || record.site);
+  const website = normalizeWebsiteDomain(websiteUrl);
+  const bronnen = normalizeDeepSearchSources(record.bronnen || record.sources || record.sourceUrls);
+
+  if (
+    isPlaceholderValue(bedrijfsnaam) ||
+    isPlaceholderValue(adres) ||
+    !email ||
+    !telefoonnummer ||
+    !website
+  ) {
+    return null;
+  }
+
+  return {
+    bedrijfsnaam,
+    adres,
+    email,
+    telefoonnummer,
+    website,
+    bronnen,
+  };
+}
+
+function dedupeDeepSearchBusinesses(businesses) {
+  const seen = new Set();
+  const result = [];
+  (businesses || []).forEach((business) => {
+    const normalized = normalizeDeepSearchBusiness(business);
+    if (!normalized) return;
+    const keys = [
+      `email:${normalized.email.toLowerCase()}`,
+      `domain:${normalized.website.toLowerCase()}`,
+      `company-address:${normalizeImportKey(normalized.bedrijfsnaam)}|${normalizeImportKey(normalized.adres)}`,
+    ];
+    if (keys.some((key) => seen.has(key))) return;
+    keys.forEach((key) => seen.add(key));
+    result.push(normalized);
+  });
+  return result;
+}
+
+function mapDeepSearchBusinessesToRows(businesses) {
+  const rows = [CANONICAL_IMPORT_COLUMNS.map((column) => column.label)];
+  const today = new Date().toISOString().slice(0, 10);
+  businesses.forEach((business) => {
+    rows.push([
+      business.bedrijfsnaam,
+      business.adres,
+      business.email,
+      business.telefoonnummer,
+      business.website,
+      '',
+      'Overig',
+      'benaderbaar',
+      'Serve',
+      'website',
+      today,
+    ]);
+  });
+  return rows;
+}
+
+function collectDeepSearchSources(data, businesses) {
+  const sources = new Map();
+  function add(url, title = '') {
+    const normalizedUrl = normalizeWebsiteUrl(url);
+    if (!normalizedUrl || sources.has(normalizedUrl)) return;
+    sources.set(normalizedUrl, {
+      url: normalizedUrl,
+      title: truncateText(title || normalizedUrl, 160),
+    });
+  }
+  businesses.forEach((business) => {
+    (business.bronnen || []).forEach((url) => add(url));
+  });
+
+  function visit(value) {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value.url === 'string') add(value.url, value.title || value.name || '');
+    if (value.url_citation && typeof value.url_citation === 'object') {
+      add(value.url_citation.url, value.url_citation.title || '');
+    }
+    Object.keys(value).forEach((key) => {
+      if (key === 'text') return;
+      visit(value[key]);
+    });
+  }
+  visit(data && data.output);
+  return Array.from(sources.values()).slice(0, 80);
+}
+
+async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
+  const fetchImpl = deps.fetchImpl || global.fetch;
+  const env = deps.env || process.env || {};
+  const apiKey = getOpenAiApiKey({ ...deps, env });
+  const target = normalizeDeepSearchTarget(input.target || input.location || input.query);
+  const count = parsePositiveInt(input.count, MAX_DEEP_SEARCH_ROWS, 1, MAX_DEEP_SEARCH_ROWS);
+  const batchNumber = parsePositiveInt(input.batchNumber, 1, 1, 999);
+  const excludeItems = normalizeDeepSearchExcludeItems(input.exclude || input.excludeItems || input.seen);
+
+  if (typeof fetchImpl !== 'function') {
+    throw createServiceError('AI zoeken is niet beschikbaar op deze server.', 'FETCH_UNAVAILABLE', 503);
+  }
+  if (!apiKey) {
+    throw createServiceError('OPENAI_API_KEY ontbreekt in de serveromgeving.', 'OPENAI_NOT_CONFIGURED', 503);
+  }
+  if (!target) {
+    throw createServiceError('Geen zoekgebied ontvangen.', 'DEEP_SEARCH_TARGET_REQUIRED', 400);
+  }
+
+  const model = getOpenAiDatabaseSearchModel({ ...deps, env });
+  const { systemPrompt, userPrompt } = buildDeepSearchPrompt({
+    target,
+    count,
+    excludeItems,
+    batchNumber,
+  });
+
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeout = controller
+    ? setTimeout(() => controller.abort(), Math.max(10000, deps.openAiTimeoutMs || 180000))
+    : null;
+  let response;
+  try {
+    response = await fetchImpl(`${getOpenAiApiBaseUrl({ ...deps, env })}/responses`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: controller ? controller.signal : undefined,
+      body: JSON.stringify({
+        model,
+        reasoning: { effort: 'low' },
+        tools: [
+          {
+            type: 'web_search',
+            external_web_access: true,
+            user_location: {
+              type: 'approximate',
+              country: 'NL',
+            },
+          },
+        ],
+        tool_choice: 'auto',
+        include: ['web_search_call.action.sources'],
+        input: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'softora_business_search_batch',
+            strict: true,
+            schema: buildDeepSearchJsonSchema(),
+          },
+        },
+      }),
+    });
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+  const data = await readJsonResponse(response);
+  if (!response || !response.ok) {
+    const message =
+      normalizeString(data && data.error && data.error.message) || 'OpenAI kon geen bedrijven ophalen.';
+    throw createServiceError(message, 'OPENAI_DEEP_SEARCH_FAILED', response && response.status ? response.status : 400);
+  }
+
+  const text = extractOpenAiResponsesText(data);
+  const parsed = parseJsonObjectFromText(text);
+  const rawBusinesses = Array.isArray(parsed && parsed.businesses) ? parsed.businesses : [];
+  const businesses = dedupeDeepSearchBusinesses(rawBusinesses).slice(0, count);
+  const rows = mapDeepSearchBusinessesToRows(businesses);
+
+  return {
+    ok: true,
+    fileType: 'openai-web-search',
+    source: 'openai-web-search',
+    target,
+    model,
+    requested: count,
+    found: businesses.length,
+    rejected: Math.max(0, rawBusinesses.length - businesses.length),
+    businesses,
+    sources: collectDeepSearchSources(data, businesses),
+    rows,
+  };
+}
+
 function createPremiumDatabaseImportCoordinator(deps = {}) {
   const { fetchImpl = global.fetch, env = process.env } = deps;
 
@@ -1012,10 +1412,36 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     }
   }
 
+  async function sendDeepSearchBusinessesResponse(req, res) {
+    try {
+      const result = await fetchDeepSearchBusinessRows(req.body || {}, {
+        fetchImpl,
+        env,
+      });
+      if (!Array.isArray(result.rows) || result.rows.length < 2) {
+        return res.status(422).json({
+          ok: false,
+          code: 'NO_DEEP_SEARCH_BUSINESSES_FOUND',
+          error: 'Geen complete bedrijven gevonden voor deze plek.',
+        });
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      const code = normalizeString(error && error.code) || 'DEEP_SEARCH_IMPORT_FAILED';
+      return res.status(error && error.statusCode ? error.statusCode : 400).json({
+        ok: false,
+        code,
+        error: truncateText(normalizeString(error && error.message) || 'AI zoeklijst ophalen mislukt.', 500),
+      });
+    }
+  }
+
   return {
     sendSyncResponse,
     sendImportResponse,
     sendRealBusinessesResponse,
+    sendDeepSearchBusinessesResponse,
   };
 }
 
@@ -1023,6 +1449,7 @@ module.exports = {
   buildGooglePlacesSearchQueries,
   createPremiumDatabaseImportCoordinator,
   detectDelimitedSeparator,
+  fetchDeepSearchBusinessRows,
   fetchRealBusinessRows,
   fetchSpreadsheetRowsFromSourceUrl,
   listWorkbookWorksheets,

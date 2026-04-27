@@ -1032,6 +1032,132 @@
             line-height: 1.45;
         }
 
+        .deep-search-modal {
+            width: min(760px, calc(100vw - 28px));
+            max-height: 86vh;
+            overflow: auto;
+        }
+
+        .deep-search-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .deep-search-stat {
+            color: var(--light);
+            font-size: 12px;
+            line-height: 1.45;
+            text-align: right;
+        }
+
+        .deep-search-current {
+            border: 1px solid rgba(139, 34, 82, 0.18);
+            background: rgba(139, 34, 82, 0.07);
+            border-radius: 7px;
+            padding: 10px 12px;
+            color: var(--crimson);
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .deep-search-input {
+            width: 100%;
+            min-height: 112px;
+            resize: vertical;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .deep-search-tools {
+            display: grid;
+            grid-template-columns: minmax(0, 1.05fr) minmax(220px, .95fr);
+            gap: 14px;
+            margin-top: 12px;
+        }
+
+        .deep-search-list,
+        .deep-search-sources {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--card-soft);
+            min-height: 184px;
+            max-height: 260px;
+            overflow: auto;
+            padding: 8px;
+        }
+
+        .deep-search-target {
+            width: 100%;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--dark);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 10px;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .deep-search-target span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .deep-search-target strong {
+            color: var(--light);
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .deep-search-target.is-active {
+            border-color: rgba(139, 34, 82, 0.28);
+            background: rgba(139, 34, 82, 0.08);
+        }
+
+        .deep-search-target.is-done strong {
+            color: var(--green);
+        }
+
+        .deep-search-sources {
+            display: grid;
+            align-content: start;
+            gap: 7px;
+        }
+
+        .deep-search-sources a {
+            color: var(--crimson);
+            font-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-decoration: none;
+        }
+
+        .deep-search-empty {
+            color: var(--light);
+            font-size: 12px;
+            padding: 8px;
+        }
+
+        .mbtn:disabled {
+            cursor: not-allowed;
+            opacity: .58;
+        }
+
         .toast {
             position: fixed;
             bottom: 20px;
@@ -1107,6 +1233,16 @@
 
             .panel {
                 width: min(420px, 100%);
+            }
+
+            .deep-search-head,
+            .deep-search-tools {
+                grid-template-columns: 1fr;
+                flex-direction: column;
+            }
+
+            .deep-search-stat {
+                text-align: left;
             }
         }
     </style>
@@ -1211,6 +1347,10 @@
                                     <button class="add-actions-item" id="addRealBusinessesButton" type="button" role="menuitem">
                                         <span class="add-actions-item-title">100 echte bedrijven toevoegen</span>
                                         <span class="add-actions-item-sub">Zoek via Google Places met echte contactdata</span>
+                                    </button>
+                                    <button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">
+                                        <span class="add-actions-item-title">AI zoeklijst</span>
+                                        <span class="add-actions-item-sub">Werk je vaste volgorde af met controle</span>
                                     </button>
                                     <button class="add-actions-item" id="addManualButton" type="button" role="menuitem">
                                         <span class="add-actions-item-title">Handmatig toevoegen</span>
@@ -1368,6 +1508,39 @@
         </div>
     </div>
 
+    <div class="modal-bg" id="deepSearchModal" aria-hidden="true">
+        <div class="modal deep-search-modal" role="dialog" aria-modal="true" aria-labelledby="deepSearchTitle">
+            <div class="deep-search-head">
+                <div class="modal-title" id="deepSearchTitle">AI zoeklijst</div>
+                <div class="deep-search-stat" id="deepSearchStats">Nog geen zoeklijst</div>
+            </div>
+            <div class="deep-search-current" id="deepSearchCurrent">Geen huidige plek</div>
+            <div class="mrow">
+                <label class="mlabel" for="deepSearchListInput">Volgorde</label>
+                <textarea class="deep-search-input" id="deepSearchListInput" placeholder="Nederland | Noord-Brabant | Altena | Almkerk"></textarea>
+            </div>
+            <div class="mbtns">
+                <button class="mbtn c" id="deepSearchSaveButton" type="button">Lijst opslaan</button>
+                <button class="mbtn s" id="deepSearchStartButton" type="button">100 zoeken</button>
+                <button class="mbtn c" id="deepSearchDoneButton" type="button">Klaar, volgende</button>
+            </div>
+            <div class="deep-search-tools">
+                <div>
+                    <label class="mlabel">Planning</label>
+                    <div class="deep-search-list" id="deepSearchList"></div>
+                </div>
+                <div>
+                    <label class="mlabel">Bronnen laatste batch</label>
+                    <div class="deep-search-sources" id="deepSearchSources"></div>
+                </div>
+            </div>
+            <div class="mbtns">
+                <button class="mbtn c" id="deepSearchResetButton" type="button">Leegmaken</button>
+                <button class="mbtn c" id="closeDeepSearchButton" type="button">Sluiten</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
     <input type="file" id="photoFileInput" accept="image/*" hidden>
     <div class="photo-preview" id="photoPreview" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Websitefoto bekijken">
@@ -1381,11 +1554,13 @@
 
     <script src="assets/premium-database-photo-batch.js?v=20260427a"></script>
     <script src="assets/premium-database-import.js?v=20260427b"></script>
+    <script src="assets/premium-database-deep-search.js?v=20260427a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
         const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";
+        const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";
         const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 * 1000;
         const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";
         const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";
@@ -1439,6 +1614,7 @@
             addUploadButton: document.getElementById("addUploadButton"),
             addSyncButton: document.getElementById("addSyncButton"),
             addRealBusinessesButton: document.getElementById("addRealBusinessesButton"),
+            deepSearchButton: document.getElementById("deepSearchButton"),
             addManualButton: document.getElementById("addManualButton"),
             importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
@@ -1475,6 +1651,17 @@
             photoBatchSummary: document.getElementById("photoBatchSummary"),
             cancelPhotoBatchButton: document.getElementById("cancelPhotoBatchButton"),
             startPhotoBatchButton: document.getElementById("startPhotoBatchButton"),
+            deepSearchModal: document.getElementById("deepSearchModal"),
+            deepSearchStats: document.getElementById("deepSearchStats"),
+            deepSearchCurrent: document.getElementById("deepSearchCurrent"),
+            deepSearchListInput: document.getElementById("deepSearchListInput"),
+            deepSearchSaveButton: document.getElementById("deepSearchSaveButton"),
+            deepSearchStartButton: document.getElementById("deepSearchStartButton"),
+            deepSearchDoneButton: document.getElementById("deepSearchDoneButton"),
+            deepSearchList: document.getElementById("deepSearchList"),
+            deepSearchSources: document.getElementById("deepSearchSources"),
+            deepSearchResetButton: document.getElementById("deepSearchResetButton"),
+            closeDeepSearchButton: document.getElementById("closeDeepSearchButton"),
             toast: document.getElementById("toast")
         };
 
@@ -3085,6 +3272,20 @@
             realBusinessButton: nodes.addRealBusinessesButton
         });
 
+        const databaseDeepSearchController = window.SoftoraDatabaseDeepSearch.createController({
+            nodes: nodes,
+            getUiState: fetchUiStateGetWithFallback,
+            setUiState: fetchUiStateSetWithFallback,
+            scope: CUSTOMER_DB_SCOPE,
+            stateKey: CUSTOMER_DB_DEEP_SEARCH_KEY,
+            importRows: importCustomersFromRows,
+            getCustomers: function () {
+                return state.klanten;
+            },
+            setStatusMessage: setStatusMessage,
+            toast: toast
+        });
+
         nodes.query.addEventListener("input", function (event) {
             state.query = normalizeString(event.target.value);
             renderPage();
@@ -3175,6 +3376,7 @@
             photoBatchController.open();
         });
         photoBatchController.bind();
+        databaseDeepSearchController.bind();
         nodes.addUploadButton.addEventListener("click", function () {
             closeAddActions();
             nodes.importFileInput.click();
@@ -3186,6 +3388,10 @@
         nodes.addRealBusinessesButton.addEventListener("click", function () {
             closeAddActions();
             void databaseImportController.handleRealBusinessAdd();
+        });
+        nodes.deepSearchButton.addEventListener("click", function () {
+            closeAddActions();
+            databaseDeepSearchController.open();
         });
         nodes.addManualButton.addEventListener("click", function () {
             closeAddActions();
