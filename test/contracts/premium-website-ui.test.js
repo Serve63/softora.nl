@@ -229,6 +229,17 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   );
 });
 
+test('premium website verbergt de personeel-link op mobiel in de footer', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<a href="\/premium-personeel-login\?logout=1">Personeel<\/a>/);
+  assert.match(
+    source,
+    /@media \(max-width: 768px\)\s*\{[\s\S]*\.footer-legal a\[href\*="premium-personeel-login"\]\s*\{\s*display:\s*none;\s*\}/
+  );
+});
+
 test('premium website houdt footer-links direct klikbaar door footer buiten content-visibility defer te houden', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
