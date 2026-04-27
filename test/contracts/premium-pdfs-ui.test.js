@@ -22,6 +22,9 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /<div class="topbar">/);
   assert.match(pageSource, /\.topbar-logo \{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.btn-dl \{[\s\S]*font-family:\s*'Oswald', sans-serif;/);
+  assert.match(pageSource, /<div class="pdf-process-notice" role="note" aria-labelledby="pdf-process-notice-title">/);
+  assert.match(pageSource, /Standaard werkwijze bij nieuwe opdrachten/);
+  assert.match(pageSource, /Akkoord met de offerte en algemene voorwaarden\./);
   assert.match(pageSource, /--preview-scale:\s*1;/);
   assert.match(pageSource, /--preview-max-scale:\s*1\.16;/);
   assert.match(pageSource, /--a4-width:\s*595px;/);

@@ -224,6 +224,55 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   gap: 0;
 }
 
+.pdf-process-notice {
+  display: flex;
+  gap: 12px;
+  margin: 22px 22px 0;
+  padding: 15px 15px 14px;
+  border: 1px solid rgba(155,35,85,.2);
+  border-left: 4px solid var(--crimson);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-2);
+}
+
+.pdf-process-notice + .pdf-form-inner {
+  padding-top: 18px;
+}
+
+.pdf-process-notice svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--crimson);
+}
+
+.pdf-process-notice h2 {
+  margin: 0 0 7px;
+  color: var(--text);
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.pdf-process-notice p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.pdf-process-notice p + p {
+  margin-top: 7px;
+}
+
+.pdf-process-notice strong {
+  color: var(--crimson);
+  font-weight: 700;
+}
+
 /* Section headers */
 .form-section-head {
   display: flex;
@@ -674,6 +723,19 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 
       <!-- FORMULIER -->
       <div class="form-panel">
+        <div class="pdf-process-notice" role="note" aria-labelledby="pdf-process-notice-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M12 10.8v5.2"></path>
+            <path d="M12 7.6h.01"></path>
+          </svg>
+          <div>
+            <h2 id="pdf-process-notice-title">Standaard werkwijze bij nieuwe opdrachten</h2>
+            <p>Bij elke nieuwe opdracht sturen we &eacute;&eacute;n mail met daarin de offerte en de algemene voorwaarden als PDF-bijlage.</p>
+            <p>In de mail staat duidelijk dat de algemene voorwaarden van Softora VOF van toepassing zijn. De klant moet v&oacute;&oacute;r de start van de werkzaamheden schriftelijk akkoord geven, bijvoorbeeld met: <strong>&quot;Akkoord met de offerte en algemene voorwaarden.&quot;</strong></p>
+            <p>Pas na dit akkoord sturen we de factuur en starten we met de werkzaamheden.</p>
+          </div>
+        </div>
         <div class="pdf-form-inner" id="form-panel">
           <!-- filled by JS -->
         </div>
