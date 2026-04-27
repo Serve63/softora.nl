@@ -1237,7 +1237,7 @@
                 <div class="modal-contact" id="modalContact">Contact</div>
             </div>
             <div class="modal-top-actions">
-                <button class="modal-close magnetic" id="modalCloseBtn" onclick="closeModal()" type="button" aria-label="Sluiten">
+                <button class="modal-close magnetic" id="modalCloseBtn" data-modal-close type="button" aria-label="Sluiten">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -1508,11 +1508,11 @@
                 <p>Let op: Agenda functioneerd pas goed bij gebruik van Softora Agenda app.</p>
             </div>
             <div class="month-nav">
-                <button class="month-nav-btn magnetic" onclick="changeMonth(-1)" type="button">
+                <button class="month-nav-btn magnetic" data-month-offset="-1" type="button">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
                 </button>
                 <span class="month-label" id="monthLabel"></span>
-                <button class="month-nav-btn magnetic" onclick="changeMonth(1)" type="button">
+                <button class="month-nav-btn magnetic" data-month-offset="1" type="button">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
                 </button>
             </div>
@@ -3416,8 +3416,8 @@
 
             dayAppointments.forEach((apt) => {
                 const appointmentClass = getCalendarAppointmentClass(apt);
-                html += `<div class="${appointmentClass}" onclick="event.stopPropagation(); void openAppointment(${apt.id})">
-                    <span class="apt-time">${apt.time}</span> ${apt.company}
+                html += `<div class="${appointmentClass}" data-appointment-id="${apt.id}" role="button" tabindex="0">
+                    <span class="apt-time">${escapeAgendaPlanningHtml(apt.time)}</span> ${escapeAgendaPlanningHtml(apt.company)}
                 </div>`;
             });
 
@@ -3496,6 +3496,12 @@
         modalElement.classList.remove('show');
     }
 
+    function openAppointmentFromElement(target) {
+        const appointmentId = Number(target?.dataset?.appointmentId);
+        if (!Number.isFinite(appointmentId)) return;
+        void openAppointment(appointmentId);
+    }
+
     function handleModalPrimaryAction() {
         const apt = getActiveAppointment();
         if (!apt) return;
@@ -3532,6 +3538,14 @@
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
     modalSecondaryBtn.addEventListener('click', handleModalSecondaryAction);
+    document.querySelectorAll('[data-modal-close]').forEach((button) => {
+        button.addEventListener('click', closeModal);
+    });
+    document.querySelectorAll('[data-month-offset]').forEach((button) => {
+        button.addEventListener('click', () => {
+            changeMonth(Number(button.dataset.monthOffset) || 0);
+        });
+    });
     modalElement.addEventListener('click', (event) => {
         if (event.target !== modalElement) return;
         event.preventDefault();
@@ -3566,6 +3580,14 @@
 
     if (calendarGridEl) {
         calendarGridEl.addEventListener('click', (event) => {
+            const appointment = event.target.closest('[data-appointment-id]');
+            if (appointment && calendarGridEl.contains(appointment)) {
+                event.preventDefault();
+                event.stopPropagation();
+                openAppointmentFromElement(appointment);
+                return;
+            }
+
             const cell = event.target.closest('.calendar-day');
             if (!cell || cell.classList.contains('other-month')) return;
             if (cell.classList.contains('calendar-day--klantwerk')) return;
@@ -3573,6 +3595,15 @@
             const dateStr = cell.getAttribute('data-calendar-date');
             if (!dateStr) return;
             openManualAppointmentModal(dateStr);
+        });
+
+        calendarGridEl.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            const appointment = event.target.closest('[data-appointment-id]');
+            if (!appointment || !calendarGridEl.contains(appointment)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            openAppointmentFromElement(appointment);
         });
     }
     if (manualAppointmentCloseBtn) {

@@ -85,6 +85,23 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   );
 });
 
+test('premium agenda gebruikt delegated acties voor agenda chrome en afspraken', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.doesNotMatch(pageSource, /\son(?:click|input|change|keydown|submit)=/i);
+  assert.match(pageSource, /id="modalCloseBtn" data-modal-close/);
+  assert.match(pageSource, /data-month-offset="-1"/);
+  assert.match(pageSource, /data-month-offset="1"/);
+  assert.match(pageSource, /data-appointment-id="\$\{apt\.id\}"/);
+  assert.match(pageSource, /escapeAgendaPlanningHtml\(apt\.company\)/);
+  assert.match(pageSource, /document\.querySelectorAll\('\[data-modal-close\]'\)/);
+  assert.match(pageSource, /document\.querySelectorAll\('\[data-month-offset\]'\)/);
+  assert.match(pageSource, /calendarGridEl\.addEventListener\('click'/);
+  assert.match(pageSource, /calendarGridEl\.addEventListener\('keydown'/);
+  assert.match(pageSource, /void openAppointment\(appointmentId\);/);
+});
+
 test('premium agenda offers stepped manual add flow on day click', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
