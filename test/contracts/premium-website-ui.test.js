@@ -339,3 +339,14 @@ test('premium homepage preloads lokaal gebruikte fonts voor eenduidige eerste pa
     /<link rel="preload" href="\/assets\/fonts\/oswald-latin\.woff2\?v=20260409a" as="font" type="font\/woff2" crossorigin="anonymous">/
   );
 });
+
+test('premium homepage gebruikt thema-kleur die matcht met de mobiele headertint', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<meta name="theme-color" content="#f8f7f4">/);
+  assert.match(
+    source,
+    /<meta name="theme-color" media="\(prefers-color-scheme: light\)" content="#f8f7f4">/
+  );
+});
