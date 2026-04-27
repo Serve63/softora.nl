@@ -654,7 +654,12 @@
             transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
         }
 
+        .manual-appointment-choice:focus {
+            outline: none;
+        }
+
         .manual-appointment-choice:hover,
+        .manual-appointment-choice:focus-visible,
         .manual-appointment-choice.is-active {
             border-color: var(--accent);
             background: rgba(255,255,255,0.96);
@@ -2380,7 +2385,7 @@
     }
 
     function resetManualAppointmentWizard() {
-        manualAppointmentKind = '';
+        manualAppointmentKind = 'meeting';
         manualAppointmentMeetingType = '';
         manualAppointmentWho = '';
         if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '';
