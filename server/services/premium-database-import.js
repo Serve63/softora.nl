@@ -9,6 +9,14 @@ function normalizeString(value) {
   return String(value || '').trim();
 }
 
+function normalizeImportKey(value) {
+  return normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
 function decodeXml(value) {
   return normalizeString(value)
     .replace(/&lt;/g, '<')
@@ -236,24 +244,44 @@ function resolveZipTarget(baseDir, target) {
   return path.posix.normalize(`${baseDir}/${normalizedTarget}`).replace(/^(\.\.\/)+/, '');
 }
 
-function resolveFirstWorksheetPath(entries) {
+function shouldSkipWorksheetName(name) {
+  return normalizeImportKey(name) === 'database';
+}
+
+function parseWorkbookRelationships(relsXml) {
+  const relationships = new Map();
+  String(relsXml || '').replace(/<Relationship\b[^>]*>/g, (tag) => {
+    const attrs = parseXmlAttributes(tag);
+    if (attrs.Id && attrs.Target) {
+      relationships.set(attrs.Id, attrs.Target);
+    }
+    return '';
+  });
+  return relationships;
+}
+
+function listWorkbookWorksheets(entries) {
   const workbookXml = getZipText(entries, 'xl/workbook.xml');
   const relsXml = getZipText(entries, 'xl/_rels/workbook.xml.rels');
-  if (!workbookXml) return 'xl/worksheets/sheet1.xml';
+  if (!workbookXml) {
+    return [{ name: 'Sheet1', path: 'xl/worksheets/sheet1.xml' }];
+  }
 
-  const sheetMatch = workbookXml.match(/<sheet\b[^>]*>/);
-  const sheetAttrs = sheetMatch ? parseXmlAttributes(sheetMatch[0]) : {};
-  const relationshipId = sheetAttrs['r:id'];
-  if (!relationshipId || !relsXml) return 'xl/worksheets/sheet1.xml';
-
-  let target = '';
-  relsXml.replace(/<Relationship\b[^>]*>/g, (tag) => {
+  const relationships = parseWorkbookRelationships(relsXml);
+  const worksheets = [];
+  workbookXml.replace(/<sheet\b[^>]*>/g, (tag) => {
     const attrs = parseXmlAttributes(tag);
-    if (attrs.Id === relationshipId) target = attrs.Target || '';
+    const relationshipId = attrs['r:id'];
+    const fallbackIndex = worksheets.length + 1;
+    const target = relationshipId ? relationships.get(relationshipId) : '';
+    worksheets.push({
+      name: normalizeString(attrs.name) || `Sheet${fallbackIndex}`,
+      path: resolveZipTarget('xl', target) || `xl/worksheets/sheet${fallbackIndex}.xml`,
+    });
     return '';
   });
 
-  return resolveZipTarget('xl', target) || 'xl/worksheets/sheet1.xml';
+  return worksheets.length ? worksheets : [{ name: 'Sheet1', path: 'xl/worksheets/sheet1.xml' }];
 }
 
 function columnIndexFromRef(reference) {
@@ -303,15 +331,127 @@ function parseWorksheetRows(sheetXml, sharedStrings) {
   return rows.slice(0, MAX_IMPORT_ROWS);
 }
 
+const CANONICAL_IMPORT_COLUMNS = Object.freeze([
+  {
+    label: 'Bedrijfsnaam',
+    keys: ['bedrijf', 'bedrijfsnaam', 'company', 'companyname', 'organisatie', 'naambedrijf'],
+  },
+  {
+    label: 'Adres',
+    keys: ['adres', 'address', 'stad', 'plaats', 'locatie'],
+  },
+  {
+    label: 'E-mail',
+    keys: ['email', 'e-mail', 'e mail', 'mail', 'mailadres'],
+  },
+  {
+    label: 'Telefoonnummer',
+    keys: ['telefoonnummer', 'telefoon', 'tel', 'phone', 'phonenumber'],
+  },
+  {
+    label: 'Website',
+    keys: ['website', 'domein', 'domain', 'url', 'site'],
+  },
+  {
+    label: 'Contactpersoon',
+    keys: ['contact', 'contactpersoon', 'naam'],
+  },
+  {
+    label: 'Branche',
+    keys: ['branche', 'branch'],
+  },
+  {
+    label: 'Status',
+    keys: ['status', 'fase'],
+  },
+  {
+    label: 'Toegewezen aan',
+    keys: ['toegewezenaan', 'verantwoordelijke', 'owner'],
+  },
+  {
+    label: 'Service',
+    keys: ['service', 'dienst'],
+  },
+  {
+    label: 'Laatste actie',
+    keys: ['laatsteactie', 'updatedat', 'datum'],
+  },
+]);
+
+function buildHeaderIndex(row) {
+  const indexByKey = new Map();
+  (row || []).forEach((cell, index) => {
+    const key = normalizeImportKey(cell);
+    if (key && !indexByKey.has(key)) {
+      indexByKey.set(key, index);
+    }
+  });
+  return indexByKey;
+}
+
+function findColumnIndex(indexByKey, keys) {
+  for (const key of keys) {
+    const normalized = normalizeImportKey(key);
+    if (indexByKey.has(normalized)) return indexByKey.get(normalized);
+  }
+  return -1;
+}
+
+function findHeaderRowIndex(rows) {
+  return (rows || []).slice(0, 12).findIndex((row) => {
+    const headerIndex = buildHeaderIndex(row);
+    const companyIndex = findColumnIndex(headerIndex, CANONICAL_IMPORT_COLUMNS[0].keys);
+    const contactIndexCount = CANONICAL_IMPORT_COLUMNS.slice(1, 5).filter(
+      (column) => findColumnIndex(headerIndex, column.keys) !== -1
+    ).length;
+    return companyIndex !== -1 && contactIndexCount >= 1;
+  });
+}
+
+function normalizeRowsToCanonicalImport(rows) {
+  const headerRowIndex = findHeaderRowIndex(rows);
+  if (headerRowIndex === -1) return [];
+
+  const headerIndex = buildHeaderIndex(rows[headerRowIndex]);
+  const columnIndexes = CANONICAL_IMPORT_COLUMNS.map((column) =>
+    findColumnIndex(headerIndex, column.keys)
+  );
+
+  return rows.slice(headerRowIndex + 1).map((row) =>
+    columnIndexes.map((columnIndex) => (columnIndex === -1 ? '' : normalizeString(row[columnIndex])))
+  ).filter((row) => row.some((cell) => normalizeString(cell)));
+}
+
+function combineWorksheetRows(worksheets) {
+  const rows = [CANONICAL_IMPORT_COLUMNS.map((column) => column.label)];
+  for (const worksheet of worksheets) {
+    if (shouldSkipWorksheetName(worksheet.name)) continue;
+    rows.push(...normalizeRowsToCanonicalImport(worksheet.rows));
+    if (rows.length >= MAX_IMPORT_ROWS) break;
+  }
+  return rows.slice(0, MAX_IMPORT_ROWS);
+}
+
 function parseXlsxRows(buffer) {
   const entries = readZipEntries(buffer);
   const sharedStrings = parseSharedStrings(getZipText(entries, 'xl/sharedStrings.xml'));
-  const sheetPath = resolveFirstWorksheetPath(entries);
-  const sheetXml = getZipText(entries, sheetPath);
-  if (!sheetXml) {
-    throw new Error('Geen werkblad gevonden in het Excel-bestand.');
+  const worksheets = listWorkbookWorksheets(entries)
+    .filter((worksheet) => !shouldSkipWorksheetName(worksheet.name))
+    .map((worksheet) => ({
+      ...worksheet,
+      rows: parseWorksheetRows(getZipText(entries, worksheet.path), sharedStrings),
+    }))
+    .filter((worksheet) => worksheet.rows.length);
+
+  if (!worksheets.length) {
+    throw new Error('Geen importeerbare datatab gevonden. De tab DATABASE wordt overgeslagen.');
   }
-  return parseWorksheetRows(sheetXml, sharedStrings);
+
+  const rows = combineWorksheetRows(worksheets);
+  if (rows.length < 2) {
+    throw new Error('Geen bruikbare bedrijfsrijen gevonden buiten de tab DATABASE.');
+  }
+  return rows;
 }
 
 function parseSpreadsheetUpload(payload = {}) {
@@ -367,7 +507,9 @@ function createPremiumDatabaseImportCoordinator() {
 module.exports = {
   createPremiumDatabaseImportCoordinator,
   detectDelimitedSeparator,
+  listWorkbookWorksheets,
   parseDelimitedRows,
   parseSpreadsheetUpload,
   parseXlsxRows,
+  shouldSkipWorksheetName,
 };

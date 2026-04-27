@@ -63,33 +63,110 @@ function createStoredZip(files) {
   return Buffer.concat([...localParts, centralDirectory, end]);
 }
 
-function createWorkbookBuffer() {
-  const sharedStrings = [
-    'Bedrijfsnaam',
-    'Adres',
-    'E-mail',
-    'Telefoonnummer',
-    'Website',
-    'Augustijn Auto Expertise',
-    'Kerkdreef 2, 4851 RB Ulvenhout',
-    'admin@jghaugustijn.nl',
-    '06 22 55 66 63',
-    'auto-expertise.nl',
-  ];
+function escapeXml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
-  return createStoredZip({
-    'xl/workbook.xml':
-      '<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="DATABASE" sheetId="1" r:id="rId1"/></sheets></workbook>',
-    'xl/_rels/workbook.xml.rels':
-      '<Relationships><Relationship Id="rId1" Type="worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
-    'xl/sharedStrings.xml':
-      `<sst>${sharedStrings.map((value) => `<si><t>${value}</t></si>`).join('')}</sst>`,
-    'xl/worksheets/sheet1.xml':
-      '<worksheet><sheetData>' +
-      '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c><c r="D1" t="s"><v>3</v></c><c r="E1" t="s"><v>4</v></c></row>' +
-      '<row r="2"><c r="A2" t="s"><v>5</v></c><c r="B2" t="s"><v>6</v></c><c r="C2" t="s"><v>7</v></c><c r="D2" t="s"><v>8</v></c><c r="E2" t="s"><v>9</v></c></row>' +
-      '</sheetData></worksheet>',
+function buildSharedStringIndex(values) {
+  const uniqueValues = [];
+  const indexByValue = new Map();
+  values.forEach((value) => {
+    if (indexByValue.has(value)) return;
+    indexByValue.set(value, uniqueValues.length);
+    uniqueValues.push(value);
   });
+  return { uniqueValues, indexByValue };
+}
+
+function buildWorksheetXml(rows, indexByValue) {
+  const columns = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  return (
+    '<worksheet><sheetData>' +
+    rows
+      .map(
+        (row, rowIndex) =>
+          `<row r="${rowIndex + 1}">` +
+          row
+            .map(
+              (value, columnIndex) =>
+                `<c r="${columns[columnIndex]}${rowIndex + 1}" t="s"><v>${indexByValue.get(value)}</v></c>`
+            )
+            .join('') +
+          '</row>'
+      )
+      .join('') +
+    '</sheetData></worksheet>'
+  );
+}
+
+function createWorkbookBuffer(sheets = null) {
+  const workbookSheets =
+    sheets ||
+    [
+      {
+        name: 'DATABASE',
+        rows: [
+          ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+          ['Niet importeren B.V.', 'Overzicht 1', 'skip@example.nl', '000', 'skip.nl'],
+        ],
+      },
+      {
+        name: 'Nederland Noord-Brabant Alphen-Chaam Ulvenhout',
+        rows: [
+          ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+          [
+            'Augustijn Auto Expertise',
+            'Kerkdreef 2, 4851 RB Ulvenhout',
+            'admin@jghaugustijn.nl',
+            '06 22 55 66 63',
+            'auto-expertise.nl',
+          ],
+        ],
+      },
+      {
+        name: 'Nieuwe toekomstige tab',
+        rows: [
+          ['Website', 'Telefoonnummer', 'E-mail', 'Adres', 'Bedrijfsnaam'],
+          [
+            'fysiotherapielombarts.nl',
+            '06 28887546',
+            'info@fysiotherapielombarts.nl',
+            'Bosrand 8, 4851 BA Ulvenhout',
+            'Fysiotherapie Lombarts',
+          ],
+        ],
+      },
+    ];
+
+  const allValues = workbookSheets.flatMap((sheet) => sheet.rows.flat());
+  const { uniqueValues, indexByValue } = buildSharedStringIndex(allValues);
+  const rels = workbookSheets
+    .map((sheet, index) => `<Relationship Id="rId${index + 1}" Type="worksheet" Target="worksheets/sheet${index + 1}.xml"/>`)
+    .join('');
+  const sheetTags = workbookSheets
+    .map(
+      (sheet, index) =>
+        `<sheet name="${escapeXml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`
+    )
+    .join('');
+
+  const files = {
+    'xl/workbook.xml':
+      `<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetTags}</sheets></workbook>`,
+    'xl/_rels/workbook.xml.rels': `<Relationships>${rels}</Relationships>`,
+    'xl/sharedStrings.xml':
+      `<sst>${uniqueValues.map((value) => `<si><t>${escapeXml(value)}</t></si>`).join('')}</sst>`,
+  };
+
+  workbookSheets.forEach((sheet, index) => {
+    files[`xl/worksheets/sheet${index + 1}.xml`] = buildWorksheetXml(sheet.rows, indexByValue);
+  });
+
+  return createStoredZip(files);
 }
 
 test('premium database import parses Dutch spreadsheet-style CSV headers', () => {
@@ -111,7 +188,7 @@ test('premium database import parses Dutch spreadsheet-style CSV headers', () =>
   ]);
 });
 
-test('premium database import extracts rows from the first xlsx worksheet', () => {
+test('premium database import skips DATABASE tab and combines future data tabs', () => {
   const workbook = createWorkbookBuffer();
   const result = parseSpreadsheetUpload({
     fileName: 'database.xlsx',
@@ -120,15 +197,67 @@ test('premium database import extracts rows from the first xlsx worksheet', () =
 
   assert.equal(result.fileType, 'xlsx');
   assert.deepEqual(result.rows, [
-    ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+    [
+      'Bedrijfsnaam',
+      'Adres',
+      'E-mail',
+      'Telefoonnummer',
+      'Website',
+      'Contactpersoon',
+      'Branche',
+      'Status',
+      'Toegewezen aan',
+      'Service',
+      'Laatste actie',
+    ],
     [
       'Augustijn Auto Expertise',
       'Kerkdreef 2, 4851 RB Ulvenhout',
       'admin@jghaugustijn.nl',
       '06 22 55 66 63',
       'auto-expertise.nl',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ],
+    [
+      'Fysiotherapie Lombarts',
+      'Bosrand 8, 4851 BA Ulvenhout',
+      'info@fysiotherapielombarts.nl',
+      '06 28887546',
+      'fysiotherapielombarts.nl',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
     ],
   ]);
+});
+
+test('premium database import rejects workbooks with only the DATABASE overview tab', () => {
+  const workbook = createWorkbookBuffer([
+    {
+      name: 'DATABASE',
+      rows: [
+        ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+        ['Niet importeren B.V.', 'Overzicht 1', 'skip@example.nl', '000', 'skip.nl'],
+      ],
+    },
+  ]);
+
+  assert.throws(
+    () =>
+      parseSpreadsheetUpload({
+        fileName: 'database.xlsx',
+        dataBase64: workbook.toString('base64'),
+      }),
+    /Geen importeerbare datatab gevonden/
+  );
 });
 
 test('premium database import route is registered behind the premium api surface', () => {
