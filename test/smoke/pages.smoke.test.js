@@ -155,10 +155,12 @@ test('page smoke: premium-ai-coldmailing.html promotes suppression after lead re
 
 test('page smoke: premium-actieve-opdrachten.html shows openstaande opdrachten as the primary tab label', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
+  const script = fs.readFileSync(path.join(repoRoot, 'assets/premium-actieve-opdrachten.js'), 'utf8');
+  const source = `${html}\n${script}`;
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
   assert.match(html, />Openstaande opdrachten<\/span>/, 'Primaire tab hoort Openstaande opdrachten te tonen.');
-  assert.match(html, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
-  assert.match(html, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
+  assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
+  assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
 });
 
 test('page smoke: assets/personnel-theme.js persists sidebar counts across premium page loads', () => {

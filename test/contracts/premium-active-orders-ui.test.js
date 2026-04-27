@@ -3,10 +3,23 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
-  const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+function readActiveOrdersSources() {
+  const pagePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
+  const scriptPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+  return {
+    pageSource,
+    scriptSource,
+    combinedSource: `${pageSource}\n${scriptSource}`,
+  };
+}
 
+test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
+  const { pageSource, combinedSource: source } = readActiveOrdersSources();
+
+  assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427a"><\/script>/);
+  assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
@@ -39,8 +52,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
 });
 
 test('premium actieve opdrachten gebruiken expliciete customer identity voor koppeling naar klanten', () => {
-  const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const { combinedSource: source } = readActiveOrdersSources();
 
   assert.match(source, /const explicitCompany = String\(record\?\.companyName \|\| ''\)\.trim\(\);/);
   assert.match(source, /const explicitContact = String\(record\?\.contactName \|\| ''\)\.trim\(\);/);
@@ -48,8 +60,7 @@ test('premium actieve opdrachten gebruiken expliciete customer identity voor kop
 });
 
 test('premium actieve opdrachten tonen create-order modal zonder sample-design en domeinvelden', () => {
-  const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const { combinedSource: source } = readActiveOrdersSources();
 
   assert.match(source, /<label class="create-order-label" for="newOrderAssignee">Toegewezen aan<\/label>/);
   assert.match(source, /<select class="create-order-select" id="newOrderAssignee" name="assignee" required>/);
