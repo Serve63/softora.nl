@@ -6,6 +6,7 @@ const {
   countStartedColdcallingResults,
   filterColdcallingLeadsByDatabaseStatus,
   parseCustomerDatabaseRowsFromUiState,
+  readCustomerDatabaseRowsForColdcallingEligibility,
 } = require('../services/coldcalling-lead-eligibility');
 
 const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
@@ -275,10 +276,10 @@ async function loadCustomerDatabaseRowsForColdcalling(deps) {
   }
 
   try {
-    const customerRows = await loadRows(
-      deps.premiumCustomersScope || 'premium_customers_database',
-      deps.premiumCustomersKey || 'softora_customers_premium_v1'
-    );
+    const customerRows = await readCustomerDatabaseRowsForColdcallingEligibility(deps, {
+      scope: deps.premiumCustomersScope || 'premium_customers_database',
+      key: deps.premiumCustomersKey || 'softora_customers_premium_v1',
+    });
     const activeOrderRows = await loadRows(
       deps.premiumActiveOrdersScope || '',
       deps.premiumActiveCustomOrdersKey || ''

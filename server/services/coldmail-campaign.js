@@ -2,6 +2,10 @@ const nodemailer = require('nodemailer');
 const dns = require('node:dns').promises;
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const {
+  appendCustomerStatusHistory,
+  createPremiumCustomersRepository,
+} = require('../repositories/premium-customers-repository');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -16,6 +20,7 @@ const DEFAULT_COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 30;
 const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 50;
 const DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT = 100;
+const CUSTOMER_REPOSITORY_SCAN_LIMIT = 1000;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
@@ -106,6 +111,9 @@ function createColdmailCampaignService(deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     now = () => new Date(),
+    customerRepository = null,
+    premiumCustomersRepository = null,
+    createCustomerRepository = createPremiumCustomersRepository,
   } = deps;
 
   const {
@@ -216,6 +224,69 @@ function createColdmailCampaignService(deps = {}) {
     } catch (_) {
       return [];
     }
+  }
+
+  function resolvePremiumCustomerRepository() {
+    if (customerRepository && typeof customerRepository.listCustomers === 'function') {
+      return customerRepository;
+    }
+    if (premiumCustomersRepository && typeof premiumCustomersRepository.listCustomers === 'function') {
+      return premiumCustomersRepository;
+    }
+    if (typeof createCustomerRepository !== 'function') return null;
+
+    return createCustomerRepository({
+      getUiStateValues,
+      setUiStateValues,
+      scope: customerDbScope,
+      key: customerDbKey,
+      customerScope: customerDbScope,
+      customerKey: customerDbKey,
+    });
+  }
+
+  function normalizeRepositoryCustomerRows(result) {
+    const rows = Array.isArray(result)
+      ? result
+      : Array.isArray(result?.rows)
+        ? result.rows
+        : Array.isArray(result?.customers)
+          ? result.customers
+          : [];
+    return rows.filter((row) => row && typeof row === 'object');
+  }
+
+  async function loadCustomerDatabaseRowsForColdmail() {
+    const repository = resolvePremiumCustomerRepository();
+    if (repository && typeof repository.listCustomers === 'function') {
+      try {
+        const listed = await repository.listCustomers({ limit: CUSTOMER_REPOSITORY_SCAN_LIMIT });
+        const repositoryRows = normalizeRepositoryCustomerRows(listed);
+        const total = Number(listed?.total ?? listed?.count ?? repositoryRows.length);
+        if (
+          repositoryRows.length > 0 &&
+          (!Number.isFinite(total) || total <= repositoryRows.length)
+        ) {
+          return {
+            source: 'repository',
+            values: {},
+            rows: repositoryRows,
+            repository,
+          };
+        }
+      } catch (_) {
+        // Legacy fallback hieronder houdt coldmail conservatief wanneer de repository tijdelijk faalt.
+      }
+    }
+
+    const state = await getUiStateValues(customerDbScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    return {
+      source: 'legacy-ui-state',
+      values,
+      rows: parseDatabaseRows(values),
+      repository,
+    };
   }
 
   function parseLeadDatabaseRows(values = {}) {
@@ -742,9 +813,18 @@ function createColdmailCampaignService(deps = {}) {
   async function resolveColdmailRecipients(input = {}) {
     const mode = normalizeString(input.mode || '').toLowerCase() === 'call' ? 'call' : 'mail';
     const count = parsePositiveInt(input.count, 10, 1, mode === 'call' ? 500 : getColdmailCampaignSendLimit());
-    const state = await getUiStateValues(mode === 'call' ? leadDbScope : customerDbScope);
-    const values = state && typeof state.values === 'object' ? state.values : {};
-    const rows = mode === 'call' ? parseLeadDatabaseRows(values) : parseDatabaseRows(values);
+    const customerDatabase =
+      mode === 'mail'
+        ? await loadCustomerDatabaseRowsForColdmail()
+        : null;
+    const state = mode === 'call' ? await getUiStateValues(leadDbScope) : null;
+    const values =
+      mode === 'mail'
+        ? customerDatabase.values
+        : state && typeof state.values === 'object'
+          ? state.values
+          : {};
+    const rows = mode === 'call' ? parseLeadDatabaseRows(values) : customerDatabase.rows;
     const candidateRows = rows
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
       .filter(({ row }) =>
@@ -789,6 +869,8 @@ function createColdmailCampaignService(deps = {}) {
       radiusKm: parseRadiusKm(input.radiusKm),
       values,
       rows,
+      customerDatabaseSource: customerDatabase?.source || 'legacy-ui-state',
+      customerRepository: customerDatabase?.repository || null,
       candidateRows,
       selectedRows,
       failed,
@@ -1135,29 +1217,57 @@ function createColdmailCampaignService(deps = {}) {
     const date = now().toISOString();
     const safeDurationDays = normalizeCampaignDurationDays(durationDays);
     const campaignEndsAt = safeDurationDays > 0 ? addDaysIso(new Date(date), safeDurationDays) : '';
-    const existingHistory = Array.isArray(row.hist) ? row.hist : [];
-    return {
-      ...row,
-      status: 'gemaild',
-      databaseStatus: 'gemaild',
-      mail: true,
-      lastMailSentAt: date,
-      lastColdmailSentAt: date,
-      coldmailCampaignStartedAt: date,
-      coldmailCampaignDurationDays: safeDurationDays,
-      coldmailCampaignEndsAt: campaignEndsAt,
-      activeColdmailCampaignUntil: campaignEndsAt,
-      updatedAt: date.slice(0, 10),
-      hist: [
-        {
-          type: 'gemaild',
-          label: 'Mail verstuurd',
-          date: date.slice(0, 10),
-          actor: normalizeString(actor) || 'Coldmailing',
-        },
-        ...existingHistory,
-      ],
+    return appendCustomerStatusHistory(
+      {
+        ...row,
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        mail: true,
+        lastMailSentAt: date,
+        lastColdmailSentAt: date,
+        coldmailCampaignStartedAt: date,
+        coldmailCampaignDurationDays: safeDurationDays,
+        coldmailCampaignEndsAt: campaignEndsAt,
+        activeColdmailCampaignUntil: campaignEndsAt,
+        updatedAt: date.slice(0, 10),
+      },
+      'gemaild',
+      {
+        label: 'Mail verstuurd',
+        date: date.slice(0, 10),
+        actor: normalizeString(actor) || 'Coldmailing',
+        source: 'coldmail-campaign',
+      }
+    );
+  }
+
+  async function persistMailedCustomerRows({ rows, values, sentPersistableRowIds, actor, durationDays, repository }) {
+    const updatedRows = rows.map((row, index) =>
+      sentPersistableRowIds.has(getRowId(row, index)) ? markRowAsMailed(row, actor, durationDays) : row
+    );
+    const changedRows = updatedRows.filter((row, index) => sentPersistableRowIds.has(getRowId(rows[index], index)));
+    const meta = {
+      source: 'coldmail-campaign',
+      actor,
     };
+
+    if (repository && typeof repository.bulkUpsertCustomers === 'function' && changedRows.length) {
+      try {
+        const saved = await repository.bulkUpsertCustomers(changedRows, meta);
+        if (saved) return saved;
+      } catch (_) {
+        // Legacy fallback hieronder bewaart huidig gedrag als repository-persist tijdelijk faalt.
+      }
+    }
+
+    return setUiStateValues(
+      customerDbScope,
+      {
+        ...values,
+        [customerDbKey]: JSON.stringify(updatedRows),
+      },
+      meta
+    );
   }
 
   async function sendColdmailCampaign(input = {}) {
@@ -1182,6 +1292,7 @@ function createColdmailCampaignService(deps = {}) {
     const values = resolvedRecipients.values;
     const rows = resolvedRecipients.rows;
     const candidateRows = resolvedRecipients.candidateRows;
+    const customerRepositoryForPersist = resolvedRecipients.customerRepository;
 
     if (!candidateRows.length) {
       const error = new Error('Geen geschikte e-mailadressen gevonden in de database.');
@@ -1308,20 +1419,14 @@ function createColdmailCampaignService(deps = {}) {
     if (sentPersistableRowIds.size) {
       const actor = normalizeString(input.actor || 'Coldmailing');
       await recordColdmailSendGuardEntry({ senderEmail, count: sent.length, actor });
-      const updatedRows = rows.map((row, index) =>
-        sentPersistableRowIds.has(getRowId(row, index)) ? markRowAsMailed(row, actor, input.durationDays) : row
-      );
-      await setUiStateValues(
-        customerDbScope,
-        {
-          ...values,
-          [customerDbKey]: JSON.stringify(updatedRows),
-        },
-        {
-          source: 'coldmail-campaign',
-          actor,
-        }
-      );
+      await persistMailedCustomerRows({
+        rows,
+        values,
+        sentPersistableRowIds,
+        actor,
+        durationDays: input.durationDays,
+        repository: customerRepositoryForPersist,
+      });
     }
 
     return {
@@ -1390,9 +1495,8 @@ function createColdmailCampaignService(deps = {}) {
         markedSeen: 0,
         errors: [],
       };
-      const dbState = await getUiStateValues(customerDbScope);
-      const values = dbState && typeof dbState.values === 'object' ? dbState.values : {};
-      const rows = parseDatabaseRows(values);
+      const customerDatabase = await loadCustomerDatabaseRowsForColdmail();
+      const rows = customerDatabase.rows;
       const replyState = await loadColdmailReplyState();
       const client = createImapClient({
         host: imapHost,
