@@ -219,27 +219,10 @@
         return ROUND_MODES.indexOf(normalized) !== -1 ? normalized : DEFAULT_ROUND_MODE;
     }
 
-    function collectWebsitesFromRows(rows) {
-        if (!Array.isArray(rows) || rows.length < 2) return [];
-        const headers = Array.isArray(rows[0]) ? rows[0] : [];
-        const websiteIndex = headers.findIndex(function (header) {
-            return normalizeKey(header).replace(/[^a-z0-9]+/g, "") === "website";
+    function collectWebsitesFromCustomers(customers) {
+        return (Array.isArray(customers) ? customers : []).map(function (customer) {
+            return customer && (customer.website || customer.dom || customer.url || customer.site);
         });
-        const index = websiteIndex === -1 ? 4 : websiteIndex;
-        return rows.slice(1).map(function (row) {
-            return Array.isArray(row) ? row[index] : "";
-        });
-    }
-
-    function collectWebsitesFromBody(body) {
-        const businesses = Array.isArray(body && body.businesses) ? body.businesses : [];
-        const rows = Array.isArray(body && body.rows) ? body.rows : [];
-        const sources = Array.isArray(body && body.sources) ? body.sources : [];
-        return businesses.map(function (business) {
-            return business && business.website;
-        })
-            .concat(collectWebsitesFromRows(rows))
-            .concat(sources);
     }
 
     function createTarget(label, index) {
@@ -598,7 +581,7 @@
             }).filter(Boolean).slice(-120);
         }
 
-        function updateTargetAfterSearch(target, body, addedCount) {
+        function updateTargetAfterSearch(target, body, addedCount, addedWebsites) {
             const businesses = Array.isArray(body.businesses) ? body.businesses : [];
             const costUsd = Math.max(0, Number(body && body.cost && body.cost.estimatedUsd) || 0);
             target.batches += 1;
@@ -610,7 +593,7 @@
             state.totalCostUsd = Math.max(0, Number(state.totalCostUsd) || 0) + costUsd;
             target.updatedAt = new Date().toISOString();
             target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
-            target.foundWebsites = uniqueWebsiteValues((target.foundWebsites || []).concat(collectWebsitesFromBody(body)), 200);
+            target.foundWebsites = uniqueWebsiteValues((target.foundWebsites || []).concat(addedWebsites || []), 200);
             target.seen = uniqueStrings(target.seen.concat(businesses.map(function (business) {
                 return [
                     business && business.bedrijfsnaam,
@@ -656,19 +639,17 @@
                 exclude: uniqueStrings(target.seen.concat(collectExistingKeys()), 180)
             }).then(function (body) {
                 const rows = Array.isArray(body.rows) ? body.rows : [];
-                target.foundWebsites = uniqueWebsiteValues((target.foundWebsites || []).concat(collectWebsitesFromBody(body)), 200);
                 target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
                 target.updatedAt = new Date().toISOString();
-                render();
-                persistState().catch(function (error) {
-                    console.error("Gevonden websites opslaan mislukt:", error);
-                    return { ok: false, error: error };
-                });
                 const importPromise = rows.length > 1 ? Promise.resolve(importRows(rows)) : Promise.resolve(false);
                 return importPromise.then(function (importResult) {
-                    const afterCount = Array.isArray(getCustomers()) ? getCustomers().length : beforeCount;
+                    const afterCustomers = Array.isArray(getCustomers()) ? getCustomers() : [];
+                    const afterCount = afterCustomers.length;
                     const addedCount = Math.max(0, afterCount - beforeCount);
-                    updateTargetAfterSearch(target, body, addedCount);
+                    const addedWebsites = importResult === false
+                        ? []
+                        : collectWebsitesFromCustomers(afterCustomers.slice(beforeCount, beforeCount + addedCount));
+                    updateTargetAfterSearch(target, body, addedCount, addedWebsites);
                     const completed = Boolean(body && body.placeComplete);
                     const customerPersisted = !(rows.length > 1 && addedCount > 0 && importResult === false);
                     const result = {
