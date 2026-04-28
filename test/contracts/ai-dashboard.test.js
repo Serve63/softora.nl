@@ -285,7 +285,6 @@ function createFixture(overrides = {}) {
       return Number.isFinite(parsed) ? parsed : fallback;
     },
     rubenAssistant,
-    customerRepository: overrides.customerRepository || null,
   });
 
   return {
@@ -370,66 +369,6 @@ test('ai dashboard coordinator builds dashboard context totals from runtime stat
   assert.equal(context.calls.withRecordingCount, 1);
   assert.equal(context.aiCallInsights.appointmentsBooked, 1);
   assert.equal(context.aiCallInsights.followUpsRequired, 1);
-});
-
-test('ai dashboard coordinator reads customers through the repository seam first', async () => {
-  let rawCustomerReads = 0;
-  const { coordinator } = createFixture({
-    getUiStateValues: async (scope) => {
-      if (scope === 'customers') rawCustomerReads += 1;
-      if (scope === 'active_orders') {
-        return {
-          values: {
-            custom_orders: [],
-            runtime_by_order_id: '{}',
-          },
-        };
-      }
-      return null;
-    },
-    customerRepository: {
-      listCustomers: async () => ({
-        rows: [
-          {
-            id: 'customer-repo-1',
-            naam: 'Repo Klant',
-            bedrijf: 'Repository B.V.',
-            telefoon: '+31 6 10 20 30 40',
-            website: 'https://repository.example',
-            type: 'Website',
-            status: 'betaald',
-            datum: '2026-04-28',
-            websiteBedrag: 2200,
-            onderhoudPerMaand: 125,
-          },
-        ],
-      }),
-    },
-  });
-
-  const context = await coordinator.buildPremiumDashboardChatContext();
-
-  assert.equal(context.overview.totaalKlanten, 1);
-  assert.equal(context.customers.paidCount, 1);
-  assert.equal(context.customers.websiteRevenueEur, 2200);
-  assert.equal(context.customers.monthlyMaintenanceEur, 125);
-  assert.equal(context.customers.items[0].naam, 'Repo Klant');
-  assert.equal(rawCustomerReads, 0);
-});
-
-test('ai dashboard coordinator keeps raw customer fallback when repository is empty', async () => {
-  const { coordinator } = createFixture({
-    customerRepository: {
-      listCustomers: async () => ({ rows: [] }),
-    },
-  });
-
-  const context = await coordinator.buildPremiumDashboardChatContext();
-
-  assert.equal(context.overview.totaalKlanten, 2);
-  assert.equal(context.customers.paidCount, 1);
-  assert.equal(context.customers.openCount, 1);
-  assert.equal(context.customers.monthlyMaintenanceEur, 149);
 });
 
 test('ai dashboard coordinator calls Anthropic Sonnet with normalized question, history and context', async () => {

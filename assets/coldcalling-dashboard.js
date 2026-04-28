@@ -1,73 +1,6 @@
 (function () {
-  const dashboardCore = window.SoftoraColdcallingDashboardCore;
-  if (!dashboardCore) {
-    console.error('[Softora] coldcalling dashboard core helpers ontbreken.');
-    return;
-  }
-  const dashboardConfig = window.SoftoraColdcallingDashboardConfig;
-  if (!dashboardConfig) {
-    console.error('[Softora] coldcalling dashboard configuratie ontbreekt.');
-    return;
-  }
-  const dashboardModes = window.SoftoraColdcallingDashboardModes;
-  if (!dashboardModes) {
-    console.error('[Softora] coldcalling dashboard mode helpers ontbreken.');
-    return;
-  }
-  const {
-    byId,
-    buildCampaignStartedMessage,
-    cloneUiStateValues,
-    estimateCampaignCompletionTime,
-    escapeHtml,
-    fetchWithTimeout,
-    formatCampaignCustomRegioLabel,
-    formatClockTime,
-    formatConversationDuration,
-    formatLeadDatabasePhone,
-    getLeadDatabaseDecisionLabel,
-    getNowTime,
-    normalizeLeadDatabaseDecision,
-    parseNumber,
-    readColdcallingDashboardBootstrapPayload,
-    setLeadSliderReadyState,
-  } = dashboardCore;
-  const {
-    TEST_LEAD_STORAGE_KEY,
-    LEAD_ROWS_STORAGE_KEY,
-    AI_NOTEBOOK_ROWS_STORAGE_KEY,
-    LEAD_DATABASE_OVERRIDES_STORAGE_KEY,
-    CALL_DISPATCH_MODE_STORAGE_KEY,
-    CALL_DISPATCH_DELAY_STORAGE_KEY,
-    STATS_RESET_BASELINE_STORAGE_KEY,
-    CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY,
-    CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY,
-    CAMPAIGN_BRANCHE_STORAGE_KEY,
-    CAMPAIGN_REGIO_STORAGE_KEY,
-    CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY,
-    CAMPAIGN_MIN_PRICE_STORAGE_KEY,
-    CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY,
-    CAMPAIGN_INSTRUCTIONS_STORAGE_KEY,
-    CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY,
-    CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY,
-    CAMPAIGN_AMOUNT_QUESTION_MODE_STORAGE_KEY,
-    CAMOUNT_Q_BELLEN,
-    CAMOUNT_Q_AFSPRAKEN,
-    BUSINESS_MODE_STORAGE_KEY,
-    DEFAULT_CAMPAIGN_REGIO_VALUE,
-    CUSTOM_CAMPAIGN_REGIO_VALUE,
-    AUTO_CAMPAIGN_REGIO_VALUE,
-    REMOTE_UI_STATE_SCOPE_BASE,
-    REMOTE_UI_STATE_SCOPE_PREFERENCES,
-    BUSINESS_MODE_ORDER,
-  } = dashboardConfig;
-  const {
-    normalizeBusinessMode,
-    normalizeColdcallingStack,
-    getColdcallingStackLabel,
-  } = dashboardModes;
-  const launchBtn = byId('launchBtn');
-  const leadSlider = byId('leadSlider');
+  const launchBtn = document.getElementById('launchBtn');
+  const leadSlider = document.getElementById('leadSlider');
 
   if (!launchBtn || !leadSlider) {
     return;
@@ -88,6 +21,34 @@
   let activeSequentialClientDispatch = null;
   let pendingStartConfirmPin = '';
   const defaultLaunchBtnHtml = launchBtn.innerHTML;
+  const TEST_LEAD_STORAGE_KEY = 'softora_coldcalling_test_lead_phone';
+  const LEAD_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
+  const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
+  const LEAD_DATABASE_OVERRIDES_STORAGE_KEY = 'softora_coldcalling_lead_database_overrides_json';
+  const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
+  const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
+  const STATS_RESET_BASELINE_STORAGE_KEY = 'softora_stats_reset_baseline_started';
+  const CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY = 'softora_campaign_amount_slider_index';
+  const CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY = 'softora_campaign_amount_custom';
+  const CAMPAIGN_BRANCHE_STORAGE_KEY = 'softora_campaign_branche';
+  const CAMPAIGN_REGIO_STORAGE_KEY = 'softora_campaign_regio';
+  const CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY = 'softora_campaign_regio_custom_km';
+  const CAMPAIGN_MIN_PRICE_STORAGE_KEY = 'softora_campaign_min_price';
+  const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
+  const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
+  const CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY = 'softora_campaign_coldcalling_stack';
+  const CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY = 'softora_campaign_fill_agenda_10_workdays';
+  const CAMPAIGN_AMOUNT_QUESTION_MODE_STORAGE_KEY = 'softora_campaign_amount_question_mode';
+  const CAMOUNT_Q_BELLEN = 'bellen';
+  const CAMOUNT_Q_AFSPRAKEN = 'afspraken';
+  const BUSINESS_MODE_STORAGE_KEY = 'softora_business_mode';
+  const DEFAULT_CAMPAIGN_REGIO_VALUE = 'unlimited';
+  const CUSTOM_CAMPAIGN_REGIO_VALUE = 'custom';
+  const AUTO_CAMPAIGN_REGIO_VALUE = 'auto';
+  const MAX_CAMPAIGN_REGIO_KM_CHOICE = 250;
+  const REMOTE_UI_STATE_SCOPE_BASE = 'coldcalling';
+  const REMOTE_UI_STATE_SCOPE_PREFERENCES = 'coldcalling_preferences';
+  const BUSINESS_MODE_ORDER = ['websites', 'voice_software', 'business_software'];
   let activeBusinessMode = 'websites';
   let remoteUiStateCache = Object.create(null);
   let remoteUiStateLoaded = false;
@@ -107,6 +68,32 @@
   };
   let coldcallingDashboardBootstrapPayload = null;
   const sharedCallSummaryCacheByCallId = Object.create(null);
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function setLeadSliderReadyState(isReady) {
+    const sliderStage = byId('leadSliderStage');
+    if (!sliderStage) return;
+    sliderStage.dataset.sliderReady = isReady ? '1' : '0';
+    if (isReady) {
+      sliderStage.removeAttribute('aria-hidden');
+      return;
+    }
+    sliderStage.setAttribute('aria-hidden', 'true');
+  }
+
+  function readColdcallingDashboardBootstrapPayload() {
+    const element = document.getElementById('softoraColdcallingDashboardBootstrap');
+    if (!element) return null;
+    try {
+      const parsed = JSON.parse(String(element.textContent || '{}'));
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   function openLeadDatabaseFromCampaignControl() {
     const dbModal = ensureLeadDatabaseModal();
@@ -143,52 +130,264 @@
     return button;
   }
 
-  const conversationSummaryHelpers = window.SoftoraColdcallingConversationSummary;
-  if (!conversationSummaryHelpers) {
-    console.error('[Softora] coldcalling conversation summary helpers ontbreken.');
-    return;
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
-  const regioRadiusHelpers = window.SoftoraColdcallingRegioRadius;
-  if (!regioRadiusHelpers) {
-    console.error('[Softora] coldcalling regio-radius helpers ontbreken.');
-    return;
+
+  function getNowTime() {
+    return new Date().toLocaleTimeString('nl-NL', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
   }
-  const manualLeadPromptHelpers = window.SoftoraColdcallingManualLeadPrompt;
-  if (!manualLeadPromptHelpers) {
-    console.error('[Softora] coldcalling manual lead prompt helpers ontbreken.');
-    return;
+
+  function parseNumber(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
   }
-  const {
-    normalizeFreeText,
-    normalizeSearchText,
-    looksLikeConversationTranscript,
-    sanitizeConversationSummaryCopy,
-    looksLikeDirectSpeechConversationSummary,
-    pickReadableConversationSummary,
-    isAbortLikeLoadError,
-    looksLikeAgendaConfirmationSummary,
-    isGenericConversationPlaceholder,
-    summarizeConversationTextNl,
-  } = conversationSummaryHelpers;
-  const {
-    countDialableLeadsWithinCampaignRegioRadius,
-    resolveAutomaticCampaignRegioKm,
-  } = regioRadiusHelpers;
-  const sharedCallSummaryAccessors =
-    typeof conversationSummaryHelpers.createSharedCallSummaryAccessors === 'function'
-      ? conversationSummaryHelpers.createSharedCallSummaryAccessors(sharedCallSummaryCacheByCallId)
-      : null;
+
+  function normalizeFreeText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function normalizeSearchText(value) {
+    return normalizeFreeText(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function looksLikeConversationTranscript(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+    const lower = normalizeSearchText(raw);
+    if (/(^|\s)(user|bot|agent|klant)\s*:/.test(lower)) return true;
+    if (raw.includes('|') && /(user|bot|agent|klant)\s*:/i.test(raw)) return true;
+    if (raw.split(/\||\n/).length >= 4 && /(user|bot|agent|klant)\s*:/i.test(raw)) return true;
+    return false;
+  }
+
+  function replaceGenericSoftoraSpeakerName(value) {
+    return String(value || '')
+      .replace(/\bde\s+agent van\s+softora\b/gi, 'Ruben Nijhuis van Softora')
+      .replace(/\bsoftora[-\s]?agent\b/gi, 'Ruben Nijhuis van Softora')
+      .replace(/\bde\s+agent\b/gi, 'Ruben Nijhuis')
+      .replace(/\been\s+agent\b/gi, 'Ruben Nijhuis')
+      .replace(/\bagent\b/gi, 'Ruben Nijhuis')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  function stripConversationDialogueMarkers(value) {
+    const stripped = String(value || '')
+      .replace(/\s*\|\s*/g, ' ')
+      .replace(/\b(user|bot|agent|klant)\s*:\s*/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    return replaceGenericSoftoraSpeakerName(stripped);
+  }
+
+  function stripActionableFollowUpSummarySentence(value) {
+    return String(value || '')
+      .replace(
+        /\s*(?:De\s+)?(?:logische\s+)?vervolgstap(?:\s*:\s*|\s+is(?:\s+om)?\s+|\s+om\s+)[^.?!]*(?:[.?!]|$)/gi,
+        ' '
+      )
+      .replace(
+        /\s*(?:Aanbevolen|Beste|Volgende)\s+(?:vervolgstap|stap)(?:\s*:\s*|\s+is(?:\s+om)?\s+|\s+om\s+)[^.?!]*(?:[.?!]|$)/gi,
+        ' '
+      )
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  function sanitizeConversationSummaryCopy(value) {
+    const stripped = stripConversationDialogueMarkers(value);
+    return stripActionableFollowUpSummarySentence(stripped.replace(/\s*\n+\s*/g, ' ').trim());
+  }
+
+  function looksLikeDirectSpeechConversationSummary(value) {
+    const raw = sanitizeConversationSummaryCopy(value);
+    if (!raw) return false;
+    const lower = raw.toLowerCase();
+    if (/^(hallo|hoi|hey|goedemiddag|goedemorgen|goedenavond|met\s+\w+|ja[,\s]|nee[,\s]|oke?[,\s]|prima[,\s])/.test(lower)) {
+      return true;
+    }
+    if (/\bje spreekt met\b|\bik bel je\b|\bkan ik\b|\bweet je wat we doen\b|\bik wil graag meteen\b/i.test(raw)) {
+      return true;
+    }
+    const questionCount = (raw.match(/\?/g) || []).length;
+    const commaCount = (raw.match(/,/g) || []).length;
+    return questionCount >= 1 && commaCount >= 3 && raw.length >= 140;
+  }
+
+  function looksLikeAbruptConversationSummary(value) {
+    const raw = sanitizeConversationSummaryCopy(value);
+    if (!raw) return false;
+    return /(\.\.\.|…)$/.test(raw);
+  }
+
+  function looksMixedLanguageConversationSummary(value) {
+    const normalized = sanitizeConversationSummaryCopy(value).toLowerCase();
+    if (!normalized) return false;
+    const strongMatches =
+      (
+        normalized.match(
+          /\b(the|call|conversation|agent|user|brief|outbound|inbound|ended|shortly|mentioned|during|standards|expectations|activities|interaction|follow-up|meeting|appointment|summary|details)\b/g
+        ) || []
+      ).length;
+    const mildMatches = (normalized.match(/\b(was|were|is|are|had|with|after|before|where|for)\b/g) || []).length;
+    return strongMatches >= 2 || (strongMatches >= 1 && mildMatches >= 3) || mildMatches >= 6;
+  }
+
+  function pickReadableConversationSummary() {
+    const candidates = Array.from(arguments);
+    for (const candidate of candidates) {
+      const raw = String(candidate || '').trim();
+      if (!raw) continue;
+      if (isGenericConversationPlaceholder(raw)) continue;
+      if (looksLikeConversationTranscript(raw)) continue;
+      const cleaned = sanitizeConversationSummaryCopy(raw);
+      if (isGenericConversationPlaceholder(cleaned)) continue;
+      if (looksLikeAgendaConfirmationSummary(cleaned)) continue;
+      if (looksMixedLanguageConversationSummary(cleaned)) continue;
+      if (looksLikeDirectSpeechConversationSummary(cleaned)) continue;
+      if (looksLikeAbruptConversationSummary(cleaned)) continue;
+      if (cleaned) return cleaned;
+    }
+    return '';
+  }
+
+  function isAbortLikeLoadError(error) {
+    const text = normalizeSearchText(error?.message || error || '');
+    return /abort|aborted|signal is aborted/.test(text);
+  }
+
+  function looksLikeAgendaConfirmationSummary(value) {
+    const text = normalizeSearchText(value);
+    if (!text) return false;
+    return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie|bevestigingsmail sturen|stuur(?:\s+\w+){0,3}\s+bevestigingsmail|gedetecteerde afspraak|afspraakbevestiging|agenda-item)/.test(
+      text
+    );
+  }
+
+  function isGenericConversationPlaceholder(value) {
+    const text = normalizeSearchText(value);
+    if (!text) return false;
+    return (
+      text === 'nog geen gesprekssamenvatting beschikbaar.' ||
+      text === 'samenvatting volgt na verwerking van het gesprek.' ||
+      text === 'samenvatting wordt opgesteld op basis van de transcriptie.'
+    );
+  }
+
+  async function summarizeConversationTextNl(text, options = {}) {
+    if (!window.SoftoraAI || typeof window.SoftoraAI.summarizeText !== 'function') return '';
+    const payload = {
+      text: String(text || ''),
+      style: options.style || 'medium',
+      language: 'nl',
+      maxSentences: Number(options.maxSentences || 4),
+      extraInstructions: String(options.extraInstructions || ''),
+    };
+    const result = await window.SoftoraAI.summarizeText(payload);
+    return String(result?.summary || '').trim();
+  }
 
   function readSharedCallSummaryCache() {
     return sharedCallSummaryCacheByCallId;
   }
 
   function getSharedCallSummary(callId) {
-    return sharedCallSummaryAccessors?.getSharedCallSummary(callId) || '';
+    const normalizedCallId = normalizeFreeText(callId);
+    if (!normalizedCallId) return '';
+    const cache = readSharedCallSummaryCache();
+    const summary = String(cache?.[normalizedCallId] || '').trim();
+    const cleanedSummary = pickReadableConversationSummary(summary);
+    if (!cleanedSummary || looksLikeAgendaConfirmationSummary(cleanedSummary)) {
+      if (summary) {
+        delete cache[normalizedCallId];
+      }
+      return '';
+    }
+    return cleanedSummary;
   }
 
   function setSharedCallSummary(callId, summary) {
-    sharedCallSummaryAccessors?.setSharedCallSummary(callId, summary);
+    const normalizedCallId = normalizeFreeText(callId);
+    const normalizedSummary = pickReadableConversationSummary(summary);
+    if (
+      !normalizedCallId ||
+      !normalizedSummary ||
+      isGenericConversationPlaceholder(normalizedSummary) ||
+      looksLikeAgendaConfirmationSummary(normalizedSummary)
+    ) {
+      return;
+    }
+    const cache = readSharedCallSummaryCache();
+    if (String(cache?.[normalizedCallId] || '').trim() === normalizedSummary) return;
+    cache[normalizedCallId] = normalizedSummary;
+  }
+
+  function normalizeBusinessMode(mode) {
+    const raw = String(mode || '').trim().toLowerCase();
+    if (raw === 'voice_software' || raw === 'voice software' || raw === 'voicesoftware') {
+      return 'voice_software';
+    }
+    if (
+      raw === 'business_software' ||
+      raw === 'business software' ||
+      raw === 'businesssoftware' ||
+      raw === 'bedrijfssoftware' ||
+      raw === 'bedrijfs_software' ||
+      raw === 'bedrijfs software'
+    ) {
+      return 'business_software';
+    }
+    return 'websites';
+  }
+
+  function normalizeColdcallingStack(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (
+      raw === 'gemini_flash_3_1_live' ||
+      raw === 'gemini flash 3.1 live' ||
+      raw === 'gemini_3_1_live' ||
+      raw === 'gemini'
+    ) {
+      return 'gemini_flash_3_1_live';
+    }
+    if (
+      raw === 'openai_realtime_1_5' ||
+      raw === 'openai realtime 1.5' ||
+      raw === 'openai_realtime' ||
+      raw === 'openai'
+    ) {
+      return 'openai_realtime_1_5';
+    }
+    if (
+      raw === 'hume_evi_3' ||
+      raw === 'hume evi 3' ||
+      raw === 'hume_evi' ||
+      raw === 'hume'
+    ) {
+      return 'hume_evi_3';
+    }
+    return 'retell_ai';
+  }
+
+  function getColdcallingStackLabel(value) {
+    const normalized = normalizeColdcallingStack(value);
+    if (normalized === 'gemini_flash_3_1_live') return 'Gemini 3.1 Live';
+    if (normalized === 'openai_realtime_1_5') return 'OpenAI Realtime 1.5';
+    if (normalized === 'hume_evi_3') return 'Hume Evi 3';
+    return 'Retell AI';
   }
 
   function syncCustomSelectUi(selectEl) {
@@ -240,6 +439,44 @@
       leadListGroup: 'Database',
       dbHint: 'Zakelijke bellijst met AI-status per bedrijf.',
     };
+  }
+
+  function formatLeadDatabasePhone(phone) {
+    const raw = normalizeFreeText(phone);
+    if (!raw) return '';
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('31')) {
+      return `+31 ${digits.slice(2, 3)} ${digits.slice(3, 7)} ${digits.slice(7)}`;
+    }
+    if (digits.length === 10 && digits.startsWith('0')) {
+      return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+    }
+    return raw;
+  }
+
+  function normalizeLeadDatabaseDecision(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return '';
+    if (/^(pending|nieuw|new|not_called|nog[-_ ]?niet[-_ ]?gebeld)$/.test(raw)) return 'pending';
+    if (/^(called|gebeld)$/.test(raw)) return 'called';
+    if (/^(no_answer|niet[-_ ]?opgenomen|geen[-_ ]?gehoor|busy|voicemail|missed)$/.test(raw)) return 'no_answer';
+    if (/^(callback|terugbellen|follow[-_ ]?up)$/.test(raw)) return 'callback';
+    if (/^(appointment|afspraak|meeting)$/.test(raw)) return 'appointment';
+    if (/^(customer|klant|closed|won)$/.test(raw)) return 'customer';
+    if (/^(do_not_call|dnc|uit[-_ ]?bellijst|stop|blacklist|remove)$/.test(raw)) return 'do_not_call';
+    return '';
+  }
+
+  function getLeadDatabaseDecisionLabel(decision) {
+    const normalized = normalizeLeadDatabaseDecision(decision);
+    if (normalized === 'pending') return 'Nog niet gebeld';
+    if (normalized === 'called') return 'Gebeld';
+    if (normalized === 'no_answer') return 'Niet opgenomen';
+    if (normalized === 'callback') return 'Terugbellen';
+    if (normalized === 'appointment') return 'Wil afspraak';
+    if (normalized === 'customer') return 'Klant';
+    if (normalized === 'do_not_call') return 'Uit bellijst';
+    return 'Onbekend';
   }
 
   function getLeadDatabaseDecisionStyle(decision, theme) {
@@ -441,6 +678,11 @@
   function getCampaignRegioOption(selectEl, value) {
     if (!(selectEl instanceof HTMLSelectElement)) return null;
     return Array.from(selectEl.options || []).find((option) => String(option.value) === String(value)) || null;
+  }
+
+  function formatCampaignCustomRegioLabel(km) {
+    const normalizedKm = Math.max(1, Math.round(Number(km) || 1));
+    return `Aangepast (${normalizedKm} km)`;
   }
 
   function applyCampaignRegioSelection(selectEl, selectedValue, customKm = null) {
@@ -773,6 +1015,53 @@
     }
   }
 
+  function formatClockTime(date) {
+    return new Date(date).toLocaleTimeString('nl-NL', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  function estimateCampaignCompletionTime(startedCount, campaign) {
+    const started = Math.max(0, Number(startedCount) || 0);
+    if (started <= 0) return null;
+
+    const avgCallSeconds = 90;
+    const mode = String(campaign?.dispatchMode || 'sequential');
+    const delaySeconds =
+      mode === 'delay' ? Math.max(0, Number(campaign?.dispatchDelaySeconds) || 0) : 0;
+    const requestSpreadSeconds = mode === 'parallel' ? 5 : Math.min(20, started);
+
+    let estimateSeconds;
+    if (mode === 'parallel') {
+      estimateSeconds = avgCallSeconds + requestSpreadSeconds;
+    } else if (mode === 'delay') {
+      const staggerSeconds = started > 1 ? (started - 1) * delaySeconds : 0;
+      estimateSeconds = avgCallSeconds + staggerSeconds + requestSpreadSeconds;
+    } else {
+      // "1 voor 1": calls happen in sequence, so duration scales roughly with count.
+      estimateSeconds = started * avgCallSeconds + requestSpreadSeconds;
+    }
+
+    estimateSeconds = Math.max(30, estimateSeconds);
+
+    return new Date(Date.now() + estimateSeconds * 1000);
+  }
+
+  function buildCampaignStartedMessage(startedCount, campaign, failedCount = 0, skippedCount = 0) {
+    const started = Math.max(0, Number(startedCount) || 0);
+    const failed = Math.max(0, Number(failedCount) || 0);
+    const skipped = Math.max(0, Number(skippedCount) || 0);
+    const personWord = started === 1 ? 'persoon' : 'personen';
+    const eta = estimateCampaignCompletionTime(started, campaign);
+    const etaText = eta ? ` Verwachte voltooiingstijd is rond ${formatClockTime(eta)}.` : '';
+    const detailParts = [];
+    if (skipped > 0) detailParts.push(`${skipped} overgeslagen`);
+    if (failed > 0) detailParts.push(`${failed} niet gestart`);
+    const detailText = detailParts.length > 0 ? ` (${detailParts.join(', ')})` : '';
+    return `Gestart met het bellen van ${started} ${personWord}${detailText}.${etaText}`;
+  }
+
   function syncSequentialClientDispatchButtonState() {
     const run = activeSequentialClientDispatch;
     if (run && !run.completed) {
@@ -786,6 +1075,28 @@
     syncSequentialClientDispatchButtonState();
     setStatusPill('idle', '');
     setStatusMessage('', '');
+  }
+
+  function cloneUiStateValues(values) {
+    const nextValues = Object.create(null);
+    if (!values || typeof values !== 'object') {
+      return nextValues;
+    }
+
+    Object.entries(values).forEach(([k, v]) => {
+      nextValues[String(k)] = String(v ?? '');
+    });
+    return nextValues;
+  }
+
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
   }
 
   async function fetchUiStateGetWithFallback(scope) {
@@ -2616,6 +2927,157 @@
     };
   }
 
+  const OISTERWIJK_CAMPAIGN_CENTER = { lat: 51.5791, lng: 5.1889 };
+  const REGIO_PLACE_COORD_ENTRIES = [
+    ['oisterwijk', 51.5791, 5.1889],
+    ['moergestel', 51.5456, 5.1778],
+    ['berkel-enschot', 51.6026, 5.1461],
+    ['uden', 51.6589, 5.6168],
+    ['tilburg', 51.5555, 5.0913],
+    ['goirle', 51.5208, 5.0707],
+    ['hilvarenbeek', 51.4853, 5.1361],
+    ['diessen', 51.475, 5.175],
+    ['middelbeers', 51.517, 5.095],
+    ['haaren', 51.602, 5.222],
+    ['vught', 51.6533, 5.2947],
+    ['boxtel', 51.5908, 5.3293],
+    ['schijndel', 51.6222, 5.4319],
+    ['sint-michielsgestel', 51.6417, 5.3519],
+    ['sint-oedenrode', 51.564, 5.4736],
+    ['liempde', 51.568, 5.375],
+    ['best', 51.5103, 5.3947],
+    ['eindhoven', 51.4416, 5.4697],
+    ['nuenen', 51.473, 5.551],
+    ['geldrop', 51.4217, 5.5578],
+    ['son-en-breugel', 51.513, 5.494],
+    ['veldhoven', 51.4181, 5.4028],
+    ['waalre', 51.3858, 5.4447],
+    ['oirschot', 51.5056, 5.3089],
+    ['dongen', 51.6267, 4.9383],
+    ['gilze', 51.5447, 4.9403],
+    ['rijen', 51.5881, 4.9267],
+    ['bavel', 51.555, 4.865],
+    ['alphen', 51.483, 4.956],
+    ['chaam', 51.505, 4.861],
+    ['baarle-nassau', 51.445, 4.929],
+    ['bladel', 51.368, 5.208],
+    ['reusel', 51.36, 5.165],
+    ['hooge-mierlo', 51.439, 5.618],
+    ['helmond', 51.4811, 5.6559],
+    ['deurne', 51.456, 5.79],
+    ['gemert', 51.555, 5.698],
+    ['veghel', 51.6167, 5.5486],
+    ['zeeland', 51.697, 5.676],
+    ['mill', 51.685, 5.78],
+    ['cuijk', 51.727, 5.879],
+    ['grave', 51.759, 5.741],
+    ['nijmegen', 51.8426, 5.8598],
+    ['oss', 51.765, 5.5181],
+    ['den-bosch', 51.6978, 5.3037],
+    ['s-hertogenbosch', 51.6978, 5.3037],
+    ['rosmalen', 51.7167, 5.3681],
+    ['waalwijk', 51.6828, 5.0717],
+    ['drunen', 51.686, 5.059],
+    ['kaatsheuvel', 51.6598, 5.0304],
+    ['loon-op-zand', 51.6278, 5.0753],
+    ['sprang-capelle', 51.671, 5.049],
+    ['oosterhout', 51.6439, 4.8601],
+    ['breda', 51.5719, 4.7683],
+    ['etten-leur', 51.5706, 4.636],
+    ['rucphen', 51.532, 4.558],
+    ['roosendaal', 51.5308, 4.4654],
+    ['bergen-op-zoom', 51.495, 4.292],
+    ['steenbergen', 51.585, 4.317],
+    ['zevenbergen', 51.645, 4.606],
+    ['gorinchem', 51.833, 4.974],
+    ['zaltbommel', 51.81, 5.244],
+    ['tiel', 51.886, 5.429],
+    ['weert', 51.2517, 5.7067],
+    ['roermond', 51.194, 6.002],
+    ['venlo', 51.3703, 6.1724],
+    ['venray', 51.525, 5.975],
+    ['valkenswaard', 51.35, 5.459],
+    ['eersel', 51.357, 5.318],
+    ['someren', 51.386, 5.711],
+    ['asten', 51.404, 5.748],
+    ['turnhout', 51.3225, 4.9447],
+    ['geel', 51.161, 4.99],
+    ['mol', 51.191, 5.115],
+    ['hamont-achel', 51.251, 5.545],
+    ['leende', 51.35, 5.553],
+    ['maastricht', 50.8514, 5.691],
+    ['heerlen', 50.8837, 5.981],
+  ];
+  const REGIO_PLACE_COORDS = Object.create(null);
+  REGIO_PLACE_COORD_ENTRIES.forEach((entry) => {
+    if (!Array.isArray(entry) || entry.length < 3) return;
+    const [name, lat, lng] = entry;
+    if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    REGIO_PLACE_COORDS[String(name)] = { lat, lng };
+  });
+
+  function normalizeDutchPlaceKey(raw) {
+    return String(raw || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/['’]/g, '')
+      .replace(/^\d{4}\s*[a-z]{0,2}\s+/i, '')
+      .trim();
+  }
+
+  function haversineKm(a, b) {
+    const R = 6371;
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const h =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+
+  function coordsForPlaceHint(raw) {
+    const s = normalizeDutchPlaceKey(raw);
+    if (!s) return null;
+    if (REGIO_PLACE_COORDS[s]) return REGIO_PLACE_COORDS[s];
+    const hyphenated = s.replace(/\s+/g, '-');
+    if (REGIO_PLACE_COORDS[hyphenated]) return REGIO_PLACE_COORDS[hyphenated];
+    const tokens = s.split(/[\s,/]+/).filter(Boolean);
+    for (let i = tokens.length - 1; i >= 0; i -= 1) {
+      let token = tokens[i];
+      token = token.replace(/^gemeente-?/i, '');
+      if (REGIO_PLACE_COORDS[token]) return REGIO_PLACE_COORDS[token];
+      const hy = token.replace(/\s+/g, '-');
+      if (REGIO_PLACE_COORDS[hy]) return REGIO_PLACE_COORDS[hy];
+    }
+    return null;
+  }
+
+  function minAirDistanceKmFromOisterwijkForLead(lead) {
+    const hints = [];
+    if (lead?.region) hints.push(lead.region);
+    if (lead?.address) {
+      const tail = String(lead.address)
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .pop();
+      if (tail) hints.push(tail);
+    }
+    let best = null;
+    hints.forEach((hint) => {
+      const coords = coordsForPlaceHint(hint);
+      if (!coords) return;
+      const d = haversineKm(OISTERWIJK_CAMPAIGN_CENTER, coords);
+      if (!Number.isFinite(d)) return;
+      if (best === null || d < best) best = d;
+    });
+    return best;
+  }
+
   function resolveCampaignRegioRadiusKmForLeadCount(selectEl) {
     if (!(selectEl instanceof HTMLSelectElement)) return Infinity;
     const v = String(selectEl.value || '').trim();
@@ -2641,6 +3103,32 @@
       if (!key) return true;
       return !blocked.has(key);
     });
+  }
+
+  function countDialableLeadsWithinCampaignRegioRadius(leads, radiusKm) {
+    if (!Array.isArray(leads) || !leads.length) return 0;
+    if (!Number.isFinite(radiusKm) || radiusKm === Infinity) return leads.length;
+    const roadishFactor = 1.15;
+    const limit = Math.max(0, radiusKm) * roadishFactor;
+    let total = 0;
+    leads.forEach((lead) => {
+      const d = minAirDistanceKmFromOisterwijkForLead(lead);
+      if (d !== null && d <= limit) total += 1;
+    });
+    return total;
+  }
+
+  function resolveAutomaticCampaignRegioKm(leads) {
+    if (!Array.isArray(leads) || !leads.length) return 10;
+    const cap = MAX_CAMPAIGN_REGIO_KM_CHOICE;
+    const maxReach = countDialableLeadsWithinCampaignRegioRadius(leads, cap);
+    if (maxReach <= 0) return 10;
+    for (let km = 10; km <= cap; km += 10) {
+      if (countDialableLeadsWithinCampaignRegioRadius(leads, km) >= maxReach) {
+        return km;
+      }
+    }
+    return cap;
   }
 
   function getCampaignRegioLabelForApi() {
@@ -2783,13 +3271,150 @@
     };
   }
 
-  async function promptAndSaveSingleManualLead(defaults = {}) {
-    const leadInput = await manualLeadPromptHelpers.promptForManualLeadDetails(defaults, {
-      escapeHtml,
-      getThemeTokens: getConversationThemeTokens,
-      looksLikePhoneNumber,
-      normalizeFreeText,
+  async function promptForManualLeadDetails(defaults = {}) {
+    if (typeof document === 'undefined' || !document.body) {
+      const company = normalizeFreeText(window.prompt('Bedrijf', normalizeFreeText(defaults.company || '')));
+      if (!company) return { ok: false, cancelled: true };
+      const address = normalizeFreeText(window.prompt('Adres', normalizeFreeText(defaults.address || '')));
+      const phone = normalizeFreeText(window.prompt('Telefoonnummer', normalizeFreeText(defaults.phone || '')));
+      if (!phone) return { ok: false, cancelled: true };
+      const website = normalizeFreeText(window.prompt('Website', normalizeFreeText(defaults.website || '')));
+      return {
+        ok: true,
+        values: { company, address, phone, website },
+      };
+    }
+
+    return new Promise((resolve) => {
+      const theme = getConversationThemeTokens();
+      const overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.inset = '0';
+      overlay.style.zIndex = '10020';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.style.padding = '24px';
+      overlay.style.background = 'rgba(14, 16, 24, 0.5)';
+      overlay.style.backdropFilter = 'blur(2px)';
+
+      overlay.innerHTML = `
+        <div style="width:min(920px, 100%); border-radius:16px; border:1px solid ${theme.border}; background:${theme.chromeBg}; box-shadow:0 28px 90px rgba(0,0,0,0.28); padding:26px 28px 22px;">
+          <div style="font-family:Oswald,sans-serif; font-size:28px; line-height:1; letter-spacing:0.03em; text-transform:uppercase; color:${theme.text};">Lead handmatig toevoegen</div>
+          <div style="margin-top:14px; font-size:15px; line-height:1.6; color:${theme.textMuted};">Vul de leadgegevens in. We nemen deze direct op in het bedrijvenregister.</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-top:22px;">
+            <label style="display:flex; flex-direction:column; gap:7px;">
+              <span style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:${theme.textMuted};">Bedrijf</span>
+              <input type="text" data-manual-lead-company inputmode="text" autocomplete="organization" value="${escapeHtml(normalizeFreeText(defaults.company || ''))}" style="height:56px; padding:0 16px; border-radius:10px; border:1px solid ${theme.border}; background:${theme.blockBg}; color:${theme.text}; font-size:16px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:7px;">
+              <span style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:${theme.textMuted};">Adres</span>
+              <input type="text" data-manual-lead-address inputmode="text" autocomplete="street-address" value="${escapeHtml(normalizeFreeText(defaults.address || ''))}" style="height:56px; padding:0 16px; border-radius:10px; border:1px solid ${theme.border}; background:${theme.blockBg}; color:${theme.text}; font-size:16px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:7px;">
+              <span style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:${theme.textMuted};">Telefoonnummer</span>
+              <input type="tel" data-manual-lead-phone inputmode="tel" autocomplete="tel" value="${escapeHtml(normalizeFreeText(defaults.phone || ''))}" placeholder="0612345678 of +31612345678" style="height:56px; padding:0 16px; border-radius:10px; border:1px solid ${theme.border}; background:${theme.blockBg}; color:${theme.text}; font-size:16px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:7px;">
+              <span style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:${theme.textMuted};">Website</span>
+              <input type="text" data-manual-lead-website inputmode="url" autocomplete="url" value="${escapeHtml(normalizeFreeText(defaults.website || ''))}" placeholder="voorbeeld.nl" style="height:56px; padding:0 16px; border-radius:10px; border:1px solid ${theme.border}; background:${theme.blockBg}; color:${theme.text}; font-size:16px;">
+            </label>
+          </div>
+          <div data-manual-lead-error style="min-height:20px; margin-top:14px; font-size:13px; color:#b4235b;"></div>
+          <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:12px;">
+            <button type="button" data-manual-lead-cancel style="height:48px; min-width:148px; padding:0 22px; border-radius:10px; border:1px solid ${theme.border}; background:${theme.blockBg}; color:${theme.text}; font-family:Oswald,sans-serif; font-size:16px; letter-spacing:0.05em; text-transform:uppercase; cursor:pointer;">Annuleren</button>
+            <button type="button" data-manual-lead-confirm style="height:48px; min-width:148px; padding:0 22px; border-radius:10px; border:1px solid transparent; background:${theme.accent}; color:#fff; font-family:Oswald,sans-serif; font-size:16px; letter-spacing:0.05em; text-transform:uppercase; cursor:pointer;">Opslaan</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      const companyInput = overlay.querySelector('[data-manual-lead-company]');
+      const addressInput = overlay.querySelector('[data-manual-lead-address]');
+      const phoneInput = overlay.querySelector('[data-manual-lead-phone]');
+      const websiteInput = overlay.querySelector('[data-manual-lead-website]');
+      const errorEl = overlay.querySelector('[data-manual-lead-error]');
+      const cancelBtn = overlay.querySelector('[data-manual-lead-cancel]');
+      const confirmBtn = overlay.querySelector('[data-manual-lead-confirm]');
+
+      let finished = false;
+
+      function cleanup(result) {
+        if (finished) return;
+        finished = true;
+        document.removeEventListener('keydown', onKeyDown, true);
+        overlay.remove();
+        resolve(result);
+      }
+
+      function setError(message) {
+        if (!errorEl) return;
+        errorEl.textContent = normalizeFreeText(message);
+      }
+
+      function submit() {
+        const company = normalizeFreeText(companyInput?.value || '');
+        const address = normalizeFreeText(addressInput?.value || '');
+        const phone = normalizeFreeText(phoneInput?.value || '');
+        const website = normalizeFreeText(websiteInput?.value || '');
+
+        if (!company) {
+          setError('Bedrijf ontbreekt.');
+          companyInput?.focus();
+          return;
+        }
+        if (!phone) {
+          setError('Telefoonnummer ontbreekt.');
+          phoneInput?.focus();
+          return;
+        }
+        if (!looksLikePhoneNumber(phone)) {
+          setError('Telefoonnummer lijkt ongeldig. Gebruik bijv. 0612345678 of +31612345678.');
+          phoneInput?.focus();
+          return;
+        }
+
+        cleanup({
+          ok: true,
+          values: {
+            company,
+            address,
+            phone,
+            website,
+          },
+        });
+      }
+
+      function onKeyDown(event) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          cleanup({ ok: false, cancelled: true });
+          return;
+        }
+        if (event.key === 'Enter' && event.target && event.target.tagName !== 'TEXTAREA') {
+          event.preventDefault();
+          submit();
+        }
+      }
+
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+          cleanup({ ok: false, cancelled: true });
+        }
+      });
+      cancelBtn?.addEventListener('click', () => cleanup({ ok: false, cancelled: true }));
+      confirmBtn?.addEventListener('click', submit);
+      document.addEventListener('keydown', onKeyDown, true);
+      window.setTimeout(() => {
+        companyInput?.focus();
+        companyInput?.select?.();
+      }, 0);
     });
+  }
+
+  async function promptAndSaveSingleManualLead(defaults = {}) {
+    const leadInput = await promptForManualLeadDetails(defaults);
     if (!leadInput?.ok) {
       return {
         ok: false,
@@ -3207,6 +3832,15 @@
     if (answered === true) return 'Ja';
     if (answered === false) return 'Nee';
     return 'Onbekend';
+  }
+
+  function formatConversationDuration(seconds) {
+    const totalSeconds = Math.round(Number(seconds) || 0);
+    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return 'Onbekend';
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    if (mins <= 0) return `${secs}s`;
+    return `${mins}m ${String(secs).padStart(2, '0')}s`;
   }
 
   function getLeadDatabaseCallPartyIdentity(call) {

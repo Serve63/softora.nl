@@ -127,7 +127,6 @@ function createFixture(overrides = {}) {
     premiumActiveOrdersScope: 'premium_active_orders',
     premiumActiveCustomOrdersKey: 'softora_custom_orders_premium_v1',
     helpers,
-    customerRepository: overrides.customerRepository || null,
   });
 
   return {
@@ -277,60 +276,4 @@ test('agenda post-call coordinator marks the premium database row as afgehaakt a
   const savedRows = JSON.parse(uiStateWrites[0].values.softora_customers_premium_v1);
   assert.equal(savedRows[0].databaseStatus, 'afgehaakt');
   assert.equal(savedRows[0].hist[0].type, 'afgehaakt');
-  assert.equal(savedRows[0].hist[0].label, 'Afgehaakt na afspraak');
-});
-
-test('agenda post-call coordinator syncs no-deal customer status through the repository seam first', async () => {
-  let rawCustomerReads = 0;
-  let upsertedCustomer = null;
-  let upsertMeta = null;
-  const { coordinator, uiStateWrites } = createFixture({
-    getUiStateValues: async (scope) => {
-      if (scope === 'premium_customers_database') rawCustomerReads += 1;
-      return { values: {} };
-    },
-    customerRepository: {
-      listCustomers: async () => ({
-        rows: [
-          {
-            id: 'customer-42',
-            naam: 'Serve Creusen',
-            bedrijf: 'Softora',
-            telefoon: '0612345678',
-            databaseStatus: 'afspraak',
-            hist: [],
-          },
-        ],
-        total: 1,
-      }),
-      upsertCustomer: async (row, meta) => {
-        upsertedCustomer = row;
-        upsertMeta = meta;
-        return { ok: true, count: 1, updated: true };
-      },
-    },
-  });
-  const res = createResponseRecorder();
-
-  await coordinator.updateAgendaAppointmentPostCallDataById(
-    {
-      body: {
-        status: 'no_deal',
-        actor: 'Serve',
-      },
-    },
-    res,
-    '42'
-  );
-
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.ok, true);
-  assert.equal(res.body.databaseSync.ok, true);
-  assert.equal(res.body.databaseSync.source, 'repository');
-  assert.equal(upsertedCustomer.databaseStatus, 'afgehaakt');
-  assert.equal(upsertedCustomer.hist[0].type, 'afgehaakt');
-  assert.equal(upsertedCustomer.hist[0].label, 'Afgehaakt na afspraak');
-  assert.equal(upsertMeta.source, 'premium-personeel-agenda');
-  assert.equal(rawCustomerReads, 0);
-  assert.equal(uiStateWrites.length, 0);
 });

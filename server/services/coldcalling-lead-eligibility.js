@@ -1,11 +1,6 @@
 const { normalizeLeadLikePhoneKey } = require('./lead-identity');
-const {
-  createPremiumCustomersRepository,
-} = require('../repositories/premium-customers-repository');
 
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
-const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
-const CUSTOMER_REPOSITORY_SCAN_LIMIT = 1000;
 const BLOCKED_DATABASE_STATUSES = new Set([
   'mailcampagne',
   'interesse',
@@ -188,72 +183,6 @@ function parseCustomerDatabaseRowsFromUiState(values = {}, key = DEFAULT_CUSTOME
   }
 }
 
-function normalizeCustomerRepositoryRows(result) {
-  const rows = Array.isArray(result)
-    ? result
-    : Array.isArray(result?.rows)
-      ? result.rows
-      : Array.isArray(result?.customers)
-        ? result.customers
-        : [];
-  return rows.filter((item) => item && typeof item === 'object');
-}
-
-function resolveCustomerRepositoryForColdcallingEligibility(deps = {}, scope, key) {
-  if (deps.customerRepository && typeof deps.customerRepository.listCustomers === 'function') {
-    return deps.customerRepository;
-  }
-  if (
-    deps.premiumCustomersRepository &&
-    typeof deps.premiumCustomersRepository.listCustomers === 'function'
-  ) {
-    return deps.premiumCustomersRepository;
-  }
-
-  const createCustomerRepository =
-    typeof deps.createCustomerRepository === 'function'
-      ? deps.createCustomerRepository
-      : createPremiumCustomersRepository;
-
-  if (typeof createCustomerRepository !== 'function') return null;
-
-  return createCustomerRepository({
-    getUiStateValues: deps.getUiStateValues,
-    setUiStateValues: deps.setUiStateValues,
-    scope,
-    key,
-    customerScope: scope,
-    customerKey: key,
-  });
-}
-
-async function readCustomerDatabaseRowsForColdcallingEligibility(deps = {}, options = {}) {
-  const scope =
-    normalizeString(options.scope || deps.customerDbScope || deps.premiumCustomersScope) ||
-    DEFAULT_CUSTOMER_DB_SCOPE;
-  const key =
-    normalizeString(options.key || deps.customerDbKey || deps.premiumCustomersKey) ||
-    DEFAULT_CUSTOMER_DB_KEY;
-
-  const repository = resolveCustomerRepositoryForColdcallingEligibility(deps, scope, key);
-  if (repository && typeof repository.listCustomers === 'function') {
-    try {
-      const repositoryRows = normalizeCustomerRepositoryRows(
-        await repository.listCustomers({ limit: CUSTOMER_REPOSITORY_SCAN_LIMIT })
-      );
-      if (repositoryRows.length > 0 && repositoryRows.length < CUSTOMER_REPOSITORY_SCAN_LIMIT) {
-        return repositoryRows;
-      }
-    } catch (_) {
-      // Fallback hieronder houdt coldcalling conservatief wanneer de repository tijdelijk faalt.
-    }
-  }
-
-  if (typeof deps.getUiStateValues !== 'function') return [];
-  const state = await deps.getUiStateValues(scope);
-  return parseCustomerDatabaseRowsFromUiState(state?.values || {}, key);
-}
-
 function createBlockedContact(record, matchedBy) {
   let status = isPremiumActiveOrderRecord(record)
     ? 'klant'
@@ -390,5 +319,4 @@ module.exports = {
   findColdcallingBlockForLead,
   normalizeDatabaseContactStatus,
   parseCustomerDatabaseRowsFromUiState,
-  readCustomerDatabaseRowsForColdcallingEligibility,
 };

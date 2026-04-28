@@ -1,10 +1,4 @@
 const { normalizeLeadLikePhoneKey } = require('./lead-identity');
-const {
-  appendCustomerStatusHistory,
-  createPremiumCustomersRepository,
-} = require('../repositories/premium-customers-repository');
-
-const CUSTOMER_REPOSITORY_SYNC_LIMIT = 5000;
 
 function normalizeCustomerSearchText(value) {
   return String(value || '')
@@ -98,30 +92,30 @@ function buildCustomerDatabaseRowForLifecycleStatus(row, appointment, status, ac
   const phone = String(
     row?.telefoon || row?.tel || row?.phone || row?.contactPhone || appointment?.phone || appointment?.telefoon || ''
   ).trim();
+  const history = Array.isArray(row?.hist) ? row.hist.filter(Boolean) : [];
+  const historyEntry = {
+    type: status,
+    label: getLifecycleDatabaseStatusLabel(status),
+    date: nowIso,
+    actor: String(actor || '').trim(),
+  };
 
-  return appendCustomerStatusHistory(
-    {
-      ...row,
-      id: String(row?.id || `customer-${Date.now().toString(36)}`).trim(),
-      naam: contact || company || 'Onbekend',
-      bedrijf: company || contact || 'Onbekend bedrijf',
-      tel: phone || row?.tel || row?.telefoon || '',
-      telefoon: phone || row?.telefoon || row?.tel || '',
-      email: String(row?.email || row?.contactEmail || appointment?.contactEmail || appointment?.email || '').trim(),
-      stad: String(row?.stad || row?.location || row?.address || appointment?.location || '').trim(),
-      branche: String(row?.branche || appointment?.branche || '').trim(),
-      website: String(row?.website || row?.dom || appointment?.domainName || appointment?.postCallDomainName || '').trim(),
-      service: String(row?.service || inferAppointmentService(appointment)).trim(),
-      databaseStatus: status,
-      updatedAt: nowIso,
-    },
-    status,
-    {
-      label: getLifecycleDatabaseStatusLabel(status),
-      date: nowIso,
-      actor: String(actor || '').trim(),
-    }
-  );
+  return {
+    ...row,
+    id: String(row?.id || `customer-${Date.now().toString(36)}`).trim(),
+    naam: contact || company || 'Onbekend',
+    bedrijf: company || contact || 'Onbekend bedrijf',
+    tel: phone || row?.tel || row?.telefoon || '',
+    telefoon: phone || row?.telefoon || row?.tel || '',
+    email: String(row?.email || row?.contactEmail || appointment?.contactEmail || appointment?.email || '').trim(),
+    stad: String(row?.stad || row?.location || row?.address || appointment?.location || '').trim(),
+    branche: String(row?.branche || appointment?.branche || '').trim(),
+    website: String(row?.website || row?.dom || appointment?.domainName || appointment?.postCallDomainName || '').trim(),
+    service: String(row?.service || inferAppointmentService(appointment)).trim(),
+    databaseStatus: status,
+    updatedAt: nowIso,
+    hist: history.concat(historyEntry).slice(-20),
+  };
 }
 
 function createAgendaPostCallHelpers(deps = {}) {
@@ -334,9 +328,6 @@ function createAgendaPostCallCoordinator(deps = {}) {
     premiumCustomersKey = 'softora_customers_premium_v1',
     logger = console,
     helpers = null,
-    customerRepository = null,
-    premiumCustomersRepository = null,
-    createCustomerRepository = createPremiumCustomersRepository,
   } = deps;
 
   const resolvedHelpers =
@@ -357,89 +348,6 @@ function createAgendaPostCallCoordinator(deps = {}) {
     parseCustomOrdersFromUiState,
   } = resolvedHelpers;
 
-  function resolvePremiumCustomerRepository() {
-    if (customerRepository && typeof customerRepository.listCustomers === 'function') {
-      return customerRepository;
-    }
-    if (premiumCustomersRepository && typeof premiumCustomersRepository.listCustomers === 'function') {
-      return premiumCustomersRepository;
-    }
-    if (typeof createCustomerRepository !== 'function') return null;
-
-    return createCustomerRepository({
-      getUiStateValues,
-      setUiStateValues,
-      scope: premiumCustomersScope,
-      key: premiumCustomersKey,
-      customerScope: premiumCustomersScope,
-      customerKey: premiumCustomersKey,
-    });
-  }
-
-  function getRepositoryRows(result) {
-    const rows = Array.isArray(result)
-      ? result
-      : Array.isArray(result?.rows)
-        ? result.rows
-        : Array.isArray(result?.customers)
-          ? result.customers
-          : [];
-    return rows.filter((row) => row && typeof row === 'object');
-  }
-
-  async function syncPremiumCustomerDatabaseStatusViaRepository(appointment, status, actor) {
-    const repository = resolvePremiumCustomerRepository();
-    if (
-      !repository ||
-      typeof repository.listCustomers !== 'function' ||
-      typeof repository.upsertCustomer !== 'function'
-    ) {
-      return null;
-    }
-
-    const listed = await repository.listCustomers({ limit: CUSTOMER_REPOSITORY_SYNC_LIMIT });
-    const rows = getRepositoryRows(listed);
-    const total = Number(listed?.total ?? listed?.count ?? rows.length);
-    if (
-      Number.isFinite(total) &&
-      total > rows.length &&
-      rows.length >= CUSTOMER_REPOSITORY_SYNC_LIMIT
-    ) {
-      return null;
-    }
-
-    const rowIndex = findCustomerDatabaseRowIndexForAppointment(rows, appointment);
-    const currentRow = rowIndex >= 0 ? rows[rowIndex] : {};
-    const nextRow = buildCustomerDatabaseRowForLifecycleStatus(
-      currentRow,
-      appointment,
-      status,
-      actor
-    );
-    const saved = await repository.upsertCustomer(nextRow, {
-      source: 'premium-personeel-agenda',
-      actor,
-    });
-
-    if (!saved) {
-      return { ok: false, skipped: false, reason: 'save_failed', status };
-    }
-
-    const savedCount = Number(saved.count ?? saved.total);
-    return {
-      ok: true,
-      skipped: false,
-      status,
-      matchedExisting: rowIndex >= 0 || saved.updated === true,
-      customerCount: Number.isFinite(savedCount)
-        ? savedCount
-        : rowIndex >= 0
-          ? rows.length
-          : rows.length + 1,
-      source: 'repository',
-    };
-  }
-
   async function syncPremiumCustomerDatabaseStatusFromAppointment(appointment, lifecycleStatus, actor) {
     const status = normalizeLifecycleDatabaseStatus(lifecycleStatus);
     if (!status || !appointment || typeof appointment !== 'object') {
@@ -447,13 +355,6 @@ function createAgendaPostCallCoordinator(deps = {}) {
     }
 
     try {
-      const repositorySync = await syncPremiumCustomerDatabaseStatusViaRepository(
-        appointment,
-        status,
-        actor
-      );
-      if (repositorySync) return repositorySync;
-
       const currentState = await getUiStateValues(premiumCustomersScope);
       const currentValues =
         currentState && currentState.values && typeof currentState.values === 'object'
@@ -496,7 +397,6 @@ function createAgendaPostCallCoordinator(deps = {}) {
         status,
         matchedExisting: rowIndex >= 0,
         customerCount: nextRows.length,
-        source: 'legacy-ui-state',
       };
     } catch (error) {
       if (logger && typeof logger.error === 'function') {

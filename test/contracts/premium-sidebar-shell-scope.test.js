@@ -167,6 +167,14 @@ test('canonical premium pages opt into the shared sidebar shell', () => {
   }
 });
 
+test('premium pdfs rollback behoudt de verwachte canonical sidebar scope', () => {
+  const pageSource = readRepoFile('premium-pdfs.html');
+
+  assert.match(pageSource, /<div class="dashboard-layout" data-sidebar-shell="canonical">/);
+  assert.match(pageSource, /href="\/premium-pdfs"[\s\S]*data-sidebar-key="pdfs"[\s\S]*<span class="sidebar-link-text">PDF'S<\/span>/);
+  assert.doesNotMatch(pageSource, /data-sidebar-shell="custom"/);
+});
+
 test('custom premium layouts stay outside the shared sidebar shell', () => {
   for (const relativePath of customLayoutPages) {
     const pageSource = readRepoFile(relativePath);
