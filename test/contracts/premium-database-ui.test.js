@@ -275,10 +275,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /<div class="p-s-title">Status wijzigen<\/div>/);
   assert.doesNotMatch(pageSource, /<div class="p-s-title">Tijdlijn<\/div>/);
   assert.doesNotMatch(pageSource, /<select class="msel" id="m-responsible">/);
-  assert.match(pageSource, /function parseResponsibleValue\(value\)/);
-  assert.match(pageSource, /function normalizeResponsibleValue\(value\)/);
-  assert.match(pageSource, /function formatResponsibleDisplayName\(value\)/);
-  assert.match(pageSource, /function getResponsibleSourceValue\(raw\)/);
+  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260428a/);
+  assert.match(pageSource, /SoftoraPremiumCustomersCore/);
+  assert.match(pageSource, /SoftoraPremiumCustomersCore/);
   assert.match(pageSource, /function openPanel\(id\)/);
   assert.match(pageSource, /nodes\.panelSub\.textContent = customer\.stad;/);
   assert.doesNotMatch(pageSource, /nodes\.panelSub\.textContent = customer\.dom \+ " · " \+ customer\.stad;/);
@@ -304,6 +303,11 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /patch: window\.SoftoraDatabaseImport\.buildChunkedStatePatch\(CUSTOMER_DB_KEY, JSON\.stringify\(normalizedCustomers\)\)/);
   assert.match(pageSource, /parseCustomers\(window\.SoftoraDatabaseImport\.readChunkedStateValue\(remoteState && remoteState\.values, CUSTOMER_DB_KEY\)\)/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 \* 1000;/);
+  assert.match(pageSource, /function normalizeStoredAmount\(value\)/);
+  assert.match(pageSource, /databaseStatus: status,/);
+  assert.match(pageSource, /websiteBedrag: normalizeStoredAmount\(raw && raw\.websiteBedrag\)/);
+  assert.match(pageSource, /onderhoudPerMaand: normalizeStoredAmount\(raw && raw\.onderhoudPerMaand\)/);
+  assert.match(pageSource, /bedrag: normalizeStoredAmount\(raw && raw\.bedrag\)/);
   assert.match(pageSource, /<div class="modal-bg" id="deepSearchModal" aria-hidden="true">/);
   assert.doesNotMatch(pageSource, /id="deepSearchListInput"/);
   assert.match(pageSource, /id="deepSearchCost"/);

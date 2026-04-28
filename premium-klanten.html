@@ -1293,6 +1293,7 @@
 
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script src="assets/premium-customers-renderers.js?v=20260427a"></script>
+    <script src="assets/premium-customers-core.js?v=20260428a"></script>
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
@@ -1311,6 +1312,25 @@
         }
 
         const customersBootstrapPayload = readCustomersBootstrapPayload();
+
+        const customerCore = window.SoftoraPremiumCustomersCore;
+        const {
+            CUSTOMER_SERVICE_OPTIONS,
+            normalizeString,
+            normalizeSearchValue,
+            normalizeDate,
+            normalizeActiveValue,
+            parseResponsibleValue,
+            normalizeResponsibleValue,
+            formatResponsibleDisplayName,
+            getResponsibleSourceValue,
+            normalizeOptionalAmount,
+            normalizeCustomerService,
+            formatCustomerServiceLabel,
+            normalizeCustomerReview,
+            normalizeCustomerDatabaseStatus,
+            isCustomerLifecycleRecord
+        } = customerCore;
 
         const state = {
             klanten: [],
@@ -1356,64 +1376,14 @@
             return "klant-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
         }
 
-        function normalizeString(value) {
-            return String(value || "").trim();
-        }
 
-        function normalizeSearchValue(value) {
-            return normalizeString(value).toLowerCase();
-        }
 
-        function parseResponsibleValue(value) {
-            const normalized = normalizeString(value)
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-z0-9]+/g, " ")
-                .trim();
-            if (normalized.indexOf("martijn") !== -1) return "Martijn";
-            if (normalized.indexOf("serve") !== -1) return "Serve";
-            return "";
-        }
 
-        function normalizeResponsibleValue(value) {
-            return parseResponsibleValue(value) || "Serve";
-        }
 
-        function formatResponsibleDisplayName(value) {
-            const normalized = parseResponsibleValue(value);
-            return normalized === "Martijn" ? "Martijn" : "Servé";
-        }
 
-        function getResponsibleSourceValue(raw) {
-            if (!raw || typeof raw !== "object") return "";
-            return normalizeString(
-                raw.verantwoordelijk
-                || raw.responsible
-                || raw.claimedBy
-                || raw.leadOwnerName
-                || raw.leadOwnerFullName
-                || raw.assignedToName
-                || raw.assignedToFullName
-                || ""
-            );
-        }
 
-        function normalizeDate(value) {
-            const raw = normalizeString(value);
-            return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
-        }
 
-        function normalizeActiveValue(value) {
-            return normalizeString(value).toLowerCase() === "nee" ? "Nee" : "Ja";
-        }
 
-        function normalizeOptionalAmount(value) {
-            if (value === null || value === undefined || value === "") return null;
-            const amount = Number(value);
-            if (!Number.isFinite(amount) || amount < 0) return null;
-            return Math.round(amount);
-        }
 
         function setModalError(message) {
             if (!nodes.modalError) return;
@@ -1422,55 +1392,10 @@
             nodes.modalError.classList.toggle("is-visible", Boolean(text));
         }
 
-        const CUSTOMER_SERVICE_OPTIONS = ["website", "bedrijfssoftware", "voicesoftware", "chatbot"];
 
-        function normalizeCustomerService(raw) {
-            const rawSvc = normalizeString(raw && raw.service).toLowerCase();
-            if (CUSTOMER_SERVICE_OPTIONS.indexOf(rawSvc) !== -1) return rawSvc;
-            return "website";
-        }
 
-        function formatCustomerServiceLabel(service) {
-            const key = normalizeString(service).toLowerCase();
-            if (key === "website") return "Website";
-            if (key === "bedrijfssoftware") return "Bedrijfssoftware";
-            if (key === "voicesoftware") return "Voicesoftware";
-            if (key === "chatbot") return "Chatbots";
-            if (!key) return "Website";
-            return key.charAt(0).toUpperCase() + key.slice(1);
-        }
 
-        function normalizeCustomerReview(raw) {
-            return normalizeString(raw && raw.review).toLowerCase() === "ja" ? "Ja" : "Nee";
-        }
 
-        function normalizeCustomerDatabaseStatus(raw) {
-            const value = normalizeString(raw && raw.databaseStatus).toLowerCase();
-            const status = normalizeString(raw && raw.status).toLowerCase();
-            const knownDatabaseStatuses = [
-                "prospect",
-                "benaderbaar",
-                "gebeld",
-                "gemaild",
-                "interesse",
-                "afspraak",
-                "klant",
-                "afgehaakt",
-                "geblokkeerd",
-                "buiten"
-            ];
-            if (knownDatabaseStatuses.indexOf(value) !== -1) return value;
-            if (knownDatabaseStatuses.indexOf(status) !== -1) return status;
-            if (value === "afgehaakt") return "afgehaakt";
-            if (value === "interesse") return "interesse";
-            if (value === "afspraak") return "afspraak";
-            if (status === "betaald" || status === "open") return "klant";
-            return "klant";
-        }
-
-        function isCustomerLifecycleRecord(raw) {
-            return normalizeCustomerDatabaseStatus(raw) === "klant";
-        }
 
         function getModalFieldNodes() {
             return [
@@ -1725,6 +1650,40 @@
                 });
             } catch (error) {
                 return [];
+            }
+        }
+
+        function getChunkMetaKey(baseKey) {
+            return normalizeString(baseKey) + "_chunks_v1";
+        }
+
+        function getChunkPrefix(baseKey) {
+            return normalizeString(baseKey) + "_chunk_";
+        }
+
+        function readChunkedStateValue(values, baseKey) {
+            const stateValues = values && typeof values === "object" ? values : {};
+            const normalizedKey = normalizeString(baseKey);
+            const fallback = typeof stateValues[normalizedKey] === "string" ? stateValues[normalizedKey] : "";
+            const metaRaw = normalizeString(stateValues[getChunkMetaKey(normalizedKey)]);
+            if (!metaRaw) return fallback;
+
+            try {
+                const meta = JSON.parse(metaRaw);
+                const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0));
+                if (!count) return fallback;
+
+                const prefix = getChunkPrefix(normalizedKey);
+                const chunks = [];
+                for (let index = 0; index < count; index += 1) {
+                    const chunk = stateValues[prefix + index];
+                    if (typeof chunk !== "string") return fallback;
+                    chunks.push(chunk);
+                }
+
+                return chunks.join("") || fallback;
+            } catch (error) {
+                return fallback;
             }
         }
 
@@ -2209,7 +2168,7 @@
 
             try {
                 const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
-                const remoteRows = parseCustomerStorageRows(remoteState && remoteState.values && remoteState.values[CUSTOMER_DB_KEY]);
+                const remoteRows = parseCustomerStorageRows(readChunkedStateValue(remoteState && remoteState.values, CUSTOMER_DB_KEY));
                 const remoteCustomers = parseCustomersFromRows(remoteRows);
                 state.sharedCustomerRows = remoteRows;
 

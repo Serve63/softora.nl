@@ -2142,6 +2142,7 @@
         </section>
     </div>
 
+    <script src="assets/premium-dashboard-core.js?v=20260428a"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -2224,29 +2225,18 @@
                 text: 'Groen: werkt perfect.',
             },
         };
-
-        function escapeHtml(str) {
-            return String(str || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
-
-        function normalizeDashboardString(value) {
-            return String(value || '').trim();
-        }
-
-        function normalizeDashboardTime(value, fallback) {
-            const raw = normalizeDashboardString(value);
-            return /^\d{2}:\d{2}$/.test(raw) ? raw : fallback;
-        }
-
-        function normalizeDashboardDate(value) {
-            const raw = normalizeDashboardString(value);
-            return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
-        }
+        const dashboardCore = window.SoftoraPremiumDashboardCore;
+        const {
+            escapeHtml,
+            normalizeDashboardString,
+            normalizeDashboardTime,
+            normalizeDashboardDate,
+            getPremiumDashboardChunkMetaKey,
+            getPremiumDashboardChunkPrefix,
+            readPremiumDashboardChunkedStateValue,
+            formatMoneyEUR,
+            formatProjectMeta
+        } = dashboardCore;
 
         function normalizeDashboardPeriodFilter(value) {
             return value === 'month' || value === 'quarter' || value === 'year' ? value : 'all';
@@ -2866,19 +2856,6 @@
             }
         }
 
-        function formatMoneyEUR(amount) {
-            const value = Number(amount) || 0;
-            return '€' + value.toLocaleString('nl-NL');
-        }
-
-        function formatProjectMeta(order) {
-            const parts = [];
-            if (order?.location) parts.push(order.location);
-            parts.push(formatMoneyEUR(order?.amount || 0));
-            if (order?.ui?.isBuilt && !order?.ui?.isPaid) parts.push('wacht op betaling');
-            return parts.join(' • ');
-        }
-
         function getProjectStatusPresentation(order) {
             if (order?.ui?.isPaid) {
                 return { text: 'Betaald', className: 'status-done' };
@@ -3219,7 +3196,7 @@
             try {
                 const data = await fetchPremiumUiState(PREMIUM_CUSTOMERS_SCOPE);
                 const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
-                const customers = parsePremiumCustomers(values[PREMIUM_CUSTOMERS_KEY]);
+                const customers = parsePremiumCustomers(readPremiumDashboardChunkedStateValue(values, PREMIUM_CUSTOMERS_KEY));
                 premiumDashboardState.customers = customers;
                 return true;
             } catch (_) {

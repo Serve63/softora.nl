@@ -1605,6 +1605,7 @@
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
     <script src="assets/premium-database-deep-search.js?v=20260428h"></script>
+    <script src="assets/premium-customers-core.js?v=20260428a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -1713,14 +1714,16 @@
             nodes, getTargets: getWebdesignPhotoTargets, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR,
             closeAddActions, setStatusMessage, generate: generateWebdesignPhotos
         });
-
-        function normalizeString(value) {
-            return String(value || "").trim();
-        }
-
-        function normalizeSearchValue(value) {
-            return normalizeString(value).toLowerCase();
-        }
+        const customersCore = window.SoftoraPremiumCustomersCore;
+        const {
+            normalizeString,
+            normalizeSearchValue,
+            parseResponsibleValue,
+            normalizeResponsibleValue,
+            formatResponsibleDisplayName,
+            getResponsibleSourceValue,
+            formatCustomerServiceLabel
+        } = customersCore;
 
         function expandScientificPhone(value) {
             const raw = normalizeString(value);
@@ -1756,40 +1759,6 @@
             return "db-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
         }
 
-        function parseResponsibleValue(value) {
-            const normalized = normalizeString(value)
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-z0-9]+/g, " ")
-                .trim();
-            if (normalized.indexOf("martijn") !== -1) return "Martijn";
-            if (normalized.indexOf("serve") !== -1) return "Serve";
-            return "";
-        }
-
-        function normalizeResponsibleValue(value) {
-            return parseResponsibleValue(value) || "Serve";
-        }
-
-        function formatResponsibleDisplayName(value) {
-            return parseResponsibleValue(value) === "Martijn" ? "Martijn" : "Servé";
-        }
-
-        function getResponsibleSourceValue(raw) {
-            if (!raw || typeof raw !== "object") return "";
-            return normalizeString(
-                raw.verantwoordelijk
-                || raw.responsible
-                || raw.claimedBy
-                || raw.leadOwnerName
-                || raw.leadOwnerFullName
-                || raw.assignedToName
-                || raw.assignedToFullName
-                || ""
-            );
-        }
-
         function slugifyDomain(value) {
             const normalized = normalizeString(value)
                 .toLowerCase()
@@ -1803,15 +1772,6 @@
                 .replace(/[^a-z0-9]+/g, "")
                 .slice(0, 18);
             return slug ? slug + ".nl" : "onbekend.nl";
-        }
-
-        function formatCustomerServiceLabel(service) {
-            const key = normalizeString(service).toLowerCase();
-            if (key === "website") return "Website";
-            if (key === "bedrijfssoftware") return "Bedrijfssoftware";
-            if (key === "voicesoftware") return "Voicesoftware";
-            if (key === "chatbot") return "Chatbot";
-            return key ? key.charAt(0).toUpperCase() + key.slice(1) : "Website";
         }
 
         function normalizeHistoryItem(item) {
@@ -1880,6 +1840,13 @@
             return "prospect";
         }
 
+        function normalizeStoredAmount(value) {
+            if (value === null || value === undefined || value === "") return null;
+            const amount = Number(value);
+            if (!Number.isFinite(amount) || amount < 0) return null;
+            return Math.round(amount);
+        }
+
         function normalizeColdmailTestCompanyName(value) {
             return normalizeString(value).toLowerCase();
         }
@@ -1928,6 +1895,7 @@
                 branche: normalizeString(raw && raw.branche) || "Overig",
                 stad: normalizeString(raw && (raw.stad || raw.location || raw.address)) || "Onbekend",
                 status: status,
+                databaseStatus: status,
                 call: raw && typeof raw.call === "boolean" ? raw.call : (status !== "geblokkeerd" && status !== "buiten"),
                 mail: raw && typeof raw.mail === "boolean" ? raw.mail : (status !== "geblokkeerd" && status !== "buiten"),
                 hist: hist,
@@ -1938,7 +1906,14 @@
                 website: normalizeString(raw && raw.website),
                 websitePhoto: normalizeString(raw && (raw.websitePhoto || raw.photo || raw.websiteImage)),
                 websitePhotoName: normalizeString(raw && (raw.websitePhotoName || raw.photoName || raw.websiteImageName)),
-                service: normalizeString(raw && raw.service) || "website"
+                service: normalizeString(raw && raw.service) || "website",
+                type: normalizeString(raw && raw.type),
+                websiteBedrag: normalizeStoredAmount(raw && raw.websiteBedrag),
+                onderhoudPerMaand: normalizeStoredAmount(raw && raw.onderhoudPerMaand),
+                bedrag: normalizeStoredAmount(raw && raw.bedrag),
+                actief: normalizeString(raw && raw.actief),
+                review: normalizeString(raw && raw.review),
+                datum: normalizeString(raw && raw.datum)
             };
         }
 

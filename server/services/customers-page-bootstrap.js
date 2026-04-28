@@ -17,6 +17,41 @@ function createCustomersPageBootstrapService(deps = {}) {
     return normalizeString(value).toLowerCase();
   }
 
+  function getChunkMetaKey(baseKey) {
+    return `${normalizeString(baseKey)}_chunks_v1`;
+  }
+
+  function getChunkPrefix(baseKey) {
+    return `${normalizeString(baseKey)}_chunk_`;
+  }
+
+  function readChunkedStateValue(values, baseKey) {
+    const stateValues = values && typeof values === 'object' ? values : {};
+    const normalizedKey = normalizeString(baseKey);
+    const fallback =
+      typeof stateValues[normalizedKey] === 'string' ? stateValues[normalizedKey] : '';
+    const metaRaw = normalizeString(stateValues[getChunkMetaKey(normalizedKey)]);
+    if (!metaRaw) return fallback;
+
+    try {
+      const meta = JSON.parse(metaRaw);
+      const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0));
+      if (!count) return fallback;
+
+      const prefix = getChunkPrefix(normalizedKey);
+      const chunks = [];
+      for (let index = 0; index < count; index += 1) {
+        const chunk = stateValues[prefix + index];
+        if (typeof chunk !== 'string') return fallback;
+        chunks.push(chunk);
+      }
+
+      return chunks.join('') || fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
   function normalizeActiveValue(value) {
     return normalizeString(value).toLowerCase() === 'nee' ? 'Nee' : 'Ja';
   }
@@ -309,7 +344,7 @@ function createCustomersPageBootstrapService(deps = {}) {
 
   async function buildCustomersBootstrapPayload() {
     const remoteState = await getUiStateValues(customerScope);
-    const remoteCustomers = parseCustomers(remoteState?.values?.[customerKey]);
+    const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
     const orderState = await getUiStateValues(orderScope);
     const orders = parseOrders(orderState?.values?.[orderKey]);
 
