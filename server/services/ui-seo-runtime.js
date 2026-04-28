@@ -58,6 +58,9 @@ function createUiSeoRuntime(deps = {}) {
     seoConfigScope,
     seoConfigKey,
     seoConfigCacheTtlMs,
+    uiStateReadTimeoutMsByScope = Object.freeze({
+      premium_database_photos: 8000,
+    }),
   } = deps;
 
   const uiStateStore = createUiStateStore({
@@ -68,6 +71,7 @@ function createUiSeoRuntime(deps = {}) {
     supabaseStateTable,
     fetchSupabaseRowByKeyViaRest,
     upsertSupabaseRowViaRest,
+    uiStateReadTimeoutMsByScope,
     normalizeString,
     truncateText,
     logger,

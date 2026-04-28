@@ -207,6 +207,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /window\.SoftoraDatabasePhotoStorage\.createController\(\{/);
   assert.match(photoStorageScriptSource, /function normalizeIdSet\(values\)/);
   assert.match(photoStorageScriptSource, /function buildCurrentStorage\(customers, onlyCustomerIds\)/);
+  assert.match(photoStorageScriptSource, /function loadPersistState\(\)/);
+  assert.match(photoStorageScriptSource, /Databasefoto's opslaan via Supabase mislukt/);
   assert.match(photoStorageScriptSource, /persistOptions && persistOptions\.onlyCustomerIds/);
   assert.match(photoStorageScriptSource, /photoKey \+ "_" \+ chunkIndex/);
   assert.match(photoStorageScriptSource, /chunkCount: chunks\.length/);
@@ -217,8 +219,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /normalizeString\(normalized\.websitePhoto\)\.slice\(0, 80\)/);
   assert.match(pageSource, /websitePhoto: isValidWebsitePhotoDataUrl\(normalizeString\(normalized\.websitePhoto\)\)/);
   assert.match(photoStorageScriptSource, /readChunkedData\(values, photoKey, 0\)/);
-  assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 2160, 3840, 0\.9\)/);
-  assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 1024, 1536, 0\.82\)/);
+  assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 1440, 2160, 0\.86\)/);
+  assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 768, 1152, 0\.74\)/);
   assert.match(pageSource, /<div class="photo-preview" id="photoPreview"/);
   assert.match(pageSource, /function readImageFileAsDataUrl\(file\)/);
   assert.match(pageSource, /function saveWebsitePhotoForCustomer\(customerId, file\)/);
@@ -235,7 +237,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428b/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428e/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
@@ -646,6 +648,41 @@ test('premium database photo storage saves one changed photo without resending o
   const storedMap = JSON.parse(patches[0].photos);
   assert.equal(storedMap.customer1.photoKey, 'photo_customer1');
   assert.equal(storedMap.customer2.photoKey, 'photo_customer2');
+});
+
+test('premium database photo storage retries Supabase reads before saving photos', async () => {
+  const photoStorageClient = loadDatabasePhotoStorageClient();
+  const patches = [];
+  let reads = 0;
+  const controller = photoStorageClient.createController({
+    getUiState: async () => {
+      reads += 1;
+      if (reads === 1) throw new Error('read timeout');
+      return { values: { photos: '{}' } };
+    },
+    setUiState: async (_scope, payload) => {
+      patches.push(payload.patch);
+      return { ok: true };
+    },
+    normalizeCustomer: (customer) => customer,
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    buildCustomerIdentityKey: (customer) => 'identity:' + customer.id,
+    formatDateForStorage: () => '2026-04-28',
+    scope: 'premium_database_photos',
+    key: 'photos',
+    dataPrefix: 'photo_',
+    chunkSize: 180000,
+  });
+
+  const result = await controller.persist([
+    { id: 'customer1', websitePhoto: 'data:image/png;base64,AAA', websitePhotoName: 'Websitefoto nieuw' },
+  ], { onlyCustomerIds: ['customer1'] });
+
+  assert.equal(result.ok, true);
+  assert.equal(reads, 2);
+  assert.equal(patches.length, 1);
+  assert.equal(patches[0].photo_customer1_0, 'data:image/png;base64,AAA');
 });
 
 test('premium database deep search client finishes the current location automatically', async () => {

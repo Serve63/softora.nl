@@ -22,6 +22,24 @@
         const dataPrefix = options.dataPrefix;
         const chunkSize = Math.max(20000, Math.min(180000, Number(options.chunkSize) || 180000));
 
+        function wait(ms) {
+            return new Promise(function (resolve) {
+                const timer = typeof global.setTimeout === "function" ? global.setTimeout : function (callback) { callback(); };
+                timer(resolve, ms);
+            });
+        }
+
+        function loadPersistState() {
+            return getUiState(scope).catch(function (firstError) {
+                if (typeof console !== "undefined" && typeof console.warn === "function") {
+                    console.warn("Databasefoto's laden voor opslaan opnieuw geprobeerd:", firstError);
+                }
+                return wait(700).then(function () {
+                    return getUiState(scope);
+                });
+            });
+        }
+
         function buildDataKey(customerId) {
             return dataPrefix + normalizeString(customerId).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 80);
         }
@@ -161,7 +179,7 @@
         }
 
         function persist(customers, persistOptions) {
-            return getUiState(scope).then(function (state) {
+            return loadPersistState().then(function (state) {
                 const values = state && state.values && typeof state.values === "object" ? state.values : {};
                 const existing = parsePhotoMap(values[key], values, customers);
                 const current = buildCurrentStorage(customers, persistOptions && persistOptions.onlyCustomerIds);
@@ -175,6 +193,9 @@
             }).then(function () {
                 return { ok: true };
             }).catch(function (error) {
+                if (typeof console !== "undefined" && typeof console.error === "function") {
+                    console.error("Databasefoto's opslaan via Supabase mislukt:", error);
+                }
                 return { ok: false, error: error };
             });
         }

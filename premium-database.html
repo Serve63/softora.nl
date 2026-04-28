@@ -1606,7 +1606,7 @@
     <script src="assets/premium-database-photo-batch.js?v=20260427a"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
-    <script src="assets/premium-database-photo-storage.js?v=20260428b"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
     <script src="assets/premium-database-deep-search.js?v=20260428e"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
@@ -2630,16 +2630,16 @@
             if (!isValidWebsitePhotoDataUrl(original.dataUrl)) {
                 throw new Error("Dit afbeeldingsbestand kan niet worden opgeslagen.");
             }
-            if (original.dataUrl.length <= 1800000) return original;
+            if (original.dataUrl.length <= 700000) return original;
 
             try {
-                const ultra = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 2160, 3840, 0.9);
-                if (ultra.dataUrl.length <= 2200000) return ultra;
-                const high = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1600, 2400, 0.88);
-                if (high.dataUrl.length <= 1600000) return high;
-                const medium = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1200, 1800, 0.84);
-                if (medium.dataUrl.length <= 1000000) return medium;
-                return compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1024, 1536, 0.82);
+                const large = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1440, 2160, 0.86);
+                if (large.dataUrl.length <= 900000) return large;
+                const medium = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1200, 1800, 0.82);
+                if (medium.dataUrl.length <= 700000) return medium;
+                const compact = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 960, 1440, 0.78);
+                if (compact.dataUrl.length <= 520000) return compact;
+                return compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 768, 1152, 0.74);
             } catch (error) {
                 return original;
             }
