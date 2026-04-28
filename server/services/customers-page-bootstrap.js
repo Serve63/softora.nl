@@ -1,11 +1,18 @@
+const {
+  createPremiumCustomersRepository,
+} = require('../repositories/premium-customers-repository');
+
 function createCustomersPageBootstrapService(deps = {}) {
   const {
     getUiStateValues = async () => null,
+    setUiStateValues = async () => null,
     normalizeString = (value) => String(value || '').trim(),
     customerScope = 'premium_customers_database',
     customerKey = 'softora_customers_premium_v1',
     orderScope = 'premium_active_orders',
     orderKey = 'softora_custom_orders_premium_v1',
+    customerRepository = null,
+    createCustomerRepository = createPremiumCustomersRepository,
   } = deps;
 
   function normalizeDate(value) {
@@ -192,6 +199,54 @@ function createCustomersPageBootstrapService(deps = {}) {
     }
   }
 
+  function resolveCustomerRepository() {
+    if (customerRepository && typeof customerRepository.listCustomers === 'function') {
+      return customerRepository;
+    }
+
+    if (typeof createCustomerRepository !== 'function') return null;
+
+    return createCustomerRepository({
+      getUiStateValues,
+      setUiStateValues,
+      scope: customerScope,
+      key: customerKey,
+      customerScope,
+      customerKey,
+    });
+  }
+
+  async function readCustomersFromRepository() {
+    const repository = resolveCustomerRepository();
+    if (!repository || typeof repository.listCustomers !== 'function') return [];
+
+    try {
+      const result = await repository.listCustomers({
+        limit: 5000,
+        sortBy: 'naam',
+        sortDirection: 'asc',
+      });
+      const rows = Array.isArray(result)
+        ? result
+        : Array.isArray(result?.rows)
+          ? result.rows
+          : Array.isArray(result?.customers)
+            ? result.customers
+            : [];
+
+      return sortCustomers(
+        rows.map((item, index) =>
+          setExplicitResponsibleMetadata(
+            normalizeCustomer(item, `klant-repository-${index}`),
+            getResponsibleSourceValue(item)
+          )
+        )
+      );
+    } catch (_) {
+      return [];
+    }
+  }
+
   function parseOrders(raw) {
     try {
       const parsed = JSON.parse(String(raw || '[]'));
@@ -343,8 +398,11 @@ function createCustomersPageBootstrapService(deps = {}) {
   }
 
   async function buildCustomersBootstrapPayload() {
-    const remoteState = await getUiStateValues(customerScope);
-    const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
+    const repositoryCustomers = await readCustomersFromRepository();
+    const remoteState = repositoryCustomers.length ? null : await getUiStateValues(customerScope);
+    const remoteCustomers = repositoryCustomers.length
+      ? repositoryCustomers
+      : parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
     const orderState = await getUiStateValues(orderScope);
     const orders = parseOrders(orderState?.values?.[orderKey]);
 

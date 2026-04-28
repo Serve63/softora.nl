@@ -80,6 +80,9 @@ function createService(overrides = {}) {
           },
         };
       }
+      if (typeof overrides.onCustomerDbRead === 'function') {
+        overrides.onCustomerDbRead(scope);
+      }
       return {
         values: {
           softora_customers_premium_v1: JSON.stringify(rows),
@@ -112,6 +115,7 @@ function createService(overrides = {}) {
     anthropicApiBaseUrl: 'https://anthropic.example.test/v1',
     coldmailAutoReplyModel: 'claude-sonnet-4-6',
     coldmailAutoReplyEnabled: Boolean(overrides.coldmailAutoReplyEnabled),
+    customerRepository: overrides.customerRepository || null,
     resolveEmailDomain: async (domain) => {
       if (overrides.invalidDomains && overrides.invalidDomains.includes(domain)) return false;
       return true;
@@ -160,10 +164,63 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
   assert.equal(savedRows[0].status, 'gemaild');
   assert.equal(savedRows[0].databaseStatus, 'gemaild');
+  assert.equal(savedRows[0].hist.at(-1).type, 'gemaild');
+  assert.equal(savedRows[0].hist.at(-1).label, 'Mail verstuurd');
   assert.equal(savedRows[0].lastColdmailSentAt, '2026-04-24T12:00:00.000Z');
   assert.equal(savedRows[0].coldmailCampaignDurationDays, 14);
   assert.equal(savedRows[0].activeColdmailCampaignUntil, '2026-05-08T12:00:00.000Z');
   assert.equal(savedRows[1].status, 'klant');
+});
+
+test('coldmail campaign persists mailed rows through the customer repository seam first', async () => {
+  let rawCustomerReads = 0;
+  let bulkRows = null;
+  let bulkMeta = null;
+  const { service, sentMessages } = createService({
+    onCustomerDbRead: () => {
+      rawCustomerReads += 1;
+    },
+    customerRepository: {
+      listCustomers: async () => ({
+        rows: [
+          {
+            id: 'prospect-repo-1',
+            bedrijf: 'Repository Prospect',
+            naam: 'Ruben',
+            email: 'ruben@example.test',
+            telefoon: '+31 6 12345678',
+            status: 'prospect',
+            mail: true,
+          },
+        ],
+        total: 1,
+      }),
+      bulkUpsertCustomers: async (rows, meta) => {
+        bulkRows = rows;
+        bulkMeta = meta;
+        return { ok: true, count: 1, updated: 1 };
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+    actor: 'Serve',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.persisted, 1);
+  assert.equal(sentMessages[0].to, 'ruben@example.test');
+  assert.equal(rawCustomerReads, 0);
+  assert.equal(bulkRows.length, 1);
+  assert.equal(bulkRows[0].databaseStatus, 'gemaild');
+  assert.equal(bulkRows[0].hist.at(-1).type, 'gemaild');
+  assert.equal(bulkRows[0].hist.at(-1).source, 'coldmail-campaign');
+  assert.equal(bulkMeta.source, 'coldmail-campaign');
+  assert.equal(bulkMeta.actor, 'Serve');
 });
 
 test('coldmail campaign attaches webdesign photo inline and as attachment', async () => {
@@ -371,6 +428,74 @@ test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', asy
   assert.equal(sentMessages[0].inReplyTo, '<incoming-1@example.test>');
   assert.match(sentMessages[0].text, /Zullen we kort bellen/);
   assert.equal(Object.keys(getReplyState().processed).length, 1);
+});
+
+test('coldmail auto-reply matches inbound campaign replies through the customer repository seam first', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-repo@example.test>',
+    subject: 'Re: Nieuw webdesign gemaakt!',
+    text: 'Hoi, ik wil hier wel wat meer over weten.',
+    from: { value: [{ address: 'repo-prospect@example.test', name: 'Repo Prospect' }] },
+    to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
+    cc: { value: [] },
+    references: '<sent-repo@softora>',
+  };
+  let rawCustomerReads = 0;
+  const { service, sentMessages } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    anthropicApiKey: 'anthropic-secret',
+    coldmailAutoReplyEnabled: true,
+    rows: [],
+    onCustomerDbRead: () => {
+      rawCustomerReads += 1;
+    },
+    customerRepository: {
+      listCustomers: async () => ({
+        rows: [
+          {
+            id: 'repo-prospect',
+            bedrijf: 'Repository Prospect',
+            naam: 'Ruben',
+            email: 'repo-prospect@example.test',
+            status: 'gemaild',
+            databaseStatus: 'gemaild',
+            lastColdmailSentAt: '2026-04-24T12:00:00.000Z',
+            activeColdmailCampaignUntil: '2026-05-08T12:00:00.000Z',
+          },
+        ],
+        total: 1,
+      }),
+    },
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [1],
+      fetch: async function* () {
+        yield { uid: 1, source: 'raw-message', flags: new Set() };
+      },
+      messageFlagsAdd: async () => {},
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async (_url, request) => ({
+      response: { ok: true, status: 200 },
+      data: {
+        model: JSON.parse(request.body).model,
+        content: [{ type: 'text', text: 'Hoi, leuk dat je reageert. Ik licht het graag kort toe.' }],
+        usage: { input_tokens: 10, output_tokens: 12 },
+      },
+    }),
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+
+  assert.equal(result.replied, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'repo-prospect@example.test');
+  assert.equal(rawCustomerReads, 0);
 });
 
 test('coldmail campaign keeps MCV E-commerce reusable even after earlier mailed status', async () => {
