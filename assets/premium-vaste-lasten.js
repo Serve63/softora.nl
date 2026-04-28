@@ -275,7 +275,7 @@ function createLoadingCostRow() {
     content,
     'div',
     'cost-note',
-    'Je opgeslagen databasegegevens en actuele coldcalling-kosten worden opgehaald'
+    'Je opgeslagen databasegegevens en actuele verbruikskosten worden opgehaald'
   );
   row.appendChild(content);
   appendCostTextElement(row, 'div', 'cost-freq', '...');

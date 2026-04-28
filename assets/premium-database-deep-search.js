@@ -14,6 +14,8 @@
     const AUTO_CONTINUE_DELAY_MS = 750;
     const REQUIRED_EMPTY_COMPLETION_ROUNDS = 1;
     const DEEP_SEARCH_BUSY_STYLE_ID = "softora-deep-search-busy-style";
+    const DEFAULT_ROUND_MODE = "complete";
+    const ROUND_MODES = ["1", "3", "5", "complete"];
     // Generated from the supplied work order, extended with CBS 2025 woonplaatsen.
     const DEFAULT_TARGET_TEXT_BASE64 = [
         "TmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFsbWtlcmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFuZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBCYWJ5bG9uacOrbmJyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBEcm9uZ2VsZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IER1c3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgRWV0aGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBHZW5kZXJlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgR2llc3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgSGFuawpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTWVldXdlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTmlldXdlbmRpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFJpanN3aWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBTbGVldXdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFVpdHdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFZlZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdhYXJkaHVpemVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBXZXJrZW5kYW0KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdpamsgZW4gQWFsYnVyZwpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgV291ZHJpY2hlbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBBc3RlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBIZXVzZGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBc3RlbiB8IE9tbWVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCYWFybGUtTmFzc2F1IHwgQmFhcmxlLU5hc3NhdQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IENhc3RlbHLDqQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IFVsaWNvdGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEJlcmdlaWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEx1eWtzZ2VzdGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IFJpZXRob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VpamsgfCBXZXN0ZXJob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBCZXJnZW4gb3AgWm9vbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBIYWxzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcmdlbiBvcCBab29tIHwgTGVwZWxzdHJhYXQKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgSGVlc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IEhlZXN3aWprLURpbnRoZXIKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgTG9vc2Jyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IE5pc3RlbHJvZGUKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgVmlua2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IFZvcnN0ZW5ib3NjaApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVzdCB8IEJlc3QKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEJsYWRlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgQ2FzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEhhcGVydApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgSG9vZ2Vsb29uCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCbGFkZWwgfCBOZXRlcnNlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm9la2VsIHwgQm9la2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb2VrZWwgfCBWZW5ob3JzdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm94dGVsIHwgQm94dGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBFc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBMaWVtcGRlCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJhdmVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJyZWRhCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFByaW5zZW5iZWVrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFRldGVyaW5nZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJyZWRhIHwgVWx2ZW5ob3V0Ck5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLURvcnBsZWluCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLVNjaG9vdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQ3JhbmVuZG9uY2sgfCBHYXN0ZWwKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IENyYW5lbmRvbmNrIHwgTWFhcmhlZXplCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IFNvZXJlbmRvbmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IERldXJuZSB8IERldXJuZQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwgSGVsZW5hdmVlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwg",
@@ -157,9 +159,10 @@
         const style = doc.createElement("style");
         style.id = DEEP_SEARCH_BUSY_STYLE_ID;
         style.textContent = [
-            ".deep-search-modal.is-running .deep-search-close { cursor: wait; color: var(--crimson); background: rgba(139, 34, 82, 0.06); }",
+            ".deep-search-modal.is-running .deep-search-close { cursor: wait; color: var(--crimson); background: rgba(139, 34, 82, 0.06); pointer-events: none; position: absolute; }",
+            ".deep-search-modal.is-running .deep-search-close > * { visibility: hidden; }",
             ".deep-search-modal.is-running .deep-search-close svg { display: none; }",
-            ".deep-search-modal.is-running .deep-search-close::after { content: \"\"; width: 14px; height: 14px; border: 2px solid rgba(139, 34, 82, 0.18); border-top-color: var(--crimson); border-radius: 50%; animation: deepSearchSpin .8s linear infinite; }",
+            ".deep-search-modal.is-running .deep-search-close::after { content: \"\"; position: absolute; inset: 0; margin: auto; display: block; width: 16px; height: 16px; border: 2px solid rgba(139, 34, 82, 0.18); border-top-color: var(--crimson); border-radius: 50%; animation: deepSearchSpin .8s linear infinite; }",
             "@keyframes deepSearchSpin { to { transform: rotate(360deg); } }"
         ].join("\n");
         doc.head.appendChild(style);
@@ -210,6 +213,23 @@
             result.push(normalized.slice(0, 180));
         });
         return result.slice(0, maxItems || 200);
+    }
+
+    function normalizeRoundMode(value) {
+        const normalized = normalizeString(value).toLowerCase();
+        return ROUND_MODES.indexOf(normalized) !== -1 ? normalized : DEFAULT_ROUND_MODE;
+    }
+
+    function collectWebsitesFromRows(rows) {
+        if (!Array.isArray(rows) || rows.length < 2) return [];
+        const headers = Array.isArray(rows[0]) ? rows[0] : [];
+        const websiteIndex = headers.findIndex(function (header) {
+            return normalizeKey(header).replace(/[^a-z0-9]+/g, "") === "website";
+        });
+        const index = websiteIndex === -1 ? 4 : websiteIndex;
+        return rows.slice(1).map(function (row) {
+            return Array.isArray(row) ? row[index] : "";
+        });
     }
 
     function createTarget(label, index) {
@@ -293,6 +313,7 @@
             totalCostUsd: targets.reduce(function (sum, target) {
                 return sum + Math.max(0, Number(target.costUsd) || 0);
             }, 0),
+            roundMode: normalizeRoundMode(parsed.roundMode),
             updatedAt: normalizeString(parsed.updatedAt)
         };
     }
@@ -324,6 +345,9 @@
             ? 0
             : Math.max(0, Number(options.autoContinueDelayMs) || AUTO_CONTINUE_DELAY_MS);
         const getCustomers = options.getCustomers || function () { return []; };
+        const recordApiCost = typeof options.recordApiCost === "function"
+            ? options.recordApiCost
+            : function () { return Promise.resolve({ ok: true }); };
         const setStatusMessage = options.setStatusMessage || function () {};
         const toast = options.toast || function () {};
         let state = normalizeState({});
@@ -339,6 +363,7 @@
                 targets: state.targets,
                 activeIndex: state.activeIndex,
                 totalCostUsd: state.totalCostUsd,
+                roundMode: normalizeRoundMode(state.roundMode),
                 updatedAt: new Date().toISOString()
             });
         }
@@ -382,6 +407,11 @@
             ].forEach(function (button) {
                 if (button) button.disabled = busy;
             });
+            if (nodes.deepSearchRounds) {
+                Array.from(nodes.deepSearchRounds.querySelectorAll("[data-deep-rounds]")).forEach(function (button) {
+                    button.disabled = busy;
+                });
+            }
             if (nodes.deepSearchStartButton) {
                 nodes.deepSearchStartButton.textContent = busy ? "Batch loopt..." : "Batch starten";
             }
@@ -410,9 +440,21 @@
             }).join("");
         }
 
+        function renderRoundControls() {
+            if (!nodes.deepSearchRounds) return;
+            const mode = normalizeRoundMode(state.roundMode);
+            Array.from(nodes.deepSearchRounds.querySelectorAll("[data-deep-rounds]")).forEach(function (button) {
+                const active = normalizeRoundMode(button.getAttribute("data-deep-rounds")) === mode;
+                button.classList.toggle("is-active", active);
+                button.setAttribute("aria-pressed", active ? "true" : "false");
+                button.disabled = busy;
+            });
+        }
+
         function render() {
             const target = getCurrentTarget();
             const canSearchTarget = target && target.status !== "done";
+            renderRoundControls();
             if (nodes.deepSearchCurrent) {
                 nodes.deepSearchCurrent.textContent = canSearchTarget
                     ? "Nu: " + target.label
@@ -455,6 +497,7 @@
 
         function updateTargetAfterSearch(target, body, addedCount) {
             const businesses = Array.isArray(body.businesses) ? body.businesses : [];
+            const rows = Array.isArray(body.rows) ? body.rows : [];
             const costUsd = Math.max(0, Number(body && body.cost && body.cost.estimatedUsd) || 0);
             target.batches += 1;
             target.found += Math.max(0, Number(body.found) || 0);
@@ -469,6 +512,7 @@
                 .concat(businesses.map(function (business) {
                     return business && business.website;
                 }))
+                .concat(collectWebsitesFromRows(rows))
                 .concat(target.lastSources), 200);
             target.seen = uniqueStrings(target.seen.concat(businesses.map(function (business) {
                 return [
@@ -529,7 +573,23 @@
                         costUsd: Math.max(0, Number(body && body.cost && body.cost.estimatedUsd) || 0),
                         found: Math.max(0, Number(body.found) || 0)
                     };
-                    return persistState().then(function (persistResult) {
+                    const costLogPromise = recordApiCost({
+                        source: "premium-database-deep-search",
+                        label: target.label,
+                        amountUsd: result.costUsd,
+                        model: body && body.cost && body.cost.model,
+                        meta: {
+                            target: target.label,
+                            batchNumber: target.batches,
+                            found: result.found,
+                            added: result.addedCount
+                        }
+                    }).catch(function (error) {
+                        console.error("API-kosten opslaan mislukt:", error);
+                        return { ok: false, error: error };
+                    });
+                    return Promise.all([persistState(), costLogPromise]).then(function (results) {
+                        const persistResult = results[0];
                         return {
                             ...result,
                             persisted: Boolean(persistResult && persistResult.ok !== false)
@@ -541,7 +601,16 @@
 
         function runTargetUntilComplete(target) {
             const startedLabel = target.label;
+            const maxRounds = normalizeRoundMode(state.roundMode) === "complete" ? Infinity : Number(state.roundMode);
+            let roundsStarted = 0;
             function nextBatch() {
+                if (Number.isFinite(maxRounds) && roundsStarted >= maxRounds) {
+                    return persistState().then(function () {
+                        setStatusMessage("Ronde-limiet bereikt voor " + startedLabel + ". Start opnieuw voor extra rondes of kies Tot klaar.", "info", true);
+                        return false;
+                    });
+                }
+                roundsStarted += 1;
                 setStatusMessage("AI werkt " + startedLabel + " af. Ronde " + (target.batches + 1) + " loopt...", "info");
                 return runTargetBatch(target).then(function (result) {
                     render();
@@ -563,6 +632,12 @@
                             setStatusMessage(baseMessage + " Deze plaats is automatisch afgerond." + nextMessage, "success", true);
                             toast("Plek afgerond");
                             return true;
+                        });
+                    }
+                    if (Number.isFinite(maxRounds) && roundsStarted >= maxRounds) {
+                        return persistState().then(function () {
+                            setStatusMessage(baseMessage + " Ronde-limiet bereikt; de locatie blijft klaar voor een volgende start.", "info", true);
+                            return false;
                         });
                     }
                     return persistState().then(function () {
@@ -647,6 +722,15 @@
             if (nodes.deepSearchStartButton) {
                 nodes.deepSearchStartButton.addEventListener("click", function () {
                     void runCurrentSearch();
+                });
+            }
+            if (nodes.deepSearchRounds) {
+                nodes.deepSearchRounds.addEventListener("click", function (event) {
+                    const button = event.target.closest("[data-deep-rounds]");
+                    if (!button || busy) return;
+                    state.roundMode = normalizeRoundMode(button.getAttribute("data-deep-rounds"));
+                    render();
+                    void persistState();
                 });
             }
             if (nodes.closeDeepSearchButton) nodes.closeDeepSearchButton.addEventListener("click", close);

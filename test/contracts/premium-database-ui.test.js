@@ -27,6 +27,14 @@ function loadDatabaseDeepSearchClient(options = {}) {
   return sandbox.window.SoftoraDatabaseDeepSearch;
 }
 
+function loadDatabasePhotoStorageClient() {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const sandbox = { window: {} };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabasePhotoStorage;
+}
+
 function readDefaultDeepSearchTargetLines(source) {
   const match = source.match(/const DEFAULT_TARGET_TEXT_BASE64 = \[([\s\S]*?)\]\.join\(""\);/);
   assert.ok(match, 'DEFAULT_TARGET_TEXT_BASE64 should be present');
@@ -76,17 +84,22 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   );
   assert.match(pageSource, /const hadBootstrapCustomers = state\.klanten\.length > 0;/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
-  assert.match(pageSource, /function deriveCustomersFromOrders\(orders\)/);
+  assert.match(pageSource, /function isDerivedOrderPlaceholderCustomer\(customer\)/);
+  assert.match(pageSource, /customersBootstrapPayload && customersBootstrapPayload\.source\) === "orders"[\s\S]*return \[\];/);
 });
 
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const importScriptPath = path.join(__dirname, '../../assets/premium-database-import.js');
   const photoBatchScriptPath = path.join(__dirname, '../../assets/premium-database-photo-batch.js');
+  const apiCostLedgerScriptPath = path.join(__dirname, '../../assets/softora-api-cost-ledger.js');
+  const photoStorageScriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
   const deepSearchScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
   const photoBatchScriptSource = fs.readFileSync(photoBatchScriptPath, 'utf8');
+  const apiCostLedgerScriptSource = fs.readFileSync(apiCostLedgerScriptPath, 'utf8');
+  const photoStorageScriptSource = fs.readFileSync(photoStorageScriptPath, 'utf8');
   const deepSearchScriptSource = fs.readFileSync(deepSearchScriptPath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
@@ -185,14 +198,16 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function prepareWebsitePhotoForStorage\(dataUrl, fileName\)/);
   assert.match(pageSource, /function removeWebsitePhotoForCustomer\(customerId\)/);
   assert.match(pageSource, /websitePhoto: ""/);
-  assert.match(pageSource, /await persistCustomerPhotos\(state\.klanten\)/);
-  assert.match(pageSource, /function buildCustomerPhotoDataKey\(customerId\)/);
-  assert.match(pageSource, /function buildCustomerPhotoStorage\(customers\)/);
-  assert.match(pageSource, /photoKey \+ "_" \+ index/);
-  assert.match(pageSource, /chunkCount: chunks\.length/);
-  assert.match(pageSource, /function persistCustomerPhotos\(customers\)/);
+  assert.match(pageSource, /persistCustomerPhotos\(state\.klanten, \{ removeCustomerIds: \[customerId\] \}\)/);
+  assert.match(pageSource, /window\.SoftoraDatabasePhotoStorage\.createController\(\{/);
+  assert.match(photoStorageScriptSource, /function buildCurrentStorage\(customers\)/);
+  assert.match(photoStorageScriptSource, /photoKey \+ "_" \+ chunkIndex/);
+  assert.match(photoStorageScriptSource, /chunkCount: chunks\.length/);
+  assert.match(photoStorageScriptSource, /function mergePhotoMaps\(existing, current, removeIds\)/);
+  assert.match(pageSource, /function persistCustomerPhotos\(customers, options\)/);
   assert.match(pageSource, /function mergeCustomersWithPhotos\(customers, photoMap\)/);
-  assert.match(pageSource, /function loadCustomerPhotoMap\(\)/);
+  assert.match(pageSource, /function loadCustomerPhotoMap\(customers\)/);
+  assert.match(photoStorageScriptSource, /readChunkedData\(values, photoKey, 0\)/);
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 2160, 3840, 0\.9\)/);
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 1024, 1536, 0\.82\)/);
   assert.match(pageSource, /<div class="photo-preview" id="photoPreview"/);
@@ -210,7 +225,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260427h/);
+  assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428a/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428a/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -260,7 +277,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260427h"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428a"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -277,6 +294,11 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /<div class="modal-bg" id="deepSearchModal" aria-hidden="true">/);
   assert.doesNotMatch(pageSource, /id="deepSearchListInput"/);
   assert.match(pageSource, /id="deepSearchCost"/);
+  assert.match(pageSource, /id="deepSearchRounds"/);
+  assert.match(pageSource, /data-deep-rounds="1">1 ronde<\/button>/);
+  assert.match(pageSource, /data-deep-rounds="3">3 rondes<\/button>/);
+  assert.match(pageSource, /data-deep-rounds="5">5 rondes<\/button>/);
+  assert.match(pageSource, /data-deep-rounds="complete">Tot klaar<\/button>/);
   assert.match(pageSource, /id="deepSearchStartButton" type="button">Batch starten<\/button>/);
   assert.doesNotMatch(pageSource, /id="deepSearchStats"/);
   assert.doesNotMatch(pageSource, /deepSearchDoneButton/);
@@ -320,6 +342,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /count: DEEP_SEARCH_BATCH_SIZE/);
   assert.match(deepSearchScriptSource, /function runTargetBatch\(target\)/);
   assert.match(deepSearchScriptSource, /function runTargetUntilComplete\(target\)/);
+  assert.match(deepSearchScriptSource, /const ROUND_MODES = \["1", "3", "5", "complete"\];/);
+  assert.match(deepSearchScriptSource, /function normalizeRoundMode\(value\)/);
+  assert.match(deepSearchScriptSource, /function renderRoundControls\(\)/);
+  assert.match(deepSearchScriptSource, /Ronde-limiet bereikt/);
   assert.match(deepSearchScriptSource, /REQUIRED_EMPTY_COMPLETION_ROUNDS = 1/);
   assert.match(deepSearchScriptSource, /function isTargetCompletionConfirmed\(target, result\)/);
   assert.match(deepSearchScriptSource, /AI gaat automatisch door met dezelfde locatie/);
@@ -343,6 +369,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /Boolean\(body && body\.placeComplete\)/);
   assert.match(deepSearchScriptSource, /foundWebsites: \[\]/);
   assert.match(deepSearchScriptSource, /function uniqueWebsiteValues\(values, maxItems\)/);
+  assert.match(deepSearchScriptSource, /function collectWebsitesFromRows\(rows\)/);
   assert.match(deepSearchScriptSource, /target\.foundWebsites = uniqueWebsiteValues/);
   assert.match(deepSearchScriptSource, /Nog geen websites voor deze plek\./);
   assert.match(deepSearchScriptSource, /persisted: Boolean\(persistResult && persistResult\.ok !== false\)/);
@@ -354,6 +381,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /nodes\.deepSearchModal\.classList\.toggle\("is-running", busy\);/);
   assert.match(deepSearchScriptSource, /DEEP_SEARCH_BUSY_STYLE_ID/);
   assert.match(deepSearchScriptSource, /ensureBusyStyles\(\);/);
+  assert.match(deepSearchScriptSource, /\.deep-search-modal\.is-running \.deep-search-close > \* \{ visibility: hidden; \}/);
   assert.match(deepSearchScriptSource, /\.deep-search-modal\.is-running \.deep-search-close svg \{ display: none; \}/);
   assert.match(deepSearchScriptSource, /\.deep-search-modal\.is-running \.deep-search-close::after/);
   assert.match(deepSearchScriptSource, /@keyframes deepSearchSpin/);
@@ -363,6 +391,13 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(deepSearchScriptSource, /function markCurrentDone\(\)/);
   assert.doesNotMatch(deepSearchScriptSource, /resetState/);
   assert.match(deepSearchScriptSource, /source: "premium-database-deep-search"/);
+  assert.match(pageSource, /const API_COST_SCOPE = "premium_api_costs";/);
+  assert.match(pageSource, /function recordApiCostEvent\(event\)/);
+  assert.match(pageSource, /window\.SoftoraApiCostLedger\.createLedger\(\{/);
+  assert.match(apiCostLedgerScriptSource, /function createLedger\(options\)/);
+  assert.match(apiCostLedgerScriptSource, /source: "softora-api-cost-ledger"/);
+  assert.match(pageSource, /recordApiCost: recordApiCostEvent/);
+  assert.match(deepSearchScriptSource, /const recordApiCost = typeof options\.recordApiCost === "function"/);
   assert.match(importScriptSource, /function readRealBusinessRows\(query\)/);
   assert.match(importScriptSource, /fetch\("\/api\/premium-database\/add-real-businesses"/);
   assert.match(importScriptSource, /count: 100/);
@@ -398,7 +433,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /fetchUiStateSetWithFallback\(CUSTOMER_DB_SCOPE/);
   assert.match(pageSource, /source: "premium-database"/);
   assert.match(pageSource, /actor: "Premium database"/);
-  assert.match(pageSource, /Database-voorbeeld uit actieve opdrachten\. Voeg klanten toe om ze permanent op te slaan\./);
+  assert.doesNotMatch(pageSource, /Database-voorbeeld uit actieve opdrachten/);
   assert.doesNotMatch(pageSource, /await persistCustomerList\(importedCustomers\)/);
   assert.doesNotMatch(pageSource, /id="restoreKnownCustomersButton"/);
   assert.doesNotMatch(pageSource, /Vaste klanten herstellen/);
@@ -506,6 +541,48 @@ test('premium database deep search client keeps a clean ordered target list', ()
       'Nederland | Noord-Brabant | Altena | Woudrichem',
     ]
   );
+});
+
+test('premium database photo storage clears removed photo chunks so refresh cannot restore them', async () => {
+  const photoStorageClient = loadDatabasePhotoStorageClient();
+  const patches = [];
+  const controller = photoStorageClient.createController({
+    getUiState: async () => ({
+      values: {
+        photos: JSON.stringify({
+          customer1: {
+            id: 'customer1',
+            identityKey: 'identity:customer1',
+            photoKey: 'photo_customer1',
+            chunkCount: 2,
+            websitePhotoName: 'Websitefoto',
+          },
+        }),
+        photo_customer1_0: 'data:image/png;base64,AAA',
+        photo_customer1_1: 'BBB',
+      },
+    }),
+    setUiState: async (_scope, payload) => {
+      patches.push(payload.patch);
+      return { ok: true };
+    },
+    normalizeCustomer: (customer) => customer,
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    buildCustomerIdentityKey: (customer) => 'identity:' + customer.id,
+    formatDateForStorage: () => '2026-04-28',
+    scope: 'premium_database_photos',
+    key: 'photos',
+    dataPrefix: 'photo_',
+    chunkSize: 180000,
+  });
+
+  await controller.persist([{ id: 'customer1', websitePhoto: '' }], { removeCustomerIds: ['customer1'] });
+
+  assert.equal(patches.length, 1);
+  assert.equal(patches[0].photo_customer1_0, '');
+  assert.equal(patches[0].photo_customer1_1, '');
+  assert.equal(JSON.parse(patches[0].photos).customer1, undefined);
 });
 
 test('premium database deep search client finishes the current location automatically', async () => {

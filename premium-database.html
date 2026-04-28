@@ -1118,6 +1118,30 @@
             margin-bottom: 12px;
         }
 
+        .deep-search-rounds {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .deep-search-round {
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            background: var(--card);
+            color: var(--dark);
+            padding: 9px 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .deep-search-round.is-active {
+            border-color: var(--crimson);
+            background: rgba(139, 34, 82, 0.08);
+            color: var(--crimson);
+        }
+
         .deep-search-input {
             width: 100%;
             min-height: 112px;
@@ -1546,6 +1570,12 @@
             </div>
             <div class="deep-search-current" id="deepSearchCurrent">Geen huidige plek</div>
             <div class="deep-search-cost" id="deepSearchCost">Geschatte API-kosten: wordt berekend</div>
+            <div class="deep-search-rounds" id="deepSearchRounds" aria-label="Aantal rondes">
+                <button class="deep-search-round" type="button" data-deep-rounds="1">1 ronde</button>
+                <button class="deep-search-round" type="button" data-deep-rounds="3">3 rondes</button>
+                <button class="deep-search-round" type="button" data-deep-rounds="5">5 rondes</button>
+                <button class="deep-search-round is-active" type="button" data-deep-rounds="complete">Tot klaar</button>
+            </div>
             <div class="mbtns">
                 <button class="mbtn s" id="deepSearchStartButton" type="button">Batch starten</button>
             </div>
@@ -1575,7 +1605,9 @@
 
     <script src="assets/premium-database-photo-batch.js?v=20260427a"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
-    <script src="assets/premium-database-deep-search.js?v=20260427h"></script>
+    <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260428a"></script>
+    <script src="assets/premium-database-deep-search.js?v=20260428a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -1583,6 +1615,9 @@
         const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";
         const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";
         const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 * 1000;
+        const API_COST_SCOPE = "premium_api_costs";
+        const API_COST_KEY = "softora_api_cost_events_v1";
+        const API_COST_USD_TO_EUR_RATE = 0.93;
         const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";
         const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";
         const CUSTOMER_PHOTO_DATA_PREFIX = "softora_database_photo_data_v1_";
@@ -1611,8 +1646,8 @@
             orders: [],
             query: "",
             activeStatus: "alle",
-            sortKey: "updatedAt",
-            sortAsc: false,
+            sortKey: "manual",
+            sortAsc: true,
             openId: null,
             modalEditId: null,
             photoTargetId: null,
@@ -1669,6 +1704,7 @@
             deepSearchModal: document.getElementById("deepSearchModal"),
             deepSearchCurrent: document.getElementById("deepSearchCurrent"),
             deepSearchCost: document.getElementById("deepSearchCost"),
+            deepSearchRounds: document.getElementById("deepSearchRounds"),
             deepSearchStartButton: document.getElementById("deepSearchStartButton"),
             deepSearchList: document.getElementById("deepSearchList"),
             deepSearchSources: document.getElementById("deepSearchSources"),
@@ -1910,9 +1946,7 @@
         }
 
         function sortCustomers(list) {
-            return list.slice().sort(function (a, b) {
-                return a.bedrijf.localeCompare(b.bedrijf, "nl");
-            });
+            return list.slice();
         }
 
         function escapeHtml(value) {
@@ -1986,9 +2020,11 @@
             try {
                 const parsed = JSON.parse(String(raw || "[]"));
                 if (!Array.isArray(parsed)) return [];
-                return sortCustomers(parsed.map(function (item, index) {
+                return parsed.map(function (item, index) {
                     return normalizeCustomer(item, "customer-" + index);
-                }));
+                }).filter(function (customer) {
+                    return !isDerivedOrderPlaceholderCustomer(customer);
+                });
             } catch (error) {
                 return [];
             }
@@ -2046,34 +2082,14 @@
             };
         }
 
-        function deriveCustomersFromOrders(orders) {
-            const seen = new Map();
-
-            orders.forEach(function (order) {
-                const seed = buildDerivedCustomerSeedFromOrder(order);
-                const key = buildCustomerIdentityKey(seed);
-                if (!key || seen.has(key)) return;
-
-                seen.set(key, normalizeCustomer({
-                    id: "seed-" + (order.id || createId()),
-                    naam: seed.naam,
-                    bedrijf: seed.bedrijf,
-                    telefoon: seed.tel,
-                    email: seed.email,
-                    stad: seed.stad,
-                    website: order.title,
-                    status: order.paidAt || normalizeString(order.status).toLowerCase() === "betaald" ? "klant" : "benaderbaar",
-                    verantwoordelijk: seed.verantwoordelijk,
-                    updatedAt: order.paidAt || order.lastRunAt || formatDateForStorage(new Date()),
-                    hist: [{
-                        type: order.paidAt ? "klant" : "benaderbaar",
-                        label: order.paidAt ? "Geimporteerd als klant vanuit opdracht" : "Geimporteerd vanuit actieve opdracht",
-                        date: order.paidAt || order.lastRunAt || formatDateForStorage(new Date())
-                    }]
-                }, "seed-" + createId()));
-            });
-
-            return sortCustomers(Array.from(seen.values()));
+        function isDerivedOrderPlaceholderCustomer(customer) {
+            const id = normalizeString(customer && customer.id).toLowerCase();
+            const website = normalizeSearchValue(customer && (customer.website || customer.dom));
+            const email = normalizeString(customer && customer.email).toLowerCase();
+            return id.indexOf("seed-") === 0
+                || website.indexOf("website opdracht") !== -1
+                || website.indexOf("websiteopdracht") !== -1
+                || /@websiteopdrachtvo\.nl$/i.test(email);
         }
 
         function mergeCustomersWithResponsible(customers, orders) {
@@ -2103,24 +2119,29 @@
         }
 
         function resolveBootstrapCustomers() {
+            if (normalizeString(customersBootstrapPayload && customersBootstrapPayload.source) === "orders") return [];
             const rawCustomers = Array.isArray(customersBootstrapPayload && customersBootstrapPayload.customers)
                 ? customersBootstrapPayload.customers
                 : [];
 
-            return sortCustomers(rawCustomers.map(function (item, index) {
+            return rawCustomers.map(function (item, index) {
                 return normalizeCustomer(item, "bootstrap-" + index);
-            }));
+            }).filter(function (customer) {
+                return !isDerivedOrderPlaceholderCustomer(customer);
+            });
         }
 
         function serializeCustomerList(customers) {
-            return JSON.stringify(sortCustomers((customers || []).map(function (item, index) {
+            return JSON.stringify((customers || []).filter(function (item) {
+                return !isDerivedOrderPlaceholderCustomer(item);
+            }).map(function (item, index) {
                 const normalized = normalizeCustomer(item, "serialize-" + index);
                 return {
                     ...normalized,
                     websitePhoto: "",
                     websitePhotoName: ""
                 };
-            })));
+            }));
         }
 
         function customerListsDiffer(nextCustomers) {
@@ -2128,14 +2149,16 @@
         }
 
         function persistCustomerList(customers) {
-            const normalizedCustomers = sortCustomers(customers.map(function (item, index) {
+            const normalizedCustomers = customers.filter(function (item) {
+                return !isDerivedOrderPlaceholderCustomer(item);
+            }).map(function (item, index) {
                 const normalized = normalizeCustomer(item, "persist-" + index);
                 return {
                     ...normalized,
                     websitePhoto: "",
                     websitePhotoName: ""
                 };
-            }));
+            });
 
             return fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
                 patch: window.SoftoraDatabaseImport.buildChunkedStatePatch(CUSTOMER_DB_KEY, JSON.stringify(normalizedCustomers)),
@@ -2148,60 +2171,31 @@
             });
         }
 
-        function buildCustomerPhotoDataKey(customerId) {
-            return CUSTOMER_PHOTO_DATA_PREFIX + normalizeString(customerId).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 80);
+        const apiCostLedger = window.SoftoraApiCostLedger.createLedger({
+            getUiState: fetchUiStateGetWithFallback,
+            setUiState: fetchUiStateSetWithFallback,
+            scope: API_COST_SCOPE,
+            key: API_COST_KEY,
+            usdToEurRate: API_COST_USD_TO_EUR_RATE
+        });
+
+        function recordApiCostEvent(event) {
+            return apiCostLedger.record(event);
         }
 
-        function parseCustomerPhotoMap(raw, values) {
-            try {
-                const parsed = JSON.parse(String(raw || "{}"));
-                if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-                const stateValues = values && typeof values === "object" ? values : {};
-                Object.keys(parsed).forEach(function (key) {
-                    const item = parsed[key];
-                    if (!item || typeof item !== "object" || isValidWebsitePhotoDataUrl(item.websitePhoto)) return;
-                    const photoKey = normalizeString(item.photoKey);
-                    const chunkCount = Math.max(0, Math.min(80, Number(item.chunkCount || 0) || 0));
-                    if (!photoKey || !chunkCount) return;
-                    const dataUrl = Array.from({ length: chunkCount }, function (_, index) {
-                        return normalizeString(stateValues[photoKey + "_" + index]);
-                    }).join("");
-                    if (isValidWebsitePhotoDataUrl(dataUrl)) {
-                        item.websitePhoto = dataUrl;
-                    }
-                });
-                return parsed;
-            } catch (error) {
-                return {};
-            }
-        }
-
-        function buildCustomerPhotoStorage(customers) {
-            const photoMap = {};
-            const patch = {};
-            (customers || []).forEach(function (customer) {
-                const normalized = normalizeCustomer(customer, "photo-map");
-                if (!normalized.id || !shouldShowWebsitePhoto(normalized) || !isValidWebsitePhotoDataUrl(normalized.websitePhoto)) return;
-                const photoKey = buildCustomerPhotoDataKey(normalized.id);
-                const chunks = normalizeString(normalized.websitePhoto).match(new RegExp("[\\s\\S]{1," + CUSTOMER_PHOTO_CHUNK_SIZE + "}", "g")) || [];
-                chunks.forEach(function (chunk, index) {
-                    patch[photoKey + "_" + index] = chunk;
-                });
-                photoMap[normalized.id] = {
-                    id: normalized.id,
-                    identityKey: buildCustomerIdentityKey(normalized),
-                    photoKey: photoKey,
-                    chunkCount: chunks.length,
-                    websitePhotoName: normalized.websitePhotoName || "Websitefoto",
-                    updatedAt: normalized.updatedAt || formatDateForStorage(new Date())
-                };
-            });
-            patch[CUSTOMER_PHOTO_KEY] = JSON.stringify(photoMap);
-            return {
-                photoMap: photoMap,
-                patch: patch
-            };
-        }
+        const customerPhotoStorageController = window.SoftoraDatabasePhotoStorage.createController({
+            getUiState: fetchUiStateGetWithFallback,
+            setUiState: fetchUiStateSetWithFallback,
+            normalizeCustomer: normalizeCustomer,
+            shouldShowWebsitePhoto: shouldShowWebsitePhoto,
+            isValidWebsitePhotoDataUrl: isValidWebsitePhotoDataUrl,
+            buildCustomerIdentityKey: buildCustomerIdentityKey,
+            formatDateForStorage: formatDateForStorage,
+            scope: CUSTOMER_PHOTO_SCOPE,
+            key: CUSTOMER_PHOTO_KEY,
+            dataPrefix: CUSTOMER_PHOTO_DATA_PREFIX,
+            chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
+        });
 
         function mergeCustomersWithPhotos(customers, photoMap) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
@@ -2231,27 +2225,12 @@
             }));
         }
 
-        function loadCustomerPhotoMap() {
-            return fetchUiStateGetWithFallback(CUSTOMER_PHOTO_SCOPE).then(function (state) {
-                const values = state && state.values && typeof state.values === "object" ? state.values : {};
-                return parseCustomerPhotoMap(values[CUSTOMER_PHOTO_KEY], values);
-            }).catch(function (error) {
-                console.error("Databasefoto's laden via Supabase mislukt:", error);
-                return {};
-            });
+        function loadCustomerPhotoMap(customers) {
+            return customerPhotoStorageController.load(customers || state.klanten);
         }
 
-        function persistCustomerPhotos(customers) {
-            const photoStorage = buildCustomerPhotoStorage(customers);
-            return fetchUiStateSetWithFallback(CUSTOMER_PHOTO_SCOPE, {
-                patch: photoStorage.patch,
-                source: "premium-database-photos",
-                actor: "Premium database"
-            }).then(function () {
-                return { ok: true };
-            }).catch(function (error) {
-                return { ok: false, error: error };
-            });
+        function persistCustomerPhotos(customers, options) {
+            return customerPhotoStorageController.persist(customers, options);
         }
 
         function setStatusMessage(message, tone, autoClear) {
@@ -2313,6 +2292,7 @@
 
         function getSortedCustomers(customers) {
             const sorted = customers.slice();
+            if (state.sortKey === "manual") return sorted;
             sorted.sort(function (a, b) {
                 let left;
                 let right;
@@ -2736,7 +2716,7 @@
             renderPage();
             closeWebsitePhotoPreview();
 
-            const photoResult = await persistCustomerPhotos(state.klanten);
+            const photoResult = await persistCustomerPhotos(state.klanten, { removeCustomerIds: [customerId] });
             if (photoResult.ok) {
                 toast("Foto verwijderd");
                 setStatusMessage("Foto verwijderd.", "success", true);
@@ -2853,7 +2833,10 @@
 
                     return {
                         dataUrl: prepared.dataUrl,
-                        fileName: prepared.fileName
+                        fileName: prepared.fileName,
+                        costEur: Math.max(0, Number(payload && payload.cost && payload.cost.eur) || WEBSITE_PHOTO_COST_EUR),
+                        costUsd: Math.max(0, Number(payload && payload.cost && (payload.cost.usd || payload.cost.estimatedUsd)) || 0),
+                        model: normalizeString(payload && payload.model)
                     };
                 } catch (error) {
                     lastError = error;
@@ -2876,6 +2859,8 @@
 
                 let done = 0;
                 let failed = 0;
+                let apiCostEur = 0;
+                let apiCostUsd = 0;
                 let firstErrorMessage = "";
                 setStatusMessage("Webdesign foto's genereren voor " + targets.length + " bedrijf" + (targets.length === 1 ? "" : "ven") + "...", "info");
 
@@ -2883,6 +2868,8 @@
                     try {
                         setStatusMessage("Webdesign maken voor " + target.bedrijf + " (" + (done + failed + 1) + "/" + targets.length + ")...", "info");
                         const generated = await generateWebsitePhotoData(target);
+                        apiCostEur += Math.max(0, Number(generated.costEur) || 0);
+                        apiCostUsd += Math.max(0, Number(generated.costUsd) || 0);
                         state.klanten = sortCustomers(state.klanten.map(function (customer) {
                             if (customer.id !== target.id) return customer;
                             return {
@@ -2912,6 +2899,14 @@
                     setStatusMessage("AI-foto's staan in beeld, maar opslaan in Supabase mislukte.", "error");
                     return;
                 }
+
+                void recordApiCostEvent({
+                    source: "premium-database-webdesigns",
+                    label: done + " webdesign" + (done === 1 ? "" : "s") + " gemaakt",
+                    amountEur: apiCostEur,
+                    amountUsd: apiCostUsd,
+                    meta: { count: done }
+                });
 
                 toast(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen");
                 setStatusMessage(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen" + (failed ? ", " + failed + " mislukt." : "."), failed ? "info" : "success", true);
@@ -3056,7 +3051,7 @@
                 return Promise.resolve(false);
             }
 
-            state.klanten = sortCustomers(mergeResult.customers);
+            state.klanten = mergeResult.customers;
             renderPage();
 
             return persistCustomerList(state.klanten).then(function (result) {
@@ -3123,7 +3118,7 @@
                 updatedAt: formatDateForStorage(new Date())
             });
 
-            state.klanten = sortCustomers([customer].concat(state.klanten));
+            state.klanten = state.klanten.concat([customer]);
             renderPage();
             closeModal();
 
@@ -3245,7 +3240,7 @@
                         console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
                     }
 
-                    const photoMap = await loadCustomerPhotoMap();
+                    const photoMap = await loadCustomerPhotoMap(enrichedCustomers);
                     const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap);
 
                     if (customerListsDiffer(customersWithPhotos) || !hadBootstrapCustomers) {
@@ -3260,34 +3255,6 @@
                 }
             } catch (error) {
                 console.error("Klanten laden via Supabase mislukt:", error);
-            }
-
-            try {
-                const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
-                const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
-                state.orders = Array.isArray(orders) ? orders : [];
-                const importedCustomers = mergeCustomersWithPhotos(
-                    deriveCustomersFromOrders(orders),
-                    await loadCustomerPhotoMap()
-                );
-
-                if (customerListsDiffer(importedCustomers) || !hadBootstrapCustomers) {
-                    state.klanten = importedCustomers;
-                    renderPage();
-                } else {
-                    state.klanten = importedCustomers;
-                }
-
-                if (importedCustomers.length) {
-                    if (!hadBootstrapCustomers) {
-                        setStatusMessage("Database-voorbeeld uit actieve opdrachten. Voeg klanten toe om ze permanent op te slaan.", "info", true);
-                    } else {
-                        setStatusMessage("");
-                    }
-                    return;
-                }
-            } catch (error) {
-                console.error("Klanten importeren vanuit opdrachten mislukt:", error);
             }
 
             state.klanten = [];
@@ -3321,6 +3288,7 @@
             scope: CUSTOMER_DB_SCOPE,
             stateKey: CUSTOMER_DB_DEEP_SEARCH_KEY,
             importRows: importCustomersFromRows,
+            recordApiCost: recordApiCostEvent,
             getCustomers: function () {
                 return state.klanten;
             },
