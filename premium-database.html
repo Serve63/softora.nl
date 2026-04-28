@@ -1658,7 +1658,7 @@
                 return [];
             }
         }
-
+        function parseCustomersFromStateValues(values, key) { const stateValues = values && typeof values === "object" ? values : {}; const rawCustomers = parseCustomers(stateValues[key]); try { const meta = JSON.parse(normalizeString(stateValues[key + "_chunks_v1"]) || "{}"); const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0)); let raw = ""; for (let index = 0; index < count; index += 1) { const chunk = stateValues[key + "_chunk_" + index]; if (typeof chunk !== "string") return rawCustomers; raw += chunk; } const chunkedCustomers = parseCustomers(raw); return chunkedCustomers.length > rawCustomers.length ? chunkedCustomers : rawCustomers; } catch (error) { return rawCustomers; } }
         function parseOrders(raw) {
             try {
                 const parsed = JSON.parse(String(raw || "[]"));
@@ -1801,10 +1801,10 @@
                     websitePhotoName: ""
                 };
             }));
-
             return fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
                 patch: {
-                    [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers)
+                    [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers),
+                    [CUSTOMER_DB_KEY + "_chunks_v1"]: ""
                 },
                 source: "premium-database",
                 actor: "Premium database"
@@ -2948,10 +2948,9 @@
             if (!hadBootstrapCustomers) {
                 setStatusMessage("Database laden...", "info");
             }
-
             try {
                 const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
-                const remoteCustomers = parseCustomers(remoteState && remoteState.values && remoteState.values[CUSTOMER_DB_KEY]);
+                const remoteCustomers = parseCustomersFromStateValues(remoteState && remoteState.values, CUSTOMER_DB_KEY);
 
                 if (remoteCustomers.length) {
                     let enrichedCustomers = remoteCustomers;
