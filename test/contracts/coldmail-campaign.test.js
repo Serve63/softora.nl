@@ -166,6 +166,36 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[1].status, 'klant');
 });
 
+test('coldmail campaign replaces city variable with the recipient database location', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        stad: 'Dorpsstraat 1, 5061 AA Oisterwijk',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}\n\n📍 {{stad}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: '',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].text, /📍 Oisterwijk/);
+  assert.doesNotMatch(sentMessages[0].text, /\{\{stad\}\}/);
+  assert.doesNotMatch(sentMessages[0].text, /Haaren/);
+});
+
 test('coldmail campaign attaches webdesign photo inline and as attachment', async () => {
   const { service, sentMessages } = createService({
     rows: [
