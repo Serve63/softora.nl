@@ -26,6 +26,11 @@
             return dataPrefix + normalizeString(customerId).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 80);
         }
 
+        function normalizeIdSet(values) {
+            const ids = new Set((values || []).map(normalizeString).filter(Boolean));
+            return ids.size ? ids : null;
+        }
+
         function readChunkedData(values, photoKey, chunkCount) {
             const stateValues = values && typeof values === "object" ? values : {};
             const count = clampCount(chunkCount, 0);
@@ -91,11 +96,13 @@
             return result;
         }
 
-        function buildCurrentStorage(customers) {
+        function buildCurrentStorage(customers, onlyCustomerIds) {
+            const onlyIds = normalizeIdSet(onlyCustomerIds);
             const photoMap = {};
             const patch = {};
             (customers || []).forEach(function (customer, index) {
                 const normalized = normalizeCustomer(customer, "photo-map-" + index);
+                if (onlyIds && !onlyIds.has(normalized.id)) return;
                 if (!normalized.id || !shouldShowWebsitePhoto(normalized) || !isValidWebsitePhotoDataUrl(normalized.websitePhoto)) return;
                 const photoKey = buildDataKey(normalized.id);
                 const chunks = normalizeString(normalized.websitePhoto).match(new RegExp("[\\s\\S]{1," + chunkSize + "}", "g")) || [];
@@ -157,7 +164,7 @@
             return getUiState(scope).then(function (state) {
                 const values = state && state.values && typeof state.values === "object" ? state.values : {};
                 const existing = parsePhotoMap(values[key], values, customers);
-                const current = buildCurrentStorage(customers);
+                const current = buildCurrentStorage(customers, persistOptions && persistOptions.onlyCustomerIds);
                 const merged = mergePhotoMaps(existing, current.photoMap, persistOptions && persistOptions.removeCustomerIds);
                 const removalPatch = buildRemovalPatch(existing, persistOptions && persistOptions.removeCustomerIds);
                 return setUiState(scope, {

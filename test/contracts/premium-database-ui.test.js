@@ -200,7 +200,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /websitePhoto: ""/);
   assert.match(pageSource, /persistCustomerPhotos\(state\.klanten, \{ removeCustomerIds: \[customerId\] \}\)/);
   assert.match(pageSource, /window\.SoftoraDatabasePhotoStorage\.createController\(\{/);
-  assert.match(photoStorageScriptSource, /function buildCurrentStorage\(customers\)/);
+  assert.match(photoStorageScriptSource, /function normalizeIdSet\(values\)/);
+  assert.match(photoStorageScriptSource, /function buildCurrentStorage\(customers, onlyCustomerIds\)/);
+  assert.match(photoStorageScriptSource, /persistOptions && persistOptions\.onlyCustomerIds/);
   assert.match(photoStorageScriptSource, /photoKey \+ "_" \+ chunkIndex/);
   assert.match(photoStorageScriptSource, /chunkCount: chunks\.length/);
   assert.match(photoStorageScriptSource, /function mergePhotoMaps\(existing, current, removeIds\)/);
@@ -228,7 +230,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428a/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428b/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428c/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
@@ -239,7 +241,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /return isWebdesignPhotoEligible\(customer\);/);
   assert.match(pageSource, /Webdesign maken voor " \+ target\.bedrijf/);
   assert.doesNotMatch(pageSource, /AI-foto maken voor " \+ target\.bedrijf/);
-  assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten\);[\s\S]*if \(!photoResult\.ok\) throw new Error\("Webdesign gemaakt, maar opslaan in Supabase mislukte\."\);[\s\S]*done \+= 1;/);
+  assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten, \{ onlyCustomerIds: \[customerId\] \}\);/);
+  assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten, \{ onlyCustomerIds: \[target\.id\] \}\);[\s\S]*if \(!photoResult\.ok\) throw new Error\("Webdesign gemaakt, maar opslaan in Supabase mislukte\."\);[\s\S]*done \+= 1;/);
   assert.match(pageSource, /Geen AI-foto's opgeslagen: /);
   assert.match(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /company: customer\.bedrijf/);
@@ -586,6 +589,52 @@ test('premium database photo storage clears removed photo chunks so refresh cann
   assert.equal(patches[0].photo_customer1_0, '');
   assert.equal(patches[0].photo_customer1_1, '');
   assert.equal(JSON.parse(patches[0].photos).customer1, undefined);
+});
+
+test('premium database photo storage saves one changed photo without resending old chunks', async () => {
+  const photoStorageClient = loadDatabasePhotoStorageClient();
+  const patches = [];
+  const controller = photoStorageClient.createController({
+    getUiState: async () => ({
+      values: {
+        photos: JSON.stringify({
+          customer1: {
+            id: 'customer1',
+            identityKey: 'identity:customer1',
+            photoKey: 'photo_customer1',
+            chunkCount: 1,
+            websitePhotoName: 'Websitefoto oud',
+          },
+        }),
+        photo_customer1_0: 'data:image/png;base64,AAA',
+      },
+    }),
+    setUiState: async (_scope, payload) => {
+      patches.push(payload.patch);
+      return { ok: true };
+    },
+    normalizeCustomer: (customer) => customer,
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    buildCustomerIdentityKey: (customer) => 'identity:' + customer.id,
+    formatDateForStorage: () => '2026-04-28',
+    scope: 'premium_database_photos',
+    key: 'photos',
+    dataPrefix: 'photo_',
+    chunkSize: 180000,
+  });
+
+  await controller.persist([
+    { id: 'customer1', websitePhoto: 'data:image/png;base64,AAA', websitePhotoName: 'Websitefoto oud' },
+    { id: 'customer2', websitePhoto: 'data:image/png;base64,BBB', websitePhotoName: 'Websitefoto nieuw' },
+  ], { onlyCustomerIds: ['customer2'] });
+
+  assert.equal(patches.length, 1);
+  assert.equal(patches[0].photo_customer1_0, undefined);
+  assert.equal(patches[0].photo_customer2_0, 'data:image/png;base64,BBB');
+  const storedMap = JSON.parse(patches[0].photos);
+  assert.equal(storedMap.customer1.photoKey, 'photo_customer1');
+  assert.equal(storedMap.customer2.photoKey, 'photo_customer2');
 });
 
 test('premium database deep search client finishes the current location automatically', async () => {

@@ -1606,7 +1606,7 @@
     <script src="assets/premium-database-photo-batch.js?v=20260427a"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
-    <script src="assets/premium-database-photo-storage.js?v=20260428a"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260428b"></script>
     <script src="assets/premium-database-deep-search.js?v=20260428c"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
@@ -2688,7 +2688,7 @@
                 }));
                 renderPage();
 
-                const photoResult = await persistCustomerPhotos(state.klanten);
+                const photoResult = await persistCustomerPhotos(state.klanten, { onlyCustomerIds: [customerId] });
                 if (photoResult.ok) {
                     toast("Foto opgeslagen");
                     setStatusMessage("Foto opgeslagen.", "success", true);
@@ -2882,7 +2882,7 @@
                             };
                         }));
                         renderPage();
-                        const photoResult = await persistCustomerPhotos(state.klanten);
+                        const photoResult = await persistCustomerPhotos(state.klanten, { onlyCustomerIds: [target.id] });
                         if (!photoResult.ok) throw new Error("Webdesign gemaakt, maar opslaan in Supabase mislukte.");
                         done += 1;
                     } catch (error) {
