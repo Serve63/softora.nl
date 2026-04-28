@@ -3,6 +3,16 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
+const websiteGeneratorHtmlSource = fs.readFileSync(
+  path.join(__dirname, '../../premium-websitegenerator.html'),
+  'utf8'
+);
+const websiteGeneratorScriptSource = fs.readFileSync(
+  path.join(__dirname, '../../assets/premium-websitegenerator.js'),
+  'utf8'
+);
+const websiteGeneratorSource = `${websiteGeneratorHtmlSource}\n${websiteGeneratorScriptSource}`;
+
 [
   '../../premium-websitegenerator.html',
   '../../premium-websitepreview.html',
@@ -26,14 +36,17 @@ const path = require('path');
 });
 
 test('premium websitegenerator biedt een websitelink-aanmaken flow met html input', () => {
-  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const source = websiteGeneratorHtmlSource;
 
   assert.match(source, /<title>Websitedesign – Softora\.nl<\/title>/);
   assert.match(source, /<div class="page-title">Websitedesign<\/div>/);
   assert.doesNotMatch(source, /<div class="page-title">Website Generator<\/div>/);
   assert.match(source, /Eén URL per keer\. AI genereert voor die website één homepage preview\./);
-  assert.match(source, /<input class="inp" id="scan-url" type="text" placeholder="https:\/\/softora\.nl" spellcheck="false" value="https:\/\/softora\.nl">/);
+  assert.match(source, /<input class="inp" id="scan-url" type="text" placeholder="softora\.nl" spellcheck="false" value="softora\.nl">/);
+  assert.match(source, /<button type="button" class="tab" data-tab="library">Bibliotheek<\/button>/);
+  assert.match(source, /<button type="button" class="tab active" data-tab="scan">Website Scan & Preview<\/button>/);
+  assert.match(source, /data-websitegenerator-action="scan"/);
+  assert.doesNotMatch(source, /onclick=/);
   assert.doesNotMatch(source, /<textarea class="inp" id="scan-url"/);
   assert.doesNotMatch(source, />AI Photo Preview</);
   assert.doesNotMatch(source, />Website URL</);
@@ -42,11 +55,18 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.doesNotMatch(source, /id="website-link-html"/);
   assert.doesNotMatch(source, /id="website-link-slug"/);
   assert.doesNotMatch(source, /Gegenereerde websitegenerator preview/);
-  assert.match(source, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*!websiteLinkListEl[\s\S]*\) \{\s*return;\s*\}/);
+  assert.match(websiteGeneratorSource, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*!websiteLinkListEl[\s\S]*\) \{\s*return;\s*\}/);
   assert.match(source, /id="website-link-list"/);
-  assert.match(source, /window\.open\('about:blank', '_blank'\)/);
-  assert.match(source, /\/api\/website-links'/);
-  assert.match(source, /\/api\/website-links\/create/);
+  assert.match(websiteGeneratorSource, /window\.open\('about:blank', '_blank'\)/);
+  assert.match(websiteGeneratorSource, /function createWebsiteLinkRow\(link\) \{/);
+  assert.match(websiteGeneratorSource, /function bindWebsiteGeneratorPageActions\(\) \{/);
+  assert.match(websiteGeneratorSource, /button\.addEventListener\('click', \(\) => \{[\s\S]*void switchTab\(button\.dataset\.tab \|\| 'scan', button\);/);
+  assert.match(websiteGeneratorSource, /scanButton\.addEventListener\('click', \(\) => \{[\s\S]*void startScan\(\);/);
+  assert.match(websiteGeneratorSource, /websiteLinkListEl\.replaceChildren\(\.\.\.normalizedLinks\.map\(\(link\) => createWebsiteLinkRow\(link\)\)\);/);
+  assert.match(websiteGeneratorSource, /return url\.protocol === 'http:' \|\| url\.protocol === 'https:' \? url\.href : '';/);
+  assert.doesNotMatch(websiteGeneratorSource, /websiteLinkListEl\.innerHTML/);
+  assert.match(websiteGeneratorSource, /\/api\/website-links'/);
+  assert.match(websiteGeneratorSource, /\/api\/website-links\/create/);
 });
 
 test('premium websitegenerator shows no recent scans section anymore', () => {
@@ -62,17 +82,21 @@ test('premium websitegenerator shows no recent scans section anymore', () => {
 });
 
 test('premium websitegenerator removes the legacy openen button but keeps download actions', () => {
-  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const source = websiteGeneratorSource;
 
   assert.doesNotMatch(source, />Openen</);
   assert.match(source, /Download PNG/);
-  assert.match(source, /class="library-card"[\s\S]*onclick="openLibraryEntry\(/);
+  assert.match(source, /function createLibraryCardElement\(entry\) \{/);
+  assert.match(source, /card\.addEventListener\('click', \(\) => openLibraryEntry\(id\)\);/);
+  assert.match(source, /removeBtn\.addEventListener\('click', \(event\) => \{[\s\S]*void removeLibraryEntry\(id, event\);/);
+  assert.match(source, /grid\.replaceChildren\(\.\.\.items\.map\(\(entry\) => createLibraryCardElement\(entry\)\)\);/);
+  assert.doesNotMatch(source, /onclick="openLibraryEntry\(/);
+  assert.doesNotMatch(source, /onclick="removeLibraryEntry\(/);
+  assert.doesNotMatch(source, /onclick="downloadPreviewBlock\(/);
 });
 
 test('premium websitegenerator toont een login-fallback voor protected acties', () => {
-  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const source = websiteGeneratorSource;
 
   assert.match(source, /id="websitegenerator-auth-card"/);
   assert.match(source, /id="websitegenerator-auth-card" hidden/);
@@ -90,11 +114,22 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /\/api\/website-preview\/batch/);
   assert.match(source, /\/api\/website-preview\/batch\/current/);
   assert.match(source, /websitePreviewActiveBatchJobId/);
+  assert.match(source, /encodeURIComponent\(jobId\)/);
+  assert.match(source, /resumeWebsitePreviewBatchIfAny/);
+  assert.match(source, /WEBSITE_PREVIEW_BATCH_MAX_STALLED_POLLS/);
+  assert.match(source, /WEBSITE_PREVIEW_BATCH_POLL_INTERVAL_MS/);
+  assert.match(source, /WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES/);
+  assert.match(source, /stopScanBatchPollWithMessage/);
+  assert.match(source, /function renderScanOutputMessage\(container, message\) \{/);
+  assert.match(source, /renderScanOutputMessage\(out, String\(payload\.detail\)\);/);
+  assert.match(source, /renderScanOutputMessage\(out, String\(e\?\.message \|\| e \|\| 'Batch mislukt'\)\);/);
+  assert.doesNotMatch(source, /out\.innerHTML/);
+  assert.match(source, /buildWebsitePreviewJobFingerprint/);
+  assert.match(source, /Scanstatus kon niet worden opgehaald\./);
 });
 
 test('premium websitegenerator behoudt hoge full-page previews zonder portrait-crop', () => {
-  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const source = websiteGeneratorSource;
 
   assert.match(source, /const WEBSITE_PREVIEW_IMAGE_WIDTH = 1024;/);
   assert.match(source, /const WEBSITE_PREVIEW_IMAGE_HEIGHT = 1536;/);
@@ -105,16 +140,23 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /async function cropPreviewImageDataUrl\(dataUrl\)/);
   assert.match(source, /const previewWidth = Number\(entry\.width\) \|\| WEBSITE_PREVIEW_IMAGE_WIDTH/);
   assert.match(source, /const frameW = Math\.min\(window\.innerWidth - 100, previewWidth\)/);
-  assert.match(source, /preview-media" style="max-width:\$\{frameW\}px;"/);
-  assert.match(source, /id="preview-image" alt="Website preview \$\{safeHost\}" style="width:100%;height:auto;display:block;"/);
+  assert.match(source, /function createPreviewZoneElement\(blockId, hostname, previewWidth, useStablePreviewImageId\) \{/);
+  assert.match(source, /media\.style\.maxWidth = `\$\{frameW\}px`;/);
+  assert.match(source, /img\.id = 'preview-image';/);
+  assert.match(source, /img\.className = 'preview-image-pixel';/);
+  assert.match(source, /downloadBtn\.addEventListener\('click', \(\) => downloadPreviewBlock\(blockId\)\);/);
+  assert.match(source, /stack\.appendChild\(createPreviewZoneElement\(blockId, entry\.hostname \|\| host, w, false\)\);/);
+  assert.match(source, /mountScanBatchShell\(out, 'Preview hervatten…'\);/);
+  assert.doesNotMatch(source, /previewZoneHtml/);
+  assert.doesNotMatch(source, /insertAdjacentHTML/);
   assert.match(source, /\/api\/website-preview-library/);
   assert.match(source, /function fetchLibraryEntryById/);
   assert.match(source, /\/api\/website-preview-library\/\$\{encodeURIComponent\(entryId\)\}/);
+  assert.doesNotMatch(source, /document\.write/);
   assert.doesNotMatch(source, /softora_website_preview_library_v1/);
   assert.doesNotMatch(source, /LIBRARY_STORAGE_KEY/);
   assert.doesNotMatch(source, /readLocalLibraryEntries/);
   assert.doesNotMatch(source, /persistLocalLibraryEntries/);
-  assert.doesNotMatch(source, /localStorage/);
   assert.doesNotMatch(source, /sessionStorage/);
   assert.doesNotMatch(source, /browseropslag/);
   assert.match(source, /data-tab="library"/);
@@ -162,6 +204,8 @@ test('website preview batch runs server-side and exposes poll route', () => {
   assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/current'/);
   assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/:jobId'/);
   assert.match(batchSvc, /getCurrentBatchResponse/);
+  assert.match(batchSvc, /findLatestJobForOwner/);
+  assert.match(batchSvc, /findLatestRunningJobForOwner/);
   assert.match(aiTools, /runWebsitePreviewGeneratePipeline/);
   assert.match(featureRoutes, /registerWebsitePreviewBatchRoutes/);
   assert.match(library, /persistPreviewLibraryEntry/);

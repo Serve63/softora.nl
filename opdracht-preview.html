@@ -66,22 +66,5 @@
     <p>Deze preview is hier niet beschikbaar. Ga terug naar Actieve Opdrachten en open het dossier vanuit de premium omgeving.</p>
     <a href="/actieve-opdrachten">Terug naar Actieve Opdrachten</a>
   </div>
-
-  <script>
-    (function () {
-      const PREVIEW_HTML_PREFIX = 'softora_preview_html_software_v2_';
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get('id');
-      if (!id) return;
-
-      const html = null;
-      if (!html) return;
-
-      // Replace the whole document with the generated preview HTML.
-      document.open();
-      document.write(html);
-      document.close();
-    })();
-  </script>
 </body>
 </html>

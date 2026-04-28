@@ -229,9 +229,9 @@ nav {
   <div class="overlay-logo">Binnenkort beschikbaar</div>
   <div class="login-box">
     <div class="login-label">Toegangscode</div>
-    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" autocomplete="off" onkeydown="if(event.key==='Enter')login()">
+    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" autocomplete="off" data-public-lock-input>
     <div class="login-error" id="login-error"></div>
-    <button type="button" class="login-btn" onclick="login()">Doorgaan</button>
+    <button type="button" class="login-btn" data-public-lock-submit>Doorgaan</button>
   </div>
 </div>
 
@@ -340,29 +340,11 @@ nav {
     <div class="contact-strip-sub">Neem gerust contact op — vrijblijvend en gratis.</div>
   </div>
   <div class="contact-strip-right">
-    <a class="btn btn-outline" href="tel:+31629917185">+31 6 2991 7185</a>
+    <a class="btn btn-outline" href="tel:+31643262792">+31 6 43 26 27 92</a>
     <a class="btn btn-solid" href="mailto:info@softora.nl">Stuur een bericht</a>
   </div>
 </div>
 
-<script>
-const CODE = 'Andre2Fritz2!';
-
-if (sessionStorage.getItem('cs-auth') === '1') {
-  document.getElementById('overlay').style.display = 'none';
-}
-
-function login() {
-  const val = document.getElementById('code-inp').value;
-  if (val === CODE) {
-    sessionStorage.setItem('cs-auth', '1');
-    document.getElementById('overlay').style.display = 'none';
-  } else {
-    document.getElementById('login-error').textContent = 'Onjuiste code, probeer opnieuw.';
-    document.getElementById('code-inp').value = '';
-    document.getElementById('code-inp').focus();
-  }
-}
-</script>
+<script src="assets/premium-public-lock.js?v=20260427a" defer></script>
 </body>
 </html>

@@ -293,6 +293,22 @@ const largeInlineScriptViolations = changedFiles
   })
   .filter(Boolean);
 
+const oversizedFrontendLineLimit = Number(process.env.GUARDRAILS_MAX_FRONTEND_FILE_LINES || 1200);
+const oversizedFrontendNetGrowthLimit = Number(process.env.GUARDRAILS_MAX_OVERSIZED_FRONTEND_NET_GROWTH || 0);
+const oversizedFrontendGrowthViolations = changedFiles
+  .filter(isFrontendProductionPath)
+  .map((filePath) => {
+    const lineCount = readRepoFileLineCount(filePath);
+    if (lineCount <= oversizedFrontendLineLimit) return '';
+    const diffArgs = getDiffArgsForPath(filePath);
+    const diffText = diffArgs ? tryRunGit(diffArgs) : '';
+    const counts = countDiffLines(diffText);
+    const netGrowth = counts.additions - counts.deletions;
+    if (netGrowth <= oversizedFrontendNetGrowthLimit) return '';
+    return `${filePath} (${lineCount} regels; netto +${netGrowth}; limiet ${oversizedFrontendLineLimit} regels en max +${oversizedFrontendNetGrowthLimit})`;
+  })
+  .filter(Boolean);
+
 function diffTouchesPremiumShell(filePath) {
   const normalized = normalizeRepoPath(filePath);
   if (isProtectedFrontendShellPath(normalized)) return true;
@@ -331,6 +347,7 @@ const violations = buildGuardrailViolations({
   browserStorageViolations,
   testWeakeningViolations,
   largeInlineScriptViolations,
+  oversizedFrontendGrowthViolations,
   protectedFrontendShellFiles,
   protectedQualityGateFiles,
   qualityBaselineViolations: getQualityBaselineViolations(),
@@ -344,6 +361,7 @@ const violations = buildGuardrailViolations({
   allowBrowserStorage: toBooleanEnv('ALLOW_BROWSER_STORAGE'),
   allowTestWeakening: toBooleanEnv('ALLOW_TEST_WEAKENING'),
   allowLargeInlineScript: toBooleanEnv('ALLOW_LARGE_INLINE_SCRIPT'),
+  allowOversizedFrontendGrowth: toBooleanEnv('ALLOW_OVERSIZED_FRONTEND_GROWTH'),
   allowUntestedShellChange: toBooleanEnv('ALLOW_UNTESTED_SHELL_CHANGE'),
   allowUntestedQualityGateChange: toBooleanEnv('ALLOW_UNTESTED_QUALITY_GATE_CHANGE'),
   allowLargeBehaviorChange: toBooleanEnv('ALLOW_LARGE_BEHAVIOR_CHANGE'),

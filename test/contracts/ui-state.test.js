@@ -17,6 +17,7 @@ function createFixture(overrides = {}) {
     getSupabaseClient: () => overrides.client || null,
     supabaseStateTable: 'app_state',
     uiStateReadTimeoutMs: overrides.uiStateReadTimeoutMs,
+    uiStateReadTimeoutMsByScope: overrides.uiStateReadTimeoutMsByScope,
     fetchSupabaseRowByKeyViaRest: async (rowKey, columns) => {
       restReads.push({ rowKey, columns });
       if (overrides.fetchResult && typeof overrides.fetchResult.then === 'function') {
@@ -208,4 +209,36 @@ test('ui-state store serves in-memory values when remote reads time out', async 
     loggerCalls.some((args) => args[0] === '[UI State][Supabase][GetTimeout]'),
     true
   );
+});
+
+test('ui-state store supports a longer read timeout for heavy photo scopes', async () => {
+  const { store } = createFixture({
+    uiStateReadTimeoutMs: 1,
+    uiStateReadTimeoutMsByScope: {
+      premium_database_photos: 30,
+    },
+    fetchResult: new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          ok: true,
+          body: {
+            payload: {
+              values: {
+                photos: 'saved',
+              },
+            },
+            updated_at: '2026-04-28T12:00:00.000Z',
+          },
+        });
+      }, 8);
+    }),
+  });
+
+  const state = await store.getUiStateValues('premium_database_photos');
+
+  assert.deepEqual(state, {
+    values: { photos: 'saved' },
+    updatedAt: '2026-04-28T12:00:00.000Z',
+    source: 'supabase',
+  });
 });

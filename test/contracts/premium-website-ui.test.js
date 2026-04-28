@@ -8,6 +8,10 @@ test('premium website over-ons paneel gebruikt dezelfde accentrand-taal als wat 
   const source = fs.readFileSync(filePath, 'utf8');
 
   assert.match(source, /<div class="content-side about-panel fade-up">/);
+  assert.ok(
+    source.includes('/assets/home-over-office-meeting-ai.jpg'),
+    'Nieuwe AI-gegenereerde bureau-aanpak foto moet in de pagina staan'
+  );
   assert.match(source, /Vanuit Oisterwijk werken wij voor ambitieuze bedrijven door heel Nederland\./);
   assert.doesNotMatch(source, /Vanuit Tilburg werken wij voor ambitieuze bedrijven door heel Nederland\./);
   assert.match(
@@ -55,10 +59,10 @@ test('premium website laat werkwijze titel natuurlijk wrappen op mobiel', () => 
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
-  assert.match(
-    source,
-    /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title\s*\{[\s\S]*max-width:\s*100%;[\s\S]*margin:\s*0\.75rem 0 1\.25rem !important;[\s\S]*font-size:\s*clamp\(1\.75rem,\s*8vw,\s*2\.35rem\) !important;/
-  );
+    assert.match(
+      source,
+      /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title\s*\{[\s\S]*max-width:\s*100%;[\s\S]*margin:\s*0\.75rem 0 1\.25rem !important;[\s\S]*font-size:\s*clamp\(2\.2rem,\s*10vw,\s*3\.1rem\) !important;/
+    );
   assert.match(
     source,
     /@media \(max-width: 768px\) \{[\s\S]*\.werkwijze-title-line,[\s\S]*\.werkwijze-lancering\s*\{[\s\S]*display:\s*block;[\s\S]*white-space:\s*normal;/
@@ -223,7 +227,21 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.match(source, /\.footer-grid\s*\{[\s\S]*grid-template-columns:\s*2fr 1fr 1fr;/s);
   assert.match(source, /\.footer-logo\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;/s);
   assert.match(source, /<div class="footer-copy">© 2026 <span>Softora\.nl<\/span> - Alle rechten voorbehouden<\/div>/);
-  assert.match(source, /<a href="#contact" class="magnetic-btn magnetic">Start Project<\/a>/);
+  assert.match(
+    source,
+    /<a href="https:\/\/wa\.me\/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic">Start Project<\/a>/
+  );
+});
+
+test('premium website verbergt de personeel-link op mobiel in de footer', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<a href="\/premium-personeel-login\?logout=1">Personeel<\/a>/);
+  assert.match(
+    source,
+    /@media \(max-width: 768px\)\s*\{[\s\S]*\.footer-legal a\[href\*="premium-personeel-login"\]\s*\{\s*display:\s*none;\s*\}/
+  );
 });
 
 test('premium website houdt footer-links direct klikbaar door footer buiten content-visibility defer te houden', () => {
@@ -274,7 +292,10 @@ test('premium website hero gebruikt lokaal gegenereerde studiofotografie met don
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
-  assert.match(source, /<div class="nav-links">\s*<a href="#contact" class="magnetic-btn magnetic nav-start-btn"[\s\S]*Start Project<\/a>\s*<\/div>/);
+  assert.match(
+    source,
+    /<div class="nav-links">\s*<a href="https:\/\/wa\.me\/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic nav-start-btn"[\s\S]*Start Project<\/a>\s*<\/div>/
+  );
   assert.match(source, /@media \(max-width: 1024px\) \{[\s\S]*\.nav-start-btn \{\s*display:\s*none !important;\s*\}/);
   assert.match(
     source,
@@ -316,4 +337,74 @@ test('premium website whatsapp-widget gebruikt een verfijnde stijl en opent het 
   );
   assert.doesNotMatch(source, /wa\.me\/31643262792\?text=/);
   assert.match(source, /aria-label="Open WhatsApp chat met Softora op \+31 6 43 26 27 92"/);
+});
+
+test('fonts stylesheet gebruikt font-display: block voor stabiele eerste rendering', () => {
+  const filePath = path.join(__dirname, '../../assets/fonts.css');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.doesNotMatch(source, /font-display:\s*swap;/);
+  assert.match(source, /font-display:\s*block;/);
+});
+
+test('premium homepage preloads lokaal gebruikte fonts voor eenduidige eerste paint', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(
+    source,
+    /<link rel="preload" href="\/assets\/fonts\/inter-latin\.woff2\?v=20260409a" as="font" type="font\/woff2" crossorigin="anonymous">/
+  );
+  assert.match(
+    source,
+    /<link rel="preload" href="\/assets\/fonts\/oswald-latin\.woff2\?v=20260409a" as="font" type="font\/woff2" crossorigin="anonymous">/
+  );
+});
+
+test('premium homepage gebruikt thema-kleur die matcht met de mobiele headertint', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<meta name="theme-color" content="#f8f7f4">/);
+  assert.match(
+    source,
+    /<meta name="theme-color" media="\(prefers-color-scheme: light\)" content="#f8f7f4">/
+  );
+});
+
+test('premium homepage start- en offerteknoppen starten een WhatsApp-chat', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  const ctaWhatsappCount = (source.match(/href="https:\/\/wa\.me\/31643262792"/g) || []).length;
+  assert.equal(ctaWhatsappCount, 7);
+
+  const startProjectCount = (source.match(/>Start Project<\/a>/g) || []).length;
+  assert.equal(startProjectCount, 2);
+
+  const nodigCount = (source.match(/>Dit heb ik nodig<\/a>/g) || []).length;
+  assert.equal(nodigCount, 4);
+
+  assert.match(
+    source,
+    /<a href="https:\/\/wa\.me\/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig<\/a>/
+  );
+});
+
+test('premium homepage heeft een werkende cookie melding', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<div class="cookie-consent" id="cookieConsent" role="dialog" aria-labelledby="cookie-consent-title" hidden>/);
+  assert.match(source, /<div class="cookie-consent-title" id="cookie-consent-title">Cookies op Softora\.nl<\/div>/);
+  assert.match(source, /data-cookie-choice="declined"[\s\S]*Weigeren<\/button>/);
+  assert.match(source, /data-cookie-choice="accepted"[\s\S]*Akkoord<\/button>/);
+  assert.match(source, /<button type="button" data-cookie-settings>Cookie-instellingen<\/button>/);
+  assert.match(source, /softora_cookie_consent/);
+  assert.match(source, /document\.cookie = "softora_cookie_consent="/);
+  assert.match(source, /setupCookieConsent\(\);/);
+  assert.match(source, /\.cookie-consent\s*\{[\s\S]*position:\s*fixed;[\s\S]*bottom:\s*24px;[\s\S]*border-left:\s*4px solid var\(--accent\);/);
+  assert.match(source, /@media \(max-width: 768px\) \{[\s\S]*\.cookie-consent\s*\{[\s\S]*bottom:\s*88px;/);
+  assert.doesNotMatch(source, /localStorage/);
+  assert.doesNotMatch(source, /sessionStorage/);
 });

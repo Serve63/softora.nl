@@ -83,9 +83,12 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260428a/);
+  assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /const databaseStatus = normalizePremiumDashboardCustomerDatabaseStatus\(item\);/);
   assert.match(pageSource, /databaseStatus,/);
   assert.match(pageSource, /\.filter\(\(customer\) => customer\.databaseStatus === 'klant'\)/);
+  assert.match(pageSource, /parsePremiumCustomers\(readPremiumDashboardChunkedStateValue\(values, PREMIUM_CUSTOMERS_KEY\)\)/);
   assert.match(pageSource, /totalClientsEl\.textContent = String\(hasCustomerDatabase \? customers\.length : uniqueClients\.size\);/);
 });
 
@@ -123,7 +126,8 @@ test('premium dashboard opent AI beheer configuratie met doel en toegestane midd
   assert.match(pageSource, /scheduleDays: \['monday', 'tuesday', 'wednesday', 'thursday', 'friday'\]/);
   assert.match(pageSource, /scheduleStart: '08:30'/);
   assert.match(pageSource, /scheduleEnd: '17:00'/);
-  assert.match(pageSource, /function normalizeDashboardTime\(value, fallback\)/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260428a/);
+  assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /const aiManagementScheduleDayInputs = Array\.from\(document\.querySelectorAll\('\[data-ai-schedule-day\]'\)\);/);
   assert.match(pageSource, /aiManagementScheduleStartInput\.value = config\.scheduleStart;/);
   assert.match(pageSource, /aiManagementScheduleEndInput\.value = config\.scheduleEnd;/);

@@ -8,13 +8,19 @@ function createUiStateStore(deps = {}) {
     fetchSupabaseRowByKeyViaRest = async () => ({ ok: false }),
     upsertSupabaseRowViaRest = async () => ({ ok: false }),
     uiStateReadTimeoutMs = 1500,
+    uiStateReadTimeoutMsByScope = {},
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     logger = console,
   } = deps;
 
-  function getSafeUiStateReadTimeoutMs() {
-    return Math.max(0, Math.min(10000, Number(uiStateReadTimeoutMs) || 0));
+  function getSafeUiStateReadTimeoutMs(scope) {
+    const scopeTimeout =
+      uiStateReadTimeoutMsByScope &&
+      Object.prototype.hasOwnProperty.call(uiStateReadTimeoutMsByScope, scope)
+        ? uiStateReadTimeoutMsByScope[scope]
+        : uiStateReadTimeoutMs;
+    return Math.max(0, Math.min(10000, Number(scopeTimeout) || 0));
   }
 
   function normalizeUiStateScope(scope) {
@@ -116,7 +122,7 @@ function createUiStateStore(deps = {}) {
       };
     };
 
-    const timeoutMs = getSafeUiStateReadTimeoutMs();
+    const timeoutMs = getSafeUiStateReadTimeoutMs(normalizedScope);
     const memoryState = buildInMemoryState(normalizedScope);
 
     if (!timeoutMs) {

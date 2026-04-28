@@ -123,6 +123,9 @@ test('premium bevestigingsmails campaign volume uses a fixed mail company label'
   assert.doesNotMatch(pageSource, /campaign-count-mode-label/);
   assert.doesNotMatch(pageSource, /Hoeveel afspraken inplannen\?/);
   assert.match(pageSource, /<div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen\?<\/div>/);
+  assert.match(pageSource, /<input class="slider" type="range" min="5" max="30" step="5" value="10" id="mail-slider"/);
+  assert.match(pageSource, /const COLDMAIL_VOLUME_CONTROL = \{ min: 5, max: 30, step: 5, value: 10/);
+  assert.match(pageSource, /const COLDCALL_VOLUME_CONTROL = \{ min: 10, max: 500, step: 10, value: 100/);
   assert.match(pageSource, /campaignVolumeLabel\.textContent = 'Hoeveel bedrijven bellen\?';/);
   assert.doesNotMatch(pageSource, /Aantal te mailen bedrijven/);
 });
@@ -133,6 +136,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
 
   assert.match(pageSource, /<div class="campagne-head">[\s\S]*<div class="campagne-title">Nieuwe Campagne<\/div>[\s\S]*id="campaignCompanyCount"/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/softora-dossier-loader\.css\?v=20260424a">/);
+  assert.match(pageSource, /<script src="assets\/premium-campaign-radius\.js\?v=20260427a"><\/script>/);
   assert.match(pageSource, /<main class="main-content is-premium-boot-host">/);
   assert.match(pageSource, /<div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">/);
   assert.match(pageSource, /<div class="premium-boot-shell is-booting" aria-busy="true">/);
@@ -173,17 +177,21 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function isEligibleColdmailCampaignRow\(row\)/);
   assert.match(pageSource, /function isEligibleColdcallingCampaignRow\(row\)/);
   assert.match(pageSource, /function isEligibleCampaignCountRow\(row\) \{\s*return isPremiumAiLeadGeneratorPath\(\)[\s\S]*isEligibleColdcallingCampaignRow\(row\)[\s\S]*isEligibleColdmailCampaignRow\(row\);/);
-  assert.match(pageSource, /const eligibleRows = coldmailingDatabaseRows\.filter\(isEligibleCampaignCountRow\);/);
+  assert.match(pageSource, /function isCampaignRowWithinRadius\(row\)/);
+  assert.match(pageSource, /const eligibleRows = coldmailingDatabaseRows\.filter\(\(row\) => isEligibleCampaignCountRow\(row\) && isCampaignRowWithinRadius\(row\)\);/);
+  assert.match(pageSource, /params\.set\('radiusKm', String\(getSelectedCampaignRadiusKm\(\)\)\);/);
   assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
   assert.match(pageSource, /Number\.isFinite\(Number\(countOverride\)\)/);
   assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{[\s\S]*fetch\(getColdmailRecipientPreviewUrl\(\), \{ cache: 'no-store' \}\)[\s\S]*renderCampaignCompanyCount\(Number\(data && data\.selected\) \|\| recipients\.length\);/);
   assert.match(pageSource, /Math\.min\(requestedCount \|\| eligibleRows\.length, eligibleRows\.length\)/);
+  assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\),/);
   assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);
   assert.match(pageSource, /initCampaignDatabaseAutoRefresh\(\);/);
   assert.match(pageSource, /const campaignBootTasks = \[/);
   assert.match(pageSource, /hydrateCampaignCompanyCountFromSupabase\(\),/);
   assert.match(pageSource, /setCampaignRecipientListOpen\(false\);/);
-  assert.match(pageSource, /renderCampaignCompanyCount\(\);[\s\S]*\}\s*updateSlider\(100\);/);
+  assert.match(pageSource, /function configureCampaignVolumeControl\(\)/);
+  assert.match(pageSource, /configureCampaignVolumeControl\(\);\s*updateSlider\(document\.getElementById\('mail-slider'\)/);
 });
 
 test('premium bevestigingsmails hides mail onderwerp row only on lead-generator alias', () => {
@@ -309,17 +317,18 @@ test('premium bevestigingsmails exposes campaign duration choices and uses them 
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /<div class="field lead-generator-branch-field">\s*<div class="field-label">Campagne afgerond na<\/div>\s*<select class="sel" id="campaignDurationDays" aria-label="Campagneduur">/);
+  assert.match(pageSource, /<option value="disabled">Uitgeschakeld<\/option>/);
   assert.match(pageSource, /<option value="5">5 dagen<\/option>/);
   assert.match(pageSource, /<option value="7">7 dagen<\/option>/);
   assert.match(pageSource, /<option value="14" selected>14 dagen<\/option>/);
   assert.match(pageSource, /function initCampaignDurationSetting\(\)/);
   assert.doesNotMatch(pageSource, /function updateCampaignDurationUi\(\)/);
-  assert.match(pageSource, /showToast\('Campagne afgerond na ' \+ formatCampaignDurationLabel\(durationDays\)\);/);
+  assert.match(pageSource, /showToast\(durationDays === 0 \? 'Campagne afronding uitgeschakeld' : 'Campagne afgerond na ' \+ formatCampaignDurationLabel\(durationDays\)\);/);
   assert.match(pageSource, /function buildCampaignTimeline\(total, durationDays\) \{/);
   assert.match(pageSource, /const timelineDays = resolveCampaignTimelineDays\(durationDays\);/);
   assert.match(pageSource, /const totalDurationDays = getCampaignTimelineTotalDays\(\);/);
   assert.match(pageSource, /campaignTimeline = buildCampaignTimeline\(actualTotal, durationDays\);/);
-  assert.match(pageSource, /timelineTitle\.textContent = durationLabel \+ ' tijdlijn';/);
+  assert.match(pageSource, /timelineTitle\.textContent = durationDays === 0 \? 'Tijdlijn voorbeeld' : durationLabel \+ ' tijdlijn';/);
   assert.match(pageSource, /`Dag \$\{step\.day\} van \$\{totalDurationDays\}`/);
   assert.match(pageSource, /'✓ Dag ' \+ totalDurationDays \+ ' bereikt — campagne afgelopen'/);
   assert.doesNotMatch(pageSource, /<select class="sel" id="branche"/);
@@ -354,6 +363,8 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
   assert.match(pageSource, /function buildSendErrorMessage\(defaultMessage\)/);
   assert.match(pageSource, /payload && Array\.isArray\(payload\.failedItems\) && payload\.failedItems\[0\]/);
   assert.match(pageSource, /if \(!payload\.sent && payload\.failed\) \{/);
-  assert.match(pageSource, /showToast\('✓ ' \+ sendResult\.sent \+ ' mails verstuurd' \+ failedSuffix\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
+  assert.match(pageSource, /function buildColdmailSendSuccessMessage\(sendResult\)/);
+  assert.match(pageSource, /overgeslagen door daglimiet/);
+  assert.match(pageSource, /showToast\(buildColdmailSendSuccessMessage\(sendResult\)\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
   assert.match(pageSource, /showScreen\('screen-campaign'\);/);
 });

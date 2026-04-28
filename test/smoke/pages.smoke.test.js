@@ -98,6 +98,51 @@ test('page smoke: premium-website.html uses the current WhatsApp number', () => 
   assert.match(html, /Open WhatsApp chat met Softora op \+31 6 43 26 27 92/, 'WhatsApp-label mist het actuele nummer.');
 });
 
+test('page smoke: premium-website.html handles missing cursor elements safely', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
+  assert.match(
+    html,
+    /safelySetStyle\(cursor, "display", "none"\);/,
+    'Premium homepage moet cursor-elementen defensief wegzetten.'
+  );
+  assert.doesNotMatch(
+    html,
+    /cursor\\.style\\.display =/,
+    'Cursorstijl mag niet meer direct zonder veiligheidsguard gezet worden.'
+  );
+  assert.doesNotMatch(
+    html,
+    /cursorDot\\.style\\.display =/,
+    'Cursor-dot stijl mag niet meer direct zonder veiligheidsguard gezet worden.'
+  );
+});
+
+test('page smoke: premium-website.html keeps mobile werkwijze background white', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
+  assert.match(html, /\.ios-statusbar-fill/, 'iOS statusbar-fill klasse ontbreekt.');
+  assert.match(html, /#werkwijze \{[^]*?background:\s*#ffffff !important;/, 'Werkwijze sectie moet mobile-compatibel wit zijn.');
+  assert.match(html, /#werkwijze \.werkwijze-copy \{[^]*?background:\s*#ffffff !important;/, 'Werkwijze copy-kaart moet mobile wit zijn.');
+  assert.match(html, /#werkwijze \.werkwijze-grid,/ , 'Werkwijze grid wit-regel hoort aanwezig te zijn.');
+});
+
+test('page smoke: premium-website.html routes non-widget CTA buttons to contact form on desktop', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
+  assert.match(html, /const ctaLinks = Array\.from\(document\.querySelectorAll\('a\[href\^="https:\/\/wa\.me\/"\]/, 'CTA WA-links routing setup ontbreekt.');
+  assert.match(html, /const desktopOnlyContactFormId = "#faq-contact-form";/, 'Desktop contact-form target id ontbreekt.');
+  assert.match(html, /syncCtaLinksForViewport\(\);/, 'Desktop/mobile CTA sync aanroep ontbreekt.');
+  assert.match(html, /window\.addEventListener\("resize", syncCtaLinksForViewport/, 'Resize-resync voor CTA routing ontbreekt.');
+  assert.match(html, /\.filter\(function \(link\) {\s*return !link\.closest\(\"\.whatsapp-widget\"\);/s, 'WhatsApp widget mag niet mee-gewijzigd worden.');
+});
+
+test('page smoke: premium-personeel-login.html has a password visibility toggle', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-personeel-login.html'), 'utf8');
+  assert.match(html, /id="passwordToggle"/, 'Wachtwoord-oogknop ontbreekt.');
+  assert.match(html, /aria-label="Wachtwoord tonen"/, 'Wachtwoord-oogknop mist toegankelijk label.');
+  assert.match(html, /function setupPasswordToggle\(\)/, 'Wachtwoord toggle-script ontbreekt.');
+  assert.match(html, /password\.type = visible \? 'text' : 'password';/, 'Wachtwoordveld hoort zichtbaar/onzichtbaar te kunnen wisselen.');
+  assert.match(html, /setupPasswordToggle\(\);/, 'Wachtwoord toggle wordt niet geinitialiseerd.');
+});
+
 test('page smoke: premium-ai-coldmailing.html promotes suppression after lead removal regardless of persistence state', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
   assert.match(html, /promoteLeadRowSuppression\(lead\)/, 'Lead suppression promotion na verwijdering ontbreekt.');
@@ -110,10 +155,12 @@ test('page smoke: premium-ai-coldmailing.html promotes suppression after lead re
 
 test('page smoke: premium-actieve-opdrachten.html shows openstaande opdrachten as the primary tab label', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
+  const script = fs.readFileSync(path.join(repoRoot, 'assets/premium-actieve-opdrachten.js'), 'utf8');
+  const source = `${html}\n${script}`;
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
   assert.match(html, />Openstaande opdrachten<\/span>/, 'Primaire tab hoort Openstaande opdrachten te tonen.');
-  assert.match(html, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
-  assert.match(html, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
+  assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
+  assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
 });
 
 test('page smoke: assets/personnel-theme.js persists sidebar counts across premium page loads', () => {

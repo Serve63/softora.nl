@@ -2,8 +2,11 @@
   'use strict';
 
   const COST_SUMMARY_ENDPOINT = '/api/coldcalling/cost-summary?scope=month';
+  const API_COST_SCOPE = 'premium_api_costs';
+  const API_COST_KEY = 'softora_api_cost_events_v1';
   const POLL_INTERVAL_MS = 15000;
   const COLDCALLING_ESTIMATE_NOTE = 'Geschatte maandkosten, Retell kan hoger uitvallen';
+  const API_COST_NOTE = 'Werkelijke API-kosten deze maand';
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
 
@@ -181,6 +184,32 @@
     return Math.round(convertUsdToEur(totalCostUsd) * 100) / 100;
   }
 
+  function parseApiCostEvents(raw) {
+    try {
+      const parsed = JSON.parse(String(raw || '[]'));
+      return Array.isArray(parsed) ? parsed.filter(function (item) {
+        return item && typeof item === 'object';
+      }) : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function isCurrentMonthApiCost(item) {
+    const occurredAtMs = Date.parse(normalizeString(item && (item.occurredAt || item.createdAt || item.updatedAt)));
+    if (!Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return false;
+    return getMonthKeyFromMs(occurredAtMs) === getMonthKeyFromMs(Date.now());
+  }
+
+  function buildCurrentMonthApiCostEur(events) {
+    const total = (Array.isArray(events) ? events : []).reduce(function (sum, item) {
+      if (!isCurrentMonthApiCost(item)) return sum;
+      const amountEur = Number(item && (item.amountEur ?? item.amount_eur));
+      return sum + (Number.isFinite(amountEur) && amountEur > 0 ? amountEur : 0);
+    }, 0);
+    return Math.round(total * 100) / 100;
+  }
+
   function getMonthlyCostsData() {
     return window.softoraMonthlyCostsData && typeof window.softoraMonthlyCostsData === 'object'
       ? window.softoraMonthlyCostsData
@@ -203,6 +232,16 @@
     );
   }
 
+  function resolveApiCostItem() {
+    const state = getMonthlyCostsData();
+    const items = Array.isArray(state && state['Totale kosten:']) ? state['Totale kosten:'] : [];
+    return (
+      items.find(function (item) {
+        return normalizeSearchText(item && item.naam) === 'api kosten';
+      }) || null
+    );
+  }
+
   function applyColdcallingCost(amountEur) {
     const item = resolveColdcallingCostItem();
     const render = getMonthlyCostsRender();
@@ -218,6 +257,36 @@
     item.note = nextNote;
     render();
     return true;
+  }
+
+  function applyApiCost(amountEur) {
+    const item = resolveApiCostItem();
+    const render = getMonthlyCostsRender();
+    if (!item || !render) return false;
+
+    const nextAmount = Math.max(0, Math.round((Number(amountEur) || 0) * 100) / 100);
+    const amountChanged = Number(item.bedrag || 0) !== nextAmount;
+    const noteChanged = normalizeString(item.note) !== API_COST_NOTE;
+    if (!amountChanged && !noteChanged) return false;
+
+    item.bedrag = nextAmount;
+    item.note = API_COST_NOTE;
+    render();
+    return true;
+  }
+
+  async function fetchUiState(scope) {
+    const response = await fetch('/api/ui-state-get?scope=' + encodeURIComponent(String(scope || '')), {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    const data = await response.json().catch(function () {
+      return {};
+    });
+    if (!response.ok) {
+      throw new Error(String((data && (data.error || data.detail)) || 'API-kosten konden niet geladen worden.'));
+    }
+    return data;
   }
 
   async function fetchMonthlyCostSummary() {
@@ -258,28 +327,50 @@
     return refreshPromise;
   }
 
+  async function refreshMonthlyApiCosts() {
+    if (!resolveApiCostItem() || !getMonthlyCostsRender()) {
+      return { ok: true, updated: false };
+    }
+    try {
+      const state = await fetchUiState(API_COST_SCOPE);
+      const events = parseApiCostEvents(state && state.values && state.values[API_COST_KEY]);
+      const amountEur = buildCurrentMonthApiCostEur(events);
+      return { ok: true, updated: applyApiCost(amountEur), amountEur };
+    } catch (error) {
+      return {
+        ok: false,
+        error: normalizeString(error && error.message) || 'API-kosten konden niet geladen worden.',
+      };
+    }
+  }
+
   function startDynamicMonthlyCostsSync() {
     if (!resolveColdcallingCostItem() || !getMonthlyCostsRender()) return;
 
     void refreshMonthlyColdcallingCosts();
+    void refreshMonthlyApiCosts();
     if (!pollTimer) {
       pollTimer = window.setInterval(function () {
         void refreshMonthlyColdcallingCosts();
+        void refreshMonthlyApiCosts();
       }, POLL_INTERVAL_MS);
     }
 
     window.addEventListener('focus', function () {
       void refreshMonthlyColdcallingCosts();
+      void refreshMonthlyApiCosts();
     });
 
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) {
         void refreshMonthlyColdcallingCosts();
+        void refreshMonthlyApiCosts();
       }
     });
   }
 
   window.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;
+  window.refreshMonthlyApiCosts = refreshMonthlyApiCosts;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', startDynamicMonthlyCostsSync, { once: true });

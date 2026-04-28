@@ -977,9 +977,9 @@ body {
     <div class="content-lock-logo">Binnenkort beschikbaar</div>
     <div class="content-lock-box">
       <div class="content-lock-label">Toegangscode</div>
-      <input class="content-lock-input" type="password" id="contentLockInput" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')unlockSeoContentArea()">
+      <input class="content-lock-input" type="password" id="contentLockInput" placeholder="••••••••••••" autocomplete="off" data-seo-lock-input>
       <div class="content-lock-error" id="contentLockError"></div>
-      <button class="content-lock-btn" onclick="unlockSeoContentArea()">Doorgaan</button>
+      <button class="content-lock-btn" type="button" data-seo-lock-submit>Doorgaan</button>
     </div>
   </div>
   <div class="dashboard-layout" data-sidebar-shell="canonical">
@@ -1052,16 +1052,16 @@ body {
       <div class="page-title">SEO</div>
       <div class="page-subtitle">Beheer en optimaliseer de SEO van softora.nl</div>
       <div class="tabs">
-        <button class="tab active" onclick="switchTab('scan', this)">SEO Scan</button>
-        <button class="tab" onclick="switchTab('paginas', this)">Pagina's</button>
-        <button class="tab" onclick="switchTab('blogs', this)">Blogs</button>
-        <button class="tab" onclick="switchTab('analytics', this)">Google Analytics</button>
+        <button class="tab active" type="button" data-seo-tab="scan">SEO Scan</button>
+        <button class="tab" type="button" data-seo-tab="paginas">Pagina's</button>
+        <button class="tab" type="button" data-seo-tab="blogs">Blogs</button>
+        <button class="tab" type="button" data-seo-tab="analytics">Google Analytics</button>
       </div>
 
       <div class="tab-panel active" id="tab-scan">
         <div class="scan-url-bar">
           <input type="text" id="scan-url" value="https://softora.nl" placeholder="https://softora.nl">
-          <button class="btn-scan" id="scan-btn" onclick="startScan()">
+          <button class="btn-scan" id="scan-btn" type="button" data-seo-action="scan">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Scan starten
           </button>
@@ -1136,11 +1136,11 @@ body {
               </div>
 
               <div class="blog-campaign-actions">
-                <button type="button" class="btn-ai" id="blog-activate-btn" onclick="activateBlogCampaign()">
+                <button type="button" class="btn-ai" id="blog-activate-btn" data-seo-action="activate-blog-campaign">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                   Campagne online zetten
                 </button>
-                <button type="button" class="btn-blog-secondary" id="blog-pause-btn" onclick="pauseBlogCampaignDemo()" style="display:none">
+                <button type="button" class="btn-blog-secondary" id="blog-pause-btn" data-seo-action="pause-blog-campaign" style="display:none">
                   Campagne pauzeren (demo)
                 </button>
               </div>
@@ -1220,17 +1220,17 @@ body {
 <div class="toast" id="toast"></div>
 
 <div class="seo-goal-modal" id="seo-goal-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="seo-goal-modal-title">
-  <div class="seo-goal-modal__backdrop" onclick="closeSeoGoalModal()" aria-hidden="true"></div>
+  <div class="seo-goal-modal__backdrop" data-seo-action="close-goal-modal" aria-hidden="true"></div>
   <div class="seo-goal-modal__card">
     <h3 id="seo-goal-modal-title">Doel van deze pagina</h3>
     <p class="seo-goal-modal__hint">Beschrijf kort wat deze pagina voor jou moet bereiken (bijv. meer offertes, uitleg product X, aanmelden nieuwsbrief). Minimaal 10 tekens.</p>
     <label for="seo-goal-input" class="visually-hidden">Paginadoel</label>
-    <textarea id="seo-goal-input" maxlength="500" rows="4" placeholder="Bijvoorbeeld: bezoekers overtuigen om een gratis kennismakingsgesprek te plannen…" oninput="updateSeoGoalCharCount()"></textarea>
+    <textarea id="seo-goal-input" maxlength="500" rows="4" placeholder="Bijvoorbeeld: bezoekers overtuigen om een gratis kennismakingsgesprek te plannen…" data-seo-goal-input></textarea>
     <div class="seo-goal-modal__count" id="seo-goal-count" aria-live="polite">0 tekens (min. 10)</div>
     <div class="seo-goal-modal__error" id="seo-goal-error" role="alert"></div>
     <div class="seo-goal-modal__actions">
-      <button type="button" onclick="closeSeoGoalModal()">Annuleren</button>
-      <button type="button" id="seo-goal-submit" class="seo-goal-modal__primary" onclick="confirmSeoGoalAndOptimise()" disabled>Optimaliseren</button>
+      <button type="button" data-seo-action="close-goal-modal">Annuleren</button>
+      <button type="button" id="seo-goal-submit" class="seo-goal-modal__primary" data-seo-action="confirm-goal-modal" disabled>Optimaliseren</button>
     </div>
   </div>
 </div>
@@ -1456,7 +1456,7 @@ function renderSeoPagePanels() {
     <section class="seo-page-block" data-seo-page="${s}">
       <header class="seo-page-header">
         <div class="seo-page-header-row">
-          <button type="button" class="btn-ai seo-page-opt-btn" onclick="optimisePage('${s}', this)">
+          <button type="button" class="btn-ai seo-page-opt-btn" data-seo-action="optimise-page" data-seo-page-slug="${s}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             Pagina optimaliseren
           </button>
@@ -1475,12 +1475,12 @@ function renderSeoPagePanels() {
           <div class="ai-card-body">
             <div class="field-label">Title tag <span style="font-weight:400;text-transform:none;letter-spacing:0">(max 60 tekens)</span></div>
             <div class="field-val">
-              <textarea id="${s}-meta-title" rows="2" oninput="charCount('${s}-meta-title', '${s}-meta-title-count', 60)"></textarea>
+              <textarea id="${s}-meta-title" rows="2" data-seo-char-count="${s}-meta-title-count" data-seo-char-max="60"></textarea>
             </div>
             <div class="char-count" id="${s}-meta-title-count"></div>
             <div class="field-label">Meta description <span style="font-weight:400;text-transform:none;letter-spacing:0">(max 160 tekens)</span></div>
             <div class="field-val">
-              <textarea id="${s}-meta-desc" rows="3" oninput="charCount('${s}-meta-desc', '${s}-meta-desc-count', 160)"></textarea>
+              <textarea id="${s}-meta-desc" rows="3" data-seo-char-count="${s}-meta-desc-count" data-seo-char-max="160"></textarea>
             </div>
             <div class="char-count" id="${s}-meta-desc-count"></div>
           </div>
@@ -1493,12 +1493,12 @@ function renderSeoPagePanels() {
           <div class="ai-card-body">
             <div class="field-label">OG Title</div>
             <div class="field-val">
-              <textarea id="${s}-og-title" rows="2" oninput="charCount('${s}-og-title', '${s}-og-title-count', 60)"></textarea>
+              <textarea id="${s}-og-title" rows="2" data-seo-char-count="${s}-og-title-count" data-seo-char-max="60"></textarea>
             </div>
             <div class="char-count" id="${s}-og-title-count"></div>
             <div class="field-label">OG Description</div>
             <div class="field-val">
-              <textarea id="${s}-og-desc" rows="3" oninput="charCount('${s}-og-desc', '${s}-og-desc-count', 200)"></textarea>
+              <textarea id="${s}-og-desc" rows="3" data-seo-char-count="${s}-og-desc-count" data-seo-char-max="200"></textarea>
             </div>
             <div class="char-count" id="${s}-og-desc-count"></div>
           </div>
@@ -1511,7 +1511,7 @@ function renderSeoPagePanels() {
           <div class="ai-card-body">
             <div class="field-label">H1 (hoofdtitel pagina)</div>
             <div class="field-val">
-              <textarea id="${s}-h1" rows="2" oninput="charCount('${s}-h1', '${s}-h1-count', 70)"></textarea>
+              <textarea id="${s}-h1" rows="2" data-seo-char-count="${s}-h1-count" data-seo-char-max="70"></textarea>
             </div>
             <div class="char-count" id="${s}-h1-count"></div>
             <div class="field-label">H2 suggesties</div>
@@ -1881,8 +1881,69 @@ function unlockSeoContentArea() {
   input.focus();
 }
 
+function bindSeoStaticActions() {
+  document.querySelectorAll('[data-seo-tab]').forEach((button) => {
+    if (button.dataset.seoBound === '1') return;
+    button.dataset.seoBound = '1';
+    button.addEventListener('click', () => {
+      switchTab(button.dataset.seoTab || 'scan', button);
+    });
+  });
+
+  const actionHandlers = {
+    scan: startScan,
+    'activate-blog-campaign': activateBlogCampaign,
+    'pause-blog-campaign': pauseBlogCampaignDemo,
+    'close-goal-modal': closeSeoGoalModal,
+    'confirm-goal-modal': confirmSeoGoalAndOptimise,
+    'optimise-page': (_event, button) => {
+      optimisePage(button.dataset.seoPageSlug, button);
+    },
+  };
+
+  document.querySelectorAll('[data-seo-action]').forEach((button) => {
+    if (button.dataset.seoBound === '1') return;
+    const handler = actionHandlers[button.dataset.seoAction];
+    if (typeof handler !== 'function') return;
+    button.dataset.seoBound = '1';
+    button.addEventListener('click', (event) => handler(event, button));
+  });
+
+  document.querySelectorAll('[data-seo-char-count]').forEach((input) => {
+    if (input.dataset.seoBound === '1') return;
+    const countId = input.dataset.seoCharCount;
+    const max = Number(input.dataset.seoCharMax || 0);
+    if (!input.id || !countId || !Number.isFinite(max) || max <= 0) return;
+    input.dataset.seoBound = '1';
+    input.addEventListener('input', () => {
+      charCount(input.id, countId, max);
+    });
+  });
+
+  const goalInput = document.querySelector('[data-seo-goal-input]');
+  if (goalInput && goalInput.dataset.seoBound !== '1') {
+    goalInput.dataset.seoBound = '1';
+    goalInput.addEventListener('input', updateSeoGoalCharCount);
+  }
+
+  const lockInput = document.querySelector('[data-seo-lock-input]');
+  if (lockInput && lockInput.dataset.seoBound !== '1') {
+    lockInput.dataset.seoBound = '1';
+    lockInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') unlockSeoContentArea();
+    });
+  }
+
+  const lockSubmit = document.querySelector('[data-seo-lock-submit]');
+  if (lockSubmit && lockSubmit.dataset.seoBound !== '1') {
+    lockSubmit.dataset.seoBound = '1';
+    lockSubmit.addEventListener('click', unlockSeoContentArea);
+  }
+}
+
 renderSeoPagePanels();
 initSeoCharCounts();
+bindSeoStaticActions();
 </script>
 </body>
 </html>

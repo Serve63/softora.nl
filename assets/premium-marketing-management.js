@@ -250,15 +250,6 @@
     return root.getAttribute('data-ai-management-mode') === 'software' ? 'software' : 'personnel';
   }
 
-  function escapeHtml(value) {
-    return String(value || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
   function normalizeHashKey(value) {
     return String(value || '')
       .toLowerCase()
@@ -287,9 +278,13 @@
 
   function renderTools(tools) {
     if (!refs.tools) return;
-    refs.tools.innerHTML = tools
-      .map((tool) => `<span class="ai-marketing-tool">${escapeHtml(tool)}</span>`)
-      .join('');
+    refs.tools.replaceChildren();
+    tools.forEach((tool) => {
+      const label = document.createElement('span');
+      label.className = 'ai-marketing-tool';
+      label.textContent = String(tool || '').trim();
+      refs.tools.appendChild(label);
+    });
   }
 
   function updateAiWorkspace() {

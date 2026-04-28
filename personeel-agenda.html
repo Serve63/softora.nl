@@ -388,7 +388,7 @@
                 <div class="modal-company" id="modalCompany">Bedrijf</div>
                 <div class="modal-contact" id="modalContact">Contact</div>
             </div>
-            <button class="modal-close magnetic" onclick="closeModal()" type="button">
+            <button class="modal-close magnetic" data-modal-close type="button">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
@@ -403,8 +403,8 @@
             <div class="modal-summary" id="modalSummary">-</div>
         </div>
         <div class="modal-footer">
-            <button class="modal-btn primary magnetic" onclick="closeModal()" type="button">Opvolgen</button>
-            <button class="modal-btn secondary magnetic" onclick="closeModal()" type="button">Sluiten</button>
+            <button class="modal-btn primary magnetic" data-modal-close type="button">Opvolgen</button>
+            <button class="modal-btn secondary magnetic" data-modal-close type="button">Sluiten</button>
         </div>
     </div>
 </div>
@@ -484,11 +484,11 @@
                 <p>Meetings ingepland door AI Lead Generator</p>
             </div>
             <div class="month-nav">
-                <button class="month-nav-btn magnetic" onclick="changeMonth(-1)" type="button">
+                <button class="month-nav-btn magnetic" data-month-offset="-1" type="button">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
                 </button>
                 <span class="month-label" id="monthLabel"></span>
-                <button class="month-nav-btn magnetic" onclick="changeMonth(1)" type="button">
+                <button class="month-nav-btn magnetic" data-month-offset="1" type="button">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
                 </button>
             </div>
@@ -562,6 +562,16 @@
         const lineClass =
             line === 'business' ? ' meeting--business' : line === 'voice' ? ' meeting--voice' : line === 'chatbot' ? ' meeting--chatbot' : '';
         return `appointment meeting magnetic${lineClass}`;
+    }
+
+    function escapeAgendaHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+        }[char]));
     }
 
     async function loadServerAppointments() {
@@ -639,7 +649,7 @@
             html += `<div class="${classes}"><div class="day-number">${day}</div>`;
             dayApts.forEach((apt) => {
                 const appointmentClass = getCalendarAppointmentClass(apt);
-                html += `<div class="${appointmentClass}" onclick="openAppointment(${apt.id})"><span class="apt-time">${apt.time}</span> ${apt.company}</div>`;
+                html += `<div class="${appointmentClass}" data-appointment-id="${apt.id}" role="button" tabindex="0"><span class="apt-time">${apt.time}</span> ${escapeAgendaHtml(apt.company)}</div>`;
             });
             html += '</div>';
         }
@@ -684,6 +694,42 @@
 
     function closeModal() { document.getElementById('modal').classList.remove('show'); }
 
+    function openAppointmentFromElement(target) {
+        const appointmentId = Number(target?.dataset?.appointmentId);
+        if (!Number.isFinite(appointmentId)) return;
+        openAppointment(appointmentId);
+    }
+
+    function bindAgendaActions() {
+        document.querySelectorAll('[data-modal-close]').forEach((button) => {
+            button.addEventListener('click', closeModal);
+        });
+
+        document.querySelectorAll('[data-month-offset]').forEach((button) => {
+            button.addEventListener('click', () => {
+                changeMonth(Number(button.dataset.monthOffset) || 0);
+            });
+        });
+
+        const calendarGrid = document.getElementById('calendarGrid');
+        if (!calendarGrid) return;
+
+        calendarGrid.addEventListener('click', (event) => {
+            const appointment = event.target.closest('[data-appointment-id]');
+            if (!appointment || !calendarGrid.contains(appointment)) return;
+            openAppointmentFromElement(appointment);
+        });
+
+        calendarGrid.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            const appointment = event.target.closest('[data-appointment-id]');
+            if (!appointment || !calendarGrid.contains(appointment)) return;
+            event.preventDefault();
+            openAppointmentFromElement(appointment);
+        });
+    }
+
+    bindAgendaActions();
     renderCalendar();
     void loadServerAppointments();
     window.setInterval(() => { void loadServerAppointments(); }, 15000);

@@ -6,14 +6,23 @@ const path = require('path');
 test('premium ai lead generator renders campaign controls before dashboard bootstrap runs', () => {
   const pagePath = path.join(__dirname, '../../premium-ai-lead-generator.html');
   const dashboardPath = path.join(__dirname, '../../assets/coldcalling-dashboard.js');
+  const regioRadiusPath = path.join(__dirname, '../../assets/coldcalling-regio-radius.js');
+  const manualLeadPromptPath = path.join(__dirname, '../../assets/coldcalling-manual-lead-prompt.js');
+  const summaryHelpersPath = path.join(__dirname, '../../assets/coldcalling-conversation-summary.js');
   const customSelectsPath = path.join(__dirname, '../../assets/custom-selects.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
+  const regioRadiusSource = fs.readFileSync(regioRadiusPath, 'utf8');
+  const manualLeadPromptSource = fs.readFileSync(manualLeadPromptPath, 'utf8');
+  const summaryHelpersSource = fs.readFileSync(summaryHelpersPath, 'utf8');
   const customSelectsSource = fs.readFileSync(customSelectsPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260427b" defer><\/script>/);
+  assert.match(
+    pageSource,
+    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260427e" defer><\/script>/
+  );
   assert.match(pageSource, /id="leadAmountQuestionLabel"/);
   assert.match(pageSource, /Hoeveel mensen wil je bellen\?/);
   assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
@@ -22,8 +31,13 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /id="statConversion"><!-- SOFTORA_COLDCALLING_STAT_CONVERSION --><\/div>/);
   assert.match(
     pageSource,
-    /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window\.openLeadDatabaseModalFromCampaign && window\.openLeadDatabaseModalFromCampaign\(\)"/
+    /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" data-lead-database-open/
   );
+  assert.match(pageSource, /openLeadListModalBtn\.addEventListener\('click'/);
+  assert.match(pageSource, /window\.openLeadDatabaseModalFromCampaign\(\);/);
+  assert.match(pageSource, /id="launchBtn" data-campaign-toggle type="button"/);
+  assert.match(pageSource, /launchBtn\.addEventListener\('click', toggleCampaign\);/);
+  assert.doesNotMatch(pageSource, /\son(?:click|input|change|keydown|submit)=/i);
   assert.doesNotMatch(pageSource, /id="branche"/);
   assert.doesNotMatch(pageSource, /<label class="form-label">Branche<\/label>/);
   assert.match(pageSource, /<div class="form-group form-group--dispatch" id="callDispatchControlWrap">/);
@@ -119,8 +133,11 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /valueEl\.innerHTML = safeLabel;/);
   assert.match(dashboardSource, /function hookRegioLeadCountCustomSelectSync\(\)/);
   assert.match(dashboardSource, /const AUTO_CAMPAIGN_REGIO_VALUE = 'auto';/);
-  assert.match(dashboardSource, /const MAX_CAMPAIGN_REGIO_KM_CHOICE = 250;/);
-  assert.match(dashboardSource, /function resolveAutomaticCampaignRegioKm\(/);
+  assert.match(dashboardSource, /window\.SoftoraColdcallingRegioRadius/);
+  assert.match(dashboardSource, /resolveAutomaticCampaignRegioKm,\s*\} = regioRadiusHelpers;/);
+  assert.doesNotMatch(dashboardSource, /REGIO_PLACE_COORD_ENTRIES/);
+  assert.match(regioRadiusSource, /const DEFAULT_MAX_CAMPAIGN_REGIO_KM = 250;/);
+  assert.match(regioRadiusSource, /function resolveAutomaticCampaignRegioKm\(/);
   assert.match(dashboardSource, /function getCampaignRegioLabelForApi\(/);
   assert.match(dashboardSource, /function syncRegioToAutoIfFillAgendaWorkdaysEnabled\(/);
   assert.match(dashboardSource, /function refreshCampaignRegioTipLabel\(/);
@@ -145,9 +162,12 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   );
   assert.doesNotMatch(dashboardSource, /Contactpersoon|Webiste/);
   assert.match(
-    dashboardSource,
-    /function promptForManualLeadDetails\(defaults = \{\}\) \{[\s\S]*Lead handmatig toevoegen[\s\S]*Bedrijf[\s\S]*Adres[\s\S]*Telefoonnummer[\s\S]*Website/
+    manualLeadPromptSource,
+    /function promptForManualLeadDetails\(defaults = \{\}, deps = \{\}\) \{[\s\S]*Lead handmatig toevoegen[\s\S]*Bedrijf[\s\S]*Adres[\s\S]*Telefoonnummer[\s\S]*Website/
   );
+  assert.match(dashboardSource, /window\.SoftoraColdcallingManualLeadPrompt/);
+  assert.match(dashboardSource, /manualLeadPromptHelpers\.promptForManualLeadDetails\(defaults/);
+  assert.doesNotMatch(dashboardSource, /Lead handmatig toevoegen/);
   assert.doesNotMatch(dashboardSource, /Voer telefoonnummer in \(NL formaat, bijv\. 0612345678 of \+31612345678\)\./);
   assert.doesNotMatch(dashboardSource, /Geen handmatige lead toegevoegd\./);
   assert.match(dashboardSource, /statusEl\.style\.margin = '14px 0 18px';/);
@@ -233,7 +253,9 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /Gebruik nooit het woord "agent"\./);
   assert.match(dashboardSource, /function shouldRefreshLeadDatabaseCallDetailPayload\(detail\) \{/);
   assert.match(dashboardSource, /function buildLeadDatabaseTranscriptFallbackSummary\(call, insight, interestedLead, remoteDetail = null\) \{/);
-  assert.match(dashboardSource, /function stripActionableFollowUpSummarySentence\(value\) \{/);
+  assert.match(dashboardSource, /SoftoraColdcallingConversationSummary/);
+  assert.match(summaryHelpersSource, /function stripActionableFollowUpSummarySentence\(value\) \{/);
+  assert.match(summaryHelpersSource, /function pickReadableConversationSummary\(\) \{/);
   assert.doesNotMatch(dashboardSource, /De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen/);
   assert.doesNotMatch(dashboardSource, /wat de logische vervolgstap is als die echt is besproken/);
   assert.match(
@@ -311,7 +333,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     dashboardSource,
     /function buildLeadDatabaseCallSummarySourceText\(call, insight, interestedLead\) \{[\s\S]*insight\?\.followUpReason[\s\S]*interestedLead\?\.whatsappInfo/
   );
-  assert.match(dashboardSource, /bevestigingsmail sturen/);
+  assert.match(summaryHelpersSource, /bevestigingsmail sturen/);
   assert.match(dashboardSource, /function openLeadDatabaseFromCampaignControl\(\) \{[\s\S]*ensureLeadDatabaseModal\(\)[\s\S]*dbModal\.openLeadDatabaseModal\(\);/);
   assert.match(
     dashboardSource,

@@ -45,6 +45,9 @@ RETELL_AGENT_VERSION=1
 RETELL_API_BASE_URL=https://api.retellai.com
 WEBHOOK_SECRET=your_optional_webhook_secret
 OPENAI_API_KEY=your_openai_api_key
+# Voor website image previews:
+# WEBSITE_PREVIEW_IMAGE_MODEL=gpt-image-2
+# (fallback/alias: OPENAI_IMAGE_MODEL=gpt-image-2)
 VERBOSE_CALL_WEBHOOK_LOGS=true
 
 # Twilio routing/security

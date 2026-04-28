@@ -11,6 +11,32 @@ const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_COLDMAIL_REPLY_SCOPE = 'premium_coldmail_auto_replies';
 const DEFAULT_COLDMAIL_REPLY_KEY = 'softora_coldmail_auto_replies_v1';
+const DEFAULT_COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
+const DEFAULT_COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
+const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 30;
+const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 50;
+const DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT = 100;
+const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
+const PERSONAL_MAILBOX_DOMAINS = new Set([
+  'aol.com',
+  'gmail.com',
+  'googlemail.com',
+  'hotmail.com',
+  'icloud.com',
+  'live.com',
+  'mac.com',
+  'me.com',
+  'msn.com',
+  'outlook.com',
+  'proton.me',
+  'protonmail.com',
+  'tuta.com',
+  'tutamail.com',
+  'yahoo.com',
+  'ymail.com',
+]);
+const COLDMAIL_OPT_OUT_TEXT =
+  'Geen interesse? Reageer met "stop" of "afmelden", dan mailen we u niet meer.';
 const TEST_RECIPIENT_EMAILS = new Set(['servec321@gmail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce']);
 const SENDER_DISPLAY_NAMES = {
@@ -65,6 +91,8 @@ function createColdmailCampaignService(deps = {}) {
     customerPhotoKey = DEFAULT_CUSTOMER_PHOTO_KEY,
     coldmailReplyScope = DEFAULT_COLDMAIL_REPLY_SCOPE,
     coldmailReplyKey = DEFAULT_COLDMAIL_REPLY_KEY,
+    coldmailSendGuardScope = DEFAULT_COLDMAIL_SEND_GUARD_SCOPE,
+    coldmailSendGuardKey = DEFAULT_COLDMAIL_SEND_GUARD_KEY,
     createTransport = (config) => nodemailer.createTransport(config),
     createImapClient = (config) => new ImapFlow(config),
     parseMailSource = (source) => simpleParser(source),
@@ -97,6 +125,10 @@ function createColdmailCampaignService(deps = {}) {
     imapMailbox = 'INBOX',
     imapExtraMailboxes = [],
     imapPollCooldownMs = 20_000,
+    coldmailCampaignSendLimit = DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT,
+    coldmailDailySendLimit = DEFAULT_COLDMAIL_DAILY_SEND_LIMIT,
+    coldmailPackageDailySendLimit = DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT,
+    coldmailBlockPersonalMailboxDomains = false,
   } = mailConfig;
 
   let smtpTransporter = null;
@@ -457,26 +489,241 @@ function createColdmailCampaignService(deps = {}) {
     return Math.max(min, Math.min(max, safe));
   }
 
+  function getColdmailCampaignSendLimit() {
+    return parsePositiveInt(
+      coldmailCampaignSendLimit,
+      DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT,
+      1,
+      DEFAULT_COLDMAIL_DAILY_SEND_LIMIT
+    );
+  }
+
+  function getColdmailDailySendLimit() {
+    return parsePositiveInt(
+      coldmailDailySendLimit,
+      DEFAULT_COLDMAIL_DAILY_SEND_LIMIT,
+      1,
+      DEFAULT_COLDMAIL_DAILY_SEND_LIMIT
+    );
+  }
+
+  function getColdmailPackageDailySendLimit() {
+    return parsePositiveInt(
+      coldmailPackageDailySendLimit,
+      DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT,
+      1,
+      DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT
+    );
+  }
+
+  function shouldBlockPersonalMailboxDomains() {
+    return coldmailBlockPersonalMailboxDomains !== false;
+  }
+
+  function getColdmailSafetyLimits() {
+    return {
+      campaignSendLimit: getColdmailCampaignSendLimit(),
+      dailySendLimit: getColdmailDailySendLimit(),
+      packageDailySendLimit: getColdmailPackageDailySendLimit(),
+      blocksPersonalMailboxDomains: shouldBlockPersonalMailboxDomains(),
+    };
+  }
+
+  function parseTimestampMs(value) {
+    const timestamp = Date.parse(normalizeString(value));
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  const oisterwijkCoords = { lat: 51.5792, lng: 5.1889 };
+  const campaignPlaceCoords = {
+    oisterwijk: { lat: 51.5792, lng: 5.1889 },
+    tilburg: { lat: 51.5555, lng: 5.0913 },
+    breda: { lat: 51.5719, lng: 4.7683 },
+    eindhoven: { lat: 51.4416, lng: 5.4697 },
+    'den bosch': { lat: 51.6978, lng: 5.3037 },
+    's hertogenbosch': { lat: 51.6978, lng: 5.3037 },
+    waalwijk: { lat: 51.6828, lng: 5.0707 },
+    boxtel: { lat: 51.5908, lng: 5.3293 },
+    udenhout: { lat: 51.6098, lng: 5.1436 },
+    haaren: { lat: 51.6027, lng: 5.2222 },
+    goirle: { lat: 51.5206, lng: 5.0667 },
+    hilvarenbeek: { lat: 51.4858, lng: 5.1397 },
+    vught: { lat: 51.6533, lng: 5.2875 },
+    best: { lat: 51.5075, lng: 5.3903 },
+    oirschot: { lat: 51.505, lng: 5.3139 },
+    helmond: { lat: 51.4793, lng: 5.657 },
+    dongen: { lat: 51.6265, lng: 4.9383 },
+    'etten-leur': { lat: 51.5706, lng: 4.6373 },
+    roosendaal: { lat: 51.5308, lng: 4.4653 },
+    'bergen op zoom': { lat: 51.4946, lng: 4.2872 },
+    almkerk: { lat: 51.7714, lng: 4.9597 },
+    werkendam: { lat: 51.8101, lng: 4.8944 },
+    sleeuwijk: { lat: 51.815, lng: 4.952 },
+    waalre: { lat: 51.3867, lng: 5.4447 },
+    valkenswaard: { lat: 51.3513, lng: 5.4595 },
+    veldhoven: { lat: 51.418, lng: 5.4024 },
+    oss: { lat: 51.765, lng: 5.5181 },
+    uden: { lat: 51.6608, lng: 5.6194 },
+    veghel: { lat: 51.6167, lng: 5.5486 },
+    schijndel: { lat: 51.6225, lng: 5.4319 },
+    'sint-oedenrode': { lat: 51.5675, lng: 5.4597 },
+  };
+
+  function normalizePlaceKey(value) {
+    return normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/['’]/g, ' ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function haversineKm(left, right) {
+    const toRad = (value) => (Number(value) * Math.PI) / 180;
+    const dLat = toRad(right.lat - left.lat);
+    const dLng = toRad(right.lng - left.lng);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(left.lat)) * Math.cos(toRad(right.lat)) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function resolveRowCoords(row) {
+    const explicitLat = Number(row && (row.lat || row.latitude || row.latitudeNumber));
+    const explicitLng = Number(row && (row.lng || row.lon || row.longitude || row.longitudeNumber));
+    if (Number.isFinite(explicitLat) && Number.isFinite(explicitLng)) return { lat: explicitLat, lng: explicitLng };
+    const haystack = normalizePlaceKey(
+      [
+        row && row.stad,
+        row && row.plaats,
+        row && row.city,
+        row && row.gemeente,
+        row && row.adres,
+        row && row.address,
+        row && row.location,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    );
+    const placeKey = Object.keys(campaignPlaceCoords)
+      .sort((left, right) => right.length - left.length)
+      .find((key) => haystack.includes(normalizePlaceKey(key)));
+    return placeKey ? campaignPlaceCoords[placeKey] : null;
+  }
+
+  function getRowDistanceKm(row) {
+    const existing = Number(row && (row.distanceKm || row.afstandKm || row.radiusKm));
+    if (Number.isFinite(existing) && existing >= 0) return existing;
+    const coords = resolveRowCoords(row);
+    return coords ? haversineKm(oisterwijkCoords, coords) : NaN;
+  }
+
+  function parseRadiusKm(value) {
+    const parsed = Number.parseFloat(normalizeString(value).replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed <= 0) return 250;
+    return Math.max(1, Math.min(250, parsed));
+  }
+
+  function pruneColdmailSendGuardEntries(entries) {
+    const cutoffMs = now().getTime() - COLDMAIL_SEND_GUARD_WINDOW_MS;
+    return (Array.isArray(entries) ? entries : [])
+      .filter((entry) => entry && typeof entry === 'object')
+      .map((entry) => ({
+        at: normalizeString(entry.at),
+        senderEmail: normalizeEmailAddress(entry.senderEmail),
+        count: Math.max(0, Number(entry.count || 0) || 0),
+      }))
+      .filter((entry) => entry.count > 0 && parseTimestampMs(entry.at) >= cutoffMs);
+  }
+
+  async function loadColdmailSendGuardState() {
+    const state = await getUiStateValues(coldmailSendGuardScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const parsed = safeJsonParse(values[coldmailSendGuardKey] || '{}', {});
+    return {
+      entries: pruneColdmailSendGuardEntries(parsed && parsed.entries),
+    };
+  }
+
+  async function saveColdmailSendGuardState(sendGuardState, actor = 'coldmail-send-guard') {
+    const entries = pruneColdmailSendGuardEntries(sendGuardState && sendGuardState.entries).slice(-1000);
+    await setUiStateValues(
+      coldmailSendGuardScope,
+      {
+        [coldmailSendGuardKey]: JSON.stringify({ entries }),
+      },
+      {
+        source: 'coldmail-send-guard',
+        actor,
+      }
+    );
+  }
+
+  async function getColdmailSendQuota(senderEmail) {
+    const selectedSenderEmail = normalizeEmailAddress(senderEmail);
+    const state = await loadColdmailSendGuardState();
+    const entries = state.entries;
+    const senderSent = entries
+      .filter((entry) => entry.senderEmail === selectedSenderEmail)
+      .reduce((sum, entry) => sum + entry.count, 0);
+    const packageSent = entries.reduce((sum, entry) => sum + entry.count, 0);
+    const dailySendLimit = getColdmailDailySendLimit();
+    const packageDailySendLimit = getColdmailPackageDailySendLimit();
+    return {
+      entries,
+      senderSent,
+      packageSent,
+      dailySendLimit,
+      packageDailySendLimit,
+      senderRemaining: Math.max(0, dailySendLimit - senderSent),
+      packageRemaining: Math.max(0, packageDailySendLimit - packageSent),
+    };
+  }
+
+  async function recordColdmailSendGuardEntry({ senderEmail, count, actor }) {
+    const safeCount = Math.max(0, Number(count || 0) || 0);
+    if (!safeCount) return false;
+    const state = await loadColdmailSendGuardState();
+    state.entries.push({
+      at: now().toISOString(),
+      senderEmail: normalizeEmailAddress(senderEmail),
+      count: safeCount,
+    });
+    await saveColdmailSendGuardState(state, actor);
+    return true;
+  }
+
   function matchesBranch(row, branchFilter) {
     const filter = normalizeString(branchFilter).toLowerCase();
     if (!filter) return true;
     return normalizeString(row.branche || row.branch || '').toLowerCase() === filter;
   }
 
-  function isEligibleColdmailRow(row, branchFilter) {
+  function matchesRadius(row, radiusKm) {
+    const radius = parseRadiusKm(radiusKm);
+    const distanceKm = getRowDistanceKm(row);
+    if (!Number.isFinite(distanceKm)) return true;
+    return distanceKm <= radius;
+  }
+
+  function isEligibleColdmailRow(row, branchFilter, radiusKm) {
     const email = getRowEmail(row);
     if (!isLikelyValidEmail(email)) return false;
     if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
     if (!matchesBranch(row, branchFilter)) return false;
+    if (!matchesRadius(row, radiusKm)) return false;
     if (isTestRecipientRow(row, email)) return true;
     const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
     return !EXCLUDED_DATABASE_STATUSES.has(status);
   }
 
-  function isEligibleColdcallingRow(row, branchFilter) {
+  function isEligibleColdcallingRow(row, branchFilter, radiusKm) {
     if (!isLikelyCallablePhone(getRowPhone(row))) return false;
     if (row.call === false || row.canCall === false || row.doNotCall === true) return false;
     if (!matchesBranch(row, branchFilter)) return false;
+    if (!matchesRadius(row, radiusKm)) return false;
     const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
     return !new Set(['interesse', 'afspraak', 'klant', 'afgehaakt', 'geblokkeerd', 'buiten']).has(status);
   }
@@ -487,15 +734,24 @@ function createColdmailCampaignService(deps = {}) {
     return Boolean(await resolveEmailDomain(domain));
   }
 
+  function isPersonalMailboxDomain(email) {
+    const domain = getEmailDomain(email);
+    return Boolean(domain && PERSONAL_MAILBOX_DOMAINS.has(domain));
+  }
+
   async function resolveColdmailRecipients(input = {}) {
-    const count = parsePositiveInt(input.count, 10, 1, 500);
     const mode = normalizeString(input.mode || '').toLowerCase() === 'call' ? 'call' : 'mail';
+    const count = parsePositiveInt(input.count, 10, 1, mode === 'call' ? 500 : getColdmailCampaignSendLimit());
     const state = await getUiStateValues(mode === 'call' ? leadDbScope : customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = mode === 'call' ? parseLeadDatabaseRows(values) : parseDatabaseRows(values);
     const candidateRows = rows
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
-      .filter(({ row }) => (mode === 'call' ? isEligibleColdcallingRow(row, input.branch) : isEligibleColdmailRow(row, input.branch)))
+      .filter(({ row }) =>
+        mode === 'call'
+          ? isEligibleColdcallingRow(row, input.branch, input.radiusKm)
+          : isEligibleColdmailRow(row, input.branch, input.radiusKm)
+      )
       .slice(0, count);
     const selectedRows = [];
     const failed = [];
@@ -506,6 +762,15 @@ function createColdmailCampaignService(deps = {}) {
         continue;
       }
       const email = getRowEmail(item.row);
+      if (!isTestRecipientRow(item.row, email) && shouldBlockPersonalMailboxDomains() && isPersonalMailboxDomain(email)) {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row),
+          email,
+          error: `Persoonlijke mailbox overgeslagen voor coldmail: ${getEmailDomain(email)}.`,
+        });
+        continue;
+      }
       if (await isDeliverableEmailDomain(email)) {
         selectedRows.push(item);
       } else {
@@ -521,6 +786,7 @@ function createColdmailCampaignService(deps = {}) {
     return {
       count,
       mode,
+      radiusKm: parseRadiusKm(input.radiusKm),
       values,
       rows,
       candidateRows,
@@ -535,13 +801,16 @@ function createColdmailCampaignService(deps = {}) {
       ok: true,
       mode: resolved.mode,
       requested: resolved.count,
+      radiusKm: resolved.radiusKm,
       candidates: resolved.candidateRows.length,
       selected: resolved.selectedRows.length,
+      safetyLimits: getColdmailSafetyLimits(),
       recipients: resolved.selectedRows.map((item) => ({
         id: item.id,
         bedrijf: getRowCompany(item.row),
         email: getRowEmail(item.row),
         phone: getRowPhone(item.row),
+        distanceKm: Number.isFinite(getRowDistanceKm(item.row)) ? Math.round(getRowDistanceKm(item.row) * 10) / 10 : null,
       })),
       failedItems: resolved.failed,
     };
@@ -563,6 +832,17 @@ function createColdmailCampaignService(deps = {}) {
       .replace(/\r\n?/g, '\n')
       .replace(/[ \t]+\n/g, '\n')
       .trim();
+  }
+
+  function appendColdmailOptOutText(text) {
+    const cleanText = normalizeString(text);
+    if (!cleanText) return COLDMAIL_OPT_OUT_TEXT;
+    if (/(afmelden|uitschrijven|unsubscribe)/i.test(cleanText)) return cleanText;
+    return `${cleanText}\n\n${COLDMAIL_OPT_OUT_TEXT}`;
+  }
+
+  function shouldAppendColdmailOptOutText(text) {
+    return !/(afmelden|uitschrijven|unsubscribe)/i.test(normalizeString(text));
   }
 
   function buildColdmailReference(row, id) {
@@ -638,11 +918,17 @@ function createColdmailCampaignService(deps = {}) {
     return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
   }
 
-  function appendWebdesignImageHtml(html, attachment) {
+  function appendWebdesignImageHtml(html, attachment, options = {}) {
     if (!attachment || !attachment.cid) return html;
-    return `${html}\n<p style="margin-top:24px;"><img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
+    const optOutText = normalizeString(options.optOutText || '');
+    const optOutHtml = optOutText
+      ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;">${escapeHtml(
+          optOutText
+        )}</p>`
+      : '';
+    return `${html}\n<p style="margin:24px 0 0 0;"><img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
       attachment.alt || 'Webdesign'
-    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>`;
+    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>${optOutHtml}`;
   }
 
   async function loadColdmailReplyState() {
@@ -839,10 +1125,16 @@ function createColdmailCampaignService(deps = {}) {
     return next.toISOString();
   }
 
+  function normalizeCampaignDurationDays(value) {
+    const normalized = normalizeString(value).toLowerCase();
+    if (normalized === 'disabled' || normalized === 'uitgeschakeld' || normalized === '0') return 0;
+    return parsePositiveInt(value, 14, 1, 90);
+  }
+
   function markRowAsMailed(row, actor, durationDays) {
     const date = now().toISOString();
-    const safeDurationDays = parsePositiveInt(durationDays, 14, 1, 90);
-    const campaignEndsAt = addDaysIso(new Date(date), safeDurationDays);
+    const safeDurationDays = normalizeCampaignDurationDays(durationDays);
+    const campaignEndsAt = safeDurationDays > 0 ? addDaysIso(new Date(date), safeDurationDays) : '';
     const existingHistory = Array.isArray(row.hist) ? row.hist : [];
     return {
       ...row,
@@ -897,8 +1189,29 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
 
-    const selectedRows = resolvedRecipients.selectedRows;
+    let selectedRows = resolvedRecipients.selectedRows;
     const failed = resolvedRecipients.failed;
+    const quota = await getColdmailSendQuota(senderEmail);
+    const quotaRemaining = Math.min(quota.senderRemaining, quota.packageRemaining);
+    if (quotaRemaining <= 0) {
+      const error = new Error(
+        'Daglimiet bereikt: om je STRATO-mailbox en domeinreputatie te beschermen worden vandaag geen extra coldmails verzonden.'
+      );
+      error.code = 'COLDMAIL_DAILY_LIMIT_REACHED';
+      error.quota = quota;
+      throw error;
+    }
+    if (selectedRows.length > quotaRemaining) {
+      selectedRows.slice(quotaRemaining).forEach((item) => {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row),
+          email: getRowEmail(item.row),
+          error: `Daglimiet beschermt deze ontvanger: nog ${quotaRemaining} verzending(en) beschikbaar vandaag.`,
+        });
+      });
+      selectedRows = selectedRows.slice(0, quotaRemaining);
+    }
     const shouldIncludeWebdesignPhoto = isWebdesignSpecialAction(input.specialAction);
     const customerPhotoMap = shouldIncludeWebdesignPhoto ? await loadCustomerPhotoMap() : {};
 
@@ -917,7 +1230,8 @@ function createColdmailCampaignService(deps = {}) {
       const row = item.row;
       const to = getRowEmail(row);
       const reference = buildColdmailReference(row, item.id);
-      const text = buildMailText(bodyTemplate, row);
+      const baseText = buildMailText(bodyTemplate, row);
+      const text = appendColdmailOptOutText(baseText);
       const subject = personalizeTemplate(subjectTemplate, row);
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
@@ -929,8 +1243,13 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
-      const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(text), reference);
-      const html = webdesignPhoto ? appendWebdesignImageHtml(htmlBase, webdesignPhoto) : htmlBase;
+      const htmlBodyText = webdesignPhoto ? baseText : text;
+      const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(htmlBodyText), reference);
+      const html = webdesignPhoto
+        ? appendWebdesignImageHtml(htmlBase, webdesignPhoto, {
+            optOutText: shouldAppendColdmailOptOutText(baseText) ? COLDMAIL_OPT_OUT_TEXT : '',
+          })
+        : htmlBase;
       const attachments = webdesignPhoto
         ? [
             {
@@ -988,6 +1307,7 @@ function createColdmailCampaignService(deps = {}) {
 
     if (sentPersistableRowIds.size) {
       const actor = normalizeString(input.actor || 'Coldmailing');
+      await recordColdmailSendGuardEntry({ senderEmail, count: sent.length, actor });
       const updatedRows = rows.map((row, index) =>
         sentPersistableRowIds.has(getRowId(row, index)) ? markRowAsMailed(row, actor, input.durationDays) : row
       );
@@ -1011,6 +1331,13 @@ function createColdmailCampaignService(deps = {}) {
       sent: sent.length,
       failed: failed.length,
       persisted: sentPersistableRowIds.size,
+      safetyLimits: getColdmailSafetyLimits(),
+      dailyQuota: {
+        senderSentBefore: quota.senderSent,
+        packageSentBefore: quota.packageSent,
+        senderRemainingBefore: quota.senderRemaining,
+        packageRemainingBefore: quota.packageRemaining,
+      },
       senderEmail,
       specialAction: normalizeString(input.specialAction || ''),
       sentItems: sent,
@@ -1198,6 +1525,7 @@ function createColdmailCampaignService(deps = {}) {
     getAllowedSenderEmails,
     getMissingImapMailEnv,
     getMissingSmtpMailEnv,
+    getColdmailSafetyLimits,
     isImapMailConfigured,
     isSmtpMailConfigured,
     isLikelyValidEmail,

@@ -22,6 +22,11 @@ test('shared custom select assets support Softora dropdown variants', () => {
 
   assert.match(jsSource, /const customSelectInstances = new Map\(\);/);
   assert.match(jsSource, /serviceLockOptionValues = new Set\(\["voice_software", "business_software", "ai_chatbots"\]\)/);
+  assert.match(jsSource, /function createServiceLockElement\(\) \{/);
+  assert.match(jsSource, /menu\.replaceChildren\(\);/);
+  assert.match(jsSource, /optionButton\.append\(createServiceLockElement\(\), createOptionLabel\(rawLabel\)\);/);
+  assert.doesNotMatch(jsSource, /menu\.innerHTML\s*=/);
+  assert.doesNotMatch(jsSource, /optionButton\.innerHTML\s*=/);
   assert.match(jsSource, /if \(select\.id === "regio"\) \{/);
   assert.match(jsSource, /String\(select\.dataset\.selectVariant \|\| ""\)\.trim\(\)/);
   assert.match(jsSource, /String\(select\.dataset\.customSelect \|\| ""\)\.trim\(\) === "true"/);

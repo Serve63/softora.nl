@@ -230,6 +230,28 @@ function loadRuntimeEnv(env = process.env) {
         5_000,
         300_000
       ),
+      coldmailCampaignSendLimit: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_CAMPAIGN_SEND_LIMIT,
+        30,
+        1,
+        50
+      ),
+      coldmailDailySendLimit: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_DAILY_SEND_LIMIT,
+        50,
+        1,
+        50
+      ),
+      coldmailPackageDailySendLimit: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_PACKAGE_DAILY_SEND_LIMIT,
+        100,
+        1,
+        100
+      ),
+      coldmailBlockPersonalMailboxDomains: readNegatedBooleanEnvFlag(
+        safeEnv.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,
+        false
+      ),
     },
     googleCalendar: {
       enabled: readBooleanEnvFlag(safeEnv.GOOGLE_CALENDAR_SYNC_ENABLED),

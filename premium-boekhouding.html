@@ -84,7 +84,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
 .aangifte-row.soon { border-color: rgba(180,90,0,.2); }
 
 .check-cell { display: flex; align-items: center; }
-.check-box { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; flex-shrink: 0; }
+.check-box { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; flex-shrink: 0; background: transparent; padding: 0; appearance: none; }
 .check-box:hover { border-color: var(--green); }
 .check-box.checked { background: var(--green); border-color: var(--green); }
 .check-box svg { width: 10px; height: 10px; color: #fff; opacity: 0; transition: opacity .15s; }
@@ -261,9 +261,9 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
   <div class="page-sub">Fiscale verplichtingen en aangiftekalender voor je VOF</div>
 
   <div class="year-nav">
-    <button class="btn-yr" onclick="changeYear(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <button class="btn-yr" type="button" data-bookkeeping-action="year-prev" aria-label="Vorig jaar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg></button>
     <div class="year-label" id="year-label">2026</div>
-    <button class="btn-yr" onclick="changeYear(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg></button>
+    <button class="btn-yr" type="button" data-bookkeeping-action="year-next" aria-label="Volgend jaar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg></button>
   </div>
 
   <div id="list-wrap"></div>
@@ -279,20 +279,20 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
         <div class="files-count" id="files-count"></div>
       </div>
       <div class="files-tools">
-        <button class="icon-btn" type="button" onclick="goBack()" aria-label="Naar overzicht">
+        <button class="icon-btn" type="button" data-bookkeeping-action="back" aria-label="Naar overzicht">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <button class="icon-btn" type="button" onclick="document.getElementById('file-inp').click()" aria-label="Upload bestanden">
+        <button class="icon-btn" type="button" data-bookkeeping-action="upload" aria-label="Upload bestanden">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
-        <input type="file" multiple id="file-inp" style="display:none" onchange="addFiles(this.files)">
+        <input type="file" multiple id="file-inp" style="display:none">
       </div>
     </div>
     <div class="files-grid" id="files-grid"></div>
 
     <div class="notes-label">Notities</div>
     <textarea class="notes-ta" id="notes-ta" placeholder="Bijv. referentienummer, ingestuurde bedragen, bijzonderheden..."></textarea>
-    <button class="btn-save" onclick="saveNotes()">
+    <button class="btn-save" type="button" data-bookkeeping-action="save-notes">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>
       Opslaan
     </button>
@@ -305,360 +305,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
 </main>
 </div>
 
-<script>
-let year = new Date().getFullYear();
-let openId = null;
-
-// STATE
-const REMOTE_UI_STATE_SCOPE = 'premium_bookkeeping';
-const REMOTE_UI_STATE_KEY = 'softora_premium_bookkeeping_state_v1';
-let st = {};
-
-async function fetchUiStateGet(scope) {
-  const encodedScope = encodeURIComponent(String(scope || ''));
-  const urls = [
-    `/api/ui-state-get?scope=${encodedScope}`,
-    `/api/ui-state/${encodedScope}`
-  ];
-  let lastError = null;
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, { method: 'GET', cache: 'no-store' });
-      if (!response.ok) throw new Error(`UI-state GET mislukt (${response.status})`);
-      return await response.json().catch(function () { return {}; });
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError || new Error('UI-state GET mislukt');
-}
-
-async function fetchUiStateSet(scope, body) {
-  const encodedScope = encodeURIComponent(String(scope || ''));
-  const urls = [
-    `/api/ui-state-set?scope=${encodedScope}`,
-    `/api/ui-state/${encodedScope}`
-  ];
-  let lastError = null;
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body || {})
-      });
-      if (!response.ok) throw new Error(`UI-state POST mislukt (${response.status})`);
-      return await response.json().catch(function () { return {}; });
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError || new Error('UI-state POST mislukt');
-}
-
-function parseRemoteState(raw) {
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(String(raw));
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch (_) {
-    return {};
-  }
-}
-
-async function loadRemoteState() {
-  try {
-    const state = await fetchUiStateGet(REMOTE_UI_STATE_SCOPE);
-    st = parseRemoteState(state && state.values && state.values[REMOTE_UI_STATE_KEY]);
-  } catch (error) {
-    console.error('Boekhouding laden via Supabase mislukt:', error);
-    showToast('Boekhouding kon niet centraal laden');
-    st = {};
-  }
-}
-
-async function save() {
-  try {
-    await fetchUiStateSet(REMOTE_UI_STATE_SCOPE, {
-      patch: {
-        [REMOTE_UI_STATE_KEY]: JSON.stringify(st)
-      },
-      source: 'premium-boekhouding',
-      actor: 'browser'
-    });
-  } catch (error) {
-    console.error('Boekhouding opslaan via Supabase mislukt:', error);
-    showToast('Opslaan naar Supabase mislukt');
-  }
-}
-
-function entry(id) { return st[id] || { checked:false, files:[], notes:'' }; }
-function upd(id, d) { st[id] = { ...entry(id), ...d }; void save(); }
-
-// AANGIFTES — BTW: kwartaalregeling Belastingdienst (Q1→30 apr, Q2→31 jul, Q3→31 okt, Q4→31 jan volgend jaar).
-// IB: belastingjaar J → uiterlijk 1 mei J+1 (standaard aangifteperiode; controleer eigen situatie op belastingdienst.nl).
-const BTW_DEADLINE_COUNT = 35;
-const INCOME_TAX_DEADLINE_COUNT = 35;
-const BTW_START_YEAR = 2026;
-const INCOME_TAX_START_YEAR = 2025;
-
-function buildBtwAangiftes() {
-  const quarters = [
-    { quarter:1, label:'1e kwartaal', months:'jan - mrt', deadlineSuffix:'04-30', deadlineYearOffset:0 },
-    { quarter:2, label:'2e kwartaal', months:'apr - jun', deadlineSuffix:'07-31', deadlineYearOffset:0 },
-    { quarter:3, label:'3e kwartaal', months:'jul - sep', deadlineSuffix:'10-31', deadlineYearOffset:0 },
-    { quarter:4, label:'4e kwartaal', months:'okt - dec', deadlineSuffix:'01-31', deadlineYearOffset:1 }
-  ];
-
-  return Array.from({ length: BTW_DEADLINE_COUNT }, (_, index) => {
-    const periodYear = BTW_START_YEAR + Math.floor(index / 4);
-    const quarter = quarters[index % 4];
-    const deadlineYear = periodYear + quarter.deadlineYearOffset;
-
-    return {
-      id:`btw${quarter.quarter}-${periodYear}`,
-      naam:'BTW Aangifte',
-      period:`${quarter.label} ${periodYear} (${quarter.months})`,
-      deadline:`${deadlineYear}-${quarter.deadlineSuffix}`,
-      cat:'Omzetbelasting (BTW)'
-    };
-  });
-}
-
-function buildIncomeTaxAangiftes() {
-  return Array.from({ length: INCOME_TAX_DEADLINE_COUNT }, (_, index) => {
-    const taxYear = INCOME_TAX_START_YEAR + index;
-
-    return {
-      id:`ib-${taxYear}`,
-      naam:'Inkomstenbelasting',
-      period:`Belastingjaar ${taxYear}`,
-      deadline:`${taxYear + 1}-05-01`,
-      cat:'Inkomstenbelasting'
-    };
-  });
-}
-
-const ALL_AANGIFTES = [...buildBtwAangiftes(), ...buildIncomeTaxAangiftes()].sort((a,b) => new Date(a.deadline) - new Date(b.deadline));
-const AVAILABLE_YEARS = [...new Set(ALL_AANGIFTES.map(a => Number(String(a.deadline).slice(0,4))))].sort((a,b) => a - b);
-function clampYear(nextYear) { return Math.max(AVAILABLE_YEARS[0], Math.min(AVAILABLE_YEARS[AVAILABLE_YEARS.length - 1], nextYear)); }
-year = clampYear(year);
-
-function aangiftes(y) {
-  return ALL_AANGIFTES.filter(a => Number(String(a.deadline).slice(0,4)) === y);
-}
-
-// HELPERS
-function daysLeft(d) { const n=new Date(); n.setHours(0,0,0,0); const t=new Date(d); t.setHours(0,0,0,0); return Math.round((t-n)/86400000); }
-function fmtDate(s) { if(!s) return '-'; const[y,m,d]=s.split('-'); const mo=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec']; return `${parseInt(d)} ${mo[m-1]} ${y}`; }
-function fmtSize(b) { return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
-
-function badge(id, deadline) {
-  const e = entry(id);
-  if (e.checked) return { cls:'badge-done', txt:'Ingediend' };
-  const d = daysLeft(deadline);
-  if (d < 0)   return { cls:'badge-urgent', txt:'Verlopen' };
-  if (d <= 14) return { cls:'badge-urgent', txt:`Nog ${d} dagen` };
-  if (d <= 30) return { cls:'badge-soon',   txt:`Nog ${d} dagen` };
-  return { cls:'badge-future', txt:`Nog ${d} dagen` };
-}
-
-function rowClass(id, deadline) {
-  const e = entry(id);
-  if (e.checked) return 'done';
-  const d = daysLeft(deadline);
-  if (d <= 14) return 'urgent';
-  if (d <= 30) return 'soon';
-  return '';
-}
-
-// RENDER OVERZICHT
-function renderList() {
-  document.getElementById('year-label').textContent = year;
-  const all = aangiftes(year);
-  const undone = all.filter(a => !entry(a.id).checked).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
-  const done   = all.filter(a =>  entry(a.id).checked).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
-
-  let html = '';
-
-  // Group undone by category
-  if (undone.length) {
-    const cats = [...new Set(undone.map(a => a.cat))];
-    cats.forEach(cat => {
-      const items = undone.filter(a => a.cat === cat);
-      if (cat !== 'Overige Opgaven') {
-        html += `<div class="section-label">${cat}</div>`;
-      }
-      html += `<div class="aangifte-list">`;
-      html += items.map(a => row(a)).join('');
-      html += `</div>`;
-    });
-  }
-  if (done.length) {
-    html += `<div class="section-label">Ingediend</div><div class="aangifte-list">`;
-    html += done.map(a => row(a)).join('');
-    html += `</div>`;
-  }
-
-  document.getElementById('list-wrap').innerHTML = html;
-}
-
-function row(a) {
-  const e = entry(a.id);
-  const fc = (e.files||[]).length;
-  const b = badge(a.id, a.deadline);
-  const dlColor = e.checked?'var(--green)':daysLeft(a.deadline)<=14?'var(--red)':daysLeft(a.deadline)<=30?'var(--orange)':'var(--dark)';
-
-  return `<div class="aangifte-row ${rowClass(a.id,a.deadline)}" onclick="openMap('${a.id}')">
-    <div class="check-cell" onclick="event.stopPropagation()">
-      <div class="check-box ${e.checked?'checked':''}" onclick="toggleCheck('${a.id}')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-      </div>
-    </div>
-    <div class="info-cell">
-      <div class="row-name">${a.naam}</div>
-      <div class="row-period">${a.period}</div>
-    </div>
-    <div class="files-cell"><strong>${fc}</strong>bestand${fc!==1?'en':''}</div>
-    <div class="deadline-cell">
-      <div class="dl-label">Deadline</div>
-      <div class="dl-date" style="color:${dlColor}">${fmtDate(a.deadline)}</div>
-    </div>
-    <div class="badge-cell"><span class="badge ${b.cls}">${b.txt}</span></div>
-    <div class="arrow-cell"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
-  </div>`;
-}
-
-// TOGGLE CHECK
-function toggleCheck(id) {
-  const e = entry(id);
-  upd(id, { checked: !e.checked });
-  renderList();
-  showToast(!e.checked ? 'Gemarkeerd als ingediend' : 'Teruggezet naar openstaand');
-}
-
-// JAAR
-function changeYear(d) { year = clampYear(year + d); renderList(); }
-
-// OPEN MAP
-function openMap(id) {
-  openId = id;
-  const a = ALL_AANGIFTES.find(x => x.id === id); if (!a) return;
-  const e = entry(id);
-
-  document.getElementById('map-title').textContent = a.naam;
-  document.getElementById('map-period').textContent = a.period || '';
-  document.getElementById('notes-ta').value = e.notes || '';
-  renderFiles();
-
-  document.getElementById('screen-overzicht').classList.remove('active');
-  document.getElementById('screen-map').classList.add('active');
-  window.scrollTo(0,0);
-}
-
-// RENDER FILES
-function renderFiles() {
-  const e = entry(openId);
-  const files = e.files || [];
-  const grid = document.getElementById('files-grid');
-  const cnt  = document.getElementById('files-count');
-  cnt.textContent = files.length + ' bestand' + (files.length!==1?'en':'');
-
-  if (!files.length) {
-    grid.innerHTML = `<div class="files-empty" style="grid-column:1/-1">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <p>Nog geen bestanden - sleep ze hierheen of klik op toevoegen</p>
-    </div>`;
-    return;
-  }
-
-  const extCol = { pdf:'#c0392b',xlsx:'#16733c',xls:'#16733c',csv:'#16733c',docx:'#1a5f8a',doc:'#1a5f8a',jpg:'#b45a00',jpeg:'#b45a00',png:'#b45a00',pptx:'#c0392b' };
-
-  grid.innerHTML = files.map((f,i) => {
-    const ext = f.name.split('.').pop().toLowerCase();
-    const col = extCol[ext] || '#888';
-    return `<div class="file-tile" onclick="openFile(${i})">
-      <button class="file-del" onclick="event.stopPropagation();delFile(${i})">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-      <div class="file-doc">
-        <svg class="doc-bg" viewBox="0 0 40 48" fill="none">
-          <path d="M0 4C0 1.79086 1.79086 0 4 0H26L40 14V44C40 46.2091 38.2091 48 36 48H4C1.79086 48 0 46.2091 0 44V4Z" fill="${col}15" stroke="${col}35" stroke-width="1.2"/>
-          <path d="M26 0L40 14H30C27.7909 14 26 12.2091 26 10V0Z" fill="${col}35"/>
-        </svg>
-        <div class="file-doc-ext">${ext}</div>
-      </div>
-      <div class="file-name" title="${f.name}">${f.name}</div>
-      <div class="file-size">${f.size}</div>
-    </div>`;
-  }).join('');
-}
-
-function openFile(i) {
-  const f = (entry(openId).files||[])[i];
-  if (!f) return;
-  if (f.url) { const a=document.createElement('a'); a.href=f.url; a.download=f.name; a.click(); }
-  showToast('Bestand geopend: ' + f.name);
-}
-
-function delFile(i) {
-  const e = entry(openId);
-  const files = [...(e.files||[])];
-  const name = files[i]?.name;
-  files.splice(i,1);
-  upd(openId, { files });
-  renderFiles();
-  renderList();
-  showToast(name + ' verwijderd');
-}
-
-function addFiles(list) {
-  const e = entry(openId);
-  const files = [...(e.files||[])];
-  let n = 0;
-  const readers = Array.from(list).map(f => new Promise(res => {
-    const r = new FileReader();
-    r.onload = ev => { files.push({ name:f.name, size:fmtSize(f.size), url:ev.target.result }); n++; res(); };
-    r.readAsDataURL(f);
-  }));
-  Promise.all(readers).then(() => {
-    upd(openId, { files });
-    renderFiles();
-    renderList();
-    showToast(n + ' bestand' + (n!==1?'en':'') + ' toegevoegd');
-  });
-}
-
-function saveNotes() {
-  upd(openId, { notes: document.getElementById('notes-ta').value });
-  showToast('Notities opgeslagen');
-}
-
-function goBack() {
-  openId = null;
-  document.getElementById('screen-map').classList.remove('active');
-  document.getElementById('screen-overzicht').classList.add('active');
-  renderList();
-  window.scrollTo(0,0);
-}
-
-function showToast(msg) {
-  const t=document.getElementById('toast'); t.textContent=msg;
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
-}
-
-void loadRemoteState().then(renderList);
-
-function finishPremiumShellBoot() {
-  if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
-    window.SoftoraPremiumBoot.setShellBooting(false);
-  }
-}
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', finishPremiumShellBoot, { once: true });
-} else {
-  finishPremiumShellBoot();
-}
-</script>
+<script src="assets/premium-ui-state-client.js?v=20260427a"></script>
+<script src="assets/premium-bookkeeping.js?v=20260427a"></script>
 </body>
 </html>

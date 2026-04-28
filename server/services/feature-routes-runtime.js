@@ -10,10 +10,14 @@ const { registerWebsitePreviewLibraryRoutes } = require('../routes/website-previ
 const { registerWebsitePreviewBatchRoutes } = require('../routes/website-preview-batch');
 const { registerMailboxRoutes } = require('../routes/mailbox');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
+const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
 const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
 const { registerRuntimeDebugOpsRoutes } = require('../routes/runtime-debug-ops');
 const { registerSeoReadRoutes } = require('../routes/seo-read');
 const { registerSeoWriteRoutes } = require('../routes/seo-write');
+const {
+  createPremiumDatabaseImportCoordinator,
+} = require('./premium-database-import');
 const { createPremiumRouteRuntime } = require('./premium-route-runtime');
 
 function registerFeatureRoutes(app, deps = {}) {
@@ -37,6 +41,7 @@ function registerFeatureRoutes(app, deps = {}) {
     seoReadCoordinator,
     seoWriteCoordinator,
   } = deps;
+  const premiumDatabaseImportCoordinator = createPremiumDatabaseImportCoordinator();
 
   registerColdcallingWebhookRoutes(app, {
     handleTwilioInboundVoice,
@@ -58,6 +63,9 @@ function registerFeatureRoutes(app, deps = {}) {
   registerWebsitePreviewBatchRoutes(app, { coordinator: websitePreviewBatchCoordinator });
   registerMailboxRoutes(app, { coordinator: mailboxCoordinator });
   registerActiveOrderRoutes(app, { coordinator: activeOrdersCoordinator });
+  registerPremiumDatabaseImportRoutes(app, {
+    coordinator: premiumDatabaseImportCoordinator,
+  });
   registerRuntimeOpsRoutes(app, {
     coordinator: runtimeOpsCoordinator,
     requireRuntimeDebugAccess,

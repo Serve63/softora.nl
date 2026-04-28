@@ -110,7 +110,7 @@
         }
         if (avatarEl) {
             var url = String(s.avatarDataUrl || "").trim();
-            avatarEl.innerHTML = "";
+            avatarEl.replaceChildren();
             if (url) {
                 var img = document.createElement("img");
                 img.src = url;
