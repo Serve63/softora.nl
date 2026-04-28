@@ -171,6 +171,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, />Bellen<\/span>/);
   assert.doesNotMatch(pageSource, />Mailen<\/span>/);
   assert.match(pageSource, /fetchUiStateSetWithFallback\(CUSTOMER_DB_SCOPE/);
+  assert.match(pageSource, /function parseCustomersFromStateValues\(values, key\)/);
+  assert.match(pageSource, /chunkedCustomers\.length > rawCustomers\.length \? chunkedCustomers : rawCustomers/);
+  assert.match(pageSource, /\[CUSTOMER_DB_KEY \+ "_chunks_v1"\]: ""/);
   assert.match(pageSource, /source: "premium-database"/);
   assert.match(pageSource, /actor: "Premium database"/);
   assert.match(pageSource, /Database-voorbeeld uit actieve opdrachten\. Voeg klanten toe om ze permanent op te slaan\./);

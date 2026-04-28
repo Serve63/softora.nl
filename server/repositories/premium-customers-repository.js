@@ -603,6 +603,50 @@ function stringifyCustomerRows(rows) {
   return JSON.stringify(normalizeCustomerRows(rows));
 }
 
+function getCustomerChunkMetaKey(baseKey) {
+  return `${normalizeString(baseKey)}_chunks_v1`;
+}
+
+function getCustomerChunkPrefix(baseKey) {
+  return `${normalizeString(baseKey)}_chunk_`;
+}
+
+function readChunkedCustomerRowsValue(values, baseKey) {
+  const stateValues = isPlainObject(values) ? values : {};
+  const normalizedKey = normalizeString(baseKey);
+  const metaRaw = normalizeString(stateValues[getCustomerChunkMetaKey(normalizedKey)]);
+  if (!metaRaw) return '';
+
+  try {
+    const meta = JSON.parse(metaRaw);
+    const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0));
+    if (!count) return '';
+
+    const prefix = getCustomerChunkPrefix(normalizedKey);
+    const chunks = [];
+    for (let index = 0; index < count; index += 1) {
+      const chunk = stateValues[prefix + index];
+      if (typeof chunk !== 'string') return '';
+      chunks.push(chunk);
+    }
+
+    return chunks.join('');
+  } catch (_error) {
+    return '';
+  }
+}
+
+function parseCustomerRowsFromStateValues(values, key = DEFAULT_CUSTOMER_KEY, logger = console) {
+  const stateValues = isPlainObject(values) ? values : {};
+  const normalizedKey = normalizeString(key) || DEFAULT_CUSTOMER_KEY;
+  const rawRows = parseCustomerRows(stateValues[normalizedKey], logger);
+  const chunkedRaw = readChunkedCustomerRowsValue(stateValues, normalizedKey);
+  if (!chunkedRaw) return rawRows;
+
+  const chunkedRows = parseCustomerRows(chunkedRaw, logger);
+  return chunkedRows.length > rawRows.length ? chunkedRows : rawRows;
+}
+
 function createPremiumCustomersRepository(deps = {}) {
   const {
     customerScope = DEFAULT_CUSTOMER_SCOPE,
@@ -630,7 +674,7 @@ function createPremiumCustomersRepository(deps = {}) {
 
     const state = await getUiStateValues(normalizedScope);
     const values = state && isPlainObject(state.values) ? state.values : {};
-    const rows = parseCustomerRows(values[normalizedKey], logger);
+    const rows = parseCustomerRowsFromStateValues(values, normalizedKey, logger);
     const selection = selectCustomerRows(rows, options);
 
     return {
@@ -664,6 +708,7 @@ function createPremiumCustomersRepository(deps = {}) {
       normalizedScope,
       {
         [normalizedKey]: stringifyCustomerRows(sanitizedRows),
+        [getCustomerChunkMetaKey(normalizedKey)]: '',
       },
       {
         ...meta,
