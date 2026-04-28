@@ -5,6 +5,7 @@ const {
   filterColdcallingLeadsByDatabaseStatus,
   normalizeDatabaseContactStatus,
   parseCustomerDatabaseRowsFromUiState,
+  readCustomerDatabaseRowsForColdcallingEligibility,
 } = require('../../server/services/coldcalling-lead-eligibility');
 const { registerColdcallingRoutes } = require('../../server/routes/coldcalling');
 
@@ -114,6 +115,45 @@ test('coldcalling lead eligibility parses premium database rows from ui state', 
   assert.equal(rows[1].bedrijf, 'B');
 });
 
+test('coldcalling lead eligibility reads customer rows through the repository seam first', async () => {
+  let rawCustomerReads = 0;
+  const rows = await readCustomerDatabaseRowsForColdcallingEligibility({
+    getUiStateValues: async () => {
+      rawCustomerReads += 1;
+      return {
+        values: {
+          softora_customers_premium_v1: JSON.stringify([{ bedrijf: 'Raw', status: 'klant' }]),
+        },
+      };
+    },
+    customerRepository: {
+      listCustomers: async () => ({
+        rows: [{ bedrijf: 'Repository Klant', telefoon: '+31612345678', status: 'klant' }],
+      }),
+    },
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].bedrijf, 'Repository Klant');
+  assert.equal(rawCustomerReads, 0);
+});
+
+test('coldcalling lead eligibility falls back to raw rows when repository scan is empty', async () => {
+  const rows = await readCustomerDatabaseRowsForColdcallingEligibility({
+    getUiStateValues: async () => ({
+      values: {
+        softora_customers_premium_v1: JSON.stringify([{ bedrijf: 'Fallback Klant', status: 'klant' }]),
+      },
+    }),
+    customerRepository: {
+      listCustomers: async () => ({ rows: [] }),
+    },
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].bedrijf, 'Fallback Klant');
+});
+
 test('coldcalling start skips database-blocked leads before provider dispatch', async () => {
   let processed = 0;
   let envChecked = false;
@@ -164,6 +204,51 @@ test('coldcalling start skips database-blocked leads before provider dispatch', 
   assert.equal(res.body.results[0].skipped, true);
   assert.equal(processed, 0);
   assert.equal(envChecked, false);
+});
+
+test('coldcalling start uses the repository seam for premium customer blocking', async () => {
+  let processed = 0;
+  let rawCustomerReads = 0;
+  const callStart = createRouteHarness({
+    validateStartPayload: () => ({
+      campaign: buildCampaign({ amount: 1 }),
+      leads: [{ company: 'Repository Klant', phone: '06 12 34 56 78' }],
+    }),
+    getEffectivePublicBaseUrl: () => 'https://softora.test',
+    resolveColdcallingProviderForCampaign: () => 'retell',
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_customers_database') rawCustomerReads += 1;
+      if (scope === 'premium_active_orders') {
+        return { values: { softora_custom_orders_premium_v1: '[]' }, source: 'supabase' };
+      }
+      return { values: { softora_customers_premium_v1: '[]' }, source: 'supabase' };
+    },
+    customerRepository: {
+      listCustomers: async () => ({
+        rows: [{ bedrijf: 'Repository Klant', telefoon: '+31612345678', status: 'klant' }],
+      }),
+    },
+    premiumActiveOrdersScope: 'premium_active_orders',
+    premiumActiveCustomOrdersKey: 'softora_custom_orders_premium_v1',
+    getMissingEnvVars: () => [],
+    processColdcallingLead: async () => {
+      processed += 1;
+      return { success: true };
+    },
+    createSequentialDispatchQueue: () => ({ id: 'queue-1', leads: [], results: [] }),
+    advanceSequentialDispatchQueue: async () => null,
+    waitForQueuedRuntimeStatePersist: async () => null,
+    sleep: async () => null,
+  });
+
+  const res = await callStart({});
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.summary.started, 0);
+  assert.equal(res.body.summary.skipped, 1);
+  assert.equal(res.body.results[0].details.databaseStatus, 'klant');
+  assert.equal(processed, 0);
+  assert.equal(rawCustomerReads, 0);
 });
 
 test('coldcalling start dispatches only allowed leads and keeps original lead indexes', async () => {
