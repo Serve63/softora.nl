@@ -69,6 +69,9 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /selectedWho='serve'/);
   assert.match(pageSource, /who:selectedWho/);
   assert.match(pageSource, /renderMobileAgendaApp/);
+  assert.match(pageSource, /const appShellTemplate = document\.createElement\('template'\);/);
+  assert.match(pageSource, /document\.body\.replaceChildren\(appShellTemplate\.content\.cloneNode\(true\)\);/);
+  assert.doesNotMatch(pageSource, /document\.body\.innerHTML\s*=/);
   assert.match(pageSource, /function go\(delta\)\{track\.style\.transform=`translateX\(\$\{delta>0\?-vp\.offsetWidth\*2:0\}px\)`;/);
   assert.match(pageSource, /if\(dx<-thr\)go\(1\);else if\(dx>thr\)go\(-1\);/);
   assert.match(pageSource, /if\(mdx<-thr\)go\(1\);else if\(mdx>thr\)go\(-1\);/);

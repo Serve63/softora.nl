@@ -314,9 +314,9 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   </div>
   <div class="topbar-search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" placeholder="Zoeken in mailbox…" id="search-input" oninput="filterMails()">
+    <input type="text" placeholder="Zoeken in mailbox…" id="search-input">
   </div>
-  <button class="btn-compose" onclick="openCompose()">
+  <button class="btn-compose" type="button" data-mailbox-action="open-compose">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Nieuwe mail
   </button>
@@ -327,28 +327,28 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 
   <!-- FOLDERS -->
   <div class="mail-sidebar">
-    <div class="folder-item active" onclick="setFolder('inbox', this)">
+    <div class="folder-item active" data-mailbox-action="set-folder" data-mailbox-folder="inbox" role="button" tabindex="0">
       <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>
       Inbox
       <span class="folder-badge" id="badge-inbox">3</span>
     </div>
-    <div class="folder-item" onclick="setFolder('starred', this)">
+    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="starred" role="button" tabindex="0">
       <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       Gemarkeerd
     </div>
-    <div class="folder-item" onclick="setFolder('sent', this)">
+    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="sent" role="button" tabindex="0">
       <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
       Verzonden
     </div>
-    <div class="folder-item" onclick="setFolder('drafts', this)">
+    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="drafts" role="button" tabindex="0">
       <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       Concepten
     </div>
-    <div class="folder-item" onclick="setFolder('spam', this)">
+    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="spam" role="button" tabindex="0">
       <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       Spam
     </div>
-    <div class="folder-item" onclick="setFolder('trash', this)">
+    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="trash" role="button" tabindex="0">
       <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
       Prullenbak
     </div>
@@ -375,14 +375,14 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   <div class="compose-box">
     <div class="compose-head">
       <div class="compose-head-title">Nieuwe mail</div>
-      <button class="compose-x" onclick="closeCompose()">×</button>
+      <button class="compose-x" type="button" data-mailbox-action="close-compose" aria-label="Sluiten">×</button>
     </div>
     <div class="compose-field"><div class="compose-field-label">Aan</div><input type="email" id="c-to" placeholder="ontvanger@email.nl"></div>
     <div class="compose-field"><div class="compose-field-label">Onderwerp</div><input type="text" id="c-subject" placeholder="Onderwerp…"></div>
     <div class="compose-body"><textarea id="c-body" placeholder="Typ je bericht hier…"></textarea></div>
     <div class="compose-footer">
-      <button class="btn-discard" onclick="closeCompose()">Verwijderen</button>
-      <button class="btn-send" onclick="sendMail()">Versturen</button>
+      <button class="btn-discard" type="button" data-mailbox-action="close-compose">Verwijderen</button>
+      <button class="btn-send" type="button" data-mailbox-action="send-mail">Versturen</button>
     </div>
   </div>
 </div>
@@ -393,540 +393,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   </main>
 </div>
 
-<script>
-const MAILBOX_ACCOUNT_DEFAULT = 'info@softora.nl';
-let activeMailboxAccount = MAILBOX_ACCOUNT_DEFAULT;
-let mailboxAccounts = [
-  { email: 'info@softora.nl', name: 'info@softora.nl', imapConfigured: false, smtpConfigured: false },
-];
-
-const avatarColors = ['#9b2355','#1a5f8a','#16733c','#7b3f00','#4a1a6b','#b45a00','#2c6e49'];
-const getColor = str => avatarColors[str.charCodeAt(0) % avatarColors.length];
-const initials = name => name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-
-function cloneMails(list) {
-  return JSON.parse(JSON.stringify(list));
-}
-
-const MAILBOX_DEMO_BY_ACCOUNT = {
-  'info@softora.nl': [
-  { id:1, folder:'inbox', from:'De Vries Installaties', email:'info@devries-inst.nl', subject:'Offerte aanvraag website', preview:'Goedemiddag, wij zijn geïnteresseerd in een nieuwe bedrijfswebsite…', body:`Goedemiddag,
-
-Wij zijn een installatiebedrijf gevestigd in Breda en zijn op zoek naar een nieuwe, professionele bedrijfswebsite.
-
-Kunt u ons een offerte sturen voor een website met de volgende wensen:
-- Moderne uitstraling
-- Contactformulier
-- Overzicht van onze diensten
-- Mobiel vriendelijk
-
-Graag horen wij van u.
-
-Met vriendelijke groet,
-Jan de Vries
-De Vries Installaties`, time:'10:24', date:'Vandaag', unread:true, starred:false, tags:['offerte','klant'] },
-
-  { id:2, folder:'inbox', from:'Hostinger', email:'billing@hostinger.com', subject:'Factuur #HG-2026-03142 beschikbaar', preview:'Uw factuur voor de maand maart is beschikbaar in uw account…', body:`Beste klant,
-
-Uw factuur #HG-2026-03142 voor de maand maart 2026 is beschikbaar in uw Hostinger account.
-
-Bedrag: €9,99 incl. BTW
-Betaalmethode: Automatische incasso
-Status: Betaald
-
-U kunt de factuur downloaden via uw control panel.
-
-Met vriendelijke groet,
-Het Hostinger Team`, time:'09:11', date:'Vandaag', unread:true, starred:false, tags:['factuur'] },
-
-  { id:3, folder:'inbox', from:'Sander Hoekstra', email:'s.hoekstra@gmail.com', subject:'Re: Onderhoudspakket verlenging', preview:'Hoi, bedankt voor de herinnering. Ik wil het pakket graag verlengen…', body:`Hoi,
-
-Bedankt voor de herinnering. Ik wil het pakket inderdaad graag verlengen voor nog een jaar.
-
-Kun je mij een nieuwe factuur sturen? Je kunt het gewoon op hetzelfde IBAN overmaken als vorige keer.
-
-Groeten,
-Sander`, time:'Gist.', date:'Gisteren', unread:true, starred:true, tags:['klant'] },
-
-  { id:4, folder:'inbox', from:'Google Workspace', email:'noreply@google.com', subject:'Maandoverzicht maart 2026', preview:'Uw Google Workspace abonnement wordt op 1 april verlengd…', body:`Beste gebruiker,
-
-Uw maandoverzicht voor Google Workspace (Business Starter) is beschikbaar.
-
-Periode: 1 maart – 31 maart 2026
-Kosten: €6,00 excl. BTW
-Volgende betaling: 1 april 2026
-
-Bedankt voor uw gebruik van Google Workspace.
-
-Met vriendelijke groet,
-Google Workspace Team`, time:'02 apr', date:'2 april', unread:false, starred:false, tags:['factuur'] },
-
-  { id:5, folder:'inbox', from:'Martine Bakker', email:'m.bakker@bakkermode.nl', subject:'Wijziging homepage tekst', preview:'Beste, kunnen jullie de tekst op onze homepage aanpassen? We hebben…', body:`Beste,
-
-Kunnen jullie de tekst op onze homepage aanpassen? We hebben een nieuwe collectie gelanceerd en de tekst klopt niet meer.
-
-De nieuwe tekst:
-"Welkom bij Bakker Mode — dé modezaak van Tilburg. Bekijk onze nieuwe lentecollectie 2026."
-
-Kunnen jullie dit deze week nog aanpassen?
-
-Alvast bedankt,
-Martine Bakker`, time:'01 apr', date:'1 april', unread:false, starred:true, tags:['klant'] },
-
-  { id:6, folder:'sent', from:'Jij (Softora.nl)', email:'info@softora.nl', subject:'Offerte – Business pakket', preview:'Beste, hierbij ontvangt u de gevraagde offerte voor het Business pakket…', body:`Beste De Vries Installaties,
-
-Hierbij ontvangt u de gevraagde offerte voor het Business pakket.
-
-Pakket: Business
-Prijs: €1.499,- excl. BTW
-Oplevering: binnen 3 weken na akkoord
-
-De offerte is 30 dagen geldig.
-
-Met vriendelijke groet,
-Softora.nl`, time:'Vandaag', date:'Vandaag', unread:false, starred:false, tags:['offerte'] },
-
-  { id:7, folder:'drafts', from:'Concept', email:'', subject:'Nieuwsbrief april 2026', preview:'Beste klanten, hierbij de maandelijkse update van Softora…', body:`Beste klanten,
-
-Hierbij de maandelijkse update van Softora.nl.
-
-[CONCEPT — NOG NIET VERZONDEN]
-
-Met vriendelijke groet,
-Softora.nl`, time:'31 mrt', date:'31 maart', unread:false, starred:false, tags:[] },
-  ],
-  'zakelijk@softora.nl': [
-  { id:101, folder:'inbox', from:'Van den Berg Kozijnen', email:'contact@vandenbergkozijnen.nl', subject:'Vraag over voorstel bedrijfswebsite', preview:'Goedemiddag, we hebben het voorstel bekeken en willen graag nog…', body:`Goedemiddag,
-
-We hebben het voorstel voor onze nieuwe bedrijfswebsite bekeken en willen graag nog een korte afstemming over de planning en de onderhoudskosten.
-
-Kun je ons laten weten welke momenten deze week nog vrij zijn?
-
-Met vriendelijke groet,
-Roy van den Berg`, time:'11:02', date:'Vandaag', unread:true, starred:true, tags:['klant'] },
-  { id:102, folder:'inbox', from:'MKB Nederland', email:'events@mkb.nl', subject:'Uitnodiging: lokaal ondernemersontbijt', preview:'Je bent uitgenodigd voor het ondernemersontbijt op 30 april…', body:`Beste Softora,
-
-Graag nodigen we je uit voor het lokaal ondernemersontbijt op dinsdag 30 april.
-
-Thema: online zichtbaarheid voor MKB-bedrijven
-Locatie: Tilburg
-
-Laat je weten of je aanwezig bent?
-
-Met vriendelijke groet,
-MKB Nederland`, time:'09:41', date:'Vandaag', unread:true, starred:false, tags:[] },
-  { id:103, folder:'inbox', from:'Bakker Interieur', email:'info@bakkerinterieur.nl', subject:'Offerteaanvraag websitedesign', preview:'Hoi, wij zoeken een nieuwe site en willen weten wat er mogelijk is…', body:`Hoi,
-
-Wij willen onze huidige website vernieuwen en zoeken een partij die zowel design als technische realisatie kan verzorgen.
-
-Kunnen jullie hiervoor een offerte opstellen?
-
-Groet,
-Sanne Bakker`, time:'Gist.', date:'Gisteren', unread:false, starred:false, tags:['offerte','klant'] },
-  { id:104, folder:'sent', from:'Jij (Softora.nl)', email:'zakelijk@softora.nl', subject:'Re: Offerteaanvraag websitedesign', preview:'Beste Sanne, bedankt voor je bericht. We maken graag een voorstel…', body:`Beste Sanne,
-
-Bedankt voor je bericht. We maken graag een voorstel voor een nieuwe website met een strakke, moderne uitstraling en een duidelijke structuur.
-
-Ik kom morgen met een eerste opzet terug.
-
-Met vriendelijke groet,
-Softora.nl`, time:'Gist.', date:'Gisteren', unread:false, starred:false, tags:['offerte'] },
-  { id:105, folder:'drafts', from:'Concept', email:'', subject:'Follow-up na kennismakingscall', preview:'Beste, bedankt voor het prettige gesprek van vanmiddag…', body:`Beste,
-
-Bedankt voor het prettige gesprek van vanmiddag. Hierbij stuur ik je morgen nog even de samenvatting met voorstel en vervolgstappen.
-
-Met vriendelijke groet,
-Softora.nl`, time:'31 mrt', date:'31 maart', unread:false, starred:false, tags:[] },
-  ],
-  'ruben@softora.nl': [
-  { id:201, folder:'inbox', from:'Lena Vermeulen', email:'l.vermeulen@techpartners.nl', subject:'Vraag over API-rate limits klantenportaal', preview:'Hoi Ruben, we willen het portaal koppelen aan ons ERP. Wat zijn jullie limits…', body:`Hoi Ruben,
-
-We willen het klantenportaal koppelen aan ons ERP via jullie REST API.
-Kun je aangeven wat de rate limits zijn en of er een sandbox-omgeving is?
-
-Alvast bedankt,
-Lena Vermeulen`, time:'10:18', date:'Vandaag', unread:true, starred:true, tags:['klant'] },
-  { id:202, folder:'inbox', from:'Martijn de Wit', email:'martijn@softora.nl', subject:'Meeting morgen verzetten?', preview:'Kunnen we de interne afstemming van morgen een half uur later doen…', body:`Hey Ruben,
-
-Kunnen we de interne afstemming van morgen een half uur later doen? Ik zit daarvoor nog in een andere call.
-
-Laat maar weten wat uitkomt.
-
-Groet,
-Martijn`, time:'09:07', date:'Vandaag', unread:true, starred:false, tags:[] },
-  { id:203, folder:'inbox', from:'Anouk Peters', email:'anouk@petersbouw.nl', subject:'Bevestiging afspraak donderdag', preview:'Hoi Ruben, donderdag om 14:00 uur is prima voor ons…', body:`Hoi Ruben,
-
-Donderdag om 14:00 uur is prima voor ons. We zitten dan op kantoor in Oisterwijk.
-
-Tot dan,
-Anouk Peters`, time:'Gist.', date:'Gisteren', unread:false, starred:false, tags:['klant'] },
-  { id:204, folder:'sent', from:'Ruben Nijhuis', email:'ruben@softora.nl', subject:'Re: Vraag over API-rate limits klantenportaal', preview:'Hi Lena, rate limits staan in de docs onder “Fair use”…', body:`Hi Lena,
-
-Rate limits: standaard 120 requests per minuut per API-key; hoger is op aanvraag mogelijk.
-Sandbox: we kunnen je een aparte base-URL en testkey sturen als je wilt testen.
-
-Groet,
-Ruben`, time:'Gist.', date:'Gisteren', unread:false, starred:false, tags:[] },
-  { id:205, folder:'drafts', from:'Concept', email:'', subject:'Samenvatting leadcall Tilburg', preview:'Belangrijke punten uit de call met Tilburgse lead…', body:`[CONCEPT]
-
-Samenvatting van de leadcall:
-- website moet moderner
-- snelheid belangrijk
-- voorkeur voor vaste prijs
-- vervolgcall inplannen`, time:'31 mrt', date:'31 maart', unread:false, starred:false, tags:[] },
-  ],
-  'serve@softora.nl': [],
-  'martijn@softora.nl': [],
-};
-
-function getMailboxAccounts() {
-  return mailboxAccounts.map((account) => account.email);
-}
-
-function getMailboxAccount() {
-  return activeMailboxAccount;
-}
-
-function closeMailboxAccountMenu() {
-  const switcher = document.getElementById('mailbox-account-switcher');
-  const menu = document.getElementById('mailbox-account-menu');
-  if (switcher) switcher.setAttribute('aria-expanded', 'false');
-  if (menu) menu.classList.remove('open');
-}
-
-function renderMailboxAccountMenu() {
-  const menu = document.getElementById('mailbox-account-menu');
-  if (!menu) return;
-  const activeEmail = getMailboxAccount();
-  menu.innerHTML = mailboxAccounts.map((account) => {
-    const email = account.email;
-    const unavailable = !account.imapConfigured && !account.smtpConfigured;
-    return `
-    <button class="topbar-mailbox-option${email === activeEmail ? ' active' : ''}" type="button" data-mailbox-email="${email}" role="menuitemradio" aria-checked="${email === activeEmail ? 'true' : 'false'}">
-      <span>${email}${unavailable ? ' · niet gekoppeld' : ''}</span>
-    </button>
-  `;
-  }).join('');
-}
-
-function setMailboxAccountUi(email) {
-  const top = document.getElementById('topbar-mailbox-account');
-  if (top) top.textContent = email;
-  renderMailboxAccountMenu();
-}
-
-let mails = [];
-
-let activeFolder = 'inbox';
-let activeMail = null;
-let filteredMails = [];
-
-function resetDetailEmpty() {
-  document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
-}
-
-function formatMailDate(value) {
-  const date = value ? new Date(value) : new Date();
-  if (!Number.isFinite(date.getTime())) return { date: '', time: '' };
-  const today = new Date();
-  const sameDay = date.toDateString() === today.toDateString();
-  return {
-    date: sameDay ? 'Vandaag' : date.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short' }),
-    time: date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
-  };
-}
-
-function normalizeMailboxApiMessage(message) {
-  const when = formatMailDate(message.date);
-  return {
-    id: message.id,
-    folder: message.folder || activeFolder,
-    from: message.from || 'Onbekend',
-    email: message.email || '',
-    subject: message.subject || '(Geen onderwerp)',
-    preview: message.preview || '',
-    body: message.body || message.preview || '',
-    time: when.time,
-    date: when.date,
-    unread: Boolean(message.unread),
-    starred: Boolean(message.starred),
-    tags: [],
-  };
-}
-
-async function loadMailboxAccounts() {
-  try {
-    const response = await fetch('/api/mailbox/accounts', {
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-    });
-    const data = await response.json().catch(() => ({}));
-    if (response.ok && data?.ok && Array.isArray(data.accounts) && data.accounts.length) {
-      mailboxAccounts = data.accounts;
-      if (!mailboxAccounts.some((account) => account.email === activeMailboxAccount)) {
-        activeMailboxAccount = mailboxAccounts[0].email;
-      }
-      renderMailboxAccountMenu();
-      setMailboxAccountUi(activeMailboxAccount);
-    }
-  } catch (_) {
-    toast('Mailboxaccounts laden mislukt');
-  }
-}
-
-async function loadMailboxMessages() {
-  const wrap = document.getElementById('mail-items');
-  if (wrap) {
-    wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Mailbox laden…</div>`;
-  }
-  try {
-    const response = await fetch(`/api/mailbox/messages?account=${encodeURIComponent(activeMailboxAccount)}&folder=${encodeURIComponent(activeFolder)}&limit=50`, {
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-      throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
-    }
-    mails = Array.isArray(data.messages) ? data.messages.map(normalizeMailboxApiMessage) : [];
-    renderList();
-  } catch (error) {
-    mails = [];
-    if (wrap) {
-      wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${String(error?.message || error || 'Mailbox laden mislukt')}</div>`;
-    }
-    toast(String(error?.message || error || 'Mailbox laden mislukt'));
-  }
-}
-
-async function applyMailboxAccount(email) {
-  activeMailboxAccount = email;
-  activeFolder = 'inbox';
-  activeMail = null;
-  const searchInput = document.getElementById('search-input');
-  if (searchInput) searchInput.value = '';
-  document.querySelectorAll('.folder-item').forEach((f, i) => f.classList.toggle('active', i === 0));
-  setMailboxAccountUi(email);
-  resetDetailEmpty();
-  await loadMailboxMessages();
-}
-
-function setFolder(folder, el) {
-  activeFolder = folder;
-  activeMail = null;
-  document.querySelectorAll('.folder-item').forEach(f => f.classList.remove('active'));
-  el.classList.add('active');
-  const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
-  const folderLabelEl = document.getElementById('folder-label');
-  if (folderLabelEl) folderLabelEl.textContent = labels[folder] || folder;
-  resetDetailEmpty();
-  loadMailboxMessages();
-}
-
-function getMailsForFolder(folder) {
-  if (['offerte','factuur','klant'].includes(folder)) return mails.filter(m => m.tags.includes(folder));
-  if (folder === 'starred') return mails.filter(m => m.starred);
-  return mails;
-}
-
-function filterMails() { renderList(); }
-
-function renderList() {
-  const q = (document.getElementById('search-input').value || '').toLowerCase();
-  let list = getMailsForFolder(activeFolder);
-  if (q) list = list.filter(m => m.from.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q) || m.preview.toLowerCase().includes(q));
-  filteredMails = list;
-  const wrap = document.getElementById('mail-items');
-  if (!list.length) { wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Geen e-mails gevonden.</div>`; return; }
-
-  wrap.innerHTML = list.map(m => `
-    <div class="mail-item ${m.unread ? 'unread' : ''} ${activeMail === m.id ? 'active' : ''}" onclick="openMail(${m.id})">
-      ${m.unread ? '<div class="unread-dot"></div>' : ''}
-      <div class="mail-item-top">
-        <div class="mail-from">${m.from}</div>
-        <div class="mail-time">${m.time}</div>
-      </div>
-      <div class="mail-subject">${m.subject}</div>
-      <div class="mail-preview">${m.preview}</div>
-    </div>`).join('');
-
-  const unread = mails.filter(m => m.folder === 'inbox' && m.unread).length;
-  const badge = document.getElementById('badge-inbox');
-  badge.textContent = unread;
-  badge.style.display = unread ? 'flex' : 'none';
-}
-
-function openMail(id) {
-  const m = mails.find(m => m.id === id);
-  if (!m) return;
-  activeMail = id;
-  m.unread = false;
-  renderList();
-
-  document.getElementById('mail-detail').innerHTML = `
-    <div class="detail-header">
-      <div class="detail-subject">${m.subject}</div>
-      <div class="detail-meta">
-        <div class="detail-from-wrap">
-          <div class="detail-avatar" style="background:${getColor(m.from)}">${initials(m.from)}</div>
-          <div>
-            <div class="detail-from">${m.from}</div>
-            <div class="detail-email">${m.email}</div>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
-          <div class="detail-date">${m.date} · ${m.time}</div>
-          <div class="detail-actions">
-            <button class="btn-action" onclick="toggleStar(${m.id})">
-              <svg viewBox="0 0 24 24" fill="${m.starred ? '#9b2355' : 'none'}" stroke="${m.starred ? '#9b2355' : 'currentColor'}" stroke-width="1.8" width="12" height="12"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              ${m.starred ? 'Gemarkeerd' : 'Markeren'}
-            </button>
-            <button class="btn-action" onclick="replyMail('${m.email}', '${m.subject}')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
-              Beantwoorden
-            </button>
-            <button class="btn-action" onclick="deleteMail(${m.id})">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
-              Verwijderen
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="detail-body">
-      <div class="detail-body-text">${m.body}</div>
-    </div>`;
-}
-
-function toggleStar(id) {
-  const m = mails.find(m => m.id === id);
-  if (!m) return;
-  m.starred = !m.starred;
-  openMail(id);
-  renderList();
-}
-
-function deleteMail(id) {
-  const m = mails.find(m => m.id === id);
-  if (!m) return;
-  m.folder = 'trash';
-  activeMail = null;
-  resetDetailEmpty();
-  renderList();
-  toast('Mail verplaatst naar prullenbak');
-}
-
-function replyMail(email, subject) {
-  document.getElementById('c-to').value = email;
-  document.getElementById('c-subject').value = 'Re: ' + subject;
-  openCompose();
-}
-
-function openCompose() { document.getElementById('compose-overlay').classList.add('open'); }
-function closeCompose() {
-  document.getElementById('compose-overlay').classList.remove('open');
-  ['c-to','c-subject','c-body'].forEach(id => document.getElementById(id).value = '');
-}
-
-async function sendMail() {
-  const to = document.getElementById('c-to').value.trim();
-  const subject = document.getElementById('c-subject').value.trim();
-  if (!to || !subject) { toast('Vul ontvanger en onderwerp in'); return; }
-  const acc = getMailboxAccount();
-  const sendBtn = document.querySelector('.btn-send');
-  if (sendBtn) sendBtn.disabled = true;
-  try {
-    const response = await fetch('/api/mailbox/send', {
-      method: 'POST',
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        account: acc,
-        to,
-        subject,
-        body: document.getElementById('c-body').value,
-      }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-      throw new Error(data?.detail || data?.error || 'Mail verzenden mislukt');
-    }
-    closeCompose();
-    toast('✓ Mail verzonden');
-    if (activeFolder === 'sent') {
-      await loadMailboxMessages();
-    }
-  } catch (error) {
-    toast(String(error?.message || error || 'Mail verzenden mislukt'));
-  } finally {
-    if (sendBtn) sendBtn.disabled = false;
-  }
-}
-
-function toast(msg) {
-  const t = document.getElementById('toast'); t.textContent = msg;
-  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500);
-}
-
-document.getElementById('compose-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('compose-overlay')) closeCompose();
-});
-
-const mailboxAccountSwitcher = document.getElementById('mailbox-account-switcher');
-const mailboxAccountMenu = document.getElementById('mailbox-account-menu');
-
-if (mailboxAccountSwitcher) {
-  mailboxAccountSwitcher.addEventListener('click', function(event) {
-    event.stopPropagation();
-    const isOpen = mailboxAccountMenu && mailboxAccountMenu.classList.contains('open');
-    if (isOpen) {
-      closeMailboxAccountMenu();
-      return;
-    }
-    if (mailboxAccountMenu) mailboxAccountMenu.classList.add('open');
-    mailboxAccountSwitcher.setAttribute('aria-expanded', 'true');
-  });
-}
-
-if (mailboxAccountMenu) {
-  mailboxAccountMenu.addEventListener('click', function(event) {
-    const option = event.target.closest('[data-mailbox-email]');
-    if (!option) return;
-    const email = String(option.dataset.mailboxEmail || '').trim();
-    closeMailboxAccountMenu();
-    applyMailboxAccount(email);
-  });
-}
-
-document.addEventListener('click', (event) => {
-  if (!mailboxAccountMenu || !mailboxAccountSwitcher) return;
-  if (mailboxAccountMenu.contains(event.target) || mailboxAccountSwitcher.contains(event.target)) return;
-  closeMailboxAccountMenu();
-});
-
-window.addEventListener('keydown', (event) => {
-  if (event.key !== 'Escape') return;
-  closeMailboxAccountMenu();
-});
-
-(async function initMailboxAccount() {
-  await loadMailboxAccounts();
-  await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT);
-})();
-
-function finishPremiumShellBoot() {
-  if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
-    window.SoftoraPremiumBoot.setShellBooting(false);
-  }
-}
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', finishPremiumShellBoot, { once: true });
-} else {
-  finishPremiumShellBoot();
-}
-</script>
+<script src="assets/premium-mailbox.js?v=20260427a"></script>
 </body>
 </html>

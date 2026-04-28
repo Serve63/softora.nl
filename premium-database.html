@@ -339,11 +339,14 @@
             border-radius: 5px;
             background: var(--card-soft);
             font-size: 11px;
-            font-weight: 500;
+            font-weight: 600;
+            line-height: 1.2;
+            min-height: 31px;
             color: var(--light);
             cursor: pointer;
-            transition: all .15s ease;
+            transition: border-color .15s ease, background .15s ease, color .15s ease;
             white-space: nowrap;
+            outline: none;
         }
 
         .sf-btn:hover {
@@ -351,11 +354,15 @@
             color: var(--dark);
         }
 
+        .sf-btn:focus-visible {
+            border-color: var(--crimson);
+            box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.16);
+        }
+
         .sf-btn.act {
             border-color: rgba(139, 34, 82, 0.4);
             background: rgba(139, 34, 82, 0.12);
             color: var(--dark);
-            font-weight: 600;
         }
 
         .sf-btn[data-s="klant"].act { border-color: var(--green); background: rgba(22,115,60,.1); color: var(--green); }
@@ -365,9 +372,9 @@
         .sf-btn[data-s="interesse"].act { border-color: var(--green); background: rgba(22,115,60,.08); color: var(--green); }
         .sf-btn[data-s="afgehaakt"].act { border-color: var(--red); background: rgba(192,57,43,.08); color: var(--red); }
         .sf-btn[data-s="geblokkeerd"].act { border-color: var(--red); background: rgba(192,57,43,.08); color: var(--red); }
-        .sf-btn[data-s="buiten"].act { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: var(--mid); }
+        .sf-btn[data-s="buiten"].act { border-color: rgba(180,90,0,.45); background: rgba(180,90,0,.08); color: var(--orange); }
         .sf-btn[data-s="benaderbaar"].act { border-color: var(--green); background: rgba(22,115,60,.1); color: var(--green); }
-        .sf-btn[data-s="geengehoor"].act { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: var(--mid); }
+        .sf-btn[data-s="geengehoor"].act { border-color: rgba(180,90,0,.45); background: rgba(180,90,0,.08); color: var(--orange); }
 
         .f-count {
             font-size: 12px;
@@ -737,8 +744,21 @@
 
         .k-call { background: rgba(180,90,0,.1); color: var(--orange); }
         .k-mail { background: rgba(155,35,85,.1); color: var(--crimson); }
+        .k-test { background: rgba(180,90,0,.12); color: var(--orange); }
         .k-off { background: rgba(255,255,255,.05); color: var(--light); text-decoration: line-through; }
         .k-empty { color: var(--light); font-size: 12px; }
+
+        .website-link {
+            color: var(--crimson);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            font-style: italic;
+            font-weight: 600;
+        }
+
+        .website-link:hover {
+            color: var(--crimson-light);
+        }
 
         .tbl-empty {
             text-align: center;
@@ -973,6 +993,262 @@
             color: var(--crimson);
         }
 
+        .photo-batch-modal {
+            width: 380px;
+        }
+
+        .photo-batch-options {
+            display: grid;
+            gap: 10px;
+        }
+
+        .photo-batch-option {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--card-soft);
+            color: var(--dark);
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            text-align: left;
+            transition: border-color .15s ease, background .15s ease;
+        }
+
+        .photo-batch-option span {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .photo-batch-option strong {
+            color: var(--light);
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .photo-batch-option.is-active {
+            border-color: rgba(139, 34, 82, 0.42);
+            background: rgba(139, 34, 82, 0.12);
+        }
+
+        .photo-batch-input {
+            width: 96px;
+            padding: 7px 9px;
+            border-radius: 5px;
+            text-align: right;
+            font-size: 13px;
+        }
+
+        .photo-batch-summary {
+            min-height: 18px;
+            margin-top: 12px;
+            color: var(--light);
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .deep-search-modal {
+            width: min(760px, calc(100vw - 28px));
+            max-height: 86vh;
+            overflow: auto;
+            position: relative;
+        }
+
+        .deep-search-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            padding-right: 34px;
+        }
+
+        .deep-search-close {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            width: 30px;
+            height: 30px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--card);
+            color: var(--light);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .15s ease;
+        }
+
+        .deep-search-close:hover {
+            border-color: var(--crimson);
+            color: var(--crimson);
+            background: rgba(139, 34, 82, 0.06);
+        }
+
+        .deep-search-close svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .deep-search-current {
+            border: 1px solid rgba(139, 34, 82, 0.18);
+            background: rgba(139, 34, 82, 0.07);
+            border-radius: 7px;
+            padding: 10px 12px;
+            color: var(--crimson);
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .deep-search-cost {
+            border: 1px solid rgba(180, 90, 0, 0.2);
+            background: rgba(180, 90, 0, 0.07);
+            border-radius: 7px;
+            padding: 9px 12px;
+            color: var(--orange);
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .deep-search-count-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            background: var(--card);
+            color: var(--dark);
+            padding: 9px 12px;
+        }
+
+        .deep-search-count-label { font-size: 12px; font-weight: 700; color: var(--dark); }
+
+        .deep-search-count-input {
+            width: 104px;
+            min-height: 34px;
+            border: 1px solid var(--border); border-radius: 6px;
+            background: #fff; color: var(--crimson);
+            font-size: 13px; font-weight: 800; text-align: right; padding: 6px 9px;
+        }
+
+        .deep-search-input {
+            width: 100%;
+            min-height: 112px;
+            resize: vertical;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .deep-search-tools {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 12px;
+        }
+
+        .deep-search-tools > div {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .deep-search-list,
+        .deep-search-sources {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--card-soft);
+            height: 320px;
+            min-height: 320px;
+            max-height: 320px;
+            overflow: auto;
+            padding: 8px;
+        }
+
+        .deep-search-target {
+            width: 100%;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--dark);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 10px;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .deep-search-target span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .deep-search-target strong {
+            color: var(--light);
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .deep-search-target.is-active {
+            border-color: rgba(139, 34, 82, 0.28);
+            background: rgba(139, 34, 82, 0.08);
+        }
+
+        .deep-search-target.is-done strong {
+            color: var(--green);
+        }
+
+        .deep-search-target.is-done span {
+            color: var(--light);
+            text-decoration: line-through;
+            text-decoration-thickness: 2px;
+            text-decoration-color: rgba(139, 34, 82, 0.72);
+        }
+
+        .deep-search-sources {
+            display: grid;
+            align-content: start;
+            gap: 7px;
+        }
+
+        .deep-search-sources a {
+            display: block;
+            color: var(--crimson);
+            font-size: 12px;
+            line-height: 1.35; min-height: 18px; padding: 1px 0;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            text-decoration: underline; text-underline-offset: 2px;
+        }
+
+        .deep-search-empty {
+            color: var(--light);
+            font-size: 12px;
+            padding: 8px;
+        }
+
+        .mbtn:disabled {
+            cursor: not-allowed;
+            opacity: .58;
+        }
+
         .toast {
             position: fixed;
             bottom: 20px;
@@ -1048,6 +1324,10 @@
 
             .panel {
                 width: min(420px, 100%);
+            }
+
+            .deep-search-tools {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -1141,12 +1421,9 @@
                                     <svg class="btn-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                                 </button>
                                 <div class="add-actions-menu" id="addActionsMenu" role="menu">
-                                    <button class="add-actions-item" id="addCompaniesButton" type="button" role="menuitem">
-                                        <span class="add-actions-item-title">Bedrijven toevoegen</span>
-                                        <span class="add-actions-item-sub">Importeer bedrijven vanuit een CSV-bestand</span>
-                                    </button>
+                                    <button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">Bedrijven toevoegen</button>
                                 </div>
-                                <input type="file" id="importFileInput" accept=".csv,text/csv" hidden>
+                                <input type="file" id="importFileInput" accept=".csv,text/csv,.tsv,text/tab-separated-values,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
                             </div>
                         </div>
                     </div>
@@ -1235,18 +1512,6 @@
             <div class="mrow"><label class="mlabel" for="m-dom">Domein</label><input class="minp" id="m-dom" placeholder="bakkerijdezon.nl"></div>
             <div class="mrow"><label class="mlabel" for="m-tel">Telefoon</label><input class="minp" id="m-tel" placeholder="+31 6 …"></div>
             <div class="mrow"><label class="mlabel" for="m-mail">E-mail</label><input class="minp" id="m-mail" placeholder="info@…"></div>
-            <div class="mrow"><label class="mlabel" for="m-branche">Branche</label>
-                <select class="msel" id="m-branche">
-                    <option>Horeca & Restaurants</option>
-                    <option>Retail & Winkels</option>
-                    <option>Zakelijke Dienstverlening</option>
-                    <option>Bouw & Vastgoed</option>
-                    <option>Gezondheidszorg</option>
-                    <option>Creatieve Sector</option>
-                    <option>Tech & Startups</option>
-                    <option selected>Overig</option>
-                </select>
-            </div>
             <div class="mrow"><label class="mlabel" for="m-stad">Adres</label><input class="minp" id="m-stad" placeholder="Tilburg"></div>
             <div class="mrow"><label class="mlabel" for="m-status">Status</label>
                 <select class="msel" id="m-status">
@@ -1263,15 +1528,63 @@
                     <option value="buiten">Buiten gebruik</option>
                 </select>
             </div>
-            <div class="mrow"><label class="mlabel" for="m-responsible">Toegewezen aan</label>
-                <select class="msel" id="m-responsible">
-                    <option value="Serve" selected>Servé</option>
-                    <option value="Martijn">Martijn</option>
-                </select>
-            </div>
             <div class="mbtns">
                 <button class="mbtn c" id="cancelModalButton" type="button">Annuleren</button>
                 <button class="mbtn s" id="saveModalButton" type="button">Toevoegen</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-bg" id="photoBatchModal" aria-hidden="true">
+        <div class="modal photo-batch-modal" role="dialog" aria-modal="true" aria-labelledby="photoBatchTitle">
+            <div class="modal-title" id="photoBatchTitle">Webdesigns maken</div>
+            <div class="photo-batch-options" id="photoBatchOptions" role="group" aria-label="Aantal webdesigns">
+                <button class="photo-batch-option" type="button" data-photo-batch-mode="all">
+                    <span>Alle bedrijven</span>
+                    <strong id="photoBatchAllCount">0 bedrijven</strong>
+                </button>
+                <label class="photo-batch-option is-active" data-photo-batch-mode="custom" for="photoBatchLimitInput">
+                    <span>Specifiek aantal</span>
+                    <input class="photo-batch-input" id="photoBatchLimitInput" type="text" inputmode="numeric" pattern="[0-9]*" value="10" aria-label="Specifiek aantal webdesigns">
+                </label>
+            </div>
+            <div class="photo-batch-summary" id="photoBatchSummary" aria-live="polite"></div>
+            <div class="mbtns">
+                <button class="mbtn c" id="cancelPhotoBatchButton" type="button">Annuleren</button>
+                <button class="mbtn s" id="startPhotoBatchButton" type="button">Starten</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-bg" id="deepSearchModal" aria-hidden="true">
+        <div class="modal deep-search-modal" role="dialog" aria-modal="true" aria-labelledby="deepSearchTitle">
+            <button class="deep-search-close" id="closeDeepSearchButton" type="button" aria-label="Sluit bedrijvenlijst">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+            <div class="deep-search-head">
+                <div class="modal-title" id="deepSearchTitle">Bedrijvenlijst</div>
+            </div>
+            <div class="deep-search-current" id="deepSearchCurrent">Geen huidige plek</div>
+            <div class="deep-search-cost" id="deepSearchCost">Geschatte API-kosten: wordt berekend</div>
+            <div class="deep-search-count-row">
+                <label class="deep-search-count-label" for="deepSearchDesiredCount">Nieuwe bedrijven</label>
+                <input class="deep-search-count-input" id="deepSearchDesiredCount" type="text" inputmode="numeric" pattern="[0-9]*" value="25" aria-label="Aantal nieuwe bedrijven">
+            </div>
+            <div class="mbtns">
+                <button class="mbtn s" id="deepSearchStartButton" type="button">Bedrijven toevoegen</button>
+            </div>
+            <div class="deep-search-tools">
+                <div>
+                    <label class="mlabel">Planning</label>
+                    <div class="deep-search-list" id="deepSearchList"></div>
+                </div>
+                <div>
+                    <label class="mlabel">Gevonden website's</label>
+                    <div class="deep-search-sources" id="deepSearchSources"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -1287,10 +1600,22 @@
         </div>
     </div>
 
+    <script src="assets/premium-database-photo-batch.js?v=20260427a"></script>
+    <script src="assets/premium-database-import.js?v=20260427c"></script>
+    <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
+    <script src="assets/premium-database-deep-search.js?v=20260428h"></script>
+    <script src="assets/premium-customers-core.js?v=20260428a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
+        const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";
+        const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";
+        const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 * 1000;
+        const API_COST_SCOPE = "premium_api_costs";
+        const API_COST_KEY = "softora_api_cost_events_v1";
+        const API_COST_USD_TO_EUR_RATE = 0.93;
         const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";
         const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";
         const CUSTOMER_PHOTO_DATA_PREFIX = "softora_database_photo_data_v1_";
@@ -1319,8 +1644,8 @@
             orders: [],
             query: "",
             activeStatus: "alle",
-            sortKey: "updatedAt",
-            sortAsc: false,
+            sortKey: "manual",
+            sortAsc: true,
             openId: null,
             modalEditId: null,
             photoTargetId: null,
@@ -1340,7 +1665,7 @@
             addButton: document.getElementById("addButton"),
             photoCostLabel: document.getElementById("photoCostLabel"),
             generatePhotosButton: document.getElementById("generatePhotosButton"),
-            addCompaniesButton: document.getElementById("addCompaniesButton"),
+            deepSearchButton: document.getElementById("deepSearchButton"),
             importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
             overlay: document.getElementById("ov"),
@@ -1357,10 +1682,8 @@
             modalDomain: document.getElementById("m-dom"),
             modalPhone: document.getElementById("m-tel"),
             modalMail: document.getElementById("m-mail"),
-            modalBranch: document.getElementById("m-branche"),
             modalCity: document.getElementById("m-stad"),
             modalStatus: document.getElementById("m-status"),
-            fieldResponsible: document.getElementById("m-responsible"),
             cancelModalButton: document.getElementById("cancelModalButton"),
             saveModalButton: document.getElementById("saveModalButton"),
             photoPreview: document.getElementById("photoPreview"),
@@ -1368,53 +1691,72 @@
             photoPreviewClose: document.getElementById("photoPreviewClose"),
             photoPreviewImage: document.getElementById("photoPreviewImage"),
             photoPreviewMeta: document.getElementById("photoPreviewMeta"),
+            photoBatchModal: document.getElementById("photoBatchModal"),
+            photoBatchOptions: document.getElementById("photoBatchOptions"),
+            photoBatchChoiceButtons: Array.from(document.querySelectorAll("[data-photo-batch-mode]")),
+            photoBatchAllCount: document.getElementById("photoBatchAllCount"),
+            photoBatchLimitInput: document.getElementById("photoBatchLimitInput"),
+            photoBatchSummary: document.getElementById("photoBatchSummary"),
+            cancelPhotoBatchButton: document.getElementById("cancelPhotoBatchButton"),
+            startPhotoBatchButton: document.getElementById("startPhotoBatchButton"),
+            deepSearchModal: document.getElementById("deepSearchModal"),
+            deepSearchCurrent: document.getElementById("deepSearchCurrent"),
+            deepSearchCost: document.getElementById("deepSearchCost"),
+            deepSearchDesiredCount: document.getElementById("deepSearchDesiredCount"),
+            deepSearchStartButton: document.getElementById("deepSearchStartButton"),
+            deepSearchList: document.getElementById("deepSearchList"),
+            deepSearchSources: document.getElementById("deepSearchSources"),
+            closeDeepSearchButton: document.getElementById("closeDeepSearchButton"),
             toast: document.getElementById("toast")
         };
 
-        function normalizeString(value) {
-            return String(value || "").trim();
+        const photoBatchController = window.SoftoraDatabasePhotoBatch.createController({
+            nodes, getTargets: getWebdesignPhotoTargets, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR,
+            closeAddActions, setStatusMessage, generate: generateWebdesignPhotos
+        });
+        const customersCore = window.SoftoraPremiumCustomersCore;
+        const {
+            normalizeString,
+            normalizeSearchValue,
+            parseResponsibleValue,
+            normalizeResponsibleValue,
+            formatResponsibleDisplayName,
+            getResponsibleSourceValue,
+            formatCustomerServiceLabel
+        } = customersCore;
+
+        function expandScientificPhone(value) {
+            const raw = normalizeString(value);
+            if (!/^\d+(?:[.,]\d+)?e\+?\d+$/i.test(raw)) return raw;
+            const numeric = Number(raw.replace(",", "."));
+            if (!Number.isFinite(numeric)) return raw;
+            return String(Math.round(numeric));
         }
 
-        function normalizeSearchValue(value) {
-            return normalizeString(value).toLowerCase();
+        function formatPhoneNumber(value) {
+            const expanded = expandScientificPhone(value);
+            const raw = normalizeString(expanded);
+            if (!raw || raw === "—" || raw === "-") return "—";
+            const hasPlus = /^\+/.test(raw);
+            let digits = raw.replace(/\D+/g, "");
+            if (!digits) return raw;
+            if (digits.length === 11 && digits.indexOf("31") === 0) {
+                const rest = digits.slice(2);
+                if (rest.indexOf("6") === 0) return "+31 " + rest.replace(/(\d)(\d{2})(\d{2})(\d{2})(\d{2})$/, "$1 $2 $3 $4 $5");
+                return "+31 " + rest.replace(/(\d{2})(\d{3})(\d{2})(\d{2})$/, "$1 $2 $3 $4");
+            }
+            if (digits.length === 10 && digits.indexOf("0") === 0) {
+                if (digits.indexOf("06") === 0) {
+                    return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+                }
+                return digits.replace(/(\d{3})(\d{3})(\d{2})(\d{2})$/, "$1 $2 $3 $4");
+            }
+            if (hasPlus) return "+" + digits;
+            return digits.length >= 8 ? digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim() : raw;
         }
 
         function createId() {
             return "db-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
-        }
-
-        function parseResponsibleValue(value) {
-            const normalized = normalizeString(value)
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-z0-9]+/g, " ")
-                .trim();
-            if (normalized.indexOf("martijn") !== -1) return "Martijn";
-            if (normalized.indexOf("serve") !== -1) return "Serve";
-            return "";
-        }
-
-        function normalizeResponsibleValue(value) {
-            return parseResponsibleValue(value) || "Serve";
-        }
-
-        function formatResponsibleDisplayName(value) {
-            return parseResponsibleValue(value) === "Martijn" ? "Martijn" : "Servé";
-        }
-
-        function getResponsibleSourceValue(raw) {
-            if (!raw || typeof raw !== "object") return "";
-            return normalizeString(
-                raw.verantwoordelijk
-                || raw.responsible
-                || raw.claimedBy
-                || raw.leadOwnerName
-                || raw.leadOwnerFullName
-                || raw.assignedToName
-                || raw.assignedToFullName
-                || ""
-            );
         }
 
         function slugifyDomain(value) {
@@ -1430,15 +1772,6 @@
                 .replace(/[^a-z0-9]+/g, "")
                 .slice(0, 18);
             return slug ? slug + ".nl" : "onbekend.nl";
-        }
-
-        function formatCustomerServiceLabel(service) {
-            const key = normalizeString(service).toLowerCase();
-            if (key === "website") return "Website";
-            if (key === "bedrijfssoftware") return "Bedrijfssoftware";
-            if (key === "voicesoftware") return "Voicesoftware";
-            if (key === "chatbot") return "Chatbot";
-            return key ? key.charAt(0).toUpperCase() + key.slice(1) : "Website";
         }
 
         function normalizeHistoryItem(item) {
@@ -1507,6 +1840,13 @@
             return "prospect";
         }
 
+        function normalizeStoredAmount(value) {
+            if (value === null || value === undefined || value === "") return null;
+            const amount = Number(value);
+            if (!Number.isFinite(amount) || amount < 0) return null;
+            return Math.round(amount);
+        }
+
         function normalizeColdmailTestCompanyName(value) {
             return normalizeString(value).toLowerCase();
         }
@@ -1550,11 +1890,12 @@
                 naam: naam,
                 bedrijf: bedrijf,
                 dom: dom,
-                tel: normalizeString(raw && (raw.tel || raw.telefoon || raw.contactPhone)) || "—",
+                tel: formatPhoneNumber(raw && (raw.tel || raw.telefoon || raw.contactPhone)),
                 email: email,
                 branche: normalizeString(raw && raw.branche) || "Overig",
                 stad: normalizeString(raw && (raw.stad || raw.location || raw.address)) || "Onbekend",
                 status: status,
+                databaseStatus: status,
                 call: raw && typeof raw.call === "boolean" ? raw.call : (status !== "geblokkeerd" && status !== "buiten"),
                 mail: raw && typeof raw.mail === "boolean" ? raw.mail : (status !== "geblokkeerd" && status !== "buiten"),
                 hist: hist,
@@ -1565,14 +1906,19 @@
                 website: normalizeString(raw && raw.website),
                 websitePhoto: normalizeString(raw && (raw.websitePhoto || raw.photo || raw.websiteImage)),
                 websitePhotoName: normalizeString(raw && (raw.websitePhotoName || raw.photoName || raw.websiteImageName)),
-                service: normalizeString(raw && raw.service) || "website"
+                service: normalizeString(raw && raw.service) || "website",
+                type: normalizeString(raw && raw.type),
+                websiteBedrag: normalizeStoredAmount(raw && raw.websiteBedrag),
+                onderhoudPerMaand: normalizeStoredAmount(raw && raw.onderhoudPerMaand),
+                bedrag: normalizeStoredAmount(raw && raw.bedrag),
+                actief: normalizeString(raw && raw.actief),
+                review: normalizeString(raw && raw.review),
+                datum: normalizeString(raw && raw.datum)
             };
         }
 
         function sortCustomers(list) {
-            return list.slice().sort(function (a, b) {
-                return a.bedrijf.localeCompare(b.bedrijf, "nl");
-            });
+            return list.slice();
         }
 
         function escapeHtml(value) {
@@ -1646,14 +1992,16 @@
             try {
                 const parsed = JSON.parse(String(raw || "[]"));
                 if (!Array.isArray(parsed)) return [];
-                return sortCustomers(parsed.map(function (item, index) {
+                return parsed.map(function (item, index) {
                     return normalizeCustomer(item, "customer-" + index);
-                }));
+                }).filter(function (customer) {
+                    return !isDerivedOrderPlaceholderCustomer(customer);
+                });
             } catch (error) {
                 return [];
             }
         }
-        function parseCustomersFromStateValues(values, key) { const stateValues = values && typeof values === "object" ? values : {}; const rawCustomers = parseCustomers(stateValues[key]); try { const meta = JSON.parse(normalizeString(stateValues[key + "_chunks_v1"]) || "{}"); const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0)); let raw = ""; for (let index = 0; index < count; index += 1) { const chunk = stateValues[key + "_chunk_" + index]; if (typeof chunk !== "string") return rawCustomers; raw += chunk; } const chunkedCustomers = parseCustomers(raw); return chunkedCustomers.length > rawCustomers.length ? chunkedCustomers : rawCustomers; } catch (error) { return rawCustomers; } }
+
         function parseOrders(raw) {
             try {
                 const parsed = JSON.parse(String(raw || "[]"));
@@ -1706,34 +2054,14 @@
             };
         }
 
-        function deriveCustomersFromOrders(orders) {
-            const seen = new Map();
-
-            orders.forEach(function (order) {
-                const seed = buildDerivedCustomerSeedFromOrder(order);
-                const key = buildCustomerIdentityKey(seed);
-                if (!key || seen.has(key)) return;
-
-                seen.set(key, normalizeCustomer({
-                    id: "seed-" + (order.id || createId()),
-                    naam: seed.naam,
-                    bedrijf: seed.bedrijf,
-                    telefoon: seed.tel,
-                    email: seed.email,
-                    stad: seed.stad,
-                    website: order.title,
-                    status: order.paidAt || normalizeString(order.status).toLowerCase() === "betaald" ? "klant" : "benaderbaar",
-                    verantwoordelijk: seed.verantwoordelijk,
-                    updatedAt: order.paidAt || order.lastRunAt || formatDateForStorage(new Date()),
-                    hist: [{
-                        type: order.paidAt ? "klant" : "benaderbaar",
-                        label: order.paidAt ? "Geimporteerd als klant vanuit opdracht" : "Geimporteerd vanuit actieve opdracht",
-                        date: order.paidAt || order.lastRunAt || formatDateForStorage(new Date())
-                    }]
-                }, "seed-" + createId()));
-            });
-
-            return sortCustomers(Array.from(seen.values()));
+        function isDerivedOrderPlaceholderCustomer(customer) {
+            const id = normalizeString(customer && customer.id).toLowerCase();
+            const website = normalizeSearchValue(customer && (customer.website || customer.dom));
+            const email = normalizeString(customer && customer.email).toLowerCase();
+            return id.indexOf("seed-") === 0
+                || website.indexOf("website opdracht") !== -1
+                || website.indexOf("websiteopdracht") !== -1
+                || /@websiteopdrachtvo\.nl$/i.test(email);
         }
 
         function mergeCustomersWithResponsible(customers, orders) {
@@ -1763,24 +2091,31 @@
         }
 
         function resolveBootstrapCustomers() {
+            if (normalizeString(customersBootstrapPayload && customersBootstrapPayload.source) === "orders") return [];
             const rawCustomers = Array.isArray(customersBootstrapPayload && customersBootstrapPayload.customers)
                 ? customersBootstrapPayload.customers
                 : [];
 
-            return sortCustomers(rawCustomers.map(function (item, index) {
+            return rawCustomers.map(function (item, index) {
                 return normalizeCustomer(item, "bootstrap-" + index);
-            }));
+            }).filter(function (customer) {
+                return !isDerivedOrderPlaceholderCustomer(customer);
+            });
         }
 
         function serializeCustomerList(customers) {
-            return JSON.stringify(sortCustomers((customers || []).map(function (item, index) {
+            return JSON.stringify((customers || []).filter(function (item) {
+                return !isDerivedOrderPlaceholderCustomer(item);
+            }).map(function (item, index) {
                 const normalized = normalizeCustomer(item, "serialize-" + index);
                 return {
                     ...normalized,
-                    websitePhoto: "",
-                    websitePhotoName: ""
+                    websitePhoto: isValidWebsitePhotoDataUrl(normalizeString(normalized.websitePhoto))
+                        ? [normalizeString(normalized.websitePhoto).length, normalizeString(normalized.websitePhoto).slice(0, 80), normalizeString(normalized.websitePhoto).slice(-80)].join("|")
+                        : "",
+                    websitePhotoName: isValidWebsitePhotoDataUrl(normalizeString(normalized.websitePhoto)) ? normalizeString(normalized.websitePhotoName) : ""
                 };
-            })));
+            }));
         }
 
         function customerListsDiffer(nextCustomers) {
@@ -1788,19 +2123,19 @@
         }
 
         function persistCustomerList(customers) {
-            const normalizedCustomers = sortCustomers(customers.map(function (item, index) {
+            const normalizedCustomers = customers.filter(function (item) {
+                return !isDerivedOrderPlaceholderCustomer(item);
+            }).map(function (item, index) {
                 const normalized = normalizeCustomer(item, "persist-" + index);
                 return {
                     ...normalized,
                     websitePhoto: "",
                     websitePhotoName: ""
                 };
-            }));
+            });
+
             return fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
-                patch: {
-                    [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers),
-                    [CUSTOMER_DB_KEY + "_chunks_v1"]: ""
-                },
+                patch: window.SoftoraDatabaseImport.buildChunkedStatePatch(CUSTOMER_DB_KEY, JSON.stringify(normalizedCustomers)),
                 source: "premium-database",
                 actor: "Premium database"
             }).then(function () {
@@ -1810,60 +2145,31 @@
             });
         }
 
-        function buildCustomerPhotoDataKey(customerId) {
-            return CUSTOMER_PHOTO_DATA_PREFIX + normalizeString(customerId).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 80);
+        const apiCostLedger = window.SoftoraApiCostLedger.createLedger({
+            getUiState: fetchUiStateGetWithFallback,
+            setUiState: fetchUiStateSetWithFallback,
+            scope: API_COST_SCOPE,
+            key: API_COST_KEY,
+            usdToEurRate: API_COST_USD_TO_EUR_RATE
+        });
+
+        function recordApiCostEvent(event) {
+            return apiCostLedger.record(event);
         }
 
-        function parseCustomerPhotoMap(raw, values) {
-            try {
-                const parsed = JSON.parse(String(raw || "{}"));
-                if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-                const stateValues = values && typeof values === "object" ? values : {};
-                Object.keys(parsed).forEach(function (key) {
-                    const item = parsed[key];
-                    if (!item || typeof item !== "object" || isValidWebsitePhotoDataUrl(item.websitePhoto)) return;
-                    const photoKey = normalizeString(item.photoKey);
-                    const chunkCount = Math.max(0, Math.min(80, Number(item.chunkCount || 0) || 0));
-                    if (!photoKey || !chunkCount) return;
-                    const dataUrl = Array.from({ length: chunkCount }, function (_, index) {
-                        return normalizeString(stateValues[photoKey + "_" + index]);
-                    }).join("");
-                    if (isValidWebsitePhotoDataUrl(dataUrl)) {
-                        item.websitePhoto = dataUrl;
-                    }
-                });
-                return parsed;
-            } catch (error) {
-                return {};
-            }
-        }
-
-        function buildCustomerPhotoStorage(customers) {
-            const photoMap = {};
-            const patch = {};
-            (customers || []).forEach(function (customer) {
-                const normalized = normalizeCustomer(customer, "photo-map");
-                if (!normalized.id || !shouldShowWebsitePhoto(normalized) || !isValidWebsitePhotoDataUrl(normalized.websitePhoto)) return;
-                const photoKey = buildCustomerPhotoDataKey(normalized.id);
-                const chunks = normalizeString(normalized.websitePhoto).match(new RegExp("[\\s\\S]{1," + CUSTOMER_PHOTO_CHUNK_SIZE + "}", "g")) || [];
-                chunks.forEach(function (chunk, index) {
-                    patch[photoKey + "_" + index] = chunk;
-                });
-                photoMap[normalized.id] = {
-                    id: normalized.id,
-                    identityKey: buildCustomerIdentityKey(normalized),
-                    photoKey: photoKey,
-                    chunkCount: chunks.length,
-                    websitePhotoName: normalized.websitePhotoName || "Websitefoto",
-                    updatedAt: normalized.updatedAt || formatDateForStorage(new Date())
-                };
-            });
-            patch[CUSTOMER_PHOTO_KEY] = JSON.stringify(photoMap);
-            return {
-                photoMap: photoMap,
-                patch: patch
-            };
-        }
+        const customerPhotoStorageController = window.SoftoraDatabasePhotoStorage.createController({
+            getUiState: fetchUiStateGetWithFallback,
+            setUiState: fetchUiStateSetWithFallback,
+            normalizeCustomer: normalizeCustomer,
+            shouldShowWebsitePhoto: shouldShowWebsitePhoto,
+            isValidWebsitePhotoDataUrl: isValidWebsitePhotoDataUrl,
+            buildCustomerIdentityKey: buildCustomerIdentityKey,
+            formatDateForStorage: formatDateForStorage,
+            scope: CUSTOMER_PHOTO_SCOPE,
+            key: CUSTOMER_PHOTO_KEY,
+            dataPrefix: CUSTOMER_PHOTO_DATA_PREFIX,
+            chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
+        });
 
         function mergeCustomersWithPhotos(customers, photoMap) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
@@ -1893,27 +2199,12 @@
             }));
         }
 
-        function loadCustomerPhotoMap() {
-            return fetchUiStateGetWithFallback(CUSTOMER_PHOTO_SCOPE).then(function (state) {
-                const values = state && state.values && typeof state.values === "object" ? state.values : {};
-                return parseCustomerPhotoMap(values[CUSTOMER_PHOTO_KEY], values);
-            }).catch(function (error) {
-                console.error("Databasefoto's laden via Supabase mislukt:", error);
-                return {};
-            });
+        function loadCustomerPhotoMap(customers) {
+            return customerPhotoStorageController.load(customers || state.klanten);
         }
 
-        function persistCustomerPhotos(customers) {
-            const photoStorage = buildCustomerPhotoStorage(customers);
-            return fetchUiStateSetWithFallback(CUSTOMER_PHOTO_SCOPE, {
-                patch: photoStorage.patch,
-                source: "premium-database-photos",
-                actor: "Premium database"
-            }).then(function () {
-                return { ok: true };
-            }).catch(function (error) {
-                return { ok: false, error: error };
-            });
+        function persistCustomerPhotos(customers, options) {
+            return customerPhotoStorageController.persist(customers, options);
         }
 
         function setStatusMessage(message, tone, autoClear) {
@@ -1975,6 +2266,7 @@
 
         function getSortedCustomers(customers) {
             const sorted = customers.slice();
+            if (state.sortKey === "manual") return sorted;
             sorted.sort(function (a, b) {
                 let left;
                 let right;
@@ -2050,6 +2342,9 @@
         }
 
         function renderUsedChannelTags(customer) {
+            if (isColdmailTestCompany(customer)) {
+                return "<span class=\"k-tag k-test\">Testversie</span>";
+            }
             const tags = [];
             if (hasUsedColdCalling(customer)) {
                 tags.push("<span class=\"k-tag k-call\">Cold calling</span>");
@@ -2093,7 +2388,7 @@
             const hasPhoto = isValidWebsitePhotoDataUrl(photo);
             const inner = isValidWebsitePhotoDataUrl(photo)
                 ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\">"
-                : "<span>Sleep</span>";
+                : "";
             const remove = hasPhoto
                 ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>"
                 : "";
@@ -2114,13 +2409,17 @@
 
             nodes.tbody.innerHTML = filtered.map(function (customer) {
                 const websiteValue = normalizeString(customer.website || customer.dom) || "—";
+                const websiteHref = normalizeWebsiteCandidateUrl(websiteValue);
+                const websiteHtml = websiteHref
+                    ? "<a class=\"website-link\" href=\"" + escapeHtml(websiteHref) + "\" target=\"_blank\" rel=\"noopener\">" + escapeHtml(websiteValue) + "</a>"
+                    : escapeHtml(websiteValue);
                 return [
                     "<tr data-id=\"" + escapeHtml(customer.id) + "\">",
                         "<td><div class=\"company-cell\"><button class=\"company-edit\" type=\"button\" data-edit-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Bedrijfsgegevens aanpassen\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z\"/></svg></button><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div></div></td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.stad) + "</td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.email || "—") + "</td>",
-                        "<td class=\"c-mid\">" + escapeHtml(customer.tel || "—") + "</td>",
-                        "<td class=\"c-mid\">" + escapeHtml(websiteValue) + "</td>",
+                        "<td class=\"c-mid\">" + escapeHtml(formatPhoneNumber(customer.tel)) + "</td>",
+                        "<td class=\"c-mid\">" + websiteHtml + "</td>",
                         "<td><div class=\"kanalen\">",
                             renderUsedChannelTags(customer),
                         "</div></td>",
@@ -2303,16 +2602,16 @@
             if (!isValidWebsitePhotoDataUrl(original.dataUrl)) {
                 throw new Error("Dit afbeeldingsbestand kan niet worden opgeslagen.");
             }
-            if (original.dataUrl.length <= 1800000) return original;
+            if (original.dataUrl.length <= 700000) return original;
 
             try {
-                const ultra = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 2160, 3840, 0.9);
-                if (ultra.dataUrl.length <= 2200000) return ultra;
-                const high = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1600, 2400, 0.88);
-                if (high.dataUrl.length <= 1600000) return high;
-                const medium = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1200, 1800, 0.84);
-                if (medium.dataUrl.length <= 1000000) return medium;
-                return compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1024, 1536, 0.82);
+                const large = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1440, 2160, 0.86);
+                if (large.dataUrl.length <= 900000) return large;
+                const medium = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 1200, 1800, 0.82);
+                if (medium.dataUrl.length <= 700000) return medium;
+                const compact = await compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 960, 1440, 0.78);
+                if (compact.dataUrl.length <= 520000) return compact;
+                return compressWebsitePhotoDataUrl(original.dataUrl, original.fileName, 768, 1152, 0.74);
             } catch (error) {
                 return original;
             }
@@ -2361,7 +2660,7 @@
                 }));
                 renderPage();
 
-                const photoResult = await persistCustomerPhotos(state.klanten);
+                const photoResult = await persistCustomerPhotos(state.klanten, { onlyCustomerIds: [customerId] });
                 if (photoResult.ok) {
                     toast("Foto opgeslagen");
                     setStatusMessage("Foto opgeslagen.", "success", true);
@@ -2391,7 +2690,7 @@
             renderPage();
             closeWebsitePhotoPreview();
 
-            const photoResult = await persistCustomerPhotos(state.klanten);
+            const photoResult = await persistCustomerPhotos(state.klanten, { removeCustomerIds: [customerId] });
             if (photoResult.ok) {
                 toast("Foto verwijderd");
                 setStatusMessage("Foto verwijderd.", "success", true);
@@ -2453,10 +2752,15 @@
             });
         }
 
-        function getWebdesignPhotoTargets() {
-            return getSortedCustomers(getFilteredCustomers()).filter(function (customer) {
+        function getWebdesignPhotoTargets(limit) {
+            const targets = getSortedCustomers(getFilteredCustomers()).filter(function (customer) {
                 return isWebdesignPhotoEligible(customer);
-            }).slice(0, 10);
+            });
+            const parsedLimit = Math.floor(Number(limit));
+            if (Number.isFinite(parsedLimit) && parsedLimit > 0) {
+                return targets.slice(0, Math.min(parsedLimit, targets.length));
+            }
+            return targets;
         }
 
         async function generateWebsitePhotoData(customer) {
@@ -2503,7 +2807,10 @@
 
                     return {
                         dataUrl: prepared.dataUrl,
-                        fileName: prepared.fileName
+                        fileName: prepared.fileName,
+                        costEur: Math.max(0, Number(payload && payload.cost && payload.cost.eur) || WEBSITE_PHOTO_COST_EUR),
+                        costUsd: Math.max(0, Number(payload && payload.cost && (payload.cost.usd || payload.cost.estimatedUsd)) || 0),
+                        model: normalizeString(payload && payload.model)
                     };
                 } catch (error) {
                     lastError = error;
@@ -2514,10 +2821,10 @@
             throw lastError || new Error("AI-foto genereren is mislukt voor " + customer.bedrijf + ".");
         }
 
-        async function generateWebdesignPhotos() {
+        async function generateWebdesignPhotos(limit) {
             closeAddActions();
             nodes.generatePhotosButton.disabled = true;
-            const targets = getWebdesignPhotoTargets();
+            const targets = getWebdesignPhotoTargets(limit);
             try {
                 if (!targets.length) {
                     setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
@@ -2526,6 +2833,8 @@
 
                 let done = 0;
                 let failed = 0;
+                let apiCostEur = 0;
+                let apiCostUsd = 0;
                 let firstErrorMessage = "";
                 setStatusMessage("Webdesign foto's genereren voor " + targets.length + " bedrijf" + (targets.length === 1 ? "" : "ven") + "...", "info");
 
@@ -2533,16 +2842,21 @@
                     try {
                         setStatusMessage("Webdesign maken voor " + target.bedrijf + " (" + (done + failed + 1) + "/" + targets.length + ")...", "info");
                         const generated = await generateWebsitePhotoData(target);
+                        apiCostEur += Math.max(0, Number(generated.costEur) || 0);
+                        apiCostUsd += Math.max(0, Number(generated.costUsd) || 0);
                         state.klanten = sortCustomers(state.klanten.map(function (customer) {
                             if (customer.id !== target.id) return customer;
                             return {
                                 ...customer,
                                 websitePhoto: generated.dataUrl,
-                                websitePhotoName: generated.fileName
+                                websitePhotoName: generated.fileName,
+                                updatedAt: formatDateForStorage(new Date())
                             };
                         }));
-                        done += 1;
                         renderPage();
+                        const photoResult = await persistCustomerPhotos(state.klanten, { onlyCustomerIds: [target.id] });
+                        if (!photoResult.ok) throw new Error("Webdesign gemaakt, maar opslaan in Supabase mislukte.");
+                        done += 1;
                     } catch (error) {
                         failed += 1;
                         if (!firstErrorMessage) {
@@ -2557,11 +2871,13 @@
                     return;
                 }
 
-                const photoResult = await persistCustomerPhotos(state.klanten);
-                if (!photoResult.ok) {
-                    setStatusMessage("AI-foto's staan in beeld, maar opslaan in Supabase mislukte.", "error");
-                    return;
-                }
+                void recordApiCostEvent({
+                    source: "premium-database-webdesigns",
+                    label: done + " webdesign" + (done === 1 ? "" : "s") + " gemaakt",
+                    amountEur: apiCostEur,
+                    amountUsd: apiCostUsd,
+                    meta: { count: done }
+                });
 
                 toast(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen");
                 setStatusMessage(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen" + (failed ? ", " + failed + " mislukt." : "."), failed ? "info" : "success", true);
@@ -2579,10 +2895,8 @@
             nodes.modalDomain.value = "";
             nodes.modalPhone.value = "";
             nodes.modalMail.value = "";
-            nodes.modalBranch.value = "Overig";
             nodes.modalCity.value = "";
             nodes.modalStatus.value = "benaderbaar";
-            if (nodes.fieldResponsible) nodes.fieldResponsible.value = "Serve";
         }
 
         function openModal() {
@@ -2603,10 +2917,8 @@
             nodes.modalDomain.value = customer.dom || "";
             nodes.modalPhone.value = customer.tel || "";
             nodes.modalMail.value = customer.email || "";
-            nodes.modalBranch.value = customer.branche || "Overig";
             nodes.modalCity.value = customer.stad || "";
             nodes.modalStatus.value = normalizeDatabaseStatus(customer.status, customer);
-            if (nodes.fieldResponsible) nodes.fieldResponsible.value = customer.verantwoordelijk || "Serve";
             nodes.modalBg.classList.add("on");
             nodes.modalCompany.focus();
         }
@@ -2643,56 +2955,7 @@
                 .trim();
         }
 
-        function parseCsvRows(raw) {
-            const text = String(raw || "").replace(/^\uFEFF/, "");
-            const rows = [];
-            let current = "";
-            let row = [];
-            let inQuotes = false;
-
-            for (let i = 0; i < text.length; i += 1) {
-                const char = text[i];
-                const next = text[i + 1];
-
-                if (char === "\"") {
-                    if (inQuotes && next === "\"") {
-                        current += "\"";
-                        i += 1;
-                    } else {
-                        inQuotes = !inQuotes;
-                    }
-                    continue;
-                }
-
-                if (char === "," && !inQuotes) {
-                    row.push(current);
-                    current = "";
-                    continue;
-                }
-
-                if ((char === "\n" || char === "\r") && !inQuotes) {
-                    if (char === "\r" && next === "\n") {
-                        i += 1;
-                    }
-                    row.push(current);
-                    if (row.some(function (cell) { return normalizeString(cell) !== ""; })) {
-                        rows.push(row);
-                    }
-                    row = [];
-                    current = "";
-                    continue;
-                }
-
-                current += char;
-            }
-
-            row.push(current);
-            if (row.some(function (cell) { return normalizeString(cell) !== ""; })) {
-                rows.push(row);
-            }
-
-            return rows;
-        }
+        const pickRecordValue = window.SoftoraDatabaseImport.pickRecordValue;
 
         function mapCsvRowToCustomer(headers, row, index) {
             const record = {};
@@ -2700,24 +2963,26 @@
                 record[header] = normalizeString(row[headerIndex]);
             });
 
-            const bedrijf = record.bedrijf || record.company || record.organisatie;
+            const bedrijf = pickRecordValue(record, ["bedrijf", "bedrijfsnaam", "company", "company name", "organisatie", "naam bedrijf"]);
             if (!bedrijf) return null;
 
-            const status = normalizeDatabaseStatus(record.status || record.fase || "benaderbaar");
-            const updatedAt = record["laatste actie"] || record.updatedat || record.datum || formatDateForStorage(new Date());
+            const website = pickRecordValue(record, ["website", "domein", "domain", "url", "site"]);
+            const status = normalizeDatabaseStatus(pickRecordValue(record, ["status", "fase"]) || "benaderbaar");
+            const updatedAt = pickRecordValue(record, ["laatste actie", "updatedat", "updated at", "datum"]) || formatDateForStorage(new Date());
 
             return normalizeCustomer({
                 id: "import-" + index + "-" + createId(),
                 bedrijf: bedrijf,
-                naam: record.contact || record.naam || bedrijf,
-                dom: record.domein || record.domain || record.website || bedrijf,
-                telefoon: record.telefoon || record.tel || record.phone || "—",
-                email: record["e mail"] || record.email || record.mail,
-                branche: record.branche || record.branch || "Overig",
-                stad: record.adres || record.stad || record.locatie || "Onbekend",
+                naam: pickRecordValue(record, ["contact", "contactpersoon", "naam"]) || bedrijf,
+                dom: website || bedrijf,
+                website: website,
+                telefoon: pickRecordValue(record, ["telefoonnummer", "telefoon", "tel", "phone", "phone number"]) || "—",
+                email: pickRecordValue(record, ["e mail", "email", "mail", "mailadres"]),
+                branche: pickRecordValue(record, ["branche", "branch"]) || "Overig",
+                stad: pickRecordValue(record, ["adres", "stad", "plaats", "locatie", "address"]) || "Onbekend",
                 status: status,
-                verantwoordelijk: record["toegewezen aan"] || record.verantwoordelijke || record.owner || "Serve",
-                service: record.service || "website",
+                verantwoordelijk: pickRecordValue(record, ["toegewezen aan", "verantwoordelijke", "owner"]) || "Serve",
+                service: pickRecordValue(record, ["service", "dienst"]) || "website",
                 updatedAt: updatedAt,
                 hist: [{
                     type: status,
@@ -2727,11 +2992,12 @@
             }, "import-" + index);
         }
 
-        function importCustomersFromCsv(raw) {
-            const rows = parseCsvRows(raw);
+        function applyCustomersFromRows(rows, options) {
+            const isSync = Boolean(options && options.updateExisting);
+            const silent = Boolean(options && options.silent);
             if (rows.length < 2) {
-                setStatusMessage("Het bestand bevat geen bruikbare CSV-rijen.", "error");
-                return;
+                setStatusMessage("Het bestand bevat geen bruikbare rijen.", "error");
+                return Promise.resolve(false);
             }
 
             const headers = rows[0].map(normalizeCsvHeader);
@@ -2741,67 +3007,53 @@
 
             if (!importedCustomers.length) {
                 setStatusMessage("Geen geldige bedrijven gevonden in het bestand.", "error");
-                return;
+                return Promise.resolve(false);
             }
 
-            const existingKeys = new Set(state.klanten.map(function (customer) {
-                return buildCustomerIdentityKey(customer);
-            }));
-
-            let importedCount = 0;
-            const mergedCustomers = state.klanten.slice();
-
-            importedCustomers.forEach(function (customer) {
-                const key = buildCustomerIdentityKey(customer);
-                if (!key || existingKeys.has(key)) {
-                    return;
-                }
-                existingKeys.add(key);
-                mergedCustomers.unshift(customer);
-                importedCount += 1;
+            const mergeResult = window.SoftoraDatabaseImport.mergeCustomers(state.klanten, importedCustomers, {
+                updateExisting: isSync
             });
+            const changedCount = mergeResult.addedCount + mergeResult.updatedCount;
 
-            if (!importedCount) {
-                setStatusMessage("Alle bedrijven uit dit bestand stonden al in de database.", "info", true);
-                return;
+            if (!changedCount) {
+                if (!silent) {
+                    setStatusMessage(isSync ? "Google Sheet is al gelijk aan de database." : "Alle bedrijven uit dit bestand stonden al in de database.", "info", true);
+                }
+                return Promise.resolve(false);
             }
 
-            state.klanten = sortCustomers(mergedCustomers);
+            state.klanten = mergeResult.customers;
             renderPage();
 
-            persistCustomerList(state.klanten).then(function (result) {
+            return persistCustomerList(state.klanten).then(function (result) {
                 if (result.ok) {
-                    toast("✓ " + importedCount + " bedrijven geupload");
-                    setStatusMessage(importedCount + " bedrijven toegevoegd via upload.", "success", true);
-                    return;
+                    const labelParts = [];
+                    if (mergeResult.addedCount) labelParts.push(mergeResult.addedCount + " toegevoegd");
+                    if (mergeResult.updatedCount) labelParts.push(mergeResult.updatedCount + " bijgewerkt");
+                    const label = labelParts.join(", ");
+                    if (!silent) {
+                        toast("✓ " + label);
+                        setStatusMessage((isSync ? "Google Sheet gesynchroniseerd: " : "") + label + ".", "success", true);
+                    }
+                    return true;
                 }
                 setStatusMessage(
                     "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
                     "error"
                 );
+                return false;
             });
         }
 
-        function handleImportFileChange(event) {
-            const file = event.target.files && event.target.files[0];
-            if (!file) return;
+        function importCustomersFromRows(rows) {
+            return applyCustomersFromRows(rows, { updateExisting: false });
+        }
 
-            const reader = new FileReader();
-            reader.onload = function () {
-                try {
-                    importCustomersFromCsv(reader.result);
-                } catch (error) {
-                    console.error("CSV import mislukt:", error);
-                    setStatusMessage("Uploaden mislukt: ongeldig CSV-bestand.", "error");
-                } finally {
-                    nodes.importFileInput.value = "";
-                }
-            };
-            reader.onerror = function () {
-                nodes.importFileInput.value = "";
-                setStatusMessage("Bestand lezen mislukt.", "error");
-            };
-            reader.readAsText(file);
+        function syncCustomersFromRows(rows, options) {
+            return applyCustomersFromRows(rows, {
+                updateExisting: true,
+                silent: options && options.silent
+            });
         }
 
         function addCustomerFromModal() {
@@ -2825,10 +3077,10 @@
                 dom: dom,
                 telefoon: normalizeString(nodes.modalPhone.value) || "—",
                 email: normalizeString(nodes.modalMail.value) || ("info@" + dom),
-                branche: normalizeString(nodes.modalBranch.value) || "Overig",
+                branche: "Overig",
                 stad: normalizeString(nodes.modalCity.value) || "Onbekend",
                 status: normalizeDatabaseStatus(nodes.modalStatus.value),
-                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : "Serve",
+                verantwoordelijk: "",
                 hist: [{
                     type: normalizeDatabaseStatus(nodes.modalStatus.value),
                     label: "Toegevoegd aan database",
@@ -2837,7 +3089,7 @@
                 updatedAt: formatDateForStorage(new Date())
             });
 
-            state.klanten = sortCustomers([customer].concat(state.klanten));
+            state.klanten = state.klanten.concat([customer]);
             renderPage();
             closeModal();
 
@@ -2883,10 +3135,10 @@
                 website: normalizeString(nodes.modalDomain.value) || existing.website,
                 telefoon: normalizeString(nodes.modalPhone.value) || "—",
                 email: normalizeString(nodes.modalMail.value) || ("info@" + dom),
-                branche: normalizeString(nodes.modalBranch.value) || "Overig",
+                branche: existing.branche || "Overig",
                 stad: normalizeString(nodes.modalCity.value) || "Onbekend",
                 status: nextStatus,
-                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : existing.verantwoordelijk,
+                verantwoordelijk: existing.verantwoordelijk,
                 hist: nextHistory,
                 updatedAt: formatDateForStorage(new Date())
             }, existing.id);
@@ -2943,9 +3195,10 @@
             if (!hadBootstrapCustomers) {
                 setStatusMessage("Database laden...", "info");
             }
+
             try {
                 const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
-                const remoteCustomers = parseCustomersFromStateValues(remoteState && remoteState.values, CUSTOMER_DB_KEY);
+                const remoteCustomers = parseCustomers(window.SoftoraDatabaseImport.readChunkedStateValue(remoteState && remoteState.values, CUSTOMER_DB_KEY));
 
                 if (remoteCustomers.length) {
                     let enrichedCustomers = remoteCustomers;
@@ -2958,7 +3211,7 @@
                         console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
                     }
 
-                    const photoMap = await loadCustomerPhotoMap();
+                    const photoMap = await loadCustomerPhotoMap(enrichedCustomers);
                     const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap);
 
                     if (customerListsDiffer(customersWithPhotos) || !hadBootstrapCustomers) {
@@ -2975,34 +3228,6 @@
                 console.error("Klanten laden via Supabase mislukt:", error);
             }
 
-            try {
-                const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
-                const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
-                state.orders = Array.isArray(orders) ? orders : [];
-                const importedCustomers = mergeCustomersWithPhotos(
-                    deriveCustomersFromOrders(orders),
-                    await loadCustomerPhotoMap()
-                );
-
-                if (customerListsDiffer(importedCustomers) || !hadBootstrapCustomers) {
-                    state.klanten = importedCustomers;
-                    renderPage();
-                } else {
-                    state.klanten = importedCustomers;
-                }
-
-                if (importedCustomers.length) {
-                    if (!hadBootstrapCustomers) {
-                        setStatusMessage("Database-voorbeeld uit actieve opdrachten. Voeg klanten toe om ze permanent op te slaan.", "info", true);
-                    } else {
-                        setStatusMessage("");
-                    }
-                    return;
-                }
-            } catch (error) {
-                console.error("Klanten importeren vanuit opdrachten mislukt:", error);
-            }
-
             state.klanten = [];
             renderPage();
             setStatusMessage("");
@@ -3013,6 +3238,34 @@
             state.klanten = initialBootstrapCustomers;
         }
         renderPage();
+
+        const databaseImportController = window.SoftoraDatabaseImport.createController({
+            input: nodes.importFileInput,
+            setStatusMessage: setStatusMessage,
+            importRows: importCustomersFromRows,
+            syncRows: syncCustomersFromRows,
+            getUiState: fetchUiStateGetWithFallback,
+            setUiState: fetchUiStateSetWithFallback,
+            syncScope: CUSTOMER_DB_SCOPE,
+            syncKey: CUSTOMER_DB_SYNC_KEY,
+            syncIntervalMs: CUSTOMER_DB_SYNC_INTERVAL_MS,
+            realBusinessButton: null
+        });
+
+        const databaseDeepSearchController = window.SoftoraDatabaseDeepSearch.createController({
+            nodes: nodes,
+            getUiState: fetchUiStateGetWithFallback,
+            setUiState: fetchUiStateSetWithFallback,
+            scope: CUSTOMER_DB_SCOPE,
+            stateKey: CUSTOMER_DB_DEEP_SEARCH_KEY,
+            importRows: importCustomersFromRows,
+            recordApiCost: recordApiCostEvent,
+            getCustomers: function () {
+                return state.klanten;
+            },
+            setStatusMessage: setStatusMessage,
+            toast: toast
+        });
 
         nodes.query.addEventListener("input", function (event) {
             state.query = normalizeString(event.target.value);
@@ -3101,13 +3354,15 @@
             toggleAddActions();
         });
         nodes.generatePhotosButton.addEventListener("click", function () {
-            void generateWebdesignPhotos();
+            photoBatchController.open();
         });
-        nodes.addCompaniesButton.addEventListener("click", function () {
+        photoBatchController.bind();
+        databaseDeepSearchController.bind();
+        nodes.deepSearchButton.addEventListener("click", function () {
             closeAddActions();
-            nodes.importFileInput.click();
+            databaseDeepSearchController.open();
         });
-        nodes.importFileInput.addEventListener("change", handleImportFileChange);
+        nodes.importFileInput.addEventListener("change", databaseImportController.handleFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
         nodes.modalBg.addEventListener("click", function (event) {
@@ -3127,6 +3382,8 @@
                     closeWebsitePhotoPreview();
                     return;
                 }
+                if (photoBatchController.isOpen()) { photoBatchController.close(); return; }
+                if (databaseDeepSearchController.isOpen()) { databaseDeepSearchController.close(); return; }
                 closeAddActions();
                 if (nodes.modalBg.classList.contains("on")) {
                     closeModal();
@@ -3141,6 +3398,7 @@
         void (async function () {
             try {
                 await bootstrapCustomers();
+                void databaseImportController.startAutoSync();
             } finally {
                 if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === "function") {
                     window.SoftoraPremiumBoot.setShellBooting(false);

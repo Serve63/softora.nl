@@ -161,7 +161,7 @@
   }
 
   function renderBulletList(target, items, emptyText) {
-    target.innerHTML = '';
+    target.replaceChildren();
     const values = toArray(items).map(normalizeText).filter(Boolean);
     if (!values.length) {
       target.appendChild(buildEmptyMessage(emptyText));
@@ -180,7 +180,7 @@
 
   function renderSelectOptions(select, options, selectedValue) {
     const currentValue = normalizeText(selectedValue);
-    select.innerHTML = '';
+    select.replaceChildren();
     toArray(options).forEach((optionDef) => {
       const option = document.createElement('option');
       option.value = normalizeText(optionDef?.value);
@@ -194,7 +194,7 @@
   }
 
   function renderHealthBreakdown(metrics) {
-    elements.healthBreakdown.innerHTML = '';
+    elements.healthBreakdown.replaceChildren();
     const values = toArray(metrics);
     if (!values.length) {
       elements.healthBreakdown.appendChild(buildEmptyMessage('Nog geen scanresultaten beschikbaar.'));
@@ -233,7 +233,7 @@
   }
 
   function renderScoreChart(pages) {
-    elements.scoreChart.innerHTML = '';
+    elements.scoreChart.replaceChildren();
     const values = toArray(pages).slice().sort((a, b) => Number(a.score || 0) - Number(b.score || 0)).slice(0, 8);
     if (!values.length) {
       elements.scoreChart.appendChild(buildEmptyMessage('Nog geen paginaresultaten beschikbaar.'));
@@ -288,7 +288,7 @@
   }
 
   function renderAuditList() {
-    elements.auditList.innerHTML = '';
+    elements.auditList.replaceChildren();
     const pages = toArray(state.audit?.pages);
     if (!pages.length) {
       elements.auditList.appendChild(buildEmptyMessage('Nog geen paginaresultaten beschikbaar.'));
@@ -348,7 +348,7 @@
   }
 
   function renderChangeList(target, page) {
-    target.innerHTML = '';
+    target.replaceChildren();
     const changeFragment = document.createDocumentFragment();
     const pageOverrides = page?.suggestedPageOverrides && typeof page.suggestedPageOverrides === 'object' ? page.suggestedPageOverrides : {};
     Object.entries(pageOverrides).forEach(([key, value]) => {
@@ -395,7 +395,7 @@
   }
 
   function renderCurrentSnapshot(target, page) {
-    target.innerHTML = '';
+    target.replaceChildren();
     const current = page?.current && typeof page.current === 'object' ? page.current : {};
     const rows = [
       ['Meta title', current.title],
@@ -475,7 +475,7 @@
   }
 
   function renderRecentChanges() {
-    elements.recentChangesList.innerHTML = '';
+    elements.recentChangesList.replaceChildren();
     const pages = toArray(state.lastOptimization?.changedPages);
     if (!pages.length) {
       elements.recentChangesList.appendChild(buildEmptyMessage('Nog geen sitebrede AI-optimalisatie uitgevoerd in deze sessie.'));

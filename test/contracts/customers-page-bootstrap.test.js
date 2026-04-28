@@ -56,6 +56,44 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
 });
 
+test('customers page bootstrap leest chunked customer database rows', async () => {
+  const rawCustomers = JSON.stringify([
+    {
+      id: 'klant-1',
+      naam: 'Linsey Klaus',
+      bedrijf: 'Linszorgt.nl',
+      telefoon: '+31 6 13 18 38 44',
+      type: 'Website',
+      website: 'Linszorgt.nl',
+      websiteBedrag: 300,
+      status: 'Betaald',
+      actief: 'Ja',
+      datum: '2026-03-23',
+    },
+  ]);
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      if (scope !== 'premium_customers_database') return null;
+      return {
+        values: {
+          softora_customers_premium_v1: '',
+          softora_customers_premium_v1_chunks_v1: JSON.stringify({ count: 2 }),
+          softora_customers_premium_v1_chunk_0: rawCustomers.slice(0, 40),
+          softora_customers_premium_v1_chunk_1: rawCustomers.slice(40),
+        },
+      };
+    },
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'customers');
+  assert.equal(payload.customers.length, 1);
+  assert.equal(payload.customers[0].naam, 'Linsey Klaus');
+  assert.equal(payload.customers[0].websiteBedrag, 300);
+});
+
 test('customers page bootstrap falls back to deriving customers from active orders', async () => {
   const service = createCustomersPageBootstrapService({
     getUiStateValues: async (scope) => {

@@ -4,13 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="format-detection" content="telephone=no">
-    <meta name="theme-color" content="#f4ede5">
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4ede5">
+    <meta name="theme-color" content="#f8f7f4">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f7f4">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Softora">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Softora | Premium Webdesign & Development</title>
     
+    <link rel="preload" href="/assets/fonts/inter-latin.woff2?v=20260409a" as="font" type="font/woff2" crossorigin="anonymous">
+    <link rel="preload" href="/assets/fonts/oswald-latin.woff2?v=20260409a" as="font" type="font/woff2" crossorigin="anonymous">
     <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
     <link rel="stylesheet" href="assets/public-theme.css">
     <script>
@@ -32,6 +37,8 @@
         :root {
             color-scheme: light;
             --bg-primary: #f8f7f4;
+            --header-surface: #f8f7f4;
+            --meta-bar-surface: #f8f7f4;
             --bg-secondary: #ffffff;
             --bg-tertiary: #efeee9;
             --bg-card: rgba(15, 23, 42, 0.03);
@@ -53,15 +60,35 @@
 
         html {
             scroll-behavior: smooth;
+            background-color: var(--header-surface);
+            background: var(--header-surface);
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--bg-primary);
+            background-color: var(--header-surface);
             color: var(--text-primary);
             line-height: 1.6;
             overflow-x: hidden;
             cursor: auto;
+        }
+
+        .ios-statusbar-fill {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: constant(safe-area-inset-top);
+            height: env(safe-area-inset-top);
+            background: var(--meta-bar-surface);
+            z-index: 1002;
+            pointer-events: none;
+        }
+
+        @supports not (height: env(safe-area-inset-top)) {
+            .ios-statusbar-fill {
+                height: 0;
+            }
         }
 
         h1, h2, h3, h4 {
@@ -219,7 +246,7 @@
             text-transform: uppercase;
             font-family: 'Oswald', sans-serif;
             letter-spacing: 0.1em;
-            background: rgba(255, 255, 255, 0.92);
+            background: var(--header-surface);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             box-shadow: 0 8px 28px rgba(15, 17, 28, 0.08);
@@ -227,7 +254,7 @@
 
         nav.scrolled {
             padding: 1rem 4rem;
-            background: rgba(255, 255, 255, 0.92);
+            background: var(--header-surface);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             box-shadow: 0 8px 28px rgba(15, 17, 28, 0.08);
@@ -1442,6 +1469,91 @@
             fill: currentColor;
         }
 
+        .cookie-consent {
+            position: fixed;
+            left: 24px;
+            bottom: 24px;
+            z-index: 1300;
+            width: min(580px, calc(100vw - 48px));
+            padding: 18px 18px 16px;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(24, 27, 44, 0.1);
+            border-left: 4px solid var(--accent);
+            border-radius: 8px;
+            box-shadow: 0 18px 42px rgba(20, 22, 34, 0.16);
+            backdrop-filter: blur(14px);
+            color: var(--text-secondary);
+        }
+
+        .cookie-consent[hidden] {
+            display: none !important;
+        }
+
+        .cookie-consent-title {
+            margin: 0 0 7px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.92rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .cookie-consent-text {
+            margin: 0;
+            font-size: 0.84rem;
+            line-height: 1.65;
+            color: var(--text-secondary);
+        }
+
+        .cookie-consent-text a {
+            color: var(--accent);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .cookie-consent-text a:hover {
+            text-decoration: underline;
+        }
+
+        .cookie-consent-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .cookie-consent-btn {
+            min-height: 40px;
+            padding: 0.72rem 1rem;
+            border: 1px solid var(--accent);
+            border-radius: 7px;
+            background: var(--accent);
+            color: #fff;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+
+        .cookie-consent-btn:hover {
+            background: var(--accent-light);
+            border-color: var(--accent-light);
+        }
+
+        .cookie-consent-btn.secondary {
+            background: transparent;
+            color: var(--accent);
+        }
+
+        .cookie-consent-btn.secondary:hover {
+            background: rgba(139, 34, 82, 0.08);
+            border-color: var(--accent);
+        }
+
         .footer-bottom {
             display: flex;
             align-items: center;
@@ -1465,15 +1577,21 @@
             gap: 24px;
         }
 
-        .footer-legal a {
+        .footer-legal a,
+        .footer-legal button {
             font-family: 'Inter', sans-serif;
             font-size: 12px;
             color: var(--text-tertiary);
             text-decoration: none;
+            background: none;
+            border: 0;
+            padding: 0;
+            cursor: pointer;
             transition: color 0.15s;
         }
 
-        .footer-legal a:hover {
+        .footer-legal a:hover,
+        .footer-legal button:hover {
             color: #9b2355;
         }
 
@@ -1683,7 +1801,22 @@
             footer.footer { padding: 42px 20px 0; }
             .footer-bottom { flex-direction: column; align-items: flex-start; gap: 10px; }
             .footer-legal { gap: 14px; flex-wrap: wrap; }
+            .footer-legal a[href*="premium-personeel-login"] { display: none; }
             h1 { font-size: 3rem; }
+            .cookie-consent {
+                left: 16px;
+                right: 16px;
+                bottom: 88px;
+                width: auto;
+                padding: 16px;
+            }
+            .cookie-consent-actions {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+            .cookie-consent-btn {
+                width: 100%;
+            }
             .whatsapp-widget {
                 right: 16px;
                 bottom: 16px;
@@ -1724,11 +1857,11 @@
             }
 
             html {
-                background: linear-gradient(180deg, #f7f5f0 0%, #f4f1eb 100%);
+                background: var(--header-surface) !important;
             }
 
             body {
-                background: linear-gradient(180deg, #f7f5f0 0%, #f4f1eb 100%);
+                background: var(--header-surface) !important;
                 color: var(--text-primary);
             }
 
@@ -1745,7 +1878,7 @@
             nav,
             nav.scrolled {
                 padding: calc(14px + env(safe-area-inset-top)) var(--mobile-shell) 14px !important;
-                background: rgba(248, 247, 244, 0.92) !important;
+                background: var(--header-surface) !important;
                 backdrop-filter: blur(18px);
                 border-bottom: 1px solid rgba(0, 0, 0, 0.06);
                 box-shadow: 0 10px 24px rgba(17, 19, 30, 0.06);
@@ -1893,8 +2026,8 @@
             .werkwijze-title {
                 max-width: 100%;
                 margin: 0.75rem 0 1.25rem !important;
-                font-size: clamp(1.75rem, 8vw, 2.35rem) !important;
-                line-height: 1.02 !important;
+                font-size: clamp(2.2rem, 10vw, 3.1rem) !important;
+                line-height: 0.95 !important;
                 overflow-wrap: normal;
                 word-break: normal;
             }
@@ -2239,9 +2372,7 @@
             }
 
             .footer-accent {
-                margin: 0 var(--mobile-shell);
-                border-radius: 999px;
-                height: 4px;
+                display: none !important;
             }
 
             footer.footer {
@@ -2323,7 +2454,7 @@
         nav,
         nav.scrolled {
             padding-inline: clamp(1.5rem, 4vw, 4rem);
-            background: rgba(250, 246, 241, 0.78);
+            background: var(--header-surface);
             border-bottom: 1px solid rgba(27, 24, 31, 0.08);
             box-shadow: 0 14px 40px rgba(20, 16, 12, 0.08);
             backdrop-filter: blur(20px);
@@ -2920,6 +3051,21 @@
                 gap: 12px;
             }
 
+            #werkwijze {
+                background: #ffffff !important;
+            }
+
+            #werkwijze > div,
+            #werkwijze .grid-2,
+            #werkwijze .werkwijze-copy {
+                background: #ffffff !important;
+            }
+
+            #werkwijze .werkwijze-grid,
+            #werkwijze .werkwijze-stats {
+                background: #ffffff !important;
+            }
+
             #faq,
             .faq-section {
                 padding-left: 18px !important;
@@ -2980,6 +3126,7 @@
     </style>
 </head>
 <body>
+    <div class="ios-statusbar-fill" aria-hidden="true"></div>
 
     <div class="noise-overlay"></div>
     <div class="cursor"></div>
@@ -2993,7 +3140,7 @@
     <nav id="navbar">
         <a href="#" class="logo">SOFTORA.NL</a>
         <div class="nav-links">
-            <a href="#contact" class="magnetic-btn magnetic nav-start-btn" style="padding: 0.8rem 1.5rem; font-size: 0.85rem;">Start Project</a>
+            <a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic nav-start-btn" style="padding: 0.8rem 1.5rem; font-size: 0.85rem;">Start Project</a>
         </div>
     </nav>
 
@@ -3006,7 +3153,7 @@
                 </h1>
                 <p>Websites die overtuigen, software die processen stroomlijnt, AI-agents die de telefoon opnemen.</p>
                 <div class="hero-buttons">
-                    <a href="#contact" class="magnetic-btn magnetic">Start Project</a>
+                    <a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic">Start Project</a>
                     <a href="#werkwijze" class="magnetic-btn magnetic secondary">Bekijk Werkwijze</a>
                 </div>
             </div>
@@ -3081,7 +3228,7 @@
     <section class="image-text-section perf-deferred-section" id="over" style="padding: 1rem 4rem 3.5rem;">
         <div class="image-text-frame">
             <div class="image-side">
-                <img src="/assets/home-hero-generated-v2.jpg" alt="Softora team werkt samen aan een premium digitale ervaring" width="1536" height="1024" loading="lazy" decoding="async" fetchpriority="low">
+                <img src="/assets/home-over-office-meeting-ai.jpg" alt="AI-gegenereerde visuele scene bij de no-nonsense projectaanpak van Softora" width="1536" height="1024" loading="lazy" decoding="async" fetchpriority="low">
             </div>
             <div class="content-side about-panel fade-up">
                 <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.85rem; display: inline-block; margin-bottom: 1.4rem;">Over Ons</span>
@@ -3165,7 +3312,7 @@
                         <li>API-koppelingen met bestaande tools</li>
                         <li>Schaalbaar met je bedrijf mee</li>
                     </ul>
-                    <a href="/premium-pakketten" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig</a>
+                    <a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig</a>
                 </div>
 
                 <div id="dienst-premium-website" class="pricing-card featured fade-up" data-tilt style="transition-delay: 0.1s">
@@ -3181,7 +3328,7 @@
                         <li>Webshop of reserveringen mogelijk</li>
                         <li>Onderhoud abonnement beschikbaar</li>
                     </ul>
-                    <a href="/premium-pakketten" class="magnetic-btn magnetic" style="width: 100%; justify-content: center;">Dit heb ik nodig</a>
+                    <a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic" style="width: 100%; justify-content: center;">Dit heb ik nodig</a>
                 </div>
 
                 <div id="dienst-voicesoftware" class="pricing-card fade-up" data-tilt style="transition-delay: 0.2s">
@@ -3197,7 +3344,7 @@
                         <li>Realtime kwaliteitscontrole</li>
                         <li>24/7 actief, geen mensen nodig</li>
                     </ul>
-                    <a href="/premium-pakketten" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig</a>
+                    <a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig</a>
                 </div>
 
                 <div id="dienst-chatbot" class="pricing-card fade-up" data-tilt style="transition-delay: 0.3s">
@@ -3213,7 +3360,7 @@
                         <li>Koppeling met mail of CRM</li>
                         <li>Tone-of-voice in jouw merkstijl</li>
                     </ul>
-                    <a href="/premium-pakketten" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig</a>
+                    <a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig</a>
                 </div>
             </div>
         </div>
@@ -3289,7 +3436,7 @@
                 <div class="footer-col-title">Contact</div>
                 <div class="contact-item">
                     <div class="contact-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6z"/></svg></div>
-                    <div class="contact-text"><strong>Telefoon</strong>+31 6 2991 7185</div>
+                    <div class="contact-text"><strong>Telefoon</strong>+31 6 43 26 27 92</div>
                 </div>
                 <div class="contact-item">
                     <div class="contact-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
@@ -3302,6 +3449,7 @@
             <div class="footer-copy">© 2026 <span>Softora.nl</span> - Alle rechten voorbehouden</div>
             <div class="footer-legal">
                 <a href="/premium-privacy-policy">Privacybeleid</a>
+                <button type="button" data-cookie-settings>Cookie-instellingen</button>
                 <a href="/premium-algemene-voorwaarden">Algemene voorwaarden</a>
                 <a href="/premium-blog">Artikelen</a>
                 <a href="/premium-over-softora">Over Softora.nl</a>
@@ -3326,166 +3474,286 @@
         </a>
     </div>
 
+    <div class="cookie-consent" id="cookieConsent" role="dialog" aria-labelledby="cookie-consent-title" hidden>
+        <div class="cookie-consent-title" id="cookie-consent-title">Cookies op Softora.nl</div>
+        <p class="cookie-consent-text">
+            We gebruiken noodzakelijke cookies om de website goed te laten werken. Met jouw akkoord mogen we ook analytische cookies gebruiken om de site te verbeteren. Lees meer in ons <a href="/premium-privacy-policy">privacybeleid</a>.
+        </p>
+        <div class="cookie-consent-actions">
+            <button type="button" class="cookie-consent-btn secondary" data-cookie-choice="declined">Weigeren</button>
+            <button type="button" class="cookie-consent-btn" data-cookie-choice="accepted">Akkoord</button>
+        </div>
+    </div>
+
     <script>
-        const cursor = document.querySelector(".cursor");
-        const cursorDot = document.querySelector(".cursor-dot");
-        const progressBar = document.querySelector(".scroll-progress");
-        const navbar = document.getElementById("navbar");
-        const magneticElements = document.querySelectorAll(".magnetic");
-        const tiltCards = document.querySelectorAll("[data-tilt]");
-        const faqListEl = document.getElementById("faq-list");
-        const anchors = document.querySelectorAll('a[href^="#"]');
-        const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
-        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
+        (function () {
+            try {
+                const cursor = document.querySelector(".cursor");
+                const cursorDot = document.querySelector(".cursor-dot");
+                const progressBar = document.querySelector(".scroll-progress");
+                const navbar = document.getElementById("navbar");
+                const cookieConsent = document.getElementById("cookieConsent");
+                const cookieChoiceButtons = document.querySelectorAll("[data-cookie-choice]");
+                const cookieSettingsButtons = document.querySelectorAll("[data-cookie-settings]");
+                const magneticElements = document.querySelectorAll(".magnetic");
+                const tiltCards = document.querySelectorAll("[data-tilt]");
+                const faqListEl = document.getElementById("faq-list");
+                const anchors = document.querySelectorAll('a[href^="#"]');
+                const ctaLinks = Array.from(document.querySelectorAll('a[href^="https://wa.me/"]')).filter(function (link) {
+                    return !link.closest(".whatsapp-widget");
+                });
+                const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
+                const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
+                const desktopOnlyContactFormId = "#faq-contact-form";
 
-        if (!enablePointerFx) {
-            document.body.style.cursor = "auto";
-            cursor.style.display = "none";
-            cursorDot.style.display = "none";
-        } else {
-            let mouseX = 0;
-            let mouseY = 0;
-            let cursorX = 0;
-            let cursorY = 0;
-            let dotX = 0;
-            let dotY = 0;
-            let cursorRafId = null;
-
-            document.addEventListener(
-                "mousemove",
-                function (event) {
-                    mouseX = event.clientX;
-                    mouseY = event.clientY;
-                },
-                { passive: true }
-            );
-
-            function animateCursor() {
-                cursorX += (mouseX - cursorX) * 1;
-                cursorY += (mouseY - cursorY) * 1;
-                cursor.style.left = cursorX + "px";
-                cursor.style.top = cursorY + "px";
-                dotX += (mouseX - dotX) * 1;
-                dotY += (mouseY - dotY) * 1;
-                cursorDot.style.left = dotX + "px";
-                cursorDot.style.top = dotY + "px";
-                cursorRafId = requestAnimationFrame(animateCursor);
-            }
-
-            function startCursorLoop() {
-                if (cursorRafId === null) {
-                    cursorRafId = requestAnimationFrame(animateCursor);
+                function isDesktop() {
+                    return window.matchMedia("(min-width: 769px)").matches;
                 }
-            }
 
-            function stopCursorLoop() {
-                if (cursorRafId !== null) {
-                    cancelAnimationFrame(cursorRafId);
-                    cursorRafId = null;
+                function syncCtaLinksForViewport() {
+                    const desktopMode = isDesktop();
+                    ctaLinks.forEach(function (link) {
+                        const baseHref = String(
+                            link.getAttribute("data-whatsapp-base-href") ||
+                            link.getAttribute("href") ||
+                            "https://wa.me/31643262792"
+                        );
+
+                        if (!link.getAttribute("data-whatsapp-base-href")) {
+                            link.setAttribute("data-whatsapp-base-href", baseHref);
+                        }
+
+                        if (desktopMode) {
+                            link.setAttribute("href", desktopOnlyContactFormId);
+                            link.removeAttribute("target");
+                            link.removeAttribute("rel");
+                        } else {
+                            link.setAttribute("href", baseHref);
+                            link.setAttribute("target", "_blank");
+                            link.setAttribute("rel", "noopener noreferrer");
+                        }
+                    });
                 }
-            }
 
-            startCursorLoop();
+                function getCookieValue(name) {
+                    const target = name + "=";
+                    return String(document.cookie || "")
+                        .split(";")
+                        .map(function (part) {
+                            return part.trim();
+                        })
+                        .find(function (part) {
+                            return part.indexOf(target) === 0;
+                        })
+                        ?.slice(target.length) || "";
+                }
 
-            document.addEventListener("visibilitychange", function () {
-                if (document.hidden) {
-                    stopCursorLoop();
-                } else {
+                function setCookieConsentChoice(choice) {
+                    const safeChoice = choice === "accepted" ? "accepted" : "declined";
+                    document.cookie = "softora_cookie_consent=" + safeChoice + "; Max-Age=15552000; Path=/; SameSite=Lax";
+                }
+
+                function showCookieConsent() {
+                    if (!cookieConsent) return;
+                    cookieConsent.hidden = false;
+                }
+
+                function hideCookieConsent() {
+                    if (!cookieConsent) return;
+                    cookieConsent.hidden = true;
+                }
+
+                function setupCookieConsent() {
+                    if (!cookieConsent) return;
+
+                    if (!getCookieValue("softora_cookie_consent")) {
+                        showCookieConsent();
+                    }
+
+                    cookieChoiceButtons.forEach(function (button) {
+                        button.addEventListener("click", function () {
+                            setCookieConsentChoice(button.getAttribute("data-cookie-choice"));
+                            hideCookieConsent();
+                        });
+                    });
+
+                    cookieSettingsButtons.forEach(function (button) {
+                        button.addEventListener("click", function () {
+                            showCookieConsent();
+                        });
+                    });
+                }
+
+                function safelySetStyle(element, property, value) {
+                    if (!element || !element.style) return;
+                    element.style[property] = value;
+                }
+
+                function safelyAddClass(element, className) {
+                    if (!element || !element.classList) return;
+                    element.classList.add(className);
+                }
+
+                function safelyRemoveClass(element, className) {
+                    if (!element || !element.classList) return;
+                    element.classList.remove(className);
+                }
+
+                if (!enablePointerFx) {
+                    if (document.body && document.body.style) document.body.style.cursor = "auto";
+                    safelySetStyle(cursor, "display", "none");
+                    safelySetStyle(cursorDot, "display", "none");
+                } else if (cursor && cursorDot) {
+                    let mouseX = 0;
+                    let mouseY = 0;
+                    let cursorX = 0;
+                    let cursorY = 0;
+                    let dotX = 0;
+                    let dotY = 0;
+                    let cursorRafId = null;
+
+                    document.addEventListener(
+                        "mousemove",
+                        function (event) {
+                            mouseX = event.clientX;
+                            mouseY = event.clientY;
+                        },
+                        { passive: true }
+                    );
+
+                    function animateCursor() {
+                        cursorX += (mouseX - cursorX) * 1;
+                        cursorY += (mouseY - cursorY) * 1;
+                        dotX += (mouseX - dotX) * 1;
+                        dotY += (mouseY - dotY) * 1;
+                        safelySetStyle(cursor, "left", `${cursorX}px`);
+                        safelySetStyle(cursor, "top", `${cursorY}px`);
+                        safelySetStyle(cursorDot, "left", `${dotX}px`);
+                        safelySetStyle(cursorDot, "top", `${dotY}px`);
+                        cursorRafId = requestAnimationFrame(animateCursor);
+                    }
+
+                    function startCursorLoop() {
+                        if (cursorRafId === null) {
+                            cursorRafId = requestAnimationFrame(animateCursor);
+                        }
+                    }
+
+                    function stopCursorLoop() {
+                        if (cursorRafId !== null) {
+                            cancelAnimationFrame(cursorRafId);
+                            cursorRafId = null;
+                        }
+                    }
+
                     startCursorLoop();
+
+                    document.addEventListener("visibilitychange", function () {
+                        if (document.hidden) {
+                            stopCursorLoop();
+                        } else {
+                            startCursorLoop();
+                        }
+                    });
+
+                    magneticElements.forEach(function (element) {
+                        let magneticRaf = 0;
+                        let targetX = 0;
+                        let targetY = 0;
+
+                        element.addEventListener("mouseenter", function () {
+                            safelyAddClass(cursor, "hover");
+                        });
+
+                        element.addEventListener("mouseleave", function () {
+                            safelyRemoveClass(cursor, "hover");
+                            element.style.transform = "translate(0, 0)";
+                        });
+
+                        element.addEventListener(
+                            "mousemove",
+                            function (event) {
+                                const rect = element.getBoundingClientRect();
+                                targetX = (event.clientX - rect.left - rect.width / 2) * 0.2;
+                                targetY = (event.clientY - rect.top - rect.height / 2) * 0.2;
+
+                                if (magneticRaf) return;
+                                magneticRaf = requestAnimationFrame(function () {
+                                    element.style.transform = `translate(${targetX}px, ${targetY}px)`;
+                                    magneticRaf = 0;
+                                });
+                            },
+                            { passive: true }
+                        );
+                    });
+
+                    tiltCards.forEach(function (card) {
+                        let tiltRaf = 0;
+                        let rotateX = 0;
+                        let rotateY = 0;
+                        const isPricingCard = card.classList.contains("pricing-card");
+                        const tiltDivisor = isPricingCard ? 220 : 15;
+                        const maxTilt = isPricingCard ? 1.1 : 12;
+                        const tiltScale = isPricingCard ? 1.002 : 1.02;
+                        const tiltPerspective = isPricingCard ? 1400 : 1000;
+
+                        card.addEventListener(
+                            "mousemove",
+                            function (event) {
+                                const rect = card.getBoundingClientRect();
+                                const x = event.clientX - rect.left;
+                                const y = event.clientY - rect.top;
+                                const centerX = rect.width / 2;
+                                const centerY = rect.height / 2;
+                                rotateX = (y - centerY) / tiltDivisor;
+                                rotateY = (centerX - x) / tiltDivisor;
+                                rotateX = Math.max(-maxTilt, Math.min(maxTilt, rotateX));
+                                rotateY = Math.max(-maxTilt, Math.min(maxTilt, rotateY));
+
+                                if (tiltRaf) return;
+                                tiltRaf = requestAnimationFrame(function () {
+                                    card.style.transform = `perspective(${tiltPerspective}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(${tiltScale}, ${tiltScale}, ${tiltScale})`;
+                                    tiltRaf = 0;
+                                });
+                            },
+                            { passive: true }
+                        );
+
+                        card.addEventListener("mouseleave", function () {
+                            card.style.transform = `perspective(${tiltPerspective}px) rotateX(0) rotateY(0) scale3d(1, 1, 1)`;
+                        });
+                    });
                 }
-            });
 
-            magneticElements.forEach(function (element) {
-                let magneticRaf = 0;
-                let targetX = 0;
-                let targetY = 0;
+                let scrollRafPending = false;
+                function updateScrollUi() {
+                    const scrolled = window.scrollY;
+                    const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+                    if (progressBar && progressBar.style) {
+                        progressBar.style.transform = `scaleX(${Math.min(scrolled / maxScroll, 1)})`;
+                    }
+                    if (navbar && navbar.classList) {
+                        navbar.classList.toggle("scrolled", scrolled > 100);
+                    }
+                    scrollRafPending = false;
+                }
 
-                element.addEventListener("mouseenter", function () {
-                    cursor.classList.add("hover");
+                function onScroll() {
+                    if (scrollRafPending) return;
+                    scrollRafPending = true;
+                    requestAnimationFrame(updateScrollUi);
+                }
+
+                window.addEventListener("scroll", onScroll, { passive: true });
+                window.addEventListener("resize", syncCtaLinksForViewport, { passive: true });
+                updateScrollUi();
+                syncCtaLinksForViewport();
+                setupCookieConsent();
+
+                document.querySelectorAll(".fade-up").forEach(function (element) {
+                    if (element && element.classList) element.classList.add("visible");
                 });
-
-                element.addEventListener("mouseleave", function () {
-                    cursor.classList.remove("hover");
-                    element.style.transform = "translate(0, 0)";
-                });
-
-                element.addEventListener(
-                    "mousemove",
-                    function (event) {
-                        const rect = element.getBoundingClientRect();
-                        targetX = (event.clientX - rect.left - rect.width / 2) * 0.2;
-                        targetY = (event.clientY - rect.top - rect.height / 2) * 0.2;
-
-                        if (magneticRaf) return;
-                        magneticRaf = requestAnimationFrame(function () {
-                            element.style.transform = `translate(${targetX}px, ${targetY}px)`;
-                            magneticRaf = 0;
-                        });
-                    },
-                    { passive: true }
-                );
-            });
-
-            tiltCards.forEach(function (card) {
-                let tiltRaf = 0;
-                let rotateX = 0;
-                let rotateY = 0;
-                const isPricingCard = card.classList.contains("pricing-card");
-                const tiltDivisor = isPricingCard ? 220 : 15;
-                const maxTilt = isPricingCard ? 1.1 : 12;
-                const tiltScale = isPricingCard ? 1.002 : 1.02;
-                const tiltPerspective = isPricingCard ? 1400 : 1000;
-
-                card.addEventListener(
-                    "mousemove",
-                    function (event) {
-                        const rect = card.getBoundingClientRect();
-                        const x = event.clientX - rect.left;
-                        const y = event.clientY - rect.top;
-                        const centerX = rect.width / 2;
-                        const centerY = rect.height / 2;
-                        rotateX = (y - centerY) / tiltDivisor;
-                        rotateY = (centerX - x) / tiltDivisor;
-                        rotateX = Math.max(-maxTilt, Math.min(maxTilt, rotateX));
-                        rotateY = Math.max(-maxTilt, Math.min(maxTilt, rotateY));
-
-                        if (tiltRaf) return;
-                        tiltRaf = requestAnimationFrame(function () {
-                            card.style.transform = `perspective(${tiltPerspective}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(${tiltScale}, ${tiltScale}, ${tiltScale})`;
-                            tiltRaf = 0;
-                        });
-                    },
-                    { passive: true }
-                );
-
-                card.addEventListener("mouseleave", function () {
-                    card.style.transform = `perspective(${tiltPerspective}px) rotateX(0) rotateY(0) scale3d(1, 1, 1)`;
-                });
-            });
-        }
-
-        let scrollRafPending = false;
-        function updateScrollUi() {
-            const scrolled = window.scrollY;
-            const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
-            progressBar.style.transform = `scaleX(${Math.min(scrolled / maxScroll, 1)})`;
-            navbar.classList.toggle("scrolled", scrolled > 100);
-            scrollRafPending = false;
-        }
-
-        function onScroll() {
-            if (scrollRafPending) return;
-            scrollRafPending = true;
-            requestAnimationFrame(updateScrollUi);
-        }
-
-        window.addEventListener("scroll", onScroll, { passive: true });
-        updateScrollUi();
-
-        document.querySelectorAll(".fade-up").forEach(function (element) {
-            element.classList.add("visible");
-        });
 
         const faqItems = [
             {
@@ -3569,16 +3837,21 @@
             });
         }
 
-        anchors.forEach(function (anchor) {
-            anchor.addEventListener("click", function (event) {
-                const targetSelector = String(anchor.getAttribute("href") || "").trim();
-                if (!targetSelector || targetSelector === "#") return;
-                event.preventDefault();
-                const target = document.querySelector(targetSelector);
-                if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-            });
-        });
-
+                anchors.forEach(function (anchor) {
+                    anchor.addEventListener("click", function (event) {
+                        const targetSelector = String(anchor.getAttribute("href") || "").trim();
+                        if (!targetSelector || targetSelector === "#") return;
+                        event.preventDefault();
+                        const target = document.querySelector(targetSelector);
+                        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+                    });
+                });
+            } catch (error) {
+                if (window.console && typeof window.console.error === "function") {
+                    console.error("[softora-homepage] bootstrapping script failed", error);
+                }
+            }
+        })();
     </script>
 </body>
 </html>

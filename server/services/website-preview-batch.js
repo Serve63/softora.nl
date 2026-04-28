@@ -102,15 +102,20 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     };
   }
 
-  function findLatestRunningJobForOwner(ownerKey) {
+  function findLatestJobForOwner(ownerKey, statusSet) {
     let latest = null;
     for (const job of jobs.values()) {
-      if (job.ownerKey !== ownerKey || job.status !== 'running') continue;
+      if (job.ownerKey !== ownerKey) continue;
+      if (statusSet && statusSet.size && !statusSet.has(job.status)) continue;
       if (!latest || job.createdAt > latest.createdAt) {
         latest = job;
       }
     }
     return latest;
+  }
+
+  function findLatestRunningJobForOwner(ownerKey) {
+    return findLatestJobForOwner(ownerKey, new Set(['running']));
   }
 
   function withTimeout(promise, timeoutMs, message) {
@@ -332,7 +337,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
 
   async function getCurrentBatchResponse(req, res) {
     pruneJobs();
-    const job = findLatestRunningJobForOwner(ownerKeyFromReq(req));
+    const job = findLatestJobForOwner(ownerKeyFromReq(req));
     if (job && !job.processing) {
       queueJobProcessing(job.id);
     }

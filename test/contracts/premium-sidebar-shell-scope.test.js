@@ -144,6 +144,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /getAttribute\("data-sidebar-profile-render-key"\)/);
   assert.match(prefillSource, /function prefillPremiumSidebarActiveState\(\) \{/);
   assert.match(prefillSource, /link\.classList\.toggle\("active", key === activeKey\);/);
+  assert.match(prefillSource, /avatarEl\.replaceChildren\(\);/);
+  assert.doesNotMatch(prefillSource, /avatarEl\.innerHTML\s*=/);
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /id="softora-premium-sidebar-critical"/);
@@ -214,6 +216,15 @@ test('static premium sidebars ship the database link in html', () => {
       `${relativePath} hoort Database direct in de sidebar html te hebben`
     );
   }
+});
+
+test('websitegenerator page loads website preview script via shared asset', () => {
+  const pageSource = readRepoFile('premium-websitegenerator.html');
+  assert.match(
+    pageSource,
+    /<script src="assets\/premium-websitegenerator\.js\?v=20260427b" defer><\/script>/,
+    'premium-websitegenerator.html moet de website-generator script uit assets laden'
+  );
 });
 
 test('static premium sidebars share the same section order and public labels', () => {

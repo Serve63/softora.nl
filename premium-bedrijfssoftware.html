@@ -316,9 +316,9 @@ nav {
   <div class="overlay-logo">Binnenkort beschikbaar</div>
   <div class="login-box">
     <div class="login-label">Toegangscode</div>
-    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')login()">
+    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" autocomplete="off" data-public-lock-input>
     <div class="login-error" id="login-error"></div>
-    <button class="login-btn" onclick="login()">Doorgaan</button>
+    <button class="login-btn" type="button" data-public-lock-submit>Doorgaan</button>
   </div>
 </div>
 
@@ -341,9 +341,9 @@ nav {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         Neem contact op
       </a>
-      <a class="btn-ghost" href="tel:+31629917185">
+      <a class="btn-ghost" href="tel:+31643262792">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6z"/></svg>
-        +31 6 2991 7185
+        +31 6 43 26 27 92
       </a>
     </div>
   </div>
@@ -568,35 +568,12 @@ nav {
       Stuur een bericht
     </a>
     <div class="cta-contact">
-      <div class="cta-tel">Of bel direct: <a href="tel:+31629917185">+31 6 2991 7185</a></div>
+      <div class="cta-tel">Of bel direct: <a href="tel:+31643262792">+31 6 43 26 27 92</a></div>
     </div>
   </div>
 </div>
 
 <!-- FOOTER -->
-<script>
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-}, { threshold: 0.1 });
-document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
-const CODE = 'Andre2Fritz2!';
-
-if (sessionStorage.getItem('cs-auth') === '1') {
-  document.getElementById('overlay').style.display = 'none';
-}
-
-function login() {
-  const val = document.getElementById('code-inp').value;
-  if (val === CODE) {
-    sessionStorage.setItem('cs-auth', '1');
-    document.getElementById('overlay').style.display = 'none';
-  } else {
-    document.getElementById('login-error').textContent = 'Onjuiste code, probeer opnieuw.';
-    document.getElementById('code-inp').value = '';
-    document.getElementById('code-inp').focus();
-  }
-}
-</script>
+<script src="assets/premium-public-lock.js?v=20260427a" defer></script>
 </body>
 </html>

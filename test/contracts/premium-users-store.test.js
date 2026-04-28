@@ -103,3 +103,12 @@ test('premium users store can bootstrap users even when Supabase is not configur
   assert.equal(hydrated.users.length, 1);
   assert.equal(hydrated.users[0].email, 'servec321@gmail.com');
 });
+
+test('premium users store exposes bootstrap users for password recovery', () => {
+  const store = createFixture();
+
+  const user = store.findBootstrapUserByEmail('SERVEC321@gmail.com');
+
+  assert.equal(user.email, 'servec321@gmail.com');
+  assert.equal(store.verifyPasswordHash('secret123', user.passwordHash), true);
+});

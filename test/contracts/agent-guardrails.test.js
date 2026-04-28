@@ -182,10 +182,50 @@ test('agent guardrails block large inline scripts in html pages', () => {
   assert.match(violations[0], /Grote inline frontend-script toevoeging/i);
 });
 
+test('agent guardrails prevent oversized frontend files from growing further', () => {
+  const violations = buildGuardrailViolations({
+    changedFiles: ['assets/coldcalling-dashboard.js', 'test/contracts/example.test.js'],
+    addedFiles: [],
+    changedTests: ['test/contracts/example.test.js'],
+    highRiskFiles: [],
+    behaviorFiles: ['assets/coldcalling-dashboard.js'],
+    oversizedFrontendGrowthViolations: [
+      'assets/coldcalling-dashboard.js (7900 regels; netto +12; limiet 1200 regels en max +0)',
+    ],
+    newestBackupAgeMs: 5 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 25,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(violations.length, 1);
+  assert.match(violations[0], /Groot frontend-bestand groeide verder/i);
+
+  const coveredException = buildGuardrailViolations({
+    changedFiles: ['assets/coldcalling-dashboard.js', 'test/contracts/example.test.js'],
+    addedFiles: [],
+    changedTests: ['test/contracts/example.test.js'],
+    highRiskFiles: [],
+    behaviorFiles: ['assets/coldcalling-dashboard.js'],
+    oversizedFrontendGrowthViolations: [
+      'assets/coldcalling-dashboard.js (7900 regels; netto +12; limiet 1200 regels en max +0)',
+    ],
+    allowOversizedFrontendGrowth: true,
+    newestBackupAgeMs: 5 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 25,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(coveredException.length, 0);
+});
+
 test('agent guardrails require targeted tests for protected quality gates and sidebar shell', () => {
+  const workflowSource = readRepoFile('.github/workflows/agent-guardrails.yml');
   const qualityLockSource = readRepoFile('scripts/check-quality-lock.js');
   assert.match(qualityLockSource, /PREMIUM_SIDEBAR_THEME_VERSION = '20260427b'/);
   assert.equal(isProtectedQualityGatePath('scripts/check-quality-lock.js'), true);
+  assert.match(workflowSource, /GUARDRAILS_MAX_BEHAVIOR_DIFF_LINES:\s*2500/);
 
   const violations = buildGuardrailViolations({
     changedFiles: ['assets/personnel-theme.css', 'scripts/check-agent-guardrails.js', 'scripts/check-quality-lock.js'],
@@ -229,6 +269,22 @@ test('agent guardrails require targeted tests for protected quality gates and si
   });
 
   assert.equal(covered.length, 0);
+
+  const workflowCovered = buildGuardrailViolations({
+    changedFiles: ['.github/workflows/agent-guardrails.yml'],
+    addedFiles: [],
+    changedTests: ['test/contracts/agent-guardrails.test.js'],
+    highRiskFiles: [],
+    behaviorFiles: ['.github/workflows/agent-guardrails.yml'],
+    protectedQualityGateFiles: ['.github/workflows/agent-guardrails.yml'],
+    protectedFrontendShellFiles: [],
+    newestBackupAgeMs: 5 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 7200,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(workflowCovered.length, 0);
 });
 
 test('agent guardrails block test weakening and quality-baseline regressions', () => {

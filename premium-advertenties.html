@@ -146,13 +146,13 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 </style>
 </head>
 <body>
-<div class="content-lock-overlay" id="contentLockOverlay">
+<div class="content-lock-overlay" id="contentLockOverlay" data-content-lock-scope="premium_advertenties_content_lock">
   <div class="content-lock-logo">Binnenkort beschikbaar</div>
   <div class="content-lock-box">
     <div class="content-lock-label">Toegangscode</div>
-    <input class="content-lock-input" type="password" id="contentLockInput" placeholder="••••••••••••" autocomplete="off" onkeydown="if(event.key==='Enter')unlockAdvertentiesArea()">
+    <input class="content-lock-input" type="password" id="contentLockInput" placeholder="••••••••••••" autocomplete="off" data-content-lock-input>
     <div class="content-lock-error" id="contentLockError"></div>
-    <button type="button" class="content-lock-btn" onclick="unlockAdvertentiesArea()">Doorgaan</button>
+    <button type="button" class="content-lock-btn" data-content-lock-submit>Doorgaan</button>
   </div>
 </div>
 <div class="dashboard-layout">
@@ -355,49 +355,8 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 </main>
 </div>
 
-<script>
-const CONTENT_LOCK_CODE = 'Andre2Fritz2!';
-const CONTENT_LOCK_STORAGE_KEY = 'cs-auth-premium-advertenties';
-
-if (sessionStorage.getItem(CONTENT_LOCK_STORAGE_KEY) === '1') {
-  var existingOverlay = document.getElementById('contentLockOverlay');
-  if (existingOverlay) existingOverlay.style.display = 'none';
-}
-
-function unlockAdvertentiesArea() {
-  var input = document.getElementById('contentLockInput');
-  var error = document.getElementById('contentLockError');
-  var overlay = document.getElementById('contentLockOverlay');
-  if (!input || !error || !overlay) return;
-
-  if (input.value === CONTENT_LOCK_CODE) {
-    sessionStorage.setItem(CONTENT_LOCK_STORAGE_KEY, '1');
-    overlay.style.display = 'none';
-    scrollToAdsHash();
-    return;
-  }
-
-  error.textContent = 'Onjuiste code, probeer opnieuw.';
-  input.value = '';
-  input.focus();
-}
-
-function scrollToAdsHash() {
-  var raw = (window.location.hash || '').replace(/^#/, '');
-  if (!raw) return;
-  var el = document.getElementById(raw);
-  if (el && typeof el.scrollIntoView === 'function') {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
-
-window.addEventListener('hashchange', scrollToAdsHash);
-if (document.readyState === 'complete') {
-  scrollToAdsHash();
-} else {
-  window.addEventListener('load', scrollToAdsHash, { once: true });
-}
-</script>
+<script src="assets/premium-ui-state-client.js?v=20260427a"></script>
+<script src="assets/premium-marketing-content-lock.js?v=20260427a" defer></script>
 <script src="assets/premium-marketing-management.js?v=20260423a" defer></script>
 </body>
 </html>

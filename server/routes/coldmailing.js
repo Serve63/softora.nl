@@ -17,6 +17,10 @@ function registerColdmailingRoutes(app, deps = {}) {
           ? coldmailCampaignService.isImapMailConfigured()
           : false,
       senderEmails: coldmailCampaignService.getAllowedSenderEmails(),
+      safetyLimits:
+        typeof coldmailCampaignService.getColdmailSafetyLimits === 'function'
+          ? coldmailCampaignService.getColdmailSafetyLimits()
+          : undefined,
     });
   });
 
@@ -26,6 +30,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         count: req.query.count,
         branch: req.query.branch,
         mode: req.query.mode,
+        radiusKm: req.query.radiusKm,
       });
       res.json(result);
     } catch (error) {
@@ -53,6 +58,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         senderEmail: body.senderEmail,
         specialAction: body.specialAction,
         durationDays: body.durationDays,
+        radiusKm: body.radiusKm,
         actor:
           normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
           'Coldmailing',
@@ -62,6 +68,8 @@ function registerColdmailingRoutes(app, deps = {}) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_SEND_FAILED';
       const status = code === 'SMTP_NOT_CONFIGURED'
         ? 503
+        : code === 'COLDMAIL_DAILY_LIMIT_REACHED'
+          ? 429
         : code === 'NO_RECIPIENTS' || code === 'NO_VALID_RECIPIENT_DOMAINS'
           ? 422
           : 400;
@@ -77,6 +85,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         allowedSenderEmails: Array.isArray(error && error.allowedSenderEmails)
           ? error.allowedSenderEmails
           : undefined,
+        quota: error && error.quota && typeof error.quota === 'object' ? error.quota : undefined,
       });
     }
   });

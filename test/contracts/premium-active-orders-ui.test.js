@@ -3,29 +3,130 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
-  const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+function readActiveOrdersSources() {
+  const pagePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
+  const scriptPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+  return {
+    pageSource,
+    scriptSource,
+    combinedSource: `${pageSource}\n${scriptSource}`,
+  };
+}
 
+test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
+  const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
+
+  assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427b"><\/script>/);
+  assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
+  assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
+  assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
+  assert.doesNotMatch(pageSource, /function bindDynamicOrderCard\(card\) \{/);
+  assert.doesNotMatch(pageSource, /function normalizeAgendaLeadOption\(item\) \{/);
+  assert.doesNotMatch(pageSource, /function renderCreateOrderAgendaLeadOptions\(selectedId\) \{/);
+  assert.doesNotMatch(pageSource, /function handleCreateOrderSubmit\(event\) \{/);
+  assert.doesNotMatch(pageSource, /function selectActiveOrderId\(explicitId\) \{/);
+  assert.doesNotMatch(pageSource, /function openOrderDossier\(id, options = \{\}\) \{/);
+  assert.doesNotMatch(pageSource, /function normalizeClaimEmployeeName\(value\) \{/);
+  assert.doesNotMatch(pageSource, /async function markOrderAsPaid\(id, options = \{\}\) \{/);
+  assert.doesNotMatch(pageSource, /function buildFallbackSitePrompt\(meta, customOrder\) \{/);
+  assert.doesNotMatch(pageSource, /async function postEstimateSiteCostRequest\(payload\) \{/);
+  assert.doesNotMatch(pageSource, /function getProgressStepForPct\(pct\) \{/);
+  assert.doesNotMatch(pageSource, /function startOrderProgressSimulation\(id\) \{/);
+  assert.doesNotMatch(pageSource, /async function postGenerateSiteRequest\(payload\) \{/);
+  assert.doesNotMatch(pageSource, /async function postLaunchSiteRequest\(payload\) \{/);
+  assert.doesNotMatch(pageSource, /function setClaimOrderMessage\(message, type\) \{/);
+  assert.doesNotMatch(pageSource, /function executeOrder\(id\) \{/);
+  assert.doesNotMatch(pageSource, /function formatModalDateTime\(value\) \{/);
+  assert.doesNotMatch(pageSource, /function renderModalOverviewHtml\(id\) \{/);
+  assert.doesNotMatch(pageSource, /function openModal\(id\) \{/);
+  assert.doesNotMatch(pageSource, /function closeModal\(\) \{/);
+  assert.doesNotMatch(pageSource, /async function removeProjectFromSystem\(id\) \{/);
+  assert.doesNotMatch(pageSource, /function bindActiveOrdersPageUi\(\) \{/);
+  assert.doesNotMatch(pageSource, /async function initializeActiveOrdersPageState\(\) \{/);
+  assert.doesNotMatch(pageSource, /function initActiveOrdersCursor\(\) \{/);
+  assert.doesNotMatch(pageSource, /Cursor \(robust\)/);
+  assert.match(scriptSource, /function normalizeOrderStatus\(value\) \{/);
+  assert.match(scriptSource, /function persistOrdersRuntime\(\) \{/);
+  assert.match(scriptSource, /function applyOrderUiStateToCard\(id\) \{/);
+  assert.match(scriptSource, /function createCustomOrderCardElement\(record\) \{/);
+  assert.match(scriptSource, /function bindDynamicOrderCard\(card\) \{/);
+  assert.match(scriptSource, /function loadCustomOrderCards\(\) \{/);
+  assert.match(scriptSource, /function setCreateOrderMessage\(message, type\) \{/);
+  assert.match(scriptSource, /function normalizeAgendaLeadOption\(item\) \{/);
+  assert.match(scriptSource, /function syncOrderClaimsFromAgendaOwners\(\) \{/);
+  assert.match(scriptSource, /function renderCreateOrderAgendaLeadOptions\(selectedId\) \{/);
+  assert.match(scriptSource, /function handleCreateOrderSubmit\(event\) \{/);
+  assert.match(scriptSource, /function selectActiveOrderId\(explicitId\) \{/);
+  assert.match(scriptSource, /function openOrderDossier\(id, options = \{\}\) \{/);
+  assert.match(scriptSource, /function normalizeClaimEmployeeName\(value\) \{/);
+  assert.match(scriptSource, /async function markOrderAsPaid\(id, options = \{\}\) \{/);
+  assert.match(scriptSource, /function buildFallbackSitePrompt\(meta, customOrder\) \{/);
+  assert.match(scriptSource, /async function postEstimateSiteCostRequest\(payload\) \{/);
+  assert.match(scriptSource, /async function postActiveOrderJsonWithFallback\(endpoints, payload, options = \{\}\) \{/);
+  assert.match(scriptSource, /function getProgressStepForPct\(pct\) \{/);
+  assert.match(scriptSource, /function startOrderProgressSimulation\(id\) \{/);
+  assert.match(scriptSource, /async function postGenerateSiteRequest\(payload\) \{/);
+  assert.match(scriptSource, /async function postLaunchSiteRequest\(payload\) \{/);
+  assert.match(scriptSource, /function setClaimOrderMessage\(message, type\) \{/);
+  assert.match(scriptSource, /function appendClaimOrderSummaryRow\(fragment, label, value\) \{/);
+  assert.match(scriptSource, /function executeOrder\(id\) \{/);
+  assert.match(scriptSource, /function formatModalDateTime\(value\) \{/);
+  assert.match(scriptSource, /function normalizeModalLinkUrl\(value\) \{/);
+  assert.match(scriptSource, /function renderModalOverview\(container, id\) \{/);
+  assert.match(scriptSource, /function openModal\(id\) \{/);
+  assert.match(scriptSource, /function closeModal\(\) \{/);
+  assert.match(scriptSource, /function handleModalPrimaryAction\(\) \{/);
+  assert.match(scriptSource, /function handleModalDeleteAction\(\) \{/);
+  assert.match(scriptSource, /async function removeProjectFromSystem\(id\) \{/);
+  assert.match(scriptSource, /function setOpenDossierButtonContent\(btnEl\) \{/);
+  assert.match(scriptSource, /function bindActiveOrdersPageUi\(\) \{/);
+  assert.match(scriptSource, /async function initializeActiveOrdersPageState\(\) \{/);
+  assert.match(scriptSource, /function initActiveOrdersCursor\(\) \{/);
+  assert.match(scriptSource, /async function showActiveOrderAlert\(message, options = \{\}\) \{/);
+  assert.match(scriptSource, /async function confirmActiveOrderAction\(message, options = \{\}\) \{/);
+  assert.doesNotMatch(scriptSource, /window\.alert\(/);
+  assert.doesNotMatch(scriptSource, /window\.confirm\(/);
+  assert.equal((scriptSource.match(/new AbortController/g) || []).length, 1);
+  assert.doesNotMatch(scriptSource, /window\.setTimeout\(\(\) => controller\.abort\(\), (30000|480000|600000)\)/);
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
-  assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
-  assert.match(source, /const paymentButtonHtml = ui\.isBuilt\s*\?\s*''\s*:/);
-  assert.match(source, /<button class="complete-btn magnetic" id="complete-btn-\$\{id\}" type="button" data-order-complete="\$\{id\}">\s*Factuur betaald\s*<\/button>/);
-  assert.match(source, /\$\{paymentButtonHtml\}\s*<div class="order-assignee" id="assignee-\$\{id\}">\$\{escapeHtml\(claimInfo\.by \|\| 'Nog niet geclaimd'\)\}<\/div>/);
+  assert.match(source, /const actions = document\.createElement\('div'\);[\s\S]*actions\.className = 'order-actions';/);
+  assert.match(source, /executeBtn\.dataset\.order = String\(id\);[\s\S]*setOpenDossierButtonContent\(executeBtn\);/);
+  assert.match(source, /if \(!ui\.isBuilt\) \{[\s\S]*completeBtn\.dataset\.orderComplete = String\(id\);[\s\S]*completeBtn\.textContent = 'Factuur betaald';/);
+  assert.match(source, /const assignee = appendTextElement\(actions, 'div', 'order-assignee', claimInfo\.by \|\| 'Nog niet geclaimd'\);[\s\S]*assignee\.id = `assignee-\$\{id\}`;/);
   assert.match(source, /completeBtnEl\.textContent = 'Factuur betaald';/);
   assert.match(source, /completeBtnEl\.hidden = isDelivered;/);
   assert.match(source, /completeBtnEl\.style\.display = isDelivered \? 'none' : '';/);
   assert.match(source, /assigneeEl\.textContent = claimInfo\.by \|\| 'Nog niet geclaimd';/);
+  assert.match(source, /setOpenDossierButtonContent\(btnEl\);/);
+  assert.doesNotMatch(source, /btnEl\.innerHTML = '<svg/);
+  assert.doesNotMatch(source, /wrapper\.innerHTML = renderCustomOrderCardHtml/);
+  assert.doesNotMatch(source, /function renderCustomOrderCardHtml\(record\) \{/);
+  assert.match(source, /renderClaimOrderSummary\(summaryEl, activeId\);/);
+  assert.doesNotMatch(source, /summaryEl\.innerHTML = renderClaimOrderSummary/);
+  assert.match(source, /renderModalOverview\(overview, id\);/);
+  assert.match(source, /container\.replaceChildren\(grid\);/);
+  assert.match(source, /return url\.protocol === 'http:' \|\| url\.protocol === 'https:' \? url\.href : '';/);
+  assert.match(source, /select\.replaceChildren\(\.\.\.options\);/);
+  assert.match(source, /document\.getElementById\('modalBtn'\)\?\.addEventListener\('click', handleModalPrimaryAction\);/);
+  assert.match(source, /document\.getElementById\('modalDeleteBtn'\)\?\.addEventListener\('click', handleModalDeleteAction\);/);
+  assert.doesNotMatch(source, /overview\.innerHTML = renderModalOverviewHtml/);
+  assert.doesNotMatch(source, /function renderModalOverviewHtml\(id\) \{/);
+  assert.doesNotMatch(source, /item\.raw/);
+  assert.doesNotMatch(source, /function escapeHtml\(str\) \{/);
+  assert.doesNotMatch(source, /\.innerHTML\s*=/);
+  assert.doesNotMatch(source, /\.onclick\s*=/);
   assert.match(source, /const isPaidOrder = Boolean\(paidAt\) \|\| status\.key === 'betaald';[\s\S]*if \(isPaidOrder\) \{[\s\S]*nextStatus = 'betaald';/);
   assert.match(source, /async function handleOrderPaymentAction\(id\) \{[\s\S]*if \(ui\.isPaid \|\| ui\.isBuilt\) return false;[\s\S]*return markOrderAsPaid\(id, \{ confirm: true \}\);/);
-  assert.match(source, /window\.SoftoraDialogs && typeof window\.SoftoraDialogs\.confirm === 'function'[\s\S]*Factuur betaald bevestigen/);
+  assert.match(source, /const confirmed = await confirmActiveOrderAction\(invoicePaidReviewReminder,[\s\S]*Factuur betaald bevestigen/);
   assert.match(
     source,
     /Vergeet niet om de klant op een vriendelijk en natuurlijk moment te vragen[\s\S]*bodyHtml:\s*invoicePaidConfirmBodyHtml/
   );
   assert.match(source, /await persistRequiredUiStateKeysOrThrow\(\s*\[CUSTOM_ORDERS_KEY, ORDER_RUNTIME_KEY\],/);
-  assert.match(source, /document\.querySelectorAll\('\.complete-btn'\)\.forEach\(\(b\) => \{[\s\S]*void handleOrderPaymentAction\(id\);/);
+  assert.match(source, /const completeBtn = card\.querySelector\('\.complete-btn\[data-order-complete\]'\);[\s\S]*void handleOrderPaymentAction\(id\);/);
   assert.match(source, /window\.addEventListener\('pagehide', \(\) => \{[\s\S]*void flushRemoteUiStateSave\(\);/);
   assert.match(source, /leadOwnerName: String\(item\?\.leadOwnerName \|\| item\?\.leadOwnerFullName \|\| ''\)\.trim\(\),/);
   assert.match(source, /const linkedLeadOwnerName = resolveLinkedLeadOwnerNameForOrder\(customOrder\);[\s\S]*const claimedBy = normalizeClaimEmployeeName\(customOrder\.claimedBy \|\| runtime\.claimedBy \|\| linkedLeadOwnerName \|\| ''\);/);
@@ -39,8 +140,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
 });
 
 test('premium actieve opdrachten gebruiken expliciete customer identity voor koppeling naar klanten', () => {
-  const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const { combinedSource: source } = readActiveOrdersSources();
 
   assert.match(source, /const explicitCompany = String\(record\?\.companyName \|\| ''\)\.trim\(\);/);
   assert.match(source, /const explicitContact = String\(record\?\.contactName \|\| ''\)\.trim\(\);/);
@@ -48,8 +148,7 @@ test('premium actieve opdrachten gebruiken expliciete customer identity voor kop
 });
 
 test('premium actieve opdrachten tonen create-order modal zonder sample-design en domeinvelden', () => {
-  const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const { combinedSource: source } = readActiveOrdersSources();
 
   assert.match(source, /<label class="create-order-label" for="newOrderAssignee">Toegewezen aan<\/label>/);
   assert.match(source, /<select class="create-order-select" id="newOrderAssignee" name="assignee" required>/);
