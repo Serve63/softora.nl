@@ -4,6 +4,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 
 ## Altijd eerst
 - Lees bij grotere refactors ook [docs/quality-protocol.md](docs/quality-protocol.md).
+- Lees bij wijzigingen rond klantstatussen ook [docs/customer-status-contract.md](docs/customer-status-contract.md).
 - Draai `npm run verify:critical` voor je afrondt.
 - Commit en push elke succesvolle wijziging direct naar de huidige branch, tenzij de gebruiker expliciet vraagt om lokaal te blijven.
 - `main` is beschermd via de GitHub ruleset "Softora main quality gate"; werk vanaf `codex/*` branches en merge naar `main` alleen via PR nadat verplichte checks groen zijn.
