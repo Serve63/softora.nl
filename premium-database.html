@@ -2138,8 +2138,10 @@
                 const normalized = normalizeCustomer(item, "serialize-" + index);
                 return {
                     ...normalized,
-                    websitePhoto: "",
-                    websitePhotoName: ""
+                    websitePhoto: isValidWebsitePhotoDataUrl(normalizeString(normalized.websitePhoto))
+                        ? [normalizeString(normalized.websitePhoto).length, normalizeString(normalized.websitePhoto).slice(0, 80), normalizeString(normalized.websitePhoto).slice(-80)].join("|")
+                        : "",
+                    websitePhotoName: isValidWebsitePhotoDataUrl(normalizeString(normalized.websitePhoto)) ? normalizeString(normalized.websitePhotoName) : ""
                 };
             }));
         }
@@ -2875,11 +2877,14 @@
                             return {
                                 ...customer,
                                 websitePhoto: generated.dataUrl,
-                                websitePhotoName: generated.fileName
+                                websitePhotoName: generated.fileName,
+                                updatedAt: formatDateForStorage(new Date())
                             };
                         }));
-                        done += 1;
                         renderPage();
+                        const photoResult = await persistCustomerPhotos(state.klanten);
+                        if (!photoResult.ok) throw new Error("Webdesign gemaakt, maar opslaan in Supabase mislukte.");
+                        done += 1;
                     } catch (error) {
                         failed += 1;
                         if (!firstErrorMessage) {
@@ -2891,12 +2896,6 @@
 
                 if (!done) {
                     setStatusMessage("Geen AI-foto's opgeslagen: " + (firstErrorMessage || "controleer of de websites bereikbaar zijn."), "error");
-                    return;
-                }
-
-                const photoResult = await persistCustomerPhotos(state.klanten);
-                if (!photoResult.ok) {
-                    setStatusMessage("AI-foto's staan in beeld, maar opslaan in Supabase mislukte.", "error");
                     return;
                 }
 

@@ -207,6 +207,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function persistCustomerPhotos\(customers, options\)/);
   assert.match(pageSource, /function mergeCustomersWithPhotos\(customers, photoMap\)/);
   assert.match(pageSource, /function loadCustomerPhotoMap\(customers\)/);
+  assert.match(pageSource, /normalizeString\(normalized\.websitePhoto\)\.slice\(0, 80\)/);
+  assert.match(pageSource, /websitePhoto: isValidWebsitePhotoDataUrl\(normalizeString\(normalized\.websitePhoto\)\)/);
   assert.match(photoStorageScriptSource, /readChunkedData\(values, photoKey, 0\)/);
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 2160, 3840, 0\.9\)/);
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 1024, 1536, 0\.82\)/);
@@ -237,6 +239,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /return isWebdesignPhotoEligible\(customer\);/);
   assert.match(pageSource, /Webdesign maken voor " \+ target\.bedrijf/);
   assert.doesNotMatch(pageSource, /AI-foto maken voor " \+ target\.bedrijf/);
+  assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten\);[\s\S]*if \(!photoResult\.ok\) throw new Error\("Webdesign gemaakt, maar opslaan in Supabase mislukte\."\);[\s\S]*done \+= 1;/);
   assert.match(pageSource, /Geen AI-foto's opgeslagen: /);
   assert.match(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /company: customer\.bedrijf/);
