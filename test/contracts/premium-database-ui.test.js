@@ -60,7 +60,11 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /AI-database/i);
   assert.doesNotMatch(pageSource, /ai-database-badge/);
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
-  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
+  assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Bedrijven toevoegen/);
+  assert.match(pageSource, /id="addCompaniesButton"/);
+  assert.doesNotMatch(pageSource, />Uploaden<\/span>/);
+  assert.doesNotMatch(pageSource, />Handmatig toevoegen<\/span>/);
+  assert.doesNotMatch(pageSource, /id="addManualButton"/);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.doesNotMatch(pageSource, /id="f-branche"/);
@@ -159,6 +163,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
+  assert.match(pageSource, /nodes\.addCompaniesButton\.addEventListener\("click"/);
+  assert.match(pageSource, /nodes\.importFileInput\.click\(\);/);
   assert.match(pageSource, /function exportCSV\(\)/);
   assert.match(pageSource, /function renderUsedChannelTags\(customer\)/);
   assert.match(pageSource, /const COLDMAIL_TEST_COMPANIES = \["mcv e-commerce"\];/);
@@ -171,6 +177,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, />Bellen<\/span>/);
   assert.doesNotMatch(pageSource, />Mailen<\/span>/);
   assert.match(pageSource, /fetchUiStateSetWithFallback\(CUSTOMER_DB_SCOPE/);
+  assert.match(pageSource, /function parseCustomersFromStateValues\(values, key\)/);
+  assert.match(pageSource, /chunkedCustomers\.length > rawCustomers\.length \? chunkedCustomers : rawCustomers/);
+  assert.match(pageSource, /\[CUSTOMER_DB_KEY \+ "_chunks_v1"\]: ""/);
   assert.match(pageSource, /source: "premium-database"/);
   assert.match(pageSource, /actor: "Premium database"/);
   assert.match(pageSource, /Database-voorbeeld uit actieve opdrachten\. Voeg klanten toe om ze permanent op te slaan\./);
