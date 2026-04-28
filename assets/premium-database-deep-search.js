@@ -422,6 +422,7 @@
         let state = normalizeState({});
         let busy = false;
         let bound = false;
+        const visibleSourceTargetIds = new Set();
 
         function getCurrentTarget() {
             return state.targets[state.activeIndex] || null;
@@ -506,7 +507,10 @@
 
         function renderSources(target) {
             if (!nodes.deepSearchSources) return;
-            const websites = uniqueWebsiteValues(target && target.foundWebsites, 200);
+            const targetId = normalizeString(target && target.id);
+            const websites = visibleSourceTargetIds.has(targetId)
+                ? uniqueWebsiteValues(target && target.foundWebsites, 200)
+                : [];
             if (!websites.length) {
                 nodes.deepSearchSources.innerHTML = "<div class=\"deep-search-empty\">Nog geen websites voor deze plek.</div>";
                 return;
@@ -764,6 +768,7 @@
                     return { finished: true };
                 });
             }
+            visibleSourceTargetIds.add(target.id);
             resetFoundWebsitesForSession(target);
             target.status = "active";
             render();
@@ -829,6 +834,7 @@
 
         function open() {
             if (!nodes.deepSearchModal) return;
+            visibleSourceTargetIds.clear();
             nodes.deepSearchModal.classList.add("on");
             nodes.deepSearchModal.setAttribute("aria-hidden", "false");
             void loadState();

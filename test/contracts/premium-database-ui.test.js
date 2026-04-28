@@ -255,7 +255,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428h/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429a/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -317,7 +317,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428h"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260429a"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -416,6 +416,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /function advanceCompletedTarget\(target\)/);
   assert.match(deepSearchScriptSource, /Boolean\(body && body\.placeComplete\)/);
   assert.match(deepSearchScriptSource, /foundWebsites: \[\]/);
+  assert.match(deepSearchScriptSource, /const visibleSourceTargetIds = new Set\(\);/);
+  assert.match(deepSearchScriptSource, /visibleSourceTargetIds\.has\(targetId\)/);
+  assert.match(deepSearchScriptSource, /visibleSourceTargetIds\.add\(target\.id\);/);
+  assert.match(deepSearchScriptSource, /visibleSourceTargetIds\.clear\(\);/);
   assert.match(deepSearchScriptSource, /function uniqueWebsiteValues\(values, maxItems\)/);
   assert.match(deepSearchScriptSource, /function collectWebsitesFromCustomers\(customers\)/);
   assert.doesNotMatch(deepSearchScriptSource, /function collectWebsitesFromRows\(rows\)/);
@@ -971,7 +975,7 @@ test('premium database deep search only shows websites after companies are added
   assert.equal(customers.length, 6);
 });
 
-test('premium database deep search persists compact website progress that survives reload', async () => {
+test('premium database deep search persists compact website progress without pre-filling the panel on reload', async () => {
   const deepSearchClient = loadDatabaseDeepSearchClient();
   const customers = [];
   const persisted = [];
@@ -1050,8 +1054,9 @@ test('premium database deep search persists compact website progress that surviv
 
   restoredController.open();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.match(restoredSourcesPanel.innerHTML, /compact1\.nl/);
-  assert.match(restoredSourcesPanel.innerHTML, /compact2\.nl/);
+  assert.match(restoredSourcesPanel.innerHTML, /Nog geen websites voor deze plek\./);
+  assert.doesNotMatch(restoredSourcesPanel.innerHTML, /compact1\.nl/);
+  assert.doesNotMatch(restoredSourcesPanel.innerHTML, /compact2\.nl/);
 });
 
 test('premium database deep search keeps found websites empty before a location starts', async () => {
@@ -1167,7 +1172,8 @@ test('premium database deep search clears old found websites when a new batch se
 
   controller.open();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.match(sourcesPanel.innerHTML, /oudesite\.nl/);
+  assert.match(sourcesPanel.innerHTML, /Nog geen websites voor deze plek\./);
+  assert.doesNotMatch(sourcesPanel.innerHTML, /oudesite\.nl/);
 
   const runPromise = controller.runCurrentSearch();
   assert.match(sourcesPanel.innerHTML, /Nog geen websites voor deze plek\./);
