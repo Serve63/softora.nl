@@ -26,4 +26,6 @@ jobs:
           node-version: 20
 
       - name: Check agent guardrails
+        env:
+          GUARDRAILS_MAX_BEHAVIOR_DIFF_LINES: 2500
         run: npm run check:guardrails
