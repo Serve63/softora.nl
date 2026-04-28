@@ -62,6 +62,35 @@ test('premium customers repository reads customers from the existing ui-state sc
   assert.deepEqual(result.rows[0], { id: 'cust-1', bedrijf: 'Softora', databaseStatus: 'klant' });
 });
 
+test('premium customers repository prefers chunked customer rows when they are more complete', async () => {
+  const fullRows = JSON.stringify([
+    { id: 'cust-full-1', bedrijf: 'Volledige Klant 1', databaseStatus: 'klant' },
+    { id: 'cust-full-2', bedrijf: 'Volledige Klant 2', databaseStatus: 'afspraak' },
+    { id: 'cust-full-3', bedrijf: 'Volledige Klant 3', databaseStatus: 'gemaild' },
+  ]);
+  const repository = createPremiumCustomersRepository({
+    getUiStateValues: async () => ({
+      values: {
+        [DEFAULT_CUSTOMER_KEY]: JSON.stringify([
+          { id: 'stale-order-fallback', bedrijf: 'Kleine fallback', databaseStatus: 'klant' },
+        ]),
+        [`${DEFAULT_CUSTOMER_KEY}_chunks_v1`]: JSON.stringify({ count: 2 }),
+        [`${DEFAULT_CUSTOMER_KEY}_chunk_0`]: fullRows.slice(0, 80),
+        [`${DEFAULT_CUSTOMER_KEY}_chunk_1`]: fullRows.slice(80),
+      },
+      source: 'supabase',
+    }),
+  });
+
+  const result = await repository.listCustomers({ sortBy: 'bedrijf' });
+
+  assert.equal(result.count, 3);
+  assert.deepEqual(
+    result.rows.map((row) => row.bedrijf),
+    ['Volledige Klant 1', 'Volledige Klant 2', 'Volledige Klant 3']
+  );
+});
+
 test('premium customers repository keeps malformed customer json safe and empty', async () => {
   const errors = [];
   const repository = createPremiumCustomersRepository({
@@ -170,6 +199,7 @@ test('premium customers repository writes customers through the existing ui-stat
   assert.equal(writes[0].scope, DEFAULT_CUSTOMER_SCOPE);
   assert.equal(writes[0].meta.source, 'premium-customers-repository');
   assert.equal(writes[0].meta.actor, 'contract-test');
+  assert.equal(writes[0].values[`${DEFAULT_CUSTOMER_KEY}_chunks_v1`], '');
   assert.deepEqual(JSON.parse(writes[0].values[DEFAULT_CUSTOMER_KEY]), [
     { id: 'cust-1', bedrijf: 'Softora', databaseStatus: 'klant' },
     { id: 'cust-2', bedrijf: 'Demo BV', databaseStatus: 'afspraak' },
