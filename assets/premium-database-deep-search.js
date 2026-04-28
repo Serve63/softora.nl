@@ -523,54 +523,9 @@
             }
         }
 
-        function targetPlaceKeys(target) {
-            const parts = normalizeString(target && target.label).split("|").map(normalizeString).filter(Boolean);
-            const placeKey = normalizeKey(parts[3] || parts[parts.length - 1] || "");
-            const municipalityKey = normalizeKey(parts[2] || "");
-            return { placeKey: placeKey, municipalityKey: municipalityKey };
-        }
-
-        function collectCustomerWebsitesForTarget(target) {
-            const keys = targetPlaceKeys(target);
-            if (!keys.placeKey && !keys.municipalityKey) return [];
-            const customers = Array.isArray(getCustomers()) ? getCustomers() : [];
-            return customers.filter(function (customer) {
-                const locationKey = normalizeKey([
-                    customer && (customer.adres || customer.address),
-                    customer && (customer.stad || customer.plaats || customer.city),
-                    customer && customer.gemeente
-                ].map(normalizeString).filter(Boolean).join(" "));
-                if (!locationKey) return false;
-                return Boolean(
-                    (keys.placeKey && locationKey.indexOf(keys.placeKey) !== -1) ||
-                    (keys.municipalityKey && locationKey.indexOf(keys.municipalityKey) !== -1)
-                );
-            }).map(function (customer) {
-                return customer && (customer.website || customer.dom || customer.url || customer.site);
-            });
-        }
-
-        function hasTargetSearchProgress(target) {
-            if (!target) return false;
-            if (uniqueWebsiteValues(target.foundWebsites, 1).length) return true;
-            return Boolean(
-                Math.max(0, Number(target.batches) || 0) > 0 ||
-                Math.max(0, Number(target.found) || 0) > 0 ||
-                Math.max(0, Number(target.added) || 0) > 0 ||
-                Math.max(0, Number(target.costUsd) || 0) > 0 ||
-                Boolean(target.placeComplete) ||
-                Boolean(normalizeString(target.completionReason)) ||
-                Boolean(normalizeString(target.updatedAt))
-            );
-        }
-
         function renderSources(target) {
             if (!nodes.deepSearchSources) return;
-            const savedWebsites = uniqueWebsiteValues(target && target.foundWebsites, 200);
-            const recoveryWebsites = savedWebsites.length || !hasTargetSearchProgress(target)
-                ? []
-                : collectCustomerWebsitesForTarget(target);
-            const websites = uniqueWebsiteValues(savedWebsites.concat(recoveryWebsites), 200);
+            const websites = uniqueWebsiteValues(target && target.foundWebsites, 200);
             if (!websites.length) {
                 nodes.deepSearchSources.innerHTML = "<div class=\"deep-search-empty\">Nog geen websites voor deze plek.</div>";
                 return;
@@ -590,6 +545,13 @@
                 button.setAttribute("aria-pressed", active ? "true" : "false");
                 button.disabled = busy;
             });
+        }
+
+        function resetFoundWebsitesForSession(target) {
+            if (!target) return;
+            target.foundWebsites = [];
+            target.lastSources = [];
+            target.updatedAt = new Date().toISOString();
         }
 
         function render() {
@@ -806,9 +768,11 @@
                 setStatusMessage("Alle plekken zijn al afgerond.", "info", true);
                 return Promise.resolve(false);
             }
+            resetFoundWebsitesForSession(target);
             setBusy(true);
             target.status = "active";
             render();
+            void persistState();
             return runTargetUntilComplete(target).catch(function (error) {
                 console.error("Bedrijvenlijst mislukt:", error);
                 setStatusMessage("Bedrijvenlijst mislukt: " + String(error.message || "controleer de instellingen"), "error");

@@ -238,7 +238,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428e/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428f/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -290,7 +290,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428e"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428f"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -386,10 +386,11 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /function serializeTargetProgressList\(targets\)/);
   assert.match(deepSearchScriptSource, /targetProgress: serializeTargetProgressList\(state\.targets\)/);
   assert.doesNotMatch(deepSearchScriptSource, /targets: state\.targets/);
-  assert.match(deepSearchScriptSource, /function collectCustomerWebsitesForTarget\(target\)/);
-  assert.match(deepSearchScriptSource, /function hasTargetSearchProgress\(target\)/);
+  assert.doesNotMatch(deepSearchScriptSource, /function collectCustomerWebsitesForTarget\(target\)/);
+  assert.doesNotMatch(deepSearchScriptSource, /function hasTargetSearchProgress\(target\)/);
+  assert.match(deepSearchScriptSource, /function resetFoundWebsitesForSession\(target\)/);
   assert.match(deepSearchScriptSource, /target\.foundWebsites = uniqueWebsiteValues/);
-  assert.match(deepSearchScriptSource, /!hasTargetSearchProgress\(target\)/);
+  assert.match(deepSearchScriptSource, /resetFoundWebsitesForSession\(target\);/);
   assert.match(deepSearchScriptSource, /Nog geen websites voor deze plek\./);
   assert.match(deepSearchScriptSource, /persisted: Boolean\(persistResult && persistResult\.ok !== false\)/);
   assert.match(deepSearchScriptSource, /Let op: voortgang opslaan lukte niet\./);
@@ -1012,7 +1013,7 @@ test('premium database deep search keeps found websites empty before a location 
   assert.doesNotMatch(sourcesPanel.innerHTML, /chaamfallback\.nl/);
 });
 
-test('premium database deep search can recover websites after active location progress exists', async () => {
+test('premium database deep search does not backfill found websites from older customer rows', async () => {
   const deepSearchClient = loadDatabaseDeepSearchClient();
   const sourcesPanel = { innerHTML: '' };
   const controller = deepSearchClient.createController({
@@ -1044,8 +1045,74 @@ test('premium database deep search can recover websites after active location pr
   controller.open();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.match(sourcesPanel.innerHTML, /almkerkfallback\.nl/);
+  assert.match(sourcesPanel.innerHTML, /Nog geen websites voor deze plek\./);
+  assert.doesNotMatch(sourcesPanel.innerHTML, /almkerkfallback\.nl/);
   assert.doesNotMatch(sourcesPanel.innerHTML, /chaamfallback\.nl/);
+});
+
+test('premium database deep search clears old found websites when a new batch session starts', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const sourcesPanel = { innerHTML: '' };
+  let resolveSearch;
+  const rows = [
+    ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+    ['Nieuwe Sessie BV', 'Kerkstraat 1, Almkerk', 'info@nieuwesessie.nl', '0183 111 111', 'nieuwesessie.nl'],
+  ];
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchList: {},
+      deepSearchModal: createClassListNode(),
+      deepSearchSources: sourcesPanel,
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    getUiState: async () => ({
+      values: {
+        deep_search_state: JSON.stringify({
+          version: 2,
+          activeIndex: 0,
+          roundMode: '1',
+          targetProgress: [{
+            index: 0,
+            label: 'Nederland | Noord-Brabant | Altena | Almkerk',
+            batches: 1,
+            foundWebsites: ['oudesite.nl', 'https://oudesite.nl/contact'],
+          }],
+        }),
+      },
+    }),
+    getCustomers: () => [],
+    importRows: async () => true,
+    readDeepSearchRows: async () => new Promise((resolve) => {
+      resolveSearch = resolve;
+    }),
+    setUiState: async () => ({ ok: true }),
+  });
+
+  controller.open();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(sourcesPanel.innerHTML, /oudesite\.nl/);
+
+  const runPromise = controller.runCurrentSearch();
+  assert.match(sourcesPanel.innerHTML, /Nog geen websites voor deze plek\./);
+  assert.doesNotMatch(sourcesPanel.innerHTML, /oudesite\.nl/);
+
+  resolveSearch({
+    ok: true,
+    rows,
+    businesses: [],
+    found: 1,
+    placeComplete: false,
+    cost: { estimatedUsd: 0.12 },
+    sources: [{ url: 'https://nieuwesessie.nl/contact', title: 'Contact' }],
+  });
+  await runPromise;
+
+  assert.match(sourcesPanel.innerHTML, /nieuwesessie\.nl/);
+  assert.doesNotMatch(sourcesPanel.innerHTML, /oudesite\.nl/);
 });
 
 test('premium database deep search locks the modal while a batch is running', async () => {
