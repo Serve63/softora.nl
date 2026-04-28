@@ -1141,9 +1141,13 @@
                                     <svg class="btn-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                                 </button>
                                 <div class="add-actions-menu" id="addActionsMenu" role="menu">
-                                    <button class="add-actions-item" id="addCompaniesButton" type="button" role="menuitem">
-                                        <span class="add-actions-item-title">Bedrijven toevoegen</span>
+                                    <button class="add-actions-item" id="addUploadButton" type="button" role="menuitem">
+                                        <span class="add-actions-item-title">Uploaden</span>
                                         <span class="add-actions-item-sub">Importeer bedrijven vanuit een CSV-bestand</span>
+                                    </button>
+                                    <button class="add-actions-item" id="addManualButton" type="button" role="menuitem">
+                                        <span class="add-actions-item-title">Handmatig toevoegen</span>
+                                        <span class="add-actions-item-sub">Voeg zelf een bedrijf toe via het formulier</span>
                                     </button>
                                 </div>
                                 <input type="file" id="importFileInput" accept=".csv,text/csv" hidden>
@@ -1340,7 +1344,8 @@
             addButton: document.getElementById("addButton"),
             photoCostLabel: document.getElementById("photoCostLabel"),
             generatePhotosButton: document.getElementById("generatePhotosButton"),
-            addCompaniesButton: document.getElementById("addCompaniesButton"),
+            addUploadButton: document.getElementById("addUploadButton"),
+            addManualButton: document.getElementById("addManualButton"),
             importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
             overlay: document.getElementById("ov"),
@@ -1653,7 +1658,7 @@
                 return [];
             }
         }
-        function parseCustomersFromStateValues(values, key) { const stateValues = values && typeof values === "object" ? values : {}; const rawCustomers = parseCustomers(stateValues[key]); try { const meta = JSON.parse(normalizeString(stateValues[key + "_chunks_v1"]) || "{}"); const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0)); let raw = ""; for (let index = 0; index < count; index += 1) { const chunk = stateValues[key + "_chunk_" + index]; if (typeof chunk !== "string") return rawCustomers; raw += chunk; } const chunkedCustomers = parseCustomers(raw); return chunkedCustomers.length > rawCustomers.length ? chunkedCustomers : rawCustomers; } catch (error) { return rawCustomers; } }
+
         function parseOrders(raw) {
             try {
                 const parsed = JSON.parse(String(raw || "[]"));
@@ -1796,10 +1801,10 @@
                     websitePhotoName: ""
                 };
             }));
+
             return fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
                 patch: {
-                    [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers),
-                    [CUSTOMER_DB_KEY + "_chunks_v1"]: ""
+                    [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers)
                 },
                 source: "premium-database",
                 actor: "Premium database"
@@ -2943,9 +2948,10 @@
             if (!hadBootstrapCustomers) {
                 setStatusMessage("Database laden...", "info");
             }
+
             try {
                 const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
-                const remoteCustomers = parseCustomersFromStateValues(remoteState && remoteState.values, CUSTOMER_DB_KEY);
+                const remoteCustomers = parseCustomers(remoteState && remoteState.values && remoteState.values[CUSTOMER_DB_KEY]);
 
                 if (remoteCustomers.length) {
                     let enrichedCustomers = remoteCustomers;
@@ -3103,9 +3109,13 @@
         nodes.generatePhotosButton.addEventListener("click", function () {
             void generateWebdesignPhotos();
         });
-        nodes.addCompaniesButton.addEventListener("click", function () {
+        nodes.addUploadButton.addEventListener("click", function () {
             closeAddActions();
             nodes.importFileInput.click();
+        });
+        nodes.addManualButton.addEventListener("click", function () {
+            closeAddActions();
+            openModal();
         });
         nodes.importFileInput.addEventListener("change", handleImportFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
