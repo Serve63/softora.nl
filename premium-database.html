@@ -1601,6 +1601,7 @@
     </div>
 
     <script src="assets/premium-database-photo-batch.js?v=20260427a"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260429a"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
@@ -2171,6 +2172,8 @@
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });
 
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, generate: generateWebdesignPhotos, setStatusMessage, isBusy: function () { return nodes.generatePhotosButton.disabled; } });
+
         function mergeCustomersWithPhotos(customers, photoMap) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
             const photosByIdentity = new Map();
@@ -2382,17 +2385,7 @@
         }
 
         function renderWebsitePhotoDrop(customer) {
-            if (!shouldShowWebsitePhoto(customer)) return "";
-            const photo = normalizeString(customer && customer.websitePhoto);
-            const label = normalizeString(customer && customer.websitePhotoName) || "Websitefoto";
-            const hasPhoto = isValidWebsitePhotoDataUrl(photo);
-            const inner = isValidWebsitePhotoDataUrl(photo)
-                ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\">"
-                : "";
-            const remove = hasPhoto
-                ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>"
-                : "";
-            return "<div class=\"photo-cell\"><div class=\"photo-drop\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" aria-label=\"" + (hasPhoto ? "Websitefoto bekijken" : "Websitefoto toevoegen") + "\">" + inner + remove + "</div></div>";
+            return webdesignActionController.render(customer);
         }
 
         function renderTable() {
@@ -2824,7 +2817,7 @@
         async function generateWebdesignPhotos(limit) {
             closeAddActions();
             nodes.generatePhotosButton.disabled = true;
-            const targets = getWebdesignPhotoTargets(limit);
+            const targets = Array.isArray(limit) ? limit : getWebdesignPhotoTargets(limit);
             try {
                 if (!targets.length) {
                     setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
@@ -3307,8 +3300,7 @@
                 if (openWebsitePhotoPreview(state.photoTargetId)) {
                     return;
                 }
-                nodes.photoFileInput.value = "";
-                nodes.photoFileInput.click();
+                void webdesignActionController.generateForCustomer(state.photoTargetId);
                 return;
             }
             const row = event.target.closest("tr[data-id]");
