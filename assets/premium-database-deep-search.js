@@ -159,10 +159,9 @@
         const style = doc.createElement("style");
         style.id = DEEP_SEARCH_BUSY_STYLE_ID;
         style.textContent = [
-            ".deep-search-modal.is-running .deep-search-close { cursor: wait; color: var(--crimson); background: rgba(139, 34, 82, 0.06); pointer-events: none; position: absolute; }",
-            ".deep-search-modal.is-running .deep-search-close > * { visibility: hidden; }",
-            ".deep-search-modal.is-running .deep-search-close svg { display: none; }",
-            ".deep-search-modal.is-running .deep-search-close::after { content: \"\"; position: absolute; inset: 0; margin: auto; display: block; width: 16px; height: 16px; border: 2px solid rgba(139, 34, 82, 0.18); border-top-color: var(--crimson); border-radius: 50%; animation: deepSearchSpin .8s linear infinite; }",
+            ".deep-search-close.is-loading, .modal-bg.is-running .deep-search-close { cursor: wait; color: var(--crimson); background: rgba(139, 34, 82, 0.06); pointer-events: none; }",
+            ".deep-search-close.is-loading svg, .modal-bg.is-running .deep-search-close svg { display: none; }",
+            ".deep-search-close-spinner { display: block; width: 16px; height: 16px; border: 2px solid rgba(139, 34, 82, 0.18); border-top-color: var(--crimson); border-radius: 50%; animation: deepSearchSpin .8s linear infinite; }",
             "@keyframes deepSearchSpin { to { transform: rotate(360deg); } }"
         ].join("\n");
         doc.head.appendChild(style);
@@ -416,10 +415,21 @@
                 nodes.deepSearchStartButton.textContent = busy ? "Batch loopt..." : "Batch starten";
             }
             if (nodes.closeDeepSearchButton) {
+                const button = nodes.closeDeepSearchButton;
+                if (busy && typeof button.innerHTML === "string") {
+                    if (!Object.prototype.hasOwnProperty.call(button, "__deepSearchDefaultHtml")) {
+                        button.__deepSearchDefaultHtml = button.innerHTML;
+                    }
+                    button.innerHTML = "<span class=\"deep-search-close-spinner\" aria-hidden=\"true\"></span>";
+                } else if (!busy && Object.prototype.hasOwnProperty.call(button, "__deepSearchDefaultHtml") && typeof button.innerHTML === "string") {
+                    button.innerHTML = button.__deepSearchDefaultHtml;
+                }
+                if (button.classList) button.classList.toggle("is-loading", busy);
                 nodes.closeDeepSearchButton.disabled = busy;
                 if (typeof nodes.closeDeepSearchButton.setAttribute === "function") {
                     nodes.closeDeepSearchButton.setAttribute("aria-label", busy ? "Bedrijvenlijst loopt" : "Sluit bedrijvenlijst");
                     nodes.closeDeepSearchButton.setAttribute("aria-disabled", busy ? "true" : "false");
+                    nodes.closeDeepSearchButton.setAttribute("aria-busy", busy ? "true" : "false");
                 }
             }
             if (nodes.deepSearchModal && nodes.deepSearchModal.classList) {

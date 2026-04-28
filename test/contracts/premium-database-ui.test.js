@@ -227,7 +227,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428a/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428b/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -277,7 +277,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428b"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -381,9 +381,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /nodes\.deepSearchModal\.classList\.toggle\("is-running", busy\);/);
   assert.match(deepSearchScriptSource, /DEEP_SEARCH_BUSY_STYLE_ID/);
   assert.match(deepSearchScriptSource, /ensureBusyStyles\(\);/);
-  assert.match(deepSearchScriptSource, /\.deep-search-modal\.is-running \.deep-search-close > \* \{ visibility: hidden; \}/);
-  assert.match(deepSearchScriptSource, /\.deep-search-modal\.is-running \.deep-search-close svg \{ display: none; \}/);
-  assert.match(deepSearchScriptSource, /\.deep-search-modal\.is-running \.deep-search-close::after/);
+  assert.match(deepSearchScriptSource, /\.deep-search-close\.is-loading, \.modal-bg\.is-running \.deep-search-close/);
+  assert.match(deepSearchScriptSource, /button\.innerHTML = "<span class=\\"deep-search-close-spinner\\" aria-hidden=\\"true\\"><\/span>";/);
+  assert.match(deepSearchScriptSource, /button\.classList\.toggle\("is-loading", busy\);/);
   assert.match(deepSearchScriptSource, /@keyframes deepSearchSpin/);
   assert.match(deepSearchScriptSource, /Batch loopt nog\. De bedrijvenlijst blijft open tot deze plek klaar is\./);
   assert.match(deepSearchScriptSource, /function isOpen\(\)/);
@@ -757,6 +757,9 @@ test('premium database deep search locks the modal while a batch is running', as
   assert.equal(closeButton.disabled, true);
   assert.equal(closeButton.getAttribute('aria-label'), 'Bedrijvenlijst loopt');
   assert.equal(closeButton.getAttribute('aria-disabled'), 'true');
+  assert.equal(closeButton.getAttribute('aria-busy'), 'true');
+  assert.equal(closeButton.classList.contains('is-loading'), true);
+  assert.match(closeButton.innerHTML, /deep-search-close-spinner/);
   assert.equal(modal.classList.contains('is-running'), true);
   assert.equal(controller.close(), false);
   assert.equal(controller.isOpen(), true);
@@ -776,6 +779,9 @@ test('premium database deep search locks the modal while a batch is running', as
   assert.equal(closeButton.disabled, false);
   assert.equal(closeButton.getAttribute('aria-label'), 'Sluit bedrijvenlijst');
   assert.equal(closeButton.getAttribute('aria-disabled'), 'false');
+  assert.equal(closeButton.getAttribute('aria-busy'), 'false');
+  assert.equal(closeButton.classList.contains('is-loading'), false);
+  assert.doesNotMatch(closeButton.innerHTML, /deep-search-close-spinner/);
   assert.equal(modal.classList.contains('is-running'), false);
   assert.equal(controller.close(), true);
   assert.equal(controller.isOpen(), false);
