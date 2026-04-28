@@ -1601,7 +1601,7 @@
     </div>
 
     <script src="assets/premium-database-photo-batch.js?v=20260427a"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260429a"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260429b"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
@@ -2172,7 +2172,7 @@
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });
 
-        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, generate: generateWebdesignPhotos, setStatusMessage, isBusy: function () { return nodes.generatePhotosButton.disabled; } });
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, generate: generateWebdesignPhotos, setStatusMessage, isBusy: function () { return nodes.generatePhotosButton.disabled; }, renderPage: renderPage });
 
         function mergeCustomersWithPhotos(customers, photoMap) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
@@ -2814,13 +2814,13 @@
             throw lastError || new Error("AI-foto genereren is mislukt voor " + customer.bedrijf + ".");
         }
 
-        async function generateWebdesignPhotos(limit) {
-            closeAddActions();
+        async function generateWebdesignPhotos(limit, options) {
+            const progressSilent = Boolean(options && options.silentProgress); closeAddActions();
             nodes.generatePhotosButton.disabled = true;
             const targets = Array.isArray(limit) ? limit : getWebdesignPhotoTargets(limit);
             try {
                 if (!targets.length) {
-                    setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
+                    if (!progressSilent) setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
                     return;
                 }
 
@@ -2829,11 +2829,11 @@
                 let apiCostEur = 0;
                 let apiCostUsd = 0;
                 let firstErrorMessage = "";
-                setStatusMessage("Webdesign foto's genereren voor " + targets.length + " bedrijf" + (targets.length === 1 ? "" : "ven") + "...", "info");
+                if (!progressSilent) setStatusMessage("Webdesign foto's genereren voor " + targets.length + " bedrijf" + (targets.length === 1 ? "" : "ven") + "...", "info");
 
                 for (const target of targets) {
                     try {
-                        setStatusMessage("Webdesign maken voor " + target.bedrijf + " (" + (done + failed + 1) + "/" + targets.length + ")...", "info");
+                        if (!progressSilent) setStatusMessage("Webdesign maken voor " + target.bedrijf + " (" + (done + failed + 1) + "/" + targets.length + ")...", "info");
                         const generated = await generateWebsitePhotoData(target);
                         apiCostEur += Math.max(0, Number(generated.costEur) || 0);
                         apiCostUsd += Math.max(0, Number(generated.costUsd) || 0);
@@ -2872,8 +2872,7 @@
                     meta: { count: done }
                 });
 
-                toast(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen");
-                setStatusMessage(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen" + (failed ? ", " + failed + " mislukt." : "."), failed ? "info" : "success", true);
+                if (!progressSilent) { toast(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen"); setStatusMessage(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen" + (failed ? ", " + failed + " mislukt." : "."), failed ? "info" : "success", true); }
             } finally {
                 nodes.generatePhotosButton.disabled = false;
             }
