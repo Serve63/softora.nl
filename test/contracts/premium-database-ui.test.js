@@ -23,6 +23,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const photoActionsPath = path.join(__dirname, '../../assets/premium-database-photo-actions.js');
+  const photoActionsSource = fs.readFileSync(photoActionsPath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
   assert.match(pageSource, /family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700/);
@@ -94,6 +96,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
   assert.match(pageSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
   assert.match(pageSource, /class=\\"photo-drop\\"/);
+  assert.match(pageSource, /assets\/premium-database-photo-actions\.js\?v=20260428a/);
+  assert.match(photoActionsSource, /class=\\"photo-generate\\"/);
+  assert.match(photoActionsSource, /data-generate-photo-id=\\"/);
+  assert.match(photoActionsSource, /Webdesign maken voor " \+ company/);
   assert.match(pageSource, /class=\\"photo-remove\\"/);
   assert.match(pageSource, /data-remove-photo-id=\\"/);
   assert.match(pageSource, /data-has-photo=\\"/);
@@ -123,6 +129,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /!isGeneratedFallbackDomain\(customer, customer && customer\.dom\)/);
   assert.match(pageSource, /function buildWebsitePreviewUrlCandidates\(customer\)/);
   assert.match(pageSource, /withWww\.hostname = "www\." \+ parsed\.hostname;/);
+  assert.match(photoActionsSource, /function applyGeneratedWebsitePhoto\(customerId, generated\)/);
+  assert.match(photoActionsSource, /async function generateWebdesignPhotoForCustomer\(customerId\)/);
+  assert.match(photoActionsSource, /generatingIds\.add\(cleanId\);/);
   assert.match(pageSource, /function generateWebdesignPhotos\(\)/);
   assert.match(pageSource, /return isWebdesignPhotoEligible\(customer\);/);
   assert.match(pageSource, /Webdesign maken voor " \+ target\.bedrijf/);
@@ -132,6 +141,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /company: customer\.bedrijf/);
   assert.match(pageSource, /source: "premium-database"/);
   assert.match(pageSource, /action: "webdesign"/);
+  assert.match(photoActionsSource, /generateWebdesignPhotoForCustomer\(button\.getAttribute\("data-generate-photo-id"\)\)/);
+  assert.match(photoActionsSource, /nodes\.tbody\.addEventListener\("click", handleGenerateClick, true\)/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
   assert.match(pageSource, /function openEditCustomerModal\(customerId\)/);
   assert.match(pageSource, /function updateCustomerFromModal\(customerId, bedrijf\)/);
