@@ -1,11 +1,18 @@
+const {
+  createPremiumCustomersRepository,
+} = require('../repositories/premium-customers-repository');
+
 function createCustomersPageBootstrapService(deps = {}) {
   const {
     getUiStateValues = async () => null,
+    setUiStateValues = async () => null,
     normalizeString = (value) => String(value || '').trim(),
     customerScope = 'premium_customers_database',
     customerKey = 'softora_customers_premium_v1',
     orderScope = 'premium_active_orders',
     orderKey = 'softora_custom_orders_premium_v1',
+    customerRepository = null,
+    createCustomerRepository = createPremiumCustomersRepository,
   } = deps;
 
   function normalizeDate(value) {
@@ -15,6 +22,41 @@ function createCustomersPageBootstrapService(deps = {}) {
 
   function normalizeSearchValue(value) {
     return normalizeString(value).toLowerCase();
+  }
+
+  function getChunkMetaKey(baseKey) {
+    return `${normalizeString(baseKey)}_chunks_v1`;
+  }
+
+  function getChunkPrefix(baseKey) {
+    return `${normalizeString(baseKey)}_chunk_`;
+  }
+
+  function readChunkedStateValue(values, baseKey) {
+    const stateValues = values && typeof values === 'object' ? values : {};
+    const normalizedKey = normalizeString(baseKey);
+    const fallback =
+      typeof stateValues[normalizedKey] === 'string' ? stateValues[normalizedKey] : '';
+    const metaRaw = normalizeString(stateValues[getChunkMetaKey(normalizedKey)]);
+    if (!metaRaw) return fallback;
+
+    try {
+      const meta = JSON.parse(metaRaw);
+      const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0));
+      if (!count) return fallback;
+
+      const prefix = getChunkPrefix(normalizedKey);
+      const chunks = [];
+      for (let index = 0; index < count; index += 1) {
+        const chunk = stateValues[prefix + index];
+        if (typeof chunk !== 'string') return fallback;
+        chunks.push(chunk);
+      }
+
+      return chunks.join('') || fallback;
+    } catch (_) {
+      return fallback;
+    }
   }
 
   function normalizeActiveValue(value) {
@@ -148,6 +190,54 @@ function createCustomersPageBootstrapService(deps = {}) {
         parsed.map((item, index) =>
           setExplicitResponsibleMetadata(
             normalizeCustomer(item, `klant-import-${index}`),
+            getResponsibleSourceValue(item)
+          )
+        )
+      );
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function resolveCustomerRepository() {
+    if (customerRepository && typeof customerRepository.listCustomers === 'function') {
+      return customerRepository;
+    }
+
+    if (typeof createCustomerRepository !== 'function') return null;
+
+    return createCustomerRepository({
+      getUiStateValues,
+      setUiStateValues,
+      scope: customerScope,
+      key: customerKey,
+      customerScope,
+      customerKey,
+    });
+  }
+
+  async function readCustomersFromRepository() {
+    const repository = resolveCustomerRepository();
+    if (!repository || typeof repository.listCustomers !== 'function') return [];
+
+    try {
+      const result = await repository.listCustomers({
+        limit: 5000,
+        sortBy: 'naam',
+        sortDirection: 'asc',
+      });
+      const rows = Array.isArray(result)
+        ? result
+        : Array.isArray(result?.rows)
+          ? result.rows
+          : Array.isArray(result?.customers)
+            ? result.customers
+            : [];
+
+      return sortCustomers(
+        rows.map((item, index) =>
+          setExplicitResponsibleMetadata(
+            normalizeCustomer(item, `klant-repository-${index}`),
             getResponsibleSourceValue(item)
           )
         )
@@ -308,8 +398,11 @@ function createCustomersPageBootstrapService(deps = {}) {
   }
 
   async function buildCustomersBootstrapPayload() {
-    const remoteState = await getUiStateValues(customerScope);
-    const remoteCustomers = parseCustomers(remoteState?.values?.[customerKey]);
+    const repositoryCustomers = await readCustomersFromRepository();
+    const remoteState = repositoryCustomers.length ? null : await getUiStateValues(customerScope);
+    const remoteCustomers = repositoryCustomers.length
+      ? repositoryCustomers
+      : parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
     const orderState = await getUiStateValues(orderScope);
     const orders = parseOrders(orderState?.values?.[orderKey]);
 
