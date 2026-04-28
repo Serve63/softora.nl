@@ -60,10 +60,13 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     pageSource,
     /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" data-lead-database-open/
   );
-  assert.match(pageSource, /openLeadListModalBtn\.addEventListener\('click'/);
-  assert.match(pageSource, /window\.openLeadDatabaseModalFromCampaign\(\);/);
+  assert.match(dashboardSource, /function bindLeadDatabaseOpenControl\(\) \{/);
+  assert.match(dashboardSource, /button\.addEventListener\('click', \(event\) => \{/);
+  assert.match(dashboardSource, /openLeadDatabaseFromCampaignControl\(\);/);
   assert.match(pageSource, /id="launchBtn" data-campaign-toggle type="button"/);
-  assert.match(pageSource, /launchBtn\.addEventListener\('click', toggleCampaign\);/);
+  assert.match(dashboardCoreSource, /function bindCampaignToggleControl\(rootDocument = global\.document\) \{/);
+  assert.match(dashboardCoreSource, /rootDocument\.addEventListener\('click', \(event\) => \{/);
+  assert.match(dashboardCoreSource, /\[data-campaign-toggle\]/);
   assert.doesNotMatch(pageSource, /\son(?:click|input|change|keydown|submit)=/i);
   assert.doesNotMatch(pageSource, /id="branche"/);
   assert.doesNotMatch(pageSource, /<label class="form-label">Branche<\/label>/);

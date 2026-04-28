@@ -2742,19 +2742,6 @@
             }
         }
 
-        const launchBtn = document.getElementById('launchBtn');
-        if (launchBtn) {
-            launchBtn.addEventListener('click', toggleCampaign);
-        }
-
-        const openLeadListModalBtn = document.getElementById('openLeadListModalBtn');
-        if (openLeadListModalBtn) {
-            openLeadListModalBtn.addEventListener('click', () => {
-                if (typeof window.openLeadDatabaseModalFromCampaign !== 'function') return;
-                window.openLeadDatabaseModalFromCampaign();
-            });
-        }
-
         // Cursor
         const cursor = document.querySelector('.cursor');
         const cursorDot = document.querySelector('.cursor-dot');
@@ -2835,8 +2822,7 @@
         }
       });
     </script>
-    <script src="assets/coldcalling-conversation-summary.js?v=20260427a" defer></script><script src="assets/coldcalling-regio-radius.js?v=20260427a" defer></script><script src="assets/coldcalling-manual-lead-prompt.js?v=20260427a" defer></script>
-    <script src="assets/coldcalling-dashboard-core.js?v=20260428e" defer></script><script src="assets/coldcalling-dashboard-config.js?v=20260428a" defer></script><script src="assets/coldcalling-dashboard-modes.js?v=20260428a" defer></script><script src="assets/coldcalling-dashboard.js?v=20260428g" defer></script>
+    <script src="assets/coldcalling-conversation-summary.js?v=20260427a" defer></script><script src="assets/coldcalling-regio-radius.js?v=20260427a" defer></script><script src="assets/coldcalling-manual-lead-prompt.js?v=20260427a" defer></script><script src="assets/coldcalling-dashboard-core.js?v=20260428e" defer></script><script src="assets/coldcalling-dashboard-config.js?v=20260428a" defer></script><script src="assets/coldcalling-dashboard-modes.js?v=20260428a" defer></script><script src="assets/coldcalling-dashboard.js?v=20260428g" defer></script>
     <script src="assets/premium-ai-lead-generator-management.js?v=20260423a" defer></script>
 </body>
 </html>

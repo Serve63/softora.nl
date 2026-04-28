@@ -135,6 +135,61 @@ test('coldcalling dashboard core beheert de lead slider ready-state defensief', 
   }
 });
 
+test('coldcalling dashboard core koppelt campagnestart veilig via data-attribuut', () => {
+  const previousDocument = global.document;
+  const previousToggleCampaign = global.toggleCampaign;
+  const listeners = [];
+  const rootDocument = {
+    addEventListener(type, handler) {
+      listeners.push({ type, handler });
+    },
+  };
+  let toggleCalls = 0;
+
+  try {
+    global.document = rootDocument;
+    global.toggleCampaign = () => {
+      toggleCalls += 1;
+    };
+
+    assert.equal(dashboardCore.bindCampaignToggleControl(rootDocument), true);
+    assert.equal(dashboardCore.bindCampaignToggleControl(rootDocument), false);
+    assert.equal(listeners.length, 1);
+    assert.equal(listeners[0].type, 'click');
+
+    let prevented = false;
+    listeners[0].handler({
+      target: {
+        closest(selector) {
+          assert.equal(selector, '[data-campaign-toggle]');
+          return { id: 'launchBtn' };
+        },
+      },
+      preventDefault() {
+        prevented = true;
+      },
+    });
+
+    assert.equal(prevented, true);
+    assert.equal(toggleCalls, 1);
+
+    listeners[0].handler({
+      target: {
+        closest() {
+          return null;
+        },
+      },
+      preventDefault() {
+        throw new Error('Niet-campagneknoppen mogen niet worden onderschept');
+      },
+    });
+    assert.equal(toggleCalls, 1);
+  } finally {
+    global.document = previousDocument;
+    global.toggleCampaign = previousToggleCampaign;
+  }
+});
+
 test('coldcalling dashboard config centraliseert opslag- en scope-contracten', () => {
   assert.equal(dashboardConfig.LEAD_ROWS_STORAGE_KEY, 'softora_coldcalling_lead_rows_json');
   assert.equal(dashboardConfig.AI_NOTEBOOK_ROWS_STORAGE_KEY, 'softora_ai_notebook_rows_json');
@@ -218,6 +273,7 @@ test('coldcalling dashboard core publiceert een expliciet bevroren helper-contra
   assert.deepEqual(
     Object.keys(dashboardCore).sort(),
     [
+      'bindCampaignToggleControl',
       'buildCampaignStartedMessage',
       'byId',
       'cloneUiStateValues',

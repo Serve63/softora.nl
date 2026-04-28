@@ -176,7 +176,22 @@
     sliderStage.setAttribute('aria-hidden', 'true');
   }
 
+  function bindCampaignToggleControl(rootDocument = global.document) {
+    if (!rootDocument || typeof rootDocument.addEventListener !== 'function') return false;
+    if (rootDocument.__softoraCampaignToggleBound === '1') return false;
+    rootDocument.__softoraCampaignToggleBound = '1';
+    rootDocument.addEventListener('click', (event) => {
+      const toggle = event?.target?.closest?.('[data-campaign-toggle]');
+      if (!toggle) return;
+      event.preventDefault?.();
+      if (typeof global.toggleCampaign !== 'function') return;
+      global.toggleCampaign();
+    });
+    return true;
+  }
+
   const helpers = Object.freeze({
+    bindCampaignToggleControl,
     byId,
     buildCampaignStartedMessage,
     cloneUiStateValues,
@@ -196,6 +211,7 @@
   });
 
   global.SoftoraColdcallingDashboardCore = helpers;
+  bindCampaignToggleControl();
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = helpers;
