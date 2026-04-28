@@ -231,6 +231,17 @@
         });
     }
 
+    function collectWebsitesFromBody(body) {
+        const businesses = Array.isArray(body && body.businesses) ? body.businesses : [];
+        const rows = Array.isArray(body && body.rows) ? body.rows : [];
+        const sources = Array.isArray(body && body.sources) ? body.sources : [];
+        return businesses.map(function (business) {
+            return business && business.website;
+        })
+            .concat(collectWebsitesFromRows(rows))
+            .concat(sources);
+    }
+
     function createTarget(label, index) {
         return {
             id: "deep-" + normalizeKey(label).replace(/[^a-z0-9]+/g, "-").slice(0, 60) + "-" + index,
@@ -507,7 +518,6 @@
 
         function updateTargetAfterSearch(target, body, addedCount) {
             const businesses = Array.isArray(body.businesses) ? body.businesses : [];
-            const rows = Array.isArray(body.rows) ? body.rows : [];
             const costUsd = Math.max(0, Number(body && body.cost && body.cost.estimatedUsd) || 0);
             target.batches += 1;
             target.found += Math.max(0, Number(body.found) || 0);
@@ -518,12 +528,7 @@
             state.totalCostUsd = Math.max(0, Number(state.totalCostUsd) || 0) + costUsd;
             target.updatedAt = new Date().toISOString();
             target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
-            target.foundWebsites = uniqueWebsiteValues((target.foundWebsites || [])
-                .concat(businesses.map(function (business) {
-                    return business && business.website;
-                }))
-                .concat(collectWebsitesFromRows(rows))
-                .concat(target.lastSources), 200);
+            target.foundWebsites = uniqueWebsiteValues((target.foundWebsites || []).concat(collectWebsitesFromBody(body)), 200);
             target.seen = uniqueStrings(target.seen.concat(businesses.map(function (business) {
                 return [
                     business && business.bedrijfsnaam,
@@ -569,6 +574,14 @@
                 exclude: uniqueStrings(target.seen.concat(collectExistingKeys()), 180)
             }).then(function (body) {
                 const rows = Array.isArray(body.rows) ? body.rows : [];
+                target.foundWebsites = uniqueWebsiteValues((target.foundWebsites || []).concat(collectWebsitesFromBody(body)), 200);
+                target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
+                target.updatedAt = new Date().toISOString();
+                render();
+                persistState().catch(function (error) {
+                    console.error("Gevonden websites opslaan mislukt:", error);
+                    return { ok: false, error: error };
+                });
                 const importPromise = rows.length > 1 ? Promise.resolve(importRows(rows)) : Promise.resolve(false);
                 return importPromise.then(function (importResult) {
                     const afterCount = Array.isArray(getCustomers()) ? getCustomers().length : beforeCount;

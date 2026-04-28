@@ -227,7 +227,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428b/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428c/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -277,7 +277,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428c"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -722,6 +722,84 @@ test('premium database deep search stops when new companies could not be saved',
   assert.equal(calls.length, 1);
   assert.equal(customers.length, 1);
   assert.match(messages.join('\n'), /Opslaan in Supabase lukte niet/);
+});
+
+test('premium database deep search shows found websites before customer persistence finishes', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const customers = [];
+  const sourcesPanel = { innerHTML: '' };
+  let resolveImport;
+  let importStartedResolve;
+  const importStarted = new Promise((resolve) => {
+    importStartedResolve = resolve;
+  });
+  let calls = 0;
+  const rows = [
+    ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+    ['Almkerk 1', 'Kerkstraat 1, Almkerk', 'info@almkerk1.nl', '0183 111 111', 'almkerk1.nl'],
+    ['Almkerk 2', 'Kerkstraat 2, Almkerk', 'info@almkerk2.nl', '0183 222 222', 'https://almkerk2.nl'],
+    ['Almkerk 3', 'Kerkstraat 3, Almkerk', 'info@almkerk3.nl', '0183 333 333', 'almkerk3.nl'],
+    ['Almkerk 4', 'Kerkstraat 4, Almkerk', 'info@almkerk4.nl', '0183 444 444', 'almkerk4.nl'],
+    ['Almkerk 5', 'Kerkstraat 5, Almkerk', 'info@almkerk5.nl', '0183 555 555', 'almkerk5.nl'],
+    ['Almkerk 6', 'Kerkstraat 6, Almkerk', 'info@almkerk6.nl', '0183 666 666', 'almkerk6.nl'],
+  ];
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchList: {},
+      deepSearchSources: sourcesPanel,
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    autoContinueDelayMs: 0,
+    getCustomers: () => customers,
+    importRows: async (receivedRows) => {
+      importStartedResolve();
+      return new Promise((resolve) => {
+        resolveImport = () => {
+          customers.push(...receivedRows.slice(1).map((row) => ({ bedrijf: row[0], email: row[2], website: row[4] })));
+          resolve(true);
+        };
+      });
+    },
+    readDeepSearchRows: async () => {
+      calls += 1;
+      return calls === 1
+        ? {
+            ok: true,
+            rows,
+            businesses: [],
+            found: 6,
+            placeComplete: false,
+            cost: { estimatedUsd: 0.12 },
+            sources: [],
+          }
+        : {
+            ok: true,
+            rows: [rows[0]],
+            businesses: [],
+            found: 0,
+            placeComplete: true,
+            cost: { estimatedUsd: 0.02 },
+            sources: [],
+          };
+    },
+    setUiState: async () => ({ ok: true }),
+  });
+
+  const runPromise = controller.runCurrentSearch();
+  await importStarted;
+
+  assert.match(sourcesPanel.innerHTML, /almkerk1\.nl/);
+  assert.match(sourcesPanel.innerHTML, /almkerk2\.nl/);
+  assert.match(sourcesPanel.innerHTML, /almkerk6\.nl/);
+  assert.equal(customers.length, 0);
+
+  resolveImport();
+  await runPromise;
+  assert.equal(customers.length, 6);
 });
 
 test('premium database deep search locks the modal while a batch is running', async () => {
