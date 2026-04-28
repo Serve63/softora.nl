@@ -550,9 +550,27 @@
             });
         }
 
+        function hasTargetSearchProgress(target) {
+            if (!target) return false;
+            if (uniqueWebsiteValues(target.foundWebsites, 1).length) return true;
+            return Boolean(
+                Math.max(0, Number(target.batches) || 0) > 0 ||
+                Math.max(0, Number(target.found) || 0) > 0 ||
+                Math.max(0, Number(target.added) || 0) > 0 ||
+                Math.max(0, Number(target.costUsd) || 0) > 0 ||
+                Boolean(target.placeComplete) ||
+                Boolean(normalizeString(target.completionReason)) ||
+                Boolean(normalizeString(target.updatedAt))
+            );
+        }
+
         function renderSources(target) {
             if (!nodes.deepSearchSources) return;
-            const websites = uniqueWebsiteValues((target && target.foundWebsites || []).concat(collectCustomerWebsitesForTarget(target)), 200);
+            const savedWebsites = uniqueWebsiteValues(target && target.foundWebsites, 200);
+            const recoveryWebsites = savedWebsites.length || !hasTargetSearchProgress(target)
+                ? []
+                : collectCustomerWebsitesForTarget(target);
+            const websites = uniqueWebsiteValues(savedWebsites.concat(recoveryWebsites), 200);
             if (!websites.length) {
                 nodes.deepSearchSources.innerHTML = "<div class=\"deep-search-empty\">Nog geen websites voor deze plek.</div>";
                 return;

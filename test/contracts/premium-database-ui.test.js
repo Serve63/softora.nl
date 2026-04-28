@@ -236,7 +236,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428b/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428d/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428e/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -288,7 +288,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428d"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428e"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -385,7 +385,9 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /targetProgress: serializeTargetProgressList\(state\.targets\)/);
   assert.doesNotMatch(deepSearchScriptSource, /targets: state\.targets/);
   assert.match(deepSearchScriptSource, /function collectCustomerWebsitesForTarget\(target\)/);
+  assert.match(deepSearchScriptSource, /function hasTargetSearchProgress\(target\)/);
   assert.match(deepSearchScriptSource, /target\.foundWebsites = uniqueWebsiteValues/);
+  assert.match(deepSearchScriptSource, /!hasTargetSearchProgress\(target\)/);
   assert.match(deepSearchScriptSource, /Nog geen websites voor deze plek\./);
   assert.match(deepSearchScriptSource, /persisted: Boolean\(persistResult && persistResult\.ok !== false\)/);
   assert.match(deepSearchScriptSource, /Let op: voortgang opslaan lukte niet\./);
@@ -948,7 +950,7 @@ test('premium database deep search persists compact website progress that surviv
   assert.match(restoredSourcesPanel.innerHTML, /compact2\.nl/);
 });
 
-test('premium database deep search falls back to database websites for the active location', async () => {
+test('premium database deep search keeps found websites empty before a location starts', async () => {
   const deepSearchClient = loadDatabaseDeepSearchClient();
   const sourcesPanel = { innerHTML: '' };
   const controller = deepSearchClient.createController({
@@ -967,6 +969,43 @@ test('premium database deep search falls back to database websites for the activ
   });
 
   controller.open();
+
+  assert.match(sourcesPanel.innerHTML, /Nog geen websites voor deze plek\./);
+  assert.doesNotMatch(sourcesPanel.innerHTML, /almkerkfallback\.nl/);
+  assert.doesNotMatch(sourcesPanel.innerHTML, /chaamfallback\.nl/);
+});
+
+test('premium database deep search can recover websites after active location progress exists', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const sourcesPanel = { innerHTML: '' };
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchList: {},
+      deepSearchModal: createClassListNode(),
+      deepSearchSources: sourcesPanel,
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    getUiState: async () => ({
+      values: {
+        deep_search_state: JSON.stringify({
+          version: 2,
+          activeIndex: 0,
+          targetProgress: [{ index: 0, label: 'Nederland | Noord-Brabant | Altena | Almkerk', batches: 1 }],
+        }),
+      },
+    }),
+    getCustomers: () => [
+      { bedrijf: 'Almkerk BV', adres: 'Kerkstraat 1, Almkerk', website: 'almkerkfallback.nl' },
+      { bedrijf: 'Chaam BV', adres: 'Dorpsstraat 1, Chaam', website: 'chaamfallback.nl' },
+    ],
+  });
+
+  controller.open();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.match(sourcesPanel.innerHTML, /almkerkfallback\.nl/);
   assert.doesNotMatch(sourcesPanel.innerHTML, /chaamfallback\.nl/);
