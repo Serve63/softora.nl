@@ -251,7 +251,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
-  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
+  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
@@ -260,6 +260,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
   assert.match(photoBatchScriptSource, /function resolveSelection\(\)/);
+  assert.match(photoBatchScriptSource, /function ensureInputFocusStyles\(\)/);
+  assert.match(photoBatchScriptSource, /\.photo-batch-input:focus/);
+  assert.match(photoBatchScriptSource, /border-color:var\(--crimson\)/);
+  assert.doesNotMatch(photoBatchScriptSource, /photoBatchLimitInput\.select\(\)/);
   assert.match(photoBatchScriptSource, /void generate\(selection\.limit\);/);
   assert.match(pageSource, /function generateWebdesignPhotos\(limit, options\)/);
   assert.match(pageSource, /const progressSilent = Boolean\(options && options\.silentProgress\);/);

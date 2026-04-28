@@ -1,6 +1,16 @@
 (function () {
+  const FOCUS_STYLE_ID = "softora-photo-batch-focus-style";
+
   function formatPhotoBatchCount(count) {
     return Number(count || 0).toLocaleString("nl-NL") + " bedrijf" + (count === 1 ? "" : "ven");
+  }
+
+  function ensureInputFocusStyles() {
+    if (typeof document === "undefined" || document.getElementById(FOCUS_STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = FOCUS_STYLE_ID;
+    style.textContent = ".photo-batch-input:focus{outline:2px solid rgba(139,34,82,.42);outline-offset:2px;border-color:var(--crimson)}.photo-batch-input::selection{background:rgba(139,34,82,.2);color:var(--dark)}";
+    document.head.appendChild(style);
   }
 
   function createController(options) {
@@ -12,6 +22,7 @@
     const setStatusMessage = options.setStatusMessage;
     const generate = options.generate;
     let mode = "custom";
+    ensureInputFocusStyles();
 
     function updateSummary(message) {
       const total = getTargets().length;
@@ -55,7 +66,6 @@
       nodes.photoBatchModal.classList.add("on");
       nodes.photoBatchModal.setAttribute("aria-hidden", "false");
       nodes.photoBatchLimitInput.focus();
-      nodes.photoBatchLimitInput.select();
     }
 
     function close() {
@@ -83,7 +93,6 @@
       if (!Number.isFinite(limit) || limit < 1) {
         updateSummary("Vul minimaal 1 in.");
         nodes.photoBatchLimitInput.focus();
-        nodes.photoBatchLimitInput.select();
         return null;
       }
 
