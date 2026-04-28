@@ -1,7 +1,3 @@
-const {
-  createPremiumCustomersRepository,
-} = require('../repositories/premium-customers-repository');
-
 function createAiDashboardCoordinator(deps = {}) {
   const {
     normalizeString = (value) => String(value || '').trim(),
@@ -21,7 +17,6 @@ function createAiDashboardCoordinator(deps = {}) {
     },
     resolvePreferredRecordingUrl = () => '',
     getUiStateValues = async () => null,
-    setUiStateValues = async () => null,
     premiumActiveOrdersScope = '',
     premiumCustomersScope = '',
     premiumActiveCustomOrdersKey = '',
@@ -59,8 +54,6 @@ function createAiDashboardCoordinator(deps = {}) {
       return Number.isFinite(parsed) ? parsed : fallback;
     },
     rubenAssistant = null,
-    customerRepository = null,
-    createCustomerRepository = createPremiumCustomersRepository,
   } = deps;
 
   function extractAnthropicTextContent(content) {
@@ -112,10 +105,11 @@ function createAiDashboardCoordinator(deps = {}) {
     return out;
   }
 
-  function normalizeDashboardChatCustomerRows(rows) {
-    if (!Array.isArray(rows)) return [];
+  function parseDashboardChatCustomers(rawValue) {
+    const parsed = parseJsonLoose(rawValue);
+    if (!Array.isArray(parsed)) return [];
 
-    return rows
+    return parsed
       .map((item, index) => {
         if (!item || typeof item !== 'object') return null;
 
@@ -153,45 +147,6 @@ function createAiDashboardCoordinator(deps = {}) {
         };
       })
       .filter(Boolean);
-  }
-
-  function parseDashboardChatCustomers(rawValue) {
-    return normalizeDashboardChatCustomerRows(parseJsonLoose(rawValue));
-  }
-
-  function resolvePremiumDashboardCustomerRepository() {
-    if (customerRepository && typeof customerRepository.listCustomers === 'function') {
-      return customerRepository;
-    }
-    if (typeof createCustomerRepository !== 'function') return null;
-
-    return createCustomerRepository({
-      getUiStateValues,
-      setUiStateValues,
-      scope: premiumCustomersScope,
-      key: premiumCustomersKey,
-      customerScope: premiumCustomersScope,
-      customerKey: premiumCustomersKey,
-    });
-  }
-
-  async function readPremiumDashboardCustomersFromRepository() {
-    const repository = resolvePremiumDashboardCustomerRepository();
-    if (!repository || typeof repository.listCustomers !== 'function') return [];
-
-    try {
-      const result = await repository.listCustomers({ limit: 1000 });
-      const rows = Array.isArray(result)
-        ? result
-        : Array.isArray(result?.rows)
-          ? result.rows
-          : Array.isArray(result?.customers)
-            ? result.customers
-            : [];
-      return normalizeDashboardChatCustomerRows(rows);
-    } catch (_) {
-      return [];
-    }
   }
 
   function buildDashboardChatStatusCounts(rows, fieldName, fallback = 'Onbekend') {
@@ -265,24 +220,19 @@ function createAiDashboardCoordinator(deps = {}) {
   }
 
   async function buildPremiumDashboardChatContext() {
-    const [orderState, repositoryCustomers] = await Promise.all([
+    const [orderState, customerState] = await Promise.all([
       getUiStateValues(premiumActiveOrdersScope),
-      readPremiumDashboardCustomersFromRepository(),
+      getUiStateValues(premiumCustomersScope),
     ]);
 
     const orderValues =
       orderState?.values && typeof orderState.values === 'object' ? orderState.values : {};
+    const customerValues =
+      customerState?.values && typeof customerState.values === 'object' ? customerState.values : {};
 
     const customOrders = parseCustomOrdersFromUiState(orderValues[premiumActiveCustomOrdersKey]);
     const runtimeByOrderId = parseDashboardChatRuntimeByOrderId(orderValues[premiumActiveRuntimeKey]);
-    let customers = repositoryCustomers;
-
-    if (!customers.length) {
-      const customerState = await getUiStateValues(premiumCustomersScope);
-      const customerValues =
-        customerState?.values && typeof customerState.values === 'object' ? customerState.values : {};
-      customers = parseDashboardChatCustomers(customerValues[premiumCustomersKey]);
-    }
+    const customers = parseDashboardChatCustomers(customerValues[premiumCustomersKey]);
 
     const orders = customOrders
       .map((item) => {
