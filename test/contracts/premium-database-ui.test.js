@@ -108,6 +108,12 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(photoActionsSource, /function patchWebdesignCountInput\(input\)/);
   assert.match(photoActionsSource, /input\.type = "text";/);
   assert.match(photoActionsSource, /observeWebdesignCountDialogs\(\);/);
+  assert.match(photoActionsSource, /function isCompaniesListDialog\(element\)/);
+  assert.match(photoActionsSource, /function findFoundWebsitesPanel\(dialog\)/);
+  assert.match(photoActionsSource, /function clearFoundWebsitesPanel\(dialog\)/);
+  assert.match(photoActionsSource, /panel\.innerHTML = "<div class=\\"found-websites-empty\\"/);
+  assert.match(photoActionsSource, /markCompaniesListActivated\(dialog\)/);
+  assert.match(photoActionsSource, /observeCompaniesListDialogs\(\);/);
   assert.match(photoActionsSource, /Webdesign maken voor " \+ company/);
   assert.match(pageSource, /class=\\"photo-remove\\"/);
   assert.match(pageSource, /data-remove-photo-id=\\"/);

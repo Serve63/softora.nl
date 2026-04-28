@@ -27,7 +27,8 @@
       ".photo-generate svg{width:15px;height:15px}",
       ".photo-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:softora-photo-spin .7s linear infinite}",
       ".webdesign-count-input:focus{border-color:var(--crimson)!important;outline:none!important;box-shadow:0 0 0 3px rgba(155,35,85,.22)!important}",
-      ".webdesign-count-input::selection{background:rgba(155,35,85,.24);color:var(--dark,#1a1a2e)}"
+      ".webdesign-count-input::selection{background:rgba(155,35,85,.24);color:var(--dark,#1a1a2e)}",
+      ".found-websites-empty{min-height:120px}"
     ].join("");
     document.head.appendChild(style);
   }
@@ -244,8 +245,92 @@
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
+  function isCompaniesListDialog(element) {
+    const text = normalizeString(element && element.textContent).toLowerCase();
+    const compactText = text.replace(/\s+/g, "");
+    return compactText.indexOf("bedrijvenlijst") !== -1 && compactText.indexOf("gevondenwebsite") !== -1;
+  }
+
+  function isFoundWebsitesHeading(element) {
+    const text = normalizeString(element && element.textContent).toLowerCase();
+    const compactText = text.replace(/\s+/g, "");
+    return compactText.indexOf("gevondenwebsite") !== -1 && compactText.length <= 40;
+  }
+
+  function findFoundWebsitesPanel(dialog) {
+    const candidates = Array.from(dialog.querySelectorAll("h1,h2,h3,h4,h5,h6,div,span,p,strong,label"));
+    const heading = candidates.find(isFoundWebsitesHeading);
+    if (!heading) return null;
+
+    let sibling = heading.nextElementSibling;
+    while (sibling) {
+      if (sibling.querySelector && (sibling.querySelector("a") || sibling.textContent)) {
+        return sibling;
+      }
+      sibling = sibling.nextElementSibling;
+    }
+
+    const parent = heading.parentElement;
+    if (!parent) return null;
+    const parentSibling = parent.nextElementSibling;
+    if (parentSibling && parentSibling.querySelector && (parentSibling.querySelector("a") || parentSibling.textContent)) {
+      return parentSibling;
+    }
+    return null;
+  }
+
+  function markCompaniesListActivated(dialog) {
+    dialog.dataset.softoraFoundWebsitesActivated = "true";
+  }
+
+  function clearFoundWebsitesPanel(dialog) {
+    if (!dialog || dialog.dataset.softoraFoundWebsitesActivated === "true") return;
+    const panel = findFoundWebsitesPanel(dialog);
+    if (!panel || panel.dataset.softoraFoundWebsitesCleared === "true") return;
+    panel.dataset.softoraFoundWebsitesCleared = "true";
+    panel.innerHTML = "<div class=\"found-websites-empty\" aria-hidden=\"true\"></div>";
+  }
+
+  function patchCompaniesListDialog(root) {
+    const element = root && root.nodeType === 1 ? root : document.body;
+    if (!element) return;
+    const dialogs = [element].concat(Array.from(element.querySelectorAll("[role='dialog'], .modal, [class*='modal'], [class*='dialog']")));
+    dialogs.forEach(function (dialog) {
+      if (!isCompaniesListDialog(dialog)) return;
+      if (dialog.dataset.softoraCompaniesListPatched !== "true") {
+        dialog.dataset.softoraCompaniesListPatched = "true";
+        Array.from(dialog.querySelectorAll("button")).forEach(function (button) {
+          const text = normalizeString(button.textContent).toLowerCase();
+          if (text.replace(/\s+/g, " ") === "bedrijven toevoegen") {
+            button.addEventListener("click", function () {
+              markCompaniesListActivated(dialog);
+            }, true);
+          }
+        });
+      }
+      clearFoundWebsitesPanel(dialog);
+      window.setTimeout(function () { clearFoundWebsitesPanel(dialog); }, 0);
+      window.setTimeout(function () { clearFoundWebsitesPanel(dialog); }, 80);
+    });
+  }
+
+  function observeCompaniesListDialogs() {
+    patchCompaniesListDialog(document.body);
+    if (typeof MutationObserver !== "function" || !document.body) return;
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        Array.from(mutation.addedNodes || []).forEach(patchCompaniesListDialog);
+        if (mutation.type === "childList" && mutation.target) {
+          patchCompaniesListDialog(mutation.target);
+        }
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
   injectPhotoActionStyles();
   observeWebdesignCountDialogs();
+  observeCompaniesListDialogs();
   nodes.tbody.addEventListener("click", handleGenerateClick, true);
   generateWebdesignPhotos = generateWebdesignPhotosWithInlineLoaders;
   window.generateWebdesignPhotos = generateWebdesignPhotosWithInlineLoaders;
