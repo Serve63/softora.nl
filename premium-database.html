@@ -1118,28 +1118,27 @@
             margin-bottom: 12px;
         }
 
-        .deep-search-rounds {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 8px;
+        .deep-search-count-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
             margin-bottom: 12px;
-        }
-
-        .deep-search-round {
             border: 1px solid var(--border);
             border-radius: 7px;
             background: var(--card);
             color: var(--dark);
-            padding: 9px 8px;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
+            padding: 9px 12px;
         }
 
-        .deep-search-round.is-active {
-            border-color: var(--crimson);
-            background: rgba(139, 34, 82, 0.08);
-            color: var(--crimson);
+        .deep-search-count-label { font-size: 12px; font-weight: 700; color: var(--dark); }
+
+        .deep-search-count-input {
+            width: 104px;
+            min-height: 34px;
+            border: 1px solid var(--border); border-radius: 6px;
+            background: #fff; color: var(--crimson);
+            font-size: 13px; font-weight: 800; text-align: right; padding: 6px 9px;
         }
 
         .deep-search-input {
@@ -1570,14 +1569,12 @@
             </div>
             <div class="deep-search-current" id="deepSearchCurrent">Geen huidige plek</div>
             <div class="deep-search-cost" id="deepSearchCost">Geschatte API-kosten: wordt berekend</div>
-            <div class="deep-search-rounds" id="deepSearchRounds" aria-label="Aantal rondes">
-                <button class="deep-search-round" type="button" data-deep-rounds="1">1 ronde</button>
-                <button class="deep-search-round" type="button" data-deep-rounds="3">3 rondes</button>
-                <button class="deep-search-round" type="button" data-deep-rounds="5">5 rondes</button>
-                <button class="deep-search-round is-active" type="button" data-deep-rounds="complete">Tot klaar</button>
+            <div class="deep-search-count-row">
+                <label class="deep-search-count-label" for="deepSearchDesiredCount">Nieuwe bedrijven</label>
+                <input class="deep-search-count-input" id="deepSearchDesiredCount" type="text" inputmode="numeric" pattern="[0-9]*" value="25" aria-label="Aantal nieuwe bedrijven">
             </div>
             <div class="mbtns">
-                <button class="mbtn s" id="deepSearchStartButton" type="button">Batch starten</button>
+                <button class="mbtn s" id="deepSearchStartButton" type="button">Bedrijven toevoegen</button>
             </div>
             <div class="deep-search-tools">
                 <div>
@@ -1607,7 +1604,7 @@
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
-    <script src="assets/premium-database-deep-search.js?v=20260428g"></script>
+    <script src="assets/premium-database-deep-search.js?v=20260428h"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -1704,7 +1701,7 @@
             deepSearchModal: document.getElementById("deepSearchModal"),
             deepSearchCurrent: document.getElementById("deepSearchCurrent"),
             deepSearchCost: document.getElementById("deepSearchCost"),
-            deepSearchRounds: document.getElementById("deepSearchRounds"),
+            deepSearchDesiredCount: document.getElementById("deepSearchDesiredCount"),
             deepSearchStartButton: document.getElementById("deepSearchStartButton"),
             deepSearchList: document.getElementById("deepSearchList"),
             deepSearchSources: document.getElementById("deepSearchSources"),

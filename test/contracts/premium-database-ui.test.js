@@ -238,7 +238,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428g/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428h/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -290,7 +290,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428g"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428h"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -307,12 +307,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /<div class="modal-bg" id="deepSearchModal" aria-hidden="true">/);
   assert.doesNotMatch(pageSource, /id="deepSearchListInput"/);
   assert.match(pageSource, /id="deepSearchCost"/);
-  assert.match(pageSource, /id="deepSearchRounds"/);
-  assert.match(pageSource, /data-deep-rounds="1">1 ronde<\/button>/);
-  assert.match(pageSource, /data-deep-rounds="3">3 rondes<\/button>/);
-  assert.match(pageSource, /data-deep-rounds="5">5 rondes<\/button>/);
-  assert.match(pageSource, /data-deep-rounds="complete">Tot klaar<\/button>/);
-  assert.match(pageSource, /id="deepSearchStartButton" type="button">Batch starten<\/button>/);
+  assert.match(pageSource, /id="deepSearchDesiredCount" type="text" inputmode="numeric" pattern="\[0-9\]\*" value="25"/);
+  assert.doesNotMatch(pageSource, /id="deepSearchRounds"/);
+  assert.doesNotMatch(pageSource, /data-deep-rounds=/);
+  assert.match(pageSource, /id="deepSearchStartButton" type="button">Bedrijven toevoegen<\/button>/);
   assert.doesNotMatch(pageSource, /id="deepSearchStats"/);
   assert.doesNotMatch(pageSource, /deepSearchDoneButton/);
   assert.doesNotMatch(pageSource, /Deze plek afronden/);
@@ -352,13 +350,18 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.ok(defaultTargetLines.includes('Nederland | Zuid-Holland | Zwijndrecht | Zwijndrecht'));
   assert.match(deepSearchScriptSource, /fetch\("\/api\/premium-database\/deep-search-businesses"/);
   assert.match(deepSearchScriptSource, /DEEP_SEARCH_BATCH_SIZE = 100/);
-  assert.match(deepSearchScriptSource, /count: DEEP_SEARCH_BATCH_SIZE/);
-  assert.match(deepSearchScriptSource, /function runTargetBatch\(target\)/);
-  assert.match(deepSearchScriptSource, /function runTargetUntilComplete\(target\)/);
-  assert.match(deepSearchScriptSource, /const ROUND_MODES = \["1", "3", "5", "complete"\];/);
-  assert.match(deepSearchScriptSource, /function normalizeRoundMode\(value\)/);
-  assert.match(deepSearchScriptSource, /function renderRoundControls\(\)/);
-  assert.match(deepSearchScriptSource, /Ronde-limiet bereikt/);
+  assert.match(deepSearchScriptSource, /DEFAULT_DESIRED_COMPANY_COUNT = 25/);
+  assert.match(deepSearchScriptSource, /MAX_DESIRED_COMPANY_COUNT = 500/);
+  assert.match(deepSearchScriptSource, /function normalizeDesiredCompanyCount\(value\)/);
+  assert.match(deepSearchScriptSource, /count: requestCount/);
+  assert.match(deepSearchScriptSource, /function runTargetBatch\(target, requestedCount\)/);
+  assert.match(deepSearchScriptSource, /function runTargetUntilComplete\(target, session\)/);
+  assert.match(deepSearchScriptSource, /function runUntilDesiredCompanyCount\(session\)/);
+  assert.match(deepSearchScriptSource, /Gewenste aantal gehaald/);
+  assert.doesNotMatch(deepSearchScriptSource, /const ROUND_MODES/);
+  assert.doesNotMatch(deepSearchScriptSource, /function normalizeRoundMode/);
+  assert.doesNotMatch(deepSearchScriptSource, /function renderRoundControls/);
+  assert.doesNotMatch(deepSearchScriptSource, /Ronde-limiet bereikt/);
   assert.match(deepSearchScriptSource, /REQUIRED_EMPTY_COMPLETION_ROUNDS = 1/);
   assert.match(deepSearchScriptSource, /function isTargetCompletionConfirmed\(target, result\)/);
   assert.match(deepSearchScriptSource, /AI gaat automatisch door met dezelfde locatie/);
@@ -688,7 +691,7 @@ test('premium database photo storage retries Supabase reads before saving photos
   assert.equal(patches[0].photo_customer1_0, 'data:image/png;base64,AAA');
 });
 
-test('premium database deep search client finishes the current location automatically', async () => {
+test('premium database deep search continues to the next location until the requested new-company count is reached', async () => {
   const deepSearchClient = loadDatabaseDeepSearchClient();
   const calls = [];
   const messages = [];
@@ -697,6 +700,10 @@ test('premium database deep search client finishes the current location automati
   const rows = [
     ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
     ['Almkerk Test BV', 'Kerkstraat 1, Almkerk', 'info@almkerktest.nl', '0183 123 456', 'almkerktest.nl'],
+  ];
+  const andelRows = [
+    rows[0],
+    ['Andel Test BV', 'Kerkstraat 2, Andel', 'info@andeltest.nl', '0183 654 321', 'andeltest.nl'],
   ];
   const responses = [
     {
@@ -717,11 +724,21 @@ test('premium database deep search client finishes the current location automati
       cost: { estimatedUsd: 0.08 },
       sources: [{ url: 'https://almkerktest.nl/over-ons', title: 'Over ons' }],
     },
+    {
+      ok: true,
+      rows: andelRows,
+      businesses: [{ bedrijfsnaam: 'Andel Test BV', email: 'info@andeltest.nl', website: 'andeltest.nl' }],
+      found: 1,
+      placeComplete: false,
+      cost: { estimatedUsd: 0.11 },
+      sources: [{ url: 'https://andeltest.nl/contact', title: 'Contact' }],
+    },
   ];
   const controller = deepSearchClient.createController({
     nodes: {
       deepSearchCost: {},
       deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '2' },
       deepSearchList: {},
       deepSearchSources: {},
       deepSearchStartButton: {},
@@ -756,15 +773,20 @@ test('premium database deep search client finishes the current location automati
   const result = await controller.runCurrentSearch();
 
   assert.equal(result, true);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.equal(calls[0].target, 'Nederland | Noord-Brabant | Altena | Almkerk');
-  assert.equal(calls[0].count, 100);
+  assert.equal(calls[0].count, 2);
   assert.equal(calls[0].batchNumber, 1);
   assert.equal(calls[1].target, calls[0].target);
+  assert.equal(calls[1].count, 1);
   assert.equal(calls[1].batchNumber, 2);
-  assert.equal(customers.length, 1);
+  assert.equal(calls[2].target, 'Nederland | Noord-Brabant | Altena | Andel');
+  assert.equal(calls[2].count, 1);
+  assert.equal(calls[2].batchNumber, 1);
+  assert.equal(customers.length, 2);
   assert.match(messages.join('\n'), /AI gaf al klaar aan/);
   assert.match(messages.join('\n'), /Deze plaats is automatisch afgerond/);
+  assert.match(messages.join('\n'), /Gewenste aantal gehaald/);
   assert.ok(persisted.length >= 2);
   const finalStatePatch = persisted[persisted.length - 1].patch.deep_search_state;
   const finalState = JSON.parse(finalStatePatch);
@@ -772,6 +794,10 @@ test('premium database deep search client finishes the current location automati
   assert.ok(finalStatePatch.length < 200000);
   assert.deepEqual(getStoredTargetProgress(finalState).foundWebsites, [
     'almkerktest.nl',
+  ]);
+  assert.equal(getStoredTargetProgress(finalState).status, 'done');
+  assert.deepEqual(getStoredTargetProgress(finalState, 1).foundWebsites, [
+    'andeltest.nl',
   ]);
 });
 
@@ -788,6 +814,7 @@ test('premium database deep search stops when new companies could not be saved',
     nodes: {
       deepSearchCost: {},
       deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '1' },
       deepSearchList: {},
       deepSearchSources: {},
       deepSearchStartButton: {},
@@ -849,6 +876,7 @@ test('premium database deep search only shows websites after companies are added
     nodes: {
       deepSearchCost: {},
       deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '6' },
       deepSearchList: {},
       deepSearchSources: sourcesPanel,
       deepSearchStartButton: {},
@@ -924,6 +952,7 @@ test('premium database deep search persists compact website progress that surviv
     nodes: {
       deepSearchCost: {},
       deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '2' },
       deepSearchList: {},
       deepSearchModal: createClassListNode(),
       deepSearchSources: { innerHTML: '' },
@@ -1000,6 +1029,7 @@ test('premium database deep search keeps found websites empty before a location 
     nodes: {
       deepSearchCost: {},
       deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '1' },
       deepSearchList: {},
       deepSearchModal: createClassListNode(),
       deepSearchSources: sourcesPanel,
@@ -1025,6 +1055,7 @@ test('premium database deep search does not backfill found websites from older c
     nodes: {
       deepSearchCost: {},
       deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '1' },
       deepSearchList: {},
       deepSearchModal: createClassListNode(),
       deepSearchSources: sourcesPanel,
@@ -1068,6 +1099,7 @@ test('premium database deep search clears old found websites when a new batch se
     nodes: {
       deepSearchCost: {},
       deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '1' },
       deepSearchList: {},
       deepSearchModal: createClassListNode(),
       deepSearchSources: sourcesPanel,
@@ -1129,12 +1161,14 @@ test('premium database deep search locks the modal while a batch is running', as
   const deepSearchClient = loadDatabaseDeepSearchClient();
   const modal = createClassListNode();
   const closeButton = createClassListNode();
+  const customers = [];
   let resolveSearch;
   const controller = deepSearchClient.createController({
     nodes: {
       closeDeepSearchButton: closeButton,
       deepSearchCost: {},
       deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '1' },
       deepSearchList: {},
       deepSearchModal: modal,
       deepSearchSources: {},
@@ -1143,8 +1177,10 @@ test('premium database deep search locks the modal while a batch is running', as
     scope: 'premium_database',
     stateKey: 'deep_search_state',
     autoContinueDelayMs: 0,
-    getCustomers: () => [],
-    importRows: async () => {},
+    getCustomers: () => customers,
+    importRows: async (receivedRows) => {
+      customers.push(...receivedRows.slice(1).map((row) => ({ bedrijf: row[0], email: row[2], website: row[4] })));
+    },
     readDeepSearchRows: async () => new Promise((resolve) => {
       resolveSearch = resolve;
     }),
@@ -1167,9 +1203,12 @@ test('premium database deep search locks the modal while a batch is running', as
 
   resolveSearch({
     ok: true,
-    rows: [['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website']],
-    businesses: [],
-    found: 0,
+    rows: [
+      ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+      ['Slot Test BV', 'Kerkstraat 1, Almkerk', 'info@slottest.nl', '0183 111 111', 'slottest.nl'],
+    ],
+    businesses: [{ bedrijfsnaam: 'Slot Test BV', email: 'info@slottest.nl', website: 'slottest.nl' }],
+    found: 1,
     placeComplete: true,
     cost: { estimatedUsd: 0.02 },
     sources: [],

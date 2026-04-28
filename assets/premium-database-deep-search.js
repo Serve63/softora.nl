@@ -11,11 +11,11 @@
         webSearchUsdPerCall: 0.01
     };
     const DEEP_SEARCH_BATCH_SIZE = 100;
+    const DEFAULT_DESIRED_COMPANY_COUNT = 25;
+    const MAX_DESIRED_COMPANY_COUNT = 500;
     const AUTO_CONTINUE_DELAY_MS = 750;
     const REQUIRED_EMPTY_COMPLETION_ROUNDS = 1;
     const DEEP_SEARCH_BUSY_STYLE_ID = "softora-deep-search-busy-style";
-    const DEFAULT_ROUND_MODE = "complete";
-    const ROUND_MODES = ["1", "3", "5", "complete"];
     // Generated from the supplied work order, extended with CBS 2025 woonplaatsen.
     const DEFAULT_TARGET_TEXT_BASE64 = [
         "TmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFsbWtlcmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFuZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBCYWJ5bG9uacOrbmJyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBEcm9uZ2VsZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IER1c3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgRWV0aGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBHZW5kZXJlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgR2llc3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgSGFuawpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTWVldXdlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTmlldXdlbmRpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFJpanN3aWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBTbGVldXdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFVpdHdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFZlZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdhYXJkaHVpemVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBXZXJrZW5kYW0KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdpamsgZW4gQWFsYnVyZwpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgV291ZHJpY2hlbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBBc3RlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBIZXVzZGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBc3RlbiB8IE9tbWVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCYWFybGUtTmFzc2F1IHwgQmFhcmxlLU5hc3NhdQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IENhc3RlbHLDqQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IFVsaWNvdGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEJlcmdlaWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEx1eWtzZ2VzdGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IFJpZXRob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VpamsgfCBXZXN0ZXJob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBCZXJnZW4gb3AgWm9vbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBIYWxzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcmdlbiBvcCBab29tIHwgTGVwZWxzdHJhYXQKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgSGVlc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IEhlZXN3aWprLURpbnRoZXIKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgTG9vc2Jyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IE5pc3RlbHJvZGUKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgVmlua2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IFZvcnN0ZW5ib3NjaApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVzdCB8IEJlc3QKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEJsYWRlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgQ2FzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEhhcGVydApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgSG9vZ2Vsb29uCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCbGFkZWwgfCBOZXRlcnNlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm9la2VsIHwgQm9la2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb2VrZWwgfCBWZW5ob3JzdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm94dGVsIHwgQm94dGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBFc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBMaWVtcGRlCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJhdmVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJyZWRhCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFByaW5zZW5iZWVrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFRldGVyaW5nZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJyZWRhIHwgVWx2ZW5ob3V0Ck5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLURvcnBsZWluCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLVNjaG9vdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQ3JhbmVuZG9uY2sgfCBHYXN0ZWwKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IENyYW5lbmRvbmNrIHwgTWFhcmhlZXplCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IFNvZXJlbmRvbmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IERldXJuZSB8IERldXJuZQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwgSGVsZW5hdmVlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwg",
@@ -214,9 +214,11 @@
         return result.slice(0, maxItems || 200);
     }
 
-    function normalizeRoundMode(value) {
-        const normalized = normalizeString(value).toLowerCase();
-        return ROUND_MODES.indexOf(normalized) !== -1 ? normalized : DEFAULT_ROUND_MODE;
+    function normalizeDesiredCompanyCount(value) {
+        const cleaned = String(value || "").replace(/[^\d]/g, "");
+        const parsed = Number(cleaned);
+        if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_DESIRED_COMPANY_COUNT;
+        return Math.max(1, Math.min(MAX_DESIRED_COMPANY_COUNT, Math.round(parsed)));
     }
 
     function collectWebsitesFromCustomers(customers) {
@@ -380,7 +382,7 @@
             totalCostUsd: targets.reduce(function (sum, target) {
                 return sum + Math.max(0, Number(target.costUsd) || 0);
             }, 0),
-            roundMode: normalizeRoundMode(parsed.roundMode),
+            desiredCompanyCount: normalizeDesiredCompanyCount(parsed.desiredCompanyCount || parsed.desiredCount),
             updatedAt: normalizeString(parsed.updatedAt)
         };
     }
@@ -431,7 +433,7 @@
                 targetProgress: serializeTargetProgressList(state.targets),
                 activeIndex: state.activeIndex,
                 totalCostUsd: state.totalCostUsd,
-                roundMode: normalizeRoundMode(state.roundMode),
+                desiredCompanyCount: normalizeDesiredCompanyCount(state.desiredCompanyCount),
                 updatedAt: new Date().toISOString()
             });
         }
@@ -471,17 +473,13 @@
         function setBusy(nextBusy) {
             busy = Boolean(nextBusy);
             [
-                nodes.deepSearchStartButton
+                nodes.deepSearchStartButton,
+                nodes.deepSearchDesiredCount
             ].forEach(function (button) {
                 if (button) button.disabled = busy;
             });
-            if (nodes.deepSearchRounds) {
-                Array.from(nodes.deepSearchRounds.querySelectorAll("[data-deep-rounds]")).forEach(function (button) {
-                    button.disabled = busy;
-                });
-            }
             if (nodes.deepSearchStartButton) {
-                nodes.deepSearchStartButton.textContent = busy ? "Batch loopt..." : "Batch starten";
+                nodes.deepSearchStartButton.textContent = busy ? "Batch loopt..." : "Bedrijven toevoegen";
             }
             if (nodes.closeDeepSearchButton) {
                 const button = nodes.closeDeepSearchButton;
@@ -519,15 +517,22 @@
             }).join("");
         }
 
-        function renderRoundControls() {
-            if (!nodes.deepSearchRounds) return;
-            const mode = normalizeRoundMode(state.roundMode);
-            Array.from(nodes.deepSearchRounds.querySelectorAll("[data-deep-rounds]")).forEach(function (button) {
-                const active = normalizeRoundMode(button.getAttribute("data-deep-rounds")) === mode;
-                button.classList.toggle("is-active", active);
-                button.setAttribute("aria-pressed", active ? "true" : "false");
-                button.disabled = busy;
-            });
+        function getDesiredCompanyCount() {
+            const inputValue = nodes.deepSearchDesiredCount && "value" in nodes.deepSearchDesiredCount
+                ? nodes.deepSearchDesiredCount.value
+                : state.desiredCompanyCount;
+            return normalizeDesiredCompanyCount(inputValue);
+        }
+
+        function renderDesiredCompanyCountControl() {
+            state.desiredCompanyCount = getDesiredCompanyCount();
+            if (!nodes.deepSearchDesiredCount || !("value" in nodes.deepSearchDesiredCount)) return;
+            const nextValue = String(state.desiredCompanyCount);
+            const doc = global && global.document ? global.document : null;
+            if (doc && doc.activeElement === nodes.deepSearchDesiredCount) return;
+            if (String(nodes.deepSearchDesiredCount.value || "") !== nextValue) {
+                nodes.deepSearchDesiredCount.value = nextValue;
+            }
         }
 
         function resetFoundWebsitesForSession(target) {
@@ -540,14 +545,16 @@
         function render() {
             const target = getCurrentTarget();
             const canSearchTarget = target && target.status !== "done";
-            renderRoundControls();
+            renderDesiredCompanyCountControl();
             if (nodes.deepSearchCurrent) {
                 nodes.deepSearchCurrent.textContent = canSearchTarget
                     ? "Nu: " + target.label
                     : "Alle plekken afgerond";
             }
             if (nodes.deepSearchCost) {
-                const batchEstimate = formatEuro(usdToEur(estimateBatchUsd()));
+                const desiredCount = getDesiredCompanyCount();
+                const estimatedBatches = Math.max(1, Math.ceil(desiredCount / DEEP_SEARCH_BATCH_SIZE));
+                const batchEstimate = formatEuro(usdToEur(estimateBatchUsd() * estimatedBatches));
                 const targetCost = target ? Math.max(0, Number(target.costUsd) || 0) : 0;
                 const batchCost = targetCost > 0 ? formatUsdAsEuro(targetCost) : batchEstimate;
                 nodes.deepSearchCost.textContent = target
@@ -630,11 +637,12 @@
             return target.placeComplete;
         }
 
-        function runTargetBatch(target) {
+        function runTargetBatch(target, requestedCount) {
             const beforeCount = Array.isArray(getCustomers()) ? getCustomers().length : 0;
+            const requestCount = Math.max(1, Math.min(DEEP_SEARCH_BATCH_SIZE, normalizeDesiredCompanyCount(requestedCount || DEEP_SEARCH_BATCH_SIZE)));
             return fetchDeepSearchRows({
                 target: target.label,
-                count: DEEP_SEARCH_BATCH_SIZE,
+                count: requestCount,
                 batchNumber: target.batches + 1,
                 exclude: uniqueStrings(target.seen.concat(collectExistingKeys()), 180)
             }).then(function (body) {
@@ -685,27 +693,37 @@
             });
         }
 
-        function runTargetUntilComplete(target) {
+        function runTargetUntilComplete(target, session) {
             const startedLabel = target.label;
-            const maxRounds = normalizeRoundMode(state.roundMode) === "complete" ? Infinity : Number(state.roundMode);
-            let roundsStarted = 0;
+            const runSession = session || {
+                desiredCount: getDesiredCompanyCount(),
+                addedCount: 0
+            };
             function nextBatch() {
-                if (Number.isFinite(maxRounds) && roundsStarted >= maxRounds) {
+                const remainingCount = Math.max(0, Number(runSession.desiredCount) - Number(runSession.addedCount || 0));
+                if (remainingCount <= 0) {
                     return persistState().then(function () {
-                        setStatusMessage("Ronde-limiet bereikt voor " + startedLabel + ". Start opnieuw voor extra rondes of kies Tot klaar.", "info", true);
-                        return false;
+                        setStatusMessage("Gewenste aantal nieuwe bedrijven is gehaald.", "success", true);
+                        return { desiredReached: true };
                     });
                 }
-                roundsStarted += 1;
-                setStatusMessage("AI werkt " + startedLabel + " af. Ronde " + (target.batches + 1) + " loopt...", "info");
-                return runTargetBatch(target).then(function (result) {
+                setStatusMessage("AI zoekt nieuwe bedrijven voor " + startedLabel + ". Nog " + remainingCount + " nodig...", "info");
+                return runTargetBatch(target, remainingCount).then(function (result) {
+                    runSession.addedCount = Number(runSession.addedCount || 0) + Math.max(0, Number(result.addedCount) || 0);
                     render();
                     if (result.addedCount) toast("+" + result.addedCount + " bedrijven");
                     const storageNote = result.persisted ? "" : " Let op: voortgang opslaan lukte niet.";
-                    const baseMessage = "AI vond " + result.found + " complete bedrijven voor " + startedLabel + ". " + result.addedCount + " nieuw toegevoegd. API-kosten: " + formatUsdAsEuro(result.costUsd) + "." + storageNote;
+                    const progressMessage = runSession.addedCount + " van " + runSession.desiredCount + " gewenste bedrijven toegevoegd. ";
+                    const baseMessage = "AI vond " + result.found + " complete bedrijven voor " + startedLabel + ". " + result.addedCount + " nieuw toegevoegd. " + progressMessage + "API-kosten: " + formatUsdAsEuro(result.costUsd) + "." + storageNote;
                     if (result.customerPersisted === false) {
                         setStatusMessage(baseMessage + " Opslaan in Supabase lukte niet, dus deze batch is gestopt zodat er niets stilletjes verloren gaat.", "error", true);
-                        return false;
+                        return { stopped: true };
+                    }
+                    if (runSession.addedCount >= runSession.desiredCount) {
+                        return persistState().then(function () {
+                            setStatusMessage(baseMessage + " Gewenste aantal gehaald.", "success", true);
+                            return { desiredReached: true };
+                        });
                     }
                     if (isTargetCompletionConfirmed(target, result)) {
                         advanceCompletedTarget(target);
@@ -717,18 +735,12 @@
                                 : "";
                             setStatusMessage(baseMessage + " Deze plaats is automatisch afgerond." + nextMessage, "success", true);
                             toast("Plek afgerond");
-                            return true;
-                        });
-                    }
-                    if (Number.isFinite(maxRounds) && roundsStarted >= maxRounds) {
-                        return persistState().then(function () {
-                            setStatusMessage(baseMessage + " Ronde-limiet bereikt; de locatie blijft klaar voor een volgende start.", "info", true);
-                            return false;
+                            return { completedTarget: true };
                         });
                     }
                     return persistState().then(function () {
                         const nextReason = result.completed
-                            ? " AI gaf al klaar aan, maar omdat deze ronde nog iets opleverde doen we automatisch nog een vervolgronde."
+                            ? " AI gaf al klaar aan, maar omdat deze zoekslag nog iets opleverde zoeken we automatisch verder."
                             : " AI gaat automatisch door met dezelfde locatie.";
                         setStatusMessage(baseMessage + nextReason, "info");
                         return wait(autoContinueDelayMs).then(nextBatch);
@@ -736,6 +748,38 @@
                 });
             }
             return nextBatch();
+        }
+
+        function runUntilDesiredCompanyCount(session) {
+            const target = getCurrentTarget();
+            if (!target || target.status === "done") {
+                return persistState().then(function () {
+                    setStatusMessage(
+                        session.addedCount > 0
+                            ? "Alle plekken zijn afgerond voordat het gewenste aantal gehaald werd."
+                            : "Alle plekken zijn al afgerond.",
+                        session.addedCount > 0 ? "info" : "success",
+                        true
+                    );
+                    return { finished: true };
+                });
+            }
+            resetFoundWebsitesForSession(target);
+            target.status = "active";
+            render();
+            void persistState();
+            return runTargetUntilComplete(target, session).then(function (result) {
+                if (result && (result.desiredReached || result.stopped)) return result;
+                if (result && result.completedTarget) {
+                    const nextTarget = getCurrentTarget();
+                    if (nextTarget && nextTarget.status !== "done" && session.addedCount < session.desiredCount) {
+                        return wait(autoContinueDelayMs).then(function () {
+                            return runUntilDesiredCompanyCount(session);
+                        });
+                    }
+                }
+                return result;
+            });
         }
 
         function runCurrentSearch() {
@@ -749,12 +793,17 @@
                 setStatusMessage("Alle plekken zijn al afgerond.", "info", true);
                 return Promise.resolve(false);
             }
-            resetFoundWebsitesForSession(target);
+            state.desiredCompanyCount = getDesiredCompanyCount();
+            const session = {
+                desiredCount: state.desiredCompanyCount,
+                addedCount: 0
+            };
             setBusy(true);
-            target.status = "active";
             render();
             void persistState();
-            return runTargetUntilComplete(target).catch(function (error) {
+            return runUntilDesiredCompanyCount(session).then(function (result) {
+                return Boolean(result && (result.desiredReached || result.completedTarget || result.finished));
+            }).catch(function (error) {
                 console.error("Bedrijvenlijst mislukt:", error);
                 setStatusMessage("Bedrijvenlijst mislukt: " + String(error.message || "controleer de instellingen"), "error");
                 return false;
@@ -812,11 +861,14 @@
                     void runCurrentSearch();
                 });
             }
-            if (nodes.deepSearchRounds) {
-                nodes.deepSearchRounds.addEventListener("click", function (event) {
-                    const button = event.target.closest("[data-deep-rounds]");
-                    if (!button || busy) return;
-                    state.roundMode = normalizeRoundMode(button.getAttribute("data-deep-rounds"));
+            if (nodes.deepSearchDesiredCount) {
+                nodes.deepSearchDesiredCount.addEventListener("input", function () {
+                    state.desiredCompanyCount = getDesiredCompanyCount();
+                    render();
+                    void persistState();
+                });
+                nodes.deepSearchDesiredCount.addEventListener("blur", function () {
+                    state.desiredCompanyCount = getDesiredCompanyCount();
                     render();
                     void persistState();
                 });
