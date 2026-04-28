@@ -532,6 +532,45 @@ test('coldcalling recipient preview selects callable phone rows', async () => {
   ]);
 });
 
+test('coldcalling recipient preview skips phone numbers from the blocklist', async () => {
+  const { service } = createService({
+    rows: [],
+    leadRows: [
+      {
+        id: 'blocked-1',
+        company: 'Niet Bellen BV',
+        phone: '+31 6 22 22 33 33',
+        status: 'prospect',
+      },
+      {
+        id: 'callable-1',
+        company: 'Wel Bellen BV',
+        phone: '+31 6 44 44 55 55',
+        status: 'prospect',
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    mode: 'call',
+    blockedPhones: '06 22 22 33 33',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.mode, 'call');
+  assert.equal(result.selected, 1);
+  assert.deepEqual(result.recipients, [
+    {
+      id: 'callable-1',
+      bedrijf: 'Wel Bellen BV',
+      email: '',
+      phone: '+31 6 44 44 55 55',
+      distanceKm: null,
+    },
+  ]);
+});
+
 test('coldmail campaign previews invalid recipient domains', async () => {
   const { service } = createService({
     rows: [

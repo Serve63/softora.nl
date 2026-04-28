@@ -374,6 +374,49 @@ function createColdmailCampaignService(deps = {}) {
     return value === '—' || value === '-' ? '' : value;
   }
 
+  function normalizePhoneDigits(value) {
+    return normalizeString(value).replace(/[^\d]/g, '');
+  }
+
+  function getComparablePhoneKeys(value) {
+    const digits = normalizePhoneDigits(value);
+    const keys = new Set();
+    if (!digits) return keys;
+    keys.add(digits);
+    const withoutInternationalPrefix = digits.startsWith('00') ? digits.slice(2) : digits;
+    if (withoutInternationalPrefix) keys.add(withoutInternationalPrefix);
+    if (withoutInternationalPrefix.startsWith('31') && withoutInternationalPrefix.length > 2) {
+      keys.add(`0${withoutInternationalPrefix.slice(2)}`);
+    }
+    if (withoutInternationalPrefix.startsWith('0') && withoutInternationalPrefix.length > 1) {
+      keys.add(`31${withoutInternationalPrefix.slice(1)}`);
+    }
+    if (withoutInternationalPrefix.length === 9 && withoutInternationalPrefix.startsWith('6')) {
+      keys.add(`0${withoutInternationalPrefix}`);
+      keys.add(`31${withoutInternationalPrefix}`);
+    }
+    return keys;
+  }
+
+  function parseBlockedPhoneList(value) {
+    const entries = Array.isArray(value)
+      ? value
+      : normalizeString(value).split(/[\n,;|]+/);
+    const keys = new Set();
+    entries.forEach((entry) => {
+      getComparablePhoneKeys(entry).forEach((key) => keys.add(key));
+    });
+    return keys;
+  }
+
+  function isPhoneBlocked(phone, blockedPhoneKeys) {
+    if (!blockedPhoneKeys || !blockedPhoneKeys.size) return false;
+    for (const key of getComparablePhoneKeys(phone)) {
+      if (blockedPhoneKeys.has(key)) return true;
+    }
+    return false;
+  }
+
   function isLikelyCallablePhone(value) {
     const phone = getRowPhone({ phone: value });
     return phone.replace(/\D/g, '').length >= 8;
@@ -795,8 +838,10 @@ function createColdmailCampaignService(deps = {}) {
     return !EXCLUDED_DATABASE_STATUSES.has(status);
   }
 
-  function isEligibleColdcallingRow(row, branchFilter, radiusKm) {
-    if (!isLikelyCallablePhone(getRowPhone(row))) return false;
+  function isEligibleColdcallingRow(row, branchFilter, radiusKm, blockedPhoneKeys) {
+    const phone = getRowPhone(row);
+    if (!isLikelyCallablePhone(phone)) return false;
+    if (isPhoneBlocked(phone, blockedPhoneKeys)) return false;
     if (row.call === false || row.canCall === false || row.doNotCall === true) return false;
     if (!matchesBranch(row, branchFilter)) return false;
     if (!matchesRadius(row, radiusKm)) return false;
@@ -818,6 +863,9 @@ function createColdmailCampaignService(deps = {}) {
   async function resolveColdmailRecipients(input = {}) {
     const mode = normalizeString(input.mode || '').toLowerCase() === 'call' ? 'call' : 'mail';
     const count = parsePositiveInt(input.count, 10, 1, mode === 'call' ? 500 : getColdmailCampaignSendLimit());
+    const blockedPhoneKeys = mode === 'call'
+      ? parseBlockedPhoneList(input.blockedPhones || input.callBlocklist || input.blockedPhoneNumbers)
+      : new Set();
     const state = await getUiStateValues(mode === 'call' ? leadDbScope : customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = mode === 'call' ? parseLeadDatabaseRows(values) : parseDatabaseRows(values);
@@ -825,7 +873,7 @@ function createColdmailCampaignService(deps = {}) {
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
       .filter(({ row }) =>
         mode === 'call'
-          ? isEligibleColdcallingRow(row, input.branch, input.radiusKm)
+          ? isEligibleColdcallingRow(row, input.branch, input.radiusKm, blockedPhoneKeys)
           : isEligibleColdmailRow(row, input.branch, input.radiusKm)
       )
       .slice(0, count);

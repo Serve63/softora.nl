@@ -309,12 +309,23 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
 
 test('premium bevestigingsmails exposes coldcalling provider choice inside lead-generator settings', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const blocklistPath = path.join(__dirname, '../../assets/premium-ai-lead-generator-call-blocklist.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const blocklistSource = fs.readFileSync(blocklistPath, 'utf8');
 
   assert.match(pageSource, /<div class="mf-row lead-generator-provider-setting">/);
   assert.match(pageSource, /<select class="mf-sel" id="coldcallingStack" aria-label="Coldcalling provider">/);
   assert.match(pageSource, /<option value="retell_ai" selected>Retell AI<\/option>/);
   assert.match(pageSource, /<option value="gemini_flash_3_1_live">Gemini 3\.1 Live<\/option>/);
+  assert.match(pageSource, /<script src="assets\/premium-ai-lead-generator-call-blocklist\.js\?v=20260429a"><\/script>/);
+  assert.match(blocklistSource, /const FIELD_ID = 'coldcallingBlocklist';/);
+  assert.match(blocklistSource, /label\.textContent = 'Bloklijst';/);
+  assert.match(blocklistSource, /textarea\.setAttribute\('aria-label', 'Telefoonnummers die nooit gebeld mogen worden'\);/);
+  assert.match(blocklistSource, /Deze nummers worden nooit meegenomen in de AI-coldcalling belrij/);
+  assert.match(blocklistSource, /settings\.callBlocklist = getBlocklistText\(\);/);
+  assert.match(blocklistSource, /blockedPhones=' \+ encodeURIComponent\(blockedPhones\)/);
+  assert.match(blocklistSource, /payload\.mode = 'call';/);
+  assert.match(blocklistSource, /payload\.blockedPhones = getBlocklistText\(\);/);
   assert.match(
     pageSource,
     /html:not\(\[data-softora-lead-generator-alias="1"\]\) \.lead-generator-provider-setting \{ display: none !important; \}/
