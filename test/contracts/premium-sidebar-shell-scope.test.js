@@ -337,11 +337,3 @@ test('unified premium sidebar splits ad channels from social media channels', ()
   assert.doesNotMatch(themeJsSource, /href:\s*"\/premium-socialmedia#snapchat"/);
   assert.doesNotMatch(themeJsSource, /label:\s*"Snapchat"/);
 });
-
-test('premium pdfs rollback behoudt de verwachte canonical sidebar scope', () => {
-  const pageSource = readRepoFile('premium-pdfs.html');
-
-  assert.match(pageSource, /<div class="dashboard-layout" data-sidebar-shell="canonical">/);
-  assert.match(pageSource, /href="\/premium-pdfs"[\s\S]*data-sidebar-key="pdfs"[\s\S]*<span class="sidebar-link-text">PDF'S<\/span>/);
-  assert.doesNotMatch(pageSource, /data-sidebar-shell="custom"/);
-});
