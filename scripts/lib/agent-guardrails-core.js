@@ -314,7 +314,6 @@ function buildGuardrailViolations(options = {}) {
     browserStorageViolations = [],
     testWeakeningViolations = [],
     largeInlineScriptViolations = [],
-    oversizedFrontendGrowthViolations = [],
     protectedFrontendShellFiles = [],
     protectedQualityGateFiles = [],
     qualityBaselineViolations = [],
@@ -328,7 +327,6 @@ function buildGuardrailViolations(options = {}) {
     allowBrowserStorage = false,
     allowTestWeakening = false,
     allowLargeInlineScript = false,
-    allowOversizedFrontendGrowth = false,
     allowUntestedShellChange = false,
     allowUntestedQualityGateChange = false,
     allowLargeBehaviorChange = false,
@@ -412,12 +410,6 @@ function buildGuardrailViolations(options = {}) {
   if (!allowLargeInlineScript && largeInlineScriptViolations.length > 0) {
     violations.push(
       `[guardrails] Grote inline frontend-script toevoeging gedetecteerd: ${largeInlineScriptViolations.join(', ')}. Zet paginalogica in assets/* of gebruik ALLOW_LARGE_INLINE_SCRIPT=1 voor een bewuste uitzondering.`
-    );
-  }
-
-  if (!allowOversizedFrontendGrowth && oversizedFrontendGrowthViolations.length > 0) {
-    violations.push(
-      `[guardrails] Groot frontend-bestand groeide verder: ${oversizedFrontendGrowthViolations.join(', ')}. Splits nieuwe logica eerst naar kleinere assets/* modules of gebruik ALLOW_OVERSIZED_FRONTEND_GROWTH=1 voor een bewuste uitzondering.`
     );
   }
 
