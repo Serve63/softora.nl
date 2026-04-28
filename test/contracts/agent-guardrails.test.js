@@ -223,9 +223,18 @@ test('agent guardrails prevent oversized frontend files from growing further', (
 test('agent guardrails require targeted tests for protected quality gates and sidebar shell', () => {
   const workflowSource = readRepoFile('.github/workflows/agent-guardrails.yml');
   const qualityLockSource = readRepoFile('scripts/check-quality-lock.js');
+  const qualityProtocolSource = readRepoFile('docs/quality-protocol.md');
   assert.match(qualityLockSource, /PREMIUM_SIDEBAR_THEME_VERSION = '20260427b'/);
   assert.equal(isProtectedQualityGatePath('scripts/check-quality-lock.js'), true);
   assert.match(workflowSource, /GUARDRAILS_MAX_BEHAVIOR_DIFF_LINES:\s*2500/);
+  assert.match(qualityProtocolSource, /docs\/codebase-health-roadmap\.md/);
+  assert.match(qualityProtocolSource, /docs\/codebase-quality-index\.md/);
+  assert.match(qualityProtocolSource, /docs\/data-ownership-map\.md/);
+  assert.match(qualityProtocolSource, /docs\/repository-migration-plan\.md/);
+  assert.match(qualityProtocolSource, /docs\/frontend-cleanup-checklist\.md/);
+  assert.match(qualityProtocolSource, /docs\/coldcalling-dashboard-module-boundaries\.md/);
+  assert.match(qualityProtocolSource, /docs\/premium-frontend-module-boundaries\.md/);
+  assert.match(qualityProtocolSource, /docs\/frontend-module-ownership-map\.md/);
 
   const violations = buildGuardrailViolations({
     changedFiles: ['assets/personnel-theme.css', 'scripts/check-agent-guardrails.js', 'scripts/check-quality-lock.js'],
