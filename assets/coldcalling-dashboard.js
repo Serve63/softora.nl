@@ -1,6 +1,73 @@
 (function () {
-  const launchBtn = document.getElementById('launchBtn');
-  const leadSlider = document.getElementById('leadSlider');
+  const dashboardCore = window.SoftoraColdcallingDashboardCore;
+  if (!dashboardCore) {
+    console.error('[Softora] coldcalling dashboard core helpers ontbreken.');
+    return;
+  }
+  const dashboardConfig = window.SoftoraColdcallingDashboardConfig;
+  if (!dashboardConfig) {
+    console.error('[Softora] coldcalling dashboard configuratie ontbreekt.');
+    return;
+  }
+  const dashboardModes = window.SoftoraColdcallingDashboardModes;
+  if (!dashboardModes) {
+    console.error('[Softora] coldcalling dashboard mode helpers ontbreken.');
+    return;
+  }
+  const {
+    byId,
+    buildCampaignStartedMessage,
+    cloneUiStateValues,
+    estimateCampaignCompletionTime,
+    escapeHtml,
+    fetchWithTimeout,
+    formatCampaignCustomRegioLabel,
+    formatClockTime,
+    formatConversationDuration,
+    formatLeadDatabasePhone,
+    getLeadDatabaseDecisionLabel,
+    getNowTime,
+    normalizeLeadDatabaseDecision,
+    parseNumber,
+    readColdcallingDashboardBootstrapPayload,
+    setLeadSliderReadyState,
+  } = dashboardCore;
+  const {
+    TEST_LEAD_STORAGE_KEY,
+    LEAD_ROWS_STORAGE_KEY,
+    AI_NOTEBOOK_ROWS_STORAGE_KEY,
+    LEAD_DATABASE_OVERRIDES_STORAGE_KEY,
+    CALL_DISPATCH_MODE_STORAGE_KEY,
+    CALL_DISPATCH_DELAY_STORAGE_KEY,
+    STATS_RESET_BASELINE_STORAGE_KEY,
+    CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY,
+    CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY,
+    CAMPAIGN_BRANCHE_STORAGE_KEY,
+    CAMPAIGN_REGIO_STORAGE_KEY,
+    CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY,
+    CAMPAIGN_MIN_PRICE_STORAGE_KEY,
+    CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY,
+    CAMPAIGN_INSTRUCTIONS_STORAGE_KEY,
+    CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY,
+    CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY,
+    CAMPAIGN_AMOUNT_QUESTION_MODE_STORAGE_KEY,
+    CAMOUNT_Q_BELLEN,
+    CAMOUNT_Q_AFSPRAKEN,
+    BUSINESS_MODE_STORAGE_KEY,
+    DEFAULT_CAMPAIGN_REGIO_VALUE,
+    CUSTOM_CAMPAIGN_REGIO_VALUE,
+    AUTO_CAMPAIGN_REGIO_VALUE,
+    REMOTE_UI_STATE_SCOPE_BASE,
+    REMOTE_UI_STATE_SCOPE_PREFERENCES,
+    BUSINESS_MODE_ORDER,
+  } = dashboardConfig;
+  const {
+    normalizeBusinessMode,
+    normalizeColdcallingStack,
+    getColdcallingStackLabel,
+  } = dashboardModes;
+  const launchBtn = byId('launchBtn');
+  const leadSlider = byId('leadSlider');
 
   if (!launchBtn || !leadSlider) {
     return;
@@ -21,33 +88,6 @@
   let activeSequentialClientDispatch = null;
   let pendingStartConfirmPin = '';
   const defaultLaunchBtnHtml = launchBtn.innerHTML;
-  const TEST_LEAD_STORAGE_KEY = 'softora_coldcalling_test_lead_phone';
-  const LEAD_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
-  const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
-  const LEAD_DATABASE_OVERRIDES_STORAGE_KEY = 'softora_coldcalling_lead_database_overrides_json';
-  const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
-  const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
-  const STATS_RESET_BASELINE_STORAGE_KEY = 'softora_stats_reset_baseline_started';
-  const CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY = 'softora_campaign_amount_slider_index';
-  const CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY = 'softora_campaign_amount_custom';
-  const CAMPAIGN_BRANCHE_STORAGE_KEY = 'softora_campaign_branche';
-  const CAMPAIGN_REGIO_STORAGE_KEY = 'softora_campaign_regio';
-  const CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY = 'softora_campaign_regio_custom_km';
-  const CAMPAIGN_MIN_PRICE_STORAGE_KEY = 'softora_campaign_min_price';
-  const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
-  const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
-  const CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY = 'softora_campaign_coldcalling_stack';
-  const CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY = 'softora_campaign_fill_agenda_10_workdays';
-  const CAMPAIGN_AMOUNT_QUESTION_MODE_STORAGE_KEY = 'softora_campaign_amount_question_mode';
-  const CAMOUNT_Q_BELLEN = 'bellen';
-  const CAMOUNT_Q_AFSPRAKEN = 'afspraken';
-  const BUSINESS_MODE_STORAGE_KEY = 'softora_business_mode';
-  const DEFAULT_CAMPAIGN_REGIO_VALUE = 'unlimited';
-  const CUSTOM_CAMPAIGN_REGIO_VALUE = 'custom';
-  const AUTO_CAMPAIGN_REGIO_VALUE = 'auto';
-  const REMOTE_UI_STATE_SCOPE_BASE = 'coldcalling';
-  const REMOTE_UI_STATE_SCOPE_PREFERENCES = 'coldcalling_preferences';
-  const BUSINESS_MODE_ORDER = ['websites', 'voice_software', 'business_software'];
   let activeBusinessMode = 'websites';
   let remoteUiStateCache = Object.create(null);
   let remoteUiStateLoaded = false;
@@ -67,32 +107,6 @@
   };
   let coldcallingDashboardBootstrapPayload = null;
   const sharedCallSummaryCacheByCallId = Object.create(null);
-
-  function byId(id) {
-    return document.getElementById(id);
-  }
-
-  function setLeadSliderReadyState(isReady) {
-    const sliderStage = byId('leadSliderStage');
-    if (!sliderStage) return;
-    sliderStage.dataset.sliderReady = isReady ? '1' : '0';
-    if (isReady) {
-      sliderStage.removeAttribute('aria-hidden');
-      return;
-    }
-    sliderStage.setAttribute('aria-hidden', 'true');
-  }
-
-  function readColdcallingDashboardBootstrapPayload() {
-    const element = document.getElementById('softoraColdcallingDashboardBootstrap');
-    if (!element) return null;
-    try {
-      const parsed = JSON.parse(String(element.textContent || '{}'));
-      return parsed && typeof parsed === 'object' ? parsed : null;
-    } catch (_) {
-      return null;
-    }
-  }
 
   function openLeadDatabaseFromCampaignControl() {
     const dbModal = ensureLeadDatabaseModal();
@@ -127,28 +141,6 @@
       });
     }
     return button;
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function getNowTime() {
-    return new Date().toLocaleTimeString('nl-NL', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  }
-
-  function parseNumber(value, fallback) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   const conversationSummaryHelpers = window.SoftoraColdcallingConversationSummary;
@@ -197,61 +189,6 @@
 
   function setSharedCallSummary(callId, summary) {
     sharedCallSummaryAccessors?.setSharedCallSummary(callId, summary);
-  }
-
-  function normalizeBusinessMode(mode) {
-    const raw = String(mode || '').trim().toLowerCase();
-    if (raw === 'voice_software' || raw === 'voice software' || raw === 'voicesoftware') {
-      return 'voice_software';
-    }
-    if (
-      raw === 'business_software' ||
-      raw === 'business software' ||
-      raw === 'businesssoftware' ||
-      raw === 'bedrijfssoftware' ||
-      raw === 'bedrijfs_software' ||
-      raw === 'bedrijfs software'
-    ) {
-      return 'business_software';
-    }
-    return 'websites';
-  }
-
-  function normalizeColdcallingStack(value) {
-    const raw = String(value || '').trim().toLowerCase();
-    if (
-      raw === 'gemini_flash_3_1_live' ||
-      raw === 'gemini flash 3.1 live' ||
-      raw === 'gemini_3_1_live' ||
-      raw === 'gemini'
-    ) {
-      return 'gemini_flash_3_1_live';
-    }
-    if (
-      raw === 'openai_realtime_1_5' ||
-      raw === 'openai realtime 1.5' ||
-      raw === 'openai_realtime' ||
-      raw === 'openai'
-    ) {
-      return 'openai_realtime_1_5';
-    }
-    if (
-      raw === 'hume_evi_3' ||
-      raw === 'hume evi 3' ||
-      raw === 'hume_evi' ||
-      raw === 'hume'
-    ) {
-      return 'hume_evi_3';
-    }
-    return 'retell_ai';
-  }
-
-  function getColdcallingStackLabel(value) {
-    const normalized = normalizeColdcallingStack(value);
-    if (normalized === 'gemini_flash_3_1_live') return 'Gemini 3.1 Live';
-    if (normalized === 'openai_realtime_1_5') return 'OpenAI Realtime 1.5';
-    if (normalized === 'hume_evi_3') return 'Hume Evi 3';
-    return 'Retell AI';
   }
 
   function syncCustomSelectUi(selectEl) {
@@ -303,44 +240,6 @@
       leadListGroup: 'Database',
       dbHint: 'Zakelijke bellijst met AI-status per bedrijf.',
     };
-  }
-
-  function formatLeadDatabasePhone(phone) {
-    const raw = normalizeFreeText(phone);
-    if (!raw) return '';
-    const digits = raw.replace(/\D/g, '');
-    if (digits.length === 11 && digits.startsWith('31')) {
-      return `+31 ${digits.slice(2, 3)} ${digits.slice(3, 7)} ${digits.slice(7)}`;
-    }
-    if (digits.length === 10 && digits.startsWith('0')) {
-      return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-    }
-    return raw;
-  }
-
-  function normalizeLeadDatabaseDecision(value) {
-    const raw = String(value || '').trim().toLowerCase();
-    if (!raw) return '';
-    if (/^(pending|nieuw|new|not_called|nog[-_ ]?niet[-_ ]?gebeld)$/.test(raw)) return 'pending';
-    if (/^(called|gebeld)$/.test(raw)) return 'called';
-    if (/^(no_answer|niet[-_ ]?opgenomen|geen[-_ ]?gehoor|busy|voicemail|missed)$/.test(raw)) return 'no_answer';
-    if (/^(callback|terugbellen|follow[-_ ]?up)$/.test(raw)) return 'callback';
-    if (/^(appointment|afspraak|meeting)$/.test(raw)) return 'appointment';
-    if (/^(customer|klant|closed|won)$/.test(raw)) return 'customer';
-    if (/^(do_not_call|dnc|uit[-_ ]?bellijst|stop|blacklist|remove)$/.test(raw)) return 'do_not_call';
-    return '';
-  }
-
-  function getLeadDatabaseDecisionLabel(decision) {
-    const normalized = normalizeLeadDatabaseDecision(decision);
-    if (normalized === 'pending') return 'Nog niet gebeld';
-    if (normalized === 'called') return 'Gebeld';
-    if (normalized === 'no_answer') return 'Niet opgenomen';
-    if (normalized === 'callback') return 'Terugbellen';
-    if (normalized === 'appointment') return 'Wil afspraak';
-    if (normalized === 'customer') return 'Klant';
-    if (normalized === 'do_not_call') return 'Uit bellijst';
-    return 'Onbekend';
   }
 
   function getLeadDatabaseDecisionStyle(decision, theme) {
@@ -542,11 +441,6 @@
   function getCampaignRegioOption(selectEl, value) {
     if (!(selectEl instanceof HTMLSelectElement)) return null;
     return Array.from(selectEl.options || []).find((option) => String(option.value) === String(value)) || null;
-  }
-
-  function formatCampaignCustomRegioLabel(km) {
-    const normalizedKm = Math.max(1, Math.round(Number(km) || 1));
-    return `Aangepast (${normalizedKm} km)`;
   }
 
   function applyCampaignRegioSelection(selectEl, selectedValue, customKm = null) {
@@ -879,53 +773,6 @@
     }
   }
 
-  function formatClockTime(date) {
-    return new Date(date).toLocaleTimeString('nl-NL', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-
-  function estimateCampaignCompletionTime(startedCount, campaign) {
-    const started = Math.max(0, Number(startedCount) || 0);
-    if (started <= 0) return null;
-
-    const avgCallSeconds = 90;
-    const mode = String(campaign?.dispatchMode || 'sequential');
-    const delaySeconds =
-      mode === 'delay' ? Math.max(0, Number(campaign?.dispatchDelaySeconds) || 0) : 0;
-    const requestSpreadSeconds = mode === 'parallel' ? 5 : Math.min(20, started);
-
-    let estimateSeconds;
-    if (mode === 'parallel') {
-      estimateSeconds = avgCallSeconds + requestSpreadSeconds;
-    } else if (mode === 'delay') {
-      const staggerSeconds = started > 1 ? (started - 1) * delaySeconds : 0;
-      estimateSeconds = avgCallSeconds + staggerSeconds + requestSpreadSeconds;
-    } else {
-      // "1 voor 1": calls happen in sequence, so duration scales roughly with count.
-      estimateSeconds = started * avgCallSeconds + requestSpreadSeconds;
-    }
-
-    estimateSeconds = Math.max(30, estimateSeconds);
-
-    return new Date(Date.now() + estimateSeconds * 1000);
-  }
-
-  function buildCampaignStartedMessage(startedCount, campaign, failedCount = 0, skippedCount = 0) {
-    const started = Math.max(0, Number(startedCount) || 0);
-    const failed = Math.max(0, Number(failedCount) || 0);
-    const skipped = Math.max(0, Number(skippedCount) || 0);
-    const personWord = started === 1 ? 'persoon' : 'personen';
-    const eta = estimateCampaignCompletionTime(started, campaign);
-    const etaText = eta ? ` Verwachte voltooiingstijd is rond ${formatClockTime(eta)}.` : '';
-    const detailParts = [];
-    if (skipped > 0) detailParts.push(`${skipped} overgeslagen`);
-    if (failed > 0) detailParts.push(`${failed} niet gestart`);
-    const detailText = detailParts.length > 0 ? ` (${detailParts.join(', ')})` : '';
-    return `Gestart met het bellen van ${started} ${personWord}${detailText}.${etaText}`;
-  }
-
   function syncSequentialClientDispatchButtonState() {
     const run = activeSequentialClientDispatch;
     if (run && !run.completed) {
@@ -939,28 +786,6 @@
     syncSequentialClientDispatchButtonState();
     setStatusPill('idle', '');
     setStatusMessage('', '');
-  }
-
-  function cloneUiStateValues(values) {
-    const nextValues = Object.create(null);
-    if (!values || typeof values !== 'object') {
-      return nextValues;
-    }
-
-    Object.entries(values).forEach(([k, v]) => {
-      nextValues[String(k)] = String(v ?? '');
-    });
-    return nextValues;
-  }
-
-  async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      return await fetch(url, { ...options, signal: controller.signal });
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
   }
 
   async function fetchUiStateGetWithFallback(scope) {
@@ -3382,15 +3207,6 @@
     if (answered === true) return 'Ja';
     if (answered === false) return 'Nee';
     return 'Onbekend';
-  }
-
-  function formatConversationDuration(seconds) {
-    const totalSeconds = Math.round(Number(seconds) || 0);
-    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return 'Onbekend';
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    if (mins <= 0) return `${secs}s`;
-    return `${mins}m ${String(secs).padStart(2, '0')}s`;
   }
 
   function getLeadDatabaseCallPartyIdentity(call) {
