@@ -390,3 +390,10 @@ test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isProtectedQualityGatePath('scripts/export-runtime-backup.js'), false);
   assert.equal(isHighRiskPath('docs/repo-map.md'), false);
 });
+
+test('agent guardrails workflow keeps the bounded PR diff budget explicit', () => {
+  const workflowSource = readRepoFile('.github/workflows/agent-guardrails.yml');
+
+  assert.match(workflowSource, /GUARDRAILS_MAX_BEHAVIOR_DIFF_LINES:\s*2500/);
+  assert.match(workflowSource, /npm run check:guardrails/);
+});
