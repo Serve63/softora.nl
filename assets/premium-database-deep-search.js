@@ -285,6 +285,80 @@
         };
     }
 
+    function serializeTargetProgress(target, index, defaultLabels) {
+        const defaultLabel = normalizeString(defaultLabels[index]);
+        const defaultStatus = index === 0 ? "active" : "pending";
+        const progress = { index: index };
+        let changed = false;
+
+        if (!defaultLabel || normalizeKey(defaultLabel) !== normalizeKey(target && target.label)) {
+            progress.label = normalizeString(target && target.label);
+            changed = true;
+        }
+        if (normalizeString(target && target.status) !== defaultStatus) {
+            progress.status = normalizeString(target && target.status);
+            changed = true;
+        }
+        [
+            "batches",
+            "found",
+            "added",
+            "costUsd",
+            "placeComplete",
+            "completionReason",
+            "completionChecks",
+            "updatedAt"
+        ].forEach(function (key) {
+            const value = target && target[key];
+            const hasValue = Array.isArray(value) ? value.length : Boolean(value);
+            if (!hasValue) return;
+            progress[key] = value;
+            changed = true;
+        });
+        const seen = uniqueStrings(target && target.seen, 180);
+        if (seen.length) {
+            progress.seen = seen;
+            changed = true;
+        }
+        const foundWebsites = uniqueWebsiteValues(target && target.foundWebsites, 200);
+        if (foundWebsites.length) {
+            progress.foundWebsites = foundWebsites;
+            changed = true;
+        }
+        return changed ? progress : null;
+    }
+
+    function serializeTargetProgressList(targets) {
+        const defaultLabels = getDefaultTargetLabels();
+        return (targets || []).map(function (target, index) {
+            return serializeTargetProgress(target, index, defaultLabels);
+        }).filter(Boolean);
+    }
+
+    function applyTargetProgress(targets, progressItems) {
+        const result = targets.slice();
+        (Array.isArray(progressItems) ? progressItems : []).forEach(function (progress, fallbackIndex) {
+            const label = normalizeString(progress && progress.label);
+            let index = Number.isFinite(Number(progress && progress.index)) ? Number(progress.index) : -1;
+            if (index < 0 && label) {
+                index = result.findIndex(function (target) {
+                    return normalizeKey(target.label) === normalizeKey(label);
+                });
+            }
+            if (index < 0) index = fallbackIndex;
+            const existing = result[index] || createTarget(label, index);
+            const merged = normalizeTarget({
+                ...existing,
+                ...progress,
+                label: label || existing.label,
+                id: normalizeString(progress && progress.id) || existing.id
+            }, index);
+            if (!merged) return;
+            result[index] = merged;
+        });
+        return result.filter(Boolean);
+    }
+
     function applyDefaultTargets(targets) {
         const previousByKey = new Map();
         (targets || []).forEach(function (target) {
@@ -306,7 +380,7 @@
         const loadedTargets = Array.isArray(parsed.targets)
             ? parsed.targets.map(normalizeTarget).filter(Boolean)
             : [];
-        const targets = applyDefaultTargets(loadedTargets);
+        const targets = applyTargetProgress(applyDefaultTargets(loadedTargets), parsed.targetProgress || parsed.progress);
         let activeIndex = Math.max(0, Math.min(targets.length - 1, Number(parsed.activeIndex) || 0));
         const activeFromStatus = targets.findIndex(function (target) {
             return target.status === "active";
@@ -370,7 +444,8 @@
 
         function serializeState() {
             return JSON.stringify({
-                targets: state.targets,
+                version: 2,
+                targetProgress: serializeTargetProgressList(state.targets),
                 activeIndex: state.activeIndex,
                 totalCostUsd: state.totalCostUsd,
                 roundMode: normalizeRoundMode(state.roundMode),
@@ -448,9 +523,36 @@
             }
         }
 
+        function targetPlaceKeys(target) {
+            const parts = normalizeString(target && target.label).split("|").map(normalizeString).filter(Boolean);
+            const placeKey = normalizeKey(parts[3] || parts[parts.length - 1] || "");
+            const municipalityKey = normalizeKey(parts[2] || "");
+            return { placeKey: placeKey, municipalityKey: municipalityKey };
+        }
+
+        function collectCustomerWebsitesForTarget(target) {
+            const keys = targetPlaceKeys(target);
+            if (!keys.placeKey && !keys.municipalityKey) return [];
+            const customers = Array.isArray(getCustomers()) ? getCustomers() : [];
+            return customers.filter(function (customer) {
+                const locationKey = normalizeKey([
+                    customer && (customer.adres || customer.address),
+                    customer && (customer.stad || customer.plaats || customer.city),
+                    customer && customer.gemeente
+                ].map(normalizeString).filter(Boolean).join(" "));
+                if (!locationKey) return false;
+                return Boolean(
+                    (keys.placeKey && locationKey.indexOf(keys.placeKey) !== -1) ||
+                    (keys.municipalityKey && locationKey.indexOf(keys.municipalityKey) !== -1)
+                );
+            }).map(function (customer) {
+                return customer && (customer.website || customer.dom || customer.url || customer.site);
+            });
+        }
+
         function renderSources(target) {
             if (!nodes.deepSearchSources) return;
-            const websites = uniqueWebsiteValues(target && target.foundWebsites, 200);
+            const websites = uniqueWebsiteValues((target && target.foundWebsites || []).concat(collectCustomerWebsitesForTarget(target)), 200);
             if (!websites.length) {
                 nodes.deepSearchSources.innerHTML = "<div class=\"deep-search-empty\">Nog geen websites voor deze plek.</div>";
                 return;

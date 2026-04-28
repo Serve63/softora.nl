@@ -43,6 +43,11 @@ function readDefaultDeepSearchTargetLines(source) {
   return Buffer.from(chunks.join(''), 'base64').toString('utf8').split(/\r?\n/).filter(Boolean);
 }
 
+function getStoredTargetProgress(storedState, index = 0) {
+  assert.ok(Array.isArray(storedState.targetProgress), 'deep-search state should use compact targetProgress');
+  return storedState.targetProgress.find((target) => target.index === index);
+}
+
 function createClassListNode() {
   const classes = new Set();
   return {
@@ -231,7 +236,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428b/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428c/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428d/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -283,7 +288,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428d"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -376,6 +381,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /foundWebsites: \[\]/);
   assert.match(deepSearchScriptSource, /function uniqueWebsiteValues\(values, maxItems\)/);
   assert.match(deepSearchScriptSource, /function collectWebsitesFromRows\(rows\)/);
+  assert.match(deepSearchScriptSource, /function serializeTargetProgressList\(targets\)/);
+  assert.match(deepSearchScriptSource, /targetProgress: serializeTargetProgressList\(state\.targets\)/);
+  assert.doesNotMatch(deepSearchScriptSource, /targets: state\.targets/);
+  assert.match(deepSearchScriptSource, /function collectCustomerWebsitesForTarget\(target\)/);
   assert.match(deepSearchScriptSource, /target\.foundWebsites = uniqueWebsiteValues/);
   assert.match(deepSearchScriptSource, /Nog geen websites voor deze plek\./);
   assert.match(deepSearchScriptSource, /persisted: Boolean\(persistResult && persistResult\.ok !== false\)/);
@@ -686,7 +695,7 @@ test('premium database deep search client finishes the current location automati
       if (payload.batchNumber === 2) {
         assert.ok(persisted.length >= 1);
         const savedBeforeFollowUp = JSON.parse(persisted[persisted.length - 1].patch.deep_search_state);
-        assert.deepEqual(savedBeforeFollowUp.targets[0].foundWebsites, [
+        assert.deepEqual(getStoredTargetProgress(savedBeforeFollowUp).foundWebsites, [
           'almkerktest.nl',
           'https://almkerktest.nl/contact',
         ]);
@@ -718,7 +727,9 @@ test('premium database deep search client finishes the current location automati
   assert.ok(persisted.length >= 2);
   const finalStatePatch = persisted[persisted.length - 1].patch.deep_search_state;
   const finalState = JSON.parse(finalStatePatch);
-  assert.deepEqual(finalState.targets[0].foundWebsites, [
+  assert.equal(finalState.targets, undefined);
+  assert.ok(finalStatePatch.length < 200000);
+  assert.deepEqual(getStoredTargetProgress(finalState).foundWebsites, [
     'almkerktest.nl',
     'https://almkerktest.nl/contact',
     'https://almkerktest.nl/over-ons',
@@ -852,6 +863,113 @@ test('premium database deep search shows found websites before customer persiste
   resolveImport();
   await runPromise;
   assert.equal(customers.length, 6);
+});
+
+test('premium database deep search persists compact website progress that survives reload', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const customers = [];
+  const persisted = [];
+  const rows = [
+    ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+    ['Compact 1', 'Kerkstraat 1, Almkerk', 'info@compact1.nl', '0183 111 111', 'compact1.nl'],
+    ['Compact 2', 'Kerkstraat 2, Almkerk', 'info@compact2.nl', '0183 222 222', 'https://compact2.nl'],
+  ];
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchList: {},
+      deepSearchModal: createClassListNode(),
+      deepSearchSources: { innerHTML: '' },
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    getUiState: async () => ({ values: { deep_search_state: JSON.stringify({ roundMode: '1' }) } }),
+    getCustomers: () => customers,
+    importRows: async (receivedRows) => {
+      customers.push(...receivedRows.slice(1).map((row) => ({
+        bedrijf: row[0],
+        adres: row[1],
+        email: row[2],
+        website: row[4],
+      })));
+      return true;
+    },
+    readDeepSearchRows: async () => ({
+      ok: true,
+      rows,
+      businesses: [],
+      found: 2,
+      placeComplete: false,
+      cost: { estimatedUsd: 0.12 },
+      sources: [{ url: 'https://compact1.nl/contact', title: 'Contact' }],
+    }),
+    setUiState: async (_scope, payload) => {
+      persisted.push(payload);
+      return { ok: true };
+    },
+  });
+
+  controller.open();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await controller.runCurrentSearch();
+
+  const finalStatePatch = persisted[persisted.length - 1].patch.deep_search_state;
+  const finalState = JSON.parse(finalStatePatch);
+  assert.equal(finalState.targets, undefined);
+  assert.ok(finalStatePatch.length < 200000);
+  assert.deepEqual(getStoredTargetProgress(finalState).foundWebsites, [
+    'compact1.nl',
+    'https://compact2.nl',
+    'https://compact1.nl/contact',
+  ]);
+
+  const restoredSourcesPanel = { innerHTML: '' };
+  const restoredController = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchList: {},
+      deepSearchModal: createClassListNode(),
+      deepSearchSources: restoredSourcesPanel,
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    getUiState: async () => ({ values: { deep_search_state: finalStatePatch } }),
+    getCustomers: () => customers,
+    setUiState: async () => ({ ok: true }),
+  });
+
+  restoredController.open();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(restoredSourcesPanel.innerHTML, /compact1\.nl/);
+  assert.match(restoredSourcesPanel.innerHTML, /compact2\.nl/);
+});
+
+test('premium database deep search falls back to database websites for the active location', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const sourcesPanel = { innerHTML: '' };
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchList: {},
+      deepSearchModal: createClassListNode(),
+      deepSearchSources: sourcesPanel,
+      deepSearchStartButton: {},
+    },
+    getCustomers: () => [
+      { bedrijf: 'Almkerk BV', adres: 'Kerkstraat 1, Almkerk', website: 'almkerkfallback.nl' },
+      { bedrijf: 'Chaam BV', adres: 'Dorpsstraat 1, Chaam', website: 'chaamfallback.nl' },
+    ],
+  });
+
+  controller.open();
+
+  assert.match(sourcesPanel.innerHTML, /almkerkfallback\.nl/);
+  assert.doesNotMatch(sourcesPanel.innerHTML, /chaamfallback\.nl/);
 });
 
 test('premium database deep search locks the modal while a batch is running', async () => {
