@@ -1141,13 +1141,9 @@
                                     <svg class="btn-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                                 </button>
                                 <div class="add-actions-menu" id="addActionsMenu" role="menu">
-                                    <button class="add-actions-item" id="addUploadButton" type="button" role="menuitem">
-                                        <span class="add-actions-item-title">Uploaden</span>
+                                    <button class="add-actions-item" id="addCompaniesButton" type="button" role="menuitem">
+                                        <span class="add-actions-item-title">Bedrijven toevoegen</span>
                                         <span class="add-actions-item-sub">Importeer bedrijven vanuit een CSV-bestand</span>
-                                    </button>
-                                    <button class="add-actions-item" id="addManualButton" type="button" role="menuitem">
-                                        <span class="add-actions-item-title">Handmatig toevoegen</span>
-                                        <span class="add-actions-item-sub">Voeg zelf een bedrijf toe via het formulier</span>
                                     </button>
                                 </div>
                                 <input type="file" id="importFileInput" accept=".csv,text/csv" hidden>
@@ -1344,8 +1340,7 @@
             addButton: document.getElementById("addButton"),
             photoCostLabel: document.getElementById("photoCostLabel"),
             generatePhotosButton: document.getElementById("generatePhotosButton"),
-            addUploadButton: document.getElementById("addUploadButton"),
-            addManualButton: document.getElementById("addManualButton"),
+            addCompaniesButton: document.getElementById("addCompaniesButton"),
             importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
             overlay: document.getElementById("ov"),
@@ -3108,13 +3103,9 @@
         nodes.generatePhotosButton.addEventListener("click", function () {
             void generateWebdesignPhotos();
         });
-        nodes.addUploadButton.addEventListener("click", function () {
+        nodes.addCompaniesButton.addEventListener("click", function () {
             closeAddActions();
             nodes.importFileInput.click();
-        });
-        nodes.addManualButton.addEventListener("click", function () {
-            closeAddActions();
-            openModal();
         });
         nodes.importFileInput.addEventListener("change", handleImportFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
