@@ -251,3 +251,16 @@ test('premium agenda does not render fictive fallback appointments when bootstra
   assert.doesNotMatch(pageSource, /Chatbot meeting met Servé Creusen/);
   assert.match(pageSource, /function applyInitialAgendaBootstrap\(\) \{\s*mergeServerAppointments\(agendaBootstrapPayload\?\.appointments\);\s*\}/);
 });
+
+test('premium agenda herlaadt afspraken met timeout-override bij verse handmatige opslag', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const expectedTimeoutCall = 'fetchJsonGetWithFallback(url, { timeoutMs: Number.isFinite(Number(options?.timeoutMs)) ? Number(options.timeoutMs) : 12000 })';
+
+  assert.match(pageSource, /await loadServerAppointments\(\{\s*fresh:\s*true,\s*timeoutMs:\s*8000\s*\}\);/);
+  assert.ok(pageSource.includes(expectedTimeoutCall));
+  assert.doesNotMatch(
+    pageSource,
+    /const response = await fetch\(url,\s*\{\s*cache: 'no-store'\s*\}\);/
+  );
+});

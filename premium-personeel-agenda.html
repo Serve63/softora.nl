@@ -2543,7 +2543,7 @@
             if (created && mergeServerAppointments([created])) {
                 renderCalendar();
             }
-            await loadServerAppointments({ fresh: true });
+            await loadServerAppointments({ fresh: true, timeoutMs: 8000 });
             renderCalendar();
             closeManualAppointmentModal();
         } catch (error) {
@@ -3330,12 +3330,10 @@
         const url = fresh
             ? '/api/agenda/appointments?limit=250&fresh=1'
             : '/api/agenda/appointments?limit=250';
-
         loadServerAppointmentsPromise = (async () => {
             try {
-                const response = await fetch(url, { cache: 'no-store' });
-                const data = await response.json();
-                if (!response.ok || !data?.ok || !Array.isArray(data.appointments)) {
+                const data = await fetchJsonGetWithFallback(url, { timeoutMs: Number.isFinite(Number(options?.timeoutMs)) ? Number(options.timeoutMs) : 12000 });
+                if (!data?.ok || !Array.isArray(data.appointments)) {
                     return;
                 }
                 const merged = mergeServerAppointments(data.appointments);
