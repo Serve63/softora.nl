@@ -212,8 +212,12 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(webdesignActionScriptSource, /const LIGHTNING_ICON = "<svg class=\\"photo-generate-icon\\"/);
   assert.match(webdesignActionScriptSource, /const LOADING_ICON = "<span class=\\"photo-generate-spinner\\"/);
   assert.match(webdesignActionScriptSource, /const pendingIds = new Set\(\);/);
+  assert.match(webdesignActionScriptSource, /let generationQueue = Promise\.resolve\(\);/);
   assert.match(webdesignActionScriptSource, /const canGenerate = !hasPhoto && Boolean\(resolveCustomerWebsiteUrl\(customer\)\);/);
   assert.match(webdesignActionScriptSource, /const isPending = pendingIds\.has\(customer\.id\);/);
+  assert.match(webdesignActionScriptSource, /if \(pendingIds\.has\(target\.id\)\) \{/);
+  assert.match(webdesignActionScriptSource, /generationQueue = generationQueue\.catch\(function \(\) \{/);
+  assert.doesNotMatch(webdesignActionScriptSource, /Er wordt al een webdesign gemaakt/);
   assert.match(webdesignActionScriptSource, /photo-drop" \+ \(isPending \? " is-generating" : ""\)/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-remove\\"/);
   assert.match(webdesignActionScriptSource, /data-remove-photo-id=\\"/);
@@ -257,7 +261,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429d/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429a/);
@@ -287,7 +291,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /renderPage: renderPage/);
   assert.match(webdesignActionScriptSource, /setStatusMessage\(""\);/);
   assert.match(webdesignActionScriptSource, /pendingIds\.add\(target\.id\);/);
-  assert.match(webdesignActionScriptSource, /await generate\(\[target\], \{ silentProgress: true \}\);/);
+  assert.match(webdesignActionScriptSource, /await generate\(\[freshTarget\], \{ silentProgress: true \}\);/);
   assert.match(webdesignActionScriptSource, /pendingIds\.delete\(target\.id\);/);
   assert.match(pageSource, /photoBatchController\.open\(\);/);
   assert.match(pageSource, /photoBatchController\.bind\(\);/);

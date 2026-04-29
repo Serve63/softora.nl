@@ -34,11 +34,11 @@
         const openWebsitePhotoPreview = options.openWebsitePhotoPreview;
         const generate = options.generate;
         const setStatusMessage = options.setStatusMessage;
-        const isBusy = options.isBusy;
         const renderPage = options.renderPage;
         const formatEuroCost = typeof options.formatEuroCost === "function" ? options.formatEuroCost : defaultFormatEuroCost;
         const costEur = Math.max(0, Number(options.costEur) || 0);
         const pendingIds = new Set();
+        let generationQueue = Promise.resolve();
         ensureStyles();
 
         function getCustomerById(customerId) {
@@ -70,8 +70,7 @@
                 openWebsitePhotoPreview(customerId);
                 return;
             }
-            if (isBusy()) {
-                setStatusMessage("Er wordt al een webdesign gemaakt. Wacht heel even tot deze klaar is.", "info", true);
+            if (pendingIds.has(target.id)) {
                 return;
             }
             if (!isWebdesignPhotoEligible(target)) {
@@ -81,12 +80,17 @@
             setStatusMessage("");
             pendingIds.add(target.id);
             if (typeof renderPage === "function") renderPage();
-            try {
-                await generate([target], { silentProgress: true });
-            } finally {
+            generationQueue = generationQueue.catch(function () {
+                return null;
+            }).then(async function () {
+                const freshTarget = getCustomerById(target.id);
+                if (!freshTarget || !isWebdesignPhotoEligible(freshTarget)) return;
+                await generate([freshTarget], { silentProgress: true });
+            }).finally(function () {
                 pendingIds.delete(target.id);
                 if (typeof renderPage === "function") renderPage();
-            }
+            });
+            await generationQueue;
         }
 
         return {
