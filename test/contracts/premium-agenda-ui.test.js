@@ -264,3 +264,12 @@ test('premium agenda herlaadt afspraken met timeout-override bij verse handmatig
     /const response = await fetch\(url,\s*\{\s*cache: 'no-store'\s*\}\);/
   );
 });
+
+test('premium agenda dwingt modal sluiting na geslaagde handmatige opslag', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.ok(pageSource.includes('function closeManualAppointmentModal(forceClose = false) {'));
+  assert.ok(pageSource.includes('if (manualAppointmentSaving && !forceClose) return;'));
+  assert.ok(pageSource.includes('closeManualAppointmentModal(true);'));
+});

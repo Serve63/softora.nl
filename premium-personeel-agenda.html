@@ -2471,9 +2471,9 @@
         focusManualAppointmentStep();
     }
 
-    function closeManualAppointmentModal() {
+    function closeManualAppointmentModal(forceClose = false) {
         if (!manualAppointmentOverlay) return;
-        if (manualAppointmentSaving) return;
+        if (manualAppointmentSaving && !forceClose) return;
         manualAppointmentOverlay.classList.remove('show');
         manualAppointmentOverlay.setAttribute('aria-hidden', 'true');
         manualAppointmentSelectedDate = '';
@@ -2545,7 +2545,7 @@
             }
             await loadServerAppointments({ fresh: true, timeoutMs: 8000 });
             renderCalendar();
-            closeManualAppointmentModal();
+            closeManualAppointmentModal(true);
         } catch (error) {
             setManualAppointmentStatus(String(error?.message || 'Opslaan mislukt.'), 'error');
         } finally {
