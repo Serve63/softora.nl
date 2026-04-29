@@ -277,8 +277,9 @@ function buildServerAppFeatureWiringRuntimeContext({
       openAiCostSummary: {
         env,
         openAiAdminApiKey: shared.normalizeString(env.OPENAI_ADMIN_API_KEY || env.OPENAI_COSTS_API_KEY || ''),
-        openAiApiKey: platformRuntime.getOpenAiApiKey(),
+        anthropicAdminApiKey: shared.normalizeString(env.ANTHROPIC_ADMIN_API_KEY || env.ANTHROPIC_COSTS_API_KEY || env.CLAUDE_ADMIN_API_KEY || ''),
         openAiCostsApiBaseUrl: env.OPENAI_COSTS_API_BASE_URL || envConfig.OPENAI_API_BASE_URL,
+        anthropicCostsApiBaseUrl: env.ANTHROPIC_COSTS_API_BASE_URL || envConfig.ANTHROPIC_API_BASE_URL,
         fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
         usdToEurRate: Number(env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR || 0),
       },

@@ -1,4 +1,6 @@
 const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
+const DEFAULT_ANTHROPIC_API_BASE_URL = 'https://api.anthropic.com/v1';
+const ANTHROPIC_API_VERSION = '2023-06-01';
 const DEFAULT_USD_TO_EUR_RATE = 0.92;
 const MAX_COST_PAGES = 12;
 
@@ -37,8 +39,19 @@ function resolveOpenAiCostsApiKey(deps = {}) {
     deps.openAiCostsApiKey ||
       deps.openAiAdminApiKey ||
       env.OPENAI_COSTS_API_KEY ||
-      env.OPENAI_ADMIN_API_KEY ||
-      env.OPENAI_API_KEY
+      env.OPENAI_ADMIN_API_KEY
+  );
+}
+
+function resolveAnthropicCostsApiKey(deps = {}) {
+  const env = deps.env || process.env || {};
+  return normalizeString(
+    deps.anthropicCostsApiKey ||
+      deps.anthropicAdminApiKey ||
+      deps.claudeAdminApiKey ||
+      env.ANTHROPIC_COSTS_API_KEY ||
+      env.ANTHROPIC_ADMIN_API_KEY ||
+      env.CLAUDE_ADMIN_API_KEY
   );
 }
 
@@ -46,6 +59,17 @@ function resolveOpenAiApiBaseUrl(deps = {}) {
   const env = deps.env || process.env || {};
   return normalizeString(
     deps.openAiCostsApiBaseUrl || deps.openAiApiBaseUrl || env.OPENAI_COSTS_API_BASE_URL || env.OPENAI_API_BASE_URL || DEFAULT_OPENAI_API_BASE_URL
+  ).replace(/\/+$/, '');
+}
+
+function resolveAnthropicApiBaseUrl(deps = {}) {
+  const env = deps.env || process.env || {};
+  return normalizeString(
+    deps.anthropicCostsApiBaseUrl ||
+      deps.anthropicApiBaseUrl ||
+      env.ANTHROPIC_COSTS_API_BASE_URL ||
+      env.ANTHROPIC_API_BASE_URL ||
+      DEFAULT_ANTHROPIC_API_BASE_URL
   ).replace(/\/+$/, '');
 }
 
@@ -107,6 +131,79 @@ function buildOpenAiCostsUrl({ apiBaseUrl, startTime, endTime, page }) {
   url.searchParams.set('limit', '31');
   if (page) url.searchParams.set('page', page);
   return url.toString();
+}
+
+function isoFromUnixSeconds(value) {
+  return new Date(Math.max(0, Number(value) || 0) * 1000).toISOString();
+}
+
+function buildAnthropicCostsUrl({ apiBaseUrl, startTime, endTime, page }) {
+  const url = new URL(`${apiBaseUrl}/organizations/cost_report`);
+  url.searchParams.set('starting_at', isoFromUnixSeconds(startTime));
+  url.searchParams.set('ending_at', isoFromUnixSeconds(endTime));
+  url.searchParams.set('bucket_width', '1d');
+  url.searchParams.set('limit', '31');
+  if (page) url.searchParams.set('page', page);
+  return url.toString();
+}
+
+function parseAnthropicCostCents(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed / 100 : 0;
+}
+
+function collectAnthropicCostAmounts(data) {
+  let totalUsd = 0;
+  let bucketCount = 0;
+  let resultCount = 0;
+
+  (Array.isArray(data && data.data) ? data.data : []).forEach((bucket) => {
+    if (!bucket || typeof bucket !== 'object') return;
+    bucketCount += 1;
+    const results = Array.isArray(bucket.results)
+      ? bucket.results
+      : Array.isArray(bucket.result)
+        ? bucket.result
+        : [];
+
+    results.forEach((result) => {
+      if (!result || typeof result !== 'object') return;
+      resultCount += 1;
+
+      if (result.amount && typeof result.amount === 'object') {
+        const currency = normalizeString(result.amount.currency || result.currency).toLowerCase();
+        if (!currency || currency === 'usd') totalUsd += Number(result.amount.value || 0) || 0;
+        return;
+      }
+
+      const directUsd = Number(result.total_cost_usd ?? result.cost_usd ?? result.usd);
+      if (Number.isFinite(directUsd) && directUsd > 0) {
+        totalUsd += directUsd;
+        return;
+      }
+
+      [
+        'total_cost',
+        'cost',
+        'uncached_input_cost',
+        'cached_input_cost',
+        'cache_write_cost',
+        'cache_read_cost',
+        'input_cost',
+        'output_cost',
+        'web_search_cost',
+        'code_execution_cost',
+      ].forEach((key) => {
+        totalUsd += parseAnthropicCostCents(result[key]);
+      });
+    });
+  });
+
+  return {
+    currencies: { usd: Number(totalUsd.toFixed(8)) },
+    bucketCount,
+    resultCount,
+  };
 }
 
 async function fetchOpenAiCostSummary(deps = {}, options = {}) {
@@ -183,6 +280,129 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
   };
 }
 
+async function fetchAnthropicCostSummary(deps = {}, options = {}) {
+  const apiKey = resolveAnthropicCostsApiKey(deps);
+  if (!apiKey) {
+    throw createServiceError(
+      'Anthropic factuurkosten zijn nog niet gekoppeld.',
+      'ANTHROPIC_COSTS_NOT_CONFIGURED',
+      503,
+      'Zet ANTHROPIC_ADMIN_API_KEY of ANTHROPIC_COSTS_API_KEY om daadwerkelijke Claude-kosten te tonen.'
+    );
+  }
+
+  const fetchJsonWithTimeout = deps.fetchJsonWithTimeout;
+  if (typeof fetchJsonWithTimeout !== 'function') {
+    throw createServiceError('Anthropic kosten-helper ontbreekt.', 'ANTHROPIC_COSTS_FETCH_UNAVAILABLE', 503);
+  }
+
+  const window = buildCostWindow(options.scope, options.nowMs);
+  const apiBaseUrl = resolveAnthropicApiBaseUrl(deps);
+  const usdToEurRate = getUsdToEurRate(deps);
+  const currencies = {};
+  let page = '';
+  let bucketCount = 0;
+  let resultCount = 0;
+
+  for (let pageIndex = 0; pageIndex < MAX_COST_PAGES; pageIndex += 1) {
+    const { response, data } = await fetchJsonWithTimeout(
+      buildAnthropicCostsUrl({ apiBaseUrl, startTime: window.startTime, endTime: window.endTime, page }),
+      {
+        method: 'GET',
+        headers: {
+          'anthropic-version': ANTHROPIC_API_VERSION,
+          'x-api-key': apiKey,
+          Accept: 'application/json',
+        },
+      },
+      15000
+    );
+
+    if (!response || !response.ok) {
+      const status = response && response.status ? response.status : 502;
+      const detail = normalizeString(data && (data.error && (data.error.message || data.error.type) || data.detail || data.raw));
+      throw createServiceError('Anthropic factuurkosten konden niet geladen worden.', 'ANTHROPIC_COSTS_FETCH_FAILED', status, detail);
+    }
+
+    const pageAmounts = collectAnthropicCostAmounts(data);
+    Object.entries(pageAmounts.currencies).forEach(([currency, amount]) => {
+      addCurrencyAmount(currencies, currency, amount);
+    });
+    bucketCount += pageAmounts.bucketCount;
+    resultCount += pageAmounts.resultCount;
+
+    page = normalizeString(data && data.next_page);
+    if (!data || data.has_more !== true || !page) break;
+  }
+
+  const costUsd = Number((currencies.usd || 0).toFixed(8));
+  const costEur = Number((costUsd * usdToEurRate).toFixed(2));
+
+  return {
+    scope: window.scope,
+    source: 'anthropic-costs',
+    exact: true,
+    startTime: window.startTime,
+    endTime: window.endTime,
+    costUsd,
+    costEur,
+    usdToEurRate,
+    currencies,
+    bucketCount,
+    resultCount,
+    note: 'Anthropic Cost Report API; kosten worden in USD-cents gerapporteerd en naar EUR omgerekend.',
+  };
+}
+
+async function fetchCombinedApiCostSummary(deps = {}, options = {}) {
+  const providers = [];
+  const unavailable = [];
+  let costUsd = 0;
+  let costEur = 0;
+
+  async function collect(provider, fetcher) {
+    try {
+      const summary = await fetcher(deps, options);
+      providers.push(summary);
+      costUsd += Number(summary.costUsd || 0) || 0;
+      costEur += Number(summary.costEur || 0) || 0;
+    } catch (error) {
+      unavailable.push({
+        provider,
+        error: error.code || 'COSTS_UNAVAILABLE',
+        detail: error.detail || error.message || '',
+      });
+    }
+  }
+
+  await Promise.all([
+    collect('openai', fetchOpenAiCostSummary),
+    collect('anthropic', fetchAnthropicCostSummary),
+  ]);
+
+  if (!providers.length) {
+    throw createServiceError(
+      'Geen factuurkoppelingen beschikbaar.',
+      'API_COSTS_NOT_CONFIGURED',
+      503,
+      unavailable.map((item) => item.provider).join(', ')
+    );
+  }
+
+  return {
+    scope: normalizeScope(options.scope),
+    source: 'api-costs',
+    exact: unavailable.length === 0,
+    costUsd: Number(costUsd.toFixed(8)),
+    costEur: Number(costEur.toFixed(2)),
+    providers,
+    unavailable,
+    note: unavailable.length
+      ? `Niet compleet: ${unavailable.map((item) => item.provider).join(', ')} factuurkoppeling ontbreekt of faalt.`
+      : 'OpenAI en Anthropic factuurkosten deze maand.',
+  };
+}
+
 function createOpenAiCostSummaryCoordinator(deps = {}) {
   return {
     async sendCostSummaryResponse(req, res) {
@@ -203,12 +423,33 @@ function createOpenAiCostSummaryCoordinator(deps = {}) {
         });
       }
     },
+    async sendCombinedCostSummaryResponse(req, res) {
+      try {
+        const summary = await fetchCombinedApiCostSummary(deps, {
+          scope: req && req.query ? req.query.scope : 'month',
+        });
+        return res.status(200).json({
+          ok: true,
+          source: 'api-costs',
+          summary,
+        });
+      } catch (error) {
+        return res.status(error.status || 500).json({
+          ok: false,
+          error: error.code || 'API_COSTS_ERROR',
+          detail: error.detail || error.message || 'API-factuurkosten konden niet geladen worden.',
+        });
+      }
+    },
   };
 }
 
 module.exports = {
   buildCostWindow,
+  collectAnthropicCostAmounts,
   collectOpenAiCostAmounts,
   createOpenAiCostSummaryCoordinator,
+  fetchAnthropicCostSummary,
+  fetchCombinedApiCostSummary,
   fetchOpenAiCostSummary,
 };

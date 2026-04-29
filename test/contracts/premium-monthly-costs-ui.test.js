@@ -158,22 +158,24 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
 
   assert.match(scriptSource, /const COST_SUMMARY_ENDPOINT = '\/api\/coldcalling\/cost-summary\?scope=month';/);
-  assert.match(scriptSource, /const OPENAI_COST_SUMMARY_ENDPOINT = '\/api\/openai\/cost-summary\?scope=month';/);
+  assert.match(scriptSource, /const API_COST_SUMMARY_ENDPOINT = '\/api\/api-cost-summary\?scope=month';/);
   assert.match(scriptSource, /async function fetchMonthlyCostSummary\(\)/);
-  assert.match(scriptSource, /async function fetchOpenAiCostSummary\(\)/);
+  assert.match(scriptSource, /async function fetchApiCostSummary\(\)/);
   assert.match(scriptSource, /function applyColdcallingCost\(amountEur\)/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'coldcalling'/);
   assert.match(scriptSource, /const summary = await fetchMonthlyCostSummary\(\);/);
   assert.match(scriptSource, /const amountEur = Number\(summary\.costEur \|\| 0\) \|\| 0;/);
   assert.match(scriptSource, /window\.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;/);
-  assert.match(scriptSource, /const API_COST_NOTE = 'OpenAI factuurkosten deze maand';/);
-  assert.match(scriptSource, /const API_COST_UNAVAILABLE_NOTE = 'OpenAI factuurkoppeling ontbreekt';/);
+  assert.match(scriptSource, /const API_COST_NOTE = 'OpenAI \+ Claude factuurkosten deze maand';/);
+  assert.match(scriptSource, /const API_COST_UNAVAILABLE_NOTE = 'API factuurkoppeling ontbreekt';/);
   assert.match(scriptSource, /const API_COST_SCOPE = 'premium_api_costs';/);
   assert.match(scriptSource, /const API_COST_KEY = 'softora_api_cost_events_v1';/);
   assert.match(scriptSource, /function applyApiCost\(amountEur, note\)/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'api kosten'/);
-  assert.match(scriptSource, /const summary = await fetchOpenAiCostSummary\(\);/);
-  assert.match(scriptSource, /return \{ ok: true, updated: applyApiCost\(amountEur, API_COST_NOTE\), amountEur, source: 'openai-costs' \};/);
+  assert.match(scriptSource, /function buildApiCostNote\(summary\)/);
+  assert.match(scriptSource, /return missing\.length \? 'Onvolledig: mist ' \+ missing\.join\(', '\) : API_COST_NOTE;/);
+  assert.match(scriptSource, /const summary = await fetchApiCostSummary\(\);/);
+  assert.match(scriptSource, /return \{ ok: true, updated: applyApiCost\(amountEur, buildApiCostNote\(summary\)\), amountEur, source: 'api-costs' \};/);
   assert.match(scriptSource, /applyApiCost\(0, API_COST_UNAVAILABLE_NOTE\);/);
   assert.match(scriptSource, /window\.refreshMonthlyApiCosts = refreshMonthlyApiCosts;/);
   assert.match(

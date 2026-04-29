@@ -57,7 +57,13 @@ test('server app runtime composition builders preserve feature wiring groups and
 
   const context = buildServerAppFeatureWiringRuntimeContext({
     app: { locals: {} },
-    env: { RETELL_API_KEY: 'retell-key', OPENAI_ADMIN_API_KEY: 'admin-key', OPENAI_COST_USD_TO_EUR: '0.91' },
+    env: {
+      RETELL_API_KEY: 'retell-key',
+      OPENAI_ADMIN_API_KEY: 'admin-key',
+      ANTHROPIC_ADMIN_API_KEY: 'anthropic-admin-key',
+      ANTHROPIC_COSTS_API_BASE_URL: 'https://api.anthropic-cost.test',
+      OPENAI_COST_USD_TO_EUR: '0.91',
+    },
     envConfig: {
       ACTIVE_ORDER_AUTOMATION_ENABLED: true,
       ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN: 'gh-token',
@@ -256,8 +262,9 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(context.featureRouteOptions.coldcalling.premiumActiveCustomOrdersKey, 'custom_orders');
   assert.equal(context.featureRouteOptions.coldcalling.logger, console);
   assert.equal(context.featureRouteOptions.openAiCostSummary.openAiAdminApiKey, 'admin-key');
-  assert.equal(context.featureRouteOptions.openAiCostSummary.openAiApiKey, 'openai');
+  assert.equal(context.featureRouteOptions.openAiCostSummary.anthropicAdminApiKey, 'anthropic-admin-key');
   assert.equal(context.featureRouteOptions.openAiCostSummary.openAiCostsApiBaseUrl, 'https://api.openai.test');
+  assert.equal(context.featureRouteOptions.openAiCostSummary.anthropicCostsApiBaseUrl, 'https://api.anthropic-cost.test');
   assert.equal(context.featureRouteOptions.openAiCostSummary.usdToEurRate, 0.91);
   assert.equal(context.featureRouteOptions.coldmailing.coldmailCampaignService.isSmtpMailConfigured(), true);
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [

@@ -2,13 +2,13 @@
   'use strict';
 
   const COST_SUMMARY_ENDPOINT = '/api/coldcalling/cost-summary?scope=month';
-  const OPENAI_COST_SUMMARY_ENDPOINT = '/api/openai/cost-summary?scope=month';
+  const API_COST_SUMMARY_ENDPOINT = '/api/api-cost-summary?scope=month';
   const API_COST_SCOPE = 'premium_api_costs';
   const API_COST_KEY = 'softora_api_cost_events_v1';
   const POLL_INTERVAL_MS = 15000;
   const COLDCALLING_ESTIMATE_NOTE = 'Geschatte maandkosten, Retell kan hoger uitvallen';
-  const API_COST_NOTE = 'OpenAI factuurkosten deze maand';
-  const API_COST_UNAVAILABLE_NOTE = 'OpenAI factuurkoppeling ontbreekt';
+  const API_COST_NOTE = 'OpenAI + Claude factuurkosten deze maand';
+  const API_COST_UNAVAILABLE_NOTE = 'API factuurkoppeling ontbreekt';
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
 
@@ -306,8 +306,17 @@
     return data.summary;
   }
 
-  async function fetchOpenAiCostSummary() {
-    const response = await fetch(OPENAI_COST_SUMMARY_ENDPOINT, {
+  function buildApiCostNote(summary) {
+    const missing = Array.isArray(summary && summary.unavailable)
+      ? summary.unavailable.map(function (item) {
+          return normalizeString(item && item.provider);
+        }).filter(Boolean)
+      : [];
+    return missing.length ? 'Onvolledig: mist ' + missing.join(', ') : API_COST_NOTE;
+  }
+
+  async function fetchApiCostSummary() {
+    const response = await fetch(API_COST_SUMMARY_ENDPOINT, {
       method: 'GET',
       cache: 'no-store',
     });
@@ -315,7 +324,7 @@
       return {};
     });
     if (!response.ok || !data || data.ok !== true || !data.summary || typeof data.summary !== 'object') {
-      throw new Error(String((data && (data.detail || data.error)) || 'OpenAI factuurkosten konden niet geladen worden.'));
+      throw new Error(String((data && (data.detail || data.error)) || 'API-factuurkosten konden niet geladen worden.'));
     }
     return data.summary;
   }
@@ -349,9 +358,9 @@
       return { ok: true, updated: false };
     }
     try {
-      const summary = await fetchOpenAiCostSummary();
+      const summary = await fetchApiCostSummary();
       const amountEur = Number(summary.costEur || 0) || 0;
-      return { ok: true, updated: applyApiCost(amountEur, API_COST_NOTE), amountEur, source: 'openai-costs' };
+      return { ok: true, updated: applyApiCost(amountEur, buildApiCostNote(summary)), amountEur, source: 'api-costs' };
     } catch (error) {
       applyApiCost(0, API_COST_UNAVAILABLE_NOTE);
       return {
