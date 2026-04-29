@@ -1408,7 +1408,7 @@
         <div class="modal-footer">
             <button class="modal-btn primary magnetic" id="modalPrimaryBtn" type="button">Akkoord</button>
             <button class="modal-btn danger magnetic" id="modalNoDealBtn" type="button">Geen deal</button>
-            <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>
+            <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button" hidden>Sluiten</button>
         </div>
     </div>
 </div>
@@ -2029,7 +2029,8 @@
         return callId ? `/api/coldcalling/recording-proxy?callId=${encodeURIComponent(callId)}` : '';
     }
 
-    function shouldHideEmptyAppointmentAudioBlock(item) {
+    function isManualAgendaAppointment(item) {
+        if (!item || typeof item !== 'object') return false;
         const callId = String(item?.callId || '').trim().toLowerCase();
         if (callId.startsWith('manual_')) return true;
 
@@ -2044,10 +2045,16 @@
         return /\b(handmatig|manual|premium-personeel-agenda)\b/.test(sourceText);
     }
 
+    function shouldHideEmptyAppointmentAudioBlock(item) {
+        return isManualAgendaAppointment(item);
+    }
+
     function isManualOtherAppointment(apt) {
         if (!apt || typeof apt !== 'object') return false;
         const manualLegendChoice = normalizeManualLegendChoice(apt?.manualLegendChoice || apt?.legendChoice || '');
-        if (manualLegendChoice === 'manual-overig') return true;
+        if (['manual-overig', 'manual-serve', 'manual-martijn', 'manual-both'].includes(manualLegendChoice)) return true;
+        if (!isManualAgendaAppointment(apt)) return false;
+        if (['website', 'business', 'voice', 'chatbot'].includes(manualLegendChoice)) return false;
 
         const callId = String(apt?.callId || '').trim().toLowerCase();
         const kindText = [
@@ -2055,11 +2062,13 @@
             apt?.kind,
             apt?.type,
             apt?.appointmentKind,
+            apt?.manualLegendChoice,
+            apt?.legendChoice,
             apt?.source,
             apt?.summary
         ].map((value) => String(value || '').trim().toLowerCase()).join(' ');
 
-        return callId.startsWith('manual_') && /\b(overig|other|manual-overig)\b/.test(kindText);
+        return callId.startsWith('manual_') || /\b(overig|other|manual-overig|manual-serve|manual-martijn|manual-both)\b/.test(kindText);
     }
 
     function getAppointmentStartDate(apt) {
