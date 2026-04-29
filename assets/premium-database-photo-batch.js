@@ -106,7 +106,7 @@
       if (!selection) return;
 
       close();
-      void generate(selection.limit);
+      void generate(selection.limit, { silentProgress: true });
     }
 
     function bind() {
