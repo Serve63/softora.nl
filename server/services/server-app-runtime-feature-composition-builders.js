@@ -227,12 +227,12 @@ function buildServerAppFeatureWiringRuntimeContext({
             coldmailPackageDailySendLimit: envConfig.COLDMAIL_PACKAGE_DAILY_SEND_LIMIT,
             coldmailBlockPersonalMailboxDomains: envConfig.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,
           },
-          getAnthropicApiKey: platformRuntime.getAnthropicApiKey,
+          getOpenAiApiKey: platformRuntime.getOpenAiApiKey,
           fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
-          extractAnthropicTextContent: aiHelpers.extractAnthropicTextContent,
-          anthropicApiBaseUrl: envConfig.ANTHROPIC_API_BASE_URL,
+          extractOpenAiTextContent: aiHelpers.extractOpenAiTextContent,
+          openAiApiBaseUrl: envConfig.OPENAI_API_BASE_URL,
           coldmailAutoReplyModel: shared.normalizeString(
-            env.COLDMAIL_AUTOREPLY_ANTHROPIC_MODEL || env.COLDMAIL_AUTOREPLY_MODEL || 'claude-sonnet-4-6'
+            env.COLDMAIL_AUTOREPLY_OPENAI_MODEL || env.COLDMAIL_AUTOREPLY_MODEL || envConfig.OPENAI_MODEL || 'gpt-5.5'
           ),
           coldmailAutoReplyEnabled: /^true$/i.test(shared.normalizeString(env.COLDMAIL_AUTOREPLY_ENABLED || '')),
           getUiStateValues: uiSeoRuntime.getUiStateValues,
@@ -277,9 +277,9 @@ function buildServerAppFeatureWiringRuntimeContext({
       openAiCostSummary: {
         env,
         openAiAdminApiKey: shared.normalizeString(env.OPENAI_ADMIN_API_KEY || env.OPENAI_COSTS_API_KEY || ''),
-        anthropicAdminApiKey: shared.normalizeString(env.ANTHROPIC_ADMIN_API_KEY || env.ANTHROPIC_COSTS_API_KEY || env.CLAUDE_ADMIN_API_KEY || ''),
         openAiCostsApiBaseUrl: env.OPENAI_COSTS_API_BASE_URL || envConfig.OPENAI_API_BASE_URL,
-        anthropicCostsApiBaseUrl: env.ANTHROPIC_COSTS_API_BASE_URL || envConfig.ANTHROPIC_API_BASE_URL,
+        openAiOrganizationId: env.OPENAI_ORGANIZATION_ID || env.OPENAI_ORG_ID || env.OPENAI_ORGANIZATION || '',
+        openAiProjectId: env.OPENAI_PROJECT_ID || env.OPENAI_PROJECT || '',
         fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
         usdToEurRate: Number(env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR || 0),
       },

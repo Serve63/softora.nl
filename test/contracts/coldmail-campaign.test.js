@@ -105,12 +105,12 @@ function createService(overrides = {}) {
     }),
     createImapClient: overrides.createImapClient,
     parseMailSource: overrides.parseMailSource,
-    getAnthropicApiKey: () => overrides.anthropicApiKey || '',
+    getOpenAiApiKey: () => overrides.openAiApiKey || '',
     fetchJsonWithTimeout: overrides.fetchJsonWithTimeout,
-    extractAnthropicTextContent: (content) =>
+    extractOpenAiTextContent: (content) =>
       Array.isArray(content) ? content.map((item) => item.text || '').join('\n') : String(content || ''),
-    anthropicApiBaseUrl: 'https://anthropic.example.test/v1',
-    coldmailAutoReplyModel: 'claude-sonnet-4-6',
+    openAiApiBaseUrl: 'https://api.openai.test/v1',
+    coldmailAutoReplyModel: 'gpt-5.5',
     coldmailAutoReplyEnabled: Boolean(overrides.coldmailAutoReplyEnabled),
     resolveEmailDomain: async (domain) => {
       if (overrides.invalidDomains && overrides.invalidDomains.includes(domain)) return false;
@@ -338,7 +338,7 @@ test('coldmail campaign sends test recipient without marking database row as mai
   assert.equal(getSavedState(), null);
 });
 
-test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', async () => {
+test('coldmail auto-reply answers inbound campaign replies with GPT-5.5', async () => {
   const parsedInbound = {
     messageId: '<incoming-1@example.test>',
     subject: 'Re: Nieuw webdesign gemaakt!',
@@ -353,7 +353,7 @@ test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', asy
     imapHost: 'imap.example.test',
     imapUser: 'serve@softora.nl',
     imapPass: 'secret',
-    anthropicApiKey: 'anthropic-secret',
+    openAiApiKey: 'openai-secret',
     coldmailAutoReplyEnabled: true,
     rows: [
       {
@@ -383,7 +383,7 @@ test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', asy
         response: { ok: true, status: 200 },
         data: {
           model: requestedModel,
-          content: [{ type: 'text', text: 'Hoi, leuk dat je reageert. Zullen we kort bellen?' }],
+          choices: [{ message: { content: 'Hoi, leuk dat je reageert. Zullen we kort bellen?' } }],
           usage: { input_tokens: 10, output_tokens: 12 },
         },
       };
@@ -393,7 +393,7 @@ test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', asy
   const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
 
   assert.equal(result.replied, 1);
-  assert.equal(requestedModel, 'claude-sonnet-4-6');
+  assert.equal(requestedModel, 'gpt-5.5');
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');

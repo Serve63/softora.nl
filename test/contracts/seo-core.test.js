@@ -56,7 +56,6 @@ function createSeoCoreFixture() {
       { value: 'gpt-5.5', label: 'GPT-5.5' },
       { value: 'gpt-5.1', label: 'GPT-5.1' },
       { value: 'gpt-5-mini', label: 'GPT-5 mini' },
-      { value: 'claude-opus-4.6', label: 'Claude Opus 4.6' },
     ],
     seoPageFieldDefs: [
       { key: 'title', maxLength: 300 },
@@ -115,7 +114,7 @@ test('seo core normalizes config and filters unknown files', () => {
   assert.equal(config.automation.preferredModel, 'gpt-5.1');
   assert.equal(config.automation.blogAutomationEnabled, true);
   assert.equal(config.automation.blogCadence, 'daily');
-  assert.equal(config.automation.blogModel, 'claude-opus-4.6');
+  assert.equal(config.automation.blogModel, 'gpt-5.5');
 });
 
 test('seo core defaults automation models to GPT-5.5', () => {

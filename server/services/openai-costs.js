@@ -36,10 +36,10 @@ function buildCostWindow(scope, nowMs = Date.now()) {
 function resolveOpenAiCostsApiKey(deps = {}) {
   const env = deps.env || process.env || {};
   return normalizeString(
-    deps.openAiCostsApiKey ||
-      deps.openAiAdminApiKey ||
-      env.OPENAI_COSTS_API_KEY ||
-      env.OPENAI_ADMIN_API_KEY
+    deps.openAiAdminApiKey ||
+      deps.openAiCostsApiKey ||
+      env.OPENAI_ADMIN_API_KEY ||
+      env.OPENAI_COSTS_API_KEY
   );
 }
 
@@ -60,6 +60,38 @@ function resolveOpenAiApiBaseUrl(deps = {}) {
   return normalizeString(
     deps.openAiCostsApiBaseUrl || deps.openAiApiBaseUrl || env.OPENAI_COSTS_API_BASE_URL || env.OPENAI_API_BASE_URL || DEFAULT_OPENAI_API_BASE_URL
   ).replace(/\/+$/, '');
+}
+
+function resolveOpenAiOrganizationId(deps = {}) {
+  const env = deps.env || process.env || {};
+  return normalizeString(
+    deps.openAiOrganizationId ||
+      deps.openAiOrgId ||
+      env.OPENAI_ORGANIZATION_ID ||
+      env.OPENAI_ORG_ID ||
+      env.OPENAI_ORGANIZATION
+  );
+}
+
+function resolveOpenAiProjectId(deps = {}) {
+  const env = deps.env || process.env || {};
+  return normalizeString(
+    deps.openAiProjectId ||
+      env.OPENAI_PROJECT_ID ||
+      env.OPENAI_PROJECT
+  );
+}
+
+function buildOpenAiCostHeaders(deps = {}, apiKey = '') {
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    Accept: 'application/json',
+  };
+  const organizationId = resolveOpenAiOrganizationId(deps);
+  const projectId = resolveOpenAiProjectId(deps);
+  if (organizationId) headers['OpenAI-Organization'] = organizationId;
+  if (projectId) headers['OpenAI-Project'] = projectId;
+  return headers;
 }
 
 function resolveAnthropicApiBaseUrl(deps = {}) {
@@ -235,10 +267,7 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
       buildOpenAiCostsUrl({ apiBaseUrl, startTime: window.startTime, endTime: window.endTime, page }),
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: 'application/json',
-        },
+        headers: buildOpenAiCostHeaders(deps, apiKey),
       },
       15000
     );
@@ -274,6 +303,8 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
     costEur,
     usdToEurRate,
     currencies,
+    organizationScoped: Boolean(resolveOpenAiOrganizationId(deps)),
+    projectScoped: Boolean(resolveOpenAiProjectId(deps)),
     bucketCount,
     resultCount,
     note: 'OpenAI Costs API; USD-bedragen worden naar EUR omgerekend met de ingestelde wisselkoers.',
@@ -355,51 +386,17 @@ async function fetchAnthropicCostSummary(deps = {}, options = {}) {
 }
 
 async function fetchCombinedApiCostSummary(deps = {}, options = {}) {
-  const providers = [];
-  const unavailable = [];
-  let costUsd = 0;
-  let costEur = 0;
-
-  async function collect(provider, fetcher) {
-    try {
-      const summary = await fetcher(deps, options);
-      providers.push(summary);
-      costUsd += Number(summary.costUsd || 0) || 0;
-      costEur += Number(summary.costEur || 0) || 0;
-    } catch (error) {
-      unavailable.push({
-        provider,
-        error: error.code || 'COSTS_UNAVAILABLE',
-        detail: error.detail || error.message || '',
-      });
-    }
-  }
-
-  await Promise.all([
-    collect('openai', fetchOpenAiCostSummary),
-    collect('anthropic', fetchAnthropicCostSummary),
-  ]);
-
-  if (!providers.length) {
-    throw createServiceError(
-      'Geen factuurkoppelingen beschikbaar.',
-      'API_COSTS_NOT_CONFIGURED',
-      503,
-      unavailable.map((item) => item.provider).join(', ')
-    );
-  }
+  const openAiSummary = await fetchOpenAiCostSummary(deps, options);
 
   return {
     scope: normalizeScope(options.scope),
     source: 'api-costs',
-    exact: unavailable.length === 0,
-    costUsd: Number(costUsd.toFixed(8)),
-    costEur: Number(costEur.toFixed(2)),
-    providers,
-    unavailable,
-    note: unavailable.length
-      ? `Niet compleet: ${unavailable.map((item) => item.provider).join(', ')} factuurkoppeling ontbreekt of faalt.`
-      : 'OpenAI en Anthropic factuurkosten deze maand.',
+    exact: true,
+    costUsd: openAiSummary.costUsd,
+    costEur: openAiSummary.costEur,
+    providers: [openAiSummary],
+    unavailable: [],
+    note: 'OpenAI factuurkosten deze maand.',
   };
 }
 

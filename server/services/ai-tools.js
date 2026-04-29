@@ -230,7 +230,8 @@ function createAiToolsCoordinator(deps = {}) {
         source: result.source,
         model: result.model,
         usage: result.usage,
-        anthropicEnabled: true,
+        anthropicEnabled: false,
+        openAiEnabled: Boolean(getOpenAiApiKey()),
       });
     } catch (error) {
       const fallbackLayout = buildOrderDossierFallbackLayout(input);
@@ -240,7 +241,8 @@ function createAiToolsCoordinator(deps = {}) {
           {
             reason: String(error?.message || 'Onbekende fout'),
             status: Number(error?.status || 0) || null,
-            anthropicEnabled: Boolean(getAnthropicApiKey()),
+            anthropicEnabled: false,
+            openAiEnabled: Boolean(getOpenAiApiKey()),
             model: getDossierAnthropicModel(),
             orderId: input.orderId || null,
           },
@@ -255,9 +257,10 @@ function createAiToolsCoordinator(deps = {}) {
         source: 'template-fallback',
         model: null,
         usage: null,
-        warning: 'Claude dossier generatie faalde, template-fallback gebruikt.',
+        warning: 'OpenAI dossier generatie faalde, template-fallback gebruikt.',
         detail: String(error?.message || 'Onbekende fout'),
-        anthropicEnabled: Boolean(getAnthropicApiKey()),
+        anthropicEnabled: false,
+        openAiEnabled: Boolean(getOpenAiApiKey()),
       });
     }
   }

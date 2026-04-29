@@ -7,7 +7,7 @@
   const API_COST_KEY = 'softora_api_cost_events_v1';
   const POLL_INTERVAL_MS = 15000;
   const COLDCALLING_ESTIMATE_NOTE = 'Geschatte maandkosten, Retell kan hoger uitvallen';
-  const API_COST_NOTE = 'OpenAI + Claude factuurkosten deze maand';
+  const API_COST_NOTE = 'OpenAI factuurkosten deze maand';
   const API_COST_UNAVAILABLE_NOTE = 'API factuurkoppeling ontbreekt';
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
@@ -312,6 +312,14 @@
           return normalizeString(item && item.provider);
         }).filter(Boolean)
       : [];
+    const usd = Number(summary && summary.costUsd);
+    const eur = Number(summary && summary.costEur);
+    if (Number.isFinite(usd) && usd > 0 && Number.isFinite(eur) && eur > 0) {
+      return 'OpenAI factuur: $' + usd.toLocaleString('nl-NL', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }) + ' omgerekend naar euro';
+    }
     return missing.length ? 'Onvolledig: mist ' + missing.join(', ') : API_COST_NOTE;
   }
 

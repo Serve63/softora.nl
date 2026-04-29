@@ -97,11 +97,11 @@ function createColdmailCampaignService(deps = {}) {
     createImapClient = (config) => new ImapFlow(config),
     parseMailSource = (source) => simpleParser(source),
     resolveEmailDomain = resolveEmailDomainWithDns,
-    getAnthropicApiKey = () => '',
+    getOpenAiApiKey = () => '',
     fetchJsonWithTimeout = async () => ({ response: { ok: false, status: 500 }, data: null }),
-    extractAnthropicTextContent = null,
-    anthropicApiBaseUrl = 'https://api.anthropic.com/v1',
-    coldmailAutoReplyModel = 'claude-sonnet-4-6',
+    extractOpenAiTextContent = null,
+    openAiApiBaseUrl = 'https://api.openai.com/v1',
+    coldmailAutoReplyModel = 'gpt-5.5',
     coldmailAutoReplyEnabled = false,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
@@ -551,9 +551,9 @@ function createColdmailCampaignService(deps = {}) {
     return candidates.length === 1 ? candidates[0] : null;
   }
 
-  function extractAnthropicReplyText(content) {
-    if (typeof extractAnthropicTextContent === 'function') {
-      return normalizeString(extractAnthropicTextContent(content));
+  function extractOpenAiReplyText(content) {
+    if (typeof extractOpenAiTextContent === 'function') {
+      return normalizeString(extractOpenAiTextContent(content));
     }
     if (typeof content === 'string') return normalizeString(content);
     if (!Array.isArray(content)) return '';
@@ -1099,15 +1099,15 @@ function createColdmailCampaignService(deps = {}) {
       .join('|');
   }
 
-  async function generateColdmailAutoReplyWithAnthropic({ row, inboundText, inboundSubject, fromName }) {
-    const apiKey = getAnthropicApiKey();
+  async function generateColdmailAutoReplyWithOpenAi({ row, inboundText, inboundSubject, fromName }) {
+    const apiKey = getOpenAiApiKey();
     if (!apiKey) {
-      const error = new Error('ANTHROPIC_API_KEY ontbreekt');
-      error.code = 'ANTHROPIC_NOT_CONFIGURED';
+      const error = new Error('OPENAI_API_KEY ontbreekt');
+      error.code = 'OPENAI_NOT_CONFIGURED';
       error.status = 503;
       throw error;
     }
-    const model = normalizeString(coldmailAutoReplyModel) || 'claude-sonnet-4-6';
+    const model = normalizeString(coldmailAutoReplyModel) || 'gpt-5.5';
     const company = getRowCompany(row);
     const contact = getRowContact(row);
     const website = getRowDomain(row);
@@ -1140,34 +1140,34 @@ function createColdmailCampaignService(deps = {}) {
       },
     };
     const { response, data } = await fetchJsonWithTimeout(
-      `${anthropicApiBaseUrl}/messages`,
+      `${openAiApiBaseUrl}/chat/completions`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model,
-          max_tokens: 1200,
           temperature: 0.35,
-          system,
-          messages: [{ role: 'user', content: JSON.stringify(payload) }],
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: JSON.stringify(payload) },
+          ],
         }),
       },
       65000
     );
     if (!response.ok) {
-      const error = new Error(`Anthropic coldmail auto-reply mislukt (${response.status})`);
-      error.code = 'ANTHROPIC_AUTO_REPLY_FAILED';
+      const error = new Error(`OpenAI coldmail auto-reply mislukt (${response.status})`);
+      error.code = 'OPENAI_AUTO_REPLY_FAILED';
       error.status = response.status;
       error.data = data;
       throw error;
     }
-    const reply = truncateText(extractAnthropicReplyText(data && data.content), 6000);
+    const reply = truncateText(extractOpenAiReplyText(data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content), 6000);
     if (!reply) {
-      const error = new Error('Anthropic gaf een lege auto-reply terug.');
+      const error = new Error('OpenAI gaf een lege auto-reply terug.');
       error.code = 'EMPTY_AI_REPLY';
       error.status = 502;
       throw error;
@@ -1506,7 +1506,7 @@ function createColdmailCampaignService(deps = {}) {
       const stats = {
         ok: true,
         startedAt: now().toISOString(),
-        model: normalizeString(coldmailAutoReplyModel) || 'claude-sonnet-4-6',
+        model: normalizeString(coldmailAutoReplyModel) || 'gpt-5.5',
         mailboxes: getImapMailboxesForSync(),
         scanned: 0,
         matched: 0,
@@ -1581,7 +1581,7 @@ function createColdmailCampaignService(deps = {}) {
               const from = getParsedMailFromEmail(parsedMail);
               try {
                 const senderEmail = resolveInboundSenderEmail(parsedMail);
-                const aiReply = await generateColdmailAutoReplyWithAnthropic({
+                const aiReply = await generateColdmailAutoReplyWithOpenAi({
                   row: match.row,
                   inboundText,
                   inboundSubject: normalizeString(parsedMail && parsedMail.subject),

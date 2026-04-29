@@ -109,12 +109,9 @@ function createActiveOrdersCoordinator(deps = {}) {
             : 'AI website generatie mislukt',
         detail: String(error?.message || 'Onbekende fout'),
         openAiEnabled: Boolean(getOpenAiApiKey()),
-        anthropicEnabled: Boolean(getAnthropicApiKey()),
+        anthropicEnabled: false,
         websiteGenerationProvider: getWebsiteGenerationProvider(),
-        websiteGenerationModel:
-          getWebsiteGenerationProvider() === 'anthropic'
-            ? getWebsiteAnthropicModel()
-            : openAiModel,
+        websiteGenerationModel: openAiModel,
         upstreamDetail: upstreamDetail || null,
       });
     }

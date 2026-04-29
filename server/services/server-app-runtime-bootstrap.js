@@ -177,7 +177,6 @@ function createServerAppRuntimeBootstrap(
       SEO_MODEL_PRESETS: Object.freeze([
         { value: 'gpt-5.5', label: 'GPT-5.5' },
         { value: 'gpt-5.1', label: 'GPT-5.1' },
-        { value: 'claude-opus-4.6', label: 'Opus 4.6' },
         { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
       ]),
       SEO_PAGE_FIELD_DEFS: [

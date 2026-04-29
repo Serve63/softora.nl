@@ -70,10 +70,15 @@ test('loadRuntimeEnv clamps coldmail safety limits for Strato-safe sending', () 
   assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, true);
 });
 
-test('loadRuntimeEnv defaults dashboard Anthropic model to Claude Sonnet 4.6', () => {
+test('loadRuntimeEnv disables Anthropic defaults', () => {
   const runtimeEnv = loadRuntimeEnv({});
 
-  assert.equal(runtimeEnv.ai.anthropicModel, 'claude-sonnet-4-6');
+  assert.equal(runtimeEnv.ai.anthropicModel, '');
+  assert.equal(runtimeEnv.ai.anthropicApiBaseUrl, '');
+  assert.equal(runtimeEnv.ai.websiteAnthropicModel, '');
+  assert.equal(runtimeEnv.ai.dossierAnthropicModel, '');
+  assert.equal(runtimeEnv.websiteGeneration.provider, 'openai');
+  assert.equal(runtimeEnv.websiteGeneration.strictAnthropic, false);
 });
 
 test('loadRuntimeEnv defaults OpenAI text calls to GPT-5.5', () => {

@@ -62,7 +62,7 @@ test('runtime status service exposes stable dependency and runtime payloads', ()
   assert.deepEqual(service.getAiStatus(), {
     coldcallingProvider: 'retell',
     openaiConfigured: true,
-    anthropicConfigured: true,
+    anthropicConfigured: false,
     retellConfigured: true,
     twilioConfigured: true,
     missingProviderEnv: ['RETELL_API_KEY'],

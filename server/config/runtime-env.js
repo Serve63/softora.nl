@@ -82,28 +82,18 @@ function loadRuntimeEnv(env = process.env) {
       openaiModel: safeEnv.OPENAI_MODEL || 'gpt-5.5',
       openaiImageModel:
         safeEnv.WEBSITE_PREVIEW_IMAGE_MODEL || safeEnv.OPENAI_IMAGE_MODEL || 'gpt-image-2',
-      anthropicApiBaseUrl: safeEnv.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com/v1',
-      anthropicModel: safeEnv.ANTHROPIC_MODEL || safeEnv.CLAUDE_MODEL || 'claude-sonnet-4-6',
-      websiteAnthropicModel:
-        safeEnv.WEBSITE_ANTHROPIC_MODEL ||
-        safeEnv.ANTHROPIC_WEBSITE_MODEL ||
-        'claude-opus-4-6',
-      dossierAnthropicModel:
-        safeEnv.DOSSIER_ANTHROPIC_MODEL ||
-        safeEnv.ANTHROPIC_DOSSIER_MODEL ||
-        safeEnv.CLAUDE_DOSSIER_MODEL ||
-        'claude-opus-4-6',
+      anthropicApiBaseUrl: '',
+      anthropicModel: '',
+      websiteAnthropicModel: '',
+      dossierAnthropicModel: '',
       verboseCallWebhookLogs: readBooleanEnvFlag(safeEnv.VERBOSE_CALL_WEBHOOK_LOGS),
       defaultTwilioMediaWsUrl: 'wss://twilio-media-bridge-ln3f.onrender.com/twilio-media',
     },
     websiteGeneration: {
       provider: normalizeString(
         safeEnv.WEBSITE_GENERATION_PROVIDER || safeEnv.SITE_GENERATION_PROVIDER || ''
-      ).toLowerCase(),
-      strictAnthropic: readNegatedBooleanEnvFlag(
-        safeEnv.WEBSITE_GENERATION_STRICT_ANTHROPIC,
-        true
-      ),
+      ).toLowerCase() || 'openai',
+      strictAnthropic: false,
       strictHtml: readNegatedBooleanEnvFlag(safeEnv.WEBSITE_GENERATION_STRICT_HTML, true),
       timeoutMs: readBoundedNumberEnv(
         safeEnv.WEBSITE_GENERATION_TIMEOUT_MS,

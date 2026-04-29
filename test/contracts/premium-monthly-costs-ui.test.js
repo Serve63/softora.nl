@@ -108,7 +108,7 @@ test('premium terugkerende kosten toont dynamische posten bovenaan met paarse st
   assert.doesNotMatch(pageSource, /naam:'TransIP backup'/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsData = data;/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsRender = render;/);
-  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260429a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260429b" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(combinedSource, /function createCategoryHeader\(cat, catTotal\) \{/);
   assert.match(combinedSource, /appendCostTextElement\(header, 'div', 'category-title', cat\);/);
@@ -166,13 +166,14 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /const summary = await fetchMonthlyCostSummary\(\);/);
   assert.match(scriptSource, /const amountEur = Number\(summary\.costEur \|\| 0\) \|\| 0;/);
   assert.match(scriptSource, /window\.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;/);
-  assert.match(scriptSource, /const API_COST_NOTE = 'OpenAI \+ Claude factuurkosten deze maand';/);
+  assert.match(scriptSource, /const API_COST_NOTE = 'OpenAI factuurkosten deze maand';/);
   assert.match(scriptSource, /const API_COST_UNAVAILABLE_NOTE = 'API factuurkoppeling ontbreekt';/);
   assert.match(scriptSource, /const API_COST_SCOPE = 'premium_api_costs';/);
   assert.match(scriptSource, /const API_COST_KEY = 'softora_api_cost_events_v1';/);
   assert.match(scriptSource, /function applyApiCost\(amountEur, note\)/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'api kosten'/);
   assert.match(scriptSource, /function buildApiCostNote\(summary\)/);
+  assert.match(scriptSource, /OpenAI factuur: \$' \+ usd\.toLocaleString\('nl-NL'/);
   assert.match(scriptSource, /return missing\.length \? 'Onvolledig: mist ' \+ missing\.join\(', '\) : API_COST_NOTE;/);
   assert.match(scriptSource, /const summary = await fetchApiCostSummary\(\);/);
   assert.match(scriptSource, /return \{ ok: true, updated: applyApiCost\(amountEur, buildApiCostNote\(summary\)\), amountEur, source: 'api-costs' \};/);

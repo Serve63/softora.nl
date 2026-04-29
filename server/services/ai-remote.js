@@ -1368,19 +1368,46 @@ function createAiRemoteService(deps = {}) {
 
   async function generateDynamicOrderDossierWithAnthropic(options = {}) {
     const promptPack = buildAnthropicOrderDossierPrompts(options);
-    const model = normalizeString(options.model || getDossierAnthropicModel()) || 'claude-opus-4-6';
-    const data = await sendAnthropicMessage({
-      model,
-      systemPrompt: promptPack.systemPrompt,
-      userPrompt: promptPack.userPrompt,
-      maxTokens: getAnthropicDossierMaxTokens(),
-      stage: 'build',
-    });
+    const apiKey = getOpenAiApiKey();
+    if (!apiKey) {
+      const err = new Error('OPENAI_API_KEY ontbreekt');
+      err.status = 503;
+      throw err;
+    }
 
-    const rawText = normalizeString(extractAnthropicTextContent(data?.content));
+    const model = normalizeString(options.model || openAiModel) || 'gpt-5.5';
+    const { response, data } = await fetchJsonWithTimeout(
+      `${openAiApiBaseUrl}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.2,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: promptPack.systemPrompt },
+            { role: 'user', content: promptPack.userPrompt },
+          ],
+        }),
+      },
+      websiteGenerationTimeoutMs
+    );
+
+    if (!response.ok) {
+      const err = new Error(`OpenAI dossier generatie mislukt (${response.status})`);
+      err.status = response.status;
+      err.data = data;
+      throw err;
+    }
+
+    const rawText = normalizeString(extractOpenAiTextContent(data?.choices?.[0]?.message?.content));
     const parsed = parseJsonLoose(rawText);
     if (!parsed || typeof parsed !== 'object') {
-      const err = new Error('Claude gaf geen geldig JSON-layout terug.');
+      const err = new Error('OpenAI gaf geen geldig JSON-layout terug.');
       err.status = 502;
       throw err;
     }
@@ -1388,7 +1415,7 @@ function createAiRemoteService(deps = {}) {
     const layout = normalizeOrderDossierLayout(parsed, promptPack.input);
     return {
       layout,
-      source: 'anthropic',
+      source: 'openai',
       model: normalizeString(data?.model || model) || model,
       usage: data?.usage || null,
     };
@@ -1623,15 +1650,6 @@ function createAiRemoteService(deps = {}) {
   }
 
   async function generateWebsiteHtmlWithAi(options = {}) {
-    const provider = getWebsiteGenerationProvider();
-    if (websiteGenerationStrictAnthropic && provider !== 'anthropic') {
-      const err = new Error('Website generatie is strict op Anthropic/Claude gezet.');
-      err.status = 503;
-      throw err;
-    }
-    if (provider === 'anthropic') {
-      return generateWebsiteHtmlWithAnthropic(options);
-    }
     return generateWebsiteHtmlWithOpenAi(options);
   }
 

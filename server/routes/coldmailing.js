@@ -111,7 +111,7 @@ function registerColdmailingRoutes(app, deps = {}) {
       res.json(result);
     } catch (error) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_REPLY_SYNC_FAILED';
-      res.status(code === 'ANTHROPIC_NOT_CONFIGURED' ? 503 : 400).json({
+      res.status(code === 'OPENAI_NOT_CONFIGURED' ? 503 : 400).json({
         ok: false,
         code,
         message: truncateText(

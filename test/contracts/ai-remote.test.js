@@ -617,42 +617,45 @@ test('ai remote service generates website html via OpenAI and preserves cost met
   });
 });
 
-test('ai remote service blocks non-anthropic providers when strict anthropic mode is enabled', async () => {
+test('ai remote service ignores legacy strict anthropic mode and uses OpenAI', async () => {
   const { service } = createService({
     websiteGenerationProvider: 'openai',
     websiteGenerationStrictAnthropic: true,
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: {
+        model: 'gpt-5-mini',
+        choices: [{ message: { content: '<main><h1>OpenAI site</h1></main>' } }],
+      },
+    }),
   });
 
-  await assert.rejects(
-    () => service.generateWebsiteHtmlWithAi({ prompt: 'Maak iets moois' }),
-    (error) => {
-      assert.equal(error.status, 503);
-      assert.match(String(error.message || ''), /strict op Anthropic/i);
-      return true;
-    }
-  );
+  const result = await service.generateWebsiteHtmlWithAi({ prompt: 'Maak iets moois' });
+
+  assert.equal(result.source, 'openai');
+  assert.match(result.html, /OpenAI site/);
 });
 
-test('ai remote service normalizes anthropic dossier JSON into a stable layout payload', async () => {
+test('ai remote service normalizes OpenAI dossier JSON into a stable layout payload', async () => {
   const { service } = createService({
     fetchJsonWithTimeout: async () => ({
       response: { ok: true, status: 200 },
       data: {
-        model: 'claude-opus-4-6',
-        usage: { input_tokens: 50, output_tokens: 120 },
-        content: [{ type: 'text', text: '{"sections":[{"type":"hero","title":"Welkom"}]}' }],
+        model: 'gpt-5-mini',
+        usage: { prompt_tokens: 50, completion_tokens: 120 },
+        choices: [{ message: { content: '{"sections":[{"type":"hero","title":"Welkom"}]}' } }],
       },
     }),
   });
 
   const result = await service.generateDynamicOrderDossierWithAnthropic({ orderId: 12 });
 
-  assert.equal(result.source, 'anthropic');
-  assert.equal(result.model, 'claude-opus-4-6');
+  assert.equal(result.source, 'openai');
+  assert.equal(result.model, 'gpt-5-mini');
   assert.deepEqual(result.layout, {
     normalized: true,
     sections: [{ type: 'hero', title: 'Welkom' }],
     orderId: 12,
   });
-  assert.deepEqual(result.usage, { input_tokens: 50, output_tokens: 120 });
+  assert.deepEqual(result.usage, { prompt_tokens: 50, completion_tokens: 120 });
 });

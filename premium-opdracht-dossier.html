@@ -1700,7 +1700,7 @@
                 } catch (error) {
                     layoutResponse = {
                         source: 'template-fallback',
-                        warning: `Claude niet bereikbaar, fallback gebruikt: ${String(error?.message || 'onbekende fout')}`,
+                        warning: `OpenAI niet bereikbaar, fallback gebruikt: ${String(error?.message || 'onbekende fout')}`,
                         layout: buildFallbackLayout(baseData),
                     };
                 }

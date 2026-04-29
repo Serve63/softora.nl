@@ -61,6 +61,7 @@ test('openai costs service fetches official OpenAI cost summary and converts USD
   const summary = await fetchOpenAiCostSummary(
     {
       openAiCostsApiKey: 'cost-key',
+      openAiOrganizationId: 'org-correct',
       openAiApiBaseUrl: 'https://api.openai.test/v1',
       usdToEurRate: 0.9,
       fetchJsonWithTimeout: async (url, options) => {
@@ -88,6 +89,7 @@ test('openai costs service fetches official OpenAI cost summary and converts USD
   assert.match(calls[0].url, /^https:\/\/api\.openai\.test\/v1\/organization\/costs\?/);
   assert.match(calls[0].url, /bucket_width=1d/);
   assert.equal(calls[0].options.headers.Authorization, 'Bearer cost-key');
+  assert.equal(calls[0].options.headers['OpenAI-Organization'], 'org-correct');
   assert.equal(summary.exact, true);
   assert.equal(summary.source, 'openai-costs');
   assert.equal(summary.costUsd, 10);
@@ -133,56 +135,29 @@ test('anthropic costs service fetches official Claude cost report and converts c
   assert.equal(summary.costEur, 11.25);
 });
 
-test('combined api costs include OpenAI and Anthropic when both factuurkoppelingen werken', async () => {
+test('combined api costs use only OpenAI factuurkosten', async () => {
   const summary = await fetchCombinedApiCostSummary(
     {
       openAiCostsApiKey: 'openai-admin-key',
-      anthropicCostsApiKey: 'anthropic-admin-key',
       usdToEurRate: 0.9,
       fetchJsonWithTimeout: async (url) => {
-        if (String(url).includes('api.openai.test')) {
-          return {
-            response: { ok: true, status: 200 },
-            data: { data: [{ results: [{ amount: { value: 2, currency: 'usd' } }] }], has_more: false },
-          };
-        }
         return {
           response: { ok: true, status: 200 },
-          data: { data: [{ results: [{ input_cost: '300' }] }], has_more: false },
+          data: { data: [{ results: [{ amount: { value: 25.18, currency: 'usd' } }] }], has_more: false },
         };
       },
       openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
-      anthropicCostsApiBaseUrl: 'https://api.anthropic.test/v1',
     },
     { scope: 'month', nowMs: Date.UTC(2026, 3, 29, 9, 0, 0) }
   );
 
   assert.equal(summary.exact, true);
   assert.equal(summary.source, 'api-costs');
-  assert.equal(summary.costUsd, 5);
-  assert.equal(summary.costEur, 4.5);
-  assert.equal(summary.providers.length, 2);
+  assert.equal(summary.costUsd, 25.18);
+  assert.equal(summary.costEur, 22.66);
+  assert.equal(summary.providers.length, 1);
+  assert.equal(summary.providers[0].source, 'openai-costs');
   assert.deepEqual(summary.unavailable, []);
-});
-
-test('combined api costs stay partial when Anthropic factuurkoppeling ontbreekt', async () => {
-  const summary = await fetchCombinedApiCostSummary(
-    {
-      openAiCostsApiKey: 'openai-admin-key',
-      usdToEurRate: 0.9,
-      fetchJsonWithTimeout: async () => ({
-        response: { ok: true, status: 200 },
-        data: { data: [{ results: [{ amount: { value: 2, currency: 'usd' } }] }], has_more: false },
-      }),
-      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
-    },
-    { scope: 'month', nowMs: Date.UTC(2026, 3, 29, 9, 0, 0) }
-  );
-
-  assert.equal(summary.exact, false);
-  assert.equal(summary.costUsd, 2);
-  assert.equal(summary.costEur, 1.8);
-  assert.deepEqual(summary.unavailable.map((item) => item.provider), ['anthropic']);
 });
 
 test('openai costs service fails closed when no costs key is configured', async () => {

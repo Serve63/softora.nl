@@ -188,43 +188,18 @@ function createRuntimeHelpers(options = {}) {
   };
 
   const getOpenAiApiKey = () => normalizeString(env.OPENAI_API_KEY);
-  const getAnthropicApiKey = () => normalizeString(env.ANTHROPIC_API_KEY || env.CLAUDE_API_KEY);
+  const getAnthropicApiKey = () => '';
 
   const getWebsiteAnthropicModel = () => {
-    const candidates = [
-      normalizeString(env.WEBSITE_ANTHROPIC_MODEL || ''),
-      normalizeString(env.ANTHROPIC_WEBSITE_MODEL || ''),
-      normalizeString(websiteAnthropicModel || ''),
-      normalizeString(env.ANTHROPIC_MODEL || ''),
-      normalizeString(env.CLAUDE_MODEL || ''),
-      normalizeString(anthropicModel || ''),
-      'claude-opus-4-6',
-    ];
-    return candidates.find((value) => Boolean(value)) || 'claude-opus-4-6';
+    return '';
   };
 
   const getWebsiteGenerationProvider = () => {
-    if (websiteGenerationProvider === 'anthropic' || websiteGenerationProvider === 'claude') {
-      return 'anthropic';
-    }
-    if (websiteGenerationProvider === 'openai') {
-      return 'openai';
-    }
-    return getAnthropicApiKey() ? 'anthropic' : 'openai';
+    return 'openai';
   };
 
   const getDossierAnthropicModel = () => {
-    const candidates = [
-      normalizeString(env.DOSSIER_ANTHROPIC_MODEL || ''),
-      normalizeString(env.ANTHROPIC_DOSSIER_MODEL || ''),
-      normalizeString(env.CLAUDE_DOSSIER_MODEL || ''),
-      normalizeString(dossierAnthropicModel || ''),
-      normalizeString(env.ANTHROPIC_MODEL || ''),
-      normalizeString(env.CLAUDE_MODEL || ''),
-      normalizeString(anthropicModel || ''),
-      'claude-opus-4-6',
-    ];
-    return candidates.find((value) => Boolean(value)) || 'claude-opus-4-6';
+    return '';
   };
 
   const getAnthropicDossierMaxTokens = () => {

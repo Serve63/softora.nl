@@ -262,9 +262,7 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(context.featureRouteOptions.coldcalling.premiumActiveCustomOrdersKey, 'custom_orders');
   assert.equal(context.featureRouteOptions.coldcalling.logger, console);
   assert.equal(context.featureRouteOptions.openAiCostSummary.openAiAdminApiKey, 'admin-key');
-  assert.equal(context.featureRouteOptions.openAiCostSummary.anthropicAdminApiKey, 'anthropic-admin-key');
   assert.equal(context.featureRouteOptions.openAiCostSummary.openAiCostsApiBaseUrl, 'https://api.openai.test');
-  assert.equal(context.featureRouteOptions.openAiCostSummary.anthropicCostsApiBaseUrl, 'https://api.anthropic-cost.test');
   assert.equal(context.featureRouteOptions.openAiCostSummary.usdToEurRate, 0.91);
   assert.equal(context.featureRouteOptions.coldmailing.coldmailCampaignService.isSmtpMailConfigured(), true);
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
