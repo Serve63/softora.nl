@@ -78,6 +78,20 @@ test('premium dashboard verbergt de personeel beheer selector boven de datumfilt
   assert.match(pageSource, /softora-ai-management-change/);
 });
 
+test('premium dashboard normaliseert open-waarden naar klantenstatus', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(
+    pageSource,
+    /if \(value === 'open' \|\| status === 'betaald' \|\| status === 'open'\) return 'klant';/
+  );
+  assert.match(
+    pageSource,
+    /return value \|\| status \|\| 'klant';/
+  );
+});
+
 test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
