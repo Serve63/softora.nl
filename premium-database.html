@@ -1601,7 +1601,7 @@
     </div>
 
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260429g"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260429h"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
@@ -1649,7 +1649,7 @@
             sortAsc: true,
             openId: null,
             modalEditId: null,
-            photoTargetId: null,
+            photoTargetId: null, photoRestorePending: true,
             messageTimer: null
         };
 
@@ -2172,27 +2172,23 @@
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });
 
-        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, refreshPhotos: async function () { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap)); renderPage(); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, refreshPhotos: async function () { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
-        function mergeCustomersWithPhotos(customers, photoMap) {
+        function mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
             const photosByIdentity = new Map();
-            Object.keys(photos).forEach(function (key) {
-                const item = photos[key];
-                const identityKey = normalizeString(item && item.identityKey);
-                if (identityKey && isValidWebsitePhotoDataUrl(item && item.websitePhoto)) {
-                    photosByIdentity.set(identityKey, item);
-                }
-            });
+            const fallbackPhotosById = new Map();
+            const fallbackPhotosByIdentity = new Map();
+            Object.keys(photos).forEach(function (key) { const item = photos[key]; const identityKey = normalizeString(item && item.identityKey); if (identityKey && isValidWebsitePhotoDataUrl(item && item.websitePhoto)) photosByIdentity.set(identityKey, item); });
+            (Array.isArray(fallbackCustomers) ? fallbackCustomers : []).forEach(function (customer) { const normalized = normalizeCustomer(customer); if (!isValidWebsitePhotoDataUrl(normalized.websitePhoto)) return; fallbackPhotosById.set(normalized.id, normalized); const identityKey = buildCustomerIdentityKey(normalized); if (identityKey) fallbackPhotosByIdentity.set(identityKey, normalized); });
 
             return sortCustomers((customers || []).map(function (customer, index) {
                 const normalized = normalizeCustomer(customer, "photo-merge-" + index);
                 if (!shouldShowWebsitePhoto(normalized)) {
                     return { ...normalized, websitePhoto: "", websitePhotoName: "" };
                 }
-                const directPhoto = photos[normalized.id];
-                const identityPhoto = photosByIdentity.get(buildCustomerIdentityKey(normalized));
-                const photo = directPhoto || identityPhoto || null;
+                const identityKey = buildCustomerIdentityKey(normalized);
+                const photo = photos[normalized.id] || photosByIdentity.get(identityKey) || fallbackPhotosById.get(normalized.id) || fallbackPhotosByIdentity.get(identityKey) || null;
                 if (!photo || !isValidWebsitePhotoDataUrl(photo.websitePhoto)) return normalized;
                 return {
                     ...normalized,
@@ -3160,7 +3156,7 @@
                     }
 
                     const photoMap = await loadCustomerPhotoMap(enrichedCustomers);
-                    const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap);
+                    const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten);
 
                     if (customerListsDiffer(customersWithPhotos) || !hadBootstrapCustomers) {
                         state.klanten = customersWithPhotos;
@@ -3344,12 +3340,10 @@
 
         void (async function () {
             try {
-                await bootstrapCustomers(); webdesignActionController.resumePendingJobs();
+                state.photoRestorePending = true; renderPage(); await bootstrapCustomers(); await webdesignActionController.resumePendingJobs();
                 void databaseImportController.startAutoSync();
             } finally {
-                if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === "function") {
-                    window.SoftoraPremiumBoot.setShellBooting(false);
-                }
+                state.photoRestorePending = false; renderPage(); if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === "function") { window.SoftoraPremiumBoot.setShellBooting(false); }
             }
         })();
     </script>
