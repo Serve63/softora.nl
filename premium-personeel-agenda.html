@@ -2101,6 +2101,22 @@
         return Boolean(startDate && startDate.getTime() <= Date.now());
     }
 
+    function isAgendaDateBeforeToday(value) {
+        const ymd = normalizeAgendaDateYmd(value);
+        if (!ymd) return false;
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+        if (!match) return false;
+        const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 0, 0, 0, 0);
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        return Number.isFinite(date.getTime()) && date.getTime() < todayStart.getTime();
+    }
+
+    function isManualAppointmentStartInPast(dateYmd, timeValue) {
+        const startDate = getAppointmentStartDate({ date: dateYmd, time: timeValue });
+        return Boolean(startDate && startDate.getTime() <= Date.now());
+    }
+
     function resolveAppointmentSourceLabel(item) {
         const raw = String(item?.source || '').trim();
         if (!raw) return 'Coldcalling';
@@ -2663,6 +2679,7 @@
         if (!manualAppointmentOverlay || !manualAppointmentDateLine) return;
         const picked = String(dateYmd || '').trim();
         if (isYmdCalendarSaturday(picked)) return;
+        if (isAgendaDateBeforeToday(picked)) return;
         manualAppointmentSelectedDate = picked;
         manualAppointmentDateLine.textContent = formatAgendaDateLongNl(manualAppointmentSelectedDate);
         resetManualAppointmentWizard();
@@ -2686,6 +2703,10 @@
         if (!manualAppointmentSelectedDate || manualAppointmentSaving) return;
         if (isYmdCalendarSaturday(manualAppointmentSelectedDate)) {
             setManualAppointmentStatus('Op zaterdag staan geen afspraken in de agenda.', 'error');
+            return;
+        }
+        if (isAgendaDateBeforeToday(manualAppointmentSelectedDate)) {
+            setManualAppointmentStatus('Je kunt geen afspraak in het verleden inplannen.', 'error');
             return;
         }
         const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : '';
@@ -2713,6 +2734,10 @@
         }
         if (!timeVal || parseManualTimeToMinutes(timeVal) === null) {
             setManualAppointmentStatus('Vul een geldig tijdstip in.', 'error');
+            return;
+        }
+        if (isManualAppointmentStartInPast(manualAppointmentSelectedDate, timeVal)) {
+            setManualAppointmentStatus('Dit tijdstip is al voorbij. Kies een toekomstige datum of tijd.', 'error');
             return;
         }
         if (!location) {
@@ -3127,7 +3152,7 @@
         const status = String(apt?.postCallStatus || '').trim().toLowerCase();
         if (status === 'no_deal') return true;
         if (status === 'completed' || status === 'afgerond') return true;
-        if (isManualOtherAppointment(apt) && hasAppointmentStartPassed(apt)) return true;
+        if (hasAppointmentStartPassed(apt)) return true;
         if (Number(getLinkedOrderIdForAppointment(apt) || 0) > 0) return true;
         if (String(apt?.activeOrderAddedAt || '').trim()) return true;
         return false;
@@ -3157,12 +3182,6 @@
             if (manualLegendChoice === 'website') return 'appointment meeting magnetic';
             if (manualLegendChoice === 'manual-martijn') return 'appointment manual-martijn magnetic';
             if (manualLegendChoice === 'manual-both') return 'appointment manual-both magnetic';
-            if (manualLegendChoice === 'manual-overig') {
-                const manualWho = String(apt?.manualPlannerWho || apt?.manualWho || '').toLowerCase();
-                if (manualWho === 'martijn') return 'appointment manual-martijn magnetic';
-                if (manualWho === 'both' || manualWho === 'allebei' || manualWho === 'beide') return 'appointment manual-both magnetic';
-                if (manualWho === 'serve' || manualWho === 'servé') return 'appointment manual-serve magnetic';
-            }
             if (manualLegendChoice === 'manual-overig') return 'appointment manual-overig magnetic';
             if (manualLegendChoice === 'manual-serve') return 'appointment manual-serve magnetic';
             const who = String(apt?.manualPlannerWho || apt?.manualWho || '').toLowerCase();
@@ -3710,6 +3729,7 @@
             }
 
             const isSaturday = Boolean(dateStr) && i % 7 === 5;
+            const isPastDate = Boolean(dateStr) && isAgendaDateBeforeToday(dateStr);
             const dayAppointmentsRaw = dateStr
                 ? appointments.filter((a) => normalizeAgendaDateYmd(a.date) === dateStr)
                 : [];
@@ -3718,11 +3738,11 @@
             let classes = 'calendar-day';
             if (isOtherMonth) classes += ' other-month';
             if (isToday) classes += ' today';
-            if (!isOtherMonth && !isSaturday) classes += ' calendar-day-selectable';
+            if (!isOtherMonth && !isSaturday && !isPastDate) classes += ' calendar-day-selectable';
             if (isSaturday) classes += ' calendar-day--klantwerk';
 
             const dayDataAttr =
-                !isOtherMonth && dateStr && !isSaturday ? ` data-calendar-date="${dateStr}"` : '';
+                !isOtherMonth && dateStr && !isSaturday && !isPastDate ? ` data-calendar-date="${dateStr}"` : '';
             html += `<div class="${classes}"${dayDataAttr}>`;
             if (!isOtherMonth) {
                 html += `<div class="day-number">${day}</div>`;
@@ -3932,6 +3952,7 @@
             if (event.target.closest('.appointment')) return;
             const dateStr = cell.getAttribute('data-calendar-date');
             if (!dateStr) return;
+            if (isAgendaDateBeforeToday(dateStr)) return;
             openManualAppointmentModal(dateStr);
         });
 
