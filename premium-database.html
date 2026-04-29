@@ -1601,7 +1601,7 @@
     </div>
 
     <script src="assets/premium-database-photo-batch.js?v=20260429a"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260429b"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260429c"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
@@ -2172,7 +2172,7 @@
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });
 
-        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, generate: generateWebdesignPhotos, setStatusMessage, isBusy: function () { return nodes.generatePhotosButton.disabled; }, renderPage: renderPage });
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, generate: generateWebdesignPhotos, setStatusMessage, isBusy: function () { return nodes.generatePhotosButton.disabled; }, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
         function mergeCustomersWithPhotos(customers, photoMap) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};

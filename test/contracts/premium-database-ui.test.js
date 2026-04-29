@@ -201,7 +201,12 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(webdesignActionScriptSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-drop/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-generate-icon\\"/);
+  assert.match(webdesignActionScriptSource, /class=\\"photo-generate-cost\\"/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-generate-spinner\\"/);
+  assert.match(webdesignActionScriptSource, /\.photo-drop:hover \.photo-generate-cost/);
+  assert.match(webdesignActionScriptSource, /"-" \+ formatEuroCost\(costEur\) \+ " AI-kosten"/);
+  assert.match(webdesignActionScriptSource, /"Webdesign maken, kost " \+ costText/);
+  assert.match(pageSource, /formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR/);
   assert.match(webdesignActionScriptSource, /@keyframes photoGenerateSpin/);
   assert.match(webdesignActionScriptSource, /data-can-generate=\\"/);
   assert.match(webdesignActionScriptSource, /const LIGHTNING_ICON = "<svg class=\\"photo-generate-icon\\"/);
@@ -252,7 +257,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429a/);
