@@ -423,6 +423,7 @@
         let busy = false;
         let bound = false;
         const visibleSourceTargetIds = new Set();
+        const sessionFoundWebsitesByTargetId = new Map();
 
         function getCurrentTarget() {
             return state.targets[state.activeIndex] || null;
@@ -505,11 +506,21 @@
             }
         }
 
+        function getSessionFoundWebsites(targetId) {
+            return uniqueWebsiteValues(sessionFoundWebsitesByTargetId.get(normalizeString(targetId)) || [], 200);
+        }
+
+        function setSessionFoundWebsites(targetId, websites) {
+            const normalizedTargetId = normalizeString(targetId);
+            if (!normalizedTargetId) return;
+            sessionFoundWebsitesByTargetId.set(normalizedTargetId, uniqueWebsiteValues(websites, 200));
+        }
+
         function renderSources(target) {
             if (!nodes.deepSearchSources) return;
             const targetId = normalizeString(target && target.id);
             const websites = visibleSourceTargetIds.has(targetId)
-                ? uniqueWebsiteValues(target && target.foundWebsites, 200)
+                ? getSessionFoundWebsites(targetId)
                 : [];
             if (!websites.length) {
                 nodes.deepSearchSources.innerHTML = "<div class=\"deep-search-empty\">Nog geen websites voor deze plek.</div>";
@@ -543,6 +554,7 @@
             if (!target) return;
             target.foundWebsites = [];
             target.lastSources = [];
+            setSessionFoundWebsites(target.id, []);
             target.updatedAt = new Date().toISOString();
         }
 
@@ -605,6 +617,7 @@
             target.updatedAt = new Date().toISOString();
             target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
             target.foundWebsites = uniqueWebsiteValues((target.foundWebsites || []).concat(addedWebsites || []), 200);
+            setSessionFoundWebsites(target.id, getSessionFoundWebsites(target.id).concat(addedWebsites || []));
             target.seen = uniqueStrings(target.seen.concat(businesses.map(function (business) {
                 return [
                     business && business.bedrijfsnaam,
@@ -832,6 +845,7 @@
         function open() {
             if (!nodes.deepSearchModal) return;
             visibleSourceTargetIds.clear();
+            sessionFoundWebsitesByTargetId.clear();
             nodes.deepSearchModal.classList.add("on");
             nodes.deepSearchModal.setAttribute("aria-hidden", "false");
             void loadState();

@@ -85,6 +85,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
   assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260428a/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
+  assert.match(pageSource, /window\.SoftoraPremiumDashboardCore \|\|/);
   assert.match(pageSource, /const databaseStatus = normalizePremiumDashboardCustomerDatabaseStatus\(item\);/);
   assert.match(pageSource, /databaseStatus,/);
   assert.match(pageSource, /\.filter\(\(customer\) => customer\.databaseStatus === 'klant'\)/);
