@@ -2,7 +2,6 @@
     "use strict";
 
     const STYLE_ID = "softora-database-webdesign-action-style";
-    const CHARGE_LABEL_ID = "softora-webdesign-charge-label";
     const JOB_ENDPOINT = "/api/premium-database/webdesign-photo-jobs";
     const PENDING_TTL_MS = 6 * 60 * 60 * 1000;
     const POLL_INTERVAL_MS = 2200;
@@ -21,7 +20,7 @@
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
         const style = global.document.createElement("style");
         style.id = STYLE_ID;
-        style.textContent = ".photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating{cursor:wait}.photo-generate-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
+        style.textContent = ".photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating{cursor:wait}.photo-generate-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
         global.document.head.appendChild(style);
     }
 
@@ -40,7 +39,6 @@
         const pendingIds = new Set();
         const pendingJobs = new Map();
         const pollTimers = new Map();
-        let chargeLabelTimer = null;
         ensureStyles();
 
         function getCustomerById(customerId) {
@@ -58,22 +56,35 @@
             return "webdesign_" + now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
         }
 
+        function updateChargeLabelPositions() {
+            if (!global.document) return;
+            const labels = Array.from(global.document.querySelectorAll(".photo-generate-charge-label"));
+            labels.reverse().forEach(function (label, index) {
+                label.style.bottom = (18 + (index * 44)) + "px";
+            });
+        }
+
         function showChargeLabel() {
             if (!global.document) return;
-            let label = global.document.getElementById(CHARGE_LABEL_ID);
-            if (!label) {
-                label = global.document.createElement("div");
-                label.id = CHARGE_LABEL_ID;
-                label.className = "photo-generate-charge-label";
-                label.setAttribute("aria-live", "polite");
-                global.document.body.appendChild(label);
-            }
+            const label = global.document.createElement("div");
+            label.className = "photo-generate-charge-label";
+            label.setAttribute("aria-live", "polite");
             label.textContent = formatCentCost(costEur);
-            label.classList.add("is-visible");
-            if (chargeLabelTimer) global.clearTimeout(chargeLabelTimer);
-            chargeLabelTimer = global.setTimeout(function () {
+            global.document.body.appendChild(label);
+            updateChargeLabelPositions();
+            const frame = typeof global.requestAnimationFrame === "function"
+                ? global.requestAnimationFrame
+                : function (callback) { global.setTimeout(callback, 0); };
+            frame(function () {
+                label.classList.add("is-visible");
+            });
+            global.setTimeout(function () {
                 label.classList.remove("is-visible");
-            }, 2400);
+            }, 1800);
+            global.setTimeout(function () {
+                if (label.parentNode) label.parentNode.removeChild(label);
+                updateChargeLabelPositions();
+            }, 2200);
         }
 
         function readPendingJobs() {

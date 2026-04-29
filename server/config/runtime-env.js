@@ -90,9 +90,7 @@ function loadRuntimeEnv(env = process.env) {
       defaultTwilioMediaWsUrl: 'wss://twilio-media-bridge-ln3f.onrender.com/twilio-media',
     },
     websiteGeneration: {
-      provider: normalizeString(
-        safeEnv.WEBSITE_GENERATION_PROVIDER || safeEnv.SITE_GENERATION_PROVIDER || ''
-      ).toLowerCase() || 'openai',
+      provider: 'openai',
       strictAnthropic: false,
       strictHtml: readNegatedBooleanEnvFlag(safeEnv.WEBSITE_GENERATION_STRICT_HTML, true),
       timeoutMs: readBoundedNumberEnv(

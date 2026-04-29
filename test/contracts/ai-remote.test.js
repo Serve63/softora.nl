@@ -636,6 +636,48 @@ test('ai remote service ignores legacy strict anthropic mode and uses OpenAI', a
   assert.match(result.html, /OpenAI site/);
 });
 
+test('ai remote service blocks direct Claude/Anthropic message calls', async () => {
+  const { service, state } = createService();
+
+  await assert.rejects(
+    () => service.sendAnthropicMessage({ systemPrompt: 'Systeem', userPrompt: 'Gebruiker' }),
+    (error) => {
+      assert.equal(error.status, 410);
+      assert.equal(error.code, 'CLAUDE_MODELS_DISABLED');
+      assert.equal(error.data.provider, 'anthropic');
+      assert.equal(error.data.replacementProvider, 'openai');
+      assert.match(error.message, /Claude\/Anthropic modellen zijn uitgeschakeld/);
+      return true;
+    }
+  );
+  assert.equal(state.fetchJsonCalls.length, 0);
+});
+
+test('ai remote service routes legacy Anthropic website alias through OpenAI', async () => {
+  const calls = [];
+  const { service } = createService({
+    fetchJsonWithTimeout: async (url, options, timeoutMs) => {
+      calls.push({ url, options, timeoutMs });
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          choices: [{ message: { content: '<main><h1>OpenAI alias</h1></main>' } }],
+          usage: { prompt_tokens: 40, completion_tokens: 30 },
+        },
+      };
+    },
+  });
+
+  const result = await service.generateWebsiteHtmlWithAnthropic({ prompt: 'Maak oude alias' });
+
+  assert.equal(result.source, 'openai');
+  assert.match(result.html, /OpenAI alias/);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://api.openai.test/v1/chat/completions');
+  assert.match(String(calls[0].options.headers.Authorization || ''), /openai-key/);
+  assert.doesNotMatch(calls[0].url, /anthropic/i);
+});
+
 test('ai remote service normalizes OpenAI dossier JSON into a stable layout payload', async () => {
   const { service } = createService({
     fetchJsonWithTimeout: async () => ({

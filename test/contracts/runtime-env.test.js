@@ -72,6 +72,15 @@ test('loadRuntimeEnv clamps coldmail safety limits for Strato-safe sending', () 
 
 test('loadRuntimeEnv disables Anthropic defaults', () => {
   const runtimeEnv = loadRuntimeEnv({});
+  const legacyEnv = loadRuntimeEnv({
+    ANTHROPIC_API_BASE_URL: 'https://api.anthropic.test/v1',
+    ANTHROPIC_MODEL: 'claude-sonnet-4-6',
+    WEBSITE_ANTHROPIC_MODEL: 'claude-opus-4-6',
+    ANTHROPIC_DOSSIER_MODEL: 'claude-opus-4-6',
+    WEBSITE_GENERATION_PROVIDER: 'anthropic',
+    SITE_GENERATION_PROVIDER: 'anthropic',
+    WEBSITE_GENERATION_STRICT_ANTHROPIC: 'true',
+  });
 
   assert.equal(runtimeEnv.ai.anthropicModel, '');
   assert.equal(runtimeEnv.ai.anthropicApiBaseUrl, '');
@@ -79,6 +88,12 @@ test('loadRuntimeEnv disables Anthropic defaults', () => {
   assert.equal(runtimeEnv.ai.dossierAnthropicModel, '');
   assert.equal(runtimeEnv.websiteGeneration.provider, 'openai');
   assert.equal(runtimeEnv.websiteGeneration.strictAnthropic, false);
+  assert.equal(legacyEnv.ai.anthropicModel, '');
+  assert.equal(legacyEnv.ai.anthropicApiBaseUrl, '');
+  assert.equal(legacyEnv.ai.websiteAnthropicModel, '');
+  assert.equal(legacyEnv.ai.dossierAnthropicModel, '');
+  assert.equal(legacyEnv.websiteGeneration.provider, 'openai');
+  assert.equal(legacyEnv.websiteGeneration.strictAnthropic, false);
 });
 
 test('loadRuntimeEnv defaults OpenAI text calls to GPT-5.5 Pro', () => {

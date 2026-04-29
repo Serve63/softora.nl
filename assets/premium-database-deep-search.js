@@ -4,8 +4,9 @@
     const USD_TO_EUR_RATE = 0.93;
     const ESTIMATED_BATCH_PRICING = {
         inputTokens: 6000,
-        outputTokens: 16000,
-        webSearchCalls: 1,
+        outputTokensPerCompany: 1400,
+        webSearchCallsPerBatch: 1,
+        batchSize: 100,
         inputUsdPerMillion: 30,
         outputUsdPerMillion: 180,
         webSearchUsdPerCall: 0.01
@@ -122,10 +123,17 @@
         return parseTargetLines(DEFAULT_TARGET_TEXT);
     }
 
-    function estimateBatchUsd() {
-        return ((ESTIMATED_BATCH_PRICING.inputTokens / 1000000) * ESTIMATED_BATCH_PRICING.inputUsdPerMillion)
-            + ((ESTIMATED_BATCH_PRICING.outputTokens / 1000000) * ESTIMATED_BATCH_PRICING.outputUsdPerMillion)
-            + (ESTIMATED_BATCH_PRICING.webSearchCalls * ESTIMATED_BATCH_PRICING.webSearchUsdPerCall);
+    function estimateRunUsd(companyCount) {
+        const count = Math.max(1, Math.min(MAX_DESIRED_COMPANY_COUNT, Number(companyCount || DEFAULT_DESIRED_COMPANY_COUNT) || DEFAULT_DESIRED_COMPANY_COUNT));
+        const batchSize = Math.max(1, Number(ESTIMATED_BATCH_PRICING.batchSize) || DEEP_SEARCH_BATCH_SIZE);
+        const estimatedBatches = Math.max(1, Math.ceil(count / batchSize));
+        const inputTokens = estimatedBatches * ESTIMATED_BATCH_PRICING.inputTokens;
+        const outputTokens = count * ESTIMATED_BATCH_PRICING.outputTokensPerCompany;
+        const webSearchCalls = estimatedBatches * ESTIMATED_BATCH_PRICING.webSearchCallsPerBatch;
+        const inputUsd = (inputTokens / 1000000) * ESTIMATED_BATCH_PRICING.inputUsdPerMillion;
+        const outputUsd = (outputTokens / 1000000) * ESTIMATED_BATCH_PRICING.outputUsdPerMillion;
+        const webSearchUsd = webSearchCalls * ESTIMATED_BATCH_PRICING.webSearchUsdPerCall;
+        return inputUsd + outputUsd + webSearchUsd;
     }
 
     function usdToEur(value) {
@@ -569,13 +577,8 @@
             }
             if (nodes.deepSearchCost) {
                 const desiredCount = getDesiredCompanyCount();
-                const estimatedBatches = Math.max(1, Math.ceil(desiredCount / DEEP_SEARCH_BATCH_SIZE));
-                const batchEstimate = formatEuro(usdToEur(estimateBatchUsd() * estimatedBatches));
-                const targetCost = target ? Math.max(0, Number(target.costUsd) || 0) : 0;
-                const batchCost = targetCost > 0 ? formatUsdAsEuro(targetCost) : batchEstimate;
-                nodes.deepSearchCost.textContent = target
-                    ? "Geschatte API-kosten: ± " + batchCost
-                    : "Geschatte API-kosten: ± " + batchEstimate;
+                const estimate = formatUsdAsEuro(estimateRunUsd(desiredCount));
+                nodes.deepSearchCost.textContent = "Geschatte API-kosten voor " + desiredCount + " bedrijven: ± " + estimate + " (max ± €2 afwijking)";
             }
             if (nodes.deepSearchList) {
                 nodes.deepSearchList.innerHTML = state.targets.length

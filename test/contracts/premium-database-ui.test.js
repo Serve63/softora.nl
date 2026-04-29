@@ -202,8 +202,11 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(webdesignActionScriptSource, /class=\\"photo-drop/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-generate-icon\\"/);
   assert.doesNotMatch(webdesignActionScriptSource, /class=\\"photo-generate-cost\\"/);
-  assert.match(webdesignActionScriptSource, /const CHARGE_LABEL_ID = "softora-webdesign-charge-label";/);
   assert.match(webdesignActionScriptSource, /className = "photo-generate-charge-label";/);
+  assert.match(webdesignActionScriptSource, /function updateChargeLabelPositions\(\)/);
+  assert.match(webdesignActionScriptSource, /querySelectorAll\("\.photo-generate-charge-label"\)/);
+  assert.match(webdesignActionScriptSource, /global\.document\.body\.appendChild\(label\)/);
+  assert.doesNotMatch(webdesignActionScriptSource, /CHARGE_LABEL_ID/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-generate-spinner\\"/);
   assert.doesNotMatch(webdesignActionScriptSource, /\.photo-drop:hover \.photo-generate-cost/);
   assert.match(webdesignActionScriptSource, /function formatCentCost\(value\)/);
@@ -266,10 +269,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429f/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429g/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429b/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429c/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -342,7 +345,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260429b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260429c"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -431,7 +434,13 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(deepSearchScriptSource, /item\.batches \+ "x/);
   assert.doesNotMatch(deepSearchScriptSource, /item\.added \+ " nieuw/);
   assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
-  assert.match(deepSearchScriptSource, /"Geschatte API-kosten: ± " \+ batchCost/);
+  assert.match(
+    deepSearchScriptSource,
+    /"Geschatte API-kosten voor " \+ desiredCount \+ " bedrijven: ± " \+ estimate \+ " \(max ± €2 afwijking\)"/
+  );
+  assert.match(deepSearchScriptSource, /function estimateRunUsd\(companyCount\)/);
+  assert.match(deepSearchScriptSource, /outputTokensPerCompany/);
+  assert.doesNotMatch(deepSearchScriptSource, /"Geschatte API-kosten: ± " \+ batchCost/);
   assert.doesNotMatch(deepSearchScriptSource, /per AI-ronde/);
   assert.doesNotMatch(deepSearchScriptSource, /gebruikt voor deze plek/);
   assert.doesNotMatch(deepSearchScriptSource, /klaar ·/);
