@@ -274,6 +274,8 @@ function buildServerAppFeatureWiringRuntimeContext({
       requireRuntimeDebugAccess: securityRuntime.requireRuntimeDebugAccess,
       seoReadCoordinator: uiSeoRuntime.seoReadCoordinator,
       seoWriteCoordinator: uiSeoRuntime.seoWriteCoordinator,
+      getUiStateValues: uiSeoRuntime.getUiStateValues,
+      setUiStateValues: uiSeoRuntime.setUiStateValues,
     },
   });
 }

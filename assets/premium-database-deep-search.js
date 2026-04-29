@@ -711,7 +711,7 @@
                         return { desiredReached: true };
                     });
                 }
-                setStatusMessage("AI zoekt nieuwe bedrijven voor " + startedLabel + ". Nog " + remainingCount + " nodig...", "info");
+                setStatusMessage("");
                 return runTargetBatch(target, remainingCount).then(function (result) {
                     runSession.addedCount = Number(runSession.addedCount || 0) + Math.max(0, Number(result.addedCount) || 0);
                     render();
@@ -743,10 +743,7 @@
                         });
                     }
                     return persistState().then(function () {
-                        const nextReason = result.completed
-                            ? " AI gaf al klaar aan, maar omdat deze zoekslag nog iets opleverde zoeken we automatisch verder."
-                            : " AI gaat automatisch door met dezelfde locatie.";
-                        setStatusMessage(baseMessage + nextReason, "info");
+                        setStatusMessage("");
                         return wait(autoContinueDelayMs).then(nextBatch);
                     });
                 });

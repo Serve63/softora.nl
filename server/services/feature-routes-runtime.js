@@ -8,6 +8,9 @@ const { registerAiToolRoutes } = require('../routes/ai-tools');
 const { registerWebsiteLinkRoutes } = require('../routes/website-links');
 const { registerWebsitePreviewLibraryRoutes } = require('../routes/website-preview-library');
 const { registerWebsitePreviewBatchRoutes } = require('../routes/website-preview-batch');
+const {
+  registerPremiumDatabaseWebdesignJobRoutes,
+} = require('../routes/premium-database-webdesign-jobs');
 const { registerMailboxRoutes } = require('../routes/mailbox');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
@@ -33,6 +36,7 @@ function registerFeatureRoutes(app, deps = {}) {
     websiteLinkCoordinator,
     websitePreviewLibraryCoordinator,
     websitePreviewBatchCoordinator = null,
+    premiumDatabaseWebdesignJobsCoordinator = null,
     mailboxCoordinator = null,
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
@@ -61,6 +65,9 @@ function registerFeatureRoutes(app, deps = {}) {
   registerWebsiteLinkRoutes(app, { coordinator: websiteLinkCoordinator });
   registerWebsitePreviewLibraryRoutes(app, { coordinator: websitePreviewLibraryCoordinator });
   registerWebsitePreviewBatchRoutes(app, { coordinator: websitePreviewBatchCoordinator });
+  registerPremiumDatabaseWebdesignJobRoutes(app, {
+    coordinator: premiumDatabaseWebdesignJobsCoordinator,
+  });
   registerMailboxRoutes(app, { coordinator: mailboxCoordinator });
   registerActiveOrderRoutes(app, { coordinator: activeOrdersCoordinator });
   registerPremiumDatabaseImportRoutes(app, {

@@ -3,6 +3,9 @@ const { createAgendaAppRuntime } = require('./agenda-app-runtime');
 const { createAppOpsRuntime } = require('./app-ops-runtime');
 const { registerFeatureRoutes } = require('./feature-routes-runtime');
 const { createWebsitePreviewBatchCoordinator } = require('./website-preview-batch');
+const {
+  createPremiumDatabaseWebdesignJobsCoordinator,
+} = require('./premium-database-webdesign-jobs');
 const { createMailboxService } = require('./mailbox');
 const {
   buildAgendaAppRuntimeOptions,
@@ -27,6 +30,14 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     aiToolsCoordinator,
     websitePreviewLibraryCoordinator: featureRouteOptions.websitePreviewLibraryCoordinator,
   });
+  const premiumDatabaseWebdesignJobsCoordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: aiDashboardOptions.logger || console,
+    normalizeString: aiDashboardOptions.normalizeString,
+    truncateText: aiDashboardOptions.truncateText,
+    aiToolsCoordinator,
+    getUiStateValues: featureRouteOptions.getUiStateValues,
+    setUiStateValues: featureRouteOptions.setUiStateValues,
+  });
   const mailboxCoordinator = createMailboxService(featureRouteOptions.mailbox || {});
 
   registerFeatureRoutesImpl(
@@ -37,6 +48,7 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
       aiToolsCoordinator,
       activeOrdersCoordinator,
       websitePreviewBatchCoordinator,
+      premiumDatabaseWebdesignJobsCoordinator,
       mailboxCoordinator,
     })
   );

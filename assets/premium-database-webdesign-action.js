@@ -2,6 +2,9 @@
     "use strict";
 
     const STYLE_ID = "softora-database-webdesign-action-style";
+    const JOB_ENDPOINT = "/api/premium-database/webdesign-photo-jobs";
+    const PENDING_TTL_MS = 6 * 60 * 60 * 1000;
+    const POLL_INTERVAL_MS = 2200;
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
 
@@ -32,19 +35,173 @@
         const resolveCustomerWebsiteUrl = options.resolveCustomerWebsiteUrl;
         const isWebdesignPhotoEligible = options.isWebdesignPhotoEligible;
         const openWebsitePhotoPreview = options.openWebsitePhotoPreview;
-        const generate = options.generate;
         const setStatusMessage = options.setStatusMessage;
         const renderPage = options.renderPage;
+        const refreshPhotos = options.refreshPhotos;
         const formatEuroCost = typeof options.formatEuroCost === "function" ? options.formatEuroCost : defaultFormatEuroCost;
         const costEur = Math.max(0, Number(options.costEur) || 0);
         const pendingIds = new Set();
-        let generationQueue = Promise.resolve();
+        const pendingJobs = new Map();
+        const pollTimers = new Map();
         ensureStyles();
 
         function getCustomerById(customerId) {
             return (state.klanten || []).find(function (item) {
                 return item.id === customerId;
             }) || null;
+        }
+
+        function now() {
+            return Date.now ? Date.now() : new Date().getTime();
+        }
+
+        function createJobId() {
+            if (global.crypto && typeof global.crypto.randomUUID === "function") return global.crypto.randomUUID();
+            return "webdesign_" + now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
+        }
+
+        function readPendingJobs() {
+            const cutoff = now() - PENDING_TTL_MS;
+            return Array.from(pendingJobs.values()).filter(function (item) {
+                return item.customerId && item.jobId && item.startedAt >= cutoff;
+            });
+        }
+
+        function upsertPendingJob(job) {
+            pendingJobs.set(job.customerId, job);
+        }
+
+        function removePendingJob(customerId) {
+            pendingJobs.delete(customerId);
+            pendingIds.delete(customerId);
+        }
+
+        function setPendingJob(job) {
+            pendingIds.add(job.customerId);
+            upsertPendingJob(job);
+            if (typeof renderPage === "function") renderPage();
+        }
+
+        function buildJobPayload(target, jobId) {
+            return {
+                jobId: jobId,
+                websiteUrl: resolveCustomerWebsiteUrl(target),
+                customer: {
+                    id: target.id,
+                    bedrijf: target.bedrijf,
+                    naam: target.naam,
+                    tel: target.tel || target.telefoon,
+                    dom: target.dom,
+                    website: target.website
+                }
+            };
+        }
+
+        async function refreshFinishedPhotos() {
+            if (typeof refreshPhotos === "function") {
+                await refreshPhotos();
+            } else if (typeof renderPage === "function") {
+                renderPage();
+            }
+        }
+
+        function clearPollTimer(jobId) {
+            const timer = pollTimers.get(jobId);
+            if (timer) global.clearTimeout(timer);
+            pollTimers.delete(jobId);
+        }
+
+        function schedulePoll(jobId, delay) {
+            if (!jobId || pollTimers.has(jobId)) return;
+            const timer = global.setTimeout(function () {
+                pollTimers.delete(jobId);
+                void pollJob(jobId);
+            }, Math.max(0, Number(delay) || 0));
+            pollTimers.set(jobId, timer);
+        }
+
+        async function finishPendingJob(job, message) {
+            clearPollTimer(job.jobId);
+            removePendingJob(job.customerId);
+            await refreshFinishedPhotos();
+            if (message) setStatusMessage(message, "error", true);
+            if (typeof renderPage === "function") renderPage();
+        }
+
+        async function pollJob(jobId) {
+            const storedJob = readPendingJobs().find(function (item) {
+                return item.jobId === jobId;
+            });
+            if (!storedJob) return;
+
+            try {
+                const response = await fetch(JOB_ENDPOINT + "/" + encodeURIComponent(jobId), {
+                    method: "GET",
+                    credentials: "same-origin",
+                    cache: "no-store",
+                    headers: { Accept: "application/json" }
+                });
+                const payload = await response.json().catch(function () {
+                    return {};
+                });
+                const job = payload && payload.job ? payload.job : null;
+                if (response.status === 404) {
+                    if (now() - storedJob.startedAt < 15000) {
+                        schedulePoll(jobId, POLL_INTERVAL_MS);
+                        return;
+                    }
+                    await finishPendingJob(storedJob, "");
+                    return;
+                }
+                if (!response.ok || !job) {
+                    throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-status laden is mislukt.");
+                }
+                if (job.status === "done") {
+                    await finishPendingJob(storedJob, "");
+                    return;
+                }
+                if (job.status === "error") {
+                    await finishPendingJob(storedJob, normalizeString(job.error) || "Webdesign maken is mislukt.");
+                    return;
+                }
+                schedulePoll(jobId, POLL_INTERVAL_MS);
+            } catch (error) {
+                schedulePoll(jobId, POLL_INTERVAL_MS * 2);
+            }
+        }
+
+        async function loadRunningJobs() {
+            try {
+                const response = await fetch(JOB_ENDPOINT, {
+                    method: "GET",
+                    credentials: "same-origin",
+                    cache: "no-store",
+                    headers: { Accept: "application/json" }
+                });
+                const payload = await response.json().catch(function () {
+                    return {};
+                });
+                const jobs = Array.isArray(payload && payload.jobs) ? payload.jobs : [];
+                if (!response.ok) return;
+                jobs.forEach(function (job) {
+                    if (!job || (job.status !== "queued" && job.status !== "running")) return;
+                    const pendingJob = {
+                        customerId: normalizeString(job.customerId),
+                        jobId: normalizeString(job.id),
+                        startedAt: Math.max(0, Number(job.createdAt) || now())
+                    };
+                    if (!pendingJob.customerId || !pendingJob.jobId) return;
+                    setPendingJob(pendingJob);
+                    schedulePoll(pendingJob.jobId, 0);
+                });
+            } catch (error) {
+                /* The next page load or poll will pick up running server jobs again. */
+            }
+        }
+
+        function resumePendingJobs() {
+            void loadRunningJobs();
+            global.setTimeout(function () { void loadRunningJobs(); }, 2000);
         }
 
         function render(customer) {
@@ -78,24 +235,46 @@
                 return;
             }
             setStatusMessage("");
-            pendingIds.add(target.id);
-            if (typeof renderPage === "function") renderPage();
-            generationQueue = generationQueue.catch(function () {
-                return null;
-            }).then(async function () {
-                const freshTarget = getCustomerById(target.id);
-                if (!freshTarget || !isWebdesignPhotoEligible(freshTarget)) return;
-                await generate([freshTarget], { silentProgress: true });
-            }).finally(function () {
-                pendingIds.delete(target.id);
-                if (typeof renderPage === "function") renderPage();
-            });
-            await generationQueue;
+            const jobId = createJobId();
+            setPendingJob({ customerId: target.id, jobId: jobId, startedAt: now() });
+            try {
+                const response = await fetch(JOB_ENDPOINT, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    cache: "no-store",
+                    keepalive: true,
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: JSON.stringify(buildJobPayload(target, jobId))
+                });
+                const payload = await response.json().catch(function () {
+                    return {};
+                });
+                const job = payload && payload.job ? payload.job : null;
+                if (!response.ok || !job || !job.id) {
+                    throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign starten is mislukt.");
+                }
+                if (job.id !== jobId) {
+                    clearPollTimer(jobId);
+                    setPendingJob({ customerId: target.id, jobId: job.id, startedAt: now() });
+                }
+                if (job.status === "done") {
+                    await finishPendingJob({ customerId: target.id, jobId: job.id }, "");
+                    return;
+                }
+                if (job.status === "error") {
+                    await finishPendingJob({ customerId: target.id, jobId: job.id }, normalizeString(job.error) || "Webdesign maken is mislukt.");
+                    return;
+                }
+                schedulePoll(job.id, 0);
+            } catch (error) {
+                await finishPendingJob({ customerId: target.id, jobId: jobId }, normalizeString(error && error.message) || "Webdesign starten is mislukt.");
+            }
         }
 
         return {
             generateForCustomer: generateForCustomer,
-            render: render
+            render: render,
+            resumePendingJobs: resumePendingJobs
         };
     }
 

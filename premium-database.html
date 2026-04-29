@@ -1601,11 +1601,11 @@
     </div>
 
     <script src="assets/premium-database-photo-batch.js?v=20260429a"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260429d"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260429e"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
-    <script src="assets/premium-database-deep-search.js?v=20260429a"></script>
+    <script src="assets/premium-database-deep-search.js?v=20260429b"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
@@ -2172,7 +2172,7 @@
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });
 
-        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, generate: generateWebdesignPhotos, setStatusMessage, isBusy: function () { return nodes.generatePhotosButton.disabled; }, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, refreshPhotos: async function () { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap)); renderPage(); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
         function mergeCustomersWithPhotos(customers, photoMap) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
@@ -3388,7 +3388,7 @@
 
         void (async function () {
             try {
-                await bootstrapCustomers();
+                await bootstrapCustomers(); webdesignActionController.resumePendingJobs();
                 void databaseImportController.startAutoSync();
             } finally {
                 if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === "function") {
