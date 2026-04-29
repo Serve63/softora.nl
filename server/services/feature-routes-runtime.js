@@ -11,6 +11,7 @@ const { registerWebsitePreviewBatchRoutes } = require('../routes/website-preview
 const {
   registerPremiumDatabaseWebdesignJobRoutes,
 } = require('../routes/premium-database-webdesign-jobs');
+const { registerOpenAiCostRoutes } = require('../routes/openai-costs');
 const { registerMailboxRoutes } = require('../routes/mailbox');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
@@ -37,6 +38,7 @@ function registerFeatureRoutes(app, deps = {}) {
     websitePreviewLibraryCoordinator,
     websitePreviewBatchCoordinator = null,
     premiumDatabaseWebdesignJobsCoordinator = null,
+    openAiCostSummary = null,
     mailboxCoordinator = null,
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
@@ -68,6 +70,7 @@ function registerFeatureRoutes(app, deps = {}) {
   registerPremiumDatabaseWebdesignJobRoutes(app, {
     coordinator: premiumDatabaseWebdesignJobsCoordinator,
   });
+  registerOpenAiCostRoutes(app, openAiCostSummary || {});
   registerMailboxRoutes(app, { coordinator: mailboxCoordinator });
   registerActiveOrderRoutes(app, { coordinator: activeOrdersCoordinator });
   registerPremiumDatabaseImportRoutes(app, {

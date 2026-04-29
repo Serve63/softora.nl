@@ -57,7 +57,7 @@ test('server app runtime composition builders preserve feature wiring groups and
 
   const context = buildServerAppFeatureWiringRuntimeContext({
     app: { locals: {} },
-    env: { RETELL_API_KEY: 'retell-key' },
+    env: { RETELL_API_KEY: 'retell-key', OPENAI_ADMIN_API_KEY: 'admin-key', OPENAI_COST_USD_TO_EUR: '0.91' },
     envConfig: {
       ACTIVE_ORDER_AUTOMATION_ENABLED: true,
       ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN: 'gh-token',
@@ -255,6 +255,10 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(context.featureRouteOptions.coldcalling.premiumActiveOrdersScope, 'premium_active_orders');
   assert.equal(context.featureRouteOptions.coldcalling.premiumActiveCustomOrdersKey, 'custom_orders');
   assert.equal(context.featureRouteOptions.coldcalling.logger, console);
+  assert.equal(context.featureRouteOptions.openAiCostSummary.openAiAdminApiKey, 'admin-key');
+  assert.equal(context.featureRouteOptions.openAiCostSummary.openAiApiKey, 'openai');
+  assert.equal(context.featureRouteOptions.openAiCostSummary.openAiCostsApiBaseUrl, 'https://api.openai.test');
+  assert.equal(context.featureRouteOptions.openAiCostSummary.usdToEurRate, 0.91);
   assert.equal(context.featureRouteOptions.coldmailing.coldmailCampaignService.isSmtpMailConfigured(), true);
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
     'info@softora.test',
