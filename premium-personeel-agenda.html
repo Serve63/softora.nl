@@ -615,10 +615,6 @@
 
         .workspace-audio-upload {
             margin-top: 0.75rem;
-            border: 1px solid rgba(155, 35, 85, 0.16);
-            border-radius: 12px;
-            background: linear-gradient(135deg, rgba(155, 35, 85, 0.075), rgba(255,255,255,0.86));
-            padding: 0.75rem 0.8rem;
         }
 
         .workspace-upload-actions {
@@ -1371,12 +1367,6 @@
                                 <button class="workspace-upload-btn magnetic" id="meetingAudioUploadBtn" type="button">
                                     Audiobestand uploaden
                                 </button>
-                                <span class="workspace-audio-upload-copy">
-                                    Upload de opname van het klantgesprek. AI zet dit om naar dossierklare wensen, afspraken en actiepunten.
-                                </span>
-                            </div>
-                            <div class="workspace-audio-upload-help">
-                                Geschikt voor MP3, M4A, WAV, WEBM, OGG, FLAC of AAC. Maximaal ongeveer 22 MB.
                             </div>
                             <div class="workspace-audio-file" id="meetingAudioFileName" hidden></div>
                             <input id="meetingAudioUploadInput" type="file" accept="audio/*,.mp3,.m4a,.wav,.webm,.ogg,.flac,.aac" hidden>
@@ -2051,6 +2041,26 @@
 
     function shouldHideEmptyAppointmentAudioBlock(item) {
         return isManualAgendaAppointment(item);
+    }
+
+    function setModalDetailValueHidden(valueElementId, hidden) {
+        const valueElement = document.getElementById(valueElementId);
+        const detailItem = valueElement ? valueElement.closest('.modal-detail-item') : null;
+        if (detailItem) detailItem.hidden = Boolean(hidden);
+    }
+
+    function syncManualAppointmentModalDetails(apt) {
+        const isManual = isManualAgendaAppointment(apt);
+        setModalDetailValueHidden('modalBranche', isManual);
+        setModalDetailValueHidden('modalProvider', isManual);
+
+        const contactEl = document.getElementById('modalContact');
+        if (contactEl) {
+            const contact = String(apt?.contact || '').trim();
+            const phone = String(apt?.phone || '').trim();
+            const hasUsefulContactLine = Boolean((contact && contact !== '—' && contact !== '-') || phone);
+            contactEl.hidden = isManual && !hasUsefulContactLine;
+        }
     }
 
     function isManualOtherAppointment(apt) {
@@ -3787,6 +3797,7 @@
         const resolvedLocation = resolveAppointmentLocationDisplay(apt);
         document.getElementById('modalLocation').textContent = resolvedLocation || 'Nog niet ingevuld';
         document.getElementById('modalSummary').textContent = buildAppointmentSummaryDisplay(apt, resolvedLocation);
+        syncManualAppointmentModalDetails(apt);
         syncAppointmentAudio(apt);
         fillWorkspaceFromAppointment(apt);
         applyWorkspaceMode(false);
