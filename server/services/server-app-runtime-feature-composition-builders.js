@@ -232,7 +232,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           extractOpenAiTextContent: aiHelpers.extractOpenAiTextContent,
           openAiApiBaseUrl: envConfig.OPENAI_API_BASE_URL,
           coldmailAutoReplyModel: shared.normalizeString(
-            env.COLDMAIL_AUTOREPLY_OPENAI_MODEL || env.COLDMAIL_AUTOREPLY_MODEL || envConfig.OPENAI_MODEL || 'gpt-5.5'
+            env.COLDMAIL_AUTOREPLY_OPENAI_MODEL || env.COLDMAIL_AUTOREPLY_MODEL || envConfig.OPENAI_MODEL || 'gpt-5.5-pro'
           ),
           coldmailAutoReplyEnabled: /^true$/i.test(shared.normalizeString(env.COLDMAIL_AUTOREPLY_ENABLED || '')),
           getUiStateValues: uiSeoRuntime.getUiStateValues,

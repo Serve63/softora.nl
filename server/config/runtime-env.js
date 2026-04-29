@@ -79,7 +79,7 @@ function loadRuntimeEnv(env = process.env) {
       retellApiBaseUrl: safeEnv.RETELL_API_BASE_URL || 'https://api.retellai.com',
       twilioApiBaseUrl: buildTwilioApiBaseUrl(safeEnv),
       openaiApiBaseUrl: safeEnv.OPENAI_API_BASE_URL || 'https://api.openai.com/v1',
-      openaiModel: safeEnv.OPENAI_MODEL || 'gpt-5.5',
+      openaiModel: safeEnv.OPENAI_MODEL || 'gpt-5.5-pro',
       openaiImageModel:
         safeEnv.WEBSITE_PREVIEW_IMAGE_MODEL || safeEnv.OPENAI_IMAGE_MODEL || 'gpt-image-2',
       anthropicApiBaseUrl: '',

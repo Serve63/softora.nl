@@ -59,7 +59,7 @@ function createFixture(overrides = {}) {
       (async (input) => ({
         layout: { blocks: [{ type: 'hero', title: input.title || 'Dossier' }] },
         source: 'openai',
-        model: 'gpt-5.5',
+        model: 'gpt-5.5-pro',
         usage: { inputTokens: 100 },
       })),
     buildOrderDossierFallbackLayout: overrides.buildOrderDossierFallbackLayout || ((input) => ({

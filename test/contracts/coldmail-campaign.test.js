@@ -110,7 +110,7 @@ function createService(overrides = {}) {
     extractOpenAiTextContent: (content) =>
       Array.isArray(content) ? content.map((item) => item.text || '').join('\n') : String(content || ''),
     openAiApiBaseUrl: 'https://api.openai.test/v1',
-    coldmailAutoReplyModel: 'gpt-5.5',
+    coldmailAutoReplyModel: 'gpt-5.5-pro',
     coldmailAutoReplyEnabled: Boolean(overrides.coldmailAutoReplyEnabled),
     resolveEmailDomain: async (domain) => {
       if (overrides.invalidDomains && overrides.invalidDomains.includes(domain)) return false;
@@ -338,7 +338,7 @@ test('coldmail campaign sends test recipient without marking database row as mai
   assert.equal(getSavedState(), null);
 });
 
-test('coldmail auto-reply answers inbound campaign replies with GPT-5.5', async () => {
+test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', async () => {
   const parsedInbound = {
     messageId: '<incoming-1@example.test>',
     subject: 'Re: Nieuw webdesign gemaakt!',
@@ -393,7 +393,7 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5', async 
   const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
 
   assert.equal(result.replied, 1);
-  assert.equal(requestedModel, 'gpt-5.5');
+  assert.equal(requestedModel, 'gpt-5.5-pro');
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');

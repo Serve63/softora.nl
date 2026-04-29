@@ -6,7 +6,7 @@ const { createAgendaConfirmationMailHelpers } = require('./agenda-confirmation-m
 function createAgendaConfirmationCoordinator(deps = {}) {
   const {
     openAiApiBaseUrl = 'https://api.openai.com/v1',
-    openAiModel = 'gpt-5.5',
+    openAiModel = 'gpt-5.5-pro',
     runtimeSyncCooldownMs = 60_000,
     aiCallInsightsByCallId = new Map(),
     getGeneratedAgendaAppointments = () => [],

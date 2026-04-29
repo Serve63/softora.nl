@@ -101,7 +101,7 @@ function createColdmailCampaignService(deps = {}) {
     fetchJsonWithTimeout = async () => ({ response: { ok: false, status: 500 }, data: null }),
     extractOpenAiTextContent = null,
     openAiApiBaseUrl = 'https://api.openai.com/v1',
-    coldmailAutoReplyModel = 'gpt-5.5',
+    coldmailAutoReplyModel = 'gpt-5.5-pro',
     coldmailAutoReplyEnabled = false,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
@@ -1107,7 +1107,7 @@ function createColdmailCampaignService(deps = {}) {
       error.status = 503;
       throw error;
     }
-    const model = normalizeString(coldmailAutoReplyModel) || 'gpt-5.5';
+    const model = normalizeString(coldmailAutoReplyModel) || 'gpt-5.5-pro';
     const company = getRowCompany(row);
     const contact = getRowContact(row);
     const website = getRowDomain(row);
@@ -1506,7 +1506,7 @@ function createColdmailCampaignService(deps = {}) {
       const stats = {
         ok: true,
         startedAt: now().toISOString(),
-        model: normalizeString(coldmailAutoReplyModel) || 'gpt-5.5',
+        model: normalizeString(coldmailAutoReplyModel) || 'gpt-5.5-pro',
         mailboxes: getImapMailboxesForSync(),
         scanned: 0,
         matched: 0,

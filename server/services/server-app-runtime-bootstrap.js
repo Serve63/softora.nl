@@ -175,6 +175,7 @@ function createServerAppRuntimeBootstrap(
       SEO_MAX_IMAGES_PER_PAGE: 2000,
       SEO_DEFAULT_SITE_ORIGIN: 'https://www.softora.nl',
       SEO_MODEL_PRESETS: Object.freeze([
+        { value: 'gpt-5.5-pro', label: 'GPT-5.5 Pro' },
         { value: 'gpt-5.5', label: 'GPT-5.5' },
         { value: 'gpt-5.1', label: 'GPT-5.1' },
         { value: 'gpt-5-mini', label: 'GPT-5 Mini' },

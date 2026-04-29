@@ -81,10 +81,10 @@ test('loadRuntimeEnv disables Anthropic defaults', () => {
   assert.equal(runtimeEnv.websiteGeneration.strictAnthropic, false);
 });
 
-test('loadRuntimeEnv defaults OpenAI text calls to GPT-5.5', () => {
+test('loadRuntimeEnv defaults OpenAI text calls to GPT-5.5 Pro', () => {
   const runtimeEnv = loadRuntimeEnv({});
 
-  assert.equal(runtimeEnv.ai.openaiModel, 'gpt-5.5');
+  assert.equal(runtimeEnv.ai.openaiModel, 'gpt-5.5-pro');
   assert.equal(runtimeEnv.ai.openaiImageModel, 'gpt-image-2');
 });
 

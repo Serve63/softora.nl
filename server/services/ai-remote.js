@@ -1375,7 +1375,7 @@ function createAiRemoteService(deps = {}) {
       throw err;
     }
 
-    const model = normalizeString(options.model || openAiModel) || 'gpt-5.5';
+    const model = normalizeString(options.model || openAiModel) || 'gpt-5.5-pro';
     const { response, data } = await fetchJsonWithTimeout(
       `${openAiApiBaseUrl}/chat/completions`,
       {
