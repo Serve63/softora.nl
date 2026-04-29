@@ -32,11 +32,50 @@ function isTruthyAllDayUnavailable(body) {
   return false;
 }
 
+function logManualAppointmentWarning(logger, label, detail) {
+  const message = detail && detail.message ? detail.message : detail;
+  if (typeof logger?.warn === 'function') {
+    logger.warn('[Agenda Manual Appointment]', label, message || '');
+  } else if (typeof logger?.error === 'function') {
+    logger.error('[Agenda Manual Appointment]', label, message || '');
+  }
+}
+
+async function runWithManualSoftTimeout(label, run, options = {}) {
+  const timeoutMs = Math.max(1, Math.min(15000, Number(options.timeoutMs) || 3500));
+  const fallbackValue = options.fallbackValue;
+  const logger = options.logger;
+  let timeoutHandle = null;
+  let timedOut = false;
+
+  const guardedRun = Promise.resolve()
+    .then(run)
+    .catch((error) => {
+      if (timedOut) {
+        logManualAppointmentWarning(logger, `${label}_late_error`, error);
+        return fallbackValue;
+      }
+      throw error;
+    });
+
+  const timeout = new Promise((resolve) => {
+    timeoutHandle = setTimeout(() => {
+      timedOut = true;
+      logManualAppointmentWarning(logger, `${label}_timeout`, `na ${timeoutMs}ms`);
+      resolve(fallbackValue);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([guardedRun, timeout]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+}
+
 function createAgendaManualAppointmentCoordinator(deps = {}) {
   const {
     isSupabaseConfigured,
-    getSupabaseStateHydrated,
-    forceHydrateRuntimeStateWithRetries,
     syncRuntimeStateFromSupabaseIfNewer,
     backfillInsightsAndAppointmentsFromRecentCallUpdates,
     getGeneratedAgendaAppointments,
@@ -54,6 +93,8 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     sanitizeAppointmentLocation,
     truncateText,
     createGoogleCalendarEventForAppointment = async () => ({ ok: true, skipped: true }),
+    manualGoogleCalendarSyncTimeoutMs = 3500,
+    logger = console,
   } = deps;
 
   const {
@@ -76,10 +117,8 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
   });
 
   async function createManualAgendaAppointmentResponse(req, res) {
-    if (isSupabaseConfigured() && !getSupabaseStateHydrated()) {
-      await forceHydrateRuntimeStateWithRetries(3);
-    }
-    await syncRuntimeStateFromSupabaseIfNewer({ force: true, maxAgeMs: 0 }).catch(() => false);
+    // Handmatige afspraken bevatten alle benodigde velden in de request zelf.
+    // Eerst een volledige shared-state refresh doen kan de UI laten time-outen.
     backfillInsightsAndAppointmentsFromRecentCallUpdates();
 
     const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -250,6 +289,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       {
         allowPendingResponse: true,
         pendingResponseAfterMs: 3000,
+        allowLocalVerifiedPending: true,
         verifyPersisted: () =>
           doesAgendaMutationMatchAppointment(
             updatedAppointment,
@@ -262,7 +302,21 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     let finalAppointment = updatedAppointment;
     let googleCalendarSync = null;
     try {
-      googleCalendarSync = await createGoogleCalendarEventForAppointment(updatedAppointment);
+      googleCalendarSync = await runWithManualSoftTimeout(
+        'google_calendar_manual_export',
+        () => createGoogleCalendarEventForAppointment(updatedAppointment),
+        {
+          timeoutMs: manualGoogleCalendarSyncTimeoutMs,
+          fallbackValue: {
+            ok: false,
+            skipped: true,
+            timedOut: true,
+            reason: 'google_calendar_sync_timeout',
+            error: 'Google Calendar synchronisatie duurde te lang; afspraak is wel opgeslagen.',
+          },
+          logger,
+        }
+      );
       if (googleCalendarSync && googleCalendarSync.appointment) {
         finalAppointment = googleCalendarSync.appointment;
       }

@@ -18,7 +18,7 @@ function createResponseRecorder() {
   };
 }
 
-function createFixture() {
+function createFixture(overrides = {}) {
   const appointments = [];
   const coordinator = createAgendaManualAppointmentCoordinator({
     isSupabaseConfigured: () => false,
@@ -48,6 +48,8 @@ function createFixture() {
     sanitizeAppointmentLocation: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     createGoogleCalendarEventForAppointment: async () => ({ ok: true, skipped: true }),
+    logger: { warn: () => {}, error: () => {} },
+    ...overrides,
   });
   return { appointments, coordinator };
 }
@@ -132,4 +134,101 @@ test('agenda manual appointment can be assigned to Serve and Martijn together', 
   assert.equal(res.body.ok, true);
   assert.equal(res.body.appointment.manualPlannerWho, 'both');
   assert.match(res.body.appointment.summary, /Wie: Servé en Martijn/);
+});
+
+test('agenda manual appointment does not block on initial shared-state hydration', async () => {
+  let hydrateCalls = 0;
+  let syncCalls = 0;
+  const { coordinator } = createFixture({
+    isSupabaseConfigured: () => true,
+    getSupabaseStateHydrated: () => false,
+    forceHydrateRuntimeStateWithRetries: async () => {
+      hydrateCalls += 1;
+      return new Promise(() => {});
+    },
+    syncRuntimeStateFromSupabaseIfNewer: async () => {
+      syncCalls += 1;
+      return new Promise(() => {});
+    },
+    waitForQueuedRuntimeSnapshotPersist: async () => true,
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        who: 'both',
+        title: 'Snel overleg',
+        time: '14:00',
+        legendChoice: 'business',
+        location: 'Kantoor',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(hydrateCalls, 0);
+  assert.equal(syncCalls, 0);
+});
+
+test('agenda manual appointment responds when shared persistence is locally verified but still pending', async () => {
+  let syncCalls = 0;
+  const { coordinator } = createFixture({
+    isSupabaseConfigured: () => true,
+    waitForQueuedRuntimeSnapshotPersist: async () => false,
+    syncRuntimeStateFromSupabaseIfNewer: async () => {
+      syncCalls += 1;
+      return new Promise(() => {});
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        who: 'serve',
+        title: 'Persist pending test',
+        time: '15:00',
+        legendChoice: 'business',
+        location: 'Kantoor',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.persistencePending, true);
+  assert.equal(syncCalls, 0);
+});
+
+test('agenda manual appointment does not wait indefinitely for Google Calendar export', async () => {
+  const { coordinator } = createFixture({
+    manualGoogleCalendarSyncTimeoutMs: 1,
+    createGoogleCalendarEventForAppointment: async () => new Promise(() => {}),
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        who: 'serve',
+        title: 'Calendar timeout test',
+        time: '16:00',
+        legendChoice: 'business',
+        location: 'Kantoor',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.googleCalendarSync.timedOut, true);
+  assert.equal(res.body.googleCalendarSync.reason, 'google_calendar_sync_timeout');
 });
