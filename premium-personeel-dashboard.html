@@ -2142,7 +2142,7 @@
         </section>
     </div>
 
-    <script src="assets/premium-dashboard-core.js?v=20260428a"></script>
+    <script src="assets/premium-dashboard-core.js?v=20260429a"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -2225,7 +2225,7 @@
                 text: 'Groen: werkt perfect.',
             },
         };
-        const dashboardCore = window.SoftoraPremiumDashboardCore || { escapeHtml: (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'), normalizeDashboardString: (value) => String(value || '').trim(), normalizeDashboardTime: (value, fallback) => /^\d{2}:\d{2}$/.test(String(value || '').trim()) ? String(value || '').trim() : fallback, normalizeDashboardDate: (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim()) ? String(value || '').trim() : '', getPremiumDashboardChunkMetaKey: (baseKey) => `${String(baseKey || '').trim()}_chunks_v1`, getPremiumDashboardChunkPrefix: (baseKey) => `${String(baseKey || '').trim()}_chunk_`, readPremiumDashboardChunkedStateValue: (values, baseKey) => { const stateValues = values && typeof values === 'object' ? values : {}; const normalizedKey = String(baseKey || '').trim(); const fallback = typeof stateValues[normalizedKey] === 'string' ? stateValues[normalizedKey] : ''; const metaRaw = String(stateValues[`${normalizedKey}_chunks_v1`] || '').trim(); if (!metaRaw) return fallback; try { const meta = JSON.parse(metaRaw); const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0)); if (!count) return fallback; const chunks = []; for (let index = 0; index < count; index += 1) { const chunk = stateValues[`${normalizedKey}_chunk_${index}`]; if (typeof chunk !== 'string') return fallback; chunks.push(chunk); } return chunks.join('') || fallback; } catch (_) { return fallback; } }, formatMoneyEUR: (amount) => '€' + (Number(amount) || 0).toLocaleString('nl-NL'), formatProjectMeta: (order) => { const parts = []; if (order?.location) parts.push(order.location); parts.push('€' + (Number(order?.amount) || 0).toLocaleString('nl-NL')); if (order?.ui?.isBuilt && !order?.ui?.isPaid) parts.push('wacht op betaling'); return parts.join(' • '); } };
+        const dashboardCore = window.SoftoraPremiumDashboardCore || { escapeHtml: (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'), normalizeDashboardString: (value) => String(value || '').trim(), normalizeDashboardTime: (value, fallback) => /^\d{2}:\d{2}$/.test(String(value || '').trim()) ? String(value || '').trim() : fallback, normalizeDashboardDate: (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim()) ? String(value || '').trim() : '', getPremiumDashboardChunkMetaKey: (baseKey) => `${String(baseKey || '').trim()}_chunks_v1`, getPremiumDashboardChunkPrefix: (baseKey) => `${String(baseKey || '').trim()}_chunk_`, readPremiumDashboardChunkedStateValue: (values, baseKey) => { const stateValues = values && typeof values === 'object' ? values : {}; const normalizedKey = String(baseKey || '').trim(); const fallback = typeof stateValues[normalizedKey] === 'string' ? stateValues[normalizedKey] : ''; const metaRaw = String(stateValues[`${normalizedKey}_chunks_v1`] || '').trim(); if (!metaRaw) return fallback; try { const meta = JSON.parse(metaRaw); const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0)); if (!count) return fallback; const chunks = []; for (let index = 0; index < count; index += 1) { const chunk = stateValues[`${normalizedKey}_chunk_${index}`]; if (typeof chunk !== 'string') return fallback; chunks.push(chunk); } return chunks.join('') || fallback; } catch (_) { return fallback; } }, formatMoneyEUR: (amount) => '€' + (Number(amount) || 0).toLocaleString('nl-NL'), formatProjectMeta: (order) => { const parts = []; if (order?.location) parts.push(order.location); parts.push('€' + (Number(order?.amount) || 0).toLocaleString('nl-NL')); if (order?.ui?.isBuilt && !order?.ui?.isPaid) parts.push('wacht op betaling'); return parts.join(' • '); }, fetchPremiumDashboardJson: (url, options) => fetch(url, options), releasePremiumDashboardBootShell: () => { if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') window.SoftoraPremiumBoot.setShellBooting(false); }, startPremiumDashboardBootWatchdog: () => {} };
         const {
             escapeHtml,
             normalizeDashboardString,
@@ -2235,8 +2235,9 @@
             getPremiumDashboardChunkPrefix,
             readPremiumDashboardChunkedStateValue,
             formatMoneyEUR,
-            formatProjectMeta
+            formatProjectMeta, fetchPremiumDashboardJson, releasePremiumDashboardBootShell, startPremiumDashboardBootWatchdog
         } = dashboardCore;
+        startPremiumDashboardBootWatchdog();
 
         function normalizeDashboardPeriodFilter(value) {
             return value === 'month' || value === 'quarter' || value === 'year' ? value : 'all';
@@ -2654,7 +2655,7 @@
 
             for (const url of urls) {
                 try {
-                    const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+                    const res = await fetchPremiumDashboardJson(url, { method: 'GET', cache: 'no-store' });
                     if (!res.ok) throw new Error(`UI-state GET mislukt (${res.status})`);
                     return await res.json().catch(() => ({}));
                 } catch (error) {
@@ -2675,11 +2676,7 @@
 
             for (const url of urls) {
                 try {
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ values: values && typeof values === 'object' ? values : {} }),
-                    });
+                    const res = await fetchPremiumDashboardJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: values && typeof values === 'object' ? values : {} }) });
                     if (!res.ok) throw new Error(`UI-state SET mislukt (${res.status})`);
                     return await res.json().catch(() => ({}));
                 } catch (error) {
@@ -3599,9 +3596,7 @@
             try {
                 await refreshPremiumDashboard(true);
             } finally {
-                if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
-                    window.SoftoraPremiumBoot.setShellBooting(false);
-                }
+                releasePremiumDashboardBootShell();
             }
         })();
 
