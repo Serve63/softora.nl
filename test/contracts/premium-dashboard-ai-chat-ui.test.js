@@ -84,7 +84,7 @@ test('premium dashboard normaliseert open-waarden naar klantenstatus', () => {
 
   assert.match(
     pageSource,
-    /if \(value === 'open' \|\| status === 'betaald' \|\| status === 'open'\) return 'klant';/
+    /if \(value === 'open' \|\| value === 'openstaand' \|\| value === 'openstaande' \|\| status === 'betaald' \|\| status === 'customer' \|\| status === 'closed' \|\| status === 'won' \|\| status === 'open' \|\| status === 'openstaand' \|\| status === 'openstaande'\) return 'klant';/
   );
   assert.match(
     pageSource,

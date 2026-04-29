@@ -2804,7 +2804,7 @@
             ];
             if (knownDatabaseStatuses.includes(value)) return value;
             if (knownDatabaseStatuses.includes(status)) return status;
-            if (value === 'open' || status === 'betaald' || status === 'open') return 'klant';
+            if (value === 'open' || value === 'openstaand' || value === 'openstaande' || status === 'betaald' || status === 'customer' || status === 'closed' || status === 'won' || status === 'open' || status === 'openstaand' || status === 'openstaande') return 'klant';
             return value || status || 'klant';
         }
 
