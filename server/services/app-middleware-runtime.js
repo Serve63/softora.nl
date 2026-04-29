@@ -18,12 +18,29 @@ function applyAppMiddleware(app, deps = {}) {
     isSupabaseConfigured,
     ensureRuntimeStateHydratedFromSupabase,
     supabaseHydrateMiddlewareWaitMs = 1500,
+    strictSupabaseHydrateApiPrefixes = [
+      '/api/ui-state',
+      '/api/ui-state-get',
+      '/api/agenda',
+      '/api/coldcalling',
+    ],
   } = deps;
 
   const safeSupabaseHydrateMiddlewareWaitMs = Math.max(
     250,
     Math.min(10000, Number(supabaseHydrateMiddlewareWaitMs) || 1500)
   );
+
+  const normalizedStrictSupabaseHydrateApiPrefixes = (
+    Array.isArray(strictSupabaseHydrateApiPrefixes) ? strictSupabaseHydrateApiPrefixes : []
+  )
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+
+  function requiresStrictSupabaseHydration(pathname) {
+    const requestPath = String(pathname || '');
+    return normalizedStrictSupabaseHydrateApiPrefixes.some((prefix) => requestPath.startsWith(prefix));
+  }
 
   app.disable('x-powered-by');
 
@@ -193,10 +210,11 @@ function applyAppMiddleware(app, deps = {}) {
     });
   });
 
-  app.use((req, _res, next) => {
+  app.use((req, res, next) => {
     const requestPath = String(req.path || '');
     if (!isSupabaseConfigured()) return next();
     if (!requestPath.startsWith('/api/')) return next();
+    const strictHydration = requiresStrictSupabaseHydration(requestPath);
 
     let released = false;
     const release = () => {
@@ -204,23 +222,43 @@ function applyAppMiddleware(app, deps = {}) {
       released = true;
       next();
     };
+    const failStrictHydration = (message) => {
+      if (released) return;
+      released = true;
+      return res.status(503).json({
+        ok: false,
+        error: message || 'Gedeelde Supabase-opslag is nog niet geladen. Probeer het zo opnieuw.',
+      });
+    };
 
     const timeout = setTimeout(() => {
       console.warn(
         '[Supabase][HydrateMiddlewareTimeout]',
         `${requestPath} na ${safeSupabaseHydrateMiddlewareWaitMs}ms doorgelaten`
       );
+      if (strictHydration) {
+        failStrictHydration('Gedeelde Supabase-opslag is nog niet geladen. Probeer het zo opnieuw.');
+        return;
+      }
       release();
     }, safeSupabaseHydrateMiddlewareWaitMs);
 
     ensureRuntimeStateHydratedFromSupabase()
-      .then(() => {
+      .then((hydrated) => {
         clearTimeout(timeout);
+        if (strictHydration && hydrated === false) {
+          failStrictHydration('Gedeelde Supabase-opslag kon niet veilig geladen worden.');
+          return;
+        }
         release();
       })
       .catch((error) => {
         clearTimeout(timeout);
         console.error('[Supabase][HydrateMiddlewareError]', error?.message || error);
+        if (strictHydration) {
+          failStrictHydration('Gedeelde Supabase-opslag kon niet veilig geladen worden.');
+          return;
+        }
         release();
       });
   });

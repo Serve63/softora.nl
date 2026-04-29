@@ -42,7 +42,7 @@ function getLastMiddleware(app) {
   return lastUse[lastUse.length - 1];
 }
 
-test('app middleware releases API requests after a short Supabase hydration wait', async () => {
+test('app middleware releases non-critical API requests after a short Supabase hydration wait', async () => {
   const app = createAppRecorder();
   let resolveHydration = null;
   let nextCalls = 0;
@@ -61,7 +61,7 @@ test('app middleware releases API requests after a short Supabase hydration wait
   const middleware = getLastMiddleware(app);
 
   await new Promise((resolve) => {
-    middleware({ path: '/api/agenda/confirmation-tasks' }, {}, () => {
+    middleware({ path: '/api/healthz' }, {}, () => {
       nextCalls += 1;
       resolve();
     });
@@ -73,6 +73,46 @@ test('app middleware releases API requests after a short Supabase hydration wait
   await new Promise((resolve) => setTimeout(resolve, 20));
 
   assert.equal(nextCalls, 1, 'next() mag maar één keer worden aangeroepen');
+});
+
+test('app middleware blocks critical API requests when Supabase hydration times out', async () => {
+  const app = createAppRecorder();
+  let nextCalls = 0;
+  const res = {
+    statusCode: null,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  applyAppMiddleware(
+    app,
+    createDeps({
+      supabaseHydrateMiddlewareWaitMs: 5,
+      ensureRuntimeStateHydratedFromSupabase: () => new Promise(() => {}),
+    })
+  );
+
+  const middleware = getLastMiddleware(app);
+
+  await new Promise((resolve) => {
+    middleware({ path: '/api/ui-state-get' }, res, () => {
+      nextCalls += 1;
+      resolve();
+    });
+    setTimeout(resolve, 280);
+  });
+
+  assert.equal(nextCalls, 0);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /Supabase-opslag/i);
 });
 
 test('app middleware skips Supabase hydration for non-api requests', async () => {

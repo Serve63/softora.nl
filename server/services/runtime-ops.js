@@ -111,14 +111,18 @@ function createRuntimeOpsCoordinator(deps = {}) {
       });
     }
 
-    const patchProvided =
-      req.body &&
-      typeof req.body === 'object' &&
-      req.body.patch &&
-      typeof req.body.patch === 'object';
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const patchProvided = body.patch && typeof body.patch === 'object' && !Array.isArray(body.patch);
+    const valuesProvided = body.values && typeof body.values === 'object' && !Array.isArray(body.values);
+    const replaceRequested =
+      body.replace === true ||
+      body.fullReplace === true ||
+      normalizeString(body.mode || '').toLowerCase() === 'replace';
     let valuesToSave;
 
-    if (patchProvided) {
+    if (replaceRequested) {
+      valuesToSave = sanitizeUiStateValues(valuesProvided ? body.values : {});
+    } else {
       const current = await getUiStateValues(scope);
       if (!current) {
         return res.status(503).json({
@@ -128,15 +132,13 @@ function createRuntimeOpsCoordinator(deps = {}) {
       }
       const currentValues =
         current && current.values && typeof current.values === 'object' ? current.values : {};
-      const patchValues = sanitizeUiStateValues(req.body.patch);
+      const patchValues = sanitizeUiStateValues(patchProvided ? body.patch : valuesProvided ? body.values : {});
       valuesToSave = { ...currentValues, ...patchValues };
-    } else {
-      valuesToSave = sanitizeUiStateValues(req.body?.values || {});
     }
 
     const state = await setUiStateValues(scope, valuesToSave, {
-      source: normalizeString(req.body?.source || 'frontend'),
-      actor: normalizeString(req.body?.actor || ''),
+      source: normalizeString(body.source || 'frontend'),
+      actor: normalizeString(body.actor || ''),
     });
     if (!state) {
       return res.status(503).json({

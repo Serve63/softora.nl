@@ -1,4 +1,9 @@
 const { normalizeLeadLikePhoneKey } = require('./lead-identity');
+const {
+  resolveColdcallingUiStateScopeForBusinessMode,
+  supabaseUiStateScopes,
+  supabaseUiStateStorageKeys,
+} = require('../config/supabase-ui-state-contract');
 
 function createColdcallingDashboardBootstrapService(deps = {}) {
   const {
@@ -7,11 +12,11 @@ function createColdcallingDashboardBootstrapService(deps = {}) {
     getRecentCallUpdates = () => [],
     getRecentAiCallInsights = () => [],
     normalizeString = (value) => String(value || '').trim(),
-    leadRowsStorageKey = 'softora_coldcalling_lead_rows_json',
-    statsResetBaselineStorageKey = 'softora_stats_reset_baseline_started',
-    preferencesScope = 'coldcalling_preferences',
-    businessModeStorageKey = 'softora_business_mode',
-    defaultUiStateScope = 'coldcalling',
+    leadRowsStorageKey = supabaseUiStateStorageKeys.coldcallingLeadRowsJson,
+    statsResetBaselineStorageKey = supabaseUiStateStorageKeys.coldcallingStatsResetBaselineStarted,
+    preferencesScope = supabaseUiStateScopes.coldcallingPreferences,
+    businessModeStorageKey = supabaseUiStateStorageKeys.coldcallingBusinessMode,
+    defaultUiStateScope = supabaseUiStateScopes.coldcalling,
     interestedLeadLimit = 500,
   } = deps;
 
@@ -32,14 +37,7 @@ function createColdcallingDashboardBootstrapService(deps = {}) {
   }
 
   function resolveUiStateScopeForBusinessMode(mode) {
-    const normalizedMode = normalizeBusinessMode(mode);
-    if (normalizedMode === 'voice_software') {
-      return `${defaultUiStateScope}_voice_software`;
-    }
-    if (normalizedMode === 'business_software') {
-      return `${defaultUiStateScope}_business_software`;
-    }
-    return defaultUiStateScope;
+    return resolveColdcallingUiStateScopeForBusinessMode(normalizeBusinessMode(mode), defaultUiStateScope);
   }
 
   function normalizePositiveInt(value) {

@@ -9,6 +9,8 @@ function createUiStateStore(deps = {}) {
     upsertSupabaseRowViaRest = async () => ({ ok: false }),
     uiStateReadTimeoutMs = 1500,
     uiStateReadTimeoutMsByScope = {},
+    uiStateAllowMemoryFallback = false,
+    uiStateMemoryFallbackScopes = [],
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     logger = console,
@@ -61,6 +63,16 @@ function createUiStateStore(deps = {}) {
     };
   }
 
+  function isMemoryFallbackAllowed(scope) {
+    if (uiStateAllowMemoryFallback) return true;
+    if (!Array.isArray(uiStateMemoryFallbackScopes)) return false;
+    return uiStateMemoryFallbackScopes.map(normalizeUiStateScope).includes(scope);
+  }
+
+  function buildFallbackState(scope) {
+    return isMemoryFallbackAllowed(scope) ? buildInMemoryState(scope) : null;
+  }
+
   async function getUiStateValues(scope) {
     const normalizedScope = normalizeUiStateScope(scope);
     if (!normalizedScope) return null;
@@ -85,7 +97,7 @@ function createUiStateStore(deps = {}) {
             '[UI State][Supabase][GetError]',
             `${clientError?.message || clientError || 'Supabase client ontbreekt.'}${fallbackMsg}`
           );
-          return buildInMemoryState(normalizedScope);
+          return buildFallbackState(normalizedScope);
         }
         return Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
       }
@@ -113,6 +125,16 @@ function createUiStateStore(deps = {}) {
         if (row === null) return null;
       }
 
+      if (row?.source === 'memory' && row.values && typeof row.values === 'object') {
+        const values = sanitizeUiStateValues(row.values);
+        inMemoryUiStateByScope.set(normalizedScope, values);
+        return {
+          values: { ...values },
+          updatedAt: row.updatedAt || null,
+          source: 'memory',
+        };
+      }
+
       const values = sanitizeUiStateValues(row?.payload?.values || {});
       inMemoryUiStateByScope.set(normalizedScope, values);
       return {
@@ -123,14 +145,14 @@ function createUiStateStore(deps = {}) {
     };
 
     const timeoutMs = getSafeUiStateReadTimeoutMs(normalizedScope);
-    const memoryState = buildInMemoryState(normalizedScope);
+    const fallbackState = buildFallbackState(normalizedScope);
 
     if (!timeoutMs) {
       try {
         return await executeRead();
       } catch (error) {
         logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
-        return memoryState;
+        return fallbackState;
       }
     }
 
@@ -146,7 +168,7 @@ function createUiStateStore(deps = {}) {
 
         const timeoutHandle = setTimeout(() => {
           logger.error('[UI State][Supabase][GetTimeout]', normalizedScope, `na ${timeoutMs}ms`);
-          finish(memoryState);
+          finish(fallbackState);
         }, timeoutMs);
 
         Promise.resolve()
@@ -154,12 +176,12 @@ function createUiStateStore(deps = {}) {
           .then((value) => finish(value))
           .catch((error) => {
             logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
-            finish(memoryState);
+            finish(fallbackState);
           });
       });
     } catch (error) {
       logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
-      return memoryState;
+      return fallbackState;
     }
   }
 
