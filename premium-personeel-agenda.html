@@ -609,6 +609,74 @@
             margin-bottom: 0.55rem; line-height: 1.45;
         }
 
+        .workspace-audio-upload {
+            margin-top: 0.75rem;
+            border: 1px solid rgba(155, 35, 85, 0.16);
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(155, 35, 85, 0.075), rgba(255,255,255,0.86));
+            padding: 0.75rem 0.8rem;
+        }
+
+        .workspace-upload-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            flex-wrap: wrap;
+        }
+
+        .workspace-upload-btn {
+            border: 1px solid rgba(155, 35, 85, 0.22);
+            background: rgba(255,255,255,0.92);
+            color: var(--accent);
+            border-radius: 999px;
+            padding: 0.58rem 0.95rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+
+        .workspace-upload-btn:hover,
+        .workspace-upload-btn:focus-visible {
+            transform: translateY(-1px);
+            border-color: rgba(155, 35, 85, 0.42);
+            box-shadow: 0 12px 28px rgba(155, 35, 85, 0.14);
+            outline: none;
+        }
+
+        .workspace-upload-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .workspace-audio-upload-copy {
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+
+        .workspace-audio-upload-help,
+        .workspace-audio-file {
+            margin-top: 0.45rem;
+            color: var(--text-tertiary);
+            font-size: 0.72rem;
+            line-height: 1.4;
+        }
+
+        .workspace-audio-file {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .workspace-audio-file[hidden] {
+            display: none !important;
+        }
+
         .modal-workspace-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -1294,6 +1362,21 @@
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Notities meeting</div>
                         <textarea id="workspaceTranscript" placeholder="Zet hier alle meetingnotities: doelen, wensen, stijl, functionaliteiten, planning, budget, bijzonderheden..."></textarea>
+                        <div class="workspace-audio-upload" id="meetingAudioUploadBlock">
+                            <div class="workspace-upload-actions">
+                                <button class="workspace-upload-btn magnetic" id="meetingAudioUploadBtn" type="button">
+                                    Audiobestand uploaden
+                                </button>
+                                <span class="workspace-audio-upload-copy">
+                                    Upload de opname van het klantgesprek. AI zet dit om naar dossierklare wensen, afspraken en actiepunten.
+                                </span>
+                            </div>
+                            <div class="workspace-audio-upload-help">
+                                Geschikt voor MP3, M4A, WAV, WEBM, OGG, FLAC of AAC. Maximaal ongeveer 22 MB.
+                            </div>
+                            <div class="workspace-audio-file" id="meetingAudioFileName" hidden></div>
+                            <input id="meetingAudioUploadInput" type="file" accept="audio/*,.mp3,.m4a,.wav,.webm,.ogg,.flac,.aac" hidden>
+                        </div>
                         <div class="workspace-attachments" id="workspaceAttachmentsBlock" hidden>
                             <div class="workspace-attachments-grid" id="workspaceAttachmentsList"></div>
                         </div>
@@ -1625,6 +1708,9 @@
     const workspaceSaveStatusEl = document.getElementById('workspaceSaveStatus');
     const notesImageUploadBtn = document.getElementById('notesImageUploadBtn');
     const notesImageUploadInput = document.getElementById('notesImageUploadInput');
+    const meetingAudioUploadBtn = document.getElementById('meetingAudioUploadBtn');
+    const meetingAudioUploadInput = document.getElementById('meetingAudioUploadInput');
+    const meetingAudioFileNameEl = document.getElementById('meetingAudioFileName');
     const workspaceAttachmentsBlock = document.getElementById('workspaceAttachmentsBlock');
     const workspaceAttachmentsList = document.getElementById('workspaceAttachmentsList');
     const customerDbReminderEl = document.getElementById('customerDbReminder');
@@ -1650,6 +1736,7 @@
     let loadServerAppointmentsPromise = null;
     let customerDbReminderTimer = null;
     let workspacePendingCustomerCheck = false;
+    const MEETING_AUDIO_MAX_BYTES = 22 * 1024 * 1024;
 
     if (wsCustomerAddedCheck) {
         wsCustomerAddedCheck.addEventListener('change', function() {
@@ -1674,6 +1761,7 @@
     function syncWorkspaceExitControls() {
         const shouldLockExit = isWorkspaceExitLocked();
         const shouldHideDismissControls = shouldHideWorkspaceDismissControls();
+        const shouldHideFooterClose = !modalWorkspaceMode;
         if (modalElement) {
             modalElement.classList.toggle('dismiss-locked', shouldLockExit);
             modalElement.dataset.dismissLocked = shouldLockExit ? '1' : '0';
@@ -1695,8 +1783,8 @@
             }
         }
         if (modalSecondaryBtn) {
-            modalSecondaryBtn.hidden = shouldHideDismissControls;
-            modalSecondaryBtn.disabled = shouldLockExit || shouldHideDismissControls;
+            modalSecondaryBtn.hidden = shouldHideFooterClose || shouldHideDismissControls;
+            modalSecondaryBtn.disabled = shouldLockExit || shouldHideFooterClose || shouldHideDismissControls;
         }
     }
 
@@ -1747,6 +1835,39 @@
     function getDataUrlApproxBytes(dataUrl) {
         const base64 = String(dataUrl || '').split(',')[1] || '';
         return Math.max(0, Math.floor((base64.length * 3) / 4));
+    }
+
+    function formatWorkspaceFileSize(bytes) {
+        const value = Number(bytes || 0);
+        if (!Number.isFinite(value) || value <= 0) return '0 MB';
+        if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
+        return `${(value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+    }
+
+    function isSupportedMeetingAudioFile(file) {
+        if (!file) return false;
+        const type = String(file.type || '').toLowerCase();
+        const name = String(file.name || '').toLowerCase();
+        if (type.startsWith('audio/')) return true;
+        if (type === 'video/mp4' || type === 'application/octet-stream') return true;
+        return /\.(mp3|m4a|wav|webm|ogg|flac|aac)$/i.test(name);
+    }
+
+    async function normalizeMeetingAudioForUpload(file) {
+        if (!isSupportedMeetingAudioFile(file)) {
+            throw new Error('Upload een geldig audiobestand, zoals MP3, M4A, WAV of WEBM.');
+        }
+
+        const size = Number(file.size || 0);
+        if (size > MEETING_AUDIO_MAX_BYTES) {
+            throw new Error(`Audiobestand is te groot (${formatWorkspaceFileSize(size)}). Gebruik maximaal ${formatWorkspaceFileSize(MEETING_AUDIO_MAX_BYTES)}.`);
+        }
+
+        const dataUrl = await readFileAsDataUrl(file);
+        if (!/^data:(audio\/[a-z0-9.+-]+|video\/mp4|application\/octet-stream);base64,/i.test(dataUrl)) {
+            throw new Error('Audiobestand kon niet veilig worden voorbereid.');
+        }
+        return dataUrl;
     }
 
     function normalizeReferenceImageList(input) {
@@ -1906,6 +2027,57 @@
         }
 
         return callId ? `/api/coldcalling/recording-proxy?callId=${encodeURIComponent(callId)}` : '';
+    }
+
+    function shouldHideEmptyAppointmentAudioBlock(item) {
+        const callId = String(item?.callId || '').trim().toLowerCase();
+        if (callId.startsWith('manual_')) return true;
+
+        const sourceText = [
+            item?.source,
+            item?.softoraSource,
+            item?.createdFrom,
+            item?.createdBy,
+            item?.summary
+        ].map((value) => String(value || '').trim().toLowerCase()).join(' ');
+
+        return /\b(handmatig|manual|premium-personeel-agenda)\b/.test(sourceText);
+    }
+
+    function isManualOtherAppointment(apt) {
+        if (!apt || typeof apt !== 'object') return false;
+        const manualLegendChoice = normalizeManualLegendChoice(apt?.manualLegendChoice || apt?.legendChoice || '');
+        if (manualLegendChoice === 'manual-overig') return true;
+
+        const callId = String(apt?.callId || '').trim().toLowerCase();
+        const kindText = [
+            apt?.manualKind,
+            apt?.kind,
+            apt?.type,
+            apt?.appointmentKind,
+            apt?.source,
+            apt?.summary
+        ].map((value) => String(value || '').trim().toLowerCase()).join(' ');
+
+        return callId.startsWith('manual_') && /\b(overig|other|manual-overig)\b/.test(kindText);
+    }
+
+    function getAppointmentStartDate(apt) {
+        const ymd = normalizeAgendaDateYmd(apt?.date || '');
+        if (!ymd) return null;
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+        if (!match) return null;
+
+        const minutes = parseManualTimeToMinutes(apt?.time || apt?.activityTime || '');
+        const hour = minutes === null ? 0 : Math.floor(minutes / 60);
+        const minute = minutes === null ? 0 : minutes % 60;
+        const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), hour, minute, 0, 0);
+        return Number.isFinite(date.getTime()) ? date : null;
+    }
+
+    function hasAppointmentStartPassed(apt) {
+        const startDate = getAppointmentStartDate(apt);
+        return Boolean(startDate && startDate.getTime() <= Date.now());
     }
 
     function resolveAppointmentSourceLabel(item) {
@@ -2709,9 +2881,10 @@
             modalAudioPlayer.hidden = true;
             modalAudioPlayer.removeAttribute('src');
             modalAudioPlayer.load();
-            modalAudioEmpty.hidden = false;
+            const hideEmptyAudioBlock = shouldHideEmptyAppointmentAudioBlock(apt);
+            modalAudioEmpty.hidden = hideEmptyAudioBlock;
             setModalAudioMeta('');
-            modalAudioBlock.hidden = modalWorkspaceMode;
+            modalAudioBlock.hidden = modalWorkspaceMode || hideEmptyAudioBlock;
             return;
         }
 
@@ -2782,6 +2955,18 @@
         const linkedOrderId = Number(getLinkedOrderIdForAppointment(apt) || 0) || null;
 
         if (!modalWorkspaceMode) {
+            if (isManualOtherAppointment(apt)) {
+                const completed = isAppointmentCompleted(apt);
+                modalPrimaryBtn.hidden = false;
+                modalPrimaryBtn.textContent = completed ? 'Activiteit afgerond' : 'Activiteit afronden';
+                modalPrimaryBtn.disabled = workspaceBusy || completed;
+                modalNoDealBtn.hidden = true;
+                modalNoDealBtn.disabled = true;
+                modalSecondaryBtn.textContent = 'Sluiten';
+                syncWorkspaceExitControls();
+                return;
+            }
+
             if (linkedOrderId) {
                 modalPrimaryBtn.hidden = false;
                 modalPrimaryBtn.textContent = 'Open dossier';
@@ -2912,6 +3097,8 @@
         if (!apt || typeof apt !== 'object') return false;
         const status = String(apt?.postCallStatus || '').trim().toLowerCase();
         if (status === 'no_deal') return true;
+        if (status === 'completed' || status === 'afgerond') return true;
+        if (isManualOtherAppointment(apt) && hasAppointmentStartPassed(apt)) return true;
         if (Number(getLinkedOrderIdForAppointment(apt) || 0) > 0) return true;
         if (String(apt?.activeOrderAddedAt || '').trim()) return true;
         return false;
@@ -3119,6 +3306,70 @@
         }
     }
 
+    function buildMeetingAudioDossierText(result) {
+        const notes = String(result?.notes || result?.dossierNotes || '').trim();
+        const rawTranscript = String(result?.rawTranscript || result?.transcript || '').trim();
+        if (notes && rawTranscript && !notes.includes(rawTranscript.slice(0, 140))) {
+            return `${notes}\n\nRuwe transcriptie gesprek:\n${rawTranscript}`;
+        }
+        return notes || rawTranscript;
+    }
+
+    async function handleMeetingAudioUpload(file) {
+        if (!file || workspaceBusy) return;
+
+        workspaceBusy = true;
+        refreshWorkspacePrimaryButtonLabel();
+        if (meetingAudioUploadBtn) meetingAudioUploadBtn.disabled = true;
+        if (meetingAudioFileNameEl) {
+            meetingAudioFileNameEl.hidden = false;
+            meetingAudioFileNameEl.textContent = `Gekozen: ${String(file.name || 'audiobestand')} (${formatWorkspaceFileSize(file.size)})`;
+        }
+        setVoiceStatus('Audio transcriberen en samenvatten... dit kan 1-2 minuten duren.');
+
+        try {
+            const audioDataUrl = await normalizeMeetingAudioForUpload(file);
+            const result = await postJsonWithFallback(
+                ['/api/ai/meeting-audio-to-notes', '/api/ai-meeting-audio-to-notes'],
+                {
+                    audioDataUrl,
+                    fileName: String(file.name || 'meeting-audio').slice(0, 160),
+                    mimeType: String(file.type || ''),
+                    language: 'nl',
+                    appointmentId: activeAppointmentId,
+                },
+                { timeoutMs: 210000 }
+            );
+
+            const audioNotes = buildMeetingAudioDossierText(result);
+            if (!audioNotes) {
+                throw new Error('Geen transcriptie of samenvatting uit het audiobestand ontvangen.');
+            }
+
+            const currentNotes = String(workspaceTranscriptEl.value || '').trim();
+            const datedHeader = `Audiogesprek verwerkt op ${new Date().toLocaleString('nl-NL')}`;
+            workspaceTranscriptEl.value = currentNotes
+                ? `${currentNotes}\n\n${datedHeader}\n\n${audioNotes}`
+                : `${datedHeader}\n\n${audioNotes}`;
+
+            const generatedPrompt = String(result?.prompt || '').trim();
+            if (generatedPrompt) {
+                workspaceDraftPrompt = generatedPrompt;
+            }
+
+            setVoiceStatus('Audio verwerkt. Klantwensen en afspraken zijn toegevoegd aan de meetingnotities.', 'success');
+            setWorkspaceStatus('Audiogesprek toegevoegd. Je kunt nu "Dossier aanmaken" gebruiken.', 'success');
+            refreshWorkspacePrimaryButtonLabel();
+        } catch (error) {
+            setVoiceStatus(`Audio verwerken mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
+        } finally {
+            workspaceBusy = false;
+            if (meetingAudioUploadBtn) meetingAudioUploadBtn.disabled = false;
+            refreshWorkspacePrimaryButtonLabel();
+            if (meetingAudioUploadInput) meetingAudioUploadInput.value = '';
+        }
+    }
+
     async function normalizeReferenceImageForUpload(file) {
         if (!file || !String(file.type || '').startsWith('image/')) {
             throw new Error('Alleen afbeelding-bestanden zijn toegestaan.');
@@ -3217,6 +3468,45 @@
         } catch (error) {
             setWorkspaceStatus(`Opslaan mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
             return null;
+        } finally {
+            workspaceBusy = false;
+            refreshWorkspacePrimaryButtonLabel();
+        }
+    }
+
+    async function markActiveManualActivityCompleted() {
+        const apt = getActiveAppointment();
+        if (!apt || workspaceBusy || !isManualOtherAppointment(apt) || isAppointmentCompleted(apt)) return;
+
+        workspaceBusy = true;
+        refreshWorkspacePrimaryButtonLabel();
+
+        try {
+            const payload = {
+                status: 'completed',
+                transcript: String(apt?.postCallNotesTranscript || apt?.summary || ''),
+                prompt: String(apt?.postCallPrompt || ''),
+                domainName: normalizeWorkspaceDomainName(apt?.postCallDomainName || ''),
+                referenceImages: normalizeReferenceImageList(apt?.referenceImages || []),
+                actor: 'premium-personeel-agenda',
+            };
+            const result = await postJsonWithFallback(
+                [
+                    `/api/agenda/appointments/${encodeURIComponent(String(apt.id))}/post-call`,
+                    `/api/agenda/appointment-post-call?appointmentId=${encodeURIComponent(String(apt.id))}`,
+                ],
+                payload
+            );
+            updateAppointmentPostCallFields({
+                ...apt,
+                ...(result?.appointment || {}),
+                postCallStatus: 'completed',
+            });
+        } catch (_error) {
+            updateAppointmentPostCallFields({
+                ...apt,
+                postCallStatus: 'completed',
+            });
         } finally {
             workspaceBusy = false;
             refreshWorkspacePrimaryButtonLabel();
@@ -3488,6 +3778,11 @@
     function closeModal() {
         if (isWorkspaceExitLocked()) return;
         if (notesImageUploadInput) notesImageUploadInput.value = '';
+        if (meetingAudioUploadInput) meetingAudioUploadInput.value = '';
+        if (meetingAudioFileNameEl) {
+            meetingAudioFileNameEl.hidden = true;
+            meetingAudioFileNameEl.textContent = '';
+        }
         if (modalAudioPlayer) {
             modalAudioPlayer.pause();
         }
@@ -3505,6 +3800,10 @@
         if (!apt) return;
 
         if (!modalWorkspaceMode) {
+            if (isManualOtherAppointment(apt)) {
+                void markActiveManualActivityCompleted();
+                return;
+            }
             if (getLinkedOrderIdForAppointment(apt)) {
                 if (workspacePendingCustomerCheck) return;
                 openLinkedOrderDossierForAppointment(apt);
@@ -3565,6 +3864,17 @@
             const file = event?.target?.files?.[0] || null;
             if (!file) return;
             void handleNotesImageUpload(file);
+        });
+    }
+    if (meetingAudioUploadBtn && meetingAudioUploadInput) {
+        meetingAudioUploadBtn.addEventListener('click', () => {
+            if (workspaceBusy) return;
+            meetingAudioUploadInput.click();
+        });
+        meetingAudioUploadInput.addEventListener('change', (event) => {
+            const file = event?.target?.files?.[0] || null;
+            if (!file) return;
+            void handleMeetingAudioUpload(file);
         });
     }
     if (workspaceDomainEl) {
@@ -3649,6 +3959,27 @@
         true
     );
 
+    function releaseAgendaBootShell() {
+        if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+            window.SoftoraPremiumBoot.setShellBooting(false);
+            return;
+        }
+        const main = document.querySelector('main.is-premium-boot-host');
+        if (!main) return;
+        const shell = main.querySelector('.premium-boot-shell');
+        const loader = main.querySelector('.premium-boot-loader');
+        if (shell) {
+            shell.classList.remove('is-booting');
+            shell.setAttribute('aria-busy', 'false');
+        }
+        if (loader) {
+            loader.classList.add('is-hidden');
+            loader.setAttribute('aria-hidden', 'true');
+        }
+    }
+
+    const agendaBootFailsafeTimer = window.setTimeout(releaseAgendaBootShell, 4500);
+
     // Init
     applyInitialAgendaBootstrap();
     renderCalendar();
@@ -3662,9 +3993,8 @@
             // van 10s blijft cached om server-load te besparen.
             await loadServerAppointments({ fresh: true });
         } finally {
-            if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
-                window.SoftoraPremiumBoot.setShellBooting(false);
-            }
+            window.clearTimeout(agendaBootFailsafeTimer);
+            releaseAgendaBootShell();
         }
     })();
     window.setInterval(() => { void loadServerAppointments(); }, 10000);

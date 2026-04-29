@@ -13,6 +13,7 @@ function createAiRemoteService(deps = {}) {
       response: { ok: true, status: 200 },
       data: {},
     }),
+    fetchImpl = fetch,
     fetchBinaryWithTimeout = async () => ({
       response: {
         ok: false,
@@ -1304,6 +1305,251 @@ function createAiRemoteService(deps = {}) {
     };
   }
 
+  function inferMeetingAudioFileExtension(mimeTypeRaw = '', fileNameRaw = '') {
+    const mimeType = normalizeString(mimeTypeRaw).toLowerCase();
+    if (mimeType.includes('mpeg') || mimeType.includes('mp3')) return 'mp3';
+    if (mimeType.includes('mp4') || mimeType.includes('m4a')) return 'm4a';
+    if (mimeType.includes('wav') || mimeType.includes('x-wav')) return 'wav';
+    if (mimeType.includes('webm')) return 'webm';
+    if (mimeType.includes('ogg')) return 'ogg';
+    if (mimeType.includes('flac')) return 'flac';
+    if (mimeType.includes('aac')) return 'aac';
+
+    const extension = normalizeString(fileNameRaw).toLowerCase().match(/\.([a-z0-9]{2,5})$/)?.[1] || '';
+    if (/^(mp3|m4a|wav|webm|ogg|flac|aac)$/.test(extension)) return extension;
+    return 'mp3';
+  }
+
+  function sanitizeMeetingAudioFileName(fileNameRaw = '', mimeTypeRaw = '') {
+    const extension = inferMeetingAudioFileExtension(mimeTypeRaw, fileNameRaw);
+    const baseName =
+      normalizeString(fileNameRaw)
+        .split(/[\\/]/)
+        .pop()
+        ?.replace(/\.[a-z0-9]{2,5}$/i, '') || 'meeting-audio';
+    const safeBaseName = baseName.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'meeting-audio';
+    return `${safeBaseName.slice(0, 90)}.${extension}`;
+  }
+
+  function decodeMeetingAudioDataUrl(audioDataUrlRaw = '', fallbackMimeType = '') {
+    const audioDataUrl = normalizeString(audioDataUrlRaw).replace(/\s+/g, '');
+    const match = audioDataUrl.match(/^data:([^;,]+);base64,([a-z0-9+/=]+)$/i);
+    if (!match) {
+      const err = new Error('Ongeldige audio-upload. Gebruik een data URL met base64 audio.');
+      err.status = 400;
+      throw err;
+    }
+
+    const mimeType = normalizeString(match[1] || fallbackMimeType || 'audio/mpeg').toLowerCase();
+    if (!(mimeType.startsWith('audio/') || mimeType === 'video/mp4' || mimeType === 'application/octet-stream')) {
+      const err = new Error('Ongeldig audiotype. Upload MP3, M4A, WAV, WEBM, OGG, FLAC of AAC.');
+      err.status = 400;
+      throw err;
+    }
+
+    const bytes = Buffer.from(match[2] || '', 'base64');
+    if (!bytes.length) {
+      const err = new Error('Audiobestand is leeg.');
+      err.status = 400;
+      throw err;
+    }
+    if (bytes.length > 24 * 1024 * 1024) {
+      const err = new Error('Audiobestand is te groot om direct te transcriberen.');
+      err.status = 413;
+      throw err;
+    }
+
+    return { bytes, mimeType };
+  }
+
+  function getOpenAiMeetingAudioTranscriptionModelCandidates() {
+    const configured = normalizeString(
+      env.OPENAI_AUDIO_TRANSCRIPTION_MODEL || env.OPENAI_TRANSCRIPTION_MODEL || ''
+    );
+    const models = [];
+    if (configured) models.push(configured);
+    ['gpt-4o-transcribe', 'whisper-1'].forEach((candidate) => {
+      if (!models.includes(candidate)) models.push(candidate);
+    });
+    return models;
+  }
+
+  async function transcribeMeetingAudioWithAi(options = {}) {
+    const apiKey = getOpenAiApiKey();
+    if (!apiKey) {
+      const err = new Error('OPENAI_API_KEY ontbreekt');
+      err.status = 503;
+      throw err;
+    }
+
+    const { bytes, mimeType } = decodeMeetingAudioDataUrl(
+      options.audioDataUrl || options.audio || '',
+      options.mimeType || options.contentType || ''
+    );
+    const fileName = sanitizeMeetingAudioFileName(options.fileName || 'meeting-audio', mimeType);
+    const language = normalizeString(options.language || 'nl') || 'nl';
+    const models = getOpenAiMeetingAudioTranscriptionModelCandidates();
+    let lastError = null;
+
+    for (const model of models) {
+      try {
+        const form = new FormData();
+        form.append('file', new Blob([bytes], { type: mimeType || 'audio/mpeg' }), fileName);
+        form.append('model', model);
+        form.append('language', language);
+        form.append('temperature', '0');
+        form.append('response_format', 'text');
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 120000);
+
+        try {
+          const response = await fetchImpl(`${openAiApiBaseUrl}/audio/transcriptions`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: form,
+            signal: controller.signal,
+          });
+
+          const rawBody = await response.text();
+          if (!response.ok) {
+            const err = new Error(`OpenAI transcriptie mislukt (${response.status})`);
+            err.status = response.status;
+            err.data = parseJsonLoose(rawBody) || rawBody;
+            throw err;
+          }
+
+          const parsed = parseJsonLoose(rawBody);
+          const transcript =
+            normalizeString(parsed?.text || parsed?.transcript || parsed?.output_text || '') ||
+            normalizeString(rawBody);
+          if (transcript) {
+            return {
+              transcript: truncateText(transcript, 20000),
+              source: 'openai-audio',
+              model,
+              usage: null,
+              language,
+            };
+          }
+        } finally {
+          clearTimeout(timeout);
+        }
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (lastError) throw lastError;
+    const err = new Error('OpenAI gaf geen transcriptie terug.');
+    err.status = 502;
+    throw err;
+  }
+
+  function normalizeSummaryList(value) {
+    if (Array.isArray(value)) {
+      return value.map((item) => normalizeString(item)).filter(Boolean).slice(0, 14);
+    }
+    const text = normalizeString(value);
+    return text ? [text] : [];
+  }
+
+  async function summarizeMeetingTranscriptWithAi(options = {}) {
+    const apiKey = getOpenAiApiKey();
+    if (!apiKey) {
+      const err = new Error('OPENAI_API_KEY ontbreekt');
+      err.status = 503;
+      throw err;
+    }
+
+    const transcript = truncateText(normalizeString(options.transcript || options.text || ''), 20000);
+    if (!transcript) {
+      const err = new Error('Transcript ontbreekt');
+      err.status = 400;
+      throw err;
+    }
+
+    const language = normalizeString(options.language || 'nl') || 'nl';
+    const context = truncateText(normalizeString(options.context || ''), 2000);
+    const systemPrompt = [
+      'Je bent een nauwkeurige intake-assistent voor Softora.',
+      'Zet een klantgesprek om naar dossierklare notities voor een website/software opdracht.',
+      'Gebruik alleen informatie uit de transcriptie/context. Verzin niets.',
+      'Als iets onzeker is, zet het onder openQuestions.',
+      'Output exact JSON met velden: summary, customerWants, agreements, actionItems, openQuestions, dossierNotes.',
+      'customerWants, agreements, actionItems en openQuestions zijn arrays met korte Nederlandse bullets.',
+      'dossierNotes is een compacte tekst die direct in een klantdossier mag komen.',
+    ].join('\n');
+    const userPrompt = [
+      `Taal: ${language}`,
+      context ? `Extra context: ${context}` : '',
+      '',
+      'Vat het gesprek samen voor het dossier.',
+      'Haal expliciet uit de transcriptie:',
+      '- wat de klant wil',
+      '- wat er is afgesproken',
+      '- belangrijke details voor ontwerp, functies, planning, budget, content en vervolgstappen',
+      '- open vragen of ontbrekende info',
+      '',
+      'Transcriptie:',
+      transcript,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const { response, data } = await fetchJsonWithTimeout(
+      `${openAiApiBaseUrl}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: openAiModel,
+          temperature: 0.1,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+        }),
+      },
+      50000
+    );
+
+    if (!response.ok) {
+      const err = new Error(`OpenAI gesprekssamenvatting mislukt (${response.status})`);
+      err.status = response.status;
+      err.data = data;
+      throw err;
+    }
+
+    const rawText = normalizeString(extractOpenAiTextContent(data?.choices?.[0]?.message?.content));
+    if (!rawText) {
+      const err = new Error('OpenAI gaf geen gesprekssamenvatting terug.');
+      err.status = 502;
+      err.data = data;
+      throw err;
+    }
+
+    const parsed = parseJsonLoose(rawText);
+    const parsedObject = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    return {
+      summary: truncateText(normalizeString(parsedObject.summary || rawText), 2500),
+      customerWants: normalizeSummaryList(parsedObject.customerWants || parsedObject.customer_wants),
+      agreements: normalizeSummaryList(parsedObject.agreements),
+      actionItems: normalizeSummaryList(parsedObject.actionItems || parsedObject.action_items),
+      openQuestions: normalizeSummaryList(parsedObject.openQuestions || parsedObject.open_questions),
+      dossierNotes: truncateText(normalizeString(parsedObject.dossierNotes || parsedObject.dossier_notes || ''), 12000),
+      source: 'openai',
+      model: openAiModel,
+      usage: data?.usage || null,
+      language,
+    };
+  }
+
   function buildWebsitePromptFallback(options = {}) {
     const language = normalizeString(options.language || 'nl') || 'nl';
     const context = truncateText(normalizeString(options.context || ''), 2000);
@@ -1526,6 +1772,8 @@ function createAiRemoteService(deps = {}) {
     generateWebsitePreviewImageWithAi,
     generateWebsitePromptFromTranscriptWithAi,
     sendAnthropicMessage,
+    summarizeMeetingTranscriptWithAi,
+    transcribeMeetingAudioWithAi,
   };
 }
 

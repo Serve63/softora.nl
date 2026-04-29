@@ -17,6 +17,9 @@ test('premium agenda modal uses dossier flow for appointments that already have 
   assert.match(pageSource, /function getLinkedOrderDossierUrl\(apt\)/);
   assert.match(pageSource, /modalPrimaryBtn\.textContent = 'Open dossier';/);
   assert.match(pageSource, /modalPrimaryBtn\.textContent = 'Dossier aanmaken';/);
+  assert.match(pageSource, /id="meetingAudioUploadBtn"/);
+  assert.match(pageSource, /function handleMeetingAudioUpload\(file\)/);
+  assert.match(pageSource, /\/api\/ai\/meeting-audio-to-notes/);
   assert.match(
     pageSource,
     /if \(!modalWorkspaceMode\) \{[\s\S]*if \(getLinkedOrderIdForAppointment\(apt\)\) \{[\s\S]*openLinkedOrderDossierForAppointment\(apt\);/
