@@ -49,4 +49,5 @@ test('agenda runtime injecteert klanten-bootstrap ook op het premium dashboard',
   assert.match(source, /fileName === 'premium-personeel-dashboard\.html'/);
   assert.match(source, /marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP'/);
   assert.match(source, /scriptId: 'softoraCustomersBootstrap'/);
+  assert.match(source, /buildDashboardHtmlReplacements\(customersPayload\)/);
 });

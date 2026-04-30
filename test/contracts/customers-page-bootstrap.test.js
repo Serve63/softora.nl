@@ -54,6 +54,11 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   assert.equal(payload.customers[0].review, 'Nee');
   assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
+
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac600');
+  assert.equal(replacements.SOFTORA_DASHBOARD_MAINTENANCE_REVENUE, '\u20ac0');
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, '2');
 });
 
 test('customers page bootstrap leest chunked customer database rows', async () => {
