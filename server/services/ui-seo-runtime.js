@@ -9,6 +9,7 @@ const { createRuntimeDebugOpsCoordinator } = require('./runtime-debug-ops');
 const { createWebsiteLinkCoordinator } = require('./website-links');
 const { createWebsitePreviewLibraryCoordinator } = require('./website-preview-library');
 const { createSoftoraDataOpsUiStateBridge } = require('./data-ops-ui-state-bridge');
+const { createSoftoraDataOpsStore } = require('./data-ops-store');
 
 function createUiSeoRuntime(deps = {}) {
   const {
@@ -82,10 +83,14 @@ function createUiSeoRuntime(deps = {}) {
   const { getUiStateValues, normalizeUiStateScope, sanitizeUiStateValues, setUiStateValues } =
     uiStateStore;
 
-  const dataOpsUiStateBridge = createSoftoraDataOpsUiStateBridge({
-    enabled: dataOpsUiStateEnabled,
+  const dataOpsStore = createSoftoraDataOpsStore({
     isSupabaseConfigured,
     getSupabaseClient,
+    logger,
+  });
+  const dataOpsUiStateBridge = createSoftoraDataOpsUiStateBridge({
+    enabled: dataOpsUiStateEnabled,
+    store: dataOpsStore,
     logger,
   });
 
@@ -257,6 +262,7 @@ function createUiSeoRuntime(deps = {}) {
     setUiStateValues,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
+    dataOpsStore,
     dataOpsUiStateBridge,
     websiteLinkCoordinator,
     websitePreviewLibraryCoordinator,

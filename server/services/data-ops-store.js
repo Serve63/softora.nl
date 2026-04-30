@@ -341,16 +341,117 @@ function createSoftoraDataOpsStore(deps = {}) {
     return entries;
   }
 
+  function toIsoFromMaybeMs(value) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) return new Date(numeric).toISOString();
+    const normalized = normalizeString(value);
+    return normalized || null;
+  }
+
+  function toMsFromIso(value) {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function buildWebdesignJobRow(job = {}) {
+    return {
+      job_id: normalizeString(job.id),
+      owner_key: normalizeString(job.ownerKey),
+      customer_id: normalizeString(job.customer && job.customer.id).slice(0, 160),
+      website_url: normalizeString(job.websiteUrl).slice(0, 500),
+      status: normalizeString(job.status || 'queued').toLowerCase(),
+      error: normalizeString(job.error || '').slice(0, 1000) || null,
+      payload: {
+        customer: job.customer && typeof job.customer === 'object' ? job.customer : {},
+      },
+      created_at: toIsoFromMaybeMs(job.createdAt) || isoNow(),
+      started_at: toIsoFromMaybeMs(job.startedAt),
+      finished_at: toIsoFromMaybeMs(job.finishedAt),
+      updated_at: isoNow(),
+    };
+  }
+
+  function normalizeWebdesignJobRow(row = {}) {
+    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    return {
+      id: normalizeString(row.job_id),
+      ownerKey: normalizeString(row.owner_key),
+      customer: payload.customer && typeof payload.customer === 'object' ? payload.customer : {},
+      websiteUrl: normalizeString(row.website_url),
+      status: normalizeString(row.status || 'queued').toLowerCase(),
+      error: normalizeString(row.error || ''),
+      createdAt: toMsFromIso(row.created_at) || Date.now(),
+      startedAt: toMsFromIso(row.started_at),
+      finishedAt: toMsFromIso(row.finished_at),
+    };
+  }
+
+  async function upsertWebdesignJob(job) {
+    const row = buildWebdesignJobRow(job);
+    if (!row.job_id || !row.owner_key) {
+      return { ok: false, unavailable: false, error: new Error('Ongeldige webdesign-job') };
+    }
+    return run('upsert-webdesign-job', (client) =>
+      client.from(TABLES.webdesignJobs).upsert(row, { onConflict: 'job_id' })
+    );
+  }
+
+  async function getWebdesignJob(jobId) {
+    const result = await run('get-webdesign-job', (client) =>
+      client
+        .from(TABLES.webdesignJobs)
+        .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
+        .eq('job_id', normalizeString(jobId))
+        .maybeSingle()
+    );
+    if (!result.ok || !result.data) return null;
+    return normalizeWebdesignJobRow(result.data);
+  }
+
+  async function findRunningWebdesignJob(ownerKey, customerId) {
+    const result = await run('find-running-webdesign-job', (client) =>
+      client
+        .from(TABLES.webdesignJobs)
+        .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
+        .eq('owner_key', normalizeString(ownerKey))
+        .eq('customer_id', normalizeString(customerId))
+        .in('status', ['queued', 'running'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    );
+    if (!result.ok || !result.data) return null;
+    return normalizeWebdesignJobRow(result.data);
+  }
+
+  async function listVisibleWebdesignJobs(ownerKey) {
+    const result = await run('list-webdesign-jobs', (client) =>
+      client
+        .from(TABLES.webdesignJobs)
+        .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
+        .eq('owner_key', normalizeString(ownerKey))
+        .in('status', ['queued', 'running'])
+        .order('created_at', { ascending: true })
+        .limit(100)
+    );
+    if (!result.ok) return null;
+    return (result.data || []).map(normalizeWebdesignJobRow);
+  }
+
   return {
+    findRunningWebdesignJob,
+    getWebdesignJob,
     listActiveOrders,
     listCustomers,
     listDesignPhotosWithDataUrls,
+    listVisibleWebdesignJobs,
     listOrderRuntime,
     replaceActiveOrders,
     replaceCustomers,
     replaceDesignPhotos,
     replaceOrderRuntime,
     uploadDesignPhoto,
+    upsertWebdesignJob,
   };
 }
 
