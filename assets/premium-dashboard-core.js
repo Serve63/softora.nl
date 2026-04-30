@@ -181,6 +181,18 @@ function formatMoneyEUR(amount) {
         return true;
     }
 
+    function hydratePremiumDashboardOrdersFromBootstrap(state, parseOrders, payload) {
+        if (!state || typeof state !== 'object' || typeof parseOrders !== 'function') return false;
+        const values = payload && payload.activeOrdersState && typeof payload.activeOrdersState.values === 'object'
+            ? payload.activeOrdersState.values
+            : {};
+        const orders = parseOrders(values);
+        if (!orders.length) return false;
+        state.orders = orders;
+        state.ordersHydrated = true;
+        return true;
+    }
+
     function releasePremiumDashboardBootShellAfterMinimum(startedAt, minimumMs = 650) {
         const timerRoot = getDashboardTimerRoot();
         const elapsed = Date.now() - (Number(startedAt) || Date.now());
@@ -234,6 +246,7 @@ function formatMoneyEUR(amount) {
             releasePremiumDashboardBootShellAfterMinimum,
             readDashboardCustomersBootstrapPayload,
             hydratePremiumDashboardCustomersFromBootstrap,
+            hydratePremiumDashboardOrdersFromBootstrap,
             startPremiumDashboardBootWatchdog,
 	    });
 });

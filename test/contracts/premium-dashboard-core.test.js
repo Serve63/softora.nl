@@ -13,6 +13,7 @@ test('premium dashboard core exposes stable pure helpers', () => {
   assert.equal(typeof dashboardCore.fetchPremiumDashboardJson, 'function');
   assert.equal(typeof dashboardCore.forcePremiumDashboardBootShellVisible, 'function');
   assert.equal(typeof dashboardCore.releasePremiumDashboardBootShell, 'function');
+  assert.equal(typeof dashboardCore.hydratePremiumDashboardOrdersFromBootstrap, 'function');
   assert.equal(typeof dashboardCore.startPremiumDashboardBootWatchdog, 'function');
 });
 
@@ -47,6 +48,25 @@ test('premium dashboard core formats money and project metadata', () => {
     }),
     'Amsterdam \u2022 \u20ac1.250 \u2022 wacht op betaling'
   );
+});
+
+test('premium dashboard core hydrates active orders from server bootstrap values', () => {
+  const state = { orders: [], ordersHydrated: false };
+  const payload = {
+    activeOrdersState: {
+      values: {
+        softora_custom_orders_premium_v1: JSON.stringify([{ id: 11, title: 'Website opdracht' }]),
+      },
+    },
+  };
+
+  const hydrated = dashboardCore.hydratePremiumDashboardOrdersFromBootstrap(state, (values) => {
+    return JSON.parse(values.softora_custom_orders_premium_v1 || '[]');
+  }, payload);
+
+  assert.equal(hydrated, true);
+  assert.equal(state.ordersHydrated, true);
+  assert.equal(state.orders[0].id, 11);
 });
 
 test('premium dashboard core can force-release the boot shell without theme helpers', () => {
