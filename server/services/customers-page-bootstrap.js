@@ -406,8 +406,8 @@ function createCustomersPageBootstrapService(deps = {}) {
       return {
         ok: true,
         loadedAt: new Date().toISOString(),
-        source: 'default-customers',
-        customers: buildDefaultCustomers(),
+        source: 'empty',
+        customers: [],
       };
     }
 

@@ -234,7 +234,7 @@ test('customers page bootstrap derives verantwoordelijke from active order claim
   assert.equal(payload.customers[0].verantwoordelijk, 'Martijn');
 });
 
-test('customers page bootstrap keeps dashboard populated when stored state is empty', async () => {
+test('customers page bootstrap does not invent customers when stored state is empty', async () => {
   const service = createCustomersPageBootstrapService({
     getUiStateValues: async () => ({
       values: {},
@@ -244,15 +244,8 @@ test('customers page bootstrap keeps dashboard populated when stored state is em
   const payload = await service.buildCustomersBootstrapPayload();
 
   assert.equal(payload.ok, true);
-  assert.equal(payload.source, 'default-customers');
-  assert.deepEqual(
-    payload.customers.map((customer) => customer.naam),
-    ['Linsey Klaus', 'Maarten Van Gemert']
-  );
-  assert.equal(
-    payload.customers.reduce((total, customer) => total + Number(customer.websiteBedrag || 0), 0),
-    600
-  );
+  assert.equal(payload.source, 'empty');
+  assert.deepEqual(payload.customers, []);
 });
 
 test('customers page bootstrap backfills verantwoordelijke for stored rows from matching active orders', async () => {

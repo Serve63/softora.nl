@@ -106,6 +106,8 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(pageSource, /const rawCustomers = readPremiumDashboardChunkedStateValue\(values, PREMIUM_CUSTOMERS_KEY\);/);
   assert.match(pageSource, /const customers = parsePremiumCustomers\(rawCustomers\);/);
   assert.match(pageSource, /totalClientsEl\.textContent = String\(hasCustomerDatabase \? customers\.length : uniqueClients\.size\);/);
+  assert.match(pageSource, /catch \(_\) \{\s+return false;\s+\}/);
+  assert.doesNotMatch(pageSource, /return applyPremiumDashboardDefaultCustomers\(\);/);
   assert.doesNotMatch(pageSource, /premiumDashboardState\.(orders|customers) = \[\];/);
 });
 
