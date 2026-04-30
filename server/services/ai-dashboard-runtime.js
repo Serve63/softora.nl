@@ -30,6 +30,7 @@ function createAiDashboardRuntime(deps = {}) {
     generateWebsitePromptFromTranscriptWithAi,
     buildWebsitePromptFallback,
     extractMeetingNotesFromImageWithAi,
+    transcribeMeetingAudioWithAi,
     logger = console,
     parseJsonLoose,
     getUiStateValues,
@@ -110,6 +111,7 @@ function createAiDashboardRuntime(deps = {}) {
     generateWebsitePromptFromTranscriptWithAi,
     buildWebsitePromptFallback,
     extractMeetingNotesFromImageWithAi,
+    transcribeMeetingAudioWithAi,
     logger,
   });
 

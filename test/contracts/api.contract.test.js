@@ -286,6 +286,16 @@ test('ai utility routes keep their auth boundaries and validation contracts', as
     assert.equal(notesResult.body.ok, false);
     assert.equal(notesResult.body.error, 'Afbeelding ontbreekt');
   }
+
+  const audioNotesResult = await postProtectedApiExpectation(
+    '/api/ai/notes-audio-to-text',
+    {},
+    { successStatuses: [400] }
+  );
+  if (audioNotesResult.response.status === 400) {
+    assert.equal(audioNotesResult.body.ok, false);
+    assert.equal(audioNotesResult.body.error, 'Audiobestand ontbreekt');
+  }
 });
 
 test('ai dashboard routes keep their auth boundaries and validation contracts', async () => {

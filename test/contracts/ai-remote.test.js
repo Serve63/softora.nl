@@ -44,6 +44,17 @@ function createService(overrides = {}) {
           text: '<html><body><h1>Softora</h1></body></html>',
         };
       }),
+    fetchImpl:
+      overrides.fetchImpl ||
+      (async (url, options) => {
+        state.fetchCalls = state.fetchCalls || [];
+        state.fetchCalls.push({ url, options });
+        return {
+          ok: true,
+          status: 200,
+          text: async () => 'Transcriptie uit audio',
+        };
+      }),
     fetchBinaryWithTimeout:
       overrides.fetchBinaryWithTimeout ||
       (async (url, options, timeoutMs) => {
@@ -336,6 +347,37 @@ test('ai remote service accepts chatgpt-image-latest without legacy response for
   assert.match(String(calls[0].options.body || ''), /"model":"chatgpt-image-latest"/);
   assert.doesNotMatch(String(calls[0].options.body || ''), /response_format/);
   assert.equal(result.model, 'chatgpt-image-latest');
+});
+
+test('ai remote service transcribes meeting audio uploads through OpenAI audio API', async () => {
+  const calls = [];
+  const { service } = createService({
+    env: { OPENAI_AUDIO_TRANSCRIPTION_MODEL: 'gpt-4o-mini-transcribe' },
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        text: async () => 'Transcriptie van de meeting',
+      };
+    },
+  });
+
+  const result = await service.transcribeMeetingAudioWithAi({
+    audioDataUrl: 'data:audio/mpeg;base64,YXVkaW8=',
+    fileName: 'meeting.mp3',
+    language: 'nl',
+  });
+
+  assert.equal(result.transcript, 'Transcriptie van de meeting');
+  assert.equal(result.model, 'gpt-4o-mini-transcribe');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://api.openai.test/v1/audio/transcriptions');
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer openai-key');
+  assert.equal(calls[0].options.body.get('model'), 'gpt-4o-mini-transcribe');
+  assert.equal(calls[0].options.body.get('language'), 'nl');
+  assert.equal(calls[0].options.body.get('response_format'), 'text');
+  assert.ok(calls[0].options.body.get('file'));
 });
 
 test('ai remote service rejects non-image model configuration before calling OpenAI', async () => {

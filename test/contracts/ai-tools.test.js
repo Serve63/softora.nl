@@ -85,6 +85,14 @@ function createFixture(overrides = {}) {
         model: 'gpt-4o-mini',
         usage: { totalTokens: 40 },
       })),
+    transcribeMeetingAudioWithAi:
+      overrides.transcribeMeetingAudioWithAi ||
+      (async () => ({
+        transcript: 'Klant wil een website op basis van audiomeeting',
+        source: 'audio',
+        model: 'gpt-4o-transcribe',
+        usage: null,
+      })),
     logger: {
       error: (...args) => loggerCalls.push(args),
     },
@@ -301,6 +309,49 @@ test('ai tools coordinator validates notes image input and keeps prompt fallback
   await fallbackFixture.coordinator.sendNotesImageToTextResponse(
     {
       body: { imageDataUrl: 'data:image/png;base64,abcd' },
+    },
+    fallbackRes
+  );
+
+  assert.equal(fallbackRes.statusCode, 200);
+  assert.equal(fallbackRes.body.ok, true);
+  assert.equal(fallbackRes.body.promptSource, 'template-fallback');
+  assert.equal(typeof fallbackRes.body.transcript, 'string');
+});
+
+test('ai tools coordinator validates notes audio input and keeps prompt fallback local to prompt generation', async () => {
+  const invalidFixture = createFixture();
+  const missingRes = createResponseRecorder();
+
+  await invalidFixture.coordinator.sendNotesAudioToTextResponse({ body: {} }, missingRes);
+
+  assert.equal(missingRes.statusCode, 400);
+  assert.equal(missingRes.body.error, 'Audiobestand ontbreekt');
+
+  const tooLargeRes = createResponseRecorder();
+  await invalidFixture.coordinator.sendNotesAudioToTextResponse(
+    {
+      body: { audioDataUrl: `data:audio/mpeg;base64,${'a'.repeat(34000001)}` },
+    },
+    tooLargeRes
+  );
+
+  assert.equal(tooLargeRes.statusCode, 413);
+  assert.equal(tooLargeRes.body.error, 'Audiobestand te groot');
+
+  const fallbackFixture = createFixture({
+    generateWebsitePromptFromTranscriptWithAi: async () => {
+      throw new Error('Prompt provider offline');
+    },
+  });
+  const fallbackRes = createResponseRecorder();
+
+  await fallbackFixture.coordinator.sendNotesAudioToTextResponse(
+    {
+      body: {
+        audioDataUrl: 'data:audio/mpeg;base64,YXVkaW8=',
+        fileName: 'meeting.mp3',
+      },
     },
     fallbackRes
   );

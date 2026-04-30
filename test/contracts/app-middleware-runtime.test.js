@@ -137,3 +137,31 @@ test('app middleware skips Supabase hydration for non-api requests', async () =>
 
   assert.equal(hydrateCalls, 0);
 });
+
+test('app middleware geeft audio-notitie uploads een grotere JSON-limiet', async () => {
+  const app = createAppRecorder();
+  const selectedLimits = [];
+
+  applyAppMiddleware(
+    app,
+    createDeps({
+      express: {
+        json: (options = {}) => (_req, _res, next) => {
+          selectedLimits.push(options.limit);
+          next();
+        },
+      },
+    })
+  );
+
+  const bodyParserSelector = app.uses[2][0];
+  await new Promise((resolve) => {
+    bodyParserSelector(
+      { method: 'POST', path: '/api/ai/notes-audio-to-text' },
+      {},
+      resolve
+    );
+  });
+
+  assert.equal(selectedLimits.at(-1), '34mb');
+});
