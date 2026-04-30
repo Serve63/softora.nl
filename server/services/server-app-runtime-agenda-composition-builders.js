@@ -247,7 +247,22 @@ function buildServerAppAgendaWiringRuntimeContext({
       sanitizeLaunchDomainName: agendaPostCallHelpers.sanitizeLaunchDomainName,
       sanitizeReferenceImages: agendaPostCallHelpers.sanitizeReferenceImages,
       agendaPostCallHelpers,
-      getUiStateValues: uiSeoRuntime.getUiStateValues,
+      getUiStateValues: async (scope, ...args) => {
+        const legacyGetUiStateValues = (...innerArgs) => uiSeoRuntime.getUiStateValues(...innerArgs);
+        const dataOpsBridge = uiSeoRuntime.dataOpsUiStateBridge;
+        if (
+          dataOpsBridge &&
+          typeof dataOpsBridge.canHandleScope === 'function' &&
+          dataOpsBridge.canHandleScope(scope) &&
+          typeof dataOpsBridge.getUiStateValues === 'function'
+        ) {
+          const bridged = await dataOpsBridge.getUiStateValues(scope, {
+            legacyGetUiStateValues,
+          });
+          if (bridged) return bridged;
+        }
+        return legacyGetUiStateValues(scope, ...args);
+      },
       setUiStateValues: uiSeoRuntime.setUiStateValues,
       premiumActiveOrdersScope: bootstrapState.PREMIUM_ACTIVE_ORDERS_SCOPE,
       premiumActiveCustomOrdersKey: bootstrapState.PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY,

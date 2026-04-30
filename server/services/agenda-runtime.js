@@ -488,10 +488,21 @@ function createAgendaRuntime(deps = {}) {
       fileName === 'premium-database.html' ||
       fileName === 'premium-personeel-dashboard.html'
     ) {
-      return {
+      const customersPayload = await customersPageBootstrapService.buildCustomersBootstrapPayload();
+      const bootstrapData = {
         marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
         scriptId: 'softoraCustomersBootstrap',
-        data: await customersPageBootstrapService.buildCustomersBootstrapPayload(),
+        data: customersPayload,
+      };
+      if (
+        fileName === 'premium-personeel-dashboard.html' &&
+        typeof customersPageBootstrapService.buildDashboardHtmlReplacements === 'function'
+      ) {
+        bootstrapData.htmlReplacements =
+          customersPageBootstrapService.buildDashboardHtmlReplacements(customersPayload);
+      }
+      return {
+        ...bootstrapData,
       };
     }
 

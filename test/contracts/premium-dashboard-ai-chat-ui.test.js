@@ -99,6 +99,9 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   const coreSource = fs.readFileSync(corePath, 'utf8');
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
+  assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_TOTAL_REVENUE -->/);
+  assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_MAINTENANCE_REVENUE -->/);
+  assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_TOTAL_CLIENTS -->/);
   assert.match(coreSource, /function readDashboardCustomersBootstrapPayload\(scriptId = 'softoraCustomersBootstrap'\) \{/);
   assert.match(pageSource, /const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload\(\);/);
   assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
@@ -116,6 +119,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(coreSource, /const customers = parseCustomers\(rawCustomers\);/);
   assert.match(pageSource, /const hadPremiumDashboardBootstrapCustomers = hydratePremiumDashboardCustomersFromBootstrap\(premiumDashboardState, parsePremiumCustomers, dashboardCustomersBootstrapPayload\);/);
   assert.match(pageSource, /totalClientsEl\.textContent = String\(hasCustomerDatabase \? customers\.length : uniqueClients\.size\);/);
+  assert.doesNotMatch(pageSource, /if \(!loaded && !hadPremiumDashboardBootstrapCustomers\) renderPremiumDashboardOrders\(\);/);
   assert.match(pageSource, /ordersHydrated: false,/);
   assert.match(pageSource, /customersHydrated: false,/);
   assert.match(pageSource, /const loaded = results\.some\(Boolean\) \|\| premiumDashboardState\.ordersHydrated \|\| premiumDashboardState\.customersHydrated;/);

@@ -279,10 +279,11 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(backfillCalls, 1);
 });
 
-test('server app runtime composition builders preserve agenda wiring groups', () => {
+test('server app runtime composition builders preserve agenda wiring groups', async () => {
   const queueRuntimeStatePersist = () => null;
   const buildRuntimeStateSnapshotPayload = () => ({ ok: true });
   const getEffectivePublicBaseUrl = () => 'https://softora.test';
+  const bridgeReads = [];
 
   const context = buildServerAppAgendaWiringRuntimeContext({
     app: { locals: {} },
@@ -386,8 +387,15 @@ test('server app runtime composition builders preserve agenda wiring groups', ()
       getOpenAiTranscriptionModelCandidates: () => ['whisper-1'],
     },
     uiSeoRuntime: {
-      getUiStateValues: async () => ({}),
+      getUiStateValues: async (scope) => ({ source: 'legacy', scope }),
       setUiStateValues: async () => true,
+      dataOpsUiStateBridge: {
+        canHandleScope: (scope) => scope === 'premium_customers',
+        getUiStateValues: async (scope) => {
+          bridgeReads.push(scope);
+          return { source: 'bridge', scope };
+        },
+      },
     },
     aiHelpers: {
       extractOpenAiTextContent: () => '',
@@ -415,6 +423,9 @@ test('server app runtime composition builders preserve agenda wiring groups', ()
   assert.equal(context.agendaAppOptions.getEffectivePublicBaseUrl, getEffectivePublicBaseUrl);
   assert.equal(context.agendaAppOptions.leadDatabaseUiScope, 'coldcalling');
   assert.equal(context.agendaAppOptions.demoConfirmationTaskEnabled, true);
+  assert.equal((await context.agendaAppOptions.getUiStateValues('premium_customers')).source, 'bridge');
+  assert.equal((await context.agendaAppOptions.getUiStateValues('other_scope')).source, 'legacy');
+  assert.deepEqual(bridgeReads, ['premium_customers']);
 });
 
 test('server app runtime composition builders preserve app ops callbacks and metadata', async () => {

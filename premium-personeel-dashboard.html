@@ -2058,15 +2058,15 @@
             <div class="kpi-grid">
                 <div class="kpi-card">
                     <div class="kpi-label">Totale Omzet</div>
-                    <div class="kpi-value" id="kpiRevenueYear">€0</div>
+                    <div class="kpi-value" id="kpiRevenueYear"><!-- SOFTORA_DASHBOARD_TOTAL_REVENUE --></div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label kpi-label-tight">Waarvan Website Onderhoud</div>
-                    <div class="kpi-value" id="kpiMaintenanceMonth">€0</div>
+                    <div class="kpi-value" id="kpiMaintenanceMonth"><!-- SOFTORA_DASHBOARD_MAINTENANCE_REVENUE --></div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Totale Klanten</div>
-                    <div class="kpi-value" id="kpiTotalClients">0</div>
+                    <div class="kpi-value" id="kpiTotalClients"><!-- SOFTORA_DASHBOARD_TOTAL_CLIENTS --></div>
                 </div>
                 <div class="kpi-card highlighted">
                     <div class="kpi-label">Actieve Opdrachten</div>
@@ -3595,7 +3595,7 @@
         if (hadPremiumDashboardBootstrapCustomers) renderPremiumDashboardOrders();
         void (async () => { const bootStartedAt = Date.now();
             try {
-                const loaded = await refreshPremiumDashboard(true); if (!loaded && !hadPremiumDashboardBootstrapCustomers) renderPremiumDashboardOrders();
+                await refreshPremiumDashboard(true);
             } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 650); }
         })();
 

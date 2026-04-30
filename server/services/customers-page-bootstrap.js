@@ -104,6 +104,27 @@ function createCustomersPageBootstrapService(deps = {}) {
     return Math.round(amount);
   }
 
+  function formatDashboardMoney(amount) {
+    const safeAmount = Math.max(0, Math.round(Number(amount) || 0));
+    return `\u20ac${safeAmount.toLocaleString('nl-NL')}`;
+  }
+
+  function getDashboardDate(value, fallback = new Date()) {
+    const normalized = normalizeDate(value);
+    if (!normalized) return fallback;
+    const date = new Date(`${normalized}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? fallback : date;
+  }
+
+  function countInclusiveMonths(startDate, endDate) {
+    if (!(startDate instanceof Date) || !(endDate instanceof Date)) return 0;
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
+    const start = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    if (start.getTime() > end.getTime()) return 0;
+    return (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+  }
+
   const CUSTOMER_SERVICE_OPTIONS = ['website', 'bedrijfssoftware', 'voicesoftware', 'chatbot'];
 
   function normalizeCustomerService(raw) {
@@ -374,6 +395,43 @@ function createCustomersPageBootstrapService(deps = {}) {
     );
   }
 
+  function buildDashboardMetricSummary(customers, nowDate = new Date()) {
+    const normalizedCustomers = (Array.isArray(customers) ? customers : [])
+      .map((customer, index) => normalizeCustomer(customer, `dashboard-customer-${index}`))
+      .filter((customer) => customer.databaseStatus === 'klant');
+
+    return normalizedCustomers.reduce(
+      (summary, customer) => {
+        if (customer.status !== 'Betaald') return summary;
+        const paidAt = getDashboardDate(customer.datum, nowDate);
+        const websiteAmount = Math.max(0, Number(customer.websiteBedrag) || 0);
+        const maintenanceAmount = Math.max(0, Number(customer.onderhoudPerMaand) || 0);
+        const maintenanceMonths = maintenanceAmount > 0 ? countInclusiveMonths(paidAt, nowDate) : 0;
+        const maintenanceRevenue = maintenanceAmount * maintenanceMonths;
+
+        return {
+          totalCustomers: summary.totalCustomers,
+          totalRevenue: summary.totalRevenue + websiteAmount + maintenanceRevenue,
+          maintenanceRevenue: summary.maintenanceRevenue + maintenanceRevenue,
+        };
+      },
+      {
+        totalCustomers: normalizedCustomers.length,
+        totalRevenue: 0,
+        maintenanceRevenue: 0,
+      }
+    );
+  }
+
+  function buildDashboardHtmlReplacements(payload = {}) {
+    const summary = buildDashboardMetricSummary(payload.customers);
+    return {
+      SOFTORA_DASHBOARD_TOTAL_REVENUE: formatDashboardMoney(summary.totalRevenue),
+      SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
+      SOFTORA_DASHBOARD_TOTAL_CLIENTS: String(summary.totalCustomers),
+    };
+  }
+
   async function buildCustomersBootstrapPayload() {
     const remoteState = await getUiStateValues(customerScope);
     const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
@@ -401,6 +459,7 @@ function createCustomersPageBootstrapService(deps = {}) {
 
   return {
     buildCustomersBootstrapPayload,
+    buildDashboardHtmlReplacements,
   };
 }
 
