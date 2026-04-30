@@ -48,7 +48,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     try {
       const result = await operation(client);
       if (result && result.error) throw result.error;
-      return { ok: true, data: result ? result.data : null };
+      return { ok: true, data: result ? result.data : null, count: result ? result.count : null };
     } catch (error) {
       if (!isUnavailableError(error)) {
         logger.error(`[DataOps][${label}]`, error?.message || error);
@@ -341,6 +341,32 @@ function createSoftoraDataOpsStore(deps = {}) {
     return entries;
   }
 
+  async function countActiveRows(table, deletedColumn = 'deleted_at') {
+    const result = await run(`count-${table}`, (client) => {
+      let query = client.from(table).select('*', { count: 'exact', head: true });
+      if (deletedColumn) query = query.is(deletedColumn, null);
+      return query;
+    });
+    return result.ok ? Number(result.data?.count || result.count || 0) : null;
+  }
+
+  async function getDataOpsCounts() {
+    const [customers, activeOrders, orderRuntime, designPhotos, webdesignJobs] = await Promise.all([
+      countActiveRows(TABLES.customers),
+      countActiveRows(TABLES.activeOrders),
+      countActiveRows(TABLES.orderRuntime),
+      countActiveRows(TABLES.designPhotos),
+      countActiveRows(TABLES.webdesignJobs, ''),
+    ]);
+    return {
+      customers,
+      activeOrders,
+      orderRuntime,
+      designPhotos,
+      webdesignJobs,
+    };
+  }
+
   function toIsoFromMaybeMs(value) {
     const numeric = Number(value);
     if (Number.isFinite(numeric) && numeric > 0) return new Date(numeric).toISOString();
@@ -440,6 +466,7 @@ function createSoftoraDataOpsStore(deps = {}) {
 
   return {
     findRunningWebdesignJob,
+    getDataOpsCounts,
     getWebdesignJob,
     listActiveOrders,
     listCustomers,

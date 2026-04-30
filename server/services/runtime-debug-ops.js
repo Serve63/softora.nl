@@ -13,6 +13,7 @@ function createRuntimeDebugOpsCoordinator(deps = {}) {
     resetHydrationState = () => {},
     ensureRuntimeStateHydratedFromSupabase = async () => false,
     getAfterState = () => ({}),
+    dataOpsHealthReporter = null,
   } = deps;
 
   async function sendSupabaseProbeResponse(_req, res) {
@@ -90,7 +91,19 @@ function createRuntimeDebugOpsCoordinator(deps = {}) {
     });
   }
 
+  async function sendDataHealthResponse(_req, res) {
+    if (!dataOpsHealthReporter || typeof dataOpsHealthReporter.buildReport !== 'function') {
+      return res.status(503).json({
+        ok: false,
+        error: 'Data-health reporter is niet beschikbaar.',
+      });
+    }
+    const report = await dataOpsHealthReporter.buildReport();
+    return res.status(200).json(report);
+  }
+
   return {
+    sendDataHealthResponse,
     sendRuntimeSyncNowResponse,
     sendSupabaseProbeResponse,
   };

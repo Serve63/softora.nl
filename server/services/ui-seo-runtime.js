@@ -10,6 +10,7 @@ const { createWebsiteLinkCoordinator } = require('./website-links');
 const { createWebsitePreviewLibraryCoordinator } = require('./website-preview-library');
 const { createSoftoraDataOpsUiStateBridge } = require('./data-ops-ui-state-bridge');
 const { createSoftoraDataOpsStore } = require('./data-ops-store');
+const { createDataOpsHealthReporter } = require('./data-ops-health');
 
 function createUiSeoRuntime(deps = {}) {
   const {
@@ -92,6 +93,10 @@ function createUiSeoRuntime(deps = {}) {
     enabled: dataOpsUiStateEnabled,
     store: dataOpsStore,
     logger,
+  });
+  const dataOpsHealthReporter = createDataOpsHealthReporter({
+    fetchSupabaseRowsByStateKeyPrefixViaRest,
+    dataOpsStore,
   });
 
   const seoCore = createSeoCore({
@@ -218,6 +223,7 @@ function createUiSeoRuntime(deps = {}) {
     resetHydrationState,
     ensureRuntimeStateHydratedFromSupabase,
     getAfterState,
+    dataOpsHealthReporter,
   });
 
   const websitePreviewLibraryCoordinator = createWebsitePreviewLibraryCoordinator({
@@ -263,6 +269,7 @@ function createUiSeoRuntime(deps = {}) {
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
     dataOpsStore,
+    dataOpsHealthReporter,
     dataOpsUiStateBridge,
     websiteLinkCoordinator,
     websitePreviewLibraryCoordinator,
