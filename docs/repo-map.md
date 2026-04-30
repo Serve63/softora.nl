@@ -5,6 +5,7 @@ Snelle oriëntatie voor mensen en AI-agents, zodat nieuwe wijzigingen op de juis
 
 ## Kwaliteitsprotocol
 - [docs/quality-protocol.md](quality-protocol.md): vaste kwaliteits-, security- en onderhoudsregels voor mensen en AI.
+- [docs/data-ops-storage.md](data-ops-storage.md): nieuwe bron-van-waarheid voor klanten, opdrachten, dashboarddata, designfoto's en webdesign-jobs.
 
 ## Runtime entrypoints
 - [server.js](../server.js): klein Express entrypoint en export-layer.
@@ -29,7 +30,7 @@ Gebruik voor deze domeinen altijd eerst:
 - [server/routes](../server/routes): route-registratie voor gemigreerde domeinen.
   Agenda, active orders, AI dashboard, AI tools, premium auth, SEO read/write, runtime debug ops, runtime ops, health en premium user-management routes landen hier.
 - [server/services](../server/services): businesslogica en coördinatie.
-  Active orders, active-order automation, AI dashboard, AI helper/core utilities, AI tools, agenda-read, agenda HTML bootstrap, agenda appointment state/repair/upsert helpers, agenda task-formatting helpers, agenda metadata/summaries/call-source refresh helpers, agenda lead-detail/transcript helpers, agenda interested-lead state/orchestration/read-materialization, agenda lead-follow-up reuse/backfill helpers, agenda post-call/active-order orchestration, agenda confirmation-task orchestration, confirmation mail/IMAP-SMTP infrastructuur, premium auth, premium user-management, runtime backup/debug ops, runtime state sync, runtime Supabase state access, runtime ops, SEO core/read/write, UI state, website-input helpers, website-generation helpers en HTML page-rendering logica zijn al apart ondergebracht.
+  Active orders, active-order automation, AI dashboard, AI helper/core utilities, AI tools, data-ops storage/health/compat, agenda-read, agenda HTML bootstrap, agenda appointment state/repair/upsert helpers, agenda task-formatting helpers, agenda metadata/summaries/call-source refresh helpers, agenda lead-detail/transcript helpers, agenda interested-lead state/orchestration/read-materialization, agenda lead-follow-up reuse/backfill helpers, agenda post-call/active-order orchestration, agenda confirmation-task orchestration, confirmation mail/IMAP-SMTP infrastructuur, premium auth, premium user-management, runtime backup/debug ops, runtime state sync, runtime Supabase state access, runtime ops, SEO core/read/write, UI state, website-input helpers, website-generation helpers en HTML page-rendering logica zijn al apart ondergebracht.
 - [server/schemas](../server/schemas): formele payload-normalisatie en contracts.
 - [server/config](../server/config): gedeelde configuratie en feature flags.
 - [server/security](../server/security): security-gerichte helpers en guards.

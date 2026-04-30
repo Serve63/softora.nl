@@ -18,6 +18,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Root-level HTML mag kleine bootstrap bevatten, maar grotere paginalogica hoort in `assets/*`.
 - Frontend-bestanden boven de guardrail-limiet mogen niet verder groeien; nieuwe logica hoort eerst in kleinere modules of in een bewuste, genoteerde uitzondering.
 - Database of formele repositories zijn leidend zodra een pad is gemigreerd; voeg geen tweede bron van waarheid toe.
+- Voor klanten, actieve opdrachten, order-runtime, database-designfoto's en webdesign-jobs is [docs/data-ops-storage.md](data-ops-storage.md) leidend: oude `ui_state:*` JSON is daar alleen tijdelijke compat/fallback.
 
 ## Hoog-risico workflow
 - Lees altijd eerst [AGENTS.md](../AGENTS.md), [docs/repo-map.md](repo-map.md) en [server/routes/manifest.js](../server/routes/manifest.js).

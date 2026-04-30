@@ -22,6 +22,18 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
 
+test('protocol docs point agents at structured data ops storage', () => {
+  const protocol = readRepoFile('docs/quality-protocol.md');
+  const repoMap = readRepoFile('docs/repo-map.md');
+  const dataOps = readRepoFile('docs/data-ops-storage.md');
+
+  assert.match(protocol, /docs\/data-ops-storage\.md/);
+  assert.match(repoMap, /data-ops storage\/health\/compat/);
+  assert.match(dataOps, /softora_customers/);
+  assert.match(dataOps, /softora-design-photos/);
+  assert.match(dataOps, /node scripts\/migrate-data-ops\.js --write/);
+});
+
 test('agent guardrails detect high-risk changes without tests and recent backup', () => {
   const violations = buildGuardrailViolations({
     changedFiles: ['server.js', 'server/services/agenda-read.js'],
