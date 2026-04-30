@@ -31,6 +31,10 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(pageSource, /Softora Volledig beheer/);
   assert.match(pageSource, /<div class="card-badge">Aanbevolen<\/div>/);
   assert.doesNotMatch(pageSource, /<div class="card-badge">Flexibel<\/div>/);
+  assert.match(pageSource, /id="tab-routes" class="tab-panel theme-routes active"/);
+  assert.match(pageSource, /id="tab-bouwen" class="tab-panel theme-website"/);
+  assert.match(pageSource, /id="tab-onderhoud" class="tab-panel theme-website"/);
+  assert.doesNotMatch(pageSource, /id="tab-onderhoud" class="tab-panel theme-website active"/);
   assert.match(scriptSource, /routes: \["routes"\]/);
   assert.match(scriptSource, /website: \["bouwen", "onderhoud"\]/);
   assert.match(scriptSource, /bedrijfssoftware: \["bedrijfssoftware", "bedrijfssoftware-onderhoud"\]/);
