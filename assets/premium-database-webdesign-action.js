@@ -36,6 +36,7 @@
         const setStatusMessage = options.setStatusMessage;
         const renderPage = options.renderPage;
         const refreshPhotos = options.refreshPhotos;
+        const generateDirectPhoto = typeof options.generateDirectPhoto === "function" ? options.generateDirectPhoto : null;
         const isRestoringPhotos = typeof options.isRestoringPhotos === "function" ? options.isRestoringPhotos : function (customer) { return Boolean(state && state.photoRestorePending) && shouldShowWebsitePhoto(customer); };
         const costEur = Math.max(0, Number(options.costEur) || 0);
         const pendingIds = new Set();
@@ -239,6 +240,7 @@
         }
 
         function resumePendingJobs() {
+            if (generateDirectPhoto) return Promise.resolve();
             const firstLoad = loadRunningJobs();
             global.setTimeout(function () { void loadRunningJobs(); }, 2000);
             return firstLoad;
@@ -281,6 +283,18 @@
             showChargeLabel();
             const jobId = createJobId();
             setPendingJob({ customerId: target.id, jobId: jobId, startedAt: now() });
+            if (generateDirectPhoto) {
+                try {
+                    await generateDirectPhoto(target);
+                    await finishPendingJob({ customerId: target.id, jobId: jobId, startedAt: now() }, "");
+                } catch (error) {
+                    await finishPendingJob(
+                        { customerId: target.id, jobId: jobId, startedAt: now() },
+                        normalizeString(error && error.message) || "Webdesign maken is mislukt."
+                    );
+                }
+                return;
+            }
             try {
                 const response = await fetch(JOB_ENDPOINT, {
                     method: "POST",

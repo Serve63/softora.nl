@@ -105,6 +105,42 @@ function createCustomersPageBootstrapService(deps = {}) {
   }
 
   const CUSTOMER_SERVICE_OPTIONS = ['website', 'bedrijfssoftware', 'voicesoftware', 'chatbot'];
+  const DEFAULT_CUSTOMER_BOOTSTRAP_ROWS = Object.freeze([
+    {
+      id: 'klant-linsey-klaus',
+      naam: 'Linsey Klaus',
+      bedrijf: 'Linszorgt.nl',
+      telefoon: '+31 6 13 18 38 44',
+      type: 'Website',
+      service: 'website',
+      website: 'Linszorgt.nl',
+      bedrag: 300,
+      websiteBedrag: 300,
+      onderhoudPerMaand: 0,
+      status: 'Betaald',
+      actief: 'Ja',
+      review: 'Nee',
+      verantwoordelijk: 'Serve',
+      datum: '2026-03-23',
+    },
+    {
+      id: 'klant-maarten-van-gemert',
+      naam: 'Maarten Van Gemert',
+      bedrijf: 'Growingbyknowing.nl',
+      telefoon: '06 10 10 22 93',
+      type: 'Website',
+      service: 'website',
+      website: 'Growingbyknowing.nl',
+      bedrag: 300,
+      websiteBedrag: 300,
+      onderhoudPerMaand: 0,
+      status: 'Betaald',
+      actief: 'Nee',
+      review: 'Nee',
+      verantwoordelijk: 'Serve',
+      datum: '2026-01-07',
+    },
+  ]);
 
   function normalizeCustomerService(raw) {
     const rawSvc = normalizeString(raw && raw.service).toLowerCase();
@@ -173,6 +209,14 @@ function createCustomersPageBootstrapService(deps = {}) {
       if (nameCompare !== 0) return nameCompare;
       return normalizeString(a?.bedrijf).localeCompare(normalizeString(b?.bedrijf), 'nl');
     });
+  }
+
+  function buildDefaultCustomers() {
+    return sortCustomers(
+      DEFAULT_CUSTOMER_BOOTSTRAP_ROWS.map((row, index) =>
+        normalizeCustomer(row, `default-customer-${index}`)
+      )
+    );
   }
 
   function parseCustomers(raw) {
@@ -358,11 +402,19 @@ function createCustomersPageBootstrapService(deps = {}) {
     }
 
     const customers = deriveCustomersFromOrders(orders);
+    if (!customers.length) {
+      return {
+        ok: true,
+        loadedAt: new Date().toISOString(),
+        source: 'default-customers',
+        customers: buildDefaultCustomers(),
+      };
+    }
 
     return {
       ok: true,
       loadedAt: new Date().toISOString(),
-      source: customers.length ? 'orders' : 'empty',
+      source: 'orders',
       customers,
     };
   }

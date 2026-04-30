@@ -1617,7 +1617,7 @@
     </div>
 
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260429h"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260430a"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
@@ -2188,7 +2188,7 @@
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });
 
-        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, refreshPhotos: async function () { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, generateDirectPhoto: generateAndPersistWebsitePhotoForCustomer, refreshPhotos: async function () { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
         function mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
@@ -2824,6 +2824,37 @@
             }
 
             throw lastError || new Error("AI-foto genereren is mislukt voor " + customer.bedrijf + ".");
+        }
+
+        async function generateAndPersistWebsitePhotoForCustomer(customer) {
+            const customerId = normalizeString(customer && customer.id);
+            const customerIndex = state.klanten.findIndex(function (item) {
+                return item.id === customerId;
+            });
+            if (!customerId || customerIndex === -1) {
+                throw new Error("Bedrijf kon niet worden gevonden voor dit webdesign.");
+            }
+
+            const currentCustomer = normalizeCustomer(state.klanten[customerIndex], customerId);
+            const generated = await generateWebsitePhotoData(currentCustomer);
+            const nextCustomer = normalizeCustomer({
+                ...currentCustomer,
+                websitePhoto: generated.dataUrl,
+                websitePhotoName: generated.fileName,
+                updatedAt: formatDateForStorage(new Date())
+            }, customerId);
+
+            state.klanten = sortCustomers(state.klanten.map(function (item) {
+                return item.id === customerId ? nextCustomer : item;
+            }));
+            renderPage();
+
+            const photoResult = await persistCustomerPhotos(state.klanten, { onlyCustomerIds: [customerId] });
+            if (!photoResult || !photoResult.ok) {
+                throw new Error("Webdesign is gemaakt, maar opslaan in Supabase mislukte.");
+            }
+
+            return nextCustomer;
         }
 
         async function generateWebdesignPhotos(limit, options) {

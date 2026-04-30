@@ -2172,6 +2172,44 @@
                 ? premiumDashboardCustomersBootstrapPayload.customers
                 : []
         );
+        const PREMIUM_DASHBOARD_DEFAULT_CUSTOMERS = Object.freeze([
+            {
+                id: 'klant-linsey-klaus',
+                naam: 'Linsey Klaus',
+                bedrijf: 'Linszorgt.nl',
+                telefoon: '+31 6 13 18 38 44',
+                type: 'Website',
+                service: 'website',
+                website: 'Linszorgt.nl',
+                bedrag: 300,
+                websiteBedrag: 300,
+                onderhoudPerMaand: 0,
+                status: 'Betaald',
+                databaseStatus: 'klant',
+                actief: 'Ja',
+                review: 'Nee',
+                verantwoordelijk: 'Serve',
+                datum: '2026-03-23',
+            },
+            {
+                id: 'klant-maarten-van-gemert',
+                naam: 'Maarten Van Gemert',
+                bedrijf: 'Growingbyknowing.nl',
+                telefoon: '06 10 10 22 93',
+                type: 'Website',
+                service: 'website',
+                website: 'Growingbyknowing.nl',
+                bedrag: 300,
+                websiteBedrag: 300,
+                onderhoudPerMaand: 0,
+                status: 'Betaald',
+                databaseStatus: 'klant',
+                actief: 'Nee',
+                review: 'Nee',
+                verantwoordelijk: 'Serve',
+                datum: '2026-01-07',
+            },
+        ]);
         const premiumDashboardState = {
             loading: false,
             orders: [],
@@ -2873,9 +2911,18 @@
             }
         }
 
+        function applyPremiumDashboardDefaultCustomers() {
+            if (premiumDashboardState.customers.length) return false;
+            const customers = parsePremiumCustomers(PREMIUM_DASHBOARD_DEFAULT_CUSTOMERS);
+            if (!customers.length) return false;
+            premiumDashboardState.customers = customers;
+            premiumDashboardState.customersHydrated = true;
+            return true;
+        }
+
         function hydratePremiumDashboardCustomersFromBootstrap() {
             const customers = parsePremiumCustomers(premiumDashboardBootstrapCustomerRows);
-            if (!customers.length) return false;
+            if (!customers.length) return applyPremiumDashboardDefaultCustomers();
             premiumDashboardState.customers = customers;
             premiumDashboardState.customersHydrated = true;
             return true;
@@ -3035,6 +3082,9 @@
         }
 
         function renderPremiumDashboardOrders() {
+            if (!premiumDashboardState.customers.length) {
+                applyPremiumDashboardDefaultCustomers();
+            }
             const orders = Array.isArray(premiumDashboardState.orders) ? premiumDashboardState.orders : [];
             const customers = Array.isArray(premiumDashboardState.customers) ? premiumDashboardState.customers : [];
             const currentYear = now.getFullYear();
@@ -3225,13 +3275,15 @@
                 const rawCustomers = readPremiumDashboardChunkedStateValue(values, PREMIUM_CUSTOMERS_KEY);
                 if (!rawCustomers && !Object.prototype.hasOwnProperty.call(values, PREMIUM_CUSTOMERS_KEY) && !Object.prototype.hasOwnProperty.call(values, getPremiumDashboardChunkMetaKey(PREMIUM_CUSTOMERS_KEY))) throw new Error('Geen Supabase-klantdata ontvangen.');
                 const customers = parsePremiumCustomers(rawCustomers);
-                if (customers.length || !premiumDashboardState.customers.length) {
+                if (customers.length) {
                     premiumDashboardState.customers = customers;
+                } else {
+                    applyPremiumDashboardDefaultCustomers();
                 }
                 premiumDashboardState.customersHydrated = true;
                 return true;
             } catch (_) {
-                return false;
+                return applyPremiumDashboardDefaultCustomers();
             }
         }
 
