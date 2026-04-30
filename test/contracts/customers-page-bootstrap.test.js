@@ -94,6 +94,47 @@ test('customers page bootstrap leest chunked customer database rows', async () =
   assert.equal(payload.customers[0].websiteBedrag, 300);
 });
 
+test('customers page bootstrap behoudt database-statussen voor dashboard filtering', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      if (scope !== 'premium_customers_database') return null;
+      return {
+        values: {
+          softora_customers_premium_v1: JSON.stringify([
+            {
+              id: 'lead-1',
+              naam: 'Prospect Bedrijf',
+              bedrijf: 'Prospect Bedrijf',
+              status: 'benaderbaar',
+              databaseStatus: 'benaderbaar',
+            },
+            {
+              id: 'klant-1',
+              naam: 'Linsey Klaus',
+              bedrijf: 'Linszorgt.nl',
+              websiteBedrag: 300,
+              status: 'klant',
+              databaseStatus: 'klant',
+              datum: '2026-03-23',
+            },
+          ]),
+        },
+      };
+    },
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload();
+
+  assert.equal(payload.customers.length, 2);
+  const prospect = payload.customers.find((customer) => customer.id === 'lead-1');
+  const customer = payload.customers.find((item) => item.id === 'klant-1');
+  assert.equal(prospect.databaseStatus, 'benaderbaar');
+  assert.equal(prospect.status, 'benaderbaar');
+  assert.equal(customer.databaseStatus, 'klant');
+  assert.equal(customer.status, 'Betaald');
+  assert.equal(customer.websiteBedrag, 300);
+});
+
 test('customers page bootstrap falls back to deriving customers from active orders', async () => {
   const service = createCustomersPageBootstrapService({
     getUiStateValues: async (scope) => {

@@ -116,12 +116,43 @@ function createCustomersPageBootstrapService(deps = {}) {
     return normalizeString(raw && raw.review).toLowerCase() === 'ja' ? 'Ja' : 'Nee';
   }
 
+  const CUSTOMER_DATABASE_STATUSES = [
+    'nieuw',
+    'prospect',
+    'benaderbaar',
+    'gebeld',
+    'geengehoor',
+    'gemaild',
+    'interesse',
+    'afspraak',
+    'klant',
+    'afgehaakt',
+    'geblokkeerd',
+    'buiten',
+  ];
+
+  function normalizeCustomerDatabaseStatus(raw) {
+    const value = normalizeString(raw && raw.databaseStatus).toLowerCase();
+    const status = normalizeString(raw && raw.status).toLowerCase();
+    if (CUSTOMER_DATABASE_STATUSES.includes(value)) return value;
+    if (CUSTOMER_DATABASE_STATUSES.includes(status)) return status;
+    if (status === 'betaald' || status === 'open') return 'klant';
+    return 'klant';
+  }
+
   function normalizeCustomer(raw, fallbackId) {
     const legacyAmount = normalizeOptionalAmount(raw && raw.bedrag);
     const rawType = normalizeString(raw && raw.type);
     const type =
       rawType === 'Onderhoud' || rawType === 'Website + onderhoud' ? rawType : 'Website';
-    const status = normalizeString(raw && raw.status) === 'Open' ? 'Open' : 'Betaald';
+    const databaseStatus = normalizeCustomerDatabaseStatus(raw);
+    const rawStatus = normalizeString(raw && raw.status);
+    const status =
+      rawStatus === 'Open'
+        ? 'Open'
+        : rawStatus === 'Betaald' || databaseStatus === 'klant'
+          ? 'Betaald'
+          : rawStatus || 'Open';
     const websiteAmountRaw = normalizeOptionalAmount(raw && raw.websiteBedrag);
     const maintenanceAmountRaw = normalizeOptionalAmount(raw && raw.onderhoudPerMaand);
     const websiteBedrag =
@@ -160,6 +191,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       onderhoudPerMaand,
       bedrag,
       status,
+      databaseStatus,
       actief: normalizeActiveValue(raw && raw.actief),
       review,
       verantwoordelijk: normalizeResponsibleValue(getResponsibleSourceValue(raw)),

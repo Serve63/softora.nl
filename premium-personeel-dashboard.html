@@ -2142,7 +2142,7 @@
         </section>
     </div>
 
-    <script src="assets/premium-dashboard-core.js?v=20260429b"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260429b"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -2226,7 +2226,7 @@
                 text: 'Groen: werkt perfect.',
             },
         };
-        const dashboardCore = window.SoftoraPremiumDashboardCore || { escapeHtml: (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'), normalizeDashboardString: (value) => String(value || '').trim(), normalizeDashboardTime: (value, fallback) => /^\d{2}:\d{2}$/.test(String(value || '').trim()) ? String(value || '').trim() : fallback, normalizeDashboardDate: (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim()) ? String(value || '').trim() : '', getPremiumDashboardChunkMetaKey: (baseKey) => `${String(baseKey || '').trim()}_chunks_v1`, getPremiumDashboardChunkPrefix: (baseKey) => `${String(baseKey || '').trim()}_chunk_`, readPremiumDashboardChunkedStateValue: (values, baseKey) => { const stateValues = values && typeof values === 'object' ? values : {}; const normalizedKey = String(baseKey || '').trim(); const fallback = typeof stateValues[normalizedKey] === 'string' ? stateValues[normalizedKey] : ''; const metaRaw = String(stateValues[`${normalizedKey}_chunks_v1`] || '').trim(); if (!metaRaw) return fallback; try { const meta = JSON.parse(metaRaw); const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0)); if (!count) return fallback; const chunks = []; for (let index = 0; index < count; index += 1) { const chunk = stateValues[`${normalizedKey}_chunk_${index}`]; if (typeof chunk !== 'string') return fallback; chunks.push(chunk); } return chunks.join('') || fallback; } catch (_) { return fallback; } }, formatMoneyEUR: (amount) => '€' + (Number(amount) || 0).toLocaleString('nl-NL'), formatProjectMeta: (order) => { const parts = []; if (order?.location) parts.push(order.location); parts.push('€' + (Number(order?.amount) || 0).toLocaleString('nl-NL')); if (order?.ui?.isBuilt && !order?.ui?.isPaid) parts.push('wacht op betaling'); return parts.join(' • '); }, fetchPremiumDashboardJson: (url, options) => fetch(url, options), releasePremiumDashboardBootShell: () => { if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') window.SoftoraPremiumBoot.setShellBooting(false); }, startPremiumDashboardBootWatchdog: () => {} };
+        const dashboardCore = window.SoftoraPremiumDashboardCore || { escapeHtml: (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'), normalizeDashboardString: (value) => String(value || '').trim(), normalizeDashboardTime: (value, fallback) => /^\d{2}:\d{2}$/.test(String(value || '').trim()) ? String(value || '').trim() : fallback, normalizeDashboardDate: (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim()) ? String(value || '').trim() : '', getPremiumDashboardChunkMetaKey: (baseKey) => `${String(baseKey || '').trim()}_chunks_v1`, getPremiumDashboardChunkPrefix: (baseKey) => `${String(baseKey || '').trim()}_chunk_`, readPremiumDashboardChunkedStateValue: (values, baseKey) => { const stateValues = values && typeof values === 'object' ? values : {}; const normalizedKey = String(baseKey || '').trim(); const fallback = typeof stateValues[normalizedKey] === 'string' ? stateValues[normalizedKey] : ''; const metaRaw = String(stateValues[`${normalizedKey}_chunks_v1`] || '').trim(); if (!metaRaw) return fallback; try { const meta = JSON.parse(metaRaw); const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0)); if (!count) return fallback; const chunks = []; for (let index = 0; index < count; index += 1) { const chunk = stateValues[`${normalizedKey}_chunk_${index}`]; if (typeof chunk !== 'string') return fallback; chunks.push(chunk); } return chunks.join('') || fallback; } catch (_) { return fallback; } }, formatMoneyEUR: (amount) => '€' + (Number(amount) || 0).toLocaleString('nl-NL'), formatProjectMeta: (order) => { const parts = []; if (order?.location) parts.push(order.location); parts.push('€' + (Number(order?.amount) || 0).toLocaleString('nl-NL')); if (order?.ui?.isBuilt && !order?.ui?.isPaid) parts.push('wacht op betaling'); return parts.join(' • '); }, fetchPremiumDashboardJson: (url, options) => fetch(url, options), readDashboardCustomersBootstrapPayload: () => ({ customers: [] }), hydratePremiumDashboardCustomersFromBootstrap: () => false, releasePremiumDashboardBootShell: () => { if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') window.SoftoraPremiumBoot.setShellBooting(false); }, releasePremiumDashboardBootShellAfterMinimum: () => { if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') window.SoftoraPremiumBoot.setShellBooting(false); }, startPremiumDashboardBootWatchdog: () => {} };
         const {
             escapeHtml,
             normalizeDashboardString,
@@ -2236,9 +2236,9 @@
             getPremiumDashboardChunkPrefix,
             readPremiumDashboardChunkedStateValue,
             formatMoneyEUR,
-            formatProjectMeta, fetchPremiumDashboardJson, releasePremiumDashboardBootShell, startPremiumDashboardBootWatchdog
+            formatProjectMeta, fetchPremiumDashboardJson, releasePremiumDashboardBootShellAfterMinimum, readDashboardCustomersBootstrapPayload, hydratePremiumDashboardCustomersFromBootstrap, startPremiumDashboardBootWatchdog
         } = dashboardCore;
-        startPremiumDashboardBootWatchdog();
+        const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload(); startPremiumDashboardBootWatchdog();
 
         function normalizeDashboardPeriodFilter(value) {
             return value === 'month' || value === 'quarter' || value === 'year' ? value : 'all';
@@ -3590,14 +3590,13 @@
             }
         }
 
+        const hadPremiumDashboardBootstrapCustomers = hydratePremiumDashboardCustomersFromBootstrap(premiumDashboardState, parsePremiumCustomers, dashboardCustomersBootstrapPayload);
         renderConfirmationTasks();
-        renderPremiumDashboardOrders();
-        void (async () => {
+        if (hadPremiumDashboardBootstrapCustomers) renderPremiumDashboardOrders();
+        void (async () => { const bootStartedAt = Date.now();
             try {
-                await refreshPremiumDashboard(true);
-            } finally {
-                releasePremiumDashboardBootShell();
-            }
+                const loaded = await refreshPremiumDashboard(true); if (!loaded && !hadPremiumDashboardBootstrapCustomers) renderPremiumDashboardOrders();
+            } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 650); }
         })();
 
         premiumDashboardState.pollTimer = window.setInterval(() => {

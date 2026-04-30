@@ -159,6 +159,39 @@ function formatMoneyEUR(amount) {
         }
     }
 
+    function readDashboardCustomersBootstrapPayload(scriptId = 'softoraCustomersBootstrap') {
+        const doc = root && root.document ? root.document : null;
+        const element = doc ? doc.getElementById(scriptId) : null;
+        if (!element) return { customers: [] };
+        try {
+            const parsed = JSON.parse(String(element.textContent || '{}'));
+            return parsed && typeof parsed === 'object' ? parsed : { customers: [] };
+        } catch (_) {
+            return { customers: [] };
+        }
+    }
+
+    function hydratePremiumDashboardCustomersFromBootstrap(state, parseCustomers, payload) {
+        if (!state || typeof state !== 'object' || typeof parseCustomers !== 'function') return false;
+        const rawCustomers = Array.isArray(payload && payload.customers) ? payload.customers : [];
+        const customers = parseCustomers(rawCustomers);
+        if (!customers.length) return false;
+        state.customers = customers;
+        state.customersHydrated = true;
+        return true;
+    }
+
+    function releasePremiumDashboardBootShellAfterMinimum(startedAt, minimumMs = 650) {
+        const timerRoot = getDashboardTimerRoot();
+        const elapsed = Date.now() - (Number(startedAt) || Date.now());
+        const remainingMs = Math.max(0, (Number(minimumMs) || 0) - elapsed);
+        if (remainingMs > 0 && typeof timerRoot.setTimeout === 'function') {
+            timerRoot.setTimeout(releasePremiumDashboardBootShell, remainingMs);
+            return;
+        }
+        releasePremiumDashboardBootShell();
+    }
+
     async function fetchPremiumDashboardJson(url, options = {}, timeoutMs = PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS) {
         const safeTimeoutMs = Math.max(1000, Math.min(30000, Number(timeoutMs) || PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS));
         const AbortCtor = root && typeof root.AbortController === 'function' ? root.AbortController : globalThis.AbortController;
@@ -198,6 +231,9 @@ function formatMoneyEUR(amount) {
             fetchPremiumDashboardJson,
             forcePremiumDashboardBootShellVisible,
             releasePremiumDashboardBootShell,
+            releasePremiumDashboardBootShellAfterMinimum,
+            readDashboardCustomersBootstrapPayload,
+            hydratePremiumDashboardCustomersFromBootstrap,
             startPremiumDashboardBootWatchdog,
 	    });
 });

@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 
 const {
   normalizePostCallStatus,
@@ -36,4 +38,15 @@ test('agenda runtime helpers trim post-call text to a safe limit', () => {
     sanitizePostCallText('abcdefghij', normalizeString, truncateText, 5),
     'abcde'
   );
+});
+
+test('agenda runtime injecteert klanten-bootstrap ook op het premium dashboard', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../../server/services/agenda-runtime.js'),
+    'utf8'
+  );
+
+  assert.match(source, /fileName === 'premium-personeel-dashboard\.html'/);
+  assert.match(source, /marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP'/);
+  assert.match(source, /scriptId: 'softoraCustomersBootstrap'/);
 });

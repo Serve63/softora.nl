@@ -95,7 +95,12 @@ test('premium dashboard normaliseert open-waarden naar klantenstatus', () => {
 test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const corePath = path.join(__dirname, '../../assets/premium-dashboard-core.js');
+  const coreSource = fs.readFileSync(corePath, 'utf8');
 
+  assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
+  assert.match(coreSource, /function readDashboardCustomersBootstrapPayload\(scriptId = 'softoraCustomersBootstrap'\) \{/);
+  assert.match(pageSource, /const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload\(\);/);
   assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
   assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260429b/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
@@ -105,6 +110,10 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(pageSource, /\.filter\(\(customer\) => customer\.databaseStatus === 'klant'\)/);
   assert.match(pageSource, /const rawCustomers = readPremiumDashboardChunkedStateValue\(values, PREMIUM_CUSTOMERS_KEY\);/);
   assert.match(pageSource, /const customers = parsePremiumCustomers\(rawCustomers\);/);
+  assert.match(coreSource, /function hydratePremiumDashboardCustomersFromBootstrap\(state, parseCustomers, payload\) \{/);
+  assert.match(coreSource, /const rawCustomers = Array\.isArray\(payload && payload\.customers\) \? payload\.customers : \[\];/);
+  assert.match(coreSource, /const customers = parseCustomers\(rawCustomers\);/);
+  assert.match(pageSource, /const hadPremiumDashboardBootstrapCustomers = hydratePremiumDashboardCustomersFromBootstrap\(premiumDashboardState, parsePremiumCustomers, dashboardCustomersBootstrapPayload\);/);
   assert.match(pageSource, /totalClientsEl\.textContent = String\(hasCustomerDatabase \? customers\.length : uniqueClients\.size\);/);
   assert.match(pageSource, /ordersHydrated: false,/);
   assert.match(pageSource, /customersHydrated: false,/);
@@ -120,11 +129,12 @@ test('premium dashboard laat de boot-loader niet hangen op trage ui-state reques
 
   assert.match(pageSource, /startPremiumDashboardBootWatchdog\(\);/);
   assert.match(pageSource, /fetchPremiumDashboardJson\(url, \{ method: 'GET', cache: 'no-store' \}\)/);
-  assert.match(pageSource, /releasePremiumDashboardBootShell\(\);/);
+  assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 650\);/);
   assert.match(coreSource, /const PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS = 6000;/);
   assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 3500;/);
   assert.match(coreSource, /function forcePremiumDashboardBootShellVisible\(\) \{/);
   assert.match(coreSource, /function releasePremiumDashboardBootShell\(\) \{/);
+  assert.match(coreSource, /function releasePremiumDashboardBootShellAfterMinimum\(startedAt, minimumMs = 650\) \{/);
   assert.match(coreSource, /function startPremiumDashboardBootWatchdog\(\) \{/);
   assert.match(coreSource, /function installPremiumDashboardBootFailSafe\(\) \{/);
   assert.match(coreSource, /installPremiumDashboardBootFailSafe\(\);/);
