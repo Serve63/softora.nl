@@ -14,6 +14,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     getUiStateValues = async () => null,
     sanitizeUiStateValues = (value) => value || {},
     setUiStateValues = async () => null,
+    dataOpsUiStateBridge = null,
     adminOnlyUiStateScopes = createAdminOnlyUiStateScopesSet(),
     appendSecurityAuditEvent = () => {},
   } = deps;
@@ -66,6 +67,33 @@ function createRuntimeOpsCoordinator(deps = {}) {
     );
   }
 
+  async function getUiStateValuesForScope(scope) {
+    if (
+      dataOpsUiStateBridge &&
+      typeof dataOpsUiStateBridge.canHandleScope === 'function' &&
+      dataOpsUiStateBridge.canHandleScope(scope) &&
+      typeof dataOpsUiStateBridge.getUiStateValues === 'function'
+    ) {
+      const bridged = await dataOpsUiStateBridge.getUiStateValues(scope, {
+        legacyGetUiStateValues: getUiStateValues,
+      });
+      if (bridged) return bridged;
+    }
+    return getUiStateValues(scope);
+  }
+
+  async function mirrorUiStateValuesToDataOps(scope, values, meta) {
+    if (
+      !dataOpsUiStateBridge ||
+      typeof dataOpsUiStateBridge.canHandleScope !== 'function' ||
+      !dataOpsUiStateBridge.canHandleScope(scope) ||
+      typeof dataOpsUiStateBridge.setUiStateValues !== 'function'
+    ) {
+      return null;
+    }
+    return dataOpsUiStateBridge.setUiStateValues(scope, values, meta);
+  }
+
   async function sendUiStateGetResponse(req, res, scopeRaw) {
     const scope = normalizeUiStateScope(scopeRaw);
     if (!scope) {
@@ -80,7 +108,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
       });
     }
 
-    const state = await getUiStateValues(scope);
+    const state = await getUiStateValuesForScope(scope);
     if (!state) {
       return res.status(503).json({
         ok: false,
@@ -123,7 +151,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     if (replaceRequested) {
       valuesToSave = sanitizeUiStateValues(valuesProvided ? body.values : {});
     } else {
-      const current = await getUiStateValues(scope);
+      const current = await getUiStateValuesForScope(scope);
       if (!current) {
         return res.status(503).json({
           ok: false,
@@ -147,12 +175,17 @@ function createRuntimeOpsCoordinator(deps = {}) {
       });
     }
 
+    const mirroredState = await mirrorUiStateValuesToDataOps(scope, state.values || valuesToSave, {
+      source: normalizeString(body.source || 'frontend'),
+      actor: normalizeString(body.actor || ''),
+    });
+
     return res.status(200).json({
       ok: true,
       scope,
-      values: state.values || {},
-      source: state.source || 'supabase',
-      updatedAt: state.updatedAt || null,
+      values: (mirroredState && mirroredState.values) || state.values || {},
+      source: (mirroredState && mirroredState.source) || state.source || 'supabase',
+      updatedAt: (mirroredState && mirroredState.updatedAt) || state.updatedAt || null,
     });
   }
 

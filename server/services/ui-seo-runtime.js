@@ -8,6 +8,7 @@ const { createRuntimeOpsCoordinator } = require('./runtime-ops');
 const { createRuntimeDebugOpsCoordinator } = require('./runtime-debug-ops');
 const { createWebsiteLinkCoordinator } = require('./website-links');
 const { createWebsitePreviewLibraryCoordinator } = require('./website-preview-library');
+const { createSoftoraDataOpsUiStateBridge } = require('./data-ops-ui-state-bridge');
 
 function createUiSeoRuntime(deps = {}) {
   const {
@@ -58,6 +59,7 @@ function createUiSeoRuntime(deps = {}) {
     seoConfigScope,
     seoConfigKey,
     seoConfigCacheTtlMs,
+    dataOpsUiStateEnabled = true,
     uiStateReadTimeoutMsByScope = Object.freeze({
       premium_active_orders: 8000,
       premium_customers_database: 8000,
@@ -82,6 +84,13 @@ function createUiSeoRuntime(deps = {}) {
 
   const { getUiStateValues, normalizeUiStateScope, sanitizeUiStateValues, setUiStateValues } =
     uiStateStore;
+
+  const dataOpsUiStateBridge = createSoftoraDataOpsUiStateBridge({
+    enabled: dataOpsUiStateEnabled,
+    isSupabaseConfigured,
+    getSupabaseClient,
+    logger,
+  });
 
   const seoCore = createSeoCore({
     knownHtmlPageFiles,
@@ -190,6 +199,7 @@ function createUiSeoRuntime(deps = {}) {
     getUiStateValues,
     sanitizeUiStateValues,
     setUiStateValues,
+    dataOpsUiStateBridge,
   });
 
   const runtimeDebugOpsCoordinator = createRuntimeDebugOpsCoordinator({
@@ -250,6 +260,7 @@ function createUiSeoRuntime(deps = {}) {
     setUiStateValues,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
+    dataOpsUiStateBridge,
     websiteLinkCoordinator,
     websitePreviewLibraryCoordinator,
   };
