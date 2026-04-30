@@ -242,6 +242,7 @@ test('premium agenda herstelt handmatige activiteitknoppen en boot-failsafe', ()
   assert.match(pageSource, /window\.SoftoraAgendaStability\.finishBoot\(\);/);
   assert.match(stabilitySource, /function isManualAgendaAppointment\(item\)/);
   assert.match(stabilitySource, /function isManualOtherAppointment\(apt\)/);
+  assert.match(stabilitySource, /choice === 'manual-overig' \|\| choice === 'manual-serve' \|\| choice === 'manual-martijn' \|\| choice === 'manual-both'/);
   assert.match(stabilitySource, /modalPrimaryBtn\.textContent = completed \? 'Activiteit afgerond' : 'Activiteit afronden';/);
   assert.match(stabilitySource, /async function markActiveManualActivityCompleted\(\)/);
   assert.match(stabilitySource, /function setModalAudioBlockHidden\(hidden\)/);
