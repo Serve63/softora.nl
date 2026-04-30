@@ -219,8 +219,8 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
-  function parseLeadDatabaseRows(values = {}) {
-    const raw = normalizeString(readChunkedStateValue(values, leadDbKey));
+  function parseLeadDatabaseRows(values = {}, rowsKey = leadDbKey) {
+    const raw = normalizeString(readChunkedStateValue(values, rowsKey));
     if (!raw) return [];
     try {
       const parsed = JSON.parse(raw);
@@ -427,6 +427,22 @@ function createColdmailCampaignService(deps = {}) {
     return [getRowCompany(row), getRowContact(row), getRowPhone(row)]
       .map((value) => normalizeString(value).toLowerCase())
       .join('|');
+  }
+
+  function mergeColdcallingRowsWithCustomerRows(leadRows = [], customerRows = []) {
+    const mergedRows = [];
+    const seenKeys = new Set();
+    const addRow = (row) => {
+      if (!row || typeof row !== 'object') return;
+      const phoneKeys = Array.from(getComparablePhoneKeys(getRowPhone(row)));
+      const keys = phoneKeys.length ? phoneKeys : [buildRowIdentityKey(row)];
+      if (keys.some((key) => key && seenKeys.has(key))) return;
+      mergedRows.push(row);
+      keys.filter(Boolean).forEach((key) => seenKeys.add(key));
+    };
+    (Array.isArray(leadRows) ? leadRows : []).forEach(addRow);
+    (Array.isArray(customerRows) ? customerRows : []).forEach(addRow);
+    return mergedRows;
   }
 
   function getEmailDomain(email) {
@@ -869,7 +885,18 @@ function createColdmailCampaignService(deps = {}) {
       : new Set();
     const state = await getUiStateValues(mode === 'call' ? leadDbScope : customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
-    const rows = mode === 'call' ? parseLeadDatabaseRows(values) : parseDatabaseRows(values);
+    let rows = [];
+    if (mode === 'call') {
+      const customerState = await getUiStateValues(customerDbScope);
+      const customerValues =
+        customerState && typeof customerState.values === 'object' ? customerState.values : {};
+      rows = mergeColdcallingRowsWithCustomerRows(
+        parseLeadDatabaseRows(values),
+        parseLeadDatabaseRows(customerValues, customerDbKey)
+      );
+    } else {
+      rows = parseDatabaseRows(values);
+    }
     const candidateRows = rows
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
       .filter(({ row }) =>

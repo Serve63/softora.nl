@@ -583,6 +583,57 @@ test('coldcalling recipient preview reads chunked lead database state', async ()
   assert.equal(result.recipients[0].bedrijf, 'Chunked Belbedrijf');
 });
 
+test('coldcalling recipient preview supplements sparse lead rows from chunked customer database state', async () => {
+  const customerRows = [
+    {
+      id: 'customer-callable',
+      bedrijf: 'Klant Prospect',
+      telefoon: '+31 6 22 22 33 33',
+      databaseStatus: 'benaderbaar',
+    },
+    {
+      id: 'customer-duplicate',
+      bedrijf: 'Dubbele Klant',
+      telefoon: '+31 6 11 11 11 11',
+      databaseStatus: 'benaderbaar',
+    },
+    {
+      id: 'customer-closed',
+      bedrijf: 'Gesloten Klant',
+      telefoon: '+31 6 44 44 55 55',
+      databaseStatus: 'klant',
+    },
+  ];
+  const { service } = createService({
+    rows: [],
+    leadRows: [
+      {
+        id: 'manual-callable',
+        company: 'Handmatige Lead',
+        phone: '+31 6 11 11 11 11',
+        status: 'prospect',
+      },
+    ],
+    customerValues: buildChunkedStatePatch(
+      'softora_customers_premium_v1',
+      JSON.stringify(customerRows),
+      80
+    ),
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    mode: 'call',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.selected, 2);
+  assert.deepEqual(
+    result.recipients.map((recipient) => recipient.bedrijf),
+    ['Handmatige Lead', 'Klant Prospect']
+  );
+});
+
 test('coldcalling recipient preview skips phone numbers from the blocklist', async () => {
   const { service } = createService({
     rows: [],
