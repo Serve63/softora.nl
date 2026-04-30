@@ -1224,9 +1224,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
           <div class="mf-row lead-generator-hidden-setting">
             <div class="mf-label">Verzenden vanaf</div>
             <select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">
-              <option value="info@softora.nl" selected>info@softora.nl</option>
-              <option value="zakelijk@softora.nl">zakelijk@softora.nl</option>
-              <option value="ruben@softora.nl">ruben@softora.nl</option>
+              <option value="ruben@softora.nl" selected>ruben@softora.nl</option>
               <option value="serve@softora.nl">serve@softora.nl</option>
               <option value="martijn@softora.nl">martijn@softora.nl</option>
             </select>
@@ -2015,6 +2013,7 @@ async function initColdmailingMailboxOptions() {
   const select = document.getElementById('campaignSenderEmail');
   if (!select || select.dataset.mailboxOptionsLoaded === '1') return;
   select.dataset.mailboxOptionsLoaded = '1';
+  const allowedSenderEmails = new Set(['ruben@softora.nl', 'serve@softora.nl', 'martijn@softora.nl']);
   try {
     const response = await fetch('/api/coldmailing/mailbox-options', {
       credentials: 'same-origin',
@@ -2022,7 +2021,7 @@ async function initColdmailingMailboxOptions() {
     });
     const payload = await response.json().catch(() => null);
     const emails = payload && Array.isArray(payload.senderEmails)
-      ? payload.senderEmails.filter(Boolean)
+      ? payload.senderEmails.filter((email) => allowedSenderEmails.has(String(email || '').toLowerCase()))
       : [];
     if (emails.length) {
       select.innerHTML = '';

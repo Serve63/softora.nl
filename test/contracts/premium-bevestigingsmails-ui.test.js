@@ -241,11 +241,13 @@ test('premium bevestigingsmails replaces sender detail fields with compact dropd
 
   assert.match(pageSource, /html\[data-softora-lead-generator-alias="1"\] \.lead-generator-hidden-setting \{ display: none !important; \}/);
   assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Verzenden vanaf<\/div>\s*<select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">/);
-  assert.match(pageSource, /<option value="info@softora\.nl" selected>info@softora\.nl<\/option>/);
-  assert.match(pageSource, /<option value="zakelijk@softora\.nl">zakelijk@softora\.nl<\/option>/);
-  assert.match(pageSource, /<option value="ruben@softora\.nl">ruben@softora\.nl<\/option>/);
+  assert.match(pageSource, /<option value="ruben@softora\.nl" selected>ruben@softora\.nl<\/option>/);
   assert.match(pageSource, /<option value="serve@softora\.nl">serve@softora\.nl<\/option>/);
   assert.match(pageSource, /<option value="martijn@softora\.nl">martijn@softora\.nl<\/option>/);
+  assert.doesNotMatch(pageSource, /<option value="info@softora\.nl"/);
+  assert.doesNotMatch(pageSource, /<option value="zakelijk@softora\.nl"/);
+  assert.doesNotMatch(pageSource, /zakelijk@theimpactbox\.co/);
+  assert.match(pageSource, /allowedSenderEmails\.has\(String\(email \|\| ''\)\.toLowerCase\(\)\)/);
   assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Speciale handeling<\/div>\s*<select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">/);
   assert.match(pageSource, /<option value="webdesign" selected>Webdesign<\/option>/);
   assert.doesNotMatch(pageSource, /id="delay1"/);

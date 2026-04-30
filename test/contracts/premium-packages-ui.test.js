@@ -20,11 +20,18 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
 
   assert.match(pageSource, /<script src="assets\/premium-packages\.js\?v=20260427a"><\/script>/);
   assert.doesNotMatch(pageSource, /\son[a-z]+=/);
+  assert.match(pageSource, /data-package-tab="routes"/);
   assert.match(pageSource, /data-package-tab="website"/);
   assert.match(pageSource, /data-package-tab="bedrijfssoftware"/);
   assert.match(pageSource, /data-package-tab="voicesoftware"/);
   assert.match(pageSource, /data-package-tab="chatbots"/);
   assert.match(scriptSource, /var packageTabGroups = \{/);
+  assert.match(pageSource, /Losse oplevering/);
+  assert.match(pageSource, /Losse oplevering mét CRM/);
+  assert.match(pageSource, /Softora Volledig beheer/);
+  assert.match(pageSource, /<div class="card-badge">Aanbevolen<\/div>/);
+  assert.doesNotMatch(pageSource, /<div class="card-badge">Flexibel<\/div>/);
+  assert.match(scriptSource, /routes: \["routes"\]/);
   assert.match(scriptSource, /website: \["bouwen", "onderhoud"\]/);
   assert.match(scriptSource, /bedrijfssoftware: \["bedrijfssoftware", "bedrijfssoftware-onderhoud"\]/);
   assert.match(scriptSource, /voicesoftware: \["voice-software", "voice-software-onderhoud"\]/);

@@ -354,15 +354,13 @@ body {
   .tab.theme-website {
     --tab-accent: #8b2252;
   }
-
+  .tab.theme-routes { --tab-accent: #8b2252; }
   .tab.theme-business {
     --tab-accent: #2563eb;
   }
-
   .tab.theme-voice {
     --tab-accent: #1f9b5a;
   }
-
   .tab.theme-chatbot {
     --tab-accent: #f39c12;
   }
@@ -398,12 +396,12 @@ body {
     box-shadow: 0 14px 36px rgba(26, 26, 46, 0.08);
     transform: translateY(-2px);
   }
-
+  .routes-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .route-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 28px 26px; position: relative; box-shadow: var(--shadow); } .route-card.featured { border-color: var(--crimson); border-width: 2px; } .route-title { font-family: 'Oswald', sans-serif; font-size: 24px; font-weight: 800; text-transform: uppercase; color: var(--text-dark); margin-bottom: 12px; } .route-desc { color: var(--text-mid); font-size: 13px; line-height: 1.5; min-height: 42px; margin-bottom: 20px; } .route-price-note { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); color: var(--text-mid); font-size: 12px; line-height: 1.45; padding: 14px 0; margin-bottom: 16px; } .route-price-note strong { color: var(--text-dark); }
   .card.featured {
     border-color: var(--crimson);
     border-width: 2px;
   }
-
   .card-badge {
     position: absolute;
     top: -1px;
@@ -428,7 +426,6 @@ body {
     color: var(--crimson);
     margin-bottom: 6px;
   }
-
   .card-name {
     font-family: 'Oswald', sans-serif;
     font-size: 22px;
@@ -438,7 +435,6 @@ body {
     color: var(--text-dark);
     margin-bottom: 4px;
   }
-
   .card-desc {
     font-size: 12px;
     color: var(--text-mid);
@@ -446,13 +442,11 @@ body {
     margin-bottom: 14px;
     min-height: 36px;
   }
-
   .card-price {
     margin-bottom: 14px;
     padding-bottom: 14px;
     border-bottom: 1px solid var(--border);
   }
-
   .price-amount {
     font-family: 'Oswald', sans-serif;
     font-size: 32px;
@@ -467,18 +461,15 @@ body {
     font-weight: 400;
     margin-left: 4px;
   }
-
   .price-note {
     font-size: 11px;
     color: var(--text-light);
     margin-top: 4px;
   }
-
   .features-list {
     list-style: none;
     margin-bottom: 16px;
   }
-
   .features-list li {
     display: flex;
     align-items: flex-start;
@@ -765,7 +756,8 @@ body {
 
   @media (max-width: 1280px) {
     .cards-grid,
-    .onderhoud-grid {
+    .onderhoud-grid,
+    .routes-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
@@ -800,7 +792,8 @@ body {
     }
 
     .cards-grid,
-    .onderhoud-grid {
+    .onderhoud-grid,
+    .routes-grid {
       grid-template-columns: 1fr;
     }
   }
@@ -1462,13 +1455,20 @@ body {
   </div>
 
   <div class="tabs">
-    <button class="tab theme-website active" type="button" data-package-tab="website">Website</button>
+    <button class="tab theme-routes active" type="button" data-package-tab="routes">Routes</button>
+    <button class="tab theme-website" type="button" data-package-tab="website">Website</button>
     <button class="tab theme-business" type="button" data-package-tab="bedrijfssoftware">Bedrijfssoftware</button>
     <button class="tab theme-voice" type="button" data-package-tab="voicesoftware">Voicesoftware</button>
     <button class="tab theme-chatbot" type="button" data-package-tab="chatbots">Chatbot</button>
   </div>
 
-  <div id="tab-bouwen" class="tab-panel theme-website active">
+  <div id="tab-routes" class="tab-panel theme-routes active"><div class="section-title">Website routes</div><div class="routes-grid">
+      <div class="route-card"><div class="card-tier">Route 01</div><div class="route-title">Losse oplevering</div><div class="route-desc">Softora maakt de website en levert hem volledig af. Daarna is het project klaar.</div><div class="route-price-note"><strong>Geen maandbedrag via Softora.</strong> Domein, hosting en beheer liggen daarna niet meer bij ons.</div><ul class="features-list"><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Wij bouwen en leveren de website op</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Klant kan de site daarna niet zelf aanpassen</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Aanpassingen lopen na oplevering niet via ons</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Hosting en domein zijn voor de klant zelf</li></ul></div>
+      <div class="route-card"><div class="card-tier">Route 02</div><div class="route-title">Losse oplevering mét CRM</div><div class="route-desc">Wij bouwen de website met een eigen beheersysteem, zodat de klant zelf teksten en foto's kan aanpassen.</div><div class="route-price-note"><strong>CRM vanaf €200 eenmalig.</strong> Het maandbedrag is €30 voor hosting, Supabase en technische basis.</div><ul class="features-list"><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Klant beheert zelf tekst en foto's</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>CRM-prijs groeit mee met wat beheerd moet worden</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Softora verzorgt hosting en Supabase</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Domein mag bij ons in beheer, maar hoeft niet</li></ul></div>
+      <div class="route-card featured"><div class="card-badge">Aanbevolen</div><div class="card-tier">Route 03</div><div class="route-title">Softora Volledig beheer</div><div class="route-desc">Wij maken de website, houden hem in beheer en voeren wijzigingen door wanneer de klant ons appt of belt.</div><div class="route-price-note"><strong>Minimaal €30 per maand.</strong> Het onderhoudspakket hangt af van hoeveel wijzigingen de klant per maand wil.</div><ul class="features-list"><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Softora blijft verantwoordelijk voor beheer</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Wij passen de site continu aan op verzoek</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Cybersecurity zit in het beheer inbegrepen</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Onderhoud wordt afgestemd op de klantbehoefte</li></ul></div>
+    </div></div>
+
+  <div id="tab-bouwen" class="tab-panel theme-website">
     <div class="section-title">Website Bouw Pakketten</div>
 
     <div class="cards-grid">
