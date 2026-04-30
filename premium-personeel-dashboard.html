@@ -809,7 +809,7 @@
             font-weight: 600;
         }
 
-        .kpi-card.highlighted .kpi-active-count-total {
+        .kpi-card.highlighted .kpi-active-count-website {
             color: var(--accent-light);
         }
 
@@ -2070,8 +2070,8 @@
                 </div>
                 <div class="kpi-card highlighted">
                     <div class="kpi-label">Actieve Opdrachten</div>
-                    <div class="kpi-value kpi-value--active-orders" id="kpiActiveOrders" aria-label="Actieve opdrachten: 0, bedrijfssoftware: 0, voicesoftware: 0, chatbots: 0">
-                        <span class="kpi-active-count-total" data-kpi-active-total>0</span>
+                    <div class="kpi-value kpi-value--active-orders" id="kpiActiveOrders" aria-label="Website opdrachten: 0, bedrijfssoftware: 0, voicesoftware: 0, chatbots: 0">
+                        <span class="kpi-active-count-website" data-kpi-active-website>0</span>
                         <span class="kpi-active-count-sep" aria-hidden="true"> - </span>
                         <span class="kpi-active-count-business" data-kpi-active-business>0</span>
                         <span class="kpi-active-count-sep" aria-hidden="true"> - </span>
@@ -2739,7 +2739,7 @@
 
         function classifyPremiumDashboardOrderProductLine(order) {
             const hay = `${String(order?.title || '')} ${String(order?.description || '')}`.toLowerCase();
-            if (!hay.trim()) return 'other';
+            if (!hay.trim()) return 'website';
             if (/chatbot|chatbots|whatsapp\s*bot|widget\s*bot|conversational\s*bot/.test(hay)) {
                 return 'chatbot';
             }
@@ -2753,35 +2753,34 @@
             if (/bedrijfssoftware|business\s*software|business_software|\bcrm\b|\berp\b/.test(hay)) {
                 return 'business';
             }
-            return 'other';
+            return 'website';
         }
 
         function updateKpiActiveOrdersDisplay(activeOrders) {
             const root = document.getElementById('kpiActiveOrders');
             if (!root) return;
             const list = Array.isArray(activeOrders) ? activeOrders : [];
-            const totalEl = root.querySelector('[data-kpi-active-total]');
+            const websiteEl = root.querySelector('[data-kpi-active-website]');
             const businessEl = root.querySelector('[data-kpi-active-business]');
             const voiceEl = root.querySelector('[data-kpi-active-voice]');
             const chatbotEl = root.querySelector('[data-kpi-active-chatbot]');
-            let business = 0;
-            let voice = 0;
-            let chatbot = 0;
+            let website = 0, business = 0, voice = 0, chatbot = 0;
             list.forEach((o) => {
                 const line = classifyPremiumDashboardOrderProductLine(o);
                 if (line === 'business') business += 1;
                 else if (line === 'voice') voice += 1;
                 else if (line === 'chatbot') chatbot += 1;
+                else website += 1;
             });
             const total = list.length;
-            if (totalEl && businessEl && voiceEl && chatbotEl) {
-                totalEl.textContent = String(total);
+            if (websiteEl && businessEl && voiceEl && chatbotEl) {
+                websiteEl.textContent = String(website);
                 businessEl.textContent = String(business);
                 voiceEl.textContent = String(voice);
                 chatbotEl.textContent = String(chatbot);
                 root.setAttribute(
                     'aria-label',
-                    `Actieve opdrachten: ${total}, bedrijfssoftware: ${business}, voicesoftware: ${voice}, chatbots: ${chatbot}`
+                    `Website opdrachten: ${website}, bedrijfssoftware: ${business}, voicesoftware: ${voice}, chatbots: ${chatbot}`
                 );
             } else {
                 root.textContent = String(total);
@@ -3180,7 +3179,7 @@
             try {
                 const data = await fetchPremiumUiState(PREMIUM_ACTIVE_ORDERS_SCOPE);
                 const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
-                if (!Object.prototype.hasOwnProperty.call(values, PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY) && !Object.prototype.hasOwnProperty.call(values, PREMIUM_ACTIVE_RUNTIME_KEY)) throw new Error('Geen Supabase-opdrachtdata ontvangen.');
+                if (!Object.prototype.hasOwnProperty.call(values, PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY) && !Object.prototype.hasOwnProperty.call(values, getPremiumDashboardChunkMetaKey(PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY)) && !Object.prototype.hasOwnProperty.call(values, PREMIUM_ACTIVE_RUNTIME_KEY) && !Object.prototype.hasOwnProperty.call(values, getPremiumDashboardChunkMetaKey(PREMIUM_ACTIVE_RUNTIME_KEY))) throw new Error('Geen Supabase-opdrachtdata ontvangen.');
                 premiumDashboardState.orders = parsePremiumOrdersFromState(values); premiumDashboardState.ordersHydrated = true;
                 return true;
             } catch (_) {
