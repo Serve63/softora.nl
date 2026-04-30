@@ -173,6 +173,64 @@ test('runtime ops coordinator merges patches for ui-state writes', async () => {
   });
 });
 
+test('runtime ops coordinator treats values writes as patches unless replace is explicit', async () => {
+  const writes = [];
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: {
+        panel: 'overview',
+        keep: 'yes',
+      },
+      source: 'supabase',
+      updatedAt: '2026-04-07T12:00:00.000Z',
+    }),
+    setUiStateValues: async (scope, values, meta) => {
+      writes.push({ scope, values, meta });
+      return {
+        values,
+        source: 'supabase',
+        updatedAt: '2026-04-07T12:30:00.000Z',
+      };
+    },
+  });
+  const patchRes = createResponseRecorder();
+  const replaceRes = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      body: {
+        values: {
+          panel: 'details',
+        },
+      },
+    },
+    patchRes,
+    'dashboard'
+  );
+  await coordinator.sendUiStateSetResponse(
+    {
+      body: {
+        replace: true,
+        values: {
+          panel: 'only',
+        },
+      },
+    },
+    replaceRes,
+    'dashboard'
+  );
+
+  assert.equal(patchRes.statusCode, 200);
+  assert.deepEqual(writes[0].values, {
+    panel: 'details',
+    keep: 'yes',
+  });
+  assert.equal(replaceRes.statusCode, 200);
+  assert.deepEqual(writes[1].values, {
+    panel: 'only',
+  });
+});
+
 test('runtime ops coordinator blocks admin-only ui-state scopes for non-admin users', async () => {
   const { coordinator, securityAuditCalls } = createFixture();
   const getRes = createResponseRecorder();

@@ -9,6 +9,27 @@ function appendOriginalQuery(pathname, originalUrl) {
   return `${basePath}${query}`;
 }
 
+function isContentHashedAssetPath(assetPath) {
+  const fileName = String(assetPath || '').split(/[\\/]/).pop() || '';
+  return /(?:^|[._-])[a-f0-9]{12,}(?:[._-]|$)/i.test(fileName);
+}
+
+function getStaticAssetCacheControl(assetPath, originalUrl = '') {
+  const asset = String(assetPath || '');
+  const requestUrl = String(originalUrl || '');
+  const isFontOrImage = /\.(woff2?|ttf|otf|eot|svg|png|jpe?g|webp|avif)$/i.test(asset);
+  const isAppScriptOrStyle = /\.(?:js|css)$/i.test(asset);
+
+  if (isFontOrImage) return 'public, max-age=31536000, immutable';
+  if (isAppScriptOrStyle) {
+    return isContentHashedAssetPath(asset)
+      ? 'public, max-age=31536000, immutable'
+      : 'public, max-age=60, stale-while-revalidate=300';
+  }
+  if (requestUrl.includes('?v=')) return 'public, max-age=31536000, immutable';
+  return 'public, max-age=604800, stale-while-revalidate=86400';
+}
+
 function registerPublicPageRoutes(app, deps) {
   app.get('/robots.txt', (_req, res) => {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -48,13 +69,7 @@ function registerPublicPageRoutes(app, deps) {
       maxAge: '7d',
       setHeaders(res, assetPath) {
         const originalUrl = String(res.req?.originalUrl || '');
-        if (/\.(woff2?|ttf|otf|eot|svg|png|jpe?g|webp|avif)$/i.test(assetPath)) {
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        } else if (originalUrl.includes('?v=')) {
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        } else {
-          res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
-        }
+        res.setHeader('Cache-Control', getStaticAssetCacheControl(assetPath, originalUrl));
       },
     })
   );
@@ -129,5 +144,7 @@ function registerPublicPageRoutes(app, deps) {
 }
 
 module.exports = {
+  appendOriginalQuery,
+  getStaticAssetCacheControl,
   registerPublicPageRoutes,
 };

@@ -80,9 +80,10 @@ function formatMoneyEUR(amount) {
 	    }
 
     const PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS = 6000;
-    const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 9000;
+    const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 3500;
     let premiumDashboardBootWatchdog = null;
     let premiumDashboardBootReleased = false;
+    let premiumDashboardBootFailSafeInstalled = false;
 
     function getDashboardTimerRoot() {
         return root && typeof root.setTimeout === 'function' && typeof root.clearTimeout === 'function'
@@ -90,27 +91,45 @@ function formatMoneyEUR(amount) {
             : globalThis;
     }
 
+    function forcePremiumDashboardBootShellVisible() {
+        const doc = root && root.document ? root.document : null;
+        const main = doc ? doc.querySelector('main.is-premium-boot-host') : null;
+        const loader = main ? main.querySelector('.premium-boot-loader') : null;
+        const shell = main ? main.querySelector('.premium-boot-shell') : null;
+        if (loader) {
+            loader.classList.add('is-hidden');
+            loader.setAttribute('aria-hidden', 'true');
+            loader.style.opacity = '0';
+            loader.style.visibility = 'hidden';
+        }
+        if (shell) {
+            shell.classList.remove('is-booting');
+            shell.setAttribute('aria-busy', 'false');
+            shell.style.opacity = '';
+            shell.style.pointerEvents = '';
+            shell.style.userSelect = '';
+        }
+    }
+
     function releasePremiumDashboardBootShell() {
-        if (premiumDashboardBootReleased) return;
+        if (premiumDashboardBootReleased) {
+            forcePremiumDashboardBootShellVisible();
+            return;
+        }
         premiumDashboardBootReleased = true;
         const timerRoot = getDashboardTimerRoot();
         if (premiumDashboardBootWatchdog && typeof timerRoot.clearTimeout === 'function') {
             timerRoot.clearTimeout(premiumDashboardBootWatchdog);
             premiumDashboardBootWatchdog = null;
         }
-        if (root?.SoftoraPremiumBoot && typeof root.SoftoraPremiumBoot.setShellBooting === 'function') {
-            root.SoftoraPremiumBoot.setShellBooting(false);
-            return;
+        try {
+            if (root?.SoftoraPremiumBoot && typeof root.SoftoraPremiumBoot.setShellBooting === 'function') {
+                root.SoftoraPremiumBoot.setShellBooting(false);
+            }
+        } catch (_) {
+            /* The direct DOM fallback below still releases the dashboard. */
         }
-        const doc = root && root.document ? root.document : null;
-        const main = doc ? doc.querySelector('main.is-premium-boot-host') : null;
-        const loader = main ? main.querySelector('.premium-boot-loader') : null;
-        const shell = main ? main.querySelector('.premium-boot-shell') : null;
-        if (loader) loader.classList.add('is-hidden');
-        if (shell) {
-            shell.classList.remove('is-booting');
-            shell.setAttribute('aria-busy', 'false');
-        }
+        forcePremiumDashboardBootShellVisible();
     }
 
     function startPremiumDashboardBootWatchdog() {
@@ -121,6 +140,23 @@ function formatMoneyEUR(amount) {
             releasePremiumDashboardBootShell,
             PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS
         );
+    }
+
+    function installPremiumDashboardBootFailSafe() {
+        const doc = root && root.document ? root.document : null;
+        if (!doc || premiumDashboardBootFailSafeInstalled) return;
+        premiumDashboardBootFailSafeInstalled = true;
+        const startWatchdog = () => startPremiumDashboardBootWatchdog();
+        if (doc.readyState === 'loading') {
+            doc.addEventListener('DOMContentLoaded', startWatchdog, { once: true });
+        } else {
+            startWatchdog();
+        }
+        if (typeof root.addEventListener === 'function') {
+            root.addEventListener('load', startWatchdog, { once: true });
+            root.addEventListener('error', releasePremiumDashboardBootShell);
+            root.addEventListener('unhandledrejection', releasePremiumDashboardBootShell);
+        }
     }
 
     async function fetchPremiumDashboardJson(url, options = {}, timeoutMs = PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS) {
@@ -147,6 +183,8 @@ function formatMoneyEUR(amount) {
         }
     }
 
+    installPremiumDashboardBootFailSafe();
+
 	    return Object.freeze({
 	        escapeHtml,
         normalizeDashboardString,
@@ -158,6 +196,7 @@ function formatMoneyEUR(amount) {
 	        formatMoneyEUR,
 	        formatProjectMeta,
             fetchPremiumDashboardJson,
+            forcePremiumDashboardBootShellVisible,
             releasePremiumDashboardBootShell,
             startPremiumDashboardBootWatchdog,
 	    });

@@ -2142,7 +2142,7 @@
         </section>
     </div>
 
-    <script src="assets/premium-dashboard-core.js?v=20260429a"></script>
+    <script src="assets/premium-dashboard-core.js?v=20260429b"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -2804,13 +2804,13 @@
             ];
             if (knownDatabaseStatuses.includes(value)) return value;
             if (knownDatabaseStatuses.includes(status)) return status;
-            if (status === 'betaald') return 'klant';
-            return value || status || 'prospect';
+            if (value === 'open' || value === 'openstaand' || value === 'openstaande' || status === 'betaald' || status === 'customer' || status === 'closed' || status === 'won' || status === 'open' || status === 'openstaand' || status === 'openstaande') return 'klant';
+            return value || status || 'klant';
         }
 
         function parsePremiumCustomers(raw) {
             try {
-                const parsed = JSON.parse(String(raw || '[]'));
+                const parsed = Array.isArray(raw) ? raw : JSON.parse(String(raw || '[]'));
                 if (!Array.isArray(parsed)) return [];
                 return parsed
                     .map((item, index) => {

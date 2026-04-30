@@ -18,6 +18,8 @@ function createFixture(overrides = {}) {
     supabaseStateTable: 'app_state',
     uiStateReadTimeoutMs: overrides.uiStateReadTimeoutMs,
     uiStateReadTimeoutMsByScope: overrides.uiStateReadTimeoutMsByScope,
+    uiStateAllowMemoryFallback: overrides.uiStateAllowMemoryFallback,
+    uiStateMemoryFallbackScopes: overrides.uiStateMemoryFallbackScopes,
     fetchSupabaseRowByKeyViaRest: async (rowKey, columns) => {
       restReads.push({ rowKey, columns });
       if (overrides.fetchResult && typeof overrides.fetchResult.then === 'function') {
@@ -189,9 +191,28 @@ test('ui-state store writes values through REST fallback when client upsert cras
   assert.equal(state.source, 'supabase');
 });
 
-test('ui-state store serves in-memory values when remote reads time out', async () => {
+test('ui-state store does not silently serve in-memory values when remote reads time out', async () => {
   const { inMemoryUiStateByScope, loggerCalls, store } = createFixture({
     uiStateReadTimeoutMs: 5,
+    fetchResult: new Promise(() => {}),
+  });
+  inMemoryUiStateByScope.set('dashboard', {
+    panel: 'cached',
+  });
+
+  const state = await store.getUiStateValues('dashboard');
+
+  assert.equal(state, null);
+  assert.equal(
+    loggerCalls.some((args) => args[0] === '[UI State][Supabase][GetTimeout]'),
+    true
+  );
+});
+
+test('ui-state store only serves in-memory fallback for explicitly allowed scopes', async () => {
+  const { inMemoryUiStateByScope, store } = createFixture({
+    uiStateReadTimeoutMs: 5,
+    uiStateMemoryFallbackScopes: ['dashboard'],
     fetchResult: new Promise(() => {}),
   });
   inMemoryUiStateByScope.set('dashboard', {
@@ -205,10 +226,6 @@ test('ui-state store serves in-memory values when remote reads time out', async 
     updatedAt: null,
     source: 'memory',
   });
-  assert.equal(
-    loggerCalls.some((args) => args[0] === '[UI State][Supabase][GetTimeout]'),
-    true
-  );
 });
 
 test('ui-state store supports a longer read timeout for heavy photo scopes', async () => {

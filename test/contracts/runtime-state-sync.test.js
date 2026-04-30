@@ -67,6 +67,9 @@ function createFixture(overrides = {}) {
     fetchSupabaseCallUpdateRowsViaRest:
       overrides.fetchSupabaseCallUpdateRowsViaRest ||
       (async () => ({ ok: true, status: 200, body: [] })),
+    fetchSupabaseRowsByStateKeyPrefixViaRest:
+      overrides.fetchSupabaseRowsByStateKeyPrefixViaRest ||
+      (async () => ({ ok: true, status: 200, body: [] })),
     upsertSupabaseRowViaRest:
       overrides.upsertSupabaseRowViaRest ||
       (async (row) => {
@@ -228,6 +231,99 @@ function createFixture(overrides = {}) {
     runtimeState,
   };
 }
+
+test('runtime state sync coordinator persists agenda appointments into dedicated Supabase rows', async () => {
+  const appointment = {
+    id: 321,
+    callId: 'call-agenda-321',
+    company: 'Agenda BV',
+    date: '2026-05-04',
+    time: '10:30',
+    updatedAt: '2026-05-01T10:00:00.000Z',
+  };
+  const fixture = createFixture({
+    buildRuntimeStateSnapshotPayloadWithLimits: () => ({
+      version: 5,
+      savedAt: '2026-05-01T10:00:00.000Z',
+      recentWebhookEvents: [],
+      recentCallUpdates: [],
+      recentAiCallInsights: [],
+      recentDashboardActivities: [],
+      recentSecurityAuditEvents: [],
+      generatedAgendaAppointments: [appointment],
+      dismissedInterestedLeadCallIds: [],
+      dismissedInterestedLeadKeys: [],
+      leadOwnerAssignments: [],
+      nextLeadOwnerRotationIndex: 0,
+      nextGeneratedAgendaAppointmentId: 322,
+    }),
+  });
+
+  const ok = await fixture.coordinator.persistRuntimeStateToSupabase('agenda_dedicated_row_contract');
+
+  assert.equal(ok, true);
+  assert.equal(
+    fixture.persistedRows.some((row) => row.state_key === 'runtime_state_main'),
+    true
+  );
+  const dedicatedRow = fixture.persistedRows.find(
+    (row) => row.state_key === 'runtime_state_main:agenda_appointment:id:321'
+  );
+  assert.ok(dedicatedRow);
+  assert.equal(dedicatedRow.payload.type, 'agenda_appointment');
+  assert.equal(dedicatedRow.payload.appointment.callId, 'call-agenda-321');
+});
+
+test('runtime state sync coordinator hydrates agenda appointments from dedicated rows when core is empty', async () => {
+  const fixture = createFixture({
+    getSupabaseClient: () => null,
+    fetchSupabaseStateRowViaRest: async () => ({
+      ok: true,
+      status: 200,
+      body: [
+        {
+          payload: {
+            version: 5,
+            savedAt: '2026-05-01T09:00:00.000Z',
+            generatedAgendaAppointments: [],
+          },
+          updated_at: '2026-05-01T09:00:00.000Z',
+        },
+      ],
+    }),
+    fetchSupabaseRowsByStateKeyPrefixViaRest: async (prefix) => ({
+      ok: true,
+      status: 200,
+      body:
+        prefix === 'runtime_state_main:agenda_appointment:'
+          ? [
+              {
+                state_key: 'runtime_state_main:agenda_appointment:id:654',
+                payload: {
+                  type: 'agenda_appointment',
+                  appointment: {
+                    id: 654,
+                    callId: 'call-agenda-654',
+                    company: 'Hydrate BV',
+                    date: '2026-05-05',
+                    time: '11:00',
+                    updatedAt: '2026-05-01T11:00:00.000Z',
+                  },
+                },
+                updated_at: '2026-05-01T11:00:00.000Z',
+              },
+            ]
+          : [],
+    }),
+  });
+
+  const ok = await fixture.coordinator.ensureRuntimeStateHydratedFromSupabase({ force: true });
+
+  assert.equal(ok, true);
+  assert.equal(fixture.generatedAgendaAppointments.length, 1);
+  assert.equal(fixture.generatedAgendaAppointments[0].id, 654);
+  assert.equal(fixture.generatedAgendaAppointments[0].company, 'Hydrate BV');
+});
 
 test('runtime state sync coordinator applies snapshot payloads into in-memory runtime state', () => {
   const fixture = createFixture();
@@ -604,16 +700,17 @@ test('runtime state sync coordinator laat bij agenda-appointment merge een later
   const ok = await fixture.coordinator.persistRuntimeStateToSupabase('agenda_schedule_merge_contract');
 
   assert.equal(ok, true);
-  assert.equal(fixture.persistedRows.length, 1);
-  assert.equal(fixture.persistedRows[0].payload.generatedAgendaAppointments.length, 1);
+  const coreRow = fixture.persistedRows.find((row) => row.state_key === 'runtime_state_main');
+  assert.ok(coreRow);
+  assert.equal(coreRow.payload.generatedAgendaAppointments.length, 1);
   assert.equal(
-    fixture.persistedRows[0].payload.generatedAgendaAppointments[0].date,
+    coreRow.payload.generatedAgendaAppointments[0].date,
     '2026-04-22',
     'De nieuwere ingeplande datum moet de stale lokale datum overschrijven'
   );
-  assert.equal(fixture.persistedRows[0].payload.generatedAgendaAppointments[0].time, '22:22');
-  assert.equal(fixture.persistedRows[0].payload.generatedAgendaAppointments[0].location, 'Amsterdam');
-  assert.equal(fixture.persistedRows[0].payload.generatedAgendaAppointments[0].confirmationResponseReceived, true);
+  assert.equal(coreRow.payload.generatedAgendaAppointments[0].time, '22:22');
+  assert.equal(coreRow.payload.generatedAgendaAppointments[0].location, 'Amsterdam');
+  assert.equal(coreRow.payload.generatedAgendaAppointments[0].confirmationResponseReceived, true);
 });
 
 test('runtime state sync coordinator syncs newer remote state and queues call update row persists safely', async () => {

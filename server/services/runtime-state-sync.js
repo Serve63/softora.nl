@@ -17,6 +17,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     fetchSupabaseCallUpdateRowsViaRest = async () => ({ ok: false }),
     upsertSupabaseRowViaRest = async () => ({ ok: false }),
     fetchSupabaseRowByKeyViaRest = async () => ({ ok: false }),
+    fetchSupabaseRowsByStateKeyPrefixViaRest = async () => ({ ok: false, body: [] }),
     supabaseStateTable = '',
     supabaseStateKey = '',
     supabaseDismissedLeadsStateKey = '',
@@ -98,6 +99,9 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
   }
   if (!('dismissedLeadsLastHydrateAtMs' in runtimeState)) {
     runtimeState.dismissedLeadsLastHydrateAtMs = 0;
+  }
+  if (!('agendaAppointmentsLastHydrateAtMs' in runtimeState)) {
+    runtimeState.agendaAppointmentsLastHydrateAtMs = 0;
   }
   if (!('nextLeadOwnerRotationIndex' in runtimeState)) {
     runtimeState.nextLeadOwnerRotationIndex = 0;
@@ -327,6 +331,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
           }
 
           await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
+          await hydrateDedicatedAgendaAppointmentsFromSupabase({ force: true, maxAgeMs: 0 });
           await hydrateDismissedLeadsFromSupabase();
 
           runtimeState.supabaseStateHydrated = true;
@@ -403,6 +408,161 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       }
     }
     return false;
+  }
+
+  function getDedicatedAgendaAppointmentStateKeyPrefix() {
+    const stateKey = normalizeString(supabaseStateKey || '');
+    return `${stateKey || 'runtime'}:agenda_appointment:`;
+  }
+
+  function buildDedicatedAgendaAppointmentStateKey(appointment) {
+    const compact = compactRuntimeSnapshotGeneratedAgendaAppointment(appointment || {});
+    const id = normalizeString(compact?.id || '');
+    const callId = normalizeString(compact?.callId || '');
+    const identity = id ? `id:${id}` : callId ? `call:${callId}` : '';
+    return identity ? `${getDedicatedAgendaAppointmentStateKeyPrefix()}${identity}` : '';
+  }
+
+  function extractDedicatedAgendaAppointmentFromRow(row) {
+    const payload = row?.payload && typeof row.payload === 'object' ? row.payload : null;
+    const rawAppointment =
+      payload?.appointment && typeof payload.appointment === 'object'
+        ? payload.appointment
+        : payload?.generatedAgendaAppointment && typeof payload.generatedAgendaAppointment === 'object'
+          ? payload.generatedAgendaAppointment
+          : payload;
+    const compact = compactRuntimeSnapshotGeneratedAgendaAppointment(rawAppointment || {});
+    const id = normalizeString(compact?.id || '');
+    const callId = normalizeString(compact?.callId || '');
+    return id || callId ? compact : null;
+  }
+
+  function mergeDedicatedAgendaAppointmentsIntoRuntime(appointments = [], updatedAt = '') {
+    const compactAppointments = (Array.isArray(appointments) ? appointments : [])
+      .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
+      .filter((item) => normalizeString(item?.id || item?.callId || ''));
+    if (compactAppointments.length === 0) return false;
+
+    const mergedPayload = mergeRuntimeSnapshotPayloads(buildRuntimeStateSnapshotPayloadWithLimits(), {
+      version: 5,
+      savedAt: normalizeString(updatedAt || '') || new Date().toISOString(),
+      generatedAgendaAppointments: compactAppointments,
+    });
+
+    return applyRuntimeStateSnapshotPayload(mergedPayload, {
+      updatedAt: normalizeString(updatedAt || '') || mergedPayload.savedAt || '',
+    });
+  }
+
+  async function hydrateDedicatedAgendaAppointmentsFromSupabase(options = {}) {
+    if (!isSupabaseConfigured()) return false;
+    const force = Boolean(options?.force);
+    const maxAgeMs = Math.max(
+      0,
+      parseNumberSafe(options?.maxAgeMs, runtimeStateSupabaseSyncCooldownMs) ||
+        runtimeStateSupabaseSyncCooldownMs
+    );
+    const nowMs = Date.now();
+    if (
+      !force &&
+      runtimeState.agendaAppointmentsLastHydrateAtMs > 0 &&
+      nowMs - runtimeState.agendaAppointmentsLastHydrateAtMs < maxAgeMs
+    ) {
+      return false;
+    }
+
+    const prefix = getDedicatedAgendaAppointmentStateKeyPrefix();
+    const appointments = [];
+    let newestUpdatedAt = '';
+    const pageLimit = 500;
+    for (let page = 0; page < 10; page += 1) {
+      const result = await fetchSupabaseRowsByStateKeyPrefixViaRest(
+        prefix,
+        pageLimit,
+        'state_key,payload,updated_at',
+        page * pageLimit
+      );
+      runtimeState.agendaAppointmentsLastHydrateAtMs = Date.now();
+      if (!result.ok) {
+        if (result.error) {
+          runtimeState.supabaseLastHydrateError = truncateText(result.error, 500);
+        }
+        return false;
+      }
+      const rows = Array.isArray(result.body) ? result.body : [];
+      rows.forEach((row) => {
+        const appointment = extractDedicatedAgendaAppointmentFromRow(row);
+        if (appointment) appointments.push(appointment);
+        const updatedAt = normalizeString(row?.updated_at || '');
+        if (updatedAt && (!newestUpdatedAt || Date.parse(updatedAt) > Date.parse(newestUpdatedAt))) {
+          newestUpdatedAt = updatedAt;
+        }
+      });
+      if (rows.length < pageLimit) break;
+    }
+
+    return mergeDedicatedAgendaAppointmentsIntoRuntime(appointments, newestUpdatedAt);
+  }
+
+  async function persistDedicatedAgendaAppointmentRowToSupabase(appointment, reason = 'agenda_appointment_row') {
+    if (!isSupabaseConfigured()) return true;
+    const compact = compactRuntimeSnapshotGeneratedAgendaAppointment(appointment || {});
+    const stateKey = buildDedicatedAgendaAppointmentStateKey(compact);
+    if (!stateKey) return true;
+
+    let appointmentToSave = compact;
+    try {
+      const existingResult = await fetchSupabaseRowByKeyViaRest(stateKey, 'payload,updated_at');
+      const existingRow = Array.isArray(existingResult.body)
+        ? existingResult.body[0] || null
+        : existingResult.body || null;
+      const existingAppointment = extractDedicatedAgendaAppointmentFromRow(existingRow);
+      if (existingAppointment) {
+        const merged = mergeRuntimeSnapshotPayloads(
+          { generatedAgendaAppointments: [compact] },
+          { generatedAgendaAppointments: [existingAppointment] }
+        );
+        appointmentToSave = compactRuntimeSnapshotGeneratedAgendaAppointment(
+          merged.generatedAgendaAppointments?.[0] || compact
+        );
+      }
+    } catch {
+      // Als de read-before-write faalt, blijft de bestaande core snapshot het compat-pad.
+    }
+
+    const updatedAtMs = getRuntimeSnapshotItemTimestampMs(appointmentToSave);
+    const updatedAt =
+      Number.isFinite(updatedAtMs) && updatedAtMs > 0
+        ? new Date(updatedAtMs).toISOString()
+        : new Date().toISOString();
+    const result = await upsertSupabaseRowViaRest({
+      state_key: stateKey,
+      payload: {
+        type: 'agenda_appointment',
+        version: 1,
+        appointment: appointmentToSave,
+      },
+      updated_at: updatedAt,
+      meta: {
+        reason: truncateText(normalizeString(reason || 'agenda_appointment_row'), 80),
+        appointmentId: truncateText(normalizeString(appointmentToSave?.id || ''), 80),
+        callId: truncateText(normalizeString(appointmentToSave?.callId || ''), 140),
+      },
+    });
+
+    return Boolean(result?.ok);
+  }
+
+  async function persistDedicatedAgendaAppointmentRowsToSupabase(appointments = [], reason = 'agenda_appointments') {
+    if (!isSupabaseConfigured()) return true;
+    const compactAppointments = (Array.isArray(appointments) ? appointments : [])
+      .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
+      .filter((item) => normalizeString(item?.id || item?.callId || ''));
+    for (const appointment of compactAppointments) {
+      const ok = await persistDedicatedAgendaAppointmentRowToSupabase(appointment, reason);
+      if (!ok) return false;
+    }
+    return true;
   }
 
   async function persistRuntimeStateToSupabase(reason = 'unknown') {
@@ -485,6 +645,14 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
 
       const primaryPersist = await persistRow(row);
       if (primaryPersist.ok) {
+        const dedicatedAppointmentsOk = await persistDedicatedAgendaAppointmentRowsToSupabase(
+          payload.generatedAgendaAppointments,
+          reason
+        );
+        if (!dedicatedAppointmentsOk) {
+          runtimeState.supabaseLastPersistError = 'Agenda-afspraken konden niet in dedicated Supabase-rijen worden opgeslagen.';
+          return false;
+        }
         runtimeState.supabaseLastPersistError = '';
         runtimeState.supabaseStateHydrated = true;
         markRuntimeStateSynced(resolveRuntimeStateVersionMs(row.updated_at, row.payload));
@@ -512,6 +680,14 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       };
       const compactPersist = await persistRow(compactRow);
       if (compactPersist.ok) {
+        const dedicatedAppointmentsOk = await persistDedicatedAgendaAppointmentRowsToSupabase(
+          compactPayload.generatedAgendaAppointments,
+          `${reason}:compact_retry`
+        );
+        if (!dedicatedAppointmentsOk) {
+          runtimeState.supabaseLastPersistError = 'Agenda-afspraken konden niet in dedicated Supabase-rijen worden opgeslagen.';
+          return false;
+        }
         runtimeState.supabaseLastPersistError = '';
         runtimeState.supabaseStateHydrated = true;
         markRuntimeStateSynced(resolveRuntimeStateVersionMs(compactRow.updated_at, compactRow.payload));
@@ -678,6 +854,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     if (!row || !row.payload || typeof row.payload !== 'object') {
       runtimeState.supabaseStateHydrated = true;
       runtimeState.supabaseLastHydrateError = '';
+      await hydrateDedicatedAgendaAppointmentsFromSupabase({ force, maxAgeMs });
       await hydrateDismissedLeadsFromSupabase();
       return false;
     }
@@ -695,12 +872,14 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
 
     if (!shouldApply) {
       await syncCallUpdatesFromSupabaseRows({ force, maxAgeMs });
+      await hydrateDedicatedAgendaAppointmentsFromSupabase({ force, maxAgeMs });
       await hydrateDismissedLeadsFromSupabase();
       return false;
     }
 
     const applied = applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
     await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
+    await hydrateDedicatedAgendaAppointmentsFromSupabase({ force: true, maxAgeMs: 0 });
     await hydrateDismissedLeadsFromSupabase();
     return applied;
   }
@@ -749,6 +928,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     ensureDismissedLeadsFreshFromSupabase,
     ensureRuntimeStateHydratedFromSupabase,
     forceHydrateRuntimeStateWithRetries,
+    hydrateDedicatedAgendaAppointmentsFromSupabase,
     hydrateDismissedLeadsFromSupabase,
     invalidateSupabaseSyncTimestamp,
     mergeCallUpdatesFromSupabaseRows,

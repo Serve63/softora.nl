@@ -11,6 +11,7 @@ test('premium dashboard core exposes stable pure helpers', () => {
   assert.equal(dashboardCore.normalizeDashboardTime('', '08:00'), '08:00');
   assert.equal(dashboardCore.normalizeDashboardDate('2026-04-28'), '2026-04-28');
   assert.equal(typeof dashboardCore.fetchPremiumDashboardJson, 'function');
+  assert.equal(typeof dashboardCore.forcePremiumDashboardBootShellVisible, 'function');
   assert.equal(typeof dashboardCore.releasePremiumDashboardBootShell, 'function');
   assert.equal(typeof dashboardCore.startPremiumDashboardBootWatchdog, 'function');
 });
@@ -46,4 +47,56 @@ test('premium dashboard core formats money and project metadata', () => {
     }),
     'Amsterdam \u2022 \u20ac1.250 \u2022 wacht op betaling'
   );
+});
+
+test('premium dashboard core can force-release the boot shell without theme helpers', () => {
+  const makeClassList = (initial = []) => {
+    const values = new Set(initial);
+    return {
+      add: (name) => values.add(name),
+      remove: (name) => values.delete(name),
+      has: (name) => values.has(name),
+    };
+  };
+  const loader = {
+    classList: makeClassList(),
+    style: {},
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  const shell = {
+    classList: makeClassList(['is-booting']),
+    style: {},
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  const oldDocument = global.document;
+  global.document = {
+    querySelector(selector) {
+      if (selector !== 'main.is-premium-boot-host') return null;
+      return {
+        querySelector(innerSelector) {
+          if (innerSelector === '.premium-boot-loader') return loader;
+          if (innerSelector === '.premium-boot-shell') return shell;
+          return null;
+        },
+      };
+    },
+  };
+
+  try {
+    dashboardCore.forcePremiumDashboardBootShellVisible();
+  } finally {
+    global.document = oldDocument;
+  }
+
+  assert.equal(loader.classList.has('is-hidden'), true);
+  assert.equal(loader.attrs['aria-hidden'], 'true');
+  assert.equal(loader.style.visibility, 'hidden');
+  assert.equal(shell.classList.has('is-booting'), false);
+  assert.equal(shell.attrs['aria-busy'], 'false');
 });
