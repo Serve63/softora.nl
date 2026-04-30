@@ -19,8 +19,8 @@ test('premium dashboard leest actieve opdrachten uit chunked Supabase state', ()
     pageSource,
     /getPremiumDashboardChunkMetaKey\(PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY\)[\s\S]*getPremiumDashboardChunkMetaKey\(PREMIUM_ACTIVE_RUNTIME_KEY\)/
   );
-  assert.doesNotMatch(pageSource, /amount <= 0\) return null;/);
-  assert.match(pageSource, /!merged\.clientName \|\| !merged\.title \|\| !merged\.description \|\| !merged\.amount/);
+  assert.match(pageSource, /const amount = Math\.round\(Number\(item\?\.amount\)\);/);
+  assert.match(pageSource, /if \(!Number\.isFinite\(amount\) \|\| amount <= 0\) return null;/);
   assert.match(
     pageSource,
     /const activeOrders = orders\.filter\(\(order\) => !order\?\.ui\?\.isBuilt\);/

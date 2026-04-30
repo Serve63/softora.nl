@@ -2694,12 +2694,12 @@
             let runtimeOrders = {};
 
             try {
-                const parsed = JSON.parse(String(safeValues[PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY] || '[]'));
+                const parsed = JSON.parse(String(readPremiumDashboardChunkedStateValue(safeValues, PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY) || '[]'));
                 if (Array.isArray(parsed)) customOrders = parsed;
             } catch (_) {}
 
             try {
-                const parsed = JSON.parse(String(safeValues[PREMIUM_ACTIVE_RUNTIME_KEY] || '{}'));
+                const parsed = JSON.parse(String(readPremiumDashboardChunkedStateValue(safeValues, PREMIUM_ACTIVE_RUNTIME_KEY) || '{}'));
                 if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) runtimeOrders = parsed;
             } catch (_) {}
 
@@ -3016,7 +3016,7 @@
             const revenueByMonth = Array.from({ length: 12 }, () => 0);
             const rollingMonthRevenue = new Map();
             const paidOrders = orders.filter((order) => order?.ui?.isPaid);
-            const activeOrders = orders.filter((order) => !order?.ui?.isPaid);
+            const activeOrders = orders.filter((order) => !order?.ui?.isBuilt);
             const uniqueClients = new Set();
             const hasCustomerDatabase = customers.length > 0;
             const revenueBreakdown = {
