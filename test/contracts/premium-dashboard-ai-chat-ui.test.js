@@ -105,7 +105,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(coreSource, /function readDashboardCustomersBootstrapPayload\(scriptId = 'softoraCustomersBootstrap'\) \{/);
   assert.match(pageSource, /const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload\(\);/);
   assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260430a/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260430b/);
   assert.doesNotMatch(pageSource, /assets\/premium-dashboard-core\.js\?v=20260429b/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /window\.SoftoraPremiumDashboardCore \|\|/);
@@ -115,11 +115,12 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(pageSource, /const rawCustomers = readPremiumDashboardChunkedStateValue\(values, PREMIUM_CUSTOMERS_KEY\);/);
   assert.match(pageSource, /const customers = parsePremiumCustomers\(rawCustomers\);/);
   assert.match(coreSource, /function hydratePremiumDashboardCustomersFromBootstrap\(state, parseCustomers, payload\) \{/);
+  assert.match(coreSource, /function hydratePremiumDashboardOrdersFromBootstrap\(state, parseOrders, payload\) \{/);
   assert.match(coreSource, /const rawCustomers = Array\.isArray\(payload && payload\.customers\) \? payload\.customers : \[\];/);
   assert.match(coreSource, /const customers = parseCustomers\(rawCustomers\);/);
-  assert.match(pageSource, /const hadPremiumDashboardBootstrapCustomers = hydratePremiumDashboardCustomersFromBootstrap\(premiumDashboardState, parsePremiumCustomers, dashboardCustomersBootstrapPayload\);/);
+  assert.match(pageSource, /const hadPremiumDashboardBootstrapData = \[hydratePremiumDashboardCustomersFromBootstrap\(premiumDashboardState, parsePremiumCustomers, dashboardCustomersBootstrapPayload\), typeof dashboardCore\.hydratePremiumDashboardOrdersFromBootstrap === 'function'/);
   assert.match(pageSource, /totalClientsEl\.textContent = String\(hasCustomerDatabase \? customers\.length : uniqueClients\.size\);/);
-  assert.doesNotMatch(pageSource, /if \(!loaded && !hadPremiumDashboardBootstrapCustomers\) renderPremiumDashboardOrders\(\);/);
+  assert.doesNotMatch(pageSource, /if \(!loaded && !hadPremiumDashboardBootstrapData\) renderPremiumDashboardOrders\(\);/);
   assert.match(pageSource, /ordersHydrated: false,/);
   assert.match(pageSource, /customersHydrated: false,/);
   assert.match(pageSource, /const loaded = results\.some\(Boolean\) \|\| premiumDashboardState\.ordersHydrated \|\| premiumDashboardState\.customersHydrated;/);
@@ -183,7 +184,7 @@ test('premium dashboard opent AI beheer configuratie met doel en toegestane midd
   assert.match(pageSource, /scheduleDays: \['monday', 'tuesday', 'wednesday', 'thursday', 'friday'\]/);
   assert.match(pageSource, /scheduleStart: '08:30'/);
   assert.match(pageSource, /scheduleEnd: '17:00'/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260430a/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260430b/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /const aiManagementScheduleDayInputs = Array\.from\(document\.querySelectorAll\('\[data-ai-schedule-day\]'\)\);/);
   assert.match(pageSource, /aiManagementScheduleStartInput\.value = config\.scheduleStart;/);
