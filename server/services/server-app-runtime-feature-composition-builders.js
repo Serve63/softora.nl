@@ -273,6 +273,7 @@ function buildServerAppFeatureWiringRuntimeContext({
       },
       runtimeOpsCoordinator: uiSeoRuntime.runtimeOpsCoordinator,
       runtimeDebugOpsCoordinator: uiSeoRuntime.runtimeDebugOpsCoordinator,
+      dataOpsStore: uiSeoRuntime.dataOpsStore,
       requireRuntimeDebugAccess: securityRuntime.requireRuntimeDebugAccess,
       seoReadCoordinator: uiSeoRuntime.seoReadCoordinator,
       seoWriteCoordinator: uiSeoRuntime.seoWriteCoordinator,

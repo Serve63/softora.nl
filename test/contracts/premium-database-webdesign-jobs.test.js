@@ -133,6 +133,82 @@ test('premium database webdesign jobs keep status access scoped to the logged in
   assert.equal(statusRes.body.ok, false);
 });
 
+test('premium database webdesign jobs persist status and generated photos through data ops storage', async () => {
+  const persistedJobs = [];
+  const uploadedPhotos = [];
+  let latestJob = null;
+  const dataOpsStore = {
+    upsertWebdesignJob: async (job) => {
+      latestJob = {
+        ...job,
+        customer: { ...job.customer },
+      };
+      persistedJobs.push(latestJob.status);
+      return { ok: true };
+    },
+    getWebdesignJob: async (jobId) => (latestJob && latestJob.id === jobId ? latestJob : null),
+    uploadDesignPhoto: async (entry, meta) => {
+      uploadedPhotos.push({ entry, meta });
+      return { ok: true };
+    },
+  };
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => ({
+        image: { dataUrl: 'data:image/png;base64,AAAA', fileName: 'preview.png' },
+      }),
+    },
+    getUiStateValues: async () => {
+      throw new Error('legacy photo storage should not be needed');
+    },
+    setUiStateValues: async () => {
+      throw new Error('legacy photo storage should not be needed');
+    },
+  });
+
+  const startRes = createResponseRecorder();
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'job_persist123456',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-persist', bedrijf: 'Softora' },
+      },
+    },
+    startRes
+  );
+
+  assert.equal(startRes.statusCode, 202);
+  assert.equal(startRes.body.job.status, 'done');
+  assert.deepEqual(persistedJobs, ['queued', 'running', 'done']);
+  assert.equal(uploadedPhotos[0].entry.customerId, 'customer-persist');
+  assert.equal(uploadedPhotos[0].meta.source, 'premium-database-webdesign-jobs');
+
+  const resumedCoordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    dataOpsStore,
+  });
+  const getRes = createResponseRecorder();
+  await resumedCoordinator.getJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      params: { jobId: 'job_persist123456' },
+    },
+    getRes
+  );
+
+  assert.equal(getRes.statusCode, 200);
+  assert.equal(getRes.body.job.status, 'done');
+});
+
 test('premium database webdesign jobs list running jobs for the current user', async () => {
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: { error() {} },
