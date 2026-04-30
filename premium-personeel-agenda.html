@@ -3532,7 +3532,9 @@
         }
         applyWorkspaceMode(false);
     }
-
+</script>
+<script src="assets/premium-agenda-stability.js?v=20260430a"></script>
+<script>
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
     modalSecondaryBtn.addEventListener('click', handleModalSecondaryAction);
@@ -3648,7 +3650,6 @@
         },
         true
     );
-
     // Init
     applyInitialAgendaBootstrap();
     renderCalendar();
@@ -3662,7 +3663,9 @@
             // van 10s blijft cached om server-load te besparen.
             await loadServerAppointments({ fresh: true });
         } finally {
-            if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+            if (window.SoftoraAgendaStability && typeof window.SoftoraAgendaStability.finishBoot === 'function') {
+                window.SoftoraAgendaStability.finishBoot();
+            } else if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
                 window.SoftoraPremiumBoot.setShellBooting(false);
             }
         }
@@ -3674,7 +3677,6 @@
         if (document.hidden) return;
         void loadServerAppointments({ fresh: true });
     });
-
     // Cursor
     const cursor = document.querySelector('.cursor');
     const cursorDot = document.querySelector('.cursor-dot');
@@ -3684,9 +3686,7 @@
     let cursorY = 0;
     let dotX = 0;
     let dotY = 0;
-
     document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
-
     function animateCursor() {
         if (!cursor || !cursorDot) return;
         cursorX += (mouseX - cursorX) * 1;
@@ -3702,7 +3702,6 @@
     if (cursor && cursorDot) {
         animateCursor();
     }
-
     document.querySelectorAll('.magnetic').forEach((elem) => {
         elem.addEventListener('mouseenter', () => {
             if (cursor) cursor.classList.add('hover');

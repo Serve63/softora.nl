@@ -2694,35 +2694,35 @@
             let runtimeOrders = {};
 
             try {
-                const parsed = JSON.parse(String(safeValues[PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY] || '[]'));
+                const parsed = JSON.parse(String(readPremiumDashboardChunkedStateValue(safeValues, PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY) || safeValues[PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY] || '[]'));
                 if (Array.isArray(parsed)) customOrders = parsed;
             } catch (_) {}
 
             try {
-                const parsed = JSON.parse(String(safeValues[PREMIUM_ACTIVE_RUNTIME_KEY] || '{}'));
+                const parsed = JSON.parse(String(readPremiumDashboardChunkedStateValue(safeValues, PREMIUM_ACTIVE_RUNTIME_KEY) || safeValues[PREMIUM_ACTIVE_RUNTIME_KEY] || '{}'));
                 if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) runtimeOrders = parsed;
             } catch (_) {}
 
             return customOrders
                 .map((item) => {
                     const id = Number(item?.id);
-                    const amount = Math.round(Number(item?.amount));
+                    const rawAmount = Number(item?.amount);
+                    const amount = Number.isFinite(rawAmount) && rawAmount > 0 ? Math.round(rawAmount) : 0;
                     if (!Number.isFinite(id) || id <= 0) return null;
-                    if (!Number.isFinite(amount) || amount <= 0) return null;
-
                     const runtime = runtimeOrders[String(id)] || {};
                     const merged = {
                         id,
-                        clientName: String(item?.clientName || runtime?.name || '').trim(),
+                        clientName: String(item?.clientName || item?.companyName || runtime?.name || '').trim(),
                         location: String(item?.location || '').trim(),
-                        title: String(item?.title || runtime?.type || 'Website opdracht').trim(),
+                        title: String(item?.title || '').trim(),
                         description: String(item?.description || '').trim(),
                         amount,
-                        statusKey: String(runtime?.statusKey || item?.status || '').trim(),
+                        statusKey: String(runtime?.statusKey || item?.statusKey || item?.status || '').trim(),
                         progressPct: Number(runtime?.progressPct),
                         paidAt: String(runtime?.paidAt || item?.paidAt || '').trim() || null,
                         updatedAt: Number(runtime?.updatedAt) || 0
                     };
+                    if (!merged.clientName || !merged.title || !merged.description || !merged.amount) return null;
                     const ui = resolvePremiumOrderUiState(merged);
                     return {
                         ...merged,
@@ -3017,7 +3017,7 @@
             const revenueByMonth = Array.from({ length: 12 }, () => 0);
             const rollingMonthRevenue = new Map();
             const paidOrders = orders.filter((order) => order?.ui?.isPaid);
-            const activeOrders = orders.filter((order) => !order?.ui?.isPaid);
+            const activeOrders = orders.filter((order) => !order?.ui?.isBuilt);
             const uniqueClients = new Set();
             const hasCustomerDatabase = customers.length > 0;
             const revenueBreakdown = {
