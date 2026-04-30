@@ -25,6 +25,7 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(pageSource, /data-package-tab="bedrijfssoftware"/);
   assert.match(pageSource, /data-package-tab="voicesoftware"/);
   assert.match(pageSource, /data-package-tab="chatbots"/);
+  assert.match(pageSource, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/);
   assert.match(scriptSource, /var packageTabGroups = \{/);
   assert.match(pageSource, /Losse oplevering/);
   assert.match(pageSource, /Losse oplevering mét CRM/);
