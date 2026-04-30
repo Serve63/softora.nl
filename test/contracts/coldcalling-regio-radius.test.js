@@ -64,15 +64,24 @@ test('coldcalling dashboard delegates regio radius data to the extracted helper 
 });
 
 test('coldcalling pages load regio radius helpers before the dashboard bootstrap', () => {
-  [
-    'ai-lead-generator.html',
-    'ai-coldmailing.html',
-    'premium-ai-lead-generator.html',
-  ].forEach((relativePath) => {
+  const expectedDashboardVersions = {
+    'ai-lead-generator.html': '20260427e',
+    'ai-coldmailing.html': '20260427e',
+    'premium-ai-lead-generator.html': '20260430a',
+  };
+
+  Object.entries(expectedDashboardVersions).forEach(([relativePath, dashboardVersion]) => {
     const pageSource = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+    const pattern = new RegExp(
+      '<script src="assets/coldcalling-conversation-summary\\.js\\?v=20260427a" defer></script>\\s*'
+        + '<script src="assets/coldcalling-regio-radius\\.js\\?v=20260427a" defer></script>\\s*'
+        + '<script src="assets/coldcalling-manual-lead-prompt\\.js\\?v=20260427a" defer></script>\\s*'
+        + `<script src="assets/coldcalling-dashboard\\.js\\?v=${dashboardVersion}" defer></script>`
+    );
+
     assert.match(
       pageSource,
-      /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260430a" defer><\/script>/,
+      pattern,
       relativePath
     );
   });
