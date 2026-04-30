@@ -7,26 +7,65 @@ function createAgendaPageBootstrapService(deps = {}) {
     getGeneratedAgendaAppointments = () => [],
     isGeneratedAppointmentVisibleForAgenda = () => true,
     compareAgendaAppointments = () => 0,
+    logger = console,
+    bootstrapPreparationTimeoutMs = 1500,
     getGoogleMapsPlacesBrowserKey = () =>
       String(process.env.GOOGLE_MAPS_PLACES_BROWSER_KEY || process.env.GOOGLE_MAPS_API_KEY || '').trim(),
   } = deps;
 
+  function getSafeBootstrapPreparationTimeoutMs() {
+    return Math.max(0, Math.min(10000, Number(bootstrapPreparationTimeoutMs) || 1500));
+  }
+
+  async function runBootstrapPreparationWithinSoftTimeout(label, run) {
+    const timeoutMs = getSafeBootstrapPreparationTimeoutMs();
+    if (!timeoutMs) {
+      return run();
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const timeoutHandle = setTimeout(() => {
+        if (typeof logger?.error === 'function') {
+          logger.error('[Agenda Bootstrap][PreparationTimeout]', label, `na ${timeoutMs}ms`);
+        }
+        finish();
+      }, timeoutMs);
+
+      function finish() {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutHandle);
+        resolve();
+      }
+
+      Promise.resolve()
+        .then(run)
+        .then(() => finish())
+        .catch((error) => {
+          if (typeof logger?.error === 'function') {
+            logger.error('[Agenda Bootstrap][PreparationError]', label, error?.message || error);
+          }
+          finish();
+        });
+    });
+  }
+
   async function buildAgendaBootstrapPayload(options = {}) {
     const limit = Math.max(1, Math.min(500, Number(options.limit) || 250));
 
-    if (isSupabaseConfigured() && !getSupabaseStateHydrated()) {
-      await forceHydrateRuntimeStateWithRetries(3);
-    }
+    await runBootstrapPreparationWithinSoftTimeout('agenda-page-bootstrap', async () => {
+      if (isSupabaseConfigured() && !getSupabaseStateHydrated()) {
+        await forceHydrateRuntimeStateWithRetries(3);
+      }
 
-    // Vercel multi-instance: ook al is de instance gehydrateerd, z'n lokale
-    // state kan achterlopen op Supabase (bv. afspraak die zojuist via
-    // "in agenda zetten" op instance A is geschreven). We dwingen daarom
-    // altijd een verse sync vóór we de bootstrap-payload samenstellen, zodat
-    // een gebruiker die direct na het inplannen naar /premium-personeel-agenda
-    // navigeert de afspraak meteen ziet.
-    if (isSupabaseConfigured()) {
-      await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: 0 });
-    }
+      // Vercel multi-instance: ook al is de instance gehydrateerd, z'n lokale
+      // state kan achterlopen op Supabase. We proberen daarom een verse sync,
+      // maar laten de pagina niet vastlopen als Supabase traag reageert.
+      if (isSupabaseConfigured()) {
+        await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: 0 });
+      }
+    });
 
     const appointments = getGeneratedAgendaAppointments()
       .filter((appointment) => isGeneratedAppointmentVisibleForAgenda(appointment))

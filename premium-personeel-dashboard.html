@@ -2681,12 +2681,12 @@
             let runtimeOrders = {};
 
             try {
-                const parsed = JSON.parse(String(readPremiumDashboardChunkedStateValue(safeValues, PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY) || '[]'));
+                const parsed = JSON.parse(String(readPremiumDashboardChunkedStateValue(safeValues, PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY) || safeValues[PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY] || '[]'));
                 if (Array.isArray(parsed)) customOrders = parsed;
             } catch (_) {}
 
             try {
-                const parsed = JSON.parse(String(readPremiumDashboardChunkedStateValue(safeValues, PREMIUM_ACTIVE_RUNTIME_KEY) || '{}'));
+                const parsed = JSON.parse(String(readPremiumDashboardChunkedStateValue(safeValues, PREMIUM_ACTIVE_RUNTIME_KEY) || safeValues[PREMIUM_ACTIVE_RUNTIME_KEY] || '{}'));
                 if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) runtimeOrders = parsed;
             } catch (_) {}
 
@@ -2700,7 +2700,7 @@
                     const runtime = runtimeOrders[String(id)] || {};
                     const merged = {
                         id,
-                        clientName: String(item?.clientName || runtime?.name || '').trim(),
+                        clientName: String(item?.clientName || item?.companyName || runtime?.name || '').trim(),
                         location: String(item?.location || '').trim(),
                         companyName: String(item?.companyName || '').trim(),
                         contactName: String(item?.contactName || '').trim(),
@@ -2709,7 +2709,7 @@
                         title: String(item?.title || runtime?.type || 'Website opdracht').trim(),
                         description: String(item?.description || '').trim(),
                         amount,
-                        statusKey: String(runtime?.statusKey || item?.status || '').trim(),
+                        statusKey: String(runtime?.statusKey || item?.statusKey || item?.status || '').trim(),
                         progressPct: Number(runtime?.progressPct),
                         paidAt: String(runtime?.paidAt || item?.paidAt || '').trim() || null,
                         updatedAt: Number(runtime?.updatedAt) || 0
