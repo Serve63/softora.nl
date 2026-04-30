@@ -2161,6 +2161,7 @@
             pollTimer: null,
             refreshPromise: null,
             lastRefreshAt: 0,
+            ordersHydrated: false, customersHydrated: false,
         };
         let dashboardPeriodFilter = loadDashboardPeriodFilter();
 
@@ -3179,10 +3180,10 @@
             try {
                 const data = await fetchPremiumUiState(PREMIUM_ACTIVE_ORDERS_SCOPE);
                 const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
-                premiumDashboardState.orders = parsePremiumOrdersFromState(values);
+                if (!Object.prototype.hasOwnProperty.call(values, PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY) && !Object.prototype.hasOwnProperty.call(values, PREMIUM_ACTIVE_RUNTIME_KEY)) throw new Error('Geen Supabase-opdrachtdata ontvangen.');
+                premiumDashboardState.orders = parsePremiumOrdersFromState(values); premiumDashboardState.ordersHydrated = true;
                 return true;
             } catch (_) {
-                premiumDashboardState.orders = [];
                 return false;
             } finally {
                 premiumDashboardState.loading = false;
@@ -3193,11 +3194,13 @@
             try {
                 const data = await fetchPremiumUiState(PREMIUM_CUSTOMERS_SCOPE);
                 const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
-                const customers = parsePremiumCustomers(readPremiumDashboardChunkedStateValue(values, PREMIUM_CUSTOMERS_KEY));
-                premiumDashboardState.customers = customers;
+                const rawCustomers = readPremiumDashboardChunkedStateValue(values, PREMIUM_CUSTOMERS_KEY);
+                if (!rawCustomers && !Object.prototype.hasOwnProperty.call(values, PREMIUM_CUSTOMERS_KEY) && !Object.prototype.hasOwnProperty.call(values, getPremiumDashboardChunkMetaKey(PREMIUM_CUSTOMERS_KEY))) throw new Error('Geen Supabase-klantdata ontvangen.');
+                const customers = parsePremiumCustomers(rawCustomers);
+                if (customers.length) premiumDashboardState.customers = customers;
+                premiumDashboardState.customersHydrated = true;
                 return true;
             } catch (_) {
-                premiumDashboardState.customers = [];
                 return false;
             }
         }
@@ -3210,13 +3213,10 @@
             }
 
             premiumDashboardState.refreshPromise = (async () => {
-                await Promise.all([
-                    loadPremiumDashboardCustomers(),
-                    loadPremiumDashboardOrders()
-                ]);
-                renderPremiumDashboardOrders();
-                premiumDashboardState.lastRefreshAt = Date.now();
-                return true;
+                const results = await Promise.all([loadPremiumDashboardCustomers(), loadPremiumDashboardOrders()]);
+                const loaded = results.some(Boolean) || premiumDashboardState.ordersHydrated || premiumDashboardState.customersHydrated;
+                if (loaded) renderPremiumDashboardOrders(); premiumDashboardState.lastRefreshAt = Date.now();
+                return loaded;
             })().finally(() => {
                 premiumDashboardState.refreshPromise = null;
             });

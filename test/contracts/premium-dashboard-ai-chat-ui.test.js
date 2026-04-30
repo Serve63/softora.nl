@@ -103,8 +103,13 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(pageSource, /const databaseStatus = normalizePremiumDashboardCustomerDatabaseStatus\(item\);/);
   assert.match(pageSource, /databaseStatus,/);
   assert.match(pageSource, /\.filter\(\(customer\) => customer\.databaseStatus === 'klant'\)/);
-  assert.match(pageSource, /parsePremiumCustomers\(readPremiumDashboardChunkedStateValue\(values, PREMIUM_CUSTOMERS_KEY\)\)/);
+  assert.match(pageSource, /const rawCustomers = readPremiumDashboardChunkedStateValue\(values, PREMIUM_CUSTOMERS_KEY\);/);
+  assert.match(pageSource, /const customers = parsePremiumCustomers\(rawCustomers\);/);
   assert.match(pageSource, /totalClientsEl\.textContent = String\(hasCustomerDatabase \? customers\.length : uniqueClients\.size\);/);
+  assert.match(pageSource, /ordersHydrated: false,/);
+  assert.match(pageSource, /customersHydrated: false,/);
+  assert.match(pageSource, /const loaded = results\.some\(Boolean\) \|\| premiumDashboardState\.ordersHydrated \|\| premiumDashboardState\.customersHydrated;/);
+  assert.doesNotMatch(pageSource, /premiumDashboardState\.(orders|customers) = \[\];/);
 });
 
 test('premium dashboard laat de boot-loader niet hangen op trage ui-state requests', () => {
