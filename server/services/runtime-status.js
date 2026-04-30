@@ -60,7 +60,7 @@ function createRuntimeStatusService(deps = {}) {
     return {
       coldcallingProvider: getColdcallingProvider(),
       openaiConfigured: Boolean(normalizeString(env.OPENAI_API_KEY)),
-      anthropicConfigured: Boolean(normalizeString(env.ANTHROPIC_API_KEY || env.CLAUDE_API_KEY)),
+      anthropicConfigured: false,
       retellConfigured: Boolean(normalizeString(env.RETELL_API_KEY)),
       twilioConfigured: Boolean(
         normalizeString(env.TWILIO_ACCOUNT_SID) &&

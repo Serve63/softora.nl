@@ -1600,11 +1600,12 @@
         </div>
     </div>
 
-    <script src="assets/premium-database-photo-batch.js?v=20260427a"></script>
+    <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260429g"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
-    <script src="assets/premium-database-deep-search.js?v=20260428h"></script>
+    <script src="assets/premium-database-deep-search.js?v=20260429c"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
@@ -2171,6 +2172,8 @@
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });
 
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, refreshPhotos: async function () { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap)); renderPage(); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
+
         function mergeCustomersWithPhotos(customers, photoMap) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
             const photosByIdentity = new Map();
@@ -2382,17 +2385,7 @@
         }
 
         function renderWebsitePhotoDrop(customer) {
-            if (!shouldShowWebsitePhoto(customer)) return "";
-            const photo = normalizeString(customer && customer.websitePhoto);
-            const label = normalizeString(customer && customer.websitePhotoName) || "Websitefoto";
-            const hasPhoto = isValidWebsitePhotoDataUrl(photo);
-            const inner = isValidWebsitePhotoDataUrl(photo)
-                ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\">"
-                : "";
-            const remove = hasPhoto
-                ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>"
-                : "";
-            return "<div class=\"photo-cell\"><div class=\"photo-drop\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" aria-label=\"" + (hasPhoto ? "Websitefoto bekijken" : "Websitefoto toevoegen") + "\">" + inner + remove + "</div></div>";
+            return webdesignActionController.render(customer);
         }
 
         function renderTable() {
@@ -2821,66 +2814,21 @@
             throw lastError || new Error("AI-foto genereren is mislukt voor " + customer.bedrijf + ".");
         }
 
-        async function generateWebdesignPhotos(limit) {
-            closeAddActions();
+        async function generateWebdesignPhotos(limit, options) {
+            const progressSilent = Boolean(options && options.silentProgress); closeAddActions();
             nodes.generatePhotosButton.disabled = true;
-            const targets = getWebdesignPhotoTargets(limit);
+            const targets = Array.isArray(limit) ? limit : getWebdesignPhotoTargets(limit);
             try {
                 if (!targets.length) {
-                    setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
+                    if (!progressSilent) setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
                     return;
                 }
-
-                let done = 0;
-                let failed = 0;
-                let apiCostEur = 0;
-                let apiCostUsd = 0;
-                let firstErrorMessage = "";
-                setStatusMessage("Webdesign foto's genereren voor " + targets.length + " bedrijf" + (targets.length === 1 ? "" : "ven") + "...", "info");
-
-                for (const target of targets) {
-                    try {
-                        setStatusMessage("Webdesign maken voor " + target.bedrijf + " (" + (done + failed + 1) + "/" + targets.length + ")...", "info");
-                        const generated = await generateWebsitePhotoData(target);
-                        apiCostEur += Math.max(0, Number(generated.costEur) || 0);
-                        apiCostUsd += Math.max(0, Number(generated.costUsd) || 0);
-                        state.klanten = sortCustomers(state.klanten.map(function (customer) {
-                            if (customer.id !== target.id) return customer;
-                            return {
-                                ...customer,
-                                websitePhoto: generated.dataUrl,
-                                websitePhotoName: generated.fileName,
-                                updatedAt: formatDateForStorage(new Date())
-                            };
-                        }));
-                        renderPage();
-                        const photoResult = await persistCustomerPhotos(state.klanten, { onlyCustomerIds: [target.id] });
-                        if (!photoResult.ok) throw new Error("Webdesign gemaakt, maar opslaan in Supabase mislukte.");
-                        done += 1;
-                    } catch (error) {
-                        failed += 1;
-                        if (!firstErrorMessage) {
-                            firstErrorMessage = normalizeString(error && error.message);
-                        }
-                        console.error("Webdesign foto genereren mislukt:", error);
-                    }
-                }
-
-                if (!done) {
-                    setStatusMessage("Geen AI-foto's opgeslagen: " + (firstErrorMessage || "controleer of de websites bereikbaar zijn."), "error");
-                    return;
-                }
-
-                void recordApiCostEvent({
-                    source: "premium-database-webdesigns",
-                    label: done + " webdesign" + (done === 1 ? "" : "s") + " gemaakt",
-                    amountEur: apiCostEur,
-                    amountUsd: apiCostUsd,
-                    meta: { count: done }
-                });
-
-                toast(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen");
-                setStatusMessage(done + " AI-foto" + (done === 1 ? "" : "'s") + " opgeslagen" + (failed ? ", " + failed + " mislukt." : "."), failed ? "info" : "success", true);
+                setStatusMessage("");
+                const results = await Promise.allSettled(targets.map(function (target) {
+                    return webdesignActionController.generateForCustomer(target.id);
+                }));
+                const failed = results.filter(function (result) { return result.status === "rejected"; }).length;
+                if (!progressSilent) toast((targets.length - failed) + " webdesign" + (targets.length - failed === 1 ? "" : "s") + " gestart");
             } finally {
                 nodes.generatePhotosButton.disabled = false;
             }
@@ -3307,8 +3255,7 @@
                 if (openWebsitePhotoPreview(state.photoTargetId)) {
                     return;
                 }
-                nodes.photoFileInput.value = "";
-                nodes.photoFileInput.click();
+                void webdesignActionController.generateForCustomer(state.photoTargetId);
                 return;
             }
             const row = event.target.closest("tr[data-id]");
@@ -3397,7 +3344,7 @@
 
         void (async function () {
             try {
-                await bootstrapCustomers();
+                await bootstrapCustomers(); webdesignActionController.resumePendingJobs();
                 void databaseImportController.startAutoSync();
             } finally {
                 if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === "function") {

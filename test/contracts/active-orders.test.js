@@ -126,13 +126,13 @@ test('active orders coordinator generates a site and emits dashboard activity', 
 
 test('active orders coordinator wraps generation failures in a stable error payload', async () => {
   const { coordinator } = createFixture({
-    websiteGenerationProvider: 'anthropic',
+    websiteGenerationProvider: 'openai',
     generateWebsiteHtmlWithAi: async () => {
       const error = new Error('Provider tijdelijk offline');
       error.status = 503;
       error.data = {
         error: {
-          detail: 'Anthropic quota bereikt',
+          detail: 'OpenAI quota bereikt',
         },
       };
       throw error;
@@ -152,9 +152,9 @@ test('active orders coordinator wraps generation failures in a stable error payl
   assert.equal(res.statusCode, 503);
   assert.equal(res.body.ok, false);
   assert.equal(res.body.error, 'AI website generatie niet beschikbaar');
-  assert.equal(res.body.websiteGenerationProvider, 'anthropic');
-  assert.equal(res.body.websiteGenerationModel, 'claude-opus-4-6');
-  assert.equal(res.body.upstreamDetail, 'Anthropic quota bereikt');
+  assert.equal(res.body.websiteGenerationProvider, 'openai');
+  assert.equal(res.body.websiteGenerationModel, 'gpt-4o-mini');
+  assert.equal(res.body.upstreamDetail, 'OpenAI quota bereikt');
 });
 
 test('active orders coordinator rejects launch requests without html', async () => {

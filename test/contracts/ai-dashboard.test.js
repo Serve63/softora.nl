@@ -245,14 +245,9 @@ function createFixture(overrides = {}) {
       return {
         response: { ok: true, status: 200 },
         data: {
-          content: [
-            {
-              type: 'text',
-              text: 'Er zijn nu 2 klanten en 2 opdrachten actief.',
-            },
-          ],
-          model: 'claude-sonnet-4-6',
-          usage: { input_tokens: 111, output_tokens: 42 },
+          choices: [{ message: { content: 'Er zijn nu 2 klanten en 2 opdrachten actief.' } }],
+          model: 'gpt-5.1-mini',
+          usage: { prompt_tokens: 111, completion_tokens: 42 },
         },
       };
     }),
@@ -371,7 +366,7 @@ test('ai dashboard coordinator builds dashboard context totals from runtime stat
   assert.equal(context.aiCallInsights.followUpsRequired, 1);
 });
 
-test('ai dashboard coordinator calls Anthropic Sonnet with normalized question, history and context', async () => {
+test('ai dashboard coordinator calls OpenAI with normalized question, history and context', async () => {
   const { coordinator, fetchCalls } = createFixture();
 
   const result = await coordinator.generatePremiumDashboardChatReplyWithAi({
@@ -388,25 +383,23 @@ test('ai dashboard coordinator calls Anthropic Sonnet with normalized question, 
   });
 
   assert.equal(result.answer, 'Er zijn nu 2 klanten en 2 opdrachten actief.');
-  assert.equal(result.provider, 'anthropic');
-  assert.equal(result.model, 'claude-sonnet-4-6');
+  assert.equal(result.provider, 'openai');
+  assert.equal(result.model, 'gpt-5.1-mini');
   assert.equal(fetchCalls.length, 1);
 
   const requestBody = JSON.parse(fetchCalls[0].options.body);
-  assert.equal(fetchCalls[0].url, 'https://api.anthropic.test/v1/messages');
-  assert.equal(fetchCalls[0].options.headers['x-api-key'], 'anthropic-key');
-  assert.equal(fetchCalls[0].options.headers['anthropic-version'], '2023-06-01');
-  assert.equal(requestBody.model, 'claude-sonnet-4-6');
-  assert.equal(requestBody.max_tokens, 4096);
-  assert.match(requestBody.system, /Ruben Nijhuis/);
-  assert.match(requestBody.system, /RUBEN_ASSISTANT_CONTEXT_JSON/);
-  assert.match(requestBody.system, /DASHBOARD_CONTEXT_JSON/);
+  assert.equal(fetchCalls[0].url, 'https://api.openai.test/v1/chat/completions');
+  assert.equal(fetchCalls[0].options.headers.Authorization, 'Bearer openai-key');
+  assert.equal(requestBody.model, 'gpt-5.1-mini');
+  assert.match(requestBody.messages[0].content, /Ruben Nijhuis/);
+  assert.match(requestBody.messages[0].content, /RUBEN_ASSISTANT_CONTEXT_JSON/);
+  assert.match(requestBody.messages[0].content, /DASHBOARD_CONTEXT_JSON/);
   assert.equal(requestBody.messages.at(-1).content, 'Hoeveel klanten hebben we?');
 });
 
-test('ai dashboard coordinator reports missing Anthropic config and empty upstream replies safely', async () => {
+test('ai dashboard coordinator reports missing OpenAI config and empty upstream replies safely', async () => {
   const missingKeyFixture = createFixture({
-    anthropicApiKey: '',
+    openAiApiKey: '',
   });
 
   await assert.rejects(
@@ -415,14 +408,14 @@ test('ai dashboard coordinator reports missing Anthropic config and empty upstre
         question: 'Hoeveel klanten?',
         context: {},
       }),
-    (error) => error?.status === 503 && /ANTHROPIC_API_KEY/.test(error.message)
+    (error) => error?.status === 503 && /OPENAI_API_KEY/.test(error.message)
   );
 
   const emptyAnswerFixture = createFixture({
     fetchJsonWithTimeout: async () => ({
       response: { ok: true, status: 200 },
       data: {
-        content: [{ type: 'text', text: '' }],
+        choices: [{ message: { content: '' } }],
       },
     }),
   });
@@ -473,9 +466,9 @@ test('ai dashboard coordinator validates dashboard chat input and returns stable
   assert.equal(typeof successRes.body.answer, 'string');
   assert.equal(successRes.body.contextMeta.totals.totaalKlanten, 2);
   assert.equal(successRes.body.assistant.name, 'Ruben Nijhuis');
-  assert.equal(successRes.body.provider, 'anthropic');
-  assert.equal(successRes.body.model, 'claude-sonnet-4-6');
-  assert.equal(successRes.body.anthropicEnabled, true);
+  assert.equal(successRes.body.provider, 'openai');
+  assert.equal(successRes.body.model, 'gpt-5.1-mini');
+  assert.equal(successRes.body.anthropicEnabled, false);
   assert.equal(runtimeReadyCalls.length, 3);
 });
 

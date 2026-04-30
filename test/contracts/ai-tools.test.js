@@ -58,15 +58,15 @@ function createFixture(overrides = {}) {
       overrides.generateDynamicOrderDossierWithAnthropic ||
       (async (input) => ({
         layout: { blocks: [{ type: 'hero', title: input.title || 'Dossier' }] },
-        source: 'anthropic',
-        model: 'claude-opus-4-6',
+        source: 'openai',
+        model: 'gpt-5.5-pro',
         usage: { inputTokens: 100 },
       })),
     buildOrderDossierFallbackLayout: overrides.buildOrderDossierFallbackLayout || ((input) => ({
       blocks: [{ type: 'fallback', title: input.title || 'Fallback dossier' }],
     })),
-    getAnthropicApiKey: () => overrides.anthropicApiKey || 'anthropic-key',
-    getDossierAnthropicModel: () => overrides.getDossierAnthropicModel || 'claude-opus-4-6',
+    getAnthropicApiKey: () => '',
+    getDossierAnthropicModel: () => '',
     generateWebsitePromptFromTranscriptWithAi:
       overrides.generateWebsitePromptFromTranscriptWithAi ||
       (async ({ transcript, language }) => ({
@@ -197,7 +197,7 @@ test('ai tools coordinator lets premium database previews generate with gpt-imag
   assert.match(generatedScans[0].bodyTextSample, /Growingbyknowing/);
 });
 
-test('ai tools coordinator validates dossier input and falls back safely on anthropic errors', async () => {
+test('ai tools coordinator validates dossier input and falls back safely on OpenAI errors', async () => {
   const invalidRes = createResponseRecorder();
   const invalidFixture = createFixture();
 
@@ -208,7 +208,7 @@ test('ai tools coordinator validates dossier input and falls back safely on anth
 
   const fallbackFixture = createFixture({
     generateDynamicOrderDossierWithAnthropic: async () => {
-      const error = new Error('Claude tijdelijk offline');
+      const error = new Error('OpenAI tijdelijk offline');
       error.status = 503;
       throw error;
     },

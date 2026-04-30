@@ -105,12 +105,12 @@ function createService(overrides = {}) {
     }),
     createImapClient: overrides.createImapClient,
     parseMailSource: overrides.parseMailSource,
-    getAnthropicApiKey: () => overrides.anthropicApiKey || '',
+    getOpenAiApiKey: () => overrides.openAiApiKey || '',
     fetchJsonWithTimeout: overrides.fetchJsonWithTimeout,
-    extractAnthropicTextContent: (content) =>
+    extractOpenAiTextContent: (content) =>
       Array.isArray(content) ? content.map((item) => item.text || '').join('\n') : String(content || ''),
-    anthropicApiBaseUrl: 'https://anthropic.example.test/v1',
-    coldmailAutoReplyModel: 'claude-sonnet-4-6',
+    openAiApiBaseUrl: 'https://api.openai.test/v1',
+    coldmailAutoReplyModel: 'gpt-5.5-pro',
     coldmailAutoReplyEnabled: Boolean(overrides.coldmailAutoReplyEnabled),
     resolveEmailDomain: async (domain) => {
       if (overrides.invalidDomains && overrides.invalidDomains.includes(domain)) return false;
@@ -164,6 +164,36 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[0].coldmailCampaignDurationDays, 14);
   assert.equal(savedRows[0].activeColdmailCampaignUntil, '2026-05-08T12:00:00.000Z');
   assert.equal(savedRows[1].status, 'klant');
+});
+
+test('coldmail campaign replaces city variable with the recipient database location', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        stad: 'Dorpsstraat 1, 5061 AA Oisterwijk',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}\n\n📍 {{stad}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: '',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].text, /📍 Oisterwijk/);
+  assert.doesNotMatch(sentMessages[0].text, /\{\{stad\}\}/);
+  assert.doesNotMatch(sentMessages[0].text, /Haaren/);
 });
 
 test('coldmail campaign attaches webdesign photo inline and as attachment', async () => {
@@ -308,7 +338,7 @@ test('coldmail campaign sends test recipient without marking database row as mai
   assert.equal(getSavedState(), null);
 });
 
-test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', async () => {
+test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', async () => {
   const parsedInbound = {
     messageId: '<incoming-1@example.test>',
     subject: 'Re: Nieuw webdesign gemaakt!',
@@ -323,7 +353,7 @@ test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', asy
     imapHost: 'imap.example.test',
     imapUser: 'serve@softora.nl',
     imapPass: 'secret',
-    anthropicApiKey: 'anthropic-secret',
+    openAiApiKey: 'openai-secret',
     coldmailAutoReplyEnabled: true,
     rows: [
       {
@@ -353,7 +383,7 @@ test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', asy
         response: { ok: true, status: 200 },
         data: {
           model: requestedModel,
-          content: [{ type: 'text', text: 'Hoi, leuk dat je reageert. Zullen we kort bellen?' }],
+          choices: [{ message: { content: 'Hoi, leuk dat je reageert. Zullen we kort bellen?' } }],
           usage: { input_tokens: 10, output_tokens: 12 },
         },
       };
@@ -363,7 +393,7 @@ test('coldmail auto-reply answers inbound campaign replies with Sonnet 4.6', asy
   const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
 
   assert.equal(result.replied, 1);
-  assert.equal(requestedModel, 'claude-sonnet-4-6');
+  assert.equal(requestedModel, 'gpt-5.5-pro');
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');
@@ -497,6 +527,45 @@ test('coldcalling recipient preview selects callable phone rows', async () => {
       bedrijf: 'Belbare Lead',
       email: '',
       phone: '+31622223333',
+      distanceKm: null,
+    },
+  ]);
+});
+
+test('coldcalling recipient preview skips phone numbers from the blocklist', async () => {
+  const { service } = createService({
+    rows: [],
+    leadRows: [
+      {
+        id: 'blocked-1',
+        company: 'Niet Bellen BV',
+        phone: '+31 6 22 22 33 33',
+        status: 'prospect',
+      },
+      {
+        id: 'callable-1',
+        company: 'Wel Bellen BV',
+        phone: '+31 6 44 44 55 55',
+        status: 'prospect',
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    mode: 'call',
+    blockedPhones: '06 22 22 33 33',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.mode, 'call');
+  assert.equal(result.selected, 1);
+  assert.deepEqual(result.recipients, [
+    {
+      id: 'callable-1',
+      bedrijf: 'Wel Bellen BV',
+      email: '',
+      phone: '+31 6 44 44 55 55',
       distanceKm: null,
     },
   ]);

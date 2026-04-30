@@ -117,6 +117,20 @@ test('page smoke: premium-website.html handles missing cursor elements safely', 
   );
 });
 
+test('page smoke: premium-pakketten.html shows the current Premium package price', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-pakketten.html'), 'utf8');
+  assert.match(
+    html,
+    /<div class="card-name">Premium<\/div>[^]*?<div class="price-amount">€2\.495/,
+    'Premium websitepakket hoort op €2.495 te staan.'
+  );
+  assert.match(
+    html,
+    /<div class="card-name">Flow<\/div>[^]*?<div class="price-amount">€2\.999/,
+    'Flow pakketprijs hoort niet mee te wijzigen met het websitepakket.'
+  );
+});
+
 test('page smoke: premium-website.html keeps mobile werkwijze background white', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
   assert.match(html, /\.ios-statusbar-fill/, 'iOS statusbar-fill klasse ontbreekt.');

@@ -130,6 +130,43 @@ test('agenda confirmation persistence helpers accept pending shared persistence 
   assert.equal(res.statusCode, null);
 });
 
+test('agenda confirmation persistence helpers can accept local verification after a fast shared persist failure', async () => {
+  let invalidated = 0;
+  let syncCalls = 0;
+  const res = createResponseRecorder();
+  const helpers = createAgendaConfirmationPersistenceHelpers({
+    isSupabaseConfigured: () => true,
+    waitForQueuedRuntimeSnapshotPersist: async () => false,
+    syncRuntimeStateFromSupabaseIfNewer: async () => {
+      syncCalls += 1;
+      return false;
+    },
+    applyRuntimeStateSnapshotPayload: () => false,
+    invalidateSupabaseSyncTimestamp: () => {
+      invalidated += 1;
+    },
+    normalizeString,
+    normalizeDateYyyyMmDd,
+    normalizeTimeHhMm,
+  });
+
+  const result = await helpers.ensureLeadMutationPersistedOrRespond(
+    res,
+    { savedAt: '2026-04-01T10:00:00.000Z' },
+    'Lead kon niet veilig in gedeelde opslag worden gezet.',
+    {
+      allowPendingResponse: true,
+      allowLocalVerifiedPending: true,
+      verifyPersisted: () => true,
+    }
+  );
+
+  assert.equal(result, 'pending');
+  assert.equal(invalidated, 1);
+  assert.equal(syncCalls, 0);
+  assert.equal(res.statusCode, null);
+});
+
 test('agenda confirmation persistence helpers restore the snapshot and respond 503 when shared persistence fails', async () => {
   const applySnapshotCalls = [];
   const res = createResponseRecorder();

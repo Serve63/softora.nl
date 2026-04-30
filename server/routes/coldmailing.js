@@ -31,6 +31,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         branch: req.query.branch,
         mode: req.query.mode,
         radiusKm: req.query.radiusKm,
+        blockedPhones: req.query.blockedPhones,
       });
       res.json(result);
     } catch (error) {
@@ -59,6 +60,8 @@ function registerColdmailingRoutes(app, deps = {}) {
         specialAction: body.specialAction,
         durationDays: body.durationDays,
         radiusKm: body.radiusKm,
+        mode: body.mode,
+        blockedPhones: body.blockedPhones || body.callBlocklist,
         actor:
           normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
           'Coldmailing',
@@ -108,7 +111,7 @@ function registerColdmailingRoutes(app, deps = {}) {
       res.json(result);
     } catch (error) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_REPLY_SYNC_FAILED';
-      res.status(code === 'ANTHROPIC_NOT_CONFIGURED' ? 503 : 400).json({
+      res.status(code === 'OPENAI_NOT_CONFIGURED' ? 503 : 400).json({
         ok: false,
         code,
         message: truncateText(

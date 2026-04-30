@@ -97,11 +97,11 @@ function createColdmailCampaignService(deps = {}) {
     createImapClient = (config) => new ImapFlow(config),
     parseMailSource = (source) => simpleParser(source),
     resolveEmailDomain = resolveEmailDomainWithDns,
-    getAnthropicApiKey = () => '',
+    getOpenAiApiKey = () => '',
     fetchJsonWithTimeout = async () => ({ response: { ok: false, status: 500 }, data: null }),
-    extractAnthropicTextContent = null,
-    anthropicApiBaseUrl = 'https://api.anthropic.com/v1',
-    coldmailAutoReplyModel = 'claude-sonnet-4-6',
+    extractOpenAiTextContent = null,
+    openAiApiBaseUrl = 'https://api.openai.com/v1',
+    coldmailAutoReplyModel = 'gpt-5.5-pro',
     coldmailAutoReplyEnabled = false,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
@@ -270,6 +270,82 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeString(row.naam || row.contact || row.contactName || row.clientName) || getRowCompany(row);
   }
 
+  function cleanPlaceLabel(value) {
+    return normalizeString(value)
+      .replace(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b/g, '')
+      .replace(/\b(Nederland|The Netherlands)\b/gi, '')
+      .replace(/^[\s,.;-]+|[\s,.;-]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function looksLikeStreetAddress(value) {
+    const text = normalizeString(value).toLowerCase();
+    return /\d/.test(text) && /(straat|weg|laan|plein|pad|dijk|hof|kade|markt|singel|steeg|gracht|boulevard|baan|akker|plantsoen|park)\b/.test(text);
+  }
+
+  function formatKnownPlaceKey(value) {
+    return normalizeString(value)
+      .split(/\s+/)
+      .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : ''))
+      .join(' ')
+      .replace(/^S Hertogenbosch$/, "'s-Hertogenbosch");
+  }
+
+  function findKnownPlaceLabel(value) {
+    const haystack = normalizePlaceKey(value);
+    if (!haystack) return '';
+    const placeKey = Object.keys(campaignPlaceCoords)
+      .sort((left, right) => right.length - left.length)
+      .find((key) => haystack.includes(normalizePlaceKey(key)));
+    return placeKey ? formatKnownPlaceKey(placeKey) : '';
+  }
+
+  function extractPlaceFromAddress(value) {
+    const text = normalizeString(value)
+      .replace(/\s+/g, ' ')
+      .replace(/\s*,\s*/g, ', ')
+      .trim();
+    if (!text) return '';
+
+    const postalMatch = text.match(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b\s+([A-Za-zÀ-ÿ'’.\- ]{2,})$/);
+    if (postalMatch) return cleanPlaceLabel(postalMatch[1]);
+
+    const parts = text.split(/[,\n;|]/).map(cleanPlaceLabel).filter(Boolean);
+    for (let index = parts.length - 1; index >= 0; index -= 1) {
+      const candidate = parts[index];
+      if (!candidate || looksLikeStreetAddress(candidate)) continue;
+      if (/^\d+$/.test(candidate)) continue;
+      return candidate;
+    }
+
+    return looksLikeStreetAddress(text) ? findKnownPlaceLabel(text) : cleanPlaceLabel(text);
+  }
+
+  function getRowCity(row) {
+    const explicit = [
+      row && row.plaats,
+      row && row.city,
+      row && row.gemeente,
+      row && row.locality,
+      row && row.town,
+      row && row.village,
+    ]
+      .map(cleanPlaceLabel)
+      .find(Boolean);
+    if (explicit) return explicit;
+
+    const addressLikeValue = [
+      row && row.stad,
+      row && row.adres,
+      row && row.address,
+      row && row.location,
+    ]
+      .map(extractPlaceFromAddress)
+      .find(Boolean);
+    return addressLikeValue || '';
+  }
+
   function getRowDomain(row) {
     return normalizeString(row.dom || row.domain || row.website || '');
   }
@@ -296,6 +372,49 @@ function createColdmailCampaignService(deps = {}) {
         ''
     );
     return value === '—' || value === '-' ? '' : value;
+  }
+
+  function normalizePhoneDigits(value) {
+    return normalizeString(value).replace(/[^\d]/g, '');
+  }
+
+  function getComparablePhoneKeys(value) {
+    const digits = normalizePhoneDigits(value);
+    const keys = new Set();
+    if (!digits) return keys;
+    keys.add(digits);
+    const withoutInternationalPrefix = digits.startsWith('00') ? digits.slice(2) : digits;
+    if (withoutInternationalPrefix) keys.add(withoutInternationalPrefix);
+    if (withoutInternationalPrefix.startsWith('31') && withoutInternationalPrefix.length > 2) {
+      keys.add(`0${withoutInternationalPrefix.slice(2)}`);
+    }
+    if (withoutInternationalPrefix.startsWith('0') && withoutInternationalPrefix.length > 1) {
+      keys.add(`31${withoutInternationalPrefix.slice(1)}`);
+    }
+    if (withoutInternationalPrefix.length === 9 && withoutInternationalPrefix.startsWith('6')) {
+      keys.add(`0${withoutInternationalPrefix}`);
+      keys.add(`31${withoutInternationalPrefix}`);
+    }
+    return keys;
+  }
+
+  function parseBlockedPhoneList(value) {
+    const entries = Array.isArray(value)
+      ? value
+      : normalizeString(value).split(/[\n,;|]+/);
+    const keys = new Set();
+    entries.forEach((entry) => {
+      getComparablePhoneKeys(entry).forEach((key) => keys.add(key));
+    });
+    return keys;
+  }
+
+  function isPhoneBlocked(phone, blockedPhoneKeys) {
+    if (!blockedPhoneKeys || !blockedPhoneKeys.size) return false;
+    for (const key of getComparablePhoneKeys(phone)) {
+      if (blockedPhoneKeys.has(key)) return true;
+    }
+    return false;
   }
 
   function isLikelyCallablePhone(value) {
@@ -432,9 +551,9 @@ function createColdmailCampaignService(deps = {}) {
     return candidates.length === 1 ? candidates[0] : null;
   }
 
-  function extractAnthropicReplyText(content) {
-    if (typeof extractAnthropicTextContent === 'function') {
-      return normalizeString(extractAnthropicTextContent(content));
+  function extractOpenAiReplyText(content) {
+    if (typeof extractOpenAiTextContent === 'function') {
+      return normalizeString(extractOpenAiTextContent(content));
     }
     if (typeof content === 'string') return normalizeString(content);
     if (!Array.isArray(content)) return '';
@@ -719,8 +838,10 @@ function createColdmailCampaignService(deps = {}) {
     return !EXCLUDED_DATABASE_STATUSES.has(status);
   }
 
-  function isEligibleColdcallingRow(row, branchFilter, radiusKm) {
-    if (!isLikelyCallablePhone(getRowPhone(row))) return false;
+  function isEligibleColdcallingRow(row, branchFilter, radiusKm, blockedPhoneKeys) {
+    const phone = getRowPhone(row);
+    if (!isLikelyCallablePhone(phone)) return false;
+    if (isPhoneBlocked(phone, blockedPhoneKeys)) return false;
     if (row.call === false || row.canCall === false || row.doNotCall === true) return false;
     if (!matchesBranch(row, branchFilter)) return false;
     if (!matchesRadius(row, radiusKm)) return false;
@@ -742,6 +863,9 @@ function createColdmailCampaignService(deps = {}) {
   async function resolveColdmailRecipients(input = {}) {
     const mode = normalizeString(input.mode || '').toLowerCase() === 'call' ? 'call' : 'mail';
     const count = parsePositiveInt(input.count, 10, 1, mode === 'call' ? 500 : getColdmailCampaignSendLimit());
+    const blockedPhoneKeys = mode === 'call'
+      ? parseBlockedPhoneList(input.blockedPhones || input.callBlocklist || input.blockedPhoneNumbers)
+      : new Set();
     const state = await getUiStateValues(mode === 'call' ? leadDbScope : customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = mode === 'call' ? parseLeadDatabaseRows(values) : parseDatabaseRows(values);
@@ -749,7 +873,7 @@ function createColdmailCampaignService(deps = {}) {
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
       .filter(({ row }) =>
         mode === 'call'
-          ? isEligibleColdcallingRow(row, input.branch, input.radiusKm)
+          ? isEligibleColdcallingRow(row, input.branch, input.radiusKm, blockedPhoneKeys)
           : isEligibleColdmailRow(row, input.branch, input.radiusKm)
       )
       .slice(0, count);
@@ -820,9 +944,11 @@ function createColdmailCampaignService(deps = {}) {
     const company = getRowCompany(row) || 'uw bedrijf';
     const contact = getRowContact(row) || company;
     const domain = getRowDomain(row);
+    const city = getRowCity(row) || 'uw regio';
     return normalizeString(template)
       .replace(/\{\{\s*bedrijf\s*\}\}/gi, company)
       .replace(/\{\{\s*naam\s*\}\}/gi, contact)
+      .replace(/\{\{\s*(stad|plaats|locatie)\s*\}\}/gi, city)
       .replace(/\{\{\s*domein\s*\}\}/gi, domain || company)
       .replace(/\{\{\s*website\s*\}\}/gi, domain || company);
   }
@@ -973,15 +1099,15 @@ function createColdmailCampaignService(deps = {}) {
       .join('|');
   }
 
-  async function generateColdmailAutoReplyWithAnthropic({ row, inboundText, inboundSubject, fromName }) {
-    const apiKey = getAnthropicApiKey();
+  async function generateColdmailAutoReplyWithOpenAi({ row, inboundText, inboundSubject, fromName }) {
+    const apiKey = getOpenAiApiKey();
     if (!apiKey) {
-      const error = new Error('ANTHROPIC_API_KEY ontbreekt');
-      error.code = 'ANTHROPIC_NOT_CONFIGURED';
+      const error = new Error('OPENAI_API_KEY ontbreekt');
+      error.code = 'OPENAI_NOT_CONFIGURED';
       error.status = 503;
       throw error;
     }
-    const model = normalizeString(coldmailAutoReplyModel) || 'claude-sonnet-4-6';
+    const model = normalizeString(coldmailAutoReplyModel) || 'gpt-5.5-pro';
     const company = getRowCompany(row);
     const contact = getRowContact(row);
     const website = getRowDomain(row);
@@ -1014,34 +1140,34 @@ function createColdmailCampaignService(deps = {}) {
       },
     };
     const { response, data } = await fetchJsonWithTimeout(
-      `${anthropicApiBaseUrl}/messages`,
+      `${openAiApiBaseUrl}/chat/completions`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model,
-          max_tokens: 1200,
           temperature: 0.35,
-          system,
-          messages: [{ role: 'user', content: JSON.stringify(payload) }],
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: JSON.stringify(payload) },
+          ],
         }),
       },
       65000
     );
     if (!response.ok) {
-      const error = new Error(`Anthropic coldmail auto-reply mislukt (${response.status})`);
-      error.code = 'ANTHROPIC_AUTO_REPLY_FAILED';
+      const error = new Error(`OpenAI coldmail auto-reply mislukt (${response.status})`);
+      error.code = 'OPENAI_AUTO_REPLY_FAILED';
       error.status = response.status;
       error.data = data;
       throw error;
     }
-    const reply = truncateText(extractAnthropicReplyText(data && data.content), 6000);
+    const reply = truncateText(extractOpenAiReplyText(data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content), 6000);
     if (!reply) {
-      const error = new Error('Anthropic gaf een lege auto-reply terug.');
+      const error = new Error('OpenAI gaf een lege auto-reply terug.');
       error.code = 'EMPTY_AI_REPLY';
       error.status = 502;
       throw error;
@@ -1380,7 +1506,7 @@ function createColdmailCampaignService(deps = {}) {
       const stats = {
         ok: true,
         startedAt: now().toISOString(),
-        model: normalizeString(coldmailAutoReplyModel) || 'claude-sonnet-4-6',
+        model: normalizeString(coldmailAutoReplyModel) || 'gpt-5.5-pro',
         mailboxes: getImapMailboxesForSync(),
         scanned: 0,
         matched: 0,
@@ -1455,7 +1581,7 @@ function createColdmailCampaignService(deps = {}) {
               const from = getParsedMailFromEmail(parsedMail);
               try {
                 const senderEmail = resolveInboundSenderEmail(parsedMail);
-                const aiReply = await generateColdmailAutoReplyWithAnthropic({
+                const aiReply = await generateColdmailAutoReplyWithOpenAi({
                   row: match.row,
                   inboundText,
                   inboundSubject: normalizeString(parsedMail && parsedMail.subject),

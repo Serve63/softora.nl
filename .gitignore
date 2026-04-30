@@ -6,5 +6,11 @@ node_modules/
 output/
 backups/*.json
 
+# Xcode local state
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+
 # Cursor local debug output
 .cursor/*.log

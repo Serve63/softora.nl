@@ -202,6 +202,8 @@ function buildFeatureRoutesOptions({
   websiteLinkCoordinator,
   websitePreviewLibraryCoordinator,
   websitePreviewBatchCoordinator,
+  premiumDatabaseWebdesignJobsCoordinator,
+  openAiCostSummary,
   mailboxCoordinator,
   activeOrdersCoordinator,
   runtimeOpsCoordinator,
@@ -209,6 +211,8 @@ function buildFeatureRoutesOptions({
   requireRuntimeDebugAccess,
   seoReadCoordinator,
   seoWriteCoordinator,
+  getUiStateValues,
+  setUiStateValues,
 }) {
   return {
     handleTwilioInboundVoice,
@@ -222,6 +226,8 @@ function buildFeatureRoutesOptions({
     websiteLinkCoordinator,
     websitePreviewLibraryCoordinator,
     websitePreviewBatchCoordinator,
+    premiumDatabaseWebdesignJobsCoordinator,
+    openAiCostSummary,
     mailboxCoordinator,
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
@@ -229,6 +235,8 @@ function buildFeatureRoutesOptions({
     requireRuntimeDebugAccess,
     seoReadCoordinator,
     seoWriteCoordinator,
+    getUiStateValues,
+    setUiStateValues,
   };
 }
 

@@ -10,6 +10,9 @@ test('premium dashboard core exposes stable pure helpers', () => {
   assert.equal(dashboardCore.normalizeDashboardTime('09:30'), '09:30');
   assert.equal(dashboardCore.normalizeDashboardTime('', '08:00'), '08:00');
   assert.equal(dashboardCore.normalizeDashboardDate('2026-04-28'), '2026-04-28');
+  assert.equal(typeof dashboardCore.fetchPremiumDashboardJson, 'function');
+  assert.equal(typeof dashboardCore.releasePremiumDashboardBootShell, 'function');
+  assert.equal(typeof dashboardCore.startPremiumDashboardBootWatchdog, 'function');
 });
 
 test('premium dashboard core reads chunked customer state values safely', () => {

@@ -2,11 +2,13 @@
   'use strict';
 
   const COST_SUMMARY_ENDPOINT = '/api/coldcalling/cost-summary?scope=month';
+  const API_COST_SUMMARY_ENDPOINT = '/api/api-cost-summary?scope=month';
   const API_COST_SCOPE = 'premium_api_costs';
   const API_COST_KEY = 'softora_api_cost_events_v1';
   const POLL_INTERVAL_MS = 15000;
   const COLDCALLING_ESTIMATE_NOTE = 'Geschatte maandkosten, Retell kan hoger uitvallen';
-  const API_COST_NOTE = 'Werkelijke API-kosten deze maand';
+  const API_COST_NOTE = 'OpenAI factuurkosten deze maand';
+  const API_COST_UNAVAILABLE_NOTE = 'API factuurkoppeling ontbreekt';
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
 
@@ -259,18 +261,19 @@
     return true;
   }
 
-  function applyApiCost(amountEur) {
+  function applyApiCost(amountEur, note) {
     const item = resolveApiCostItem();
     const render = getMonthlyCostsRender();
     if (!item || !render) return false;
 
     const nextAmount = Math.max(0, Math.round((Number(amountEur) || 0) * 100) / 100);
+    const nextNote = normalizeString(note) || API_COST_NOTE;
     const amountChanged = Number(item.bedrag || 0) !== nextAmount;
-    const noteChanged = normalizeString(item.note) !== API_COST_NOTE;
+    const noteChanged = normalizeString(item.note) !== nextNote;
     if (!amountChanged && !noteChanged) return false;
 
     item.bedrag = nextAmount;
-    item.note = API_COST_NOTE;
+    item.note = nextNote;
     render();
     return true;
   }
@@ -299,6 +302,37 @@
     });
     if (!response.ok || !data || data.ok !== true || !data.summary || typeof data.summary !== 'object') {
       throw new Error(String((data && (data.error || data.detail)) || 'Coldcalling-kosten konden niet geladen worden.'));
+    }
+    return data.summary;
+  }
+
+  function buildApiCostNote(summary) {
+    const missing = Array.isArray(summary && summary.unavailable)
+      ? summary.unavailable.map(function (item) {
+          return normalizeString(item && item.provider);
+        }).filter(Boolean)
+      : [];
+    const usd = Number(summary && summary.costUsd);
+    const eur = Number(summary && summary.costEur);
+    if (Number.isFinite(usd) && usd > 0 && Number.isFinite(eur) && eur > 0) {
+      return 'OpenAI factuur: $' + usd.toLocaleString('nl-NL', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }) + ' omgerekend naar euro';
+    }
+    return missing.length ? 'Onvolledig: mist ' + missing.join(', ') : API_COST_NOTE;
+  }
+
+  async function fetchApiCostSummary() {
+    const response = await fetch(API_COST_SUMMARY_ENDPOINT, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    const data = await response.json().catch(function () {
+      return {};
+    });
+    if (!response.ok || !data || data.ok !== true || !data.summary || typeof data.summary !== 'object') {
+      throw new Error(String((data && (data.detail || data.error)) || 'API-factuurkosten konden niet geladen worden.'));
     }
     return data.summary;
   }
@@ -332,11 +366,11 @@
       return { ok: true, updated: false };
     }
     try {
-      const state = await fetchUiState(API_COST_SCOPE);
-      const events = parseApiCostEvents(state && state.values && state.values[API_COST_KEY]);
-      const amountEur = buildCurrentMonthApiCostEur(events);
-      return { ok: true, updated: applyApiCost(amountEur), amountEur };
+      const summary = await fetchApiCostSummary();
+      const amountEur = Number(summary.costEur || 0) || 0;
+      return { ok: true, updated: applyApiCost(amountEur, buildApiCostNote(summary)), amountEur, source: 'api-costs' };
     } catch (error) {
+      applyApiCost(0, API_COST_UNAVAILABLE_NOTE);
       return {
         ok: false,
         error: normalizeString(error && error.message) || 'API-kosten konden niet geladen worden.',

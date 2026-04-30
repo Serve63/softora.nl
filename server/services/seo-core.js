@@ -34,20 +34,13 @@ function createSeoCore(deps = {}) {
     const raw = normalizeString(valueRaw || '')
       .toLowerCase()
       .replace(/[\s_]+/g, '-');
-    if (!raw) return 'gpt-5.5';
+    if (!raw) return 'gpt-5.5-pro';
+    if (raw === 'gpt-5.5-pro' || raw === 'gpt55pro' || raw === 'gpt-5-pro') return 'gpt-5.5-pro';
     if (raw === 'gpt-5.5' || raw === 'gpt55' || raw === 'gpt-5') return 'gpt-5.5';
     if (raw === 'gpt-5.1' || raw === 'gpt51') return 'gpt-5.1';
-    if (
-      raw === 'claude-opus-4.6' ||
-      raw === 'opus-4.6' ||
-      raw === 'opus46' ||
-      raw === 'claude-opus-46' ||
-      raw === 'claude-opus'
-    ) {
-      return 'claude-opus-4.6';
-    }
+    if (/^(claude|opus)/.test(raw)) return 'gpt-5.5-pro';
     if (raw === 'gpt-5-mini' || raw === 'gpt5mini') return 'gpt-5-mini';
-    return seoModelPresets.some((item) => item.value === raw) ? raw : 'gpt-5.5';
+    return seoModelPresets.some((item) => item.value === raw) ? raw : 'gpt-5.5-pro';
   }
 
   function normalizeSeoBlogCadence(valueRaw) {
@@ -65,10 +58,10 @@ function createSeoCore(deps = {}) {
 
   function getDefaultSeoAutomationSettings() {
     return {
-      preferredModel: 'gpt-5.5',
+      preferredModel: 'gpt-5.5-pro',
       blogAutomationEnabled: false,
       blogCadence: 'weekly',
-      blogModel: 'gpt-5.5',
+      blogModel: 'gpt-5.5-pro',
       blogAutoImages: true,
       searchConsoleConnected: false,
       analyticsConnected: false,

@@ -1368,19 +1368,46 @@ function createAiRemoteService(deps = {}) {
 
   async function generateDynamicOrderDossierWithAnthropic(options = {}) {
     const promptPack = buildAnthropicOrderDossierPrompts(options);
-    const model = normalizeString(options.model || getDossierAnthropicModel()) || 'claude-opus-4-6';
-    const data = await sendAnthropicMessage({
-      model,
-      systemPrompt: promptPack.systemPrompt,
-      userPrompt: promptPack.userPrompt,
-      maxTokens: getAnthropicDossierMaxTokens(),
-      stage: 'build',
-    });
+    const apiKey = getOpenAiApiKey();
+    if (!apiKey) {
+      const err = new Error('OPENAI_API_KEY ontbreekt');
+      err.status = 503;
+      throw err;
+    }
 
-    const rawText = normalizeString(extractAnthropicTextContent(data?.content));
+    const model = normalizeString(options.model || openAiModel) || 'gpt-5.5-pro';
+    const { response, data } = await fetchJsonWithTimeout(
+      `${openAiApiBaseUrl}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.2,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: promptPack.systemPrompt },
+            { role: 'user', content: promptPack.userPrompt },
+          ],
+        }),
+      },
+      websiteGenerationTimeoutMs
+    );
+
+    if (!response.ok) {
+      const err = new Error(`OpenAI dossier generatie mislukt (${response.status})`);
+      err.status = response.status;
+      err.data = data;
+      throw err;
+    }
+
+    const rawText = normalizeString(extractOpenAiTextContent(data?.choices?.[0]?.message?.content));
     const parsed = parseJsonLoose(rawText);
     if (!parsed || typeof parsed !== 'object') {
-      const err = new Error('Claude gaf geen geldig JSON-layout terug.');
+      const err = new Error('OpenAI gaf geen geldig JSON-layout terug.');
       err.status = 502;
       throw err;
     }
@@ -1388,105 +1415,21 @@ function createAiRemoteService(deps = {}) {
     const layout = normalizeOrderDossierLayout(parsed, promptPack.input);
     return {
       layout,
-      source: 'anthropic',
+      source: 'openai',
       model: normalizeString(data?.model || model) || model,
       usage: data?.usage || null,
     };
   }
 
   async function sendAnthropicMessage(options = {}) {
-    const apiKey = getAnthropicApiKey();
-    if (!apiKey) {
-      const err = new Error('ANTHROPIC_API_KEY ontbreekt');
-      err.status = 503;
-      throw err;
-    }
-
-    const systemPrompt = normalizeString(options.systemPrompt || '');
-    const userPrompt = normalizeString(options.userPrompt || '');
-    if (!systemPrompt || !userPrompt) {
-      const err = new Error('Anthropic prompt is onvolledig.');
-      err.status = 500;
-      throw err;
-    }
-
-    const maxTokens = Math.max(2000, Math.min(48000, Number(options.maxTokens || 12000) || 12000));
-    const model = normalizeString(options.model || getWebsiteAnthropicModel());
-    if (!model) {
-      const err = new Error('Anthropic model voor website generatie ontbreekt.');
-      err.status = 500;
-      throw err;
-    }
-    const effort = getAnthropicWebsiteStageEffort(options.stage || 'build');
-    const referenceImages = sanitizeReferenceImages(options.referenceImages || options.attachments || [], {
-      maxItems: 6,
-      maxBytesPerImage: 550 * 1024,
-      maxTotalBytes: 3 * 1024 * 1024,
-    });
-    const imageBlocks = referenceImages
-      .map((item) => {
-        const parsed = parseImageDataUrl(item?.dataUrl || '');
-        if (!parsed) return null;
-        return {
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: parsed.mimeType,
-            data: parsed.base64Payload,
-          },
-        };
-      })
-      .filter(Boolean);
-    const userContentBlocks = [...imageBlocks, { type: 'text', text: userPrompt }];
-
-    const basePayload = {
-      model,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: userContentBlocks,
-        },
-      ],
+    const err = new Error('Claude/Anthropic modellen zijn uitgeschakeld. Gebruik OpenAI.');
+    err.status = 410;
+    err.code = 'CLAUDE_MODELS_DISABLED';
+    err.data = {
+      provider: 'anthropic',
+      replacementProvider: 'openai',
     };
-
-    const enhancedPayload = supportsAnthropicAdaptiveThinking(model)
-      ? {
-          ...basePayload,
-          thinking: { type: 'adaptive' },
-          output_config: { effort },
-        }
-      : basePayload;
-
-    const sendRequest = async (payload) =>
-      fetchJsonWithTimeout(
-        `${anthropicApiBaseUrl}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': env.ANTHROPIC_API_VERSION || '2023-06-01',
-          },
-          body: JSON.stringify(payload),
-        },
-        websiteGenerationTimeoutMs
-      );
-
-    let result = await sendRequest(enhancedPayload);
-    if (!result.response.ok && enhancedPayload !== basePayload && Number(result.response.status) === 400) {
-      result = await sendRequest(basePayload);
-    }
-
-    if (!result.response.ok) {
-      const err = new Error(`Anthropic website generatie mislukt (${result.response.status})`);
-      err.status = result.response.status;
-      err.data = result.data;
-      throw err;
-    }
-
-    return result.data;
+    throw err;
   }
 
   async function generateWebsiteHtmlWithOpenAi(options = {}) {
@@ -1565,73 +1508,10 @@ function createAiRemoteService(deps = {}) {
   }
 
   async function generateWebsiteHtmlWithAnthropic(options = {}) {
-    const blueprintText = buildLocalWebsiteBlueprint(options);
-    const websiteModel = getWebsiteAnthropicModel();
-    const buildPrompts = buildAnthropicWebsiteHtmlPrompts(options, blueprintText);
-    const htmlData = await sendAnthropicMessage({
-      model: websiteModel,
-      systemPrompt: buildPrompts.systemPrompt,
-      userPrompt: buildPrompts.userPrompt,
-      referenceImages: buildPrompts.referenceImages,
-      maxTokens: getAnthropicWebsiteStageMaxTokens('build'),
-      stage: 'build',
-    });
-
-    const generatedText = normalizeString(extractAnthropicTextContent(htmlData?.content));
-    if (!generatedText) {
-      const err = new Error('Anthropic gaf lege HTML terug.');
-      err.status = 502;
-      err.data = htmlData;
-      throw err;
-    }
-
-    const html = websiteGenerationStrictHtml
-      ? ensureStrictAnthropicHtml(generatedText)
-      : ensureHtmlDocument(generatedText, {
-          title: buildPrompts.title,
-          company: buildPrompts.company,
-        });
-    if (!html) {
-      const err = new Error('Kon HTML output niet valideren.');
-      err.status = 502;
-      err.data = htmlData;
-      throw err;
-    }
-
-    if (!isLikelyUsableWebsiteHtml(html)) {
-      const err = new Error('AI output lijkt onvolledig of visueel defect.');
-      err.status = 502;
-      err.data = htmlData;
-      throw err;
-    }
-
-    const resolvedModel = normalizeString(htmlData?.model || websiteModel || anthropicModel);
-
-    return {
-      html,
-      source: 'anthropic',
-      model: resolvedModel,
-      usage: htmlData?.usage || null,
-      apiCost:
-        estimateAnthropicUsageCost(htmlData?.usage || null, resolvedModel) ||
-        estimateAnthropicTextCost(
-          `${buildPrompts.userPrompt}\n\n${blueprintText}`,
-          html,
-          resolvedModel
-        ),
-    };
+    return generateWebsiteHtmlWithOpenAi(options);
   }
 
   async function generateWebsiteHtmlWithAi(options = {}) {
-    const provider = getWebsiteGenerationProvider();
-    if (websiteGenerationStrictAnthropic && provider !== 'anthropic') {
-      const err = new Error('Website generatie is strict op Anthropic/Claude gezet.');
-      err.status = 503;
-      throw err;
-    }
-    if (provider === 'anthropic') {
-      return generateWebsiteHtmlWithAnthropic(options);
-    }
     return generateWebsiteHtmlWithOpenAi(options);
   }
 

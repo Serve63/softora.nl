@@ -73,7 +73,7 @@ test('runtime helpers normalize booleans, dates, times and currency labels', () 
   assert.match(helpers.formatEuroLabel('2500'), /2\.500/);
 });
 
-test('runtime helpers choose anthropic models and provider fallbacks from env', () => {
+test('runtime helpers keep AI provider on OpenAI even when legacy Anthropic env exists', () => {
   const helpers = createRuntimeHelpers({
     env: {
       ANTHROPIC_API_KEY: 'anthropic-key',
@@ -91,9 +91,9 @@ test('runtime helpers choose anthropic models and provider fallbacks from env', 
     dossierAnthropicModel: '',
   });
 
-  assert.equal(helpers.getAnthropicApiKey(), 'anthropic-key');
-  assert.equal(helpers.getWebsiteGenerationProvider(), 'anthropic');
-  assert.equal(helpers.getWebsiteAnthropicModel(), 'claude-opus-site');
-  assert.equal(helpers.getDossierAnthropicModel(), 'claude-dossier');
+  assert.equal(helpers.getAnthropicApiKey(), '');
+  assert.equal(helpers.getWebsiteGenerationProvider(), 'openai');
+  assert.equal(helpers.getWebsiteAnthropicModel(), '');
+  assert.equal(helpers.getDossierAnthropicModel(), '');
   assert.equal(helpers.getAnthropicDossierMaxTokens(), 24000);
 });

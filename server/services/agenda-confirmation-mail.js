@@ -1,7 +1,7 @@
 function createAgendaConfirmationMailHelpers(deps = {}) {
   const {
     openAiApiBaseUrl = 'https://api.openai.com/v1',
-    openAiModel = 'gpt-5.5',
+    openAiModel = 'gpt-5.5-pro',
     getGeneratedAgendaAppointments = () => [],
     setGeneratedAgendaAppointmentAtIndex = () => null,
     buildConfirmationTaskDetail = () => ({}),

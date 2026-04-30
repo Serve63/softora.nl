@@ -34,6 +34,8 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
         mailbox: { mailConfig: {} },
         websiteLinkCoordinator: { scope: 'website-link' },
         websitePreviewLibraryCoordinator: { scope: 'website-preview-library' },
+        getUiStateValues: async () => ({ values: {} }),
+        setUiStateValues: async () => ({ values: {} }),
         runtimeOpsCoordinator: { scope: 'runtime-ops' },
         runtimeDebugOpsCoordinator: { scope: 'runtime-debug' },
         requireRuntimeDebugAccess: () => true,
@@ -69,6 +71,15 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
   assert.equal(capturedRouteOptions.activeOrdersCoordinator, activeOrdersCoordinator);
   assert.ok(capturedRouteOptions.websitePreviewBatchCoordinator);
   assert.equal(typeof capturedRouteOptions.websitePreviewBatchCoordinator.startBatchResponse, 'function');
+  assert.ok(capturedRouteOptions.premiumDatabaseWebdesignJobsCoordinator);
+  assert.equal(
+    typeof capturedRouteOptions.premiumDatabaseWebdesignJobsCoordinator.startJobResponse,
+    'function'
+  );
+  assert.equal(
+    typeof capturedRouteOptions.premiumDatabaseWebdesignJobsCoordinator.listJobsResponse,
+    'function'
+  );
   assert.ok(capturedRouteOptions.mailboxCoordinator);
   assert.equal(typeof capturedRouteOptions.mailboxCoordinator.accountsResponse, 'function');
   assert.equal(capturedRouteOptions.premiumRouteRuntime.sessionSecret, 'secret');

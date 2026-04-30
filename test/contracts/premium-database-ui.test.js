@@ -97,12 +97,14 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const importScriptPath = path.join(__dirname, '../../assets/premium-database-import.js');
   const photoBatchScriptPath = path.join(__dirname, '../../assets/premium-database-photo-batch.js');
+  const webdesignActionScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
   const apiCostLedgerScriptPath = path.join(__dirname, '../../assets/softora-api-cost-ledger.js');
   const photoStorageScriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
   const deepSearchScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
   const photoBatchScriptSource = fs.readFileSync(photoBatchScriptPath, 'utf8');
+  const webdesignActionScriptSource = fs.readFileSync(webdesignActionScriptPath, 'utf8');
   const apiCostLedgerScriptSource = fs.readFileSync(apiCostLedgerScriptPath, 'utf8');
   const photoStorageScriptSource = fs.readFileSync(photoStorageScriptPath, 'utf8');
   const deepSearchScriptSource = fs.readFileSync(deepSearchScriptPath, 'utf8');
@@ -194,11 +196,40 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function shouldShowWebsitePhoto\(customer\)/);
   assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
-  assert.match(pageSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
-  assert.match(pageSource, /class=\\"photo-drop\\"/);
-  assert.match(pageSource, /class=\\"photo-remove\\"/);
-  assert.match(pageSource, /data-remove-photo-id=\\"/);
-  assert.match(pageSource, /data-has-photo=\\"/);
+  assert.match(pageSource, /return webdesignActionController\.render\(customer\);/);
+  assert.match(pageSource, /window\.SoftoraDatabaseWebdesignAction\.createController\(\{/);
+  assert.match(webdesignActionScriptSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
+  assert.match(webdesignActionScriptSource, /class=\\"photo-drop/);
+  assert.match(webdesignActionScriptSource, /class=\\"photo-generate-icon\\"/);
+  assert.doesNotMatch(webdesignActionScriptSource, /class=\\"photo-generate-cost\\"/);
+  assert.match(webdesignActionScriptSource, /className = "photo-generate-charge-label";/);
+  assert.match(webdesignActionScriptSource, /function updateChargeLabelPositions\(\)/);
+  assert.match(webdesignActionScriptSource, /querySelectorAll\("\.photo-generate-charge-label"\)/);
+  assert.match(webdesignActionScriptSource, /global\.document\.body\.appendChild\(label\)/);
+  assert.doesNotMatch(webdesignActionScriptSource, /CHARGE_LABEL_ID/);
+  assert.match(webdesignActionScriptSource, /class=\\"photo-generate-spinner\\"/);
+  assert.doesNotMatch(webdesignActionScriptSource, /\.photo-drop:hover \.photo-generate-cost/);
+  assert.match(webdesignActionScriptSource, /function formatCentCost\(value\)/);
+  assert.match(webdesignActionScriptSource, /label\.textContent = formatCentCost\(costEur\);/);
+  assert.match(webdesignActionScriptSource, /showChargeLabel\(\);/);
+  assert.doesNotMatch(webdesignActionScriptSource, /AI-kosten/);
+  assert.doesNotMatch(webdesignActionScriptSource, /Webdesign maken, kost/);
+  assert.match(pageSource, /formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR/);
+  assert.match(webdesignActionScriptSource, /@keyframes photoGenerateSpin/);
+  assert.match(webdesignActionScriptSource, /data-can-generate=\\"/);
+  assert.match(webdesignActionScriptSource, /const LIGHTNING_ICON = "<svg class=\\"photo-generate-icon\\"/);
+  assert.match(webdesignActionScriptSource, /const LOADING_ICON = "<span class=\\"photo-generate-spinner\\"/);
+  assert.match(webdesignActionScriptSource, /const pendingIds = new Set\(\);/);
+  assert.match(webdesignActionScriptSource, /const pollTimers = new Map\(\);/);
+  assert.match(webdesignActionScriptSource, /const canGenerate = !hasPhoto && Boolean\(resolveCustomerWebsiteUrl\(customer\)\);/);
+  assert.match(webdesignActionScriptSource, /const isPending = pendingIds\.has\(customer\.id\);/);
+  assert.match(webdesignActionScriptSource, /if \(pendingIds\.has\(target\.id\)\) \{/);
+  assert.match(webdesignActionScriptSource, /schedulePoll\(job\.id, 0\);/);
+  assert.doesNotMatch(webdesignActionScriptSource, /Er wordt al een webdesign gemaakt/);
+  assert.match(webdesignActionScriptSource, /photo-drop" \+ \(isPending \? " is-generating" : ""\)/);
+  assert.match(webdesignActionScriptSource, /class=\\"photo-remove\\"/);
+  assert.match(webdesignActionScriptSource, /data-remove-photo-id=\\"/);
+  assert.match(webdesignActionScriptSource, /data-has-photo=\\"/);
   assert.match(pageSource, /function openWebsitePhotoPreview\(customerId\)/);
   assert.match(pageSource, /function prepareWebsitePhotoForStorage\(dataUrl, fileName\)/);
   assert.match(pageSource, /function removeWebsitePhotoForCustomer\(customerId\)/);
@@ -234,28 +265,53 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function buildWebsitePreviewUrlCandidates\(customer\)/);
   assert.match(pageSource, /withWww\.hostname = "www\." \+ parsed\.hostname;/);
   assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
+  assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
+  assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
-  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260427a/);
+  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429g/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260428h/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429c/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
   assert.match(photoBatchScriptSource, /function resolveSelection\(\)/);
-  assert.match(photoBatchScriptSource, /void generate\(selection\.limit\);/);
-  assert.match(pageSource, /function generateWebdesignPhotos\(limit\)/);
+  assert.match(photoBatchScriptSource, /function ensureInputFocusStyles\(\)/);
+  assert.match(photoBatchScriptSource, /\.photo-batch-input:focus/);
+  assert.match(photoBatchScriptSource, /border-color:var\(--crimson\)/);
+  assert.doesNotMatch(photoBatchScriptSource, /photoBatchLimitInput\.select\(\)/);
+  assert.match(photoBatchScriptSource, /void generate\(selection\.limit, \{ silentProgress: true \}\);/);
+  assert.match(pageSource, /function generateWebdesignPhotos\(limit, options\)/);
+  assert.match(pageSource, /const progressSilent = Boolean\(options && options\.silentProgress\);/);
   assert.match(pageSource, /return isWebdesignPhotoEligible\(customer\);/);
-  assert.match(pageSource, /Webdesign maken voor " \+ target\.bedrijf/);
+  assert.match(pageSource, /Promise\.allSettled\(targets\.map\(function \(target\) \{/);
+  assert.match(pageSource, /return webdesignActionController\.generateForCustomer\(target\.id\);/);
+  assert.doesNotMatch(pageSource, /Webdesign maken voor " \+ target\.bedrijf/);
   assert.doesNotMatch(pageSource, /AI-foto maken voor " \+ target\.bedrijf/);
   assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten, \{ onlyCustomerIds: \[customerId\] \}\);/);
-  assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten, \{ onlyCustomerIds: \[target\.id\] \}\);[\s\S]*if \(!photoResult\.ok\) throw new Error\("Webdesign gemaakt, maar opslaan in Supabase mislukte\."\);[\s\S]*done \+= 1;/);
-  assert.match(pageSource, /Geen AI-foto's opgeslagen: /);
+  assert.doesNotMatch(pageSource, /onlyCustomerIds: \[target\.id\]/);
+  assert.match(pageSource, /setStatusMessage\(""\);[\s\S]*Promise\.allSettled/);
   assert.match(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /company: customer\.bedrijf/);
   assert.match(pageSource, /source: "premium-database"/);
   assert.match(pageSource, /action: "webdesign"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
+  assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
+  assert.match(pageSource, /renderPage: renderPage/);
+  assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
+  assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
+  assert.match(webdesignActionScriptSource, /keepalive: true/);
+  assert.match(webdesignActionScriptSource, /function resumePendingJobs\(\)/);
+  assert.match(webdesignActionScriptSource, /async function loadRunningJobs\(\)/);
+  assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT,/);
+  assert.doesNotMatch(webdesignActionScriptSource, /localStorage/);
+  assert.match(pageSource, /refreshPhotos: async function \(\)/);
+  assert.match(pageSource, /webdesignActionController\.resumePendingJobs\(\);/);
+  assert.match(webdesignActionScriptSource, /pendingIds\.add\(job\.customerId\);/);
+  assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT/);
+  assert.doesNotMatch(webdesignActionScriptSource, /await generate\(\[freshTarget\]/);
+  assert.match(webdesignActionScriptSource, /pendingIds\.delete\(customerId\);/);
   assert.match(pageSource, /photoBatchController\.open\(\);/);
   assert.match(pageSource, /photoBatchController\.bind\(\);/);
   assert.match(photoBatchScriptSource, /nodes\.startPhotoBatchButton\.addEventListener\("click", start\);/);
@@ -289,7 +345,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260428h"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260429c"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -368,8 +424,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(deepSearchScriptSource, /Ronde-limiet bereikt/);
   assert.match(deepSearchScriptSource, /REQUIRED_EMPTY_COMPLETION_ROUNDS = 1/);
   assert.match(deepSearchScriptSource, /function isTargetCompletionConfirmed\(target, result\)/);
-  assert.match(deepSearchScriptSource, /AI gaat automatisch door met dezelfde locatie/);
-  assert.match(deepSearchScriptSource, /AI gaf al klaar aan/);
+  assert.doesNotMatch(deepSearchScriptSource, /AI gaat automatisch door met dezelfde locatie/);
+  assert.doesNotMatch(deepSearchScriptSource, /AI gaf al klaar aan/);
   assert.match(deepSearchScriptSource, /Deze locatie loopt al\. Wacht tot de AI hem automatisch afrondt\./);
   assert.doesNotMatch(deepSearchScriptSource, /100 bedrijven toevoegen/);
   assert.match(deepSearchScriptSource, /\? "Nu: " \+ target\.label/);
@@ -378,7 +434,13 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(deepSearchScriptSource, /item\.batches \+ "x/);
   assert.doesNotMatch(deepSearchScriptSource, /item\.added \+ " nieuw/);
   assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
-  assert.match(deepSearchScriptSource, /"Geschatte API-kosten: ± " \+ batchCost/);
+  assert.match(
+    deepSearchScriptSource,
+    /"Geschatte API-kosten voor " \+ desiredCount \+ " bedrijven: ± " \+ estimate \+ " \(max ± €2 afwijking\)"/
+  );
+  assert.match(deepSearchScriptSource, /function estimateRunUsd\(companyCount\)/);
+  assert.match(deepSearchScriptSource, /outputTokensPerCompany/);
+  assert.doesNotMatch(deepSearchScriptSource, /"Geschatte API-kosten: ± " \+ batchCost/);
   assert.doesNotMatch(deepSearchScriptSource, /per AI-ronde/);
   assert.doesNotMatch(deepSearchScriptSource, /gebruikt voor deze plek/);
   assert.doesNotMatch(deepSearchScriptSource, /klaar ·/);
@@ -388,6 +450,13 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /function advanceCompletedTarget\(target\)/);
   assert.match(deepSearchScriptSource, /Boolean\(body && body\.placeComplete\)/);
   assert.match(deepSearchScriptSource, /foundWebsites: \[\]/);
+  assert.match(deepSearchScriptSource, /const visibleSourceTargetIds = new Set\(\);/);
+  assert.match(deepSearchScriptSource, /const sessionFoundWebsitesByTargetId = new Map\(\);/);
+  assert.match(deepSearchScriptSource, /visibleSourceTargetIds\.has\(targetId\)/);
+  assert.match(deepSearchScriptSource, /getSessionFoundWebsites\(targetId\)/);
+  assert.match(deepSearchScriptSource, /visibleSourceTargetIds\.add\(target\.id\);/);
+  assert.match(deepSearchScriptSource, /visibleSourceTargetIds\.clear\(\);/);
+  assert.match(deepSearchScriptSource, /sessionFoundWebsitesByTargetId\.clear\(\);/);
   assert.match(deepSearchScriptSource, /function uniqueWebsiteValues\(values, maxItems\)/);
   assert.match(deepSearchScriptSource, /function collectWebsitesFromCustomers\(customers\)/);
   assert.doesNotMatch(deepSearchScriptSource, /function collectWebsitesFromRows\(rows\)/);
@@ -416,6 +485,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(deepSearchScriptSource, /@keyframes deepSearchSpin/);
   assert.match(deepSearchScriptSource, /Batch loopt nog\. De bedrijvenlijst blijft open tot deze plek klaar is\./);
   assert.match(deepSearchScriptSource, /function isOpen\(\)/);
+  assert.doesNotMatch(deepSearchScriptSource, /AI zoekt nieuwe bedrijven voor/);
   assert.match(pageSource, /if \(databaseDeepSearchController\.isOpen\(\)\) \{[\s\S]*databaseDeepSearchController\.close\(\);/);
   assert.doesNotMatch(deepSearchScriptSource, /function markCurrentDone\(\)/);
   assert.doesNotMatch(deepSearchScriptSource, /resetState/);
@@ -788,7 +858,7 @@ test('premium database deep search continues to the next location until the requ
   assert.equal(calls[2].count, 1);
   assert.equal(calls[2].batchNumber, 1);
   assert.equal(customers.length, 2);
-  assert.match(messages.join('\n'), /AI gaf al klaar aan/);
+  assert.doesNotMatch(messages.join('\n'), /AI gaf al klaar aan/);
   assert.match(messages.join('\n'), /Deze plaats is automatisch afgerond/);
   assert.match(messages.join('\n'), /Gewenste aantal gehaald/);
   assert.ok(persisted.length >= 2);
@@ -943,7 +1013,7 @@ test('premium database deep search only shows websites after companies are added
   assert.equal(customers.length, 6);
 });
 
-test('premium database deep search persists compact website progress that survives reload', async () => {
+test('premium database deep search persists compact website progress without pre-filling the panel on reload', async () => {
   const deepSearchClient = loadDatabaseDeepSearchClient();
   const customers = [];
   const persisted = [];
@@ -1022,8 +1092,9 @@ test('premium database deep search persists compact website progress that surviv
 
   restoredController.open();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.match(restoredSourcesPanel.innerHTML, /compact1\.nl/);
-  assert.match(restoredSourcesPanel.innerHTML, /compact2\.nl/);
+  assert.match(restoredSourcesPanel.innerHTML, /Nog geen websites voor deze plek\./);
+  assert.doesNotMatch(restoredSourcesPanel.innerHTML, /compact1\.nl/);
+  assert.doesNotMatch(restoredSourcesPanel.innerHTML, /compact2\.nl/);
 });
 
 test('premium database deep search keeps found websites empty before a location starts', async () => {
@@ -1139,7 +1210,8 @@ test('premium database deep search clears old found websites when a new batch se
 
   controller.open();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.match(sourcesPanel.innerHTML, /oudesite\.nl/);
+  assert.match(sourcesPanel.innerHTML, /Nog geen websites voor deze plek\./);
+  assert.doesNotMatch(sourcesPanel.innerHTML, /oudesite\.nl/);
 
   const runPromise = controller.runCurrentSearch();
   assert.match(sourcesPanel.innerHTML, /Nog geen websites voor deze plek\./);

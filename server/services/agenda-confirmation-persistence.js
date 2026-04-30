@@ -63,6 +63,7 @@ function createAgendaConfirmationPersistenceHelpers(deps = {}) {
     const verifyPersisted =
       options && typeof options.verifyPersisted === 'function' ? options.verifyPersisted : null;
     const allowPendingResponse = Boolean(options?.allowPendingResponse);
+    const allowLocalVerifiedPending = Boolean(options?.allowLocalVerifiedPending);
     const pendingResponseAfterMs = Math.max(1000, Math.min(15000, Number(options?.pendingResponseAfterMs) || 3000));
     let persisted = null;
 
@@ -87,6 +88,14 @@ function createAgendaConfirmationPersistenceHelpers(deps = {}) {
     } else {
       persisted = await waitForQueuedRuntimeSnapshotPersist();
       if (persisted) return true;
+    }
+
+    if (allowPendingResponse && allowLocalVerifiedPending && verifyPersisted) {
+      try {
+        if (verifyPersisted()) return 'pending';
+      } catch {
+        // Val terug op het bestaande herstelpad als lokale verificatie faalt.
+      }
     }
 
     if (persisted === null) {
