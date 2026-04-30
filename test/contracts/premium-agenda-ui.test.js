@@ -310,3 +310,20 @@ test('premium agenda dwingt modal sluiting na geslaagde handmatige opslag', () =
   assert.ok(pageSource.includes('if (manualAppointmentSaving && !forceClose) return;'));
   assert.ok(pageSource.includes('closeManualAppointmentModal(true);'));
 });
+
+test('premium agenda dossierwerkruimte biedt audio-upload voor meetingnotities', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
+
+  assert.match(pageSource, /assets\/premium-agenda-stability\.js/);
+  assert.match(stabilitySource, /button\.id = 'notesAudioUploadBtn';/);
+  assert.match(stabilitySource, /Audio toevoegen/);
+  assert.match(stabilitySource, /input\.id = 'notesAudioUploadInput';/);
+  assert.match(stabilitySource, /input\.accept = 'audio\/mpeg/);
+  assert.match(stabilitySource, /async function handleAgendaNotesAudioUpload\(file, button, input\)/);
+  assert.match(stabilitySource, /\/api\/ai\/notes-audio-to-text/);
+  assert.match(stabilitySource, /Transcriptie audiobestand[\s\S]*workspaceTranscriptEl\.value = currentNotes/);
+  assert.match(stabilitySource, /button\.addEventListener\('click'/);
+});

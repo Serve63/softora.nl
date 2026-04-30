@@ -23,6 +23,12 @@ function registerAiToolRoutes(app, deps) {
   app.post('/api/ai-notes-image-to-text', (req, res) =>
     deps.coordinator.sendNotesImageToTextResponse(req, res)
   );
+  app.post('/api/ai/notes-audio-to-text', (req, res) =>
+    deps.coordinator.sendNotesAudioToTextResponse(req, res)
+  );
+  app.post('/api/ai-notes-audio-to-text', (req, res) =>
+    deps.coordinator.sendNotesAudioToTextResponse(req, res)
+  );
 }
 
 module.exports = {

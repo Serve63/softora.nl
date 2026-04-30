@@ -44,6 +44,12 @@ function createAiToolsCoordinator(deps = {}) {
       model: '',
       usage: null,
     }),
+    transcribeMeetingAudioWithAi = async () => ({
+      transcript: '',
+      source: '',
+      model: '',
+      usage: null,
+    }),
     logger = console,
   } = deps;
 
@@ -414,7 +420,89 @@ function createAiToolsCoordinator(deps = {}) {
     }
   }
 
+  async function sendNotesAudioToTextResponse(req, res) {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const audioDataUrl = normalizeString(body.audioDataUrl || body.audio || '').replace(/\s+/g, '');
+    const fileName = truncateText(normalizeString(body.fileName || 'meeting-audio'), 160);
+    const mimeType = normalizeString(body.mimeType || '');
+    const language = normalizeString(body.language || 'nl') || 'nl';
+    const context = normalizeString(body.context || '');
+
+    if (!audioDataUrl) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Audiobestand ontbreekt',
+        detail: 'Stuur een JSON body met { audioDataUrl: "data:audio/...;base64,..." }',
+      });
+    }
+
+    if (audioDataUrl.length > 34000000) {
+      return res.status(413).json({
+        ok: false,
+        error: 'Audiobestand te groot',
+        detail: 'Upload een kleiner audiobestand (maximaal ongeveer 24MB).',
+      });
+    }
+
+    try {
+      const extraction = await transcribeMeetingAudioWithAi({
+        audioDataUrl,
+        fileName,
+        mimeType,
+        language,
+      });
+
+      let promptResult = null;
+      try {
+        promptResult = await generateWebsitePromptFromTranscriptWithAi({
+          transcript: extraction.transcript,
+          language,
+          context,
+        });
+      } catch (_promptError) {
+        promptResult = {
+          prompt: buildWebsitePromptFallback({
+            transcript: extraction.transcript,
+            language,
+            context,
+          }),
+          source: 'template-fallback',
+          model: null,
+          usage: null,
+        };
+      }
+
+      return res.status(200).json({
+        ok: true,
+        transcript: extraction.transcript,
+        prompt: String(promptResult?.prompt || '').trim(),
+        source: extraction.source,
+        model: extraction.model,
+        promptSource: String(promptResult?.source || ''),
+        usage: {
+          extraction: extraction.usage || null,
+          prompt: promptResult?.usage || null,
+        },
+        language,
+        openAiEnabled: true,
+      });
+    } catch (error) {
+      const status = Number(error?.status) || 500;
+      const safeStatus = status >= 400 && status < 600 ? status : 500;
+      return res.status(safeStatus).json({
+        ok: false,
+        error:
+          safeStatus === 503
+            ? 'AI audio-transcriptie niet beschikbaar'
+            : 'AI audio-transcriptie mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+        openAiEnabled: Boolean(getOpenAiApiKey()),
+      });
+    }
+  }
+
   return {
+    sendNotesAudioToTextResponse,
     sendNotesImageToTextResponse,
     sendOrderDossierResponse,
     sendTranscriptToPromptResponse,

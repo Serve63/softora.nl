@@ -31,6 +31,7 @@ function createAiRemoteService(deps = {}) {
       },
       text: '',
     }),
+    fetchImpl = fetch,
     extractOpenAiTextContent = () => '',
     extractAnthropicTextContent = () => '',
     parseJsonLoose = () => null,
@@ -76,6 +77,7 @@ function createAiRemoteService(deps = {}) {
     openAiApiBaseUrl = '',
     openAiModel = '',
     openAiImageModel = '',
+    openAiAudioTranscriptionModel = '',
     anthropicApiBaseUrl = '',
     anthropicModel = '',
     websiteGenerationTimeoutMs = 60000,
@@ -206,6 +208,110 @@ function createAiRemoteService(deps = {}) {
   function extractResponseHeader(response, name) {
     if (!response || !response.headers || typeof response.headers.get !== 'function') return '';
     return normalizeString(response.headers.get(name) || '');
+  }
+
+  function inferAudioMimeTypeFromFileName(fileName = '') {
+    const match = normalizeString(fileName).toLowerCase().match(/\.([a-z0-9]{2,5})(?:[?#].*)?$/i);
+    const ext = normalizeString(match?.[1] || '').toLowerCase();
+    if (ext === 'mp3') return 'audio/mpeg';
+    if (ext === 'm4a' || ext === 'mp4') return 'audio/mp4';
+    if (ext === 'wav') return 'audio/wav';
+    if (ext === 'webm') return 'audio/webm';
+    if (ext === 'ogg' || ext === 'oga') return 'audio/ogg';
+    if (ext === 'aac') return 'audio/aac';
+    if (ext === 'flac') return 'audio/flac';
+    return '';
+  }
+
+  function inferAudioExtensionFromMime(mimeType = '', fileName = '') {
+    const normalizedMime = normalizeString(mimeType).toLowerCase();
+    if (normalizedMime.includes('mpeg') || normalizedMime.includes('mp3')) return 'mp3';
+    if (normalizedMime.includes('mp4') || normalizedMime.includes('m4a')) return 'm4a';
+    if (normalizedMime.includes('wav')) return 'wav';
+    if (normalizedMime.includes('webm')) return 'webm';
+    if (normalizedMime.includes('ogg')) return 'ogg';
+    if (normalizedMime.includes('aac')) return 'aac';
+    if (normalizedMime.includes('flac')) return 'flac';
+    const match = normalizeString(fileName).toLowerCase().match(/\.([a-z0-9]{2,5})(?:[?#].*)?$/i);
+    const ext = normalizeString(match?.[1] || '').toLowerCase();
+    if (/^(mp3|m4a|mp4|wav|webm|ogg|oga|aac|flac)$/.test(ext)) {
+      return ext === 'mp4' ? 'm4a' : ext;
+    }
+    return 'mp3';
+  }
+
+  function isSupportedMeetingAudioMime(mimeType = '', fileName = '') {
+    const normalizedMime = normalizeString(mimeType).toLowerCase();
+    if (/^audio\/[a-z0-9.+-]+$/i.test(normalizedMime)) return true;
+    if (/^video\/(?:mp4|webm|ogg)$/i.test(normalizedMime)) return true;
+    return Boolean(inferAudioMimeTypeFromFileName(fileName));
+  }
+
+  function parseMeetingAudioDataUrl(audioDataUrl = '', fileName = '', fallbackMimeType = '') {
+    const raw = normalizeString(audioDataUrl).replace(/\s+/g, '');
+    const match = raw.match(/^data:([^;,]+);base64,([a-z0-9+/=]+)$/i);
+    if (!match) {
+      const err = new Error('Ongeldig audiobestand. Upload MP3, M4A, WAV, WEBM, OGG, AAC of FLAC.');
+      err.status = 400;
+      throw err;
+    }
+
+    const inferredMime = inferAudioMimeTypeFromFileName(fileName);
+    let mimeType = normalizeString(match[1] || fallbackMimeType || inferredMime || 'audio/mpeg').toLowerCase();
+    if (!isSupportedMeetingAudioMime(mimeType, fileName)) {
+      if (inferredMime) {
+        mimeType = inferredMime;
+      } else {
+        const err = new Error('Ongeldig audiobestand. Upload MP3, M4A, WAV, WEBM, OGG, AAC of FLAC.');
+        err.status = 400;
+        throw err;
+      }
+    }
+
+    const base64Payload = normalizeString(match[2] || '');
+    if (!base64Payload || base64Payload.length % 4 === 1 || !/^[a-z0-9+/]+={0,2}$/i.test(base64Payload)) {
+      const err = new Error('Audiobestand kon niet worden gelezen.');
+      err.status = 400;
+      throw err;
+    }
+
+    const bytes = Buffer.from(base64Payload, 'base64');
+    if (!bytes.length) {
+      const err = new Error('Audiobestand is leeg.');
+      err.status = 400;
+      throw err;
+    }
+
+    return {
+      bytes,
+      mimeType,
+    };
+  }
+
+  function buildMeetingAudioUploadFileName(fileName = '', mimeType = '') {
+    const ext = inferAudioExtensionFromMime(mimeType, fileName);
+    const safeBase =
+      normalizeString(fileName)
+        .replace(/\.[a-z0-9]{2,5}$/i, '')
+        .replace(/[^a-z0-9_-]+/gi, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 80) || 'meeting-audio';
+    return `${safeBase}.${ext}`;
+  }
+
+  function getOpenAiAudioTranscriptionModelCandidates() {
+    const configured = normalizeString(
+      openAiAudioTranscriptionModel ||
+        env.OPENAI_AUDIO_TRANSCRIPTION_MODEL ||
+        env.OPENAI_TRANSCRIPTION_MODEL ||
+        ''
+    );
+    const models = [];
+    if (configured) models.push(configured);
+    ['gpt-4o-transcribe', 'whisper-1'].forEach((candidate) => {
+      if (!models.includes(candidate)) models.push(candidate);
+    });
+    return models;
   }
 
   function normalizeWebsitePreviewText(textRaw) {
@@ -1304,6 +1410,95 @@ function createAiRemoteService(deps = {}) {
     };
   }
 
+  async function transcribeMeetingAudioWithAi(options = {}) {
+    const apiKey = getOpenAiApiKey();
+    if (!apiKey) {
+      const err = new Error('OPENAI_API_KEY ontbreekt');
+      err.status = 503;
+      throw err;
+    }
+
+    const audioDataUrl = normalizeString(options.audioDataUrl || options.audio || '');
+    const fileName = normalizeString(options.fileName || 'meeting-audio');
+    const fallbackMimeType = normalizeString(options.mimeType || '');
+    const language = normalizeString(options.language || 'nl') || 'nl';
+    const parsedAudio = parseMeetingAudioDataUrl(audioDataUrl, fileName, fallbackMimeType);
+    if (parsedAudio.bytes.length > 24 * 1024 * 1024) {
+      const err = new Error('Audiobestand is te groot om direct te transcriberen.');
+      err.status = 413;
+      throw err;
+    }
+
+    const models = getOpenAiAudioTranscriptionModelCandidates();
+    let lastError = null;
+
+    for (const model of models) {
+      try {
+        const form = new FormData();
+        form.append(
+          'file',
+          new Blob([parsedAudio.bytes], { type: parsedAudio.mimeType || 'audio/mpeg' }),
+          buildMeetingAudioUploadFileName(fileName, parsedAudio.mimeType)
+        );
+        form.append('model', model);
+        form.append('language', language);
+        form.append('temperature', '0');
+        form.append('response_format', 'text');
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 120000);
+
+        try {
+          const response = await fetchImpl(`${openAiApiBaseUrl}/audio/transcriptions`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: form,
+            signal: controller.signal,
+          });
+
+          const rawBody = await response.text();
+          if (!response.ok) {
+            const err = new Error(`OpenAI audio transcriptie mislukt (${response.status})`);
+            err.status = response.status;
+            err.data = parseJsonLoose(rawBody) || rawBody;
+            throw err;
+          }
+
+          const parsed = parseJsonLoose(rawBody);
+          const transcript = truncateText(
+            normalizeString(parsed?.text || parsed?.transcript || parsed?.output_text || '') ||
+              normalizeString(rawBody),
+            20000
+          );
+          if (!transcript) {
+            const err = new Error('OpenAI gaf geen transcriptie terug uit het audiobestand.');
+            err.status = 502;
+            throw err;
+          }
+
+          return {
+            transcript,
+            source: 'openai-audio',
+            model,
+            usage: parsed?.usage || null,
+            language,
+          };
+        } finally {
+          clearTimeout(timeout);
+        }
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (lastError) throw lastError;
+    const err = new Error('Audio transcriptie mislukt.');
+    err.status = 502;
+    throw err;
+  }
+
   function buildWebsitePromptFallback(options = {}) {
     const language = normalizeString(options.language || 'nl') || 'nl';
     const context = truncateText(normalizeString(options.context || ''), 2000);
@@ -1526,6 +1721,7 @@ function createAiRemoteService(deps = {}) {
     generateWebsitePreviewImageWithAi,
     generateWebsitePromptFromTranscriptWithAi,
     sendAnthropicMessage,
+    transcribeMeetingAudioWithAi,
   };
 }
 
