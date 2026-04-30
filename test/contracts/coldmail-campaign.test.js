@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createColdmailCampaignService } = require('../../server/services/coldmail-campaign');
+const { buildChunkedStatePatch } = require('../../server/services/data-ops-serialization');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -61,7 +62,7 @@ function createService(overrides = {}) {
       }
       if (scope === 'coldcalling') {
         return {
-          values: {
+          values: overrides.leadValues || {
             softora_coldcalling_lead_rows_json: JSON.stringify(overrides.leadRows || []),
           },
         };
@@ -81,7 +82,7 @@ function createService(overrides = {}) {
         };
       }
       return {
-        values: {
+        values: overrides.customerValues || {
           softora_customers_premium_v1: JSON.stringify(rows),
         },
       };
@@ -457,6 +458,32 @@ test('coldmail campaign previews selected recipients before sending', async () =
   ]);
 });
 
+test('coldmail campaign previews recipients from chunked customer database state', async () => {
+  const rows = [
+    {
+      id: 'chunked-prospect',
+      bedrijf: 'Chunked Winkel',
+      email: 'chunked@example.test',
+      status: 'prospect',
+      branche: 'Retail & Winkels',
+      mail: true,
+    },
+  ];
+  const { service } = createService({
+    rows: [],
+    customerValues: buildChunkedStatePatch('softora_customers_premium_v1', JSON.stringify(rows), 80),
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    branch: 'Retail & Winkels',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].bedrijf, 'Chunked Winkel');
+});
+
 test('coldmail campaign recipient preview respects Oisterwijk radius', async () => {
   const { service } = createService({
     rows: [
@@ -530,6 +557,30 @@ test('coldcalling recipient preview selects callable phone rows', async () => {
       distanceKm: null,
     },
   ]);
+});
+
+test('coldcalling recipient preview reads chunked lead database state', async () => {
+  const rows = [
+    {
+      id: 'chunked-callable',
+      company: 'Chunked Belbedrijf',
+      phone: '+31655556666',
+      status: 'prospect',
+    },
+  ];
+  const { service } = createService({
+    rows: [],
+    leadValues: buildChunkedStatePatch('softora_coldcalling_lead_rows_json', JSON.stringify(rows), 80),
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    mode: 'call',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].bedrijf, 'Chunked Belbedrijf');
 });
 
 test('coldcalling recipient preview skips phone numbers from the blocklist', async () => {

@@ -1611,15 +1611,15 @@ function isEligibleCampaignCountRow(row) {
 }
 
 function parseCustomerDatabaseRows(values) {
-  const raw = values && values[CUSTOMER_DB_KEY];
+  const stateValues = values && typeof values === 'object' ? values : {};
+  let raw = stateValues[CUSTOMER_DB_KEY];
+  if (!raw && stateValues[CUSTOMER_DB_KEY + '_chunks_v1']) try {
+    const meta = JSON.parse(String(stateValues[CUSTOMER_DB_KEY + '_chunks_v1'] || '{}'));
+    raw = Array.from({ length: Math.max(0, Math.min(200, Number(meta && meta.count) || 0)) }, (_, index) => String(stateValues[CUSTOMER_DB_KEY + '_chunk_' + index] || '')).join('');
+  } catch (_) {}
   if (Array.isArray(raw)) return raw.filter((item) => item && typeof item === 'object');
   if (!raw) return [];
-  try {
-    const parsed = JSON.parse(String(raw));
-    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item === 'object') : [];
-  } catch (_) {
-    return [];
-  }
+  try { const parsed = JSON.parse(String(raw)); return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item === 'object') : []; } catch (_) { return []; }
 }
 
 function getCampaignRequestedCompanyCount() {

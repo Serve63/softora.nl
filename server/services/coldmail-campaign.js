@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 const dns = require('node:dns').promises;
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const { readChunkedStateValue } = require('./data-ops-serialization');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -208,7 +209,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function parseDatabaseRows(values = {}) {
-    const raw = normalizeString(values && values[customerDbKey]);
+    const raw = normalizeString(readChunkedStateValue(values, customerDbKey));
     if (!raw) return [];
     try {
       const parsed = JSON.parse(raw);
@@ -219,7 +220,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function parseLeadDatabaseRows(values = {}) {
-    const raw = normalizeString(values && values[leadDbKey]);
+    const raw = normalizeString(readChunkedStateValue(values, leadDbKey));
     if (!raw) return [];
     try {
       const parsed = JSON.parse(raw);
