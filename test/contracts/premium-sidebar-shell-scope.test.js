@@ -180,18 +180,28 @@ test('custom premium layouts stay outside the shared sidebar shell', () => {
   }
 });
 
-test('static premium sidebars ship the websitedesign link in html', () => {
+test('static premium sidebars ship the webdesign link in html', () => {
   for (const relativePath of staticSidebarPages) {
     const pageSource = readRepoFile(relativePath);
     assert.match(
       pageSource,
       /data-sidebar-key="websitegenerator"/,
-      `${relativePath} hoort Websitedesign direct in de sidebar html te hebben`
+      `${relativePath} hoort Webdesign direct in de sidebar html te hebben`
     );
     assert.match(
       pageSource,
-      /<span class="sidebar-link-text">Websitedesign<\/span>/,
-      `${relativePath} hoort de sidebarnaam Websitedesign te tonen`
+      /<span class="sidebar-link-text">Webdesign<\/span>/,
+      `${relativePath} hoort de sidebarnaam Webdesign te tonen`
+    );
+    assert.match(
+      pageSource,
+      /data-sidebar-key="qr_code"/,
+      `${relativePath} hoort QR Code direct in de sidebar html te hebben`
+    );
+    assert.match(
+      pageSource,
+      /<span class="sidebar-link-text">QR Code<\/span>/,
+      `${relativePath} hoort de sidebarnaam QR Code te tonen`
     );
   }
 });
@@ -246,8 +256,9 @@ test('static premium sidebars share the same section order and public labels', (
       links: [
         'customers:Klanten',
         'mailbox:Mailbox',
-        'websitegenerator:Websitedesign',
+        'websitegenerator:Webdesign',
         'seo:SEO',
+        'qr_code:QR Code',
         'packages:Pakketten',
         "pdfs:PDF'S",
       ],
@@ -300,8 +311,10 @@ test('static premium sidebars share the same section order and public labels', (
     assert.equal(linkTargets.ads_google, '/premium-advertenties#google');
     assert.equal(linkTargets.ads_linkedin, '/premium-advertenties#linkedin');
     assert.equal(linkTargets.social_linkedin, '/premium-socialmedia#linkedin');
+    assert.equal(linkTargets.qr_code, '/premium-qr-code');
     for (const lockedKey of [
       'seo',
+      'qr_code',
       'ads_trustoo',
       'ads_pinterest',
       'ads_facebook',

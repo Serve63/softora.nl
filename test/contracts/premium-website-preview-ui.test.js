@@ -38,8 +38,8 @@ const websiteGeneratorSource = `${websiteGeneratorHtmlSource}\n${websiteGenerato
 test('premium websitegenerator biedt een websitelink-aanmaken flow met html input', () => {
   const source = websiteGeneratorHtmlSource;
 
-  assert.match(source, /<title>Websitedesign – Softora\.nl<\/title>/);
-  assert.match(source, /<div class="page-title">Websitedesign<\/div>/);
+  assert.match(source, /<title>Webdesign – Softora\.nl<\/title>/);
+  assert.match(source, /<div class="page-title">Webdesign<\/div>/);
   assert.doesNotMatch(source, /<div class="page-title">Website Generator<\/div>/);
   assert.match(source, /Eén URL per keer\. AI genereert voor die website één homepage preview\./);
   assert.match(source, /<input class="inp" id="scan-url" type="text" placeholder="softora\.nl" spellcheck="false" value="softora\.nl">/);
