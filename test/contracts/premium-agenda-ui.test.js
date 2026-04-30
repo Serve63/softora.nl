@@ -53,7 +53,7 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   );
   assert.match(
     pageSource,
-    /function syncWorkspaceExitControls\(\) \{[\s\S]*const shouldHideDismissControls = shouldHideWorkspaceDismissControls\(\);[\s\S]*const hideClose = shouldLockExit \|\| shouldHideDismissControls;[\s\S]*modalCloseBtn\.hidden = hideClose;[\s\S]*modalCloseBtn\.style\.display = hideClose \? 'none' : '';[\s\S]*modalCloseBtn\.setAttribute\('aria-hidden', hideClose \? 'true' : 'false'\);[\s\S]*modalSecondaryBtn\.hidden = shouldHideDismissControls;[\s\S]*modalSecondaryBtn\.disabled = shouldLockExit \|\| shouldHideDismissControls;/
+    /function syncWorkspaceExitControls\(\) \{[\s\S]*const shouldHideDismissControls = shouldHideWorkspaceDismissControls\(\);[\s\S]*const shouldHideFooterClose = !modalWorkspaceMode;[\s\S]*const hideClose = shouldLockExit \|\| shouldHideDismissControls;[\s\S]*modalCloseBtn\.hidden = hideClose;[\s\S]*modalCloseBtn\.style\.display = hideClose \? 'none' : '';[\s\S]*modalCloseBtn\.setAttribute\('aria-hidden', hideClose \? 'true' : 'false'\);[\s\S]*modalSecondaryBtn\.hidden = shouldHideFooterClose \|\| shouldHideDismissControls;[\s\S]*modalSecondaryBtn\.disabled = shouldLockExit \|\| shouldHideFooterClose \|\| shouldHideDismissControls;/
   );
   assert.match(
     pageSource,
