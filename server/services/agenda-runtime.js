@@ -488,18 +488,33 @@ function createAgendaRuntime(deps = {}) {
       fileName === 'premium-database.html' ||
       fileName === 'premium-personeel-dashboard.html'
     ) {
-      const customersPayload = await customersPageBootstrapService.buildCustomersBootstrapPayload();
+      const isPremiumDashboard = fileName === 'premium-personeel-dashboard.html';
+      const [customersPayload, activeOrdersState] = await Promise.all([
+        customersPageBootstrapService.buildCustomersBootstrapPayload(),
+        isPremiumDashboard ? getUiStateValues(premiumActiveOrdersScope) : Promise.resolve(null),
+      ]);
+      const dashboardPayload =
+        isPremiumDashboard && activeOrdersState
+          ? {
+              ...customersPayload,
+              activeOrdersState: {
+                values: activeOrdersState.values || {},
+                source: activeOrdersState.source || '',
+                updatedAt: activeOrdersState.updatedAt || null,
+              },
+            }
+          : customersPayload;
       const bootstrapData = {
         marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
         scriptId: 'softoraCustomersBootstrap',
-        data: customersPayload,
+        data: dashboardPayload,
       };
       if (
-        fileName === 'premium-personeel-dashboard.html' &&
+        isPremiumDashboard &&
         typeof customersPageBootstrapService.buildDashboardHtmlReplacements === 'function'
       ) {
         bootstrapData.htmlReplacements =
-          customersPageBootstrapService.buildDashboardHtmlReplacements(customersPayload);
+          customersPageBootstrapService.buildDashboardHtmlReplacements(dashboardPayload);
       }
       return {
         ...bootstrapData,
