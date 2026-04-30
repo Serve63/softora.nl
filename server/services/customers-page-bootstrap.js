@@ -6,6 +6,7 @@ function createCustomersPageBootstrapService(deps = {}) {
     customerKey = 'softora_customers_premium_v1',
     orderScope = 'premium_active_orders',
     orderKey = 'softora_custom_orders_premium_v1',
+    orderRuntimeKey = 'softora_order_runtime_premium_v1',
   } = deps;
 
   function normalizeDate(value) {
@@ -286,6 +287,84 @@ function createCustomersPageBootstrapService(deps = {}) {
     }
   }
 
+  function parseOrderRuntime(raw) {
+    try {
+      const parsed = JSON.parse(String(raw || '{}'));
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function normalizeOrderStatus(value) {
+    const key = normalizeString(value).toLowerCase();
+    if (key === 'actief') return 'actief';
+    if (key === 'bezig') return 'bezig';
+    if (key === 'klaar') return 'klaar';
+    if (key === 'betaald') return 'betaald';
+    return 'wacht';
+  }
+
+  function isOrderBuilt(order, runtimeMap) {
+    const runtime = runtimeMap && typeof runtimeMap === 'object' ? runtimeMap[String(order?.id)] || {} : {};
+    const pct = Math.max(0, Math.min(100, Number(runtime?.progressPct ?? order?.progressPct) || 0));
+    const fallback = pct >= 100 ? 'klaar' : pct > 0 ? 'bezig' : 'wacht';
+    const status = normalizeOrderStatus(runtime?.statusKey || runtime?.status || order?.status || fallback);
+    return status === 'klaar' || status === 'betaald' || pct >= 100;
+  }
+
+  function classifyActiveOrderProductLine(order) {
+    const haystack = [order?.title, order?.description, order?.prompt].join(' ').toLowerCase();
+    if (/chatbot|chatbots|whatsapp\s*bot|widget\s*bot|conversational\s*bot/.test(haystack)) {
+      return 'chatbot';
+    }
+    if (/voice\s*software|voicesoftware|voicebot|spraakbot|belbot|telefonie\s*ai/.test(haystack)) {
+      return 'voice';
+    }
+    if (/bedrijfssoftware|business\s*software|business_software|\bcrm\b|\berp\b/.test(haystack)) {
+      return 'business';
+    }
+    return 'website';
+  }
+
+  function buildActiveOrdersBreakdown(activeOrdersState = {}) {
+    const values = activeOrdersState && typeof activeOrdersState.values === 'object' ? activeOrdersState.values : {};
+    const orders = parseOrders(readChunkedStateValue(values, orderKey));
+    const runtimeMap = parseOrderRuntime(readChunkedStateValue(values, orderRuntimeKey));
+    return orders
+      .filter((order) => !isOrderBuilt(order, runtimeMap))
+      .reduce(
+        (counts, order) => {
+          const productLine = classifyActiveOrderProductLine(order);
+          if (productLine === 'business') counts.business += 1;
+          else if (productLine === 'voice') counts.voice += 1;
+          else if (productLine === 'chatbot') counts.chatbot += 1;
+          else counts.website += 1;
+          return counts;
+        },
+        { website: 0, business: 0, voice: 0, chatbot: 0 }
+      );
+  }
+
+  function escapeInlineJson(value) {
+    return JSON.stringify(value === undefined ? null : value)
+      .replace(/</g, '\\u003c')
+      .replace(/>/g, '\\u003e')
+      .replace(/&/g, '\\u0026')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029');
+  }
+
+  function buildDashboardActiveOrdersBootstrapScript(counts) {
+    const safeCounts = {
+      website: Math.max(0, Number(counts?.website) || 0),
+      business: Math.max(0, Number(counts?.business) || 0),
+      voice: Math.max(0, Number(counts?.voice) || 0),
+      chatbot: Math.max(0, Number(counts?.chatbot) || 0),
+    };
+    return `<script>(function applyActiveOrders(){var counts=${escapeInlineJson(safeCounts)};var root=typeof document!=='undefined'?document.getElementById('kpiActiveOrders'):null;if(!root){if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',applyActiveOrders,{once:true});return;}var pairs=[['website','[data-kpi-active-website]'],['business','[data-kpi-active-business]'],['voice','[data-kpi-active-voice]'],['chatbot','[data-kpi-active-chatbot]']];pairs.forEach(function(pair){var el=root.querySelector(pair[1]);if(el)el.textContent=String(counts[pair[0]]||0);});root.setAttribute('aria-label','Website opdrachten: '+(counts.website||0)+', bedrijfssoftware: '+(counts.business||0)+', voicesoftware: '+(counts.voice||0)+', chatbots: '+(counts.chatbot||0));})();</script>`;
+  }
+
   function inferTypeFromOrder(order) {
     const haystack = [order?.title, order?.description, order?.prompt].join(' ').toLowerCase();
     const maintenanceKeywords = [
@@ -425,10 +504,12 @@ function createCustomersPageBootstrapService(deps = {}) {
 
   function buildDashboardHtmlReplacements(payload = {}) {
     const summary = buildDashboardMetricSummary(payload.customers);
+    const activeOrdersBreakdown = buildActiveOrdersBreakdown(payload.activeOrdersState);
     return {
       SOFTORA_DASHBOARD_TOTAL_REVENUE: formatDashboardMoney(summary.totalRevenue),
       SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
-      SOFTORA_DASHBOARD_TOTAL_CLIENTS: String(summary.totalCustomers),
+      SOFTORA_DASHBOARD_TOTAL_CLIENTS:
+        String(summary.totalCustomers) + buildDashboardActiveOrdersBootstrapScript(activeOrdersBreakdown),
     };
   }
 
@@ -436,7 +517,7 @@ function createCustomersPageBootstrapService(deps = {}) {
     const remoteState = await getUiStateValues(customerScope);
     const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
     const orderState = await getUiStateValues(orderScope);
-    const orders = parseOrders(orderState?.values?.[orderKey]);
+    const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
 
     if (remoteCustomers.length) {
       return {
