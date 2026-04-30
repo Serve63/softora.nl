@@ -46,10 +46,10 @@ function isManualAppointmentStartInPast(dateYmd, timeValue) {
 
 function isManualOtherAppointment(apt) {
     if (!apt || typeof apt !== 'object') return false;
-    const choice = normalizeManualLegendChoice(apt.manualLegendChoice || apt.legendChoice || '');
-    if (choice === 'manual-overig') return true;
-    if (choice) return false;
     if (!isManualAgendaAppointment(apt)) return false;
+    const choice = normalizeManualLegendChoice(apt.manualLegendChoice || apt.legendChoice || '');
+    if (choice === 'manual-overig' || choice === 'manual-serve' || choice === 'manual-martijn' || choice === 'manual-both') return true;
+    if (choice) return false;
     const kindText = [apt.manualKind, apt.kind, apt.type, apt.appointmentKind, apt.source]
         .map((value) => String(value || '').trim().toLowerCase())
         .join(' ');
