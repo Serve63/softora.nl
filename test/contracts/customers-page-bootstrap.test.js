@@ -58,7 +58,79 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   const replacements = service.buildDashboardHtmlReplacements(payload);
   assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac600');
   assert.equal(replacements.SOFTORA_DASHBOARD_MAINTENANCE_REVENUE, '\u20ac0');
-  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, '2');
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^2<script>/);
+});
+
+test('customers page bootstrap vult dashboard actieve-opdrachten teller server-side', () => {
+  const orders = JSON.stringify([
+    {
+      id: 11,
+      clientName: 'Servé Creusen',
+      title: 'Website opdracht',
+      description: 'Nieuwe website bouwen',
+      amount: 2500,
+      status: 'wacht',
+    },
+    {
+      id: 12,
+      clientName: 'BusinessCo',
+      title: 'Bedrijfssoftware opdracht',
+      description: 'CRM bouwen',
+      amount: 2500,
+      status: 'wacht',
+    },
+    {
+      id: 13,
+      clientName: 'VoiceCo',
+      title: 'Voicesoftware opdracht',
+      description: 'Belbot bouwen',
+      amount: 2500,
+      status: 'wacht',
+    },
+    {
+      id: 14,
+      clientName: 'ChatCo',
+      title: 'Chatbot opdracht',
+      description: 'WhatsApp bot bouwen',
+      amount: 2500,
+      status: 'wacht',
+    },
+    {
+      id: 15,
+      clientName: 'KlaarCo',
+      title: 'Website opdracht',
+      description: 'Al gebouwd',
+      amount: 2500,
+      status: 'wacht',
+    },
+  ]);
+  const service = createCustomersPageBootstrapService({});
+
+  const replacements = service.buildDashboardHtmlReplacements({
+    customers: [],
+    activeOrdersState: {
+      values: {
+        softora_custom_orders_premium_v1: '',
+        softora_custom_orders_premium_v1_chunks_v1: JSON.stringify({ count: 2 }),
+        softora_custom_orders_premium_v1_chunk_0: orders.slice(0, 80),
+        softora_custom_orders_premium_v1_chunk_1: orders.slice(80),
+        softora_order_runtime_premium_v1: JSON.stringify({
+          11: { statusKey: 'bezig', progressPct: 0 },
+          12: { statusKey: 'bezig', progressPct: 0 },
+          13: { statusKey: 'bezig', progressPct: 0 },
+          14: { statusKey: 'bezig', progressPct: 0 },
+          15: { statusKey: 'betaald', progressPct: 0 },
+        }),
+      },
+    },
+  });
+
+  const script = replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS;
+  assert.match(script, /"website":1/);
+  assert.match(script, /"business":1/);
+  assert.match(script, /"voice":1/);
+  assert.match(script, /"chatbot":1/);
+  assert.match(script, /data-kpi-active-website/);
 });
 
 test('customers page bootstrap leest chunked customer database rows', async () => {
