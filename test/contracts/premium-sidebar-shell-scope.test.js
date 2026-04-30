@@ -186,12 +186,23 @@ test('static premium sidebars ship the websitedesign link in html', () => {
     assert.match(
       pageSource,
       /data-sidebar-key="websitegenerator"/,
-      `${relativePath} hoort Websitedesign direct in de sidebar html te hebben`
+      `${relativePath} hoort Webdesign direct in de sidebar html te hebben`
     );
     assert.match(
       pageSource,
-      /<span class="sidebar-link-text">Websitedesign<\/span>/,
-      `${relativePath} hoort de sidebarnaam Websitedesign te tonen`
+      /<span class="sidebar-link-text">Webdesign<\/span>/,
+      `${relativePath} hoort de sidebarnaam Webdesign te tonen`
+    );
+  }
+});
+
+test('static premium sidebars ship the locked QR Code link in html', () => {
+  for (const relativePath of staticSidebarPages) {
+    const pageSource = readRepoFile(relativePath);
+    assert.match(
+      pageSource,
+      /data-sidebar-key="qr_code"[\s\S]*aria-disabled="true"[\s\S]*<span class="sidebar-link-text">QR Code<\/span>/,
+      `${relativePath} hoort QR Code als vergrendelde beheeroptie te tonen`
     );
   }
 });
@@ -246,7 +257,8 @@ test('static premium sidebars share the same section order and public labels', (
       links: [
         'customers:Klanten',
         'mailbox:Mailbox',
-        'websitegenerator:Websitedesign',
+        'websitegenerator:Webdesign',
+        'qr_code:QR Code',
         'seo:SEO',
         'packages:Pakketten',
         "pdfs:PDF'S",

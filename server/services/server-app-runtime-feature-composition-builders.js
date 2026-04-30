@@ -278,12 +278,14 @@ function buildServerAppFeatureWiringRuntimeContext({
       seoWriteCoordinator: uiSeoRuntime.seoWriteCoordinator,
       openAiCostSummary: {
         env,
-        openAiAdminApiKey: shared.normalizeString(env.OPENAI_ADMIN_API_KEY || env.OPENAI_COSTS_API_KEY || ''),
+        openAiAdminApiKey: shared.normalizeString(
+          env.OPENAI_ADMIN_API_KEY || env.OPENAI_COSTS_API_KEY || env.OPENAI_API_KEY || ''
+        ),
         openAiCostsApiBaseUrl: env.OPENAI_COSTS_API_BASE_URL || envConfig.OPENAI_API_BASE_URL,
         openAiOrganizationId: env.OPENAI_ORGANIZATION_ID || env.OPENAI_ORG_ID || env.OPENAI_ORGANIZATION || '',
         openAiProjectId: env.OPENAI_PROJECT_ID || env.OPENAI_PROJECT || '',
         fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
-        usdToEurRate: Number(env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR || 0),
+        usdToEurRate: Number(env.OPENAI_COSTS_EUR_RATE || env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR || 0),
       },
       getUiStateValues: uiSeoRuntime.getUiStateValues,
       setUiStateValues: uiSeoRuntime.setUiStateValues,

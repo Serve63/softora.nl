@@ -1,6 +1,10 @@
 (function () {
   const STYLE_ID = 'softora-coldmail-location-variable-style';
 
+  function isLeadGeneratorAlias() {
+    return document.documentElement.getAttribute('data-softora-lead-generator-alias') === '1';
+  }
+
   function normalizeBodyTemplate(value) {
     return String(value || '')
       .replace(/(^|\n)([ \t]*📍[ \t]*)Haaren([ \t]*(?=\n|$))/gi, '$1$2{{stad}}$3')
@@ -19,8 +23,9 @@
   }
 
   function ensureLocationNote() {
-    const bodyInput = document.getElementById('body1');
-    if (!bodyInput || document.querySelector('.mail-variable-note')) return;
+    if (isLeadGeneratorAlias()) return;
+    const settingsFields = document.querySelector('#mail-panel-5 .mail-fields');
+    if (!settingsFields || document.querySelector('.mail-variable-note')) return;
     const note = document.createElement('div');
     note.className = 'mail-variable-note';
     note.setAttribute('aria-label', 'Dynamische plaats uit database');
@@ -33,10 +38,16 @@
     const label = document.createElement('span');
     label.textContent = 'Plaats uit database';
     note.append(pin, variable, label);
-    bodyInput.insertAdjacentElement('afterend', note);
+    const intro = settingsFields.querySelector('.settings-intro');
+    if (intro && intro.nextSibling) {
+      settingsFields.insertBefore(note, intro.nextSibling);
+      return;
+    }
+    settingsFields.insertBefore(note, settingsFields.firstChild);
   }
 
   function normalizeCurrentTextarea() {
+    if (isLeadGeneratorAlias()) return;
     const bodyInput = document.getElementById('body1');
     if (!bodyInput) return;
     const normalized = normalizeBodyTemplate(bodyInput.value);
@@ -52,9 +63,21 @@
   }
 
   function installFunctionWrappers() {
+    if (isLeadGeneratorAlias()) return;
     wrapGlobalFunction('applyColdmailingSettings', (original) => function (settings) {
       const nextSettings = settings && typeof settings === 'object'
-        ? Object.assign({}, settings, { body: normalizeBodyTemplate(settings.body) })
+        ? Object.assign({}, settings, {
+            body: normalizeBodyTemplate(settings.body),
+            servicePrompts: settings.servicePrompts && typeof settings.servicePrompts === 'object'
+              ? Object.keys(settings.servicePrompts).reduce((prompts, key) => {
+                  const prompt = settings.servicePrompts[key];
+                  prompts[key] = prompt && typeof prompt === 'object'
+                    ? Object.assign({}, prompt, { body: normalizeBodyTemplate(prompt.body) })
+                    : prompt;
+                  return prompts;
+                }, {})
+              : settings.servicePrompts,
+          })
         : settings;
       const result = original.call(this, nextSettings);
       normalizeCurrentTextarea();
@@ -64,6 +87,12 @@
     wrapGlobalFunction('collectColdmailingSettings', (original) => function () {
       const settings = original.apply(this, arguments);
       if (settings && typeof settings === 'object') settings.body = normalizeBodyTemplate(settings.body);
+      if (settings && settings.servicePrompts && typeof settings.servicePrompts === 'object') {
+        Object.keys(settings.servicePrompts).forEach((key) => {
+          const prompt = settings.servicePrompts[key];
+          if (prompt && typeof prompt === 'object') prompt.body = normalizeBodyTemplate(prompt.body);
+        });
+      }
       return settings;
     });
 
@@ -75,6 +104,7 @@
   }
 
   function install() {
+    if (isLeadGeneratorAlias()) return;
     injectStyle();
     ensureLocationNote();
     normalizeCurrentTextarea();

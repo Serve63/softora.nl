@@ -1063,6 +1063,73 @@
     scheduleRemoteUiStateSave();
   }
 
+  function writeStoragePatch(patch) {
+    const entries = patch && typeof patch === 'object' ? Object.entries(patch) : [];
+    if (!entries.length) return;
+    entries.forEach(([key, value]) => {
+      if (!key) return;
+      const nextValue = String(value ?? '');
+      remoteUiStateCache[key] = nextValue;
+      remoteUiStatePendingPatch[key] = nextValue;
+    });
+    scheduleRemoteUiStateSave();
+  }
+
+  function getChunkMetaKey(baseKey) {
+    return `${normalizeString(baseKey)}_chunks_v1`;
+  }
+
+  function getChunkPrefix(baseKey) {
+    return `${normalizeString(baseKey)}_chunk_`;
+  }
+
+  function readChunkedStorageValue(baseKey) {
+    const normalizedKey = normalizeString(baseKey);
+    if (!normalizedKey) return '';
+    const fallback = String(remoteUiStateCache[normalizedKey] ?? '');
+    const metaRaw = normalizeString(remoteUiStateCache[getChunkMetaKey(normalizedKey)]);
+    if (!metaRaw) return fallback;
+    try {
+      const meta = JSON.parse(metaRaw);
+      const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0));
+      if (!count) return fallback;
+      const prefix = getChunkPrefix(normalizedKey);
+      const chunks = [];
+      for (let index = 0; index < count; index += 1) {
+        const chunk = remoteUiStateCache[prefix + index];
+        if (typeof chunk !== 'string') return fallback;
+        chunks.push(chunk);
+      }
+      return chunks.join('') || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function buildChunkedStoragePatch(baseKey, rawValue, chunkSize = 120000) {
+    const normalizedKey = normalizeString(baseKey);
+    const serialized = String(rawValue || '');
+    if (!normalizedKey) return {};
+    const safeChunkSize = Math.max(10000, Math.min(180000, Number(chunkSize) || 120000));
+    const chunks = [];
+    for (let index = 0; index < serialized.length; index += safeChunkSize) {
+      chunks.push(serialized.slice(index, index + safeChunkSize));
+    }
+    if (!chunks.length) chunks.push('');
+    const patch = {
+      [normalizedKey]: serialized.length <= safeChunkSize ? serialized : '',
+      [getChunkMetaKey(normalizedKey)]: JSON.stringify({
+        count: chunks.length,
+        updatedAt: new Date().toISOString(),
+      }),
+    };
+    const prefix = getChunkPrefix(normalizedKey);
+    chunks.forEach((chunk, index) => {
+      patch[prefix + index] = chunk;
+    });
+    return patch;
+  }
+
   async function loadRemoteUiState() {
     if (remoteUiStateLoaded) return true;
     if (remoteUiStateLoadingPromise) return remoteUiStateLoadingPromise;
@@ -1830,7 +1897,7 @@
   }
 
   function getSavedLeadRows() {
-    const raw = readStorage(LEAD_ROWS_STORAGE_KEY).trim();
+    const raw = readChunkedStorageValue(LEAD_ROWS_STORAGE_KEY).trim();
     if (!raw) {
       return [];
     }
@@ -1853,7 +1920,7 @@
 
   function saveLeadRows(rows) {
     const serialized = JSON.stringify((rows || []).map(normalizeLeadRow));
-    writeStorage(LEAD_ROWS_STORAGE_KEY, serialized);
+    writeStoragePatch(buildChunkedStoragePatch(LEAD_ROWS_STORAGE_KEY, serialized));
   }
 
   function persistLeadRowsDraft(rows) {

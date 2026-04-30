@@ -39,7 +39,8 @@ function resolveOpenAiCostsApiKey(deps = {}) {
     deps.openAiAdminApiKey ||
       deps.openAiCostsApiKey ||
       env.OPENAI_ADMIN_API_KEY ||
-      env.OPENAI_COSTS_API_KEY
+      env.OPENAI_COSTS_API_KEY ||
+      env.OPENAI_API_KEY
   );
 }
 
@@ -107,7 +108,12 @@ function resolveAnthropicApiBaseUrl(deps = {}) {
 
 function getUsdToEurRate(deps = {}) {
   const env = deps.env || process.env || {};
-  const parsed = Number(deps.usdToEurRate || env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR);
+  const parsed = Number(
+    deps.usdToEurRate ||
+      env.OPENAI_COSTS_EUR_RATE ||
+      env.OPENAI_COST_USD_TO_EUR ||
+      env.AI_COST_USD_TO_EUR
+  );
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_USD_TO_EUR_RATE;
 }
 
@@ -245,7 +251,7 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
       'OpenAI factuurkosten zijn nog niet gekoppeld.',
       'OPENAI_COSTS_NOT_CONFIGURED',
       503,
-      'Zet OPENAI_COSTS_API_KEY of OPENAI_ADMIN_API_KEY om daadwerkelijke OpenAI-kosten te tonen.'
+      'Zet OPENAI_COSTS_API_KEY, OPENAI_ADMIN_API_KEY of een OPENAI_API_KEY met adminrechten om daadwerkelijke OpenAI-kosten te tonen.'
     );
   }
 

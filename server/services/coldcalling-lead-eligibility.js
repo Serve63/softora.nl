@@ -170,8 +170,39 @@ function getDatabaseCompanyKey(row) {
   );
 }
 
+function getChunkMetaKey(baseKey) {
+  return `${normalizeString(baseKey)}_chunks_v1`;
+}
+
+function getChunkPrefix(baseKey) {
+  return `${normalizeString(baseKey)}_chunk_`;
+}
+
+function readChunkedStateValue(values, baseKey) {
+  const stateValues = values && typeof values === 'object' ? values : {};
+  const normalizedKey = normalizeString(baseKey);
+  const fallback = typeof stateValues[normalizedKey] === 'string' ? stateValues[normalizedKey] : '';
+  const metaRaw = normalizeString(stateValues[getChunkMetaKey(normalizedKey)]);
+  if (!metaRaw) return fallback;
+  try {
+    const meta = JSON.parse(metaRaw);
+    const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0));
+    if (!count) return fallback;
+    const prefix = getChunkPrefix(normalizedKey);
+    const chunks = [];
+    for (let index = 0; index < count; index += 1) {
+      const chunk = stateValues[prefix + index];
+      if (typeof chunk !== 'string') return fallback;
+      chunks.push(chunk);
+    }
+    return chunks.join('') || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function parseCustomerDatabaseRowsFromUiState(values = {}, key = DEFAULT_CUSTOMER_DB_KEY) {
-  const raw = values && typeof values === 'object' ? values[key] : null;
+  const raw = readChunkedStateValue(values, key);
   if (Array.isArray(raw)) return raw.filter((item) => item && typeof item === 'object');
   if (!raw) return [];
 

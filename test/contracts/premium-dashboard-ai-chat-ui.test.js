@@ -97,14 +97,16 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260429b/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260429c/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /window\.SoftoraPremiumDashboardCore \|\|/);
   assert.match(pageSource, /const databaseStatus = normalizePremiumDashboardCustomerDatabaseStatus\(item\);/);
   assert.match(pageSource, /databaseStatus,/);
   assert.match(pageSource, /\.filter\(\(customer\) => customer\.databaseStatus === 'klant'\)/);
-  assert.match(pageSource, /parsePremiumCustomers\(readPremiumDashboardChunkedStateValue\(values, PREMIUM_CUSTOMERS_KEY\)\)/);
+  assert.match(pageSource, /const rawCustomers = readPremiumDashboardChunkedStateValue\(values, PREMIUM_CUSTOMERS_KEY\);/);
+  assert.match(pageSource, /const customers = parsePremiumCustomers\(rawCustomers\);/);
   assert.match(pageSource, /totalClientsEl\.textContent = String\(hasCustomerDatabase \? customers\.length : uniqueClients\.size\);/);
+  assert.doesNotMatch(pageSource, /premiumDashboardState\.(orders|customers) = \[\];/);
 });
 
 test('premium dashboard laat de boot-loader niet hangen op trage ui-state requests', () => {
@@ -115,9 +117,9 @@ test('premium dashboard laat de boot-loader niet hangen op trage ui-state reques
 
   assert.match(pageSource, /startPremiumDashboardBootWatchdog\(\);/);
   assert.match(pageSource, /fetchPremiumDashboardJson\(url, \{ method: 'GET', cache: 'no-store' \}\)/);
-  assert.match(pageSource, /releasePremiumDashboardBootShell\(\);/);
+  assert.match(pageSource, /if \(loaded\) releasePremiumDashboardBootShell\(\);/);
   assert.match(coreSource, /const PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS = 6000;/);
-  assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 3500;/);
+  assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 12000;/);
   assert.match(coreSource, /function forcePremiumDashboardBootShellVisible\(\) \{/);
   assert.match(coreSource, /function releasePremiumDashboardBootShell\(\) \{/);
   assert.match(coreSource, /function startPremiumDashboardBootWatchdog\(\) \{/);
@@ -163,7 +165,7 @@ test('premium dashboard opent AI beheer configuratie met doel en toegestane midd
   assert.match(pageSource, /scheduleDays: \['monday', 'tuesday', 'wednesday', 'thursday', 'friday'\]/);
   assert.match(pageSource, /scheduleStart: '08:30'/);
   assert.match(pageSource, /scheduleEnd: '17:00'/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260429b/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260429c/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /const aiManagementScheduleDayInputs = Array\.from\(document\.querySelectorAll\('\[data-ai-schedule-day\]'\)\);/);
   assert.match(pageSource, /aiManagementScheduleStartInput\.value = config\.scheduleStart;/);

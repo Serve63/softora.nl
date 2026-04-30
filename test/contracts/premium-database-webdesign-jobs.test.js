@@ -35,19 +35,23 @@ async function waitForJobDone(coordinator, jobId) {
 
 test('premium database webdesign jobs generate and persist a customer photo in the background', async () => {
   let values = {};
+  let pipelineOptions = null;
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: { error() {} },
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     aiToolsCoordinator: {
-      runWebsitePreviewGeneratePipeline: async (url, options) => ({
-        ok: true,
-        site: { host: new URL(url).hostname },
-        image: {
-          dataUrl: 'data:image/png;base64,AAAA',
-          fileName: `${options.body.company}-webdesign.png`,
-        },
-      }),
+      runWebsitePreviewGeneratePipeline: async (url, options) => {
+        pipelineOptions = options;
+        return {
+          ok: true,
+          site: { host: new URL(url).hostname },
+          image: {
+            dataUrl: 'data:image/png;base64,AAAA',
+            fileName: `${options.body.company}-webdesign.png`,
+          },
+        };
+      },
     },
     getUiStateValues: async () => ({ values }),
     setUiStateValues: async (_scope, nextValues) => {
@@ -86,6 +90,7 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(photoMap['customer-1'].id, 'customer-1');
   assert.equal(photoMap['customer-1'].identityKey, 'softora|serve|31612345678');
   assert.equal(values['softora_database_photo_data_v1_customer-1_0'], 'data:image/png;base64,AAAA');
+  assert.equal(pipelineOptions.imageSize, '1024x1536');
 });
 
 test('premium database webdesign jobs keep status access scoped to the logged in user', async () => {
@@ -167,4 +172,37 @@ test('premium database webdesign jobs list running jobs for the current user', a
   assert.equal(res.body.ok, true);
   assert.equal(res.body.jobs.length, 1);
   assert.equal(res.body.jobs[0].customerId, 'customer-list');
+});
+
+test('premium database webdesign jobs fail stale generators instead of spinning forever', async () => {
+  const errors = [];
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error(message) { errors.push(String(message)); } },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    jobProcessTimeoutMs: 100,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => new Promise(() => {}),
+    },
+    getUiStateValues: async () => ({ values: {} }),
+    setUiStateValues: async () => ({ values: {} }),
+  });
+
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'job_timeout123456',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-timeout', bedrijf: 'Softora' },
+      },
+    },
+    createResponseRecorder()
+  );
+
+  const job = await waitForJobDone(coordinator, 'job_timeout123456');
+
+  assert.equal(job.status, 'error');
+  assert.match(job.error, /duurde te lang/i);
+  assert.ok(errors.length >= 1);
 });

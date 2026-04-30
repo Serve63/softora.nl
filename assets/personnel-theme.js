@@ -195,9 +195,9 @@
 .softora-dialog-badge-row {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
+    gap: 0.72rem;
     flex-wrap: wrap;
-    margin: 0.15rem 0 0 0;
+    margin: 0.4rem 0 0.15rem 0;
 }
 
 .softora-review-badge {
@@ -205,29 +205,31 @@
     align-items: center;
     justify-content: center;
     text-decoration: none;
-    border-radius: 10px;
+    border-radius: 14px;
     overflow: hidden;
     line-height: 0;
-    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.28), 0 2px 6px rgba(60, 64, 67, 0.15);
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    transform: translateY(0);
+    box-shadow: 0 9px 22px rgba(20, 21, 40, 0.1), 0 2px 8px rgba(20, 21, 40, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
 .softora-review-badge:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(60, 64, 67, 0.22), 0 4px 12px rgba(60, 64, 67, 0.12);
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(20, 21, 40, 0.14), 0 5px 16px rgba(20, 21, 40, 0.1);
+    filter: saturate(1.05);
 }
 
 .softora-review-badge:active {
     transform: translateY(0);
-    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.24);
+    box-shadow: 0 6px 14px rgba(20, 21, 40, 0.1);
 }
 
 .softora-review-badge--google:hover {
-    box-shadow: 0 2px 10px rgba(66, 133, 244, 0.22), 0 4px 14px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 14px 30px rgba(66, 133, 244, 0.16), 0 5px 16px rgba(20, 21, 40, 0.08);
 }
 
 .softora-review-badge--trustpilot:hover {
-    box-shadow: 0 2px 12px rgba(0, 182, 122, 0.45), 0 4px 14px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 14px 32px rgba(0, 182, 122, 0.3), 0 5px 16px rgba(20, 21, 40, 0.08);
 }
 
 .softora-review-badge:focus-visible {
@@ -237,7 +239,7 @@
 
 .softora-review-badge svg {
     display: block;
-    height: 38px;
+    height: 50px;
     width: auto;
     shape-rendering: geometricPrecision;
 }
@@ -572,8 +574,17 @@
         return {
             key: "websitegenerator",
             href: "/premium-websitegenerator",
-            label: "Websitedesign",
+            label: "Webdesign",
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg>',
+        };
+    }
+
+    function getQrCodeSidebarLink() {
+        return {
+            key: "qr_code",
+            href: "/premium-qr-code",
+            label: "QR Code",
+            icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5h6v6h-6v-6Zm9 0h6v6h-6v-6Zm-9 9h6v6h-6v-6Zm9 0h2.25v2.25H13.5V13.5Zm3.75 0h2.25v2.25h-2.25V13.5Zm-3.75 3.75h2.25v2.25H13.5v-2.25Zm3.75 3.75h2.25V19.5h-2.25V21Z"></path></svg>',
         };
     }
 
@@ -589,6 +600,7 @@
     /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
         "seo",
+        "qr_code",
         "ads_google",
         "ads_facebook",
         "ads_linkedin",
@@ -818,6 +830,7 @@
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>',
             },
             getWebsitePreviewSidebarLink(),
+            getQrCodeSidebarLink(),
             {
                 key: "seo",
                 href: "/premium-seo",
@@ -1093,6 +1106,7 @@
                 getCustomersSidebarLink(),
                 ["mailbox", "websitegenerator", "seo", "packages", "pdfs"]
             );
+            ensureStaticSidebarLink(sidebar, "beheer", getQrCodeSidebarLink(), ["seo", "packages", "pdfs"]);
         }
 
         if (overviewSection) {

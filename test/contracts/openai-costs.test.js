@@ -160,6 +160,29 @@ test('combined api costs use only OpenAI factuurkosten', async () => {
   assert.deepEqual(summary.unavailable, []);
 });
 
+test('openai costs service accepts OPENAI_API_KEY when it has admin permissions', async () => {
+  const calls = [];
+  const summary = await fetchOpenAiCostSummary(
+    {
+      env: {
+        OPENAI_API_KEY: 'standard-name-admin-key',
+      },
+      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
+      fetchJsonWithTimeout: async (url, options) => {
+        calls.push({ url, options });
+        return {
+          response: { ok: true, status: 200 },
+          data: { data: [{ results: [{ amount: { value: 29.07, currency: 'usd' } }] }], has_more: false },
+        };
+      },
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 3, 30, 9, 0, 0) }
+  );
+
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer standard-name-admin-key');
+  assert.equal(summary.costUsd, 29.07);
+});
+
 test('openai costs service fails closed when no costs key is configured', async () => {
   await assert.rejects(
     () =>

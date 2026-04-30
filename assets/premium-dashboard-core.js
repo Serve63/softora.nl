@@ -80,7 +80,7 @@ function formatMoneyEUR(amount) {
 	    }
 
     const PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS = 6000;
-    const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 3500;
+    const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 12000;
     let premiumDashboardBootWatchdog = null;
     let premiumDashboardBootReleased = false;
     let premiumDashboardBootFailSafeInstalled = false;

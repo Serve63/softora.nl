@@ -72,7 +72,7 @@ test('coldcalling pages load regio radius helpers before the dashboard bootstrap
     const pageSource = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
     assert.match(
       pageSource,
-      /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260427e" defer><\/script>/,
+      /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260430a" defer><\/script>/,
       relativePath
     );
   });

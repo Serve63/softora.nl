@@ -1216,11 +1216,7 @@ loadWebsiteGeneratorAuthState();
   const htmlInput = document.getElementById('html-code');
   const websiteLinkCreateEl = document.getElementById('website-link-create-btn');
   const websiteLinkStatusEl = document.getElementById('website-link-status');
-  const websiteLinkCopyEl = document.getElementById('website-link-copy');
-  const websiteLinkListEl = document.getElementById('website-link-list');
-  if (!urlInput || !htmlInput || !websiteLinkCreateEl || !websiteLinkStatusEl || !websiteLinkCopyEl || !websiteLinkListEl) { return; }
-
-  let latestWebsiteLinkUrl = '';
+  if (!urlInput || !htmlInput || !websiteLinkCreateEl || !websiteLinkStatusEl) { return; }
 
   function setWebsiteLinkStatus(message, isError = false) {
     websiteLinkStatusEl.textContent = String(message || '');
@@ -1237,98 +1233,6 @@ loadWebsiteGeneratorAuthState();
       return '';
     }
   }
-
-  function renderWebsiteLinkEmptyState(message) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.style.padding = '22px';
-    appendWebsiteGeneratorTextElement(empty, 'p', '', message);
-    websiteLinkListEl.replaceChildren(empty);
-  }
-
-  function createWebsiteLinkRow(link) {
-    const title = String(link?.title || link?.slug || 'Softora pagina').trim() || 'Softora pagina';
-    const urlLabel = String(link?.url || '').trim() || '—';
-    const href = normalizeWebsiteLinkHref(urlLabel);
-
-    const row = document.createElement('div');
-    row.className = 'website-link-row';
-
-    const main = document.createElement('div');
-    main.className = 'website-link-row-main';
-    const titleEl = appendWebsiteGeneratorTextElement(main, 'div', 'website-link-row-title', title);
-    titleEl.title = title;
-
-    if (href) {
-      const urlLink = appendWebsiteGeneratorTextElement(main, 'a', 'website-link-row-url', urlLabel);
-      urlLink.href = href;
-      urlLink.target = '_blank';
-      urlLink.rel = 'noopener noreferrer';
-    } else {
-      appendWebsiteGeneratorTextElement(main, 'span', 'website-link-row-url', urlLabel);
-    }
-
-    const actions = document.createElement('div');
-    actions.className = 'website-link-row-actions';
-    if (href) {
-      const liveLink = appendWebsiteGeneratorTextElement(actions, 'a', 'btn outline', 'Live pagina');
-      liveLink.href = href;
-      liveLink.target = '_blank';
-      liveLink.rel = 'noopener noreferrer';
-    } else {
-      const unavailable = appendWebsiteGeneratorTextElement(actions, 'span', 'btn outline', 'Geen live URL');
-      unavailable.setAttribute('aria-disabled', 'true');
-    }
-
-    row.append(main, actions);
-    return row;
-  }
-
-  function renderWebsiteLinks(links) {
-    const normalizedLinks = Array.isArray(links) ? links : [];
-    if (!websiteGeneratorAuthState.authenticated) {
-      renderWebsiteLinkEmptyState('Log in om opgeslagen websitelinks te bekijken.');
-      return;
-    }
-    if (!normalizedLinks.length) {
-      renderWebsiteLinkEmptyState('Nog geen websitelinks. Plak HTML-code en maak je eerste live pagina aan.');
-      return;
-    }
-    websiteLinkListEl.replaceChildren(...normalizedLinks.map((link) => createWebsiteLinkRow(link)));
-  }
-
-  async function loadWebsiteLinks() {
-    if (!websiteGeneratorAuthState.authenticated) {
-      renderWebsiteLinks([]);
-      return;
-    }
-    renderWebsiteLinkEmptyState('Websitelinks laden...');
-    try {
-      const response = await fetch('/api/website-links', {
-        method: 'GET',
-        credentials: 'same-origin',
-        cache: 'no-store',
-        headers: { Accept: 'application/json' }
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload || payload.ok === false) {
-        throw new Error(String(payload?.detail || payload?.error || 'Websitelinks laden mislukt'));
-      }
-      renderWebsiteLinks(payload.links || []);
-    } catch (error) {
-      renderWebsiteLinkEmptyState(String(error?.message || 'Websitelinks laden mislukt'));
-    }
-  }
-
-  websiteLinkCopyEl.addEventListener('click', async function () {
-    if (!latestWebsiteLinkUrl) return;
-    try {
-      await navigator.clipboard.writeText(latestWebsiteLinkUrl);
-      showToast('Websitelink gekopieerd');
-    } catch (_) {
-      showToast('Kopieren mislukt');
-    }
-  });
 
   websiteLinkCreateEl.addEventListener('click', async function () {
     const openedTab = window.open('about:blank', '_blank');
@@ -1356,8 +1260,6 @@ loadWebsiteGeneratorAuthState();
     }
 
     websiteLinkCreateEl.disabled = true;
-    websiteLinkCopyEl.hidden = true;
-    latestWebsiteLinkUrl = '';
     setWebsiteLinkStatus('Websitelink wordt aangemaakt...');
 
     try {
@@ -1377,17 +1279,15 @@ loadWebsiteGeneratorAuthState();
       if (!response.ok || !payload || payload.ok === false) {
         throw new Error(String(payload?.detail || payload?.error || 'Websitelink aanmaken mislukt'));
       }
-      latestWebsiteLinkUrl = String(payload.url || '').trim();
-      websiteLinkCopyEl.hidden = !latestWebsiteLinkUrl;
-      setWebsiteLinkStatus(latestWebsiteLinkUrl || 'Websitelink aangemaakt.');
-      if (latestWebsiteLinkUrl) {
+      const websiteLinkUrl = normalizeWebsiteLinkHref(payload.url || '');
+      setWebsiteLinkStatus(websiteLinkUrl || 'Websitelink aangemaakt.');
+      if (websiteLinkUrl) {
         if (openedTab && !openedTab.closed) {
-          openedTab.location.href = latestWebsiteLinkUrl;
+          openedTab.location.href = websiteLinkUrl;
         } else {
-          window.open(latestWebsiteLinkUrl, '_blank', 'noopener');
+          window.open(websiteLinkUrl, '_blank', 'noopener');
         }
       }
-      await loadWebsiteLinks();
     } catch (error) {
       if (openedTab && !openedTab.closed) openedTab.close();
       setWebsiteLinkStatus(String(error?.message || 'Websitelink aanmaken mislukt'), true);
@@ -1396,7 +1296,7 @@ loadWebsiteGeneratorAuthState();
     }
   });
 
-  void loadWebsiteGeneratorAuthState().then(() => loadWebsiteLinks());
+  void loadWebsiteGeneratorAuthState();
 })();
 
 bindWebsiteGeneratorPageActions();

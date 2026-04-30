@@ -14,6 +14,60 @@ let remoteUiStateSaveInFlight = false;
 let remoteUiStateSavePromise = null;
 let remoteUiStatePendingPatch = {};
 
+function getChunkMetaKey(baseKey) {
+    return String(baseKey || '').trim() + '_chunks_v1';
+}
+
+function getChunkPrefix(baseKey) {
+    return String(baseKey || '').trim() + '_chunk_';
+}
+
+function readChunkedStateValue(values, baseKey) {
+    const stateValues = values && typeof values === 'object' ? values : {};
+    const normalizedKey = String(baseKey || '').trim();
+    const fallback = typeof stateValues[normalizedKey] === 'string' ? stateValues[normalizedKey] : '';
+    const metaRaw = String(stateValues[getChunkMetaKey(normalizedKey)] || '').trim();
+    if (!metaRaw) return fallback;
+    try {
+        const meta = JSON.parse(metaRaw);
+        const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0));
+        if (!count) return fallback;
+        const prefix = getChunkPrefix(normalizedKey);
+        const chunks = [];
+        for (let index = 0; index < count; index += 1) {
+            const chunk = stateValues[prefix + index];
+            if (typeof chunk !== 'string') return fallback;
+            chunks.push(chunk);
+        }
+        return chunks.join('') || fallback;
+    } catch (_) {
+        return fallback;
+    }
+}
+
+function buildChunkedStatePatch(baseKey, rawValue, chunkSize) {
+    const normalizedKey = String(baseKey || '').trim();
+    const serialized = String(rawValue || '');
+    const safeChunkSize = Math.max(10000, Math.min(180000, Number(chunkSize) || 120000));
+    const chunks = [];
+    for (let index = 0; index < serialized.length; index += safeChunkSize) {
+        chunks.push(serialized.slice(index, index + safeChunkSize));
+    }
+    if (!chunks.length) chunks.push('');
+    const patch = {
+        [normalizedKey]: serialized.length <= safeChunkSize ? serialized : '',
+        [getChunkMetaKey(normalizedKey)]: JSON.stringify({
+            count: chunks.length,
+            updatedAt: new Date().toISOString()
+        })
+    };
+    const prefix = getChunkPrefix(normalizedKey);
+    chunks.forEach((chunk, index) => {
+        patch[prefix + index] = chunk;
+    });
+    return patch;
+}
+
 const orders = {
     1: { name: 'Kapsalon Mooi', type: 'Kapper Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null },
     2: { name: 'Restaurant De Harmonie', type: 'Restaurant Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null },
@@ -414,7 +468,7 @@ function parseCustomerDatabase(raw) {
 async function readCustomerDatabase() {
     try {
         const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
-        const remoteCustomers = parseCustomerDatabase(remoteState?.values?.[CUSTOMER_DB_KEY]);
+        const remoteCustomers = parseCustomerDatabase(readChunkedStateValue(remoteState?.values, CUSTOMER_DB_KEY));
         if (remoteCustomers.length) return remoteCustomers;
     } catch (_) {
         return [];
@@ -424,9 +478,7 @@ async function readCustomerDatabase() {
 async function persistCustomerDatabase(customers) {
     const serialized = JSON.stringify(Array.isArray(customers) ? customers : []);
     await fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
-        patch: {
-            [CUSTOMER_DB_KEY]: serialized
-        },
+        patch: buildChunkedStatePatch(CUSTOMER_DB_KEY, serialized),
         source: 'premium-actieve-opdrachten',
         actor: 'browser'
     });
@@ -2076,7 +2128,7 @@ async function markOrderAsPaid(id, options = {}) {
     const requiresConfirmation = options.confirm === true && !ui.isBuilt;
     if (requiresConfirmation) {
         const invoicePaidReviewReminder =
-            'Vergeet niet om de klant op een vriendelijk en natuurlijk moment te vragen of hij of zij een review wil achterlaten over de ervaring!';
+            'Vergeet niet om de klant op een natuurlijk moment te vragen of hij of zij een revieuw wilt achterlaten!';
         const reviewBadgeGoogleUrl = 'https://www.google.com/maps';
         const reviewBadgeTrustpilotUrl = 'https://www.trustpilot.com';
         const invoicePaidConfirmBodyHtml = [
@@ -2087,23 +2139,28 @@ async function markOrderAsPaid(id, options = {}) {
             '<a class="softora-review-badge softora-review-badge--google" href="',
             reviewBadgeGoogleUrl,
             '" target="_blank" rel="noopener noreferrer" aria-label="Google Reviews">',
-            '<svg xmlns="http://www.w3.org/2000/svg" width="142" height="38" viewBox="0 0 142 38" aria-hidden="true" role="img">',
-            '<rect width="142" height="38" rx="9" fill="#fff" stroke="#dadce0" stroke-width="1"/>',
-            '<g transform="translate(8 7) scale(0.833333)">',
+            '<svg xmlns="http://www.w3.org/2000/svg" width="176" height="50" viewBox="0 0 176 50" aria-hidden="true" role="img">',
+            '<rect x="1" y="1" width="174" height="48" rx="14" fill="#fff" stroke="#dadce0" stroke-width="1"/>',
+            '<rect x="1.5" y="1.5" width="173" height="47" rx="13.5" fill="none" stroke="rgba(66,133,244,0.10)" stroke-width="1"/>',
+            '<g transform="translate(15 13) scale(0.92)">',
             '<path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>',
             '<path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>',
             '<path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>',
             '<path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>',
             '</g>',
-            '<text x="44" y="24" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#202124">Google Reviews</text>',
+            '<text x="52" y="24" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="750" fill="#202124">Google</text>',
+            '<text x="52" y="38" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="10" font-weight="600" fill="#6b7280" letter-spacing="0.08em">REVIEWS</text>',
             '</svg></a>',
             '<a class="softora-review-badge softora-review-badge--trustpilot" href="',
             reviewBadgeTrustpilotUrl,
             '" target="_blank" rel="noopener noreferrer" aria-label="Trustpilot">',
-            '<svg xmlns="http://www.w3.org/2000/svg" width="148" height="38" viewBox="0 0 148 38" aria-hidden="true" role="img">',
-            '<rect width="148" height="38" rx="9" fill="#00b67a"/>',
-            '<path fill="#fff" d="M19.2 11.2l2.35 7.15h7.6l-6.15 5.6 2.35 7.15-6.15-4.48-6.15 4.48 2.35-7.15-6.15-5.6h7.6l2.35-7.15z"/>',
-            '<text x="40" y="24" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#fff" letter-spacing="0.04em">Trustpilot</text>',
+            '<svg xmlns="http://www.w3.org/2000/svg" width="176" height="50" viewBox="0 0 176 50" aria-hidden="true" role="img">',
+            '<defs><linearGradient id="trustpilotReviewGradient" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#05d596"/><stop offset="1" stop-color="#00a875"/></linearGradient></defs>',
+            '<rect x="1" y="1" width="174" height="48" rx="14" fill="url(#trustpilotReviewGradient)"/>',
+            '<rect x="1.5" y="1.5" width="173" height="47" rx="13.5" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1"/>',
+            '<path fill="#fff" d="M29 12.3l3.03 9.22h9.8l-7.93 7.22 3.03 9.22L29 32.18l-7.93 5.78 3.03-9.22-7.93-7.22h9.8L29 12.3z"/>',
+            '<text x="53" y="24" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#fff" letter-spacing="0.02em">Trustpilot</text>',
+            '<text x="53" y="38" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="rgba(255,255,255,0.78)" letter-spacing="0.08em">REVIEW</text>',
             '</svg></a>',
             '</div>',
         ].join('');
@@ -2428,11 +2485,7 @@ function getProgressStepForPct(pct) {
 }
 
 function refreshOpenModalOverview(id) {
-    if (Number(currentModalId) !== Number(id)) return;
-    const overview = document.getElementById('modalOverview');
-    if (overview) {
-        renderModalOverview(overview, id);
-    }
+    void id;
 }
 
 function setOrderProgress(id, pct, step, options = {}) {
@@ -2714,163 +2767,8 @@ function executeOrder(id) {
     openClaimOrderModal(activeId);
 }
 
-function formatModalDateTime(value) {
-    const raw = String(value || '').trim();
-    if (!raw) return '—';
-
-    const asNumber = Number(raw);
-    if (Number.isFinite(asNumber) && asNumber > 0) {
-        const d = new Date(asNumber);
-        if (!Number.isNaN(d.getTime())) {
-            return d.toLocaleString('nl-NL');
-        }
-    }
-
-    const date = new Date(raw);
-    if (Number.isNaN(date.getTime())) return raw;
-    return date.toLocaleString('nl-NL');
-}
-
-function normalizeModalLinkUrl(value) {
-    const raw = String(value || '').trim();
-    if (!raw) return '';
-    try {
-        const url = new URL(raw);
-        return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
-    } catch (_) {
-        return '';
-    }
-}
-
-function appendModalOverviewItem(grid, item) {
-    const row = document.createElement('div');
-    row.className = 'modal-overview-item';
-    appendTextElement(row, 'div', 'modal-overview-label', item.label || '—');
-
-    const valueEl = document.createElement('div');
-    valueEl.className = 'modal-overview-value';
-    const value = String(item.value || '—');
-    if (item.href) {
-        const link = document.createElement('a');
-        link.href = item.href;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.textContent = value;
-        valueEl.appendChild(link);
-    } else {
-        valueEl.textContent = value;
-    }
-
-    row.appendChild(valueEl);
-    grid.appendChild(row);
-    return row;
-}
-
-function appendModalOverviewBlock(grid, label, value) {
-    const row = document.createElement('div');
-    row.className = 'modal-overview-item full';
-    appendTextElement(row, 'div', 'modal-overview-label', label);
-    appendTextElement(row, 'div', 'modal-overview-value modal-overview-block', value || '—');
-    grid.appendChild(row);
-    return row;
-}
-
-function appendModalOverviewAttachments(grid, referenceImages) {
-    const row = document.createElement('div');
-    row.className = 'modal-overview-item full';
-    appendTextElement(row, 'div', 'modal-overview-label', 'Foto-bijlagen preview');
-
-    if (!referenceImages.length) {
-        appendTextElement(row, 'div', 'modal-overview-value', 'Geen foto-bijlagen gekoppeld.');
-        grid.appendChild(row);
-        return row;
-    }
-
-    const attachmentsGrid = document.createElement('div');
-    attachmentsGrid.className = 'modal-attachments-grid';
-    referenceImages.forEach((img) => {
-        const thumb = document.createElement('div');
-        thumb.className = 'modal-attachment-thumb';
-        const image = document.createElement('img');
-        image.src = img.dataUrl;
-        image.alt = img.name || 'Bijlage';
-        thumb.appendChild(image);
-        attachmentsGrid.appendChild(thumb);
-    });
-
-    row.appendChild(attachmentsGrid);
-    grid.appendChild(row);
-    return row;
-}
-
-function renderModalOverview(container, id) {
-    if (!container) return;
-    const runtimeOrder = orders[id] || {};
-    const customOrder = getCustomOrderById(id);
-    const ui = resolveOrderUiState({
-        status: customOrder?.status || runtimeOrder?.statusKey || 'wacht',
-        paidAt: customOrder?.paidAt || runtimeOrder?.paidAt || null,
-        progressPct: Number(runtimeOrder?.progressPct) || 0
-    });
-
-    const description = String(customOrder?.description || '').trim();
-    const transcript = String(customOrder?.transcript || '').trim();
-    const prompt = String(customOrder?.prompt || '').trim();
-    const sourceLabel = String(customOrder?.sourceAppointmentLabel || '').trim();
-    const domainName = String(customOrder?.domainName || '').trim();
-    const deliveryTime = String(customOrder?.deliveryTime || '').trim();
-    const includeSampleDesign = Boolean(customOrder?.includeSampleDesign);
-    const claimInfo = getOrderClaimInfo(id);
-    const launchDeploymentUrl = String(customOrder?.launchDeploymentUrl || '').trim();
-    const launchRepoUrl = String(customOrder?.launchRepoUrl || '').trim();
-    const launchDeploymentHref = normalizeModalLinkUrl(launchDeploymentUrl);
-    const launchRepoHref = normalizeModalLinkUrl(launchRepoUrl);
-    const launchDomainStatus = String(customOrder?.launchDomainStatus || '').trim();
-    const launchDomainMessage = String(customOrder?.launchDomainMessage || '').trim();
-    const lastRunAt = String(customOrder?.lastRunAt || '').trim();
-    const launchedAt = String(customOrder?.launchedAt || '').trim();
-    const referenceImages = normalizeReferenceImageList(customOrder?.referenceImages || []);
-    const amount = Number(customOrder?.amount);
-    const amountLabel = Number.isFinite(amount) && amount > 0
-        ? `€${Math.round(amount).toLocaleString('nl-NL')}`
-        : '—';
-
-    const infoItems = [
-        { label: 'Bedrijfsnaam', value: customOrder?.clientName || runtimeOrder?.name || '—' },
-        { label: 'Contactpersoon', value: customOrder?.location || '—' },
-        { label: 'Status', value: ui.status?.text || '—' },
-        { label: 'Voortgang', value: `${Math.round(Math.max(0, Math.min(100, Number(runtimeOrder?.progressPct) || 0)))}%` },
-        { label: 'Bedrag', value: amountLabel },
-        { label: 'Oplevertijd', value: deliveryTime || '—' },
-        { label: 'Domein', value: domainName || '—' },
-        { label: 'Agenda-koppeling', value: sourceLabel || '—' },
-        { label: 'Geclaimd door', value: claimInfo.by || 'Nog niet geclaimd' },
-        { label: 'Geclaimd op', value: formatModalDateTime(claimInfo.at) },
-        { label: 'Voorbeelddesign', value: includeSampleDesign ? 'Ja, meenemen als basis' : 'Nee' },
-        { label: 'Foto-bijlagen', value: referenceImages.length ? String(referenceImages.length) : '0' },
-        { label: 'Laatste build run', value: formatModalDateTime(lastRunAt) },
-        { label: 'Launch afgerond', value: formatModalDateTime(launchedAt) },
-        { label: 'Live URL', value: launchDeploymentUrl || '—', href: launchDeploymentHref },
-        { label: 'GitHub repo', value: launchRepoUrl || '—', href: launchRepoHref },
-        { label: 'Domeinstatus', value: launchDomainStatus || '—' },
-        { label: 'Domeinmelding', value: launchDomainMessage || '—' }
-    ];
-
-    const grid = document.createElement('div');
-    grid.className = 'modal-overview-grid';
-    infoItems.forEach((item) => appendModalOverviewItem(grid, item));
-    appendModalOverviewBlock(grid, 'Omschrijving opdracht', description || '—');
-    appendModalOverviewBlock(grid, 'Meeting notities', transcript || '—');
-    appendModalOverviewBlock(grid, 'AI bouwprompt', prompt || '—');
-    appendModalOverviewAttachments(grid, referenceImages);
-
-    container.replaceChildren(grid);
-    container.hidden = false;
-}
-
 function openModal(id) {
     const modal = document.getElementById('modal');
-    const overview = document.getElementById('modalOverview');
     const title = document.getElementById('modalTitle');
     const subtitle = document.getElementById('modalSubtitle');
     const primaryBtn = document.getElementById('modalBtn');
@@ -2881,10 +2779,6 @@ function openModal(id) {
 
     title.textContent = orders[id]?.type || 'Opdracht';
     subtitle.textContent = orders[id]?.name || '';
-    if (overview) {
-        renderModalOverview(overview, id);
-        overview.scrollTop = 0;
-    }
 
     const pctValue = Number(orders[id]?.progressPct) || 0;
     if (pctValue === 100 && hasGeneratedPreviewHtml(id)) {

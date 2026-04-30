@@ -199,6 +199,8 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /return webdesignActionController\.render\(customer\);/);
   assert.match(pageSource, /window\.SoftoraDatabaseWebdesignAction\.createController\(\{/);
   assert.match(pageSource, /photoRestorePending: true/);
+  assert.match(pageSource, /if \(!hadBootstrapCustomers && !state\.klanten\.length\) renderPage\(\);/);
+  assert.doesNotMatch(pageSource, /state\.klanten = \[\];/);
   assert.match(webdesignActionScriptSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-drop/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-generate-icon\\"/);
@@ -209,6 +211,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(webdesignActionScriptSource, /global\.document\.body\.appendChild\(label\)/);
   assert.doesNotMatch(webdesignActionScriptSource, /CHARGE_LABEL_ID/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-generate-spinner\\"/);
+  assert.match(webdesignActionScriptSource, /const title = isLoading \? "" : ariaLabel;/);
   assert.doesNotMatch(webdesignActionScriptSource, /\.photo-drop:hover \.photo-generate-cost/);
   assert.match(webdesignActionScriptSource, /function formatCentCost\(value\)/);
   assert.match(webdesignActionScriptSource, /label\.textContent = formatCentCost\(costEur\);/);
@@ -327,6 +330,11 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function updateCustomerFromModal\(customerId, bedrijf\)/);
   assert.match(pageSource, /state\.modalEditId/);
   assert.match(pageSource, /nodes\.modalTitle\.textContent = "Bedrijf aanpassen"/);
+  assert.match(pageSource, /<label class="mlabel" for="m-dom">Website<\/label>/);
+  assert.doesNotMatch(pageSource, /<label class="mlabel" for="m-dom">Domein<\/label>/);
+  assert.match(pageSource, /<select class="msel" id="m-status" data-custom-select="true">/);
+  assert.match(pageSource, /function syncModalStatusSelect\(\)/);
+  assert.match(pageSource, /nodes\.modalStatus\.__softoraSyncCustomFormSelect\(\);/);
   assert.match(pageSource, /nodes\.saveModalButton\.textContent = "Opslaan"/);
   assert.match(pageSource, /openEditCustomerModal\(editButton\.getAttribute\("data-edit-id"\)\)/);
   assert.match(pageSource, /removeWebsitePhotoForCustomer\(removePhotoButton\.getAttribute\("data-remove-photo-id"\)\)/);
@@ -442,9 +450,10 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(deepSearchScriptSource, /item\.batches \+ "x/);
   assert.doesNotMatch(deepSearchScriptSource, /item\.added \+ " nieuw/);
   assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
+  assert.match(deepSearchScriptSource, /const ESTIMATE_EUR_BUFFER = 2;/);
   assert.match(
     deepSearchScriptSource,
-    /"Geschatte API-kosten voor " \+ desiredCount \+ " bedrijven: ± " \+ estimate \+ " \(max ± €2 afwijking\)"/
+    /"Geschatte API-kosten voor " \+ desiredCount \+ " bedrijven: ± " \+ estimate/
   );
   assert.match(deepSearchScriptSource, /function estimateRunUsd\(companyCount\)/);
   assert.match(deepSearchScriptSource, /outputTokensPerCompany/);
@@ -779,6 +788,7 @@ test('premium database deep search continues to the next location until the requ
   const messages = [];
   const customers = [];
   const persisted = [];
+  const startButton = {};
   const rows = [
     ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
     ['Almkerk Test BV', 'Kerkstraat 1, Almkerk', 'info@almkerktest.nl', '0183 123 456', 'almkerktest.nl'],
@@ -823,7 +833,7 @@ test('premium database deep search continues to the next location until the requ
       deepSearchDesiredCount: { value: '2' },
       deepSearchList: {},
       deepSearchSources: {},
-      deepSearchStartButton: {},
+      deepSearchStartButton: startButton,
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
@@ -855,6 +865,8 @@ test('premium database deep search continues to the next location until the requ
   const result = await controller.runCurrentSearch();
 
   assert.equal(result, true);
+  assert.equal(startButton.textContent, '2 bedrijven toegevoegd');
+  assert.equal(startButton.disabled, true);
   assert.equal(calls.length, 3);
   assert.equal(calls[0].target, 'Nederland | Noord-Brabant | Altena | Almkerk');
   assert.equal(calls[0].count, 2);

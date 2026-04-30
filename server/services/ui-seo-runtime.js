@@ -59,7 +59,10 @@ function createUiSeoRuntime(deps = {}) {
     seoConfigKey,
     seoConfigCacheTtlMs,
     uiStateReadTimeoutMsByScope = Object.freeze({
+      premium_active_orders: 8000,
+      premium_customers_database: 8000,
       premium_database_photos: 8000,
+      premium_api_costs: 8000,
     }),
   } = deps;
 

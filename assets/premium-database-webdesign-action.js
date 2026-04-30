@@ -4,6 +4,7 @@
     const STYLE_ID = "softora-database-webdesign-action-style";
     const JOB_ENDPOINT = "/api/premium-database/webdesign-photo-jobs";
     const PENDING_TTL_MS = 6 * 60 * 60 * 1000;
+    const POLL_TIMEOUT_MS = 6 * 60 * 1000;
     const POLL_INTERVAL_MS = 2200;
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
@@ -152,6 +153,12 @@
             clearPollTimer(job.jobId);
             removePendingJob(job.customerId);
             await refreshFinishedPhotos();
+            if (!message) {
+                const refreshed = getCustomerById(job.customerId);
+                if (!isValidWebsitePhotoDataUrl(refreshed && refreshed.websitePhoto)) {
+                    message = "Webdesign is klaar, maar de foto kon niet worden ingeladen. Probeer opnieuw.";
+                }
+            }
             if (message) setStatusMessage(message, "error", true);
             if (typeof renderPage === "function") renderPage();
         }
@@ -178,7 +185,7 @@
                         schedulePoll(jobId, POLL_INTERVAL_MS);
                         return;
                     }
-                    await finishPendingJob(storedJob, "");
+                    await finishPendingJob(storedJob, "Webdesign-taak kon niet meer worden gevonden. Probeer opnieuw.");
                     return;
                 }
                 if (!response.ok || !job) {
@@ -194,6 +201,10 @@
                 }
                 schedulePoll(jobId, POLL_INTERVAL_MS);
             } catch (error) {
+                if (now() - storedJob.startedAt > POLL_TIMEOUT_MS) {
+                    await finishPendingJob(storedJob, "Webdesign-status bleef te lang onbereikbaar. Probeer het opnieuw.");
+                    return;
+                }
                 schedulePoll(jobId, POLL_INTERVAL_MS * 2);
             }
         }
@@ -245,7 +256,7 @@
             const inner = hasPhoto ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\">" : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
             const remove = hasPhoto ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>" : "";
             const ariaLabel = hasPhoto ? "Websitefoto bekijken" : (isLoading ? (isPending ? "Webdesign wordt gemaakt" : "Websitefoto's worden hersteld") : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden"));
-            const title = ariaLabel;
+            const title = isLoading ? "" : ariaLabel;
             return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div></div>";
         }
 

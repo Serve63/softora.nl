@@ -149,6 +149,37 @@ function createAiDashboardCoordinator(deps = {}) {
       .filter(Boolean);
   }
 
+  function getDashboardChunkMetaKey(baseKey) {
+    return `${normalizeString(baseKey)}_chunks_v1`;
+  }
+
+  function getDashboardChunkPrefix(baseKey) {
+    return `${normalizeString(baseKey)}_chunk_`;
+  }
+
+  function readDashboardChunkedStateValue(values, baseKey) {
+    const stateValues = values && typeof values === 'object' ? values : {};
+    const normalizedKey = normalizeString(baseKey);
+    const fallback = typeof stateValues[normalizedKey] === 'string' ? stateValues[normalizedKey] : '';
+    const metaRaw = normalizeString(stateValues[getDashboardChunkMetaKey(normalizedKey)]);
+    if (!metaRaw) return fallback;
+    try {
+      const meta = JSON.parse(metaRaw);
+      const count = Math.max(0, Math.min(100, Number(meta && meta.count) || 0));
+      if (!count) return fallback;
+      const prefix = getDashboardChunkPrefix(normalizedKey);
+      const chunks = [];
+      for (let index = 0; index < count; index += 1) {
+        const chunk = stateValues[prefix + index];
+        if (typeof chunk !== 'string') return fallback;
+        chunks.push(chunk);
+      }
+      return chunks.join('') || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
   function buildDashboardChatStatusCounts(rows, fieldName, fallback = 'Onbekend') {
     const counts = {};
     for (const row of Array.isArray(rows) ? rows : []) {
@@ -232,7 +263,9 @@ function createAiDashboardCoordinator(deps = {}) {
 
     const customOrders = parseCustomOrdersFromUiState(orderValues[premiumActiveCustomOrdersKey]);
     const runtimeByOrderId = parseDashboardChatRuntimeByOrderId(orderValues[premiumActiveRuntimeKey]);
-    const customers = parseDashboardChatCustomers(customerValues[premiumCustomersKey]);
+    const customers = parseDashboardChatCustomers(
+      readDashboardChunkedStateValue(customerValues, premiumCustomersKey)
+    );
 
     const orders = customOrders
       .map((item) => {

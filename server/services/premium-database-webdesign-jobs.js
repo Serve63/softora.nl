@@ -11,12 +11,17 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     photoScope = 'premium_database_photos',
     photoKey = 'softora_database_photos_v1',
     photoDataPrefix = 'softora_database_photo_data_v1_',
+    jobProcessTimeoutMs = 4 * 60 * 1000,
+    processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
   } = deps;
 
   const jobs = new Map();
   const JOB_TTL_MS = 6 * 60 * 60 * 1000;
+  const JOB_PROCESS_TIMEOUT_MS = Math.max(100, Math.min(10 * 60 * 1000, Number(jobProcessTimeoutMs) || 0));
   const MAX_JOBS = 500;
   const CHUNK_SIZE = 180000;
+  const MAX_STORAGE_CHUNKS = 80;
+  const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
   let processing = false;
 
   function pruneJobs() {
@@ -155,6 +160,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const customer = job.customer;
     const photoDataKey = buildDataKey(customer.id);
     const chunks = dataUrl.match(new RegExp(`[\\s\\S]{1,${CHUNK_SIZE}}`, 'g')) || [];
+    if (chunks.length > MAX_STORAGE_CHUNKS) {
+      throw new Error('De AI-foto was te groot om betrouwbaar op te slaan. Probeer het opnieuw.');
+    }
     const patch = {};
 
     chunks.forEach((chunk, index) => {
@@ -209,6 +217,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
     const payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, {
       allowScanFallback: true,
+      imageSize: DATABASE_PHOTO_IMAGE_SIZE,
       body: {
         source: 'premium-database',
         action: 'webdesign',
@@ -220,6 +229,39 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     await persistGeneratedPhoto(job, payload && payload.image);
   }
 
+  function withJobProcessTimeout(job, promise) {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(`Webdesign maken duurde te lang (${Math.round(JOB_PROCESS_TIMEOUT_MS / 1000)}s). Probeer het opnieuw.`));
+      }, JOB_PROCESS_TIMEOUT_MS);
+      Promise.resolve(promise).then(
+        (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      );
+    });
+  }
+
+  async function settleJob(job) {
+    try {
+      await withJobProcessTimeout(job, processJob(job));
+      job.status = 'done';
+      job.error = null;
+      job.finishedAt = Date.now();
+    } catch (error) {
+      job.status = 'error';
+      job.error = truncateText(normalizeString(error && error.message) || 'Webdesign maken is mislukt.', 500);
+      job.finishedAt = Date.now();
+      logger.error('[PremiumDatabaseWebdesignJobs][process]', error && error.message ? error.message : error);
+    }
+    return job;
+  }
+
   function queueProcessing() {
     if (processing) return;
     const next = Array.from(jobs.values()).find((job) => job.status === 'queued');
@@ -227,18 +269,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
     processing = true;
     setImmediate(() => {
-      processJob(next)
-        .then(() => {
-          next.status = 'done';
-          next.error = null;
-          next.finishedAt = Date.now();
-        })
-        .catch((error) => {
-          next.status = 'error';
-          next.error = truncateText(normalizeString(error && error.message) || 'Webdesign maken is mislukt.', 500);
-          next.finishedAt = Date.now();
-          logger.error('[PremiumDatabaseWebdesignJobs][process]', error && error.message ? error.message : error);
-        })
+      settleJob(next)
         .finally(() => {
           processing = false;
           queueProcessing();
@@ -305,7 +336,11 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       finishedAt: null,
     };
     jobs.set(job.id, job);
-    queueProcessing();
+    if (processJobsInline) {
+      await settleJob(job);
+    } else {
+      queueProcessing();
+    }
 
     return res.status(202).json({
       ok: true,

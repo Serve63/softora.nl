@@ -55,17 +55,21 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.doesNotMatch(source, /id="website-link-html"/);
   assert.doesNotMatch(source, /id="website-link-slug"/);
   assert.doesNotMatch(source, /Gegenereerde websitegenerator preview/);
-  assert.match(websiteGeneratorSource, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*!websiteLinkListEl[\s\S]*\) \{\s*return;\s*\}/);
-  assert.match(source, /id="website-link-list"/);
+  assert.doesNotMatch(source, /id="website-link-copy"/);
+  assert.doesNotMatch(source, /Kopieer websitelink/);
+  assert.doesNotMatch(source, /Aangemaakte websitelinks/);
+  assert.doesNotMatch(source, /id="website-link-list"/);
+  assert.doesNotMatch(source, /Kon opgeslagen websitelinks niet ophalen/);
+  assert.match(websiteGeneratorSource, /if \(\s*!urlInput \|\| !htmlInput \|\| !websiteLinkCreateEl \|\| !websiteLinkStatusEl\) \{ return; \}/);
   assert.match(websiteGeneratorSource, /window\.open\('about:blank', '_blank'\)/);
-  assert.match(websiteGeneratorSource, /function createWebsiteLinkRow\(link\) \{/);
+  assert.doesNotMatch(websiteGeneratorSource, /function createWebsiteLinkRow\(link\) \{/);
   assert.match(websiteGeneratorSource, /function bindWebsiteGeneratorPageActions\(\) \{/);
   assert.match(websiteGeneratorSource, /button\.addEventListener\('click', \(\) => \{[\s\S]*void switchTab\(button\.dataset\.tab \|\| 'scan', button\);/);
   assert.match(websiteGeneratorSource, /scanButton\.addEventListener\('click', \(\) => \{[\s\S]*void startScan\(\);/);
-  assert.match(websiteGeneratorSource, /websiteLinkListEl\.replaceChildren\(\.\.\.normalizedLinks\.map\(\(link\) => createWebsiteLinkRow\(link\)\)\);/);
+  assert.doesNotMatch(websiteGeneratorSource, /websiteLinkListEl\.replaceChildren/);
   assert.match(websiteGeneratorSource, /return url\.protocol === 'http:' \|\| url\.protocol === 'https:' \? url\.href : '';/);
   assert.doesNotMatch(websiteGeneratorSource, /websiteLinkListEl\.innerHTML/);
-  assert.match(websiteGeneratorSource, /\/api\/website-links'/);
+  assert.doesNotMatch(websiteGeneratorSource, /\/api\/website-links'/);
   assert.match(websiteGeneratorSource, /\/api\/website-links\/create/);
 });
 

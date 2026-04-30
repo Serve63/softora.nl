@@ -72,9 +72,10 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /function setClaimOrderMessage\(message, type\) \{/);
   assert.match(scriptSource, /function appendClaimOrderSummaryRow\(fragment, label, value\) \{/);
   assert.match(scriptSource, /function executeOrder\(id\) \{/);
-  assert.match(scriptSource, /function formatModalDateTime\(value\) \{/);
-  assert.match(scriptSource, /function normalizeModalLinkUrl\(value\) \{/);
-  assert.match(scriptSource, /function renderModalOverview\(container, id\) \{/);
+  assert.doesNotMatch(pageSource, /id="modalOverview"/);
+  assert.doesNotMatch(scriptSource, /function formatModalDateTime\(value\) \{/);
+  assert.doesNotMatch(scriptSource, /function normalizeModalLinkUrl\(value\) \{/);
+  assert.doesNotMatch(scriptSource, /function renderModalOverview\(container, id\) \{/);
   assert.match(scriptSource, /function openModal\(id\) \{/);
   assert.match(scriptSource, /function closeModal\(\) \{/);
   assert.match(scriptSource, /function handleModalPrimaryAction\(\) \{/);
@@ -106,9 +107,10 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.doesNotMatch(source, /function renderCustomOrderCardHtml\(record\) \{/);
   assert.match(source, /renderClaimOrderSummary\(summaryEl, activeId\);/);
   assert.doesNotMatch(source, /summaryEl\.innerHTML = renderClaimOrderSummary/);
-  assert.match(source, /renderModalOverview\(overview, id\);/);
-  assert.match(source, /container\.replaceChildren\(grid\);/);
-  assert.match(source, /return url\.protocol === 'http:' \|\| url\.protocol === 'https:' \? url\.href : '';/);
+  assert.doesNotMatch(source, /renderModalOverview\(overview, id\);/);
+  assert.doesNotMatch(source, /container\.replaceChildren\(grid\);/);
+  assert.doesNotMatch(source, /Foto-bijlagen preview/);
+  assert.doesNotMatch(source, /AI bouwprompt/);
   assert.match(source, /select\.replaceChildren\(\.\.\.options\);/);
   assert.match(source, /document\.getElementById\('modalBtn'\)\?\.addEventListener\('click', handleModalPrimaryAction\);/);
   assert.match(source, /document\.getElementById\('modalDeleteBtn'\)\?\.addEventListener\('click', handleModalDeleteAction\);/);
@@ -123,7 +125,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /const confirmed = await confirmActiveOrderAction\(invoicePaidReviewReminder,[\s\S]*Factuur betaald bevestigen/);
   assert.match(
     source,
-    /Vergeet niet om de klant op een vriendelijk en natuurlijk moment te vragen[\s\S]*bodyHtml:\s*invoicePaidConfirmBodyHtml/
+    /Vergeet niet om de klant op een natuurlijk moment te vragen of hij of zij een revieuw wilt achterlaten![\s\S]*bodyHtml:\s*invoicePaidConfirmBodyHtml/
   );
   assert.match(source, /await persistRequiredUiStateKeysOrThrow\(\s*\[CUSTOM_ORDERS_KEY, ORDER_RUNTIME_KEY\],/);
   assert.match(source, /const completeBtn = card\.querySelector\('\.complete-btn\[data-order-complete\]'\);[\s\S]*void handleOrderPaymentAction\(id\);/);
@@ -151,7 +153,8 @@ test('premium actieve opdrachten tonen create-order modal zonder sample-design e
   const { combinedSource: source } = readActiveOrdersSources();
 
   assert.match(source, /<label class="create-order-label" for="newOrderAssignee">Toegewezen aan<\/label>/);
-  assert.match(source, /<select class="create-order-select" id="newOrderAssignee" name="assignee" required>/);
+  assert.match(source, /<div class="create-order-select-wrap has-softora-select">/);
+  assert.match(source, /<select class="create-order-select" id="newOrderAssignee" name="assignee" required data-custom-select="true">/);
   assert.match(source, /<option value="">Kies medewerker<\/option>\s*<option value="Martijn">Martijn<\/option>\s*<option value="Servé">Servé<\/option>/);
   assert.match(source, /const ORDER_ASSIGNEE_OPTIONS = Object\.freeze\(\['Martijn', 'Servé'\]\);/);
   assert.match(source, /function normalizeOrderAssignee\(value\) \{[\s\S]*const words = normalized\.split\(\/\[\^a-z\]\+\/\)\.filter\(Boolean\);[\s\S]*if \(words\.includes\('serve'\)\) return 'Servé';[\s\S]*if \(words\.includes\('martijn'\)\) return 'Martijn';/);

@@ -136,7 +136,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
 
   assert.match(pageSource, /<div class="campagne-head">[\s\S]*<div class="campagne-title">Nieuwe Campagne<\/div>[\s\S]*id="campaignCompanyCount"/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/softora-dossier-loader\.css\?v=20260424a">/);
-  assert.match(pageSource, /<script src="assets\/premium-campaign-radius\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-campaign-radius\.js\?v=20260430a"><\/script>/);
   assert.match(pageSource, /<main class="main-content is-premium-boot-host">/);
   assert.match(pageSource, /<div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">/);
   assert.match(pageSource, /<div class="premium-boot-shell is-booting" aria-busy="true">/);
@@ -178,6 +178,12 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function isEligibleColdcallingCampaignRow\(row\)/);
   assert.match(pageSource, /function isEligibleCampaignCountRow\(row\) \{\s*return isPremiumAiLeadGeneratorPath\(\)[\s\S]*isEligibleColdcallingCampaignRow\(row\)[\s\S]*isEligibleColdmailCampaignRow\(row\);/);
   assert.match(pageSource, /function isCampaignRowWithinRadius\(row\)/);
+  const radiusPath = path.join(__dirname, '../../assets/premium-campaign-radius.js');
+  const radiusSource = fs.readFileSync(radiusPath, 'utf8');
+  assert.match(radiusSource, /function coordsForPlaceHint\(value\)/);
+  assert.match(radiusSource, /source\.formattedAddress/);
+  assert.match(radiusSource, /source\.fullAddress/);
+  assert.match(radiusSource, /return false;/);
   assert.match(pageSource, /const eligibleRows = coldmailingDatabaseRows\.filter\(\(row\) => isEligibleCampaignCountRow\(row\) && isCampaignRowWithinRadius\(row\)\);/);
   assert.match(pageSource, /params\.set\('radiusKm', String\(getSelectedCampaignRadiusKm\(\)\)\);/);
   assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
@@ -240,7 +246,8 @@ test('premium bevestigingsmails replaces sender detail fields with compact dropd
   assert.doesNotMatch(pageSource, /Deze gegevens kun je later gebruiken als vaste afzenderinformatie voor alle coldmails\./);
 
   assert.match(pageSource, /html\[data-softora-lead-generator-alias="1"\] \.lead-generator-hidden-setting \{ display: none !important; \}/);
-  assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Verzenden vanaf<\/div>\s*<select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">/);
+  assert.doesNotMatch(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Verzenden vanaf<\/div>/);
+  assert.match(pageSource, /<div class="field lead-generator-branch-field">\s*<div class="field-label">Verzenden vanaf<\/div>\s*<select class="sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">/);
   assert.match(pageSource, /<option value="info@softora\.nl" selected>info@softora\.nl<\/option>/);
   assert.match(pageSource, /<option value="zakelijk@softora\.nl">zakelijk@softora\.nl<\/option>/);
   assert.match(pageSource, /<option value="ruben@softora\.nl">ruben@softora\.nl<\/option>/);
@@ -258,14 +265,19 @@ test('premium bevestigingsmails toont de locatie als zichtbare variabele', () =>
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const locationVariableSource = fs.readFileSync(locationVariablePath, 'utf8');
 
-  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-location-variable\.js\?v=20260429a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-location-variable\.js\?v=20260430b"><\/script>/);
   assert.match(locationVariableSource, /\.mail-variable-note\{[\s\S]*color:var\(--crimson\);[\s\S]*border:1px solid rgba\(155,35,85,\.18\);/);
+  assert.match(locationVariableSource, /function isLeadGeneratorAlias\(\)/);
+  assert.match(locationVariableSource, /if \(isLeadGeneratorAlias\(\)\) return;/);
   assert.match(locationVariableSource, /function normalizeBodyTemplate\(value\)/);
   assert.match(locationVariableSource, /📍\[ \\t\]\*\)Haaren/);
   assert.match(locationVariableSource, /note\.setAttribute\('aria-label', 'Dynamische plaats uit database'\);/);
   assert.match(locationVariableSource, /variable\.textContent = '\{\{stad\}\}';/);
   assert.match(locationVariableSource, /label\.textContent = 'Plaats uit database';/);
+  assert.match(locationVariableSource, /document\.querySelector\('#mail-panel-5 \.mail-fields'\)/);
+  assert.match(locationVariableSource, /settingsFields\.insertBefore\(note,/);
   assert.match(locationVariableSource, /wrapGlobalFunction\('applyColdmailingSettings'/);
+  assert.match(locationVariableSource, /servicePrompts: settings\.servicePrompts/);
   assert.match(locationVariableSource, /wrapGlobalFunction\('getColdmailCampaignPayload'/);
 });
 
@@ -280,9 +292,15 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /function getCampaignSettingsScope\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_SCOPE : COLDMAILING_SETTINGS_SCOPE;\s*\}/);
   assert.match(pageSource, /function getCampaignSettingsKey\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_KEY : COLDMAILING_SETTINGS_KEY;\s*\}/);
   assert.match(pageSource, /function collectColdmailingSettings\(\)/);
+  assert.match(pageSource, /function getCampaignServicePromptKey\(value\)/);
+  assert.match(pageSource, /function normalizeCampaignServicePrompts\(value\)/);
+  assert.match(pageSource, /function storeCurrentPromptForService\(serviceKey\)/);
+  assert.match(pageSource, /function applyPromptForSelectedCampaignService\(settings\)/);
+  assert.match(pageSource, /let activeColdmailingPromptServiceKey = '';/);
   assert.match(pageSource, /senderEmail: senderSelect \? senderSelect\.value : ''/);
   assert.match(pageSource, /specialAction: specialActionSelect \? specialActionSelect\.value : ''/);
   assert.match(pageSource, /coldcallingStack: stackSelect \? stackSelect\.value : ''/);
+  assert.match(pageSource, /servicePrompts\[serviceKey\] = \{/);
   assert.match(pageSource, /subject: subjectInput \? subjectInput\.value : ''/);
   assert.match(pageSource, /body: bodyInput \? bodyInput\.value : ''/);
   assert.match(pageSource, /function fetchColdmailingUiState\(scope\)/);
@@ -297,10 +315,14 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /function hydrateColdmailingSettingsFromSupabase\(\)/);
   assert.match(pageSource, /function bindColdmailingSettingsPersistence\(\)/);
   assert.match(pageSource, /\['campaignSenderEmail', 'campaignSpecialAction', 'coldcallingStack'\]/);
+  assert.match(pageSource, /const serviceSelect = document\.getElementById\('service'\);/);
+  assert.match(pageSource, /serviceSelect\.addEventListener\('change', function \(\) \{/);
+  assert.match(pageSource, /storeCurrentPromptForService\(activeColdmailingPromptServiceKey\);/);
   assert.match(pageSource, /\['subj1', 'body1'\]/);
-  assert.match(pageSource, /input\.addEventListener\('input', persistColdmailingSettingsSoon\);/);
-  assert.match(pageSource, /if \(subjectInput && normalized\.subject\) subjectInput\.value = normalized\.subject;/);
-  assert.match(pageSource, /if \(bodyInput && normalized\.body\) bodyInput\.value = normalized\.body;/);
+  assert.match(pageSource, /input\.addEventListener\('input', function \(\) \{/);
+  assert.match(pageSource, /storeCurrentPromptForService\(\);\s*persistColdmailingSettingsSoon\(\);/);
+  assert.match(pageSource, /if \(subjectInput\) subjectInput\.value = prompt\.subject \|\| '';/);
+  assert.match(pageSource, /if \(bodyInput\) bodyInput\.value = prompt\.body \|\| '';/);
   assert.match(
     pageSource,
     /initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\)/
@@ -340,15 +362,13 @@ test('premium bevestigingsmails exposes coldcalling provider choice inside lead-
   assert.match(pageSource, /Provider: ' \+ getSelectedColdcallingStackLabel\(\) \+ '\.'/);
 });
 
-test('premium bevestigingsmails exposes campaign duration choices and uses them in the timeline copy', () => {
+test('premium bevestigingsmails keeps campaign duration logic without the visible duration dropdown', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /<div class="field lead-generator-branch-field">\s*<div class="field-label">Campagne afgerond na<\/div>\s*<select class="sel" id="campaignDurationDays" aria-label="Campagneduur">/);
-  assert.match(pageSource, /<option value="disabled">Uitgeschakeld<\/option>/);
-  assert.match(pageSource, /<option value="5">5 dagen<\/option>/);
-  assert.match(pageSource, /<option value="7">7 dagen<\/option>/);
-  assert.match(pageSource, /<option value="14" selected>14 dagen<\/option>/);
+  assert.doesNotMatch(pageSource, /<div class="field-label">Campagne afgerond na<\/div>/);
+  assert.doesNotMatch(pageSource, /<select class="sel" id="campaignDurationDays" aria-label="Campagneduur">/);
+  assert.match(pageSource, /function getSelectedCampaignDurationDays\(\) \{\s*const select = document\.getElementById\('campaignDurationDays'\);[\s\S]*return normalizeCampaignDurationDays\(select \? select\.value : 14\);[\s\S]*\}/);
   assert.match(pageSource, /function initCampaignDurationSetting\(\)/);
   assert.doesNotMatch(pageSource, /function updateCampaignDurationUi\(\)/);
   assert.match(pageSource, /showToast\(durationDays === 0 \? 'Campagne afronding uitgeschakeld' : 'Campagne afgerond na ' \+ formatCampaignDurationLabel\(durationDays\)\);/);

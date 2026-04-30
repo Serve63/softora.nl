@@ -20,6 +20,76 @@ function parseCustomerDatabaseRows(rawValue) {
   }
 }
 
+function normalizeCustomerStateKey(key) {
+  return String(key || '').trim();
+}
+
+function getCustomerStateChunkMetaKey(baseKey) {
+  return `${normalizeCustomerStateKey(baseKey)}_chunks_v1`;
+}
+
+function getCustomerStateChunkPrefix(baseKey) {
+  return `${normalizeCustomerStateKey(baseKey)}_chunk_`;
+}
+
+function readCustomerChunkedStateValue(values, baseKey) {
+  if (!values || typeof values !== 'object') return '';
+  const normalizedKey = normalizeCustomerStateKey(baseKey);
+  if (!normalizedKey) return '';
+
+  const metaRaw = String(values[getCustomerStateChunkMetaKey(normalizedKey)] || '').trim();
+  if (metaRaw) {
+    try {
+      const meta = JSON.parse(metaRaw);
+      const count = Number.parseInt(meta && meta.count, 10);
+      if (Number.isFinite(count) && count > 0 && count < 10000) {
+        const prefix = getCustomerStateChunkPrefix(normalizedKey);
+        const chunks = [];
+        for (let index = 0; index < count; index += 1) {
+          const chunk = values[`${prefix}${index}`];
+          if (typeof chunk !== 'string') return '';
+          chunks.push(chunk);
+        }
+        return chunks.join('');
+      }
+    } catch {}
+  }
+
+  return typeof values[normalizedKey] === 'string' ? values[normalizedKey] : '';
+}
+
+function buildCustomerChunkedStateValues(baseKey, rawValue, chunkSize = 120000) {
+  const normalizedKey = normalizeCustomerStateKey(baseKey);
+  const serialized = String(rawValue || '');
+  if (!normalizedKey) return {};
+
+  if (serialized.length <= chunkSize) {
+    return {
+      [normalizedKey]: serialized,
+      [getCustomerStateChunkMetaKey(normalizedKey)]: '',
+    };
+  }
+
+  const chunks = [];
+  for (let index = 0; index < serialized.length; index += chunkSize) {
+    chunks.push(serialized.slice(index, index + chunkSize));
+  }
+
+  return chunks.reduce(
+    (patch, chunk, index) => ({
+      ...patch,
+      [`${getCustomerStateChunkPrefix(normalizedKey)}${index}`]: chunk,
+    }),
+    {
+      [normalizedKey]: '',
+      [getCustomerStateChunkMetaKey(normalizedKey)]: JSON.stringify({
+        count: chunks.length,
+        length: serialized.length,
+      }),
+    }
+  );
+}
+
 function getAppointmentPhoneKey(appointment) {
   return (
     normalizeLeadLikePhoneKey(appointment?.phone || '') ||
@@ -360,7 +430,9 @@ function createAgendaPostCallCoordinator(deps = {}) {
         currentState && currentState.values && typeof currentState.values === 'object'
           ? currentState.values
           : {};
-      const rows = parseCustomerDatabaseRows(currentValues[premiumCustomersKey]);
+      const rows = parseCustomerDatabaseRows(
+        readCustomerChunkedStateValue(currentValues, premiumCustomersKey)
+      );
       const rowIndex = findCustomerDatabaseRowIndexForAppointment(rows, appointment);
 
       const nextRows = rows.slice();
@@ -380,7 +452,7 @@ function createAgendaPostCallCoordinator(deps = {}) {
 
       const nextValues = {
         ...currentValues,
-        [premiumCustomersKey]: JSON.stringify(nextRows),
+        ...buildCustomerChunkedStateValues(premiumCustomersKey, JSON.stringify(nextRows)),
       };
       const saved = await setUiStateValues(premiumCustomersScope, nextValues, {
         source: 'premium-personeel-agenda',

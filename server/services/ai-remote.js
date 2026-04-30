@@ -890,7 +890,13 @@ function createAiRemoteService(deps = {}) {
     return /size|resolution|dimension|width|height|pixels/.test(message);
   }
 
-  async function generateWebsitePreviewImageWithAi(scan = {}) {
+  function normalizeWebsitePreviewImageSize(value, fallback = '2160x3840') {
+    const size = normalizeString(value);
+    const allowedSizes = new Set(['1024x1024', '1024x1536', '1536x1024', '2160x3840']);
+    return allowedSizes.has(size) ? size : fallback;
+  }
+
+  async function generateWebsitePreviewImageWithAi(scan = {}, options = {}) {
     const apiKey = getOpenAiApiKey();
     if (!apiKey) {
       const err = new Error('OPENAI_API_KEY ontbreekt');
@@ -917,15 +923,16 @@ function createAiRemoteService(deps = {}) {
       ...scan,
       referenceImageCount: referenceImages.length,
     });
+    const requestedImageSize = normalizeWebsitePreviewImageSize(options && options.imageSize);
 
     let { response, data } = await requestOpenAiWebsitePreviewImageGeneration({
       apiKey,
       imageModel,
       prompt,
       referenceImages,
-      imageSize: '2160x3840',
+      imageSize: requestedImageSize,
     });
-    if (!response.ok && isOpenAiImageSizeError(response, data)) {
+    if (!response.ok && requestedImageSize !== '1024x1536' && isOpenAiImageSizeError(response, data)) {
       ({ response, data } = await requestOpenAiWebsitePreviewImageGeneration({
         apiKey,
         imageModel,

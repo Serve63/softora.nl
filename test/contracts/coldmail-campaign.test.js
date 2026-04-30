@@ -61,7 +61,7 @@ function createService(overrides = {}) {
       }
       if (scope === 'coldcalling') {
         return {
-          values: {
+          values: overrides.leadValues || {
             softora_coldcalling_lead_rows_json: JSON.stringify(overrides.leadRows || []),
           },
         };
@@ -466,7 +466,7 @@ test('coldmail campaign recipient preview respects Oisterwijk radius', async () 
         email: 'near@example.test',
         status: 'prospect',
         branche: 'Retail & Winkels',
-        adres: 'Dorpsstraat 1, Oisterwijk',
+        adres: 'Dorpsstraat 1, 5061 AA Oisterwijk',
         mail: true,
       },
       {
@@ -530,6 +530,49 @@ test('coldcalling recipient preview selects callable phone rows', async () => {
       distanceKm: null,
     },
   ]);
+});
+
+test('coldcalling recipient preview reads chunked lead database and respects Oisterwijk radius', async () => {
+  const leadRows = [
+    {
+      id: 'near-callable',
+      company: 'Oisterwijk Lead',
+      phone: '+31622223333',
+      status: 'prospect',
+      address: 'Dorpsstraat 1, 5061 AA Oisterwijk',
+    },
+    {
+      id: 'far-callable',
+      company: 'Breda Lead',
+      phone: '+31644445555',
+      status: 'prospect',
+      address: 'Markt 1, Breda',
+    },
+  ];
+  const raw = JSON.stringify(leadRows);
+  const splitAt = Math.ceil(raw.length / 2);
+  const { service } = createService({
+    rows: [],
+    leadValues: {
+      softora_coldcalling_lead_rows_json: '',
+      softora_coldcalling_lead_rows_json_chunks_v1: JSON.stringify({ count: 2 }),
+      softora_coldcalling_lead_rows_json_chunk_0: raw.slice(0, splitAt),
+      softora_coldcalling_lead_rows_json_chunk_1: raw.slice(splitAt),
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    mode: 'call',
+    radiusKm: 20,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.mode, 'call');
+  assert.equal(result.radiusKm, 20);
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].bedrijf, 'Oisterwijk Lead');
+  assert.equal(result.recipients[0].distanceKm, 0);
 });
 
 test('coldcalling recipient preview skips phone numbers from the blocklist', async () => {

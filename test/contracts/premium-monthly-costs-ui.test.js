@@ -167,6 +167,7 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /const amountEur = Number\(summary\.costEur \|\| 0\) \|\| 0;/);
   assert.match(scriptSource, /window\.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;/);
   assert.match(scriptSource, /const API_COST_NOTE = 'OpenAI factuurkosten deze maand';/);
+  assert.match(scriptSource, /const API_COST_LEDGER_NOTE = 'API-kosten uit Softora-logboek deze maand';/);
   assert.match(scriptSource, /const API_COST_UNAVAILABLE_NOTE = 'API factuurkoppeling ontbreekt';/);
   assert.match(scriptSource, /const API_COST_SCOPE = 'premium_api_costs';/);
   assert.match(scriptSource, /const API_COST_KEY = 'softora_api_cost_events_v1';/);
@@ -177,7 +178,12 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /return missing\.length \? 'Onvolledig: mist ' \+ missing\.join\(', '\) : API_COST_NOTE;/);
   assert.match(scriptSource, /const summary = await fetchApiCostSummary\(\);/);
   assert.match(scriptSource, /return \{ ok: true, updated: applyApiCost\(amountEur, buildApiCostNote\(summary\)\), amountEur, source: 'api-costs' \};/);
-  assert.match(scriptSource, /applyApiCost\(0, API_COST_UNAVAILABLE_NOTE\);/);
+  assert.match(scriptSource, /async function fetchLoggedApiCostEvents\(\)/);
+  assert.match(scriptSource, /async function applyLoggedApiCostFallback\(\)/);
+  assert.match(scriptSource, /amountEur <= 0 && Array\.isArray\(summary\.unavailable\) && summary\.unavailable\.length/);
+  assert.match(scriptSource, /const amountEur = buildCurrentMonthApiCostEur\(await fetchLoggedApiCostEvents\(\)\);/);
+  assert.match(scriptSource, /source: 'api-cost-ledger', fallback: true/);
+  assert.doesNotMatch(scriptSource, /applyApiCost\(0, API_COST_UNAVAILABLE_NOTE\);/);
   assert.match(scriptSource, /window\.refreshMonthlyApiCosts = refreshMonthlyApiCosts;/);
   assert.match(
     scriptSource,

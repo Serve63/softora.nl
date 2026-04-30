@@ -147,14 +147,17 @@ function createAiToolsCoordinator(deps = {}) {
   }
 
   async function runWebsitePreviewGeneratePipeline(inputUrl, options = {}) {
+    const safeOptions = options && typeof options === 'object' ? options : {};
     let fetched;
     try {
       fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
     } catch (error) {
-      if (!options.allowScanFallback) throw error;
-      fetched = buildDatabasePreviewFallbackScan(inputUrl, options.body || {});
+      if (!safeOptions.allowScanFallback) throw error;
+      fetched = buildDatabasePreviewFallbackScan(inputUrl, safeOptions.body || {});
     }
-    const generated = await generateWebsitePreviewImageWithAi(fetched.scan);
+    const generated = await generateWebsitePreviewImageWithAi(fetched.scan, {
+      imageSize: normalizeString(safeOptions.imageSize || safeOptions.image?.imageSize || ''),
+    });
 
     appendDashboardActivity(
       {

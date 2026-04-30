@@ -2,6 +2,7 @@
     "use strict";
 
     const USD_TO_EUR_RATE = 0.93;
+    const ESTIMATE_EUR_BUFFER = 2;
     const ESTIMATED_BATCH_PRICING = {
         inputTokens: 6000,
         outputTokensPerCompany: 1400,
@@ -429,6 +430,7 @@
         const toast = options.toast || function () {};
         let state = normalizeState({});
         let busy = false;
+        let lastSuccessfulAddedCount = 0;
         let bound = false;
         const visibleSourceTargetIds = new Set();
         const sessionFoundWebsitesByTargetId = new Map();
@@ -489,7 +491,7 @@
                 if (button) button.disabled = busy;
             });
             if (nodes.deepSearchStartButton) {
-                nodes.deepSearchStartButton.textContent = busy ? "Batch loopt..." : "Bedrijven toevoegen";
+                nodes.deepSearchStartButton.textContent = busy ? "Batch loopt..." : (lastSuccessfulAddedCount > 0 ? lastSuccessfulAddedCount + " bedrijven toegevoegd" : "Bedrijven toevoegen");
             }
             if (nodes.closeDeepSearchButton) {
                 const button = nodes.closeDeepSearchButton;
@@ -577,8 +579,8 @@
             }
             if (nodes.deepSearchCost) {
                 const desiredCount = getDesiredCompanyCount();
-                const estimate = formatUsdAsEuro(estimateRunUsd(desiredCount));
-                nodes.deepSearchCost.textContent = "Geschatte API-kosten voor " + desiredCount + " bedrijven: ± " + estimate + " (max ± €2 afwijking)";
+                const estimate = formatEuro(usdToEur(estimateRunUsd(desiredCount)) + ESTIMATE_EUR_BUFFER);
+                nodes.deepSearchCost.textContent = "Geschatte API-kosten voor " + desiredCount + " bedrijven: ± " + estimate;
             }
             if (nodes.deepSearchList) {
                 nodes.deepSearchList.innerHTML = state.targets.length
@@ -592,7 +594,10 @@
                     : "<div class=\"deep-search-empty\">Geen vaste volgorde gevonden.</div>";
             }
             renderSources(target);
-            if (nodes.deepSearchStartButton) nodes.deepSearchStartButton.disabled = busy || !canSearchTarget;
+            if (nodes.deepSearchStartButton) {
+                nodes.deepSearchStartButton.textContent = busy ? "Batch loopt..." : (lastSuccessfulAddedCount > 0 ? lastSuccessfulAddedCount + " bedrijven toegevoegd" : "Bedrijven toevoegen");
+                nodes.deepSearchStartButton.disabled = busy || !canSearchTarget || lastSuccessfulAddedCount > 0;
+            }
         }
 
         function collectExistingKeys() {
@@ -724,7 +729,7 @@
                 if (remainingCount <= 0) {
                     return persistState().then(function () {
                         setStatusMessage("Gewenste aantal nieuwe bedrijven is gehaald.", "success", true);
-                        return { desiredReached: true };
+                        return { desiredReached: true, addedCount: runSession.addedCount };
                     });
                 }
                 setStatusMessage("");
@@ -737,12 +742,12 @@
                     const baseMessage = "AI vond " + result.found + " complete bedrijven voor " + startedLabel + ". " + result.addedCount + " nieuw toegevoegd. " + progressMessage + "API-kosten: " + formatUsdAsEuro(result.costUsd) + "." + storageNote;
                     if (result.customerPersisted === false) {
                         setStatusMessage(baseMessage + " Opslaan in Supabase lukte niet, dus deze batch is gestopt zodat er niets stilletjes verloren gaat.", "error", true);
-                        return { stopped: true };
+                        return { stopped: true, addedCount: runSession.addedCount };
                     }
                     if (runSession.addedCount >= runSession.desiredCount) {
                         return persistState().then(function () {
                             setStatusMessage(baseMessage + " Gewenste aantal gehaald.", "success", true);
-                            return { desiredReached: true };
+                            return { desiredReached: true, addedCount: runSession.addedCount };
                         });
                     }
                     if (isTargetCompletionConfirmed(target, result)) {
@@ -755,7 +760,7 @@
                                 : "";
                             setStatusMessage(baseMessage + " Deze plaats is automatisch afgerond." + nextMessage, "success", true);
                             toast("Plek afgerond");
-                            return { completedTarget: true };
+                            return { completedTarget: true, addedCount: runSession.addedCount };
                         });
                     }
                     return persistState().then(function () {
@@ -778,7 +783,7 @@
                         session.addedCount > 0 ? "info" : "success",
                         true
                     );
-                    return { finished: true };
+                    return { finished: true, addedCount: session.addedCount };
                 });
             }
             visibleSourceTargetIds.add(target.id);
@@ -812,6 +817,7 @@
                 return Promise.resolve(false);
             }
             state.desiredCompanyCount = getDesiredCompanyCount();
+            lastSuccessfulAddedCount = 0;
             const session = {
                 desiredCount: state.desiredCompanyCount,
                 addedCount: 0
@@ -820,7 +826,9 @@
             render();
             void persistState();
             return runUntilDesiredCompanyCount(session).then(function (result) {
-                return Boolean(result && (result.desiredReached || result.completedTarget || result.finished));
+                const completed = Boolean(result && (result.desiredReached || result.completedTarget || result.finished));
+                if (completed) lastSuccessfulAddedCount = Math.max(0, Number(result.addedCount || session.addedCount) || 0);
+                return completed;
             }).catch(function (error) {
                 console.error("Bedrijvenlijst mislukt:", error);
                 setStatusMessage("Bedrijvenlijst mislukt: " + String(error.message || "controleer de instellingen"), "error");
@@ -838,6 +846,7 @@
             }
             const targetIndex = Math.max(0, Math.min(state.targets.length - 1, Number(index) || 0));
             state.activeIndex = targetIndex;
+            lastSuccessfulAddedCount = 0;
             state.targets.forEach(function (target, itemIndex) {
                 if (target.status !== "done") target.status = itemIndex === targetIndex ? "active" : "pending";
             });
@@ -847,6 +856,7 @@
 
         function open() {
             if (!nodes.deepSearchModal) return;
+            lastSuccessfulAddedCount = 0;
             visibleSourceTargetIds.clear();
             sessionFoundWebsitesByTargetId.clear();
             nodes.deepSearchModal.classList.add("on");
@@ -884,11 +894,13 @@
             if (nodes.deepSearchDesiredCount) {
                 nodes.deepSearchDesiredCount.addEventListener("input", function () {
                     state.desiredCompanyCount = getDesiredCompanyCount();
+                    lastSuccessfulAddedCount = 0;
                     render();
                     void persistState();
                 });
                 nodes.deepSearchDesiredCount.addEventListener("blur", function () {
                     state.desiredCompanyCount = getDesiredCompanyCount();
+                    lastSuccessfulAddedCount = 0;
                     render();
                     void persistState();
                 });

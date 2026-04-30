@@ -8,6 +8,7 @@
   const POLL_INTERVAL_MS = 15000;
   const COLDCALLING_ESTIMATE_NOTE = 'Geschatte maandkosten, Retell kan hoger uitvallen';
   const API_COST_NOTE = 'OpenAI factuurkosten deze maand';
+  const API_COST_LEDGER_NOTE = 'API-kosten uit Softora-logboek deze maand';
   const API_COST_UNAVAILABLE_NOTE = 'API factuurkoppeling ontbreekt';
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
@@ -337,6 +338,18 @@
     return data.summary;
   }
 
+  async function fetchLoggedApiCostEvents() {
+    const data = await fetchUiState(API_COST_SCOPE);
+    const values = data && data.values && typeof data.values === 'object' ? data.values : {};
+    return parseApiCostEvents(values[API_COST_KEY]);
+  }
+
+  async function applyLoggedApiCostFallback() {
+    const amountEur = buildCurrentMonthApiCostEur(await fetchLoggedApiCostEvents());
+    if (amountEur <= 0) return null;
+    return { ok: true, updated: applyApiCost(amountEur, API_COST_LEDGER_NOTE), amountEur, source: 'api-cost-ledger', fallback: true };
+  }
+
   async function refreshMonthlyColdcallingCosts() {
     if (refreshPromise) return refreshPromise;
     if (!resolveColdcallingCostItem() || !getMonthlyCostsRender()) {
@@ -368,9 +381,16 @@
     try {
       const summary = await fetchApiCostSummary();
       const amountEur = Number(summary.costEur || 0) || 0;
+      if (amountEur <= 0 && Array.isArray(summary.unavailable) && summary.unavailable.length) {
+        const fallback = await applyLoggedApiCostFallback().catch(function () { return null; });
+        if (fallback) return fallback;
+      }
       return { ok: true, updated: applyApiCost(amountEur, buildApiCostNote(summary)), amountEur, source: 'api-costs' };
     } catch (error) {
-      applyApiCost(0, API_COST_UNAVAILABLE_NOTE);
+      try {
+        const fallback = await applyLoggedApiCostFallback();
+        if (fallback) return fallback;
+      } catch (_) {}
       return {
         ok: false,
         error: normalizeString(error && error.message) || 'API-kosten konden niet geladen worden.',
