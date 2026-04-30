@@ -112,3 +112,24 @@ test('runtime debug ops coordinator runs runtime sync and reports before/after s
   assert.equal(resetCalls, 1);
   assert.equal(hydrateCalls, 1);
 });
+
+test('runtime debug ops coordinator exposes protected data health reports', async () => {
+  const coordinator = createRuntimeDebugOpsCoordinator({
+    dataOpsHealthReporter: {
+      buildReport: async () => ({
+        ok: true,
+        legacyScopes: [{ scope: 'premium_customers_database', rowCount: 3 }],
+        structuredCounts: { customers: 3 },
+        warnings: [],
+      }),
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendDataHealthResponse({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.legacyScopes[0].rowCount, 3);
+  assert.equal(res.body.structuredCounts.customers, 3);
+});

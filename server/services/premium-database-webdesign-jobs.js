@@ -8,15 +8,21 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     aiToolsCoordinator = null,
     getUiStateValues = async () => null,
     setUiStateValues = async () => null,
+    dataOpsStore = null,
     photoScope = 'premium_database_photos',
     photoKey = 'softora_database_photos_v1',
     photoDataPrefix = 'softora_database_photo_data_v1_',
+    jobProcessTimeoutMs = 4 * 60 * 1000,
+    processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
   } = deps;
 
   const jobs = new Map();
   const JOB_TTL_MS = 6 * 60 * 60 * 1000;
+  const JOB_PROCESS_TIMEOUT_MS = Math.max(100, Math.min(10 * 60 * 1000, Number(jobProcessTimeoutMs) || 0));
   const MAX_JOBS = 500;
   const CHUNK_SIZE = 180000;
+  const MAX_STORAGE_CHUNKS = 80;
+  const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
   let processing = false;
 
   function pruneJobs() {
@@ -121,7 +127,35 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     };
   }
 
-  function findRunningJobForCustomer(ownerKey, customerId) {
+  async function persistJob(job) {
+    if (!dataOpsStore || typeof dataOpsStore.upsertWebdesignJob !== 'function') return null;
+    try {
+      const saved = await dataOpsStore.upsertWebdesignJob(job);
+      return saved && saved.ok ? saved : null;
+    } catch (error) {
+      logger.error('[PremiumDatabaseWebdesignJobs][persist]', error && error.message ? error.message : error);
+      return null;
+    }
+  }
+
+  async function loadPersistentJob(jobId) {
+    if (!dataOpsStore || typeof dataOpsStore.getWebdesignJob !== 'function') return null;
+    try {
+      return dataOpsStore.getWebdesignJob(jobId);
+    } catch (error) {
+      logger.error('[PremiumDatabaseWebdesignJobs][load]', error && error.message ? error.message : error);
+      return null;
+    }
+  }
+
+  async function findRunningJobForCustomer(ownerKey, customerId) {
+    if (dataOpsStore && typeof dataOpsStore.findRunningWebdesignJob === 'function') {
+      const persistent = await dataOpsStore.findRunningWebdesignJob(ownerKey, customerId);
+      if (persistent) {
+        jobs.set(persistent.id, persistent);
+        return persistent;
+      }
+    }
     for (const job of jobs.values()) {
       if (job.ownerKey !== ownerKey) continue;
       if (job.customer.id !== customerId) continue;
@@ -130,11 +164,22 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return null;
   }
 
-  function getVisibleJobsForOwner(ownerKey) {
-    return Array.from(jobs.values())
+  async function getVisibleJobsForOwner(ownerKey) {
+    const byId = new Map();
+    if (dataOpsStore && typeof dataOpsStore.listVisibleWebdesignJobs === 'function') {
+      const persistentJobs = await dataOpsStore.listVisibleWebdesignJobs(ownerKey);
+      (Array.isArray(persistentJobs) ? persistentJobs : []).forEach((job) => {
+        if (job && job.id) {
+          jobs.set(job.id, job);
+          byId.set(job.id, job);
+        }
+      });
+    }
+    Array.from(jobs.values())
       .filter((job) => job.ownerKey === ownerKey)
       .filter((job) => job.status === 'queued' || job.status === 'running')
-      .sort((left, right) => left.createdAt - right.createdAt);
+      .forEach((job) => byId.set(job.id, job));
+    return Array.from(byId.values()).sort((left, right) => left.createdAt - right.createdAt);
   }
 
   async function persistGeneratedPhoto(job, image) {
@@ -147,14 +192,36 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       throw new Error('De AI gaf geen geldige afbeelding terug.');
     }
 
+    const customer = job.customer;
+    if (dataOpsStore && typeof dataOpsStore.uploadDesignPhoto === 'function') {
+      const structured = await dataOpsStore.uploadDesignPhoto(
+        {
+          customerId: customer.id,
+          dataUrl,
+          identityKey: buildCustomerIdentityKey(customer),
+          fileName: truncateText(normalizeString(image.fileName || `${customer.dom || customer.bedrijf || 'webdesign'}-webdesign.png`), 180),
+          legacyMeta: {
+            id: customer.id,
+            identityKey: buildCustomerIdentityKey(customer),
+            websitePhotoName: truncateText(normalizeString(image.fileName || `${customer.dom || customer.bedrijf || 'webdesign'}-webdesign.png`), 180) || 'Websitefoto',
+            updatedAt: new Date().toISOString().slice(0, 10),
+          },
+        },
+        { source: 'premium-database-webdesign-jobs' }
+      );
+      if (structured && structured.ok) return;
+    }
+
     const state = await getUiStateValues(photoScope);
     if (!state) throw new Error('Databasefoto-opslag kon niet worden geladen.');
 
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const existingMap = safeParseJsonObject(values[photoKey]);
-    const customer = job.customer;
     const photoDataKey = buildDataKey(customer.id);
     const chunks = dataUrl.match(new RegExp(`[\\s\\S]{1,${CHUNK_SIZE}}`, 'g')) || [];
+    if (chunks.length > MAX_STORAGE_CHUNKS) {
+      throw new Error('De AI-foto was te groot om betrouwbaar op te slaan. Probeer het opnieuw.');
+    }
     const patch = {};
 
     chunks.forEach((chunk, index) => {
@@ -202,6 +269,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   async function processJob(job) {
     job.status = 'running';
     job.startedAt = Date.now();
+    await persistJob(job);
 
     if (!aiToolsCoordinator || typeof aiToolsCoordinator.runWebsitePreviewGeneratePipeline !== 'function') {
       throw new Error('Websitegenerator is niet beschikbaar.');
@@ -209,6 +277,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
     const payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, {
       allowScanFallback: true,
+      imageSize: DATABASE_PHOTO_IMAGE_SIZE,
       body: {
         source: 'premium-database',
         action: 'webdesign',
@@ -220,6 +289,41 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     await persistGeneratedPhoto(job, payload && payload.image);
   }
 
+  function withJobProcessTimeout(job, promise) {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(`Webdesign maken duurde te lang (${Math.round(JOB_PROCESS_TIMEOUT_MS / 1000)}s). Probeer het opnieuw.`));
+      }, JOB_PROCESS_TIMEOUT_MS);
+      Promise.resolve(promise).then(
+        (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      );
+    });
+  }
+
+  async function settleJob(job) {
+    try {
+      await withJobProcessTimeout(job, processJob(job));
+      job.status = 'done';
+      job.error = null;
+      job.finishedAt = Date.now();
+      await persistJob(job);
+    } catch (error) {
+      job.status = 'error';
+      job.error = truncateText(normalizeString(error && error.message) || 'Webdesign maken is mislukt.', 500);
+      job.finishedAt = Date.now();
+      logger.error('[PremiumDatabaseWebdesignJobs][process]', error && error.message ? error.message : error);
+      await persistJob(job);
+    }
+    return job;
+  }
+
   function queueProcessing() {
     if (processing) return;
     const next = Array.from(jobs.values()).find((job) => job.status === 'queued');
@@ -227,18 +331,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
     processing = true;
     setImmediate(() => {
-      processJob(next)
-        .then(() => {
-          next.status = 'done';
-          next.error = null;
-          next.finishedAt = Date.now();
-        })
-        .catch((error) => {
-          next.status = 'error';
-          next.error = truncateText(normalizeString(error && error.message) || 'Webdesign maken is mislukt.', 500);
-          next.finishedAt = Date.now();
-          logger.error('[PremiumDatabaseWebdesignJobs][process]', error && error.message ? error.message : error);
-        })
+      settleJob(next)
         .finally(() => {
           processing = false;
           queueProcessing();
@@ -268,7 +361,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       });
     }
 
-    const existing = findRunningJobForCustomer(ownerKey, customer.id);
+    const existing = await findRunningJobForCustomer(ownerKey, customer.id);
     if (existing) {
       return res.status(202).json({
         ok: true,
@@ -278,8 +371,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
     const requestedJobId = normalizeJobId(body.jobId);
     const jobId = requestedJobId || randomUUID();
-    const existingById = jobs.get(jobId);
+    const existingById = jobs.get(jobId) || await loadPersistentJob(jobId);
     if (existingById) {
+      jobs.set(existingById.id, existingById);
       if (existingById.ownerKey !== ownerKey) {
         return res.status(403).json({
           ok: false,
@@ -305,7 +399,12 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       finishedAt: null,
     };
     jobs.set(job.id, job);
-    queueProcessing();
+    await persistJob(job);
+    if (processJobsInline) {
+      await settleJob(job);
+    } else {
+      queueProcessing();
+    }
 
     return res.status(202).json({
       ok: true,
@@ -331,7 +430,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       });
     }
 
-    const job = jobs.get(jobId);
+    const job = jobs.get(jobId) || await loadPersistentJob(jobId);
     if (!job) {
       return res.status(404).json({
         ok: false,
@@ -344,6 +443,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         error: 'Geen toegang',
       });
     }
+    jobs.set(job.id, job);
     if (job.status === 'queued') queueProcessing();
 
     return res.status(200).json({
@@ -365,7 +465,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
     return res.status(200).json({
       ok: true,
-      jobs: getVisibleJobsForOwner(ownerKey).map(serializeJob),
+      jobs: (await getVisibleJobsForOwner(ownerKey)).map(serializeJob),
     });
   }
 

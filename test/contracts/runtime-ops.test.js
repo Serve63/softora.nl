@@ -66,6 +66,7 @@ function createFixture(overrides = {}) {
         source: meta.source,
         updatedAt: '2026-04-07T12:30:00.000Z',
       })),
+    dataOpsUiStateBridge: overrides.dataOpsUiStateBridge || null,
     adminOnlyUiStateScopes: overrides.adminOnlyUiStateScopes || new Set(['premium_password_register']),
     appendSecurityAuditEvent: overrides.appendSecurityAuditEvent || ((payload, reason) => {
       securityAuditCalls.push({ payload, reason });
@@ -171,6 +172,57 @@ test('runtime ops coordinator merges patches for ui-state writes', async () => {
       actor: 'serve',
     },
   });
+});
+
+test('runtime ops coordinator prefers structured data ops reads and mirrors writes safely', async () => {
+  const bridgeCalls = [];
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: { panel: 'legacy' },
+      source: 'legacy',
+      updatedAt: '2026-04-07T12:00:00.000Z',
+    }),
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_customers_database',
+      getUiStateValues: async (scope, options) => {
+        bridgeCalls.push({ type: 'get', scope, hasLegacy: typeof options.legacyGetUiStateValues === 'function' });
+        return {
+          values: { softora_customers_premium_v1: '[{"id":"cust-1"}]' },
+          source: 'supabase:data_ops',
+          updatedAt: '2026-04-07T12:15:00.000Z',
+        };
+      },
+      setUiStateValues: async (scope, values, meta) => {
+        bridgeCalls.push({ type: 'set', scope, values, meta });
+        return {
+          values,
+          source: 'supabase:data_ops',
+          updatedAt: '2026-04-07T12:30:00.000Z',
+        };
+      },
+    },
+  });
+  const getRes = createResponseRecorder();
+  const setRes = createResponseRecorder();
+
+  await coordinator.sendUiStateGetResponse({}, getRes, 'premium_customers_database');
+  await coordinator.sendUiStateSetResponse(
+    {
+      body: {
+        patch: { softora_customers_premium_v1: '[{"id":"cust-2"}]' },
+        source: 'premium-klanten',
+      },
+    },
+    setRes,
+    'premium_customers_database'
+  );
+
+  assert.equal(getRes.statusCode, 200);
+  assert.equal(getRes.body.source, 'supabase:data_ops');
+  assert.equal(setRes.statusCode, 200);
+  assert.equal(setRes.body.source, 'supabase:data_ops');
+  assert.deepEqual(bridgeCalls.map((call) => call.type), ['get', 'get', 'set']);
+  assert.equal(bridgeCalls[2].meta.source, 'premium-klanten');
 });
 
 test('runtime ops coordinator treats values writes as patches unless replace is explicit', async () => {

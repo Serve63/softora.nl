@@ -37,6 +37,7 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     aiToolsCoordinator,
     getUiStateValues: featureRouteOptions.getUiStateValues,
     setUiStateValues: featureRouteOptions.setUiStateValues,
+    dataOpsStore: featureRouteOptions.dataOpsStore,
   });
   const mailboxCoordinator = createMailboxService(featureRouteOptions.mailbox || {});
 

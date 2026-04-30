@@ -8,6 +8,9 @@ const { createRuntimeOpsCoordinator } = require('./runtime-ops');
 const { createRuntimeDebugOpsCoordinator } = require('./runtime-debug-ops');
 const { createWebsiteLinkCoordinator } = require('./website-links');
 const { createWebsitePreviewLibraryCoordinator } = require('./website-preview-library');
+const { createSoftoraDataOpsUiStateBridge } = require('./data-ops-ui-state-bridge');
+const { createSoftoraDataOpsStore } = require('./data-ops-store');
+const { createDataOpsHealthReporter } = require('./data-ops-health');
 
 function createUiSeoRuntime(deps = {}) {
   const {
@@ -58,6 +61,7 @@ function createUiSeoRuntime(deps = {}) {
     seoConfigScope,
     seoConfigKey,
     seoConfigCacheTtlMs,
+    dataOpsUiStateEnabled = true,
     uiStateReadTimeoutMsByScope = Object.freeze({
       premium_database_photos: 8000,
     }),
@@ -79,6 +83,21 @@ function createUiSeoRuntime(deps = {}) {
 
   const { getUiStateValues, normalizeUiStateScope, sanitizeUiStateValues, setUiStateValues } =
     uiStateStore;
+
+  const dataOpsStore = createSoftoraDataOpsStore({
+    isSupabaseConfigured,
+    getSupabaseClient,
+    logger,
+  });
+  const dataOpsUiStateBridge = createSoftoraDataOpsUiStateBridge({
+    enabled: dataOpsUiStateEnabled,
+    store: dataOpsStore,
+    logger,
+  });
+  const dataOpsHealthReporter = createDataOpsHealthReporter({
+    fetchSupabaseRowsByStateKeyPrefixViaRest,
+    dataOpsStore,
+  });
 
   const seoCore = createSeoCore({
     knownHtmlPageFiles,
@@ -187,6 +206,7 @@ function createUiSeoRuntime(deps = {}) {
     getUiStateValues,
     sanitizeUiStateValues,
     setUiStateValues,
+    dataOpsUiStateBridge,
   });
 
   const runtimeDebugOpsCoordinator = createRuntimeDebugOpsCoordinator({
@@ -203,6 +223,7 @@ function createUiSeoRuntime(deps = {}) {
     resetHydrationState,
     ensureRuntimeStateHydratedFromSupabase,
     getAfterState,
+    dataOpsHealthReporter,
   });
 
   const websitePreviewLibraryCoordinator = createWebsitePreviewLibraryCoordinator({
@@ -247,6 +268,9 @@ function createUiSeoRuntime(deps = {}) {
     setUiStateValues,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
+    dataOpsStore,
+    dataOpsHealthReporter,
+    dataOpsUiStateBridge,
     websiteLinkCoordinator,
     websitePreviewLibraryCoordinator,
   };
