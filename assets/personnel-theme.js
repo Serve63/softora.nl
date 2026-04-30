@@ -525,7 +525,7 @@
         if (p.indexOf("/premium-websitegenerator") === 0) {
             return "websitegenerator";
         }
-        if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo";
+        if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo"; if (p.indexOf("/premium-qr-code") === 0 || p.indexOf("/premium-qrcode") === 0) return "qr_code";
         if (p.indexOf("/premium-pakketten") === 0) return "packages";
         if (p.indexOf("/premium-pdfs") === 0) return "pdfs";
         if (p.indexOf("/premium-wachtwoordenregister") === 0) return "passwords";
@@ -572,7 +572,7 @@
         return {
             key: "websitegenerator",
             href: "/premium-websitegenerator",
-            label: "Websitedesign",
+            label: "Webdesign",
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg>',
         };
     }
@@ -588,7 +588,7 @@
 
     /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
-        "seo",
+        "seo", "qr_code",
         "ads_google",
         "ads_facebook",
         "ads_linkedin",
@@ -823,7 +823,7 @@
                 href: "/premium-seo",
                 label: "SEO",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg>',
-            },
+            }, { key: "qr_code", href: "/premium-qr-code", label: "QR Code", icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5h5v5h-5v-5Zm10 0h5v5h-5v-5Zm-10 10h5v5h-5v-5Zm10 0h1.5m3.5 0v1.5m-5 3.5h1.5m3.5 0h.01m-3.51-3.5h3.5v3.5"></path></svg>' },
             {
                 key: "packages",
                 href: "/premium-pakketten",
