@@ -1907,8 +1907,8 @@
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
 
         <main class="main-content is-premium-boot-host">
-            <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
-                <div class="premium-boot-spinner" aria-hidden="true">
+            <div class="premium-boot-loader" id="premium-boot-loader" data-dashboard-boot-loader="true" aria-hidden="true" style="background:var(--bg-primary,#f8f7f4);z-index:120;">
+                <div class="premium-boot-spinner" aria-hidden="true" style="--loader-size:58px;filter:drop-shadow(0 14px 28px rgba(139,34,82,0.18));">
                     <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
                     <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
                     <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
@@ -2142,7 +2142,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260501a"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260501b"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -3595,7 +3595,7 @@
         void (async () => { const bootStartedAt = Date.now();
             try {
                 await refreshPremiumDashboard(true);
-            } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 650); }
+            } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 950); }
         })();
 
         premiumDashboardState.pollTimer = window.setInterval(() => {
