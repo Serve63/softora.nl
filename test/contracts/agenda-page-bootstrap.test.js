@@ -101,3 +101,32 @@ test('agenda page bootstrap service forceert altijd een verse runtime-state sync
     'bootstrap moet cooldown omzeilen (maxAgeMs: 0), anders ziet gebruiker stale data');
   assert.equal(payload.appointments.length, 1);
 });
+
+test('agenda page bootstrap service blokkeert paginalaad niet wanneer verse runtime-sync blijft hangen', async () => {
+  const loggerCalls = [];
+  const service = createAgendaPageBootstrapService({
+    logger: {
+      error: (...args) => loggerCalls.push(args),
+    },
+    bootstrapPreparationTimeoutMs: 5,
+    isSupabaseConfigured: () => true,
+    getSupabaseStateHydrated: () => true,
+    forceHydrateRuntimeStateWithRetries: async () => {},
+    syncRuntimeStateFromSupabaseIfNewer: async () => new Promise(() => {}),
+    getGeneratedAgendaAppointments: () => [{ id: 77, date: '2026-04-29', time: '09:30' }],
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+    compareAgendaAppointments: () => 0,
+  });
+
+  const startedAt = Date.now();
+  const payload = await service.buildAgendaBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.appointments.length, 1);
+  assert.equal(payload.appointments[0].id, 77);
+  assert.ok(Date.now() - startedAt < 250, 'bootstrap moet snel terugvallen op bestaande agenda-data');
+  assert.equal(
+    loggerCalls.some((args) => args[0] === '[Agenda Bootstrap][PreparationTimeout]'),
+    true
+  );
+});

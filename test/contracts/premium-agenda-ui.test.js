@@ -29,9 +29,12 @@ test('premium agenda modal uses dossier flow for appointments that already have 
 
 test('premium agenda workspace locks modal exit while dossier flow is still mandatory', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
 
   assert.match(pageSource, /<button class="modal-close magnetic" id="modalCloseBtn"/);
+  assert.match(pageSource, /assets\/premium-agenda-stability\.js/);
   assert.match(
     pageSource,
     /\.modal-overlay\.dismiss-locked \.modal-close,\s*\.modal\.dismiss-locked \.modal-close \{[\s\S]*display:\s*none !important;[\s\S]*pointer-events:\s*none;/
@@ -50,8 +53,11 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   );
   assert.match(
     pageSource,
-    /function syncWorkspaceExitControls\(\) \{[\s\S]*const shouldHideDismissControls = shouldHideWorkspaceDismissControls\(\);[\s\S]*const hideClose = shouldLockExit \|\| shouldHideDismissControls;[\s\S]*modalCloseBtn\.hidden = hideClose;[\s\S]*modalCloseBtn\.style\.display = hideClose \? 'none' : '';[\s\S]*modalCloseBtn\.setAttribute\('aria-hidden', hideClose \? 'true' : 'false'\);[\s\S]*modalSecondaryBtn\.hidden = shouldHideDismissControls;[\s\S]*modalSecondaryBtn\.disabled = shouldLockExit \|\| shouldHideDismissControls;/
+    /function syncWorkspaceExitControls\(\) \{[\s\S]*const shouldHideDismissControls = shouldHideWorkspaceDismissControls\(\);[\s\S]*const hideClose = shouldLockExit \|\| shouldHideDismissControls;[\s\S]*modalCloseBtn\.hidden = hideClose;[\s\S]*modalCloseBtn\.style\.display = hideClose \? 'none' : '';[\s\S]*modalCloseBtn\.setAttribute\('aria-hidden', hideClose \? 'true' : 'false'\);/
   );
+  assert.match(stabilitySource, /const hideFooterClose = !modalWorkspaceMode;/);
+  assert.match(stabilitySource, /modalSecondaryBtn\.hidden = hideFooterClose \|\| hideDismiss;/);
+  assert.match(stabilitySource, /modalSecondaryBtn\.disabled = locked \|\| hideFooterClose \|\| hideDismiss;/);
   assert.match(
     pageSource,
     /function setWorkspaceLoading\(loading\) \{[\s\S]*workspaceLoadingOverlay\.classList\.toggle\('show', loading\);[\s\S]*workspaceLoadingOverlay\.setAttribute\('aria-hidden', loading \? 'false' : 'true'\);[\s\S]*syncWorkspaceExitControls\(\);[\s\S]*\}/
@@ -226,6 +232,26 @@ test('premium agenda shows klantwerk label on Saturdays', () => {
   assert.match(pageSource, /if \(isYmdCalendarSaturday\(picked\)\) return;/);
 });
 
+test('premium agenda herstelt handmatige activiteitknoppen en boot-failsafe', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
+
+  assert.match(pageSource, /assets\/premium-agenda-stability\.js/);
+  assert.match(pageSource, /window\.SoftoraAgendaStability\.finishBoot\(\);/);
+  assert.match(stabilitySource, /function isManualAgendaAppointment\(item\)/);
+  assert.match(stabilitySource, /function isManualOtherAppointment\(apt\)/);
+  assert.match(stabilitySource, /choice === 'manual-overig' \|\| choice === 'manual-serve' \|\| choice === 'manual-martijn' \|\| choice === 'manual-both'/);
+  assert.match(stabilitySource, /modalPrimaryBtn\.textContent = completed \? 'Activiteit afgerond' : 'Activiteit afronden';/);
+  assert.match(stabilitySource, /async function markActiveManualActivityCompleted\(\)/);
+  assert.match(stabilitySource, /function setModalAudioBlockHidden\(hidden\)/);
+  assert.match(stabilitySource, /syncManualAppointmentModalDetails\(apt\);/);
+  assert.match(stabilitySource, /const agendaBootFailsafeTimer = window\.setTimeout\(releaseAgendaBootShell, 4500\);/);
+  assert.match(stabilitySource, /function isAgendaDateBeforeToday\(value\)/);
+  assert.match(stabilitySource, /if \(isManualAppointmentStartInPast\(manualAppointmentSelectedDate, timeVal\)\)/);
+});
+
 test('premium agenda toont Ruben planning uitleg alleen in AI beheer modus', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -284,4 +310,21 @@ test('premium agenda dwingt modal sluiting na geslaagde handmatige opslag', () =
   assert.ok(pageSource.includes('function closeManualAppointmentModal(forceClose = false) {'));
   assert.ok(pageSource.includes('if (manualAppointmentSaving && !forceClose) return;'));
   assert.ok(pageSource.includes('closeManualAppointmentModal(true);'));
+});
+
+test('premium agenda dossierwerkruimte biedt audio-upload voor meetingnotities', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
+
+  assert.match(pageSource, /assets\/premium-agenda-stability\.js/);
+  assert.match(stabilitySource, /button\.id = 'notesAudioUploadBtn';/);
+  assert.match(stabilitySource, /Audio toevoegen/);
+  assert.match(stabilitySource, /input\.id = 'notesAudioUploadInput';/);
+  assert.match(stabilitySource, /input\.accept = 'audio\/mpeg/);
+  assert.match(stabilitySource, /async function handleAgendaNotesAudioUpload\(file, button, input\)/);
+  assert.match(stabilitySource, /\/api\/ai\/notes-audio-to-text/);
+  assert.match(stabilitySource, /Transcriptie audiobestand[\s\S]*workspaceTranscriptEl\.value = currentNotes/);
+  assert.match(stabilitySource, /button\.addEventListener\('click'/);
 });

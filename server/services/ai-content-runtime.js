@@ -133,6 +133,7 @@ function createAiContentRuntime(deps = {}) {
     generateWebsiteHtmlWithAi,
     generateWebsitePreviewImageWithAi,
     generateWebsitePromptFromTranscriptWithAi,
+    transcribeMeetingAudioWithAi,
   } = aiRemoteService;
 
   return {
@@ -146,6 +147,7 @@ function createAiContentRuntime(deps = {}) {
     generateWebsiteHtmlWithAi,
     generateWebsitePreviewImageWithAi,
     generateWebsitePromptFromTranscriptWithAi,
+    transcribeMeetingAudioWithAi,
   };
 }
 

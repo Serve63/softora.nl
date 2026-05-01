@@ -19,10 +19,14 @@ test('premium dashboard leest actieve opdrachten uit chunked Supabase state', ()
     pageSource,
     /getPremiumDashboardChunkMetaKey\(PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY\)[\s\S]*getPremiumDashboardChunkMetaKey\(PREMIUM_ACTIVE_RUNTIME_KEY\)/
   );
+  assert.match(pageSource, /safeValues\[PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY\]/);
+  assert.match(pageSource, /safeValues\[PREMIUM_ACTIVE_RUNTIME_KEY\]/);
   assert.match(pageSource, /const amount = Math\.round\(Number\(item\?\.amount\)\);/);
   assert.match(pageSource, /if \(!Number\.isFinite\(amount\) \|\| amount <= 0\) return null;/);
   assert.match(pageSource, /companyName: String\(item\?\.companyName \|\| ''\)\.trim\(\),/);
   assert.match(pageSource, /contactName: String\(item\?\.contactName \|\| ''\)\.trim\(\),/);
+  assert.match(pageSource, /clientName: String\(item\?\.clientName \|\| item\?\.companyName \|\| runtime\?\.name \|\| ''\)\.trim\(\),/);
+  assert.match(pageSource, /statusKey: String\(runtime\?\.statusKey \|\| item\?\.statusKey \|\| item\?\.status \|\| ''\)\.trim\(\),/);
   assert.match(
     pageSource,
     /const activeOrders = orders\.filter\(\(order\) => !order\?\.ui\?\.isBuilt\);/

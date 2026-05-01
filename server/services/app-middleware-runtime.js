@@ -114,11 +114,23 @@ function applyAppMiddleware(app, deps = {}) {
       req.rawBody = buf;
     },
   });
+  const jsonBodyParserAudioUpload = express.json({
+    limit: '34mb',
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  });
 
   app.use((req, res, next) => {
     const pathname = getRequestPathname(req);
     if (req.method === 'POST' && pathname === '/api/website-preview-library') {
       return jsonBodyParserPreviewLibrary(req, res, next);
+    }
+    if (
+      req.method === 'POST' &&
+      (pathname === '/api/ai/notes-audio-to-text' || pathname === '/api/ai-notes-audio-to-text')
+    ) {
+      return jsonBodyParserAudioUpload(req, res, next);
     }
     return jsonBodyParser8mb(req, res, next);
   });

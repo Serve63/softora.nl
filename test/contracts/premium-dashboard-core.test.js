@@ -15,6 +15,7 @@ test('premium dashboard core exposes stable pure helpers', () => {
   assert.equal(typeof dashboardCore.fetchPremiumDashboardJson, 'function');
   assert.equal(typeof dashboardCore.forcePremiumDashboardBootShellVisible, 'function');
   assert.equal(typeof dashboardCore.releasePremiumDashboardBootShell, 'function');
+  assert.equal(typeof dashboardCore.showPremiumDashboardBootShellForMinimum, 'function');
   assert.equal(typeof dashboardCore.hydratePremiumDashboardOrdersFromBootstrap, 'function');
   assert.equal(typeof dashboardCore.startPremiumDashboardBootWatchdog, 'function');
 });
@@ -121,8 +122,25 @@ test('premium dashboard core can force-release the boot shell without theme help
       this.attrs[name] = value;
     },
   };
+  const hardLoader = {
+    style: {},
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
   const oldDocument = global.document;
+  const root = {
+    removed: [],
+    removeAttribute(name) {
+      this.removed.push(name);
+    },
+  };
   global.document = {
+    documentElement: root,
+    getElementById(id) {
+      return id === 'dashboardHardBootLoader' ? hardLoader : null;
+    },
     querySelector(selector) {
       if (selector !== 'main.is-premium-boot-host') return null;
       return {
@@ -144,6 +162,143 @@ test('premium dashboard core can force-release the boot shell without theme help
   assert.equal(loader.classList.has('is-hidden'), true);
   assert.equal(loader.attrs['aria-hidden'], 'true');
   assert.equal(loader.style.visibility, 'hidden');
+  assert.equal(hardLoader.attrs['aria-hidden'], 'true');
+  assert.equal(hardLoader.style.visibility, 'hidden');
+  assert.deepEqual(root.removed, ['data-dashboard-boot-loading']);
   assert.equal(shell.classList.has('is-booting'), false);
   assert.equal(shell.attrs['aria-busy'], 'false');
+});
+
+test('premium dashboard core waits for a real paint before releasing the boot shell minimum', async () => {
+  const makeClassList = (initial = []) => {
+    const values = new Set(initial);
+    return {
+      add: (name) => values.add(name),
+      remove: (name) => values.delete(name),
+      has: (name) => values.has(name),
+    };
+  };
+  const loader = {
+    classList: makeClassList(),
+    style: {},
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  const shell = {
+    classList: makeClassList(['is-booting']),
+    style: {},
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  const oldDocument = global.document;
+  const oldRequestAnimationFrame = global.requestAnimationFrame;
+  const oldSetTimeout = global.setTimeout;
+  const oldClearTimeout = global.clearTimeout;
+  const rafQueue = [];
+  const timeoutQueue = [];
+
+  global.document = {
+    querySelector(selector) {
+      if (selector !== 'main.is-premium-boot-host') return null;
+      return {
+        querySelector(innerSelector) {
+          if (innerSelector === '.premium-boot-loader') return loader;
+          if (innerSelector === '.premium-boot-shell') return shell;
+          return null;
+        },
+      };
+    },
+  };
+  global.requestAnimationFrame = (callback) => {
+    rafQueue.push(callback);
+    return rafQueue.length;
+  };
+  global.setTimeout = (callback, ms) => {
+    timeoutQueue.push({ callback, ms });
+    return timeoutQueue.length;
+  };
+  global.clearTimeout = () => {};
+
+  try {
+    dashboardCore.releasePremiumDashboardBootShellAfterMinimum(Date.now() - 5000, 650);
+    assert.equal(loader.classList.has('is-hidden'), false);
+    assert.equal(rafQueue.length, 1);
+
+    rafQueue.shift()();
+    assert.equal(loader.classList.has('is-hidden'), false);
+    assert.equal(rafQueue.length, 1);
+
+    rafQueue.shift()();
+    await Promise.resolve();
+    assert.equal(loader.classList.has('is-hidden'), false);
+    assert.equal(timeoutQueue.length, 1);
+    assert.ok(timeoutQueue[0].ms > 0);
+    assert.ok(timeoutQueue[0].ms <= 650);
+
+    timeoutQueue[0].callback();
+    assert.equal(loader.classList.has('is-hidden'), true);
+    assert.equal(shell.classList.has('is-booting'), false);
+  } finally {
+    global.document = oldDocument;
+    global.requestAnimationFrame = oldRequestAnimationFrame;
+    global.setTimeout = oldSetTimeout;
+    global.clearTimeout = oldClearTimeout;
+  }
+});
+
+test('premium dashboard core can re-show the boot shell after browser restore', () => {
+  const oldDocument = global.document;
+  const oldSetTimeout = global.setTimeout;
+  const oldClearTimeout = global.clearTimeout;
+  const attrs = {};
+  const removed = [];
+  const hardLoader = {
+    style: {},
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  let scheduled = null;
+
+  global.document = {
+    documentElement: {
+      setAttribute(name, value) {
+        attrs[name] = value;
+      },
+      removeAttribute(name) {
+        removed.push(name);
+        delete attrs[name];
+      },
+    },
+    getElementById(id) {
+      return id === 'dashboardHardBootLoader' ? hardLoader : null;
+    },
+    querySelector() {
+      return null;
+    },
+  };
+  global.setTimeout = (callback, delay) => {
+    scheduled = { callback, delay };
+    return 7;
+  };
+  global.clearTimeout = () => {};
+
+  try {
+    dashboardCore.showPremiumDashboardBootShellForMinimum(2000);
+    assert.equal(attrs['data-dashboard-boot-loading'], 'true');
+    assert.equal(hardLoader.attrs['aria-hidden'], 'false');
+    assert.equal(hardLoader.style.visibility, '');
+    assert.equal(scheduled.delay, 2000);
+    scheduled.callback();
+    assert.ok(removed.includes('data-dashboard-boot-loading'));
+  } finally {
+    global.document = oldDocument;
+    global.setTimeout = oldSetTimeout;
+    global.clearTimeout = oldClearTimeout;
+  }
 });
