@@ -136,7 +136,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
 
   assert.match(pageSource, /<div class="campagne-head">[\s\S]*<div class="campagne-title">Nieuwe Campagne<\/div>[\s\S]*id="campaignCompanyCount"/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/softora-dossier-loader\.css\?v=20260424a">/);
-  assert.match(pageSource, /<script src="assets\/premium-campaign-radius\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-campaign-radius\.js\?v=20260501a"><\/script>/);
   assert.match(pageSource, /<main class="main-content is-premium-boot-host">/);
   assert.match(pageSource, /<div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">/);
   assert.match(pageSource, /<div class="premium-boot-shell is-booting" aria-busy="true">/);
@@ -182,12 +182,15 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function isCampaignRowWithinRadius\(row\)/);
   assert.match(pageSource, /const eligibleRows = coldmailingDatabaseRows\.filter\(\(row\) => isEligibleCampaignCountRow\(row\) && isCampaignRowWithinRadius\(row\)\);/);
   assert.match(pageSource, /params\.set\('radiusKm', String\(getSelectedCampaignRadiusKm\(\)\)\);/);
+  assert.match(pageSource, /<input class="slider" type="range" min="0" max="11" value="4" id="km-slider" oninput="updateKm\(this\.value\)">/);
+  assert.match(pageSource, /const index = Math\.max\(0, Math\.min\(KM_OPTIES\.length - 1,/);
+  assert.match(pageSource, /const pct = KM_OPTIES\.length > 1 \? \(index \/ \(KM_OPTIES\.length - 1\)\) \* 100 : 0;/);
   assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
   assert.match(pageSource, /Number\.isFinite\(Number\(countOverride\)\)/);
   assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{[\s\S]*fetch\(getColdmailRecipientPreviewUrl\(\), \{ cache: 'no-store' \}\)[\s\S]*renderCampaignCompanyCount\(Number\(data && data\.selected\) \|\| recipients\.length\);/);
   assert.match(pageSource, /Math\.min\(requestedCount \|\| eligibleRows\.length, eligibleRows\.length\)/);
   assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\),/);
-  assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);
+  assert.match(pageSource, /renderCampaignCompanyCount\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);
   assert.match(pageSource, /initCampaignDatabaseAutoRefresh\(\);/);
   assert.match(pageSource, /const campaignBootTasks = \[/);
   assert.match(pageSource, /hydrateCampaignCompanyCountFromSupabase\(\),/);
@@ -225,7 +228,7 @@ test('premium bevestigingsmails removes mail and ai-instructions tabs while keep
   assert.doesNotMatch(pageSource, /Terug naar script/);
 });
 
-test('premium bevestigingsmails replaces sender detail fields with compact dropdown settings', () => {
+test('premium bevestigingsmails places sender dropdown in the campaign card and compact settings behind the gear', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -242,7 +245,7 @@ test('premium bevestigingsmails replaces sender detail fields with compact dropd
   assert.doesNotMatch(pageSource, /Deze gegevens kun je later gebruiken als vaste afzenderinformatie voor alle coldmails\./);
 
   assert.match(pageSource, /html\[data-softora-lead-generator-alias="1"\] \.lead-generator-hidden-setting \{ display: none !important; \}/);
-  assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Verzenden vanaf<\/div>\s*<select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">/);
+  assert.match(pageSource, /<div class="field lead-generator-hidden-setting">\s*<div class="field-label">Verzenden vanaf<\/div>\s*<select class="sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">/);
   assert.match(pageSource, /<option value="ruben@softora\.nl" selected>ruben@softora\.nl<\/option>/);
   assert.match(pageSource, /<option value="serve@softora\.nl">serve@softora\.nl<\/option>/);
   assert.match(pageSource, /<option value="martijn@softora\.nl">martijn@softora\.nl<\/option>/);
@@ -250,6 +253,7 @@ test('premium bevestigingsmails replaces sender detail fields with compact dropd
   assert.doesNotMatch(pageSource, /<option value="zakelijk@softora\.nl"/);
   assert.doesNotMatch(pageSource, /zakelijk@theimpactbox\.co/);
   assert.match(pageSource, /allowedSenderEmails\.has\(String\(email \|\| ''\)\.toLowerCase\(\)\)/);
+  assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Campagne afgerond na<\/div>\s*<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
   assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Speciale handeling<\/div>\s*<select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">/);
   assert.match(pageSource, /<option value="webdesign" selected>Webdesign<\/option>/);
   assert.doesNotMatch(pageSource, /id="delay1"/);
@@ -262,11 +266,14 @@ test('premium bevestigingsmails toont de locatie als zichtbare variabele', () =>
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const locationVariableSource = fs.readFileSync(locationVariablePath, 'utf8');
 
-  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-location-variable\.js\?v=20260429a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-location-variable\.js\?v=20260501a"><\/script>/);
   assert.match(locationVariableSource, /\.mail-variable-note\{[\s\S]*color:var\(--crimson\);[\s\S]*border:1px solid rgba\(155,35,85,\.18\);/);
   assert.match(locationVariableSource, /function normalizeBodyTemplate\(value\)/);
   assert.match(locationVariableSource, /📍\[ \\t\]\*\)Haaren/);
   assert.match(locationVariableSource, /note\.setAttribute\('aria-label', 'Dynamische plaats uit database'\);/);
+  assert.match(locationVariableSource, /document\.querySelector\('#mail-panel-5 \.mail-fields'\)/);
+  assert.match(locationVariableSource, /host\.appendChild\(note\);/);
+  assert.doesNotMatch(locationVariableSource, /insertAdjacentElement\('afterend', note\)/);
   assert.match(locationVariableSource, /variable\.textContent = '\{\{stad\}\}';/);
   assert.match(locationVariableSource, /label\.textContent = 'Plaats uit database';/);
   assert.match(locationVariableSource, /wrapGlobalFunction\('applyColdmailingSettings'/);
@@ -348,7 +355,7 @@ test('premium bevestigingsmails exposes campaign duration choices and uses them 
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /<div class="field lead-generator-branch-field">\s*<div class="field-label">Campagne afgerond na<\/div>\s*<select class="sel" id="campaignDurationDays" aria-label="Campagneduur">/);
+  assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Campagne afgerond na<\/div>\s*<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
   assert.match(pageSource, /<option value="disabled">Uitgeschakeld<\/option>/);
   assert.match(pageSource, /<option value="5">5 dagen<\/option>/);
   assert.match(pageSource, /<option value="7">7 dagen<\/option>/);

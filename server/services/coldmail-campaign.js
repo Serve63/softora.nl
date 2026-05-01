@@ -684,6 +684,14 @@ function createColdmailCampaignService(deps = {}) {
     haaren: { lat: 51.6027, lng: 5.2222 },
     goirle: { lat: 51.5206, lng: 5.0667 },
     hilvarenbeek: { lat: 51.4858, lng: 5.1397 },
+    chaam: { lat: 51.5069, lng: 4.8616 },
+    alphen: { lat: 51.4817, lng: 4.9583 },
+    ulvenhout: { lat: 51.5486, lng: 4.7967 },
+    galder: { lat: 51.515, lng: 4.775 },
+    strijbeek: { lat: 51.5006, lng: 4.7839 },
+    bavel: { lat: 51.5653, lng: 4.8307 },
+    gilze: { lat: 51.5442, lng: 4.9403 },
+    'baarle-nassau': { lat: 51.4475, lng: 4.9292 },
     vught: { lat: 51.6533, lng: 5.2875 },
     best: { lat: 51.5075, lng: 5.3903 },
     oirschot: { lat: 51.505, lng: 5.3139 },
@@ -760,6 +768,10 @@ function createColdmailCampaignService(deps = {}) {
     const parsed = Number.parseFloat(normalizeString(value).replace(',', '.'));
     if (!Number.isFinite(parsed) || parsed <= 0) return 250;
     return Math.max(1, Math.min(250, parsed));
+  }
+
+  function hasExplicitRadiusKm(value) {
+    return normalizeString(value) !== '';
   }
 
   function pruneColdmailSendGuardEntries(entries) {
@@ -840,7 +852,7 @@ function createColdmailCampaignService(deps = {}) {
   function matchesRadius(row, radiusKm) {
     const radius = parseRadiusKm(radiusKm);
     const distanceKm = getRowDistanceKm(row);
-    if (!Number.isFinite(distanceKm)) return true;
+    if (!Number.isFinite(distanceKm)) return !hasExplicitRadiusKm(radiusKm);
     return distanceKm <= radius;
   }
 

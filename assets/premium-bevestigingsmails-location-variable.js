@@ -18,9 +18,18 @@
     document.head.appendChild(style);
   }
 
+  function getLocationNoteHost() {
+    return document.querySelector('#mail-panel-5 .mail-fields') || document.getElementById('body1')?.parentNode || null;
+  }
+
   function ensureLocationNote() {
-    const bodyInput = document.getElementById('body1');
-    if (!bodyInput || document.querySelector('.mail-variable-note')) return;
+    const host = getLocationNoteHost();
+    if (!host) return;
+    const existing = document.querySelector('.mail-variable-note');
+    if (existing) {
+      if (!host.contains(existing)) host.appendChild(existing);
+      return;
+    }
     const note = document.createElement('div');
     note.className = 'mail-variable-note';
     note.setAttribute('aria-label', 'Dynamische plaats uit database');
@@ -33,7 +42,7 @@
     const label = document.createElement('span');
     label.textContent = 'Plaats uit database';
     note.append(pin, variable, label);
-    bodyInput.insertAdjacentElement('afterend', note);
+    host.appendChild(note);
   }
 
   function normalizeCurrentTextarea() {
