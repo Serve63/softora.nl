@@ -11,7 +11,8 @@ function createCustomersPageBootstrapService(deps = {}) {
 
   function normalizeDate(value) {
     const raw = normalizeString(value);
-    return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
+    const match = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
+    return match ? match[1] : '';
   }
 
   function normalizeSearchValue(value) {

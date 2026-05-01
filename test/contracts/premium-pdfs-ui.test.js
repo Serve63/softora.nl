@@ -31,7 +31,7 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.doesNotMatch(pageSource, /Algemene voorwaarden downloaden \(PDF\)/);
   assert.match(pageSource, /data-doc="opleveringsmail"[\s\S]*Opleveringsmail/);
   assert.match(pageSource, /<div class="pdf-process-notice" role="note" aria-labelledby="pdf-process-notice-title">/);
-  assert.match(pageSource, /Standaard werkwijze bij nieuwe opdrachten/);
+  assert.match(pageSource, /Werkwijze bij nieuwe opdracht/);
   assert.match(pageSource, /Akkoord met de offerte en algemene voorwaarden\./);
   assert.match(builderSource, /const DEFAULT_OFFERTE_NOTITIES = 'In de bijlage vind je de offerte en de algemene voorwaarden van Softora VOF\. Door akkoord te geven op deze offerte verklaar je ook akkoord te gaan met de algemene voorwaarden\. Reageer bij akkoord altijd expliciet met: "Akkoord met de offerte en algemene voorwaarden\."';/);
   assert.match(builderSource, /id:'notities'[\s\S]*default:\s*DEFAULT_OFFERTE_NOTITIES/);

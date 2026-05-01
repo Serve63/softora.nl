@@ -10,11 +10,38 @@ test('premium dashboard core exposes stable pure helpers', () => {
   assert.equal(dashboardCore.normalizeDashboardTime('09:30'), '09:30');
   assert.equal(dashboardCore.normalizeDashboardTime('', '08:00'), '08:00');
   assert.equal(dashboardCore.normalizeDashboardDate('2026-04-28'), '2026-04-28');
+  assert.equal(dashboardCore.normalizeDashboardDate('2026-04-28T10:00:00.000Z'), '2026-04-28');
+  assert.equal(typeof dashboardCore.getCustomerRevenueDate, 'function');
   assert.equal(typeof dashboardCore.fetchPremiumDashboardJson, 'function');
   assert.equal(typeof dashboardCore.forcePremiumDashboardBootShellVisible, 'function');
   assert.equal(typeof dashboardCore.releasePremiumDashboardBootShell, 'function');
   assert.equal(typeof dashboardCore.hydratePremiumDashboardOrdersFromBootstrap, 'function');
   assert.equal(typeof dashboardCore.startPremiumDashboardBootWatchdog, 'function');
+});
+
+test('premium dashboard core resolves customer revenue date from matching paid order', () => {
+  const fallbackNow = new Date('2026-05-01T12:00:00.000Z');
+  const paidOrders = [
+    {
+      clientName: 'Servé Creusen',
+      location: 'Oisterwijk',
+      ui: { paidAt: '2026-03-23T10:00:00.000Z' },
+    },
+  ];
+
+  const resolved = dashboardCore.getCustomerRevenueDate(
+    { naam: 'Servé Creusen', bedrijf: 'Oisterwijk', datum: '' },
+    paidOrders,
+    fallbackNow
+  );
+
+  assert.equal(resolved.toISOString().slice(0, 10), '2026-03-23');
+  assert.equal(
+    dashboardCore.getCustomerRevenueDate({ naam: 'Andere klant', datum: '' }, paidOrders, fallbackNow)
+      .toISOString()
+      .slice(0, 10),
+    '2026-05-01'
+  );
 });
 
 test('premium dashboard core reads chunked customer state values safely', () => {

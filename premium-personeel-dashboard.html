@@ -2089,20 +2089,7 @@
                         <span class="panel-title" id="revenuePanelTitle">Omzet 2026</span>
                         <span class="panel-badge" id="revenuePanelBadge">Betaald per maand</span>
                     </div>
-                    <div class="chart-area" id="revenueChart">
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="0" style="height: 0%;"></div><span class="chart-label">Jan</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="1" style="height: 0%;"></div><span class="chart-label">Feb</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="2" style="height: 0%;"></div><span class="chart-label">Mrt</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="3" style="height: 0%;"></div><span class="chart-label">Apr</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="4" style="height: 0%;"></div><span class="chart-label">Mei</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="5" style="height: 0%;"></div><span class="chart-label">Jun</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="6" style="height: 0%;"></div><span class="chart-label">Jul</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="7" style="height: 0%;"></div><span class="chart-label">Aug</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="8" style="height: 0%;"></div><span class="chart-label">Sep</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="9" style="height: 0%;"></div><span class="chart-label">Okt</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="10" style="height: 0%;"></div><span class="chart-label">Nov</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="11" style="height: 0%;"></div><span class="chart-label">Dec</span></div>
-                    </div>
+                    <div class="chart-area" id="revenueChart"></div>
                 </div>
 
             </div>
@@ -2142,7 +2129,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260430b"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260501a"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -2715,6 +2702,10 @@
                         id,
                         clientName: String(item?.clientName || runtime?.name || '').trim(),
                         location: String(item?.location || '').trim(),
+                        companyName: String(item?.companyName || '').trim(),
+                        contactName: String(item?.contactName || '').trim(),
+                        contactPhone: String(item?.contactPhone || '').trim(),
+                        contactEmail: String(item?.contactEmail || '').trim(),
                         title: String(item?.title || runtime?.type || 'Website opdracht').trim(),
                         description: String(item?.description || '').trim(),
                         amount,
@@ -3050,7 +3041,9 @@
             if (hasCustomerDatabase) {
                 customers.forEach((customer) => {
                     if (customer?.status !== 'Betaald') return;
-                    const paidAt = getEffectiveRevenueDate(customer?.datum);
+                    const paidAt = typeof dashboardCore.getCustomerRevenueDate === 'function'
+                        ? dashboardCore.getCustomerRevenueDate(customer, paidOrders, now)
+                        : getEffectiveRevenueDate(customer?.datum);
                     const websiteAmount = Math.max(0, Number(customer?.websiteBedrag) || 0);
                     const maintenanceAmount = Math.max(0, Number(customer?.onderhoudPerMaand) || 0);
 
