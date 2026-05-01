@@ -55,7 +55,7 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
     /<div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">/
   );
   assert.match(pageSource, /<div class="monthly-costs-stage" id="monthly-costs-stage">/);
-  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260501a"><\/script>/);
   assert.doesNotMatch(pageSource, /let data = \{/);
   assert.match(
     combinedSource,
@@ -108,7 +108,8 @@ test('premium terugkerende kosten toont dynamische posten bovenaan met paarse st
   assert.doesNotMatch(pageSource, /naam:'TransIP backup'/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsData = data;/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsRender = render;/);
-  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260429b" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260501a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260501a" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(combinedSource, /function createCategoryHeader\(cat, catTotal\) \{/);
   assert.match(combinedSource, /appendCostTextElement\(header, 'div', 'category-title', cat\);/);
