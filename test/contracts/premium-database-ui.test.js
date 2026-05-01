@@ -314,7 +314,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429h/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260501c/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260501d/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -388,7 +388,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260501c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260501d"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -461,6 +461,12 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(deepSearchScriptSource, /function runTargetUntilComplete\(target, session\)/);
   assert.match(deepSearchScriptSource, /function runUntilDesiredCompanyCount\(session\)/);
   assert.match(deepSearchScriptSource, /Gewenste aantal gehaald/);
+  assert.match(deepSearchScriptSource, /function buildCompletedSessionButtonLabel\(summary\)/);
+  assert.match(deepSearchScriptSource, /function getTargetLocationName\(label\)/);
+  assert.match(deepSearchScriptSource, /setCompletedSessionSummary\(target, targetSessionAddedCount\);/);
+  assert.match(deepSearchScriptSource, /classList\.toggle\("is-session-complete", isSessionComplete\)/);
+  assert.match(deepSearchScriptSource, /#deepSearchStartButton\.is-session-complete:disabled/);
+  assert.match(deepSearchScriptSource, /box-shadow: inset 0 0 0 1px rgba\(63, 143, 90, 0\.34\);/);
   assert.doesNotMatch(deepSearchScriptSource, /const ROUND_MODES/);
   assert.doesNotMatch(deepSearchScriptSource, /function normalizeRoundMode/);
   assert.doesNotMatch(deepSearchScriptSource, /function renderRoundControls/);
@@ -942,6 +948,57 @@ test('premium database deep search shows the precise estimate without deviation 
 
   assert.equal(nodes.deepSearchCost.textContent, 'Geschatte API-kosten voor 25 bedrijven: ± €6,04');
   assert.doesNotMatch(nodes.deepSearchCost.textContent, /max ± €2 afwijking/);
+});
+
+test('premium database deep search turns the start button into a disabled completed-session summary', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const startButton = createClassListNode();
+  const calls = [];
+  const customers = [];
+  const rows = [
+    ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+    ['Schutte Groen & Grond', 'Kerkstraat 1, Almkerk', 'info@schuttegroenengrond.nl', '0183 123 456', 'schuttegroenengrond.nl'],
+  ];
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '1' },
+      deepSearchList: {},
+      deepSearchSources: {},
+      deepSearchStartButton: startButton,
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    autoContinueDelayMs: 0,
+    getCustomers: () => customers,
+    importRows: async (receivedRows) => {
+      customers.push(...receivedRows.slice(1).map((row) => ({ bedrijf: row[0], email: row[2], website: row[4] })));
+    },
+    readDeepSearchRows: async (payload) => {
+      calls.push(payload);
+      return {
+        ok: true,
+        rows,
+        businesses: [{ bedrijfsnaam: 'Schutte Groen & Grond', email: 'info@schuttegroenengrond.nl', website: 'schuttegroenengrond.nl' }],
+        found: 1,
+        placeComplete: false,
+        cost: { estimatedUsd: 0.02 },
+        sources: [{ url: 'https://schuttegroenengrond.nl', title: 'Schutte Groen & Grond' }],
+      };
+    },
+    setUiState: async () => ({ ok: true }),
+  });
+
+  assert.equal(await controller.runCurrentSearch(), true);
+
+  assert.equal(calls.length, 1);
+  assert.equal(startButton.textContent, '1 bedrijf gevonden in Almkerk');
+  assert.equal(startButton.disabled, true);
+  assert.equal(startButton.getAttribute('aria-disabled'), 'true');
+  assert.equal(startButton.classList.contains('is-session-complete'), true);
+  assert.equal(await controller.runCurrentSearch(), false);
+  assert.equal(calls.length, 1);
 });
 
 test('premium database deep search stops when new companies could not be saved', async () => {

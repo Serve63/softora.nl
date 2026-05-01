@@ -142,6 +142,20 @@
         return Math.max(0, Number(value || 0) || 0) * USD_TO_EUR_RATE;
     }
 
+    function getTargetLocationName(label) {
+        const parts = normalizeString(label).split("|").map(normalizeString).filter(Boolean);
+        return parts.length ? parts[parts.length - 1] : "deze locatie";
+    }
+
+    function formatCompanyCountLabel(count) {
+        const amount = Math.max(0, Math.round(Number(count) || 0));
+        return amount + (amount === 1 ? " bedrijf" : " bedrijven");
+    }
+
+    function buildCompletedSessionButtonLabel(summary) {
+        return formatCompanyCountLabel(summary && summary.addedCount) + " gevonden in " + getTargetLocationName(summary && summary.targetLabel);
+    }
+
     function formatEuro(value) {
         const amount = Math.max(0, Number(value || 0) || 0);
         const visibleAmount = amount > 0 && amount < 0.01 ? 0.01 : amount;
@@ -172,6 +186,7 @@
             ".deep-search-close.is-loading, .modal-bg.is-running .deep-search-close { cursor: wait; color: var(--crimson); background: rgba(139, 34, 82, 0.06); pointer-events: none; }",
             ".deep-search-close.is-loading svg, .modal-bg.is-running .deep-search-close svg { display: none; }",
             ".deep-search-close-spinner { display: block; width: 16px; height: 16px; border: 2px solid rgba(139, 34, 82, 0.18); border-top-color: var(--crimson); border-radius: 50%; animation: deepSearchSpin .8s linear infinite; }",
+            "#deepSearchStartButton.is-session-complete:disabled { background: rgba(65, 150, 92, 0.12); color: #3f8f5a; box-shadow: inset 0 0 0 1px rgba(63, 143, 90, 0.34); opacity: 1; cursor: not-allowed; }",
             "@keyframes deepSearchSpin { to { transform: rotate(360deg); } }"
         ].join("\n");
         doc.head.appendChild(style);
@@ -393,6 +408,7 @@
                 return sum + Math.max(0, Number(target.costUsd) || 0);
             }, 0),
             desiredCompanyCount: normalizeDesiredCompanyCount(parsed.desiredCompanyCount || parsed.desiredCount),
+            completedSessionSummary: null,
             updatedAt: normalizeString(parsed.updatedAt)
         };
     }
@@ -437,6 +453,26 @@
 
         function getCurrentTarget() {
             return state.targets[state.activeIndex] || null;
+        }
+
+        function getCompletedSessionSummaryForTarget(target) {
+            const summary = state.completedSessionSummary;
+            if (!target || !summary || normalizeString(summary.targetId) !== normalizeString(target.id)) return null;
+            if (Math.max(0, Number(summary.addedCount) || 0) <= 0) return null;
+            return summary;
+        }
+
+        function clearCompletedSessionSummary() {
+            state.completedSessionSummary = null;
+        }
+
+        function setCompletedSessionSummary(target, addedCount) {
+            if (!target) return;
+            state.completedSessionSummary = {
+                targetId: target.id,
+                targetLabel: target.label,
+                addedCount: Math.max(0, Math.round(Number(addedCount) || 0))
+            };
         }
 
         function serializeState() {
@@ -550,7 +586,11 @@
         }
 
         function renderDesiredCompanyCountControl() {
+            const previousCount = state.desiredCompanyCount;
             state.desiredCompanyCount = getDesiredCompanyCount();
+            if (previousCount && previousCount !== state.desiredCompanyCount) {
+                clearCompletedSessionSummary();
+            }
             if (!nodes.deepSearchDesiredCount || !("value" in nodes.deepSearchDesiredCount)) return;
             const nextValue = String(state.desiredCompanyCount);
             const doc = global && global.document ? global.document : null;
@@ -570,10 +610,12 @@
 
         function render() {
             const target = getCurrentTarget();
-            const canSearchTarget = target && target.status !== "done";
             renderDesiredCompanyCountControl();
+            const completedSummary = getCompletedSessionSummaryForTarget(target);
+            const hasRunnableTarget = target && target.status !== "done";
+            const canSearchTarget = hasRunnableTarget && !completedSummary;
             if (nodes.deepSearchCurrent) {
-                nodes.deepSearchCurrent.textContent = canSearchTarget
+                nodes.deepSearchCurrent.textContent = hasRunnableTarget
                     ? "Nu: " + target.label
                     : "Alle plekken afgerond";
             }
@@ -594,7 +636,19 @@
                     : "<div class=\"deep-search-empty\">Geen vaste volgorde gevonden.</div>";
             }
             renderSources(target);
-            if (nodes.deepSearchStartButton) nodes.deepSearchStartButton.disabled = busy || !canSearchTarget;
+            if (nodes.deepSearchStartButton) {
+                const isSessionComplete = Boolean(completedSummary);
+                nodes.deepSearchStartButton.disabled = busy || !canSearchTarget;
+                nodes.deepSearchStartButton.textContent = busy
+                    ? "Batch loopt..."
+                    : (isSessionComplete ? buildCompletedSessionButtonLabel(completedSummary) : "Bedrijven toevoegen");
+                if (nodes.deepSearchStartButton.classList) {
+                    nodes.deepSearchStartButton.classList.toggle("is-session-complete", isSessionComplete);
+                }
+                if (typeof nodes.deepSearchStartButton.setAttribute === "function") {
+                    nodes.deepSearchStartButton.setAttribute("aria-disabled", nodes.deepSearchStartButton.disabled ? "true" : "false");
+                }
+            }
         }
 
         function collectExistingKeys() {
@@ -717,6 +771,7 @@
 
         function runTargetUntilComplete(target, session) {
             const startedLabel = target.label;
+            let targetSessionAddedCount = 0;
             const runSession = session || {
                 desiredCount: getDesiredCompanyCount(),
                 addedCount: 0
@@ -732,6 +787,7 @@
                 setStatusMessage("");
                 return runTargetBatch(target, remainingCount).then(function (result) {
                     runSession.addedCount = Number(runSession.addedCount || 0) + Math.max(0, Number(result.addedCount) || 0);
+                    targetSessionAddedCount += Math.max(0, Number(result.addedCount) || 0);
                     render();
                     if (result.addedCount) toast("+" + result.addedCount + " bedrijven");
                     const storageNote = result.persisted ? "" : " Let op: voortgang opslaan lukte niet.";
@@ -742,6 +798,7 @@
                         return { stopped: true };
                     }
                     if (runSession.addedCount >= runSession.desiredCount) {
+                        setCompletedSessionSummary(target, targetSessionAddedCount);
                         return persistState().then(function () {
                             setStatusMessage(baseMessage + " Gewenste aantal gehaald.", "success", true);
                             return { desiredReached: true };
@@ -813,7 +870,15 @@
                 setStatusMessage("Alle plekken zijn al afgerond.", "info", true);
                 return Promise.resolve(false);
             }
-            state.desiredCompanyCount = getDesiredCompanyCount();
+            const requestedCount = getDesiredCompanyCount();
+            if (state.desiredCompanyCount !== requestedCount) {
+                clearCompletedSessionSummary();
+            }
+            state.desiredCompanyCount = requestedCount;
+            if (getCompletedSessionSummaryForTarget(target)) {
+                return Promise.resolve(false);
+            }
+            clearCompletedSessionSummary();
             const session = {
                 desiredCount: state.desiredCompanyCount,
                 addedCount: 0
@@ -838,6 +903,7 @@
                 setStatusMessage("Deze locatie loopt al. Wacht tot de AI hem automatisch afrondt.", "info");
                 return;
             }
+            clearCompletedSessionSummary();
             const targetIndex = Math.max(0, Math.min(state.targets.length - 1, Number(index) || 0));
             state.activeIndex = targetIndex;
             state.targets.forEach(function (target, itemIndex) {
@@ -884,12 +950,16 @@
             }
             if (nodes.deepSearchDesiredCount) {
                 nodes.deepSearchDesiredCount.addEventListener("input", function () {
-                    state.desiredCompanyCount = getDesiredCompanyCount();
+                    const nextCount = getDesiredCompanyCount();
+                    if (state.desiredCompanyCount !== nextCount) clearCompletedSessionSummary();
+                    state.desiredCompanyCount = nextCount;
                     render();
                     void persistState();
                 });
                 nodes.deepSearchDesiredCount.addEventListener("blur", function () {
-                    state.desiredCompanyCount = getDesiredCompanyCount();
+                    const nextCount = getDesiredCompanyCount();
+                    if (state.desiredCompanyCount !== nextCount) clearCompletedSessionSummary();
+                    state.desiredCompanyCount = nextCount;
                     render();
                     void persistState();
                 });
