@@ -2076,34 +2076,34 @@ async function markOrderAsPaid(id, options = {}) {
     const requiresConfirmation = options.confirm === true && !ui.isBuilt;
     if (requiresConfirmation) {
         const invoicePaidReviewReminder =
-            'Vergeet niet om de klant op een vriendelijk en natuurlijk moment te vragen of hij of zij een review wil achterlaten over de ervaring!';
-        const reviewBadgeGoogleUrl = 'https://www.google.com/maps';
-        const reviewBadgeTrustpilotUrl = 'https://www.trustpilot.com';
+            'Vergeet niet om de klant op een goed moment te vragen om een revieuw achter te laten!';
+        const reviewBadgeGoogleUrl = 'https://www.google.com/search?q=Softora.nl+Google+Reviews';
+        const reviewBadgeTrustpilotUrl = 'https://www.trustpilot.com/review/softora.nl';
         const invoicePaidConfirmBodyHtml = [
             '<p class="softora-dialog-review-lead" style="margin:0 0 0.65rem 0">',
             invoicePaidReviewReminder,
             '</p>',
-            '<div class="softora-dialog-badge-row">',
+            '<div class="softora-dialog-badge-row softora-dialog-badge-row--reviews" style="gap:0.75rem;margin-top:0.85rem">',
             '<a class="softora-review-badge softora-review-badge--google" href="',
             reviewBadgeGoogleUrl,
-            '" target="_blank" rel="noopener noreferrer" aria-label="Google Reviews">',
-            '<svg xmlns="http://www.w3.org/2000/svg" width="142" height="38" viewBox="0 0 142 38" aria-hidden="true" role="img">',
-            '<rect width="142" height="38" rx="9" fill="#fff" stroke="#dadce0" stroke-width="1"/>',
-            '<g transform="translate(8 7) scale(0.833333)">',
+            '" target="_blank" rel="noopener noreferrer" aria-label="Google Reviews openen" title="Google Reviews openen">',
+            '<svg xmlns="http://www.w3.org/2000/svg" width="184" height="46" viewBox="0 0 184 46" style="width:184px;height:46px;display:block" aria-hidden="true" role="img">',
+            '<rect width="184" height="46" rx="12" fill="#fff" stroke="#dadce0" stroke-width="1"/>',
+            '<g transform="translate(11 10) scale(0.92)">',
             '<path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>',
             '<path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>',
             '<path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>',
             '<path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>',
             '</g>',
-            '<text x="44" y="24" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#202124">Google Reviews</text>',
+            '<text x="54" y="21" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#202124">Google Reviews</text><text x="54" y="34" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="9" font-weight="600" fill="#5f6368" letter-spacing="0.04em">REVIEWPROFIEL</text>',
             '</svg></a>',
             '<a class="softora-review-badge softora-review-badge--trustpilot" href="',
             reviewBadgeTrustpilotUrl,
-            '" target="_blank" rel="noopener noreferrer" aria-label="Trustpilot">',
-            '<svg xmlns="http://www.w3.org/2000/svg" width="148" height="38" viewBox="0 0 148 38" aria-hidden="true" role="img">',
-            '<rect width="148" height="38" rx="9" fill="#00b67a"/>',
-            '<path fill="#fff" d="M19.2 11.2l2.35 7.15h7.6l-6.15 5.6 2.35 7.15-6.15-4.48-6.15 4.48 2.35-7.15-6.15-5.6h7.6l2.35-7.15z"/>',
-            '<text x="40" y="24" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#fff" letter-spacing="0.04em">Trustpilot</text>',
+            '" target="_blank" rel="noopener noreferrer" aria-label="Trustpilot openen" title="Trustpilot openen">',
+            '<svg xmlns="http://www.w3.org/2000/svg" width="184" height="46" viewBox="0 0 184 46" style="width:184px;height:46px;display:block" aria-hidden="true" role="img">',
+            '<rect width="184" height="46" rx="12" fill="#00b67a"/>',
+            '<path fill="#fff" d="M22.4 11.6l3.05 9.28h9.86l-7.98 6.2 3.05 9.28-7.98-5.81-7.98 5.81 3.05-9.28-7.98-6.2h9.86l3.05-9.28z"/>',
+            '<text x="54" y="21" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#fff" letter-spacing="0.02em">Trustpilot</text><text x="54" y="34" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="9" font-weight="700" fill="rgba(255,255,255,0.84)" letter-spacing="0.08em">REVIEWS</text>',
             '</svg></a>',
             '</div>',
         ].join('');
