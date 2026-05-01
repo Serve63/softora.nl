@@ -122,6 +122,13 @@ test('premium dashboard core can force-release the boot shell without theme help
       this.attrs[name] = value;
     },
   };
+  const hardLoader = {
+    style: {},
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
   const oldDocument = global.document;
   const root = {
     removed: [],
@@ -131,6 +138,9 @@ test('premium dashboard core can force-release the boot shell without theme help
   };
   global.document = {
     documentElement: root,
+    getElementById(id) {
+      return id === 'dashboardHardBootLoader' ? hardLoader : null;
+    },
     querySelector(selector) {
       if (selector !== 'main.is-premium-boot-host') return null;
       return {
@@ -152,6 +162,8 @@ test('premium dashboard core can force-release the boot shell without theme help
   assert.equal(loader.classList.has('is-hidden'), true);
   assert.equal(loader.attrs['aria-hidden'], 'true');
   assert.equal(loader.style.visibility, 'hidden');
+  assert.equal(hardLoader.attrs['aria-hidden'], 'true');
+  assert.equal(hardLoader.style.visibility, 'hidden');
   assert.deepEqual(root.removed, ['data-dashboard-boot-loading']);
   assert.equal(shell.classList.has('is-booting'), false);
   assert.equal(shell.attrs['aria-busy'], 'false');
@@ -244,6 +256,13 @@ test('premium dashboard core can re-show the boot shell after browser restore', 
   const oldClearTimeout = global.clearTimeout;
   const attrs = {};
   const removed = [];
+  const hardLoader = {
+    style: {},
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
   let scheduled = null;
 
   global.document = {
@@ -255,6 +274,9 @@ test('premium dashboard core can re-show the boot shell after browser restore', 
         removed.push(name);
         delete attrs[name];
       },
+    },
+    getElementById(id) {
+      return id === 'dashboardHardBootLoader' ? hardLoader : null;
     },
     querySelector() {
       return null;
@@ -269,6 +291,8 @@ test('premium dashboard core can re-show the boot shell after browser restore', 
   try {
     dashboardCore.showPremiumDashboardBootShellForMinimum(2000);
     assert.equal(attrs['data-dashboard-boot-loading'], 'true');
+    assert.equal(hardLoader.attrs['aria-hidden'], 'false');
+    assert.equal(hardLoader.style.visibility, '');
     assert.equal(scheduled.delay, 2000);
     scheduled.callback();
     assert.ok(removed.includes('data-dashboard-boot-loading'));

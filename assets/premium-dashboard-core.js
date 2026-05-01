@@ -152,11 +152,13 @@ function formatMoneyEUR(amount) {
 
     const PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS = 6000;
     const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 3500;
+    const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 2000;
     let premiumDashboardBootWatchdog = null;
     let premiumDashboardBootReleased = false;
     let premiumDashboardBootFailSafeInstalled = false;
     let premiumDashboardFirstPaintAt = 0;
     let premiumDashboardFirstPaintPromise = null;
+    let premiumDashboardBootStartedAt = Date.now();
 
     function getDashboardTimerRoot() {
         return root && typeof root.setTimeout === 'function' && typeof root.clearTimeout === 'function'
@@ -208,6 +210,14 @@ function formatMoneyEUR(amount) {
         if (doc?.documentElement) {
             doc.documentElement.removeAttribute('data-dashboard-boot-loading');
         }
+        const hardLoader = doc && typeof doc.getElementById === 'function'
+            ? doc.getElementById('dashboardHardBootLoader')
+            : null;
+        if (hardLoader) {
+            hardLoader.setAttribute('aria-hidden', 'true');
+            hardLoader.style.opacity = '0';
+            hardLoader.style.visibility = 'hidden';
+        }
         const main = doc ? doc.querySelector('main.is-premium-boot-host') : null;
         const loader = main ? main.querySelector('.premium-boot-loader') : null;
         const shell = main ? main.querySelector('.premium-boot-shell') : null;
@@ -247,7 +257,7 @@ function formatMoneyEUR(amount) {
         forcePremiumDashboardBootShellVisible();
     }
 
-    function showPremiumDashboardBootShellForMinimum(minimumMs = 2000) {
+    function showPremiumDashboardBootShellForMinimum(minimumMs = PREMIUM_DASHBOARD_BOOT_MINIMUM_MS) {
         const doc = root && root.document ? root.document : null;
         if (!doc?.documentElement) return;
         const timerRoot = getDashboardTimerRoot();
@@ -259,7 +269,15 @@ function formatMoneyEUR(amount) {
         premiumDashboardFirstPaintAt = getDashboardNow();
         premiumDashboardFirstPaintPromise = Promise.resolve();
         doc.documentElement.setAttribute('data-dashboard-boot-loading', 'true');
-        const safeMinimumMs = Math.max(450, Math.min(2500, Number(minimumMs) || 2000));
+        const hardLoader = typeof doc.getElementById === 'function'
+            ? doc.getElementById('dashboardHardBootLoader')
+            : null;
+        if (hardLoader) {
+            hardLoader.setAttribute('aria-hidden', 'false');
+            hardLoader.style.opacity = '';
+            hardLoader.style.visibility = '';
+        }
+        const safeMinimumMs = Math.max(450, Math.min(2500, Number(minimumMs) || PREMIUM_DASHBOARD_BOOT_MINIMUM_MS));
         timerRoot.setTimeout(releasePremiumDashboardBootShell, safeMinimumMs);
     }
 
@@ -285,12 +303,18 @@ function formatMoneyEUR(amount) {
             startWatchdog();
         }
         if (typeof root.addEventListener === 'function') {
+            const releaseAfterMinimum = () => {
+                releasePremiumDashboardBootShellAfterMinimum(
+                    premiumDashboardBootStartedAt,
+                    PREMIUM_DASHBOARD_BOOT_MINIMUM_MS
+                );
+            };
             root.addEventListener('load', startWatchdog, { once: true });
-            root.addEventListener('error', releasePremiumDashboardBootShell);
-            root.addEventListener('unhandledrejection', releasePremiumDashboardBootShell);
+            root.addEventListener('error', releaseAfterMinimum);
+            root.addEventListener('unhandledrejection', releaseAfterMinimum);
             root.addEventListener('pageshow', function (event) {
                 if (event && event.persisted) {
-                    showPremiumDashboardBootShellForMinimum(2000);
+                    showPremiumDashboardBootShellForMinimum(PREMIUM_DASHBOARD_BOOT_MINIMUM_MS);
                 }
             });
         }
