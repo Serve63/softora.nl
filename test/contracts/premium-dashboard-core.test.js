@@ -122,7 +122,14 @@ test('premium dashboard core can force-release the boot shell without theme help
     },
   };
   const oldDocument = global.document;
+  const root = {
+    removed: [],
+    removeAttribute(name) {
+      this.removed.push(name);
+    },
+  };
   global.document = {
+    documentElement: root,
     querySelector(selector) {
       if (selector !== 'main.is-premium-boot-host') return null;
       return {
@@ -144,6 +151,7 @@ test('premium dashboard core can force-release the boot shell without theme help
   assert.equal(loader.classList.has('is-hidden'), true);
   assert.equal(loader.attrs['aria-hidden'], 'true');
   assert.equal(loader.style.visibility, 'hidden');
+  assert.deepEqual(root.removed, ['data-dashboard-boot-loading']);
   assert.equal(shell.classList.has('is-booting'), false);
   assert.equal(shell.attrs['aria-busy'], 'false');
 });

@@ -205,6 +205,9 @@ function formatMoneyEUR(amount) {
 
     function forcePremiumDashboardBootShellVisible() {
         const doc = root && root.document ? root.document : null;
+        if (doc?.documentElement) {
+            doc.documentElement.removeAttribute('data-dashboard-boot-loading');
+        }
         const main = doc ? doc.querySelector('main.is-premium-boot-host') : null;
         const loader = main ? main.querySelector('.premium-boot-loader') : null;
         const shell = main ? main.querySelector('.premium-boot-shell') : null;
