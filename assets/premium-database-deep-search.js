@@ -2,8 +2,10 @@
     "use strict";
 
     const USD_TO_EUR_RATE = 0.93;
+    const ESTIMATED_DEEP_SEARCH_MODEL = "gpt-5.5-pro";
     const ESTIMATED_BATCH_PRICING = {
-        inputTokens: 6000,
+        model: ESTIMATED_DEEP_SEARCH_MODEL,
+        inputTokensPerBatch: 6000,
         outputTokensPerCompany: 1400,
         webSearchCallsPerBatch: 1,
         batchSize: 100,
@@ -127,13 +129,13 @@
         const count = Math.max(1, Math.min(MAX_DESIRED_COMPANY_COUNT, Number(companyCount || DEFAULT_DESIRED_COMPANY_COUNT) || DEFAULT_DESIRED_COMPANY_COUNT));
         const batchSize = Math.max(1, Number(ESTIMATED_BATCH_PRICING.batchSize) || DEEP_SEARCH_BATCH_SIZE);
         const estimatedBatches = Math.max(1, Math.ceil(count / batchSize));
-        const inputTokens = estimatedBatches * ESTIMATED_BATCH_PRICING.inputTokens;
+        const inputTokens = estimatedBatches * ESTIMATED_BATCH_PRICING.inputTokensPerBatch;
         const outputTokens = count * ESTIMATED_BATCH_PRICING.outputTokensPerCompany;
         const webSearchCalls = estimatedBatches * ESTIMATED_BATCH_PRICING.webSearchCallsPerBatch;
         const inputUsd = (inputTokens / 1000000) * ESTIMATED_BATCH_PRICING.inputUsdPerMillion;
         const outputUsd = (outputTokens / 1000000) * ESTIMATED_BATCH_PRICING.outputUsdPerMillion;
         const webSearchUsd = webSearchCalls * ESTIMATED_BATCH_PRICING.webSearchUsdPerCall;
-        return inputUsd + outputUsd + webSearchUsd;
+        return Number((inputUsd + outputUsd + webSearchUsd).toFixed(6));
     }
 
     function usdToEur(value) {
@@ -578,7 +580,7 @@
             if (nodes.deepSearchCost) {
                 const desiredCount = getDesiredCompanyCount();
                 const estimate = formatUsdAsEuro(estimateRunUsd(desiredCount));
-                nodes.deepSearchCost.textContent = "Geschatte API-kosten voor " + desiredCount + " bedrijven: ± " + estimate + " (max ± €2 afwijking)";
+                nodes.deepSearchCost.textContent = "Geschatte API-kosten voor " + desiredCount + " bedrijven: ± " + estimate;
             }
             if (nodes.deepSearchList) {
                 nodes.deepSearchList.innerHTML = state.targets.length

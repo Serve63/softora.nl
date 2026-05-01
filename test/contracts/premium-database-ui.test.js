@@ -314,7 +314,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429h/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429c/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260501b/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -388,7 +388,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260429c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260501b"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -479,10 +479,17 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
   assert.match(
     deepSearchScriptSource,
-    /"Geschatte API-kosten voor " \+ desiredCount \+ " bedrijven: ± " \+ estimate \+ " \(max ± €2 afwijking\)"/
+    /"Geschatte API-kosten voor " \+ desiredCount \+ " bedrijven: ± " \+ estimate/
   );
+  assert.doesNotMatch(deepSearchScriptSource, /max ± €2 afwijking/);
   assert.match(deepSearchScriptSource, /function estimateRunUsd\(companyCount\)/);
   assert.match(deepSearchScriptSource, /outputTokensPerCompany/);
+  assert.match(deepSearchScriptSource, /ESTIMATED_DEEP_SEARCH_MODEL = "gpt-5\.5-pro"/);
+  assert.match(deepSearchScriptSource, /inputTokensPerBatch: 6000/);
+  assert.match(deepSearchScriptSource, /inputUsdPerMillion: 30/);
+  assert.match(deepSearchScriptSource, /outputUsdPerMillion: 180/);
+  assert.match(deepSearchScriptSource, /webSearchUsdPerCall: 0\.01/);
+  assert.match(deepSearchScriptSource, /Number\(\(inputUsd \+ outputUsd \+ webSearchUsd\)\.toFixed\(6\)\)/);
   assert.doesNotMatch(deepSearchScriptSource, /"Geschatte API-kosten: ± " \+ batchCost/);
   assert.doesNotMatch(deepSearchScriptSource, /per AI-ronde/);
   assert.doesNotMatch(deepSearchScriptSource, /gebruikt voor deze plek/);
@@ -916,6 +923,25 @@ test('premium database deep search continues to the next location until the requ
   assert.deepEqual(getStoredTargetProgress(finalState, 1).foundWebsites, [
     'andeltest.nl',
   ]);
+});
+
+test('premium database deep search shows the precise estimate without deviation copy', () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const nodes = {
+    deepSearchModal: createClassListNode(),
+    deepSearchCost: {},
+    deepSearchCurrent: {},
+    deepSearchDesiredCount: { value: '25' },
+    deepSearchList: {},
+    deepSearchSources: {},
+    deepSearchStartButton: {},
+  };
+  const controller = deepSearchClient.createController({ nodes });
+
+  controller.open();
+
+  assert.equal(nodes.deepSearchCost.textContent, 'Geschatte API-kosten voor 25 bedrijven: ± €6,04');
+  assert.doesNotMatch(nodes.deepSearchCost.textContent, /max ± €2 afwijking/);
 });
 
 test('premium database deep search stops when new companies could not be saved', async () => {
