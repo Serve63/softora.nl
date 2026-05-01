@@ -1,7 +1,6 @@
 let data = {
   'Totale kosten:': [
     { id:1, naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
-    { id:2, naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
     { id:3, naam:'API kosten', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
   ],
 };
