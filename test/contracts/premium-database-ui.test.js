@@ -295,6 +295,13 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 1440, 2160, 0\.86\)/);
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 768, 1152, 0\.74\)/);
   assert.match(pageSource, /<div class="photo-preview" id="photoPreview"/);
+  const photoPreviewImageRule = pageSource.match(/\.photo-preview-image \{([\s\S]*?)\n\s*\}/);
+  assert.ok(photoPreviewImageRule, 'photo preview image styling should be present');
+  assert.match(photoPreviewImageRule[1], /display: block;/);
+  assert.match(photoPreviewImageRule[1], /border-radius: 0;/);
+  assert.match(photoPreviewImageRule[1], /background: transparent;/);
+  assert.match(photoPreviewImageRule[1], /box-shadow: none;/);
+  assert.doesNotMatch(photoPreviewImageRule[1], /background: #111;/);
   assert.match(pageSource, /function readImageFileAsDataUrl\(file\)/);
   assert.match(pageSource, /function saveWebsitePhotoForCustomer\(customerId, file\)/);
   assert.match(pageSource, /function normalizeWebsiteCandidateUrl\(value\)/);
