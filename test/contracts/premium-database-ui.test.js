@@ -1437,18 +1437,19 @@ test('premium database deep search locks the modal while a batch is running', as
 
 test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
-  const sorterPath = path.join(__dirname, '../../assets/premium-database-distance-sort.js');
+  const sorterPath = path.join(__dirname, '../../assets/premium-database-distance.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const sorterSource = fs.readFileSync(sorterPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-database-distance-sort\.js/);
-  assert.match(pageSource, /window\.SoftoraDatabaseDistanceSort/);
-  assert.match(pageSource, /if \(state\.sortKey === "manual"\) return sortCustomers\(sorted\);/);
-  assert.match(sorterSource, /const center = \{ lat: 51\.5792, lng: 5\.1889 \};/);
-  assert.match(sorterSource, /function resolveCustomerDistanceCoords\(customer\)/);
-  assert.match(sorterSource, /function getCustomerDistanceKm\(customer\)/);
-  assert.match(sorterSource, /function compareCustomersByDistance\(leftCustomer, rightCustomer\)/);
-  assert.match(sorterSource, /return Array\.isArray\(list\) \? list\.slice\(\)\.sort\(compareCustomersByDistance\) : \[\];/);
-  assert.match(sorterSource, /4861: placeCoords\.chaam/);
-  assert.match(sorterSource, /5131: placeCoords\.alphen/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260501a/);
+  assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
+  assert.match(pageSource, /sortKey: "distance"/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);/);
+  assert.match(sorterSource, /const OISTERWIJK_COORDS = \{ lat: 51\.5792, lng: 5\.1889 \};/);
+  assert.match(sorterSource, /function resolveCustomerCoords\(customer\)/);
+  assert.match(sorterSource, /function getDistanceKm\(customer\)/);
+  assert.match(sorterSource, /function compareCustomersByDistance\(left, right\)/);
+  assert.match(sorterSource, /return \(Array\.isArray\(customers\) \? customers : \[\]\)\.slice\(\)\.sort\(compareCustomersByDistance\);/);
+  assert.match(sorterSource, /"4861": \{ lat: 51\.5069, lng: 4\.8616 \}/);
+  assert.match(sorterSource, /"5131": \{ lat: 51\.4817, lng: 4\.9583 \}/);
 });
