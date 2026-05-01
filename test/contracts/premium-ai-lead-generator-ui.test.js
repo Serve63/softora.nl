@@ -8,12 +8,14 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   const dashboardPath = path.join(__dirname, '../../assets/coldcalling-dashboard.js');
   const regioRadiusPath = path.join(__dirname, '../../assets/coldcalling-regio-radius.js');
   const manualLeadPromptPath = path.join(__dirname, '../../assets/coldcalling-manual-lead-prompt.js');
+  const recipientPreviewPath = path.join(__dirname, '../../assets/coldcalling-campaign-recipient-preview.js');
   const summaryHelpersPath = path.join(__dirname, '../../assets/coldcalling-conversation-summary.js');
   const customSelectsPath = path.join(__dirname, '../../assets/custom-selects.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
   const regioRadiusSource = fs.readFileSync(regioRadiusPath, 'utf8');
   const manualLeadPromptSource = fs.readFileSync(manualLeadPromptPath, 'utf8');
+  const recipientPreviewSource = fs.readFileSync(recipientPreviewPath, 'utf8');
   const summaryHelpersSource = fs.readFileSync(summaryHelpersPath, 'utf8');
   const customSelectsSource = fs.readFileSync(customSelectsPath, 'utf8');
 
@@ -21,7 +23,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
   assert.match(
     pageSource,
-    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260427e" defer><\/script>/
+    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=20260502a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260502a" defer><\/script>/
   );
   assert.match(pageSource, /id="leadAmountQuestionLabel"/);
   assert.match(pageSource, /Hoeveel mensen wil je bellen\?/);
@@ -131,6 +133,16 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /function paintRegioLeadCountOnCustomSelectValue\(\)/);
   assert.match(dashboardSource, /const countHost = byId\('campaignRegioLeadCount'\);/);
   assert.match(dashboardSource, /valueEl\.innerHTML = safeLabel;/);
+  assert.match(dashboardSource, /SoftoraColdcallingCampaignRecipientPreview\.createCampaignRecipientPreviewController/);
+  assert.match(dashboardSource, /campaignRecipientPreviewController\.getDisplayCount\(count, leads\.length\)/);
+  assert.match(dashboardSource, /const safeCount = preview\.loading \? '\.\.\.' : String\(n\);/);
+  assert.match(dashboardSource, /campaignRecipientPreviewController\.schedule\(\);/);
+  assert.match(recipientPreviewSource, /const CAMPAIGN_RECIPIENT_PREVIEW_COUNT_LIMIT = 500;/);
+  assert.match(recipientPreviewSource, /params\.set\('mode', 'call'\);/);
+  assert.match(recipientPreviewSource, /params\.set\('count', String\(CAMPAIGN_RECIPIENT_PREVIEW_COUNT_LIMIT\)\);/);
+  assert.match(recipientPreviewSource, /\/api\/coldmailing\/campaigns\/recipients\?\$\{key\}/);
+  assert.match(recipientPreviewSource, /Number\(data\?\.candidates \?\? data\?\.selected \?\? data\?\.recipients\?\.length \?\? 0\)/);
+  assert.match(recipientPreviewSource, /global\.SoftoraColdcallingCampaignRecipientPreview/);
   assert.match(dashboardSource, /function hookRegioLeadCountCustomSelectSync\(\)/);
   assert.match(dashboardSource, /const AUTO_CAMPAIGN_REGIO_VALUE = 'auto';/);
   assert.match(dashboardSource, /window\.SoftoraColdcallingRegioRadius/);
