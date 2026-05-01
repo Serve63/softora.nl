@@ -247,7 +247,7 @@ function formatMoneyEUR(amount) {
         forcePremiumDashboardBootShellVisible();
     }
 
-    function showPremiumDashboardBootShellForMinimum(minimumMs = 900) {
+    function showPremiumDashboardBootShellForMinimum(minimumMs = 2000) {
         const doc = root && root.document ? root.document : null;
         if (!doc?.documentElement) return;
         const timerRoot = getDashboardTimerRoot();
@@ -259,7 +259,7 @@ function formatMoneyEUR(amount) {
         premiumDashboardFirstPaintAt = getDashboardNow();
         premiumDashboardFirstPaintPromise = Promise.resolve();
         doc.documentElement.setAttribute('data-dashboard-boot-loading', 'true');
-        const safeMinimumMs = Math.max(450, Math.min(2500, Number(minimumMs) || 900));
+        const safeMinimumMs = Math.max(450, Math.min(2500, Number(minimumMs) || 2000));
         timerRoot.setTimeout(releasePremiumDashboardBootShell, safeMinimumMs);
     }
 
@@ -290,7 +290,7 @@ function formatMoneyEUR(amount) {
             root.addEventListener('unhandledrejection', releasePremiumDashboardBootShell);
             root.addEventListener('pageshow', function (event) {
                 if (event && event.persisted) {
-                    showPremiumDashboardBootShellForMinimum(900);
+                    showPremiumDashboardBootShellForMinimum(2000);
                 }
             });
         }

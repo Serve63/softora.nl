@@ -177,11 +177,11 @@ test('premium dashboard keeps its first-paint boot overlay in the shell contract
   assert.match(pageSource, /html\[data-dashboard-boot-loading="true"\] body::before/);
   assert.match(pageSource, /softora-dashboard-boot-spin/);
   assert.match(pageSource, /data-dashboard-boot-loader="true"/);
-  assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 1200\);/);
+  assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 2000\);/);
   assert.match(coreSource, /removeAttribute\('data-dashboard-boot-loading'\)/);
-  assert.match(coreSource, /function showPremiumDashboardBootShellForMinimum\(minimumMs = 900\) \{/);
+  assert.match(coreSource, /function showPremiumDashboardBootShellForMinimum\(minimumMs = 2000\) \{/);
   assert.match(coreSource, /root\.addEventListener\('pageshow', function \(event\) \{/);
-  assert.match(coreSource, /event\.persisted[\s\S]*showPremiumDashboardBootShellForMinimum\(900\);/);
+  assert.match(coreSource, /event\.persisted[\s\S]*showPremiumDashboardBootShellForMinimum\(2000\);/);
 });
 
 test('custom premium layouts stay outside the shared sidebar shell', () => {

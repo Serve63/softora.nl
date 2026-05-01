@@ -267,9 +267,9 @@ test('premium dashboard core can re-show the boot shell after browser restore', 
   global.clearTimeout = () => {};
 
   try {
-    dashboardCore.showPremiumDashboardBootShellForMinimum(900);
+    dashboardCore.showPremiumDashboardBootShellForMinimum(2000);
     assert.equal(attrs['data-dashboard-boot-loading'], 'true');
-    assert.equal(scheduled.delay, 900);
+    assert.equal(scheduled.delay, 2000);
     scheduled.callback();
     assert.ok(removed.includes('data-dashboard-boot-loading'));
   } finally {

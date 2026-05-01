@@ -2129,7 +2129,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260501d"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260501e"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -3588,7 +3588,7 @@
         void (async () => { const bootStartedAt = Date.now();
             try {
                 await refreshPremiumDashboard(true);
-            } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 1200); }
+            } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 2000); }
         })();
 
         premiumDashboardState.pollTimer = window.setInterval(() => {
