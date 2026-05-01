@@ -314,7 +314,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429h/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260501b/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260501c/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -388,7 +388,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260501b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260501c"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -533,7 +533,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(deepSearchScriptSource, /button\.innerHTML = "<span class=\\"deep-search-close-spinner\\" aria-hidden=\\"true\\"><\/span>";/);
   assert.match(deepSearchScriptSource, /button\.classList\.toggle\("is-loading", busy\);/);
   assert.match(deepSearchScriptSource, /@keyframes deepSearchSpin/);
-  assert.match(deepSearchScriptSource, /Batch loopt nog\. De bedrijvenlijst blijft open tot deze plek klaar is\./);
+  assert.doesNotMatch(deepSearchScriptSource, /Batch loopt nog\. De bedrijvenlijst blijft open tot deze plek klaar is\./);
   assert.match(deepSearchScriptSource, /function isOpen\(\)/);
   assert.doesNotMatch(deepSearchScriptSource, /AI zoekt nieuwe bedrijven voor/);
   assert.match(pageSource, /if \(databaseDeepSearchController\.isOpen\(\)\) \{[\s\S]*databaseDeepSearchController\.close\(\);/);
@@ -1307,6 +1307,7 @@ test('premium database deep search locks the modal while a batch is running', as
   const modal = createClassListNode();
   const closeButton = createClassListNode();
   const customers = [];
+  const messages = [];
   let resolveSearch;
   const controller = deepSearchClient.createController({
     nodes: {
@@ -1329,6 +1330,9 @@ test('premium database deep search locks the modal while a batch is running', as
     readDeepSearchRows: async () => new Promise((resolve) => {
       resolveSearch = resolve;
     }),
+    setStatusMessage: (message) => {
+      messages.push(message);
+    },
   });
 
   controller.open();
@@ -1343,8 +1347,10 @@ test('premium database deep search locks the modal while a batch is running', as
   assert.equal(closeButton.classList.contains('is-loading'), true);
   assert.match(closeButton.innerHTML, /deep-search-close-spinner/);
   assert.equal(modal.classList.contains('is-running'), true);
+  const messagesBeforeClose = messages.slice();
   assert.equal(controller.close(), false);
   assert.equal(controller.isOpen(), true);
+  assert.deepEqual(messages, messagesBeforeClose);
 
   resolveSearch({
     ok: true,
