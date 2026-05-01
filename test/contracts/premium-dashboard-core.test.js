@@ -147,3 +147,84 @@ test('premium dashboard core can force-release the boot shell without theme help
   assert.equal(shell.classList.has('is-booting'), false);
   assert.equal(shell.attrs['aria-busy'], 'false');
 });
+
+test('premium dashboard core waits for a real paint before releasing the boot shell minimum', async () => {
+  const makeClassList = (initial = []) => {
+    const values = new Set(initial);
+    return {
+      add: (name) => values.add(name),
+      remove: (name) => values.delete(name),
+      has: (name) => values.has(name),
+    };
+  };
+  const loader = {
+    classList: makeClassList(),
+    style: {},
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  const shell = {
+    classList: makeClassList(['is-booting']),
+    style: {},
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  const oldDocument = global.document;
+  const oldRequestAnimationFrame = global.requestAnimationFrame;
+  const oldSetTimeout = global.setTimeout;
+  const oldClearTimeout = global.clearTimeout;
+  const rafQueue = [];
+  const timeoutQueue = [];
+
+  global.document = {
+    querySelector(selector) {
+      if (selector !== 'main.is-premium-boot-host') return null;
+      return {
+        querySelector(innerSelector) {
+          if (innerSelector === '.premium-boot-loader') return loader;
+          if (innerSelector === '.premium-boot-shell') return shell;
+          return null;
+        },
+      };
+    },
+  };
+  global.requestAnimationFrame = (callback) => {
+    rafQueue.push(callback);
+    return rafQueue.length;
+  };
+  global.setTimeout = (callback, ms) => {
+    timeoutQueue.push({ callback, ms });
+    return timeoutQueue.length;
+  };
+  global.clearTimeout = () => {};
+
+  try {
+    dashboardCore.releasePremiumDashboardBootShellAfterMinimum(Date.now() - 5000, 650);
+    assert.equal(loader.classList.has('is-hidden'), false);
+    assert.equal(rafQueue.length, 1);
+
+    rafQueue.shift()();
+    assert.equal(loader.classList.has('is-hidden'), false);
+    assert.equal(rafQueue.length, 1);
+
+    rafQueue.shift()();
+    await Promise.resolve();
+    assert.equal(loader.classList.has('is-hidden'), false);
+    assert.equal(timeoutQueue.length, 1);
+    assert.ok(timeoutQueue[0].ms > 0);
+    assert.ok(timeoutQueue[0].ms <= 650);
+
+    timeoutQueue[0].callback();
+    assert.equal(loader.classList.has('is-hidden'), true);
+    assert.equal(shell.classList.has('is-booting'), false);
+  } finally {
+    global.document = oldDocument;
+    global.requestAnimationFrame = oldRequestAnimationFrame;
+    global.setTimeout = oldSetTimeout;
+    global.clearTimeout = oldClearTimeout;
+  }
+});

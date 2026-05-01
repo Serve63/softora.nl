@@ -155,11 +155,52 @@ function formatMoneyEUR(amount) {
     let premiumDashboardBootWatchdog = null;
     let premiumDashboardBootReleased = false;
     let premiumDashboardBootFailSafeInstalled = false;
+    let premiumDashboardFirstPaintAt = 0;
+    let premiumDashboardFirstPaintPromise = null;
 
     function getDashboardTimerRoot() {
         return root && typeof root.setTimeout === 'function' && typeof root.clearTimeout === 'function'
             ? root
             : globalThis;
+    }
+
+    function getDashboardNow() {
+        return Date.now();
+    }
+
+    function markPremiumDashboardFirstPaint() {
+        if (!premiumDashboardFirstPaintAt) {
+            premiumDashboardFirstPaintAt = getDashboardNow();
+        }
+    }
+
+    function waitForPremiumDashboardFirstPaint() {
+        const doc = root && root.document ? root.document : null;
+        if (!doc || premiumDashboardFirstPaintAt) return Promise.resolve();
+        if (premiumDashboardFirstPaintPromise) return premiumDashboardFirstPaintPromise;
+
+        const timerRoot = getDashboardTimerRoot();
+        const raf = root && typeof root.requestAnimationFrame === 'function'
+            ? root.requestAnimationFrame.bind(root)
+            : null;
+
+        premiumDashboardFirstPaintPromise = new Promise((resolve) => {
+            const finish = () => {
+                markPremiumDashboardFirstPaint();
+                resolve();
+            };
+
+            if (!raf) {
+                timerRoot.setTimeout(finish, 32);
+                return;
+            }
+
+            raf(() => {
+                raf(finish);
+            });
+        });
+
+        return premiumDashboardFirstPaintPromise;
     }
 
     function forcePremiumDashboardBootShellVisible() {
@@ -217,6 +258,7 @@ function formatMoneyEUR(amount) {
         const doc = root && root.document ? root.document : null;
         if (!doc || premiumDashboardBootFailSafeInstalled) return;
         premiumDashboardBootFailSafeInstalled = true;
+        void waitForPremiumDashboardFirstPaint();
         const startWatchdog = () => startPremiumDashboardBootWatchdog();
         if (doc.readyState === 'loading') {
             doc.addEventListener('DOMContentLoaded', startWatchdog, { once: true });
@@ -265,14 +307,19 @@ function formatMoneyEUR(amount) {
     }
 
     function releasePremiumDashboardBootShellAfterMinimum(startedAt, minimumMs = 650) {
-        const timerRoot = getDashboardTimerRoot();
-        const elapsed = Date.now() - (Number(startedAt) || Date.now());
-        const remainingMs = Math.max(0, (Number(minimumMs) || 0) - elapsed);
-        if (remainingMs > 0 && typeof timerRoot.setTimeout === 'function') {
-            timerRoot.setTimeout(releasePremiumDashboardBootShell, remainingMs);
-            return;
-        }
-        releasePremiumDashboardBootShell();
+        const finishRelease = () => {
+            const timerRoot = getDashboardTimerRoot();
+            const visibleSince = premiumDashboardFirstPaintAt || Number(startedAt) || getDashboardNow();
+            const elapsed = getDashboardNow() - visibleSince;
+            const remainingMs = Math.max(0, (Number(minimumMs) || 0) - elapsed);
+            if (remainingMs > 0 && typeof timerRoot.setTimeout === 'function') {
+                timerRoot.setTimeout(releasePremiumDashboardBootShell, remainingMs);
+                return;
+            }
+            releasePremiumDashboardBootShell();
+        };
+
+        waitForPremiumDashboardFirstPaint().then(finishRelease, finishRelease);
     }
 
     async function fetchPremiumDashboardJson(url, options = {}, timeoutMs = PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS) {
