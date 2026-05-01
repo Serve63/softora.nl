@@ -133,6 +133,45 @@ test('customers page bootstrap vult dashboard actieve-opdrachten teller server-s
   assert.match(script, /data-kpi-active-website/);
 });
 
+test('customers page bootstrap levert actieve-opdrachten state voor snelle paginastart', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      assert.equal(scope, 'premium_active_orders');
+      return {
+        source: 'supabase:data_ops',
+        updatedAt: '2026-05-01T00:00:00.000Z',
+        values: {
+          softora_custom_orders_premium_v1: '',
+          softora_custom_orders_premium_v1_chunks_v1: JSON.stringify({ count: 1 }),
+          softora_custom_orders_premium_v1_chunk_0: JSON.stringify([
+            {
+              id: 11,
+              clientName: 'Servé Creusen',
+              title: 'Website opdracht',
+              description: 'Nieuwe website bouwen',
+              amount: 2500,
+            },
+          ]),
+          softora_order_runtime_premium_v1: JSON.stringify({
+            11: { statusKey: 'bezig', progressPct: 0 },
+          }),
+        },
+      };
+    },
+  });
+
+  const payload = await service.buildActiveOrdersPageBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.activeOrdersState.source, 'supabase:data_ops');
+  assert.equal(payload.activeOrdersState.updatedAt, '2026-05-01T00:00:00.000Z');
+  assert.match(
+    payload.activeOrdersState.values.softora_custom_orders_premium_v1_chunks_v1,
+    /"count":1/
+  );
+  assert.match(payload.activeOrdersState.values.softora_order_runtime_premium_v1, /"bezig"/);
+});
+
 test('customers page bootstrap leest chunked customer database rows', async () => {
   const rawCustomers = JSON.stringify([
     {

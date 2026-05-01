@@ -538,7 +538,26 @@ function createCustomersPageBootstrapService(deps = {}) {
     };
   }
 
+  async function buildActiveOrdersPageBootstrapPayload() {
+    const activeOrdersState = await getUiStateValues(orderScope);
+    const values =
+      activeOrdersState && activeOrdersState.values && typeof activeOrdersState.values === 'object'
+        ? activeOrdersState.values
+        : {};
+
+    return {
+      ok: true,
+      loadedAt: new Date().toISOString(),
+      activeOrdersState: {
+        values,
+        source: normalizeString(activeOrdersState && activeOrdersState.source),
+        updatedAt: normalizeString(activeOrdersState && activeOrdersState.updatedAt) || null,
+      },
+    };
+  }
+
   return {
+    buildActiveOrdersPageBootstrapPayload,
     buildCustomersBootstrapPayload,
     buildDashboardHtmlReplacements,
   };

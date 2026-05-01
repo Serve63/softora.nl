@@ -51,10 +51,13 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
     assert.match(source, /class="premium-boot-shell is-booting"/, file);
     if (file !== 'premium-instellingen.html') {
       if (file === 'premium-actieve-opdrachten.html') {
-        assert.match(source, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427b"><\/script>/, file);
+        assert.match(source, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260501a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260501a"><\/script>/, file);
+        const activeOrdersBootPath = path.join(__dirname, '../../assets/premium-active-orders-boot.js');
         const activeOrdersPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
+        const activeOrdersBootSource = fs.readFileSync(activeOrdersBootPath, 'utf8');
         const activeOrdersSource = fs.readFileSync(activeOrdersPath, 'utf8');
-        assert.match(activeOrdersSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
+        assert.match(activeOrdersBootSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
+        assert.match(activeOrdersSource, /boot\.releaseAfterMinimum/, file);
       } else if (file === 'premium-pdfs.html') {
         assert.match(source, /<script src="assets\/premium-pdfs-builder\.js\?v=20260427a"><\/script>/, file);
         const pdfBuilderPath = path.join(__dirname, '../../assets/premium-pdfs-builder.js');

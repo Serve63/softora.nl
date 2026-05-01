@@ -5,20 +5,23 @@ const path = require('path');
 
 function readActiveOrdersSources() {
   const pagePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
+  const bootScriptPath = path.join(__dirname, '../../assets/premium-active-orders-boot.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const bootScriptSource = fs.readFileSync(bootScriptPath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
   return {
+    bootScriptSource,
     pageSource,
     scriptSource,
-    combinedSource: `${pageSource}\n${scriptSource}`,
+    combinedSource: `${pageSource}\n${bootScriptSource}\n${scriptSource}`,
   };
 }
 
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427b"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260501a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260501a"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -82,7 +85,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /async function removeProjectFromSystem\(id\) \{/);
   assert.match(scriptSource, /function setOpenDossierButtonContent\(btnEl\) \{/);
   assert.match(scriptSource, /function bindActiveOrdersPageUi\(\) \{/);
-  assert.match(scriptSource, /async function initializeActiveOrdersPageState\(\) \{/);
+  assert.match(scriptSource, /async function initializeActiveOrdersPageState\(options = \{\}\) \{/);
   assert.match(scriptSource, /function initActiveOrdersCursor\(\) \{/);
   assert.match(scriptSource, /async function showActiveOrderAlert\(message, options = \{\}\) \{/);
   assert.match(scriptSource, /async function confirmActiveOrderAction\(message, options = \{\}\) \{/);
@@ -137,6 +140,22 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /companyName,\s*contactName: contactPerson,\s*contactPhone: linkedContactPhone,\s*contactEmail: linkedContactEmail,/);
   assert.match(source, /const companyName = String\(item\?\.companyName \|\| ''\)\.trim\(\);/);
   assert.match(source, /const contactName = String\(item\?\.contactName \|\| ''\)\.trim\(\);/);
+});
+
+test('premium actieve opdrachten start snel met server-bootstrap en korte boot-loader', () => {
+  const { bootScriptSource, scriptSource } = readActiveOrdersSources();
+
+  assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOTSTRAP_SCRIPT_ID = 'softoraActiveOrdersBootstrap';/);
+  assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOT_MIN_MS = 650;/);
+  assert.match(bootScriptSource, /function readChunkedStateValue\(values, baseKey\) \{/);
+  assert.match(bootScriptSource, /function hydrateRemoteUiStateFromBootstrap\(currentCache, setCache\) \{/);
+  assert.match(bootScriptSource, /root\.SoftoraPremiumBoot\.setShellBooting\(false\)/);
+  assert.match(bootScriptSource, /releasePremiumDashboardBootShellAfterMinimum\(startedAt, ACTIVE_ORDERS_BOOT_MIN_MS\)/);
+  assert.match(scriptSource, /boot\.startWatchdog\?\.\(\);/);
+  assert.match(scriptSource, /boot\.hydrateRemoteUiStateFromBootstrap\(remoteUiStateCache,/);
+  assert.match(scriptSource, /await initializeActiveOrdersPageState\(\{ loadRemote: !hadBootstrap \}\);/);
+  assert.match(scriptSource, /boot\.releaseAfterMinimum/);
+  assert.match(scriptSource, /loadRemoteUiState\(\{ force: true \}\)\.then/);
 });
 
 test('premium actieve opdrachten gebruiken expliciete customer identity voor koppeling naar klanten', () => {
