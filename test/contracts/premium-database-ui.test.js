@@ -35,6 +35,14 @@ function loadDatabasePhotoStorageClient() {
   return sandbox.window.SoftoraDatabasePhotoStorage;
 }
 
+function loadDatabaseDistanceClient() {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-distance.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const sandbox = { window: {} };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraPremiumDatabaseDistance;
+}
+
 function readDefaultDeepSearchTargetLines(source) {
   const match = source.match(/const DEFAULT_TARGET_TEXT_BASE64 = \[([\s\S]*?)\]\.join\(""\);/);
   assert.ok(match, 'DEFAULT_TARGET_TEXT_BASE64 should be present');
@@ -85,12 +93,39 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function resolveBootstrapCustomers\(\)/);
   assert.match(
     pageSource,
-    /const initialBootstrapCustomers = resolveBootstrapCustomers\(\);[\s\S]*state\.klanten = initialBootstrapCustomers;[\s\S]*renderPage\(\);/
+    /const initialBootstrapCustomers = resolveBootstrapCustomers\(\);[\s\S]*state\.klanten = sortCustomers\(initialBootstrapCustomers\);[\s\S]*renderPage\(\);/
   );
   assert.match(pageSource, /const hadBootstrapCustomers = state\.klanten\.length > 0;/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
   assert.match(pageSource, /function isDerivedOrderPlaceholderCustomer\(customer\)/);
   assert.match(pageSource, /customersBootstrapPayload && customersBootstrapPayload\.source\) === "orders"[\s\S]*return \[\];/);
+});
+
+test('premium database page keeps customers fixed from Oisterwijk nearby to far away', () => {
+  const pagePath = path.join(__dirname, '../../premium-database.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const distanceClient = loadDatabaseDistanceClient();
+
+  const sorted = distanceClient.sortCustomersByDistance([
+    { bedrijf: 'Roosendaal Zaak', stad: 'Markt 1, 4701 PE Roosendaal' },
+    { bedrijf: 'Oisterwijk Winkel', stad: 'Dorpsstraat 1, 5061 AA Oisterwijk' },
+    { bedrijf: 'Chaam Garage', stad: 'Florijnstraat 2, 4861 BW Chaam' },
+    { bedrijf: 'Alphen Service', stad: 'Baarleseweg 69, 5131 BB Alphen (N.Br)' },
+    { bedrijf: 'Onbekend Ver Weg', stad: 'Onbekend' },
+  ]);
+
+  assert.deepEqual(
+    sorted.map((customer) => customer.bedrijf),
+    ['Oisterwijk Winkel', 'Alphen Service', 'Chaam Garage', 'Roosendaal Zaak', 'Onbekend Ver Weg']
+  );
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260501a/);
+  assert.match(pageSource, /sortKey: "distance"/);
+  assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);/);
+  assert.match(pageSource, /state\.klanten = sortCustomers\(state\.klanten\.concat\(\[customer\]\)\);/);
+  assert.match(pageSource, /state\.klanten = sortCustomers\(mergeResult\.customers\);/);
+  assert.match(pageSource, /const normalizedCustomers = sortCustomers\(customers\)\.filter/);
+  assert.doesNotMatch(pageSource, /sortKey: "manual"/);
 });
 
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
