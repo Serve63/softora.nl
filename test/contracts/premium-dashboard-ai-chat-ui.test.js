@@ -105,7 +105,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(coreSource, /function readDashboardCustomersBootstrapPayload\(scriptId = 'softoraCustomersBootstrap'\) \{/);
   assert.match(pageSource, /const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload\(\);/);
   assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260501d/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260501e/);
   assert.doesNotMatch(pageSource, /assets\/premium-dashboard-core\.js\?v=20260429b/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /window\.SoftoraPremiumDashboardCore \|\|/);
@@ -135,7 +135,7 @@ test('premium dashboard laat de boot-loader niet hangen op trage ui-state reques
 
   assert.match(pageSource, /startPremiumDashboardBootWatchdog\(\);/);
   assert.match(pageSource, /fetchPremiumDashboardJson\(url, \{ method: 'GET', cache: 'no-store' \}\)/);
-  assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 1200\);/);
+  assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 2000\);/);
   assert.match(pageSource, /setAttribute\("data-dashboard-boot-loading", "true"\)/);
   assert.match(pageSource, /html\[data-dashboard-boot-loading="true"\] body::before/);
   assert.match(pageSource, /softora-dashboard-boot-spin/);
@@ -147,9 +147,9 @@ test('premium dashboard laat de boot-loader niet hangen op trage ui-state reques
   assert.match(coreSource, /function forcePremiumDashboardBootShellVisible\(\) \{/);
   assert.match(coreSource, /removeAttribute\('data-dashboard-boot-loading'\)/);
   assert.match(coreSource, /function releasePremiumDashboardBootShell\(\) \{/);
-  assert.match(coreSource, /function showPremiumDashboardBootShellForMinimum\(minimumMs = 900\) \{/);
+  assert.match(coreSource, /function showPremiumDashboardBootShellForMinimum\(minimumMs = 2000\) \{/);
   assert.match(coreSource, /root\.addEventListener\('pageshow', function \(event\) \{/);
-  assert.match(coreSource, /if \(event && event\.persisted\) \{\s*showPremiumDashboardBootShellForMinimum\(900\);/s);
+  assert.match(coreSource, /if \(event && event\.persisted\) \{\s*showPremiumDashboardBootShellForMinimum\(2000\);/s);
   assert.match(coreSource, /function releasePremiumDashboardBootShellAfterMinimum\(startedAt, minimumMs = 650\) \{/);
   assert.match(coreSource, /function startPremiumDashboardBootWatchdog\(\) \{/);
   assert.match(coreSource, /function installPremiumDashboardBootFailSafe\(\) \{/);
@@ -194,7 +194,7 @@ test('premium dashboard opent AI beheer configuratie met doel en toegestane midd
   assert.match(pageSource, /scheduleDays: \['monday', 'tuesday', 'wednesday', 'thursday', 'friday'\]/);
   assert.match(pageSource, /scheduleStart: '08:30'/);
   assert.match(pageSource, /scheduleEnd: '17:00'/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260501d/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260501e/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /const aiManagementScheduleDayInputs = Array\.from\(document\.querySelectorAll\('\[data-ai-schedule-day\]'\)\);/);
   assert.match(pageSource, /aiManagementScheduleStartInput\.value = config\.scheduleStart;/);
