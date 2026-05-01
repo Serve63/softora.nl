@@ -143,7 +143,10 @@ test('premium terugkerende kosten bewaart bewerkbare posten via supabase ui-stat
   assert.match(combinedSource, /if \(!monthlyCostsBootstrapDone\) \{\s*setTotalsLoading\(\);/);
   assert.match(combinedSource, /\[MONTHLY_COSTS_REMOTE_KEY\]: JSON\.stringify\(editableItems\),/);
   assert.match(combinedSource, /await ensureMonthlyCostEntriesLoaded\(\);/);
-  assert.match(combinedSource, /await window\.refreshMonthlyColdcallingCosts\(\);/);
+  assert.match(combinedSource, /const refreshTasks = \[\];/);
+  assert.match(combinedSource, /refreshTasks\.push\(window\.refreshMonthlyColdcallingCosts\(\)\);/);
+  assert.match(combinedSource, /refreshTasks\.push\(window\.refreshMonthlyApiCosts\(\)\);/);
+  assert.match(combinedSource, /await Promise\.all\(refreshTasks\);/);
   assert.match(combinedSource, /const parsedEntries = JSON\.parse\(serializedEntries\);/);
   assert.match(combinedSource, /setMonthlyCostsStageBooting\(true\);/);
   assert.match(combinedSource, /setMonthlyCostsStageBooting\(false\);/);
@@ -179,6 +182,9 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /return \{ ok: true, updated: applyApiCost\(amountEur, buildApiCostNote\(summary\)\), amountEur, source: 'api-costs' \};/);
   assert.match(scriptSource, /applyApiCost\(0, API_COST_UNAVAILABLE_NOTE\);/);
   assert.match(scriptSource, /window\.refreshMonthlyApiCosts = refreshMonthlyApiCosts;/);
+  assert.match(scriptSource, /let coldcallingRefreshPromise = null;/);
+  assert.match(scriptSource, /let apiCostRefreshPromise = null;/);
+  assert.match(scriptSource, /const hasApiCostItem = Boolean\(resolveApiCostItem\(\)\);/);
   assert.match(
     scriptSource,
     /window\.setInterval\(function \(\) \{\s*void refreshMonthlyColdcallingCosts\(\);\s*void refreshMonthlyApiCosts\(\);\s*\}, POLL_INTERVAL_MS\);/
