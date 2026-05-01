@@ -1,5 +1,6 @@
 const express = require('express');
 const { validateColdcallingStartConfirmPin } = require('../security/coldcalling-start-confirm-pin');
+const { resolveUsdToEurRateDetails } = require('../services/openai-costs');
 const {
   countFailedColdcallingResults,
   countSkippedColdcallingResults,
@@ -9,7 +10,6 @@ const {
 } = require('../services/coldcalling-lead-eligibility');
 
 const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
-const DEFAULT_USD_TO_EUR_RATE = 0.92;
 const RETELL_COST_SUMMARY_CACHE_MS = 12000;
 const retellCostSummaryCacheByScope = new Map();
 
@@ -28,6 +28,20 @@ function extractRetellCallsFromListResponse(data) {
   return [];
 }
 
+function extractRetellListPaginationKey(data, calls = []) {
+  const explicitKey =
+    data?.pagination_key ||
+    data?.next_pagination_key ||
+    data?.nextPaginationKey ||
+    data?.next_page ||
+    data?.nextPage ||
+    '';
+  if (explicitKey) return String(explicitKey).trim();
+
+  const lastCall = Array.isArray(calls) && calls.length ? calls[calls.length - 1] : null;
+  return String(lastCall?.call_id || lastCall?.callId || '').trim();
+}
+
 function normalizeRetellCostSummaryScope(value) {
   return String(value || '').trim().toLowerCase() === 'month' ? 'month' : 'all_time';
 }
@@ -37,14 +51,133 @@ function getRetellCostSummaryMonthStartMs(nowMs = Date.now()) {
   return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
 }
 
-function convertUsdToEur(amountUsd) {
-  return Math.max(0, Number(amountUsd) || 0) * DEFAULT_USD_TO_EUR_RATE;
-}
-
 function getRetellEstimatedCostUsdFromDurationSeconds(durationSeconds) {
   const safeDurationSeconds = Math.max(0, Math.round(Number(durationSeconds) || 0));
   if (safeDurationSeconds <= 0) return 0;
   return (safeDurationSeconds / 60) * DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD;
+}
+
+function resolveRetellCallStartMs(call) {
+  const timestampCandidates = [
+    call?.start_timestamp,
+    call?.startTime,
+    call?.start_time,
+    call?.created_at,
+    call?.createdAt,
+  ];
+
+  for (const candidate of timestampCandidates) {
+    const numeric = Number(candidate);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+    }
+    const parsed = Date.parse(String(candidate || ''));
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  return 0;
+}
+
+function resolveRetellCallDurationSeconds(call) {
+  const durationMs = Number(call?.duration_ms);
+  if (Number.isFinite(durationMs) && durationMs > 0) {
+    return Math.max(1, Math.round(durationMs / 1000));
+  }
+
+  const durationSeconds = Number(call?.duration_seconds ?? call?.duration);
+  if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+    return Math.max(1, Math.round(durationSeconds));
+  }
+
+  const startedAtMs = resolveRetellCallStartMs(call);
+  const endedAtMs =
+    Number.isFinite(Number(call?.end_timestamp)) && Number(call.end_timestamp) > 0
+      ? Number(call.end_timestamp) < 10_000_000_000
+        ? Number(call.end_timestamp) * 1000
+        : Number(call.end_timestamp)
+      : Date.parse(String(call?.end_time || call?.endedAt || call?.ended_at || ''));
+  if (startedAtMs > 0 && Number.isFinite(endedAtMs) && endedAtMs > startedAtMs) {
+    return Math.max(1, Math.round((endedAtMs - startedAtMs) / 1000));
+  }
+
+  return 0;
+}
+
+function shouldIncludeRetellCallInCostSummary(deps, call, lowerThresholdMs) {
+  if (!call || typeof call !== 'object') return false;
+
+  const startedAtMs = resolveRetellCallStartMs(call);
+  if (Number.isFinite(lowerThresholdMs) && lowerThresholdMs > 0 && startedAtMs > 0 && startedAtMs < lowerThresholdMs) {
+    return false;
+  }
+
+  const callType = deps.normalizeString(call?.call_type || call?.callType || '').toLowerCase();
+  if (callType && callType !== 'phone_call') return false;
+
+  const direction = deps.normalizeString(call?.direction || call?.call_direction || '').toLowerCase();
+  if (direction && direction.indexOf('outbound') === -1) return false;
+
+  const status = deps.normalizeString(call?.call_status || call?.status || '').toLowerCase();
+  if (!status || status === 'registered' || status === 'ongoing' || status === 'in_progress') return false;
+
+  const metadata = call?.metadata && typeof call.metadata === 'object' ? call.metadata : {};
+  const source = deps.normalizeString(metadata.source || metadata.Source || '');
+  if (source && source !== 'softora-coldcalling-dashboard') return false;
+
+  return true;
+}
+
+function buildRetellListOptionsForCostSummary(deps, lowerThresholdMs, paginationKey, apiVersion) {
+  if (apiVersion === 'v2') {
+    const filterCriteria = {
+      call_type: ['phone_call'],
+      direction: ['outbound'],
+      call_status: ['ended', 'not_connected', 'error', 'completed'],
+    };
+    if (Number.isFinite(lowerThresholdMs) && lowerThresholdMs > 0) {
+      filterCriteria.start_timestamp = {
+        lower_threshold: lowerThresholdMs,
+      };
+    }
+    return {
+      apiVersion: 'v2',
+      filterCriteria,
+      sortOrder: 'descending',
+      limit: 1000,
+      paginationKey,
+    };
+  }
+
+  return {
+    apiVersion: 'v3',
+    filterCriteria: {},
+    sortOrder: 'descending',
+    limit: 1000,
+    paginationKey,
+  };
+}
+
+async function listRetellCallsForCostSummary(deps, lowerThresholdMs, paginationKey, preferredApiVersion) {
+  const versions = preferredApiVersion === 'v2' ? ['v2'] : ['v3', 'v2'];
+  let lastError = null;
+
+  for (const apiVersion of versions) {
+    try {
+      const result = await deps.listRetellCalls(
+        buildRetellListOptionsForCostSummary(deps, lowerThresholdMs, paginationKey, apiVersion)
+      );
+      return {
+        ...result,
+        apiVersion,
+      };
+    } catch (error) {
+      lastError = error;
+      const status = Number(error?.status || 0);
+      if (apiVersion === 'v2' || ![400, 404, 405, 422].includes(status)) break;
+    }
+  }
+
+  throw lastError || new Error('Retell list calls ophalen mislukt.');
 }
 
 async function buildRetellCostSummary(deps, scope, options = {}) {
@@ -63,16 +196,6 @@ async function buildRetellCostSummary(deps, scope, options = {}) {
 
   const lowerThresholdMs =
     normalizedScope === 'month' ? getRetellCostSummaryMonthStartMs(nowMs) : null;
-  const filterCriteria = {
-    call_type: ['phone_call'],
-    direction: ['outbound'],
-    call_status: ['ended', 'not_connected', 'error'],
-  };
-  if (Number.isFinite(lowerThresholdMs) && lowerThresholdMs > 0) {
-    filterCriteria.start_timestamp = {
-      lower_threshold: lowerThresholdMs,
-    };
-  }
 
   let paginationKey = '';
   let totalCostUsd = 0;
@@ -80,37 +203,52 @@ async function buildRetellCostSummary(deps, scope, options = {}) {
   let callCount = 0;
   let exactCostCount = 0;
   let estimatedCostCount = 0;
+  let lastApiVersion = '';
+  const preferredApiVersion = deps.normalizeString(
+    options?.apiVersion || deps.retellCostSummaryApiVersion || deps.env?.RETELL_COST_SUMMARY_API_VERSION || 'v3'
+  ).toLowerCase() === 'v2'
+    ? 'v2'
+    : 'v3';
 
   for (let pageIndex = 0; pageIndex < 25; pageIndex += 1) {
-    const { data } = await deps.listRetellCalls({
-      filterCriteria,
-      sortOrder: 'descending',
-      limit: 1000,
+    const { data, apiVersion } = await listRetellCallsForCostSummary(
+      deps,
+      lowerThresholdMs,
       paginationKey,
-    });
+      preferredApiVersion
+    );
+    lastApiVersion = apiVersion;
     const calls = extractRetellCallsFromListResponse(data);
     if (!calls.length) break;
+
+    let pageReachedOlderThanMonth = false;
 
     calls.forEach((call) => {
       if (!call || typeof call !== 'object') return;
 
-      const status = deps.normalizeString(call?.call_status || call?.status || '').toLowerCase();
-      if (!status || status === 'registered' || status === 'ongoing') return;
+      const startedAtMs = resolveRetellCallStartMs(call);
+      if (
+        Number.isFinite(lowerThresholdMs) &&
+        lowerThresholdMs > 0 &&
+        startedAtMs > 0 &&
+        startedAtMs < lowerThresholdMs
+      ) {
+        pageReachedOlderThanMonth = true;
+      }
+      if (!shouldIncludeRetellCallInCostSummary(deps, call, lowerThresholdMs)) return;
 
-      const durationSeconds =
-        Number.isFinite(Number(call?.duration_ms)) && Number(call.duration_ms) > 0
-          ? Math.max(1, Math.round(Number(call.duration_ms) / 1000))
-          : 0;
+      const durationSeconds = resolveRetellCallDurationSeconds(call);
       const resolvedCost =
         typeof deps.resolveRetellCallCostFields === 'function'
           ? deps.resolveRetellCallCostFields(call)
           : { costUsd: null, costUsdMilli: null };
-      const exactCostUsd = Number(resolvedCost?.costUsd);
+      const rawExactCostUsd = resolvedCost?.costUsd;
+      const exactCostUsd = Number(rawExactCostUsd);
 
       callCount += 1;
       totalDurationSeconds += durationSeconds;
 
-      if (Number.isFinite(exactCostUsd) && exactCostUsd >= 0) {
+      if (rawExactCostUsd !== null && rawExactCostUsd !== undefined && Number.isFinite(exactCostUsd) && exactCostUsd >= 0) {
         totalCostUsd += exactCostUsd;
         exactCostCount += 1;
         return;
@@ -120,22 +258,40 @@ async function buildRetellCostSummary(deps, scope, options = {}) {
       estimatedCostCount += 1;
     });
 
-    const nextPaginationKey = deps.normalizeString(
-      calls[calls.length - 1]?.call_id || calls[calls.length - 1]?.callId || ''
-    );
+    const nextPaginationKey = deps.normalizeString(extractRetellListPaginationKey(data, calls));
+    if (pageReachedOlderThanMonth && normalizedScope === 'month') break;
+    if (data && data.has_more === false) break;
     if (calls.length < 1000 || !nextPaginationKey) break;
     paginationKey = nextPaginationKey;
   }
 
+  const usdToEurRateDetails = await resolveUsdToEurRateDetails({
+    env: deps.env,
+    fetchJsonWithTimeout: deps.fetchJsonWithTimeout,
+    usdToEurRate: deps.usdToEurRate,
+    exchangeRateApiUrl: deps.exchangeRateApiUrl,
+    usdToEurRateCache: deps.usdToEurRateCache,
+  });
+
   const summary = {
     scope: normalizedScope,
+    source: 'retell',
+    exact: estimatedCostCount === 0,
     callCount,
     totalDurationSeconds,
     exactCostCount,
     estimatedCostCount,
     costUsd: Math.round(totalCostUsd * 1000) / 1000,
     costUsdMilli: Math.max(0, Math.round(totalCostUsd * 1000)),
-    costEur: Math.round(convertUsdToEur(totalCostUsd) * 100) / 100,
+    costEur: Math.round(totalCostUsd * usdToEurRateDetails.rate * 100) / 100,
+    usdToEurRate: usdToEurRateDetails.rate,
+    usdToEurRateSource: usdToEurRateDetails.source,
+    exchangeRateFetchedAtMs: usdToEurRateDetails.fetchedAtMs,
+    retellListApiVersion: lastApiVersion || preferredApiVersion,
+    note:
+      estimatedCostCount === 0
+        ? 'Retell AI call_cost factuurkosten.'
+        : 'Retell AI call_cost waar beschikbaar; resterende afgeronde calls tijdelijk geschat op duur.',
   };
 
   retellCostSummaryCacheByScope.set(normalizedScope, {
@@ -877,7 +1033,11 @@ function registerColdcallingRoutes(app, deps) {
 }
 
 module.exports = {
+  buildRetellCostSummary,
   createSendColdcallingStatusResponse,
+  extractRetellListPaginationKey,
   registerColdcallingWebhookRoutes,
   registerColdcallingRoutes,
+  resolveRetellCallDurationSeconds,
+  resolveRetellCallStartMs,
 };
