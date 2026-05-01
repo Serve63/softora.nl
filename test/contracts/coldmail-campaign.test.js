@@ -521,6 +521,52 @@ test('coldmail campaign recipient preview respects Oisterwijk radius', async () 
   assert.equal(result.recipients[0].distanceKm, 0);
 });
 
+test('coldmail campaign radius includes real customer database places near Oisterwijk', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'chaam-1',
+        bedrijf: 'Chaam Winkel',
+        email: 'chaam@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Dorpsstraat 10, Chaam',
+        mail: true,
+      },
+      {
+        id: 'alphen-1',
+        bedrijf: 'Alphen Studio',
+        email: 'alphen@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Raadhuisstraat 1, Alphen',
+        mail: true,
+      },
+      {
+        id: 'roosendaal-1',
+        bedrijf: 'Roosendaal Zaak',
+        email: 'roosendaal@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Markt 1, Roosendaal',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    branch: 'Retail & Winkels',
+    radiusKm: 40,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.radiusKm, 40);
+  assert.equal(result.selected, 2);
+  assert.deepEqual(result.recipients.map((recipient) => recipient.bedrijf), ['Chaam Winkel', 'Alphen Studio']);
+  assert.ok(result.recipients.every((recipient) => recipient.distanceKm <= 40));
+});
+
 test('coldcalling recipient preview selects callable phone rows', async () => {
   const { service } = createService({
     rows: [],

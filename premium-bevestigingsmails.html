@@ -1212,7 +1212,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
       <!-- INSTELLINGEN -->
       <div class="mail-panel" id="mail-panel-5">
         <div class="mail-fields">
-          <div class="settings-intro">Kies vanuit welke mailbox deze campagne verzendt en welke speciale handeling erbij hoort.</div>
+          <div class="settings-intro">Kies hoelang deze campagne loopt en welke speciale handeling erbij hoort.</div>
           <div class="mf-row lead-generator-provider-setting">
             <div class="mf-label">AI-provider</div>
             <select class="mf-sel" id="coldcallingStack" aria-label="Coldcalling provider">
@@ -1222,12 +1222,14 @@ Softora.nl | +31 6 43 26 27 92</textarea>
             <div class="mf-help">Kies welke AI-stack de software gebruikt voor coldcalling.</div>
           </div>
           <div class="mf-row lead-generator-hidden-setting">
-            <div class="mf-label">Verzenden vanaf</div>
-            <select class="mf-sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">
-              <option value="ruben@softora.nl" selected>ruben@softora.nl</option>
-              <option value="serve@softora.nl">serve@softora.nl</option>
-              <option value="martijn@softora.nl">martijn@softora.nl</option>
+            <div class="mf-label">Campagne afgerond na</div>
+            <select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">
+              <option value="disabled">Uitgeschakeld</option>
+              <option value="5">5 dagen</option>
+              <option value="7">7 dagen</option>
+              <option value="14" selected>14 dagen</option>
             </select>
+            <div class="mf-help">Na deze looptijd ziet Softora de mailcampagne als afgerond.</div>
           </div>
           <div class="mf-row lead-generator-hidden-setting">
             <div class="mf-label">Speciale handeling</div>
@@ -1267,15 +1269,13 @@ Softora.nl | +31 6 43 26 27 92</textarea>
           <div class="slider-row" id="campaignVolumeSliderLabels"><span>5</span><span>20</span><span>30</span></div>
         </div>
 
-        <div class="field lead-generator-branch-field">
-          <div class="field-label">Campagne afgerond na</div>
-          <select class="sel" id="campaignDurationDays" aria-label="Campagneduur">
-            <option value="disabled">Uitgeschakeld</option>
-            <option value="5">5 dagen</option>
-            <option value="7">7 dagen</option>
-            <option value="14" selected>14 dagen</option>
+        <div class="field lead-generator-hidden-setting">
+          <div class="field-label">Verzenden vanaf</div>
+          <select class="sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">
+            <option value="ruben@softora.nl" selected>ruben@softora.nl</option>
+            <option value="serve@softora.nl">serve@softora.nl</option>
+            <option value="martijn@softora.nl">martijn@softora.nl</option>
           </select>
-          <div class="mf-help">Na deze looptijd ziet Softora de mailcampagne als afgerond en kan er weer een nieuwe starten.</div>
         </div>
 
         <div class="field lead-generator-belmethod-field">
@@ -1288,7 +1288,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
 
         <div class="field">
           <div class="field-label">Straal vanuit Oisterwijk — <span id="km-val">50 km</span></div>
-          <input class="slider" type="range" min="0" max="10" value="4" id="km-slider" oninput="updateKm(this.value)">
+          <input class="slider" type="range" min="0" max="11" value="4" id="km-slider" oninput="updateKm(this.value)">
           <div class="slider-row"><span>10 km</span><span>130 km</span><span>250 km</span></div>
         </div>
 
@@ -1448,7 +1448,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
-<script src="assets/premium-campaign-radius.js?v=20260427a"></script>
+<script src="assets/premium-campaign-radius.js?v=20260501a"></script>
 <script>
 // ── DATA ──
 let bedrijven = [];
@@ -1632,7 +1632,8 @@ const KM_OPTIES = [10,20,30,40,50,75,100,130,150,175,200,250];
 
 function getSelectedCampaignRadiusKm() {
   const slider = document.getElementById('km-slider');
-  const index = Number.parseInt(slider ? slider.value : '4', 10);
+  const rawIndex = Number.parseInt(slider ? slider.value : '4', 10);
+  const index = Math.max(0, Math.min(KM_OPTIES.length - 1, Number.isFinite(rawIndex) ? rawIndex : 4));
   return KM_OPTIES[index] || 50;
 }
 
@@ -2139,27 +2140,23 @@ function updateSlider(v) {
   document.getElementById('slider-val').textContent = String(value);
   if (slider) slider.style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
-  if (isPremiumAiLeadGeneratorPath()) {
-    void hydrateCampaignCompanyCountFromSupabase();
-  } else {
-    renderCampaignCompanyCount();
-  }
+  renderCampaignCompanyCount();
+  void hydrateCampaignCompanyCountFromSupabase();
   hydrateCampaignRecipientListSoon();
 }
 configureCampaignVolumeControl();
 updateSlider(document.getElementById('mail-slider') ? document.getElementById('mail-slider').value : 10);
 
 function updateKm(v) {
-  const km = KM_OPTIES[v] || 50;
+  const rawIndex = Number.parseInt(v, 10);
+  const index = Math.max(0, Math.min(KM_OPTIES.length - 1, Number.isFinite(rawIndex) ? rawIndex : 4));
+  const km = KM_OPTIES[index] || 50;
   document.getElementById('km-val').textContent = km + ' km';
-  const pct = (v/10)*100;
+  const pct = KM_OPTIES.length > 1 ? (index / (KM_OPTIES.length - 1)) * 100 : 0;
   document.getElementById('km-slider').style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
-  if (isPremiumAiLeadGeneratorPath()) {
-    void hydrateCampaignCompanyCountFromSupabase();
-  } else {
-    renderCampaignCompanyCount();
-  }
+  renderCampaignCompanyCount();
+  void hydrateCampaignCompanyCountFromSupabase();
   hydrateCampaignRecipientListSoon();
 }
 updateKm(4);
@@ -3018,6 +3015,6 @@ Promise.allSettled(campaignBootTasks).finally(finishPremiumShellBoot);
 </main>
 </div>
 <script src="assets/premium-bevestigingsmails-management.js?v=20260423a" defer></script>
-<script src="assets/premium-bevestigingsmails-location-variable.js?v=20260429a"></script><script src="assets/premium-ai-lead-generator-call-blocklist.js?v=20260429a"></script>
+<script src="assets/premium-bevestigingsmails-location-variable.js?v=20260501a"></script><script src="assets/premium-ai-lead-generator-call-blocklist.js?v=20260429a"></script>
 </body>
 </html>
