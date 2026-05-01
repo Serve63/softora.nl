@@ -3653,14 +3653,12 @@
     applyInitialAgendaBootstrap();
     renderCalendar();
     renderWorkspaceReferenceImages();
+    window.SoftoraPremiumBoot?.setShellBooting?.(false);
     void (async () => {
         try {
-            await refreshKnownActiveOrdersIndex();
-            // Eerste load + elke user-getriggerde refresh forceert fresh, zodat
-            // afspraken die zojuist via een andere instance (of een andere tab)
-            // zijn ingepland direct in de agenda verschijnen. De achtergrond-poll
-            // van 10s blijft cached om server-load te besparen.
-            await loadServerAppointments({ fresh: true });
+            await refreshKnownActiveOrdersIndex().catch(() => null);
+            // Fresh eerste load maakt afspraken uit andere tabs/instances meteen zichtbaar.
+            await loadServerAppointments({ fresh: true }).catch(() => null);
         } finally {
             if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
                 window.SoftoraPremiumBoot.setShellBooting(false);

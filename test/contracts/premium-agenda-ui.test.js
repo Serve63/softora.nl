@@ -265,6 +265,18 @@ test('premium agenda herlaadt afspraken met timeout-override bij verse handmatig
   );
 });
 
+test('premium agenda toont de pagina direct en laadt externe data daarna bij', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(
+    pageSource,
+    /applyInitialAgendaBootstrap\(\);\s*renderCalendar\(\);\s*renderWorkspaceReferenceImages\(\);\s*window\.SoftoraPremiumBoot\?\.setShellBooting\?\.\(false\);/
+  );
+  assert.match(pageSource, /await refreshKnownActiveOrdersIndex\(\)\.catch\(\(\) => null\);/);
+  assert.match(pageSource, /await loadServerAppointments\(\{ fresh: true \}\)\.catch\(\(\) => null\);/);
+});
+
 test('premium agenda dwingt modal sluiting na geslaagde handmatige opslag', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
