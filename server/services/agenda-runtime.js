@@ -483,6 +483,14 @@ function createAgendaRuntime(deps = {}) {
       };
     }
 
+    if (fileName === 'premium-actieve-opdrachten.html') {
+      return {
+        marker: 'SOFTORA_ACTIVE_ORDERS_BOOTSTRAP',
+        scriptId: 'softoraActiveOrdersBootstrap',
+        data: await customersPageBootstrapService.buildActiveOrdersPageBootstrapPayload(),
+      };
+    }
+
     if (
       fileName === 'premium-klanten.html' ||
       fileName === 'premium-database.html' ||

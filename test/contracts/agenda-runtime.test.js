@@ -53,3 +53,15 @@ test('agenda runtime injecteert klanten-bootstrap ook op het premium dashboard',
   assert.match(source, /scriptId: 'softoraCustomersBootstrap'/);
   assert.match(source, /buildDashboardHtmlReplacements\(dashboardPayload\)/);
 });
+
+test('agenda runtime injecteert actieve-opdrachten bootstrap op de opdrachtenpagina', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../../server/services/agenda-runtime.js'),
+    'utf8'
+  );
+
+  assert.match(source, /fileName === 'premium-actieve-opdrachten\.html'/);
+  assert.match(source, /marker: 'SOFTORA_ACTIVE_ORDERS_BOOTSTRAP'/);
+  assert.match(source, /scriptId: 'softoraActiveOrdersBootstrap'/);
+  assert.match(source, /buildActiveOrdersPageBootstrapPayload\(\)/);
+});

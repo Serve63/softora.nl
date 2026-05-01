@@ -152,9 +152,9 @@ async function fetchUiStateSetWithFallback(scope, body) {
     throw lastError || new Error('UI-state POST mislukt');
 }
 
-async function loadRemoteUiState() {
-    if (remoteUiStateLoaded) return true;
+async function loadRemoteUiState(options = {}) {
     if (remoteUiStateLoadPromise) return remoteUiStateLoadPromise;
+    if (remoteUiStateLoaded && !options.force) return true;
 
     remoteUiStateLoadPromise = (async () => {
         try {
@@ -180,7 +180,7 @@ async function loadRemoteUiState() {
 }
 
 function readStateValue(key) {
-    return String(remoteUiStateCache[key] ?? '');
+    return String(window.SoftoraActiveOrdersBoot?.readStateValue?.(remoteUiStateCache, key) ?? remoteUiStateCache[key] ?? '');
 }
 
 function queueRemoteUiStateSave() {
@@ -246,8 +246,8 @@ async function persistRequiredUiStateKeysOrThrow(requiredKeys, errorMessage) {
 }
 
 function writeStateValue(key, value) {
-    remoteUiStateCache[key] = String(value ?? '');
-    remoteUiStatePendingPatch[key] = String(value ?? '');
+    const patch = window.SoftoraActiveOrdersBoot?.buildStateWritePatch?.(key, value) || { [key]: String(value ?? '') };
+    Object.assign(remoteUiStateCache, patch); Object.assign(remoteUiStatePendingPatch, patch);
     queueRemoteUiStateSave();
 }
 
@@ -3057,8 +3057,8 @@ function bindActiveOrdersPageUi() {
     document.querySelectorAll('#ordersGrid .order-card').forEach(bindDynamicOrderCard);
 }
 
-async function initializeActiveOrdersPageState() {
-    await loadRemoteUiState();
+async function initializeActiveOrdersPageState(options = {}) {
+    if (options.loadRemote !== false) await loadRemoteUiState({ force: Boolean(options.forceRemote) });
     buildMode = loadBuildMode();
     setBuildMode(buildMode);
     clearDemoOrdersOnLoad();
@@ -3069,13 +3069,13 @@ async function initializeActiveOrdersPageState() {
 }
 
 async function bootActiveOrdersPage() {
+    const boot = window.SoftoraActiveOrdersBoot || {}, bootStartedAt = Date.now(); boot.startWatchdog?.();
     bindActiveOrdersPageUi();
+    const hadBootstrap = typeof boot.hydrateRemoteUiStateFromBootstrap === 'function' ? boot.hydrateRemoteUiStateFromBootstrap(remoteUiStateCache, (next) => { remoteUiStateCache = next; remoteUiStateLoaded = true; }) : false;
     try {
-        await initializeActiveOrdersPageState();
+        await initializeActiveOrdersPageState({ loadRemote: !hadBootstrap });
     } finally {
-        if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
-            window.SoftoraPremiumBoot.setShellBooting(false);
-        }
+        (boot.releaseAfterMinimum || (() => window.SoftoraPremiumBoot?.setShellBooting?.(false)))(bootStartedAt); if (hadBootstrap) void loadRemoteUiState({ force: true }).then((loaded) => loaded && initializeActiveOrdersPageState({ loadRemote: false })).catch(() => {});
     }
 }
 
