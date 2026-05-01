@@ -54,8 +54,11 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.doesNotMatch(source, /id="website-preview-generate"/);
   assert.doesNotMatch(source, /id="website-link-html"/);
   assert.doesNotMatch(source, /id="website-link-slug"/);
+  assert.doesNotMatch(source, /id="website-link-copy"/);
+  assert.doesNotMatch(source, /Kopieer websitelink/);
   assert.doesNotMatch(source, /Gegenereerde websitegenerator preview/);
-  assert.match(websiteGeneratorSource, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*!websiteLinkListEl[\s\S]*\) \{\s*return;\s*\}/);
+  assert.doesNotMatch(websiteGeneratorScriptSource, /websiteLinkCopyEl/);
+  assert.match(websiteGeneratorSource, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkStatusEl[\s\S]*!websiteLinkListEl[\s\S]*\) \{\s*return;\s*\}/);
   assert.match(source, /id="website-link-list"/);
   assert.match(websiteGeneratorSource, /window\.open\('about:blank', '_blank'\)/);
   assert.match(websiteGeneratorSource, /function createWebsiteLinkRow\(link\) \{/);
