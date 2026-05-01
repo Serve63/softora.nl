@@ -530,9 +530,14 @@ async function bootstrapMonthlyCostsPage() {
       setTotalsLoading();
       render();
       await ensureMonthlyCostEntriesLoaded();
+      const refreshTasks = [];
       if (typeof window.refreshMonthlyColdcallingCosts === 'function') {
-        await window.refreshMonthlyColdcallingCosts();
+        refreshTasks.push(window.refreshMonthlyColdcallingCosts());
       }
+      if (typeof window.refreshMonthlyApiCosts === 'function') {
+        refreshTasks.push(window.refreshMonthlyApiCosts());
+      }
+      await Promise.all(refreshTasks);
       monthlyCostsBootstrapDone = true;
       render();
       return true;

@@ -2,7 +2,10 @@ const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_ANTHROPIC_API_BASE_URL = 'https://api.anthropic.com/v1';
 const ANTHROPIC_API_VERSION = '2023-06-01';
 const DEFAULT_USD_TO_EUR_RATE = 0.92;
+const DEFAULT_EXCHANGE_RATE_API_URL = 'https://api.frankfurter.app/latest?from=USD&to=EUR';
+const DEFAULT_EXCHANGE_RATE_CACHE_MS = 30 * 60 * 1000;
 const MAX_COST_PAGES = 12;
+let usdToEurRateCache = null;
 
 function normalizeString(value) {
   return String(value || '').trim();
@@ -105,10 +108,122 @@ function resolveAnthropicApiBaseUrl(deps = {}) {
   ).replace(/\/+$/, '');
 }
 
-function getUsdToEurRate(deps = {}) {
+function getConfiguredUsdToEurRate(deps = {}) {
   const env = deps.env || process.env || {};
   const parsed = Number(deps.usdToEurRate || env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_USD_TO_EUR_RATE;
+}
+
+function getExplicitUsdToEurRate(deps = {}) {
+  const env = deps.env || process.env || {};
+  const parsed = Number(deps.usdToEurRate || env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function getExchangeRateCacheMs(deps = {}) {
+  const env = deps.env || process.env || {};
+  const parsed = Number(deps.exchangeRateCacheMs || env.OPENAI_COST_EXCHANGE_RATE_CACHE_MS);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_EXCHANGE_RATE_CACHE_MS;
+}
+
+function resolveExchangeRateApiUrl(deps = {}) {
+  const env = deps.env || process.env || {};
+  return normalizeString(
+    deps.exchangeRateApiUrl || env.OPENAI_COST_EXCHANGE_RATE_URL || env.USD_TO_EUR_RATE_URL || DEFAULT_EXCHANGE_RATE_API_URL
+  );
+}
+
+function parseUsdToEurRateResponse(data) {
+  const direct = Number(
+    data && (
+      data.usdToEur ||
+      data.usd_to_eur ||
+      data.conversion_rate ||
+      data.rate
+    )
+  );
+  if (Number.isFinite(direct) && direct > 0) return direct;
+
+  const rates = data && typeof data.rates === 'object' ? data.rates : {};
+  const eur = Number(rates.EUR ?? rates.eur);
+  return Number.isFinite(eur) && eur > 0 ? eur : 0;
+}
+
+function readUsdToEurRateCache(deps = {}, nowMs = Date.now()) {
+  const cache = deps.usdToEurRateCache || usdToEurRateCache;
+  if (!cache || typeof cache !== 'object') return null;
+
+  const rate = Number(cache.rate);
+  const fetchedAtMs = Number(cache.fetchedAtMs);
+  const cacheMs = getExchangeRateCacheMs(deps);
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+  if (!Number.isFinite(fetchedAtMs) || fetchedAtMs <= 0) return null;
+  if (cacheMs <= 0 || nowMs - fetchedAtMs > cacheMs) return null;
+
+  return {
+    rate,
+    source: normalizeString(cache.source) || 'live-cache',
+    fetchedAtMs,
+  };
+}
+
+function writeUsdToEurRateCache(deps = {}, value = {}) {
+  const nextCache = {
+    rate: Number(value.rate),
+    source: normalizeString(value.source) || 'live',
+    fetchedAtMs: Number(value.fetchedAtMs) || Date.now(),
+  };
+  if (deps.usdToEurRateCache && typeof deps.usdToEurRateCache === 'object') {
+    Object.assign(deps.usdToEurRateCache, nextCache);
+    return;
+  }
+  usdToEurRateCache = nextCache;
+}
+
+async function resolveUsdToEurRateDetails(deps = {}) {
+  const explicitRate = getExplicitUsdToEurRate(deps);
+  if (explicitRate > 0) {
+    return {
+      rate: explicitRate,
+      source: 'configured',
+      fetchedAtMs: null,
+    };
+  }
+
+  const nowMs = Date.now();
+  const cached = readUsdToEurRateCache(deps, nowMs);
+  if (cached) return cached;
+
+  const fetchJsonWithTimeout = deps.fetchJsonWithTimeout;
+  const exchangeRateApiUrl = resolveExchangeRateApiUrl(deps);
+  if (typeof fetchJsonWithTimeout === 'function' && exchangeRateApiUrl && exchangeRateApiUrl.toLowerCase() !== 'off') {
+    try {
+      const { response, data } = await fetchJsonWithTimeout(
+        exchangeRateApiUrl,
+        {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        },
+        5000
+      );
+      if (response && response.ok) {
+        const rate = parseUsdToEurRateResponse(data);
+        if (rate > 0) {
+          const rateDetails = { rate, source: 'live', fetchedAtMs: nowMs };
+          writeUsdToEurRateCache(deps, rateDetails);
+          return rateDetails;
+        }
+      }
+    } catch (_) {
+      // Fallback below keeps the costs endpoint available when the rate provider is temporarily unreachable.
+    }
+  }
+
+  return {
+    rate: getConfiguredUsdToEurRate(deps),
+    source: 'fallback',
+    fetchedAtMs: null,
+  };
 }
 
 function createServiceError(message, code, status = 500, detail = '') {
@@ -256,7 +371,6 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
 
   const window = buildCostWindow(options.scope, options.nowMs);
   const apiBaseUrl = resolveOpenAiApiBaseUrl(deps);
-  const usdToEurRate = getUsdToEurRate(deps);
   const currencies = {};
   let page = '';
   let bucketCount = 0;
@@ -291,7 +405,8 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
 
   const costUsd = Number((currencies.usd || 0).toFixed(8));
   const costEurDirect = Number((currencies.eur || 0).toFixed(8));
-  const costEur = Number((costEurDirect + costUsd * usdToEurRate).toFixed(2));
+  const usdToEurRateDetails = await resolveUsdToEurRateDetails(deps);
+  const costEur = Number((costEurDirect + costUsd * usdToEurRateDetails.rate).toFixed(2));
 
   return {
     scope: window.scope,
@@ -301,13 +416,15 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
     endTime: window.endTime,
     costUsd,
     costEur,
-    usdToEurRate,
+    usdToEurRate: usdToEurRateDetails.rate,
+    usdToEurRateSource: usdToEurRateDetails.source,
+    exchangeRateFetchedAtMs: usdToEurRateDetails.fetchedAtMs,
     currencies,
     organizationScoped: Boolean(resolveOpenAiOrganizationId(deps)),
     projectScoped: Boolean(resolveOpenAiProjectId(deps)),
     bucketCount,
     resultCount,
-    note: 'OpenAI Costs API; USD-bedragen worden naar EUR omgerekend met de ingestelde wisselkoers.',
+    note: 'OpenAI Costs API; USD-bedragen worden naar EUR omgerekend met een live wisselkoers wanneer er geen vaste koers is ingesteld.',
   };
 }
 
@@ -329,7 +446,6 @@ async function fetchAnthropicCostSummary(deps = {}, options = {}) {
 
   const window = buildCostWindow(options.scope, options.nowMs);
   const apiBaseUrl = resolveAnthropicApiBaseUrl(deps);
-  const usdToEurRate = getUsdToEurRate(deps);
   const currencies = {};
   let page = '';
   let bucketCount = 0;
@@ -367,7 +483,8 @@ async function fetchAnthropicCostSummary(deps = {}, options = {}) {
   }
 
   const costUsd = Number((currencies.usd || 0).toFixed(8));
-  const costEur = Number((costUsd * usdToEurRate).toFixed(2));
+  const usdToEurRateDetails = await resolveUsdToEurRateDetails(deps);
+  const costEur = Number((costUsd * usdToEurRateDetails.rate).toFixed(2));
 
   return {
     scope: window.scope,
@@ -377,7 +494,9 @@ async function fetchAnthropicCostSummary(deps = {}, options = {}) {
     endTime: window.endTime,
     costUsd,
     costEur,
-    usdToEurRate,
+    usdToEurRate: usdToEurRateDetails.rate,
+    usdToEurRateSource: usdToEurRateDetails.source,
+    exchangeRateFetchedAtMs: usdToEurRateDetails.fetchedAtMs,
     currencies,
     bucketCount,
     resultCount,
@@ -449,4 +568,6 @@ module.exports = {
   fetchAnthropicCostSummary,
   fetchCombinedApiCostSummary,
   fetchOpenAiCostSummary,
+  parseUsdToEurRateResponse,
+  resolveUsdToEurRateDetails,
 };

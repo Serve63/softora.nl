@@ -12,8 +12,10 @@
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
 
-  let refreshPromise = null;
+  let coldcallingRefreshPromise = null;
+  let apiCostRefreshPromise = null;
   let pollTimer = null;
+  let syncListenersBound = false;
 
   function normalizeString(value) {
     return String(value || '').trim();
@@ -338,12 +340,12 @@
   }
 
   async function refreshMonthlyColdcallingCosts() {
-    if (refreshPromise) return refreshPromise;
+    if (coldcallingRefreshPromise) return coldcallingRefreshPromise;
     if (!resolveColdcallingCostItem() || !getMonthlyCostsRender()) {
       return { ok: true, updated: false };
     }
 
-    refreshPromise = (async function () {
+    coldcallingRefreshPromise = (async function () {
       try {
         const summary = await fetchMonthlyCostSummary();
         const amountEur = Number(summary.costEur || 0) || 0;
@@ -354,41 +356,54 @@
           error: normalizeString(error && error.message) || 'Coldcalling-kosten konden niet geladen worden.',
         };
       } finally {
-        refreshPromise = null;
+        coldcallingRefreshPromise = null;
       }
     })();
 
-    return refreshPromise;
+    return coldcallingRefreshPromise;
   }
 
   async function refreshMonthlyApiCosts() {
+    if (apiCostRefreshPromise) return apiCostRefreshPromise;
     if (!resolveApiCostItem() || !getMonthlyCostsRender()) {
       return { ok: true, updated: false };
     }
-    try {
-      const summary = await fetchApiCostSummary();
-      const amountEur = Number(summary.costEur || 0) || 0;
-      return { ok: true, updated: applyApiCost(amountEur, buildApiCostNote(summary)), amountEur, source: 'api-costs' };
-    } catch (error) {
-      applyApiCost(0, API_COST_UNAVAILABLE_NOTE);
-      return {
-        ok: false,
-        error: normalizeString(error && error.message) || 'API-kosten konden niet geladen worden.',
-      };
-    }
+
+    apiCostRefreshPromise = (async function () {
+      try {
+        const summary = await fetchApiCostSummary();
+        const amountEur = Number(summary.costEur || 0) || 0;
+        return { ok: true, updated: applyApiCost(amountEur, buildApiCostNote(summary)), amountEur, source: 'api-costs' };
+      } catch (error) {
+        applyApiCost(0, API_COST_UNAVAILABLE_NOTE);
+        return {
+          ok: false,
+          error: normalizeString(error && error.message) || 'API-kosten konden niet geladen worden.',
+        };
+      } finally {
+        apiCostRefreshPromise = null;
+      }
+    })();
+
+    return apiCostRefreshPromise;
   }
 
   function startDynamicMonthlyCostsSync() {
-    if (!resolveColdcallingCostItem() || !getMonthlyCostsRender()) return;
+    const hasColdcallingCostItem = Boolean(resolveColdcallingCostItem());
+    const hasApiCostItem = Boolean(resolveApiCostItem());
+    if ((!hasColdcallingCostItem && !hasApiCostItem) || !getMonthlyCostsRender()) return;
 
-    void refreshMonthlyColdcallingCosts();
-    void refreshMonthlyApiCosts();
+    if (hasColdcallingCostItem) void refreshMonthlyColdcallingCosts();
+    if (hasApiCostItem) void refreshMonthlyApiCosts();
     if (!pollTimer) {
       pollTimer = window.setInterval(function () {
         void refreshMonthlyColdcallingCosts();
         void refreshMonthlyApiCosts();
       }, POLL_INTERVAL_MS);
     }
+
+    if (syncListenersBound) return;
+    syncListenersBound = true;
 
     window.addEventListener('focus', function () {
       void refreshMonthlyColdcallingCosts();
