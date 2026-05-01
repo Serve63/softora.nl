@@ -227,20 +227,35 @@ function createColdmailCampaignService(deps = {}) {
       if (!Array.isArray(parsed)) return [];
       return parsed
         .filter((row) => row && typeof row === 'object')
-        .map((row, index) => ({
-          id: normalizeString(row.id || row.leadId || '') || `lead-${index}`,
-          bedrijf: normalizeString(row.company || row.name || row.bedrijf || row.naam || '') || `Lead ${index + 1}`,
-          naam: normalizeString(row.contactPerson || row.contact || row.naam || ''),
-          phone: normalizeString(row.phone || row.phoneE164 || row.tel || row.telefoon || ''),
-          branche: normalizeString(row.branche || row.branch || ''),
-          region: normalizeString(row.region || row.regio || row.province || ''),
-          address: normalizeString(row.address || row.adres || ''),
-          website: normalizeString(row.website || ''),
-          call: row.call,
-          canCall: row.canCall,
-          doNotCall: row.doNotCall,
-          status: normalizeString(row.status || row.databaseStatus || ''),
-        }));
+        .map((row, index) => {
+          const city = getRowCity(row);
+          const address = normalizeString(row.address || row.adres || row.location || '');
+          const region = normalizeString(row.region || row.regio || row.province || row.provincie || '');
+          return {
+            id: normalizeString(row.id || row.leadId || '') || `lead-${index}`,
+            bedrijf: normalizeString(row.company || row.companyName || row.name || row.bedrijf || row.naam || '') || `Lead ${index + 1}`,
+            naam: normalizeString(row.contactPerson || row.contact || row.contactName || row.clientName || row.naam || ''),
+            phone: getRowPhone(row),
+            branche: normalizeString(row.branche || row.branch || ''),
+            region,
+            stad: city,
+            plaats: city,
+            city,
+            gemeente: normalizeString(row.gemeente || '') || city,
+            adres: address,
+            address,
+            location: normalizeString(row.location || address || city || region),
+            lat: row.lat ?? row.latitude ?? row.latitudeNumber,
+            lng: row.lng ?? row.lon ?? row.longitude ?? row.longitudeNumber,
+            distanceKm: row.distanceKm,
+            afstandKm: row.afstandKm,
+            website: normalizeString(row.website || ''),
+            call: row.call,
+            canCall: row.canCall,
+            doNotCall: row.doNotCall,
+            status: normalizeString(row.status || row.databaseStatus || ''),
+          };
+        });
     } catch (_) {
       return [];
     }

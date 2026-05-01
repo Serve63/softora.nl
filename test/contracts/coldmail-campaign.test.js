@@ -680,6 +680,52 @@ test('coldcalling recipient preview supplements sparse lead rows from chunked cu
   );
 });
 
+test('coldcalling recipient preview accepts premium database telefoonnummer and place fields', async () => {
+  const customerRows = [
+    {
+      id: 'premium-almkerk',
+      bedrijf: 'Schutte Groen & Grond',
+      telefoonnummer: '06 12 34 56 78',
+      plaats: 'Almkerk',
+      databaseStatus: 'benaderbaar',
+    },
+    {
+      id: 'premium-no-phone',
+      bedrijf: 'Alleen Website BV',
+      plaats: 'Almkerk',
+      website: 'alleenwebsite.example',
+      databaseStatus: 'benaderbaar',
+    },
+  ];
+  const { service } = createService({
+    rows: [],
+    leadRows: [],
+    customerValues: buildChunkedStatePatch(
+      'softora_customers_premium_v1',
+      JSON.stringify(customerRows),
+      80
+    ),
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    mode: 'call',
+    radiusKm: 40,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.selected, 1);
+  assert.deepEqual(result.recipients, [
+    {
+      id: 'premium-almkerk',
+      bedrijf: 'Schutte Groen & Grond',
+      email: '',
+      phone: '06 12 34 56 78',
+      distanceKm: 26.6,
+    },
+  ]);
+});
+
 test('coldcalling recipient preview skips phone numbers from the blocklist', async () => {
   const { service } = createService({
     rows: [],
