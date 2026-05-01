@@ -247,6 +247,22 @@ function formatMoneyEUR(amount) {
         forcePremiumDashboardBootShellVisible();
     }
 
+    function showPremiumDashboardBootShellForMinimum(minimumMs = 900) {
+        const doc = root && root.document ? root.document : null;
+        if (!doc?.documentElement) return;
+        const timerRoot = getDashboardTimerRoot();
+        if (premiumDashboardBootWatchdog && typeof timerRoot.clearTimeout === 'function') {
+            timerRoot.clearTimeout(premiumDashboardBootWatchdog);
+            premiumDashboardBootWatchdog = null;
+        }
+        premiumDashboardBootReleased = false;
+        premiumDashboardFirstPaintAt = getDashboardNow();
+        premiumDashboardFirstPaintPromise = Promise.resolve();
+        doc.documentElement.setAttribute('data-dashboard-boot-loading', 'true');
+        const safeMinimumMs = Math.max(450, Math.min(2500, Number(minimumMs) || 900));
+        timerRoot.setTimeout(releasePremiumDashboardBootShell, safeMinimumMs);
+    }
+
     function startPremiumDashboardBootWatchdog() {
         if (premiumDashboardBootWatchdog || premiumDashboardBootReleased) return;
         const timerRoot = getDashboardTimerRoot();
@@ -272,6 +288,11 @@ function formatMoneyEUR(amount) {
             root.addEventListener('load', startWatchdog, { once: true });
             root.addEventListener('error', releasePremiumDashboardBootShell);
             root.addEventListener('unhandledrejection', releasePremiumDashboardBootShell);
+            root.addEventListener('pageshow', function (event) {
+                if (event && event.persisted) {
+                    showPremiumDashboardBootShellForMinimum(900);
+                }
+            });
         }
     }
 
@@ -371,6 +392,7 @@ function formatMoneyEUR(amount) {
             forcePremiumDashboardBootShellVisible,
             releasePremiumDashboardBootShell,
             releasePremiumDashboardBootShellAfterMinimum,
+            showPremiumDashboardBootShellForMinimum,
             readDashboardCustomersBootstrapPayload,
             hydratePremiumDashboardCustomersFromBootstrap,
             hydratePremiumDashboardOrdersFromBootstrap,
