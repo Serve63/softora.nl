@@ -1605,7 +1605,7 @@
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
-    <script src="assets/premium-database-deep-search.js?v=20260429c"></script>
+    <script src="assets/premium-database-deep-search.js?v=20260429c"></script><script src="assets/premium-database-distance.js?v=20260501a"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
@@ -1645,7 +1645,7 @@
             orders: [],
             query: "",
             activeStatus: "alle",
-            sortKey: "manual",
+            sortKey: "distance",
             sortAsc: true,
             openId: null,
             modalEditId: null,
@@ -1919,7 +1919,7 @@
         }
 
         function sortCustomers(list) {
-            return list.slice();
+            return window.SoftoraPremiumDatabaseDistance && typeof window.SoftoraPremiumDatabaseDistance.sortCustomersByDistance === "function" ? window.SoftoraPremiumDatabaseDistance.sortCustomersByDistance(list || []) : (list || []).slice();
         }
 
         function escapeHtml(value) {
@@ -2124,7 +2124,7 @@
         }
 
         function persistCustomerList(customers) {
-            const normalizedCustomers = customers.filter(function (item) {
+            const normalizedCustomers = sortCustomers(customers).filter(function (item) {
                 return !isDerivedOrderPlaceholderCustomer(item);
             }).map(function (item, index) {
                 const normalized = normalizeCustomer(item, "persist-" + index);
@@ -2264,30 +2264,7 @@
         }
 
         function getSortedCustomers(customers) {
-            const sorted = customers.slice();
-            if (state.sortKey === "manual") return sorted;
-            sorted.sort(function (a, b) {
-                let left;
-                let right;
-
-                if (state.sortKey === "updatedAt") {
-                    left = Number(a.updatedMs || parseDateValue(a.updatedAt));
-                    right = Number(b.updatedMs || parseDateValue(b.updatedAt));
-                } else {
-                    left = normalizeSearchValue(a[state.sortKey]);
-                    right = normalizeSearchValue(b[state.sortKey]);
-                }
-
-                if (left === right) {
-                    left = normalizeSearchValue(a.bedrijf);
-                    right = normalizeSearchValue(b.bedrijf);
-                }
-
-                if (left < right) return state.sortAsc ? -1 : 1;
-                if (left > right) return state.sortAsc ? 1 : -1;
-                return 0;
-            });
-            return sorted;
+            return sortCustomers(customers);
         }
 
         function getStatusLabel(status) {
@@ -2433,12 +2410,8 @@
         }
 
         function sort(key) {
-            if (state.sortKey === key) {
-                state.sortAsc = !state.sortAsc;
-            } else {
-                state.sortKey = key;
-                state.sortAsc = key !== "updatedAt";
-            }
+            state.sortKey = "distance";
+            state.sortAsc = true;
             renderPage();
         }
 
@@ -2966,7 +2939,7 @@
                 return Promise.resolve(false);
             }
 
-            state.klanten = mergeResult.customers;
+            state.klanten = sortCustomers(mergeResult.customers);
             renderPage();
 
             return persistCustomerList(state.klanten).then(function (result) {
@@ -3033,7 +3006,7 @@
                 updatedAt: formatDateForStorage(new Date())
             });
 
-            state.klanten = state.klanten.concat([customer]);
+            state.klanten = sortCustomers(state.klanten.concat([customer]));
             renderPage();
             closeModal();
 
@@ -3179,7 +3152,7 @@
 
         const initialBootstrapCustomers = resolveBootstrapCustomers();
         if (initialBootstrapCustomers.length) {
-            state.klanten = initialBootstrapCustomers;
+            state.klanten = sortCustomers(initialBootstrapCustomers);
         }
         renderPage();
 
