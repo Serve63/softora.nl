@@ -165,7 +165,8 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /const API_COST_SUMMARY_ENDPOINT = '\/api\/api-cost-summary\?scope=month';/);
   assert.match(scriptSource, /async function fetchMonthlyCostSummary\(\)/);
   assert.match(scriptSource, /async function fetchApiCostSummary\(\)/);
-  assert.match(scriptSource, /function applyColdcallingCost\(amountEur\)/);
+  assert.match(scriptSource, /function applyColdcallingCost\(amountEur, note\)/);
+  assert.match(scriptSource, /function buildColdcallingCostNote\(summary\)/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'coldcalling'/);
   assert.match(scriptSource, /const summary = await fetchMonthlyCostSummary\(\);/);
   assert.match(scriptSource, /const amountEur = Number\(summary\.costEur \|\| 0\) \|\| 0;/);

@@ -405,6 +405,26 @@ test('call provider helpers extract stable retell and twilio call updates', () =
   assert.equal(retellFloatCostUpdate.costUsdMilli, 498);
   assert.equal(retellFloatCostUpdate.costUsd, 0.498);
 
+  const retellOfficialCostUpdate = helpers.extractCallUpdateFromRetellPayload({
+    event: 'call_ended',
+    call: {
+      call_id: 'call_official_cost_units',
+      call_status: 'ended',
+      duration_ms: 60000,
+      start_timestamp: 1_700_000_000,
+      end_timestamp: 1_700_000_060,
+      call_cost: {
+        total_duration_seconds: 60,
+        total_duration_unit_price: 1,
+        product_costs: [{ product: 'elevenlabs_tts', cost: 60 }],
+        combined_cost: 70,
+      },
+    },
+  });
+
+  assert.equal(retellOfficialCostUpdate.costUsdMilli, 70);
+  assert.equal(retellOfficialCostUpdate.costUsd, 0.07);
+
   const retellCentsCostUpdate = helpers.extractCallUpdateFromRetellPayload({
     event: 'call_ended',
     call: {

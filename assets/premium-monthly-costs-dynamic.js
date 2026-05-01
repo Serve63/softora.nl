@@ -6,7 +6,8 @@
   const API_COST_SCOPE = 'premium_api_costs';
   const API_COST_KEY = 'softora_api_cost_events_v1';
   const POLL_INTERVAL_MS = 15000;
-  const COLDCALLING_ESTIMATE_NOTE = 'Geschatte maandkosten, Retell kan hoger uitvallen';
+  const COLDCALLING_COST_NOTE = 'Retell AI kosten deze maand';
+  const COLDCALLING_PARTIAL_NOTE = 'Retell AI deels exact, deels geschat';
   const API_COST_NOTE = 'OpenAI factuurkosten deze maand';
   const API_COST_UNAVAILABLE_NOTE = 'API factuurkoppeling ontbreekt';
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
@@ -246,13 +247,13 @@
     );
   }
 
-  function applyColdcallingCost(amountEur) {
+  function applyColdcallingCost(amountEur, note) {
     const item = resolveColdcallingCostItem();
     const render = getMonthlyCostsRender();
     if (!item || !render) return false;
 
     const nextAmount = Math.max(0, Math.round((Number(amountEur) || 0) * 100) / 100);
-    const nextNote = COLDCALLING_ESTIMATE_NOTE;
+    const nextNote = normalizeString(note) || COLDCALLING_COST_NOTE;
     const amountChanged = Number(item.bedrag || 0) !== nextAmount;
     const noteChanged = normalizeString(item.note) !== nextNote;
     if (!amountChanged && !noteChanged) return false;
@@ -261,6 +262,13 @@
     item.note = nextNote;
     render();
     return true;
+  }
+
+  function buildColdcallingCostNote(summary) {
+    const estimatedCostCount = Number(summary && summary.estimatedCostCount);
+    return Number.isFinite(estimatedCostCount) && estimatedCostCount > 0
+      ? COLDCALLING_PARTIAL_NOTE
+      : COLDCALLING_COST_NOTE;
   }
 
   function applyApiCost(amountEur, note) {
@@ -349,7 +357,7 @@
       try {
         const summary = await fetchMonthlyCostSummary();
         const amountEur = Number(summary.costEur || 0) || 0;
-        return { ok: true, updated: applyColdcallingCost(amountEur), amountEur };
+        return { ok: true, updated: applyColdcallingCost(amountEur, buildColdcallingCostNote(summary)), amountEur };
       } catch (error) {
         return {
           ok: false,

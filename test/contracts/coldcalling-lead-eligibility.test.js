@@ -6,7 +6,11 @@ const {
   normalizeDatabaseContactStatus,
   parseCustomerDatabaseRowsFromUiState,
 } = require('../../server/services/coldcalling-lead-eligibility');
-const { registerColdcallingRoutes } = require('../../server/routes/coldcalling');
+const { buildRetellCostSummary, registerColdcallingRoutes } = require('../../server/routes/coldcalling');
+
+function normalizeString(value) {
+  return String(value || '').trim();
+}
 
 function createRouteHarness(deps) {
   let startHandler = null;
@@ -112,6 +116,82 @@ test('coldcalling lead eligibility parses premium database rows from ui state', 
   assert.equal(rows.length, 2);
   assert.equal(rows[0].bedrijf, 'A');
   assert.equal(rows[1].bedrijf, 'B');
+});
+
+test('coldcalling cost summary gebruikt Retell call_cost en schat alleen ontbrekende kosten', async () => {
+  const listCallsOptions = [];
+  const summary = await buildRetellCostSummary(
+    {
+      env: {},
+      usdToEurRate: 0.9,
+      normalizeString,
+      listRetellCalls: async (options) => {
+        listCallsOptions.push(options);
+        return {
+          data: {
+            items: [
+              {
+                call_id: 'call-exact',
+                call_type: 'phone_call',
+                direction: 'outbound',
+                call_status: 'ended',
+                start_timestamp: Date.UTC(2026, 4, 3, 10, 0, 0),
+                duration_ms: 60_000,
+                metadata: { source: 'softora-coldcalling-dashboard' },
+                call_cost: {
+                  total_duration_seconds: 60,
+                  total_duration_unit_price: 1,
+                  product_costs: [{ product: 'elevenlabs_tts', cost: 60 }],
+                  combined_cost: 70,
+                },
+              },
+              {
+                call_id: 'call-estimated',
+                call_type: 'phone_call',
+                direction: 'outbound',
+                call_status: 'ended',
+                start_timestamp: Date.UTC(2026, 4, 4, 10, 0, 0),
+                duration_ms: 120_000,
+                metadata: { source: 'softora-coldcalling-dashboard' },
+              },
+              {
+                call_id: 'call-older',
+                call_type: 'phone_call',
+                direction: 'outbound',
+                call_status: 'ended',
+                start_timestamp: Date.UTC(2026, 3, 28, 10, 0, 0),
+                duration_ms: 60_000,
+                metadata: { source: 'softora-coldcalling-dashboard' },
+                call_cost: { combined_cost: 500 },
+              },
+            ],
+            has_more: false,
+          },
+        };
+      },
+      resolveRetellCallCostFields: (call) => {
+        const combinedCost = Number(call?.call_cost?.combined_cost);
+        const hasOfficialShape = Array.isArray(call?.call_cost?.product_costs);
+        if (!Number.isFinite(combinedCost)) {
+          return { costUsd: null, costUsdMilli: null };
+        }
+        const costUsdMilli = hasOfficialShape ? Math.round(combinedCost) : Math.round(combinedCost);
+        return { costUsd: costUsdMilli / 1000, costUsdMilli };
+      },
+    },
+    'month',
+    { force: true, nowMs: Date.UTC(2026, 4, 15, 12, 0, 0), apiVersion: 'v3' }
+  );
+
+  assert.equal(listCallsOptions[0].apiVersion, 'v3');
+  assert.equal(summary.source, 'retell');
+  assert.equal(summary.exact, false);
+  assert.equal(summary.callCount, 2);
+  assert.equal(summary.exactCostCount, 1);
+  assert.equal(summary.estimatedCostCount, 1);
+  assert.equal(summary.costUsd, 0.21);
+  assert.equal(summary.costEur, 0.19);
+  assert.equal(summary.retellListApiVersion, 'v3');
 });
 
 test('coldcalling start skips database-blocked leads before provider dispatch', async () => {

@@ -387,8 +387,13 @@ function createCallProviderHelpers(options = {}) {
     const sortOrder = normalizeString(options?.sortOrder || 'descending').toLowerCase() || 'descending';
     const limit = Math.max(1, Math.min(1000, parseIntSafe(options?.limit, 50) || 50));
     const paginationKey = normalizeString(options?.paginationKey || '');
+    const apiVersion = normalizeString(
+      options?.apiVersion || env.RETELL_LIST_CALLS_API_VERSION || 'v2'
+    ).toLowerCase() === 'v3'
+      ? 'v3'
+      : 'v2';
 
-    const endpoint = '/v2/list-calls';
+    const endpoint = `/${apiVersion}/list-calls`;
     const requestBody = {
       filter_criteria: filterCriteria,
       sort_order: sortOrder === 'ascending' ? 'ascending' : 'descending',
@@ -453,7 +458,7 @@ function createCallProviderHelpers(options = {}) {
     });
   }
 
-  function normalizeRetellCostToUsdMilli(rawValue) {
+  function normalizeRetellOfficialCostToUsdMilli(rawValue, costContext = {}) {
     if (rawValue === '' || rawValue === null || rawValue === undefined) return null;
 
     const numericValue = parseNumberSafe(rawValue, null);
@@ -465,15 +470,41 @@ function createCallProviderHelpers(options = {}) {
       return Math.max(0, Math.round(numericValue * 1000));
     }
 
-    if (numericValue >= 100) {
+    const hasOfficialCostShape =
+      costContext &&
+      typeof costContext === 'object' &&
+      (
+        Array.isArray(costContext.product_costs) ||
+        Number.isFinite(Number(costContext.total_duration_seconds)) ||
+        Number.isFinite(Number(costContext.total_duration_unit_price)) ||
+        Number.isFinite(Number(costContext.total_one_time_price))
+      );
+
+    if (Number.isInteger(numericValue) || hasOfficialCostShape) {
       return Math.max(0, Math.round(numericValue));
     }
 
     return Math.max(0, Math.round(numericValue * 10));
   }
 
+  function normalizeRetellLegacyCostToUsdMilli(rawValue) {
+    if (rawValue === '' || rawValue === null || rawValue === undefined) return null;
+
+    const numericValue = parseNumberSafe(rawValue, null);
+    if (!Number.isFinite(numericValue) || numericValue < 0) return null;
+
+    if (numericValue === 0) return 0;
+    if (numericValue < 1) return Math.max(0, Math.round(numericValue * 1000));
+    if (numericValue >= 100) return Math.max(0, Math.round(numericValue));
+    return Math.max(0, Math.round(numericValue * 10));
+  }
+
   function resolveRetellCallCostFields(call) {
-    const combinedCostMilli = normalizeRetellCostToUsdMilli(call?.call_cost?.combined_cost);
+    const callCost = call?.call_cost && typeof call.call_cost === 'object' ? call.call_cost : {};
+    const combinedCostMilli = normalizeRetellOfficialCostToUsdMilli(
+      callCost?.combined_cost,
+      callCost
+    );
     if (Number.isFinite(combinedCostMilli)) {
       return {
         costUsdMilli: combinedCostMilli,
@@ -481,7 +512,30 @@ function createCallProviderHelpers(options = {}) {
       };
     }
 
-    const directCostMilli = normalizeRetellCostToUsdMilli(call?.cost_usd ?? call?.cost);
+    const productCosts = Array.isArray(callCost?.product_costs) ? callCost.product_costs : [];
+    if (productCosts.length > 0) {
+      const productCostMilli = productCosts.reduce((sum, product) => {
+        const costMilli = normalizeRetellOfficialCostToUsdMilli(product?.cost, callCost);
+        return sum + (Number.isFinite(costMilli) ? costMilli : 0);
+      }, 0);
+      if (productCostMilli >= 0) {
+        return {
+          costUsdMilli: productCostMilli,
+          costUsd: productCostMilli / 1000,
+        };
+      }
+    }
+
+    const directCostUsd = parseNumberSafe(call?.cost_usd, null);
+    if (Number.isFinite(directCostUsd) && directCostUsd >= 0) {
+      const directUsdMilli = Math.max(0, Math.round(directCostUsd * 1000));
+      return {
+        costUsdMilli: directUsdMilli,
+        costUsd: directUsdMilli / 1000,
+      };
+    }
+
+    const directCostMilli = normalizeRetellLegacyCostToUsdMilli(call?.cost);
     if (Number.isFinite(directCostMilli)) {
       return {
         costUsdMilli: directCostMilli,

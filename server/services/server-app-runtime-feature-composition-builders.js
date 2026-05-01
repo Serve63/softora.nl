@@ -138,6 +138,10 @@ function buildServerAppFeatureWiringRuntimeContext({
         runtimeStateSupabaseSyncCooldownMs:
           bootstrapState.RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS,
         openAiModel: envConfig.OPENAI_MODEL,
+        env,
+        fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
+        usdToEurRate: Number(env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR || 0),
+        retellCostSummaryApiVersion: env.RETELL_COST_SUMMARY_API_VERSION || 'v3',
         callUpdatesById: runtimeMemory.callUpdatesById,
         recentCallUpdates: runtimeMemory.recentCallUpdates,
         recentWebhookEvents: runtimeMemory.recentWebhookEvents,
