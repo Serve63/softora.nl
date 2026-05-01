@@ -169,6 +169,18 @@ test('canonical premium pages opt into the shared sidebar shell', () => {
   }
 });
 
+test('premium dashboard keeps its first-paint boot overlay in the shell contract', () => {
+  const pageSource = readRepoFile('premium-personeel-dashboard.html');
+  const coreSource = readRepoFile('assets/premium-dashboard-core.js');
+
+  assert.match(pageSource, /setAttribute\("data-dashboard-boot-loading", "true"\)/);
+  assert.match(pageSource, /html\[data-dashboard-boot-loading="true"\] body::before/);
+  assert.match(pageSource, /softora-dashboard-boot-spin/);
+  assert.match(pageSource, /data-dashboard-boot-loader="true"/);
+  assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 1200\);/);
+  assert.match(coreSource, /removeAttribute\('data-dashboard-boot-loading'\)/);
+});
+
 test('custom premium layouts stay outside the shared sidebar shell', () => {
   for (const relativePath of customLayoutPages) {
     const pageSource = readRepoFile(relativePath);
