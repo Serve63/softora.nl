@@ -21,7 +21,7 @@ function readActiveOrdersSources() {
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260501a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260501a"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260501a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260501b"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -126,8 +126,18 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /const confirmed = await confirmActiveOrderAction\(invoicePaidReviewReminder,[\s\S]*Factuur betaald bevestigen/);
   assert.match(
     source,
-    /Vergeet niet om de klant op een vriendelijk en natuurlijk moment te vragen[\s\S]*bodyHtml:\s*invoicePaidConfirmBodyHtml/
+    /Vergeet niet om de klant op een goed moment te vragen om een revieuw achter te laten![\s\S]*bodyHtml:\s*invoicePaidConfirmBodyHtml/
   );
+  assert.match(source, /reviewBadgeGoogleUrl = 'https:\/\/www\.google\.com\/search\?q=Softora\.nl\+Google\+Reviews'/);
+  assert.match(source, /reviewBadgeTrustpilotUrl = 'https:\/\/www\.trustpilot\.com\/review\/softora\.nl'/);
+  assert.match(source, /softora-dialog-badge-row--reviews/);
+  assert.match(source, /aria-label="Google Reviews openen"/);
+  assert.match(source, /aria-label="Trustpilot openen"/);
+  assert.match(source, /width="184" height="46"/);
+  assert.match(source, /REVIEWPROFIEL/);
+  assert.match(source, /REVIEWS/);
+  assert.doesNotMatch(source, /reviewBadgeGoogleUrl = 'https:\/\/www\.google\.com\/maps'/);
+  assert.doesNotMatch(source, /reviewBadgeTrustpilotUrl = 'https:\/\/www\.trustpilot\.com'/);
   assert.match(source, /await persistRequiredUiStateKeysOrThrow\(\s*\[CUSTOM_ORDERS_KEY, ORDER_RUNTIME_KEY\],/);
   assert.match(source, /const completeBtn = card\.querySelector\('\.complete-btn\[data-order-complete\]'\);[\s\S]*void handleOrderPaymentAction\(id\);/);
   assert.match(source, /window\.addEventListener\('pagehide', \(\) => \{[\s\S]*void flushRemoteUiStateSave\(\);/);
