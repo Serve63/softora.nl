@@ -1216,11 +1216,8 @@ loadWebsiteGeneratorAuthState();
   const htmlInput = document.getElementById('html-code');
   const websiteLinkCreateEl = document.getElementById('website-link-create-btn');
   const websiteLinkStatusEl = document.getElementById('website-link-status');
-  const websiteLinkCopyEl = document.getElementById('website-link-copy');
   const websiteLinkListEl = document.getElementById('website-link-list');
-  if (!urlInput || !htmlInput || !websiteLinkCreateEl || !websiteLinkStatusEl || !websiteLinkCopyEl || !websiteLinkListEl) { return; }
-
-  let latestWebsiteLinkUrl = '';
+  if (!urlInput || !htmlInput || !websiteLinkCreateEl || !websiteLinkStatusEl || !websiteLinkListEl) { return; }
 
   function setWebsiteLinkStatus(message, isError = false) {
     websiteLinkStatusEl.textContent = String(message || '');
@@ -1320,16 +1317,6 @@ loadWebsiteGeneratorAuthState();
     }
   }
 
-  websiteLinkCopyEl.addEventListener('click', async function () {
-    if (!latestWebsiteLinkUrl) return;
-    try {
-      await navigator.clipboard.writeText(latestWebsiteLinkUrl);
-      showToast('Websitelink gekopieerd');
-    } catch (_) {
-      showToast('Kopieren mislukt');
-    }
-  });
-
   websiteLinkCreateEl.addEventListener('click', async function () {
     const openedTab = window.open('about:blank', '_blank');
     if (openedTab) {
@@ -1356,8 +1343,6 @@ loadWebsiteGeneratorAuthState();
     }
 
     websiteLinkCreateEl.disabled = true;
-    websiteLinkCopyEl.hidden = true;
-    latestWebsiteLinkUrl = '';
     setWebsiteLinkStatus('Websitelink wordt aangemaakt...');
 
     try {
@@ -1377,14 +1362,13 @@ loadWebsiteGeneratorAuthState();
       if (!response.ok || !payload || payload.ok === false) {
         throw new Error(String(payload?.detail || payload?.error || 'Websitelink aanmaken mislukt'));
       }
-      latestWebsiteLinkUrl = String(payload.url || '').trim();
-      websiteLinkCopyEl.hidden = !latestWebsiteLinkUrl;
-      setWebsiteLinkStatus(latestWebsiteLinkUrl || 'Websitelink aangemaakt.');
-      if (latestWebsiteLinkUrl) {
+      const websiteLinkUrl = String(payload.url || '').trim();
+      setWebsiteLinkStatus(websiteLinkUrl || 'Websitelink aangemaakt.');
+      if (websiteLinkUrl) {
         if (openedTab && !openedTab.closed) {
-          openedTab.location.href = latestWebsiteLinkUrl;
+          openedTab.location.href = websiteLinkUrl;
         } else {
-          window.open(latestWebsiteLinkUrl, '_blank', 'noopener');
+          window.open(websiteLinkUrl, '_blank', 'noopener');
         }
       }
       await loadWebsiteLinks();
