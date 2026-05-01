@@ -36,7 +36,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        html[data-dashboard-boot-loading="true"] body::before{content:"";position:fixed;inset:0 0 0 var(--premium-sidebar-width,280px);background:var(--bg-primary,#f8f7f4);z-index:15000;pointer-events:none;}html[data-dashboard-boot-loading="true"] body::after{content:"";position:fixed;left:calc(var(--premium-sidebar-width,280px) + (100vw - var(--premium-sidebar-width,280px))/2 - 29px);top:calc(50vh - 29px);width:58px;height:58px;border-radius:50%;border:2px solid rgba(139,34,82,.12);border-top-color:var(--accent,#8b2252);animation:softora-dashboard-boot-spin 1.15s linear infinite;z-index:15001;pointer-events:none;}@keyframes softora-dashboard-boot-spin{to{transform:rotate(360deg);}}@media(max-width:900px){html[data-dashboard-boot-loading="true"] body::before{inset:0;}html[data-dashboard-boot-loading="true"] body::after{left:calc(50vw - 29px);}}
+        html[data-dashboard-boot-loading="true"] body::before{content:"";position:fixed;inset:0 0 0 var(--premium-sidebar-width,280px);background:var(--bg-primary,#f8f7f4);z-index:15000;pointer-events:none;}html[data-dashboard-boot-loading="true"] body::after{content:"";position:fixed;left:calc(var(--premium-sidebar-width,280px) + (100vw - var(--premium-sidebar-width,280px))/2 - 29px);top:calc(50vh - 29px);width:58px;height:58px;border-radius:50%;border:2px solid rgba(139,34,82,.12);border-top-color:var(--accent,#8b2252);animation:softora-dashboard-boot-spin 1.15s linear infinite;z-index:15001;pointer-events:none;}#dashboardHardBootLoader{position:fixed;inset:0 0 0 var(--premium-sidebar-width,280px);display:flex;align-items:center;justify-content:center;background:var(--bg-primary,#f8f7f4);z-index:20000;pointer-events:none;transition:opacity .18s ease,visibility .18s ease;}html:not([data-dashboard-boot-loading="true"]) #dashboardHardBootLoader{opacity:0;visibility:hidden;}.dashboard-hard-boot-spinner{width:64px;height:64px;border-radius:50%;border:2px solid rgba(139,34,82,.12);border-top-color:var(--accent,#8b2252);filter:drop-shadow(0 14px 28px rgba(139,34,82,.18));animation:softora-dashboard-boot-spin 1.15s linear infinite;}@keyframes softora-dashboard-boot-spin{to{transform:rotate(360deg);}}@media(max-width:900px){html[data-dashboard-boot-loading="true"] body::before{inset:0;}html[data-dashboard-boot-loading="true"] body::after{left:calc(50vw - 29px);}#dashboardHardBootLoader{inset:0;}}
 
         :root {
             --bg-primary: #080808;
@@ -1835,7 +1835,7 @@
     </style>
 </head>
 <body>
-
+    <div id="dashboardHardBootLoader" data-dashboard-hard-boot-loader="true" aria-hidden="false"><div class="dashboard-hard-boot-spinner" aria-hidden="true"></div></div>
     <div class="noise-overlay"></div>
     <div class="cursor"></div>
     <div class="cursor-dot"></div>
@@ -2142,7 +2142,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260501e"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260501f"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
