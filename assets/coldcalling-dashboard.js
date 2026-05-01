@@ -186,6 +186,7 @@
     typeof conversationSummaryHelpers.createSharedCallSummaryAccessors === 'function'
       ? conversationSummaryHelpers.createSharedCallSummaryAccessors(sharedCallSummaryCacheByCallId)
       : null;
+  const campaignRecipientPreviewController = window.SoftoraColdcallingCampaignRecipientPreview.createCampaignRecipientPreviewController({ byId, getSelectedText, getBlockedPhoneKeys: getDoNotCallPhoneKeys, resolveRadiusKm: resolveCampaignRegioRadiusKmForLeadCount, fetchWithTimeout, normalizeFreeText, paint: paintRegioLeadCountOnCustomSelectValue });
 
   function readSharedCallSummaryCache() {
     return sharedCallSummaryCacheByCallId;
@@ -795,7 +796,6 @@
     }
 
     leadSlider.addEventListener('input', () => {
-      // De pagina-script verwijdert customValue al op slider beweging; wij persistten daarna de nieuwe state.
       persistCampaignAmountState();
     });
     leadSlider.addEventListener('change', persistCampaignAmountState);
@@ -1489,6 +1489,7 @@
     remoteUiStatePendingPatch = Object.create(null);
     remoteUiStateLastSource = '';
     remoteUiStateLastError = '';
+    campaignRecipientPreviewController.reset();
   }
 
   const FIXED_TOPBAR_TITLE = 'Coldcalling';
@@ -1811,7 +1812,6 @@
     return {
       company,
       phone,
-      // Keep legacy saved rows from showing prefilled region values when no lead data exists.
       region: company || phone ? region : '',
       contactPerson,
       branche,
@@ -2737,7 +2737,6 @@
 
     rows.forEach((row, idx) => {
       const rowNo = idx + 1;
-      // Treat rows without company/phone as empty so prefilled region values don't become "input".
       const hasAnyData = Boolean(row.company || row.phone);
       if (!hasAnyData) {
         return;
@@ -2859,20 +2858,21 @@
     const radiusKm = resolveCampaignRegioRadiusKmForLeadCount(regioSel);
     const leads = getDialableLeadsForRegioCount();
     const count = countDialableLeadsWithinCampaignRegioRadius(leads, radiusKm);
-    const n = Math.max(0, Math.floor(Number(count) || 0));
+    const preview = campaignRecipientPreviewController.getDisplayCount(count, leads.length);
+    const n = preview.count;
     const safeLabel = escapeHtml(baseLabel);
-    const safeCount = String(n);
+    const safeCount = preview.loading ? '...' : String(n);
     const buildingSvg =
       '<svg class="site-select-regio-count-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V8l8-4 8 4v13"></path><path d="M4 21h16"></path><path d="M9 21v-4h6v4"></path><path d="M9 11h.01M12 11h.01M15 11h.01M9 15h.01M12 15h.01M15 15h.01"></path></svg>';
     valueEl.innerHTML = safeLabel;
     const countHost = byId('campaignRegioLeadCount');
     if (countHost) {
       countHost.innerHTML = `<span class="site-select-regio-count">${buildingSvg}<span class="site-select-regio-count-num">${safeCount}</span></span>`;
-      countHost.setAttribute('aria-label', `${n} bedrijven in dit gebied`);
+      countHost.setAttribute('aria-label', preview.loading ? 'Bedrijven laden' : `${n} bedrijven in dit gebied`);
     }
     const trigger = valueEl.closest('.site-select-trigger');
     if (trigger) {
-      trigger.setAttribute('aria-label', `Regio: ${baseLabel}, ${n} bedrijven`);
+      trigger.setAttribute('aria-label', preview.loading ? `Regio: ${baseLabel}, bedrijven laden` : `Regio: ${baseLabel}, ${n} bedrijven`);
     }
   }
 
@@ -2887,6 +2887,7 @@
       paintRegioLeadCountOnCustomSelectValue();
     };
     regioSel.addEventListener('change', () => {
+      campaignRecipientPreviewController.schedule({ force: true });
       window.setTimeout(() => paintRegioLeadCountOnCustomSelectValue(), 0);
     });
   }
@@ -2916,6 +2917,7 @@
         }
       }
     }
+    campaignRecipientPreviewController.schedule();
     paintRegioLeadCountOnCustomSelectValue();
   }
 
@@ -7530,7 +7532,6 @@
     }
   }
 
-  // Overschrijf bestaande demo-functie uit de pagina: eerst pin-bevestiging, daarna backend-start.
   window.toggleCampaign = function toggleCampaignColdcalling() {
     openStartCampaignConfirmModal();
   };
@@ -7555,7 +7556,6 @@
           'error',
           remoteUiStateLastError || 'Dashboardconfiguratie kon niet uit Supabase geladen worden.'
         );
-        // Automatisch opnieuw proberen na 5 seconden
         window.setTimeout(async () => {
           remoteUiStateLoaded = false;
           const retried = await loadRemoteUiState();
