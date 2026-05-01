@@ -859,7 +859,6 @@
         function close() {
             if (!nodes.deepSearchModal) return;
             if (busy) {
-                setStatusMessage("Batch loopt nog. De bedrijvenlijst blijft open tot deze plek klaar is.", "info");
                 return false;
             }
             nodes.deepSearchModal.classList.remove("on");
