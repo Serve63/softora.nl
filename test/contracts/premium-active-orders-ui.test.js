@@ -21,7 +21,7 @@ function readActiveOrdersSources() {
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260501a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260501b"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260501a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260501c"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -76,7 +76,6 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /function appendClaimOrderSummaryRow\(fragment, label, value\) \{/);
   assert.match(scriptSource, /function executeOrder\(id\) \{/);
   assert.match(scriptSource, /function formatModalDateTime\(value\) \{/);
-  assert.match(scriptSource, /function normalizeModalLinkUrl\(value\) \{/);
   assert.match(scriptSource, /function renderModalOverview\(container, id\) \{/);
   assert.match(scriptSource, /function openModal\(id\) \{/);
   assert.match(scriptSource, /function closeModal\(\) \{/);
@@ -110,8 +109,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /renderClaimOrderSummary\(summaryEl, activeId\);/);
   assert.doesNotMatch(source, /summaryEl\.innerHTML = renderClaimOrderSummary/);
   assert.match(source, /renderModalOverview\(overview, id\);/);
-  assert.match(source, /container\.replaceChildren\(grid\);/);
-  assert.match(source, /return url\.protocol === 'http:' \|\| url\.protocol === 'https:' \? url\.href : '';/);
+  assert.match(source, /function renderModalOverview\(container, id\) \{[\s\S]*container\.replaceChildren\(\);[\s\S]*container\.hidden = true;/);
+  assert.doesNotMatch(scriptSource, /Foto-bijlagen preview|Geen foto-bijlagen gekoppeld\.|AI bouwprompt|Omschrijving opdracht|Meeting notities|Domeinmelding|Laatste build run/);
   assert.match(source, /select\.replaceChildren\(\.\.\.options\);/);
   assert.match(source, /document\.getElementById\('modalBtn'\)\?\.addEventListener\('click', handleModalPrimaryAction\);/);
   assert.match(source, /document\.getElementById\('modalDeleteBtn'\)\?\.addEventListener\('click', handleModalDeleteAction\);/);

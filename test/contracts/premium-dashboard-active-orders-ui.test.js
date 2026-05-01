@@ -21,10 +21,14 @@ test('premium dashboard leest actieve opdrachten uit chunked Supabase state', ()
   );
   assert.match(pageSource, /const amount = Math\.round\(Number\(item\?\.amount\)\);/);
   assert.match(pageSource, /if \(!Number\.isFinite\(amount\) \|\| amount <= 0\) return null;/);
+  assert.match(pageSource, /companyName: String\(item\?\.companyName \|\| ''\)\.trim\(\),/);
+  assert.match(pageSource, /contactName: String\(item\?\.contactName \|\| ''\)\.trim\(\),/);
   assert.match(
     pageSource,
     /const activeOrders = orders\.filter\(\(order\) => !order\?\.ui\?\.isBuilt\);/
   );
+  assert.match(pageSource, /typeof dashboardCore\.getCustomerRevenueDate === 'function'/);
+  assert.match(pageSource, /dashboardCore\.getCustomerRevenueDate\(customer, paidOrders, now\)/);
   assert.match(pageSource, /data-kpi-active-website/);
   assert.match(pageSource, /Website opdrachten: \$\{website\}, bedrijfssoftware: \$\{business\}, voicesoftware: \$\{voice\}, chatbots: \$\{chatbot\}/);
   assert.doesNotMatch(pageSource, /data-kpi-active-total/);

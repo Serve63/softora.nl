@@ -29,7 +29,78 @@ function normalizeDashboardTime(value, fallback) {
 
 function normalizeDashboardDate(value) {
         const raw = normalizeDashboardString(value);
-        return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
+        const match = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
+        return match ? match[1] : '';
+    }
+
+function getExplicitRevenueDate(value) {
+        const raw = normalizeDashboardString(value);
+        if (!raw) return null;
+        const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+            ? new Date(raw + 'T12:00:00')
+            : new Date(raw);
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+function getEffectiveRevenueDate(value, nowDate = new Date()) {
+        const explicitDate = getExplicitRevenueDate(value);
+        if (explicitDate) return explicitDate;
+        const nowValue = nowDate instanceof Date && !Number.isNaN(nowDate.getTime()) ? nowDate : new Date();
+        return new Date(nowValue.getFullYear(), nowValue.getMonth(), 1, 12, 0, 0);
+    }
+
+function normalizeDashboardIdentityValue(value) {
+        return normalizeDashboardString(value)
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+    }
+
+function getDashboardIdentityTokens(...values) {
+        const tokens = new Set();
+        values.forEach((value) => {
+            const normalized = normalizeDashboardIdentityValue(value);
+            if (!normalized || normalized === '-' || normalized === 'onbekend') return;
+            if (normalized.length >= 3) tokens.add(normalized);
+            normalized.split(/\s+/).forEach((part) => {
+                if (part.length >= 4) tokens.add(part);
+            });
+        });
+        return Array.from(tokens);
+    }
+
+function findPaidDashboardOrderForCustomer(customer, paidOrders) {
+        const customerTokens = getDashboardIdentityTokens(customer?.naam, customer?.bedrijf, customer?.telefoon);
+        if (!customerTokens.length) return null;
+
+        return (Array.isArray(paidOrders) ? paidOrders : []).find((order) => {
+            const orderTokens = getDashboardIdentityTokens(
+                order?.clientName,
+                order?.location,
+                order?.companyName,
+                order?.contactName,
+                order?.contactPhone
+            );
+            if (!orderTokens.length) return false;
+            return customerTokens.some((customerToken) =>
+                orderTokens.some((orderToken) =>
+                    customerToken === orderToken ||
+                    customerToken.includes(orderToken) ||
+                    orderToken.includes(customerToken)
+                )
+            );
+        }) || null;
+    }
+
+function getCustomerRevenueDate(customer, paidOrders, nowDate = new Date()) {
+        const explicitCustomerDate = getExplicitRevenueDate(customer?.datum);
+        if (explicitCustomerDate) return explicitCustomerDate;
+
+        const matchedPaidOrder = findPaidDashboardOrderForCustomer(customer, paidOrders);
+        const matchedPaidDate = getExplicitRevenueDate(matchedPaidOrder?.ui?.paidAt || matchedPaidOrder?.paidAt);
+        return matchedPaidDate || getEffectiveRevenueDate(customer?.datum, nowDate);
     }
 
 function getPremiumDashboardChunkMetaKey(baseKey) {
@@ -235,6 +306,12 @@ function formatMoneyEUR(amount) {
         normalizeDashboardString,
         normalizeDashboardTime,
         normalizeDashboardDate,
+        getExplicitRevenueDate,
+        getEffectiveRevenueDate,
+        normalizeDashboardIdentityValue,
+        getDashboardIdentityTokens,
+        findPaidDashboardOrderForCustomer,
+        getCustomerRevenueDate,
         getPremiumDashboardChunkMetaKey,
         getPremiumDashboardChunkPrefix,
 	        readPremiumDashboardChunkedStateValue,

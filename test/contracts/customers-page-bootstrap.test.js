@@ -22,7 +22,7 @@ test('customers page bootstrap prefers stored customer database rows', async () 
               bedrag: 300,
               status: 'Betaald',
               actief: 'Nee',
-              datum: '2026-01-07',
+              datum: '2026-01-07T10:00:00.000Z',
             },
             {
               id: 'klant-1',
@@ -53,6 +53,7 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   assert.equal(payload.customers[0].service, 'website');
   assert.equal(payload.customers[0].review, 'Nee');
   assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
+  assert.equal(payload.customers[1].datum, '2026-01-07');
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
 
   const replacements = service.buildDashboardHtmlReplacements(payload);
