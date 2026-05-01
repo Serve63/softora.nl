@@ -13,6 +13,7 @@ test('premium dashboard core exposes stable pure helpers', () => {
   assert.equal(typeof dashboardCore.fetchPremiumDashboardJson, 'function');
   assert.equal(typeof dashboardCore.forcePremiumDashboardBootShellVisible, 'function');
   assert.equal(typeof dashboardCore.releasePremiumDashboardBootShell, 'function');
+  assert.equal(typeof dashboardCore.showPremiumDashboardBootShellForMinimum, 'function');
   assert.equal(typeof dashboardCore.hydratePremiumDashboardOrdersFromBootstrap, 'function');
   assert.equal(typeof dashboardCore.startPremiumDashboardBootWatchdog, 'function');
 });
@@ -205,6 +206,47 @@ test('premium dashboard core waits for a real paint before releasing the boot sh
   } finally {
     global.document = oldDocument;
     global.requestAnimationFrame = oldRequestAnimationFrame;
+    global.setTimeout = oldSetTimeout;
+    global.clearTimeout = oldClearTimeout;
+  }
+});
+
+test('premium dashboard core can re-show the boot shell after browser restore', () => {
+  const oldDocument = global.document;
+  const oldSetTimeout = global.setTimeout;
+  const oldClearTimeout = global.clearTimeout;
+  const attrs = {};
+  const removed = [];
+  let scheduled = null;
+
+  global.document = {
+    documentElement: {
+      setAttribute(name, value) {
+        attrs[name] = value;
+      },
+      removeAttribute(name) {
+        removed.push(name);
+        delete attrs[name];
+      },
+    },
+    querySelector() {
+      return null;
+    },
+  };
+  global.setTimeout = (callback, delay) => {
+    scheduled = { callback, delay };
+    return 7;
+  };
+  global.clearTimeout = () => {};
+
+  try {
+    dashboardCore.showPremiumDashboardBootShellForMinimum(900);
+    assert.equal(attrs['data-dashboard-boot-loading'], 'true');
+    assert.equal(scheduled.delay, 900);
+    scheduled.callback();
+    assert.ok(removed.includes('data-dashboard-boot-loading'));
+  } finally {
+    global.document = oldDocument;
     global.setTimeout = oldSetTimeout;
     global.clearTimeout = oldClearTimeout;
   }
