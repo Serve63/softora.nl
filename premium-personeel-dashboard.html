@@ -36,7 +36,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        html[data-dashboard-boot-loading="true"] body::before{content:"";position:fixed;inset:0 0 0 var(--premium-sidebar-width,280px);background:var(--bg-primary,#f8f7f4);z-index:15000;pointer-events:none;}html[data-dashboard-boot-loading="true"] body::after{content:"";position:fixed;left:calc(var(--premium-sidebar-width,280px) + (100vw - var(--premium-sidebar-width,280px))/2 - 29px);top:calc(50vh - 29px);width:58px;height:58px;border-radius:50%;border:2px solid rgba(139,34,82,.12);border-top-color:var(--accent,#8b2252);animation:softora-dashboard-boot-spin 1.15s linear infinite;z-index:15001;pointer-events:none;}#dashboardHardBootLoader{position:fixed;inset:0 0 0 var(--premium-sidebar-width,280px);display:flex;align-items:center;justify-content:center;background:var(--bg-primary,#f8f7f4);z-index:20000;pointer-events:none;transition:opacity .18s ease,visibility .18s ease;}html:not([data-dashboard-boot-loading="true"]) #dashboardHardBootLoader{opacity:0;visibility:hidden;}.dashboard-hard-boot-spinner{width:64px;height:64px;border-radius:50%;border:2px solid rgba(139,34,82,.12);border-top-color:var(--accent,#8b2252);filter:drop-shadow(0 14px 28px rgba(139,34,82,.18));animation:softora-dashboard-boot-spin 1.15s linear infinite;}@keyframes softora-dashboard-boot-spin{to{transform:rotate(360deg);}}@media(max-width:900px){html[data-dashboard-boot-loading="true"] body::before{inset:0;}html[data-dashboard-boot-loading="true"] body::after{left:calc(50vw - 29px);}#dashboardHardBootLoader{inset:0;}}
+        #dashboardHardBootLoader{position:fixed;inset:0 0 0 var(--premium-sidebar-width,280px);display:flex;align-items:center;justify-content:center;background:var(--bg-primary,#f8f7f4);z-index:20000;pointer-events:none;transition:opacity .18s ease,visibility .18s ease;}html:not([data-dashboard-boot-loading="true"]) #dashboardHardBootLoader{opacity:0;visibility:hidden;}.dashboard-hard-boot-spinner{width:64px;height:64px;border-radius:50%;border:2px solid rgba(139,34,82,.12);border-top-color:var(--accent,#8b2252);filter:drop-shadow(0 14px 28px rgba(139,34,82,.18));animation:softora-dashboard-boot-spin 1.15s linear infinite;}@keyframes softora-dashboard-boot-spin{to{transform:rotate(360deg);}}@media(max-width:900px){#dashboardHardBootLoader{inset:0;}}
 
         :root {
             --bg-primary: #080808;
@@ -1907,7 +1907,7 @@
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
 
         <main class="main-content is-premium-boot-host">
-            <div class="premium-boot-loader" id="premium-boot-loader" data-dashboard-boot-loader="true" aria-hidden="true" style="background:var(--bg-primary,#f8f7f4);z-index:120;">
+            <div class="premium-boot-loader is-hidden" id="premium-boot-loader" data-dashboard-boot-loader="true" aria-hidden="true" style="background:var(--bg-primary,#f8f7f4);z-index:120;">
                 <div class="premium-boot-spinner" aria-hidden="true" style="--loader-size:58px;filter:drop-shadow(0 14px 28px rgba(139,34,82,0.18));">
                     <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
                     <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
@@ -3595,7 +3595,7 @@
         void (async () => { const bootStartedAt = Date.now();
             try {
                 await refreshPremiumDashboard(true);
-            } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 2000); }
+            } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 1000); }
         })();
 
         premiumDashboardState.pollTimer = window.setInterval(() => {

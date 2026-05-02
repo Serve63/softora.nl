@@ -135,19 +135,19 @@ test('premium dashboard laat de boot-loader niet hangen op trage ui-state reques
 
   assert.match(pageSource, /startPremiumDashboardBootWatchdog\(\);/);
   assert.match(pageSource, /fetchPremiumDashboardJson\(url, \{ method: 'GET', cache: 'no-store' \}\)/);
-  assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 2000\);/);
+  assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 1000\);/);
   assert.match(pageSource, /setAttribute\("data-dashboard-boot-loading", "true"\)/);
-  assert.match(pageSource, /html\[data-dashboard-boot-loading="true"\] body::before/);
+  assert.doesNotMatch(pageSource, /html\[data-dashboard-boot-loading="true"\] body::after/);
   assert.match(pageSource, /id="dashboardHardBootLoader" data-dashboard-hard-boot-loader="true"/);
   assert.match(pageSource, /dashboard-hard-boot-spinner/);
   assert.match(pageSource, /#dashboardHardBootLoader\{position:fixed;[\s\S]*z-index:20000/);
   assert.match(pageSource, /softora-dashboard-boot-spin/);
-  assert.match(pageSource, /data-dashboard-boot-loader="true"/);
+  assert.match(pageSource, /class="premium-boot-loader is-hidden"[\s\S]*data-dashboard-boot-loader="true"/);
   assert.match(pageSource, /style="background:var\(--bg-primary,#f8f7f4\);z-index:120;"/);
   assert.match(pageSource, /style="--loader-size:58px;filter:drop-shadow\(0 14px 28px rgba\(139,34,82,0\.18\)\);"/);
   assert.match(coreSource, /const PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS = 6000;/);
   assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 3500;/);
-  assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 2000;/);
+  assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 1000;/);
   assert.match(coreSource, /function forcePremiumDashboardBootShellVisible\(\) \{/);
   assert.match(coreSource, /getElementById\('dashboardHardBootLoader'\)/);
   assert.match(coreSource, /removeAttribute\('data-dashboard-boot-loading'\)/);

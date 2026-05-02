@@ -18,6 +18,9 @@ let monthlyCostsLoaded = false;
 let monthlyCostsLoadPromise = null;
 let monthlyCostsBootstrapDone = false;
 let monthlyCostsBootstrapPromise = null;
+const MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS = 1000;
+let monthlyCostsBootVisibleSince = Date.now();
+let monthlyCostsBootHideTimer = null;
 
 const freqLabel = { maandelijks:'Maandelijks', jaarlijks:'Jaarlijks', kwartaal:'Per kwartaal' };
 
@@ -161,6 +164,23 @@ function setTotalsLoading() {
 function setMonthlyCostsStageBooting(isBooting) {
   const shell = document.getElementById('monthly-costs-boot-shell');
   const loader = document.getElementById('monthly-costs-boot-loader');
+  if (monthlyCostsBootHideTimer) {
+    window.clearTimeout(monthlyCostsBootHideTimer);
+    monthlyCostsBootHideTimer = null;
+  }
+  if (isBooting) {
+    monthlyCostsBootVisibleSince = Date.now();
+  } else {
+    const elapsed = Date.now() - monthlyCostsBootVisibleSince;
+    const remaining = Math.max(0, MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS - elapsed);
+    if (remaining > 0) {
+      monthlyCostsBootHideTimer = window.setTimeout(() => {
+        monthlyCostsBootHideTimer = null;
+        setMonthlyCostsStageBooting(false);
+      }, remaining);
+      return;
+    }
+  }
   if (shell) {
     shell.classList.toggle('is-booting', Boolean(isBooting));
     shell.setAttribute('aria-busy', isBooting ? 'true' : 'false');

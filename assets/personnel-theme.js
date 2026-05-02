@@ -29,7 +29,8 @@
     let premiumProfileModalRef = null;
     let premiumSidebarProfileResolved = !isPremiumPersonnelContext;
     let sidebarLeadsRefreshRequestId = 0;
-    let sidebarLeadsZeroSnapshotStreak = 0;
+    let sidebarLeadsZeroSnapshotStreak = 0, premiumBootVisibleSince = Date.now(), premiumBootHideTimer = null;
+    const PREMIUM_BOOT_MIN_VISIBLE_MS = 1000;
     window[sidebarCountCacheKey] = sidebarCountCacheState;
 
     try {
@@ -110,15 +111,13 @@
         if (!main) {
             return;
         }
-        var loader = main.querySelector(".premium-boot-loader");
-        var shell = main.querySelector(".premium-boot-shell");
-        if (shell) {
-            shell.classList.toggle("is-booting", Boolean(isBooting));
-            shell.setAttribute("aria-busy", isBooting ? "true" : "false");
-        }
-        if (loader) {
-            loader.classList.toggle("is-hidden", !isBooting);
-        }
+        var loader = main.querySelector(".premium-boot-loader"), shell = main.querySelector(".premium-boot-shell");
+        var applyBooting = function (booting) { if (shell) { shell.classList.toggle("is-booting", Boolean(booting)); shell.setAttribute("aria-busy", booting ? "true" : "false"); } if (loader) { loader.classList.toggle("is-hidden", !booting); loader.setAttribute("aria-hidden", booting ? "false" : "true"); } };
+        if (premiumBootHideTimer) { window.clearTimeout(premiumBootHideTimer); premiumBootHideTimer = null; }
+        if (isBooting) { premiumBootVisibleSince = Date.now(); applyBooting(true); return; }
+        var remaining = Math.max(0, PREMIUM_BOOT_MIN_VISIBLE_MS - (Date.now() - premiumBootVisibleSince));
+        if (remaining > 0) { premiumBootHideTimer = window.setTimeout(function () { premiumBootHideTimer = null; applyBooting(false); }, remaining); return; }
+        applyBooting(false);
     };
 
     function initSoftoraDialogs() {

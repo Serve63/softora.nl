@@ -61,6 +61,7 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
     combinedSource,
     /getElementById\('monthly-costs-boot-loader'\)[\s\S]*classList\.toggle\('is-hidden', !isBooting\)/
   );
+  assert.match(combinedSource, /const MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS = 1000;/);
   assert.match(pageSource, /\.totaal-amount\s*\{[\s\S]*font-size:\s*2\.62rem;/);
   assert.match(pageSource, /\.category-title\s*\{[\s\S]*font-size:\s*0\.92rem;/);
   assert.match(pageSource, /\.cost-name\s*\{\s*font-size:\s*0\.92rem;/);
