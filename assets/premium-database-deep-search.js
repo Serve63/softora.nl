@@ -753,7 +753,10 @@
                             const nextMessage = nextTarget && nextTarget !== target && nextTarget.status !== "done"
                                 ? " Volgende locatie: " + nextTarget.label + "."
                                 : "";
-                            setStatusMessage(baseMessage + " Deze plaats is automatisch afgerond." + nextMessage, "success", true);
+                            const completionMessage = nextMessage
+                                ? " Oké, we hebben uit deze locatie alles gehaald. Ik streep deze af en ga door naar de volgende." + nextMessage
+                                : " Oké, we hebben uit deze locatie alles gehaald. Ik streep deze af.";
+                            setStatusMessage(baseMessage + completionMessage, "success", true);
                             toast("Plek afgerond");
                             return { completedTarget: true };
                         });

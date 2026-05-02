@@ -883,17 +883,20 @@ test('premium database deep search continues to the next location until the requ
   assert.equal(calls[2].batchNumber, 1);
   assert.equal(customers.length, 2);
   assert.doesNotMatch(messages.join('\n'), /AI gaf al klaar aan/);
-  assert.match(messages.join('\n'), /Deze plaats is automatisch afgerond/);
+  assert.match(messages.join('\n'), /Oké, we hebben uit deze locatie alles gehaald\. Ik streep deze af en ga door naar de volgende\./);
+  assert.match(messages.join('\n'), /Volgende locatie: Nederland \| Noord-Brabant \| Altena \| Andel/);
   assert.match(messages.join('\n'), /Gewenste aantal gehaald/);
   assert.ok(persisted.length >= 2);
   const finalStatePatch = persisted[persisted.length - 1].patch.deep_search_state;
   const finalState = JSON.parse(finalStatePatch);
   assert.equal(finalState.targets, undefined);
+  assert.equal(finalState.activeIndex, 1);
   assert.ok(finalStatePatch.length < 200000);
   assert.deepEqual(getStoredTargetProgress(finalState).foundWebsites, [
     'almkerktest.nl',
   ]);
   assert.equal(getStoredTargetProgress(finalState).status, 'done');
+  assert.equal(getStoredTargetProgress(finalState).placeComplete, true);
   assert.deepEqual(getStoredTargetProgress(finalState, 1).foundWebsites, [
     'andeltest.nl',
   ]);
