@@ -165,7 +165,9 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /data-tab="library"/);
   assert.match(source, /id="tab-library"/);
   assert.doesNotMatch(source, /Bibliotheek kon niet centraal laden/);
-  assert.match(source, /Alle previews van alle accounts worden zonder vaste itemlimiet centraal opgeslagen in Supabase/);
+  assert.match(source, /Elk webdesign dat wordt gemaakt, wordt centraal opgeslagen in <strong>Supabase<\/strong> en verschijnt hier voor alle accounts\./);
+  assert.doesNotMatch(source, /Elke preview die via Website Scan &amp; Preview \(AI-foto-api\) wordt gemaakt/);
+  assert.doesNotMatch(source, /Alle previews van alle accounts worden zonder vaste itemlimiet centraal opgeslagen in Supabase/);
   assert.match(source, /console\.warn\('Websitepreview-bibliotheek laden mislukt:', error\);/);
   assert.doesNotMatch(source, /function openPreviewNewTab\(/);
   assert.match(source, /SCAN_URL_BATCH_MAX = 1/);
