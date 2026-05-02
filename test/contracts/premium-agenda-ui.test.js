@@ -130,7 +130,9 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /data-manual-meeting-type="voice"/);
   assert.match(pageSource, /data-manual-meeting-type="chatbot"/);
   assert.match(pageSource, /id="manualAppointmentActivity"/);
+  assert.match(pageSource, /Wie heeft deze lead geregeld\?/);
   assert.match(pageSource, /Voor wie\?/);
+  assert.match(pageSource, /id="manualAppointmentWhoLabel"/);
   assert.match(pageSource, /id="manualAppointmentWhoChoices"/);
   assert.match(pageSource, /\.manual-appointment-choice-grid--who \{[\s\S]*display: flex;[\s\S]*flex-wrap: nowrap;/);
   assert.match(pageSource, /data-manual-who="serve"/);
@@ -167,6 +169,10 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   );
   assert.match(pageSource, /manualAppointmentSubmitBtn\.addEventListener\('click', \(\) => advanceManualAppointmentStep\(\)\);/);
   assert.match(pageSource, /function getManualAppointmentLegendChoice\(/);
+  assert.match(pageSource, /function syncManualAppointmentDetailsMode\(/);
+  assert.match(pageSource, /whoLabel\.textContent = isMeeting \? 'Wie heeft deze lead geregeld\?' : 'Voor wie\?';/);
+  assert.match(pageSource, /bothChoice\.hidden = isMeeting;/);
+  assert.match(pageSource, /if \(isMeeting && manualAppointmentWho === 'both'\) manualAppointmentWho = '';/);
   assert.match(pageSource, /legend-dot manual-serve/);
   assert.match(pageSource, /Activiteit Servé/);
   assert.match(pageSource, /legend-dot manual-martijn/);
@@ -178,9 +184,13 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /\.legend-dot\.manual-overig \{ background: #ec4899; \}/);
   assert.match(pageSource, /\.appointment\.manual-overig \{[\s\S]*border-left: 3px solid #ec4899;/);
   assert.match(pageSource, /activityTime: timeVal/);
-  assert.match(pageSource, /const who = String\(manualAppointmentWho \|\| ''\)\.trim\(\);/);
+  assert.match(pageSource, /const who = isMeeting \? 'both' : String\(manualAppointmentWho \|\| ''\)\.trim\(\);/);
+  assert.match(pageSource, /const leadOwnerKey = isMeeting && \(manualAppointmentWho === 'serve' \|\| manualAppointmentWho === 'martijn'\) \? manualAppointmentWho : '';/);
+  assert.match(pageSource, /Kies wie deze lead heeft geregeld\./);
   assert.match(pageSource, /Kies voor wie deze afspraak is\./);
   assert.match(pageSource, /legendChoice,/);
+  assert.match(pageSource, /appointmentKind: manualAppointmentKind,/);
+  assert.match(pageSource, /manualLeadOwner: leadOwnerKey,/);
   assert.match(pageSource, /who,/);
   assert.match(pageSource, /notes,/);
   assert.match(pageSource, /if \(manualLegendChoice === 'business'\) return 'appointment meeting magnetic meeting--business';/);

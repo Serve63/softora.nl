@@ -18,11 +18,50 @@ function normalizeManualLegendChoice(body, normalizeString) {
   if (raw === 'business' || raw === 'bedrijfssoftware') return 'business';
   if (raw === 'voice' || raw === 'voicesoftware') return 'voice';
   if (raw === 'chatbot' || raw === 'chatbots') return 'chatbot';
+  if (raw === 'website') return 'website';
   if (raw === 'manual-martijn' || raw === 'martijn') return 'manual-martijn';
   if (raw === 'manual-overig' || raw === 'overig' || raw === 'other') return 'manual-overig';
   if (raw === 'completed' || raw === 'afgerond') return 'completed';
   if (raw === 'manual-serve' || raw === 'serve' || raw === 'servé') return 'manual-serve';
   return raw ? '' : 'manual-serve';
+}
+
+function normalizeManualLeadOwnerKey(value, normalizeString) {
+  const normalized = normalizeString(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (normalized.includes('martijn')) return 'martijn';
+  if (normalized.includes('serve')) return 'serve';
+  return '';
+}
+
+function resolveManualLeadOwner(body, normalizeString) {
+  const key = normalizeManualLeadOwnerKey(
+    body?.manualLeadOwner || body?.leadOwnerKey || body?.leadOwnerName || body?.leadOwnerFullName,
+    normalizeString
+  );
+  if (key === 'martijn') {
+    return {
+      key: 'martijn',
+      name: 'Martijn van de Ven',
+      fullName: 'Martijn van de Ven',
+      email: '',
+    };
+  }
+  if (key === 'serve') {
+    return {
+      key: 'serve',
+      name: 'Servé Creusen',
+      fullName: 'Servé Creusen',
+      email: '',
+    };
+  }
+  return null;
+}
+
+function isMeetingLegendChoice(value) {
+  return ['website', 'business', 'voice', 'chatbot'].includes(String(value || '').trim().toLowerCase());
 }
 
 function isTruthyAllDayUnavailable(body) {
@@ -126,6 +165,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     const allDayUnavailable = isTruthyAllDayUnavailable(body);
     const whoLabel = resolveManualPlannerLabel(body, normalizeString);
     const actor = truncateText(normalizeString(body.actor || body.doneBy || ''), 120);
+    const appointmentKind = normalizeString(body.appointmentKind || body.manualAppointmentKind || '').toLowerCase();
 
     let appointmentTime;
     let activityTime;
@@ -153,6 +193,9 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       availableAgain = normalizeTimeHhMm(body.availableAgain || '');
       legendChoice = normalizeManualLegendChoice(body, normalizeString);
     }
+    const manualLeadOwner = resolveManualLeadOwner(body, normalizeString);
+    const requiresManualLeadOwner =
+      !allDayUnavailable && appointmentKind === 'meeting' && isMeetingLegendChoice(legendChoice);
 
     if (!appointmentDate) {
       return res.status(400).json({ ok: false, error: 'Vul een geldige datum in (YYYY-MM-DD).' });
@@ -182,6 +225,12 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
           error: 'Kies een geldige legenda keuze.',
         });
       }
+      if (requiresManualLeadOwner && !manualLeadOwner) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Kies wie deze lead heeft geregeld.',
+        });
+      }
     }
 
     const callId = `manual_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
@@ -191,6 +240,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       activityTime ? `Tijdstip activiteit: ${activityTime}` : '',
       location && location !== '—' ? `Locatie: ${location}` : '',
       legendChoice ? `Legenda: ${legendChoice}` : '',
+      manualLeadOwner ? `Lead geregeld door: ${manualLeadOwner.name}` : '',
       notes ? `Opmerkingen: ${notes}` : '',
       availableAgain ? `Weer thuis, beschikbaar voor een reis naar prospect: ${availableAgain}` : '',
     ].filter(Boolean).join('\n\n');
@@ -221,6 +271,12 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       manualLegendChoice: legendChoice,
       manualActivityTime: activityTime,
       manualNotes: notes,
+      manualLeadOwnerKey: manualLeadOwner?.key || '',
+      manualLeadOwnerName: manualLeadOwner?.name || '',
+      leadOwnerKey: manualLeadOwner?.key || '',
+      leadOwnerName: manualLeadOwner?.name || '',
+      leadOwnerFullName: manualLeadOwner?.fullName || '',
+      leadOwnerEmail: manualLeadOwner?.email || '',
       manualAllDayUnavailable: allDayUnavailable,
       manualAvailableAgain: availableAgain,
       summary,
