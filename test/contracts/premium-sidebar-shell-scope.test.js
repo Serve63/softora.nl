@@ -175,9 +175,12 @@ test('premium dashboard keeps its first-paint boot overlay in the shell contract
 
   assert.match(pageSource, /setAttribute\("data-dashboard-boot-loading", "true"\)/);
   assert.match(pageSource, /html\[data-dashboard-boot-loading="true"\] body::before/);
+  assert.doesNotMatch(pageSource, /html\[data-dashboard-boot-loading="true"\] body::after/);
   assert.match(pageSource, /id="dashboardHardBootLoader" data-dashboard-hard-boot-loader="true"/);
   assert.match(pageSource, /#dashboardHardBootLoader\{position:fixed;[\s\S]*z-index:20000/);
-  assert.match(pageSource, /softora-dashboard-boot-spin/);
+  assert.match(pageSource, /class="premium-boot-spinner dashboard-hard-boot-spinner"/);
+  assert.match(pageSource, /softora-dossier-loader__orbit--outer/);
+  assert.doesNotMatch(pageSource, /@keyframes softora-dashboard-boot-spin/);
   assert.match(pageSource, /data-dashboard-boot-loader="true"/);
   assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 2000\);/);
   assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 2000;/);
