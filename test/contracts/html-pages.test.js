@@ -181,7 +181,7 @@ test('html page coordinator injects critical premium sidebar shell before theme 
     [
       '<!DOCTYPE html><html><head>',
       '<title>Agenda</title>',
-      '<link rel="stylesheet" href="assets/personnel-theme.css?v=20260427b">',
+      '<link rel="stylesheet" href="assets/personnel-theme.css?v=20260502a">',
       '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">',
       '</head><body>',
       '<aside class="sidebar" data-static-sidebar="1"><a class="sidebar-logo">SOFTORA.NL</a><nav class="sidebar-nav"><a class="sidebar-link"><span class="sidebar-link-text">Dashboard</span></a></nav></aside>',

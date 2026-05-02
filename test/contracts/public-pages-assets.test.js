@@ -9,7 +9,7 @@ test('public asset cache keeps unhashed app js/css fresh even with version query
     'public, max-age=60, stale-while-revalidate=300'
   );
   assert.equal(
-    getStaticAssetCacheControl('/app/assets/personnel-theme.css', '/assets/personnel-theme.css?v=20260427b'),
+    getStaticAssetCacheControl('/app/assets/personnel-theme.css', '/assets/personnel-theme.css?v=20260502a'),
     'public, max-age=60, stale-while-revalidate=300'
   );
 });

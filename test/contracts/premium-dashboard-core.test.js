@@ -224,7 +224,7 @@ test('premium dashboard core waits for a real paint before releasing the boot sh
   global.clearTimeout = () => {};
 
   try {
-    dashboardCore.releasePremiumDashboardBootShellAfterMinimum(Date.now() - 5000, 650);
+    dashboardCore.releasePremiumDashboardBootShellAfterMinimum(Date.now() - 5000, 1000);
     assert.equal(loader.classList.has('is-hidden'), false);
     assert.equal(rafQueue.length, 1);
 
@@ -237,7 +237,7 @@ test('premium dashboard core waits for a real paint before releasing the boot sh
     assert.equal(loader.classList.has('is-hidden'), false);
     assert.equal(timeoutQueue.length, 1);
     assert.ok(timeoutQueue[0].ms > 0);
-    assert.ok(timeoutQueue[0].ms <= 650);
+    assert.ok(timeoutQueue[0].ms <= 1000);
 
     timeoutQueue[0].callback();
     assert.equal(loader.classList.has('is-hidden'), true);
@@ -289,11 +289,11 @@ test('premium dashboard core can re-show the boot shell after browser restore', 
   global.clearTimeout = () => {};
 
   try {
-    dashboardCore.showPremiumDashboardBootShellForMinimum(2000);
+    dashboardCore.showPremiumDashboardBootShellForMinimum(1000);
     assert.equal(attrs['data-dashboard-boot-loading'], 'true');
     assert.equal(hardLoader.attrs['aria-hidden'], 'false');
     assert.equal(hardLoader.style.visibility, '');
-    assert.equal(scheduled.delay, 2000);
+    assert.equal(scheduled.delay, 1000);
     scheduled.callback();
     assert.ok(removed.includes('data-dashboard-boot-loading'));
   } finally {
