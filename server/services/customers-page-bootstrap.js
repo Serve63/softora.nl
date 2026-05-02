@@ -111,6 +111,21 @@ function createCustomersPageBootstrapService(deps = {}) {
     return `\u20ac${safeAmount.toLocaleString('nl-NL')}`;
   }
 
+  const DASHBOARD_MONTH_LABELS_SHORT = [
+    'Jan',
+    'Feb',
+    'Mrt',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Dec',
+  ];
+
   function getDashboardDate(value, fallback = new Date()) {
     const normalized = normalizeDate(value);
     if (!normalized) return fallback;
@@ -503,12 +518,57 @@ function createCustomersPageBootstrapService(deps = {}) {
     );
   }
 
+  function buildDashboardRevenueSeries(customers, nowDate = new Date()) {
+    const currentYear = nowDate instanceof Date && !Number.isNaN(nowDate.getTime())
+      ? nowDate.getFullYear()
+      : new Date().getFullYear();
+    const currentMonth = nowDate instanceof Date && !Number.isNaN(nowDate.getTime())
+      ? nowDate.getMonth()
+      : new Date().getMonth();
+    const values = Array.from({ length: 12 }, () => 0);
+    const normalizedCustomers = (Array.isArray(customers) ? customers : [])
+      .map((customer, index) => normalizeCustomer(customer, `dashboard-chart-customer-${index}`))
+      .filter((customer) => customer.databaseStatus === 'klant' && customer.status === 'Betaald');
+
+    normalizedCustomers.forEach((customer) => {
+      const paidAt = getDashboardDate(customer.datum, nowDate);
+      if (paidAt.getFullYear() !== currentYear) return;
+      const websiteAmount = Math.max(0, Number(customer.websiteBedrag) || 0);
+      const maintenanceAmount = Math.max(0, Number(customer.onderhoudPerMaand) || 0);
+      if (websiteAmount > 0) values[paidAt.getMonth()] += websiteAmount;
+      if (maintenanceAmount <= 0 || paidAt.getMonth() > currentMonth) return;
+      for (let month = paidAt.getMonth(); month <= currentMonth; month += 1) {
+        values[month] += maintenanceAmount;
+      }
+    });
+
+    return values;
+  }
+
+  function buildDashboardRevenueChartHtml(customers, nowDate = new Date()) {
+    const values = buildDashboardRevenueSeries(customers, nowDate);
+    const maxRevenue = Math.max(...values, 0);
+    return DASHBOARD_MONTH_LABELS_SHORT.map((label, index) => {
+      const amount = Math.max(0, Number(values[index]) || 0);
+      const height = maxRevenue > 0 && amount > 0
+        ? Math.max(14, Math.round((amount / maxRevenue) * 214))
+        : 0;
+      return [
+        '<div class="chart-bar-group">',
+        `<div class="chart-bar" data-chart-index="${index}" style="height: ${height}px;" title="${formatDashboardMoney(amount)}"></div>`,
+        `<span class="chart-label">${label}</span>`,
+        '</div>',
+      ].join('');
+    }).join('');
+  }
+
   function buildDashboardHtmlReplacements(payload = {}) {
     const summary = buildDashboardMetricSummary(payload.customers);
     const activeOrdersBreakdown = buildActiveOrdersBreakdown(payload.activeOrdersState);
     return {
       SOFTORA_DASHBOARD_TOTAL_REVENUE: formatDashboardMoney(summary.totalRevenue),
       SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
+      SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardRevenueChartHtml(payload.customers),
       SOFTORA_DASHBOARD_TOTAL_CLIENTS:
         String(summary.totalCustomers) + buildDashboardActiveOrdersBootstrapScript(activeOrdersBreakdown),
     };
