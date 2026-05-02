@@ -58,6 +58,22 @@
       .trim();
   }
 
+  const PLACE_KEYS_BY_LENGTH = Object.keys(PLACE_COORDS).sort((left, right) => right.length - left.length);
+
+  function tokenizePlaceKey(value) {
+    return normalizePlaceKey(value).split(/\s+/).filter(Boolean);
+  }
+
+  function placeKeyMatchesHaystack(haystack, key) {
+    const haystackTokens = tokenizePlaceKey(haystack);
+    const keyTokens = tokenizePlaceKey(key);
+    if (!haystackTokens.length || !keyTokens.length || keyTokens.length > haystackTokens.length) return false;
+    for (let index = 0; index <= haystackTokens.length - keyTokens.length; index += 1) {
+      if (keyTokens.every((token, offset) => haystackTokens[index + offset] === token)) return true;
+    }
+    return false;
+  }
+
   function haversineKm(left, right) {
     const toRad = (value) => (Number(value) * Math.PI) / 180;
     const dLat = toRad(right.lat - left.lat);
@@ -82,14 +98,12 @@
       row && row.address,
       row && row.location
     ].filter(Boolean).join(" "));
-    const placeKey = Object.keys(PLACE_COORDS)
-      .sort((left, right) => right.length - left.length)
-      .find((key) => haystack.includes(normalizePlaceKey(key)));
+    const placeKey = PLACE_KEYS_BY_LENGTH.find((key) => placeKeyMatchesHaystack(haystack, key));
     return placeKey ? PLACE_COORDS[placeKey] : null;
   }
 
   function getDistanceKm(row) {
-    const existing = Number(row && (row.distanceKm || row.afstandKm || row.radiusKm));
+    const existing = Number(row && (row.distanceKm || row.afstandKm));
     if (Number.isFinite(existing) && existing >= 0) return existing;
     const coords = resolveRowCoords(row);
     return coords ? haversineKm(ORIGIN_OISTERWIJK, coords) : NaN;
@@ -105,6 +119,7 @@
     getDistanceKm,
     isWithinRadius,
     normalizePlaceKey,
+    placeKeyMatchesHaystack,
     resolveRowCoords
   };
 })(window);

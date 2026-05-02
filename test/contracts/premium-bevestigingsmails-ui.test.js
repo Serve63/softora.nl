@@ -136,7 +136,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
 
   assert.match(pageSource, /<div class="campagne-head">[\s\S]*<div class="campagne-title">Nieuwe Campagne<\/div>[\s\S]*id="campaignCompanyCount"/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/softora-dossier-loader\.css\?v=20260424a">/);
-  assert.match(pageSource, /<script src="assets\/premium-campaign-radius\.js\?v=20260501a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-campaign-radius\.js\?v=20260502a"><\/script>/);
   assert.match(pageSource, /<main class="main-content is-premium-boot-host">/);
   assert.match(pageSource, /<div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">/);
   assert.match(pageSource, /<div class="premium-boot-shell is-booting" aria-busy="true">/);

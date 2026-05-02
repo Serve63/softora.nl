@@ -42,15 +42,29 @@ test('coldcalling regio radius helper counts leads with the extracted place map'
     ),
     2
   );
+  assert.ok(Math.abs(helpers.minAirDistanceKmFromOisterwijkForLead({ region: 'Almkerk' }) - 26.6) < 0.1);
   assert.equal(
     helpers.resolveAutomaticCampaignRegioKm(
       [
         { region: 'Oisterwijk' },
-        { region: 'Breda' },
+        { region: 'Roosendaal' },
       ],
       { maxKm: 250 }
     ),
-    30
+    60
+  );
+});
+
+test('coldcalling regio radius uses the visible kilometer value without hidden margin', () => {
+  const helpers = loadRegioRadiusHelpers();
+
+  assert.equal(
+    helpers.countDialableLeadsWithinCampaignRegioRadius([{ region: 'Roosendaal' }], 50),
+    0
+  );
+  assert.equal(
+    helpers.countDialableLeadsWithinCampaignRegioRadius([{ region: 'Roosendaal' }], 60),
+    1
   );
 });
 
@@ -72,7 +86,7 @@ test('coldcalling pages load regio radius helpers before the dashboard bootstrap
     const pageSource = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
     assert.match(
       pageSource,
-      /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*(?:<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=20260502a" defer><\/script>\s*)?<script src="assets\/coldcalling-dashboard\.js\?v=(?:20260427e|20260502a)" defer><\/script>/,
+      /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260502a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*(?:<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=20260502a" defer><\/script>\s*)?<script src="assets\/coldcalling-dashboard\.js\?v=(?:20260427e|20260502a)" defer><\/script>/,
       relativePath
     );
   });

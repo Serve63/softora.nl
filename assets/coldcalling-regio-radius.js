@@ -65,6 +65,9 @@
     ['steenbergen', 51.585, 4.317],
     ['zevenbergen', 51.645, 4.606],
     ['gorinchem', 51.833, 4.974],
+    ['almkerk', 51.7714, 4.9597],
+    ['werkendam', 51.8101, 4.8944],
+    ['sleeuwijk', 51.815, 4.952],
     ['zaltbommel', 51.81, 5.244],
     ['tiel', 51.886, 5.429],
     ['weert', 51.2517, 5.7067],
@@ -157,8 +160,7 @@
   function countDialableLeadsWithinCampaignRegioRadius(leads, radiusKm) {
     if (!Array.isArray(leads) || !leads.length) return 0;
     if (!Number.isFinite(radiusKm) || radiusKm === Infinity) return leads.length;
-    const roadishFactor = 1.15;
-    const limit = Math.max(0, radiusKm) * roadishFactor;
+    const limit = Math.max(0, radiusKm);
     let total = 0;
     leads.forEach((lead) => {
       const distance = minAirDistanceKmFromOisterwijkForLead(lead);

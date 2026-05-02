@@ -521,6 +521,52 @@ test('coldmail campaign recipient preview respects Oisterwijk radius', async () 
   assert.equal(result.recipients[0].distanceKm, 0);
 });
 
+test('coldmail campaign radius rejects metadata distances and street-name substring matches', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'polluted-radius',
+        bedrijf: 'Breda Radius Metadata',
+        email: 'polluted@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Markt 1, Breda',
+        radiusKm: 0,
+        mail: true,
+      },
+      {
+        id: 'street-only',
+        bedrijf: 'Bredaseweg Zonder Plaats',
+        email: 'street@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Bredaseweg 1',
+        mail: true,
+      },
+      {
+        id: 'tilburg-street',
+        bedrijf: 'Tilburg Straat',
+        email: 'tilburg@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Bredaseweg 1, Tilburg',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    branch: 'Retail & Winkels',
+    radiusKm: 20,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].bedrijf, 'Tilburg Straat');
+  assert.ok(result.recipients[0].distanceKm > 0 && result.recipients[0].distanceKm <= 20);
+});
+
 test('coldmail campaign radius includes real customer database places near Oisterwijk', async () => {
   const { service } = createService({
     rows: [

@@ -311,9 +311,7 @@ function createColdmailCampaignService(deps = {}) {
   function findKnownPlaceLabel(value) {
     const haystack = normalizePlaceKey(value);
     if (!haystack) return '';
-    const placeKey = Object.keys(campaignPlaceCoords)
-      .sort((left, right) => right.length - left.length)
-      .find((key) => haystack.includes(normalizePlaceKey(key)));
+    const placeKey = campaignPlaceKeysByLength.find((key) => placeKeyMatchesHaystack(haystack, key));
     return placeKey ? formatKnownPlaceKey(placeKey) : '';
   }
 
@@ -738,6 +736,23 @@ function createColdmailCampaignService(deps = {}) {
       .trim();
   }
 
+  const campaignPlaceKeysByLength = Object.keys(campaignPlaceCoords)
+    .sort((left, right) => right.length - left.length);
+
+  function tokenizePlaceKey(value) {
+    return normalizePlaceKey(value).split(/\s+/).filter(Boolean);
+  }
+
+  function placeKeyMatchesHaystack(haystack, key) {
+    const haystackTokens = tokenizePlaceKey(haystack);
+    const keyTokens = tokenizePlaceKey(key);
+    if (!haystackTokens.length || !keyTokens.length || keyTokens.length > haystackTokens.length) return false;
+    for (let index = 0; index <= haystackTokens.length - keyTokens.length; index += 1) {
+      if (keyTokens.every((token, offset) => haystackTokens[index + offset] === token)) return true;
+    }
+    return false;
+  }
+
   function haversineKm(left, right) {
     const toRad = (value) => (Number(value) * Math.PI) / 180;
     const dLat = toRad(right.lat - left.lat);
@@ -766,14 +781,12 @@ function createColdmailCampaignService(deps = {}) {
         .filter(Boolean)
         .join(' ')
     );
-    const placeKey = Object.keys(campaignPlaceCoords)
-      .sort((left, right) => right.length - left.length)
-      .find((key) => haystack.includes(normalizePlaceKey(key)));
+    const placeKey = campaignPlaceKeysByLength.find((key) => placeKeyMatchesHaystack(haystack, key));
     return placeKey ? campaignPlaceCoords[placeKey] : null;
   }
 
   function getRowDistanceKm(row) {
-    const existing = Number(row && (row.distanceKm || row.afstandKm || row.radiusKm));
+    const existing = Number(row && (row.distanceKm || row.afstandKm));
     if (Number.isFinite(existing) && existing >= 0) return existing;
     const coords = resolveRowCoords(row);
     return coords ? haversineKm(oisterwijkCoords, coords) : NaN;
