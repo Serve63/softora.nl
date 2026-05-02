@@ -674,12 +674,12 @@
         }
 
         .photo-preview-image {
-            max-width: min(1120px, 94vw);
+            display: block; max-width: min(1120px, 94vw);
             max-height: 84vh;
-            border-radius: 12px;
-            background: #111;
+            border: 0; border-radius: 0; outline: 0;
+            background: transparent;
             box-shadow: 0 26px 80px rgba(0,0,0,.42);
-            object-fit: contain;
+            object-fit: contain; vertical-align: top; clip-path: inset(1px);
         }
 
         .photo-preview-meta {

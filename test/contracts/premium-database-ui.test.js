@@ -93,6 +93,22 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /customersBootstrapPayload && customersBootstrapPayload\.source\) === "orders"[\s\S]*return \[\];/);
 });
 
+test('premium database preview lightbox toont previews zonder extra rand', () => {
+  const pagePath = path.join(__dirname, '../../premium-database.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const imageStyleMatch = pageSource.match(/\.photo-preview-image\s*\{([\s\S]*?)\}/);
+
+  assert.ok(imageStyleMatch, 'photo preview image style should exist');
+  const imageStyle = imageStyleMatch[1];
+
+  assert.match(imageStyle, /display:\s*block;/);
+  assert.match(imageStyle, /border:\s*0;/);
+  assert.match(imageStyle, /outline:\s*0;/);
+  assert.match(imageStyle, /background:\s*transparent;/);
+  assert.match(imageStyle, /clip-path:\s*inset\(1px\);/);
+  assert.doesNotMatch(imageStyle, /background:\s*#111;/);
+});
+
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const importScriptPath = path.join(__dirname, '../../assets/premium-database-import.js');
