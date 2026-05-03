@@ -10,10 +10,11 @@ struct RootView: View {
             } else if store.isAuthenticated {
                 AgendaListView(store: store)
             } else {
-                LoginView(store: store)
+                PinAccessView(store: store)
             }
         }
         .tint(Color.softoraBlue)
+        .font(.softoraBody(16))
     }
 }
 
@@ -25,7 +26,7 @@ private struct LaunchLoadingView: View {
                 .foregroundStyle(Color.softoraBlue)
 
             ProgressView("Agenda openen...")
-                .font(.headline)
+                .font(.softoraBody(17, weight: .semibold))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.softoraBackground)

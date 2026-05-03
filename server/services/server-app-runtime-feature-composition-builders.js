@@ -134,6 +134,11 @@ function buildServerAppFeatureWiringRuntimeContext({
         sessionSecret: envConfig.PREMIUM_SESSION_SECRET,
         premiumSessionTtlHours: envConfig.PREMIUM_SESSION_TTL_HOURS,
         premiumSessionRememberTtlDays: envConfig.PREMIUM_SESSION_REMEMBER_TTL_DAYS,
+        agendaAppPin: envConfig.AGENDA_APP_PIN,
+        agendaAppPinHash: envConfig.AGENDA_APP_PIN_HASH,
+        agendaAppServeEmail: envConfig.AGENDA_APP_SERVE_EMAIL,
+        agendaAppMartijnEmail: envConfig.AGENDA_APP_MARTIJN_EMAIL,
+        agendaAppSessionTtlDays: envConfig.AGENDA_APP_SESSION_TTL_DAYS,
       },
       coldcalling: {
         runtimeStateSupabaseSyncCooldownMs:

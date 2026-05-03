@@ -85,6 +85,11 @@ test('server app runtime composition builders preserve feature wiring groups and
       PREMIUM_SESSION_SECRET: 'secret',
       PREMIUM_SESSION_TTL_HOURS: 8,
       PREMIUM_SESSION_REMEMBER_TTL_DAYS: 30,
+      AGENDA_APP_PIN: '',
+      AGENDA_APP_PIN_HASH: 'sha256:agenda-pin',
+      AGENDA_APP_SERVE_EMAIL: 'serve@softora.test',
+      AGENDA_APP_MARTIJN_EMAIL: 'martijn@softora.test',
+      AGENDA_APP_SESSION_TTL_DAYS: 3650,
       MAIL_SMTP_HOST: 'smtp.softora.test',
       MAIL_SMTP_PORT: 587,
       MAIL_SMTP_SECURE: false,
@@ -247,6 +252,14 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(
     context.featureRouteOptions.premiumRouteRuntime.sessionSecret,
     'secret'
+  );
+  assert.equal(
+    context.featureRouteOptions.premiumRouteRuntime.agendaAppPinHash,
+    'sha256:agenda-pin'
+  );
+  assert.equal(
+    context.featureRouteOptions.premiumRouteRuntime.agendaAppMartijnEmail,
+    'martijn@softora.test'
   );
   assert.equal(
     context.featureRouteOptions.coldcalling.runtimeStateSupabaseSyncCooldownMs,

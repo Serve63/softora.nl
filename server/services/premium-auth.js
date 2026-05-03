@@ -1,8 +1,20 @@
+const { timingSafeEqualStrings } = require('../security/crypto-utils');
+
+const AGENDA_APP_IDENTITY_EMAILS = Object.freeze({
+  serve: 'serve@softora.nl',
+  martijn: 'martijn@softora.nl',
+});
+
 function createPremiumAuthRouteCoordinator(deps = {}) {
   const {
     sessionSecret = '',
     premiumSessionTtlHours = 12,
     premiumSessionRememberTtlDays = 30,
+    agendaAppPin = '',
+    agendaAppPinHash = '',
+    agendaAppServeEmail = AGENDA_APP_IDENTITY_EMAILS.serve,
+    agendaAppMartijnEmail = AGENDA_APP_IDENTITY_EMAILS.martijn,
+    agendaAppSessionTtlDays = 3650,
     premiumUsersStore,
     normalizePremiumSessionEmail = (value) => String(value || '').trim().toLowerCase(),
     normalizeString = (value) => String(value || '').trim(),
@@ -40,6 +52,85 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
         userAgent: getRequestUserAgent(req),
       },
       reason
+    );
+  }
+
+  function normalizeAgendaAppIdentity(value) {
+    const normalized = normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    if (normalized === 'martijn') return 'martijn';
+    if (normalized === 'serve' || normalized === 'serv') return 'serve';
+    return '';
+  }
+
+  function getAgendaAppIdentityEmail(identity) {
+    if (identity === 'martijn') return normalizePremiumSessionEmail(agendaAppMartijnEmail);
+    if (identity === 'serve') return normalizePremiumSessionEmail(agendaAppServeEmail);
+    return '';
+  }
+
+  function isAgendaAppPinConfigured() {
+    return Boolean(normalizeString(agendaAppPinHash) || normalizeString(agendaAppPin));
+  }
+
+  function isAgendaAppPinValid(pin) {
+    const rawPin = String(pin || '').trim();
+    if (!rawPin) return false;
+
+    const pinHash = normalizeString(agendaAppPinHash);
+    if (pinHash && premiumUsersStore.verifyPasswordHash(rawPin, pinHash)) {
+      return true;
+    }
+
+    const plainPin = normalizeString(agendaAppPin);
+    return Boolean(plainPin && timingSafeEqualStrings(rawPin, plainPin));
+  }
+
+  function getAgendaAppSessionMaxAgeMs() {
+    const days = Math.max(1, Math.min(3650, Number(agendaAppSessionTtlDays) || 3650));
+    return days * 24 * 60 * 60 * 1000;
+  }
+
+  function getUserDisplayName(user) {
+    if (typeof premiumUsersStore.buildUserDisplayName === 'function') {
+      return premiumUsersStore.buildUserDisplayName(user);
+    }
+    const firstName = normalizeString(user?.firstName || user?.voornaam || '');
+    const lastName = normalizeString(user?.lastName || user?.achternaam || '');
+    return `${firstName} ${lastName}`.trim() || normalizePremiumSessionEmail(user?.email || '');
+  }
+
+  function normalizeAgendaAppIdentityCandidate(value) {
+    const normalized = normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const token = normalized.split(/[^a-z0-9]+/).find(Boolean) || normalized;
+    return normalizeAgendaAppIdentity(token);
+  }
+
+  function getAgendaAppUserIdentityCandidates(user) {
+    const email = normalizePremiumSessionEmail(user?.email || '');
+    const emailLocalPart = email.split('@')[0] || '';
+    return [
+      user?.firstName,
+      user?.voornaam,
+      getUserDisplayName(user),
+      emailLocalPart,
+    ]
+      .map((value) => normalizeAgendaAppIdentityCandidate(value))
+      .filter(Boolean);
+  }
+
+  function findAgendaAppUser(users, email, identity) {
+    const exactUser = premiumUsersStore.findUserByEmail(users, email);
+    if (exactUser) return exactUser;
+    if (!Array.isArray(users) || !identity) return null;
+    return (
+      users.find((user) => getAgendaAppUserIdentityCandidates(user).includes(identity)) || null
     );
   }
 
@@ -308,6 +399,181 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     });
   }
 
+  async function agendaAppLoginResponse(req, res) {
+    const pin = String(req.body?.pin || '');
+    const identity = normalizeAgendaAppIdentity(req.body?.who || req.body?.identity || '');
+    const email = getAgendaAppIdentityEmail(identity);
+
+    res.setHeader('Cache-Control', 'no-store, private');
+
+    const { hydrated, users } = await loadUsersForLogin();
+
+    if (!sessionSecret) {
+      appendAuditEvent(
+        req,
+        {
+          type: 'agenda_app_login_rejected',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: 'Agenda-app login niet geconfigureerd: sessie-secret ontbreekt.',
+        },
+        'security_agenda_app_login_rejected'
+      );
+      return res.status(503).json({
+        ok: false,
+        error:
+          'Agenda-app toegang is nog niet volledig ingesteld op de server.',
+      });
+    }
+
+    if (!isAgendaAppPinConfigured()) {
+      appendAuditEvent(
+        req,
+        {
+          type: 'agenda_app_login_rejected',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: 'Agenda-app login niet geconfigureerd: pincode ontbreekt.',
+        },
+        'security_agenda_app_login_rejected'
+      );
+      return res.status(503).json({
+        ok: false,
+        error:
+          'Agenda-app toegang is nog niet volledig ingesteld op de server.',
+      });
+    }
+
+    if (users.length === 0) {
+      const isTemporaryUserStoreFailure = hydrated?.source === 'unavailable';
+      appendAuditEvent(
+        req,
+        {
+          type: 'agenda_app_login_rejected',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: isTemporaryUserStoreFailure
+            ? 'Agenda-app login tijdelijk niet beschikbaar: gebruikerslijst kon niet worden geladen.'
+            : 'Agenda-app login niet geconfigureerd: geen premium gebruikers gevonden.',
+        },
+        'security_agenda_app_login_rejected'
+      );
+      return res.status(503).json({
+        ok: false,
+        error: isTemporaryUserStoreFailure
+          ? 'Agenda-app toegang is tijdelijk niet beschikbaar. Probeer het zo opnieuw.'
+          : 'Agenda-app toegang is nog niet volledig ingesteld op de server.',
+      });
+    }
+
+    if (!identity || !email) {
+      appendAuditEvent(
+        req,
+        {
+          type: 'agenda_app_login_failed',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: 'Agenda-app identiteit ontbreekt of is ongeldig.',
+        },
+        'security_agenda_app_login_failed'
+      );
+      return res.status(400).json({
+        ok: false,
+        error: 'Kies Martijn of Servé.',
+      });
+    }
+
+    if (!pin) {
+      appendAuditEvent(
+        req,
+        {
+          type: 'agenda_app_login_failed',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: 'Agenda-app pincode ontbreekt.',
+        },
+        'security_agenda_app_login_failed'
+      );
+      return res.status(400).json({
+        ok: false,
+        error: 'Vul je pincode in.',
+      });
+    }
+
+    const matchedUser = findAgendaAppUser(users, email, identity);
+    if (!matchedUser || !isAgendaAppPinValid(pin)) {
+      appendAuditEvent(
+        req,
+        {
+          type: 'agenda_app_login_failed',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: 'Agenda-app pincode of gebruiker ongeldig.',
+        },
+        'security_agenda_app_login_failed'
+      );
+      return res.status(401).json({
+        ok: false,
+        error: 'Pincode klopt niet.',
+      });
+    }
+
+    if (premiumUsersStore.normalizeUserStatus(matchedUser.status) !== 'active') {
+      appendAuditEvent(
+        req,
+        {
+          type: 'agenda_app_login_failed',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: 'Agenda-app login geweigerd omdat het account inactief is.',
+        },
+        'security_agenda_app_login_failed'
+      );
+      return res.status(403).json({
+        ok: false,
+        error: 'Dit account is gedeactiveerd.',
+      });
+    }
+
+    const sessionMaxAgeMs = getAgendaAppSessionMaxAgeMs();
+    const sessionEmail = normalizePremiumSessionEmail(matchedUser.email || email);
+    const sessionToken = createPremiumSessionToken({
+      email: sessionEmail,
+      maxAgeMs: sessionMaxAgeMs,
+      userId: matchedUser.id,
+      role: matchedUser.role,
+    });
+    setPremiumSessionCookie(req, res, sessionToken, sessionMaxAgeMs);
+
+    appendAuditEvent(
+      req,
+      {
+        type: 'agenda_app_login_success',
+        severity: 'info',
+        success: true,
+        email: sessionEmail,
+        detail: 'Agenda-app login succesvol met langdurige sessie.',
+      },
+      'security_agenda_app_login_success'
+    );
+
+    return res.status(200).json({
+      ok: true,
+      authenticated: true,
+      who: identity,
+      email: sessionEmail,
+      role: matchedUser.role,
+      displayName: getUserDisplayName(matchedUser),
+    });
+  }
+
   async function logoutResponse(req, res) {
     const authState = await getResolvedPremiumAuthState(req);
     res.setHeader('Cache-Control', 'no-store, private');
@@ -327,6 +593,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
   }
 
   return {
+    agendaAppLoginResponse,
     loginResponse,
     logoutResponse,
     sendSessionResponse,

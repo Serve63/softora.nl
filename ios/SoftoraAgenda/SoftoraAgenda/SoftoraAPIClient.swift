@@ -35,16 +35,10 @@ struct SoftoraAPIClient {
         try await get("/api/auth/session")
     }
 
-    func login(email: String, password: String, otp: String, remember: Bool) async throws -> LoginResponse {
+    func unlockAgendaApp(pin: String, who: Planner) async throws -> AgendaAppLoginResponse {
         try await post(
-            "/api/auth/login",
-            body: LoginPayload(
-                email: email,
-                password: password,
-                otp: otp,
-                remember: remember,
-                next: "/premium-personeel-agenda"
-            )
+            "/api/agenda-app/login",
+            body: AgendaAppLoginPayload(pin: pin, who: who.apiValue)
         )
     }
 
@@ -141,12 +135,9 @@ struct SoftoraAPIClient {
     }
 }
 
-private struct LoginPayload: Encodable {
-    let email: String
-    let password: String
-    let otp: String
-    let remember: Bool
-    let next: String
+private struct AgendaAppLoginPayload: Encodable {
+    let pin: String
+    let who: String
 }
 
 private struct EmptyPayload: Encodable {}

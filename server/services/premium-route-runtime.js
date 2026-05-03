@@ -29,12 +29,22 @@ function createPremiumRouteRuntime(deps = {}) {
     sessionSecret,
     premiumSessionTtlHours,
     premiumSessionRememberTtlDays,
+    agendaAppPin,
+    agendaAppPinHash,
+    agendaAppServeEmail,
+    agendaAppMartijnEmail,
+    agendaAppSessionTtlDays,
   } = deps;
 
   const premiumAuthRouteCoordinator = createPremiumAuthRouteCoordinator({
     sessionSecret,
     premiumSessionTtlHours,
     premiumSessionRememberTtlDays,
+    agendaAppPin,
+    agendaAppPinHash,
+    agendaAppServeEmail,
+    agendaAppMartijnEmail,
+    agendaAppSessionTtlDays,
     premiumUsersStore,
     normalizePremiumSessionEmail,
     normalizeString,
