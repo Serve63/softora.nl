@@ -56,10 +56,14 @@ test('production deploy scripts and docs force the safe deployment path', () => 
   const deployScript = fs.readFileSync(path.join(repoRoot, 'scripts/deploy-production-safe.js'), 'utf8');
 
   assert.equal(packageJson.scripts['check:production-deploy-source'], 'node scripts/guard-production-deploy-source.js');
+  assert.equal(packageJson.scripts['check:live-production-version'], 'node scripts/check-live-production-version.js');
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.match(agents, /Productie deployen mag alleen via `npm run deploy:production`/);
+  assert.match(agents, /check:live-production-version/);
   assert.match(protocol, /Productie deploys lopen alleen via `npm run deploy:production`/);
+  assert.match(protocol, /check:live-production-version/);
   assert.match(operations, /npm run check:production-deploy-source/);
+  assert.match(operations, /npm run check:live-production-version/);
   assert.match(operations, /npm run deploy:production/);
   assert.match(deployScript, /assertSafeProductionDeploySource\(\)/);
   assert.match(deployScript, /projectName:\s*'softora-nl'/);
@@ -68,4 +72,5 @@ test('production deploy scripts and docs force the safe deployment path', () => 
   assert.match(deployScript, /assertExpectedVercelProjectLink\(\);/);
   assert.match(deployScript, /verify:critical/);
   assert.match(deployScript, /deploy', '--prebuilt', '--prod', '--yes'/);
+  assert.match(deployScript, /check:live-production-version/);
 });

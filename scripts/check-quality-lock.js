@@ -20,7 +20,9 @@ const REQUIRED_QUALITY_FILES = Object.freeze([
   'scripts/check-repo-hygiene.sh',
   'scripts/deploy-production-safe.js',
   'scripts/guard-production-deploy-source.js',
+  'scripts/check-live-production-version.js',
   'scripts/verify-critical.js',
+  'test/contracts/production-live-version-guard.test.js',
   'test/contracts/production-deploy-guard.test.js',
 ]);
 
@@ -133,6 +135,7 @@ function listQualityLockViolations(options = {}) {
     'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
     'check:quality-lock': 'node scripts/check-quality-lock.js',
     'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
+    'check:live-production-version': 'node scripts/check-live-production-version.js',
     'deploy:production': 'node scripts/deploy-production-safe.js',
     'verify:critical': 'node scripts/verify-critical.js',
   };
@@ -172,13 +175,22 @@ function listQualityLockViolations(options = {}) {
 
   if (trackedFileSet.has('scripts/deploy-production-safe.js')) {
     const safeDeploySource = readFile('scripts/deploy-production-safe.js');
-    ['assertSafeProductionDeploySource()', "projectName: 'softora-nl'", "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'"].forEach(
+    ['assertSafeProductionDeploySource()', "projectName: 'softora-nl'", "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'", 'check:live-production-version'].forEach(
       (requiredText) => {
         if (!safeDeploySource.includes(requiredText)) {
           violations.push(`[quality-lock] deploy-production-safe.js mist "${requiredText}".`);
         }
       }
     );
+  }
+
+  if (trackedFileSet.has('scripts/check-live-production-version.js')) {
+    const liveVersionSource = readFile('scripts/check-live-production-version.js');
+    ['vercel', 'ls', 'origin/main', 'githubCommitSha', 'gitCommitSha'].forEach((requiredText) => {
+      if (!liveVersionSource.includes(requiredText)) {
+        violations.push(`[quality-lock] check-live-production-version.js mist "${requiredText}".`);
+      }
+    });
   }
 
   const bypassEnvPattern = new RegExp(

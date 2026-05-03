@@ -5,6 +5,7 @@
 - `npm run verify:critical`
 - `npm run backup:runtime`
 - `npm run deploy:production`
+- `npm run check:live-production-version`
 - health endpoints controleren
 
 ## Dagelijks
