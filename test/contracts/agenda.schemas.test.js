@@ -5,6 +5,7 @@ const {
   validateAddActiveOrderRequest,
   validateConfirmationMailSyncRequest,
   validateInterestedLeadDismissRequest,
+  validateManualAgendaAppointmentRequest,
   validatePostCallRequest,
   validateSendEmailRequest,
 } = require('../../server/schemas/agenda');
@@ -72,6 +73,34 @@ test('interested-lead dismiss validator requires a callId', () => {
   assert.equal(valid.ok, true);
   assert.equal(valid.body.callId, 'call-123');
   assert.equal(valid.body.actor, 'Admin');
+});
+
+test('manual appointment validator preserves meeting lead owner fields', () => {
+  const result = validateManualAgendaAppointmentRequest({
+    body: {
+      actor: ' Serve ',
+      date: ' 2026-04-28 ',
+      time: ' 11:00 ',
+      title: ' Website intake ',
+      location: ' Klantlocatie ',
+      who: ' both ',
+      appointmentKind: ' meeting ',
+      manualLeadOwner: ' martijn ',
+      leadOwnerName: ' Martijn van de Ven ',
+      notes: ' Intake voorbereid. ',
+      legendChoice: ' website ',
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.body.actor, 'Serve');
+  assert.equal(result.body.title, 'Website intake');
+  assert.equal(result.body.appointmentKind, 'meeting');
+  assert.equal(result.body.manualLeadOwner, 'martijn');
+  assert.equal(result.body.leadOwnerKey, 'martijn');
+  assert.equal(result.body.leadOwnerName, 'Martijn van de Ven');
+  assert.equal(result.body.notes, 'Intake voorbereid.');
+  assert.equal(result.body.legendChoice, 'website');
 });
 
 test('confirmation mail sync validator clamps maxMessages to safe limits', () => {
