@@ -133,6 +133,9 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /persistPremiumSidebarSessionSnapshot/);
   assert.match(themeJsSource, /buildSidebarProfileRenderKey/);
   assert.match(themeJsSource, /sidebar\.dataset\.sidebarProfileRenderKey === renderKey/);
+  assert.match(themeJsSource, /document\.querySelector\("\[data-sidebar-profile-trigger\]"\) \|\| document\.querySelector\("\.sidebar-user \.sidebar-user-trigger"\);/);
+  assert.match(themeJsSource, /if \(!document\.querySelector\("\[data-sidebar-user-name\]"\)\) \{[\s\S]*markPremiumSidebarProfileResolved\(\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(themeJsSource, /loadPremiumSession\(\);/);
   assert.match(themeSource, /\.sidebar-link \.sidebar-link-text[\s\S]*white-space:\s*nowrap !important;/);
   assert.match(
     themeSource,
@@ -247,6 +250,35 @@ test('static premium sidebars ship the database link in html', () => {
       pageSource,
       /href="\/premium-database"[\s\S]*<span class="sidebar-link-text">Database<\/span>/,
       `${relativePath} hoort Database direct in de sidebar html te hebben`
+    );
+  }
+});
+
+test('logged-in premium sidebar pages always have a profile host for session refresh', () => {
+  const profileCriticalPages = [
+    'premium-ai-lead-generator.html',
+    'premium-bevestigingsmails.html',
+    'premium-websitegenerator.html',
+    'premium-pakketten.html',
+    'premium-wachtwoordenregister.html',
+  ];
+
+  for (const relativePath of profileCriticalPages) {
+    const pageSource = readRepoFile(relativePath);
+    assert.match(
+      pageSource,
+      /<div class="sidebar-user-name" data-sidebar-user-name>Softora Premium<\/div>/,
+      `${relativePath} hoort een herkenbare profielnaam-host te hebben`
+    );
+    assert.match(
+      pageSource,
+      /<div class="sidebar-user-trigger" role="group" aria-label="Gebruikersinfo">/,
+      `${relativePath} hoort het gedeelde profielblok te hebben zodat personnel-theme.js de sessie kan verversen`
+    );
+    assert.match(
+      pageSource,
+      /assets\/premium-sidebar-profile-prefill\.js\?v=/,
+      `${relativePath} hoort de profiel-prefill direct na de sidebar te laden`
     );
   }
 });

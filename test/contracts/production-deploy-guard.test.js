@@ -66,6 +66,10 @@ test('production deploy scripts and docs force the safe deployment path', () => 
   assert.match(operations, /npm run check:production-deploy-source/);
   assert.match(operations, /npm run deploy:production/);
   assert.match(deployScript, /assertSafeProductionDeploySource\(\)/);
+  assert.match(deployScript, /projectName:\s*'softora-nl'/);
+  assert.match(deployScript, /projectId:\s*'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'/);
+  assert.match(deployScript, /ensureExpectedVercelProjectLink\(\);/);
+  assert.match(deployScript, /assertExpectedVercelProjectLink\(\);/);
   assert.match(deployScript, /verify:critical/);
   assert.match(deployScript, /deploy', '--prebuilt', '--prod', '--yes'/);
 });
