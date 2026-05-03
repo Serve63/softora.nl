@@ -7,6 +7,7 @@ const PREMIUM_PUBLIC_API_EXACT_MATCHES = new Set([
   '/api/auth/login',
   '/api/auth/logout',
   '/api/auth/session',
+  '/api/agenda-app/login',
   '/api/twilio/voice',
   '/api/twilio/status',
   '/api/retell/webhook',

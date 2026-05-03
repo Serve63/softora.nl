@@ -55,6 +55,9 @@ function createPremiumUsersStoreStub(initialUsers = [], source = 'supabase', opt
     findUserByEmail(list, email) {
       return list.find((user) => String(user.email || '').toLowerCase() === String(email || '').toLowerCase()) || null;
     },
+    buildUserDisplayName(user) {
+      return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || '';
+    },
     normalizeUserStatus(status) {
       return String(status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active';
     },
@@ -89,6 +92,11 @@ function createFixture(options = {}) {
     sessionSecret: options.sessionSecret === undefined ? 'secret' : options.sessionSecret,
     premiumSessionTtlHours: 12,
     premiumSessionRememberTtlDays: 30,
+    agendaAppPin: options.agendaAppPin || '',
+    agendaAppPinHash: options.agendaAppPinHash || '',
+    agendaAppServeEmail: options.agendaAppServeEmail || 'serve@softora.nl',
+    agendaAppMartijnEmail: options.agendaAppMartijnEmail || 'martijn@softora.nl',
+    agendaAppSessionTtlDays: options.agendaAppSessionTtlDays || 3650,
     premiumUsersStore,
     normalizePremiumSessionEmail: (value) => normalizeString(value).toLowerCase(),
     normalizeString,
@@ -203,6 +211,123 @@ test('premium auth login accepts bootstrap-backed users when supabase hydration 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.authenticated, true);
+});
+
+test('premium agenda app login requires a configured pincode', async () => {
+  const { auditEvents, coordinator } = createFixture({
+    users: [
+      {
+        id: 'usr_serve',
+        email: 'serve@softora.nl',
+        role: 'admin',
+        status: 'active',
+        passwordHash: 'hash:irrelevant',
+      },
+    ],
+  });
+  const req = createRequest({
+    originalUrl: '/api/agenda-app/login',
+    body: { who: 'serve', pin: '1234' },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.agendaAppLoginResponse(req, res);
+
+  assert.equal(res.statusCode, 503);
+  assert.match(res.body.error, /Agenda-app toegang/i);
+  assert.equal(auditEvents[0].reason, 'security_agenda_app_login_rejected');
+});
+
+test('premium agenda app login maps identity to user and sets long session cookie', async () => {
+  const { auditEvents, coordinator, cookieSets, tokenCalls } = createFixture({
+    agendaAppPin: '2468',
+    agendaAppSessionTtlDays: 3650,
+    users: [
+      {
+        id: 'usr_serve',
+        firstName: 'Servé',
+        email: 'serve@softora.nl',
+        role: 'admin',
+        status: 'active',
+        passwordHash: 'hash:irrelevant',
+      },
+      {
+        id: 'usr_martijn',
+        firstName: 'Martijn',
+        email: 'martijn@softora.nl',
+        role: 'medewerker',
+        status: 'active',
+        passwordHash: 'hash:irrelevant',
+      },
+    ],
+  });
+  const req = createRequest({
+    originalUrl: '/api/agenda-app/login',
+    body: { who: 'martijn', pin: '2468' },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.agendaAppLoginResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.authenticated, true);
+  assert.equal(res.body.who, 'martijn');
+  assert.equal(res.body.email, 'martijn@softora.nl');
+  assert.equal(res.body.displayName, 'Martijn');
+  assert.equal(tokenCalls.length, 1);
+  assert.equal(tokenCalls[0].email, 'martijn@softora.nl');
+  assert.equal(tokenCalls[0].maxAgeMs, 3650 * 24 * 60 * 60 * 1000);
+  assert.equal(cookieSets[0].maxAgeMs, 3650 * 24 * 60 * 60 * 1000);
+  assert.equal(auditEvents.at(-1).reason, 'security_agenda_app_login_success');
+});
+
+test('premium agenda app login rejects wrong pins and inactive mapped users', async () => {
+  const invalidFixture = createFixture({
+    agendaAppPinHash: 'hash:2468',
+    users: [
+      {
+        id: 'usr_serve',
+        email: 'serve@softora.nl',
+        role: 'admin',
+        status: 'active',
+        passwordHash: 'hash:irrelevant',
+      },
+    ],
+  });
+  const invalidReq = createRequest({
+    originalUrl: '/api/agenda-app/login',
+    body: { who: 'Servé', pin: '9999' },
+  });
+  const invalidRes = createResponseRecorder();
+
+  await invalidFixture.coordinator.agendaAppLoginResponse(invalidReq, invalidRes);
+
+  assert.equal(invalidRes.statusCode, 401);
+  assert.equal(invalidRes.body.error, 'Pincode klopt niet.');
+
+  const inactiveFixture = createFixture({
+    agendaAppPin: '2468',
+    users: [
+      {
+        id: 'usr_serve',
+        email: 'serve@softora.nl',
+        role: 'admin',
+        status: 'inactive',
+        passwordHash: 'hash:irrelevant',
+      },
+    ],
+  });
+  const inactiveReq = createRequest({
+    originalUrl: '/api/agenda-app/login',
+    body: { who: 'serve', pin: '2468' },
+  });
+  const inactiveRes = createResponseRecorder();
+
+  await inactiveFixture.coordinator.agendaAppLoginResponse(inactiveReq, inactiveRes);
+
+  assert.equal(inactiveRes.statusCode, 403);
+  assert.equal(inactiveRes.body.error, 'Dit account is gedeactiveerd.');
 });
 
 test('premium auth login reports temporary user store failures separately from config errors', async () => {

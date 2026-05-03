@@ -164,6 +164,20 @@ function loadRuntimeEnv(env = process.env) {
         365
       ),
       sessionCookieName: 'softora_premium_session',
+      agendaAppPin: normalizeString(safeEnv.AGENDA_APP_PIN || ''),
+      agendaAppPinHash: normalizeString(safeEnv.AGENDA_APP_PIN_HASH || ''),
+      agendaAppServeEmail: normalizeLoginEmailValue(
+        safeEnv.AGENDA_APP_SERVE_EMAIL || 'serve@softora.nl'
+      ),
+      agendaAppMartijnEmail: normalizeLoginEmailValue(
+        safeEnv.AGENDA_APP_MARTIJN_EMAIL || 'martijn@softora.nl'
+      ),
+      agendaAppSessionTtlDays: readBoundedNumberEnv(
+        safeEnv.AGENDA_APP_SESSION_TTL_DAYS,
+        3650,
+        1,
+        3650
+      ),
       mfaTotpSecret: normalizeString(safeEnv.PREMIUM_MFA_TOTP_SECRET || ''),
       adminIpAllowlist: normalizeString(safeEnv.PREMIUM_ADMIN_IP_ALLOWLIST || ''),
       enforceSameOriginRequests: readNegatedBooleanEnvFlag(

@@ -6,6 +6,11 @@ struct AddAppointmentView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft = NewAppointmentDraft()
 
+    init(store: AgendaStore) {
+        self.store = store
+        _draft = State(initialValue: NewAppointmentDraft(planner: store.selectedPlanner))
+    }
+
     var body: some View {
         NavigationStack {
             Form {

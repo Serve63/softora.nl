@@ -1,12 +1,15 @@
 import SwiftUI
 
-struct LoginView: View {
+struct PinAccessView: View {
     let store: AgendaStore
 
-    @State private var email = ""
-    @State private var password = ""
-    @State private var otp = ""
-    @State private var remember = true
+    @State private var pin = ""
+    @State private var planner: Planner
+
+    init(store: AgendaStore) {
+        self.store = store
+        _planner = State(initialValue: store.selectedPlanner)
+    }
 
     var body: some View {
         NavigationStack {
@@ -29,15 +32,15 @@ struct LoginView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: "calendar.badge.clock")
+            Image(systemName: "lock.shield")
                 .font(.system(size: 44, weight: .semibold))
                 .foregroundStyle(Color.softoraBlue)
 
-            Text("Inloggen")
+            Text("Agenda openen")
                 .font(.largeTitle.bold())
                 .foregroundStyle(Color.softoraInk)
 
-            Text("Gebruik je bestaande Softora-login om de agenda te openen.")
+            Text("Kies wie je bent en vul je pincode in.")
                 .font(.body)
                 .foregroundStyle(Color.softoraMuted)
         }
@@ -46,46 +49,40 @@ struct LoginView: View {
 
     private var form: some View {
         VStack(spacing: 14) {
-            TextField("E-mailadres", text: $email)
-                .softoraEmailInput()
-                .autocorrectionDisabled()
-                .submitLabel(.next)
-
-            SecureField("Wachtwoord", text: $password)
-                .softoraPasswordInput()
-                .submitLabel(store.mfaRequired ? .next : .go)
-
-            if store.mfaRequired {
-                TextField("2FA-code", text: $otp)
-                    .softoraOneTimeCodeInput()
-            }
-
-            Toggle("Onthoud mij", isOn: $remember)
-
-            Button {
-                Task {
-                    await store.login(
-                        email: email,
-                        password: password,
-                        otp: otp,
-                        remember: remember
-                    )
+            Picker("Wie ben je?", selection: $planner) {
+                ForEach(Planner.appAccessCases) { planner in
+                    Text(planner.title).tag(planner)
                 }
-            } label: {
+            }
+            .pickerStyle(.segmented)
+
+            SecureField("Pincode", text: $pin)
+                .softoraOneTimeCodeInput()
+                .submitLabel(.go)
+                .onSubmit(openAgenda)
+
+            Button(action: openAgenda) {
                 HStack {
-                    if store.isLoggingIn {
+                    if store.isUnlocking {
                         ProgressView()
                     }
-                    Text(store.isLoggingIn ? "Inloggen..." : "Inloggen")
+                    Text(store.isUnlocking ? "Openen..." : "Open agenda")
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(store.isLoggingIn || email.isEmpty || password.isEmpty)
+            .disabled(store.isUnlocking || pin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .textFieldStyle(.roundedBorder)
         .softoraCard()
+    }
+
+    private func openAgenda() {
+        guard !store.isUnlocking else { return }
+        Task {
+            await store.unlock(pin: pin, planner: planner)
+        }
     }
 
     private var alertBinding: Binding<Bool> {
@@ -100,8 +97,8 @@ struct LoginView: View {
     }
 }
 
-struct LoginView_Previews: PreviewProvider {
+struct PinAccessView_Previews: PreviewProvider {
     static var previews: some View {
-        LoginView(store: AgendaStore(apiClient: SoftoraAPIClient()))
+        PinAccessView(store: AgendaStore(apiClient: SoftoraAPIClient()))
     }
 }

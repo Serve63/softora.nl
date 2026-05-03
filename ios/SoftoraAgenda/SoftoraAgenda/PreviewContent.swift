@@ -6,6 +6,7 @@ extension AgendaStore {
         store.isCheckingSession = false
         store.isAuthenticated = true
         store.displayName = "Softora"
+        store.selectedPlanner = .serve
         store.appointments = [
             AgendaAppointment(
                 id: "1",

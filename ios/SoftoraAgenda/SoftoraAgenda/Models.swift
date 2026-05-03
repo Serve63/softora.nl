@@ -10,10 +10,12 @@ struct PremiumSession: Decodable {
     let error: String?
 }
 
-struct LoginResponse: Decodable {
+struct AgendaAppLoginResponse: Decodable {
     let ok: Bool
     let authenticated: Bool?
-    let mfaRequired: Bool?
+    let who: String?
+    let email: String?
+    let displayName: String?
     let error: String?
 }
 
@@ -121,6 +123,8 @@ enum Planner: String, CaseIterable, Codable, Identifiable {
 
     var id: String { rawValue }
 
+    static let appAccessCases: [Planner] = [.serve, .martijn]
+
     init(rawAPIValue: String) {
         let normalized = rawAPIValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -171,6 +175,10 @@ struct NewAppointmentDraft {
     var time = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     var location = ""
     var notes = ""
+
+    init(planner: Planner = .serve) {
+        self.planner = planner
+    }
 
     var canSubmit: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
