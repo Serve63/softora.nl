@@ -1599,7 +1599,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260429h"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260503a"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
@@ -3311,8 +3311,8 @@
 
         void (async function () {
             try {
-                state.photoRestorePending = true; renderPage(); if (databaseHadBootstrapCustomers) releaseDatabaseBootShell(); await bootstrapCustomers(); releaseDatabaseBootShell();
-                void webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); }).finally(function () { state.photoRestorePending = false; renderPage(); });
+                state.photoRestorePending = true; renderPage(); const bootPhotosReady = databaseHadBootstrapCustomers && state.klanten.length ? await loadCustomerPhotoMap(state.klanten).then(function (photoMap) { state.klanten = mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten); renderPage(); return true; }).catch(function (error) { console.error("Databasefoto's laden voor boot mislukt:", error); return false; }) : false; if (!bootPhotosReady) await bootstrapCustomers();
+                await webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); }); state.photoRestorePending = false; renderPage(); await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 24); releaseDatabaseBootShell(); if (bootPhotosReady) void bootstrapCustomers().catch(function (error) { console.error("Database sync na foto-boot mislukt:", error); });
                 void databaseImportController.startAutoSync();
             } catch (error) { console.error("Database bootstrap mislukt:", error); state.photoRestorePending = false; renderPage(); } finally { releaseDatabaseBootShell(); }
         })();
