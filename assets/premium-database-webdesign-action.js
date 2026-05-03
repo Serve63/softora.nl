@@ -7,6 +7,7 @@
     const POLL_INTERVAL_MS = 2200;
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
+    const PHOTO_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEAAAAALAAAAA==";
 
     function normalizeString(value) {
         return String(value || "").trim();
@@ -40,6 +41,7 @@
         const pendingIds = new Set();
         const pendingJobs = new Map();
         const pollTimers = new Map();
+        let photoIntersectionObserver = null;
         ensureStyles();
 
         function getCustomerById(customerId) {
@@ -156,6 +158,58 @@
             if (typeof renderPage === "function") renderPage();
         }
 
+        function hydratePhotoFromNode(imageNode) {
+            if (!imageNode || imageNode.getAttribute("data-photo-loaded") === "1") return;
+
+            const customerId = normalizeString(imageNode.getAttribute("data-photo-id"));
+            const customer = getCustomerById(customerId);
+            const photo = normalizeString(customer && customer.websitePhoto);
+            if (!isValidWebsitePhotoDataUrl(photo)) {
+                imageNode.removeAttribute("src");
+                imageNode.setAttribute("data-photo-loaded", "1");
+                return;
+            }
+
+            imageNode.src = photo;
+            imageNode.setAttribute("data-photo-loaded", "1");
+            imageNode.removeAttribute("data-photo-id");
+        }
+
+        function hydratePhotoNodes(scopeNode) {
+            if (!global.document) return;
+
+            const root = scopeNode && scopeNode.querySelectorAll ? scopeNode : global.document;
+            const pendingPhotoNodes = Array.from(root.querySelectorAll('.photo-drop[data-has-photo="true"] img[data-photo-id]:not([data-photo-loaded="1"])'));
+            if (!pendingPhotoNodes.length) return;
+
+            if (!global.IntersectionObserver) {
+                pendingPhotoNodes.forEach(function (node) {
+                    hydratePhotoFromNode(node);
+                });
+                return;
+            }
+
+            if (photoIntersectionObserver) {
+                photoIntersectionObserver.disconnect();
+            } else {
+                photoIntersectionObserver = new global.IntersectionObserver(function (entries) {
+                    entries.forEach(function (entry) {
+                        if (!entry.isIntersecting) return;
+                        hydratePhotoFromNode(entry.target);
+                        photoIntersectionObserver.unobserve(entry.target);
+                    });
+                }, {
+                    root: null,
+                    rootMargin: "180px 0px",
+                    threshold: 0.01
+                });
+            }
+
+            pendingPhotoNodes.forEach(function (node) {
+                photoIntersectionObserver.observe(node);
+            });
+        }
+
         async function pollJob(jobId) {
             const storedJob = readPendingJobs().find(function (item) {
                 return item.jobId === jobId;
@@ -242,7 +296,9 @@
             const isRestoring = !hasPhoto && !isPending && Boolean(isRestoringPhotos(customer));
             const isLoading = isPending || isRestoring;
             const canGenerate = !hasPhoto && !isLoading && Boolean(resolveCustomerWebsiteUrl(customer));
-            const inner = hasPhoto ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\">" : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
+            const inner = hasPhoto
+                ? "<img src=\"" + escapeHtml(PHOTO_PLACEHOLDER) + "\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-photo-loaded=\"0\" loading=\"lazy\" decoding=\"async\" alt=\"" + escapeHtml(label) + "\">"
+                : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
             const remove = hasPhoto ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>" : "";
             const ariaLabel = hasPhoto ? "Websitefoto bekijken" : (isLoading ? (isPending ? "Webdesign wordt gemaakt" : "Websitefoto's worden hersteld") : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden"));
             const title = ariaLabel;
@@ -307,6 +363,7 @@
         return {
             generateForCustomer: generateForCustomer,
             render: render,
+            hydratePhotoNodes: hydratePhotoNodes,
             resumePendingJobs: resumePendingJobs
         };
     }
