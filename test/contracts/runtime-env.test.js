@@ -8,6 +8,10 @@ test('loadRuntimeEnv normalizes premium auth and supabase-derived keys', () => {
     NODE_ENV: 'production',
     PUBLIC_BASE_URL: ' https://softora.nl ',
     PREMIUM_LOGIN_EMAILS: ' Admin@Softora.NL, second@example.com;admin@softora.nl ',
+    AGENDA_APP_PIN_HASH: ' sha256:abc123 ',
+    AGENDA_APP_SERVE_EMAIL: ' Serve@Softora.NL ',
+    AGENDA_APP_MARTIJN_EMAIL: ' MARTIJN@Softora.NL ',
+    AGENDA_APP_SESSION_TTL_DAYS: '730',
     SUPABASE_STATE_KEY: ' core-v2 ',
   });
 
@@ -17,6 +21,10 @@ test('loadRuntimeEnv normalizes premium auth and supabase-derived keys', () => {
     'admin@softora.nl',
     'second@example.com',
   ]);
+  assert.equal(runtimeEnv.premiumAuth.agendaAppPinHash, 'sha256:abc123');
+  assert.equal(runtimeEnv.premiumAuth.agendaAppServeEmail, 'serve@softora.nl');
+  assert.equal(runtimeEnv.premiumAuth.agendaAppMartijnEmail, 'martijn@softora.nl');
+  assert.equal(runtimeEnv.premiumAuth.agendaAppSessionTtlDays, 730);
   assert.equal(runtimeEnv.supabase.stateKey, 'core-v2');
   assert.equal(runtimeEnv.supabase.callUpdateStateKeyPrefix, 'core-v2:call_update:');
   assert.equal(runtimeEnv.supabase.dismissedLeadsStateKey, 'core-v2:dismissed_leads');
@@ -133,6 +141,7 @@ test('loadRuntimeEnv preserves legacy boolean and numeric fallback rules', () =>
     ACTIVE_ORDER_AUTOMATION_GITHUB_PRIVATE: 'false',
     PREMIUM_SESSION_TTL_HOURS: '0',
     PREMIUM_SESSION_REMEMBER_TTL_DAYS: '9999',
+    AGENDA_APP_SESSION_TTL_DAYS: '99999',
     MAIL_IMAP_POLL_COOLDOWN_MS: '1',
     ENABLE_DEMO_CONFIRMATION_TASK: 'true',
   });
@@ -145,6 +154,9 @@ test('loadRuntimeEnv preserves legacy boolean and numeric fallback rules', () =>
   assert.equal(runtimeEnv.premiumAuth.enforceSameOriginRequests, true);
   assert.equal(runtimeEnv.premiumAuth.sessionTtlHours, 12);
   assert.equal(runtimeEnv.premiumAuth.sessionRememberTtlDays, 365);
+  assert.equal(runtimeEnv.premiumAuth.agendaAppServeEmail, 'serve@softora.nl');
+  assert.equal(runtimeEnv.premiumAuth.agendaAppMartijnEmail, 'martijn@softora.nl');
+  assert.equal(runtimeEnv.premiumAuth.agendaAppSessionTtlDays, 3650);
   assert.equal(runtimeEnv.mail.imapPollCooldownMs, 5_000);
   assert.equal(runtimeEnv.demoConfirmationTaskEnabled, true);
 });

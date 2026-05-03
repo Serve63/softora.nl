@@ -39,9 +39,9 @@ struct AgendaListView: View {
                     Button {
                         Task { await store.logout() }
                     } label: {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Image(systemName: "person.crop.circle.badge.arrow.forward")
                     }
-                    .accessibilityLabel("Uitloggen")
+                    .accessibilityLabel("Wissel persoon")
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -57,9 +57,9 @@ struct AgendaListView: View {
                     Button {
                         Task { await store.logout() }
                     } label: {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Image(systemName: "person.crop.circle.badge.arrow.forward")
                     }
-                    .accessibilityLabel("Uitloggen")
+                    .accessibilityLabel("Wissel persoon")
                 }
 
                 ToolbarItem(placement: .automatic) {
@@ -73,8 +73,8 @@ struct AgendaListView: View {
                 #endif
             }
             .safeAreaInset(edge: .top) {
-                if !store.displayName.isEmpty {
-                    Text("Ingelogd als \(store.displayName)")
+                if store.isAuthenticated {
+                    Text("Binnen als \(store.selectedPlanner.title)")
                         .font(.caption)
                         .foregroundStyle(Color.softoraMuted)
                         .frame(maxWidth: .infinity)

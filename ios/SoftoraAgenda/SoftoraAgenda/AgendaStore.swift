@@ -4,21 +4,27 @@ import Observation
 @MainActor
 @Observable
 final class AgendaStore {
+    @ObservationIgnored private let accessStorage: AgendaAccessStorage
     private let apiClient: SoftoraAPIClient
 
     var isCheckingSession = true
     var isAuthenticated = false
     var isLoadingAppointments = false
-    var isLoggingIn = false
+    var isUnlocking = false
     var isSavingAppointment = false
     var appointments: [AgendaAppointment] = []
     var displayName = ""
     var email = ""
-    var mfaRequired = false
+    var selectedPlanner: Planner
     var alertMessage: String?
 
-    init(apiClient: SoftoraAPIClient) {
+    init(
+        apiClient: SoftoraAPIClient,
+        accessStorage: AgendaAccessStorage = AgendaAccessStorage()
+    ) {
         self.apiClient = apiClient
+        self.accessStorage = accessStorage
+        self.selectedPlanner = accessStorage.selectedPlanner
     }
 
     func bootstrap() async {
@@ -37,28 +43,24 @@ final class AgendaStore {
         }
     }
 
-    func login(email: String, password: String, otp: String, remember: Bool) async {
-        isLoggingIn = true
+    func unlock(pin: String, planner: Planner) async {
+        isUnlocking = true
         alertMessage = nil
-        defer { isLoggingIn = false }
+        defer { isUnlocking = false }
 
         do {
-            let response = try await apiClient.login(
-                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                password: password,
-                otp: otp.trimmingCharacters(in: .whitespacesAndNewlines),
-                remember: remember
+            let response = try await apiClient.unlockAgendaApp(
+                pin: pin.trimmingCharacters(in: .whitespacesAndNewlines),
+                who: planner
             )
-            mfaRequired = response.mfaRequired == true
             guard response.ok, response.authenticated == true else {
-                throw SoftoraAPIError.server(response.error ?? "Inloggen mislukt.")
+                throw SoftoraAPIError.server(response.error ?? "Pincode klopt niet.")
             }
+            selectedPlanner = Planner(rawAPIValue: response.who ?? planner.apiValue)
+            accessStorage.selectedPlanner = selectedPlanner
             let session = try await apiClient.fetchSession()
             apply(session)
             await loadAppointments(fresh: true)
-        } catch SoftoraAPIError.mfaRequired(let message) {
-            mfaRequired = true
-            alertMessage = message
         } catch {
             alertMessage = error.localizedDescription
         }
@@ -74,6 +76,7 @@ final class AgendaStore {
         displayName = ""
         email = ""
         appointments = []
+        accessStorage.clear()
     }
 
     func loadAppointments(fresh: Bool) async {
@@ -117,9 +120,35 @@ final class AgendaStore {
         isAuthenticated = session.authenticated
         displayName = session.displayName
         email = session.email
-        mfaRequired = session.mfaEnabled
         if !session.configured {
             alertMessage = "Softora-login is nog niet volledig ingesteld op de server."
         }
+    }
+}
+
+final class AgendaAccessStorage {
+    private let defaults: UserDefaults
+    private let plannerKey = "nl.softora.agenda.selectedPlanner"
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    var selectedPlanner: Planner {
+        get {
+            guard let rawValue = defaults.string(forKey: plannerKey),
+                  let planner = Planner(rawValue: rawValue),
+                  Planner.appAccessCases.contains(planner) else {
+                return .serve
+            }
+            return planner
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: plannerKey)
+        }
+    }
+
+    func clear() {
+        defaults.removeObject(forKey: plannerKey)
     }
 }

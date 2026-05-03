@@ -10,7 +10,7 @@ struct RootView: View {
             } else if store.isAuthenticated {
                 AgendaListView(store: store)
             } else {
-                LoginView(store: store)
+                PinAccessView(store: store)
             }
         }
         .tint(Color.softoraBlue)

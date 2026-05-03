@@ -60,6 +60,11 @@ test('server app runtime bootstrap flattens env config without changing values',
       sessionTtlHours: 24,
       sessionRememberTtlDays: 30,
       sessionCookieName: 'premium_session',
+      agendaAppPin: '',
+      agendaAppPinHash: 'sha256:agenda-pin',
+      agendaAppServeEmail: 'serve@softora.test',
+      agendaAppMartijnEmail: 'martijn@softora.test',
+      agendaAppSessionTtlDays: 3650,
       mfaTotpSecret: 'totp',
       adminIpAllowlist: ['127.0.0.1'],
       enforceSameOriginRequests: true,
@@ -91,6 +96,10 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.OPENAI_MODEL, 'gpt-test');
   assert.equal(envConfig.SUPABASE_STATE_TABLE, 'runtime_state');
   assert.deepEqual(envConfig.PREMIUM_LOGIN_EMAILS, ['serve@softora.test']);
+  assert.equal(envConfig.AGENDA_APP_PIN_HASH, 'sha256:agenda-pin');
+  assert.equal(envConfig.AGENDA_APP_SERVE_EMAIL, 'serve@softora.test');
+  assert.equal(envConfig.AGENDA_APP_MARTIJN_EMAIL, 'martijn@softora.test');
+  assert.equal(envConfig.AGENDA_APP_SESSION_TTL_DAYS, 3650);
   assert.equal(envConfig.MAIL_IMAP_MAILBOX, 'INBOX');
   assert.equal(envConfig.SECURITY_CONTACT_EMAIL, 'security@test.invalid');
 });
@@ -187,6 +196,11 @@ test('server app runtime bootstrap creates app, runtime state and known page map
       sessionTtlHours: 24,
       sessionRememberTtlDays: 30,
       sessionCookieName: 'premium_session',
+      agendaAppPin: '',
+      agendaAppPinHash: '',
+      agendaAppServeEmail: 'serve@softora.nl',
+      agendaAppMartijnEmail: 'martijn@softora.nl',
+      agendaAppSessionTtlDays: 3650,
       mfaTotpSecret: '',
       adminIpAllowlist: [],
       enforceSameOriginRequests: true,
