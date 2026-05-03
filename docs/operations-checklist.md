@@ -1,8 +1,10 @@
 # Operationele Checklist
 
 ## Voor een release
+- `npm run check:production-deploy-source`
 - `npm run verify:critical`
 - `npm run backup:runtime`
+- `npm run deploy:production`
 - health endpoints controleren
 
 ## Dagelijks

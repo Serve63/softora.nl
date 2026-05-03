@@ -360,9 +360,15 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const verifyCriticalSource = readRepoFile('scripts/verify-critical.js');
   const hygieneSource = readRepoFile('scripts/check-repo-hygiene.sh');
   const cleanSource = readRepoFile('scripts/clean-local-artifacts.sh');
+  const deployGuardSource = readRepoFile('scripts/guard-production-deploy-source.js');
+  const safeDeploySource = readRepoFile('scripts/deploy-production-safe.js');
+  const agentsSource = readRepoFile('AGENTS.md');
+  const protocolSource = readRepoFile('docs/quality-protocol.md');
 
   assert.equal(packageJson.scripts['check:repo-hygiene'], 'bash scripts/check-repo-hygiene.sh');
   assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
+  assert.equal(packageJson.scripts['check:production-deploy-source'], 'node scripts/guard-production-deploy-source.js');
+  assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);
@@ -370,6 +376,12 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(hygieneSource, /npm run clean:local/);
   assert.match(cleanSource, /\.vercel\/output/);
   assert.doesNotMatch(cleanSource, /rm -rf -- "\.vercel"/);
+  assert.match(deployGuardSource, /merge-base', '--is-ancestor', 'origin\/main', 'HEAD'/);
+  assert.match(deployGuardSource, /branch', '-r', '--contains', 'HEAD'/);
+  assert.match(safeDeploySource, /assertSafeProductionDeploySource\(\)/);
+  assert.match(safeDeploySource, /verify:critical/);
+  assert.match(agentsSource, /Productie deployen mag alleen via `npm run deploy:production`/);
+  assert.match(protocolSource, /Productie deploys lopen alleen via `npm run deploy:production`/);
 });
 
 test('agent guardrails helpers recognize approved and high-risk paths', () => {

@@ -15,6 +15,8 @@
     "check:quality-lock": "node scripts/check-quality-lock.js",
     "clean:local": "bash scripts/clean-local-artifacts.sh",
     "check:deps": "npm audit --omit=dev",
+    "check:production-deploy-source": "node scripts/guard-production-deploy-source.js",
+    "deploy:production": "node scripts/deploy-production-safe.js",
     "verify:critical": "node scripts/verify-critical.js",
     "verify:security": "npm run check:secrets && npm run check:deps",
     "backup:runtime": "node scripts/export-runtime-backup.js"
