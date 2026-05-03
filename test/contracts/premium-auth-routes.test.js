@@ -282,6 +282,36 @@ test('premium agenda app login maps identity to user and sets long session cooki
   assert.equal(auditEvents.at(-1).reason, 'security_agenda_app_login_success');
 });
 
+test('premium agenda app login can resolve users by first name when mapped emails differ', async () => {
+  const { coordinator, tokenCalls } = createFixture({
+    agendaAppPin: '2468',
+    users: [
+      {
+        id: 'usr_custom_serve',
+        firstName: 'Servé',
+        lastName: 'Creusen',
+        email: 'planning@softora.nl',
+        role: 'admin',
+        status: 'active',
+        passwordHash: 'hash:irrelevant',
+      },
+    ],
+  });
+  const req = createRequest({
+    originalUrl: '/api/agenda-app/login',
+    body: { who: 'serve', pin: '2468' },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.agendaAppLoginResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.email, 'planning@softora.nl');
+  assert.equal(res.body.displayName, 'Servé Creusen');
+  assert.equal(tokenCalls[0].email, 'planning@softora.nl');
+});
+
 test('premium agenda app login rejects wrong pins and inactive mapped users', async () => {
   const invalidFixture = createFixture({
     agendaAppPinHash: 'hash:2468',

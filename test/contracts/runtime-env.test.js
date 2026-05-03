@@ -52,6 +52,19 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, false);
 });
 
+test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () => {
+  const fallbackRuntimeEnv = loadRuntimeEnv({
+    PREMIUM_SETTINGS_CONFIRM_PIN: ' 123456 ',
+  });
+  const explicitRuntimeEnv = loadRuntimeEnv({
+    PREMIUM_SETTINGS_CONFIRM_PIN: '123456',
+    AGENDA_APP_PIN: '654321',
+  });
+
+  assert.equal(fallbackRuntimeEnv.premiumAuth.agendaAppPin, '123456');
+  assert.equal(explicitRuntimeEnv.premiumAuth.agendaAppPin, '654321');
+});
+
 test('loadRuntimeEnv derives generic imap host from smtp subdomain', () => {
   const runtimeEnv = loadRuntimeEnv({
     MAIL_SMTP_HOST: 'smtp.softora.nl',

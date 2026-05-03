@@ -164,7 +164,12 @@ function loadRuntimeEnv(env = process.env) {
         365
       ),
       sessionCookieName: 'softora_premium_session',
-      agendaAppPin: normalizeString(safeEnv.AGENDA_APP_PIN || ''),
+      agendaAppPin: normalizeString(
+        safeEnv.AGENDA_APP_PIN ||
+          safeEnv.PREMIUM_SETTINGS_CONFIRM_PIN ||
+          safeEnv.COLDCALLING_START_CONFIRM_PIN ||
+          ''
+      ),
       agendaAppPinHash: normalizeString(safeEnv.AGENDA_APP_PIN_HASH || ''),
       agendaAppServeEmail: normalizeLoginEmailValue(
         safeEnv.AGENDA_APP_SERVE_EMAIL || 'serve@softora.nl'
