@@ -13,11 +13,15 @@ const REQUIRED_QUALITY_FILES = Object.freeze([
   '.github/workflows/repo-hygiene.yml',
   '.github/workflows/verify-critical.yml',
   'docs/quality-protocol.md',
+  'docs/operations-checklist.md',
   'docs/repo-map.md',
   'scripts/check-agent-guardrails.js',
   'scripts/check-quality-lock.js',
   'scripts/check-repo-hygiene.sh',
+  'scripts/deploy-production-safe.js',
+  'scripts/guard-production-deploy-source.js',
   'scripts/verify-critical.js',
+  'test/contracts/production-deploy-guard.test.js',
 ]);
 
 const GUARDRail_BYPASS_ENV_NAMES = Object.freeze([
@@ -128,6 +132,8 @@ function listQualityLockViolations(options = {}) {
     'check:guardrails': 'node scripts/check-agent-guardrails.js',
     'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
     'check:quality-lock': 'node scripts/check-quality-lock.js',
+    'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
+    'deploy:production': 'node scripts/deploy-production-safe.js',
     'verify:critical': 'node scripts/verify-critical.js',
   };
   Object.entries(expectedScripts).forEach(([scriptName, expectedCommand]) => {
@@ -145,6 +151,31 @@ function listQualityLockViolations(options = {}) {
         const pattern = new RegExp(`\\['run',\\s*'${scriptName.replace(':', '\\:')}'\\]`);
         if (!pattern.test(verifyCriticalSource)) {
           violations.push(`[quality-lock] verify:critical mist npm run ${scriptName}.`);
+        }
+      }
+    );
+  }
+
+  if (trackedFileSet.has('scripts/guard-production-deploy-source.js')) {
+    const deployGuardSource = readFile('scripts/guard-production-deploy-source.js');
+    if (!/mainRef\.stdout !== headRef\.stdout/.test(deployGuardSource)) {
+      violations.push(
+        '[quality-lock] production deploy guard moet alleen exact origin/main accepteren.'
+      );
+    }
+    if (!/exact origin\/main/.test(deployGuardSource)) {
+      violations.push(
+        '[quality-lock] production deploy guard mist de exacte-origin/main blokkade.'
+      );
+    }
+  }
+
+  if (trackedFileSet.has('scripts/deploy-production-safe.js')) {
+    const safeDeploySource = readFile('scripts/deploy-production-safe.js');
+    ['assertSafeProductionDeploySource()', "projectName: 'softora-nl'", "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'"].forEach(
+      (requiredText) => {
+        if (!safeDeploySource.includes(requiredText)) {
+          violations.push(`[quality-lock] deploy-production-safe.js mist "${requiredText}".`);
         }
       }
     );

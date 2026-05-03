@@ -14,32 +14,28 @@ function createGitStub(overrides = {}) {
     'status --porcelain': { status: 0, stdout: '' },
     'fetch origin main --quiet': { status: 0, stdout: '' },
     'rev-parse --verify origin/main': { status: 0, stdout: 'main-sha' },
-    'rev-parse --verify HEAD': { status: 0, stdout: 'head-sha' },
-    'merge-base --is-ancestor origin/main HEAD': { status: 0, stdout: '' },
-    'branch -r --contains HEAD': { status: 0, stdout: 'origin/codex/safe-branch' },
+    'rev-parse --verify HEAD': { status: 0, stdout: 'main-sha' },
     ...overrides,
   };
   return (args) => responses[args.join(' ')] || { status: 1, stdout: '', stderr: 'unexpected git call' };
 }
 
-test('production deploy guard accepts only clean pushed commits that contain origin/main', () => {
+test('production deploy guard accepts only clean checkouts exactly at origin/main', () => {
   const violations = listProductionDeploySourceViolations({ git: createGitStub() });
 
   assert.deepEqual(violations, []);
 });
 
-test('production deploy guard blocks dirty worktrees, stale branches and unpushed commits', () => {
+test('production deploy guard blocks dirty worktrees and branch commits outside origin/main', () => {
   const violations = listProductionDeploySourceViolations({
     git: createGitStub({
       'status --porcelain': { status: 0, stdout: ' M premium-personeel-dashboard.html' },
-      'merge-base --is-ancestor origin/main HEAD': { status: 1, stdout: '' },
-      'branch -r --contains HEAD': { status: 0, stdout: '' },
+      'rev-parse --verify HEAD': { status: 0, stdout: 'feature-sha' },
     }),
   });
 
   assert.match(violations.join('\n'), /Werkmap is niet schoon/);
-  assert.match(violations.join('\n'), /bevat niet alle commits van origin\/main/);
-  assert.match(violations.join('\n'), /staat nog niet op origin/);
+  assert.match(violations.join('\n'), /exact origin\/main/);
 });
 
 test('production deploy guard blocks when origin/main cannot be refreshed', () => {

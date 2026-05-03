@@ -49,16 +49,10 @@ function listProductionDeploySourceViolations(options = {}) {
     violations.push('[production-deploy] HEAD bestaat niet; productie-deploy geblokkeerd.');
   }
 
-  if (mainRef.status === 0 && headRef.status === 0) {
-    const containsMain = git(['merge-base', '--is-ancestor', 'origin/main', 'HEAD']);
-    if (containsMain.status !== 0) {
-      violations.push('[production-deploy] Deze code bevat niet alle commits van origin/main. Rebase/merge main eerst.');
-    }
-
-    const remoteBranches = git(['branch', '-r', '--contains', 'HEAD']);
-    if (remoteBranches.status !== 0 || !/\borigin\//.test(remoteBranches.stdout)) {
-      violations.push('[production-deploy] Deze commit staat nog niet op origin. Push eerst, deploy daarna.');
-    }
+  if (mainRef.status === 0 && headRef.status === 0 && mainRef.stdout !== headRef.stdout) {
+    violations.push(
+      '[production-deploy] Productie mag alleen vanaf exact origin/main worden gedeployed. Merge eerst via PR naar main en deploy daarna opnieuw vanuit origin/main.'
+    );
   }
 
   return violations;
@@ -77,7 +71,7 @@ function assertSafeProductionDeploySource(options = {}) {
 function runCli() {
   try {
     assertSafeProductionDeploySource();
-    console.log('[production-deploy] Bron is veilig: schoon, gepusht en bovenop origin/main.');
+    console.log('[production-deploy] Bron is veilig: schoon en exact gelijk aan origin/main.');
   } catch (error) {
     console.error(error.message || String(error));
     process.exit(1);

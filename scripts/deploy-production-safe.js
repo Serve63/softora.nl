@@ -56,7 +56,7 @@ function run(label, command, args) {
 
 try {
   assertSafeProductionDeploySource();
-  console.log('[production-deploy] Bron is veilig: schoon, gepusht en bovenop origin/main.');
+  console.log('[production-deploy] Bron is veilig: schoon en exact gelijk aan origin/main.');
 } catch (error) {
   console.error(error.message || String(error));
   process.exit(1);
