@@ -1834,8 +1834,8 @@
         if (!isPremiumPersonnelContext) return;
         if (document.documentElement.dataset.premiumSidebarProfileInit === "1") return;
         document.documentElement.dataset.premiumSidebarProfileInit = "1";
-        const triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
-        if (!triggerEl) {
+        const triggerEl = document.querySelector("[data-sidebar-profile-trigger]") || document.querySelector(".sidebar-user .sidebar-user-trigger");
+        if (!document.querySelector("[data-sidebar-user-name]")) {
             markPremiumSidebarProfileResolved();
             return;
         }
