@@ -376,8 +376,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(hygieneSource, /npm run clean:local/);
   assert.match(cleanSource, /\.vercel\/output/);
   assert.doesNotMatch(cleanSource, /rm -rf -- "\.vercel"/);
-  assert.match(deployGuardSource, /merge-base', '--is-ancestor', 'origin\/main', 'HEAD'/);
-  assert.match(deployGuardSource, /branch', '-r', '--contains', 'HEAD'/);
+  assert.match(deployGuardSource, /mainRef\.stdout !== headRef\.stdout/);
+  assert.match(deployGuardSource, /exact origin\/main/);
   assert.match(safeDeploySource, /assertSafeProductionDeploySource\(\)/);
   assert.match(safeDeploySource, /verify:critical/);
   assert.match(agentsSource, /Productie deployen mag alleen via `npm run deploy:production`/);

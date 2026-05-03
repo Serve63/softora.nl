@@ -56,7 +56,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - `npm run verify:critical` is groen voor afronding.
 - De kwaliteitsbaseline blijft intact: guardrails, contracttests, smoke-tests en secrets-checks blijven onderdeel van `verify:critical`.
 - `main` blijft beschermd via de GitHub ruleset "Softora main quality gate"; wijzigingen landen via PR vanaf `codex/*` branches.
-- Productie deploys lopen alleen via `npm run deploy:production`; dat script weigert deploys vanaf branches die niet bovenop actuele `origin/main` liggen, vanaf ongepushte commits of vanuit een vuile worktree.
+- Productie deploys lopen alleen via `npm run deploy:production`; dat script weigert alles behalve een schone checkout die exact gelijk is aan de actuele `origin/main`.
 - Grote wijzigingen landen in kleine stappen; brede productiediffs en grote inline scripts worden door guardrails geblokkeerd tenzij bewust overruled.
 - Oversized frontend-bestanden mogen standaard niet netto groeien; splits eerst op of noteer bewust waarom `ALLOW_OVERSIZED_FRONTEND_GROWTH` nodig is.
 - Premium shell/sidebar wijzigingen houden `test/contracts/premium-sidebar-shell-scope.test.js` actueel.

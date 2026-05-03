@@ -1383,7 +1383,7 @@
                     <input type="hidden" id="manualAppointmentActivityTime" autocomplete="off">
                     <input type="hidden" id="manualAppointmentLegendChoice" autocomplete="off">
                     <div class="modal-workspace-field">
-                        <div class="modal-workspace-label">Voor wie?</div>
+                        <div class="modal-workspace-label" id="manualAppointmentWhoLabel">Voor wie?</div>
                         <div class="manual-appointment-choice-grid manual-appointment-choice-grid--who" id="manualAppointmentWhoChoices" role="group" aria-label="Voor wie is deze afspraak?">
                             <button class="manual-appointment-choice" type="button" data-manual-who="serve">
                                 <span class="manual-appointment-choice-title">Servé</span>
@@ -2361,6 +2361,8 @@
         return normalizeManualLegendChoice(manualAppointmentMeetingType);
     }
 
+    function syncManualAppointmentDetailsMode() { const isMeeting = manualAppointmentKind === 'meeting', whoLabel = document.getElementById('manualAppointmentWhoLabel'), whoChoices = document.getElementById('manualAppointmentWhoChoices'), bothChoice = document.querySelector('[data-manual-who="both"]'); if (whoLabel) whoLabel.textContent = isMeeting ? 'Wie heeft deze lead geregeld?' : 'Voor wie?'; if (whoChoices) whoChoices.setAttribute('aria-label', isMeeting ? 'Wie heeft deze lead geregeld?' : 'Voor wie is deze afspraak?'); if (bothChoice) bothChoice.hidden = isMeeting; if (isMeeting && manualAppointmentWho === 'both') manualAppointmentWho = ''; }
+
     function setManualAppointmentStep(step) {
         manualAppointmentStep = step || 'kind';
         const panels = {
@@ -2377,9 +2379,8 @@
         if (manualAppointmentBackBtn) {
             manualAppointmentBackBtn.hidden = manualAppointmentStep === 'kind';
         }
-        if (manualAppointmentSubmitBtn) {
-            manualAppointmentSubmitBtn.textContent = manualAppointmentStep === 'details' ? 'Toevoegen' : 'Volgende';
-        }
+        if (manualAppointmentSubmitBtn) manualAppointmentSubmitBtn.textContent = manualAppointmentStep === 'details' ? 'Toevoegen' : 'Volgende';
+        syncManualAppointmentDetailsMode();
         setManualAppointmentActiveChoices();
         setManualAppointmentStatus('');
     }
@@ -2492,7 +2493,7 @@
         const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
         const location = manualAppointmentLocationEl ? String(manualAppointmentLocationEl.value || '').trim() : '';
         const notes = manualAppointmentNotesEl ? String(manualAppointmentNotesEl.value || '').trim() : '';
-        const who = String(manualAppointmentWho || '').trim();
+        const isMeeting = manualAppointmentKind === 'meeting', who = isMeeting ? 'both' : String(manualAppointmentWho || '').trim(), leadOwnerKey = isMeeting && (manualAppointmentWho === 'serve' || manualAppointmentWho === 'martijn') ? manualAppointmentWho : '';
 
         if (manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
             setManualAppointmentStatus('Kies eerst wat je wilt inplannen.', 'error');
@@ -2502,7 +2503,8 @@
             setManualAppointmentStatus('Kies welke meeting je wilt inplannen.', 'error');
             return;
         }
-        if (who !== 'serve' && who !== 'martijn' && who !== 'both') {
+        if (isMeeting && !leadOwnerKey) { setManualAppointmentStatus('Kies wie deze lead heeft geregeld.', 'error'); return; }
+        if (!isMeeting && who !== 'serve' && who !== 'martijn' && who !== 'both') {
             setManualAppointmentStatus('Kies voor wie deze afspraak is.', 'error');
             return;
         }
@@ -2530,7 +2532,7 @@
                 title: activity,
                 time: timeVal,
                 activityTime: timeVal,
-                legendChoice,
+                legendChoice, appointmentKind: manualAppointmentKind, manualLeadOwner: leadOwnerKey, leadOwnerKey,
                 activity,
                 location,
                 notes,
@@ -3606,16 +3608,13 @@
             openAppointmentFromElement(appointment);
         });
     }
-    if (manualAppointmentCloseBtn) {
-        manualAppointmentCloseBtn.addEventListener('click', () => closeManualAppointmentModal());
-    }
-    if (manualAppointmentBackBtn) {
-        manualAppointmentBackBtn.addEventListener('click', () => goBackManualAppointmentStep());
-    }
+    if (manualAppointmentCloseBtn) manualAppointmentCloseBtn.addEventListener('click', () => closeManualAppointmentModal());
+    if (manualAppointmentBackBtn) manualAppointmentBackBtn.addEventListener('click', () => goBackManualAppointmentStep());
     document.querySelectorAll('[data-manual-kind]').forEach((button) => {
         button.addEventListener('click', () => {
             manualAppointmentKind = String(button.getAttribute('data-manual-kind') || '').trim();
             if (manualAppointmentKind !== 'meeting') manualAppointmentMeetingType = '';
+            syncManualAppointmentDetailsMode();
             setManualAppointmentActiveChoices();
         });
     });

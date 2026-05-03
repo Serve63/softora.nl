@@ -28,12 +28,16 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
     '.github/workflows/agent-guardrails.yml',
     '.github/workflows/repo-hygiene.yml',
     'docs/quality-protocol.md',
+    'docs/operations-checklist.md',
     'docs/repo-map.md',
     'package.json',
     'scripts/check-agent-guardrails.js',
     'scripts/check-quality-lock.js',
     'scripts/check-repo-hygiene.sh',
+    'scripts/deploy-production-safe.js',
+    'scripts/guard-production-deploy-source.js',
     'scripts/verify-critical.js',
+    'test/contracts/production-deploy-guard.test.js',
     'test/contracts/example.test.js',
     'premium-personeel-dashboard.html',
   ];
@@ -43,9 +47,20 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
         'check:guardrails': 'node scripts/check-agent-guardrails.js',
         'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
         'check:quality-lock': 'node scripts/check-quality-lock.js',
+        'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
+        'deploy:production': 'node scripts/deploy-production-safe.js',
         'verify:critical': 'node scripts/verify-critical.js',
       },
     }),
+    'scripts/deploy-production-safe.js': [
+      'assertSafeProductionDeploySource()',
+      "projectName: 'softora-nl'",
+      "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'",
+    ].join('\n'),
+    'scripts/guard-production-deploy-source.js': [
+      'if (mainRef.status === 0 && headRef.status === 0 && mainRef.stdout !== headRef.stdout) {}',
+      'exact origin/main',
+    ].join('\n'),
     'scripts/verify-critical.js': [
       "['run', 'check:guardrails'],",
       "['run', 'check:repo-hygiene'],",
@@ -94,12 +109,16 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
     '.github/workflows/agent-guardrails.yml',
     '.github/workflows/repo-hygiene.yml',
     'docs/quality-protocol.md',
+    'docs/operations-checklist.md',
     'docs/repo-map.md',
     'package.json',
     'scripts/check-agent-guardrails.js',
     'scripts/check-quality-lock.js',
     'scripts/check-repo-hygiene.sh',
+    'scripts/deploy-production-safe.js',
+    'scripts/guard-production-deploy-source.js',
     'scripts/verify-critical.js',
+    'test/contracts/production-deploy-guard.test.js',
     'premium-personeel-dashboard.html',
   ];
   const fileMap = {
@@ -108,9 +127,20 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
         'check:guardrails': 'node scripts/check-agent-guardrails.js',
         'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
         'check:quality-lock': 'node scripts/check-quality-lock.js',
+        'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
+        'deploy:production': 'node scripts/deploy-production-safe.js',
         'verify:critical': 'node scripts/verify-critical.js',
       },
     }),
+    'scripts/deploy-production-safe.js': [
+      'assertSafeProductionDeploySource()',
+      "projectName: 'softora-nl'",
+      "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'",
+    ].join('\n'),
+    'scripts/guard-production-deploy-source.js': [
+      'if (mainRef.status === 0 && headRef.status === 0 && mainRef.stdout !== headRef.stdout) {}',
+      'exact origin/main',
+    ].join('\n'),
     'scripts/verify-critical.js': [
       "['run', 'check:guardrails'],",
       "['run', 'check:repo-hygiene'],",
@@ -151,6 +181,11 @@ test('quality lock remains part of verify critical and the PR checklist', () => 
   );
 
   assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
+  assert.equal(
+    packageJson.scripts['check:production-deploy-source'],
+    'node scripts/guard-production-deploy-source.js'
+  );
+  assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);
   assert.match(pullRequestTemplate, /npm run verify:critical/);
   assert.match(pullRequestTemplate, /npm run check:guardrails/);

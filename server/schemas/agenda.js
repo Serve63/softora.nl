@@ -271,11 +271,21 @@ function validateManualAgendaAppointmentRequest(req) {
       time: truncateText(normalizeString(body.time || body.appointmentTime || ''), 16),
       location: truncateText(normalizeString(body.location || body.appointmentLocation || ''), 220),
       activity: truncateText(normalizeString(body.activity || body.company || ''), 500),
+      title: truncateText(normalizeString(body.title || body.activity || body.company || ''), 500),
       availableAgain: truncateText(
         normalizeString(body.availableAgain || body.available_after || ''),
         16
       ),
       who: truncateText(normalizeString(body.who || body.manualWho || ''), 32),
+      appointmentKind: truncateText(normalizeString(body.appointmentKind || body.manualAppointmentKind || ''), 32),
+      manualLeadOwner: truncateText(normalizeString(body.manualLeadOwner || body.leadOwnerKey || ''), 80),
+      leadOwnerKey: truncateText(normalizeString(body.leadOwnerKey || body.manualLeadOwner || ''), 80),
+      leadOwnerName: truncateText(normalizeString(body.leadOwnerName || ''), 120),
+      leadOwnerFullName: truncateText(normalizeString(body.leadOwnerFullName || body.leadOwnerName || ''), 160),
+      leadOwnerEmail: truncateText(normalizeString(body.leadOwnerEmail || ''), 160),
+      notes: truncateText(normalizeString(body.notes || body.opmerkingen || ''), 1000),
+      legendChoice: truncateText(normalizeString(body.legendChoice || body.manualLegendChoice || ''), 64),
+      activityTime: truncateText(normalizeString(body.activityTime || body.activity_time || ''), 16),
     },
   };
 }
