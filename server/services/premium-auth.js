@@ -103,6 +103,37 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     return `${firstName} ${lastName}`.trim() || normalizePremiumSessionEmail(user?.email || '');
   }
 
+  function normalizeAgendaAppIdentityCandidate(value) {
+    const normalized = normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const token = normalized.split(/[^a-z0-9]+/).find(Boolean) || normalized;
+    return normalizeAgendaAppIdentity(token);
+  }
+
+  function getAgendaAppUserIdentityCandidates(user) {
+    const email = normalizePremiumSessionEmail(user?.email || '');
+    const emailLocalPart = email.split('@')[0] || '';
+    return [
+      user?.firstName,
+      user?.voornaam,
+      getUserDisplayName(user),
+      emailLocalPart,
+    ]
+      .map((value) => normalizeAgendaAppIdentityCandidate(value))
+      .filter(Boolean);
+  }
+
+  function findAgendaAppUser(users, email, identity) {
+    const exactUser = premiumUsersStore.findUserByEmail(users, email);
+    if (exactUser) return exactUser;
+    if (!Array.isArray(users) || !identity) return null;
+    return (
+      users.find((user) => getAgendaAppUserIdentityCandidates(user).includes(identity)) || null
+    );
+  }
+
   async function sendSessionResponse(req, res) {
     const authState = await getResolvedPremiumAuthState(req);
     res.setHeader('Cache-Control', 'no-store, private');
@@ -474,7 +505,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       });
     }
 
-    const matchedUser = premiumUsersStore.findUserByEmail(users, email);
+    const matchedUser = findAgendaAppUser(users, email, identity);
     if (!matchedUser || !isAgendaAppPinValid(pin)) {
       appendAuditEvent(
         req,
@@ -512,8 +543,9 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     }
 
     const sessionMaxAgeMs = getAgendaAppSessionMaxAgeMs();
+    const sessionEmail = normalizePremiumSessionEmail(matchedUser.email || email);
     const sessionToken = createPremiumSessionToken({
-      email,
+      email: sessionEmail,
       maxAgeMs: sessionMaxAgeMs,
       userId: matchedUser.id,
       role: matchedUser.role,
@@ -526,7 +558,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
         type: 'agenda_app_login_success',
         severity: 'info',
         success: true,
-        email,
+        email: sessionEmail,
         detail: 'Agenda-app login succesvol met langdurige sessie.',
       },
       'security_agenda_app_login_success'
@@ -536,7 +568,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       ok: true,
       authenticated: true,
       who: identity,
-      email,
+      email: sessionEmail,
       role: matchedUser.role,
       displayName: getUserDisplayName(matchedUser),
     });
