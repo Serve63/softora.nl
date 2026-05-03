@@ -192,12 +192,6 @@ private struct PinHeader: View {
                 .font(.softoraBody(22, weight: .semibold))
                 .foregroundStyle(Color.softoraInk)
 
-            Text("Typ je zes cijfers. Daarna opent de agenda automatisch.")
-                .font(.softoraBody(14))
-                .foregroundStyle(Color.softoraMuted)
-                .lineSpacing(4)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 300)
         }
     }
 }
