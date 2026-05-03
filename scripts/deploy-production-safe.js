@@ -68,3 +68,4 @@ run('Vercel productieomgeving ophalen', npxCmd, ['vercel', 'pull', '--yes', '--e
 assertExpectedVercelProjectLink();
 run('Vercel productie-build', npxCmd, ['vercel', 'build', '--prod']);
 run('Vercel productie-deploy', npxCmd, ['vercel', 'deploy', '--prebuilt', '--prod', '--yes']);
+run('live productieversie controleren', npmCmd, ['run', 'check:live-production-version']);

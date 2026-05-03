@@ -36,7 +36,9 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
     'scripts/check-repo-hygiene.sh',
     'scripts/deploy-production-safe.js',
     'scripts/guard-production-deploy-source.js',
+    'scripts/check-live-production-version.js',
     'scripts/verify-critical.js',
+    'test/contracts/production-live-version-guard.test.js',
     'test/contracts/production-deploy-guard.test.js',
     'test/contracts/example.test.js',
     'premium-personeel-dashboard.html',
@@ -48,6 +50,7 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
         'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
         'check:quality-lock': 'node scripts/check-quality-lock.js',
         'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
+        'check:live-production-version': 'node scripts/check-live-production-version.js',
         'deploy:production': 'node scripts/deploy-production-safe.js',
         'verify:critical': 'node scripts/verify-critical.js',
       },
@@ -56,6 +59,14 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
       'assertSafeProductionDeploySource()',
       "projectName: 'softora-nl'",
       "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'",
+      'check:live-production-version',
+    ].join('\n'),
+    'scripts/check-live-production-version.js': [
+      'vercel',
+      'ls',
+      'origin/main',
+      'githubCommitSha',
+      'gitCommitSha',
     ].join('\n'),
     'scripts/guard-production-deploy-source.js': [
       'if (mainRef.status === 0 && headRef.status === 0 && mainRef.stdout !== headRef.stdout) {}',
@@ -117,7 +128,9 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
     'scripts/check-repo-hygiene.sh',
     'scripts/deploy-production-safe.js',
     'scripts/guard-production-deploy-source.js',
+    'scripts/check-live-production-version.js',
     'scripts/verify-critical.js',
+    'test/contracts/production-live-version-guard.test.js',
     'test/contracts/production-deploy-guard.test.js',
     'premium-personeel-dashboard.html',
   ];
@@ -128,6 +141,7 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
         'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
         'check:quality-lock': 'node scripts/check-quality-lock.js',
         'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
+        'check:live-production-version': 'node scripts/check-live-production-version.js',
         'deploy:production': 'node scripts/deploy-production-safe.js',
         'verify:critical': 'node scripts/verify-critical.js',
       },
@@ -136,6 +150,14 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
       'assertSafeProductionDeploySource()',
       "projectName: 'softora-nl'",
       "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'",
+      'check:live-production-version',
+    ].join('\n'),
+    'scripts/check-live-production-version.js': [
+      'vercel',
+      'ls',
+      'origin/main',
+      'githubCommitSha',
+      'gitCommitSha',
     ].join('\n'),
     'scripts/guard-production-deploy-source.js': [
       'if (mainRef.status === 0 && headRef.status === 0 && mainRef.stdout !== headRef.stdout) {}',
@@ -184,6 +206,10 @@ test('quality lock remains part of verify critical and the PR checklist', () => 
   assert.equal(
     packageJson.scripts['check:production-deploy-source'],
     'node scripts/guard-production-deploy-source.js'
+  );
+  assert.equal(
+    packageJson.scripts['check:live-production-version'],
+    'node scripts/check-live-production-version.js'
   );
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);

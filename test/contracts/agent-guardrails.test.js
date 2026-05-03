@@ -368,6 +368,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['check:repo-hygiene'], 'bash scripts/check-repo-hygiene.sh');
   assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
   assert.equal(packageJson.scripts['check:production-deploy-source'], 'node scripts/guard-production-deploy-source.js');
+  assert.equal(packageJson.scripts['check:live-production-version'], 'node scripts/check-live-production-version.js');
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
@@ -380,8 +381,11 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(deployGuardSource, /exact origin\/main/);
   assert.match(safeDeploySource, /assertSafeProductionDeploySource\(\)/);
   assert.match(safeDeploySource, /verify:critical/);
+  assert.match(safeDeploySource, /check:live-production-version/);
   assert.match(agentsSource, /Productie deployen mag alleen via `npm run deploy:production`/);
+  assert.match(agentsSource, /check:live-production-version/);
   assert.match(protocolSource, /Productie deploys lopen alleen via `npm run deploy:production`/);
+  assert.match(protocolSource, /check:live-production-version/);
 });
 
 test('agent guardrails helpers recognize approved and high-risk paths', () => {
