@@ -1,24 +1,40 @@
 import SwiftUI
 
 extension Color {
-    static let softoraBlue = Color(red: 0.12, green: 0.45, blue: 0.94)
-    static let softoraGreen = Color(red: 0.10, green: 0.62, blue: 0.46)
-    static let softoraInk = Color(red: 0.08, green: 0.10, blue: 0.14)
-    static let softoraMuted = Color(red: 0.42, green: 0.46, blue: 0.54)
-    static let softoraBackground = Color(red: 0.96, green: 0.97, blue: 0.99)
-    static let softoraLine = Color(red: 0.86, green: 0.88, blue: 0.92)
+    static let softoraCrimson = Color(red: 0.545, green: 0.133, blue: 0.322)
+    static let softoraCrimsonLight = Color(red: 0.710, green: 0.173, blue: 0.439)
+    static let softoraBlue = Color.softoraCrimson
+    static let softoraGreen = Color(red: 0.141, green: 0.698, blue: 0.420)
+    static let softoraInk = Color(red: 0.090, green: 0.090, blue: 0.153)
+    static let softoraMuted = Color(red: 0.467, green: 0.459, blue: 0.525)
+    static let softoraBackground = Color(red: 0.965, green: 0.949, blue: 0.957)
+    static let softoraCard = Color.white
+    static let softoraLine = Color.softoraInk.opacity(0.10)
+    static let softoraInput = Color(red: 0.984, green: 0.980, blue: 0.973)
+    static let softoraDanger = Color(red: 0.753, green: 0.224, blue: 0.169)
+}
+
+extension Font {
+    static func softoraBody(_ size: CGFloat, weight: Weight = .regular) -> Font {
+        .custom("Inter", size: size).weight(weight)
+    }
+
+    static func softoraDisplay(_ size: CGFloat, weight: Weight = .semibold) -> Font {
+        .custom("Oswald", size: size).weight(weight)
+    }
 }
 
 extension View {
     func softoraCard() -> some View {
         self
             .padding(16)
-            .background(.background)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(Color.softoraCard)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.softoraLine, lineWidth: 1)
             }
+            .shadow(color: Color.softoraInk.opacity(0.08), radius: 24, x: 0, y: 14)
     }
 
     @ViewBuilder

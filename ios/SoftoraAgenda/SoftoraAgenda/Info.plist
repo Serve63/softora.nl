@@ -24,6 +24,11 @@
 	<true/>
 	<key>SoftoraAPIBaseURL</key>
 	<string>https://www.softora.nl</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>inter-latin.woff2</string>
+		<string>oswald-latin.woff2</string>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>
