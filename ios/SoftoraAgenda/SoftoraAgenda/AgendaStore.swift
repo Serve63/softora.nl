@@ -43,7 +43,7 @@ final class AgendaStore {
         }
     }
 
-    func unlock(pin: String, planner: Planner) async {
+    func unlock(pin: String, planner: Planner) async -> Bool {
         isUnlocking = true
         alertMessage = nil
         defer { isUnlocking = false }
@@ -61,8 +61,10 @@ final class AgendaStore {
             let session = try await apiClient.fetchSession()
             apply(session)
             await loadAppointments(fresh: true)
+            return true
         } catch {
             alertMessage = error.localizedDescription
+            return false
         }
     }
 

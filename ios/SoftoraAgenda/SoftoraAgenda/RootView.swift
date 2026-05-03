@@ -14,6 +14,7 @@ struct RootView: View {
             }
         }
         .tint(Color.softoraBlue)
+        .font(.softoraBody(16))
     }
 }
 
@@ -25,7 +26,7 @@ private struct LaunchLoadingView: View {
                 .foregroundStyle(Color.softoraBlue)
 
             ProgressView("Agenda openen...")
-                .font(.headline)
+                .font(.softoraBody(17, weight: .semibold))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.softoraBackground)

@@ -20,6 +20,8 @@
 		9A000000000000000000002A /* AppointmentRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A000000000000000000001A /* AppointmentRowView.swift */; };
 		9A000000000000000000002B /* AddAppointmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A000000000000000000001B /* AddAppointmentView.swift */; };
 		9A000000000000000000002C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9A000000000000000000001C /* Assets.xcassets */; };
+		9A000000000000000000002D /* inter-latin.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 9A000000000000000000001F /* inter-latin.woff2 */; };
+		9A000000000000000000002E /* oswald-latin.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000033 /* oswald-latin.woff2 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +40,8 @@
 		9A000000000000000000001C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9A000000000000000000001D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9A000000000000000000001E /* SoftoraAgenda.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SoftoraAgenda.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9A000000000000000000001F /* inter-latin.woff2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "inter-latin.woff2"; sourceTree = "<group>"; };
+		9A0000000000000000000033 /* oswald-latin.woff2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "oswald-latin.woff2"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,10 +75,20 @@
 				9A0000000000000000000016 /* AgendaStore.swift */,
 				9A0000000000000000000017 /* PreviewContent.swift */,
 				9A0000000000000000000004 /* Views */,
+				9A0000000000000000000006 /* Fonts */,
 				9A000000000000000000001C /* Assets.xcassets */,
 				9A000000000000000000001D /* Info.plist */,
 			);
 			path = SoftoraAgenda;
+			sourceTree = "<group>";
+		};
+		9A0000000000000000000006 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				9A000000000000000000001F /* inter-latin.woff2 */,
+				9A0000000000000000000033 /* oswald-latin.woff2 */,
+			);
+			path = Fonts;
 			sourceTree = "<group>";
 		};
 		9A0000000000000000000004 /* Views */ = {
@@ -157,6 +171,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				9A000000000000000000002C /* Assets.xcassets in Resources */,
+				9A000000000000000000002D /* inter-latin.woff2 in Resources */,
+				9A000000000000000000002E /* oswald-latin.woff2 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
