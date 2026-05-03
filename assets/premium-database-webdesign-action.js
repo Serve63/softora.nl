@@ -233,6 +233,50 @@
             return firstLoad;
         }
 
+        function waitForPhotoImage(photo, timeoutMs) {
+            return new Promise(function (resolve) {
+                const dataUrl = normalizeString(photo);
+                if (!isValidWebsitePhotoDataUrl(dataUrl) || typeof global.Image !== "function") {
+                    resolve(false);
+                    return;
+                }
+                const image = new global.Image();
+                let finished = false;
+                const timer = global.setTimeout(finish, Math.max(250, Number(timeoutMs) || 900));
+                function finish() {
+                    if (finished) return;
+                    finished = true;
+                    global.clearTimeout(timer);
+                    resolve(true);
+                }
+                image.onload = function () {
+                    if (typeof image.decode === "function") {
+                        image.decode().catch(function () {}).finally(finish);
+                        return;
+                    }
+                    finish();
+                };
+                image.onerror = finish;
+                image.src = dataUrl;
+            });
+        }
+
+        async function preloadPhotoImages(customers, limit) {
+            const seen = new Set();
+            const photos = [];
+            (Array.isArray(customers) ? customers : []).some(function (customer) {
+                const photo = normalizeString(customer && customer.websitePhoto);
+                if (!isValidWebsitePhotoDataUrl(photo) || seen.has(photo)) return false;
+                seen.add(photo);
+                photos.push(photo);
+                return photos.length >= Math.max(1, Number(limit) || 24);
+            });
+            if (!photos.length) return;
+            await Promise.allSettled(photos.map(function (photo) {
+                return waitForPhotoImage(photo, 900);
+            }));
+        }
+
         function render(customer) {
             if (!shouldShowWebsitePhoto(customer)) return "";
             const photo = normalizeString(customer && customer.websitePhoto);
@@ -242,7 +286,7 @@
             const isRestoring = !hasPhoto && !isPending && Boolean(isRestoringPhotos(customer));
             const isLoading = isPending || isRestoring;
             const canGenerate = !hasPhoto && !isLoading && Boolean(resolveCustomerWebsiteUrl(customer));
-            const inner = hasPhoto ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\">" : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
+            const inner = hasPhoto ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"eager\" decoding=\"sync\">" : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
             const remove = hasPhoto ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>" : "";
             const ariaLabel = hasPhoto ? "Websitefoto bekijken" : (isLoading ? (isPending ? "Webdesign wordt gemaakt" : "Websitefoto's worden hersteld") : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden"));
             const title = ariaLabel;
@@ -306,6 +350,7 @@
 
         return {
             generateForCustomer: generateForCustomer,
+            preloadPhotoImages: preloadPhotoImages,
             render: render,
             resumePendingJobs: resumePendingJobs
         };
