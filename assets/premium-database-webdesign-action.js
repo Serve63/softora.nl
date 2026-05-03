@@ -261,7 +261,7 @@
             });
         }
 
-        async function preloadPhotoImages(customers, limit) {
+        async function preloadPhotoImages(customers, limit, timeoutMs) {
             const seen = new Set();
             const photos = [];
             (Array.isArray(customers) ? customers : []).some(function (customer) {
@@ -273,7 +273,7 @@
             });
             if (!photos.length) return;
             await Promise.allSettled(photos.map(function (photo) {
-                return waitForPhotoImage(photo, 900);
+                return waitForPhotoImage(photo, timeoutMs || 450);
             }));
         }
 
