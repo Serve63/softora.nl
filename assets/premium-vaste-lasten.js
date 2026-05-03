@@ -157,7 +157,11 @@ function setTotalsLoading() {
   document.getElementById('totaal-posten').textContent = '...';
 }
 
-function setMonthlyCostsStageBooting(isBooting) {
+const MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS = 1000;
+let monthlyCostsBootStartedAt = Date.now();
+let monthlyCostsBootReleaseTimer = null;
+
+function applyMonthlyCostsStageBooting(isBooting) {
   const shell = document.getElementById('monthly-costs-boot-shell');
   const loader = document.getElementById('monthly-costs-boot-loader');
   if (shell) {
@@ -167,6 +171,35 @@ function setMonthlyCostsStageBooting(isBooting) {
   if (loader) {
     loader.classList.toggle('is-hidden', !isBooting);
   }
+}
+
+function clearMonthlyCostsBootReleaseTimer() {
+  if (!monthlyCostsBootReleaseTimer) return;
+  window.clearTimeout(monthlyCostsBootReleaseTimer);
+  monthlyCostsBootReleaseTimer = null;
+}
+
+function releaseMonthlyCostsStageBooting() {
+  clearMonthlyCostsBootReleaseTimer();
+  applyMonthlyCostsStageBooting(false);
+}
+
+function setMonthlyCostsStageBooting(isBooting) {
+  if (isBooting) {
+    clearMonthlyCostsBootReleaseTimer();
+    monthlyCostsBootStartedAt = Date.now();
+    applyMonthlyCostsStageBooting(true);
+    return;
+  }
+
+  const elapsedMs = Date.now() - monthlyCostsBootStartedAt;
+  const remainingMs = Math.max(0, MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS - elapsedMs);
+  clearMonthlyCostsBootReleaseTimer();
+  if (remainingMs > 0) {
+    monthlyCostsBootReleaseTimer = window.setTimeout(releaseMonthlyCostsStageBooting, remainingMs);
+    return;
+  }
+  releaseMonthlyCostsStageBooting();
 }
 
 function appendCostTextElement(parent, tagName, className, text) {
@@ -524,11 +557,22 @@ async function bootstrapMonthlyCostsPage() {
   if (monthlyCostsBootstrapPromise) return monthlyCostsBootstrapPromise;
 
   monthlyCostsBootstrapPromise = (async () => {
+    let bootReleased = false;
+    const releaseBoot = () => {
+      if (bootReleased) return;
+      bootReleased = true;
+      setMonthlyCostsStageBooting(false);
+    };
+
     try {
       setMonthlyCostsStageBooting(true);
       setTotalsLoading();
       render();
       await ensureMonthlyCostEntriesLoaded();
+      monthlyCostsBootstrapDone = true;
+      render();
+      releaseBoot();
+
       const refreshTasks = [];
       if (typeof window.refreshMonthlyColdcallingCosts === 'function') {
         refreshTasks.push(window.refreshMonthlyColdcallingCosts());
@@ -536,9 +580,9 @@ async function bootstrapMonthlyCostsPage() {
       if (typeof window.refreshMonthlyApiCosts === 'function') {
         refreshTasks.push(window.refreshMonthlyApiCosts());
       }
-      await Promise.all(refreshTasks);
-      monthlyCostsBootstrapDone = true;
-      render();
+      void Promise.allSettled(refreshTasks).then(() => {
+        render();
+      });
       return true;
     } catch (error) {
       console.error('Terugkerende kosten bootstrap mislukt:', error);
@@ -546,7 +590,7 @@ async function bootstrapMonthlyCostsPage() {
       render();
       return false;
     } finally {
-      setMonthlyCostsStageBooting(false);
+      releaseBoot();
     }
   })();
 

@@ -34,6 +34,10 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
   const jsSource = fs.readFileSync(jsPath, 'utf8');
   assert.match(jsSource, /SoftoraPremiumBoot\.setShellBooting/);
   assert.match(jsSource, /main\.is-premium-boot-host/);
+  const oneSecondBootPath = path.join(__dirname, '../../assets/premium-boot-one-second.js');
+  const oneSecondBootSource = fs.readFileSync(oneSecondBootPath, 'utf8');
+  assert.match(oneSecondBootSource, /const DEFAULT_MINIMUM_MS = 1000;/);
+  assert.match(oneSecondBootSource, /boot\.releaseShellAfterMinimum = releaseShellAfterMinimum;/);
 
   const userMgmtPath = path.join(__dirname, '../../assets/premium-user-management.js');
   const userMgmtSource = fs.readFileSync(userMgmtPath, 'utf8');
@@ -49,9 +53,10 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
     assert.match(source, /<main[^>]*\bis-premium-boot-host\b/, file);
     assert.match(source, /class="premium-boot-loader"/, file);
     assert.match(source, /class="premium-boot-shell is-booting"/, file);
+    assert.match(source, /assets\/premium-boot-one-second\.js\?v=20260502a/, file);
     if (file !== 'premium-instellingen.html') {
       if (file === 'premium-actieve-opdrachten.html') {
-        assert.match(source, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260501a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260501c"><\/script>/, file);
+        assert.match(source, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260501c"><\/script>/, file);
         const activeOrdersBootPath = path.join(__dirname, '../../assets/premium-active-orders-boot.js');
         const activeOrdersPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
         const activeOrdersBootSource = fs.readFileSync(activeOrdersBootPath, 'utf8');
@@ -89,7 +94,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const packagesSource = fs.readFileSync(packagesPath, 'utf8');
         assert.match(packagesSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else {
-        assert.match(source, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
+        assert.match(source, /SoftoraPremiumBoot\.setShellBooting\(false\)|SoftoraPremiumBootTiming\?\.release/, file);
       }
     }
   }

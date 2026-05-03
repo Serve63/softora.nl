@@ -56,6 +56,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - `npm run verify:critical` is groen voor afronding.
 - De kwaliteitsbaseline blijft intact: guardrails, contracttests, smoke-tests en secrets-checks blijven onderdeel van `verify:critical`.
 - `main` blijft beschermd via de GitHub ruleset "Softora main quality gate"; wijzigingen landen via PR vanaf `codex/*` branches.
+- Productie deploys lopen alleen via `npm run deploy:production`; dat script weigert deploys vanaf branches die niet bovenop actuele `origin/main` liggen, vanaf ongepushte commits of vanuit een vuile worktree.
 - Grote wijzigingen landen in kleine stappen; brede productiediffs en grote inline scripts worden door guardrails geblokkeerd tenzij bewust overruled.
 - Oversized frontend-bestanden mogen standaard niet netto groeien; splits eerst op of noteer bewust waarom `ALLOW_OVERSIZED_FRONTEND_GROWTH` nodig is.
 - Premium shell/sidebar wijzigingen houden `test/contracts/premium-sidebar-shell-scope.test.js` actueel.
@@ -74,6 +75,8 @@ Dit protocol wordt geborgd via:
 - [scripts/check-agent-guardrails.js](../scripts/check-agent-guardrails.js)
 - [scripts/check-quality-lock.js](../scripts/check-quality-lock.js)
 - [scripts/check-repo-hygiene.sh](../scripts/check-repo-hygiene.sh)
+- [scripts/guard-production-deploy-source.js](../scripts/guard-production-deploy-source.js)
+- [scripts/deploy-production-safe.js](../scripts/deploy-production-safe.js)
 - [scripts/clean-local-artifacts.sh](../scripts/clean-local-artifacts.sh)
 - [server/routes/manifest.js](../server/routes/manifest.js)
 - GitHub ruleset "Softora main quality gate" op `main`: PR verplicht, deletion/force-push geblokkeerd, en `agent-guardrails`, `verify-critical` en `repo-hygiene` verplicht groen.

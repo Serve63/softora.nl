@@ -357,7 +357,9 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT,/);
   assert.doesNotMatch(webdesignActionScriptSource, /localStorage/);
   assert.match(pageSource, /refreshPhotos: async function \(\)/);
-  assert.match(pageSource, /await webdesignActionController\.resumePendingJobs\(\);/);
+  assert.match(pageSource, /const databaseBootStartedAt = Date\.now\(\), databaseHadBootstrapCustomers = initialBootstrapCustomers\.length > 0, releaseDatabaseBootShell =/);
+  assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 1000\)/);
+  assert.match(pageSource, /void webdesignActionController\.resumePendingJobs\(\)/);
   assert.match(webdesignActionScriptSource, /pendingIds\.add\(job\.customerId\);/);
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT/);
   assert.doesNotMatch(webdesignActionScriptSource, /await generate\(\[freshTarget\]/);

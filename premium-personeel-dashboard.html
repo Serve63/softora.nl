@@ -10,7 +10,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260427b">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260502a">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true"); document.documentElement.setAttribute("data-dashboard-boot-loading", "true");
@@ -28,7 +28,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260427b" defer></script>
+    <script src="assets/personnel-theme.js?v=20260502a" defer></script><script src="assets/premium-boot-one-second.js?v=20260502a"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -2129,7 +2129,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260501f"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260502a"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -3588,7 +3588,7 @@
         void (async () => { const bootStartedAt = Date.now();
             try {
                 await refreshPremiumDashboard(true);
-            } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 2000); }
+            } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 1000); }
         })();
 
         premiumDashboardState.pollTimer = window.setInterval(() => {

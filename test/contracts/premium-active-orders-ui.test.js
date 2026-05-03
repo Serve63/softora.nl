@@ -21,7 +21,7 @@ function readActiveOrdersSources() {
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260501a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260501c"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260501c"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -155,7 +155,7 @@ test('premium actieve opdrachten start snel met server-bootstrap en korte boot-l
   const { bootScriptSource, scriptSource } = readActiveOrdersSources();
 
   assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOTSTRAP_SCRIPT_ID = 'softoraActiveOrdersBootstrap';/);
-  assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOT_MIN_MS = 650;/);
+  assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOT_MIN_MS = 1000;/);
   assert.match(bootScriptSource, /function readChunkedStateValue\(values, baseKey\) \{/);
   assert.match(bootScriptSource, /function hydrateRemoteUiStateFromBootstrap\(currentCache, setCache\) \{/);
   assert.match(bootScriptSource, /root\.SoftoraPremiumBoot\.setShellBooting\(false\)/);

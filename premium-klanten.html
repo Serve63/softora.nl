@@ -10,7 +10,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260427b">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260502a">
     <link rel="stylesheet" href="assets/custom-selects.css?v=20260421b">
     <script>
         (function () {
@@ -27,7 +27,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260427b" defer></script>
+    <script src="assets/personnel-theme.js?v=20260502a" defer></script><script src="assets/premium-boot-one-second.js?v=20260502a"></script>
     <script src="assets/custom-selects.js?v=20260421a" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -2236,11 +2236,7 @@
                 /* ignore import errors */
             }
 
-            const shouldRerender = customerListsDiffer([]);
-            state.klanten = [];
-            if (shouldRerender || !hadBootstrapCustomers) {
-                renderPage();
-            }
+            if (!hadBootstrapCustomers) { const shouldRerender = customerListsDiffer([]); state.klanten = []; if (shouldRerender) renderPage(); }
             setStatusMessage("");
         }
 
@@ -2249,6 +2245,7 @@
             state.klanten = initialBootstrapCustomers;
         }
         renderPage();
+        const customersBootStartedAt = Date.now(), customersHadBootstrap = initialBootstrapCustomers.length > 0, releaseCustomersBootShell = () => window.SoftoraPremiumBootTiming?.release(customersBootStartedAt, 1000) || window.SoftoraPremiumBoot?.setShellBooting?.(false);
 
         nodes.search.addEventListener("input", function (event) {
             state.query = normalizeString(event.target.value);
@@ -2315,12 +2312,9 @@
 
         void (async function () {
             try {
+                if (customersHadBootstrap) releaseCustomersBootShell();
                 await bootstrapCustomers();
-            } finally {
-                if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
-                    window.SoftoraPremiumBoot.setShellBooting(false);
-                }
-            }
+            } catch (error) { console.error("Klanten bootstrap mislukt:", error); } finally { releaseCustomersBootShell(); }
         })();
     </script>
 </body>

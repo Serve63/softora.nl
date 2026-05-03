@@ -2,7 +2,7 @@
     'use strict';
 
     const ACTIVE_ORDERS_BOOTSTRAP_SCRIPT_ID = 'softoraActiveOrdersBootstrap';
-    const ACTIVE_ORDERS_BOOT_MIN_MS = 650;
+    const ACTIVE_ORDERS_BOOT_MIN_MS = 1000;
     const ACTIVE_ORDERS_BOOT_WATCHDOG_MS = 3500;
 
     function getStateChunkMetaKey(baseKey) {
