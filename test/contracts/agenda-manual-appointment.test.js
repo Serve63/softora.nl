@@ -136,6 +136,61 @@ test('agenda manual appointment can be assigned to Serve and Martijn together', 
   assert.match(res.body.appointment.summary, /Wie: Servé en Martijn/);
 });
 
+test('agenda manual meeting stores the selected lead owner separately from planner visibility', async () => {
+  const { coordinator } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        appointmentKind: 'meeting',
+        who: 'both',
+        manualLeadOwner: 'martijn',
+        title: 'Website intake',
+        time: '11:00',
+        legendChoice: 'website',
+        location: 'Klantlocatie',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.appointment.manualPlannerWho, 'both');
+  assert.equal(res.body.appointment.manualLeadOwnerKey, 'martijn');
+  assert.equal(res.body.appointment.manualLeadOwnerName, 'Martijn van de Ven');
+  assert.equal(res.body.appointment.leadOwnerKey, 'martijn');
+  assert.equal(res.body.appointment.leadOwnerName, 'Martijn van de Ven');
+  assert.match(res.body.appointment.summary, /Wie: Servé en Martijn/);
+  assert.match(res.body.appointment.summary, /Lead geregeld door: Martijn van de Ven/);
+});
+
+test('agenda manual meeting requires a lead owner only for the new meeting wizard flow', async () => {
+  const { coordinator } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        appointmentKind: 'meeting',
+        who: 'both',
+        title: 'Website intake zonder eigenaar',
+        time: '11:00',
+        legendChoice: 'website',
+        location: 'Klantlocatie',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /Kies wie deze lead heeft geregeld/);
+});
+
 test('agenda manual appointment does not block on initial shared-state hydration', async () => {
   let hydrateCalls = 0;
   let syncCalls = 0;
