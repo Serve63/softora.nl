@@ -5,6 +5,7 @@ const path = require('path');
 const repoRoot = path.resolve(__dirname, '..');
 const DEFAULT_DOMAIN = 'www.softora.nl';
 const DEFAULT_PROJECT = 'softora-nl';
+const DEFAULT_HEALTH_PATH = '/api/health/baseline';
 
 function run(command, args, options = {}) {
   const env = options.env || process.env;
@@ -55,10 +56,25 @@ function resolveDeploymentRef(deployment) {
   return String(meta.githubCommitRef || meta.gitCommitRef || '').trim();
 }
 
+function resolveHealthDeploymentSha(payload) {
+  const deployment = payload && payload.deployment && typeof payload.deployment === 'object'
+    ? payload.deployment
+    : {};
+  return String(deployment.commitSha || deployment.sha || '').trim();
+}
+
+function resolveHealthDeploymentRef(payload) {
+  const deployment = payload && payload.deployment && typeof payload.deployment === 'object'
+    ? payload.deployment
+    : {};
+  return String(deployment.commitRef || deployment.ref || '').trim();
+}
+
 function listLiveProductionVersionViolations(options = {}) {
   const domain = options.domain || DEFAULT_DOMAIN;
   const project = options.project || DEFAULT_PROJECT;
   const runner = options.runner || run;
+  const healthUrl = options.healthUrl || `https://${domain}${DEFAULT_HEALTH_PATH}`;
   const violations = [];
 
   const fetch = runner('git', ['fetch', 'origin', 'main', '--quiet']);
@@ -70,6 +86,42 @@ function listLiveProductionVersionViolations(options = {}) {
   const expectedSha = mainRef.status === 0 ? String(mainRef.stdout || '').trim() : '';
   if (!expectedSha) {
     violations.push('[live-production] origin/main commit kon niet worden bepaald.');
+  }
+
+  const health = runner('curl', [
+    '--fail',
+    '--silent',
+    '--show-error',
+    '--max-time',
+    '20',
+    healthUrl,
+  ]);
+  const healthPayload = health.status === 0 ? extractJsonObject(health.stdout) : null;
+  const healthSha = resolveHealthDeploymentSha(healthPayload);
+  const healthRef = resolveHealthDeploymentRef(healthPayload);
+  if (healthSha) {
+    if (expectedSha && healthSha !== expectedSha) {
+      return {
+        ok: false,
+        violations: [
+          `[live-production] ${domain} meldt ${healthSha}, maar origin/main is ${expectedSha}. Productie wijkt af van main.`,
+        ],
+        expectedSha,
+        liveSha: healthSha,
+        liveRef: healthRef,
+        liveHost: domain,
+        method: 'health',
+      };
+    }
+    return {
+      ok: violations.length === 0,
+      violations,
+      expectedSha,
+      liveSha: healthSha,
+      liveRef: healthRef,
+      liveHost: domain,
+      method: 'health',
+    };
   }
 
   const inspect = runner('npx', ['vercel', 'inspect', domain, '--format=json']);
@@ -117,6 +169,7 @@ function listLiveProductionVersionViolations(options = {}) {
     liveSha,
     liveRef,
     liveHost,
+    method: 'vercel',
   };
 }
 
@@ -152,5 +205,7 @@ module.exports = {
   normalizeDeploymentHost,
   resolveDeploymentRef,
   resolveDeploymentSha,
+  resolveHealthDeploymentRef,
+  resolveHealthDeploymentSha,
   run,
 };

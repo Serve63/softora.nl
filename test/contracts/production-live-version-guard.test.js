@@ -4,6 +4,7 @@ const {
   extractJsonObject,
   listLiveProductionVersionViolations,
   normalizeDeploymentHost,
+  resolveHealthDeploymentSha,
 } = require('../../scripts/check-live-production-version');
 const {
   parsePositiveInteger,
@@ -15,6 +16,16 @@ function createRunner(overrides = {}) {
   const responses = {
     'git fetch origin main --quiet': { status: 0, stdout: '' },
     'git rev-parse --verify origin/main': { status: 0, stdout: 'main-sha' },
+    'curl --fail --silent --show-error --max-time 20 https://www.softora.nl/api/health/baseline': {
+      status: 0,
+      stdout: JSON.stringify({
+        ok: true,
+        deployment: {
+          commitSha: 'main-sha',
+          commitRef: 'main',
+        },
+      }),
+    },
     'npx vercel inspect www.softora.nl --format=json': {
       status: 0,
       stdout: 'Fetching deployment\n{"url":"softora-live.vercel.app","target":"production"}',
@@ -52,36 +63,37 @@ test('live production version guard accepts the deployment that matches origin/m
   assert.equal(result.ok, true);
   assert.equal(result.expectedSha, 'main-sha');
   assert.equal(result.liveSha, 'main-sha');
+  assert.equal(result.method, 'health');
 });
 
 test('live production version guard blocks rollback or stale production deployments', () => {
   const result = listLiveProductionVersionViolations({
     runner: createRunner({
-      'npx vercel ls softora-nl --format=json': {
+      'curl --fail --silent --show-error --max-time 20 https://www.softora.nl/api/health/baseline': {
         status: 0,
         stdout: JSON.stringify({
-          deployments: [
-            {
-              url: 'softora-live.vercel.app',
-              target: 'production',
-              meta: {
-                githubCommitSha: 'old-sha',
-                githubCommitRef: 'codex/old-branch',
-              },
-            },
-          ],
+          ok: true,
+          deployment: {
+            commitSha: 'old-sha',
+            commitRef: 'codex/old-branch',
+          },
         }),
       },
     }),
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.violations.join('\n'), /draait op old-sha, maar origin\/main is main-sha/);
+  assert.match(result.violations.join('\n'), /meldt old-sha, maar origin\/main is main-sha/);
 });
 
 test('live production version guard blocks deployments without Git metadata', () => {
   const result = listLiveProductionVersionViolations({
     runner: createRunner({
+      'curl --fail --silent --show-error --max-time 20 https://www.softora.nl/api/health/baseline': {
+        status: 22,
+        stdout: '',
+        stderr: 'not found',
+      },
       'npx vercel ls softora-nl --format=json': {
         status: 0,
         stdout: JSON.stringify({
@@ -104,6 +116,22 @@ test('live production version guard blocks deployments without Git metadata', ()
 test('live production version helpers parse noisy Vercel JSON and normalize hosts', () => {
   assert.deepEqual(extractJsonObject('noise\n{"ok":true}\n'), { ok: true });
   assert.equal(normalizeDeploymentHost('https://softora-live.vercel.app/'), 'softora-live.vercel.app');
+  assert.equal(resolveHealthDeploymentSha({ deployment: { commitSha: 'abc123' } }), 'abc123');
+});
+
+test('live production version guard falls back to Vercel metadata while old production has no health commit', () => {
+  const result = listLiveProductionVersionViolations({
+    runner: createRunner({
+      'curl --fail --silent --show-error --max-time 20 https://www.softora.nl/api/health/baseline': {
+        status: 0,
+        stdout: JSON.stringify({ ok: true, deployment: { commitSha: null } }),
+      },
+    }),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.liveSha, 'main-sha');
+  assert.equal(result.method, 'vercel');
 });
 
 test('live production version wait helper retries until Vercel auto deploy reaches main', async () => {

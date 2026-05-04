@@ -361,6 +361,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const hygieneSource = readRepoFile('scripts/check-repo-hygiene.sh');
   const cleanSource = readRepoFile('scripts/clean-local-artifacts.sh');
   const deployGuardSource = readRepoFile('scripts/guard-production-deploy-source.js');
+  const qualityLockSource = readRepoFile('scripts/check-quality-lock.js');
   const liveVersionSource = readRepoFile('scripts/check-live-production-version.js');
   const liveWaitSource = readRepoFile('scripts/wait-live-production-version.js');
   const safeDeploySource = readRepoFile('scripts/deploy-production-safe.js');
@@ -383,6 +384,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.doesNotMatch(cleanSource, /rm -rf -- "\.vercel"/);
   assert.match(deployGuardSource, /mainRef\.stdout !== headRef\.stdout/);
   assert.match(deployGuardSource, /exact origin\/main/);
+  assert.match(qualityLockSource, /curl/);
+  assert.match(qualityLockSource, /deployment/);
   assert.match(liveVersionSource, /VERCEL_TOKEN/);
   assert.match(liveVersionSource, /--yes/);
   assert.match(liveWaitSource, /assertLiveProductionVersion/);
