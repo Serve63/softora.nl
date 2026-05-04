@@ -100,6 +100,24 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
   }
 });
 
+test('premium laadiconen blijven overal 58px', () => {
+  const filesToScan = [
+    ...fs.readdirSync(path.join(__dirname, '../..'))
+      .filter((file) => /^premium-.*\.html$/.test(file)),
+    ...fs.readdirSync(path.join(__dirname, '../../assets'))
+      .filter((file) => /\.js$|\.css$/.test(file))
+      .map((file) => `assets/${file}`),
+  ];
+
+  for (const file of filesToScan) {
+    const source = fs.readFileSync(path.join(__dirname, '../../', file), 'utf8');
+    const explicitLoaderSizes = source.match(/--loader-size\s*:\s*\d+px|setProperty\('--loader-size', '\d+px'\)/g) || [];
+    for (const declaration of explicitLoaderSizes) {
+      assert.match(declaration, /58px/, `${file} heeft nog een afwijkende loadermaat: ${declaration}`);
+    }
+  }
+});
+
 test('coldcalling-dashboard beëindigt premium boot-shell na bootstrap', () => {
   const scriptPath = path.join(__dirname, '../../assets/coldcalling-dashboard.js');
   const source = fs.readFileSync(scriptPath, 'utf8');

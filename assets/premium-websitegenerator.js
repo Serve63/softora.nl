@@ -593,7 +593,7 @@ function createBatchLoadingRow(hostname) {
   const spinner = document.createElement('div');
   spinner.className = 'premium-boot-spinner';
   spinner.setAttribute('aria-hidden', 'true');
-  spinner.style.setProperty('--loader-size', '28px');
+  spinner.style.setProperty('--loader-size', '58px');
   ['softora-dossier-loader__orbit--outer', 'softora-dossier-loader__orbit--inner', 'softora-dossier-loader__dot']
     .forEach((className) => {
       const part = document.createElement('span');

@@ -45,3 +45,22 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(scriptSource, /function switchTab\(name, tabEl\)/);
   assert.match(scriptSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/);
 });
+
+test('website onderhoudspakketten tonen vaste uren per maand met taakvoorbeelden', () => {
+  const pageSource = readPage();
+  const sectionStart = pageSource.indexOf('<div id="tab-onderhoud"');
+  const sectionEnd = pageSource.indexOf('<div id="tab-bedrijfssoftware"', sectionStart);
+  const websiteMaintenanceSection = pageSource.slice(sectionStart, sectionEnd);
+
+  assert.match(websiteMaintenanceSection, /<div class="card-name">Basis<\/div>[\s\S]*5 uur per maand voor basisbeheer/);
+  assert.match(websiteMaintenanceSection, /<div class="card-name">Plus<\/div>[\s\S]*10 uur per maand voor doorlopend beheer/);
+  assert.match(websiteMaintenanceSection, /<div class="card-name">Premium<\/div>[\s\S]*15 uur per maand voor actief optimaliseren/);
+  assert.match(websiteMaintenanceSection, /<div class="card-name">Enterprise<\/div>[\s\S]*25 uur per maand voor intensief beheer/);
+  assert.match(websiteMaintenanceSection, /Updates, backups en monitoring/);
+  assert.match(websiteMaintenanceSection, /Kleine tekst- en fotowijzigingen/);
+  assert.match(websiteMaintenanceSection, /Nieuwe secties, acties of pagina-updates/);
+  assert.match(websiteMaintenanceSection, /SEO, snelheid en conversie verbeteren/);
+  assert.match(websiteMaintenanceSection, /Campagnepagina's, funnels en grotere uitbreidingen/);
+  assert.doesNotMatch(websiteMaintenanceSection, /<div class="card-name">Pro<\/div>/);
+  assert.doesNotMatch(websiteMaintenanceSection, /Onbeperkte aanpassingen/);
+});
