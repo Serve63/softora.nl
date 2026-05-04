@@ -4,7 +4,7 @@
  */
 .premium-boot-spinner,
 .monthly-costs-spinner {
-    --loader-size: 48px;
+    --loader-size: 58px;
     position: relative;
     width: var(--loader-size);
     height: var(--loader-size);
