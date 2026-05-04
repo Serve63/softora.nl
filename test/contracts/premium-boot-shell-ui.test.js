@@ -115,6 +115,19 @@ test('premium laadiconen blijven overal 58px', () => {
     for (const declaration of explicitLoaderSizes) {
       assert.match(declaration, /58px/, `${file} heeft nog een afwijkende loadermaat: ${declaration}`);
     }
+
+    const cssRulePattern = /\.([a-zA-Z0-9_-]*(?:spin|spinner|loader)[a-zA-Z0-9_-]*)[^{}]*\{([^{}]*)\}/g;
+    for (const match of source.matchAll(cssRulePattern)) {
+      const [, className, body] = match;
+      const sizeDeclarations = body.match(/\b(?:width|height)\s*:\s*\d+px/g) || [];
+      for (const declaration of sizeDeclarations) {
+        assert.match(
+          declaration,
+          /58px/,
+          `${file} heeft nog een afwijkende laadicoonmaat in .${className}: ${declaration}`
+        );
+      }
+    }
   }
 });
 
