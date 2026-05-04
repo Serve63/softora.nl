@@ -79,6 +79,20 @@ function createAppOpsRuntime(deps = {}) {
     generatedAgendaAppointments,
   });
 
+  const deployment = {
+    commitSha:
+      normalizeString(env.VERCEL_GIT_COMMIT_SHA) ||
+      normalizeString(env.GITHUB_SHA) ||
+      normalizeString(env.COMMIT_SHA) ||
+      null,
+    commitRef:
+      normalizeString(env.VERCEL_GIT_COMMIT_REF) ||
+      normalizeString(env.GITHUB_REF_NAME) ||
+      normalizeString(env.BRANCH) ||
+      null,
+    provider: normalizeString(env.VERCEL) ? 'vercel' : null,
+  };
+
   const {
     getSupabaseStatus,
     getMailStatus,
@@ -98,6 +112,7 @@ function createAppOpsRuntime(deps = {}) {
     buildRuntimeBackupForOps,
     isProduction,
     isServerlessRuntime,
+    deployment,
     isSupabaseConfigured,
     getSupabaseStatus,
     getMailStatus,

@@ -67,6 +67,8 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
     'scripts/check-live-production-version.js': [
       'vercel',
       '--yes',
+      'curl',
+      'deployment',
       'ls',
       'origin/main',
       'githubCommitSha',
@@ -174,6 +176,8 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
     'scripts/check-live-production-version.js': [
       'vercel',
       '--yes',
+      'curl',
+      'deployment',
       'ls',
       'origin/main',
       'githubCommitSha',

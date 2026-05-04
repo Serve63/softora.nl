@@ -78,6 +78,15 @@ test('health endpoints expose stable baseline payloads', async () => {
     assert.equal(typeof body.service, 'string', pathname);
     assert.equal(typeof body.version, 'string', pathname);
     assert.equal(typeof body.timestamp, 'string', pathname);
+    assert.equal(typeof body.deployment, 'object', pathname);
+    assert.ok(
+      typeof body.deployment.commitSha === 'string' || body.deployment.commitSha === null,
+      pathname
+    );
+    assert.ok(
+      typeof body.deployment.commitRef === 'string' || body.deployment.commitRef === null,
+      pathname
+    );
     assert.equal(typeof body.supabase, 'object', pathname);
     assert.ok(Array.isArray(body.criticalFlows), pathname);
   }

@@ -2,6 +2,19 @@ function cloneObject(value) {
   return value && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : {};
 }
 
+function normalizeText(value) {
+  return String(value || '').trim();
+}
+
+function buildDeploymentPayload(deps) {
+  const deployment = cloneObject(deps.deployment);
+  return {
+    commitSha: normalizeText(deployment.commitSha) || null,
+    commitRef: normalizeText(deployment.commitRef) || null,
+    provider: normalizeText(deployment.provider) || null,
+  };
+}
+
 function buildBaselineHealthPayload(deps) {
   const supabase = cloneObject(deps.getSupabaseStatus());
   const runtime = cloneObject(deps.getRuntimeStatus());
@@ -14,6 +27,7 @@ function buildBaselineHealthPayload(deps) {
       production: Boolean(deps.isProduction),
       serverless: Boolean(deps.isServerlessRuntime),
     },
+    deployment: buildDeploymentPayload(deps),
     flags: deps.getPublicFeatureFlags(),
     supabase: {
       enabled: Boolean(supabase.enabled),
@@ -39,6 +53,7 @@ function buildDependencyHealthPayload(deps) {
     version: deps.appVersion,
     timestamp: new Date().toISOString(),
     flags: deps.getPublicFeatureFlags(),
+    deployment: buildDeploymentPayload(deps),
     dependencies: {
       supabase: {
         enabled: Boolean(supabase.enabled),
@@ -78,6 +93,7 @@ function buildRuntimeHealthDebugPayload(deps) {
     ok: true,
     timestamp: new Date().toISOString(),
     flags: deps.getPublicFeatureFlags(),
+    deployment: buildDeploymentPayload(deps),
     runtime: cloneObject(deps.getRuntimeStatus()),
     supabase,
     mail,
@@ -127,6 +143,7 @@ function registerHealthAndOpsRoutes(app, deps) {
 module.exports = {
   buildBaselineHealthPayload,
   buildDependencyHealthPayload,
+  buildDeploymentPayload,
   buildRuntimeHealthDebugPayload,
   registerHealthAndOpsRoutes,
 };
