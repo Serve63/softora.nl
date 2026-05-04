@@ -101,6 +101,10 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
 });
 
 test('premium laadiconen blijven overal 58px', () => {
+  const compactInlineLoaderExceptions = new Map([
+    ['assets/premium-database-webdesign-action.js:.photo-generate-spinner', '18px'],
+  ]);
+
   const filesToScan = [
     ...fs.readdirSync(path.join(__dirname, '../..'))
       .filter((file) => /^premium-.*\.html$/.test(file)),
@@ -119,11 +123,12 @@ test('premium laadiconen blijven overal 58px', () => {
     const cssRulePattern = /\.([a-zA-Z0-9_-]*(?:spin|spinner|loader)[a-zA-Z0-9_-]*)[^{}]*\{([^{}]*)\}/g;
     for (const match of source.matchAll(cssRulePattern)) {
       const [, className, body] = match;
+      const exceptionSize = compactInlineLoaderExceptions.get(`${file}:.${className}`);
       const sizeDeclarations = body.match(/\b(?:width|height)\s*:\s*\d+px/g) || [];
       for (const declaration of sizeDeclarations) {
         assert.match(
           declaration,
-          /58px/,
+          exceptionSize ? new RegExp(exceptionSize) : /58px/,
           `${file} heeft nog een afwijkende laadicoonmaat in .${className}: ${declaration}`
         );
       }

@@ -237,8 +237,9 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-drop/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-generate-icon\\"/);
-  assert.match(webdesignActionScriptSource, /photo-drop\.is-generating,\.photo-drop\.is-restoring\{cursor:wait;width:58px;height:58px\}/);
-  assert.match(webdesignActionScriptSource, /photo-generate-spinner\{width:58px;height:58px/);
+  assert.match(webdesignActionScriptSource, /photo-drop\.is-generating,\.photo-drop\.is-restoring\{cursor:wait\}/);
+  assert.doesNotMatch(webdesignActionScriptSource, /photo-drop\.is-generating,\.photo-drop\.is-restoring\{cursor:wait;width:58px;height:58px\}/);
+  assert.match(webdesignActionScriptSource, /photo-generate-spinner\{width:18px;height:18px/);
   assert.doesNotMatch(webdesignActionScriptSource, /class=\\"photo-generate-cost\\"/);
   assert.match(webdesignActionScriptSource, /className = "photo-generate-charge-label";/);
   assert.match(webdesignActionScriptSource, /function updateChargeLabelPositions\(\)/);
