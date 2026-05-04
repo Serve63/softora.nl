@@ -237,6 +237,8 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-drop/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-generate-icon\\"/);
+  assert.match(webdesignActionScriptSource, /photo-drop\.is-generating,\.photo-drop\.is-restoring\{cursor:wait;width:58px;height:58px\}/);
+  assert.match(webdesignActionScriptSource, /photo-generate-spinner\{width:58px;height:58px/);
   assert.doesNotMatch(webdesignActionScriptSource, /class=\\"photo-generate-cost\\"/);
   assert.match(webdesignActionScriptSource, /className = "photo-generate-charge-label";/);
   assert.match(webdesignActionScriptSource, /function updateChargeLabelPositions\(\)/);
@@ -558,6 +560,8 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(deepSearchScriptSource, /ensureBusyStyles\(\);/);
   assert.match(deepSearchScriptSource, /\.deep-search-close\.is-loading, \.modal-bg\.is-running \.deep-search-close/);
   assert.match(deepSearchScriptSource, /button\.innerHTML = "<span class=\\"deep-search-close-spinner\\" aria-hidden=\\"true\\"><\/span>";/);
+  assert.match(deepSearchScriptSource, /deep-search-close\.is-loading, \.modal-bg\.is-running \.deep-search-close \{ width: 58px; height: 58px;/);
+  assert.match(deepSearchScriptSource, /deep-search-close-spinner \{ display: block; width: 58px; height: 58px;/);
   assert.match(deepSearchScriptSource, /button\.classList\.toggle\("is-loading", busy\);/);
   assert.match(deepSearchScriptSource, /@keyframes deepSearchSpin/);
   assert.doesNotMatch(deepSearchScriptSource, /Batch loopt nog\. De bedrijvenlijst blijft open tot deze plek klaar is\./);
