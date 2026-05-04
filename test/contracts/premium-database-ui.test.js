@@ -87,9 +87,22 @@ test('premium database page bootstraps customer rows before async sync runs', ()
     pageSource,
     /const initialBootstrapCustomers = resolveBootstrapCustomers\(\);[\s\S]*state\.klanten = initialBootstrapCustomers;[\s\S]*renderPage\(\);/
   );
+  assert.match(pageSource, /customerLoadEpoch: 0,/);
+  assert.match(pageSource, /customerPhotoLoadEpoch: 0,/);
+  assert.match(pageSource, /let lastResolvedPhotoMap = null;/);
   assert.match(pageSource, /const hadBootstrapCustomers = state\.klanten\.length > 0;/);
+  assert.match(pageSource, /function setCustomersSorted\(nextCustomers\)/);
+  assert.match(pageSource, /function hasRenderablePhotos\(customers\)/);
+  assert.match(pageSource, /function resolvePhotoMap\(photoMap, fallbackCustomers\)/);
+  assert.match(pageSource, /function beginCustomerLoadCycle\(\)/);
+  assert.match(pageSource, /function isActiveCustomerLoadCycle\(epoch\)/);
+  assert.match(pageSource, /function beginCustomerPhotoLoadCycle\(\)/);
+  assert.match(pageSource, /function isActiveCustomerPhotoLoadCycle\(epoch\)/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
+  assert.match(pageSource, /function beginCustomerLoadCycle\(\)/);
+  assert.match(pageSource, /const loadEpoch = beginCustomerLoadCycle\(\);/);
   assert.match(pageSource, /function isDerivedOrderPlaceholderCustomer\(customer\)/);
+  assert.match(pageSource, /if \(!isActiveCustomerLoadCycle\(loadEpoch\)\) \{/);
   assert.match(pageSource, /customersBootstrapPayload && customersBootstrapPayload\.source\) === "orders"[\s\S]*return \[\];/);
 });
 
@@ -232,6 +245,10 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.doesNotMatch(webdesignActionScriptSource, /AI-kosten/);
   assert.doesNotMatch(webdesignActionScriptSource, /Webdesign maken, kost/);
   assert.match(pageSource, /formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR/);
+  assert.match(pageSource, /photoLoadEpoch = beginCustomerPhotoLoadCycle\(\)/);
+  assert.match(pageSource, /if \(!isActiveCustomerPhotoLoadCycle\(photoLoadEpoch\)\) \{/);
+  assert.match(pageSource, /const mergedCustomers = mergeCustomersWithPhotos\(state\.klanten, resolvePhotoMap\(rawPhotoMap, state\.klanten\), state\.klanten\);/);
+  assert.match(pageSource, /state\.klanten = getSortedCustomers\(mergedCustomers\);/);
   assert.match(webdesignActionScriptSource, /@keyframes photoGenerateSpin/);
   assert.match(webdesignActionScriptSource, /data-can-generate=\\"/);
   assert.match(webdesignActionScriptSource, /const LIGHTNING_ICON = "<svg class=\\"photo-generate-icon\\"/);

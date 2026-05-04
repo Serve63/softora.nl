@@ -1646,11 +1646,14 @@
             activeStatus: "alle",
             sortKey: "manual",
             sortAsc: true,
+            customerLoadEpoch: 0,
+            customerPhotoLoadEpoch: 0,
             openId: null,
             modalEditId: null,
             photoTargetId: null, photoRestorePending: true,
             messageTimer: null
         };
+        let lastResolvedPhotoMap = null;
 
         const nodes = {
             topSub: document.getElementById("top-sub"),
@@ -2067,7 +2070,7 @@
 
         function mergeCustomersWithResponsible(customers, orders) {
             if (!Array.isArray(customers) || !customers.length) return [];
-            if (!Array.isArray(orders) || !orders.length) return sortCustomers(customers);
+            if (!Array.isArray(orders) || !orders.length) return customers.slice();
 
             const responsibleByCustomerKey = new Map();
             orders.forEach(function (order) {
@@ -2079,7 +2082,7 @@
                 }
             });
 
-            return sortCustomers(customers.map(function (customer, index) {
+            return customers.map(function (customer, index) {
                 const normalizedCustomer = normalizeCustomer(customer, "customer-merge-" + index);
                 const explicitResponsible = parseResponsibleValue(getResponsibleSourceValue(customer));
                 const key = buildCustomerIdentityKey(normalizedCustomer);
@@ -2088,7 +2091,7 @@
                     return normalizedCustomer;
                 }
                 return { ...normalizedCustomer, verantwoordelijk: matchedResponsible };
-            }));
+            });
         }
 
         function resolveBootstrapCustomers() {
@@ -2097,11 +2100,54 @@
                 ? customersBootstrapPayload.customers
                 : [];
 
-            return rawCustomers.map(function (item, index) {
+            return getSortedCustomers(rawCustomers.map(function (item, index) {
                 return normalizeCustomer(item, "bootstrap-" + index);
             }).filter(function (customer) {
                 return !isDerivedOrderPlaceholderCustomer(customer);
+            }));
+        }
+
+        function setCustomersSorted(nextCustomers) {
+            const customers = Array.isArray(nextCustomers) ? nextCustomers : [];
+            state.klanten = getSortedCustomers(customers);
+            return state.klanten;
+        }
+
+        function hasRenderablePhotos(customers) {
+            return Array.isArray(customers) && customers.some(function (customer) {
+                return shouldShowWebsitePhoto(customer) && isValidWebsitePhotoDataUrl(normalizeString(customer && customer.websitePhoto));
             });
+        }
+
+        function resolvePhotoMap(photoMap, fallbackCustomers) {
+            const incomingMap = photoMap && typeof photoMap === "object" ? photoMap : {};
+            const hasIncomingMap = Object.keys(incomingMap).length > 0;
+            if (hasIncomingMap) {
+                lastResolvedPhotoMap = incomingMap;
+                return incomingMap;
+            }
+            if (!hasRenderablePhotos(fallbackCustomers) || !lastResolvedPhotoMap || typeof lastResolvedPhotoMap !== "object") {
+                return incomingMap;
+            }
+            return lastResolvedPhotoMap;
+        }
+
+        function beginCustomerLoadCycle() {
+            state.customerLoadEpoch += 1;
+            return state.customerLoadEpoch;
+        }
+
+        function isActiveCustomerLoadCycle(epoch) {
+            return epoch === state.customerLoadEpoch;
+        }
+
+        function beginCustomerPhotoLoadCycle() {
+            state.customerPhotoLoadEpoch += 1;
+            return state.customerPhotoLoadEpoch;
+        }
+
+        function isActiveCustomerPhotoLoadCycle(epoch) {
+            return epoch === state.customerPhotoLoadEpoch;
         }
 
         function serializeCustomerList(customers) {
@@ -2172,7 +2218,16 @@
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });
 
-        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, refreshPhotos: async function () { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, refreshPhotos: async function () {
+            const photoLoadEpoch = beginCustomerPhotoLoadCycle();
+            const rawPhotoMap = await loadCustomerPhotoMap(state.klanten);
+            if (!isActiveCustomerPhotoLoadCycle(photoLoadEpoch)) {
+                return;
+            }
+            const mergedCustomers = mergeCustomersWithPhotos(state.klanten, resolvePhotoMap(rawPhotoMap, state.klanten), state.klanten);
+            state.klanten = getSortedCustomers(mergedCustomers);
+            renderPage();
+        }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
         function mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
@@ -2182,7 +2237,7 @@
             Object.keys(photos).forEach(function (key) { const item = photos[key]; const identityKey = normalizeString(item && item.identityKey); if (identityKey && isValidWebsitePhotoDataUrl(item && item.websitePhoto)) photosByIdentity.set(identityKey, item); });
             (Array.isArray(fallbackCustomers) ? fallbackCustomers : []).forEach(function (customer) { const normalized = normalizeCustomer(customer); if (!isValidWebsitePhotoDataUrl(normalized.websitePhoto)) return; fallbackPhotosById.set(normalized.id, normalized); const identityKey = buildCustomerIdentityKey(normalized); if (identityKey) fallbackPhotosByIdentity.set(identityKey, normalized); });
 
-            return sortCustomers((customers || []).map(function (customer, index) {
+            return (customers || []).map(function (customer, index) {
                 const normalized = normalizeCustomer(customer, "photo-merge-" + index);
                 if (!shouldShowWebsitePhoto(normalized)) {
                     return { ...normalized, websitePhoto: "", websitePhotoName: "" };
@@ -2195,7 +2250,7 @@
                     websitePhoto: normalizeString(photo.websitePhoto),
                     websitePhotoName: normalizeString(photo.websitePhotoName) || normalized.websitePhotoName || "Websitefoto"
                 };
-            }));
+            });
         }
 
         function loadCustomerPhotoMap(customers) {
@@ -2476,8 +2531,9 @@
 
             const current = state.klanten[customerIndex];
             const updated = normalizeCustomer(mutator(current), current.id);
-            state.klanten = state.klanten.slice();
-            state.klanten[customerIndex] = updated;
+            const nextCustomers = state.klanten.slice();
+            nextCustomers[customerIndex] = updated;
+            state.klanten = getSortedCustomers(nextCustomers);
             return updated;
         }
 
@@ -2647,7 +2703,7 @@
                     websitePhotoName: prepared.fileName,
                     updatedAt: formatDateForStorage(new Date())
                 }, customerId);
-                state.klanten = sortCustomers(state.klanten.map(function (item) {
+                state.klanten = getSortedCustomers(state.klanten.map(function (item) {
                     return item.id === customerId ? nextCustomer : item;
                 }));
                 renderPage();
@@ -2676,7 +2732,7 @@
                 websitePhotoName: "",
                 updatedAt: formatDateForStorage(new Date())
             }, customerId);
-            state.klanten = sortCustomers(state.klanten.map(function (item) {
+            state.klanten = getSortedCustomers(state.klanten.map(function (item) {
                 return item.id === customerId ? nextCustomer : item;
             }));
             renderPage();
@@ -2969,7 +3025,7 @@
                 return Promise.resolve(false);
             }
 
-            state.klanten = mergeResult.customers;
+            state.klanten = setCustomersSorted(mergeResult.customers);
             renderPage();
 
             return persistCustomerList(state.klanten).then(function (result) {
@@ -3036,7 +3092,7 @@
                 updatedAt: formatDateForStorage(new Date())
             });
 
-            state.klanten = state.klanten.concat([customer]);
+            state.klanten = setCustomersSorted(state.klanten.concat([customer]));
             renderPage();
             closeModal();
 
@@ -3090,7 +3146,7 @@
                 updatedAt: formatDateForStorage(new Date())
             }, existing.id);
 
-            state.klanten = sortCustomers(state.klanten.map(function (customer) {
+            state.klanten = getSortedCustomers(state.klanten.map(function (customer) {
                 return customer.id === customerId ? updatedCustomer : customer;
             }));
             renderPage();
@@ -3138,6 +3194,7 @@
 
         async function bootstrapCustomers() {
             const hadBootstrapCustomers = state.klanten.length > 0;
+            const loadEpoch = beginCustomerLoadCycle();
 
             if (!hadBootstrapCustomers) {
                 setStatusMessage("Database laden...", "info");
@@ -3146,6 +3203,10 @@
             try {
                 const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
                 const remoteCustomers = parseCustomers(window.SoftoraDatabaseImport.readChunkedStateValue(remoteState && remoteState.values, CUSTOMER_DB_KEY));
+
+                if (!isActiveCustomerLoadCycle(loadEpoch)) {
+                    return;
+                }
 
                 if (remoteCustomers.length) {
                     let enrichedCustomers = remoteCustomers;
@@ -3158,14 +3219,25 @@
                         console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
                     }
 
-                    const photoMap = await loadCustomerPhotoMap(enrichedCustomers);
-                    const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten);
+                    if (!isActiveCustomerLoadCycle(loadEpoch)) {
+                        return;
+                    }
 
-                    if (customerListsDiffer(customersWithPhotos) || !hadBootstrapCustomers) {
-                        state.klanten = customersWithPhotos;
+                    const photoMap = await loadCustomerPhotoMap(enrichedCustomers);
+                    const resolvedPhotoMap = resolvePhotoMap(photoMap, state.klanten);
+
+                    if (!isActiveCustomerLoadCycle(loadEpoch)) {
+                        return;
+                    }
+
+                    const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, resolvedPhotoMap, state.klanten);
+                    const sortedCustomers = getSortedCustomers(customersWithPhotos);
+
+                    if (customerListsDiffer(sortedCustomers) || !hadBootstrapCustomers) {
+                        state.klanten = sortedCustomers;
                         renderPage();
                     } else {
-                        state.klanten = customersWithPhotos;
+                        state.klanten = sortedCustomers;
                     }
 
                     setStatusMessage("");
@@ -3173,6 +3245,15 @@
                 }
             } catch (error) {
                 console.error("Klanten laden via Supabase mislukt:", error);
+            }
+
+            if (!isActiveCustomerLoadCycle(loadEpoch)) {
+                return;
+            }
+
+            if (hadBootstrapCustomers) {
+                setStatusMessage("");
+                return;
             }
 
             state.klanten = [];
