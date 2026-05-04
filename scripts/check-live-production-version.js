@@ -8,10 +8,11 @@ const DEFAULT_PROJECT = 'softora-nl';
 
 function run(command, args, options = {}) {
   const env = options.env || process.env;
+  const npxArgs = command === 'npx' && args[0] === 'vercel' ? ['--yes', ...args] : args;
   const finalArgs =
-    command === 'npx' && args[0] === 'vercel' && env.VERCEL_TOKEN && !args.includes('--token')
-      ? [...args, '--token', env.VERCEL_TOKEN]
-      : args;
+    command === 'npx' && args[0] === 'vercel' && env.VERCEL_TOKEN && !npxArgs.includes('--token')
+      ? [...npxArgs, '--token', env.VERCEL_TOKEN]
+      : npxArgs;
   const result = spawnSync(command, finalArgs, {
     cwd: options.cwd || repoRoot,
     encoding: 'utf8',

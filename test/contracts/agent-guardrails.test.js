@@ -384,6 +384,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(deployGuardSource, /mainRef\.stdout !== headRef\.stdout/);
   assert.match(deployGuardSource, /exact origin\/main/);
   assert.match(liveVersionSource, /VERCEL_TOKEN/);
+  assert.match(liveVersionSource, /--yes/);
   assert.match(liveWaitSource, /assertLiveProductionVersion/);
   assert.match(liveWorkflowSource, /push:\s*[\s\S]*branches:\s*[\s\S]*main/);
   assert.match(liveWorkflowSource, /npm run check:live-production-version:wait/);

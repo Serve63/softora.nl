@@ -189,7 +189,7 @@ function listQualityLockViolations(options = {}) {
 
   if (trackedFileSet.has('scripts/check-live-production-version.js')) {
     const liveVersionSource = readFile('scripts/check-live-production-version.js');
-    ['vercel', 'ls', 'origin/main', 'githubCommitSha', 'gitCommitSha', 'VERCEL_TOKEN'].forEach((requiredText) => {
+    ['--yes', 'vercel', 'ls', 'origin/main', 'githubCommitSha', 'gitCommitSha', 'VERCEL_TOKEN'].forEach((requiredText) => {
       if (!liveVersionSource.includes(requiredText)) {
         violations.push(`[quality-lock] check-live-production-version.js mist "${requiredText}".`);
       }
