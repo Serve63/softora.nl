@@ -8,6 +8,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Commit en push elke succesvolle wijziging direct naar de huidige branch, tenzij de gebruiker expliciet vraagt om lokaal te blijven.
 - Productie deployen mag alleen via `npm run deploy:production`; dat script blokkeert alles behalve een schone checkout die exact gelijk is aan de actuele `origin/main`.
 - Na een productie-deploy moet `npm run check:live-production-version` groen zijn; `www.softora.nl` moet exact dezelfde commit draaien als `origin/main`.
+- Elke push/merge naar `main` moet automatisch door Vercel naar productie gaan; `.github/workflows/live-production-version.yml` wacht daarna en faalt rood als `www.softora.nl` niet exact op die nieuwe `main` staat.
 - `main` is beschermd via de GitHub ruleset "Softora main quality gate"; werk vanaf `codex/*` branches en merge naar `main` alleen via PR nadat verplichte checks groen zijn.
 - Draai bij wijzigingen in `server.js`, `server/routes`, `server/security`, `agenda`, `auth`, `leads` of `coldcalling` eerst `npm run backup:runtime`.
 - Gebruik [server/routes/manifest.js](server/routes/manifest.js) als lijst van kritieke flows.

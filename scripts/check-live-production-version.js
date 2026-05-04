@@ -7,10 +7,16 @@ const DEFAULT_DOMAIN = 'www.softora.nl';
 const DEFAULT_PROJECT = 'softora-nl';
 
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const env = options.env || process.env;
+  const finalArgs =
+    command === 'npx' && args[0] === 'vercel' && env.VERCEL_TOKEN && !args.includes('--token')
+      ? [...args, '--token', env.VERCEL_TOKEN]
+      : args;
+  const result = spawnSync(command, finalArgs, {
     cwd: options.cwd || repoRoot,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    env,
   });
   return {
     status: Number.isInteger(result.status) ? result.status : 1,
