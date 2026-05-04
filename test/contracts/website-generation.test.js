@@ -57,14 +57,8 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /Bekijk eerst de website grondig op basis van de URL-scan hieronder/i);
   assert.match(prompt, /Gebruik deze scan en eventuele referentiebeelden alleen als moodboard\/context/i);
   assert.match(prompt, /Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept/i);
-  assert.match(prompt, /aangeleverde screenshot alleen dient als moodboard voor merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep/i);
-  assert.match(prompt, /ontwerp vanaf nul een radicaal andere Awwwards-level website/i);
-  assert.match(prompt, /totaal nieuwe informatiearchitectuur/i);
-  assert.match(prompt, /geen herkenbare kopie van layout, hero, sectievolgorde, grids, kaartenrijen, iconenblokken, USP-blokken of footerstructuur/i);
-  assert.match(prompt, /rustige, ruimtelijke, branche-passende editorial compositie/i);
-  assert.match(prompt, /veel negative space, sterke visual hierarchy, hoogwaardige beeldregie/i);
-  assert.match(prompt, /asymmetrische layout, subtiele diepte, verfijnde CTA’s, premium typografie/i);
-  assert.match(prompt, /maximaal 5 grote ademende contentmomenten/i);
+  assert.match(prompt, /Er zijn 2 referentiebeeld\(en\) meegegeven; behandel die uitsluitend als moodboard voor merkidentiteit, kleuren, sfeer en doelgroep\./i);
+  assert.match(prompt, /Gebruik dezelfde globale structuur waar mogelijk/i);
   assert.match(prompt, /UI-ONLY OUTPUT/i);
   assert.match(prompt, /duidelijk een gerenderde desktop website-interface/i);
   assert.match(prompt, /zichtbare navigatie, hero, typografie, secties, knoppen en footer/i);
