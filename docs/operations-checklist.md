@@ -8,6 +8,11 @@
 - `npm run check:live-production-version`
 - health endpoints controleren
 
+## Automatische productie
+- Elke push/merge naar `main` hoort door Vercel automatisch naar productie te gaan.
+- De workflow `Live Production Version` draait daarna `npm run check:live-production-version:wait`.
+- Als `www.softora.nl` niet exact op de nieuwste `origin/main` staat, is dat een release-incident en mag er niet worden doorgewerkt alsof productie klopt.
+
 ## Dagelijks
 - smoke-resultaten bekijken
 - security audit events bekijken

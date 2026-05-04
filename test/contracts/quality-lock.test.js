@@ -26,6 +26,7 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
     '.github/pull_request_template.md',
     '.github/workflows/verify-critical.yml',
     '.github/workflows/agent-guardrails.yml',
+    '.github/workflows/live-production-version.yml',
     '.github/workflows/repo-hygiene.yml',
     'docs/quality-protocol.md',
     'docs/operations-checklist.md',
@@ -37,6 +38,7 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
     'scripts/deploy-production-safe.js',
     'scripts/guard-production-deploy-source.js',
     'scripts/check-live-production-version.js',
+    'scripts/wait-live-production-version.js',
     'scripts/verify-critical.js',
     'test/contracts/production-live-version-guard.test.js',
     'test/contracts/production-deploy-guard.test.js',
@@ -51,6 +53,7 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
         'check:quality-lock': 'node scripts/check-quality-lock.js',
         'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
         'check:live-production-version': 'node scripts/check-live-production-version.js',
+        'check:live-production-version:wait': 'node scripts/wait-live-production-version.js',
         'deploy:production': 'node scripts/deploy-production-safe.js',
         'verify:critical': 'node scripts/verify-critical.js',
       },
@@ -67,6 +70,12 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
       'origin/main',
       'githubCommitSha',
       'gitCommitSha',
+      'VERCEL_TOKEN',
+    ].join('\n'),
+    'scripts/wait-live-production-version.js': [
+      'assertLiveProductionVersion',
+      'LIVE_PRODUCTION_WAIT_TIMEOUT_MS',
+      'maxAttempts',
     ].join('\n'),
     'scripts/guard-production-deploy-source.js': [
       'if (mainRef.status === 0 && headRef.status === 0 && mainRef.stdout !== headRef.stdout) {}',
@@ -88,6 +97,12 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
       '      ALLOW_UNTESTED_CHANGES: 1',
     ].join('\n'),
     '.github/workflows/agent-guardrails.yml': 'run: npm run check:guardrails',
+    '.github/workflows/live-production-version.yml': [
+      'push:',
+      'main',
+      'VERCEL_TOKEN',
+      'npm run check:live-production-version:wait',
+    ].join('\n'),
     '.github/workflows/repo-hygiene.yml': 'run: bash scripts/check-repo-hygiene.sh',
     'test/contracts/example.test.js': 'test' + '.only("focus", () => {});',
     'premium-personeel-dashboard.html': [
@@ -118,6 +133,7 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
     '.github/pull_request_template.md',
     '.github/workflows/verify-critical.yml',
     '.github/workflows/agent-guardrails.yml',
+    '.github/workflows/live-production-version.yml',
     '.github/workflows/repo-hygiene.yml',
     'docs/quality-protocol.md',
     'docs/operations-checklist.md',
@@ -129,6 +145,7 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
     'scripts/deploy-production-safe.js',
     'scripts/guard-production-deploy-source.js',
     'scripts/check-live-production-version.js',
+    'scripts/wait-live-production-version.js',
     'scripts/verify-critical.js',
     'test/contracts/production-live-version-guard.test.js',
     'test/contracts/production-deploy-guard.test.js',
@@ -142,6 +159,7 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
         'check:quality-lock': 'node scripts/check-quality-lock.js',
         'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
         'check:live-production-version': 'node scripts/check-live-production-version.js',
+        'check:live-production-version:wait': 'node scripts/wait-live-production-version.js',
         'deploy:production': 'node scripts/deploy-production-safe.js',
         'verify:critical': 'node scripts/verify-critical.js',
       },
@@ -158,6 +176,12 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
       'origin/main',
       'githubCommitSha',
       'gitCommitSha',
+      'VERCEL_TOKEN',
+    ].join('\n'),
+    'scripts/wait-live-production-version.js': [
+      'assertLiveProductionVersion',
+      'LIVE_PRODUCTION_WAIT_TIMEOUT_MS',
+      'maxAttempts',
     ].join('\n'),
     'scripts/guard-production-deploy-source.js': [
       'if (mainRef.status === 0 && headRef.status === 0 && mainRef.stdout !== headRef.stdout) {}',
@@ -173,6 +197,12 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
     ].join('\n'),
     '.github/workflows/verify-critical.yml': 'run: npm run verify:critical',
     '.github/workflows/agent-guardrails.yml': 'run: npm run check:guardrails',
+    '.github/workflows/live-production-version.yml': [
+      'push:',
+      'main',
+      'VERCEL_TOKEN',
+      'npm run check:live-production-version:wait',
+    ].join('\n'),
     '.github/workflows/repo-hygiene.yml': 'run: bash scripts/check-repo-hygiene.sh',
     'premium-personeel-dashboard.html': [
       '<link rel="stylesheet" href="assets/personnel-theme.css?v=old">',
@@ -211,7 +241,18 @@ test('quality lock remains part of verify critical and the PR checklist', () => 
     packageJson.scripts['check:live-production-version'],
     'node scripts/check-live-production-version.js'
   );
+  assert.equal(
+    packageJson.scripts['check:live-production-version:wait'],
+    'node scripts/wait-live-production-version.js'
+  );
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
+  const liveProductionWorkflow = fs.readFileSync(
+    path.join(repoRoot, '.github/workflows/live-production-version.yml'),
+    'utf8'
+  );
+  assert.match(liveProductionWorkflow, /push:\s*[\s\S]*branches:\s*[\s\S]*main/);
+  assert.match(liveProductionWorkflow, /npm run check:live-production-version:wait/);
+  assert.match(liveProductionWorkflow, /VERCEL_TOKEN/);
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);
   assert.match(pullRequestTemplate, /npm run verify:critical/);
   assert.match(pullRequestTemplate, /npm run check:guardrails/);

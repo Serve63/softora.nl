@@ -10,6 +10,7 @@ const REQUIRED_QUALITY_FILES = Object.freeze([
   'AGENTS.md',
   '.github/pull_request_template.md',
   '.github/workflows/agent-guardrails.yml',
+  '.github/workflows/live-production-version.yml',
   '.github/workflows/repo-hygiene.yml',
   '.github/workflows/verify-critical.yml',
   'docs/quality-protocol.md',
@@ -21,6 +22,7 @@ const REQUIRED_QUALITY_FILES = Object.freeze([
   'scripts/deploy-production-safe.js',
   'scripts/guard-production-deploy-source.js',
   'scripts/check-live-production-version.js',
+  'scripts/wait-live-production-version.js',
   'scripts/verify-critical.js',
   'test/contracts/production-live-version-guard.test.js',
   'test/contracts/production-deploy-guard.test.js',
@@ -136,6 +138,7 @@ function listQualityLockViolations(options = {}) {
     'check:quality-lock': 'node scripts/check-quality-lock.js',
     'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
     'check:live-production-version': 'node scripts/check-live-production-version.js',
+    'check:live-production-version:wait': 'node scripts/wait-live-production-version.js',
     'deploy:production': 'node scripts/deploy-production-safe.js',
     'verify:critical': 'node scripts/verify-critical.js',
   };
@@ -186,11 +189,35 @@ function listQualityLockViolations(options = {}) {
 
   if (trackedFileSet.has('scripts/check-live-production-version.js')) {
     const liveVersionSource = readFile('scripts/check-live-production-version.js');
-    ['vercel', 'ls', 'origin/main', 'githubCommitSha', 'gitCommitSha'].forEach((requiredText) => {
+    ['vercel', 'ls', 'origin/main', 'githubCommitSha', 'gitCommitSha', 'VERCEL_TOKEN'].forEach((requiredText) => {
       if (!liveVersionSource.includes(requiredText)) {
         violations.push(`[quality-lock] check-live-production-version.js mist "${requiredText}".`);
       }
     });
+  }
+
+  if (trackedFileSet.has('scripts/wait-live-production-version.js')) {
+    const waitLiveVersionSource = readFile('scripts/wait-live-production-version.js');
+    ['assertLiveProductionVersion', 'LIVE_PRODUCTION_WAIT_TIMEOUT_MS', 'maxAttempts'].forEach(
+      (requiredText) => {
+        if (!waitLiveVersionSource.includes(requiredText)) {
+          violations.push(`[quality-lock] wait-live-production-version.js mist "${requiredText}".`);
+        }
+      }
+    );
+  }
+
+  if (trackedFileSet.has('.github/workflows/live-production-version.yml')) {
+    const liveWorkflowSource = readFile('.github/workflows/live-production-version.yml');
+    ['push:', 'main', 'VERCEL_TOKEN', 'npm run check:live-production-version:wait'].forEach(
+      (requiredText) => {
+        if (!liveWorkflowSource.includes(requiredText)) {
+          violations.push(
+            `[quality-lock] live-production-version workflow mist "${requiredText}".`
+          );
+        }
+      }
+    );
   }
 
   const bypassEnvPattern = new RegExp(

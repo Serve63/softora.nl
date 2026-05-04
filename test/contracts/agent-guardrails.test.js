@@ -361,7 +361,10 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const hygieneSource = readRepoFile('scripts/check-repo-hygiene.sh');
   const cleanSource = readRepoFile('scripts/clean-local-artifacts.sh');
   const deployGuardSource = readRepoFile('scripts/guard-production-deploy-source.js');
+  const liveVersionSource = readRepoFile('scripts/check-live-production-version.js');
+  const liveWaitSource = readRepoFile('scripts/wait-live-production-version.js');
   const safeDeploySource = readRepoFile('scripts/deploy-production-safe.js');
+  const liveWorkflowSource = readRepoFile('.github/workflows/live-production-version.yml');
   const agentsSource = readRepoFile('AGENTS.md');
   const protocolSource = readRepoFile('docs/quality-protocol.md');
 
@@ -369,6 +372,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
   assert.equal(packageJson.scripts['check:production-deploy-source'], 'node scripts/guard-production-deploy-source.js');
   assert.equal(packageJson.scripts['check:live-production-version'], 'node scripts/check-live-production-version.js');
+  assert.equal(packageJson.scripts['check:live-production-version:wait'], 'node scripts/wait-live-production-version.js');
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
@@ -379,13 +383,19 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.doesNotMatch(cleanSource, /rm -rf -- "\.vercel"/);
   assert.match(deployGuardSource, /mainRef\.stdout !== headRef\.stdout/);
   assert.match(deployGuardSource, /exact origin\/main/);
+  assert.match(liveVersionSource, /VERCEL_TOKEN/);
+  assert.match(liveWaitSource, /assertLiveProductionVersion/);
+  assert.match(liveWorkflowSource, /push:\s*[\s\S]*branches:\s*[\s\S]*main/);
+  assert.match(liveWorkflowSource, /npm run check:live-production-version:wait/);
   assert.match(safeDeploySource, /assertSafeProductionDeploySource\(\)/);
   assert.match(safeDeploySource, /verify:critical/);
   assert.match(safeDeploySource, /check:live-production-version/);
   assert.match(agentsSource, /Productie deployen mag alleen via `npm run deploy:production`/);
   assert.match(agentsSource, /check:live-production-version/);
+  assert.match(agentsSource, /Elke push\/merge naar `main`/);
   assert.match(protocolSource, /Productie deploys lopen alleen via `npm run deploy:production`/);
   assert.match(protocolSource, /check:live-production-version/);
+  assert.match(protocolSource, /Elke push\/merge naar `main`/);
 });
 
 test('agent guardrails helpers recognize approved and high-risk paths', () => {
