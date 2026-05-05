@@ -1065,6 +1065,33 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  async function resolveImageAttachment(value) {
+    const parsed = parseDataUrlImage(value);
+    if (parsed) return parsed;
+    const url = normalizeString(value);
+    if (!/^https:\/\//i.test(url) || typeof fetch !== 'function') return null;
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 9000) : null;
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller ? controller.signal : undefined,
+      });
+      if (!response.ok) return null;
+      const contentType = normalizeString(response.headers && response.headers.get && response.headers.get('content-type')).split(';')[0].toLowerCase();
+      if (!/^image\/(?:png|jpe?g|webp|gif)$/i.test(contentType)) return null;
+      const arrayBuffer = await response.arrayBuffer();
+      const content = Buffer.from(arrayBuffer);
+      if (!content.length || content.length > 10 * 1024 * 1024) return null;
+      return { contentType, content };
+    } catch (error) {
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   function getImageExtension(contentType) {
     if (contentType === 'image/jpeg' || contentType === 'image/jpg') return 'jpg';
     if (contentType === 'image/webp') return 'webp';
@@ -1107,9 +1134,14 @@ function createColdmailCampaignService(deps = {}) {
           optOutText
         )}</p>`
       : '';
+    const mockupHtml = attachment.mockup && attachment.mockup.cid
+      ? `\n<p style="margin:18px 0 0 0;"><img src="cid:${escapeHtml(attachment.mockup.cid)}" alt="${escapeHtml(
+          attachment.mockup.alt || 'Device mockup'
+        )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>`
+      : '';
     return `${html}\n<p style="margin:24px 0 0 0;"><img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
       attachment.alt || 'Webdesign'
-    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>${optOutHtml}`;
+    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>${mockupHtml}${optOutHtml}`;
   }
 
   async function loadColdmailReplyState() {
@@ -1262,12 +1294,19 @@ function createColdmailCampaignService(deps = {}) {
     const stateValues = values && typeof values === 'object' ? values : {};
     Object.keys(parsed).forEach((key) => {
       const item = parsed[key];
-      if (!item || typeof item !== 'object' || parseDataUrlImage(item.websitePhoto)) return;
+      if (!item || typeof item !== 'object') return;
       const photoKey = normalizeString(item.photoKey);
       const chunkCount = Math.max(0, Math.min(80, Number(item.chunkCount || 0) || 0));
-      if (!photoKey || !chunkCount) return;
-      const dataUrl = Array.from({ length: chunkCount }, (_, index) => normalizeString(stateValues[`${photoKey}_${index}`])).join('');
-      if (parseDataUrlImage(dataUrl)) item.websitePhoto = dataUrl;
+      if (photoKey && chunkCount && !parseDataUrlImage(item.websitePhoto)) {
+        const dataUrl = Array.from({ length: chunkCount }, (_, index) => normalizeString(stateValues[`${photoKey}_${index}`])).join('');
+        if (parseDataUrlImage(dataUrl)) item.websitePhoto = dataUrl;
+      }
+      const mockupPhotoKey = normalizeString(item.mockupPhotoKey || item.websiteMockupKey);
+      const mockupChunkCount = Math.max(0, Math.min(80, Number(item.mockupChunkCount || item.websiteMockupChunkCount || 0) || 0));
+      if (mockupPhotoKey && mockupChunkCount && !parseDataUrlImage(item.websiteMockup)) {
+        const mockupDataUrl = Array.from({ length: mockupChunkCount }, (_, index) => normalizeString(stateValues[`${mockupPhotoKey}_${index}`])).join('');
+        if (parseDataUrlImage(mockupDataUrl)) item.websiteMockup = mockupDataUrl;
+      }
     });
     return parsed;
   }
@@ -1278,7 +1317,7 @@ function createColdmailCampaignService(deps = {}) {
     return parseCustomerPhotoMap(values[customerPhotoKey], values);
   }
 
-  function resolveRowWebdesignPhoto(row, photoMap) {
+  async function resolveRowWebdesignPhoto(row, photoMap) {
     const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
     const direct = photos[getRowId(row, 0)];
     const identityKey = buildRowIdentityKey(row);
@@ -1286,17 +1325,28 @@ function createColdmailCampaignService(deps = {}) {
       .map((key) => photos[key])
       .find((item) => normalizeString(item && item.identityKey) === identityKey);
     const photo = direct || identity || null;
-    const parsed = parseDataUrlImage(photo && photo.websitePhoto);
+    const parsed = await resolveImageAttachment(photo && (photo.websitePhoto || photo.websitePhotoUrl));
     if (!parsed) return null;
     const baseName = sanitizeFilename(photo.websitePhotoName || `${getRowCompany(row)} webdesign`, 'webdesign');
     const extension = getImageExtension(parsed.contentType);
     const filename = `${baseName}.${extension}`;
     const cid = `webdesign-${sanitizeFilename(getRowId(row, 0), 'image')}@softora`;
+    const mockupParsed = await resolveImageAttachment(photo && (photo.websiteMockup || photo.websiteMockupUrl));
+    const mockupBaseName = sanitizeFilename(photo && (photo.websiteMockupName || `${getRowCompany(row)} device mockup`), 'device-mockup');
+    const mockup = mockupParsed
+      ? {
+          ...mockupParsed,
+          filename: `${mockupBaseName}.${getImageExtension(mockupParsed.contentType)}`,
+          cid: `webdesign-mockup-${sanitizeFilename(getRowId(row, 0), 'image')}@softora`,
+          alt: `${getRowCompany(row) || 'Bedrijf'} device mockup`,
+        }
+      : null;
     return {
       ...parsed,
       filename,
       cid,
       alt: `${getRowCompany(row) || 'Bedrijf'} webdesign`,
+      mockup,
     };
   }
 
@@ -1414,7 +1464,7 @@ function createColdmailCampaignService(deps = {}) {
       const baseText = buildMailText(bodyTemplate, row);
       const text = appendColdmailOptOutText(baseText);
       const subject = personalizeTemplate(subjectTemplate, row);
-      const webdesignPhoto = shouldIncludeWebdesignPhoto ? resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
+      const webdesignPhoto = shouldIncludeWebdesignPhoto ? await resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
         failed.push({
           id: item.id,
@@ -1440,6 +1490,15 @@ function createColdmailCampaignService(deps = {}) {
               cid: webdesignPhoto.cid,
               contentDisposition: 'inline',
             },
+            ...(webdesignPhoto.mockup
+              ? [{
+                  filename: webdesignPhoto.mockup.filename,
+                  content: webdesignPhoto.mockup.content,
+                  contentType: webdesignPhoto.mockup.contentType,
+                  cid: webdesignPhoto.mockup.cid,
+                  contentDisposition: 'inline',
+                }]
+              : []),
           ]
         : undefined;
       try {

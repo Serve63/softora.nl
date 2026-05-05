@@ -105,7 +105,9 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
         photoKey,
         chunkCount: chunks.length,
         websitePhotoUrl,
+        websiteMockupUrl: normalizeString(entry.websiteMockupUrl || entry.mockupUrl),
         websitePhotoName: normalizeString(entry.fileName || entry.legacyMeta?.websitePhotoName) || 'Websitefoto',
+        websiteMockupName: normalizeString(entry.websiteMockupName || entry.legacyMeta?.websiteMockupName),
         updatedAt: normalizeString(entry.legacyMeta?.updatedAt || entry.updatedAt).slice(0, 10),
         storage: {
           source: 'supabase_storage',
@@ -154,11 +156,18 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
         }
         const dataUrl = chunks.join('');
         if (!parseImageDataUrl(dataUrl)) return null;
+        const mockupPhotoKey = normalizeString(meta && (meta.mockupPhotoKey || meta.websiteMockupKey));
+        const mockupChunkCount = Math.max(0, Math.min(100, Number(meta && (meta.mockupChunkCount || meta.websiteMockupChunkCount)) || 0));
+        const mockupDataUrl = mockupPhotoKey && mockupChunkCount
+          ? Array.from({ length: mockupChunkCount }, (_, index) => normalizeString(values[`${mockupPhotoKey}_${index}`])).join('')
+          : '';
         return {
           customerId,
           dataUrl,
+          websiteMockup: parseImageDataUrl(mockupDataUrl) ? mockupDataUrl : '',
           identityKey: normalizeString(meta && meta.identityKey),
           fileName: normalizeString(meta && meta.websitePhotoName) || 'Websitefoto',
+          websiteMockupName: normalizeString(meta && meta.websiteMockupName),
           legacyMeta: meta && typeof meta === 'object' ? meta : {},
         };
       })

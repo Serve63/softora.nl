@@ -76,6 +76,10 @@
                 chunkCount: clampCount(item && item.chunkCount, 0),
                 websitePhotoUrl: normalizeString(item && (item.websitePhotoUrl || item.signedUrl || (item.storage && item.storage.signedUrl))),
                 websitePhotoName: normalizeString(item && item.websitePhotoName) || "Websitefoto",
+                mockupPhotoKey: normalizeString(item && (item.mockupPhotoKey || item.websiteMockupKey)),
+                mockupChunkCount: clampCount(item && (item.mockupChunkCount || item.websiteMockupChunkCount), 0),
+                websiteMockupUrl: normalizeString(item && (item.websiteMockupUrl || item.mockupUrl || item.signedMockupUrl || (item.mockupStorage && item.mockupStorage.signedUrl))),
+                websiteMockupName: normalizeString(item && item.websiteMockupName) || "",
                 updatedAt: normalizeString(item && item.updatedAt) || ""
             };
         }
@@ -94,12 +98,14 @@
                 const meta = stripPhotoMeta({ ...parsed[photoId], id: parsed[photoId].id || photoId });
                 if (!meta.id || !meta.photoKey) return;
                 const chunked = readChunkedData(values, meta.photoKey, meta.chunkCount);
+                const mockupChunked = meta.mockupPhotoKey ? readChunkedData(values, meta.mockupPhotoKey, meta.mockupChunkCount) : null;
+                const mockupSource = mockupChunked ? mockupChunked.dataUrl : (isValidWebsitePhotoSource(meta.websiteMockupUrl) ? meta.websiteMockupUrl : "");
                 if (chunked) {
-                    result[meta.id] = { ...meta, chunkCount: chunked.chunkCount, websitePhoto: chunked.dataUrl };
+                    result[meta.id] = { ...meta, chunkCount: chunked.chunkCount, websitePhoto: chunked.dataUrl, websiteMockup: mockupSource, websiteMockupName: meta.websiteMockupName || "Device mockup" };
                     return;
                 }
                 if (isValidWebsitePhotoSource(meta.websitePhotoUrl)) {
-                    result[meta.id] = { ...meta, websitePhoto: meta.websitePhotoUrl };
+                    result[meta.id] = { ...meta, websitePhoto: meta.websitePhotoUrl, websiteMockup: mockupSource, websiteMockupName: meta.websiteMockupName || "Device mockup" };
                 }
             });
 
@@ -115,6 +121,8 @@
                     photoKey: photoKey,
                     chunkCount: chunked.chunkCount,
                     websitePhotoName: normalized.websitePhotoName || "Websitefoto",
+                    websiteMockup: normalized.websiteMockup || "",
+                    websiteMockupName: normalized.websiteMockupName || "",
                     updatedAt: normalized.updatedAt || "",
                     websitePhoto: chunked.dataUrl
                 };
@@ -132,8 +140,14 @@
                 if (!normalized.id || !shouldShowWebsitePhoto(normalized) || !isValidWebsitePhotoDataUrl(normalized.websitePhoto)) return;
                 const photoKey = buildDataKey(normalized.id);
                 const chunks = normalizeString(normalized.websitePhoto).match(new RegExp("[\\s\\S]{1," + chunkSize + "}", "g")) || [];
+                const hasMockup = isValidWebsitePhotoDataUrl(normalized.websiteMockup);
+                const mockupPhotoKey = hasMockup ? buildDataKey(normalized.id + "_mockup") : "";
+                const mockupChunks = hasMockup ? normalizeString(normalized.websiteMockup).match(new RegExp("[\\s\\S]{1," + chunkSize + "}", "g")) || [] : [];
                 chunks.forEach(function (chunk, chunkIndex) {
                     patch[photoKey + "_" + chunkIndex] = chunk;
+                });
+                mockupChunks.forEach(function (chunk, chunkIndex) {
+                    patch[mockupPhotoKey + "_" + chunkIndex] = chunk;
                 });
                 photoMap[normalized.id] = {
                     id: normalized.id,
@@ -141,6 +155,9 @@
                     photoKey: photoKey,
                     chunkCount: chunks.length,
                     websitePhotoName: normalized.websitePhotoName || "Websitefoto",
+                    mockupPhotoKey: mockupPhotoKey,
+                    mockupChunkCount: mockupChunks.length,
+                    websiteMockupName: normalized.websiteMockupName || "",
                     updatedAt: normalized.updatedAt || formatDateForStorage(new Date())
                 };
             });
@@ -171,6 +188,11 @@
                 const count = meta.chunkCount || 80;
                 for (let index = 0; index < count; index += 1) {
                     patch[photoKey + "_" + index] = "";
+                }
+                const mockupPhotoKey = meta.mockupPhotoKey || buildDataKey(id + "_mockup");
+                const mockupCount = meta.mockupChunkCount || 80;
+                for (let index = 0; index < mockupCount; index += 1) {
+                    patch[mockupPhotoKey + "_" + index] = "";
                 }
             });
             return patch;

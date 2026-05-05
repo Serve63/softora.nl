@@ -135,6 +135,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   const webdesignActionScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
   const apiCostLedgerScriptPath = path.join(__dirname, '../../assets/softora-api-cost-ledger.js');
   const photoStorageScriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
+  const webdesignMockupScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-mockup.js');
   const deepSearchScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
@@ -142,6 +143,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   const webdesignActionScriptSource = fs.readFileSync(webdesignActionScriptPath, 'utf8');
   const apiCostLedgerScriptSource = fs.readFileSync(apiCostLedgerScriptPath, 'utf8');
   const photoStorageScriptSource = fs.readFileSync(photoStorageScriptPath, 'utf8');
+  const webdesignMockupScriptSource = fs.readFileSync(webdesignMockupScriptPath, 'utf8');
   const deepSearchScriptSource = fs.readFileSync(deepSearchScriptPath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
@@ -228,6 +230,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /const CUSTOMER_PHOTO_DATA_PREFIX = "softora_database_photo_data_v1_";/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_CHUNK_SIZE = 180000;/);
   assert.match(pageSource, /websitePhoto: normalizeString\(raw && \(raw\.websitePhoto \|\| raw\.photo \|\| raw\.websiteImage\)\)/);
+  assert.match(pageSource, /websiteMockup: normalizeString\(raw && \(raw\.websiteMockup \|\| raw\.mockup \|\| raw\.websiteMockupImage\)\)/);
   assert.match(pageSource, /function shouldShowWebsitePhoto\(customer\)/);
   assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
@@ -247,6 +250,11 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /global\.document\.body\.appendChild\(label\)/);
   assert.doesNotMatch(webdesignActionScriptSource, /CHARGE_LABEL_ID/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-generate-spinner\\"/);
+  assert.match(webdesignActionScriptSource, /const MOCKUP_ICON = "<svg class=\\"photo-mockup-icon\\"/);
+  assert.match(webdesignActionScriptSource, /data-mockup-photo-id=\\"/);
+  assert.match(webdesignMockupScriptSource, /global\.SoftoraDatabaseWebdesignMockup =/);
+  assert.match(webdesignMockupScriptSource, /Laptop - iPad - iPhone/);
+  assert.match(webdesignMockupScriptSource, /ensureVisibleMockups/);
   assert.doesNotMatch(webdesignActionScriptSource, /\.photo-drop:hover \.photo-generate-cost/);
   assert.match(webdesignActionScriptSource, /function formatCentCost\(value\)/);
   assert.match(webdesignActionScriptSource, /label\.textContent = formatCentCost\(costEur\);/);
@@ -273,10 +281,11 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /class=\\"photo-remove\\"/);
   assert.match(webdesignActionScriptSource, /data-remove-photo-id=\\"/);
   assert.match(webdesignActionScriptSource, /data-has-photo=\\"/);
-  assert.match(pageSource, /function openWebsitePhotoPreview\(customerId\)/);
+  assert.match(pageSource, /function openWebsitePhotoPreview\(customerId, kind\)/);
   assert.match(pageSource, /function prepareWebsitePhotoForStorage\(dataUrl, fileName\)/);
   assert.match(pageSource, /function removeWebsitePhotoForCustomer\(customerId\)/);
   assert.match(pageSource, /websitePhoto: ""/);
+  assert.match(pageSource, /websiteMockup: ""/);
   assert.match(pageSource, /persistCustomerPhotos\(state\.klanten, \{ removeCustomerIds: \[customerId\] \}\)/);
   assert.match(pageSource, /window\.SoftoraDatabasePhotoStorage\.createController\(\{/);
   assert.match(photoStorageScriptSource, /function normalizeIdSet\(values\)/);
@@ -293,11 +302,13 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /function persistCustomerPhotos\(customers, options\)/);
   assert.match(pageSource, /function mergeCustomersWithPhotos\(customers, photoMap, fallbackCustomers\)/);
   assert.match(pageSource, /fallbackPhotosById/);
+  assert.match(pageSource, /websiteMockup: normalizeString\(photo\.websiteMockup \|\| normalized\.websiteMockup\)/);
   assert.match(pageSource, /mergeCustomersWithPhotos\(enrichedCustomers, photoMap, state\.klanten\)/);
   assert.match(pageSource, /function loadCustomerPhotoMap\(customers\)/);
   assert.match(pageSource, /function serializeWebsitePhotoForDiff\(value\)/);
   assert.match(pageSource, /isValidWebsitePhotoUrl\(photo\) \? "url" : ""/);
   assert.match(pageSource, /websitePhoto: serializeWebsitePhotoForDiff\(normalized\.websitePhoto\)/);
+  assert.match(pageSource, /websiteMockup: serializeWebsitePhotoForDiff\(normalized\.websiteMockup\)/);
   assert.match(photoStorageScriptSource, /readChunkedData\(values, photoKey, 0\)/);
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 1440, 2160, 0\.86\)/);
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 768, 1152, 0\.74\)/);
@@ -318,16 +329,17 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /domain === slugifyDomain\(customer && customer\.bedrijf\)/);
   assert.match(pageSource, /const websiteUrl = normalizeWebsiteCandidateUrl\(customer && customer\.website\);/);
   assert.match(pageSource, /!isGeneratedFallbackDomain\(customer, customer && customer\.dom\)/);
-  assert.match(pageSource, /function buildWebsitePreviewUrlCandidates\(customer\)/);
-  assert.match(pageSource, /withWww\.hostname = "www\." \+ parsed\.hostname;/);
+  assert.doesNotMatch(pageSource, /function buildWebsitePreviewUrlCandidates\(customer\)/);
+  assert.doesNotMatch(pageSource, /async function generateWebsitePhotoData\(customer\)/);
   assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
   assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260505b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260505c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505b/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260505a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260501d/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
@@ -348,10 +360,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten, \{ onlyCustomerIds: \[customerId\] \}\);/);
   assert.doesNotMatch(pageSource, /onlyCustomerIds: \[target\.id\]/);
   assert.match(pageSource, /setStatusMessage\(""\);[\s\S]*Promise\.allSettled/);
-  assert.match(pageSource, /fetch\("\/api\/website-preview\/generate"/);
-  assert.match(pageSource, /company: customer\.bedrijf/);
-  assert.match(pageSource, /source: "premium-database"/);
-  assert.match(pageSource, /action: "webdesign"/);
+  assert.doesNotMatch(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: renderPage/);
@@ -363,7 +372,9 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /async function loadRunningJobs\(\)/);
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT,/);
   assert.doesNotMatch(webdesignActionScriptSource, /localStorage/);
-  assert.match(pageSource, /refreshPhotos: async function \(\)/);
+  assert.match(pageSource, /window\.SoftoraDatabaseWebdesignMockup\.createController\(\{/);
+  assert.match(pageSource, /ensureMockupForCustomer: function \(customerId\)/);
+  assert.match(pageSource, /refreshPhotos: async function \(context\)/);
   assert.match(pageSource, /const databaseBootStartedAt = Date\.now\(\), databaseHadBootstrapCustomers = initialBootstrapCustomers\.length > 0, releaseDatabaseBootShell =/);
   assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 1000\)/);
   assert.match(webdesignActionScriptSource, /async function preloadPhotoImages\(customers, limit, timeoutMs\)/);
@@ -375,6 +386,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /else \{\s*await bootstrapCustomers\(\);\s*\}/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);[\s\S]*state\.photoRestorePending = false;[\s\S]*renderPage\(\);[\s\S]*releaseDatabaseBootShell\(\);/);
+  assert.match(pageSource, /void webdesignMockupController\.ensureVisibleMockups\(getSortedCustomers\(getFilteredCustomers\(\)\), 12\)\.catch/);
   assert.doesNotMatch(pageSource, /window\.setTimeout\(function \(\) \{ resolve\(false\); \}, 850\);/);
   assert.doesNotMatch(pageSource, /releaseDatabaseBootShell\(\); void webdesignActionController\.preloadPhotoImages/);
   assert.match(pageSource, /void webdesignActionController\.resumePendingJobs\(\)\.catch/);
@@ -808,15 +820,18 @@ test('premium database photo storage saves one changed photo without resending o
 
   await controller.persist([
     { id: 'customer1', websitePhoto: 'data:image/png;base64,AAA', websitePhotoName: 'Websitefoto oud' },
-    { id: 'customer2', websitePhoto: 'data:image/png;base64,BBB', websitePhotoName: 'Websitefoto nieuw' },
+    { id: 'customer2', websitePhoto: 'data:image/png;base64,BBB', websitePhotoName: 'Websitefoto nieuw', websiteMockup: 'data:image/jpeg;base64,CCC', websiteMockupName: 'Device mockup nieuw' },
   ], { onlyCustomerIds: ['customer2'] });
 
   assert.equal(patches.length, 1);
   assert.equal(patches[0].photo_customer1_0, undefined);
   assert.equal(patches[0].photo_customer2_0, 'data:image/png;base64,BBB');
+  assert.equal(patches[0].photo_customer2_mockup_0, 'data:image/jpeg;base64,CCC');
   const storedMap = JSON.parse(patches[0].photos);
   assert.equal(storedMap.customer1.photoKey, 'photo_customer1');
   assert.equal(storedMap.customer2.photoKey, 'photo_customer2');
+  assert.equal(storedMap.customer2.mockupPhotoKey, 'photo_customer2_mockup');
+  assert.equal(storedMap.customer2.websiteMockupName, 'Device mockup nieuw');
 });
 
 test('premium database photo storage retries Supabase reads before saving photos', async () => {

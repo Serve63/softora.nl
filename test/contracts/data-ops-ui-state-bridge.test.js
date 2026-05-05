@@ -99,7 +99,9 @@ test('data ops ui-state bridge stores photo chunks as structured photo entries',
   const store = createStore();
   const bridge = createSoftoraDataOpsUiStateBridge({ store });
   const dataUrl = 'data:image/png;base64,aGVsbG8=';
+  const mockupDataUrl = 'data:image/jpeg;base64,bW9ja3Vw';
   const photoKey = 'softora_database_photo_data_v1_cust_1';
+  const mockupPhotoKey = 'softora_database_photo_data_v1_cust_1_mockup';
 
   const state = await bridge.setUiStateValues(
     SCOPES.photos,
@@ -110,9 +112,13 @@ test('data ops ui-state bridge stores photo chunks as structured photo entries',
           photoKey,
           chunkCount: 1,
           websitePhotoName: 'demo.png',
+          mockupPhotoKey,
+          mockupChunkCount: 1,
+          websiteMockupName: 'demo mockup.jpg',
         },
       }),
       [`${photoKey}_0`]: dataUrl,
+      [`${mockupPhotoKey}_0`]: mockupDataUrl,
     },
     { source: 'premium-database-photos' }
   );
@@ -121,10 +127,13 @@ test('data ops ui-state bridge stores photo chunks as structured photo entries',
   assert.equal(store.calls[0].type, 'photos-upsert');
   assert.equal(store.calls[0].entries[0].customerId, 'cust-1');
   assert.equal(store.calls[0].entries[0].dataUrl, dataUrl);
+  assert.equal(store.calls[0].entries[0].websiteMockup, mockupDataUrl);
+  assert.equal(store.calls[0].entries[0].websiteMockupName, 'demo mockup.jpg');
 });
 
 test('data ops ui-state bridge reads photo rows as signed URLs without embedding image data', async () => {
   const signedUrl = 'https://example.supabase.co/storage/v1/object/sign/softora-design-photos/demo.png?token=test';
+  const mockupSignedUrl = 'https://example.supabase.co/storage/v1/object/sign/softora-design-photos/demo-mockup.jpg?token=test';
   const bridge = createSoftoraDataOpsUiStateBridge({
     store: createStore({
       listDesignPhotosWithSignedUrls: async () => [
@@ -132,9 +141,11 @@ test('data ops ui-state bridge reads photo rows as signed URLs without embedding
           customerId: 'cust-1',
           identityKey: 'softora||0612345678',
           websitePhotoUrl: signedUrl,
+          websiteMockupUrl: mockupSignedUrl,
           storageBucket: 'softora-design-photos',
           storagePath: 'customers/cust-1/demo.png',
           fileName: 'demo.png',
+          websiteMockupName: 'demo mockup.jpg',
           updatedAt: '2026-05-05T12:00:00.000Z',
         },
       ],
@@ -148,6 +159,8 @@ test('data ops ui-state bridge reads photo rows as signed URLs without embedding
 
   assert.equal(state.source, 'supabase:data_ops');
   assert.equal(photoMap['cust-1'].websitePhotoUrl, signedUrl);
+  assert.equal(photoMap['cust-1'].websiteMockupUrl, mockupSignedUrl);
+  assert.equal(photoMap['cust-1'].websiteMockupName, 'demo mockup.jpg');
   assert.equal(photoMap['cust-1'].chunkCount, 0);
   assert.equal(state.values.softora_database_photo_data_v1_cust_1_0, undefined);
 });
