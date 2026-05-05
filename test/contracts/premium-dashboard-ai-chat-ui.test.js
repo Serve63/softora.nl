@@ -47,7 +47,7 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
   );
 });
 
-test('premium dashboard verbergt de personeel beheer selector boven de datumfilters', () => {
+test('premium dashboard verbergt selectors naast de datum en toont jaaromzet', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -65,7 +65,11 @@ test('premium dashboard verbergt de personeel beheer selector boven de datumfilt
   assert.doesNotMatch(pageSource, />PERSONEEL BEHEER<\/span>/);
   assert.match(pageSource, /class="dashboard-topbar-controls"/);
   assert.match(pageSource, /class="topbar-date"/);
-  assert.match(pageSource, /id="dashboardPeriodDropdown"/);
+  assert.doesNotMatch(pageSource, /id="dashboardPeriodDropdown"/);
+  assert.doesNotMatch(pageSource, /id="dashboardPeriodTrigger"/);
+  assert.doesNotMatch(pageSource, /id="dashboardPeriodMenu"/);
+  assert.match(pageSource, />Totale Omzet dit jaar<\/div>/);
+  assert.match(pageSource, /function loadDashboardPeriodFilter\(\) \{\s*return 'year';\s*\}/);
   assert.doesNotMatch(pageSource, /\.ai-management-status-dot--red \{/);
   assert.match(pageSource, /const initialAiManagementMode =/);
   assert.match(pageSource, /const AI_MANAGEMENT_STATUS = \{/);
