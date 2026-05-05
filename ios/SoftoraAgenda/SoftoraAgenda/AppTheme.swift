@@ -3,11 +3,16 @@ import SwiftUI
 extension Color {
     static let softoraCrimson = Color(red: 0.545, green: 0.133, blue: 0.322)
     static let softoraCrimsonLight = Color(red: 0.710, green: 0.173, blue: 0.439)
+    static let softoraCrimsonDim = Color(red: 0.851, green: 0.627, blue: 0.733)
     static let softoraBlue = Color.softoraCrimson
     static let softoraGreen = Color(red: 0.141, green: 0.698, blue: 0.420)
     static let softoraInk = Color(red: 0.090, green: 0.090, blue: 0.153)
     static let softoraMuted = Color(red: 0.467, green: 0.459, blue: 0.525)
     static let softoraBackground = Color(red: 0.965, green: 0.949, blue: 0.957)
+    static let softoraShellBackground = Color.white
+    static let softoraPurpleLight = Color(red: 0.969, green: 0.910, blue: 0.941)
+    static let softoraGridLine = Color(red: 0.847, green: 0.745, blue: 0.796)
+    static let softoraSheetBackground = Color(red: 0.969, green: 0.949, blue: 0.961)
     static let softoraCard = Color.white
     static let softoraLine = Color.softoraInk.opacity(0.10)
     static let softoraInput = Color(red: 0.984, green: 0.980, blue: 0.973)

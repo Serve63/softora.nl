@@ -175,14 +175,111 @@ struct NewAppointmentDraft {
     var time = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     var location = ""
     var notes = ""
+    var repeatChoice: RepeatChoice = .none
+    var appointmentType: AppointmentType = .personal
+    var businessMeetingType: BusinessMeetingType = .website
 
-    init(planner: Planner = .serve) {
+    init(
+        planner: Planner = .serve,
+        date: Date = Date(),
+        appointmentType: AppointmentType = .personal,
+        businessMeetingType: BusinessMeetingType = .website
+    ) {
         self.planner = planner
+        self.date = date
+        self.appointmentType = appointmentType
+        self.businessMeetingType = businessMeetingType
     }
 
     var canSubmit: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+enum AppointmentType: String, CaseIterable, Identifiable {
+    case personal
+    case business
+
+    var id: String { rawValue }
+
+    var apiValue: String {
+        switch self {
+        case .personal:
+            "private"
+        case .business:
+            "business"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .personal:
+            "Privé"
+        case .business:
+            "Zakelijk"
+        }
+    }
+}
+
+enum BusinessMeetingType: String, CaseIterable, Identifiable {
+    case website
+    case software
+    case voice
+    case chatbot
+
+    var id: String { rawValue }
+
+    var apiValue: String {
+        switch self {
+        case .website:
+            "website"
+        case .software:
+            "business"
+        case .voice:
+            "voice"
+        case .chatbot:
+            "chatbot"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .website:
+            "Website"
+        case .software:
+            "Bedrijfssoftware"
+        case .voice:
+            "Voicesoftware"
+        case .chatbot:
+            "Chatbot"
+        }
+    }
+}
+
+enum RepeatChoice: String, CaseIterable, Identifiable {
+    case none
+    case daily
+    case weekly
+    case monthly
+    case quarterly
+
+    var id: String { rawValue }
+
+    var apiValue: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .none:
+            "Nooit"
+        case .daily:
+            "Elke dag"
+        case .weekly:
+            "Elke week"
+        case .monthly:
+            "Elke maand"
+        case .quarterly:
+            "Per kwartaal"
+        }
     }
 }
 
@@ -196,6 +293,10 @@ struct ManualAppointmentPayload: Encodable {
     let activity: String
     let location: String
     let notes: String
+    let recurrence: String
+    let repeatChoice: String
+    let appointmentType: String
+    let businessMeetingType: String
     let actor: String
 }
 
