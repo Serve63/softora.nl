@@ -106,7 +106,6 @@ struct PinAccessView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("AGENDA OPENEN...")
             }
             .font(.softoraBody(13, weight: .semibold))
             .foregroundStyle(Color.softoraMuted)
