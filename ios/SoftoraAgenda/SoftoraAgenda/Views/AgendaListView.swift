@@ -349,11 +349,6 @@ private struct AppointmentTypeOverlay: View {
                     TypeChoiceButton(title: AppointmentType.business.title, isPrimary: true, action: onSelectBusiness)
                     TypeChoiceButton(title: AppointmentType.personal.title, isPrimary: false, action: onSelectPersonal)
                 }
-
-                Button("Annuleer", action: onClose)
-                    .font(.softoraBody(15, weight: .medium))
-                    .foregroundStyle(Color.softoraMuted)
-                    .padding(.top, 2)
             }
         }
     }

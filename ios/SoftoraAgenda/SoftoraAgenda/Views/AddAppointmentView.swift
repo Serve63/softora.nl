@@ -403,12 +403,6 @@ private struct RepeatChoiceOverlay: View {
                         .buttonStyle(.plain)
                     }
                 }
-
-                Button("Annuleer") {
-                    onClose()
-                }
-                .font(.softoraBody(15, weight: .medium))
-                .foregroundStyle(Color.softoraMuted)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 24)
