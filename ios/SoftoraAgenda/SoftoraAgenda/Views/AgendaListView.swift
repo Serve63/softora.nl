@@ -309,14 +309,16 @@ private struct CalendarEventChip: View {
 
     var body: some View {
         HStack(spacing: 7) {
-            Text(appointment.time)
-                .font(.softoraBody(10, weight: .bold))
-                .foregroundStyle(Color.white)
-                .lineLimit(1)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(Color.softoraCrimson)
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            if hasTime {
+                Text(appointment.time)
+                    .font(.softoraBody(10, weight: .bold))
+                    .foregroundStyle(Color.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.softoraCrimson)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            }
 
             Text(appointment.privacyMasked ? "Bezet" : appointment.title)
                 .font(.softoraBody(12, weight: .medium))
@@ -326,8 +328,13 @@ private struct CalendarEventChip: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.softoraPurpleLight)
+        .background(hasTime ? Color.clear : Color.softoraPurpleLight)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var hasTime: Bool {
+        let trimmedTime = appointment.time.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmedTime.isEmpty && trimmedTime != "—" && trimmedTime != "--:--"
     }
 }
 
