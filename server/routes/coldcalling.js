@@ -1,5 +1,6 @@
 const express = require('express');
 const { validateColdcallingStartConfirmPin } = require('../security/coldcalling-start-confirm-pin');
+const { createAgendaCapacityService } = require('../services/agenda-capacity');
 const { resolveUsdToEurRateDetails } = require('../services/openai-costs');
 const {
   countFailedColdcallingResults,
@@ -479,6 +480,59 @@ function buildColdcallingSummary({
   };
 }
 
+async function resolveColdcallingAgendaCapacity(deps) {
+  if (deps && typeof deps.backfillInsightsAndAppointmentsFromRecentCallUpdates === 'function') {
+    deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
+  }
+
+  if (
+    deps &&
+    typeof deps.isSupabaseConfigured === 'function' &&
+    deps.isSupabaseConfigured() &&
+    typeof deps.syncRuntimeStateFromSupabaseIfNewer === 'function'
+  ) {
+    await deps.syncRuntimeStateFromSupabaseIfNewer({
+      force: false,
+      maxAgeMs: 0,
+      skipPendingPersistWait: true,
+    });
+  }
+
+  if (deps && typeof deps.backfillInsightsAndAppointmentsFromRecentCallUpdates === 'function') {
+    deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
+  }
+
+  const appointments =
+    typeof deps?.getGeneratedAgendaAppointments === 'function'
+      ? deps.getGeneratedAgendaAppointments()
+      : Array.isArray(deps?.generatedAgendaAppointments)
+        ? deps.generatedAgendaAppointments
+        : [];
+
+  const capacityService = createAgendaCapacityService({
+    normalizeString: deps?.normalizeString,
+    normalizeDateYyyyMmDd: deps?.normalizeDateYyyyMmDd,
+    normalizeTimeHhMm: deps?.normalizeTimeHhMm,
+    now:
+      typeof deps?.getColdcallingAgendaCapacityNow === 'function'
+        ? deps.getColdcallingAgendaCapacityNow
+        : () => new Date(),
+  });
+
+  return capacityService.assessUpcomingWorkdayCapacity({
+    appointments,
+    isAppointmentVisible:
+      typeof deps?.isGeneratedAppointmentVisibleForAgenda === 'function'
+        ? deps.isGeneratedAppointmentVisibleForAgenda
+        : () => true,
+    workdayCount: 10,
+    slotMinutes: 60,
+    businessHoursStart: '09:00',
+    businessHoursEnd: '17:00',
+    timeZone: 'Europe/Amsterdam',
+  });
+}
+
 function registerColdcallingWebhookRoutes(app, deps) {
   app.get('/api/twilio/voice', deps.handleTwilioInboundVoice);
   app.post('/api/twilio/voice', express.urlencoded({ extended: false }), deps.handleTwilioInboundVoice);
@@ -502,6 +556,32 @@ function registerColdcallingRoutes(app, deps) {
 
     const { campaign, leads } = validated;
     campaign.publicBaseUrl = deps.getEffectivePublicBaseUrl(req);
+
+    let agendaCapacity = null;
+    try {
+      agendaCapacity = await resolveColdcallingAgendaCapacity(deps);
+    } catch (error) {
+      if (deps.logger && typeof deps.logger.error === 'function') {
+        deps.logger.error('[Coldcalling][AgendaCapacityError]', error?.message || error);
+      }
+      return res.status(503).json({
+        ok: false,
+        error: 'Kon de agenda niet veilig controleren. Coldcalling is niet gestart.',
+        agendaBlocked: true,
+        reason: 'agenda_check_unavailable',
+      });
+    }
+
+    if (agendaCapacity?.full) {
+      return res.status(409).json({
+        ok: false,
+        error: 'Coldcalling is geblokkeerd omdat de agenda voor de komende 10 werkdagen vol zit.',
+        agendaBlocked: true,
+        reason: 'agenda_full_10_workdays',
+        agendaCapacity,
+      });
+    }
+
     const provider = deps.resolveColdcallingProviderForCampaign(campaign);
     const selectedLeads = leads.slice(0, Math.min(campaign.amount, leads.length));
     const customerRows = await loadCustomerDatabaseRowsForColdcalling(deps);

@@ -170,6 +170,8 @@ function buildServerAppFeatureWiringRuntimeContext({
         waitForQueuedRuntimeStatePersist:
           runtimeSyncRuntime.waitForQueuedRuntimeStatePersist,
         normalizeString: shared.normalizeString,
+        normalizeDateYyyyMmDd: platformRuntime.normalizeDateYyyyMmDd,
+        normalizeTimeHhMm: platformRuntime.normalizeTimeHhMm,
         parseIntSafe: shared.parseIntSafe,
         parseNumberSafe: shared.parseNumberSafe,
         sleep: coldcallingServiceRuntime.sleep,
@@ -200,6 +202,9 @@ function buildServerAppFeatureWiringRuntimeContext({
         isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
         syncRuntimeStateFromSupabaseIfNewer:
           runtimeSyncRuntime.syncRuntimeStateFromSupabaseIfNewer,
+        generatedAgendaAppointments: runtimeMemory.generatedAgendaAppointments,
+        isGeneratedAppointmentVisibleForAgenda:
+          agendaSupportRuntime.isGeneratedAppointmentVisibleForAgenda,
         syncCallUpdatesFromSupabaseRows: runtimeSyncRuntime.syncCallUpdatesFromSupabaseRows,
         shouldRefreshRetellCallStatus: platformRuntime.shouldRefreshRetellCallStatus,
         collectMissingCallUpdateRefreshCandidates:

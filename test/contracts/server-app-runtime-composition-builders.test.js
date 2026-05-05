@@ -54,6 +54,7 @@ test('server app runtime composition builders barrel keeps domain builder seams 
 test('server app runtime composition builders preserve feature wiring groups and warmup callbacks', async () => {
   let hydratedAttempts = 0;
   let backfillCalls = 0;
+  const isGeneratedAppointmentVisibleForAgenda = () => true;
 
   const context = buildServerAppFeatureWiringRuntimeContext({
     app: { locals: {} },
@@ -216,6 +217,7 @@ test('server app runtime composition builders preserve feature wiring groups and
       backfillInsightsAndAppointmentsFromRecentCallUpdates: () => {
         backfillCalls += 1;
       },
+      isGeneratedAppointmentVisibleForAgenda,
     },
     agendaPostCallHelpers: {
       parseCustomOrdersFromUiState: () => [],
@@ -273,6 +275,14 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(context.featureRouteOptions.coldcalling.premiumCustomersKey, 'customers_key');
   assert.equal(context.featureRouteOptions.coldcalling.premiumActiveOrdersScope, 'premium_active_orders');
   assert.equal(context.featureRouteOptions.coldcalling.premiumActiveCustomOrdersKey, 'custom_orders');
+  assert.equal(
+    context.featureRouteOptions.coldcalling.generatedAgendaAppointments,
+    context.aiDashboardOptions.generatedAgendaAppointments
+  );
+  assert.equal(
+    context.featureRouteOptions.coldcalling.isGeneratedAppointmentVisibleForAgenda,
+    isGeneratedAppointmentVisibleForAgenda
+  );
   assert.equal(context.featureRouteOptions.coldcalling.logger, console);
   assert.equal(context.featureRouteOptions.openAiCostSummary.openAiAdminApiKey, 'admin-key');
   assert.equal(context.featureRouteOptions.openAiCostSummary.openAiCostsApiBaseUrl, 'https://api.openai.test');

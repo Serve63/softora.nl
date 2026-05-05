@@ -23,8 +23,18 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
   assert.match(
     pageSource,
-    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=20260502a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260502a" defer><\/script>/
+    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=20260502a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260506a" defer><\/script>/
   );
+  assert.match(
+    pageSource,
+    /Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit\./
+  );
+  assert.doesNotMatch(pageSource, /of het gewenste aantal afspraken is ingepland/);
+  assert.match(
+    dashboardSource,
+    /Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit\./
+  );
+  assert.doesNotMatch(dashboardSource, /gewenste aantal afspraken is ingepland/);
   assert.match(pageSource, /id="leadAmountQuestionLabel"/);
   assert.match(pageSource, /Hoeveel mensen wil je bellen\?/);
   assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
