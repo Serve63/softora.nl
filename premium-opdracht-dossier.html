@@ -874,14 +874,10 @@
                     .replace(/'/g, '&#039;');
             }
 
-            function safeJsonParse(value, fallback) {
-                try {
-                    const parsed = JSON.parse(String(value || ''));
-                    return parsed === null || parsed === undefined ? fallback : parsed;
-                } catch (_) {
-                    return fallback;
-                }
-            }
+            function getStateChunkMetaKey(baseKey) { return `${String(baseKey || '').trim()}_chunks_v1`; }
+            function getStateChunkPrefix(baseKey) { return `${String(baseKey || '').trim()}_chunk_`; }
+            function readChunkedStateValue(values, baseKey) { const stateValues = values && typeof values === 'object' ? values : {}; const normalizedKey = String(baseKey || '').trim(); const fallback = typeof stateValues[normalizedKey] === 'string' ? stateValues[normalizedKey] : ''; const metaRaw = String(stateValues[getStateChunkMetaKey(normalizedKey)] || '').trim(); if (!metaRaw) return fallback; try { const meta = JSON.parse(metaRaw); const count = Math.max(0, Math.min(200, Number(meta && meta.count) || 0)); if (!count) return fallback; const prefix = getStateChunkPrefix(normalizedKey); const chunks = []; for (let index = 0; index < count; index += 1) { const chunk = stateValues[prefix + index]; if (typeof chunk !== 'string') return fallback; chunks.push(chunk); } return chunks.join('') || fallback; } catch (_) { return fallback; } }
+            function safeJsonParse(value, fallback) { try { const parsed = JSON.parse(String(value || '')); return parsed === null || parsed === undefined ? fallback : parsed; } catch (_) { return fallback; } }
 
             function normalizeText(value) {
                 return String(value || '')
@@ -1662,8 +1658,8 @@
 
                 renderLoading(DOSSIER_LOADING_TITLE);
                 const values = await fetchUiStateValues(REMOTE_SCOPE);
-                const customOrders = safeJsonParse(values?.[CUSTOM_ORDERS_KEY], []);
-                const runtimeMap = safeJsonParse(values?.[ORDER_RUNTIME_KEY], {});
+                const customOrders = safeJsonParse(readChunkedStateValue(values, CUSTOM_ORDERS_KEY), []);
+                const runtimeMap = safeJsonParse(readChunkedStateValue(values, ORDER_RUNTIME_KEY), {});
                 const customOrder = Array.isArray(customOrders)
                     ? customOrders.find((item) => Number(item?.id) === orderId)
                     : null;
@@ -1679,7 +1675,7 @@
                 const baseData = buildBaseOrderData(orderId, customOrder, runtimeOrder);
                 const dossierFingerprint = buildDossierCacheFingerprint(baseData);
                 const cachedLayoutResponse = getCachedDossierLayoutResponse(
-                    values?.[DOSSIER_CACHE_KEY],
+                    readChunkedStateValue(values, DOSSIER_CACHE_KEY),
                     orderId,
                     dossierFingerprint
                 );
@@ -1706,7 +1702,7 @@
                 }
 
                 renderDossier(baseData, layoutResponse);
-                void persistDossierCache(values?.[DOSSIER_CACHE_KEY], orderId, dossierFingerprint, layoutResponse);
+                void persistDossierCache(readChunkedStateValue(values, DOSSIER_CACHE_KEY), orderId, dossierFingerprint, layoutResponse);
 
                 if (shouldAutoPrint()) {
                     window.setTimeout(() => {

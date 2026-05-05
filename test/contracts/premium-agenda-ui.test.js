@@ -35,6 +35,8 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
 
   assert.match(pageSource, /<button class="modal-close magnetic" id="modalCloseBtn"/);
   assert.match(pageSource, /assets\/premium-agenda-stability\.js/);
+  assert.match(pageSource, /\.modal-workspace-loading \{[\s\S]*background:\s*var\(--bg-primary\);[\s\S]*backdrop-filter:\s*none;[\s\S]*-webkit-backdrop-filter:\s*none;/);
+  assert.doesNotMatch(pageSource, /background:\s*rgba\(250,\s*248,\s*246,\s*0\.88\)/);
   assert.match(
     pageSource,
     /\.modal-overlay\.dismiss-locked \.modal-close,\s*\.modal\.dismiss-locked \.modal-close \{[\s\S]*display:\s*none !important;[\s\S]*pointer-events:\s*none;/

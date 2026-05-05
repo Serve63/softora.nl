@@ -1,4 +1,5 @@
 const { normalizeLeadLikePhoneKey } = require('./lead-identity');
+const { readChunkedStateValue } = require('./data-ops-serialization');
 
 function normalizeCustomerSearchText(value) {
   return String(value || '')
@@ -360,7 +361,7 @@ function createAgendaPostCallCoordinator(deps = {}) {
         currentState && currentState.values && typeof currentState.values === 'object'
           ? currentState.values
           : {};
-      const rows = parseCustomerDatabaseRows(currentValues[premiumCustomersKey]);
+      const rows = parseCustomerDatabaseRows(readChunkedStateValue(currentValues, premiumCustomersKey));
       const rowIndex = findCustomerDatabaseRowIndexForAppointment(rows, appointment);
 
       const nextRows = rows.slice();
@@ -516,7 +517,7 @@ function createAgendaPostCallCoordinator(deps = {}) {
       currentState && currentState.values && typeof currentState.values === 'object'
         ? currentState.values
         : {};
-    const customOrders = parseCustomOrdersFromUiState(currentValues[premiumActiveCustomOrdersKey]);
+    const customOrders = parseCustomOrdersFromUiState(readChunkedStateValue(currentValues, premiumActiveCustomOrdersKey));
 
     const appointmentId = Number(appointment?.id) || null;
     let existingOrder = appointmentId

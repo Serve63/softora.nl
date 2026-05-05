@@ -5,6 +5,7 @@ const {
   createAgendaPostCallCoordinator,
   createAgendaPostCallHelpers,
 } = require('../../server/services/agenda-post-call');
+const { buildChunkedStatePatch } = require('../../server/services/data-ops-serialization');
 
 function normalizeString(value) {
   return String(value || '').trim();
@@ -230,6 +231,79 @@ test('agenda post-call coordinator adds a new active order and links it back to 
   assert.equal(uiStateWrites[1].scope, 'premium_customers_database');
   assert.match(uiStateWrites[1].values.softora_customers_premium_v1, /"databaseStatus":"klant"/);
   assert.equal(activityCalls[0].reason, 'dashboard_activity_active_order_added');
+});
+
+test('agenda post-call coordinator keeps chunked active orders and customer rows intact', async () => {
+  const existingOrders = [
+    {
+      id: 24,
+      clientName: 'Bestaande klant',
+      companyName: 'Bestaande klant',
+      title: 'Website opdracht voor bestaande klant',
+      description: 'Deze opdracht bestond al in de actieve opdrachten.',
+      amount: 2500,
+      status: 'wacht',
+    },
+  ];
+  const customerRows = [
+    {
+      id: 'customer-42',
+      bedrijf: 'Softora',
+      naam: 'Serve Creusen',
+      telefoon: '0612345678',
+      databaseStatus: 'afspraak',
+      hist: [],
+    },
+  ];
+  const { coordinator, uiStateWrites } = createFixture({
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_active_orders') {
+        return {
+          values: buildChunkedStatePatch(
+            'softora_custom_orders_premium_v1',
+            JSON.stringify(existingOrders),
+            80
+          ),
+        };
+      }
+      if (scope === 'premium_customers_database') {
+        return {
+          values: buildChunkedStatePatch(
+            'softora_customers_premium_v1',
+            JSON.stringify(customerRows),
+            80
+          ),
+        };
+      }
+      return { values: {} };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.addAgendaAppointmentToPremiumActiveOrders(
+    {
+      body: {
+        prompt: 'Maak een conversion-focused website voor Softora.',
+        transcript: 'Klant wil snel live en stuurt later teksten.',
+        domainName: 'softora.nl',
+        actor: 'Serve',
+      },
+    },
+    res,
+    '42'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.order.id, 25);
+  assert.equal(res.body.databaseSync.matchedExisting, true);
+  const savedOrders = JSON.parse(uiStateWrites[0].values.softora_custom_orders_premium_v1);
+  assert.equal(savedOrders.length, 2);
+  assert.equal(savedOrders[0].id, 24);
+  assert.equal(savedOrders[1].id, 25);
+  const savedRows = JSON.parse(uiStateWrites[1].values.softora_customers_premium_v1);
+  assert.equal(savedRows.length, 1);
+  assert.equal(savedRows[0].databaseStatus, 'klant');
 });
 
 test('agenda post-call coordinator marks the premium database row as afgehaakt after no deal', async () => {
