@@ -246,6 +246,71 @@ test('coldcalling start skips database-blocked leads before provider dispatch', 
   assert.equal(envChecked, false);
 });
 
+test('coldcalling start blocks provider dispatch when the next 10 workdays are full', async () => {
+  let processed = 0;
+  let envChecked = false;
+  let synced = false;
+  const fullWorkdayDates = [
+    '2026-05-06',
+    '2026-05-07',
+    '2026-05-08',
+    '2026-05-11',
+    '2026-05-12',
+    '2026-05-13',
+    '2026-05-14',
+    '2026-05-15',
+    '2026-05-18',
+    '2026-05-19',
+  ];
+  const callStart = createRouteHarness({
+    validateStartPayload: () => ({
+      campaign: buildCampaign({ amount: 1 }),
+      leads: [{ company: 'Open Lead', phone: '06 2000 0000' }],
+    }),
+    getEffectivePublicBaseUrl: () => 'https://softora.test',
+    getColdcallingAgendaCapacityNow: () => new Date('2026-05-06T06:30:00.000Z'),
+    isSupabaseConfigured: () => true,
+    syncRuntimeStateFromSupabaseIfNewer: async (options) => {
+      synced = true;
+      assert.equal(options.maxAgeMs, 0);
+    },
+    generatedAgendaAppointments: fullWorkdayDates.map((date, id) => ({
+      id,
+      date,
+      time: '09:00',
+      manualAllDayUnavailable: true,
+    })),
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+    backfillInsightsAndAppointmentsFromRecentCallUpdates: () => null,
+    resolveColdcallingProviderForCampaign: () => 'retell',
+    getUiStateValues: async () => ({ values: { softora_customers_premium_v1: '[]' }, source: 'supabase' }),
+    getMissingEnvVars: () => {
+      envChecked = true;
+      return [];
+    },
+    processColdcallingLead: async () => {
+      processed += 1;
+      return { success: true };
+    },
+    createSequentialDispatchQueue: () => ({ id: 'queue-1', leads: [], results: [] }),
+    advanceSequentialDispatchQueue: async () => null,
+    waitForQueuedRuntimeStatePersist: async () => null,
+    sleep: async () => null,
+    logger: { error: () => null },
+  });
+
+  const res = await callStart({});
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.ok, false);
+  assert.equal(res.body.agendaBlocked, true);
+  assert.equal(res.body.reason, 'agenda_full_10_workdays');
+  assert.equal(res.body.agendaCapacity.availableSlots, 0);
+  assert.equal(synced, true);
+  assert.equal(processed, 0);
+  assert.equal(envChecked, false);
+});
+
 test('coldcalling start dispatches only allowed leads and keeps original lead indexes', async () => {
   const processedIndexes = [];
   const callStart = createRouteHarness({
