@@ -1,5 +1,4 @@
 (function () {
-  const STORAGE_KEY = 'softora_papertrader_state_v1';
   const STARTING_CASH = 10000;
 
   const assets = [
@@ -31,7 +30,7 @@
     history: {}
   };
 
-  const state = loadState();
+  const state = createInitialState();
   const elements = {
     assetSelect: document.getElementById('assetSelect'),
     cashBalance: document.getElementById('cashBalance'),
@@ -65,17 +64,16 @@
   render();
   window.setInterval(tickMarket, 2600);
 
-  function loadState() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      return Object.assign({}, fallbackState, saved || {});
-    } catch (_error) {
-      return Object.assign({}, fallbackState);
-    }
-  }
-
-  function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  function createInitialState() {
+    return {
+      cash: STARTING_CASH,
+      holdings: {},
+      orders: [],
+      selectedSymbol: 'SOFT',
+      dayStartEquity: STARTING_CASH,
+      prices: {},
+      history: {}
+    };
   }
 
   function hydrateMarket() {
@@ -101,7 +99,6 @@
   function bindEvents() {
     elements.assetSelect.addEventListener('change', () => {
       state.selectedSymbol = elements.assetSelect.value;
-      saveState();
       render();
     });
 
@@ -115,8 +112,7 @@
     elements.resetAccountButton.addEventListener('click', () => {
       const shouldReset = window.confirm('Weet je zeker dat je het papertrading account wilt resetten?');
       if (!shouldReset) return;
-      localStorage.removeItem(STORAGE_KEY);
-      Object.assign(state, JSON.parse(JSON.stringify(fallbackState)));
+      Object.assign(state, createInitialState());
       hydrateMarket();
       renderAssetOptions();
       render();
@@ -171,7 +167,6 @@
       showToast(`Verkocht: ${quantity}x ${symbol} voor ${formatCurrency.format(value)}.`);
     }
 
-    saveState();
     render();
   }
 
@@ -197,7 +192,6 @@
       state.history[asset.symbol].push(state.prices[asset.symbol]);
       state.history[asset.symbol] = state.history[asset.symbol].slice(-72);
     });
-    saveState();
     render();
   }
 
@@ -291,7 +285,6 @@
       button.addEventListener('click', () => {
         state.selectedSymbol = button.dataset.selectAsset;
         elements.assetSelect.value = state.selectedSymbol;
-        saveState();
         render();
         document.getElementById('trade-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
