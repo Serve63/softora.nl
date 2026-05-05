@@ -2,6 +2,7 @@ const {
   validateAddActiveOrderRequest,
   validateConfirmationMailSyncRequest,
   validateConfirmationTaskSetInAgendaRequest,
+  validateDeleteAgendaAppointmentRequest,
   validateDraftEmailRequest,
   validateInterestedLeadDismissRequest,
   validateInterestedLeadSetInAgendaRequest,
@@ -38,6 +39,13 @@ function registerAgendaMutationRoutes(app, deps) {
     '/api/agenda/appointments/:id/add-active-order',
     withValidation(validateAddActiveOrderRequest, (req, res) =>
       deps.addAgendaAppointmentToPremiumActiveOrders(req, res, req.params.id)
+    )
+  );
+
+  app.post(
+    '/api/agenda/appointments/:id/delete',
+    withValidation(validateDeleteAgendaAppointmentRequest, (req, res) =>
+      deps.deleteAgendaAppointmentResponse(req, res, req.params.id)
     )
   );
 

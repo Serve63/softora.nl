@@ -83,6 +83,18 @@ struct SoftoraAPIClient {
         return response.appointment
     }
 
+    func deleteAppointment(id: String) async throws {
+        let trimmedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let encodedID = trimmedID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? trimmedID
+        let response: DeleteAppointmentResponse = try await post(
+            "/api/agenda/appointments/\(encodedID)/delete",
+            body: DeleteAppointmentPayload(actor: "softora-ios-agenda")
+        )
+        guard response.ok else {
+            throw SoftoraAPIError.server(response.error ?? "Afspraak kon niet worden verwijderd.")
+        }
+    }
+
     private func get<Response: Decodable>(_ path: String) async throws -> Response {
         try await send(path: path, method: "GET", body: Optional<EmptyPayload>.none)
     }

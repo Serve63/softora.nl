@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   validateAddActiveOrderRequest,
   validateConfirmationMailSyncRequest,
+  validateDeleteAgendaAppointmentRequest,
   validateInterestedLeadDismissRequest,
   validateManualAgendaAppointmentRequest,
   validatePostCallRequest,
@@ -101,6 +102,18 @@ test('manual appointment validator preserves meeting lead owner fields', () => {
   assert.equal(result.body.leadOwnerName, 'Martijn van de Ven');
   assert.equal(result.body.notes, 'Intake voorbereid.');
   assert.equal(result.body.legendChoice, 'website');
+});
+
+test('delete agenda appointment validator preserves appointment id and actor', () => {
+  const result = validateDeleteAgendaAppointmentRequest({
+    params: { id: ' 77 ' },
+    query: {},
+    body: { actor: ' Serve ' },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.params.id, '77');
+  assert.equal(result.body.actor, 'Serve');
 });
 
 test('confirmation mail sync validator clamps maxMessages to safe limits', () => {

@@ -19,7 +19,8 @@ function createResponseRecorder() {
 }
 
 function createFixture(overrides = {}) {
-  const appointments = [];
+  const appointments = overrides.appointments || [];
+  const activityCalls = [];
   const coordinator = createAgendaManualAppointmentCoordinator({
     isSupabaseConfigured: () => false,
     getSupabaseStateHydrated: () => true,
@@ -37,7 +38,9 @@ function createFixture(overrides = {}) {
       appointments.push(persisted);
       return persisted;
     },
-    appendDashboardActivity: () => {},
+    appendDashboardActivity: (activity, reason) => {
+      activityCalls.push({ activity, reason });
+    },
     buildRuntimeStateSnapshotPayload: () => null,
     applyRuntimeStateSnapshotPayload: () => false,
     waitForQueuedRuntimeSnapshotPersist: async () => true,
@@ -51,7 +54,7 @@ function createFixture(overrides = {}) {
     logger: { warn: () => {}, error: () => {} },
     ...overrides,
   });
-  return { appointments, coordinator };
+  return { activityCalls, appointments, coordinator };
 }
 
 test('agenda manual appointment stores legend choice and activity time', async () => {
@@ -286,4 +289,42 @@ test('agenda manual appointment does not wait indefinitely for Google Calendar e
   assert.equal(res.body.ok, true);
   assert.equal(res.body.googleCalendarSync.timedOut, true);
   assert.equal(res.body.googleCalendarSync.reason, 'google_calendar_sync_timeout');
+});
+
+test('agenda manual appointment delete removes appointment after confirmation request', async () => {
+  const { activityCalls, appointments, coordinator } = createFixture({
+    appointments: [
+      {
+        id: 77,
+        callId: 'manual_77',
+        company: 'Klantbespreking',
+        date: '2026-04-28',
+        time: '11:00',
+      },
+    ],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.deleteAgendaAppointmentResponse(
+    { body: { actor: 'softora-ios-agenda' } },
+    res,
+    '77'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.deletedAppointmentId, 77);
+  assert.equal(appointments.length, 0);
+  assert.equal(activityCalls[0].reason, 'dashboard_activity_manual_agenda_appointment_deleted');
+});
+
+test('agenda manual appointment delete returns 404 for missing appointment', async () => {
+  const { coordinator } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.deleteAgendaAppointmentResponse({ body: {} }, res, '999');
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /niet gevonden/i);
 });

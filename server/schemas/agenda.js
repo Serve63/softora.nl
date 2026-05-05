@@ -131,6 +131,20 @@ function validateAddActiveOrderRequest(req) {
   };
 }
 
+function validateDeleteAgendaAppointmentRequest(req) {
+  const appointmentId = ensureRequiredRef(req.params?.id || req.query?.appointmentId, 'appointmentId');
+  if (!appointmentId.ok) return appointmentId;
+
+  return {
+    ok: true,
+    params: req.params?.id ? { id: appointmentId.value } : undefined,
+    query: req.query?.appointmentId !== undefined ? { appointmentId: appointmentId.value } : undefined,
+    body: {
+      ...normalizeActorFields(req.body || {}),
+    },
+  };
+}
+
 function buildLeadToAgendaBody(body = {}, options = {}) {
   const actorFields = normalizeActorFields(body);
   const whatsappConfirmed = normalizeBooleanOrUndefined(body.whatsappConfirmed);
@@ -295,6 +309,7 @@ module.exports = {
   validateAddActiveOrderRequest,
   validateConfirmationMailSyncRequest,
   validateConfirmationTaskSetInAgendaRequest,
+  validateDeleteAgendaAppointmentRequest,
   validateDraftEmailRequest,
   validateInterestedLeadDismissRequest,
   validateInterestedLeadSetInAgendaRequest,

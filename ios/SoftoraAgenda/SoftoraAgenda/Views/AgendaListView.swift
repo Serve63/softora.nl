@@ -96,7 +96,7 @@ struct AgendaListView: View {
             )
         }
         .fullScreenCover(item: $selectedAppointment) { appointment in
-            AppointmentDetailView(appointment: appointment)
+            AppointmentDetailView(store: store, appointment: appointment)
         }
         .alert("MELDING", isPresented: alertBinding) {
             Button("OK", role: .cancel) {}
@@ -367,7 +367,9 @@ private struct CalendarEventChip: View {
 
 private struct AppointmentDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var isShowingDeleteConfirmation = false
 
+    let store: AgendaStore
     let appointment: AgendaAppointment
 
     var body: some View {
@@ -449,11 +451,39 @@ private struct AppointmentDetailView: View {
                                 }
                         }
                     }
+
+                    Button {
+                        isShowingDeleteConfirmation = true
+                    } label: {
+                        Text(store.isDeletingAppointment ? "Verwijderen..." : "Verwijderen")
+                            .font(.softoraDisplay(15, weight: .bold))
+                            .textCase(.uppercase)
+                            .tracking(0.75)
+                            .foregroundStyle(Color.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.softoraCrimson)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(store.isDeletingAppointment)
                 }
                 .padding(.horizontal, 26)
                 .padding(.top, 28)
                 .padding(.bottom, 34)
             }
+        }
+        .alert("AFSPRAAK VERWIJDEREN?", isPresented: $isShowingDeleteConfirmation) {
+            Button("ANNULEER", role: .cancel) {}
+            Button("VERWIJDEREN", role: .destructive) {
+                Task {
+                    if await store.deleteAppointment(appointment) {
+                        dismiss()
+                    }
+                }
+            }
+        } message: {
+            Text("WEET JE ZEKER DAT JE DEZE AFSPRAAK WILT VERWIJDEREN?")
         }
     }
 

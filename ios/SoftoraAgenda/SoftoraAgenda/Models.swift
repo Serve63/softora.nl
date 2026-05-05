@@ -32,6 +32,12 @@ struct ManualAppointmentResponse: Decodable {
     let error: String?
 }
 
+struct DeleteAppointmentResponse: Decodable {
+    let ok: Bool
+    let deletedAppointmentId: Int?
+    let error: String?
+}
+
 struct APIErrorEnvelope: Decodable {
     let ok: Bool?
     let error: String?
@@ -306,6 +312,10 @@ struct ManualAppointmentPayload: Encodable {
     let repeatChoice: String
     let appointmentType: String
     let businessMeetingType: String
+    let actor: String
+}
+
+struct DeleteAppointmentPayload: Encodable {
     let actor: String
 }
 

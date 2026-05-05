@@ -377,8 +377,67 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     });
   }
 
+  async function deleteAgendaAppointmentResponse(req, res, rawId) {
+    backfillInsightsAndAppointmentsFromRecentCallUpdates();
+
+    const appointmentId = Number(rawId);
+    if (!Number.isFinite(appointmentId) || appointmentId <= 0) {
+      return res.status(400).json({ ok: false, error: 'Afspraak-id ontbreekt.' });
+    }
+
+    let idx = getGeneratedAppointmentIndexById(appointmentId);
+    if (idx < 0 && isSupabaseConfigured()) {
+      await syncRuntimeStateFromSupabaseIfNewer({ force: true, maxAgeMs: 0 }).catch(() => false);
+      idx = getGeneratedAppointmentIndexById(appointmentId);
+    }
+    if (idx < 0) {
+      return res.status(404).json({ ok: false, error: 'Afspraak niet gevonden.' });
+    }
+
+    const appointments = getGeneratedAgendaAppointments();
+    const runtimeSnapshot = takeRuntimeMutationSnapshot();
+    const removed = appointments.splice(idx, 1)[0] || null;
+    const actor = truncateText(normalizeString(req.body?.actor || req.body?.doneBy || ''), 120);
+    const actorLabel = actor || 'softora-ios-agenda';
+    const title = truncateText(normalizeString(removed?.company || removed?.title || removed?.activity || ''), 200);
+
+    appendDashboardActivity(
+      {
+        type: 'manual_agenda_appointment_deleted',
+        title: 'Afspraak verwijderd',
+        detail: `${title || 'Afspraak'} op ${removed?.date || ''}${removed?.time ? ` om ${removed.time}` : ''}.`,
+        company: title || 'Afspraak',
+        actor: actorLabel,
+        taskId: appointmentId,
+        callId: normalizeString(removed?.callId || ''),
+        source: 'softora-ios-agenda',
+      },
+      'dashboard_activity_manual_agenda_appointment_deleted'
+    );
+
+    const persistOk = await ensureLeadMutationPersistedOrRespond(
+      res,
+      runtimeSnapshot,
+      'Afspraak kon niet veilig uit gedeelde opslag worden verwijderd.',
+      {
+        allowPendingResponse: true,
+        pendingResponseAfterMs: 3000,
+        allowLocalVerifiedPending: true,
+        verifyPersisted: () => !resolveGeneratedAgendaAppointmentById(appointmentId),
+      }
+    );
+    if (!persistOk) return res;
+
+    return res.status(persistOk === 'pending' ? 202 : 200).json({
+      ok: true,
+      persistencePending: persistOk === 'pending',
+      deletedAppointmentId: appointmentId,
+    });
+  }
+
   return {
     createManualAgendaAppointmentResponse,
+    deleteAgendaAppointmentResponse,
   };
 }
 
