@@ -433,9 +433,11 @@ private struct TypeChoiceButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.softoraBody(16, weight: .bold))
+                .font(.softoraBody(15, weight: .bold))
                 .textCase(.uppercase)
                 .foregroundStyle(isPrimary ? Color.white : Color.softoraInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
                 .background(isPrimary ? Color.softoraCrimson : Color.white)
@@ -466,11 +468,11 @@ private struct SelectableChoiceButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.softoraBody(15, weight: .bold))
+                .font(.softoraBody(13, weight: .bold))
                 .textCase(.uppercase)
                 .foregroundStyle(Color.softoraInk)
                 .lineLimit(1)
-                .minimumScaleFactor(0.82)
+                .minimumScaleFactor(0.9)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
                 .padding(.horizontal, 8)
