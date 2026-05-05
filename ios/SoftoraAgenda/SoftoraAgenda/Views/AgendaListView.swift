@@ -9,6 +9,7 @@ struct AgendaListView: View {
     @State private var isChoosingBusinessType = false
     @State private var selectedBusinessType: BusinessMeetingType = .website
     @State private var addConfiguration: AddAppointmentConfiguration?
+    @State private var selectedAppointment: AgendaAppointment?
     @State private var weekTransitionDirection = 1
 
     var body: some View {
@@ -25,7 +26,8 @@ struct AgendaListView: View {
                         WeekGridView(
                             weekStart: weekStart,
                             appointments: appointmentsByDate,
-                            onSelectDate: openAppointmentTypeChoice
+                            onSelectDate: openAppointmentTypeChoice,
+                            onSelectAppointment: openAppointmentDetail
                         )
                         .id(weekStart)
                         .transition(weekSlideTransition)
@@ -93,6 +95,9 @@ struct AgendaListView: View {
                 businessMeetingType: configuration.businessMeetingType
             )
         }
+        .fullScreenCover(item: $selectedAppointment) { appointment in
+            AppointmentDetailView(appointment: appointment)
+        }
         .alert("MELDING", isPresented: alertBinding) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -142,6 +147,10 @@ struct AgendaListView: View {
     private func openAppointmentTypeChoice(_ date: Date) {
         pendingDate = date
         isChoosingAppointmentType = true
+    }
+
+    private func openAppointmentDetail(_ appointment: AgendaAppointment) {
+        selectedAppointment = appointment
     }
 
     private func closeAppointmentTypeChoice() {
@@ -202,6 +211,7 @@ private struct WeekGridView: View {
     let weekStart: Date
     let appointments: [String: [AgendaAppointment]]
     let onSelectDate: (Date) -> Void
+    let onSelectAppointment: (AgendaAppointment) -> Void
 
     private let columns = [
         GridItem(.flexible(), spacing: 1.5),
@@ -214,7 +224,8 @@ private struct WeekGridView: View {
                 if let date = displayDays[index] {
                     DayCellView(
                         date: date,
-                        appointments: appointments[AgendaDateFormatter.ymd(from: date)] ?? []
+                        appointments: appointments[AgendaDateFormatter.ymd(from: date)] ?? [],
+                        onSelectAppointment: onSelectAppointment
                     ) {
                         onSelectDate(date)
                     }
@@ -246,52 +257,54 @@ private struct WeekGridView: View {
 private struct DayCellView: View {
     let date: Date
     let appointments: [AgendaAppointment]
+    let onSelectAppointment: (AgendaAppointment) -> Void
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 5) {
-                    Text(AgendaDateFormatter.shortWeekday(date))
-                        .font(.softoraBody(12))
-                        .foregroundStyle(Color.softoraMuted)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text(AgendaDateFormatter.shortWeekday(date))
+                    .font(.softoraBody(12))
+                    .foregroundStyle(Color.softoraMuted)
 
-                    Text(dayNumber)
-                        .font(.softoraBody(15, weight: .bold))
-                        .foregroundStyle(Color.softoraInk)
-                        .frame(width: 26, height: 26)
+                Text(dayNumber)
+                    .font(.softoraBody(15, weight: .bold))
+                    .foregroundStyle(Color.softoraInk)
+                    .frame(width: 26, height: 26)
 
-                    Text(AgendaDateFormatter.shortMonth(date))
-                        .font(.softoraBody(11))
-                        .foregroundStyle(Color.softoraMuted)
-                }
-
-                ForEach(appointments.prefix(4)) { appointment in
-                    CalendarEventChip(appointment: appointment)
-                }
-
-                if appointments.count > 4 {
-                    Text("+\(appointments.count - 4) meer")
-                        .font(.softoraBody(11, weight: .semibold))
-                        .foregroundStyle(Color.softoraMuted)
-                        .padding(.top, 2)
-                }
-
-                Spacer(minLength: 0)
+                Text(AgendaDateFormatter.shortMonth(date))
+                    .font(.softoraBody(11))
+                    .foregroundStyle(Color.softoraMuted)
             }
-            .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
-            .padding(.top, 14)
-            .padding(.horizontal, 14)
-            .padding(.bottom, 10)
-            .background(cellBackground)
-            .overlay {
-                if AgendaDateFormatter.isToday(date) {
-                    Rectangle()
-                        .stroke(Color.softoraCrimsonDim, lineWidth: 1.5)
+
+            ForEach(appointments.prefix(4)) { appointment in
+                CalendarEventChip(appointment: appointment) {
+                    onSelectAppointment(appointment)
                 }
+            }
+
+            if appointments.count > 4 {
+                Text("+\(appointments.count - 4) meer")
+                    .font(.softoraBody(11, weight: .semibold))
+                    .foregroundStyle(Color.softoraMuted)
+                    .padding(.top, 2)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
+        .padding(.top, 14)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
+        .background(cellBackground)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
+        .overlay {
+            if AgendaDateFormatter.isToday(date) {
+                Rectangle()
+                    .stroke(Color.softoraCrimsonDim, lineWidth: 1.5)
             }
         }
-        .buttonStyle(.plain)
     }
 
     private var dayNumber: String {
@@ -306,20 +319,24 @@ private struct DayCellView: View {
 
 private struct CalendarEventChip: View {
     let appointment: AgendaAppointment
+    let onOpen: () -> Void
 
     @ViewBuilder
     var body: some View {
-        if hasTime {
-            eventContent
-                .frame(maxWidth: .infinity, alignment: .leading)
-        } else {
-            eventContent
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.softoraPurpleLight)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        Button(action: onOpen) {
+            if hasTime {
+                eventContent
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                eventContent
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.softoraPurpleLight)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
         }
+        .buttonStyle(.plain)
     }
 
     private var eventContent: some View {
@@ -345,6 +362,136 @@ private struct CalendarEventChip: View {
     private var hasTime: Bool {
         let trimmedTime = appointment.time.trimmingCharacters(in: .whitespacesAndNewlines)
         return !trimmedTime.isEmpty && trimmedTime != "—" && trimmedTime != "--:--"
+    }
+}
+
+private struct AppointmentDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let appointment: AgendaAppointment
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [.white, Color.softoraSheetBackground],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(alignment: .top) {
+                        Text("Afspraak")
+                            .font(.softoraDisplay(14, weight: .semibold))
+                            .textCase(.uppercase)
+                            .tracking(0.8)
+                            .foregroundStyle(Color.softoraCrimson)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(Color.softoraPurpleLight)
+
+                        Spacer()
+
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(Color.softoraMuted)
+                                .frame(width: 44, height: 44)
+                                .background(Color.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Text(displayTitle)
+                        .font(.softoraDisplay(25, weight: .bold))
+                        .textCase(.uppercase)
+                        .tracking(1.0)
+                        .foregroundStyle(Color.softoraInk)
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.82)
+
+                    VStack(spacing: 12) {
+                        AppointmentDetailRow(label: "Datum", value: AgendaDateFormatter.displayDate(appointment.date))
+                        AppointmentDetailRow(label: "Tijdstip", value: appointment.time)
+                        AppointmentDetailRow(label: "Voor wie", value: appointment.who.title)
+
+                        if !appointment.privacyMasked {
+                            AppointmentDetailRow(label: "Locatie", value: detailValue(appointment.location))
+                        }
+                    }
+
+                    if !appointment.privacyMasked, !appointment.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text("Opmerkingen")
+                                .font(.softoraDisplay(12, weight: .semibold))
+                                .textCase(.uppercase)
+                                .tracking(1.1)
+                                .foregroundStyle(Color.softoraMuted)
+
+                            Text(appointment.summary.softoraUppercased)
+                                .font(.softoraBody(13))
+                                .foregroundStyle(Color.softoraInk)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(16)
+                                .background(Color.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                }
+                        }
+                    }
+                }
+                .padding(.horizontal, 26)
+                .padding(.top, 28)
+                .padding(.bottom, 34)
+            }
+        }
+    }
+
+    private var displayTitle: String {
+        appointment.privacyMasked ? "Bezet" : appointment.title
+    }
+
+    private func detailValue(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed == "—" ? "Niet ingevuld" : trimmed
+    }
+}
+
+private struct AppointmentDetailRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label)
+                .font(.softoraDisplay(12, weight: .semibold))
+                .textCase(.uppercase)
+                .tracking(1.1)
+                .foregroundStyle(Color.softoraMuted)
+
+            Text(value.softoraUppercased)
+                .font(.softoraBody(14, weight: .semibold))
+                .foregroundStyle(Color.softoraInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 15)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                }
+        }
     }
 }
 
