@@ -78,7 +78,7 @@ struct AgendaListView: View {
                 )
             }
         }
-        .sheet(item: $addConfiguration) { configuration in
+        .fullScreenCover(item: $addConfiguration) { configuration in
             AddAppointmentView(
                 store: store,
                 date: configuration.date,

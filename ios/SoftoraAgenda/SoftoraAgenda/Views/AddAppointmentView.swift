@@ -28,7 +28,12 @@ struct AddAppointmentView: View {
 
     var body: some View {
         ZStack {
-            Color.softoraInk.opacity(0.58).ignoresSafeArea()
+            LinearGradient(
+                colors: [.white, Color.softoraSheetBackground],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 0) {
@@ -89,21 +94,7 @@ struct AddAppointmentView: View {
                     .padding(.top, 12)
                     .padding(.bottom, 24)
                 }
-                .background(
-                    LinearGradient(
-                        colors: [.white, Color.softoraSheetBackground],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.softoraCrimson.opacity(0.12), lineWidth: 1)
-                }
-                .shadow(color: Color.softoraInk.opacity(0.28), radius: 45, x: 0, y: 24)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 18)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .scrollIndicators(.hidden)
 
