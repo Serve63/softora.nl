@@ -209,6 +209,7 @@ function createCallProviderHelpers(options = {}) {
     const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
     const minProjectValue = parseNumberSafe(campaign.minProjectValue, null);
     const maxDiscountPct = parseNumberSafe(campaign.maxDiscountPct, null);
+    const campaignPrompt = normalizeString(campaign.extraInstructions);
     const rawValues = {
       name: normalizeString(lead.name),
       company: normalizeString(lead.company),
@@ -217,7 +218,10 @@ function createCallProviderHelpers(options = {}) {
       region: effectiveRegion,
       minProjectValue: Number.isFinite(minProjectValue) ? String(minProjectValue) : '',
       maxDiscountPct: Number.isFinite(maxDiscountPct) ? String(maxDiscountPct) : '',
-      extraInstructions: normalizeString(campaign.extraInstructions),
+      extraInstructions: campaignPrompt,
+      campaignPrompt,
+      prompt: campaignPrompt,
+      instructionBrief: campaignPrompt,
     };
 
     return Object.fromEntries(
@@ -273,6 +277,7 @@ function createCallProviderHelpers(options = {}) {
         leadAddress: effectiveAddress,
         sector: normalizeString(campaign.sector),
         region: effectiveRegion,
+        campaignPrompt: normalizeString(campaign.extraInstructions),
       },
     };
   }

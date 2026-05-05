@@ -1448,7 +1448,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
-<script src="assets/premium-campaign-radius.js?v=20260501a"></script>
+<script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260505a"></script>
 <script>
 // ── DATA ──
 let bedrijven = [];
@@ -2451,8 +2451,8 @@ function setCampaignStartButtonBusy(isBusy) {
   button.style.opacity = isBusy ? '.72' : '';
   button.style.cursor = isBusy ? 'wait' : '';
   button.innerHTML = isBusy
-    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg> Verzenden...'
-    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Mails Versturen';
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg> ' + (window.SoftoraAiLeadGeneratorCallStart ? window.SoftoraAiLeadGeneratorCallStart.getBusyLabel(isPremiumAiLeadGeneratorPath()) : 'Verzenden...')
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> ' + (window.SoftoraAiLeadGeneratorCallStart ? window.SoftoraAiLeadGeneratorCallStart.getButtonLabel(isPremiumAiLeadGeneratorPath()) : 'Mails Versturen');
 }
 
 function getColdmailCampaignPayload() {
