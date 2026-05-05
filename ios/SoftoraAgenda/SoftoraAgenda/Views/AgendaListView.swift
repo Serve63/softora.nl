@@ -328,8 +328,8 @@ private struct AppointmentTypeOverlay: View {
                     .foregroundStyle(Color.softoraInk)
 
                 HStack(spacing: 10) {
-                    TypeChoiceButton(title: AppointmentType.personal.title, isPrimary: false, action: onSelectPersonal)
                     TypeChoiceButton(title: AppointmentType.business.title, isPrimary: true, action: onSelectBusiness)
+                    TypeChoiceButton(title: AppointmentType.personal.title, isPrimary: false, action: onSelectPersonal)
                 }
 
                 Button("Annuleer", action: onClose)
