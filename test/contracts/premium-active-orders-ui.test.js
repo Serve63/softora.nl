@@ -212,6 +212,9 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
 
   assert.match(source, /const DOSSIER_CACHE_KEY = 'softora_order_dossier_cache_v1';/);
   assert.match(source, /const DOSSIER_LAYOUT_SCHEMA_VERSION = '20260417a';/);
+  assert.match(source, /function readChunkedStateValue\(values, baseKey\)/);
+  assert.match(source, /const customOrders = safeJsonParse\(readChunkedStateValue\(values, CUSTOM_ORDERS_KEY\), \[\]\);/);
+  assert.match(source, /const runtimeMap = safeJsonParse\(readChunkedStateValue\(values, ORDER_RUNTIME_KEY\), \{\}\);/);
   assert.match(source, /function buildDossierCacheFingerprint\(baseData\) \{/);
   assert.match(source, /layoutVersion: DOSSIER_LAYOUT_SCHEMA_VERSION,/);
   assert.match(source, /function getCachedDossierLayoutResponse\(rawValue, orderId, fingerprint\) \{/);
@@ -236,7 +239,7 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
   assert.match(source, /const opusPrompt = opusFromLayout \|\| buildShortOpusPrompt\(baseData\);/);
   assert.match(source, /if \(shouldHideLegacyDossierBlockTitle\(title\)\) return null;/);
   assert.match(source, /if \(cachedLayoutResponse\) \{[\s\S]*renderDossier\(baseData, cachedLayoutResponse\);/);
-  assert.match(source, /void persistDossierCache\(values\?\.\[DOSSIER_CACHE_KEY\], orderId, dossierFingerprint, layoutResponse\);/);
+  assert.match(source, /void persistDossierCache\(readChunkedStateValue\(values, DOSSIER_CACHE_KEY\), orderId, dossierFingerprint, layoutResponse\);/);
   assert.doesNotMatch(source, /source-chip/);
   assert.doesNotMatch(source, /Dynamisch via/);
   assert.doesNotMatch(source, /Klantwensen \(bron\):/);
