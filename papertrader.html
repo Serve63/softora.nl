@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/papertrader.css?v=20260505b">
+  <link rel="stylesheet" href="/assets/papertrader.css?v=20260505c">
 </head>
 <body>
   <main class="shell">
@@ -20,8 +20,8 @@
         We houden dit bewust klein: eerst simuleren, meten en leren. Pas als de test logisch voelt,
         bouwen we de volgende laag erbij.
       </p>
-      <button class="simulate-button" type="button" id="simulateButton">Start simulatie</button>
-      <p class="note">Geen echt geld. Geen echte orders. Alleen een eerste testomgeving.</p>
+      <button class="simulate-button" type="button" id="simulateButton">Start real-data backtest</button>
+      <p class="note">Echte historische marktdata. Geen echt geld. Geen echte orders.</p>
     </header>
 
     <section class="overview" aria-label="Simulatie overzicht">
@@ -45,12 +45,11 @@
 
     <section class="lab-card">
       <div>
-        <p class="eyebrow">Huidige hypothese</p>
-        <h2>Test of een kleine statistische voorsprong overeind blijft na veel trades.</h2>
+        <p class="eyebrow">Huidige edge-hypothese</p>
+        <h2>Koop alleen de sterkste cryptomarkt als trend en momentum tegelijk positief zijn.</h2>
       </div>
       <p id="resultText" class="result-text">
-        Klik op simuleren om een eerste reeks papertrades te draaien. Daarna kijken we niet naar hype,
-        maar naar cijfers: rendement, winrate, drawdown en consistentie.
+        Klik op de knop om echte historische data op te halen en onze eerste trend/momentum-edge te testen. We vergelijken de strategie direct met buy-and-hold Bitcoin.
       </p>
       <div class="progress-track" aria-hidden="true">
         <span id="progressFill"></span>
@@ -73,6 +72,6 @@
     </footer>
   </main>
 
-  <script src="/assets/papertrader.js?v=20260505b" defer></script>
+  <script src="/assets/papertrader.js?v=20260505c" defer></script>
 </body>
 </html>
