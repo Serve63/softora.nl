@@ -380,10 +380,7 @@ private struct BusinessTypeOverlay: View {
                     }
                 }
 
-                HStack(spacing: 10) {
-                    ActionChoiceButton(title: "Terug", isPrimary: false, action: onBack)
-                    ActionChoiceButton(title: "Volgende", isPrimary: true, action: onNext)
-                }
+                ActionChoiceButton(title: "Volgende", isPrimary: true, action: onNext)
             }
         }
     }
