@@ -19,6 +19,7 @@
         const formatDateForStorage = options.formatDateForStorage;
         const scope = options.scope;
         const key = options.key;
+        const removalKey = options.removalKey || (key + "_removed_v1");
         const dataPrefix = options.dataPrefix;
         const chunkSize = Math.max(20000, Math.min(180000, Number(options.chunkSize) || 180000));
 
@@ -183,10 +184,11 @@
                 const values = state && state.values && typeof state.values === "object" ? state.values : {};
                 const existing = parsePhotoMap(values[key], values, customers);
                 const current = buildCurrentStorage(customers, persistOptions && persistOptions.onlyCustomerIds);
-                const merged = mergePhotoMaps(existing, current.photoMap, persistOptions && persistOptions.removeCustomerIds);
-                const removalPatch = buildRemovalPatch(existing, persistOptions && persistOptions.removeCustomerIds);
+                const removeIds = (persistOptions && persistOptions.removeCustomerIds || []).map(normalizeString).filter(Boolean);
+                const merged = mergePhotoMaps(existing, current.photoMap, removeIds);
+                const removalPatch = buildRemovalPatch(existing, removeIds);
                 return setUiState(scope, {
-                    patch: { ...removalPatch, ...current.patch, [key]: JSON.stringify(merged) },
+                    patch: { ...removalPatch, ...current.patch, [key]: JSON.stringify(merged), [removalKey]: JSON.stringify(removeIds) },
                     source: "premium-database-photos",
                     actor: "Premium database"
                 });

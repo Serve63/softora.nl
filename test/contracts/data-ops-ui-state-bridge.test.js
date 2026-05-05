@@ -29,7 +29,15 @@ function createStore(overrides = {}) {
     }),
     listDesignPhotosWithDataUrls: overrides.listDesignPhotosWithDataUrls || (async () => []),
     replaceDesignPhotos: overrides.replaceDesignPhotos || (async (entries, meta) => {
-      calls.push({ type: 'photos', entries, meta });
+      calls.push({ type: 'photos-replace', entries, meta });
+      return { ok: true };
+    }),
+    upsertDesignPhotos: overrides.upsertDesignPhotos || (async (entries, meta) => {
+      calls.push({ type: 'photos-upsert', entries, meta });
+      return { ok: true };
+    }),
+    deleteDesignPhotos: overrides.deleteDesignPhotos || (async (customerIds, meta) => {
+      calls.push({ type: 'photos-delete', customerIds, meta });
       return { ok: true };
     }),
   };
@@ -107,7 +115,80 @@ test('data ops ui-state bridge stores photo chunks as structured photo entries',
   );
 
   assert.equal(state.source, 'supabase:data_ops');
-  assert.equal(store.calls[0].type, 'photos');
+  assert.equal(store.calls[0].type, 'photos-upsert');
   assert.equal(store.calls[0].entries[0].customerId, 'cust-1');
   assert.equal(store.calls[0].entries[0].dataUrl, dataUrl);
+});
+
+test('data ops ui-state bridge upserts partial photo saves instead of replacing all photos', async () => {
+  const store = createStore({
+    replaceDesignPhotos: async () => {
+      throw new Error('replaceDesignPhotos should not be used for partial photo saves');
+    },
+  });
+  const bridge = createSoftoraDataOpsUiStateBridge({ store });
+  const dataUrl = 'data:image/png;base64,aGVsbG8=';
+  const photoKey = 'softora_database_photo_data_v1_cust_2';
+
+  await bridge.setUiStateValues(
+    SCOPES.photos,
+    {
+      [KEYS.photos]: JSON.stringify({
+        'cust-2': {
+          id: 'cust-2',
+          photoKey,
+          chunkCount: 1,
+          websitePhotoName: 'demo.png',
+        },
+      }),
+      [`${photoKey}_0`]: dataUrl,
+      [KEYS.photoRemovals]: JSON.stringify([]),
+    },
+    { source: 'premium-database-photos' }
+  );
+
+  assert.deepEqual(store.calls.map((call) => call.type), ['photos-upsert']);
+  assert.equal(store.calls[0].entries[0].customerId, 'cust-2');
+});
+
+test('data ops ui-state bridge deletes only explicitly removed photo ids', async () => {
+  const store = createStore({
+    replaceDesignPhotos: async () => {
+      throw new Error('replaceDesignPhotos should not be used for photo removals');
+    },
+  });
+  const bridge = createSoftoraDataOpsUiStateBridge({ store });
+
+  await bridge.setUiStateValues(
+    SCOPES.photos,
+    {
+      [KEYS.photos]: JSON.stringify({}),
+      [KEYS.photoRemovals]: JSON.stringify(['cust-1']),
+    },
+    { source: 'premium-database-photos' }
+  );
+
+  assert.deepEqual(store.calls.map((call) => call.type), ['photos-delete']);
+  assert.deepEqual(store.calls[0].customerIds, ['cust-1']);
+});
+
+test('data ops ui-state bridge does not fall back to stale legacy photos when structured rows exist', async () => {
+  const emptyStructuredRows = [];
+  Object.defineProperty(emptyStructuredRows, 'hadStructuredRows', {
+    enumerable: false,
+    value: true,
+  });
+  const bridge = createSoftoraDataOpsUiStateBridge({
+    store: createStore({
+      listDesignPhotosWithDataUrls: async () => emptyStructuredRows,
+    }),
+  });
+
+  const state = await bridge.getUiStateValues(SCOPES.photos, {
+    legacyGetUiStateValues: async () => ({ values: { legacy: 'stale-photo-state' }, source: 'legacy' }),
+  });
+
+  assert.equal(state.source, 'supabase:data_ops');
+  assert.equal(state.values[KEYS.photos], '{}');
+  assert.equal(state.values.legacy, undefined);
 });

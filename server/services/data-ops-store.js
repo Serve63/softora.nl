@@ -298,6 +298,14 @@ function createSoftoraDataOpsStore(deps = {}) {
 
   async function replaceDesignPhotos(entries, meta = {}) {
     const list = Array.isArray(entries) ? entries : [];
+    const source = normalizeString(meta.source || 'ui-state-compat').slice(0, 120);
+    const fullReplaceAllowed = Boolean(meta.fullReplace || /^migration:/i.test(source));
+    if (!fullReplaceAllowed) {
+      return upsertDesignPhotos(list, meta);
+    }
+    if (!list.length && !meta.allowEmptyReplace) {
+      return { ok: true, data: [], skippedEmptyReplace: true };
+    }
     for (const entry of list) {
       const saved = await uploadDesignPhoto(entry, meta);
       if (!saved.ok) return saved;
@@ -306,7 +314,31 @@ function createSoftoraDataOpsStore(deps = {}) {
       TABLES.designPhotos,
       'customer_id',
       list.map((entry) => entry.customerId),
-      meta.source
+      source
+    );
+  }
+
+  async function upsertDesignPhotos(entries, meta = {}) {
+    const list = Array.isArray(entries) ? entries : [];
+    for (const entry of list) {
+      const saved = await uploadDesignPhoto(entry, meta);
+      if (!saved.ok) return saved;
+    }
+    return { ok: true, data: [], upserted: list.length };
+  }
+
+  async function deleteDesignPhotos(customerIds, meta = {}) {
+    const ids = Array.from(new Set((Array.isArray(customerIds) ? customerIds : []).map(normalizeString).filter(Boolean)));
+    if (!ids.length) return { ok: true, data: [], deleted: 0 };
+    return run('delete-design-photos-explicit', (client) =>
+      client
+        .from(TABLES.designPhotos)
+        .update({
+          deleted_at: isoNow(),
+          updated_at: isoNow(),
+          source: normalizeString(meta.source || 'ui-state-compat').slice(0, 120),
+        })
+        .in('customer_id', ids)
     );
   }
 
@@ -321,23 +353,37 @@ function createSoftoraDataOpsStore(deps = {}) {
     );
     if (!result.ok) return null;
     const client = getClient();
+    const rows = result.data || [];
     const entries = [];
-    for (const row of result.data || []) {
-      const bucket = normalizeString(row.storage_bucket || bucketName);
-      const path = normalizeString(row.storage_path);
-      if (!bucket || !path) continue;
-      const downloaded = await client.storage.from(bucket).download(path);
-      if (downloaded.error || !downloaded.data) continue;
-      const buffer = Buffer.from(await downloaded.data.arrayBuffer());
-      entries.push({
-        customerId: normalizeString(row.customer_id),
-        dataUrl: `data:${normalizeString(row.mime_type || 'image/jpeg')};base64,${buffer.toString('base64')}`,
-        fileName: normalizeString(row.file_name),
-        identityKey: normalizeString(row.identity_key),
-        legacyMeta: row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {},
-        updatedAt: normalizeString(row.updated_at),
-      });
+    let cursor = 0;
+    const workerCount = Math.min(8, Math.max(1, rows.length));
+
+    async function downloadNext() {
+      while (cursor < rows.length) {
+        const row = rows[cursor];
+        cursor += 1;
+        const bucket = normalizeString(row.storage_bucket || bucketName);
+        const path = normalizeString(row.storage_path);
+        if (!bucket || !path) continue;
+        const downloaded = await client.storage.from(bucket).download(path);
+        if (downloaded.error || !downloaded.data) continue;
+        const buffer = Buffer.from(await downloaded.data.arrayBuffer());
+        entries.push({
+          customerId: normalizeString(row.customer_id),
+          dataUrl: `data:${normalizeString(row.mime_type || 'image/jpeg')};base64,${buffer.toString('base64')}`,
+          fileName: normalizeString(row.file_name),
+          identityKey: normalizeString(row.identity_key),
+          legacyMeta: row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {},
+          updatedAt: normalizeString(row.updated_at),
+        });
+      }
     }
+
+    await Promise.all(Array.from({ length: workerCount }, downloadNext));
+    Object.defineProperty(entries, 'hadStructuredRows', {
+      value: rows.length > 0,
+      enumerable: false,
+    });
     return entries;
   }
 
@@ -468,6 +514,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     findRunningWebdesignJob,
     getDataOpsCounts,
     getWebdesignJob,
+    deleteDesignPhotos,
     listActiveOrders,
     listCustomers,
     listDesignPhotosWithDataUrls,
@@ -478,6 +525,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     replaceDesignPhotos,
     replaceOrderRuntime,
     uploadDesignPhoto,
+    upsertDesignPhotos,
     upsertWebdesignJob,
   };
 }

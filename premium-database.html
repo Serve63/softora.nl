@@ -1602,7 +1602,7 @@
     <script src="assets/premium-database-webdesign-action.js?v=20260503b"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
-    <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260505a"></script>
     <script src="assets/premium-database-deep-search.js?v=20260501d"></script><script src="assets/premium-database-distance.js?v=20260501a"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
@@ -2165,7 +2165,7 @@
             buildCustomerIdentityKey: buildCustomerIdentityKey,
             formatDateForStorage: formatDateForStorage,
             scope: CUSTOMER_PHOTO_SCOPE,
-            key: CUSTOMER_PHOTO_KEY,
+            key: CUSTOMER_PHOTO_KEY, removalKey: "softora_database_photos_removed_v1",
             dataPrefix: CUSTOMER_PHOTO_DATA_PREFIX,
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });

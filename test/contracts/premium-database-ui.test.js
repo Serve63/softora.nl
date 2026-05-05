@@ -284,6 +284,9 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(photoStorageScriptSource, /function loadPersistState\(\)/);
   assert.match(photoStorageScriptSource, /Databasefoto's opslaan via Supabase mislukt/);
   assert.match(photoStorageScriptSource, /persistOptions && persistOptions\.onlyCustomerIds/);
+  assert.match(photoStorageScriptSource, /const removalKey = options\.removalKey \|\| \(key \+ "_removed_v1"\);/);
+  assert.match(photoStorageScriptSource, /\[removalKey\]: JSON\.stringify\(removeIds\)/);
+  assert.match(pageSource, /removalKey: "softora_database_photos_removed_v1"/);
   assert.match(photoStorageScriptSource, /photoKey \+ "_" \+ chunkIndex/);
   assert.match(photoStorageScriptSource, /chunkCount: chunks\.length/);
   assert.match(photoStorageScriptSource, /function mergePhotoMaps\(existing, current, removeIds\)/);
@@ -323,7 +326,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260503b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260501d/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
@@ -1479,6 +1482,11 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(sorterSource, /function getDistanceKm\(customer\)/);
   assert.match(sorterSource, /function compareCustomersByDistance\(left, right\)/);
   assert.match(sorterSource, /return \(Array\.isArray\(customers\) \? customers : \[\]\)\.slice\(\)\.sort\(compareCustomersByDistance\);/);
+  assert.match(sorterSource, /"4281": \{ lat: 51\.7835, lng: 5\.0585 \}/);
+  assert.match(sorterSource, /"4286": \{ lat: 51\.7714, lng: 4\.9597 \}/);
+  assert.match(sorterSource, /"4856": \{ lat: 51\.5006, lng: 4\.7839 \}/);
+  assert.match(sorterSource, /"4858": \{ lat: 51\.5486, lng: 4\.7967 \}/);
+  assert.match(sorterSource, /"4859": \{ lat: 51\.5653, lng: 4\.8307 \}/);
   assert.match(sorterSource, /"4861": \{ lat: 51\.5069, lng: 4\.8616 \}/);
   assert.match(sorterSource, /"5131": \{ lat: 51\.4817, lng: 4\.9583 \}/);
 });
