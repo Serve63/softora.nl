@@ -137,6 +137,9 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /whoLabel\.textContent = isMeeting \? 'Wie heeft deze lead geregeld\?' : 'Voor wie\?';/);
   assert.match(pageSource, /whoChoices\.setAttribute\('aria-label', isMeeting \? 'Wie heeft deze lead geregeld\?' : 'Voor wie is deze afspraak\?'\);/);
   assert.match(pageSource, /id="manualAppointmentWhoChoices"/);
+  assert.match(pageSource, /\.manual-appointment-step \{[\s\S]*display: grid;[\s\S]*gap: 0\.95rem;/);
+  assert.match(pageSource, /\.manual-appointment-step \.modal-workspace-field \{[\s\S]*display: grid;[\s\S]*gap: 0\.55rem;/);
+  assert.match(pageSource, /\.manual-appointment-step \.modal-workspace-label \{[\s\S]*margin-bottom: 0;[\s\S]*line-height: 1\.12;/);
   assert.match(pageSource, /\.manual-appointment-choice-grid--who \{[\s\S]*display: flex;[\s\S]*flex-wrap: nowrap;/);
   assert.match(pageSource, /data-manual-who="serve"/);
   assert.match(pageSource, /data-manual-who="martijn"/);

@@ -623,9 +623,9 @@
             display: none !important;
         }
 
-        .manual-appointment-step[hidden] {
-            display: none !important;
-        }
+        .manual-appointment-step { display: grid; gap: 0.95rem; } .manual-appointment-step[hidden] { display: none !important; }
+        .manual-appointment-step .modal-workspace-field { display: grid; gap: 0.55rem; }
+        .manual-appointment-step .modal-workspace-label { margin-bottom: 0; line-height: 1.12; }
 
         .manual-appointment-choice-grid {
             display: grid;
