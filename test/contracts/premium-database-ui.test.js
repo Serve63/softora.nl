@@ -156,7 +156,9 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /thead th \{[\s\S]*padding: 10px 9px;[\s\S]*letter-spacing: 1\.1px;/);
   assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 14%; \}/);
   assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 9%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(9\), tbody td:nth-child\(9\) \{[\s\S]*width: 5%;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
+  assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 15%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(6\), tbody td:nth-child\(6\) \{ width: 12%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(9\), tbody td:nth-child\(9\) \{[\s\S]*width: 7%;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
   assert.match(pageSource, /\.photo-drop \{[\s\S]*width: 34px;[\s\S]*height: 34px;/);
   assert.match(pageSource, /\.photo-remove \{[\s\S]*width: 14px;[\s\S]*height: 14px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
