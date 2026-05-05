@@ -177,7 +177,7 @@ struct AddAppointmentView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(draft.planner == planner ? Color.blue : Color.softoraPurpleLight, lineWidth: draft.planner == planner ? 2 : 1)
+                                .stroke(draft.planner == planner ? Color.softoraCrimson : Color.softoraPurpleLight, lineWidth: draft.planner == planner ? 2 : 1)
                         }
                 }
                 .buttonStyle(.plain)
@@ -391,7 +391,7 @@ private struct RepeatChoiceOverlay: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .stroke(selectedChoice == choice ? Color.blue : Color.clear, lineWidth: 2)
+                                        .stroke(selectedChoice == choice ? Color.softoraCrimson : Color.clear, lineWidth: 2)
                                 }
                         }
                         .buttonStyle(.plain)
