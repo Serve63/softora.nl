@@ -2076,7 +2076,7 @@ async function markOrderAsPaid(id, options = {}) {
     const requiresConfirmation = options.confirm === true && !ui.isBuilt;
     if (requiresConfirmation) {
         const invoicePaidReviewReminder =
-            'Vergeet niet om de klant op een goed moment te vragen om een revieuw achter te laten!';
+            'Vergeet niet om de klant op een geschikt en natuurlijk moment vriendelijk te vragen of deze een review wil achterlaten over de samenwerking en de ervaring';
         const reviewBadgeGoogleUrl = 'https://www.google.com/search?q=Softora.nl+Google+Reviews';
         const reviewBadgeTrustpilotUrl = 'https://www.trustpilot.com/review/softora.nl';
         const invoicePaidConfirmBodyHtml = [
