@@ -447,7 +447,7 @@ private struct SelectableChoiceButton: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+                        .stroke(isSelected ? Color.softoraCrimson : Color.clear, lineWidth: 2)
                 }
         }
         .buttonStyle(.plain)
