@@ -242,8 +242,6 @@ private struct DayCellView: View {
                         .font(.softoraBody(15, weight: .bold))
                         .foregroundStyle(Color.softoraInk)
                         .frame(width: 26, height: 26)
-                        .background(todayFill)
-                        .clipShape(Circle())
 
                     Text(AgendaDateFormatter.shortMonth(date))
                         .font(.softoraBody(11))
@@ -281,15 +279,6 @@ private struct DayCellView: View {
     private var dayNumber: String {
         let day = Calendar.current.component(.day, from: date)
         return String(day)
-    }
-
-    @ViewBuilder
-    private var todayFill: some View {
-        if AgendaDateFormatter.isToday(date) {
-            Color.white.opacity(0.68)
-        } else {
-            Color.clear
-        }
     }
 
     private var cellBackground: Color {
