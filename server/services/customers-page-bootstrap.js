@@ -216,15 +216,24 @@ function createCustomersPageBootstrapService(deps = {}) {
 
     const service = normalizeCustomerService(raw);
     const review = normalizeCustomerReview(raw);
+    const phone = normalizeString(raw && (raw.telefoon || raw.tel || raw.phone || raw.contactPhone));
+    const website = normalizeString(raw && (raw.website || raw.dom || raw.domain || raw.url)) || '-';
 
     return {
       id: normalizeString(raw && raw.id) || fallbackId || '',
       naam: normalizeString(raw && raw.naam) || 'Onbekend',
       bedrijf: normalizeString(raw && raw.bedrijf) || '-',
-      telefoon: normalizeString(raw && raw.telefoon) || '-',
+      telefoon: phone || '-',
+      tel: phone || '-',
+      email: normalizeString(raw && (raw.email || raw.contactEmail)),
       type,
       service,
-      website: normalizeString(raw && raw.website) || '-',
+      website,
+      dom: normalizeString(raw && (raw.dom || raw.domain)) || website,
+      stad: normalizeString(raw && (raw.stad || raw.adres || raw.location || raw.address || raw.plaats || raw.city)),
+      branche: normalizeString(raw && raw.branche),
+      nota: normalizeString(raw && raw.nota),
+      updatedAt: normalizeDate(raw && (raw.updatedAt || raw.updated || raw.datum || raw.paidAt)),
       websiteBedrag,
       onderhoudPerMaand,
       bedrag,

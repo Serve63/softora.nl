@@ -1599,10 +1599,9 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260503b"></script>
-    <script src="assets/premium-database-import.js?v=20260427c"></script>
-    <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
-    <script src="assets/premium-database-photo-storage.js?v=20260505a"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260505b"></script>
+    <script src="assets/premium-database-import.js?v=20260427c"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260505b"></script>
     <script src="assets/premium-database-deep-search.js?v=20260501d"></script><script src="assets/premium-database-distance.js?v=20260501a"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
@@ -1892,7 +1891,7 @@
                 tel: formatPhoneNumber(raw && (raw.tel || raw.telefoon || raw.contactPhone)),
                 email: email,
                 branche: normalizeString(raw && raw.branche) || "Overig",
-                stad: normalizeString(raw && (raw.stad || raw.location || raw.address)) || "Onbekend",
+                stad: normalizeString(raw && (raw.stad || raw.adres || raw.location || raw.address || raw.plaats || raw.city)) || "Onbekend",
                 status: status,
                 databaseStatus: status,
                 call: raw && typeof raw.call === "boolean" ? raw.call : (status !== "geblokkeerd" && status !== "buiten"),
@@ -2101,7 +2100,7 @@
                 return !isDerivedOrderPlaceholderCustomer(customer);
             });
         }
-
+        function serializeWebsitePhotoForDiff(value) { const photo = normalizeString(value); return isValidWebsitePhotoDataUrl(photo) ? [photo.length, photo.slice(0, 80), photo.slice(-80)].join("|") : (isValidWebsitePhotoUrl(photo) ? "url" : ""); }
         function serializeCustomerList(customers) {
             return JSON.stringify((customers || []).filter(function (item) {
                 return !isDerivedOrderPlaceholderCustomer(item);
@@ -2109,17 +2108,14 @@
                 const normalized = normalizeCustomer(item, "serialize-" + index);
                 return {
                     ...normalized,
-                    websitePhoto: isValidWebsitePhotoDataUrl(normalizeString(normalized.websitePhoto))
-                        ? [normalizeString(normalized.websitePhoto).length, normalizeString(normalized.websitePhoto).slice(0, 80), normalizeString(normalized.websitePhoto).slice(-80)].join("|")
-                        : "",
-                    websitePhotoName: isValidWebsitePhotoDataUrl(normalizeString(normalized.websitePhoto)) ? normalizeString(normalized.websitePhotoName) : ""
+                    websitePhoto: serializeWebsitePhotoForDiff(normalized.websitePhoto),
+                    websitePhotoName: isValidWebsitePhotoSource(normalized.websitePhoto) ? normalizeString(normalized.websitePhotoName) : ""
                 };
             }));
         }
 
-        function customerListsDiffer(nextCustomers) {
-            return serializeCustomerList(state.klanten) !== serializeCustomerList(nextCustomers);
-        }
+        function customerListsDiffer(nextCustomers) { return serializeCustomerList(state.klanten) !== serializeCustomerList(nextCustomers); }
+        function applyCustomerList(nextCustomers, forceRender) { if (customerListsDiffer(nextCustomers) || forceRender) { state.klanten = nextCustomers; renderPage(); return; } state.klanten = nextCustomers; }
 
         function persistCustomerList(customers) {
             const normalizedCustomers = sortCustomers(customers).filter(function (item) {
@@ -2162,6 +2158,7 @@
             normalizeCustomer: normalizeCustomer,
             shouldShowWebsitePhoto: shouldShowWebsitePhoto,
             isValidWebsitePhotoDataUrl: isValidWebsitePhotoDataUrl,
+            isValidWebsitePhotoSource: isValidWebsitePhotoSource,
             buildCustomerIdentityKey: buildCustomerIdentityKey,
             formatDateForStorage: formatDateForStorage,
             scope: CUSTOMER_PHOTO_SCOPE,
@@ -2170,15 +2167,15 @@
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });
 
-        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, refreshPhotos: async function () { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, refreshPhotos: async function () { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
         function mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
             const photosByIdentity = new Map();
             const fallbackPhotosById = new Map();
             const fallbackPhotosByIdentity = new Map();
-            Object.keys(photos).forEach(function (key) { const item = photos[key]; const identityKey = normalizeString(item && item.identityKey); if (identityKey && isValidWebsitePhotoDataUrl(item && item.websitePhoto)) photosByIdentity.set(identityKey, item); });
-            (Array.isArray(fallbackCustomers) ? fallbackCustomers : []).forEach(function (customer) { const normalized = normalizeCustomer(customer); if (!isValidWebsitePhotoDataUrl(normalized.websitePhoto)) return; fallbackPhotosById.set(normalized.id, normalized); const identityKey = buildCustomerIdentityKey(normalized); if (identityKey) fallbackPhotosByIdentity.set(identityKey, normalized); });
+            Object.keys(photos).forEach(function (key) { const item = photos[key]; const identityKey = normalizeString(item && item.identityKey); if (identityKey && isValidWebsitePhotoSource(item && item.websitePhoto)) photosByIdentity.set(identityKey, item); });
+            (Array.isArray(fallbackCustomers) ? fallbackCustomers : []).forEach(function (customer) { const normalized = normalizeCustomer(customer); if (!isValidWebsitePhotoSource(normalized.websitePhoto)) return; fallbackPhotosById.set(normalized.id, normalized); const identityKey = buildCustomerIdentityKey(normalized); if (identityKey) fallbackPhotosByIdentity.set(identityKey, normalized); });
 
             return sortCustomers((customers || []).map(function (customer, index) {
                 const normalized = normalizeCustomer(customer, "photo-merge-" + index);
@@ -2187,7 +2184,7 @@
                 }
                 const identityKey = buildCustomerIdentityKey(normalized);
                 const photo = photos[normalized.id] || photosByIdentity.get(identityKey) || fallbackPhotosById.get(normalized.id) || fallbackPhotosByIdentity.get(identityKey) || null;
-                if (!photo || !isValidWebsitePhotoDataUrl(photo.websitePhoto)) return normalized;
+                if (!photo || !isValidWebsitePhotoSource(photo.websitePhoto)) return normalized;
                 return {
                     ...normalized,
                     websitePhoto: normalizeString(photo.websitePhoto),
@@ -2332,13 +2329,15 @@
         function isValidWebsitePhotoDataUrl(value) {
             return /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(normalizeString(value));
         }
+        function isValidWebsitePhotoUrl(value) { const raw = normalizeString(value); if (!/^https:\/\//i.test(raw)) return false; try { const parsed = new URL(raw); return parsed.protocol === "https:" && Boolean(parsed.hostname); } catch (error) { return false; } }
+        function isValidWebsitePhotoSource(value) { return isValidWebsitePhotoDataUrl(value) || isValidWebsitePhotoUrl(value); }
 
         function shouldShowWebsitePhoto(customer) {
             return normalizeDatabaseStatus(customer && customer.status, customer) !== "klant";
         }
 
         function isWebdesignPhotoEligible(customer) {
-            return shouldShowWebsitePhoto(customer) && !isValidWebsitePhotoDataUrl(customer && customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
+            return shouldShowWebsitePhoto(customer) && !isValidWebsitePhotoSource(customer && customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
         }
 
         function formatEuroCost(value) {
@@ -2582,7 +2581,7 @@
                 return item.id === customerId;
             });
             const photo = normalizeString(customer && customer.websitePhoto);
-            if (!customer || !isValidWebsitePhotoDataUrl(photo)) return false;
+            if (!customer || !isValidWebsitePhotoSource(photo)) return false;
 
             const label = normalizeString(customer.websitePhotoName) || "Websitefoto";
             nodes.photoPreviewImage.src = photo;
@@ -3126,14 +3125,13 @@
                         console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
                     }
 
-                    const photoMap = await loadCustomerPhotoMap(enrichedCustomers);
-                    const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten);
+                    applyCustomerList(mergeCustomersWithPhotos(enrichedCustomers, {}, state.klanten), !hadBootstrapCustomers);
 
-                    if (customerListsDiffer(customersWithPhotos) || !hadBootstrapCustomers) {
-                        state.klanten = customersWithPhotos;
-                        renderPage();
-                    } else {
-                        state.klanten = customersWithPhotos;
+                    try {
+                        const photoMap = await loadCustomerPhotoMap(enrichedCustomers);
+                        applyCustomerList(mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten), false);
+                    } catch (error) {
+                        console.error("Databasefoto's laden via Supabase mislukt:", error);
                     }
 
                     setStatusMessage("");

@@ -387,6 +387,53 @@ function createSoftoraDataOpsStore(deps = {}) {
     return entries;
   }
 
+  async function listDesignPhotosWithSignedUrls(options = {}) {
+    const expiresInSeconds = Math.max(
+      60,
+      Math.min(24 * 60 * 60, Number(options.expiresInSeconds) || 60 * 60)
+    );
+    const result = await run('list-design-photos-signed-urls', (client) =>
+      client
+        .from(TABLES.designPhotos)
+        .select('customer_id,identity_key,storage_bucket,storage_path,mime_type,file_name,legacy_meta,updated_at')
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .limit(500)
+    );
+    if (!result.ok) return null;
+    const client = getClient();
+    const rows = result.data || [];
+    const entries = [];
+
+    await Promise.all(
+      rows.map(async (row) => {
+        const bucket = normalizeString(row.storage_bucket || bucketName);
+        const path = normalizeString(row.storage_path);
+        if (!bucket || !path) return;
+        const signed = await client.storage.from(bucket).createSignedUrl(path, expiresInSeconds);
+        if (signed.error || !signed.data?.signedUrl) return;
+        entries.push({
+          customerId: normalizeString(row.customer_id),
+          websitePhotoUrl: normalizeString(signed.data.signedUrl),
+          storageBucket: bucket,
+          storagePath: path,
+          mimeType: normalizeString(row.mime_type || 'image/jpeg'),
+          fileName: normalizeString(row.file_name),
+          identityKey: normalizeString(row.identity_key),
+          legacyMeta: row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {},
+          updatedAt: normalizeString(row.updated_at),
+          signedUrlExpiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+        });
+      })
+    );
+
+    Object.defineProperty(entries, 'hadStructuredRows', {
+      value: rows.length > 0,
+      enumerable: false,
+    });
+    return entries;
+  }
+
   async function countActiveRows(table, deletedColumn = 'deleted_at') {
     const result = await run(`count-${table}`, (client) => {
       let query = client.from(table).select('*', { count: 'exact', head: true });
@@ -518,6 +565,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     listActiveOrders,
     listCustomers,
     listDesignPhotosWithDataUrls,
+    listDesignPhotosWithSignedUrls,
     listVisibleWebdesignJobs,
     listOrderRuntime,
     replaceActiveOrders,
