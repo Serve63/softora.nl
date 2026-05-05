@@ -199,13 +199,13 @@ struct AddAppointmentView: View {
         } label: {
             HStack {
                 Text("HERHALEN")
-                    .font(.softoraBody(16))
+                    .font(.softoraBody(13))
                     .foregroundStyle(Color.softoraInk)
 
                 Spacer()
 
                 Text(draft.repeatChoice.title.softoraUppercased)
-                    .font(.softoraBody(16, weight: .semibold))
+                    .font(.softoraBody(13, weight: .semibold))
                     .foregroundStyle(Color.softoraMuted)
             }
             .padding(.horizontal, 16)
