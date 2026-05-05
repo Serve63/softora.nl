@@ -6,6 +6,10 @@ extension Color {
     static let softoraCrimsonDim = Color(red: 0.851, green: 0.627, blue: 0.733)
     static let softoraBlue = Color.softoraCrimson
     static let softoraGreen = Color(red: 0.141, green: 0.698, blue: 0.420)
+    static let softoraMeetingWebsite = Color.softoraCrimson
+    static let softoraMeetingBusiness = Color(red: 0.204, green: 0.596, blue: 0.859)
+    static let softoraMeetingVoice = Color(red: 0.180, green: 0.800, blue: 0.443)
+    static let softoraMeetingChatbot = Color(red: 0.953, green: 0.612, blue: 0.071)
     static let softoraInk = Color(red: 0.090, green: 0.090, blue: 0.153)
     static let softoraMuted = Color(red: 0.467, green: 0.459, blue: 0.525)
     static let softoraBackground = Color(red: 0.965, green: 0.949, blue: 0.957)

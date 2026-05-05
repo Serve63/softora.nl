@@ -377,7 +377,8 @@ private struct BusinessTypeOverlay: View {
                     ForEach(BusinessMeetingType.allCases) { type in
                         SelectableChoiceButton(
                             title: type.title,
-                            isSelected: selectedType == type
+                            isSelected: selectedType == type,
+                            selectedColor: type.selectionColor
                         ) {
                             selectedType = type
                         }
@@ -449,7 +450,20 @@ private struct TypeChoiceButton: View {
 private struct SelectableChoiceButton: View {
     let title: String
     let isSelected: Bool
+    let selectedColor: Color
     let action: () -> Void
+
+    init(
+        title: String,
+        isSelected: Bool,
+        selectedColor: Color = .softoraCrimson,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.isSelected = isSelected
+        self.selectedColor = selectedColor
+        self.action = action
+    }
 
     var body: some View {
         Button(action: action) {
@@ -465,10 +479,25 @@ private struct SelectableChoiceButton: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(isSelected ? Color.softoraCrimson : Color.clear, lineWidth: 2)
+                        .stroke(isSelected ? selectedColor : Color.clear, lineWidth: 2)
                 }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private extension BusinessMeetingType {
+    var selectionColor: Color {
+        switch self {
+        case .website:
+            Color.softoraMeetingWebsite
+        case .software:
+            Color.softoraMeetingBusiness
+        case .voice:
+            Color.softoraMeetingVoice
+        case .chatbot:
+            Color.softoraMeetingChatbot
+        }
     }
 }
 
