@@ -13,6 +13,124 @@ function compareConfirmationTasks(a, b) {
   return bTs - aTs;
 }
 
+function createReadCoordinator(overrides = {}) {
+  return createAgendaReadCoordinator({
+    runtimeSyncCooldownMs: 4000,
+    demoConfirmationTaskEnabled: false,
+    isSupabaseConfigured: () => false,
+    getSupabaseStateHydrated: () => true,
+    forceHydrateRuntimeStateWithRetries: async () => {},
+    syncRuntimeStateFromSupabaseIfNewer: async () => false,
+    isImapMailConfigured: () => false,
+    syncInboundConfirmationEmailsFromImap: async () => {},
+    backfillInsightsAndAppointmentsFromRecentCallUpdates: () => {},
+    refreshAgendaAppointmentCallSourcesIfNeeded: async () => {},
+    backfillGeneratedAgendaAppointmentsMetadataIfNeeded: () => {},
+    refreshGeneratedAgendaSummariesIfNeeded: async () => {},
+    getGeneratedAgendaAppointments: () => [],
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+    compareAgendaAppointments: (a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`),
+    mapAppointmentToConfirmationTask: (appointment) => appointment,
+    ensureConfirmationEmailDraftAtIndex: () => {},
+    compareConfirmationTasks,
+    buildAllInterestedLeadRows: () => [],
+    isInterestedLeadDismissedForRow: () => false,
+    normalizeString,
+    ...overrides,
+  });
+}
+
+test('agenda read coordinator masks other planner private appointments for agenda app viewers', async () => {
+  const appointments = [
+    {
+      id: 41,
+      company: 'Martijn privé afspraak',
+      title: 'Martijn privé afspraak',
+      date: '2026-05-12',
+      time: '10:30',
+      location: 'Privé locatie',
+      appointmentLocation: 'Privé locatie',
+      manualPlannerWho: 'martijn',
+      manualLegendChoice: 'manual-overig',
+      manualNotes: 'Privé notitie',
+      summary: 'Privé samenvatting',
+      phone: '0612345678',
+    },
+    {
+      id: 42,
+      company: 'Zakelijke website intake',
+      title: 'Zakelijke website intake',
+      date: '2026-05-12',
+      time: '13:00',
+      location: 'Teams',
+      manualPlannerWho: 'martijn',
+      manualLegendChoice: 'website',
+      summary: 'Zakelijke samenvatting',
+    },
+    {
+      id: 43,
+      company: 'Serve privé afspraak',
+      title: 'Serve privé afspraak',
+      date: '2026-05-12',
+      time: '15:00',
+      location: 'Eigen locatie',
+      manualPlannerWho: 'serve',
+      manualLegendChoice: 'manual-overig',
+      summary: 'Eigen samenvatting',
+    },
+    {
+      id: 44,
+      company: 'Gezamenlijke blokkade',
+      title: 'Gezamenlijke blokkade',
+      date: '2026-05-12',
+      time: '16:00',
+      location: 'Samen',
+      manualPlannerWho: 'serve-martijn',
+      manualLegendChoice: 'manual-overig',
+      summary: 'Gezamenlijke samenvatting',
+    },
+  ];
+
+  const coordinator = createReadCoordinator({
+    getGeneratedAgendaAppointments: () => appointments,
+  });
+
+  const result = await coordinator.listAppointments({
+    limit: 10,
+    viewer: { email: 'serve@softora.nl', displayName: 'Servé Creusen' },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.count, 4);
+
+  const masked = result.appointments.find((appointment) => appointment.id === 41);
+  assert.equal(masked.privacyMasked, true);
+  assert.equal(masked.company, 'Bezet');
+  assert.equal(masked.title, 'Bezet');
+  assert.equal(masked.time, '10:30');
+  assert.equal(masked.date, '2026-05-12');
+  assert.equal(masked.manualPlannerWho, 'martijn');
+  assert.equal(masked.location, '');
+  assert.equal(masked.summary, '');
+  assert.equal(masked.phone, '');
+  assert.equal(masked.manualNotes, '');
+
+  const business = result.appointments.find((appointment) => appointment.id === 42);
+  assert.equal(business.privacyMasked, undefined);
+  assert.equal(business.company, 'Zakelijke website intake');
+  assert.equal(business.location, 'Teams');
+
+  const ownPrivate = result.appointments.find((appointment) => appointment.id === 43);
+  assert.equal(ownPrivate.privacyMasked, undefined);
+  assert.equal(ownPrivate.company, 'Serve privé afspraak');
+  assert.equal(ownPrivate.location, 'Eigen locatie');
+
+  const sharedPrivate = result.appointments.find((appointment) => appointment.id === 44);
+  assert.equal(sharedPrivate.privacyMasked, undefined);
+  assert.equal(sharedPrivate.company, 'Gezamenlijke blokkade');
+  assert.equal(sharedPrivate.location, 'Samen');
+});
+
 test('agenda read coordinator filters dismissed confirmation tasks for the full lead identity', async () => {
   const appointments = [
     {

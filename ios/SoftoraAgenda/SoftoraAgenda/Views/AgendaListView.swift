@@ -318,7 +318,7 @@ private struct CalendarEventChip: View {
                 .background(Color.softoraCrimson)
                 .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
 
-            Text(appointment.title)
+            Text(appointment.privacyMasked ? "Bezet" : appointment.title)
                 .font(.softoraBody(12, weight: .medium))
                 .foregroundStyle(Color.softoraCrimson)
                 .lineLimit(1)

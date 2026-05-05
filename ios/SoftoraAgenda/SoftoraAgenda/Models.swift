@@ -46,6 +46,7 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
     let location: String
     let who: Planner
     let summary: String
+    let privacyMasked: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -61,6 +62,7 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
         case manualWho
         case who
         case summary
+        case privacyMasked
     }
 
     init(
@@ -70,7 +72,8 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
         time: String,
         location: String,
         who: Planner,
-        summary: String
+        summary: String,
+        privacyMasked: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -79,6 +82,7 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
         self.location = location
         self.who = who
         self.summary = summary
+        self.privacyMasked = privacyMasked
     }
 
     init(from decoder: Decoder) throws {
@@ -93,15 +97,17 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
         let decodedWho = Planner(rawAPIValue: container.firstString(for: [.manualPlannerWho, .manualWho, .who]))
         let decodedSummary = container.firstString(for: [.summary])
         let decodedID = container.firstString(for: [.id])
+        let decodedPrivacyMasked = (try? container.decode(Bool.self, forKey: .privacyMasked)) ?? false
 
         self.init(
             id: decodedID.isEmpty ? "\(decodedDate)-\(decodedTime)-\(decodedTitle)" : decodedID,
-            title: decodedTitle,
+            title: decodedPrivacyMasked ? "Bezet" : decodedTitle,
             date: decodedDate,
             time: decodedTime,
             location: decodedLocation,
             who: decodedWho,
-            summary: decodedSummary
+            summary: decodedSummary,
+            privacyMasked: decodedPrivacyMasked
         )
     }
 
