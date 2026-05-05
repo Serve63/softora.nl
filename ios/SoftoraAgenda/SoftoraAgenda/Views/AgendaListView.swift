@@ -307,7 +307,22 @@ private struct DayCellView: View {
 private struct CalendarEventChip: View {
     let appointment: AgendaAppointment
 
+    @ViewBuilder
     var body: some View {
+        if hasTime {
+            eventContent
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            eventContent
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.softoraPurpleLight)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+    }
+
+    private var eventContent: some View {
         HStack(spacing: 7) {
             if hasTime {
                 Text(appointment.time)
@@ -325,11 +340,6 @@ private struct CalendarEventChip: View {
                 .foregroundStyle(Color.softoraCrimson)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(hasTime ? Color.clear : Color.softoraPurpleLight)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private var hasTime: Bool {
