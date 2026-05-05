@@ -186,7 +186,7 @@ struct AddAppointmentView: View {
     }
 
     private var plannerOptions: [Planner] {
-        draft.appointmentType == .business ? Planner.appAccessCases : Planner.appAccessCases + [.both]
+        Planner.appAccessCases
     }
 
     private var plannerLabelTitle: String {
