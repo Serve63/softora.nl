@@ -9,6 +9,7 @@ struct AgendaListView: View {
     @State private var isChoosingBusinessType = false
     @State private var selectedBusinessType: BusinessMeetingType = .website
     @State private var addConfiguration: AddAppointmentConfiguration?
+    @State private var weekTransitionDirection = 1
 
     var body: some View {
         ZStack {
@@ -20,11 +21,17 @@ struct AgendaListView: View {
                 )
 
                 ScrollView {
-                    WeekGridView(
-                        weekStart: weekStart,
-                        appointments: appointmentsByDate,
-                        onSelectDate: openAppointmentTypeChoice
-                    )
+                    ZStack {
+                        WeekGridView(
+                            weekStart: weekStart,
+                            appointments: appointmentsByDate,
+                            onSelectDate: openAppointmentTypeChoice
+                        )
+                        .id(weekStart)
+                        .transition(weekSlideTransition)
+                    }
+                    .clipped()
+                    .animation(.smooth(duration: 0.42), value: weekStart)
                     .padding(.top, 1.5)
                 }
                 .scrollIndicators(.hidden)
@@ -115,8 +122,19 @@ struct AgendaListView: View {
         )
     }
 
+    private var weekSlideTransition: AnyTransition {
+        let insertionEdge: Edge = weekTransitionDirection > 0 ? .trailing : .leading
+        let removalEdge: Edge = weekTransitionDirection > 0 ? .leading : .trailing
+
+        return .asymmetric(
+            insertion: .move(edge: insertionEdge).combined(with: .opacity),
+            removal: .move(edge: removalEdge).combined(with: .opacity)
+        )
+    }
+
     private func moveWeek(_ delta: Int) {
-        withAnimation(.easeInOut(duration: 0.28)) {
+        weekTransitionDirection = delta
+        withAnimation(.smooth(duration: 0.42)) {
             weekStart = AgendaDateFormatter.addWeeks(delta, to: weekStart)
         }
     }
