@@ -394,7 +394,7 @@ private struct RepeatChoiceOverlay: View {
                             onClose()
                         } label: {
                             Text(choice.title)
-                                .font(.softoraBody(15, weight: .bold))
+                                .font(.softoraBody(13, weight: .bold))
                                 .textCase(.uppercase)
                                 .foregroundStyle(Color.softoraInk)
                                 .lineLimit(1)
