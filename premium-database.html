@@ -1599,13 +1599,13 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260429h"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260505a"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
-    <script src="assets/premium-database-photo-storage.js?v=20260428c"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260505a"></script>
     <script src="assets/premium-database-deep-search.js?v=20260429c"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
-    <script src="assets/premium-database-distance-sort.js?v=20260430a"></script>
+    <script src="assets/premium-database-distance-sort.js?v=20260505a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -1637,7 +1637,7 @@
             }
         }
 
-        const customersBootstrapPayload = readCustomersBootstrapPayload();
+        const customersBootstrapPayload = readCustomersBootstrapPayload(); const databaseBootStartedAt = Date.now();
 
         const state = {
             klanten: [],
@@ -2213,7 +2213,7 @@
             buildCustomerIdentityKey: buildCustomerIdentityKey,
             formatDateForStorage: formatDateForStorage,
             scope: CUSTOMER_PHOTO_SCOPE,
-            key: CUSTOMER_PHOTO_KEY,
+            key: CUSTOMER_PHOTO_KEY, removalKey: "softora_database_photos_removed_v1",
             dataPrefix: CUSTOMER_PHOTO_DATA_PREFIX,
             chunkSize: CUSTOMER_PHOTO_CHUNK_SIZE
         });
@@ -3427,7 +3427,7 @@
                 state.photoRestorePending = true; renderPage(); await bootstrapCustomers(); await webdesignActionController.resumePendingJobs();
                 void databaseImportController.startAutoSync();
             } finally {
-                state.photoRestorePending = false; renderPage(); if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === "function") { window.SoftoraPremiumBoot.setShellBooting(false); }
+                state.photoRestorePending = false; try { if (typeof webdesignActionController.preloadPhotoImages === "function") { await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 32, 1200); } } catch (error) { console.warn("Databasefoto's voorbereiden voor eerste render mislukt:", error); } renderPage(); if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === "function") { window.setTimeout(function () { window.SoftoraPremiumBoot.setShellBooting(false); }, Math.max(0, 1000 - (Date.now() - databaseBootStartedAt))); }
             }
         })();
     </script>

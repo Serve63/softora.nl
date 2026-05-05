@@ -259,6 +259,8 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(webdesignActionScriptSource, /state && state\.photoRestorePending/);
   assert.match(webdesignActionScriptSource, /const isRestoring = !hasPhoto && !isPending && Boolean\(isRestoringPhotos\(customer\)\);/);
   assert.match(webdesignActionScriptSource, /const canGenerate = !hasPhoto && !isLoading && Boolean\(resolveCustomerWebsiteUrl\(customer\)\);/);
+  assert.match(webdesignActionScriptSource, /loading=\\"eager\\" decoding=\\"sync\\"/);
+  assert.match(webdesignActionScriptSource, /async function preloadPhotoImages\(customers, limit, timeoutMs\)/);
   assert.match(webdesignActionScriptSource, /const isPending = pendingIds\.has\(customer\.id\);/);
   assert.match(webdesignActionScriptSource, /if \(pendingIds\.has\(target\.id\)\) \{/);
   assert.match(webdesignActionScriptSource, /if \(isRestoringPhotos\(target\)\) \{/);
@@ -279,13 +281,16 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(photoStorageScriptSource, /function loadPersistState\(\)/);
   assert.match(photoStorageScriptSource, /Databasefoto's opslaan via Supabase mislukt/);
   assert.match(photoStorageScriptSource, /persistOptions && persistOptions\.onlyCustomerIds/);
+  assert.match(photoStorageScriptSource, /const removalKey = options\.removalKey \|\| \(key \+ "_removed_v1"\);/);
+  assert.match(photoStorageScriptSource, /\[removalKey\]: JSON\.stringify\(removeIds\)/);
+  assert.match(pageSource, /removalKey: "softora_database_photos_removed_v1"/);
   assert.match(photoStorageScriptSource, /photoKey \+ "_" \+ chunkIndex/);
   assert.match(photoStorageScriptSource, /chunkCount: chunks\.length/);
   assert.match(photoStorageScriptSource, /function mergePhotoMaps\(existing, current, removeIds\)/);
   assert.match(pageSource, /function persistCustomerPhotos\(customers, options\)/);
   assert.match(pageSource, /function mergeCustomersWithPhotos\(customers, photoMap, fallbackCustomers\)/);
   assert.match(pageSource, /fallbackPhotosById/);
-  assert.match(pageSource, /mergeCustomersWithPhotos\(enrichedCustomers, photoMap, state\.klanten\)/);
+  assert.match(pageSource, /mergeCustomersWithPhotos\(state\.klanten, resolvePhotoMap\(rawPhotoMap, state\.klanten\), state\.klanten\)/);
   assert.match(pageSource, /function loadCustomerPhotoMap\(customers\)/);
   assert.match(pageSource, /normalizeString\(normalized\.websitePhoto\)\.slice\(0, 80\)/);
   assert.match(pageSource, /websitePhoto: isValidWebsitePhotoDataUrl\(normalizeString\(normalized\.websitePhoto\)\)/);
@@ -309,9 +314,9 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260429h/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260505a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260428c/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429c/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
@@ -349,6 +354,7 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.doesNotMatch(webdesignActionScriptSource, /localStorage/);
   assert.match(pageSource, /refreshPhotos: async function \(\)/);
   assert.match(pageSource, /await webdesignActionController\.resumePendingJobs\(\);/);
+  assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 32, 1200\);/);
   assert.match(webdesignActionScriptSource, /pendingIds\.add\(job\.customerId\);/);
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT/);
   assert.doesNotMatch(webdesignActionScriptSource, /await generate\(\[freshTarget\]/);
@@ -723,6 +729,7 @@ test('premium database photo storage clears removed photo chunks so refresh cann
   assert.equal(patches[0].photo_customer1_0, '');
   assert.equal(patches[0].photo_customer1_1, '');
   assert.equal(JSON.parse(patches[0].photos).customer1, undefined);
+  assert.deepEqual(JSON.parse(patches[0].photos_removed_v1), ['customer1']);
 });
 
 test('premium database photo storage saves one changed photo without resending old chunks', async () => {
@@ -769,6 +776,7 @@ test('premium database photo storage saves one changed photo without resending o
   const storedMap = JSON.parse(patches[0].photos);
   assert.equal(storedMap.customer1.photoKey, 'photo_customer1');
   assert.equal(storedMap.customer2.photoKey, 'photo_customer2');
+  assert.deepEqual(JSON.parse(patches[0].photos_removed_v1), []);
 });
 
 test('premium database photo storage retries Supabase reads before saving photos', async () => {
@@ -804,6 +812,7 @@ test('premium database photo storage retries Supabase reads before saving photos
   assert.equal(reads, 2);
   assert.equal(patches.length, 1);
   assert.equal(patches[0].photo_customer1_0, 'data:image/png;base64,AAA');
+  assert.deepEqual(JSON.parse(patches[0].photos_removed_v1), []);
 });
 
 test('premium database deep search continues to the next location until the requested new-company count is reached', async () => {
@@ -1361,6 +1370,10 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(sorterSource, /function getCustomerDistanceKm\(customer\)/);
   assert.match(sorterSource, /function compareCustomersByDistance\(leftCustomer, rightCustomer\)/);
   assert.match(sorterSource, /return Array\.isArray\(list\) \? list\.slice\(\)\.sort\(compareCustomersByDistance\) : \[\];/);
+  assert.match(sorterSource, /4286: placeCoords\.almkerk/);
   assert.match(sorterSource, /4861: placeCoords\.chaam/);
+  assert.match(sorterSource, /4856: placeCoords\.strijbeek/);
+  assert.match(sorterSource, /4858: placeCoords\.ulvenhout/);
+  assert.match(sorterSource, /4859: placeCoords\.bavel/);
   assert.match(sorterSource, /5131: placeCoords\.alphen/);
 });

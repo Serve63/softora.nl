@@ -25,10 +25,13 @@ const SoftoraDatabaseDistanceSort = (() => {
         rijen: { lat: 51.5906, lng: 4.9197 },
         gilze: { lat: 51.5449, lng: 4.9402 },
         alphen: { lat: 51.4818, lng: 4.9583 },
+        almkerk: { lat: 51.7707, lng: 4.9598 },
+        andel: { lat: 51.7835, lng: 5.0585 },
         chaam: { lat: 51.5067, lng: 4.8619 },
         'baarle nassau': { lat: 51.4476, lng: 4.9292 },
         ulvenhout: { lat: 51.5496, lng: 4.7989 },
         galder: { lat: 51.5156, lng: 4.7752 },
+        strijbeek: { lat: 51.5004, lng: 4.7946 },
         bavel: { lat: 51.5642, lng: 4.8303 },
         breda: { lat: 51.5719, lng: 4.7683 },
         oosterhout: { lat: 51.645, lng: 4.8597 },
@@ -45,8 +48,12 @@ const SoftoraDatabaseDistanceSort = (() => {
         'sint oedenrode': { lat: 51.5675, lng: 5.4597 },
     };
     const postcodeCoords = {
+        4286: placeCoords.almkerk,
         4851: placeCoords.ulvenhout,
         4855: placeCoords.galder,
+        4856: placeCoords.strijbeek,
+        4858: placeCoords.ulvenhout,
+        4859: placeCoords.bavel,
         4861: placeCoords.chaam,
         5051: placeCoords.goirle,
         5061: placeCoords.oisterwijk,
@@ -59,6 +66,7 @@ const SoftoraDatabaseDistanceSort = (() => {
         5121: placeCoords.rijen,
         5126: placeCoords.gilze,
         5131: placeCoords.alphen,
+        4281: placeCoords.andel,
     };
 
     function normalizeText(value) {

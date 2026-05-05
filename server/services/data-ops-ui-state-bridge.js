@@ -20,6 +20,7 @@ const KEYS = Object.freeze({
   activeOrders: 'softora_custom_orders_premium_v1',
   orderRuntime: 'softora_order_runtime_premium_v1',
   photos: 'softora_database_photos_v1',
+  photoRemovals: 'softora_database_photos_removed_v1',
 });
 
 const PHOTO_DATA_PREFIX = 'softora_database_photo_data_v1_';
@@ -115,7 +116,8 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
 
   async function getPhotosState(legacyGetUiStateValues) {
     const entries = await store.listDesignPhotosWithDataUrls();
-    if (!entries || entries.length === 0) return readLegacy(legacyGetUiStateValues, SCOPES.photos);
+    if (!entries) return readLegacy(legacyGetUiStateValues, SCOPES.photos);
+    if (entries.length === 0 && !entries.hadStructuredRows) return readLegacy(legacyGetUiStateValues, SCOPES.photos);
     return buildState(SCOPES.photos, buildPhotoCompatValues(entries));
   }
 
@@ -156,6 +158,11 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
       .filter(Boolean);
   }
 
+  function extractPhotoRemovalIds(values) {
+    const parsed = safeParseJsonArray(values && values[KEYS.photoRemovals]);
+    return Array.from(new Set(parsed.map(normalizeString).filter(Boolean)));
+  }
+
   async function setUiStateValues(scope, values, meta = {}) {
     if (!canHandleScope(scope)) return null;
     const stateValues = values && typeof values === 'object' ? values : {};
@@ -185,8 +192,18 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
       }
       if (scope === SCOPES.photos && Object.prototype.hasOwnProperty.call(stateValues, KEYS.photos)) {
         const entries = extractPhotoEntries(stateValues);
-        const saved = await store.replaceDesignPhotos(entries, sourceMeta);
-        return saved.ok ? buildState(scope, stateValues) : null;
+        const removalIds = extractPhotoRemovalIds(stateValues);
+        if (entries.length) {
+          const saved = typeof store.upsertDesignPhotos === 'function'
+            ? await store.upsertDesignPhotos(entries, sourceMeta)
+            : await store.replaceDesignPhotos(entries, sourceMeta);
+          if (!saved.ok) return null;
+        }
+        if (removalIds.length && typeof store.deleteDesignPhotos === 'function') {
+          const removed = await store.deleteDesignPhotos(removalIds, sourceMeta);
+          if (!removed.ok) return null;
+        }
+        return buildState(scope, stateValues);
       }
     } catch (error) {
       logger.error('[DataOps][ui-state-set]', error?.message || error);
