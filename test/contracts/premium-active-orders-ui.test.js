@@ -6,22 +6,28 @@ const path = require('path');
 function readActiveOrdersSources() {
   const pagePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
   const bootScriptPath = path.join(__dirname, '../../assets/premium-active-orders-boot.js');
+  const assigneeScriptPath = path.join(__dirname, '../../assets/premium-active-orders-assignee.js');
+  const assigneeStylePath = path.join(__dirname, '../../assets/premium-active-orders-assignee.css');
   const scriptPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const bootScriptSource = fs.readFileSync(bootScriptPath, 'utf8');
+  const assigneeScriptSource = fs.readFileSync(assigneeScriptPath, 'utf8');
+  const assigneeStyleSource = fs.readFileSync(assigneeStylePath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
   return {
+    assigneeScriptSource,
+    assigneeStyleSource,
     bootScriptSource,
     pageSource,
     scriptSource,
-    combinedSource: `${pageSource}\n${bootScriptSource}\n${scriptSource}`,
+    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${scriptSource}`,
   };
 }
 
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260505a"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260505b"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -178,9 +184,15 @@ test('premium actieve opdrachten gebruiken expliciete customer identity voor kop
 test('premium actieve opdrachten tonen create-order modal zonder sample-design en domeinvelden', () => {
   const { combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(source, /<label class="create-order-label" for="newOrderAssignee">Toegewezen aan<\/label>/);
-  assert.match(source, /<select class="create-order-select" id="newOrderAssignee" name="assignee" required>/);
-  assert.match(source, /<option value="">Kies medewerker<\/option>\s*<option value="Martijn">Martijn<\/option>\s*<option value="Servé">Servé<\/option>/);
+  assert.match(source, /<label class="create-order-label" id="newOrderAssigneeLabel">Toegewezen aan<\/label>/);
+  assert.match(source, /<input id="newOrderAssignee" name="assignee" type="hidden" required>/);
+  assert.match(source, /<div class="create-order-assignee-options" id="newOrderAssigneeOptions" role="radiogroup" aria-labelledby="newOrderAssigneeLabel">/);
+  assert.match(source, /data-create-order-assignee="Martijn"[\s\S]*data-create-order-assignee="Servé"/);
+  assert.match(source, /function setAssignee\(value, options\) \{[\s\S]*button\.classList\.toggle\('is-active', active\);/);
+  assert.match(source, /window\.SoftoraCreateOrderAssignee = \{ set: setAssignee \};/);
+  assert.match(source, /window\.SoftoraCreateOrderAssignee\?\.set\?\.\(suggestedAssignee, \{ agendaAutofill: true \}\);/);
+  assert.match(source, /\.create-order-assignee-choice\.is-active \{/);
+  assert.doesNotMatch(source, /<select class="create-order-select" id="newOrderAssignee" name="assignee" required>/);
   assert.match(source, /const ORDER_ASSIGNEE_OPTIONS = Object\.freeze\(\['Martijn', 'Servé'\]\);/);
   assert.match(source, /function normalizeOrderAssignee\(value\) \{[\s\S]*const words = normalized\.split\(\/\[\^a-z\]\+\/\)\.filter\(Boolean\);[\s\S]*if \(words\.includes\('serve'\)\) return 'Servé';[\s\S]*if \(words\.includes\('martijn'\)\) return 'Martijn';/);
   assert.match(source, /function normalizeClaimEmployeeName\(value\) \{[\s\S]*const canonicalAssignee = normalizeOrderAssignee\(value\);[\s\S]*if \(canonicalAssignee\) return canonicalAssignee;/);

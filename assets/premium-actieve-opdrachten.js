@@ -1729,8 +1729,7 @@ function hydrateCreateOrderFormFromLead(lead) {
     if (assigneeInput) {
         const suggestedAssignee = normalizeOrderAssignee(lead.leadOwnerName || lead.leadOwnerFullName || '');
         if (suggestedAssignee && (!assigneeInput.value || assigneeInput.dataset.agendaAutofill === '1')) {
-            assigneeInput.value = suggestedAssignee;
-            assigneeInput.dataset.agendaAutofill = '1';
+            window.SoftoraCreateOrderAssignee?.set?.(suggestedAssignee, { agendaAutofill: true });
         }
     }
     if (amountInput) {
