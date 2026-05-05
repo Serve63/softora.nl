@@ -76,15 +76,10 @@ struct AddAppointmentView: View {
                         FormLabel("Opmerkingen")
                         notesEditor
 
-                        HStack(spacing: 10) {
-                            SheetActionButton(title: "Terug", isPrimary: false) {
-                                dismiss()
-                            }
-                            SheetActionButton(title: store.isSavingAppointment ? "Opslaan..." : "Toevoegen", isPrimary: true) {
-                                save()
-                            }
-                            .disabled(store.isSavingAppointment)
+                        SheetActionButton(title: store.isSavingAppointment ? "Opslaan..." : "Toevoegen", isPrimary: true) {
+                            save()
                         }
+                        .disabled(store.isSavingAppointment)
                         .padding(.top, 12)
                         .overlay(alignment: .top) {
                             Rectangle()
