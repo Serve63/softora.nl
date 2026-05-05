@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/papertrader.css?v=20260505d">
+  <link rel="stylesheet" href="/assets/papertrader.css?v=20260505e">
 </head>
 <body>
   <main class="shell">
@@ -20,7 +20,7 @@
         We bouwen dit alsof de bot maar één kans krijgt met één euro: liever niets doen dan dom handelen. Eerst testen we of de edge na kosten beter is dan simpel vasthouden.
       </p>
       <button class="simulate-button" type="button" id="simulateButton">Start real-data backtest</button>
-      <p class="note">Echte historische marktdata. Startkapitaal in de test: €1. Geen echte orders.</p>
+      <p class="note">Echte historische marktdata. Startkapitaal in de test: €1. Edge v2 gebruikt max 50% inzet. Geen echte orders.</p>
     </header>
 
     <section class="overview" aria-label="Simulatie overzicht">
@@ -45,7 +45,7 @@
     <section class="lab-card">
       <div>
         <p class="eyebrow">Huidige edge-hypothese</p>
-        <h2>Handel langzaam, bescherm kapitaal en koop alleen als trend en momentum samen sterk genoeg zijn.</h2>
+        <h2>Edge v2: 60-daagse trend, 45-daags momentum, wekelijkse beslissingen en maximaal 50% inzet.</h2>
       </div>
       <p id="resultText" class="result-text">
         Klik op de knop om echte historische data op te halen. De bot mag cash blijven, zet maximaal een deel van de euro in en krijgt pas een positief oordeel als hij BTC na kosten verslaat.
@@ -71,6 +71,6 @@
     </footer>
   </main>
 
-  <script src="/assets/papertrader.js?v=20260505d" defer></script>
+  <script src="/assets/papertrader.js?v=20260505e" defer></script>
 </body>
 </html>

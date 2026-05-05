@@ -7,12 +7,12 @@
 
   const DAYS = 365;
   const START_EQUITY = 1;
-  const FAST_MOMENTUM_DAYS = 30;
-  const TREND_DAYS = 120;
+  const FAST_MOMENTUM_DAYS = 45;
+  const TREND_DAYS = 60;
   const REBALANCE_EVERY_DAYS = 7;
-  const MAX_ALLOCATION = 0.7;
+  const MAX_ALLOCATION = 0.5;
   const COST_PER_TURNOVER = 0.004;
-  const MIN_EDGE_SCORE_TO_TRADE = 65;
+  const MIN_EDGE_SCORE_TO_TRADE = 70;
 
   const state = {
     runs: 0,
