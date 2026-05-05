@@ -1,7 +1,15 @@
 (function () {
+  const ASSETS = [
+    { id: 'bitcoin', symbol: 'BTC' },
+    { id: 'ethereum', symbol: 'ETH' },
+    { id: 'solana', symbol: 'SOL' }
+  ];
+
+  const DAYS = 365;
   const START_EQUITY = 10000;
-  const TRADE_COUNT = 120;
-  const RISK_PER_TRADE = 0.006;
+  const FAST_MOMENTUM_DAYS = 30;
+  const TREND_DAYS = 120;
+  const COST_PER_SWITCH = 0.0025;
 
   const state = {
     runs: 0,
@@ -21,51 +29,177 @@
     logList: document.getElementById('logList')
   };
 
-  elements.button.addEventListener('click', runSimulation);
+  elements.button.addEventListener('click', runBacktest);
   render();
 
-  function runSimulation() {
-    elements.button.disabled = true;
-    elements.button.textContent = 'Simuleert...';
+  async function runBacktest() {
+    setLoading(true);
 
-    window.setTimeout(() => {
-      const result = simulateEdge();
+    try {
+      const marketData = await fetchMarketData();
+      const result = backtestMomentumRotation(marketData);
       state.runs += 1;
       state.latest = result;
       state.log.unshift(buildLogLine(result, state.runs));
       state.log = state.log.slice(0, 6);
       render();
-      elements.button.disabled = false;
-      elements.button.textContent = 'Simuleer opnieuw';
-    }, 420);
+    } catch (error) {
+      elements.statusPill.textContent = 'Datafout';
+      elements.resultText.textContent = `De databron gaf geen bruikbare data terug: ${error.message}. Dit is precies waarom we straks een eigen betrouwbare datalaag willen.`;
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function simulateEdge() {
+  async function fetchMarketData() {
+    const responses = await Promise.all(ASSETS.map(async (asset) => {
+      const endpoint = `https://api.coingecko.com/api/v3/coins/${asset.id}/market_chart?vs_currency=usd&days=${DAYS}&interval=daily`;
+      const response = await fetch(endpoint, { cache: 'no-store' });
+
+      if (!response.ok) {
+        throw new Error(`${asset.symbol} data niet beschikbaar (${response.status})`);
+      }
+
+      const payload = await response.json();
+      const prices = normalizeCoinGeckoPrices(payload.prices, asset);
+
+      if (prices.length < TREND_DAYS + FAST_MOMENTUM_DAYS) {
+        throw new Error(`${asset.symbol} heeft te weinig datapunten`);
+      }
+
+      return [asset.symbol, prices];
+    }));
+
+    return Object.fromEntries(responses);
+  }
+
+  function normalizeCoinGeckoPrices(rows, asset) {
+    if (!Array.isArray(rows)) return [];
+
+    return rows
+      .map((row) => ({
+        date: new Date(row[0]).toISOString().slice(0, 10),
+        symbol: asset.symbol,
+        close: Number(row[1])
+      }))
+      .filter((row) => row.date && Number.isFinite(row.close) && row.close > 0)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  function backtestMomentumRotation(marketData) {
+    const dates = getSharedDates(marketData);
+    const startIndex = TREND_DAYS;
     let equity = START_EQUITY;
     let peak = START_EQUITY;
     let maxDrawdown = 0;
+    let currentSymbol = 'CASH';
+    let trades = 0;
     let wins = 0;
+    let previousEquity = equity;
+    const dailyEquity = [];
+    const allocations = [];
 
-    for (let index = 0; index < TRADE_COUNT; index += 1) {
-      const riskAmount = equity * RISK_PER_TRADE;
-      const marketNoise = Math.random() * 0.16 - 0.08;
-      const winProbability = 0.53 + marketNoise;
-      const isWin = Math.random() < winProbability;
-      const reward = isWin ? 1.28 + Math.random() * 0.42 : -1;
+    for (let index = startIndex; index < dates.length; index += 1) {
+      const date = dates[index];
+      const previousDate = dates[index - 1];
+      const targetSymbol = chooseTargetSymbol(marketData, date);
 
-      if (isWin) wins += 1;
-      equity += riskAmount * reward;
+      if (targetSymbol !== currentSymbol) {
+        if (currentSymbol !== 'CASH') trades += 1;
+        equity *= 1 - COST_PER_SWITCH;
+        currentSymbol = targetSymbol;
+        allocations.push({ date, symbol: currentSymbol });
+      }
+
+      if (currentSymbol !== 'CASH') {
+        const todayClose = getClose(marketData, currentSymbol, date);
+        const previousClose = getClose(marketData, currentSymbol, previousDate);
+        const dailyReturn = todayClose / previousClose - 1;
+        equity *= 1 + dailyReturn;
+      }
+
+      if (equity > previousEquity) wins += 1;
+      previousEquity = equity;
       peak = Math.max(peak, equity);
       maxDrawdown = Math.max(maxDrawdown, (peak - equity) / peak);
+      dailyEquity.push({ date, equity });
     }
 
+    const benchmark = benchmarkBuyAndHold(marketData.BTC, dates[startIndex], dates[dates.length - 1]);
+    const testedDays = Math.max(1, dailyEquity.length);
+    const years = testedDays / 365;
+    const totalReturn = equity / START_EQUITY - 1;
+    const cagr = Math.pow(equity / START_EQUITY, 1 / years) - 1;
+    const benchmarkReturn = benchmark / START_EQUITY - 1;
+    const lastAllocation = currentSymbol;
+
     return {
-      equity,
-      returnPct: (equity - START_EQUITY) / START_EQUITY,
-      winrate: wins / TRADE_COUNT,
+      source: 'CoinGecko',
+      testedDays,
+      trades,
+      totalReturn,
+      cagr,
+      benchmarkReturn,
+      winrate: wins / testedDays,
       maxDrawdown,
-      trades: TRADE_COUNT
+      edgeScore: calculateEdgeScore(totalReturn, benchmarkReturn, maxDrawdown, trades),
+      lastAllocation,
+      firstDate: dates[startIndex],
+      lastDate: dates[dates.length - 1],
+      allocations
     };
+  }
+
+  function chooseTargetSymbol(marketData, date) {
+    const candidates = ASSETS.map((asset) => {
+      const prices = marketData[asset.symbol];
+      const index = prices.findIndex((row) => row.date === date);
+      const close = prices[index].close;
+      const trendAverage = averageClose(prices, index - TREND_DAYS + 1, index);
+      const momentumBase = prices[index - FAST_MOMENTUM_DAYS].close;
+      const momentum = close / momentumBase - 1;
+      const aboveTrend = close > trendAverage;
+
+      return {
+        symbol: asset.symbol,
+        score: aboveTrend ? momentum : -Infinity,
+        momentum,
+        aboveTrend
+      };
+    }).sort((a, b) => b.score - a.score);
+
+    const best = candidates[0];
+    return best && best.aboveTrend && best.momentum > 0 ? best.symbol : 'CASH';
+  }
+
+  function getSharedDates(marketData) {
+    const dateSets = ASSETS.map((asset) => new Set(marketData[asset.symbol].map((row) => row.date)));
+    return marketData.BTC
+      .map((row) => row.date)
+      .filter((date) => dateSets.every((set) => set.has(date)));
+  }
+
+  function benchmarkBuyAndHold(rows, startDate, endDate) {
+    const start = rows.find((row) => row.date === startDate);
+    const end = rows.find((row) => row.date === endDate);
+    return START_EQUITY * (end.close / start.close);
+  }
+
+  function averageClose(rows, fromIndex, toIndex) {
+    let total = 0;
+    let count = 0;
+
+    for (let index = fromIndex; index <= toIndex; index += 1) {
+      total += rows[index].close;
+      count += 1;
+    }
+
+    return total / count;
+  }
+
+  function getClose(marketData, symbol, date) {
+    const row = marketData[symbol].find((entry) => entry.date === date);
+    return row ? row.close : 0;
   }
 
   function render() {
@@ -76,46 +210,59 @@
       elements.winrate.textContent = 'Nog niet getest';
       elements.drawdown.textContent = 'Nog niet getest';
       elements.progressFill.style.width = '0%';
-      elements.logList.innerHTML = '<p class="empty-log">Nog geen simulaties uitgevoerd.</p>';
+      elements.logList.innerHTML = '<p class="empty-log">Nog geen real-data backtest uitgevoerd.</p>';
       return;
     }
 
     const result = state.latest;
-    const isPositive = result.returnPct >= 0;
-    const edgeScore = calculateEdgeScore(result);
+    const beatsBenchmark = result.totalReturn > result.benchmarkReturn;
 
-    elements.returnValue.textContent = formatSignedPercent(result.returnPct);
-    elements.returnValue.className = isPositive ? 'good' : 'bad';
+    elements.returnValue.textContent = formatSignedPercent(result.totalReturn);
+    elements.returnValue.className = result.totalReturn >= 0 ? 'good' : 'bad';
     elements.winrate.textContent = formatPercent(result.winrate);
     elements.drawdown.textContent = formatPercent(result.maxDrawdown);
-    elements.drawdown.className = result.maxDrawdown <= 0.12 ? 'good' : 'bad';
-    elements.progressFill.style.width = `${edgeScore}%`;
-    elements.statusPill.textContent = edgeScore >= 70 ? 'Veelbelovend' : edgeScore >= 45 ? 'Verder testen' : 'Nog zwak';
-    elements.resultText.textContent = buildResultText(result, edgeScore);
+    elements.drawdown.className = result.maxDrawdown <= 0.22 ? 'good' : 'bad';
+    elements.progressFill.style.width = `${result.edgeScore}%`;
+    elements.statusPill.textContent = beatsBenchmark ? 'Edge > BTC' : 'Nog geen edge';
+    elements.resultText.textContent = buildResultText(result);
     elements.logList.innerHTML = state.log.map((line) => `<p class="log-item">${line}</p>`).join('');
   }
 
-  function buildResultText(result, edgeScore) {
-    if (edgeScore >= 70) {
-      return 'Deze run ziet er veelbelovend uit, maar een edge bewijst zich pas na veel herhalingen. Volgende stap: dezelfde hypothese vaker draaien en kijken of het patroon blijft bestaan.';
+  function buildResultText(result) {
+    const benchmarkText = formatSignedPercent(result.benchmarkReturn);
+    const cagrText = formatSignedPercent(result.cagr);
+    const allocationText = result.lastAllocation === 'CASH' ? 'cash' : result.lastAllocation;
+
+    if (result.totalReturn > result.benchmarkReturn && result.maxDrawdown <= 0.25) {
+      return `Deze run verslaat buy-and-hold BTC (${benchmarkText}) met een CAGR van ${cagrText}, na kosten. Laatste allocatie: ${allocationText}. Dit is interessant genoeg om vaker en strenger te testen.`;
     }
 
-    if (edgeScore >= 45) {
-      return 'Deze run is nog niet overtuigend, maar ook niet meteen waardeloos. Volgende stap: parameters scherper maken en opnieuw testen.';
+    if (result.totalReturn > 0) {
+      return `De strategie is positief, maar nog niet duidelijk beter dan buy-and-hold BTC (${benchmarkText}). Laatste allocatie: ${allocationText}. Volgende stap: filters verbeteren en out-of-sample testen.`;
     }
 
-    return 'Deze run is zwak. Dat is nuttige informatie: liever nu ontdekken dat de hypothese niet sterk genoeg is dan later met echt geld.';
+    return `Deze edge is nog zwak op echte data. Goed om nu te zien: liever een hypothese killen dan jezelf voor de gek houden. Laatste allocatie: ${allocationText}.`;
   }
 
   function buildLogLine(result, runNumber) {
-    return `<strong>Run ${runNumber}</strong>: ${result.trades} trades, rendement ${formatSignedPercent(result.returnPct)}, winrate ${formatPercent(result.winrate)}, max drawdown ${formatPercent(result.maxDrawdown)}.`;
+    return `<strong>Run ${runNumber}</strong>: ${result.source} ${result.firstDate} t/m ${result.lastDate}, rendement ${formatSignedPercent(result.totalReturn)}, BTC benchmark ${formatSignedPercent(result.benchmarkReturn)}, winrate ${formatPercent(result.winrate)}, max drawdown ${formatPercent(result.maxDrawdown)}, trades ${result.trades}.`;
   }
 
-  function calculateEdgeScore(result) {
-    const returnScore = clamp((result.returnPct + 0.08) * 360, 0, 45);
-    const winrateScore = clamp((result.winrate - 0.45) * 260, 0, 30);
-    const drawdownScore = clamp((0.18 - result.maxDrawdown) * 140, 0, 25);
-    return Math.round(returnScore + winrateScore + drawdownScore);
+  function calculateEdgeScore(totalReturn, benchmarkReturn, maxDrawdown, trades) {
+    const excessScore = clamp((totalReturn - benchmarkReturn + 0.15) * 130, 0, 45);
+    const returnScore = clamp((totalReturn + 0.2) * 80, 0, 25);
+    const drawdownScore = clamp((0.35 - maxDrawdown) * 85, 0, 25);
+    const activityScore = trades > 1 ? 5 : 0;
+    return Math.round(excessScore + returnScore + drawdownScore + activityScore);
+  }
+
+  function setLoading(isLoading) {
+    elements.button.disabled = isLoading;
+    elements.button.textContent = isLoading ? 'Haalt echte data op...' : 'Start real-data backtest';
+    if (isLoading) {
+      elements.statusPill.textContent = 'Data ophalen';
+      elements.resultText.textContent = 'We halen nu echte historische marktdata op en draaien daarna de strategie met kosten/slippage.';
+    }
   }
 
   function formatSignedPercent(value) {
