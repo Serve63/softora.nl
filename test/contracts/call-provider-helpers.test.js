@@ -306,12 +306,29 @@ test('call provider helpers build outbound payloads and stack-specific urls', ()
 
   const retellPayload = helpers.buildRetellPayload(
     { name: 'Serve', company: 'Softora', phone: '06 12 34 56 78', branche: 'AI', region: 'NL' },
-    { sector: 'Software', region: 'Randstad' }
+    { sector: 'Software', region: 'Randstad', extraInstructions: 'Gebruik de Softora prompt uit de leadgenerator.' }
   );
   assert.equal(retellPayload.to_number, '+31612345678');
   assert.equal(retellPayload.override_agent_id, 'agent_123');
   assert.equal(retellPayload.override_agent_version, 2);
   assert.equal(retellPayload.retell_llm_dynamic_variables.company, 'Softora');
+  assert.equal(
+    retellPayload.retell_llm_dynamic_variables.extraInstructions,
+    'Gebruik de Softora prompt uit de leadgenerator.'
+  );
+  assert.equal(
+    retellPayload.retell_llm_dynamic_variables.campaignPrompt,
+    'Gebruik de Softora prompt uit de leadgenerator.'
+  );
+  assert.equal(
+    retellPayload.retell_llm_dynamic_variables.prompt,
+    'Gebruik de Softora prompt uit de leadgenerator.'
+  );
+  assert.equal(
+    retellPayload.retell_llm_dynamic_variables.instructionBrief,
+    'Gebruik de Softora prompt uit de leadgenerator.'
+  );
+  assert.equal(retellPayload.metadata.campaignPrompt, 'Gebruik de Softora prompt uit de leadgenerator.');
 
   const twilioPayload = helpers.buildTwilioOutboundPayload(
     { phone: '06 12 34 56 78' },

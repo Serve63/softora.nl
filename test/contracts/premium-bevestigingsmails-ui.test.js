@@ -387,6 +387,24 @@ test('premium ai lead generator alias replaces branche with belmethode', () => {
   assert.match(pageSource, /<option value="parallel">Alles tegelijk<\/option>/);
 });
 
+test('premium ai lead generator uses calling copy and the on-page prompt for coldcalling start', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const callStartPath = path.join(__dirname, '../../assets/premium-ai-lead-generator-call-start.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const callStartSource = fs.readFileSync(callStartPath, 'utf8');
+
+  assert.match(pageSource, /assets\/premium-ai-lead-generator-call-start\.js\?v=20260505a/);
+  assert.match(pageSource, /SoftoraAiLeadGeneratorCallStart\.getBusyLabel\(isPremiumAiLeadGeneratorPath\(\)\)/);
+  assert.match(pageSource, /SoftoraAiLeadGeneratorCallStart\.getButtonLabel\(isPremiumAiLeadGeneratorPath\(\)\)/);
+  assert.match(callStartSource, /return isAlias \? 'Bedrijven bellen' : 'Mails Versturen'/);
+  assert.match(callStartSource, /return isAlias \? 'Bellen\.\.\.' : 'Verzenden\.\.\.'/);
+  assert.match(callStartSource, /function getCampaignPayload\(count\) \{/);
+  assert.match(callStartSource, /extraInstructions: body \? body\.value : ''/);
+  assert.match(callStartSource, /fetch\('\/api\/coldcalling\/start'/);
+  assert.match(callStartSource, /const original = global\.startCampagneImmediate;/);
+  assert.match(callStartSource, /showToast\('Bedrijven bellen wordt gestart\.\.\.'\);/);
+});
+
 test('premium bevestigingsmails sends real coldmail campaigns without opening timeline page', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
