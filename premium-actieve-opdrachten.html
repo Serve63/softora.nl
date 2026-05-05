@@ -12,6 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260502a">
     <link rel="stylesheet" href="assets/custom-selects.css?v=20260421b">
+    <link rel="stylesheet" href="assets/premium-active-orders-assignee.css?v=20260505a">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -1205,7 +1206,6 @@
         }
 
         .create-order-input,
-        .create-order-select,
         .create-order-textarea {
             width: 100%;
             background: var(--bg-primary);
@@ -1219,7 +1219,6 @@
         }
 
         .create-order-input:focus,
-        .create-order-select:focus,
         .create-order-textarea:focus {
             border-color: rgba(139,34,82,0.55);
             box-shadow: 0 0 0 3px rgba(139,34,82,0.08);
@@ -1228,29 +1227,6 @@
         .create-order-input::placeholder,
         .create-order-textarea::placeholder {
             color: var(--text-tertiary);
-        }
-
-        .create-order-select {
-            appearance: none;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-        }
-
-        .create-order-select-wrap {
-            position: relative;
-        }
-
-        .create-order-select-wrap::after {
-            content: '';
-            position: absolute;
-            right: 1rem;
-            top: 50%;
-            width: 8px;
-            height: 8px;
-            border-right: 1.5px solid var(--text-tertiary);
-            border-bottom: 1.5px solid var(--text-tertiary);
-            transform: translateY(-65%) rotate(45deg);
-            pointer-events: none;
         }
 
         .create-order-hint {
@@ -1475,13 +1451,11 @@
                         <input class="create-order-input" id="newOrderDeliveryTime" name="deliveryTime" type="text" placeholder="Bijv. Binnen 3 weken" required>
                     </div>
                     <div class="create-order-field">
-                        <label class="create-order-label" for="newOrderAssignee">Toegewezen aan</label>
-                        <div class="create-order-select-wrap">
-                            <select class="create-order-select" id="newOrderAssignee" name="assignee" required>
-                                <option value="">Kies medewerker</option>
-                                <option value="Martijn">Martijn</option>
-                                <option value="Servé">Servé</option>
-                            </select>
+                        <label class="create-order-label" id="newOrderAssigneeLabel">Toegewezen aan</label>
+                        <input id="newOrderAssignee" name="assignee" type="hidden" required>
+                        <div class="create-order-assignee-options" id="newOrderAssigneeOptions" role="radiogroup" aria-labelledby="newOrderAssigneeLabel">
+                            <button class="create-order-assignee-choice magnetic" type="button" data-create-order-assignee="Martijn" aria-pressed="false">Martijn</button>
+                            <button class="create-order-assignee-choice magnetic" type="button" data-create-order-assignee="Servé" aria-pressed="false">Servé</button>
                         </div>
                     </div>
                     <div class="create-order-field">
@@ -1668,6 +1642,6 @@
             </div>
         </main>
     </div>
-    <!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets/premium-active-orders-boot.js?v=20260502a"></script><script src="assets/premium-actieve-opdrachten.js?v=20260505a"></script>
+    <!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets/premium-active-orders-boot.js?v=20260502a"></script><script src="assets/premium-active-orders-assignee.js?v=20260505a"></script><script src="assets/premium-actieve-opdrachten.js?v=20260505b"></script>
 </body>
 </html>

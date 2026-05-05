@@ -1,0 +1,38 @@
+.create-order-assignee-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+}
+
+.create-order-assignee-choice {
+    width: 100%;
+    min-height: 50px;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, color 0.2s;
+}
+
+.create-order-assignee-choice:hover,
+.create-order-assignee-choice:focus-visible {
+    border-color: rgba(139,34,82,0.55);
+    box-shadow: 0 0 0 3px rgba(139,34,82,0.08);
+    outline: none;
+}
+
+.create-order-assignee-choice.is-active {
+    border-color: var(--accent);
+    background: rgba(139,34,82,0.08);
+    color: var(--accent);
+    box-shadow: 0 10px 28px rgba(139,34,82,0.13);
+}
+
+.create-order-assignee-options.is-invalid .create-order-assignee-choice:not(.is-active) {
+    border-color: rgba(192, 57, 43, 0.55);
+}
