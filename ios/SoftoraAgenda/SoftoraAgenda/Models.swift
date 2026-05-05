@@ -279,15 +279,15 @@ enum RepeatChoice: String, CaseIterable, Identifiable {
         case .none:
             "Nooit"
         case .daily:
-            "Elke dag"
+            "Dagelijks"
         case .weekly:
-            "Elke week"
+            "Wekelijks"
         case .monthly:
-            "Elke maand"
+            "Maandelijks"
         case .quarterly:
             "Per kwartaal"
         case .yearly:
-            "Elk jaar"
+            "Jaarlijks"
         }
     }
 }
