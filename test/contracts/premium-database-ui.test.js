@@ -295,8 +295,9 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /fallbackPhotosById/);
   assert.match(pageSource, /mergeCustomersWithPhotos\(enrichedCustomers, photoMap, state\.klanten\)/);
   assert.match(pageSource, /function loadCustomerPhotoMap\(customers\)/);
-  assert.match(pageSource, /normalizeString\(normalized\.websitePhoto\)\.slice\(0, 80\)/);
-  assert.match(pageSource, /websitePhoto: isValidWebsitePhotoDataUrl\(normalizeString\(normalized\.websitePhoto\)\)/);
+  assert.match(pageSource, /function serializeWebsitePhotoForDiff\(value\)/);
+  assert.match(pageSource, /isValidWebsitePhotoUrl\(photo\) \? "url" : ""/);
+  assert.match(pageSource, /websitePhoto: serializeWebsitePhotoForDiff\(normalized\.websitePhoto\)/);
   assert.match(photoStorageScriptSource, /readChunkedData\(values, photoKey, 0\)/);
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 1440, 2160, 0\.86\)/);
   assert.match(pageSource, /compressWebsitePhotoDataUrl\(original\.dataUrl, original\.fileName, 768, 1152, 0\.74\)/);
@@ -324,9 +325,9 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260503b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260505b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505a/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505b/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260501d/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);

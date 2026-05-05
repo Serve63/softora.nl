@@ -15,6 +15,7 @@
         const normalizeCustomer = options.normalizeCustomer;
         const shouldShowWebsitePhoto = options.shouldShowWebsitePhoto;
         const isValidWebsitePhotoDataUrl = options.isValidWebsitePhotoDataUrl;
+        const isValidWebsitePhotoSource = options.isValidWebsitePhotoSource || isValidWebsitePhotoDataUrl;
         const buildCustomerIdentityKey = options.buildCustomerIdentityKey;
         const formatDateForStorage = options.formatDateForStorage;
         const scope = options.scope;
@@ -73,6 +74,7 @@
                 identityKey: normalizeString(item && item.identityKey),
                 photoKey: normalizeString(item && item.photoKey),
                 chunkCount: clampCount(item && item.chunkCount, 0),
+                websitePhotoUrl: normalizeString(item && (item.websitePhotoUrl || item.signedUrl || (item.storage && item.storage.signedUrl))),
                 websitePhotoName: normalizeString(item && item.websitePhotoName) || "Websitefoto",
                 updatedAt: normalizeString(item && item.updatedAt) || ""
             };
@@ -92,8 +94,13 @@
                 const meta = stripPhotoMeta({ ...parsed[photoId], id: parsed[photoId].id || photoId });
                 if (!meta.id || !meta.photoKey) return;
                 const chunked = readChunkedData(values, meta.photoKey, meta.chunkCount);
-                if (!chunked) return;
-                result[meta.id] = { ...meta, chunkCount: chunked.chunkCount, websitePhoto: chunked.dataUrl };
+                if (chunked) {
+                    result[meta.id] = { ...meta, chunkCount: chunked.chunkCount, websitePhoto: chunked.dataUrl };
+                    return;
+                }
+                if (isValidWebsitePhotoSource(meta.websitePhotoUrl)) {
+                    result[meta.id] = { ...meta, websitePhoto: meta.websitePhotoUrl };
+                }
             });
 
             (Array.isArray(customers) ? customers : []).forEach(function (customer, index) {

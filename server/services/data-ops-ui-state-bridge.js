@@ -92,9 +92,10 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     (Array.isArray(entries) ? entries : []).forEach((entry) => {
       const customerId = normalizeString(entry.customerId);
       const parsed = parseImageDataUrl(entry.dataUrl);
-      if (!customerId || !parsed) return;
+      const websitePhotoUrl = normalizeString(entry.websitePhotoUrl || entry.signedUrl || entry.publicUrl);
+      if (!customerId || (!parsed && !websitePhotoUrl)) return;
       const photoKey = buildPhotoDataKey(customerId);
-      const chunks = chunkPhotoDataUrl(parsed.dataUrl);
+      const chunks = parsed ? chunkPhotoDataUrl(parsed.dataUrl) : [];
       chunks.forEach((chunk, index) => {
         values[`${photoKey}_${index}`] = chunk;
       });
@@ -103,10 +104,14 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
         identityKey: normalizeString(entry.identityKey),
         photoKey,
         chunkCount: chunks.length,
+        websitePhotoUrl,
         websitePhotoName: normalizeString(entry.fileName || entry.legacyMeta?.websitePhotoName) || 'Websitefoto',
         updatedAt: normalizeString(entry.legacyMeta?.updatedAt || entry.updatedAt).slice(0, 10),
         storage: {
           source: 'supabase_storage',
+          bucket: normalizeString(entry.storageBucket),
+          path: normalizeString(entry.storagePath),
+          signedUrlExpiresAt: normalizeString(entry.signedUrlExpiresAt),
         },
       };
     });
@@ -115,7 +120,9 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
   }
 
   async function getPhotosState(legacyGetUiStateValues) {
-    const entries = await store.listDesignPhotosWithDataUrls();
+    const entries = typeof store.listDesignPhotosWithSignedUrls === 'function'
+      ? await store.listDesignPhotosWithSignedUrls()
+      : await store.listDesignPhotosWithDataUrls();
     if (!entries) return readLegacy(legacyGetUiStateValues, SCOPES.photos);
     if (entries.length === 0 && !entries.hadStructuredRows) return readLegacy(legacyGetUiStateValues, SCOPES.photos);
     return buildState(SCOPES.photos, buildPhotoCompatValues(entries));

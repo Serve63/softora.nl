@@ -40,6 +40,9 @@ function createStore(overrides = {}) {
       calls.push({ type: 'photos-delete', customerIds, meta });
       return { ok: true };
     }),
+    ...(overrides.listDesignPhotosWithSignedUrls
+      ? { listDesignPhotosWithSignedUrls: overrides.listDesignPhotosWithSignedUrls }
+      : {}),
   };
 }
 
@@ -118,6 +121,35 @@ test('data ops ui-state bridge stores photo chunks as structured photo entries',
   assert.equal(store.calls[0].type, 'photos-upsert');
   assert.equal(store.calls[0].entries[0].customerId, 'cust-1');
   assert.equal(store.calls[0].entries[0].dataUrl, dataUrl);
+});
+
+test('data ops ui-state bridge reads photo rows as signed URLs without embedding image data', async () => {
+  const signedUrl = 'https://example.supabase.co/storage/v1/object/sign/softora-design-photos/demo.png?token=test';
+  const bridge = createSoftoraDataOpsUiStateBridge({
+    store: createStore({
+      listDesignPhotosWithSignedUrls: async () => [
+        {
+          customerId: 'cust-1',
+          identityKey: 'softora||0612345678',
+          websitePhotoUrl: signedUrl,
+          storageBucket: 'softora-design-photos',
+          storagePath: 'customers/cust-1/demo.png',
+          fileName: 'demo.png',
+          updatedAt: '2026-05-05T12:00:00.000Z',
+        },
+      ],
+    }),
+  });
+
+  const state = await bridge.getUiStateValues(SCOPES.photos, {
+    legacyGetUiStateValues: async () => ({ values: { legacy: 'stale-photo-state' }, source: 'legacy' }),
+  });
+  const photoMap = JSON.parse(state.values[KEYS.photos]);
+
+  assert.equal(state.source, 'supabase:data_ops');
+  assert.equal(photoMap['cust-1'].websitePhotoUrl, signedUrl);
+  assert.equal(photoMap['cust-1'].chunkCount, 0);
+  assert.equal(state.values.softora_database_photo_data_v1_cust_1_0, undefined);
 });
 
 test('data ops ui-state bridge upserts partial photo saves instead of replacing all photos', async () => {

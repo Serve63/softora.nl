@@ -19,6 +19,7 @@ test('customers page bootstrap prefers stored customer database rows', async () 
               telefoon: '(06) 10 10 22 93',
               type: 'Website',
               website: 'Growingbyknowing.nl',
+              stad: 'Raadhuisplein 1, 4861 RV Chaam',
               bedrag: 300,
               status: 'Betaald',
               actief: 'Nee',
@@ -31,6 +32,7 @@ test('customers page bootstrap prefers stored customer database rows', async () 
               telefoon: '+31 6 13 18 38 44',
               type: 'Website',
               website: 'Linszorgt.nl',
+              adres: 'Gemullehoekenweg 1, 5062 SB Oisterwijk',
               bedrag: 300,
               status: 'Betaald',
               actief: 'Ja',
@@ -51,6 +53,7 @@ test('customers page bootstrap prefers stored customer database rows', async () 
     ['Linsey Klaus', 'Maarten Van Gemert']
   );
   assert.equal(payload.customers[0].service, 'website');
+  assert.equal(payload.customers[0].stad, 'Gemullehoekenweg 1, 5062 SB Oisterwijk');
   assert.equal(payload.customers[0].review, 'Nee');
   assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
   assert.equal(payload.customers[1].datum, '2026-01-07');
