@@ -3,254 +3,76 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Softora PaperTrader: oefen met kopen en verkopen met virtueel geld en gesimuleerde koersen.">
+  <meta name="description" content="Softora PaperTrader Edge Lab: simpele simulatiepagina om stap voor stap een trading edge te testen.">
   <title>Softora PaperTrader</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/papertrader.css?v=20260505a">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/papertrader.css?v=20260505b">
 </head>
 <body>
-  <div class="page-noise" aria-hidden="true"></div>
-  <div class="orb orb-one" aria-hidden="true"></div>
-  <div class="orb orb-two" aria-hidden="true"></div>
+  <main class="shell">
+    <header class="hero-card">
+      <a class="brand" href="/premium-website" aria-label="Terug naar Softora">Softora.nl</a>
+      <p class="eyebrow">PaperTrader Edge Lab</p>
+      <h1>Een simpele plek om onze edge te testen.</h1>
+      <p class="intro">
+        We houden dit bewust klein: eerst simuleren, meten en leren. Pas als de test logisch voelt,
+        bouwen we de volgende laag erbij.
+      </p>
+      <button class="simulate-button" type="button" id="simulateButton">Start simulatie</button>
+      <p class="note">Geen echt geld. Geen echte orders. Alleen een eerste testomgeving.</p>
+    </header>
 
-  <header class="topbar">
-    <a class="brand" href="/premium-website" aria-label="Terug naar Softora">
-      <span class="brand-mark">S</span>
-      <span>
-        <strong>Softora.nl</strong>
-        <small>PaperTrader</small>
-      </span>
-    </a>
+    <section class="overview" aria-label="Simulatie overzicht">
+      <article class="metric-card">
+        <span>Simulaties</span>
+        <strong id="runsValue">0</strong>
+      </article>
+      <article class="metric-card">
+        <span>Rendement</span>
+        <strong id="returnValue">Nog niet getest</strong>
+      </article>
+      <article class="metric-card">
+        <span>Winrate</span>
+        <strong id="winrateValue">Nog niet getest</strong>
+      </article>
+      <article class="metric-card">
+        <span>Max drawdown</span>
+        <strong id="drawdownValue">Nog niet getest</strong>
+      </article>
+    </section>
 
-    <nav class="topnav" aria-label="PaperTrader navigatie">
-      <a href="#portfolio">Portfolio</a>
-      <a href="#markt">Markt</a>
-      <a href="#orders">Orders</a>
-    </nav>
-
-    <button class="ghost-button" type="button" id="resetAccountButton">Reset account</button>
-  </header>
-
-  <main>
-    <section class="hero">
-      <div class="hero-copy">
-        <span class="eyebrow">Virtueel geld. Echte discipline.</span>
-        <h1>Papertraden zonder paniekknop in je bank-app.</h1>
-        <p>
-          Bouw een testportfolio, koop en verkoop gesimuleerde assets, bekijk je winst/verlies
-          en leer rustig hoe posities bewegen. Geen echt geld, geen echte beursorders.
-        </p>
-        <div class="hero-actions">
-          <a class="primary-button" href="#trade-panel">Start met traden</a>
-          <a class="secondary-button" href="#coach">Bekijk trader coach</a>
-        </div>
+    <section class="lab-card">
+      <div>
+        <p class="eyebrow">Huidige hypothese</p>
+        <h2>Test of een kleine statistische voorsprong overeind blijft na veel trades.</h2>
       </div>
-
-      <div class="hero-terminal" aria-label="Live paper account preview">
-        <div class="terminal-bar">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-        <div class="ticker-line">
-          <span>Portfolio waarde</span>
-          <strong id="heroEquity">€ 10.000,00</strong>
-        </div>
-        <div class="ticker-line">
-          <span>Vandaag</span>
-          <strong id="heroDailyChange" class="positive">+0,00%</strong>
-        </div>
-        <div class="pulse-chart" aria-hidden="true">
-          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-        </div>
+      <p id="resultText" class="result-text">
+        Klik op simuleren om een eerste reeks papertrades te draaien. Daarna kijken we niet naar hype,
+        maar naar cijfers: rendement, winrate, drawdown en consistentie.
+      </p>
+      <div class="progress-track" aria-hidden="true">
+        <span id="progressFill"></span>
       </div>
     </section>
 
-    <section class="dashboard-grid" id="portfolio">
-      <article class="panel portfolio-panel">
-        <div class="panel-heading">
-          <div>
-            <span class="panel-kicker">Oefenaccount</span>
-            <h2>Portfolio</h2>
-          </div>
-          <span class="status-pill">Simulatie</span>
-        </div>
-
-        <div class="metric-grid">
-          <div class="metric-card metric-card-large">
-            <span>Totale waarde</span>
-            <strong id="totalEquity">€ 10.000,00</strong>
-          </div>
-          <div class="metric-card">
-            <span>Cash</span>
-            <strong id="cashBalance">€ 10.000,00</strong>
-          </div>
-          <div class="metric-card">
-            <span>Belegd</span>
-            <strong id="investedValue">€ 0,00</strong>
-          </div>
-          <div class="metric-card">
-            <span>Winst/verlies</span>
-            <strong id="profitLoss">€ 0,00</strong>
-          </div>
-        </div>
-
-        <div class="risk-box">
-          <div>
-            <span>Risicometer</span>
-            <strong id="riskLabel">Rustig</strong>
-          </div>
-          <div class="risk-track" aria-hidden="true">
-            <span id="riskFill"></span>
-          </div>
-        </div>
-      </article>
-
-      <article class="panel trade-panel" id="trade-panel">
-        <div class="panel-heading">
-          <div>
-            <span class="panel-kicker">Orderticket</span>
-            <h2>Plaats oefenorder</h2>
-          </div>
-        </div>
-
-        <form id="tradeForm" class="trade-form">
-          <label>
-            Asset
-            <select id="assetSelect" name="asset"></select>
-          </label>
-
-          <div class="side-switch" role="radiogroup" aria-label="Koop of verkoop">
-            <label>
-              <input type="radio" name="side" value="buy" checked>
-              <span>Kopen</span>
-            </label>
-            <label>
-              <input type="radio" name="side" value="sell">
-              <span>Verkopen</span>
-            </label>
-          </div>
-
-          <label>
-            Aantal stukken
-            <input id="quantityInput" name="quantity" type="number" min="1" step="1" value="1" inputmode="numeric">
-          </label>
-
-          <div class="order-preview">
-            <div>
-              <span>Indicatieve prijs</span>
-              <strong id="previewPrice">€ 0,00</strong>
-            </div>
-            <div>
-              <span>Geschatte waarde</span>
-              <strong id="previewValue">€ 0,00</strong>
-            </div>
-          </div>
-
-          <button class="primary-button order-button" type="submit">Order uitvoeren</button>
-          <p class="microcopy">Orders worden direct gesimuleerd tegen de actuele oefenprijs.</p>
-        </form>
-      </article>
-
-      <article class="panel chart-panel">
-        <div class="panel-heading">
-          <div>
-            <span class="panel-kicker">Koersbeeld</span>
-            <h2 id="chartTitle">SOFT</h2>
-          </div>
-          <strong id="chartPrice" class="chart-price">€ 124,80</strong>
-        </div>
-        <canvas id="priceCanvas" width="900" height="360" aria-label="Gesimuleerde koersgrafiek"></canvas>
-      </article>
-
-      <article class="panel market-panel" id="markt">
-        <div class="panel-heading">
-          <div>
-            <span class="panel-kicker">Watchlist</span>
-            <h2>Simulatiemarkt</h2>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Prijs</th>
-                <th>Beweging</th>
-                <th>Actie</th>
-              </tr>
-            </thead>
-            <tbody id="marketRows"></tbody>
-          </table>
-        </div>
-      </article>
-
-      <article class="panel holdings-panel">
-        <div class="panel-heading">
-          <div>
-            <span class="panel-kicker">Bezittingen</span>
-            <h2>Open posities</h2>
-          </div>
-        </div>
-        <div class="empty-state" id="holdingsEmpty">
-          <strong>Nog geen posities.</strong>
-          <span>Kies een asset en plaats je eerste oefenorder.</span>
-        </div>
-        <div class="table-wrap" id="holdingsTableWrap" hidden>
-          <table>
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Aantal</th>
-                <th>Gem. prijs</th>
-                <th>Waarde</th>
-                <th>P/L</th>
-              </tr>
-            </thead>
-            <tbody id="holdingsRows"></tbody>
-          </table>
-        </div>
-      </article>
-
-      <article class="panel coach-panel" id="coach">
-        <div class="panel-heading">
-          <div>
-            <span class="panel-kicker">Trader coach</span>
-            <h2>Rust boven ruis</h2>
-          </div>
-        </div>
-        <p id="coachText">
-          Je account staat nog volledig in cash. Mooie start: kies eerst een kleine positie,
-          zodat je gevoel krijgt voor koersbewegingen zonder meteen all-in te gaan.
-        </p>
-        <div class="coach-list">
-          <span>Max 25% per positie</span>
-          <span>Noteer waarom je koopt</span>
-          <span>Bekijk je risico voor je winst</span>
-        </div>
-      </article>
-
-      <article class="panel orders-panel" id="orders">
-        <div class="panel-heading">
-          <div>
-            <span class="panel-kicker">Logboek</span>
-            <h2>Laatste orders</h2>
-          </div>
-        </div>
-        <div class="order-feed" id="orderFeed"></div>
-      </article>
+    <section class="log-card" aria-label="Simulatie logboek">
+      <div class="log-heading">
+        <p class="eyebrow">Logboek</p>
+        <span id="statusPill">Wacht op eerste test</span>
+      </div>
+      <div class="log-list" id="logList">
+        <p class="empty-log">Nog geen simulaties uitgevoerd.</p>
+      </div>
     </section>
 
-    <section class="disclaimer">
-      <strong>Belangrijk:</strong>
-      Dit is een papertrading-demo met gesimuleerde koersen. Het is geen financieel advies,
-      geen echte broker en er worden geen echte orders geplaatst.
-    </section>
+    <footer class="disclaimer">
+      Dit is een ontwerp- en testpagina voor papertrading. Het is geen financieel advies en geen bewijs
+      dat een strategie winstgevend is. De edge moeten we stap voor stap valideren.
+    </footer>
   </main>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/papertrader.js?v=20260505a" defer></script>
+  <script src="/assets/papertrader.js?v=20260505b" defer></script>
 </body>
 </html>

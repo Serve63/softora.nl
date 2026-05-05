@@ -225,7 +225,7 @@ test('page smoke: /papertrader serves the papertrading demo', async () => {
   assert.equal(response.status, 200, '/papertrader');
   assert.match(html, /<!DOCTYPE html>/i, '/papertrader moet HTML serveren.');
   assert.match(html, /Softora PaperTrader/, 'PaperTrader titel ontbreekt.');
-  assert.match(html, /assets\/papertrader\.css\?v=20260505a/, 'PaperTrader stylesheet ontbreekt.');
-  assert.match(html, /assets\/papertrader\.js\?v=20260505a/, 'PaperTrader script ontbreekt.');
+  assert.match(html, /assets\/papertrader\.css\?v=20260505b/, 'PaperTrader stylesheet ontbreekt.');
+  assert.match(html, /assets\/papertrader\.js\?v=20260505b/, 'PaperTrader script ontbreekt.');
   assert.doesNotMatch(script, /localStorage|sessionStorage/, 'PaperTrader mag geen browser-opslag gebruiken.');
 });
