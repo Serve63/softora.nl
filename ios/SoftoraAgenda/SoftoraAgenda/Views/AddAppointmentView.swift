@@ -48,7 +48,8 @@ struct AddAppointmentView: View {
                         FormLabel("Titel")
                         SoftoraTextField(
                             placeholder: "Titel van de afspraak",
-                            text: $draft.title
+                            text: $draft.title,
+                            fontSize: 13
                         )
                         .focused($focusedField, equals: .title)
 
@@ -69,7 +70,8 @@ struct AddAppointmentView: View {
                         FormLabel("Locatie")
                         SoftoraTextField(
                             placeholder: "Bijv. kantoor, Teams, klantlocatie",
-                            text: $draft.location
+                            text: $draft.location,
+                            fontSize: 13
                         )
                         .focused($focusedField, equals: .location)
 
@@ -317,10 +319,11 @@ private struct SoftoraTextField: View {
     let placeholder: String
     @Binding var text: String
     var keyboardType: UIKeyboardType = .default
+    var fontSize: CGFloat = 16
 
     var body: some View {
         TextField(placeholder.softoraUppercased, text: uppercasedText)
-            .font(.softoraBody(16))
+            .font(.softoraBody(fontSize))
             .foregroundStyle(Color.softoraInk)
             .keyboardType(keyboardType)
             .textInputAutocapitalization(.characters)
