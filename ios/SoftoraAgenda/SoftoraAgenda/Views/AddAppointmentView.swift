@@ -160,7 +160,7 @@ struct AddAppointmentView: View {
 
     private var plannerChoices: some View {
         HStack(spacing: 10) {
-            ForEach(Planner.appAccessCases + [.both]) { planner in
+            ForEach(plannerOptions) { planner in
                 Button {
                     draft.planner = planner
                 } label: {
@@ -183,6 +183,10 @@ struct AddAppointmentView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private var plannerOptions: [Planner] {
+        draft.appointmentType == .business ? Planner.appAccessCases : Planner.appAccessCases + [.both]
     }
 
     private var plannerLabelTitle: String {
