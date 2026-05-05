@@ -243,6 +243,7 @@ test('premium bevestigingsmails places sender dropdown in the campaign card and 
   assert.doesNotMatch(pageSource, /Domein \/ website/);
   assert.doesNotMatch(pageSource, /Handtekening/);
   assert.doesNotMatch(pageSource, /Deze gegevens kun je later gebruiken als vaste afzenderinformatie voor alle coldmails\./);
+  assert.doesNotMatch(pageSource, /Kies hoelang deze campagne loopt en welke speciale handeling erbij hoort\./);
 
   assert.match(pageSource, /html\[data-softora-lead-generator-alias="1"\] \.lead-generator-hidden-setting \{ display: none !important; \}/);
   assert.match(pageSource, /<div class="field lead-generator-hidden-setting">\s*<div class="field-label">Verzenden vanaf<\/div>\s*<select class="sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">/);
