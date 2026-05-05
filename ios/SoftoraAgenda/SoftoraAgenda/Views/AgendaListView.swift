@@ -349,6 +349,11 @@ private struct AppointmentTypeOverlay: View {
                     TypeChoiceButton(title: AppointmentType.business.title, isPrimary: true, action: onSelectBusiness)
                     TypeChoiceButton(title: AppointmentType.personal.title, isPrimary: false, action: onSelectPersonal)
                 }
+
+                Color.clear
+                    .frame(height: 20)
+                    .padding(.top, 2)
+                    .accessibilityHidden(true)
             }
         }
     }

@@ -403,6 +403,10 @@ private struct RepeatChoiceOverlay: View {
                         .buttonStyle(.plain)
                     }
                 }
+
+                Color.clear
+                    .frame(height: 20)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 24)
