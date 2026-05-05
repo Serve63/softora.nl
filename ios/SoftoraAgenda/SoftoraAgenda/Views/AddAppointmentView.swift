@@ -40,8 +40,10 @@ struct AddAppointmentView: View {
                     sheetHeader
 
                     VStack(alignment: .leading, spacing: 11) {
-                        FormLabel(plannerLabelTitle)
-                        plannerChoices
+                        if showsPlannerChoices {
+                            FormLabel("Wie heeft deze lead geregeld?")
+                            plannerChoices
+                        }
 
                         FormLabel("Titel")
                         SoftoraTextField(
@@ -189,8 +191,8 @@ struct AddAppointmentView: View {
         Planner.appAccessCases
     }
 
-    private var plannerLabelTitle: String {
-        draft.appointmentType == .business ? "Wie heeft deze lead geregeld?" : "Voor wie?"
+    private var showsPlannerChoices: Bool {
+        draft.appointmentType == .business
     }
 
     private var repeatRow: some View {
@@ -266,6 +268,10 @@ struct AddAppointmentView: View {
     }
 
     private func save() {
+        if draft.appointmentType == .personal {
+            draft.planner = store.selectedPlanner
+        }
+
         let trimmedTime = timeText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedTime.count == 5, trimmedTime.contains(":") else {
             store.alertMessage = "Vul een tijdstip in als HH:MM."
