@@ -22,9 +22,25 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.match(pageSource, /<div class="card-title">Prompt & AI instructies<\/div>/);
   assert.match(pageSource, /<div class="campagne-title">Nieuwe Campagne<\/div>/);
   assert.match(pageSource, /Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
-  assert.doesNotMatch(pageSource, /Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
+  assert.doesNotMatch(pageSource, /<p>Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
   assert.match(pageSource, /<button class="btn-start" id="start-campaign-btn" onclick="startCampagne\(\)">/);
   assert.doesNotMatch(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
+});
+
+test('premium ai lead generator alias rewrites the shared coldmailing subtitle to coldcalling', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /data-softora-lead-generator-alias/);
+  assert.match(pageSource, /h1\.textContent = 'Coldcalling';/);
+  assert.match(
+    pageSource,
+    /subtitle\.innerHTML =\s*'Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit\.';/
+  );
+  assert.doesNotMatch(
+    pageSource,
+    /Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland/
+  );
 });
 
 test('premium bevestigingsmails toont een aparte AI beheer pagina wanneer de modus op software staat', () => {

@@ -1130,8 +1130,8 @@ html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { dis
     (function () {
       try {
         if (document.documentElement.getAttribute('data-softora-lead-generator-alias') !== '1') return;
-        var h1 = document.querySelector('#screen-dashboard .topbar-left h1');
-        if (h1) h1.textContent = 'Coldcalling';
+        var h1 = document.querySelector('#screen-dashboard .topbar-left h1'), subtitle = document.querySelector('#screen-dashboard .topbar-left p');
+        if (h1) h1.textContent = 'Coldcalling'; if (subtitle) subtitle.innerHTML = 'Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit.';
       } catch (e) {}
     })();
     </script>
