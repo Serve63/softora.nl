@@ -216,3 +216,16 @@ test('page smoke: premium-mailbox compose modal is centered and enlarged', () =>
     'Compose box moet groter in hoogte staan.'
   );
 });
+
+test('page smoke: /papertrader serves the papertrading demo', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/papertrader`, { cache: 'no-store' });
+  const html = await response.text();
+  const script = fs.readFileSync(path.join(repoRoot, 'assets/papertrader.js'), 'utf8');
+
+  assert.equal(response.status, 200, '/papertrader');
+  assert.match(html, /<!DOCTYPE html>/i, '/papertrader moet HTML serveren.');
+  assert.match(html, /Softora PaperTrader/, 'PaperTrader titel ontbreekt.');
+  assert.match(html, /assets\/papertrader\.css\?v=20260505a/, 'PaperTrader stylesheet ontbreekt.');
+  assert.match(html, /assets\/papertrader\.js\?v=20260505a/, 'PaperTrader script ontbreekt.');
+  assert.doesNotMatch(script, /localStorage|sessionStorage/, 'PaperTrader mag geen browser-opslag gebruiken.');
+});
