@@ -374,7 +374,7 @@ private struct RepeatChoiceOverlay: View {
                     .foregroundStyle(Color.softoraInk)
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    ForEach(RepeatChoice.allCases.filter { $0 != .none }) { choice in
+                    ForEach(RepeatChoice.allCases) { choice in
                         Button {
                             selectedChoice = choice
                             onClose()
