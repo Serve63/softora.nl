@@ -391,29 +391,32 @@ private struct BottomChoiceOverlay<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Color.softoraInk.opacity(0.58)
-                .ignoresSafeArea()
-                .onTapGesture(perform: onClose)
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                Color.softoraInk.opacity(0.58)
+                    .ignoresSafeArea()
+                    .onTapGesture(perform: onClose)
 
-            VStack {
-                content
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 22)
-            .padding(.bottom, 24)
-            .frame(maxWidth: 430)
-            .background(
-                LinearGradient(
-                    colors: [.white, Color.softoraSheetBackground],
-                    startPoint: .top,
-                    endPoint: .bottom
+                VStack {
+                    content
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 24 + proxy.safeAreaInsets.bottom)
+                .frame(maxWidth: 430)
+                .background(
+                    LinearGradient(
+                        colors: [.white, Color.softoraSheetBackground],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                 )
-            )
-            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24))
-            .shadow(color: Color.softoraInk.opacity(0.24), radius: 36, x: 0, y: -22)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24))
+                .shadow(color: Color.softoraInk.opacity(0.24), radius: 36, x: 0, y: -22)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .ignoresSafeArea(edges: .bottom)
     }
 }
 
