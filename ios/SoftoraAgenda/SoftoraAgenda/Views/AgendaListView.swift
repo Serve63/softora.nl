@@ -433,7 +433,7 @@ private struct TypeChoiceButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.softoraBody(15, weight: .bold))
+                .font(.softoraBody(13, weight: .bold))
                 .textCase(.uppercase)
                 .foregroundStyle(isPrimary ? Color.white : Color.softoraInk)
                 .lineLimit(1)
