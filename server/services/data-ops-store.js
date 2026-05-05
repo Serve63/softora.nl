@@ -277,6 +277,31 @@ function createSoftoraDataOpsStore(deps = {}) {
         upsert: true,
       });
       if (uploaded.error) throw uploaded.error;
+      const legacyMeta = entry.legacyMeta && typeof entry.legacyMeta === 'object' ? { ...entry.legacyMeta } : {};
+      const mockup = parseImageDataUrl(entry.websiteMockup || entry.mockupDataUrl);
+      if (mockup) {
+        const mockupExt = extensionForMimeType(mockup.mimeType);
+        const mockupPath = [
+          'customers',
+          sanitizeStorageSegment(customerId, 'customer'),
+          `${mockup.contentHash}-mockup.${mockupExt}`,
+        ].join('/');
+        const uploadedMockup = await client.storage.from(bucketName).upload(mockupPath, mockup.buffer, {
+          contentType: mockup.mimeType,
+          upsert: true,
+        });
+        if (uploadedMockup.error) throw uploadedMockup.error;
+        legacyMeta.mockup = {
+          storageBucket: bucketName,
+          storagePath: mockupPath,
+          mimeType: mockup.mimeType,
+          fileName: normalizeString(entry.websiteMockupName || entry.mockupFileName || `${customerId}-mockup.${mockupExt}`).slice(0, 240),
+          byteSize: mockup.buffer.length,
+          contentHash: mockup.contentHash,
+          updatedAt: isoNow(),
+        };
+        legacyMeta.websiteMockupName = legacyMeta.mockup.fileName;
+      }
       const row = {
         customer_id: customerId,
         identity_key: normalizeString(entry.identityKey || ''),
@@ -286,7 +311,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         file_name: normalizeString(entry.fileName || entry.websitePhotoName || `${customerId}.${ext}`).slice(0, 240),
         byte_size: parsed.buffer.length,
         content_hash: parsed.contentHash,
-        legacy_meta: entry.legacyMeta && typeof entry.legacyMeta === 'object' ? entry.legacyMeta : {},
+        legacy_meta: legacyMeta,
         source: normalizeString(meta.source || 'ui-state-compat').slice(0, 120),
         version: Date.now(),
         updated_at: isoNow(),
@@ -368,14 +393,26 @@ function createSoftoraDataOpsStore(deps = {}) {
         const downloaded = await client.storage.from(bucket).download(path);
         if (downloaded.error || !downloaded.data) continue;
         const buffer = Buffer.from(await downloaded.data.arrayBuffer());
-        entries.push({
+        const entry = {
           customerId: normalizeString(row.customer_id),
           dataUrl: `data:${normalizeString(row.mime_type || 'image/jpeg')};base64,${buffer.toString('base64')}`,
           fileName: normalizeString(row.file_name),
           identityKey: normalizeString(row.identity_key),
           legacyMeta: row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {},
           updatedAt: normalizeString(row.updated_at),
-        });
+        };
+        const mockupMeta = row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta.mockup : null;
+        const mockupBucket = normalizeString(mockupMeta && mockupMeta.storageBucket);
+        const mockupPath = normalizeString(mockupMeta && mockupMeta.storagePath);
+        if (mockupBucket && mockupPath) {
+          const downloadedMockup = await client.storage.from(mockupBucket).download(mockupPath);
+          if (!downloadedMockup.error && downloadedMockup.data) {
+            const mockupBuffer = Buffer.from(await downloadedMockup.data.arrayBuffer());
+            entry.websiteMockup = `data:${normalizeString(mockupMeta.mimeType || 'image/jpeg')};base64,${mockupBuffer.toString('base64')}`;
+            entry.websiteMockupName = normalizeString(mockupMeta.fileName || entry.legacyMeta.websiteMockupName);
+          }
+        }
+        entries.push(entry);
       }
     }
 
@@ -412,15 +449,30 @@ function createSoftoraDataOpsStore(deps = {}) {
         if (!bucket || !path) return;
         const signed = await client.storage.from(bucket).createSignedUrl(path, expiresInSeconds);
         if (signed.error || !signed.data?.signedUrl) return;
+        const legacyMeta = row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {};
+        const mockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : null;
+        let websiteMockupUrl = '';
+        if (mockupMeta) {
+          const mockupBucket = normalizeString(mockupMeta.storageBucket || bucketName);
+          const mockupPath = normalizeString(mockupMeta.storagePath);
+          if (mockupBucket && mockupPath) {
+            const mockupSigned = await client.storage.from(mockupBucket).createSignedUrl(mockupPath, expiresInSeconds);
+            if (!mockupSigned.error && mockupSigned.data?.signedUrl) {
+              websiteMockupUrl = normalizeString(mockupSigned.data.signedUrl);
+            }
+          }
+        }
         entries.push({
           customerId: normalizeString(row.customer_id),
           websitePhotoUrl: normalizeString(signed.data.signedUrl),
+          websiteMockupUrl,
           storageBucket: bucket,
           storagePath: path,
           mimeType: normalizeString(row.mime_type || 'image/jpeg'),
           fileName: normalizeString(row.file_name),
+          websiteMockupName: normalizeString(mockupMeta && mockupMeta.fileName || legacyMeta.websiteMockupName),
           identityKey: normalizeString(row.identity_key),
-          legacyMeta: row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {},
+          legacyMeta,
           updatedAt: normalizeString(row.updated_at),
           signedUrlExpiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
         });

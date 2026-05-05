@@ -197,7 +197,7 @@ test('coldmail campaign replaces city variable with the recipient database locat
   assert.doesNotMatch(sentMessages[0].text, /Haaren/);
 });
 
-test('coldmail campaign attaches webdesign photo inline and as attachment', async () => {
+test('coldmail campaign attaches webdesign photo and device mockup inline and as attachments', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -214,6 +214,8 @@ test('coldmail campaign attaches webdesign photo inline and as attachment', asyn
         id: 'prospect-1',
         websitePhoto: TINY_PNG_DATA_URL,
         websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Bakkerij Zon device mockup',
       },
     },
   });
@@ -229,6 +231,7 @@ test('coldmail campaign attaches webdesign photo inline and as attachment', asyn
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-prospect-1@softora"/);
   assert.match(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].html, /<p>Geen interesse\? Reageer met/);
   assert.match(
@@ -237,12 +240,15 @@ test('coldmail campaign attaches webdesign photo inline and as attachment', asyn
   );
   assert.ok(
     sentMessages[0].html.indexOf('Geen interesse? Reageer met &quot;stop&quot;') >
-      sentMessages[0].html.indexOf('<img src="cid:webdesign-prospect-1@softora"')
+      sentMessages[0].html.indexOf('<img src="cid:webdesign-mockup-prospect-1@softora"')
   );
-  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-prospect-1@softora');
   assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
   assert.equal(sentMessages[0].attachments[0].contentType, 'image/png');
+  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-prospect-1@softora');
+  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'inline');
+  assert.equal(sentMessages[0].attachments[1].contentType, 'image/png');
 });
 
 test('coldmail campaign can disable automatic campaign end date', async () => {
