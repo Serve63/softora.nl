@@ -109,10 +109,10 @@ struct AddAppointmentView: View {
         }
         .presentationBackground(.clear)
         .presentationDragIndicator(.hidden)
-        .alert("Melding", isPresented: alertBinding) {
+        .alert("MELDING", isPresented: alertBinding) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(store.alertMessage ?? "")
+            Text((store.alertMessage ?? "").softoraUppercased)
         }
     }
 
@@ -201,13 +201,13 @@ struct AddAppointmentView: View {
             isChoosingRepeat = true
         } label: {
             HStack {
-                Text("Herhalen")
+                Text("HERHALEN")
                     .font(.softoraBody(16))
                     .foregroundStyle(Color.softoraInk)
 
                 Spacer()
 
-                Text(draft.repeatChoice.title)
+                Text(draft.repeatChoice.title.softoraUppercased)
                     .font(.softoraBody(16, weight: .semibold))
                     .foregroundStyle(Color.softoraMuted)
             }
@@ -225,9 +225,15 @@ struct AddAppointmentView: View {
     }
 
     private var notesEditor: some View {
-        TextEditor(text: $draft.notes)
+        TextEditor(
+            text: Binding(
+                get: { draft.notes },
+                set: { draft.notes = $0.softoraUppercased }
+            )
+        )
             .font(.softoraBody(16))
             .foregroundStyle(Color.softoraInk)
+            .textInputAutocapitalization(.characters)
             .scrollContentBackground(.hidden)
             .frame(minHeight: 130)
             .padding(.horizontal, 12)
@@ -318,11 +324,11 @@ private struct SoftoraTextField: View {
     var keyboardType: UIKeyboardType = .default
 
     var body: some View {
-        TextField(placeholder, text: $text)
+        TextField(placeholder.softoraUppercased, text: uppercasedText)
             .font(.softoraBody(16))
             .foregroundStyle(Color.softoraInk)
             .keyboardType(keyboardType)
-            .textInputAutocapitalization(.sentences)
+            .textInputAutocapitalization(.characters)
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
             .background(Color.white)
@@ -332,6 +338,13 @@ private struct SoftoraTextField: View {
                     .stroke(Color.softoraPurpleLight, lineWidth: 1)
             }
             .shadow(color: Color.softoraInk.opacity(0.04), radius: 18, x: 0, y: 8)
+    }
+
+    private var uppercasedText: Binding<String> {
+        Binding(
+            get: { text },
+            set: { text = $0.softoraUppercased }
+        )
     }
 }
 
@@ -387,6 +400,7 @@ private struct RepeatChoiceOverlay: View {
                         } label: {
                             Text(choice.title)
                                 .font(.softoraBody(15, weight: .bold))
+                                .textCase(.uppercase)
                                 .foregroundStyle(Color.softoraInk)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.82)

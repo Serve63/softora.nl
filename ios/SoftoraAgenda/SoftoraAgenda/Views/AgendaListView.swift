@@ -93,10 +93,10 @@ struct AgendaListView: View {
                 businessMeetingType: configuration.businessMeetingType
             )
         }
-        .alert("Melding", isPresented: alertBinding) {
+        .alert("MELDING", isPresented: alertBinding) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(store.alertMessage ?? "")
+            Text((store.alertMessage ?? "").softoraUppercased)
         }
     }
 
@@ -434,6 +434,7 @@ private struct TypeChoiceButton: View {
         Button(action: action) {
             Text(title)
                 .font(.softoraBody(16, weight: .bold))
+                .textCase(.uppercase)
                 .foregroundStyle(isPrimary ? Color.white : Color.softoraInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
@@ -466,6 +467,7 @@ private struct SelectableChoiceButton: View {
         Button(action: action) {
             Text(title)
                 .font(.softoraBody(15, weight: .bold))
+                .textCase(.uppercase)
                 .foregroundStyle(Color.softoraInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
@@ -531,7 +533,7 @@ private struct AgendaLoadingOverlay: View {
             ProgressView()
                 .tint(Color.softoraCrimson)
 
-            Text("Agenda laden...")
+            Text("AGENDA LADEN...")
                 .font(.softoraBody(13, weight: .semibold))
                 .foregroundStyle(Color.softoraMuted)
         }

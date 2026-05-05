@@ -33,6 +33,12 @@ extension Font {
     }
 }
 
+extension String {
+    var softoraUppercased: String {
+        uppercased(with: Locale(identifier: "nl_NL"))
+    }
+}
+
 extension View {
     func softoraCard() -> some View {
         self

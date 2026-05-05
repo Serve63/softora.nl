@@ -25,7 +25,7 @@ private struct LaunchLoadingView: View {
                 .font(.system(size: 44, weight: .semibold))
                 .foregroundStyle(Color.softoraBlue)
 
-            ProgressView("Agenda openen...")
+            ProgressView("AGENDA OPENEN...")
                 .font(.softoraBody(17, weight: .semibold))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
