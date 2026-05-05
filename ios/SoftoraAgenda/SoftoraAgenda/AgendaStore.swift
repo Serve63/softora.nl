@@ -91,6 +91,7 @@ final class AgendaStore {
                 .filter(\.isUpcoming)
                 .sorted { $0.sortKey < $1.sortKey }
         } catch {
+            guard !error.isSoftoraCancellation else { return }
             alertMessage = error.localizedDescription
             if error.localizedDescription == "Niet ingelogd." {
                 isAuthenticated = false
@@ -152,5 +153,19 @@ final class AgendaAccessStorage {
 
     func clear() {
         defaults.removeObject(forKey: plannerKey)
+    }
+}
+
+private extension Error {
+    var isSoftoraCancellation: Bool {
+        if self is CancellationError {
+            return true
+        }
+        if let urlError = self as? URLError, urlError.code == .cancelled {
+            return true
+        }
+
+        let nsError = self as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }
