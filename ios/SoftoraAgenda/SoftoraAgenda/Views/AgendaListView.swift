@@ -472,18 +472,26 @@ private struct AppointmentDetailView: View {
                 .padding(.top, 28)
                 .padding(.bottom, 34)
             }
-        }
-        .alert("AFSPRAAK VERWIJDEREN?", isPresented: $isShowingDeleteConfirmation) {
-            Button("ANNULEER", role: .cancel) {}
-            Button("VERWIJDEREN", role: .destructive) {
-                Task {
-                    if await store.deleteAppointment(appointment) {
-                        dismiss()
+
+            if isShowingDeleteConfirmation {
+                BottomChoiceOverlay(onClose: hideDeleteConfirmation) {
+                    HStack(spacing: 10) {
+                        ActionChoiceButton(title: "Annuleer", isPrimary: false, action: hideDeleteConfirmation)
+
+                        ActionChoiceButton(
+                            title: store.isDeletingAppointment ? "Verwijderen..." : "Verwijderen",
+                            isPrimary: true
+                        ) {
+                            Task {
+                                if await store.deleteAppointment(appointment) {
+                                    dismiss()
+                                }
+                            }
+                        }
+                        .disabled(store.isDeletingAppointment)
                     }
                 }
             }
-        } message: {
-            Text("WEET JE ZEKER DAT JE DEZE AFSPRAAK WILT VERWIJDEREN?")
         }
     }
 
@@ -494,6 +502,11 @@ private struct AppointmentDetailView: View {
     private func detailValue(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty || trimmed == "—" ? "Niet ingevuld" : trimmed
+    }
+
+    private func hideDeleteConfirmation() {
+        guard !store.isDeletingAppointment else { return }
+        isShowingDeleteConfirmation = false
     }
 }
 
