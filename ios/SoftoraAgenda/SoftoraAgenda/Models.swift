@@ -268,6 +268,7 @@ enum RepeatChoice: String, CaseIterable, Identifiable {
     case weekly
     case monthly
     case quarterly
+    case yearly
 
     var id: String { rawValue }
 
@@ -285,6 +286,8 @@ enum RepeatChoice: String, CaseIterable, Identifiable {
             "Elke maand"
         case .quarterly:
             "Per kwartaal"
+        case .yearly:
+            "Elk jaar"
         }
     }
 }
