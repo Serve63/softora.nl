@@ -35,7 +35,7 @@ struct AddAppointmentView: View {
                     sheetHeader
 
                     VStack(alignment: .leading, spacing: 11) {
-                        FormLabel("Voor wie?")
+                        FormLabel(plannerLabelTitle)
                         plannerChoices
 
                         FormLabel("Titel")
@@ -192,6 +192,10 @@ struct AddAppointmentView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private var plannerLabelTitle: String {
+        draft.appointmentType == .business ? "Wie heeft deze lead geregeld?" : "Voor wie?"
     }
 
     private var repeatRow: some View {
