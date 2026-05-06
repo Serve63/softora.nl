@@ -73,6 +73,7 @@ let mails = [];
 
 let activeFolder = 'inbox';
 let activeMail = null;
+let inboxUnreadCount = 0;
 
 function resetDetailEmpty() {
   document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
@@ -147,6 +148,7 @@ async function loadMailboxMessages() {
     renderList();
   } catch (error) {
     mails = [];
+    syncInboxBadgeFromCurrentFolder();
     if (wrap) {
       wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${escapeHtml(error?.message || error || 'Mailbox laden mislukt')}</div>`;
     }
@@ -186,6 +188,21 @@ function getMailsForFolder(folder) {
 
 function filterMails() { renderList(); }
 
+function renderInboxBadge() {
+  const badge = document.getElementById('badge-inbox');
+  if (!badge) return;
+  const count = Number.isFinite(inboxUnreadCount) && inboxUnreadCount > 0 ? inboxUnreadCount : 0;
+  badge.textContent = String(count);
+  badge.hidden = count === 0;
+}
+
+function syncInboxBadgeFromCurrentFolder() {
+  if (activeFolder === 'inbox') {
+    inboxUnreadCount = mails.filter(m => m.folder === 'inbox' && m.unread).length;
+  }
+  renderInboxBadge();
+}
+
 function renderList() {
   const searchInput = document.getElementById('search-input');
   const q = ((searchInput && searchInput.value) || '').toLowerCase();
@@ -193,6 +210,7 @@ function renderList() {
   if (q) list = list.filter(m => m.from.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q) || m.preview.toLowerCase().includes(q));
   const wrap = document.getElementById('mail-items');
   if (!wrap) return;
+  syncInboxBadgeFromCurrentFolder();
   if (!list.length) { wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Geen e-mails gevonden.</div>`; return; }
 
   wrap.innerHTML = list.map(m => `
@@ -206,10 +224,6 @@ function renderList() {
       <div class="mail-preview">${escapeHtml(m.preview)}</div>
     </div>`).join('');
 
-  const unread = mails.filter(m => m.folder === 'inbox' && m.unread).length;
-  const badge = document.getElementById('badge-inbox');
-  badge.textContent = unread;
-  badge.style.display = unread ? 'flex' : 'none';
 }
 
 function openMail(id) {

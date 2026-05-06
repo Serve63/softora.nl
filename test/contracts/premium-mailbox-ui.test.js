@@ -25,7 +25,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260506a"><\/script>/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
@@ -39,6 +39,20 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(scriptSource, /async function applyMailboxAccount\(email\) \{[\s\S]*activeMailboxAccount = email;[\s\S]*setMailboxAccountUi\(email\);/);
   assert.match(scriptSource, /mailboxAccountSwitcher\.addEventListener\('click', function\(event\) \{/);
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*applyMailboxAccount\(email\);/);
+});
+
+test('premium mailbox inboxbadge volgt de geladen inbox en niet een vast getal', () => {
+  const pageSource = readPage();
+  const scriptSource = readScript();
+
+  assert.doesNotMatch(pageSource, /id="badge-inbox">3<\/span>/);
+  assert.match(pageSource, /<span class="folder-badge" id="badge-inbox" hidden>0<\/span>/);
+  assert.match(pageSource, /\.folder-badge\[hidden\] \{\s*display:\s*none;\s*\}/);
+  assert.match(scriptSource, /let inboxUnreadCount = 0;/);
+  assert.match(scriptSource, /function renderInboxBadge\(\) \{[\s\S]*badge\.textContent = String\(count\);[\s\S]*badge\.hidden = count === 0;/);
+  assert.match(scriptSource, /function syncInboxBadgeFromCurrentFolder\(\) \{[\s\S]*if \(activeFolder === 'inbox'\) \{[\s\S]*inboxUnreadCount = mails\.filter\(m => m\.folder === 'inbox' && m\.unread\)\.length;[\s\S]*renderInboxBadge\(\);/);
+  assert.match(scriptSource, /function renderList\(\) \{[\s\S]*syncInboxBadgeFromCurrentFolder\(\);[\s\S]*if \(!list\.length\)/);
+  assert.match(scriptSource, /catch \(error\) \{[\s\S]*mails = \[\];[\s\S]*syncInboxBadgeFromCurrentFolder\(\);/);
 });
 
 test('premium mailbox houdt gedrag uit inline handlers', () => {
