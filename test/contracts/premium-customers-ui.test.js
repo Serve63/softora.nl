@@ -75,6 +75,30 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /function updateStats\(\) \{[\s\S]*updateLeaderboard\(\);[\s\S]*\}/);
 });
 
+test('premium customers onderhoudsprijs is alleen actief wanneer onderhoud ja is gekozen', () => {
+  const pagePath = path.join(__dirname, '../../premium-klanten.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /for="fieldMaintenanceEnabled">Onderhoud\?<\/label>/);
+  assert.match(pageSource, /id="fieldMaintenanceEnabled" name="onderhoudActief" required/);
+  assert.match(pageSource, /<option value="Nee" selected>Nee<\/option><option value="Ja">Ja<\/option>/);
+  assert.match(pageSource, /id="fieldMaintenanceAmount" name="onderhoudPerMaand" type="number" min="0" step="1" placeholder="49">/);
+  assert.match(pageSource, /fieldMaintenanceEnabled: document\.getElementById\("fieldMaintenanceEnabled"\),/);
+  assert.match(pageSource, /function normalizeMaintenanceEnabled\(raw, type, amount\)/);
+  assert.match(pageSource, /onderhoudActief: onderhoudActief,/);
+  assert.match(pageSource, /if \(explicit === "Ja"\) return true;[\s\S]*if \(explicit === "Nee"\) return false;/);
+  assert.match(pageSource, /nodes\.maintenanceAmountGroup\.hidden = !\(nodes\.fieldMaintenanceEnabled && nodes\.fieldMaintenanceEnabled\.value === "Ja"\);/);
+  assert.match(pageSource, /nodes\.fieldMaintenanceAmount\.required = Boolean\(maintenanceEnabled\);/);
+  assert.match(pageSource, /nodes\.fieldMaintenanceAmount\.disabled = !maintenanceEnabled;/);
+  assert.match(pageSource, /if \(!maintenanceEnabled\) nodes\.fieldMaintenanceAmount\.value = "";/);
+  assert.match(pageSource, /if \(nodes\.fieldMaintenanceEnabled\) nodes\.fieldMaintenanceEnabled\.value = "Nee";/);
+  assert.match(pageSource, /nodes\.fieldMaintenanceEnabled\.value = customerHasMaintenance\(customer\) \? "Ja" : "Nee";/);
+  assert.match(pageSource, /const onderhoudActief = nodes\.fieldMaintenanceEnabled && nodes\.fieldMaintenanceEnabled\.value === "Ja" \? "Ja" : "Nee";/);
+  assert.match(pageSource, /const onderhoudPerMaand = onderhoudActief === "Ja" \? normalizeOptionalAmount/);
+  assert.match(pageSource, /if \(hasM && onderhoudPerMaand === null\)/);
+  assert.match(pageSource, /if \(nodes\.fieldMaintenanceEnabled\) nodes\.fieldMaintenanceEnabled\.addEventListener\("change", updateAmountFieldVisibility\);/);
+});
+
 test('premium customers page preserves the shared database lifecycle status', () => {
   const pagePath = path.join(__dirname, '../../premium-klanten.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
