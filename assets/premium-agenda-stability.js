@@ -56,6 +56,14 @@ function isManualOtherAppointment(apt) {
     return /\b(overig|other|manual-overig)\b/.test(kindText);
 }
 
+function canCompleteAppointmentManually(apt) {
+    if (!apt || typeof apt !== 'object') return false;
+    const kind = String(apt.appointmentKind || apt.manualAppointmentKind || apt.manualKind || apt.kind || apt.type || '').trim().toLowerCase();
+    if (kind === 'meeting') return false;
+    if (kind === 'overig' || kind === 'other' || kind === 'prive' || kind === 'privé' || kind === 'private') return true;
+    return isManualOtherAppointment(apt);
+}
+
 function setModalDetailValueHidden(valueElementId, hidden) {
     const valueElement = document.getElementById(valueElementId);
     const detailItem = valueElement ? valueElement.closest('.modal-detail-item') : null;
@@ -284,14 +292,14 @@ function ensureAgendaAudioUploadControl() {
 function syncCompleteActivityButtonVisibility() {
     const apt = getActiveAppointment();
     if (!modalCompleteActivityBtn) return;
-    const shouldShow = Boolean(apt) && !modalWorkspaceMode && !isAppointmentCompleted(apt);
+    const shouldShow = Boolean(apt) && !modalWorkspaceMode && canCompleteAppointmentManually(apt) && !isAppointmentCompleted(apt);
     modalCompleteActivityBtn.hidden = !shouldShow;
     modalCompleteActivityBtn.disabled = workspaceBusy || !shouldShow;
 }
 
 async function markActiveAppointmentCompletedByStaff() {
     const apt = getActiveAppointment();
-    if (!apt || workspaceBusy || isAppointmentCompleted(apt)) return;
+    if (!apt || workspaceBusy || !canCompleteAppointmentManually(apt) || isAppointmentCompleted(apt)) return;
     workspaceBusy = true;
     refreshWorkspacePrimaryButtonLabel();
     try {
