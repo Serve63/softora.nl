@@ -287,7 +287,19 @@ test('premium agenda verbergt dealacties voor handmatige overige afspraken en be
   assert.match(stabilitySource, /modalBadge\.textContent = 'Overige afspraak';/);
   assert.match(stabilitySource, /modalPrimaryBtn\.hidden = true;/);
   assert.match(stabilitySource, /modalNoDealBtn\.hidden = true;/);
+  assert.match(pageSource, /id="modalCompleteActivityBtn"[^>]*>Activiteit afgerond<\/button>/);
+  assert.match(pageSource, /const modalCompleteActivityBtn = document\.getElementById\('modalCompleteActivityBtn'\);/);
+  assert.match(stabilitySource, /function syncCompleteActivityButtonVisibility\(\)/);
+  assert.match(stabilitySource, /async function markActiveAppointmentCompletedByStaff\(\)/);
+  assert.match(stabilitySource, /status: 'completed'/);
+  assert.match(stabilitySource, /modalCompleteActivityBtn\.addEventListener\('click', \(\) => \{ void markActiveAppointmentCompletedByStaff\(\); \}\);/);
+  assert.match(
+    stabilitySource,
+    /if \(!modalWorkspaceMode && isAppointmentCompleted\(apt\) && !getLinkedOrderIdForAppointment\(apt\)\) \{[\s\S]*modalPrimaryBtn\.hidden = true;[\s\S]*modalNoDealBtn\.hidden = true;/
+  );
   assert.match(stabilitySource, /const baseMarkActiveAppointmentNoDeal = markActiveAppointmentNoDeal;/);
+  assert.match(stabilitySource, /return baseIsAppointmentCompleted\(apt\) \|\| status === 'completed' \|\| status === 'afgerond';/);
+  assert.doesNotMatch(stabilitySource, /status === 'afgerond' \|\| hasAppointmentStartPassed\(apt\)/);
   assert.match(stabilitySource, /function setModalAudioBlockHidden\(hidden\)/);
   assert.match(stabilitySource, /syncManualAppointmentModalDetails\(apt\);/);
   assert.match(stabilitySource, /const agendaBootFailsafeTimer = window\.setTimeout\(releaseAgendaBootShell, 4500\);/);

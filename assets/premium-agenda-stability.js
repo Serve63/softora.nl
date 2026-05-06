@@ -281,9 +281,17 @@ function ensureAgendaAudioUploadControl() {
     transcript.parentNode.insertBefore(actions, transcript);
 }
 
-async function markActiveManualActivityCompleted() {
+function syncCompleteActivityButtonVisibility() {
     const apt = getActiveAppointment();
-    if (!apt || workspaceBusy || !isManualOtherAppointment(apt) || isAppointmentCompleted(apt)) return;
+    if (!modalCompleteActivityBtn) return;
+    const shouldShow = Boolean(apt) && !modalWorkspaceMode && !isAppointmentCompleted(apt);
+    modalCompleteActivityBtn.hidden = !shouldShow;
+    modalCompleteActivityBtn.disabled = workspaceBusy || !shouldShow;
+}
+
+async function markActiveAppointmentCompletedByStaff() {
+    const apt = getActiveAppointment();
+    if (!apt || workspaceBusy || isAppointmentCompleted(apt)) return;
     workspaceBusy = true;
     refreshWorkspacePrimaryButtonLabel();
     try {
@@ -300,12 +308,18 @@ async function markActiveManualActivityCompleted() {
             `/api/agenda/appointment-post-call?appointmentId=${encodeURIComponent(String(apt.id))}`,
         ], payload);
         updateAppointmentPostCallFields({ ...apt, ...(result.appointment || {}), postCallStatus: 'completed' });
+        closeModal();
     } catch (_) {
         updateAppointmentPostCallFields({ ...apt, postCallStatus: 'completed' });
+        closeModal();
     } finally {
         workspaceBusy = false;
         refreshWorkspacePrimaryButtonLabel();
     }
+}
+
+async function markActiveManualActivityCompleted() {
+    return markActiveAppointmentCompletedByStaff();
 }
 
 function releaseAgendaBootShell() {
@@ -383,6 +397,13 @@ const baseRefreshWorkspacePrimaryButtonLabel = refreshWorkspacePrimaryButtonLabe
 refreshWorkspacePrimaryButtonLabel = function refreshWorkspacePrimaryButtonLabelStable() {
     baseRefreshWorkspacePrimaryButtonLabel();
     const apt = getActiveAppointment();
+    if (!modalWorkspaceMode && isAppointmentCompleted(apt) && !getLinkedOrderIdForAppointment(apt)) {
+        modalPrimaryBtn.hidden = true;
+        modalPrimaryBtn.disabled = true;
+        modalNoDealBtn.hidden = true;
+        modalNoDealBtn.disabled = true;
+        if (modalSecondaryBtn) modalSecondaryBtn.textContent = 'Sluiten';
+    }
     if (!modalWorkspaceMode && isManualOtherAppointment(apt)) {
         modalPrimaryBtn.hidden = true;
         modalPrimaryBtn.disabled = true;
@@ -390,13 +411,14 @@ refreshWorkspacePrimaryButtonLabel = function refreshWorkspacePrimaryButtonLabel
         modalNoDealBtn.disabled = true;
         if (modalSecondaryBtn) modalSecondaryBtn.textContent = 'Sluiten';
     }
+    syncCompleteActivityButtonVisibility();
     syncWorkspaceExitControls();
 };
 
 const baseIsAppointmentCompleted = isAppointmentCompleted;
 isAppointmentCompleted = function isAppointmentCompletedStable(apt) {
     const status = String((apt && apt.postCallStatus) || '').trim().toLowerCase();
-    return baseIsAppointmentCompleted(apt) || status === 'completed' || status === 'afgerond' || hasAppointmentStartPassed(apt);
+    return baseIsAppointmentCompleted(apt) || status === 'completed' || status === 'afgerond';
 };
 
 const baseGetCalendarAppointmentClass = getCalendarAppointmentClass;
@@ -442,4 +464,5 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
 };
 
 if (modalSecondaryBtn) modalSecondaryBtn.hidden = true;
+if (modalCompleteActivityBtn) modalCompleteActivityBtn.addEventListener('click', () => { void markActiveAppointmentCompletedByStaff(); });
 ensureAgendaAudioUploadControl();
