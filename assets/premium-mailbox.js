@@ -102,6 +102,7 @@ function normalizeMailboxApiMessage(message) {
     body: message.body || message.preview || '',
     time: when.time,
     date: when.date,
+    uid: message.uid,
     unread: Boolean(message.unread),
     starred: Boolean(message.starred),
     tags: [],
@@ -226,12 +227,40 @@ function renderList() {
 
 }
 
+async function persistMailReadState(mail) {
+  if (!mail) return;
+  try {
+    const response = await fetch('/api/mailbox/messages/read', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        account: activeMailboxAccount,
+        id: mail.id,
+        uid: mail.uid,
+        folder: mail.folder || activeFolder,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.detail || data?.error || 'Gelezen status opslaan mislukt');
+    }
+  } catch (error) {
+    mail.unread = true;
+    renderList();
+    toast(String(error?.message || error || 'Gelezen status opslaan mislukt'));
+  }
+}
+
 function openMail(id) {
   const m = findMailById(id);
   if (!m) return;
+  const wasUnread = m.unread;
   activeMail = m.id;
   m.unread = false;
   renderList();
+  if (wasUnread) void persistMailReadState(m);
 
   document.getElementById('mail-detail').innerHTML = `
     <div class="detail-header">

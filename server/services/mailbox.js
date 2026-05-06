@@ -245,6 +245,30 @@ function createMailboxService(deps = {}) {
     return getAccounts().find((account) => account.email === normalizeEmail(email)) || null;
   }
 
+  function normalizeFolder(value) {
+    const folder = normalizeString(value).toLowerCase();
+    return FOLDER_ALIASES[folder] ? folder : 'inbox';
+  }
+
+  function parseMessageReference(input = {}) {
+    const rawId = normalizeString(input.id || input.messageId);
+    let folder = normalizeFolder(input.folder);
+    let uid = Number(input.uid || 0);
+    if ((!Number.isFinite(uid) || uid <= 0) && rawId) {
+      const match = rawId.match(/^([a-z]+):(\d+)$/i);
+      if (match) {
+        folder = normalizeFolder(match[1]);
+        uid = Number(match[2]);
+      }
+    }
+    if (!Number.isSafeInteger(uid) || uid <= 0) {
+      const error = new Error('Mailboxbericht niet gevonden.');
+      error.status = 400;
+      throw error;
+    }
+    return { folder, uid };
+  }
+
   function createClient(account) {
     return createImapClient({
       host: account.imapHost,
@@ -332,6 +356,42 @@ function createMailboxService(deps = {}) {
           messages.push(toClientMessage(parsed, message, folder, account));
         }
         return messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      } finally {
+        lock.release();
+      }
+    } finally {
+      try {
+        if (client.usable) await client.logout();
+      } catch (_) {}
+    }
+  }
+
+  async function markMessageRead({ accountEmail, id, folder, uid }) {
+    const account = getAccount(accountEmail);
+    if (!account) {
+      const error = new Error('Mailbox-account niet gevonden.');
+      error.status = 404;
+      throw error;
+    }
+    if (!account.imapConfigured) {
+      const error = new Error('IMAP is niet geconfigureerd voor deze mailbox.');
+      error.status = 503;
+      throw error;
+    }
+    const messageRef = parseMessageReference({ id, folder, uid });
+    const client = createClient(account);
+    try {
+      await client.connect();
+      const mailboxName = await resolveMailboxName(client, messageRef.folder);
+      const lock = await client.getMailboxLock(mailboxName);
+      try {
+        await client.messageFlagsAdd([messageRef.uid], ['\\Seen'], { uid: true });
+        return {
+          account: account.email,
+          folder: messageRef.folder,
+          uid: messageRef.uid,
+          unread: false,
+        };
       } finally {
         lock.release();
       }
@@ -434,12 +494,34 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function markMessageReadResponse(req, res) {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await markMessageRead({
+        accountEmail: body.account,
+        id: body.id || body.messageId,
+        folder: body.folder,
+        uid: body.uid,
+      });
+      return res.status(200).json({ ok: true, result });
+    } catch (error) {
+      logger.error('[Mailbox][Read]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Gelezen status opslaan mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
   return {
     accountsResponse,
     listMessagesResponse,
     sendMessageResponse,
+    markMessageReadResponse,
     getAccounts,
     listMessages,
+    markMessageRead,
     sendMessage,
   };
 }

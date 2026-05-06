@@ -216,6 +216,93 @@ test('mailbox service can intentionally expose aliases through the base mailbox 
   }
 });
 
+test('mailbox service marks opened messages as seen through IMAP uid flags', async () => {
+  const calls = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: (config) => ({
+      usable: true,
+      connect: async () => calls.push(['connect', config.auth.user]),
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async (mailboxName) => {
+        calls.push(['lock', mailboxName]);
+        return { release: () => calls.push(['release', mailboxName]) };
+      },
+      messageFlagsAdd: async (uids, flags, options) => {
+        calls.push(['flagsAdd', uids, flags, options]);
+      },
+      logout: async () => calls.push(['logout']),
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await service.markMessageReadResponse(
+    {
+      body: {
+        account: 'serve@softora.nl',
+        id: 'inbox:42',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.deepEqual(res.body.result, {
+    account: 'serve@softora.nl',
+    folder: 'inbox',
+    uid: 42,
+    unread: false,
+  });
+  assert.deepEqual(calls, [
+    ['connect', 'serve@softora.nl'],
+    ['lock', 'INBOX'],
+    ['flagsAdd', [42], ['\\Seen'], { uid: true }],
+    ['release', 'INBOX'],
+    ['logout'],
+  ]);
+});
+
+test('mailbox service rejects invalid mark-read message references', async () => {
+  const service = createMailboxService({
+    logger: { error() {} },
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+  });
+  const res = createResponseRecorder();
+
+  await service.markMessageReadResponse(
+    {
+      body: {
+        account: 'serve@softora.nl',
+        id: 'not-a-message',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.ok, false);
+  assert.equal(res.body.error, 'Gelezen status opslaan mislukt');
+});
+
 test('mailbox routes expose accounts, messages and send endpoints', () => {
   const routes = [];
   const app = {
@@ -231,11 +318,13 @@ test('mailbox routes expose accounts, messages and send endpoints', () => {
     coordinator: {
       accountsResponse() {},
       listMessagesResponse() {},
+      markMessageReadResponse() {},
       sendMessageResponse() {},
     },
   });
 
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/accounts'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/read'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
 });
