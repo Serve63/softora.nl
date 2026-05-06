@@ -2047,7 +2047,7 @@
             activeOrderId: Number(item.activeOrderId || 0) || null,
             activeOrderAddedAt: String(item.activeOrderAddedAt || ''),
             referenceImages: normalizeReferenceImageList(item.referenceImages || item.attachments || []),
-            manualPlannerWho: String(item.manualPlannerWho || ''),
+            manualPlannerWho: String(item.manualPlannerWho || ''), manualLegendChoice: String(item.manualLegendChoice || item.legendChoice || ''), appointmentKind: String(item.appointmentKind || item.manualAppointmentKind || ''),
             manualAllDayUnavailable: Boolean(item.manualAllDayUnavailable),
             uiFallback: Boolean(item.uiFallback),
         };
