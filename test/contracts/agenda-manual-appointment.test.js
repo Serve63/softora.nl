@@ -328,3 +328,34 @@ test('agenda manual appointment delete returns 404 for missing appointment', asy
   assert.equal(res.body.ok, false);
   assert.match(res.body.error, /niet gevonden/i);
 });
+
+test('agenda manual appointment delete blocks other planner private appointments', async () => {
+  const { appointments, coordinator } = createFixture({
+    appointments: [
+      {
+        id: 88,
+        company: 'Martijn privé afspraak',
+        manualPlannerWho: 'martijn',
+        manualLegendChoice: 'manual-overig',
+        appointmentType: 'private',
+        date: '2026-05-12',
+        time: '10:30',
+      },
+    ],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.deleteAgendaAppointmentResponse(
+    {
+      body: { actor: 'softora-ios-agenda' },
+      premiumAuth: { email: 'serve@softora.nl', displayName: 'Servé Creusen' },
+    },
+    res,
+    '88'
+  );
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /privé-afspraak van de ander/i);
+  assert.equal(appointments.length, 1);
+});

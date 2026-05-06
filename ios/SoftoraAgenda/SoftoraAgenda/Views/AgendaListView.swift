@@ -452,28 +452,30 @@ private struct AppointmentDetailView: View {
                         }
                     }
 
-                    Button {
-                        isShowingDeleteConfirmation = true
-                    } label: {
-                        Text(store.isDeletingAppointment ? "Verwijderen..." : "Verwijderen")
-                            .font(.softoraDisplay(15, weight: .bold))
-                            .textCase(.uppercase)
-                            .tracking(0.75)
-                            .foregroundStyle(Color.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.softoraCrimson)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    if !appointment.privacyMasked {
+                        Button {
+                            isShowingDeleteConfirmation = true
+                        } label: {
+                            Text(store.isDeletingAppointment ? "Verwijderen..." : "Verwijderen")
+                                .font(.softoraDisplay(15, weight: .bold))
+                                .textCase(.uppercase)
+                                .tracking(0.75)
+                                .foregroundStyle(Color.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color.softoraCrimson)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(store.isDeletingAppointment)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(store.isDeletingAppointment)
                 }
                 .padding(.horizontal, 26)
                 .padding(.top, 28)
                 .padding(.bottom, 34)
             }
 
-            if isShowingDeleteConfirmation {
+            if isShowingDeleteConfirmation, !appointment.privacyMasked {
                 BottomChoiceOverlay(onClose: hideDeleteConfirmation) {
                     HStack(spacing: 10) {
                         ActionChoiceButton(title: "Annuleer", isPrimary: false, action: hideDeleteConfirmation)

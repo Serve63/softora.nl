@@ -2,6 +2,8 @@ const crypto = require('crypto');
 
 const { createAgendaConfirmationPersistenceHelpers } = require('./agenda-confirmation-persistence');
 
+const { isPrivateAppointmentBlockedForViewer } = require('./agenda-read');
+
 function resolveManualPlannerLabel(body, normalizeString) {
   const raw = normalizeString(body?.who || body?.manualWho || '').toLowerCase();
   if (raw === 'serve' || raw === 'servé') return 'Servé';
@@ -395,6 +397,14 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     }
 
     const appointments = getGeneratedAgendaAppointments();
+    const appointment = appointments[idx] || null;
+    if (isPrivateAppointmentBlockedForViewer(appointment, req.premiumAuth || null, normalizeString)) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Je kunt een privé-afspraak van de ander niet verwijderen.',
+      });
+    }
+
     const runtimeSnapshot = takeRuntimeMutationSnapshot();
     const removed = appointments.splice(idx, 1)[0] || null;
     const actor = truncateText(normalizeString(req.body?.actor || req.body?.doneBy || ''), 120);

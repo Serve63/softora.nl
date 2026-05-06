@@ -125,6 +125,13 @@ function maskPrivateAppointmentForViewer(appointment, viewerPlanner, normalizeSt
   };
 }
 
+function isPrivateAppointmentBlockedForViewer(appointment, viewer, normalizeString) {
+  const viewerPlanner = resolveViewerPlanner(viewer, normalizeString);
+  const owner = resolveAppointmentPlanner(appointment, normalizeString);
+  if (!viewerPlanner || !owner || owner === viewerPlanner || owner === 'both') return false;
+  return isPrivateAppointment(appointment, normalizeString);
+}
+
 function createAgendaReadCoordinator(deps) {
   function getSafePreparationTimeoutMs() {
     return Math.max(0, Math.min(10000, Number(deps.readPreparationTimeoutMs) || 1500));
@@ -345,4 +352,5 @@ function createAgendaReadCoordinator(deps) {
 
 module.exports = {
   createAgendaReadCoordinator,
+  isPrivateAppointmentBlockedForViewer,
 };
