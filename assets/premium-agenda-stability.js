@@ -79,6 +79,186 @@ function syncManualAppointmentModalDetails(apt) {
     }
 }
 
+function normalizeManualLeadStatsOwner(value) {
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    if (normalized.includes('martijn')) return 'martijn';
+    if (normalized.includes('serve')) return 'serve';
+    return '';
+}
+
+function getManualLeadStatsOwner(apt) {
+    if (!apt || typeof apt !== 'object') return '';
+    const explicitOwner = normalizeManualLeadStatsOwner(
+        apt.manualLeadOwnerKey || apt.leadOwnerKey || apt.manualLeadOwnerName || apt.leadOwnerName || apt.leadOwnerFullName
+    );
+    if (explicitOwner) return explicitOwner;
+
+    const summaryMatch = /lead\s+geregeld\s+door:\s*([^\n]+)/i.exec(String(apt.summary || ''));
+    return normalizeManualLeadStatsOwner(summaryMatch ? summaryMatch[1] : '');
+}
+
+function isManualLeadStatsAppointment(apt) {
+    if (!apt || !isManualAgendaAppointment(apt)) return false;
+    if (isManualOtherAppointment(apt)) return false;
+
+    const kind = String(apt.appointmentKind || apt.manualAppointmentKind || '').trim().toLowerCase();
+    const choice = normalizeManualLegendChoice(apt.manualLegendChoice || apt.legendChoice || '');
+    const isMeetingChoice = choice === 'website' || choice === 'business' || choice === 'voice' || choice === 'chatbot';
+
+    if (kind && kind !== 'meeting') return false;
+    if (!kind && !isMeetingChoice) return false;
+    return Boolean(getManualLeadStatsOwner(apt));
+}
+
+function buildManualLeadStatsEntries(sourceAppointments) {
+    const counts = { serve: 0, martijn: 0 };
+    (Array.isArray(sourceAppointments) ? sourceAppointments : []).forEach((apt) => {
+        if (!isManualLeadStatsAppointment(apt)) return;
+        const owner = getManualLeadStatsOwner(apt);
+        if (owner === 'serve' || owner === 'martijn') counts[owner] += 1;
+    });
+
+    return [
+        { key: 'serve', displayName: 'Servé', count: counts.serve },
+        { key: 'martijn', displayName: 'Martijn', count: counts.martijn },
+    ].sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return a.key === 'serve' ? -1 : 1;
+    });
+}
+
+function ensureManualLeadStatsStyles() {
+    if (document.getElementById('agendaManualLeadStatsStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'agendaManualLeadStatsStyles';
+    style.textContent = `
+        .agenda-manual-lead-stats-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.2rem;
+            margin: 0 0 1.3rem;
+            padding: 1rem 1.15rem;
+            border: 1px solid rgba(139, 34, 82, 0.16);
+            background: var(--bg-primary);
+            box-shadow: var(--shadow-sm);
+        }
+        .agenda-manual-lead-stats-title {
+            margin: 0;
+            color: var(--text-primary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .agenda-manual-lead-stats-list {
+            display: grid;
+            gap: 0.42rem;
+            width: min(320px, 100%);
+        }
+        .agenda-manual-lead-stats-entry {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.8rem;
+        }
+        .agenda-manual-lead-stats-entry.is-leading .agenda-manual-lead-stats-name {
+            color: var(--accent);
+        }
+        .agenda-manual-lead-stats-name {
+            color: var(--text-primary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.94rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            line-height: 1.1;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .agenda-manual-lead-stats-count {
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            font-weight: 500;
+            line-height: 1.2;
+            text-align: right;
+            white-space: nowrap;
+        }
+        @media (max-width: 720px) {
+            .agenda-manual-lead-stats-card {
+                align-items: stretch;
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+            .agenda-manual-lead-stats-list {
+                width: 100%;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function ensureManualLeadStatsCard() {
+    let card = document.getElementById('agendaManualLeadStatsCard');
+    if (card) return card;
+
+    ensureManualLeadStatsStyles();
+    const target = document.querySelector('.agenda-routing-bubble-wrap') || document.querySelector('.calendar-wrapper');
+    const parent = target ? target.parentNode : document.querySelector('.premium-boot-shell') || document.body;
+
+    card = document.createElement('section');
+    card.id = 'agendaManualLeadStatsCard';
+    card.className = 'agenda-manual-lead-stats-card';
+    card.setAttribute('aria-label', 'Handmatige leads per medewerker');
+
+    const title = document.createElement('h2');
+    title.className = 'agenda-manual-lead-stats-title';
+    title.textContent = 'Handmatige leads';
+
+    const list = document.createElement('div');
+    list.id = 'agendaManualLeadStatsList';
+    list.className = 'agenda-manual-lead-stats-list';
+
+    card.appendChild(title);
+    card.appendChild(list);
+    if (target && parent) {
+        parent.insertBefore(card, target.nextSibling);
+    } else if (parent) {
+        parent.appendChild(card);
+    }
+    return card;
+}
+
+function renderManualLeadStatsCard() {
+    const card = ensureManualLeadStatsCard();
+    const list = document.getElementById('agendaManualLeadStatsList');
+    if (!card || !list) return;
+
+    const entries = buildManualLeadStatsEntries(typeof appointments !== 'undefined' ? appointments : []);
+    list.replaceChildren();
+    entries.forEach((entry, index) => {
+        const row = document.createElement('div');
+        row.className = index === 0 ? 'agenda-manual-lead-stats-entry is-leading' : 'agenda-manual-lead-stats-entry';
+
+        const name = document.createElement('span');
+        name.className = 'agenda-manual-lead-stats-name';
+        name.textContent = entry.displayName;
+
+        const count = document.createElement('span');
+        count.className = 'agenda-manual-lead-stats-count';
+        count.textContent = `${entry.count} ${entry.count === 1 ? 'handmatige lead' : 'handmatige leads'}`;
+
+        row.appendChild(name);
+        row.appendChild(count);
+        list.appendChild(row);
+    });
+}
+
 function setModalAudioBlockHidden(hidden) {
     if (!modalAudioBlock) return;
     modalAudioBlock.hidden = Boolean(hidden);
@@ -409,6 +589,7 @@ getCalendarAppointmentClass = function getCalendarAppointmentClassStable(apt) {
 const baseRenderCalendar = renderCalendar;
 renderCalendar = function renderCalendarStable() {
     baseRenderCalendar();
+    renderManualLeadStatsCard();
     document.querySelectorAll('[data-calendar-date]').forEach((cell) => {
         const date = cell.getAttribute('data-calendar-date');
         if (!isAgendaDateBeforeToday(date)) return;
@@ -443,3 +624,4 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
 
 if (modalSecondaryBtn) modalSecondaryBtn.hidden = true;
 ensureAgendaAudioUploadControl();
+renderManualLeadStatsCard();
