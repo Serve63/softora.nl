@@ -271,9 +271,11 @@ test('premium bevestigingsmails places sender dropdown in the campaign card and 
   assert.doesNotMatch(pageSource, /<option value="zakelijk@softora\.nl"/);
   assert.doesNotMatch(pageSource, /zakelijk@theimpactbox\.co/);
   assert.match(pageSource, /allowedSenderEmails\.has\(String\(email \|\| ''\)\.toLowerCase\(\)\)/);
-  assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Campagne afgerond na<\/div>\s*<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
+  assert.doesNotMatch(pageSource, /<div class="mf-label">Campagne afgerond na<\/div>/);
+  assert.doesNotMatch(pageSource, /<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
   assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Speciale handeling<\/div>\s*<select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">/);
   assert.match(pageSource, /<option value="webdesign" selected>Webdesign<\/option>/);
+  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-mail-blocklist\.js\?v=20260506a"><\/script>/);
   assert.doesNotMatch(pageSource, /id="delay1"/);
   assert.doesNotMatch(pageSource, /Antwoord snelheid/);
 });
@@ -369,17 +371,32 @@ test('premium bevestigingsmails exposes coldcalling provider choice inside lead-
   assert.match(pageSource, /Provider: ' \+ getSelectedColdcallingStackLabel\(\) \+ '\.'/);
 });
 
-test('premium bevestigingsmails exposes campaign duration choices and uses them in the timeline copy', () => {
+test('premium bevestigingsmails exposes mail blocklist in settings and sends it with campaign payload', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const blocklistPath = path.join(__dirname, '../../assets/premium-bevestigingsmails-mail-blocklist.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const blocklistSource = fs.readFileSync(blocklistPath, 'utf8');
+
+  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-mail-blocklist\.js\?v=20260506a"><\/script>/);
+  assert.match(blocklistSource, /const FIELD_ID = 'coldmailingEmailBlocklist';/);
+  assert.match(blocklistSource, /label\.textContent = 'Bloklijst';/);
+  assert.match(blocklistSource, /textarea\.setAttribute\('aria-label', 'Mailadressen die nooit gemaild mogen worden'\);/);
+  assert.match(blocklistSource, /Deze adressen worden nooit meegenomen in de coldmailcampagne/);
+  assert.match(blocklistSource, /settings\.emailBlocklist = getBlocklistText\(\);/);
+  assert.match(blocklistSource, /blockedEmails=' \+ encodeURIComponent\(blockedEmails\)/);
+  assert.match(blocklistSource, /payload\.blockedEmails = getBlocklistText\(\);/);
+  assert.match(blocklistSource, /specialActionRow\.insertAdjacentElement\('afterend', row\);/);
+});
+
+test('premium bevestigingsmails hides campaign duration dropdown but keeps timeline fallback', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Campagne afgerond na<\/div>\s*<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
-  assert.match(pageSource, /<option value="disabled">Uitgeschakeld<\/option>/);
-  assert.match(pageSource, /<option value="5">5 dagen<\/option>/);
-  assert.match(pageSource, /<option value="7">7 dagen<\/option>/);
-  assert.match(pageSource, /<option value="14" selected>14 dagen<\/option>/);
+  assert.doesNotMatch(pageSource, /<div class="mf-label">Campagne afgerond na<\/div>/);
+  assert.doesNotMatch(pageSource, /<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
   assert.match(pageSource, /function initCampaignDurationSetting\(\)/);
   assert.doesNotMatch(pageSource, /function updateCampaignDurationUi\(\)/);
+  assert.match(pageSource, /return normalizeCampaignDurationDays\(select \? select\.value : 14\);/);
   assert.match(pageSource, /showToast\(durationDays === 0 \? 'Campagne afronding uitgeschakeld' : 'Campagne afgerond na ' \+ formatCampaignDurationLabel\(durationDays\)\);/);
   assert.match(pageSource, /function buildCampaignTimeline\(total, durationDays\) \{/);
   assert.match(pageSource, /const timelineDays = resolveCampaignTimelineDays\(durationDays\);/);

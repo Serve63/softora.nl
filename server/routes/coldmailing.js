@@ -86,6 +86,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         mode: req.query.mode,
         radiusKm: req.query.radiusKm,
         blockedPhones: req.query.blockedPhones,
+        blockedEmails: req.query.blockedEmails || req.query.emailBlocklist || req.query.mailBlocklist,
       });
       res.json(result);
     } catch (error) {
@@ -140,6 +141,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         radiusKm: body.radiusKm,
         mode: body.mode,
         blockedPhones: body.blockedPhones || body.callBlocklist,
+        blockedEmails: body.blockedEmails || body.emailBlocklist || body.mailBlocklist || body.blockedMailAddresses,
         actor:
           normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
           'Coldmailing',
