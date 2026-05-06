@@ -64,3 +64,26 @@ test('website onderhoudspakketten tonen vaste uren per maand met taakvoorbeelden
   assert.doesNotMatch(websiteMaintenanceSection, /<div class="card-name">Pro<\/div>/);
   assert.doesNotMatch(websiteMaintenanceSection, /Onbeperkte aanpassingen/);
 });
+
+test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () => {
+  const pageSource = readPage();
+  const sectionStart = pageSource.indexOf('<div id="tab-routes"');
+  const sectionEnd = pageSource.indexOf('<div id="tab-bouwen"', sectionStart);
+  const routesSection = pageSource.slice(sectionStart, sectionEnd);
+
+  assert.match(
+    routesSection,
+    /Softora ontwikkelt en levert de website volledig gebruiksklaar op\. Na oplevering is het project afgerond en zijn wijzigingen uitgesloten, tenzij er aantoonbare gebreken vanuit Softora zijn\./
+  );
+  assert.match(
+    routesSection,
+    /Softora ontwikkelt de website met een eigen CRM-\/beheersysteem\. Minimaal €200 extra voor tekst- en fotobeheer\. Extra wijzigingsopties zijn mogelijk maar verhogen de prijs\./
+  );
+  assert.match(
+    routesSection,
+    /Softora ontwikkelt en beheert de website, inclusief monitoring, updates en beveiliging\. Wijzigingen voert Softora op aanvraag uit binnen het onderhoudspakket, zodat de klant technisch volledig wordt ontzorgd\./
+  );
+  assert.doesNotMatch(routesSection, /Softora maakt de website en levert hem volledig af/);
+  assert.doesNotMatch(routesSection, /Wij bouwen de website met een eigen beheersysteem/);
+  assert.doesNotMatch(routesSection, /Wij maken de website, houden hem in beheer/);
+});
