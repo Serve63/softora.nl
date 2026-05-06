@@ -14,7 +14,9 @@ function loadDatabaseImportClient() {
 
 function loadDatabaseDeepSearchClient(options = {}) {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
+  const distanceScriptPath = path.join(__dirname, '../../assets/premium-database-distance.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
+  const distanceSource = fs.readFileSync(distanceScriptPath, 'utf8');
   const sandbox = {
     window: {},
     Buffer,
@@ -23,6 +25,7 @@ function loadDatabaseDeepSearchClient(options = {}) {
   };
   if (options.document) sandbox.window.document = options.document;
   sandbox.window.confirm = () => true;
+  vm.runInNewContext(distanceSource, sandbox);
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseDeepSearch;
 }
@@ -118,7 +121,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
     sorted.map((customer) => customer.bedrijf),
     ['Oisterwijk Winkel', 'Alphen Service', 'Chaam Garage', 'Roosendaal Zaak', 'Onbekend Ver Weg']
   );
-  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260501a/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260506a/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);/);
@@ -342,7 +345,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505c/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260505a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260501d/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260506a/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -433,7 +436,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260501d"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260506a"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -491,9 +494,16 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT/);
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT_BASE64/);
   assert.match(deepSearchScriptSource, /function decodeBase64Utf8\(value\)/);
-  const defaultTargetLines = readDefaultDeepSearchTargetLines(deepSearchScriptSource);
+  assert.match(deepSearchScriptSource, /TARGET_ORDER_VERSION = "distance-oisterwijk-v1"/);
+  assert.match(deepSearchScriptSource, /function getRawDefaultTargetLabels\(\)/);
+  assert.match(deepSearchScriptSource, /function getDefaultTargetLabels\(\)/);
+  const rawTargetLines = readDefaultDeepSearchTargetLines(deepSearchScriptSource);
+  const defaultTargetLines = loadDatabaseDeepSearchClient().getDefaultTargetLabels();
+  assert.equal(rawTargetLines.length, 2501);
   assert.equal(defaultTargetLines.length, 2501);
-  assert.equal(defaultTargetLines[0], 'Nederland | Noord-Brabant | Altena | Almkerk');
+  assert.equal(defaultTargetLines[0], 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk');
+  assert.ok(defaultTargetLines.indexOf('Nederland | Noord-Brabant | Oisterwijk | Moergestel') < defaultTargetLines.indexOf('Nederland | Noord-Brabant | Altena | Almkerk'));
+  assert.ok(defaultTargetLines.indexOf('Nederland | Noord-Brabant | Altena | Almkerk') < defaultTargetLines.indexOf('Nederland | Groningen | Groningen | Groningen'));
   assert.ok(defaultTargetLines.includes('Nederland | Noord-Brabant | Altena | Woudrichem'));
   assert.ok(defaultTargetLines.includes('Nederland | Zuid-Holland | Zwijndrecht | Zwijndrecht'));
   assert.match(deepSearchScriptSource, /fetch\("\/api\/premium-database\/deep-search-businesses"/);
@@ -745,6 +755,39 @@ test('premium database deep search client keeps a clean ordered target list', ()
   );
 });
 
+test('premium database deep search keeps old index-only progress on the original location after distance sorting', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const listNode = { innerHTML: '' };
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '25' },
+      deepSearchList: listNode,
+      deepSearchModal: createClassListNode(),
+      deepSearchSources: {},
+      deepSearchStartButton: createClassListNode(),
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    getUiState: async () => ({
+      values: {
+        deep_search_state: JSON.stringify({
+          version: 2,
+          activeIndex: 0,
+          targetProgress: [{ index: 0, status: 'done', batches: 1, placeComplete: true }],
+        }),
+      },
+    }),
+  });
+
+  controller.open();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.match(listNode.innerHTML, /^<button class="deep-search-target is-active is-active"[\s\S]*1\. Nederland \| Noord-Brabant \| Oisterwijk \| Oisterwijk/);
+  assert.match(listNode.innerHTML, /class="deep-search-target is-done"[\s\S]*Nederland \| Noord-Brabant \| Altena \| Almkerk/);
+});
+
 test('premium database photo storage clears removed photo chunks so refresh cannot restore them', async () => {
   const photoStorageClient = loadDatabasePhotoStorageClient();
   const patches = [];
@@ -879,21 +922,21 @@ test('premium database deep search continues to the next location until the requ
   const persisted = [];
   const rows = [
     ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
-    ['Almkerk Test BV', 'Kerkstraat 1, Almkerk', 'info@almkerktest.nl', '0183 123 456', 'almkerktest.nl'],
+    ['Oisterwijk Test BV', 'Kerkstraat 1, Oisterwijk', 'info@oisterwijktest.nl', '013 123 4567', 'oisterwijktest.nl'],
   ];
-  const andelRows = [
+  const heukelomRows = [
     rows[0],
-    ['Andel Test BV', 'Kerkstraat 2, Andel', 'info@andeltest.nl', '0183 654 321', 'andeltest.nl'],
+    ['Heukelom Test BV', 'Kerkstraat 2, Heukelom', 'info@heukelomtest.nl', '013 765 4321', 'heukelomtest.nl'],
   ];
   const responses = [
     {
       ok: true,
       rows,
-      businesses: [{ bedrijfsnaam: 'Almkerk Test BV', email: 'info@almkerktest.nl', website: 'almkerktest.nl' }],
+      businesses: [{ bedrijfsnaam: 'Oisterwijk Test BV', email: 'info@oisterwijktest.nl', website: 'oisterwijktest.nl' }],
       found: 1,
       placeComplete: true,
       cost: { estimatedUsd: 0.12 },
-      sources: [{ url: 'https://almkerktest.nl/contact', title: 'Contact' }],
+      sources: [{ url: 'https://oisterwijktest.nl/contact', title: 'Contact' }],
     },
     {
       ok: true,
@@ -902,16 +945,16 @@ test('premium database deep search continues to the next location until the requ
       found: 0,
       placeComplete: true,
       cost: { estimatedUsd: 0.08 },
-      sources: [{ url: 'https://almkerktest.nl/over-ons', title: 'Over ons' }],
+      sources: [{ url: 'https://oisterwijktest.nl/over-ons', title: 'Over ons' }],
     },
     {
       ok: true,
-      rows: andelRows,
-      businesses: [{ bedrijfsnaam: 'Andel Test BV', email: 'info@andeltest.nl', website: 'andeltest.nl' }],
+      rows: heukelomRows,
+      businesses: [{ bedrijfsnaam: 'Heukelom Test BV', email: 'info@heukelomtest.nl', website: 'heukelomtest.nl' }],
       found: 1,
       placeComplete: false,
       cost: { estimatedUsd: 0.11 },
-      sources: [{ url: 'https://andeltest.nl/contact', title: 'Contact' }],
+      sources: [{ url: 'https://heukelomtest.nl/contact', title: 'Contact' }],
     },
   ];
   const controller = deepSearchClient.createController({
@@ -935,7 +978,7 @@ test('premium database deep search continues to the next location until the requ
         assert.ok(persisted.length >= 1);
         const savedBeforeFollowUp = JSON.parse(persisted[persisted.length - 1].patch.deep_search_state);
         assert.deepEqual(getStoredTargetProgress(savedBeforeFollowUp).foundWebsites, [
-          'almkerktest.nl',
+          'oisterwijktest.nl',
         ]);
       }
       calls.push(payload);
@@ -954,13 +997,13 @@ test('premium database deep search continues to the next location until the requ
 
   assert.equal(result, true);
   assert.equal(calls.length, 3);
-  assert.equal(calls[0].target, 'Nederland | Noord-Brabant | Altena | Almkerk');
+  assert.equal(calls[0].target, 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk');
   assert.equal(calls[0].count, 2);
   assert.equal(calls[0].batchNumber, 1);
   assert.equal(calls[1].target, calls[0].target);
   assert.equal(calls[1].count, 1);
   assert.equal(calls[1].batchNumber, 2);
-  assert.equal(calls[2].target, 'Nederland | Noord-Brabant | Altena | Andel');
+  assert.equal(calls[2].target, 'Nederland | Noord-Brabant | Oisterwijk | Heukelom');
   assert.equal(calls[2].count, 1);
   assert.equal(calls[2].batchNumber, 1);
   assert.equal(customers.length, 2);
@@ -971,13 +1014,14 @@ test('premium database deep search continues to the next location until the requ
   const finalStatePatch = persisted[persisted.length - 1].patch.deep_search_state;
   const finalState = JSON.parse(finalStatePatch);
   assert.equal(finalState.targets, undefined);
+  assert.equal(finalState.targetOrderVersion, 'distance-oisterwijk-v1');
   assert.ok(finalStatePatch.length < 200000);
   assert.deepEqual(getStoredTargetProgress(finalState).foundWebsites, [
-    'almkerktest.nl',
+    'oisterwijktest.nl',
   ]);
   assert.equal(getStoredTargetProgress(finalState).status, 'done');
   assert.deepEqual(getStoredTargetProgress(finalState, 1).foundWebsites, [
-    'andeltest.nl',
+    'heukelomtest.nl',
   ]);
 });
 
@@ -1007,7 +1051,7 @@ test('premium database deep search turns the start button into a disabled comple
   const customers = [];
   const rows = [
     ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
-    ['Schutte Groen & Grond', 'Kerkstraat 1, Almkerk', 'info@schuttegroenengrond.nl', '0183 123 456', 'schuttegroenengrond.nl'],
+    ['Schutte Groen & Grond', 'Kerkstraat 1, Oisterwijk', 'info@schuttegroenengrond.nl', '013 123 4567', 'schuttegroenengrond.nl'],
   ];
   const controller = deepSearchClient.createController({
     nodes: {
@@ -1043,7 +1087,7 @@ test('premium database deep search turns the start button into a disabled comple
   assert.equal(await controller.runCurrentSearch(), true);
 
   assert.equal(calls.length, 1);
-  assert.equal(startButton.textContent, '1 bedrijf gevonden in Almkerk');
+  assert.equal(startButton.textContent, '1 bedrijf gevonden in Oisterwijk');
   assert.equal(startButton.disabled, true);
   assert.equal(startButton.getAttribute('aria-disabled'), 'true');
   assert.equal(startButton.classList.contains('is-session-complete'), true);
@@ -1491,7 +1535,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const sorterSource = fs.readFileSync(sorterPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260501a/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260506a/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);/);
@@ -1499,6 +1543,8 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(sorterSource, /function resolveCustomerCoords\(customer\)/);
   assert.match(sorterSource, /function getDistanceKm\(customer\)/);
   assert.match(sorterSource, /function compareCustomersByDistance\(left, right\)/);
+  assert.match(sorterSource, /function compareTargetLabelsByDistance\(left, right\)/);
+  assert.match(sorterSource, /function sortTargetLabelsByDistance\(labels\)/);
   assert.match(sorterSource, /return \(Array\.isArray\(customers\) \? customers : \[\]\)\.slice\(\)\.sort\(compareCustomersByDistance\);/);
   assert.match(sorterSource, /"4281": \{ lat: 51\.7835, lng: 5\.0585 \}/);
   assert.match(sorterSource, /"4286": \{ lat: 51\.7714, lng: 4\.9597 \}/);
@@ -1507,4 +1553,17 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(sorterSource, /"4859": \{ lat: 51\.5653, lng: 4\.8307 \}/);
   assert.match(sorterSource, /"4861": \{ lat: 51\.5069, lng: 4\.8616 \}/);
   assert.match(sorterSource, /"5131": \{ lat: 51\.4817, lng: 4\.9583 \}/);
+  const sorter = loadDatabaseDistanceClient();
+  const sortedTargets = sorter.sortTargetLabelsByDistance([
+    'Nederland | Noord-Brabant | Altena | Almkerk',
+    'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk',
+    'Nederland | Noord-Brabant | Oisterwijk | Moergestel',
+    'Nederland | Groningen | Groningen | Groningen',
+  ]);
+  assert.deepEqual(sortedTargets, [
+    'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk',
+    'Nederland | Noord-Brabant | Oisterwijk | Moergestel',
+    'Nederland | Noord-Brabant | Altena | Almkerk',
+    'Nederland | Groningen | Groningen | Groningen',
+  ]);
 });
