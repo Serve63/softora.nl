@@ -595,7 +595,7 @@
         }
 
         .photo-cell {
-            display: inline-block;
+            display: inline-flex; align-items: center; justify-content: center; gap: 4px;
             line-height: 0;
         }
 
@@ -1599,7 +1599,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260505c"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260506a"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260505c"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260505a"></script>
@@ -3154,7 +3154,7 @@
             const mockupDrop = event.target.closest("[data-mockup-photo-id]");
             if (mockupDrop) {
                 event.preventDefault();
-                event.stopPropagation();
+                event.stopPropagation(); if (mockupDrop.getAttribute("data-can-generate") !== "true") return;
                 state.photoTargetId = mockupDrop.getAttribute("data-mockup-photo-id");
                 if (openWebsitePhotoPreview(state.photoTargetId, "mockup")) return;
                 void webdesignMockupController.ensureForCustomer(state.photoTargetId, { force: true });

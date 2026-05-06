@@ -297,9 +297,12 @@
             const mockup = normalizeString(customer && customer.websiteMockup);
             const mockupLabel = normalizeString(customer && customer.websiteMockupName) || "Device mockup";
             const hasMockup = isValidWebsitePhotoDataUrl(mockup);
-            const mockupLoading = hasPhoto && isMockupPending(customer.id);
+            const canUseMockup = hasPhoto || hasMockup;
+            const mockupLoading = hasPhoto && !hasMockup && isMockupPending(customer.id);
             const mockupInner = hasMockup ? "<img src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" decoding=\"sync\">" : (mockupLoading ? LOADING_ICON : MOCKUP_ICON);
-            const mockupSlot = hasPhoto ? "<div class=\"photo-drop photo-drop--mockup" + (mockupLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-mockup-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasMockup ? "true" : "false") + "\" data-can-generate=\"true\" aria-label=\"" + (hasMockup ? "Device mockup bekijken" : "Device mockup maken") + "\" title=\"" + (hasMockup ? escapeHtml(mockupLabel) : "Device mockup maken") + "\">" + mockupInner + "</div>" : "";
+            const mockupAriaLabel = hasMockup ? "Device mockup bekijken" : (mockupLoading ? "Device mockup wordt gemaakt" : (canUseMockup ? "Device mockup maken" : "Device mockup nog niet beschikbaar"));
+            const mockupTitle = hasMockup ? mockupLabel : (canUseMockup ? "Device mockup maken" : "Maak eerst een webdesign");
+            const mockupSlot = "<div class=\"photo-drop photo-drop--mockup" + (mockupLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-mockup-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasMockup ? "true" : "false") + "\" data-can-generate=\"" + (canUseMockup ? "true" : "false") + "\" data-mockup-disabled=\"" + (canUseMockup ? "false" : "true") + "\" aria-label=\"" + escapeHtml(mockupAriaLabel) + "\" title=\"" + escapeHtml(mockupTitle) + "\">" + mockupInner + "</div>";
             return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + "</div>";
         }
 
