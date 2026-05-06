@@ -280,22 +280,23 @@ test('premium bevestigingsmails places sender dropdown in the campaign card and 
   assert.doesNotMatch(pageSource, /Antwoord snelheid/);
 });
 
-test('premium bevestigingsmails toont de locatie als zichtbare variabele', () => {
+test('premium bevestigingsmails toont plaats en website als zichtbare variabelen', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const locationVariablePath = path.join(__dirname, '../../assets/premium-bevestigingsmails-location-variable.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const locationVariableSource = fs.readFileSync(locationVariablePath, 'utf8');
 
-  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-location-variable\.js\?v=20260501a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-location-variable\.js\?v=20260506b"><\/script>/);
   assert.match(locationVariableSource, /\.mail-variable-note\{[\s\S]*color:var\(--crimson\);[\s\S]*border:1px solid rgba\(155,35,85,\.18\);/);
   assert.match(locationVariableSource, /function normalizeBodyTemplate\(value\)/);
   assert.match(locationVariableSource, /📍\[ \\t\]\*\)Haaren/);
-  assert.match(locationVariableSource, /note\.setAttribute\('aria-label', 'Dynamische plaats uit database'\);/);
+  assert.match(locationVariableSource, /note\.setAttribute\('aria-label', 'Dynamische plaats en website uit database'\);/);
   assert.match(locationVariableSource, /document\.querySelector\('#mail-panel-5 \.mail-fields'\)/);
   assert.match(locationVariableSource, /host\.appendChild\(note\);/);
   assert.doesNotMatch(locationVariableSource, /insertAdjacentElement\('afterend', note\)/);
   assert.match(locationVariableSource, /variable\.textContent = '\{\{stad\}\}';/);
-  assert.match(locationVariableSource, /label\.textContent = 'Plaats uit database';/);
+  assert.match(locationVariableSource, /websiteVariable\.textContent = '\{\{website\}\}';/);
+  assert.match(locationVariableSource, /label\.textContent = 'Plaats en website uit database';/);
   assert.match(locationVariableSource, /wrapGlobalFunction\('applyColdmailingSettings'/);
   assert.match(locationVariableSource, /wrapGlobalFunction\('getColdmailCampaignPayload'/);
 });
