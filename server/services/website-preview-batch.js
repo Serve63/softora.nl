@@ -6,6 +6,11 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     aiToolsCoordinator = null,
     websitePreviewLibraryCoordinator = null,
+    getUiStateValues = async () => null,
+    setUiStateValues = async () => null,
+    batchScope = 'website_preview_batches',
+    batchStorageKey = 'softora_website_preview_batches_v1',
+    processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
   } = deps;
 
   const jobs = new Map();
@@ -13,6 +18,8 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
   const MAX_JOBS = 200;
   const MAX_URLS = 50;
   const ITEM_TIMEOUT_MS = 2 * 60 * 1000;
+  const VALID_ITEM_STATUSES = new Set(['pending', 'running', 'done', 'error']);
+  const VALID_JOB_STATUSES = new Set(['running', 'done', 'error']);
 
   function ownerKeyFromReq(req) {
     const email = normalizeString(req?.premiumAuth?.email || '').toLowerCase();
@@ -51,6 +58,154 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       if (oldestId) jobs.delete(oldestId);
       else break;
     }
+  }
+
+  function safeParseJsonObject(raw) {
+    try {
+      const parsed = JSON.parse(String(raw || '{}'));
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function normalizeJobStatus(value, fallback = 'running') {
+    const status = normalizeString(value || '').toLowerCase();
+    return VALID_JOB_STATUSES.has(status) ? status : fallback;
+  }
+
+  function normalizeItemStatus(value, fallback = 'pending') {
+    const status = normalizeString(value || '').toLowerCase();
+    return VALID_ITEM_STATUSES.has(status) ? status : fallback;
+  }
+
+  function normalizeOwnerStub(raw) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    return {
+      email: normalizeString(source.email),
+      userId: normalizeString(source.userId),
+      displayName: normalizeString(source.displayName),
+      authenticated: Boolean(source.authenticated),
+      role: normalizeString(source.role),
+    };
+  }
+
+  function normalizeStoredItem(raw) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const url = normalizeUrlToken(source.url);
+    if (!url) return null;
+    let hostname = normalizeString(source.hostname || '');
+    try {
+      hostname = hostname || new URL(url).hostname;
+    } catch (_) {}
+    return {
+      url,
+      hostname,
+      status: normalizeItemStatus(source.status),
+      error: normalizeString(source.error || '') || null,
+      libraryEntryId: normalizeString(source.libraryEntryId || '') || null,
+    };
+  }
+
+  function normalizeStoredJob(raw) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const id = normalizeString(source.id || '');
+    if (!/^[a-f0-9-]{16,80}$/i.test(id)) return null;
+    const ownerKey = normalizeString(source.ownerKey || '');
+    if (!ownerKey) return null;
+    const items = (Array.isArray(source.items) ? source.items : [])
+      .map(normalizeStoredItem)
+      .filter(Boolean);
+    if (!items.length) return null;
+    return {
+      id,
+      ownerKey,
+      ownerStub: normalizeOwnerStub(source.ownerStub),
+      status: normalizeJobStatus(source.status),
+      currentIndex: Math.max(0, Math.min(items.length - 1, Number(source.currentIndex) || 0)),
+      items,
+      error: normalizeString(source.error || '') || null,
+      createdAt: Math.max(0, Number(source.createdAt) || Date.now()),
+      finishedAt: Number(source.finishedAt) || null,
+      processing: false,
+      processingStartedAt: null,
+    };
+  }
+
+  function serializeJobForStorage(job) {
+    return {
+      id: job.id,
+      ownerKey: job.ownerKey,
+      ownerStub: normalizeOwnerStub(job.ownerStub),
+      status: job.status,
+      currentIndex: job.currentIndex,
+      items: job.items.map((item) => ({
+        url: item.url,
+        hostname: item.hostname,
+        status: item.status,
+        error: item.error || null,
+        libraryEntryId: item.libraryEntryId || null,
+      })),
+      error: job.error || null,
+      createdAt: job.createdAt,
+      finishedAt: job.finishedAt || null,
+    };
+  }
+
+  async function loadSharedJobMap() {
+    if (typeof getUiStateValues !== 'function') return {};
+    try {
+      const state = await getUiStateValues(batchScope);
+      const values = state && state.values && typeof state.values === 'object' ? state.values : {};
+      return safeParseJsonObject(values[batchStorageKey]);
+    } catch (error) {
+      logger.error('[WebsitePreviewBatch][loadShared]', error?.message || error);
+      return {};
+    }
+  }
+
+  async function persistSharedJob(job) {
+    if (typeof setUiStateValues !== 'function') return null;
+    try {
+      const existingMap = await loadSharedJobMap();
+      const now = Date.now();
+      const nextMap = {};
+      Object.entries(existingMap).forEach(([id, rawJob]) => {
+        const stored = normalizeStoredJob(rawJob);
+        if (!stored) return;
+        if (now - stored.createdAt > JOB_TTL_MS) return;
+        nextMap[id] = serializeJobForStorage(stored);
+      });
+      nextMap[job.id] = serializeJobForStorage(job);
+      return setUiStateValues(
+        batchScope,
+        { [batchStorageKey]: JSON.stringify(nextMap) },
+        { source: 'website-preview-batch', actor: 'Premium websitegenerator' }
+      );
+    } catch (error) {
+      logger.error('[WebsitePreviewBatch][persistShared]', error?.message || error);
+      return null;
+    }
+  }
+
+  async function loadSharedJob(jobId) {
+    const sharedMap = await loadSharedJobMap();
+    const job = normalizeStoredJob(sharedMap[jobId]);
+    if (job) jobs.set(job.id, job);
+    return job;
+  }
+
+  async function findLatestSharedJobForOwner(ownerKey, statusSet) {
+    const sharedMap = await loadSharedJobMap();
+    let latest = null;
+    Object.values(sharedMap).forEach((rawJob) => {
+      const job = normalizeStoredJob(rawJob);
+      if (!job || job.ownerKey !== ownerKey) return;
+      if (statusSet && statusSet.size && !statusSet.has(job.status)) return;
+      if (!latest || job.createdAt > latest.createdAt) latest = job;
+    });
+    if (latest) jobs.set(latest.id, latest);
+    return latest;
   }
 
   function normalizeUrlToken(chunk) {
@@ -133,6 +288,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     if (!job || job.status !== 'running' || job.processing) return;
     job.processing = true;
     job.processingStartedAt = Date.now();
+    void persistSharedJob(job);
     setImmediate(() => {
       processJob(jobId).catch((err) => {
         const currentJob = jobs.get(jobId);
@@ -141,6 +297,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
           currentJob.error = String(err?.message || err || 'Batch mislukt');
           currentJob.finishedAt = Date.now();
           currentJob.processing = false;
+          void persistSharedJob(currentJob);
         }
         logger.error('[WebsitePreviewBatch][processJob]', err?.message || err);
       });
@@ -150,6 +307,9 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
   async function processJob(jobId) {
     const job = jobs.get(jobId);
     if (!job || job.status !== 'running') return;
+    job.processing = true;
+    job.processingStartedAt = Date.now();
+    await persistSharedJob(job);
 
     const stub = job.ownerStub;
     if (!stub || !aiToolsCoordinator || typeof aiToolsCoordinator.runWebsitePreviewGeneratePipeline !== 'function') {
@@ -157,6 +317,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       job.error = 'Serverconfiguratie ontbreekt voor batchverwerking.';
       job.finishedAt = Date.now();
       job.processing = false;
+      await persistSharedJob(job);
       return;
     }
 
@@ -166,6 +327,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       job.error = 'Bibliotheek-coördinator ontbreekt.';
       job.finishedAt = Date.now();
       job.processing = false;
+      await persistSharedJob(job);
       return;
     }
 
@@ -174,6 +336,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
         const item = job.items[i];
         item.status = 'running';
         job.currentIndex = i;
+        await persistSharedJob(job);
 
         try {
           const payload = await withTimeout(
@@ -211,6 +374,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
           item.error = String(err?.message || err || 'Onbekende fout');
           item.libraryEntryId = null;
         }
+        await persistSharedJob(job);
       }
 
       job.status = 'done';
@@ -222,6 +386,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       logger.error('[WebsitePreviewBatch][Fatal]', fatal?.message || fatal);
     } finally {
       job.processing = false;
+      await persistSharedJob(job);
     }
   }
 
@@ -287,8 +452,13 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     };
 
     jobs.set(jobId, job);
+    await persistSharedJob(job);
 
-    queueJobProcessing(jobId);
+    if (processJobsInline) {
+      await processJob(jobId);
+    } else {
+      queueJobProcessing(jobId);
+    }
 
     return res.status(202).json({
       ok: true,
@@ -308,7 +478,10 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       });
     }
 
-    const job = jobs.get(jobId);
+    let job = jobs.get(jobId);
+    if (!job) {
+      job = await loadSharedJob(jobId);
+    }
     if (!job) {
       return res.status(404).json({
         ok: false,
@@ -326,7 +499,11 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     }
 
     if (job.status === 'running' && !job.processing) {
-      queueJobProcessing(job.id);
+      if (processJobsInline) {
+        await processJob(job.id);
+      } else {
+        queueJobProcessing(job.id);
+      }
     }
 
     return res.status(200).json({
@@ -337,9 +514,19 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
 
   async function getCurrentBatchResponse(req, res) {
     pruneJobs();
-    const job = findLatestJobForOwner(ownerKeyFromReq(req));
+    const ownerKey = ownerKeyFromReq(req);
+    const localJob = findLatestJobForOwner(ownerKey);
+    const sharedJob = await findLatestSharedJobForOwner(ownerKey);
+    let job = localJob;
+    if (sharedJob && (!job || sharedJob.createdAt > job.createdAt)) {
+      job = sharedJob;
+    }
     if (job && !job.processing) {
-      queueJobProcessing(job.id);
+      if (job.status === 'running' && processJobsInline) {
+        await processJob(job.id);
+      } else {
+        queueJobProcessing(job.id);
+      }
     }
     return res.status(200).json({
       ok: true,

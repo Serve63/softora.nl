@@ -29,6 +29,8 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     normalizeString: aiDashboardOptions.normalizeString,
     aiToolsCoordinator,
     websitePreviewLibraryCoordinator: featureRouteOptions.websitePreviewLibraryCoordinator,
+    getUiStateValues: featureRouteOptions.getUiStateValues,
+    setUiStateValues: featureRouteOptions.setUiStateValues,
   });
   const premiumDatabaseWebdesignJobsCoordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: aiDashboardOptions.logger || console,
