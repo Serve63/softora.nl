@@ -56,11 +56,16 @@ test('website onderhoudspakketten tonen vaste uren per maand met taakvoorbeelden
   assert.match(websiteMaintenanceSection, /<div class="card-name">Plus<\/div>[\s\S]*10 uur per maand voor doorlopend beheer/);
   assert.match(websiteMaintenanceSection, /<div class="card-name">Premium<\/div>[\s\S]*15 uur per maand voor actief optimaliseren/);
   assert.match(websiteMaintenanceSection, /<div class="card-name">Enterprise<\/div>[\s\S]*25 uur per maand voor intensief beheer/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">€29<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 5 uur\/mnd<\/span>/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">€59<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 10 uur\/mnd<\/span>/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">€99<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 15 uur\/mnd<\/span>/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">Op<span class="price-suffix"> aanvraag<\/span><\/div><span class="price-hours">· 25 uur\/mnd<\/span>/);
   assert.match(websiteMaintenanceSection, /Updates, backups en monitoring/);
   assert.match(websiteMaintenanceSection, /Kleine tekst- en fotowijzigingen/);
   assert.match(websiteMaintenanceSection, /Nieuwe secties, acties of pagina-updates/);
   assert.match(websiteMaintenanceSection, /SEO, snelheid en conversie verbeteren/);
   assert.match(websiteMaintenanceSection, /Campagnepagina's, funnels en grotere uitbreidingen/);
+  assert.doesNotMatch(websiteMaintenanceSection, /uur p\/m · Excl\. BTW/);
   assert.doesNotMatch(websiteMaintenanceSection, /<div class="card-name">Pro<\/div>/);
   assert.doesNotMatch(websiteMaintenanceSection, /Onbeperkte aanpassingen/);
 });
