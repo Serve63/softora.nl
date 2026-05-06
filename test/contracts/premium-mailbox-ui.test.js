@@ -55,6 +55,16 @@ test('premium mailbox inboxbadge volgt de geladen inbox en niet een vast getal',
   assert.match(scriptSource, /catch \(error\) \{[\s\S]*mails = \[\];[\s\S]*syncInboxBadgeFromCurrentFolder\(\);/);
 });
 
+test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderknop', () => {
+  const pageSource = readPage();
+
+  assert.match(pageSource, /\.compose-head \{[\s\S]*background:\s*var\(--crimson\);/);
+  assert.match(pageSource, /\.compose-footer \{[\s\S]*justify-content:\s*flex-end;/);
+  assert.match(pageSource, /<button class="compose-x" type="button" data-mailbox-action="close-compose" aria-label="Sluiten">×<\/button>/);
+  assert.doesNotMatch(pageSource, /class="btn-discard"/);
+  assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
+});
+
 test('premium mailbox bewaart gelezen status via de mailbox API', () => {
   const scriptSource = readScript();
 
