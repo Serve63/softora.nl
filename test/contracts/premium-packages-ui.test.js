@@ -86,4 +86,8 @@ test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () =
   assert.doesNotMatch(routesSection, /Softora maakt de website en levert hem volledig af/);
   assert.doesNotMatch(routesSection, /Wij bouwen de website met een eigen beheersysteem/);
   assert.doesNotMatch(routesSection, /Wij maken de website, houden hem in beheer/);
+  assert.doesNotMatch(routesSection, /route-price-note/);
+  assert.doesNotMatch(routesSection, /Geen maandbedrag via Softora/);
+  assert.doesNotMatch(routesSection, /CRM vanaf €200 eenmalig/);
+  assert.doesNotMatch(routesSection, /Minimaal €30 per maand/);
 });
