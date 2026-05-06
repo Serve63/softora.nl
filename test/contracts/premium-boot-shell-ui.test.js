@@ -84,7 +84,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const bookkeepingSource = fs.readFileSync(bookkeepingPath, 'utf8');
         assert.match(bookkeepingSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else if (file === 'premium-mailbox.html') {
-        assert.match(source, /<script src="assets\/premium-mailbox\.js\?v=20260506a"><\/script>/, file);
+        assert.match(source, /<script src="assets\/premium-mailbox\.js\?v=20260506b"><\/script>/, file);
         const mailboxPath = path.join(__dirname, '../../assets/premium-mailbox.js');
         const mailboxSource = fs.readFileSync(mailboxPath, 'utf8');
         assert.match(mailboxSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
