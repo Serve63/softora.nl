@@ -32,7 +32,7 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /<th>Toegewezen aan<\/th>/);
   assert.match(pageSource, /<th>Review\?<\/th>\s*<th>Betaaldatum<\/th>/);
   assert.match(pageSource, /<label class="form-label" for="fieldResponsible">Toegewezen aan<\/label>/);
-  assert.match(pageSource, /<select class="form-select" id="fieldResponsible" name="verantwoordelijk" required>/);
+  assert.match(pageSource, /<select class="form-select" id="fieldResponsible" name="verantwoordelijk" required data-custom-select="true">/);
   assert.match(pageSource, /<option value="Serve" selected>Servé<\/option>/);
   assert.match(pageSource, /<option value="Martijn">Martijn<\/option>/);
   assert.match(pageSource, /fieldResponsible: document\.getElementById\("fieldResponsible"\),/);
@@ -97,6 +97,21 @@ test('premium customers onderhoudsprijs is alleen actief wanneer onderhoud ja is
   assert.match(pageSource, /const onderhoudPerMaand = onderhoudActief === "Ja" \? normalizeOptionalAmount/);
   assert.match(pageSource, /if \(hasM && onderhoudPerMaand === null\)/);
   assert.match(pageSource, /if \(nodes\.fieldMaintenanceEnabled\) nodes\.fieldMaintenanceEnabled\.addEventListener\("change", updateAmountFieldVisibility\);/);
+});
+
+test('premium customers modal uses Softora custom dropdowns instead of native browser menus', () => {
+  const pagePath = path.join(__dirname, '../../premium-klanten.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  ['fieldService', 'fieldMaintenanceEnabled', 'fieldStatus', 'fieldActive', 'fieldReview', 'fieldResponsible'].forEach((fieldId) => {
+    assert.match(pageSource, new RegExp(`<select class="form-select" id="${fieldId}"[\\s\\S]*?data-custom-select="true"`));
+  });
+  assert.match(pageSource, /assets\/custom-selects\.css\?v=20260421b/);
+  assert.match(pageSource, /assets\/custom-selects\.js\?v=20260421a/);
+  assert.match(pageSource, /\.modal \.site-select-trigger\{min-height:2\.85rem!important/);
+  assert.match(pageSource, /\.modal \.site-select-menu\{background:var\(--bg-secondary\)!important/);
+  assert.match(pageSource, /function refreshCustomerCustomSelects\(\) \{ if \(typeof window\.refreshCustomFormSelects === "function"\) window\.refreshCustomFormSelects\(\); \}/);
+  assert.match(pageSource, /clearModalValidationState\(\);\s*refreshCustomerCustomSelects\(\);/);
 });
 
 test('premium customers page preserves the shared database lifecycle status', () => {
