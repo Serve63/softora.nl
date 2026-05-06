@@ -55,6 +55,60 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
 .page-title { font-family: 'Oswald', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 .page-sub { font-size: 13px; color: var(--light); margin-top: 3px; margin-bottom: 32px; }
 
+.bookkeeping-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 32px;
+}
+.bookkeeping-header-copy { min-width: 0; }
+.bookkeeping-header .page-sub { margin-bottom: 0; }
+.company-tax-card {
+  width: min(100%, 380px);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 18px;
+  box-shadow: 0 10px 30px rgba(26, 26, 46, 0.04);
+}
+.company-tax-card__title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.7px;
+  text-transform: uppercase;
+  color: var(--crimson);
+  margin-bottom: 12px;
+}
+.company-tax-card__list {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.company-tax-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+}
+.company-tax-card__label {
+  color: var(--light);
+  font-weight: 700;
+}
+.company-tax-card__value {
+  color: var(--dark);
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .bookkeeping-header { flex-direction: column; gap: 18px; }
+  .company-tax-card { width: 100%; }
+}
+
 .year-nav { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
 .year-label { font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 1px; }
 .btn-yr { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--mid); transition: all .15s; }
@@ -257,8 +311,33 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
 
 <!-- SCHERM 1: OVERZICHT -->
 <div class="screen active" id="screen-overzicht">
-  <div class="page-title">Boekhouding</div>
-  <div class="page-sub">Fiscale verplichtingen en aangiftekalender voor je VOF</div>
+  <div class="bookkeeping-header">
+    <div class="bookkeeping-header-copy">
+      <div class="page-title">Boekhouding</div>
+      <div class="page-sub">Fiscale verplichtingen en aangiftekalender voor je VOF</div>
+    </div>
+    <section class="company-tax-card" aria-label="Bedrijfsgegevens Softora">
+      <div class="company-tax-card__title">Bedrijfsgegevens</div>
+      <div class="company-tax-card__list">
+        <div class="company-tax-card__row">
+          <span class="company-tax-card__label">KVK-nummer</span>
+          <span class="company-tax-card__value">93827504</span>
+        </div>
+        <div class="company-tax-card__row">
+          <span class="company-tax-card__label">Btw-identificatienummer</span>
+          <span class="company-tax-card__value">NL866541925B01</span>
+        </div>
+        <div class="company-tax-card__row">
+          <span class="company-tax-card__label">Omzetbelastingnummer</span>
+          <span class="company-tax-card__value">866541925B01</span>
+        </div>
+        <div class="company-tax-card__row">
+          <span class="company-tax-card__label">Aangiftetijdvak</span>
+          <span class="company-tax-card__value">kwartaal</span>
+        </div>
+      </div>
+    </section>
+  </div>
 
   <div class="year-nav">
     <button class="btn-yr" type="button" data-bookkeeping-action="year-prev" aria-label="Vorig jaar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg></button>
