@@ -870,6 +870,8 @@
             background: rgba(231, 76, 60, 0.04);
         }
 
+        .modal .site-select{width:100%!important}.modal .site-select-trigger{min-height:2.85rem!important;padding:.82rem 2.4rem .82rem .9rem!important;border:1px solid var(--border)!important;border-radius:0!important;background:var(--bg-tertiary)!important;color:var(--text-primary)!important;font:inherit!important;font-size:.92rem!important;line-height:1.4!important;letter-spacing:0!important;text-transform:none!important;box-shadow:none!important}.modal .site-select-trigger:hover,.modal .site-select-trigger:focus-visible,.modal .site-select.is-open .site-select-trigger{border-color:rgba(139,34,82,.42)!important;box-shadow:0 0 0 1px rgba(139,34,82,.16)!important}.modal .site-select-menu{background:var(--bg-secondary)!important;color:var(--text-primary)!important;border:1px solid rgba(139,34,82,.26)!important;border-radius:0!important;box-shadow:0 18px 42px rgba(20,22,32,.18)!important}.modal .site-select-option{border-radius:0!important;padding:.72rem .85rem!important}.modal .site-select-option.is-selected{background:rgba(139,34,82,.10)!important;color:var(--accent)!important}.modal .site-select-native.is-invalid + .site-select-trigger{border-color:rgba(231,76,60,.55)!important;background:rgba(231,76,60,.04)!important}
+
         .modal-actions {
             display: flex;
             justify-content: flex-end;
@@ -1203,25 +1205,21 @@
                         <label class="form-label" for="fieldName">Naam</label>
                         <input class="form-input" id="fieldName" name="naam" autocomplete="name" placeholder="Jan de Vries" required>
                     </div>
-
                     <div class="form-group">
                         <label class="form-label" for="fieldProject">Website</label>
                         <input class="form-input" id="fieldProject" name="website" placeholder="softora.nl" required>
                     </div>
-
                     <div class="form-group">
                         <label class="form-label" for="fieldCompany">Bedrijfsnaam</label>
                         <input class="form-input" id="fieldCompany" name="bedrijf" autocomplete="organization" placeholder="De Vries BV" required>
                     </div>
-
                     <div class="form-group">
                         <label class="form-label" for="fieldPhone">Telefoonnummer</label>
                         <input class="form-input" id="fieldPhone" name="telefoon" autocomplete="tel" placeholder="+31 6 12345678" required>
                     </div>
-
                     <div class="form-group">
                         <label class="form-label" for="fieldService">Service</label>
-                        <select class="form-select" id="fieldService" name="service" required>
+                        <select class="form-select" id="fieldService" name="service" required data-custom-select="true">
                             <option value="website">Website</option>
                             <option value="bedrijfssoftware">Bedrijfssoftware</option>
                             <option value="voicesoftware">Voicesoftware</option>
@@ -1239,7 +1237,7 @@
                         <input class="form-input" id="fieldWebsiteAmount" name="websiteBedrag" type="number" min="0" step="1" placeholder="1500">
                     </div>
 
-                    <div class="form-group"><label class="form-label" for="fieldMaintenanceEnabled">Onderhoud?</label><select class="form-select" id="fieldMaintenanceEnabled" name="onderhoudActief" required><option value="Nee" selected>Nee</option><option value="Ja">Ja</option></select></div>
+                    <div class="form-group"><label class="form-label" for="fieldMaintenanceEnabled">Onderhoud?</label><select class="form-select" id="fieldMaintenanceEnabled" name="onderhoudActief" required data-custom-select="true"><option value="Nee" selected>Nee</option><option value="Ja">Ja</option></select></div>
 
                     <div class="form-group" id="maintenanceAmountGroup">
                         <label class="form-label" for="fieldMaintenanceAmount">Onderhoud per maand (EUR)</label>
@@ -1248,7 +1246,7 @@
 
                     <div class="form-group">
                         <label class="form-label" for="fieldStatus">Status</label>
-                        <select class="form-select" id="fieldStatus" name="status" required>
+                        <select class="form-select" id="fieldStatus" name="status" required data-custom-select="true">
                             <option value="Betaald">Betaald</option>
                             <option value="Open">Open</option>
                         </select>
@@ -1256,7 +1254,7 @@
 
                     <div class="form-group">
                         <label class="form-label" for="fieldActive">Actief</label>
-                        <select class="form-select" id="fieldActive" name="actief" required>
+                        <select class="form-select" id="fieldActive" name="actief" required data-custom-select="true">
                             <option value="Ja" selected>Ja</option>
                             <option value="Nee">Nee</option>
                         </select>
@@ -1264,7 +1262,7 @@
 
                     <div class="form-group">
                         <label class="form-label" for="fieldReview">Review?</label>
-                        <select class="form-select" id="fieldReview" name="review" required>
+                        <select class="form-select" id="fieldReview" name="review" required data-custom-select="true">
                             <option value="Nee" selected>Nee</option>
                             <option value="Ja">Ja</option>
                         </select>
@@ -1272,7 +1270,7 @@
 
                     <div class="form-group">
                         <label class="form-label" for="fieldResponsible">Toegewezen aan</label>
-                        <select class="form-select" id="fieldResponsible" name="verantwoordelijk" required>
+                        <select class="form-select" id="fieldResponsible" name="verantwoordelijk" required data-custom-select="true">
                             <option value="Serve" selected>Servé</option>
                             <option value="Martijn">Martijn</option>
                         </select>
@@ -1419,6 +1417,7 @@
             if (!group) return true;
             return !group.hidden;
         }
+        function refreshCustomerCustomSelects() { if (typeof window.refreshCustomFormSelects === "function") window.refreshCustomFormSelects(); }
         function normalizeMaintenanceEnabled(raw, type, amount) { const value = normalizeString(raw && (raw.onderhoudActief || raw.heeftOnderhoud || raw.maintenanceEnabled || raw.onderhoud)).toLowerCase(); if (value === "ja" || value === "yes" || value === "true" || value === "1") return "Ja"; if (value === "nee" || value === "no" || value === "false" || value === "0") return "Nee"; return type === "Onderhoud" || type === "Website + onderhoud" || (amount !== null && amount > 0) ? "Ja" : "Nee"; }
         function normalizeCustomer(raw, fallbackId) {
             const legacyAmount = normalizeOptionalAmount(raw && raw.bedrag);
@@ -1550,6 +1549,7 @@
                 if (!maintenanceEnabled) nodes.fieldMaintenanceAmount.value = "";
             }
             clearModalValidationState();
+            refreshCustomerCustomSelects();
         }
 
         function setStatusMessage(message, tone, autoClear) {
