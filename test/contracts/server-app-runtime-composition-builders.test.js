@@ -296,6 +296,14 @@ test('server app runtime composition builders preserve feature wiring groups and
     'serve@softora.nl',
     'martijn@softora.nl',
   ]);
+  assert.equal(
+    context.featureRouteOptions.coldmailing.generatedAgendaAppointments,
+    context.aiDashboardOptions.generatedAgendaAppointments
+  );
+  assert.equal(
+    context.featureRouteOptions.coldmailing.isGeneratedAppointmentVisibleForAgenda,
+    isGeneratedAppointmentVisibleForAgenda
+  );
 
   await context.aiDashboardOptions.ensureDashboardChatRuntimeReady();
   assert.equal(hydratedAttempts, 1);

@@ -1,3 +1,57 @@
+const { createAgendaCapacityService } = require('../services/agenda-capacity');
+
+async function resolveColdmailingAgendaCapacity(deps) {
+  if (deps && typeof deps.backfillInsightsAndAppointmentsFromRecentCallUpdates === 'function') {
+    deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
+  }
+
+  if (
+    deps &&
+    typeof deps.isSupabaseConfigured === 'function' &&
+    deps.isSupabaseConfigured() &&
+    typeof deps.syncRuntimeStateFromSupabaseIfNewer === 'function'
+  ) {
+    await deps.syncRuntimeStateFromSupabaseIfNewer({
+      force: false,
+      maxAgeMs: 0,
+      skipPendingPersistWait: true,
+    });
+  }
+
+  if (deps && typeof deps.backfillInsightsAndAppointmentsFromRecentCallUpdates === 'function') {
+    deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
+  }
+
+  const appointments =
+    typeof deps?.getGeneratedAgendaAppointments === 'function'
+      ? deps.getGeneratedAgendaAppointments()
+      : Array.isArray(deps?.generatedAgendaAppointments)
+        ? deps.generatedAgendaAppointments
+        : [];
+  const capacityService = createAgendaCapacityService({
+    normalizeString: deps?.normalizeString,
+    normalizeDateYyyyMmDd: deps?.normalizeDateYyyyMmDd,
+    normalizeTimeHhMm: deps?.normalizeTimeHhMm,
+    now:
+      typeof deps?.getColdmailingAgendaCapacityNow === 'function'
+        ? deps.getColdmailingAgendaCapacityNow
+        : () => new Date(),
+  });
+
+  return capacityService.assessUpcomingWorkdayCapacity({
+    appointments,
+    isAppointmentVisible:
+      typeof deps?.isGeneratedAppointmentVisibleForAgenda === 'function'
+        ? deps.isGeneratedAppointmentVisibleForAgenda
+        : () => true,
+    workdayCount: 10,
+    slotMinutes: 60,
+    businessHoursStart: '09:00',
+    businessHoursEnd: '17:00',
+    timeZone: 'Europe/Amsterdam',
+  });
+}
+
 function registerColdmailingRoutes(app, deps = {}) {
   const {
     coldmailCampaignService,
@@ -49,6 +103,30 @@ function registerColdmailingRoutes(app, deps = {}) {
   app.post('/api/coldmailing/campaigns/send', async (req, res) => {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
+      let agendaCapacity = null;
+      try {
+        agendaCapacity = await resolveColdmailingAgendaCapacity(deps);
+      } catch (error) {
+        res.status(503).json({
+          ok: false,
+          agendaBlocked: true,
+          code: 'AGENDA_CHECK_UNAVAILABLE',
+          reason: 'agenda_check_unavailable',
+          message: 'Kon de agenda niet veilig controleren. Coldmailing is niet gestart.',
+        });
+        return;
+      }
+      if (agendaCapacity && agendaCapacity.full) {
+        res.status(409).json({
+          ok: false,
+          agendaBlocked: true,
+          code: 'AGENDA_FULL_10_WORKDAYS',
+          reason: 'agenda_full_10_workdays',
+          message: 'Coldmailing is geblokkeerd omdat de agenda voor de komende 10 werkdagen vol zit.',
+          agendaCapacity,
+        });
+        return;
+      }
       const result = await coldmailCampaignService.sendColdmailCampaign({
         count: body.count,
         subject: body.subject,
@@ -124,5 +202,6 @@ function registerColdmailingRoutes(app, deps = {}) {
 }
 
 module.exports = {
+  resolveColdmailingAgendaCapacity,
   registerColdmailingRoutes,
 };

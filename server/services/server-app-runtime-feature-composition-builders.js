@@ -259,6 +259,16 @@ function buildServerAppFeatureWiringRuntimeContext({
           normalizeString: shared.normalizeString,
           truncateText: shared.truncateText,
         }),
+        normalizeDateYyyyMmDd: platformRuntime.normalizeDateYyyyMmDd,
+        normalizeTimeHhMm: platformRuntime.normalizeTimeHhMm,
+        isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
+        syncRuntimeStateFromSupabaseIfNewer:
+          runtimeSyncRuntime.syncRuntimeStateFromSupabaseIfNewer,
+        generatedAgendaAppointments: runtimeMemory.generatedAgendaAppointments,
+        isGeneratedAppointmentVisibleForAgenda:
+          agendaSupportRuntime.isGeneratedAppointmentVisibleForAgenda,
+        backfillInsightsAndAppointmentsFromRecentCallUpdates:
+          agendaSupportRuntime.backfillInsightsAndAppointmentsFromRecentCallUpdates,
         normalizeString: shared.normalizeString,
         truncateText: shared.truncateText,
       },
