@@ -217,7 +217,7 @@ test('premium agenda handmatige afspraak-modal slaat locatie en opmerkingen op',
   assert.match(pageSource, /notes,/);
 });
 
-test('premium agenda toont leaderboard voor handmatig geregelde leads', () => {
+test('premium agenda toont handmatige lead-eigenaren in maandheader zonder losse statistiekkaart', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -226,16 +226,17 @@ test('premium agenda toont leaderboard voor handmatig geregelde leads', () => {
   assert.match(pageSource, /manualLeadOwnerKey: String\(item\.manualLeadOwnerKey \|\| ''\)/);
   assert.match(pageSource, /leadOwnerKey: String\(item\.leadOwnerKey \|\| ''\)/);
   assert.match(pageSource, /leadOwnerFullName: String\(item\.leadOwnerFullName \|\| ''\)/);
-  assert.match(stabilitySource, /function buildManualLeadStatsEntries\(sourceAppointments\)/);
-  assert.match(stabilitySource, /function renderManualLeadStatsCard\(\)/);
-  assert.match(stabilitySource, /agendaManualLeadStatsCard/);
-  assert.match(stabilitySource, /Handmatige leads/);
-  assert.match(stabilitySource, /handmatige lead/);
-  assert.match(stabilitySource, /if \(!apt \|\| !isManualAgendaAppointment\(apt\)\) return false;/);
-  assert.match(stabilitySource, /if \(isManualOtherAppointment\(apt\)\) return false;/);
-  assert.match(stabilitySource, /choice === 'website' \|\| choice === 'business' \|\| choice === 'voice' \|\| choice === 'chatbot'/);
-  assert.match(stabilitySource, /manualLeadOwnerKey \|\| apt\.leadOwnerKey \|\| apt\.manualLeadOwnerName/);
-  assert.match(stabilitySource, /renderCalendar = function renderCalendarStable\(\) \{[\s\S]*baseRenderCalendar\(\);[\s\S]*renderManualLeadStatsCard\(\);/);
+  assert.match(pageSource, /class="agenda-header-owners" aria-label="Handmatige lead eigenaren"/);
+  assert.match(pageSource, /class="agenda-header-owner">Servé<\/span>/);
+  assert.match(pageSource, /class="agenda-header-owner">Martijn<\/span>/);
+  assert.match(pageSource, /\.month-nav\s*\{[\s\S]*gap:\s*0\.45rem;/);
+  assert.match(pageSource, /\.month-label\s*\{[\s\S]*min-width:\s*auto;/);
+  assert.doesNotMatch(pageSource, /agendaManualLeadStatsCard/);
+  assert.doesNotMatch(pageSource, />\s*Handmatige leads\s*</);
+  assert.doesNotMatch(stabilitySource, /agendaManualLeadStatsCard/);
+  assert.doesNotMatch(stabilitySource, /renderManualLeadStatsCard/);
+  assert.doesNotMatch(stabilitySource, /Handmatige leads/);
+  assert.match(stabilitySource, /renderCalendar = function renderCalendarStable\(\) \{[\s\S]*baseRenderCalendar\(\);[\s\S]*document\.querySelectorAll\('\[data-calendar-date\]'\)/);
 });
 
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {
