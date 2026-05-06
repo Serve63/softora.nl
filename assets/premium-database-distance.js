@@ -9,16 +9,25 @@
   const PLACE_COORD_ENTRIES = [
     ["oisterwijk", 51.5792, 5.1889],
     ["moergestel", 51.5456, 5.1778],
+    ["heukelom", 51.585, 5.164],
     ["berkel-enschot", 51.6026, 5.1461],
     ["tilburg", 51.5555, 5.0913],
     ["haaren", 51.6027, 5.2222],
     ["udenhout", 51.6098, 5.1436],
+    ["biezenmortel", 51.625, 5.178],
     ["goirle", 51.5206, 5.0667],
+    ["riel", 51.523, 5.023],
     ["hilvarenbeek", 51.4858, 5.1397],
+    ["biest-houtakker", 51.506, 5.156],
     ["diessen", 51.475, 5.175],
+    ["haghorst", 51.5, 5.204],
     ["middelbeers", 51.517, 5.095],
+    ["oost-west-en-middelbeers", 51.47, 5.25],
     ["vught", 51.6533, 5.2875],
+    ["cromvoirt", 51.662, 5.233],
+    ["helvoirt", 51.631, 5.231],
     ["boxtel", 51.5908, 5.3293],
+    ["esch", 51.6105, 5.2915],
     ["sint-michielsgestel", 51.6417, 5.3519],
     ["schijndel", 51.6225, 5.4319],
     ["sint-oedenrode", 51.5675, 5.4597],
@@ -32,7 +41,10 @@
     ["veldhoven", 51.418, 5.4024],
     ["waalre", 51.3867, 5.4447],
     ["dongen", 51.6265, 4.9383],
+    ["s-gravenmoer", 51.654, 4.94],
     ["gilze", 51.5442, 4.9403],
+    ["hulten", 51.573, 4.958],
+    ["molenschot", 51.571, 4.881],
     ["rijen", 51.5881, 4.9267],
     ["bavel", 51.5653, 4.8307],
     ["ulvenhout", 51.5486, 4.7967],
@@ -50,9 +62,26 @@
     ["roosendaal", 51.5308, 4.4653],
     ["steenbergen", 51.585, 4.317],
     ["bergen-op-zoom", 51.4946, 4.2872],
+    ["altena", 51.79, 4.94],
     ["almkerk", 51.7714, 4.9597],
+    ["andel", 51.785, 5.058],
+    ["babylonienbroek", 51.742, 5.007],
+    ["drongelen", 51.712, 5.054],
+    ["dussen", 51.73, 4.964],
+    ["eethen", 51.735, 5.049],
+    ["genderen", 51.734, 5.087],
+    ["giessen", 51.789, 5.03],
+    ["hank", 51.734, 4.894],
+    ["meeuwen", 51.73, 5.016],
+    ["nieuwendijk", 51.777, 4.923],
+    ["rijswijk", 51.795, 5.025],
     ["werkendam", 51.8101, 4.8944],
     ["sleeuwijk", 51.815, 4.952],
+    ["uitwijk", 51.788, 5.006],
+    ["veen", 51.777, 5.107],
+    ["waardhuizen", 51.777, 5.0],
+    ["wijk-en-aalburg", 51.755, 5.132],
+    ["woudrichem", 51.815, 5.002],
     ["gorinchem", 51.833, 4.974],
     ["zaltbommel", 51.81, 5.244],
     ["waalwijk", 51.6828, 5.0707],
@@ -198,12 +227,49 @@
     return (Array.isArray(customers) ? customers : []).slice().sort(compareCustomersByDistance);
   }
 
+  function getTargetParts(label) {
+    return String(label || "")
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+
+  function resolveTargetCoords(label) {
+    const parts = getTargetParts(label);
+    const place = parts.length ? parts[parts.length - 1] : "";
+    const municipality = parts.length > 2 ? parts[parts.length - 2] : "";
+    return resolvePlaceCoords(place) || resolvePlaceCoords(municipality) || resolvePlaceCoords(label);
+  }
+
+  function getTargetDistanceKm(label) {
+    const coords = resolveTargetCoords(label);
+    return coords ? haversineKm(OISTERWIJK_COORDS, coords) : Infinity;
+  }
+
+  function compareTargetLabelsByDistance(left, right) {
+    const leftDistance = getTargetDistanceKm(left);
+    const rightDistance = getTargetDistanceKm(right);
+    if (Number.isFinite(leftDistance) && !Number.isFinite(rightDistance)) return -1;
+    if (!Number.isFinite(leftDistance) && Number.isFinite(rightDistance)) return 1;
+    if (leftDistance < rightDistance) return -1;
+    if (leftDistance > rightDistance) return 1;
+    return normalizeText(left).localeCompare(normalizeText(right), "nl");
+  }
+
+  function sortTargetLabelsByDistance(labels) {
+    return (Array.isArray(labels) ? labels : []).slice().sort(compareTargetLabelsByDistance);
+  }
+
   return Object.freeze({
     compareCustomersByDistance,
+    compareTargetLabelsByDistance,
     getDistanceKm,
+    getTargetDistanceKm,
     normalizeText,
     resolveCustomerCoords,
     resolvePlaceCoords,
+    resolveTargetCoords,
     sortCustomersByDistance,
+    sortTargetLabelsByDistance,
   });
 });

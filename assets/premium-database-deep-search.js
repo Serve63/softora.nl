@@ -19,6 +19,7 @@
     const AUTO_CONTINUE_DELAY_MS = 750;
     const REQUIRED_EMPTY_COMPLETION_ROUNDS = 1;
     const DEEP_SEARCH_BUSY_STYLE_ID = "softora-deep-search-busy-style";
+    const TARGET_ORDER_VERSION = "distance-oisterwijk-v1";
     // Generated from the supplied work order, extended with CBS 2025 woonplaatsen.
     const DEFAULT_TARGET_TEXT_BASE64 = [
         "TmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFsbWtlcmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFuZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBCYWJ5bG9uacOrbmJyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBEcm9uZ2VsZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IER1c3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgRWV0aGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBHZW5kZXJlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgR2llc3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgSGFuawpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTWVldXdlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTmlldXdlbmRpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFJpanN3aWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBTbGVldXdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFVpdHdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFZlZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdhYXJkaHVpemVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBXZXJrZW5kYW0KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdpamsgZW4gQWFsYnVyZwpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgV291ZHJpY2hlbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBBc3RlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBIZXVzZGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBc3RlbiB8IE9tbWVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCYWFybGUtTmFzc2F1IHwgQmFhcmxlLU5hc3NhdQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IENhc3RlbHLDqQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IFVsaWNvdGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEJlcmdlaWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEx1eWtzZ2VzdGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IFJpZXRob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VpamsgfCBXZXN0ZXJob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBCZXJnZW4gb3AgWm9vbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBIYWxzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcmdlbiBvcCBab29tIHwgTGVwZWxzdHJhYXQKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgSGVlc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IEhlZXN3aWprLURpbnRoZXIKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgTG9vc2Jyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IE5pc3RlbHJvZGUKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgVmlua2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IFZvcnN0ZW5ib3NjaApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVzdCB8IEJlc3QKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEJsYWRlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgQ2FzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEhhcGVydApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgSG9vZ2Vsb29uCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCbGFkZWwgfCBOZXRlcnNlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm9la2VsIHwgQm9la2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb2VrZWwgfCBWZW5ob3JzdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm94dGVsIHwgQm94dGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBFc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBMaWVtcGRlCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJhdmVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJyZWRhCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFByaW5zZW5iZWVrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFRldGVyaW5nZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJyZWRhIHwgVWx2ZW5ob3V0Ck5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLURvcnBsZWluCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLVNjaG9vdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQ3JhbmVuZG9uY2sgfCBHYXN0ZWwKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IENyYW5lbmRvbmNrIHwgTWFhcmhlZXplCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IFNvZXJlbmRvbmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IERldXJuZSB8IERldXJuZQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwgSGVsZW5hdmVlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwg",
@@ -121,8 +122,29 @@
             });
     }
 
-    function getDefaultTargetLabels() {
+    function getRawDefaultTargetLabels() {
         return parseTargetLines(DEFAULT_TARGET_TEXT);
+    }
+
+    function getDistanceSorter() {
+        return global && global.SoftoraPremiumDatabaseDistance && typeof global.SoftoraPremiumDatabaseDistance.sortTargetLabelsByDistance === "function"
+            ? global.SoftoraPremiumDatabaseDistance
+            : null;
+    }
+
+    function sortTargetLabelsByDistance(labels) {
+        const sorter = getDistanceSorter();
+        return sorter ? sorter.sortTargetLabelsByDistance(labels) : (Array.isArray(labels) ? labels.slice() : []);
+    }
+
+    function getDefaultTargetLabels() {
+        return sortTargetLabelsByDistance(getRawDefaultTargetLabels());
+    }
+
+    function getProgressDefaultLabels(parsed) {
+        return normalizeString(parsed && parsed.targetOrderVersion) === TARGET_ORDER_VERSION
+            ? getDefaultTargetLabels()
+            : getRawDefaultTargetLabels();
     }
 
     function estimateRunUsd(companyCount) {
@@ -345,15 +367,18 @@
         }).filter(Boolean);
     }
 
-    function applyTargetProgress(targets, progressItems) {
+    function applyTargetProgress(targets, progressItems, progressDefaultLabels) {
         const result = targets.slice();
+        const defaultLabels = Array.isArray(progressDefaultLabels) ? progressDefaultLabels : getDefaultTargetLabels();
         (Array.isArray(progressItems) ? progressItems : []).forEach(function (progress, fallbackIndex) {
-            const label = normalizeString(progress && progress.label);
+            let label = normalizeString(progress && progress.label);
             let index = Number.isFinite(Number(progress && progress.index)) ? Number(progress.index) : -1;
-            if (index < 0 && label) {
-                index = result.findIndex(function (target) {
+            if (!label && index >= 0) label = normalizeString(defaultLabels[index]);
+            if (label) {
+                const labelIndex = result.findIndex(function (target) {
                     return normalizeKey(target.label) === normalizeKey(label);
                 });
+                if (labelIndex !== -1) index = labelIndex;
             }
             if (index < 0) index = fallbackIndex;
             const existing = result[index] || createTarget(label, index);
@@ -390,8 +415,16 @@
         const loadedTargets = Array.isArray(parsed.targets)
             ? parsed.targets.map(normalizeTarget).filter(Boolean)
             : [];
-        const targets = applyTargetProgress(applyDefaultTargets(loadedTargets), parsed.targetProgress || parsed.progress);
+        const progressDefaultLabels = getProgressDefaultLabels(parsed);
+        const targets = applyTargetProgress(applyDefaultTargets(loadedTargets), parsed.targetProgress || parsed.progress, progressDefaultLabels);
         let activeIndex = Math.max(0, Math.min(targets.length - 1, Number(parsed.activeIndex) || 0));
+        if (normalizeString(parsed.targetOrderVersion) !== TARGET_ORDER_VERSION && Number.isFinite(Number(parsed.activeIndex))) {
+            const legacyActiveLabel = normalizeString(progressDefaultLabels[Math.max(0, Number(parsed.activeIndex) || 0)]);
+            const migratedActiveIndex = legacyActiveLabel
+                ? targets.findIndex(function (target) { return normalizeKey(target.label) === normalizeKey(legacyActiveLabel); })
+                : -1;
+            if (migratedActiveIndex !== -1) activeIndex = migratedActiveIndex;
+        }
         const activeFromStatus = targets.findIndex(function (target) {
             return target.status === "active";
         });
@@ -478,6 +511,7 @@
         function serializeState() {
             return JSON.stringify({
                 version: 2,
+                targetOrderVersion: TARGET_ORDER_VERSION,
                 targetProgress: serializeTargetProgressList(state.targets),
                 activeIndex: state.activeIndex,
                 totalCostUsd: state.totalCostUsd,
@@ -985,6 +1019,8 @@
             isBusy: isBusy,
             isOpen: isOpen,
             open: open,
+            getDefaultTargetLabels: getDefaultTargetLabels,
+            getRawDefaultTargetLabels: getRawDefaultTargetLabels,
             parseTargetLines: parseTargetLines,
             readDeepSearchRows: readDeepSearchRows,
             runCurrentSearch: runCurrentSearch
@@ -993,6 +1029,8 @@
 
     global.SoftoraDatabaseDeepSearch = {
         createController: createController,
+        getDefaultTargetLabels: getDefaultTargetLabels,
+        getRawDefaultTargetLabels: getRawDefaultTargetLabels,
         parseTargetLines: parseTargetLines,
         readDeepSearchRows: readDeepSearchRows
     };
