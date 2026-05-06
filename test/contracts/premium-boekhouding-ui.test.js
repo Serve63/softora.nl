@@ -29,6 +29,19 @@ test('premium boekhouding no longer shows ICP opgave rows', () => {
   assert.doesNotMatch(scriptSource, /cat: "Overige Opgaven"/);
 });
 
+test('premium boekhouding toont Softora bedrijfsgegevens rechtsboven in de header', () => {
+  const pageSource = readPage();
+
+  assert.match(pageSource, /class="bookkeeping-header"/);
+  assert.match(pageSource, /class="company-tax-card" aria-label="Bedrijfsgegevens Softora"/);
+  assert.match(pageSource, /KVK-nummer[\s\S]*93827504/);
+  assert.match(pageSource, /Btw-identificatienummer[\s\S]*NL866541925B01/);
+  assert.match(pageSource, /Omzetbelastingnummer[\s\S]*866541925B01/);
+  assert.match(pageSource, /Aangiftetijdvak[\s\S]*kwartaal/);
+  assert.match(pageSource, /\.bookkeeping-header\s*\{[\s\S]*justify-content:\s*space-between;/);
+  assert.match(pageSource, /\.company-tax-card\s*\{[\s\S]*width:\s*min\(100%, 380px\);/);
+});
+
 test('premium boekhouding anchors deadlines to official upcoming ranges', () => {
   const scriptSource = readScript();
 
