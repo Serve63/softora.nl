@@ -12,7 +12,7 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = [
-      '.mail-variable-note{margin-top:8px;display:inline-flex;align-items:center;gap:8px;align-self:flex-start;color:var(--crimson);background:rgba(155,35,85,.06);border:1px solid rgba(155,35,85,.18);border-radius:6px;padding:5px 9px;font-size:12px;line-height:1.4}',
+      '.mail-variable-note{margin-top:8px;display:inline-flex;align-items:center;gap:8px;align-self:flex-start;color:var(--crimson);background:rgba(155,35,85,.06);border:1px solid rgba(155,35,85,.18);border-radius:6px;padding:5px 9px;font-size:12px;line-height:1.4;flex-wrap:wrap}',
       '.mail-variable-note .var-tag{padding:2px 8px;background:rgba(155,35,85,.12);border-color:rgba(155,35,85,.24)}',
     ].join('\n');
     document.head.appendChild(style);
@@ -32,16 +32,19 @@
     }
     const note = document.createElement('div');
     note.className = 'mail-variable-note';
-    note.setAttribute('aria-label', 'Dynamische plaats uit database');
+    note.setAttribute('aria-label', 'Dynamische plaats en website uit database');
     const pin = document.createElement('span');
     pin.setAttribute('aria-hidden', 'true');
     pin.textContent = '📍';
     const variable = document.createElement('span');
     variable.className = 'var-tag';
     variable.textContent = '{{stad}}';
+    const websiteVariable = document.createElement('span');
+    websiteVariable.className = 'var-tag';
+    websiteVariable.textContent = '{{website}}';
     const label = document.createElement('span');
-    label.textContent = 'Plaats uit database';
-    note.append(pin, variable, label);
+    label.textContent = 'Plaats en website uit database';
+    note.append(pin, variable, websiteVariable, label);
     host.appendChild(note);
   }
 

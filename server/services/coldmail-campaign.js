@@ -362,8 +362,34 @@ function createColdmailCampaignService(deps = {}) {
     return addressLikeValue || '';
   }
 
+  function normalizeWebsiteVariableValue(value) {
+    const raw = normalizeString(value);
+    if (!raw) return '';
+    const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+      const parsed = new URL(candidate);
+      return normalizeString(parsed.hostname).replace(/^www\./i, '') || raw;
+    } catch (_) {
+      return raw
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .replace(/\/.*$/g, '')
+        .replace(/\/+$/g, '');
+    }
+  }
+
   function getRowDomain(row) {
-    return normalizeString(row.dom || row.domain || row.website || '');
+    return normalizeWebsiteVariableValue(
+      row.dom ||
+        row.domain ||
+        row.website ||
+        row.websiteUrl ||
+        row.website_url ||
+        row.url ||
+        row.site ||
+        row.domein ||
+        ''
+    );
   }
 
   function getRowEmail(row) {
