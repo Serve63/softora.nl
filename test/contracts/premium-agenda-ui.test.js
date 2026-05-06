@@ -289,7 +289,7 @@ test('premium agenda verbergt dealacties voor handmatige overige afspraken en be
   assert.match(stabilitySource, /modalBadge\.textContent = 'Overige afspraak';/);
   assert.match(stabilitySource, /modalPrimaryBtn\.hidden = true;/);
   assert.match(stabilitySource, /modalNoDealBtn\.hidden = true;/);
-  assert.match(pageSource, /id="modalCompleteActivityBtn"[^>]*>Activiteit afgerond<\/button>/);
+  assert.match(pageSource, /class="modal-btn primary magnetic" id="modalCompleteActivityBtn"[^>]*>Activiteit afgerond<\/button>/);
   assert.match(pageSource, /const modalCompleteActivityBtn = document\.getElementById\('modalCompleteActivityBtn'\);/);
   assert.match(stabilitySource, /function syncCompleteActivityButtonVisibility\(\)/);
   assert.match(stabilitySource, /canCompleteAppointmentManually\(apt\) && !isAppointmentCompleted\(apt\)/);
