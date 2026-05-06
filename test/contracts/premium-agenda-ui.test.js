@@ -199,6 +199,8 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /leadOwnerKey,/);
   assert.match(pageSource, /who,/);
   assert.match(pageSource, /notes,/);
+  assert.match(pageSource, /manualLegendChoice: String\(item\.manualLegendChoice \|\| item\.legendChoice \|\| ''\),/);
+  assert.match(pageSource, /appointmentKind: String\(item\.appointmentKind \|\| item\.manualAppointmentKind \|\| ''\),/);
   assert.match(pageSource, /if \(manualLegendChoice === 'business'\) return 'appointment meeting magnetic meeting--business';/);
   assert.match(pageSource, /if \(who === 'overig'\) return 'appointment manual-overig magnetic';/);
   assert.match(pageSource, /if \(who === 'both' \|\| who === 'allebei' \|\| who === 'beide'\) return 'appointment manual-both magnetic';/);
@@ -248,7 +250,7 @@ test('premium agenda shows klantwerk label on Saturdays', () => {
   assert.match(pageSource, /if \(isYmdCalendarSaturday\(picked\)\) return;/);
 });
 
-test('premium agenda herstelt handmatige activiteitknoppen en boot-failsafe', () => {
+test('premium agenda verbergt dealacties voor handmatige overige afspraken en behoudt boot-failsafe', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -258,9 +260,12 @@ test('premium agenda herstelt handmatige activiteitknoppen en boot-failsafe', ()
   assert.match(pageSource, /window\.SoftoraAgendaStability\.finishBoot\(\);/);
   assert.match(stabilitySource, /function isManualAgendaAppointment\(item\)/);
   assert.match(stabilitySource, /function isManualOtherAppointment\(apt\)/);
+  assert.match(stabilitySource, /apt\.summary/);
   assert.match(stabilitySource, /choice === 'manual-overig' \|\| choice === 'manual-serve' \|\| choice === 'manual-martijn' \|\| choice === 'manual-both'/);
-  assert.match(stabilitySource, /modalPrimaryBtn\.textContent = completed \? 'Activiteit afgerond' : 'Activiteit afronden';/);
-  assert.match(stabilitySource, /async function markActiveManualActivityCompleted\(\)/);
+  assert.match(stabilitySource, /modalBadge\.textContent = 'Overige afspraak';/);
+  assert.match(stabilitySource, /modalPrimaryBtn\.hidden = true;/);
+  assert.match(stabilitySource, /modalNoDealBtn\.hidden = true;/);
+  assert.match(stabilitySource, /const baseMarkActiveAppointmentNoDeal = markActiveAppointmentNoDeal;/);
   assert.match(stabilitySource, /function setModalAudioBlockHidden\(hidden\)/);
   assert.match(stabilitySource, /syncManualAppointmentModalDetails\(apt\);/);
   assert.match(stabilitySource, /const agendaBootFailsafeTimer = window\.setTimeout\(releaseAgendaBootShell, 4500\);/);

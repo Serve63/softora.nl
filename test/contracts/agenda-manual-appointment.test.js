@@ -107,6 +107,7 @@ test('agenda manual appointment stores stepped modal details', async () => {
   assert.equal(res.body.appointment.location, 'Kantoor');
   assert.equal(res.body.appointment.manualActivityTime, '18:30');
   assert.equal(res.body.appointment.manualLegendChoice, 'manual-overig');
+  assert.equal(res.body.appointment.appointmentKind, 'overig');
   assert.equal(res.body.appointment.manualNotes, 'Voorbereiden voor klantgesprek.');
   assert.match(res.body.appointment.summary, /Locatie: Kantoor/);
   assert.match(res.body.appointment.summary, /Opmerkingen: Voorbereiden voor klantgesprek\./);
@@ -158,6 +159,7 @@ test('agenda manual meeting stores the selected lead owner separately from plann
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
+  assert.equal(res.body.appointment.appointmentKind, 'meeting');
   assert.equal(res.body.appointment.manualPlannerWho, 'both');
   assert.equal(res.body.appointment.manualLeadOwnerKey, 'martijn');
   assert.equal(res.body.appointment.manualLeadOwnerName, 'Martijn van de Ven');

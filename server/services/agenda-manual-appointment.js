@@ -254,6 +254,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
             : whoLabel === 'Overig'
               ? 'overig'
               : 'serve',
+      appointmentKind: appointmentKind || (isMeetingLegendChoice(legendChoice) ? 'meeting' : 'overig'),
       manualLegendChoice: legendChoice,
       manualActivityTime: activityTime,
       manualNotes: notes,
@@ -292,6 +293,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
         time: appointmentTime,
         location,
         appointmentLocation: location,
+        appointmentKind: appointmentKind || (isMeetingLegendChoice(legendChoice) ? 'meeting' : 'overig'),
         summary,
         summaryFormatVersion: 4,
         needsConfirmationEmail: false,

@@ -50,7 +50,7 @@ function isManualOtherAppointment(apt) {
     const choice = normalizeManualLegendChoice(apt.manualLegendChoice || apt.legendChoice || '');
     if (choice === 'manual-overig' || choice === 'manual-serve' || choice === 'manual-martijn' || choice === 'manual-both') return true;
     if (choice) return false;
-    const kindText = [apt.manualKind, apt.kind, apt.type, apt.appointmentKind, apt.source]
+    const kindText = [apt.manualKind, apt.kind, apt.type, apt.appointmentKind, apt.source, apt.summary]
         .map((value) => String(value || '').trim().toLowerCase())
         .join(' ');
     return /\b(overig|other|manual-overig)\b/.test(kindText);
@@ -66,6 +66,11 @@ function syncManualAppointmentModalDetails(apt) {
     const isManual = isManualAgendaAppointment(apt);
     setModalDetailValueHidden('modalBranche', isManual);
     setModalDetailValueHidden('modalProvider', isManual);
+    const modalBadge = document.getElementById('modalBadge');
+    if (modalBadge && isManualOtherAppointment(apt)) {
+        modalBadge.textContent = 'Overige afspraak';
+        modalBadge.className = 'modal-type-badge';
+    }
     const contactEl = document.getElementById('modalContact');
     if (contactEl) {
         const contact = String((apt && apt.contact) || '').trim();
@@ -379,10 +384,8 @@ refreshWorkspacePrimaryButtonLabel = function refreshWorkspacePrimaryButtonLabel
     baseRefreshWorkspacePrimaryButtonLabel();
     const apt = getActiveAppointment();
     if (!modalWorkspaceMode && isManualOtherAppointment(apt)) {
-        const completed = isAppointmentCompleted(apt);
-        modalPrimaryBtn.hidden = false;
-        modalPrimaryBtn.textContent = completed ? 'Activiteit afgerond' : 'Activiteit afronden';
-        modalPrimaryBtn.disabled = workspaceBusy || completed;
+        modalPrimaryBtn.hidden = true;
+        modalPrimaryBtn.disabled = true;
         modalNoDealBtn.hidden = true;
         modalNoDealBtn.disabled = true;
         if (modalSecondaryBtn) modalSecondaryBtn.textContent = 'Sluiten';
@@ -427,10 +430,15 @@ const baseHandleModalPrimaryAction = handleModalPrimaryAction;
 handleModalPrimaryAction = function handleModalPrimaryActionStable() {
     const apt = getActiveAppointment();
     if (!modalWorkspaceMode && isManualOtherAppointment(apt)) {
-        void markActiveManualActivityCompleted();
         return;
     }
     return baseHandleModalPrimaryAction();
+};
+
+const baseMarkActiveAppointmentNoDeal = markActiveAppointmentNoDeal;
+markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
+    if (isManualOtherAppointment(getActiveAppointment())) return undefined;
+    return baseMarkActiveAppointmentNoDeal();
 };
 
 if (modalSecondaryBtn) modalSecondaryBtn.hidden = true;
