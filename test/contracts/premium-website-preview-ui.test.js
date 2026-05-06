@@ -205,12 +205,18 @@ test('website preview batch runs server-side and exposes poll route', () => {
   assert.match(batchSvc, /ITEM_TIMEOUT_MS/);
   assert.match(batchSvc, /queueJobProcessing/);
   assert.match(batchSvc, /withTimeout/);
+  assert.match(batchSvc, /getUiStateValues/);
+  assert.match(batchSvc, /setUiStateValues/);
+  assert.match(batchSvc, /processJobsInline/);
+  assert.match(batchSvc, /softora_website_preview_batches_v1/);
   assert.match(batchRoutes, /app\.post\('\/api\/website-preview\/batch'/);
   assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/current'/);
   assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/:jobId'/);
   assert.match(batchSvc, /getCurrentBatchResponse/);
   assert.match(batchSvc, /findLatestJobForOwner/);
   assert.match(batchSvc, /findLatestRunningJobForOwner/);
+  assert.match(batchSvc, /loadSharedJob/);
+  assert.match(batchSvc, /persistSharedJob/);
   assert.match(aiTools, /runWebsitePreviewGeneratePipeline/);
   assert.match(featureRoutes, /registerWebsitePreviewBatchRoutes/);
   assert.match(library, /persistPreviewLibraryEntry/);
