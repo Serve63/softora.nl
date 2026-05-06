@@ -22,6 +22,7 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.match(pageSource, /<div class="card-title">Prompt & AI instructies<\/div>/);
   assert.match(pageSource, /<div class="campagne-title">Nieuwe Campagne<\/div>/);
   assert.match(pageSource, /Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
+  assert.doesNotMatch(pageSource, /Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland/);
   assert.doesNotMatch(pageSource, /<p>Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
   assert.match(pageSource, /<button class="btn-start" id="start-campaign-btn" onclick="startCampagne\(\)">/);
   assert.doesNotMatch(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
