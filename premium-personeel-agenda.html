@@ -2047,7 +2047,7 @@
             activeOrderId: Number(item.activeOrderId || 0) || null,
             activeOrderAddedAt: String(item.activeOrderAddedAt || ''),
             referenceImages: normalizeReferenceImageList(item.referenceImages || item.attachments || []),
-            manualPlannerWho: String(item.manualPlannerWho || ''), manualLegendChoice: String(item.manualLegendChoice || item.legendChoice || ''), appointmentKind: String(item.appointmentKind || item.manualAppointmentKind || ''),
+            manualPlannerWho: String(item.manualPlannerWho || ''), manualLegendChoice: String(item.manualLegendChoice || item.legendChoice || ''), appointmentKind: String(item.appointmentKind || item.manualAppointmentKind || ''), manualLeadOwnerKey: String(item.manualLeadOwnerKey || ''), manualLeadOwnerName: String(item.manualLeadOwnerName || ''), leadOwnerKey: String(item.leadOwnerKey || ''), leadOwnerName: String(item.leadOwnerName || ''), leadOwnerFullName: String(item.leadOwnerFullName || ''),
             manualAllDayUnavailable: Boolean(item.manualAllDayUnavailable),
             uiFallback: Boolean(item.uiFallback),
         };
