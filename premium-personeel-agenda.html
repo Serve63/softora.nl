@@ -1325,7 +1325,7 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="modal-btn primary magnetic" id="modalPrimaryBtn" type="button">Akkoord</button>
+            <button class="modal-btn primary magnetic" id="modalPrimaryBtn" type="button">Akkoord</button><button class="modal-btn secondary magnetic" id="modalCompleteActivityBtn" type="button">Activiteit afgerond</button>
             <button class="modal-btn danger magnetic" id="modalNoDealBtn" type="button">Geen deal</button>
             <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>
         </div>
@@ -1590,7 +1590,7 @@
     const modalCardElement = modalElement ? modalElement.querySelector('.modal') : null;
     const modalOverviewElement = document.getElementById('modalOverview');
     const modalWorkspaceElement = document.getElementById('modalWorkspace');
-    const modalPrimaryBtn = document.getElementById('modalPrimaryBtn');
+    const modalPrimaryBtn = document.getElementById('modalPrimaryBtn'); const modalCompleteActivityBtn = document.getElementById('modalCompleteActivityBtn');
     const modalNoDealBtn = document.getElementById('modalNoDealBtn');
     const modalSecondaryBtn = document.getElementById('modalSecondaryBtn');
     const modalCloseBtn = document.getElementById('modalCloseBtn');

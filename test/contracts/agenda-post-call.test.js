@@ -38,7 +38,7 @@ function sanitizePostCallText(value, maxLen = 20000) {
 
 function normalizePostCallStatus(value) {
   const raw = normalizeString(value).toLowerCase();
-  if (['nieuw', 'wacht', 'bezig', 'klaar'].includes(raw)) return raw;
+  if (['nieuw', 'wacht', 'bezig', 'klaar', 'completed', 'no_deal'].includes(raw)) return raw;
   return 'nieuw';
 }
 
@@ -165,6 +165,27 @@ test('agenda post-call coordinator stores normalized post-call appointment data'
   assert.equal(appointments[0].postCallDomainName, 'softora.nl');
   assert.equal(appointments[0].referenceImages.length, 1);
   assert.equal(activityCalls[0].reason, 'dashboard_activity_post_call_saved');
+});
+
+test('agenda post-call coordinator persists manual completed appointment status', () => {
+  const { appointments, coordinator } = createFixture();
+  const res = createResponseRecorder();
+
+  coordinator.updateAgendaAppointmentPostCallDataById(
+    {
+      body: {
+        status: 'completed',
+        actor: 'premium-personeel-agenda',
+      },
+    },
+    res,
+    '42'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(appointments[0].postCallStatus, 'completed');
+  assert.equal(res.body.appointment.postCallStatus, 'completed');
 });
 
 test('agenda post-call helpers parse custom active orders from ui-state safely', () => {
