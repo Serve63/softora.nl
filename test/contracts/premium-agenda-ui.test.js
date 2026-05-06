@@ -282,6 +282,8 @@ test('premium agenda verbergt dealacties voor handmatige overige afspraken en be
   assert.match(pageSource, /window\.SoftoraAgendaStability\.finishBoot\(\);/);
   assert.match(stabilitySource, /function isManualAgendaAppointment\(item\)/);
   assert.match(stabilitySource, /function isManualOtherAppointment\(apt\)/);
+  assert.match(stabilitySource, /function canCompleteAppointmentManually\(apt\)/);
+  assert.match(stabilitySource, /if \(kind === 'meeting'\) return false;/);
   assert.match(stabilitySource, /apt\.summary/);
   assert.match(stabilitySource, /choice === 'manual-overig' \|\| choice === 'manual-serve' \|\| choice === 'manual-martijn' \|\| choice === 'manual-both'/);
   assert.match(stabilitySource, /modalBadge\.textContent = 'Overige afspraak';/);
@@ -290,7 +292,9 @@ test('premium agenda verbergt dealacties voor handmatige overige afspraken en be
   assert.match(pageSource, /id="modalCompleteActivityBtn"[^>]*>Activiteit afgerond<\/button>/);
   assert.match(pageSource, /const modalCompleteActivityBtn = document\.getElementById\('modalCompleteActivityBtn'\);/);
   assert.match(stabilitySource, /function syncCompleteActivityButtonVisibility\(\)/);
+  assert.match(stabilitySource, /canCompleteAppointmentManually\(apt\) && !isAppointmentCompleted\(apt\)/);
   assert.match(stabilitySource, /async function markActiveAppointmentCompletedByStaff\(\)/);
+  assert.match(stabilitySource, /!canCompleteAppointmentManually\(apt\)/);
   assert.match(stabilitySource, /status: 'completed'/);
   assert.match(stabilitySource, /modalCompleteActivityBtn\.addEventListener\('click', \(\) => \{ void markActiveAppointmentCompletedByStaff\(\); \}\);/);
   assert.match(
