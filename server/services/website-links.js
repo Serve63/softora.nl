@@ -15,6 +15,9 @@ function createWebsiteLinkCoordinator(deps = {}) {
     appendDashboardActivity = () => {},
   } = deps;
 
+  const supabasePageSize = 500;
+  const autoWebsiteLinkSlugBase = 'voorbeelddesign';
+
   const reservedExactSlugs = new Set([
     'api',
     'assets',
@@ -42,6 +45,29 @@ function createWebsiteLinkCoordinator(deps = {}) {
     const slug = normalizeWebsiteLinkSlug(slugRaw);
     if (!slug) return '';
     return `${websiteLinkStateKeyPrefix}${slug}`;
+  }
+
+  function extractSlugFromWebsiteLinkStateKey(rowKey) {
+    const key = normalizeString(rowKey || '');
+    const prefix = normalizeString(websiteLinkStateKeyPrefix || '');
+    if (!key || !prefix || !key.startsWith(prefix)) return '';
+    return normalizeWebsiteLinkSlug(key.slice(prefix.length));
+  }
+
+  function resolveWebsiteLinkSlugFromRow(row) {
+    const payload = row?.payload && typeof row.payload === 'object' ? row.payload : {};
+    return normalizeWebsiteLinkSlug(payload.slug || extractSlugFromWebsiteLinkStateKey(row?.state_key || ''));
+  }
+
+  function getAutoWebsiteLinkNumber(slugRaw) {
+    const match = normalizeWebsiteLinkSlug(slugRaw).match(/^voorbeelddesign(\d+)$/);
+    return match ? Number(match[1]) || 0 : 0;
+  }
+
+  function formatWebsiteLinkTitleFromSlug(slugRaw) {
+    const slug = normalizeWebsiteLinkSlug(slugRaw);
+    const number = getAutoWebsiteLinkNumber(slug);
+    return number ? `Voorbeelddesign ${number}` : `Softora pagina ${slug}`;
   }
 
   function isReservedWebsiteLinkSlug(slugRaw) {
@@ -176,15 +202,55 @@ function createWebsiteLinkCoordinator(deps = {}) {
 
   function mapWebsiteLinkRowToClient(row) {
     const payload = row?.payload && typeof row.payload === 'object' ? row.payload : {};
-    const slug = normalizeWebsiteLinkSlug(payload.slug || '');
+    const slug = resolveWebsiteLinkSlugFromRow(row);
     if (!slug) return null;
     return {
       slug,
-      title: truncateText(normalizeString(payload.title || ''), 160) || `Softora pagina ${slug}`,
+      title: truncateText(normalizeString(payload.title || ''), 160) || formatWebsiteLinkTitleFromSlug(slug),
       url: '',
       createdAt: normalizeString(payload.createdAt || row?.updated_at || ''),
       updatedAt: normalizeString(payload.updatedAt || row?.updated_at || ''),
     };
+  }
+
+  async function fetchWebsiteLinkRows(selectColumns = 'state_key,updated_at') {
+    const rows = [];
+    let offset = 0;
+
+    while (true) {
+      const result = await fetchSupabaseRowsByStateKeyPrefixViaRest(
+        websiteLinkStateKeyPrefix,
+        supabasePageSize,
+        selectColumns,
+        offset
+      );
+      if (!result.ok) return result;
+
+      const pageRows = Array.isArray(result.body) ? result.body : [];
+      rows.push(...pageRows);
+      if (pageRows.length < supabasePageSize) return { ok: true, body: rows };
+      offset += supabasePageSize;
+    }
+  }
+
+  async function fetchExistingWebsiteLinkSlugs() {
+    const result = await fetchWebsiteLinkRows('state_key');
+    if (!result.ok) return result;
+    return {
+      ok: true,
+      slugs: new Set((Array.isArray(result.body) ? result.body : [])
+        .map(resolveWebsiteLinkSlugFromRow)
+        .filter(Boolean)),
+    };
+  }
+
+  function compareWebsiteLinkRows(a, b) {
+    const aNumber = getAutoWebsiteLinkNumber(a.slug);
+    const bNumber = getAutoWebsiteLinkNumber(b.slug);
+    if (aNumber && bNumber && aNumber !== bNumber) return aNumber - bNumber;
+    if (aNumber && !bNumber) return -1;
+    if (!aNumber && bNumber) return 1;
+    return String(a.slug || '').localeCompare(String(b.slug || ''), 'nl');
   }
 
   async function listWebsiteLinksResponse(req, res) {
@@ -197,7 +263,7 @@ function createWebsiteLinkCoordinator(deps = {}) {
     }
 
     try {
-      const result = await fetchSupabaseRowsByStateKeyPrefixViaRest(websiteLinkStateKeyPrefix, 500);
+      const result = await fetchWebsiteLinkRows('state_key,updated_at');
       if (!result.ok) {
         logger.error('[WebsiteLinks][ListError]', result.error || result.status || result.body);
         return res.status(500).json({
@@ -210,7 +276,8 @@ function createWebsiteLinkCoordinator(deps = {}) {
       const links = (Array.isArray(result.body) ? result.body : [])
         .map(mapWebsiteLinkRowToClient)
         .filter(Boolean)
-        .map((link) => ({ ...link, url: buildPublishedWebsiteLinkUrl(req, link.slug) }));
+        .map((link) => ({ ...link, url: buildPublishedWebsiteLinkUrl(req, link.slug) }))
+        .sort(compareWebsiteLinkRows);
 
       return res.status(200).json({ ok: true, links });
     } catch (error) {
@@ -227,8 +294,8 @@ function createWebsiteLinkCoordinator(deps = {}) {
     const slug = normalizeWebsiteLinkSlug(slugRaw);
     if (!slug) return false;
     if (isReservedWebsiteLinkSlug(slug)) return false;
-    const existing = await getPublishedWebsiteLinkBySlug(slug);
-    return !existing;
+    const existingRow = await fetchStoredWebsiteLinkRow(slug);
+    return !existingRow;
   }
 
   async function resolveNextWebsiteLinkSlug(requestedSlugRaw, rawHtml, explicitTitle = '') {
@@ -262,17 +329,27 @@ function createWebsiteLinkCoordinator(deps = {}) {
       return { ok: true, slug: requestedSlug, autoGenerated: false };
     }
 
-    const titleCandidate =
-      truncateText(normalizeString(explicitTitle || ''), 160) ||
-      extractTitleFromHtml(rawHtml) ||
-      extractFirstHeadingFromHtml(rawHtml) ||
-      'pagina';
-    let baseSlug = normalizeWebsiteLinkSlug(titleCandidate) || 'pagina';
-    if (isReservedWebsiteLinkSlug(baseSlug)) baseSlug = 'pagina';
+    const existingResult = await fetchExistingWebsiteLinkSlugs();
+    if (existingResult.ok) {
+      const existingSlugs = existingResult.slugs;
+      let highestNumber = 0;
+      existingSlugs.forEach((slug) => {
+        highestNumber = Math.max(highestNumber, getAutoWebsiteLinkNumber(slug));
+      });
 
-    for (let index = 1; index <= 50; index += 1) {
-      const candidate =
-        index === 1 ? baseSlug : normalizeWebsiteLinkSlug(`${baseSlug}-${index}`) || `pagina-${index}`;
+      const startIndex = Math.max(1, highestNumber + 1);
+      for (let index = startIndex; index < startIndex + 500; index += 1) {
+        const candidate = `${autoWebsiteLinkSlugBase}${index}`;
+        if (!existingSlugs.has(candidate) && (await isWebsiteLinkSlugAvailable(candidate))) {
+          return { ok: true, slug: candidate, autoGenerated: true };
+        }
+      }
+    } else {
+      logger.error('[WebsiteLinks][SlugListError]', existingResult.error || existingResult.status || existingResult.body);
+    }
+
+    for (let index = 1; index <= 500; index += 1) {
+      const candidate = `${autoWebsiteLinkSlugBase}${index}`;
       if (await isWebsiteLinkSlugAvailable(candidate)) {
         return { ok: true, slug: candidate, autoGenerated: true };
       }
