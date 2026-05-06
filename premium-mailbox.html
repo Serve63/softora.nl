@@ -61,6 +61,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .folder-icon { width: 15px; height: 15px; opacity: .6; flex-shrink: 0; }
 .folder-item.active .folder-icon { opacity: 1; }
 .folder-badge { margin-left: auto; background: var(--crimson); color: #fff; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+.folder-badge[hidden] { display: none; }
 .folder-divider { height: 1px; background: var(--border); margin: 8px 16px; }
 .folder-label { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-light); padding: 10px 18px 4px; }
 
@@ -330,7 +331,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
     <div class="folder-item active" data-mailbox-action="set-folder" data-mailbox-folder="inbox" role="button" tabindex="0">
       <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>
       Inbox
-      <span class="folder-badge" id="badge-inbox">3</span>
+      <span class="folder-badge" id="badge-inbox" hidden>0</span>
     </div>
     <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="starred" role="button" tabindex="0">
       <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -393,6 +394,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   </main>
 </div>
 
-<script src="assets/premium-mailbox.js?v=20260427a"></script>
+<script src="assets/premium-mailbox.js?v=20260506a"></script>
 </body>
 </html>
