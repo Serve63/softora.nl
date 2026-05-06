@@ -771,6 +771,85 @@ test('coldcalling recipient preview skips phone numbers from the blocklist', asy
   ]);
 });
 
+test('coldmailing recipient preview skips email addresses from the blocklist', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'blocked-mail-1',
+        bedrijf: 'Niet Mailen BV',
+        naam: 'Ruben',
+        email: 'blocked@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'mailable-1',
+        bedrijf: 'Wel Mailen BV',
+        naam: 'Servé',
+        email: 'allowed@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    blockedEmails: 'BLOCKED@example.test',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.mode, 'mail');
+  assert.equal(result.selected, 1);
+  assert.deepEqual(result.recipients, [
+    {
+      id: 'mailable-1',
+      bedrijf: 'Wel Mailen BV',
+      email: 'allowed@example.test',
+      phone: '',
+      distanceKm: null,
+    },
+  ]);
+});
+
+test('coldmail campaign never sends to blocked email addresses', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'blocked-mail-1',
+        bedrijf: 'Niet Mailen BV',
+        naam: 'Ruben',
+        email: 'blocked@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'mailable-1',
+        bedrijf: 'Wel Mailen BV',
+        naam: 'Servé',
+        email: 'allowed@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 10,
+    subject: 'Test',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+    emailBlocklist: 'blocked@example.test',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.failed, 0);
+  assert.deepEqual(
+    sentMessages.map((message) => message.to),
+    ['allowed@example.test']
+  );
+});
+
 test('coldmail campaign previews invalid recipient domains', async () => {
   const { service } = createService({
     rows: [

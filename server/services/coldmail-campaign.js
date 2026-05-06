@@ -433,6 +433,16 @@ function createColdmailCampaignService(deps = {}) {
     return false;
   }
 
+  function parseBlockedEmailList(value) {
+    const entries = (Array.isArray(value) ? value.join('\n') : normalizeString(value)).split(/[\s,;|]+/);
+    return new Set(entries.map(normalizeEmailAddress).filter(isLikelyValidEmail));
+  }
+
+  function isEmailBlocked(email, blockedEmailKeys) {
+    if (!blockedEmailKeys || !blockedEmailKeys.size) return false;
+    return blockedEmailKeys.has(normalizeEmailAddress(email));
+  }
+
   function isLikelyCallablePhone(value) {
     const phone = getRowPhone({ phone: value });
     return phone.replace(/\D/g, '').length >= 8;
@@ -871,9 +881,10 @@ function createColdmailCampaignService(deps = {}) {
     return distanceKm <= radius;
   }
 
-  function isEligibleColdmailRow(row, branchFilter, radiusKm) {
+  function isEligibleColdmailRow(row, branchFilter, radiusKm, blockedEmailKeys) {
     const email = getRowEmail(row);
     if (!isLikelyValidEmail(email)) return false;
+    if (isEmailBlocked(email, blockedEmailKeys)) return false;
     if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
     if (!matchesBranch(row, branchFilter)) return false;
     if (!matchesRadius(row, radiusKm)) return false;
@@ -910,6 +921,11 @@ function createColdmailCampaignService(deps = {}) {
     const blockedPhoneKeys = mode === 'call'
       ? parseBlockedPhoneList(input.blockedPhones || input.callBlocklist || input.blockedPhoneNumbers)
       : new Set();
+    const blockedEmailKeys = mode === 'mail'
+      ? parseBlockedEmailList(
+          input.blockedEmails || input.emailBlocklist || input.mailBlocklist || input.blockedMailAddresses
+        )
+      : new Set();
     const state = await getUiStateValues(mode === 'call' ? leadDbScope : customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     let rows = [];
@@ -929,7 +945,7 @@ function createColdmailCampaignService(deps = {}) {
       .filter(({ row }) =>
         mode === 'call'
           ? isEligibleColdcallingRow(row, input.branch, input.radiusKm, blockedPhoneKeys)
-          : isEligibleColdmailRow(row, input.branch, input.radiusKm)
+          : isEligibleColdmailRow(row, input.branch, input.radiusKm, blockedEmailKeys)
       )
       .slice(0, count);
     const selectedRows = [];
