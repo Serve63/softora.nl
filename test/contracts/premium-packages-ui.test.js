@@ -46,16 +46,16 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(scriptSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/);
 });
 
-test('website onderhoudspakketten tonen vaste uren per maand met taakvoorbeelden', () => {
+test('website onderhoudspakketten tonen vaste uren per maand met taakvoorbeelden zonder losse kaartintro', () => {
   const pageSource = readPage();
   const sectionStart = pageSource.indexOf('<div id="tab-onderhoud"');
   const sectionEnd = pageSource.indexOf('<div id="tab-bedrijfssoftware"', sectionStart);
   const websiteMaintenanceSection = pageSource.slice(sectionStart, sectionEnd);
 
-  assert.match(websiteMaintenanceSection, /<div class="card-name">Basis<\/div>[\s\S]*5 uur per maand voor basisbeheer/);
-  assert.match(websiteMaintenanceSection, /<div class="card-name">Plus<\/div>[\s\S]*10 uur per maand voor doorlopend beheer/);
-  assert.match(websiteMaintenanceSection, /<div class="card-name">Premium<\/div>[\s\S]*15 uur per maand voor actief optimaliseren/);
-  assert.match(websiteMaintenanceSection, /<div class="card-name">Enterprise<\/div>[\s\S]*25 uur per maand voor intensief beheer/);
+  assert.doesNotMatch(websiteMaintenanceSection, /5 uur per maand voor basisbeheer en kleine verbeteringen\./);
+  assert.doesNotMatch(websiteMaintenanceSection, /10 uur per maand voor doorlopend beheer en zichtbare verbeteringen\./);
+  assert.doesNotMatch(websiteMaintenanceSection, /15 uur per maand voor actief optimaliseren en sneller doorpakken\./);
+  assert.doesNotMatch(websiteMaintenanceSection, /25 uur per maand voor intensief beheer, campagnes en doorontwikkeling\./);
   assert.match(websiteMaintenanceSection, /<div class="price-amount">€29<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 5 uur\/mnd<\/span>/);
   assert.match(websiteMaintenanceSection, /<div class="price-amount">€59<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 10 uur\/mnd<\/span>/);
   assert.match(websiteMaintenanceSection, /<div class="price-amount">€99<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 15 uur\/mnd<\/span>/);
