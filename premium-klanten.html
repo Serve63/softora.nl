@@ -1239,9 +1239,11 @@
                         <input class="form-input" id="fieldWebsiteAmount" name="websiteBedrag" type="number" min="0" step="1" placeholder="1500">
                     </div>
 
+                    <div class="form-group"><label class="form-label" for="fieldMaintenanceEnabled">Onderhoud?</label><select class="form-select" id="fieldMaintenanceEnabled" name="onderhoudActief" required><option value="Nee" selected>Nee</option><option value="Ja">Ja</option></select></div>
+
                     <div class="form-group" id="maintenanceAmountGroup">
                         <label class="form-label" for="fieldMaintenanceAmount">Onderhoud per maand (EUR)</label>
-                        <input class="form-input" id="fieldMaintenanceAmount" name="onderhoudPerMaand" type="number" min="0" step="1" placeholder="49" required>
+                        <input class="form-input" id="fieldMaintenanceAmount" name="onderhoudPerMaand" type="number" min="0" step="1" placeholder="49">
                     </div>
 
                     <div class="form-group">
@@ -1365,38 +1367,22 @@
             websiteAmountGroup: document.getElementById("websiteAmountGroup"),
             maintenanceAmountGroup: document.getElementById("maintenanceAmountGroup"),
             fieldWebsiteAmount: document.getElementById("fieldWebsiteAmount"),
+            fieldMaintenanceEnabled: document.getElementById("fieldMaintenanceEnabled"),
             fieldMaintenanceAmount: document.getElementById("fieldMaintenanceAmount"),
             fieldStatus: document.getElementById("fieldStatus"),
             fieldActive: document.getElementById("fieldActive"),
             fieldResponsible: document.getElementById("fieldResponsible"),
             fieldDate: document.getElementById("fieldDate")
         };
-
         function createId() {
             return "klant-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
         }
-
-
-
-
-
-
-
-
-
-
         function setModalError(message) {
             if (!nodes.modalError) return;
             const text = normalizeString(message);
             nodes.modalError.textContent = text;
             nodes.modalError.classList.toggle("is-visible", Boolean(text));
         }
-
-
-
-
-
-
         function getModalFieldNodes() {
             return [
                 nodes.fieldName,
@@ -1405,6 +1391,7 @@
                 nodes.fieldService,
                 nodes.fieldProject,
                 nodes.fieldWebsiteAmount,
+                nodes.fieldMaintenanceEnabled,
                 nodes.fieldMaintenanceAmount,
                 nodes.fieldStatus,
                 nodes.fieldActive,
@@ -1432,13 +1419,11 @@
             if (!group) return true;
             return !group.hidden;
         }
-
+        function normalizeMaintenanceEnabled(raw, type, amount) { const value = normalizeString(raw && (raw.onderhoudActief || raw.heeftOnderhoud || raw.maintenanceEnabled || raw.onderhoud)).toLowerCase(); if (value === "ja" || value === "yes" || value === "true" || value === "1") return "Ja"; if (value === "nee" || value === "no" || value === "false" || value === "0") return "Nee"; return type === "Onderhoud" || type === "Website + onderhoud" || (amount !== null && amount > 0) ? "Ja" : "Nee"; }
         function normalizeCustomer(raw, fallbackId) {
             const legacyAmount = normalizeOptionalAmount(raw && raw.bedrag);
             const rawType = normalizeString(raw && raw.type);
-            const type = rawType === "Onderhoud" || rawType === "Website + onderhoud"
-                ? rawType
-                : "Website";
+            const baseType = rawType === "Onderhoud" || rawType === "Website + onderhoud" ? rawType : "Website";
             const databaseStatus = normalizeCustomerDatabaseStatus(raw);
             const rawStatus = normalizeString(raw && raw.status);
             const status = rawStatus === "Open"
@@ -1448,10 +1433,11 @@
             const maintenanceAmountRaw = normalizeOptionalAmount(raw && raw.onderhoudPerMaand);
             const websiteBedrag = websiteAmountRaw !== null
                 ? websiteAmountRaw
-                : ((type === "Website" || type === "Website + onderhoud") ? legacyAmount : null);
-            const onderhoudPerMaand = maintenanceAmountRaw !== null
-                ? maintenanceAmountRaw
-                : (type === "Onderhoud" ? legacyAmount : null);
+                : ((baseType === "Website" || baseType === "Website + onderhoud") ? legacyAmount : null);
+            const rawOnderhoudPerMaand = maintenanceAmountRaw !== null ? maintenanceAmountRaw : (baseType === "Onderhoud" ? legacyAmount : null);
+            const onderhoudActief = normalizeMaintenanceEnabled(raw, baseType, rawOnderhoudPerMaand);
+            const onderhoudPerMaand = onderhoudActief === "Ja" ? rawOnderhoudPerMaand : null;
+            const type = onderhoudActief === "Ja" ? (websiteBedrag !== null ? "Website + onderhoud" : "Onderhoud") : "Website";
             const bedrag = legacyAmount !== null
                 ? legacyAmount
                 : (websiteBedrag !== null ? websiteBedrag : (onderhoudPerMaand !== null ? onderhoudPerMaand : 0));
@@ -1468,6 +1454,7 @@
                 service: service,
                 website: normalizeString(raw && raw.website) || "-",
                 websiteBedrag: websiteBedrag,
+                onderhoudActief: onderhoudActief,
                 onderhoudPerMaand: onderhoudPerMaand,
                 bedrag: bedrag,
                 status: status,
@@ -1525,6 +1512,9 @@
         }
 
         function customerHasMaintenance(customer) {
+            const explicit = normalizeString(customer && customer.onderhoudActief);
+            if (explicit === "Ja") return true;
+            if (explicit === "Nee") return false;
             const type = normalizeString(customer && customer.type);
             return type === "Onderhoud" || type === "Website + onderhoud";
         }
@@ -1547,15 +1537,17 @@
                 nodes.websiteAmountGroup.hidden = false;
             }
             if (nodes.maintenanceAmountGroup) {
-                nodes.maintenanceAmountGroup.hidden = false;
+                nodes.maintenanceAmountGroup.hidden = !(nodes.fieldMaintenanceEnabled && nodes.fieldMaintenanceEnabled.value === "Ja");
             }
             if (nodes.fieldWebsiteAmount) {
                 nodes.fieldWebsiteAmount.required = false;
                 nodes.fieldWebsiteAmount.disabled = false;
             }
             if (nodes.fieldMaintenanceAmount) {
-                nodes.fieldMaintenanceAmount.required = false;
-                nodes.fieldMaintenanceAmount.disabled = false;
+                const maintenanceEnabled = nodes.fieldMaintenanceEnabled && nodes.fieldMaintenanceEnabled.value === "Ja";
+                nodes.fieldMaintenanceAmount.required = Boolean(maintenanceEnabled);
+                nodes.fieldMaintenanceAmount.disabled = !maintenanceEnabled;
+                if (!maintenanceEnabled) nodes.fieldMaintenanceAmount.value = "";
             }
             clearModalValidationState();
         }
@@ -1964,6 +1956,7 @@
             if (nodes.fieldResponsible) nodes.fieldResponsible.value = "Serve";
             nodes.fieldDate.value = "";
             if (nodes.fieldWebsiteAmount) nodes.fieldWebsiteAmount.value = "";
+            if (nodes.fieldMaintenanceEnabled) nodes.fieldMaintenanceEnabled.value = "Nee";
             if (nodes.fieldMaintenanceAmount) nodes.fieldMaintenanceAmount.value = "";
             clearModalValidationState();
             updateAmountFieldVisibility();
@@ -2000,6 +1993,7 @@
                         ? String(customer.onderhoudPerMaand)
                         : "";
                 }
+                if (nodes.fieldMaintenanceEnabled) nodes.fieldMaintenanceEnabled.value = customerHasMaintenance(customer) ? "Ja" : "Nee";
                 nodes.fieldStatus.value = customer.status;
                 if (nodes.fieldActive) nodes.fieldActive.value = customer.actief || "Ja";
                 if (nodes.fieldReview) nodes.fieldReview.value = customer.review || "Nee";
@@ -2055,12 +2049,16 @@
 
             const naam = normalizeString(nodes.fieldName.value);
             const websiteBedrag = normalizeOptionalAmount(nodes.fieldWebsiteAmount && nodes.fieldWebsiteAmount.value);
-            const onderhoudPerMaand = normalizeOptionalAmount(nodes.fieldMaintenanceAmount && nodes.fieldMaintenanceAmount.value);
+            const onderhoudActief = nodes.fieldMaintenanceEnabled && nodes.fieldMaintenanceEnabled.value === "Ja" ? "Ja" : "Nee";
+            const onderhoudPerMaand = onderhoudActief === "Ja" ? normalizeOptionalAmount(nodes.fieldMaintenanceAmount && nodes.fieldMaintenanceAmount.value) : null;
             const hasW = websiteBedrag !== null;
-            const hasM = onderhoudPerMaand !== null && onderhoudPerMaand > 0;
+            const hasM = onderhoudActief === "Ja";
 
             if (!hasW && !hasM) {
-                addMissingField(nodes.fieldWebsiteAmount, "prijs of onderhoud per maand");
+                addMissingField(nodes.fieldWebsiteAmount, "prijs");
+            }
+            if (hasM && onderhoudPerMaand === null) {
+                addMissingField(nodes.fieldMaintenanceAmount, "onderhoud per maand");
             }
 
             if (missingFields.length) {
@@ -2083,6 +2081,7 @@
                 service: nodes.fieldService ? nodes.fieldService.value : "website",
                 website: normalizeString(nodes.fieldProject.value),
                 websiteBedrag: websiteBedrag,
+                onderhoudActief: onderhoudActief,
                 onderhoudPerMaand: onderhoudPerMaand,
                 status: nodes.fieldStatus.value,
                 actief: nodes.fieldActive ? nodes.fieldActive.value : "Ja",
@@ -2270,6 +2269,7 @@
                 }
             });
         });
+        if (nodes.fieldMaintenanceEnabled) nodes.fieldMaintenanceEnabled.addEventListener("change", updateAmountFieldVisibility);
 
         nodes.cancelButton.addEventListener("click", function () {
             closeModal();
