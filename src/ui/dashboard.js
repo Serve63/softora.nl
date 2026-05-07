@@ -4,6 +4,7 @@ import { optimizeStrategy } from '../core/optimizer.js';
 import { runResearchDiagnostics } from '../core/researchEngine.js';
 import { DEFAULT_CONFIG } from '../core/riskEngine.js';
 import { runStrategyTournament } from '../core/strategyTournament.js';
+import { DEFAULT_TIMEFRAME_RESEARCH, runTimeframeResearch } from '../core/timeframeResearch.js';
 import { runRollingWalkForward } from '../core/walkForward.js';
 import {
   exportForwardCsv,
@@ -23,6 +24,7 @@ const state = {
   optimizer: null,
   walkForward: null,
   tournament: null,
+  timeframeResearch: null,
   forwardState: null,
   running: false,
 };
@@ -197,6 +199,15 @@ function renderShell(root) {
         </div>
         <div id="tournamentSummary" class="optimizer-summary"></div>
         <div id="tournamentTable" class="table-wrap"></div>
+      </section>
+
+      <section class="panel timeframe-panel wide-panel">
+        <div class="panel-title">
+          <h2>Timeframe Research</h2>
+          <button id="runTimeframes" type="button">Vergelijk Daily / 4H</button>
+        </div>
+        <div id="timeframeSummary" class="optimizer-summary"></div>
+        <div id="timeframeTable" class="table-wrap"></div>
       </section>
 
       <section class="panel chart-panel">
@@ -548,6 +559,70 @@ function renderTournament(root) {
   `;
 }
 
+function renderTimeframeResearch(root) {
+  const research = state.timeframeResearch;
+  const summary = root.querySelector('#timeframeSummary');
+  const table = root.querySelector('#timeframeTable');
+
+  if (!research?.rows?.length) {
+    summary.innerHTML = '<p class="muted">Nog niet gedraaid. Deze check vergelijkt Daily en 4H met dezelfde tournament-gate.</p>';
+    table.innerHTML = '';
+    return;
+  }
+
+  const best = research.best;
+  summary.innerHTML = `
+    <div class="edge-verdict ${best.bestVerdict === 'GATE_OPEN' ? 'candidate' : 'watch'}">${best.timeframe}</div>
+    <p>${research.message}</p>
+    <div class="data-facts">
+      <span>Beste timeframe: ${best.timeframe}</span>
+      <span>Beste strategie: ${best.bestStrategy}</span>
+      <span>Rolling leader: ${best.rollingLeader}</span>
+      <span>Return: ${formatPercent(best.strategyReturn)}</span>
+      <span>Benchmark: ${formatPercent(best.benchmarkReturn)}</span>
+      <span>Rolling: ${formatPercent(best.rollingReturn)}</span>
+      <span>Rolling benchmark: ${formatPercent(best.rollingBenchmarkReturn)}</span>
+    </div>
+  `;
+
+  table.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Timeframe</th>
+          <th>Beste strategie</th>
+          <th>Verdict</th>
+          <th>Full</th>
+          <th>Benchmark</th>
+          <th>Rolling</th>
+          <th>Beat</th>
+          <th>DD</th>
+          <th>PF</th>
+          <th>Rolling leader</th>
+          <th>Fails</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${research.rows.map((row) => `
+          <tr>
+            <td>${row.timeframe}</td>
+            <td>${row.bestStrategy}</td>
+            <td>${row.bestVerdict}</td>
+            <td>${formatPercent(row.strategyReturn)}</td>
+            <td>${formatPercent(row.benchmarkReturn)}</td>
+            <td>${formatPercent(row.rollingReturn)} / ${formatPercent(row.rollingBenchmarkReturn)}</td>
+            <td>${formatPercent(row.rollingBeatRate)}</td>
+            <td>${formatPercent(row.maxDrawdown)}</td>
+            <td>${Number.isFinite(row.profitFactor) ? row.profitFactor.toFixed(2) : 'oneindig'}</td>
+            <td>${row.rollingLeader} · ${formatPercent(row.rollingLeaderReturn)}</td>
+            <td>${row.failed.join(', ') || 'geen'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
 function renderGuardrails(root, result) {
   const list = root.querySelector('#guardList');
   const checks = result?.gate?.checks || [];
@@ -734,6 +809,7 @@ function renderAll(root) {
   renderOptimizer(root);
   renderWalkForward(root);
   renderTournament(root);
+  renderTimeframeResearch(root);
   renderCharts(root, state.backtest);
   renderRanking(root, state.backtest);
   renderForward(root);
@@ -767,6 +843,7 @@ async function runAnalysis(root) {
     state.optimizer = null;
     state.walkForward = null;
     state.tournament = null;
+    state.timeframeResearch = null;
     state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
     setText(root, '#statusText', state.backtest.ok ? 'Backtest klaar.' : state.backtest.error);
     renderAll(root);
@@ -864,6 +941,43 @@ function wireEvents(root) {
         renderTournament(root);
       } catch (error) {
         setText(root, '#statusText', `Tournament fout: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        button.disabled = false;
+      }
+    }, 20);
+  });
+
+  root.querySelector('#runTimeframes').addEventListener('click', () => {
+    if (!state.marketData) {
+      setText(root, '#statusText', 'Run eerst een backtest voordat je timeframes vergelijkt.');
+      return;
+    }
+    const button = root.querySelector('#runTimeframes');
+    button.disabled = true;
+    setText(root, '#statusText', 'Daily en 4H data ophalen en vergelijken...');
+    setTimeout(async () => {
+      try {
+        const datasetsByTimeframe = {
+          [state.config.timeframe]: state.marketData,
+        };
+        for (const [timeframe, options] of Object.entries(DEFAULT_TIMEFRAME_RESEARCH)) {
+          if (!datasetsByTimeframe[timeframe]) {
+            datasetsByTimeframe[timeframe] = await fetchMarketData({
+              assets: SUPPORTED_ASSETS,
+              timeframe,
+              target: options.candleTarget,
+            });
+          }
+        }
+        state.timeframeResearch = runTimeframeResearch({
+          datasetsByTimeframe,
+          baseConfig: state.config,
+          assets: SUPPORTED_ASSETS,
+        });
+        setText(root, '#statusText', `Timeframe research klaar: ${state.timeframeResearch.message}`);
+        renderTimeframeResearch(root);
+      } catch (error) {
+        setText(root, '#statusText', `Timeframe research fout: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
         button.disabled = false;
       }

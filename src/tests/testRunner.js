@@ -2,6 +2,7 @@ import { accountingTestCases } from './accountingTests.js';
 import { optimizerTestCases } from './optimizerTests.js';
 import { parityTestCases } from './parityTests.js';
 import { sprintRotationTestCases } from './sprintRotationTests.js';
+import { timeframeResearchTestCases } from './timeframeResearchTests.js';
 import { walkForwardTestCases } from './walkForwardTests.js';
 import { tournamentTestCases } from './tournamentTests.js';
 
@@ -32,6 +33,7 @@ export async function runAllTests() {
     ...accountingTestCases(),
     ...optimizerTestCases(),
     ...sprintRotationTestCases(),
+    ...timeframeResearchTestCases(),
     ...walkForwardTestCases(),
     ...tournamentTestCases(),
   ];

@@ -321,7 +321,8 @@ h2 {
 .edge-panel,
 .optimizer-panel,
 .walkforward-panel,
-.tournament-panel {
+.tournament-panel,
+.timeframe-panel {
   min-height: 290px;
 }
 
