@@ -2222,13 +2222,6 @@
         }
 
         const parts = [];
-        parts.push(
-            '<p>Zo zou Ruben je dag kunnen voorlezen: vandaag (' +
-                escapeAgendaPlanningHtml(longDate) +
-                '), vertrekkend vanuit ' +
-                escapeAgendaPlanningHtml(RUBEN_DEFAULT_START_ADDRESS) +
-                '. Dit is hoe de dag eruitziet; er wordt rekening gehouden met reistijd tussen locaties zodat een vervolgafspraak aansluit op het adres van de vorige stop.</p>'
-        );
 
         const items = [];
         todays.forEach((apt, index) => {
