@@ -2,6 +2,7 @@ const { createActiveOrderAutomationService } = require('./active-order-automatio
 const { createActiveOrdersCoordinator } = require('./active-orders');
 const { createAiToolsCoordinator } = require('./ai-tools');
 const { createRubenAssistant } = require('./ruben-assistant');
+const { createRubenAssistantKnowledge } = require('./ruben-assistant-knowledge');
 const { createAiDashboardCoordinator } = require('./ai-dashboard');
 
 function createAiDashboardRuntime(deps = {}) {
@@ -117,11 +118,17 @@ function createAiDashboardRuntime(deps = {}) {
     logger,
   });
 
+  const rubenAssistantKnowledge = createRubenAssistantKnowledge({
+    repoRoot: process.cwd(),
+    logger,
+  });
+
   const rubenAssistant = createRubenAssistant({
     normalizeString,
     truncateText,
     parseJsonLoose,
     getUiStateValues,
+    buildKnowledgeContext: rubenAssistantKnowledge.buildKnowledgeContext,
     assistantMemoryScope: 'ruben_nijhuis_memory',
     assistantName: 'Ruben Nijhuis',
   });

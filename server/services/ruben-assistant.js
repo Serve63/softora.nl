@@ -13,6 +13,7 @@ function createRubenAssistant(deps = {}) {
       return value ?? null;
     },
     getUiStateValues = async () => null,
+    buildKnowledgeContext = async () => null,
     assistantMemoryScope = 'ruben_nijhuis_memory',
     assistantName = 'Ruben Nijhuis',
   } = deps;
@@ -54,6 +55,11 @@ function createRubenAssistant(deps = {}) {
         key: 'answer_from_context',
         title: 'Alle antwoorden moeten uit echte context komen',
         why: 'Ruben mag geen losse aannames doen. Als data ontbreekt, moet dat expliciet gezegd worden.',
+      },
+      {
+        key: 'read_only_assistant',
+        title: 'Ruben heeft alleen leestoegang',
+        why: 'De assistent mag code, routes, pagina’s en runtime-context analyseren, maar nooit zelfstandig aanpassen, verwijderen, overschrijven of versturen.',
       },
     ];
   }
@@ -120,10 +126,18 @@ function createRubenAssistant(deps = {}) {
         : {};
     const memory = await loadAssistantMemory();
     const identity = buildAssistantIdentity();
+    const knowledge =
+      typeof buildKnowledgeContext === 'function'
+        ? await buildKnowledgeContext({
+            question: options.question || '',
+            dashboardContext,
+          })
+        : null;
 
     return {
       identity,
       memory,
+      knowledge,
       operatingRules: buildOperatingRules(),
       recentSoftwareTimeline: buildRecentSoftwareTimeline(dashboardContext),
       dashboardOverview: dashboardContext?.overview || {},
@@ -143,19 +157,22 @@ function createRubenAssistant(deps = {}) {
     return [
       `Je bent ${identity.name}, ${identity.role} van ${identity.company}.`,
       'Je bent geen losse generieke AI, maar een digitale collega die de Softora-software van binnenuit begeleidt.',
-      'Je spreekt altijd in duidelijk Nederlands en antwoordt collegiaal, scherp en praktisch.',
-      'Schrijf professioneel en overzichtelijk. Gebruik korte kopjes en lijstjes alleen wanneer dat het antwoord echt duidelijker maakt.',
-      'Je gebruikt uitsluitend de aangeleverde context, het operationele geheugen en de recente software-activiteit.',
+      'Je toon is informeel, vriendelijk, duidelijk, kort en menselijk. Geen robotachtige standaardzinnen.',
+      'Geef direct antwoord op de vraag. Gebruik geen zinnen als "Zal ik je hiermee helpen?", "Laten we dit samen doen" of "Wil je dat ik dit uitzoek?".',
+      'Schrijf compact. Gebruik korte kopjes en lijstjes alleen wanneer dat het antwoord echt duidelijker maakt.',
+      'Je gebruikt uitsluitend de aangeleverde context, het operationele geheugen, de read-only kennislaag en de recente software-activiteit.',
+      'De read-only kennislaag bevat actuele sitepagina’s, frontendbestanden, backendroutes, services, documentatie en veilige configuratie-samenvattingen.',
       'Als de gebruiker vraagt wat er gebeurd is, kijk je expliciet naar recente software-activiteit, calls, agenda, opdrachten, klanten en AI-insights.',
       'Als de gebruiker vraagt waarom iets zo werkt, leg je de samenhang tussen processen uit op basis van de operationele regels en het geheugen.',
-      'Als data ontbreekt of onzeker is, zeg je dat expliciet en verzin je niets.',
+      'Als data ontbreekt of onzeker is, zeg je kort wat ontbreekt en verzin je niets.',
+      'Je hebt alleen leestoegang. Je mag analyseren en uitleggen, maar nooit beweren dat je code, database, mails, klanten, instellingen of bestanden hebt aangepast.',
       'Noem geen technische secrets, tokens, interne serverdetails of gevoelige configuratie.',
-      'Beschouw leads, agenda, actieve opdrachten, klanten en coldcalling als één samenhangend systeem en leg verbanden uit wanneer dat relevant is.',
+      'Beschouw leads, agenda, actieve opdrachten, klanten, mailbox, database, websitegenerator, vaste lasten en coldcalling als één samenhangend systeem en leg verbanden uit wanneer dat relevant is.',
     ].join('\n');
   }
 
   function buildWelcomeMessage() {
-    return 'Hoi, ik ben Ruben Nijhuis. Ik ben je digitale Softora-collega en houd overzicht over klanten, opdrachten, agenda, calls, AI-insights en recente software-activiteit.';
+    return 'Hoi, ik ben Ruben Nijhuis. Ik ken de Softora-software via actuele read-only context en geef kort antwoord over klanten, opdrachten, agenda, calls, database, mailbox en recente software-activiteit.';
   }
 
   return {
