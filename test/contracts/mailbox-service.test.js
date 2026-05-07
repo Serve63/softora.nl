@@ -324,7 +324,76 @@ test('mailbox service rejects invalid mark-read message references', async () =>
   assert.equal(res.body.error, 'Gelezen status opslaan mislukt');
 });
 
-test('mailbox routes expose accounts, messages and send endpoints', () => {
+test('mailbox service rewrites compose draft through OpenAI with reply context', async () => {
+  const calls = [];
+  const service = createMailboxService({
+    getOpenAiApiKey: () => 'openai-key',
+    openAiApiBaseUrl: 'https://api.openai.test/v1',
+    openAiModel: 'gpt-test',
+    fetchJsonWithTimeout: async (url, options, timeout) => {
+      calls.push({ url, options, timeout, payload: JSON.parse(options.body) });
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          model: 'gpt-test',
+          usage: { total_tokens: 123 },
+          choices: [{ message: { content: 'Beste klant,\n\nVerbeterde tekst.' } }],
+        },
+      };
+    },
+    extractOpenAiTextContent: (content) => String(content || ''),
+  });
+
+  const result = await service.rewriteDraft({
+    accountEmail: 'serve@softora.nl',
+    to: 'klant@example.nl',
+    subject: 'Re: Vraag',
+    body: 'hoi ik stuur dit ff',
+    context: {
+      from: 'Klant',
+      email: 'klant@example.nl',
+      subject: 'Vraag',
+      preview: 'Kan dit?',
+      body: 'Kan dit voor vrijdag?',
+      date: '2026-05-07',
+      time: '14:00',
+    },
+  });
+
+  assert.equal(result.text, 'Beste klant,\n\nVerbeterde tekst.');
+  assert.equal(result.model, 'gpt-test');
+  assert.equal(calls[0].url, 'https://api.openai.test/v1/chat/completions');
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer openai-key');
+  assert.equal(calls[0].timeout, 65000);
+  assert.equal(calls[0].payload.model, 'gpt-test');
+  assert.match(calls[0].payload.messages[0].content, /Verzin geen feiten/);
+  assert.match(calls[0].payload.messages[1].content, /Kan dit voor vrijdag/);
+  assert.match(calls[0].payload.messages[1].content, /hoi ik stuur dit ff/);
+});
+
+test('mailbox service refuses rewrite without OpenAI key', async () => {
+  const service = createMailboxService({
+    logger: { error() {} },
+    getOpenAiApiKey: () => '',
+  });
+  const res = createResponseRecorder();
+
+  await service.rewriteDraftResponse(
+    {
+      body: {
+        body: 'hoi',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.ok, false);
+  assert.equal(res.body.error, 'Mailtekst verbeteren mislukt');
+  assert.equal(res.body.detail, 'OpenAI API-key ontbreekt.');
+});
+
+test('mailbox routes expose accounts, messages, send and rewrite endpoints', () => {
   const routes = [];
   const app = {
     get(path, handler) {
@@ -341,6 +410,7 @@ test('mailbox routes expose accounts, messages and send endpoints', () => {
       listMessagesResponse() {},
       markMessageReadResponse() {},
       sendMessageResponse() {},
+      rewriteDraftResponse() {},
     },
   });
 
@@ -348,4 +418,5 @@ test('mailbox routes expose accounts, messages and send endpoints', () => {
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/read'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/rewrite'));
 });

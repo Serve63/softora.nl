@@ -122,7 +122,12 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .compose-field input { flex: 1; padding: 14px 16px; border: none; font-family: 'Barlow', sans-serif; font-size: 16px; color: var(--text-dark); outline: none; background: transparent; }
 .compose-body { padding: 0; display: flex; flex: 1; min-height: 0; }
 .compose-body textarea { flex: 1; width: 100%; min-height: 360px; padding: 18px; border: none; font-family: 'Barlow', sans-serif; font-size: 16px; color: var(--text-dark); resize: none; outline: none; background: transparent; line-height: 1.7; }
-.compose-footer { padding: 14px 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; align-items: center; }
+.compose-footer { padding: 14px 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.compose-footer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-left: auto; }
+.btn-rewrite-compose { padding: 10px 18px; background: #fff; color: var(--crimson); border: 1px solid rgba(155,35,85,.35); border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all .15s; }
+.btn-rewrite-compose:hover { border-color: var(--crimson); background: rgba(155,35,85,.06); }
+.btn-rewrite-compose:disabled,
+.btn-send:disabled { opacity: .55; cursor: not-allowed; }
 .btn-send { padding: 10px 24px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
 .btn-send:hover { background: var(--crimson-light); }
 
@@ -381,7 +386,10 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
     <div class="compose-field"><div class="compose-field-label">Onderwerp</div><input type="text" id="c-subject" placeholder="Onderwerp…"></div>
     <div class="compose-body"><textarea id="c-body" placeholder="Typ je bericht hier…"></textarea></div>
     <div class="compose-footer">
-      <button class="btn-send" type="button" data-mailbox-action="send-mail">Versturen</button>
+      <button class="btn-rewrite-compose" type="button" data-mailbox-action="rewrite-compose">Verwoord dit beter</button>
+      <div class="compose-footer-actions">
+        <button class="btn-send" type="button" data-mailbox-action="send-mail">Versturen</button>
+      </div>
     </div>
   </div>
 </div>
@@ -392,6 +400,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   </main>
 </div>
 
-<script src="assets/premium-mailbox.js?v=20260507a"></script>
+<script src="assets/premium-mailbox.js?v=20260507b"></script>
 </body>
 </html>

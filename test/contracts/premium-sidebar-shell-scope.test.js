@@ -215,7 +215,7 @@ test('premium mailbox behoudt eigen layout en vaste sidebar bij responsive mailw
   assert.match(pageSource, /\.main-content \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
   assert.match(pageSource, /\.mail-page-shell \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
   assert.match(pageSource, /\.mail-detail \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
-  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260507a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260507b"><\/script>/);
 });
 
 test('static premium sidebars ship the webdesign link in html', () => {

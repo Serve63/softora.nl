@@ -6,6 +6,7 @@ function registerMailboxRoutes(app, deps = {}) {
   app.get('/api/mailbox/messages', (req, res) => coordinator.listMessagesResponse(req, res));
   app.post('/api/mailbox/messages/read', (req, res) => coordinator.markMessageReadResponse(req, res));
   app.post('/api/mailbox/send', (req, res) => coordinator.sendMessageResponse(req, res));
+  app.post('/api/mailbox/rewrite', (req, res) => coordinator.rewriteDraftResponse(req, res));
 }
 
 module.exports = {
