@@ -345,6 +345,23 @@ function createPremiumUserManagementCoordinator(deps = {}) {
     }
 
     const updatedUser = premiumUsersStore.findUserById(saved.users, userId);
+    const updatedUserIsCurrentSession =
+      updatedUser &&
+      (updatedUser.id === authState.userId || updatedUser.email === authState.email);
+    const refreshedAuthState = updatedUserIsCurrentSession
+      ? {
+          ...authState,
+          user: updatedUser,
+          userId: updatedUser.id,
+          email: updatedUser.email,
+          role: updatedUser.role,
+          isAdmin: premiumUsersStore.isAdminRole(updatedUser.role),
+          firstName: normalizeString(updatedUser.firstName || ''),
+          lastName: normalizeString(updatedUser.lastName || ''),
+          displayName: premiumUsersStore.buildUserDisplayName(updatedUser),
+          avatarDataUrl: premiumUsersStore.sanitizeAvatarDataUrl(updatedUser.avatarDataUrl || ''),
+        }
+      : null;
     appendAuditEvent(
       req,
       authState,
@@ -361,6 +378,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
       ok: true,
       user: premiumUsersStore.sanitizeUserForClient(updatedUser),
       users: sanitizeUsersForClient(saved.users),
+      ...(refreshedAuthState ? { session: buildPremiumAuthSessionPayload(refreshedAuthState) } : {}),
     });
   }
 

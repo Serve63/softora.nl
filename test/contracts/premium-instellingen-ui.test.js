@@ -5,6 +5,10 @@ const path = require('node:path');
 
 test('premium instellingen gebruikt delegated actions zonder inline handlers', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../premium-instellingen.html'), 'utf8');
+  const userManagementSource = fs.readFileSync(
+    path.join(__dirname, '../../assets/premium-user-management.js'),
+    'utf8'
+  );
 
   assert.match(source, /<button type="button" class="settings-num-btn" data-settings-pin-digit="1">1<\/button>/);
   assert.match(source, /data-settings-pin-clear aria-label="Volledige PIN wissen"/);
@@ -28,6 +32,11 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(source, /callSettingsGlobal\('togglePw', \[button\.dataset\.settingsPasswordToggle, button\]\);/);
   assert.match(source, /callSettingsGlobal\('onEditAvatarPicked', \[avatarFile\]\);/);
   assert.match(source, /bindSettingsStaticActions\(\);/);
+  assert.match(userManagementSource, /persoon && persoon\.avatarDataUrl/);
+  assert.match(userManagementSource, /document\.createElement\('img'\)/);
+  assert.match(userManagementSource, /avatarImg\.src = avatarDataUrl/);
+  assert.match(userManagementSource, /syncPremiumSidebarAfterUserManagementSave\(payload\.session\)/);
+  assert.match(userManagementSource, /payload\.session/);
 
   assert.doesNotMatch(source, /\son(?:click|input|change|keydown|submit)=/);
   assert.doesNotMatch(source, /onclick=/);
