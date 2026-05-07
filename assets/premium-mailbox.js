@@ -28,6 +28,82 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+const MAILBOX_TRACKING_HOST_PATTERNS = [
+  /(^|\.)sendgrid\.net$/i,
+  /(^|\.)ct\.sendgrid\.net$/i,
+  /(^|\.)mandrillapp\.com$/i,
+  /(^|\.)list-manage\.com$/i,
+  /(^|\.)mailchimp\.com$/i,
+  /(^|\.)mailgun\.org$/i,
+  /(^|\.)postmarkapp\.com$/i,
+];
+const MAILBOX_IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
+
+function parseMailboxUrl(value) {
+  const raw = String(value || '')
+    .trim()
+    .replace(/^<|>$/g, '')
+    .replace(/^\[|\]$/g, '')
+    .replace(/^"|"$/g, '');
+  if (!/^https?:\/\//i.test(raw)) return null;
+  try {
+    return new URL(raw);
+  } catch (_) {
+    return null;
+  }
+}
+
+function isMailboxTrackingUrl(value) {
+  const parsed = parseMailboxUrl(value);
+  if (!parsed) return false;
+  const host = parsed.hostname.toLowerCase();
+  const path = parsed.pathname.toLowerCase();
+  return MAILBOX_TRACKING_HOST_PATTERNS.some((pattern) => pattern.test(host)) ||
+    /\/(?:wf\/open|open|click|ls\/click|track|tracking)\b/i.test(path);
+}
+
+function isMailboxStandaloneAssetUrl(value) {
+  const parsed = parseMailboxUrl(value);
+  if (!parsed) return false;
+  const host = parsed.hostname.toLowerCase();
+  const path = decodeURIComponent(parsed.pathname || '').toLowerCase();
+  return MAILBOX_IMAGE_ASSET_EXTENSIONS.test(path) ||
+    (host === 'cdn.openai.com' && /(?:logo|asset|image|header)/i.test(path));
+}
+
+function isMailboxTechnicalUrl(value, options) {
+  if (isMailboxTrackingUrl(value)) return true;
+  return Boolean(options && options.standalone && isMailboxStandaloneAssetUrl(value));
+}
+
+function cleanMailboxText(value) {
+  return String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\u200B/g, '')
+    .split('\n')
+    .map((line) => String(line || '')
+      .replace(/\[(https?:\/\/[^\]\s]+)\]/gi, (match, url) => isMailboxTechnicalUrl(url) ? '' : match)
+      .replace(/<((?:https?:\/\/)[^>\s]+)>/gi, (match, url) => isMailboxTechnicalUrl(url) ? '' : match)
+      .replace(/\s{2,}/g, ' ')
+      .trimEnd())
+    .filter((line) => {
+      const value = String(line || '').trim();
+      const url = value.match(/^\[(https?:\/\/[^\]]+)\]$/i)?.[1] ||
+        value.match(/^<(https?:\/\/[^>]+)>$/i)?.[1] ||
+        value.match(/^(https?:\/\/\S+)$/i)?.[1] ||
+        '';
+      return !(url && isMailboxTechnicalUrl(url, { standalone: true }));
+    })
+    .join('\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function renderMailBody(value) {
+  return escapeHtml(cleanMailboxText(value) || 'Geen inhoud.');
+}
+
 function findMailById(id) {
   const key = String(id);
   return mails.find(mail => String(mail.id) === key);
@@ -92,14 +168,16 @@ function formatMailDate(value) {
 
 function normalizeMailboxApiMessage(message) {
   const when = formatMailDate(message.date);
+  const body = cleanMailboxText(message.body || message.preview || '');
+  const preview = cleanMailboxText(message.preview || body).replace(/\s+/g, ' ').slice(0, 160);
   return {
     id: message.id,
     folder: message.folder || activeFolder,
     from: message.from || 'Onbekend',
     email: message.email || '',
     subject: message.subject || '(Geen onderwerp)',
-    preview: message.preview || '',
-    body: message.body || message.preview || '',
+    preview,
+    body,
     time: when.time,
     date: when.date,
     uid: message.uid,
@@ -293,7 +371,7 @@ function openMail(id) {
       </div>
     </div>
     <div class="detail-body">
-      <div class="detail-body-text">${escapeHtml(m.body)}</div>
+      <div class="detail-body-text">${renderMailBody(m.body)}</div>
     </div>`;
 }
 

@@ -18,6 +18,118 @@ const FOLDER_ALIASES = {
   trash: ['Trash', 'Deleted Items', 'INBOX.Trash', 'Prullenbak'],
 };
 
+const TRACKING_HOST_PATTERNS = [
+  /(^|\.)sendgrid\.net$/i,
+  /(^|\.)ct\.sendgrid\.net$/i,
+  /(^|\.)mandrillapp\.com$/i,
+  /(^|\.)list-manage\.com$/i,
+  /(^|\.)mailchimp\.com$/i,
+  /(^|\.)mailgun\.org$/i,
+  /(^|\.)postmarkapp\.com$/i,
+];
+
+const IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
+
+function decodeBasicHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
+function htmlToReadableText(value) {
+  return decodeBasicHtmlEntities(value)
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<img\b[^>]*(?:width=["']?1["']?|height=["']?1["']?)[^>]*>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(?:p|div|section|article|tr|li|h[1-6])>/gi, '\n')
+    .replace(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_match, href, label) => {
+      const text = htmlToReadableText(label).trim();
+      const url = String(href || '').trim();
+      if (!text) return url;
+      if (!url || text === url) return text;
+      return `${text} [${url}]`;
+    })
+    .replace(/<[^>]+>/g, ' ');
+}
+
+function safeUrl(value) {
+  const raw = String(value || '')
+    .trim()
+    .replace(/^<|>$/g, '')
+    .replace(/^\[|\]$/g, '')
+    .replace(/^"|"$/g, '');
+  if (!/^https?:\/\//i.test(raw)) return null;
+  try {
+    return new URL(raw);
+  } catch (_) {
+    return null;
+  }
+}
+
+function isTrackingUrl(rawUrl) {
+  const parsed = safeUrl(rawUrl);
+  if (!parsed) return false;
+  const host = parsed.hostname.toLowerCase();
+  const path = parsed.pathname.toLowerCase();
+  if (TRACKING_HOST_PATTERNS.some((pattern) => pattern.test(host))) return true;
+  return /\/(?:wf\/open|open|click|ls\/click|track|tracking)\b/i.test(path);
+}
+
+function isStandaloneAssetUrl(rawUrl) {
+  const parsed = safeUrl(rawUrl);
+  if (!parsed) return false;
+  const host = parsed.hostname.toLowerCase();
+  const path = decodeURIComponent(parsed.pathname || '').toLowerCase();
+  if (IMAGE_ASSET_EXTENSIONS.test(path)) return true;
+  if (host === 'cdn.openai.com' && /(?:logo|asset|image|header)/i.test(path)) return true;
+  return false;
+}
+
+function isTechnicalMailUrl(rawUrl, options = {}) {
+  if (isTrackingUrl(rawUrl)) return true;
+  return Boolean(options.standalone && isStandaloneAssetUrl(rawUrl));
+}
+
+function stripInlineTechnicalUrls(line) {
+  return String(line || '')
+    .replace(/\[(https?:\/\/[^\]\s]+)\]/gi, (match, url) => (isTechnicalMailUrl(url) ? '' : match))
+    .replace(/<((?:https?:\/\/)[^>\s]+)>/gi, (match, url) => (isTechnicalMailUrl(url) ? '' : match))
+    .replace(/\s{2,}/g, ' ')
+    .trimEnd();
+}
+
+function isStandaloneTechnicalUrlLine(line) {
+  const value = String(line || '').trim();
+  if (!value) return false;
+  const bracketed = value.match(/^\[(https?:\/\/[^\]]+)\]$/i);
+  const angled = value.match(/^<(https?:\/\/[^>]+)>$/i);
+  const bare = value.match(/^(https?:\/\/\S+)$/i);
+  const url = bracketed?.[1] || angled?.[1] || bare?.[1] || '';
+  return Boolean(url && isTechnicalMailUrl(url, { standalone: true }));
+}
+
+function sanitizeMailboxDisplayText(value) {
+  const raw = String(value || '');
+  const source = /<\/?[a-z][\s\S]*>/i.test(raw) ? htmlToReadableText(raw) : decodeBasicHtmlEntities(raw);
+  const normalized = source
+    .replace(/\r\n?/g, '\n')
+    .replace(/\u200B/g, '')
+    .split('\n')
+    .map((line) => stripInlineTechnicalUrls(line))
+    .filter((line) => !isStandaloneTechnicalUrlLine(line))
+    .join('\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return normalized;
+}
+
 function createMailboxService(deps = {}) {
   const {
     logger = console,
@@ -309,7 +421,7 @@ function createMailboxService(deps = {}) {
 
   function toClientMessage(parsed, message, folder, account) {
     const date = parsed.date || message.internalDate || new Date();
-    const text = normalizeString(parsed.text || parsed.html || '');
+    const text = sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
     const preview = truncateText(text.replace(/\s+/g, ' '), 140);
     const fromText = folder === 'sent' ? account.name || account.email : displayName(parsed.from?.value);
     return {
@@ -528,4 +640,5 @@ function createMailboxService(deps = {}) {
 
 module.exports = {
   createMailboxService,
+  sanitizeMailboxDisplayText,
 };

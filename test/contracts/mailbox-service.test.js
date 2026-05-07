@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createMailboxService } = require('../../server/services/mailbox');
+const { createMailboxService, sanitizeMailboxDisplayText } = require('../../server/services/mailbox');
 const { registerMailboxRoutes } = require('../../server/routes/mailbox');
 
 function createResponseRecorder() {
@@ -270,6 +270,27 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
     ['release', 'INBOX'],
     ['logout'],
   ]);
+});
+
+test('mailbox service strips tracking and standalone asset urls from display text', () => {
+  const clean = sanitizeMailboxDisplayText(`
+[https://cdn.openai.com/API/logo-assets/openai-logo-email-header-1.png]
+
+Your authentication code
+
+If you have questions please contact us through our help center
+[https://u20216706.ct.sendgrid.net/ls/click?upn=test123]
+
+https://u20216706.ct.sendgrid.net/wf/open?upn=test123
+
+Bekijk normale link: [https://softora.nl/voorbeelddesign1]
+`);
+
+  assert.match(clean, /Your authentication code/);
+  assert.match(clean, /If you have questions please contact us through our help center/);
+  assert.match(clean, /https:\/\/softora\.nl\/voorbeelddesign1/);
+  assert.doesNotMatch(clean, /cdn\.openai\.com/);
+  assert.doesNotMatch(clean, /sendgrid\.net/);
 });
 
 test('mailbox service rejects invalid mark-read message references', async () => {
