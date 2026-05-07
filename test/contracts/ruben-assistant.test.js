@@ -22,6 +22,18 @@ test('ruben assistant builds identity, operating rules and recent software timel
         ]),
       },
     }),
+    buildKnowledgeContext: async ({ question }) => ({
+      source: 'repo-readonly-index',
+      accessMode: 'read-only',
+      relevantItems: [
+        {
+          type: 'page',
+          route: '/premium-database',
+          title: 'Database',
+          summary: `Vraag: ${question}`,
+        },
+      ],
+    }),
   });
 
   const assistantContext = await assistant.buildAssistantContext({
@@ -40,6 +52,7 @@ test('ruben assistant builds identity, operating rules and recent software timel
         },
       ],
     },
+    question: 'Hoe werkt premium database?',
   });
 
   assert.equal(assistantContext.identity.name, 'Ruben Nijhuis');
@@ -47,6 +60,8 @@ test('ruben assistant builds identity, operating rules and recent software timel
   assert.ok(Array.isArray(assistantContext.operatingRules));
   assert.ok(assistantContext.operatingRules.some((item) => item.key === 'lead_do_not_call'));
   assert.equal(assistantContext.memory.source, 'supabase');
+  assert.equal(assistantContext.knowledge.source, 'repo-readonly-index');
+  assert.equal(assistantContext.knowledge.accessMode, 'read-only');
   assert.equal(assistantContext.memory.notes[0].title, 'Niet geïnteresseerde leads niet opnieuw bellen');
   assert.equal(assistantContext.recentSoftwareTimeline[0].title, 'Lead dismissed');
 });
@@ -63,4 +78,7 @@ test('ruben assistant system prompt frames the assistant as a Softora colleague'
   assert.match(prompt, /digitale collega/);
   assert.match(prompt, /operationele regels/);
   assert.match(prompt, /geen losse generieke AI/);
+  assert.match(prompt, /read-only kennislaag/);
+  assert.match(prompt, /alleen leestoegang/);
+  assert.match(prompt, /Geef direct antwoord/);
 });

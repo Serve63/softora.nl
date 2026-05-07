@@ -446,7 +446,10 @@ function createAiDashboardCoordinator(deps = {}) {
         ? options.assistantContext
         : null;
     if (!assistantContext && rubenAssistant && typeof rubenAssistant.buildAssistantContext === 'function') {
-      assistantContext = await rubenAssistant.buildAssistantContext({ dashboardContext: context });
+      assistantContext = await rubenAssistant.buildAssistantContext({
+        dashboardContext: context,
+        question,
+      });
     }
     const trimmedContext = trimDashboardChatContextForModel(context, 52000);
     const contextJson = JSON.stringify(trimmedContext);
@@ -546,7 +549,7 @@ function createAiDashboardCoordinator(deps = {}) {
       const context = await buildPremiumDashboardChatContext();
       const assistantContext =
         rubenAssistant && typeof rubenAssistant.buildAssistantContext === 'function'
-          ? await rubenAssistant.buildAssistantContext({ dashboardContext: context })
+          ? await rubenAssistant.buildAssistantContext({ dashboardContext: context, question })
           : null;
       const result = await generatePremiumDashboardChatReplyWithAi({
         question,

@@ -129,6 +129,20 @@ function createFixture(overrides = {}) {
       return value ?? null;
     },
     getUiStateValues: async (scope) => stateByScope[scope] || null,
+    buildKnowledgeContext:
+      overrides.buildKnowledgeContext ||
+      (async ({ question }) => ({
+        source: 'repo-readonly-index',
+        accessMode: 'read-only',
+        relevantItems: [
+          {
+            type: 'page',
+            route: '/premium-klanten',
+            title: 'Klanten',
+            summary: `Kennis bij vraag: ${question}`,
+          },
+        ],
+      })),
   });
 
   const coordinator = createAiDashboardCoordinator({
@@ -393,6 +407,8 @@ test('ai dashboard coordinator calls OpenAI with normalized question, history an
   assert.equal(requestBody.model, 'gpt-5.1-mini');
   assert.match(requestBody.messages[0].content, /Ruben Nijhuis/);
   assert.match(requestBody.messages[0].content, /RUBEN_ASSISTANT_CONTEXT_JSON/);
+  assert.match(requestBody.messages[0].content, /repo-readonly-index/);
+  assert.match(requestBody.messages[0].content, /Kennis bij vraag: Hoeveel klanten hebben we\?/);
   assert.match(requestBody.messages[0].content, /DASHBOARD_CONTEXT_JSON/);
   assert.equal(requestBody.messages.at(-1).content, 'Hoeveel klanten hebben we?');
 });
