@@ -140,6 +140,17 @@ function createMailboxService(deps = {}) {
     createTransport = (config) => nodemailer.createTransport(config),
     createImapClient = (config) => new ImapFlow(config),
     parseMailSource = (source) => simpleParser(source),
+    getOpenAiApiKey = () => '',
+    openAiApiBaseUrl = 'https://api.openai.com/v1',
+    openAiModel = 'gpt-5.5-pro',
+    fetchJsonWithTimeout = async () => ({ response: { ok: false, status: 500 }, data: null }),
+    extractOpenAiTextContent = (content) => {
+      if (typeof content === 'string') return content;
+      if (!Array.isArray(content)) return '';
+      return content
+        .map((part) => (typeof part === 'string' ? part : part?.text || part?.content || ''))
+        .join('');
+    },
   } = deps;
 
   const baseAccount = {
@@ -556,6 +567,107 @@ function createMailboxService(deps = {}) {
     };
   }
 
+  function cleanPromptText(value, maxLength = 6000) {
+    return truncateText(sanitizeMailboxDisplayText(normalizeString(value)), maxLength);
+  }
+
+  function buildRewritePromptPayload({ accountEmail, to, subject, body, context }) {
+    const original = context && typeof context === 'object'
+      ? {
+          from: cleanPromptText(context.from, 240),
+          email: cleanPromptText(context.email, 240),
+          subject: cleanPromptText(context.subject, 240),
+          preview: cleanPromptText(context.preview, 600),
+          body: cleanPromptText(context.body, 6000),
+          date: cleanPromptText(context.date, 120),
+          time: cleanPromptText(context.time, 80),
+          folder: cleanPromptText(context.folder, 80),
+        }
+      : null;
+
+    return {
+      mailbox: {
+        accountEmail: normalizeEmail(accountEmail),
+        to: cleanPromptText(to, 240),
+        subject: cleanPromptText(subject, 240),
+      },
+      origineleMail: original,
+      conceptAntwoord: cleanPromptText(body, 8000),
+    };
+  }
+
+  async function rewriteDraft({ accountEmail, to, subject, body, context }) {
+    const draft = cleanPromptText(body, 8000);
+    if (!draft) {
+      const error = new Error('Typ eerst je mailtekst.');
+      error.status = 400;
+      throw error;
+    }
+
+    const apiKey = normalizeString(typeof getOpenAiApiKey === 'function' ? getOpenAiApiKey() : '');
+    if (!apiKey) {
+      const error = new Error('OpenAI API-key ontbreekt.');
+      error.status = 503;
+      throw error;
+    }
+
+    const model = normalizeString(openAiModel) || 'gpt-5.5-pro';
+    const systemPrompt = [
+      'Je bent de mailherschrijver van Softora.',
+      'Herschrijf alleen het conceptantwoord van de medewerker.',
+      'Maak de tekst duidelijker, netter en professioneler, maar behoud exact de bedoeling.',
+      'Gebruik de context van de originele mail om toon en inhoud passend te houden.',
+      'Verzin geen feiten, beloftes, bedragen, datums, namen, afspraken, URLs of voorwaarden.',
+      'Wijzig belangrijke gegevens niet.',
+      'Maak het niet overdreven formeel als dat niet nodig is.',
+      'Geef alleen de verbeterde mailtekst terug, zonder uitleg, markdown of extra analyse.',
+    ].join('\n');
+
+    const payload = buildRewritePromptPayload({ accountEmail, to, subject, body: draft, context });
+    const baseUrl = normalizeString(openAiApiBaseUrl) || 'https://api.openai.com/v1';
+    const { response, data } = await fetchJsonWithTimeout(
+      `${baseUrl}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.25,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: JSON.stringify(payload) },
+          ],
+        }),
+      },
+      65000
+    );
+
+    if (!response.ok) {
+      const error = new Error(`OpenAI mailtekst verbeteren mislukt (${response.status})`);
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+
+    const content = data?.choices?.[0]?.message?.content;
+    const text = truncateText(normalizeString(extractOpenAiTextContent(content)), 8000);
+    if (!text) {
+      const error = new Error('OpenAI gaf geen verbeterde tekst terug.');
+      error.status = 502;
+      throw error;
+    }
+
+    return {
+      text,
+      model: normalizeString(data?.model || model) || model,
+      usage: data?.usage || null,
+      provider: 'openai',
+    };
+  }
+
   async function accountsResponse(_req, res) {
     return res.status(200).json({
       ok: true,
@@ -626,15 +738,38 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function rewriteDraftResponse(req, res) {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await rewriteDraft({
+        accountEmail: body.account,
+        to: body.to,
+        subject: body.subject,
+        body: body.body || body.text || '',
+        context: body.context,
+      });
+      return res.status(200).json({ ok: true, text: result.text, result });
+    } catch (error) {
+      logger.error('[Mailbox][Rewrite]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Mailtekst verbeteren mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
   return {
     accountsResponse,
     listMessagesResponse,
     sendMessageResponse,
     markMessageReadResponse,
+    rewriteDraftResponse,
     getAccounts,
     listMessages,
     markMessageRead,
     sendMessage,
+    rewriteDraft,
   };
 }
 

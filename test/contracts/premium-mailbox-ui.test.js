@@ -25,11 +25,12 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260507a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260507b"><\/script>/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
   assert.match(scriptSource, /\/api\/mailbox\/send/);
+  assert.match(scriptSource, /\/api\/mailbox\/rewrite/);
   assert.match(scriptSource, /async function loadMailboxAccounts\(\)/);
   assert.match(scriptSource, /async function loadMailboxMessages\(\)/);
   assert.match(scriptSource, /async function sendMail\(\)/);
@@ -59,10 +60,27 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   const pageSource = readPage();
 
   assert.match(pageSource, /\.compose-head \{[\s\S]*background:\s*var\(--crimson\);/);
-  assert.match(pageSource, /\.compose-footer \{[\s\S]*justify-content:\s*flex-end;/);
+  assert.match(pageSource, /\.compose-footer \{[\s\S]*justify-content:\s*space-between;/);
+  assert.match(pageSource, /\.btn-rewrite-compose \{[\s\S]*color:\s*var\(--crimson\);/);
+  assert.match(pageSource, /data-mailbox-action="rewrite-compose">Verwoord dit beter<\/button>/);
   assert.match(pageSource, /<button class="compose-x" type="button" data-mailbox-action="close-compose" aria-label="Sluiten">×<\/button>/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
+});
+
+test('premium mailbox kan conceptantwoord met mailcontext laten herschrijven', () => {
+  const pageSource = readPage();
+  const scriptSource = readScript();
+
+  assert.match(pageSource, /data-mailbox-action="rewrite-compose">Verwoord dit beter<\/button>/);
+  assert.match(scriptSource, /let composeReplyContext = null;/);
+  assert.match(scriptSource, /function buildComposeRewriteContext\(\)/);
+  assert.match(scriptSource, /async function rewriteComposeBody\(\)/);
+  assert.match(scriptSource, /\/api\/mailbox\/rewrite/);
+  assert.match(scriptSource, /context: buildComposeRewriteContext\(\)/);
+  assert.match(scriptSource, /case 'rewrite-compose':[\s\S]*void rewriteComposeBody\(\);/);
+  assert.match(scriptSource, /function replyMail\(mail\) \{[\s\S]*setComposeReplyContext\(mail\);/);
+  assert.match(scriptSource, /bodyField\.value = rewritten;/);
 });
 
 test('premium mailbox bewaart gelezen status via de mailbox API', () => {
@@ -107,6 +125,7 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.doesNotMatch(pageSource, /\son[a-z]+=/);
   assert.doesNotMatch(scriptSource, /onclick=/);
   assert.match(pageSource, /data-mailbox-action="open-compose"/);
+  assert.match(pageSource, /data-mailbox-action="rewrite-compose"/);
   assert.match(pageSource, /data-mailbox-action="set-folder" data-mailbox-folder="inbox"/);
   assert.match(scriptSource, /data-mailbox-action="open-mail"/);
   assert.match(scriptSource, /data-mailbox-action="toggle-star"/);

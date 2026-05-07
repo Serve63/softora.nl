@@ -150,6 +150,7 @@ let mails = [];
 let activeFolder = 'inbox';
 let activeMail = null;
 let inboxUnreadCount = 0;
+let composeReplyContext = null;
 
 function resetDetailEmpty() {
   document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
@@ -393,23 +394,105 @@ function deleteMail(id) {
   toast('Mail verplaatst naar prullenbak');
 }
 
-function replyMail(email, subject) {
-  document.getElementById('c-to').value = email;
-  document.getElementById('c-subject').value = 'Re: ' + subject;
-  openCompose();
+function getComposeFieldValue(id) {
+  const field = document.getElementById(id);
+  return field ? field.value : '';
 }
 
-function openCompose() {
+function setComposeReplyContext(mail) {
+  composeReplyContext = mail
+    ? {
+        id: mail.id,
+        from: mail.from,
+        email: mail.email,
+        subject: mail.subject,
+        preview: mail.preview,
+        body: mail.body,
+        date: mail.date,
+        time: mail.time,
+        folder: mail.folder || activeFolder,
+      }
+    : null;
+}
+
+function buildComposeRewriteContext() {
+  return composeReplyContext ? { ...composeReplyContext } : null;
+}
+
+function replyMail(mail) {
+  if (!mail) return;
+  setComposeReplyContext(mail);
+  const toField = document.getElementById('c-to');
+  const subjectField = document.getElementById('c-subject');
+  if (toField) toField.value = mail.email || '';
+  if (subjectField) {
+    const subject = mail.subject || '';
+    subjectField.value = /^re:/i.test(subject) ? subject : `Re: ${subject}`;
+  }
+  openCompose({ keepContext: true });
+}
+
+function openCompose(options = {}) {
+  if (!options.keepContext) setComposeReplyContext(null);
   const overlay = document.getElementById('compose-overlay');
   if (overlay) overlay.classList.add('open');
 }
 function closeCompose() {
   const overlay = document.getElementById('compose-overlay');
   if (overlay) overlay.classList.remove('open');
+  setComposeReplyContext(null);
   ['c-to','c-subject','c-body'].forEach(id => {
     const field = document.getElementById(id);
     if (field) field.value = '';
   });
+}
+
+async function rewriteComposeBody() {
+  const bodyField = document.getElementById('c-body');
+  const draft = String(bodyField?.value || '').trim();
+  if (!draft) {
+    toast('Typ eerst je mailtekst');
+    return;
+  }
+  const rewriteBtn = document.querySelector('[data-mailbox-action="rewrite-compose"]');
+  const sendBtn = document.querySelector('.btn-send');
+  const originalLabel = rewriteBtn ? rewriteBtn.textContent : '';
+  if (rewriteBtn) {
+    rewriteBtn.disabled = true;
+    rewriteBtn.textContent = 'Bezig...';
+  }
+  if (sendBtn) sendBtn.disabled = true;
+  try {
+    const response = await fetch('/api/mailbox/rewrite', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        account: getMailboxAccount(),
+        to: getComposeFieldValue('c-to'),
+        subject: getComposeFieldValue('c-subject'),
+        body: draft,
+        context: buildComposeRewriteContext(),
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.detail || data?.error || 'Mailtekst verbeteren mislukt');
+    }
+    const rewritten = String(data?.text || data?.result?.text || '').trim();
+    if (!rewritten) throw new Error('Geen verbeterde tekst ontvangen');
+    bodyField.value = rewritten;
+    toast('Tekst verbeterd');
+  } catch (error) {
+    toast(String(error?.message || error || 'Mailtekst verbeteren mislukt'));
+  } finally {
+    if (rewriteBtn) {
+      rewriteBtn.disabled = false;
+      rewriteBtn.textContent = originalLabel || 'Verwoord dit beter';
+    }
+    if (sendBtn) sendBtn.disabled = false;
+  }
 }
 
 async function sendMail() {
@@ -471,6 +554,9 @@ function handleMailboxAction(actionEl) {
     case 'send-mail':
       void sendMail();
       break;
+    case 'rewrite-compose':
+      void rewriteComposeBody();
+      break;
     case 'set-folder':
       setFolder(actionEl.getAttribute('data-mailbox-folder') || 'inbox', actionEl);
       break;
@@ -482,7 +568,7 @@ function handleMailboxAction(actionEl) {
       break;
     case 'reply-mail': {
       const mail = findMailById(id);
-      if (mail) replyMail(mail.email, mail.subject);
+      if (mail) replyMail(mail);
       break;
     }
     case 'delete-mail':
