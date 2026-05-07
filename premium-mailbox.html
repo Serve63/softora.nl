@@ -31,17 +31,17 @@
   --text-dark: #1a1a2e; --text-mid: #555; --text-light: #999;
   --border: #e2ddd6; --card: #ffffff; --tag: #f5f0eb;
 }
-html, body { height: 100%; }
+html, body { height: 100%; width: 100%; overflow-x: hidden; }
 body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text-dark); min-height: 100vh; overflow: hidden; }
 
-.dashboard-layout { display: flex; min-height: 100vh; }
-.main-content { flex: 1; margin-left: 280px; width: calc(100% - 280px); min-height: 100vh; padding: 0; }
-.mail-page-shell { display: flex; flex-direction: column; min-height: 100vh; max-height: 100vh; }
+.dashboard-layout { display: flex; min-height: 100vh; width: 100%; min-width: 0; overflow: hidden; }
+.main-content { flex: 1; margin-left: 280px; width: calc(100% - 280px); min-width: 0; min-height: 100vh; padding: 0; overflow: hidden; }
+.mail-page-shell { display: flex; flex-direction: column; min-width: 0; width: 100%; min-height: 100vh; max-height: 100vh; overflow: hidden; }
 
 /* TOP BAR */
-.topbar { height: 52px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; flex-shrink: 0; }
+.topbar { height: 52px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; flex-shrink: 0; min-width: 0; overflow: hidden; }
 .topbar-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); margin-right: 8px; }
-.topbar-search { flex: 1; max-width: 400px; margin-left: auto; position: relative; }
+.topbar-search { flex: 1 1 220px; min-width: 160px; max-width: 400px; margin-left: auto; position: relative; }
 .topbar-search input { width: 100%; padding: 7px 12px 7px 32px; border: 1px solid var(--border); border-radius: 4px; font-family: 'Barlow', sans-serif; font-size: 13px; background: var(--bg); color: var(--text-dark); outline: none; transition: border-color .15s; }
 .topbar-search input:focus { border-color: var(--crimson); background: #fff; }
 .topbar-search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 13px; height: 13px; color: var(--text-light); pointer-events: none; }
@@ -50,10 +50,10 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .btn-compose svg { width: 13px; height: 13px; }
 
 /* LAYOUT */
-.layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.layout { display: flex; flex: 1; min-width: 0; width: 100%; min-height: 0; overflow: hidden; }
 
 /* SIDEBAR */
-.mail-sidebar { width: 190px; flex-shrink: 0; background: var(--card); border-right: 1px solid var(--border); padding: 16px 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.mail-sidebar { width: 190px; min-width: 150px; flex-shrink: 0; background: var(--card); border-right: 1px solid var(--border); padding: 16px 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
 .folder-item { display: flex; align-items: center; gap: 10px; padding: 8px 18px; font-size: 13px; font-weight: 500; color: var(--text-mid); cursor: pointer; transition: all .12s; border-radius: 0; position: relative; }
 .folder-item:hover { background: var(--tag); color: var(--text-dark); }
 .folder-item.active { color: var(--crimson); background: rgba(155,35,85,.06); font-weight: 600; }
@@ -66,46 +66,47 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .folder-label { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-light); padding: 10px 18px 4px; }
 
 /* MAIL LIST */
-.mail-list { width: 310px; flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; background: var(--card); }
+.mail-list { width: min(310px, 28vw); min-width: 240px; flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; background: var(--card); }
 .mail-list-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: var(--tag); }
 .mail-list-title { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-light); }
 .mail-list-count { font-size: 11px; color: var(--text-light); }
 .mail-items { flex: 1; overflow-y: auto; }
-.mail-item { padding: 13px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; position: relative; }
+.mail-item { padding: 13px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; position: relative; min-width: 0; }
 .mail-item:hover { background: var(--tag); }
 .mail-item.active { background: rgba(155,35,85,.05); border-left: 3px solid var(--crimson); }
 .mail-item.unread .mail-from { font-weight: 700; color: var(--text-dark); }
 .mail-item.unread .mail-subject { font-weight: 600; color: var(--text-dark); }
 .unread-dot { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); width: 6px; height: 6px; background: var(--crimson); border-radius: 50%; }
-.mail-item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
-.mail-from { font-size: 13px; font-weight: 500; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+.mail-item-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; margin-bottom: 3px; }
+.mail-from { font-size: 13px; font-weight: 500; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 180px; }
 .mail-time { font-size: 11px; color: var(--text-light); white-space: nowrap; }
 .mail-subject { font-size: 12px; color: var(--text-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
 .mail-preview { font-size: 11px; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* MAIL DETAIL */
-.mail-detail { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.mail-detail { flex: 1; min-width: 0; max-width: 100%; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
 .detail-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-light); }
 .detail-empty svg { width: 40px; height: 40px; opacity: .25; }
 .detail-empty p { font-size: 13px; }
 
-.detail-header { background: var(--card); border-bottom: 1px solid var(--border); padding: 18px 24px 16px; flex-shrink: 0; }
-.detail-subject { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: .5px; margin-bottom: 10px; }
-.detail-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.detail-header { background: var(--card); border-bottom: 1px solid var(--border); padding: 18px 24px 16px; flex-shrink: 0; min-width: 0; max-width: 100%; overflow: hidden; }
+.detail-subject { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: .5px; margin-bottom: 10px; min-width: 0; overflow-wrap: anywhere; }
+.detail-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; flex-wrap: wrap; }
 .detail-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; color: #fff; flex-shrink: 0; }
-.detail-from-wrap { display: flex; align-items: center; gap: 10px; flex: 1; }
-.detail-from { font-size: 13px; font-weight: 600; color: var(--text-dark); }
-.detail-email { font-size: 11px; color: var(--text-light); }
+.detail-from-wrap { display: flex; align-items: center; gap: 10px; flex: 1 1 240px; min-width: 0; }
+.detail-from { font-size: 13px; font-weight: 600; color: var(--text-dark); overflow-wrap: anywhere; }
+.detail-email { font-size: 11px; color: var(--text-light); overflow-wrap: anywhere; }
 .detail-date { font-size: 11px; color: var(--text-light); white-space: nowrap; }
-.detail-actions { display: flex; gap: 6px; }
+.detail-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
 .btn-action { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-mid); cursor: pointer; transition: all .15s; }
 .btn-action:hover { border-color: var(--crimson); color: var(--crimson); }
 .btn-action svg { width: 12px; height: 12px; }
 .btn-action.primary { background: var(--crimson); color: #fff; border-color: var(--crimson); }
 .btn-action.primary:hover { background: var(--crimson-light); border-color: var(--crimson-light); }
 
-.detail-body { flex: 1; overflow-y: auto; padding: 24px; }
-.detail-body-text { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 24px; font-size: 14px; line-height: 1.8; color: var(--text-dark); white-space: pre-wrap; }
+.detail-body { flex: 1; min-width: 0; max-width: 100%; overflow-y: auto; overflow-x: hidden; padding: 24px; }
+.detail-body-text { background: var(--card); border: 1px solid var(--border); border-radius: 6px; max-width: 100%; overflow-x: hidden; padding: 24px; font-size: 14px; line-height: 1.8; color: var(--text-dark); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.detail-body-text img { max-width: 100%; height: auto; display: block; }
 
 /* COMPOSE MODAL */
 .compose-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.42); z-index: 50; display: none; align-items: center; justify-content: center; padding: clamp(10px, 3vw, 28px); }
@@ -391,6 +392,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   </main>
 </div>
 
-<script src="assets/premium-mailbox.js?v=20260506b"></script>
+<script src="assets/premium-mailbox.js?v=20260507a"></script>
 </body>
 </html>

@@ -206,6 +206,18 @@ test('custom premium layouts stay outside the shared sidebar shell', () => {
   }
 });
 
+test('premium mailbox behoudt eigen layout en vaste sidebar bij responsive mailweergave', () => {
+  const pageSource = readRepoFile('premium-mailbox.html');
+
+  assert.match(pageSource, /<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*>/);
+  assert.match(pageSource, /data-sidebar-key="mailbox"[^>]*>[\s\S]*<span class="sidebar-link-text">Mailbox<\/span>/);
+  assert.match(pageSource, /<main class="main-content is-premium-boot-host">[\s\S]*<div class="mail-page-shell">/);
+  assert.match(pageSource, /\.main-content \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
+  assert.match(pageSource, /\.mail-page-shell \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
+  assert.match(pageSource, /\.mail-detail \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
+  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260507a"><\/script>/);
+});
+
 test('static premium sidebars ship the webdesign link in html', () => {
   for (const relativePath of staticSidebarPages) {
     const pageSource = readRepoFile(relativePath);
