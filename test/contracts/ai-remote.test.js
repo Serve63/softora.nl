@@ -380,6 +380,42 @@ test('ai remote service transcribes meeting audio uploads through OpenAI audio A
   assert.ok(calls[0].options.body.get('file'));
 });
 
+test('ai remote service summarizes audio transcripts into dossier notes', async () => {
+  const calls = [];
+  const { service } = createService({
+    fetchJsonWithTimeout: async (url, options, timeoutMs) => {
+      calls.push({ url, options, timeoutMs });
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  notes: 'Samenvatting audiomeeting\n\nWat de klant wil:\n- Nieuwe website met offerteformulier',
+                }),
+              },
+            },
+          ],
+          usage: { total_tokens: 42 },
+        },
+      };
+    },
+  });
+
+  const result = await service.summarizeMeetingTranscriptWithAi({
+    transcript: 'De klant wil een nieuwe website met offerteformulier.',
+    language: 'nl',
+    context: 'Website meeting',
+  });
+
+  assert.match(result.notes, /Nieuwe website met offerteformulier/);
+  assert.equal(result.source, 'openai');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://api.openai.test/v1/chat/completions');
+  assert.match(String(calls[0].options.body || ''), /Samenvatting audiomeeting/);
+});
+
 test('ai remote service rejects non-image model configuration before calling OpenAI', async () => {
   const { service } = createService({
     openAiImageModel: 'gpt-4o-mini',

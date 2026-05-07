@@ -1499,6 +1499,117 @@ function createAiRemoteService(deps = {}) {
     throw err;
   }
 
+  function buildMeetingNotesFallback(options = {}) {
+    const transcript = truncateText(normalizeString(options.transcript || options.text || ''), 12000);
+    const context = truncateText(normalizeString(options.context || ''), 1200);
+    return [
+      'Samenvatting audiomeeting',
+      '',
+      context ? `Context: ${context}` : '',
+      'Klantwens en afspraken:',
+      transcript || '[Transcriptie ontbreekt]',
+      '',
+      'Open punten:',
+      '- Controleer de notities handmatig en vul ontbrekende details aan.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  async function summarizeMeetingTranscriptWithAi(options = {}) {
+    const apiKey = getOpenAiApiKey();
+    if (!apiKey) {
+      const err = new Error('OPENAI_API_KEY ontbreekt');
+      err.status = 503;
+      throw err;
+    }
+
+    const transcript = truncateText(normalizeString(options.transcript || options.text || ''), 20000);
+    if (!transcript) {
+      const err = new Error('Transcript ontbreekt');
+      err.status = 400;
+      throw err;
+    }
+
+    const language = normalizeString(options.language || 'nl') || 'nl';
+    const context = truncateText(normalizeString(options.context || ''), 2000);
+    const systemPrompt = [
+      'Je bent een nauwkeurige Nederlandse meetingnotitie-assistent voor Softora.',
+      'Zet een audiotranscript om naar duidelijke dossiernotities voor een website-opdracht.',
+      'Gebruik alleen informatie uit transcriptie en context. Verzin geen feiten.',
+      'Als iets niet besproken is, schrijf kort "Niet besproken".',
+      'Output exact JSON met veld "notes". Geen markdown fences en geen extra tekst.',
+    ].join('\n');
+
+    const userPrompt = [
+      `Taal: ${language}`,
+      context ? `Context afspraak:\n${context}` : '',
+      '',
+      'Maak compacte, duidelijke meetingnotities met deze vaste kopjes:',
+      'Samenvatting audiomeeting',
+      'Klant / bedrijf',
+      'Wat de klant wil',
+      'Afgesproken',
+      'Belangrijke wensen',
+      'Planning / budget',
+      'Open punten',
+      'Vervolgactie',
+      '',
+      'Schrijf in normale dossierstijl, met korte bullets waar dat helpt.',
+      '',
+      'Transcriptie:',
+      transcript,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const { response, data } = await fetchJsonWithTimeout(
+      `${openAiApiBaseUrl}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: openAiModel,
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+        }),
+      },
+      30000
+    );
+
+    if (!response.ok) {
+      const err = new Error(`OpenAI meetingnotities mislukt (${response.status})`);
+      err.status = response.status;
+      err.data = data;
+      throw err;
+    }
+
+    const content = data?.choices?.[0]?.message?.content;
+    const parsed = parseJsonLoose(extractOpenAiTextContent(content));
+    const notes = truncateText(normalizeString(parsed?.notes || parsed?.summary || parsed?.text || ''), 12000);
+    if (!notes) {
+      const err = new Error('OpenAI gaf lege meetingnotities terug.');
+      err.status = 502;
+      err.data = data;
+      throw err;
+    }
+
+    return {
+      notes,
+      source: 'openai',
+      model: openAiModel,
+      usage: data?.usage || null,
+      language,
+    };
+  }
+
   function buildWebsitePromptFallback(options = {}) {
     const language = normalizeString(options.language || 'nl') || 'nl';
     const context = truncateText(normalizeString(options.context || ''), 2000);
@@ -1712,6 +1823,7 @@ function createAiRemoteService(deps = {}) {
 
   return {
     buildWebsitePromptFallback,
+    buildMeetingNotesFallback,
     extractMeetingNotesFromImageWithAi,
     fetchWebsitePreviewScanFromUrl,
     generateDynamicOrderDossierWithAnthropic,
@@ -1721,6 +1833,7 @@ function createAiRemoteService(deps = {}) {
     generateWebsitePreviewImageWithAi,
     generateWebsitePromptFromTranscriptWithAi,
     sendAnthropicMessage,
+    summarizeMeetingTranscriptWithAi,
     transcribeMeetingAudioWithAi,
   };
 }

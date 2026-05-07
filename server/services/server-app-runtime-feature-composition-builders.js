@@ -70,6 +70,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         aiContentRuntime.generateWebsitePromptFromTranscriptWithAi,
       buildWebsitePromptFallback: aiContentRuntime.buildWebsitePromptFallback,
       extractMeetingNotesFromImageWithAi: aiContentRuntime.extractMeetingNotesFromImageWithAi,
+      summarizeMeetingTranscriptWithAi: aiContentRuntime.summarizeMeetingTranscriptWithAi,
       transcribeMeetingAudioWithAi: aiContentRuntime.transcribeMeetingAudioWithAi,
       logger: console,
       parseJsonLoose: aiHelpers.parseJsonLoose,

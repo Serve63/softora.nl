@@ -85,6 +85,15 @@ function createFixture(overrides = {}) {
         model: 'gpt-4o-mini',
         usage: { totalTokens: 40 },
       })),
+    summarizeMeetingTranscriptWithAi:
+      overrides.summarizeMeetingTranscriptWithAi ||
+      (async ({ transcript, language }) => ({
+        notes: `Samenvatting audiomeeting\n\nWat de klant wil:\n- ${transcript}`,
+        source: 'openai',
+        model: 'gpt-4o-mini',
+        usage: { totalTokens: 45 },
+        language,
+      })),
     transcribeMeetingAudioWithAi:
       overrides.transcribeMeetingAudioWithAi ||
       (async () => ({
@@ -358,6 +367,7 @@ test('ai tools coordinator validates notes audio input and keeps prompt fallback
 
   assert.equal(fallbackRes.statusCode, 200);
   assert.equal(fallbackRes.body.ok, true);
+  assert.match(fallbackRes.body.notes, /Samenvatting audiomeeting/);
   assert.equal(fallbackRes.body.promptSource, 'template-fallback');
   assert.equal(typeof fallbackRes.body.transcript, 'string');
 });
