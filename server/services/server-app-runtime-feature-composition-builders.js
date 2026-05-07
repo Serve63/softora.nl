@@ -318,7 +318,7 @@ function buildServerAppFeatureWiringRuntimeContext({
       seoWriteCoordinator: uiSeoRuntime.seoWriteCoordinator,
       openAiCostSummary: {
         env,
-        openAiAdminApiKey: shared.normalizeString(env.OPENAI_ADMIN_API_KEY || env.OPENAI_COSTS_API_KEY || ''),
+        openAiAdminApiKey: shared.normalizeString(env.OPENAI_ADMIN_KEY || env.OPENAI_ADMIN_API_KEY || env.OPENAI_COSTS_API_KEY || ''),
         openAiCostsApiBaseUrl: env.OPENAI_COSTS_API_BASE_URL || envConfig.OPENAI_API_BASE_URL,
         openAiOrganizationId: env.OPENAI_ORGANIZATION_ID || env.OPENAI_ORG_ID || env.OPENAI_ORGANIZATION || '',
         openAiProjectId: env.OPENAI_PROJECT_ID || env.OPENAI_PROJECT || '',

@@ -4,8 +4,11 @@ const ANTHROPIC_API_VERSION = '2023-06-01';
 const DEFAULT_USD_TO_EUR_RATE = 0.92;
 const DEFAULT_EXCHANGE_RATE_API_URL = 'https://api.frankfurter.app/latest?from=USD&to=EUR';
 const DEFAULT_EXCHANGE_RATE_CACHE_MS = 30 * 60 * 1000;
+const DEFAULT_OPENAI_COSTS_CACHE_MS = 10 * 60 * 1000;
 const MAX_COST_PAGES = 12;
 let usdToEurRateCache = null;
+let openAiCostsDashboardCache = null;
+let openAiCostsLastSuccessfulSnapshot = null;
 
 function normalizeString(value) {
   return String(value || '').trim();
@@ -18,6 +21,89 @@ function normalizeScope(value) {
 function getMonthStartUnixSeconds(nowMs = Date.now()) {
   const now = new Date(Number(nowMs) || Date.now());
   return Math.floor(new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime() / 1000);
+}
+
+function getDayStartUnixSeconds(nowMs = Date.now()) {
+  const now = new Date(Number(nowMs) || Date.now());
+  return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime() / 1000);
+}
+
+function getOpenAiCostsCacheMs(deps = {}) {
+  const env = deps.env || process.env || {};
+  const parsed = Number(deps.openAiCostsCacheMs || env.OPENAI_COSTS_CACHE_MS);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_OPENAI_COSTS_CACHE_MS;
+  return Math.min(Math.max(Math.round(parsed), 60 * 1000), 15 * 60 * 1000);
+}
+
+function getOpenAiCostsCacheStore(deps = {}) {
+  if (deps.openAiCostsCache && typeof deps.openAiCostsCache === 'object') {
+    return deps.openAiCostsCache;
+  }
+  if (!openAiCostsDashboardCache) {
+    openAiCostsDashboardCache = {};
+  }
+  return openAiCostsDashboardCache;
+}
+
+function getOpenAiCostsLastSuccessfulSnapshot(deps = {}) {
+  const cache = getOpenAiCostsCacheStore(deps);
+  return cache.lastSuccessfulSnapshot || openAiCostsLastSuccessfulSnapshot || null;
+}
+
+function setOpenAiCostsLastSuccessfulSnapshot(deps = {}, snapshot) {
+  const cache = getOpenAiCostsCacheStore(deps);
+  cache.lastSuccessfulSnapshot = snapshot;
+  openAiCostsLastSuccessfulSnapshot = snapshot;
+}
+
+function logOpenAiCosts(deps = {}, message, meta = {}) {
+  const logger = deps.logger || console;
+  const payload = {
+    ...meta,
+    service: 'openai-costs',
+  };
+  if (logger && typeof logger.info === 'function') {
+    logger.info(`[openai-costs] ${message}`, payload);
+    return;
+  }
+  if (logger && typeof logger.log === 'function') {
+    logger.log(`[openai-costs] ${message}`, payload);
+  }
+}
+
+function buildOpenAiDashboardPeriods(nowMs = Date.now()) {
+  const safeNowMs = Math.max(0, Number(nowMs) || Date.now());
+  const endTime = Math.max(1, Math.ceil(safeNowMs / 1000));
+  const oneDaySeconds = 24 * 60 * 60;
+  const todayStartTime = getDayStartUnixSeconds(safeNowMs);
+  const monthStartTime = getMonthStartUnixSeconds(safeNowMs);
+
+  return [
+    {
+      key: 'current_month',
+      label: 'Huidige maand tot nu toe',
+      startTime: monthStartTime,
+      endTime: Math.max(monthStartTime + 1, endTime),
+    },
+    {
+      key: 'today',
+      label: 'Vandaag',
+      startTime: todayStartTime,
+      endTime: Math.max(todayStartTime + 1, endTime),
+    },
+    {
+      key: 'last_7_days',
+      label: 'Afgelopen 7 dagen',
+      startTime: Math.max(1, endTime - 7 * oneDaySeconds),
+      endTime,
+    },
+    {
+      key: 'last_30_days',
+      label: 'Afgelopen 30 dagen',
+      startTime: Math.max(1, endTime - 30 * oneDaySeconds),
+      endTime,
+    },
+  ];
 }
 
 function buildCostWindow(scope, nowMs = Date.now()) {
@@ -41,6 +127,7 @@ function resolveOpenAiCostsApiKey(deps = {}) {
   return normalizeString(
     deps.openAiAdminApiKey ||
       deps.openAiCostsApiKey ||
+      env.OPENAI_ADMIN_KEY ||
       env.OPENAI_ADMIN_API_KEY ||
       env.OPENAI_COSTS_API_KEY
   );
@@ -270,6 +357,31 @@ function collectOpenAiCostAmounts(data) {
   };
 }
 
+function pickPrimaryCurrencyAmount(currencies = {}) {
+  const entries = Object.entries(currencies || {})
+    .map(([currency, amount]) => [normalizeString(currency).toLowerCase(), Number(amount)])
+    .filter(([currency, amount]) => currency && Number.isFinite(amount) && amount >= 0);
+
+  const preferredCurrency = ['usd', 'eur'].find((currency) =>
+    entries.some(([entryCurrency]) => entryCurrency === currency)
+  );
+  const selected = preferredCurrency
+    ? entries.find(([currency]) => currency === preferredCurrency)
+    : entries[0];
+
+  if (!selected) {
+    return {
+      currency: 'usd',
+      amount: 0,
+    };
+  }
+
+  return {
+    currency: selected[0],
+    amount: Math.round(selected[1] * 100000000) / 100000000,
+  };
+}
+
 function buildOpenAiCostsUrl({ apiBaseUrl, startTime, endTime, page }) {
   const url = new URL(`${apiBaseUrl}/organization/costs`);
   url.searchParams.set('start_time', String(startTime));
@@ -278,6 +390,156 @@ function buildOpenAiCostsUrl({ apiBaseUrl, startTime, endTime, page }) {
   url.searchParams.set('limit', '31');
   if (page) url.searchParams.set('page', page);
   return url.toString();
+}
+
+async function fetchOpenAiCostPeriodSummary(deps = {}, period = {}) {
+  const apiKey = resolveOpenAiCostsApiKey(deps);
+  if (!apiKey) {
+    logOpenAiCosts(deps, 'admin key aanwezig', { present: false });
+    throw createServiceError(
+      'OpenAI kosten konden niet worden opgehaald',
+      'OPENAI_ADMIN_KEY_MISSING',
+      503,
+      'OPENAI_ADMIN_KEY ontbreekt. Voeg een OpenAI Admin Key server-side toe.'
+    );
+  }
+
+  const fetchJsonWithTimeout = deps.fetchJsonWithTimeout;
+  if (typeof fetchJsonWithTimeout !== 'function') {
+    throw createServiceError('OpenAI kosten-helper ontbreekt.', 'OPENAI_COSTS_FETCH_UNAVAILABLE', 503);
+  }
+
+  const apiBaseUrl = resolveOpenAiApiBaseUrl(deps);
+  const startTime = Math.max(1, Number(period.startTime) || 1);
+  const endTime = Math.max(startTime + 1, Number(period.endTime) || startTime + 1);
+  const currencies = {};
+  let page = '';
+  let bucketCount = 0;
+  let resultCount = 0;
+  let pageCount = 0;
+
+  logOpenAiCosts(deps, 'periode ophalen', {
+    adminKeyPresent: true,
+    period: normalizeString(period.key) || 'custom',
+    startTime,
+    endTime,
+  });
+
+  for (let pageIndex = 0; pageIndex < MAX_COST_PAGES; pageIndex += 1) {
+    const url = buildOpenAiCostsUrl({ apiBaseUrl, startTime, endTime, page });
+    const { response, data } = await fetchJsonWithTimeout(
+      url,
+      {
+        method: 'GET',
+        headers: buildOpenAiCostHeaders(deps, apiKey),
+      },
+      15000
+    );
+    pageCount += 1;
+
+    logOpenAiCosts(deps, 'openai statuscode', {
+      period: normalizeString(period.key) || 'custom',
+      statusCode: response && response.status ? response.status : 0,
+      page: pageIndex + 1,
+    });
+
+    if (!response || !response.ok) {
+      const status = response && response.status ? response.status : 502;
+      const detail = normalizeString(data && (data.error && (data.error.message || data.error.code) || data.detail || data.raw));
+      throw createServiceError('OpenAI kosten konden niet worden opgehaald', 'OPENAI_COSTS_FETCH_FAILED', status, detail);
+    }
+
+    const pageAmounts = collectOpenAiCostAmounts(data);
+    Object.entries(pageAmounts.currencies).forEach(([currency, amount]) => {
+      addCurrencyAmount(currencies, currency, amount);
+    });
+    bucketCount += pageAmounts.bucketCount;
+    resultCount += pageAmounts.resultCount;
+
+    page = normalizeString(data && data.next_page);
+    if (!page || data.has_more === false) break;
+  }
+
+  const primary = pickPrimaryCurrencyAmount(currencies);
+  logOpenAiCosts(deps, 'periode totaal berekend', {
+    period: normalizeString(period.key) || 'custom',
+    amount: primary.amount,
+    currency: primary.currency,
+    bucketCount,
+    resultCount,
+    pageCount,
+  });
+
+  return {
+    key: normalizeString(period.key) || 'custom',
+    label: normalizeString(period.label) || 'OpenAI kosten',
+    startTime,
+    endTime,
+    startAt: isoFromUnixSeconds(startTime),
+    endAt: isoFromUnixSeconds(endTime),
+    amount: primary.amount,
+    currency: primary.currency,
+    currencies,
+    bucketCount,
+    resultCount,
+    pageCount,
+  };
+}
+
+async function fetchOpenAiCostsDashboardSnapshot(deps = {}, options = {}) {
+  const nowMs = Math.max(0, Number(options.nowMs) || Date.now());
+  const cacheMs = getOpenAiCostsCacheMs(deps);
+  const cache = getOpenAiCostsCacheStore(deps);
+  if (!options.forceRefresh && cache.snapshot && Number(cache.expiresAtMs || 0) > nowMs) {
+    return {
+      ...cache.snapshot,
+      cache: {
+        hit: true,
+        ttlMs: Math.max(0, Number(cache.expiresAtMs || 0) - nowMs),
+      },
+    };
+  }
+
+  logOpenAiCosts(deps, 'admin key aanwezig', { present: Boolean(resolveOpenAiCostsApiKey(deps)) });
+
+  const periods = {};
+  for (const period of buildOpenAiDashboardPeriods(nowMs)) {
+    periods[period.key] = await fetchOpenAiCostPeriodSummary(deps, period);
+  }
+
+  const currentMonth = periods.current_month;
+  const currency = currentMonth && currentMonth.currency ? currentMonth.currency : 'usd';
+  const fetchedAt = new Date(nowMs).toISOString();
+  const snapshot = {
+    status: 'success',
+    source: 'openai-organization-costs',
+    endpoint: '/v1/organization/costs',
+    exact: true,
+    currency,
+    fetchedAt,
+    lastSuccessfulUpdate: fetchedAt,
+    cacheTtlMs: cacheMs,
+    currentMonth,
+    periods,
+  };
+
+  cache.snapshot = snapshot;
+  cache.expiresAtMs = nowMs + cacheMs;
+  setOpenAiCostsLastSuccessfulSnapshot(deps, snapshot);
+
+  logOpenAiCosts(deps, 'snapshot succesvol bijgewerkt', {
+    amount: currentMonth ? currentMonth.amount : 0,
+    currency,
+    lastSuccessfulUpdate: fetchedAt,
+  });
+
+  return {
+    ...snapshot,
+    cache: {
+      hit: false,
+      ttlMs: cacheMs,
+    },
+  };
 }
 
 function isoFromUnixSeconds(value) {
@@ -357,10 +619,10 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
   const apiKey = resolveOpenAiCostsApiKey(deps);
   if (!apiKey) {
     throw createServiceError(
-      'OpenAI factuurkosten zijn nog niet gekoppeld.',
+      'OpenAI kosten konden niet worden opgehaald',
       'OPENAI_COSTS_NOT_CONFIGURED',
       503,
-      'Zet OPENAI_COSTS_API_KEY of OPENAI_ADMIN_API_KEY om daadwerkelijke OpenAI-kosten te tonen.'
+      'Zet OPENAI_ADMIN_KEY server-side om daadwerkelijke OpenAI-kosten te tonen.'
     );
   }
 
@@ -389,7 +651,7 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
     if (!response || !response.ok) {
       const status = response && response.status ? response.status : 502;
       const detail = normalizeString(data && (data.error && (data.error.message || data.error.code) || data.detail || data.raw));
-      throw createServiceError('OpenAI factuurkosten konden niet geladen worden.', 'OPENAI_COSTS_FETCH_FAILED', status, detail);
+      throw createServiceError('OpenAI kosten konden niet worden opgehaald', 'OPENAI_COSTS_FETCH_FAILED', status, detail);
     }
 
     const pageAmounts = collectOpenAiCostAmounts(data);
@@ -515,12 +777,34 @@ async function fetchCombinedApiCostSummary(deps = {}, options = {}) {
     costEur: openAiSummary.costEur,
     providers: [openAiSummary],
     unavailable: [],
-    note: 'OpenAI factuurkosten deze maand.',
+    note: 'OpenAI kosten deze maand via de Organization Costs API.',
   };
 }
 
 function createOpenAiCostSummaryCoordinator(deps = {}) {
   return {
+    async sendOpenAiCostsDashboardResponse(req, res) {
+      try {
+        const snapshot = await fetchOpenAiCostsDashboardSnapshot(deps, {
+          forceRefresh: Boolean(req && req.query && req.query.refresh === '1'),
+        });
+        return res.status(200).json({
+          ok: true,
+          ...snapshot,
+        });
+      } catch (error) {
+        const lastSuccessful = getOpenAiCostsLastSuccessfulSnapshot(deps);
+        return res.status(error.status || 500).json({
+          ok: false,
+          status: 'error',
+          source: 'openai-organization-costs',
+          message: 'OpenAI kosten konden niet worden opgehaald',
+          error: error.code || 'OPENAI_COSTS_ERROR',
+          detail: error.detail || error.message || 'OpenAI kosten konden niet worden opgehaald',
+          lastSuccessful,
+        });
+      }
+    },
     async sendCostSummaryResponse(req, res) {
       try {
         const summary = await fetchOpenAiCostSummary(deps, {
@@ -535,7 +819,7 @@ function createOpenAiCostSummaryCoordinator(deps = {}) {
         return res.status(error.status || 500).json({
           ok: false,
           error: error.code || 'OPENAI_COSTS_ERROR',
-          detail: error.detail || error.message || 'OpenAI factuurkosten konden niet geladen worden.',
+          detail: error.detail || error.message || 'OpenAI kosten konden niet worden opgehaald',
         });
       }
     },
@@ -562,12 +846,16 @@ function createOpenAiCostSummaryCoordinator(deps = {}) {
 
 module.exports = {
   buildCostWindow,
+  buildOpenAiDashboardPeriods,
   collectAnthropicCostAmounts,
   collectOpenAiCostAmounts,
   createOpenAiCostSummaryCoordinator,
   fetchAnthropicCostSummary,
   fetchCombinedApiCostSummary,
+  fetchOpenAiCostsDashboardSnapshot,
+  fetchOpenAiCostPeriodSummary,
   fetchOpenAiCostSummary,
+  getOpenAiCostsLastSuccessfulSnapshot,
   parseUsdToEurRateResponse,
   resolveUsdToEurRateDetails,
 };
