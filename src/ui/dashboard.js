@@ -8,8 +8,11 @@ import { runStrategyTournament } from '../core/strategyTournament.js';
 import { DEFAULT_TIMEFRAME_RESEARCH, runTimeframeResearch } from '../core/timeframeResearch.js';
 import { runRollingWalkForward } from '../core/walkForward.js';
 import {
+  calculateForwardMetrics,
+  evaluateForwardDiscipline,
   exportForwardCsv,
   exportForwardJson,
+  FROZEN_INCUBATION_CANDIDATE,
   importForwardJson,
   loadOrCreateForwardState,
   logForwardSignal,
@@ -274,6 +277,15 @@ function renderShell(root) {
           <button id="resetForward" class="danger-button" type="button">Reset</button>
           <input id="jsonFile" type="file" accept="application/json" hidden>
         </div>
+      </section>
+
+      <section class="panel wide-panel">
+        <div class="panel-title">
+          <h2>Forward Performance</h2>
+          <span id="forwardVerdict">WAITING</span>
+        </div>
+        <div id="forwardPerformance" class="optimizer-summary"></div>
+        <ul id="forwardRules" class="guard-list"></ul>
       </section>
 
       <section class="panel wide-panel">
@@ -847,8 +859,11 @@ function renderRanking(root, result) {
 function renderForward(root) {
   const forwardState = state.forwardState || createSafeForwardState();
   const logs = forwardState.logs || [];
+  const metrics = calculateForwardMetrics(forwardState, state.config);
+  const discipline = evaluateForwardDiscipline(forwardState, state.config);
   setText(root, '#paperEquity', formatCurrency(forwardState.paperPortfolio?.equity || state.config.initialCapital));
   setText(root, '#forwardCount', `${logs.length} logs`);
+  setText(root, '#forwardVerdict', discipline.verdict);
   root.querySelector('#paperPortfolio').innerHTML = `
     <div class="portfolio-line">
       <span>Paper equity</span>
@@ -861,13 +876,41 @@ function renderForward(root) {
     <div class="weights-row">${formatWeightMap(forwardState.paperPortfolio?.weights || {})}</div>
   `;
 
+  root.querySelector('#forwardPerformance').innerHTML = `
+    <div class="edge-verdict ${discipline.verdict === 'PROMOTE_READY' || discipline.verdict === 'PASS' ? 'candidate' : discipline.verdict === 'WATCH' || discipline.verdict === 'INCUBATING' ? 'watch' : 'reject'}">${discipline.verdict}</div>
+    <p>${discipline.message}</p>
+    <div class="data-facts">
+      <span>Kandidaat: ${metrics.candidate?.label || FROZEN_INCUBATION_CANDIDATE.label}</span>
+      <span>Logs: ${metrics.logs}</span>
+      <span>Start: ${formatDate(metrics.startTime)}</span>
+      <span>Laatste: ${formatDate(metrics.endTime)}</span>
+      <span>Paper: ${formatPercent(metrics.paperReturn)}</span>
+      <span>Benchmark: ${formatPercent(metrics.benchmarkReturn)}</span>
+      <span>Edge: ${formatPercent(metrics.edge)}</span>
+      <span>Forward DD: ${formatPercent(metrics.maxDrawdown)}</span>
+      <span>Gate open: ${formatPercent(metrics.gateOpenRate, 0)}</span>
+      <span>Laatste signaal: ${metrics.latestSignal}</span>
+    </div>
+  `;
+  root.querySelector('#forwardRules').innerHTML = discipline.checks.map((check) => `
+    <li class="${!check.active ? 'pass' : check.pass ? 'pass' : 'fail'}">
+      <span>${!check.active ? 'WAIT' : check.pass ? 'PASS' : 'FAIL'}</span>
+      <div>
+        <strong>${check.label}</strong>
+        <small>${check.detail}</small>
+      </div>
+    </li>
+  `).join('');
+
   root.querySelector('#forwardLog').innerHTML = `
     <table>
       <thead>
         <tr>
           <th>Datum</th>
+          <th>Kandidaat</th>
           <th>Timeframe</th>
           <th>Signaal</th>
+          <th>Gate</th>
           <th>Paper</th>
           <th>Benchmark</th>
           <th>Weights</th>
@@ -877,13 +920,15 @@ function renderForward(root) {
         ${logs.slice(-12).reverse().map((entry) => `
           <tr>
             <td>${entry.dateKey}</td>
+            <td>${entry.candidateId || '-'}</td>
             <td>${entry.timeframe}</td>
             <td>${entry.signal}</td>
+            <td>${entry.gateOpen ? 'OPEN' : 'DICHT'}</td>
             <td>${formatCurrency(entry.paperEquity)}</td>
             <td>${formatCurrency(entry.benchmarkEquity)}</td>
             <td>${formatWeightMap(entry.weights)}</td>
           </tr>
-        `).join('') || '<tr><td colspan="6" class="muted">Nog geen forward logs.</td></tr>'}
+        `).join('') || '<tr><td colspan="8" class="muted">Nog geen forward logs.</td></tr>'}
       </tbody>
     </table>
   `;
@@ -1179,6 +1224,7 @@ function wireEvents(root) {
       candlesByAsset: state.marketData.candlesByAsset,
       assets: SUPPORTED_ASSETS,
       config: state.config,
+      backtest: state.backtest,
     });
     state.forwardState = result.state;
     setText(root, '#statusText', result.message);

@@ -1,6 +1,12 @@
 import { maxDrawdown, profitFactor } from '../core/metrics.js';
 import { rebalancePortfolio, simulateTradeAccounting } from '../core/portfolio.js';
-import { createEmptyForwardState, logForwardSignal } from '../forward/forwardRunner.js';
+import {
+  calculateForwardMetrics,
+  createEmptyForwardState,
+  evaluateForwardDiscipline,
+  FROZEN_INCUBATION_CANDIDATE,
+  logForwardSignal,
+} from '../forward/forwardRunner.js';
 import { createMemoryStorage } from '../storage/localStore.js';
 
 function approx(actual, expected, tolerance = 1e-8) {
@@ -72,7 +78,7 @@ export function accountingTestCases() {
           signal: { label: 'BTC 100%', weights: { BTCUSDT: 1 }, exposure: 1 },
           candlesByAsset,
           assets: ['BTCUSDT'],
-          config: { timeframe: 'Daily', initialCapital: 10000 },
+          config: { ...FROZEN_INCUBATION_CANDIDATE.config, initialCapital: 10000 },
           storage,
         });
         const secondLog = logForwardSignal({
@@ -80,11 +86,62 @@ export function accountingTestCases() {
           signal: { label: 'BTC 100%', weights: { BTCUSDT: 1 }, exposure: 1 },
           candlesByAsset,
           assets: ['BTCUSDT'],
-          config: { timeframe: 'Daily', initialCapital: 10000 },
+          config: { ...FROZEN_INCUBATION_CANDIDATE.config, initialCapital: 10000 },
           storage,
         });
         assert(firstLog.state.logs.length === 1, 'Eerste forward-log is niet opgeslagen.');
         assert(secondLog.skipped === true, 'Dubbele forward-log op dezelfde datum wordt niet geblokkeerd.');
+      },
+    },
+    {
+      name: 'Forward-log weigert niet-gelockte kandidaatconfig',
+      run(assert) {
+        const forwardState = createEmptyForwardState(10000);
+        const result = logForwardSignal({
+          state: forwardState,
+          signal: { label: 'BTC 100%', weights: { BTCUSDT: 1 }, exposure: 1 },
+          candlesByAsset: { BTCUSDT: [{ time: Date.UTC(2026, 0, 1), close: 100 }] },
+          assets: ['BTCUSDT'],
+          config: { timeframe: 'Daily', initialCapital: 10000 },
+        });
+
+        assert(result.skipped === true, 'Forward-log accepteert een niet-gelockte config.');
+        assert(result.state.logs.length === 0, 'Niet-gelockte config mag geen log toevoegen.');
+      },
+    },
+    {
+      name: 'Forward metrics berekenen edge en drawdown',
+      run(assert) {
+        const forwardState = createEmptyForwardState(10000);
+        forwardState.logs = [
+          { timestamp: '2026-01-01T00:00:00.000Z', paperEquity: 10000, benchmarkEquity: 10000, gateOpen: true, signal: 'BTC' },
+          { timestamp: '2026-01-02T00:00:00.000Z', paperEquity: 11000, benchmarkEquity: 9000, gateOpen: true, signal: 'BTC' },
+          { timestamp: '2026-01-03T00:00:00.000Z', paperEquity: 9900, benchmarkEquity: 8000, gateOpen: false, signal: 'CASH' },
+        ];
+        const metrics = calculateForwardMetrics(forwardState, FROZEN_INCUBATION_CANDIDATE.config);
+
+        assert(approx(metrics.paperReturn, -0.01), 'Forward paper return klopt niet.');
+        assert(approx(metrics.benchmarkReturn, -0.2), 'Forward benchmark return klopt niet.');
+        assert(approx(metrics.edge, 0.19), 'Forward edge klopt niet.');
+        assert(approx(metrics.maxDrawdown, 0.1), 'Forward drawdown klopt niet.');
+        assert(approx(metrics.gateOpenRate, 2 / 3), 'Forward gate-open rate klopt niet.');
+      },
+    },
+    {
+      name: 'Forward discipline blijft incubating voor 30 logs',
+      run(assert) {
+        const forwardState = createEmptyForwardState(10000);
+        forwardState.logs = Array.from({ length: 12 }, (_, index) => ({
+          timestamp: new Date(Date.UTC(2026, 0, 1 + index)).toISOString(),
+          paperEquity: 10000 + index * 10,
+          benchmarkEquity: 10000,
+          gateOpen: true,
+          signal: 'BTC',
+        }));
+        const discipline = evaluateForwardDiscipline(forwardState, FROZEN_INCUBATION_CANDIDATE.config);
+
+        assert(discipline.verdict === 'INCUBATING', 'Forward discipline moet voor 30 logs incubating blijven.');
+        assert(discipline.failed.length === 0, 'Incubating fase mag nog geen actieve failures geven.');
       },
     },
   ];

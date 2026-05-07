@@ -5,6 +5,7 @@ node_modules/
 *.bak
 output/
 backups/*.json
+.paper-forward-state.json
 
 # Xcode local state
 DerivedData/
