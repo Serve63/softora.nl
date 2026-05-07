@@ -673,6 +673,9 @@ function renderProfitFactorLab(root) {
       <span>PF: ${Number.isFinite(best.profitFactor) ? best.profitFactor.toFixed(2) : 'oneindig'}</span>
       <span>Rolling: ${formatPercent(best.rolling?.summary?.strategyCompoundReturn)}</span>
       <span>Beat-rate: ${formatPercent(best.rolling?.summary?.beatRate)}</span>
+      <span>Robustness: ${best.robustness?.verdict || 'n.v.t.'}</span>
+      <span>Buren groen: ${best.robustness ? formatPercent(best.robustness.passRate, 0) : 'n.v.t.'}</span>
+      <span>Median PF: ${best.robustness ? best.robustness.medianProfitFactor.toFixed(2) : 'n.v.t.'}</span>
     </div>
     ${lab.candidate ? `
       <div class="button-row">
@@ -694,6 +697,7 @@ function renderProfitFactorLab(root) {
           <th>Beat</th>
           <th>DD</th>
           <th>Trades</th>
+          <th>Robust</th>
           <th>Config</th>
           <th>Fails</th>
         </tr>
@@ -710,6 +714,7 @@ function renderProfitFactorLab(root) {
             <td>${formatPercent(row.rolling?.summary?.beatRate)}</td>
             <td>${formatPercent(row.maxDrawdown)}</td>
             <td>${row.trades}</td>
+            <td>${row.robustness ? `${row.robustness.verdict} · ${formatPercent(row.robustness.passRate, 0)}` : 'n.v.t.'}</td>
             <td>${row.config.rebalanceBars} bars · score ${row.config.scoreThreshold} · vol ${formatPercent(row.config.targetVolatility, 0)} · stop ${formatPercent(row.config.emergencyDrawdownStop, 0)} · cap ${formatPercent(row.config.assetCap, 0)}</td>
             <td>${row.failed?.map((check) => check.id).join(', ') || 'geen'}</td>
           </tr>

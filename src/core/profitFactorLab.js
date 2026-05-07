@@ -3,14 +3,15 @@ import sprintRotation from '../strategies/sprintRotation.js';
 import trendParticipation from '../strategies/trendParticipation.js';
 import { runBacktest } from './backtester.js';
 import { DEFAULT_CONFIG } from './riskEngine.js';
+import { runParameterRobustness } from './robustnessLab.js';
 import { runRollingWalkForward } from './walkForward.js';
 
 export const DEFAULT_PROFIT_FACTOR_GRID = Object.freeze({
-  rebalanceBars: [42, 60, 90],
+  rebalanceBars: [60, 90],
   scoreThreshold: [65, 75],
-  targetVolatility: [0.04, 0.06],
-  emergencyDrawdownStop: [0.2, 0.24],
-  assetCap: [0.45],
+  targetVolatility: [0.03, 0.04],
+  emergencyDrawdownStop: [0.18, 0.2],
+  assetCap: [0.35, 0.45],
 });
 
 export const DEFAULT_PROFIT_FACTOR_STRATEGIES = Object.freeze([
@@ -105,10 +106,9 @@ function uniqueRows(rows) {
   return output;
 }
 
-function buildRowChecks(row, config) {
+function buildRowChecks(row, config, robustness = null) {
   const rolling = row.rolling?.summary;
-
-  return [
+  const checks = [
     {
       id: 'full-edge',
       label: 'Strategy return > buy & hold',
@@ -145,6 +145,17 @@ function buildRowChecks(row, config) {
       pass: row.currentRiskExposure > 0,
     },
   ];
+
+  if (robustness) {
+    checks.push({
+      id: 'robustness',
+      label: 'Parameter robustness voldoende',
+      pass: robustness.verdict === 'PASS',
+      detail: `${Math.round(robustness.passRate * 100)}% buren · median PF ${robustness.medianProfitFactor.toFixed(2)}`,
+    });
+  }
+
+  return checks;
 }
 
 function verdictForChecks(checks) {
@@ -163,6 +174,7 @@ export function runProfitFactorLab({
   assets = SUPPORTED_ASSETS,
   topN = 4,
   walkForwardOptions = {},
+  robustnessOptions = {},
 } = {}) {
   const config = {
     ...DEFAULT_CONFIG,
@@ -187,7 +199,7 @@ export function runProfitFactorLab({
     }
   }
 
-  const shortlisted = uniqueRows(baseRows
+  let shortlisted = uniqueRows(baseRows
     .sort((a, b) => b.score - a.score)
   )
     .slice(0, topN)
@@ -235,6 +247,47 @@ export function runProfitFactorLab({
       };
     })
     .sort((a, b) => b.validatedScore - a.validatedScore);
+
+  const robustnessTarget = shortlisted.find((row) => row.verdict === 'CANDIDATE') || shortlisted[0] || null;
+  if (robustnessTarget && robustnessOptions.enabled !== false) {
+    const robustness = runParameterRobustness({
+      candlesByAsset,
+      strategy: robustnessTarget.strategy,
+      baseConfig: robustnessTarget.config,
+      assets,
+      grid: robustnessOptions.grid,
+      thresholds: robustnessOptions.thresholds,
+    });
+
+    shortlisted = shortlisted.map((row) => {
+      if (row !== robustnessTarget) {
+        if (row.verdict !== 'CANDIDATE') return row;
+        const checks = [
+          ...row.checks,
+          {
+            id: 'robustness',
+            label: 'Parameter robustness voldoende',
+            pass: false,
+            detail: 'Niet zwaar getest; alleen de beste kandidaat krijgt de volledige robustness gate.',
+          },
+        ];
+        return {
+          ...row,
+          checks,
+          failed: checks.filter((check) => !check.pass),
+          verdict: verdictForChecks(checks),
+        };
+      }
+      const checks = buildRowChecks(row, row.config, robustness);
+      return {
+        ...row,
+        robustness,
+        checks,
+        failed: checks.filter((check) => !check.pass),
+        verdict: verdictForChecks(checks),
+      };
+    }).sort((a, b) => b.validatedScore - a.validatedScore);
+  }
 
   const best = shortlisted[0] || null;
   const candidate = shortlisted.find((row) => row.verdict === 'CANDIDATE') || null;
