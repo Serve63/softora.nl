@@ -3,6 +3,7 @@ import { runBacktest } from '../core/backtester.js';
 import { optimizeStrategy } from '../core/optimizer.js';
 import { runResearchDiagnostics } from '../core/researchEngine.js';
 import { DEFAULT_CONFIG } from '../core/riskEngine.js';
+import { runStrategyTournament } from '../core/strategyTournament.js';
 import { runRollingWalkForward } from '../core/walkForward.js';
 import {
   exportForwardCsv,
@@ -21,6 +22,7 @@ const state = {
   diagnostics: null,
   optimizer: null,
   walkForward: null,
+  tournament: null,
   forwardState: null,
   running: false,
 };
@@ -186,6 +188,15 @@ function renderShell(root) {
         </div>
         <div id="walkForwardSummary" class="optimizer-summary"></div>
         <div id="walkForwardTable" class="table-wrap"></div>
+      </section>
+
+      <section class="panel tournament-panel wide-panel">
+        <div class="panel-title">
+          <h2>Strategy Tournament</h2>
+          <button id="runTournament" type="button">Vergelijk strategieen</button>
+        </div>
+        <div id="tournamentSummary" class="optimizer-summary"></div>
+        <div id="tournamentTable" class="table-wrap"></div>
       </section>
 
       <section class="panel chart-panel">
@@ -466,6 +477,74 @@ function renderWalkForward(root) {
   `;
 }
 
+function verdictClass(verdict) {
+  if (verdict === 'GATE_OPEN' || verdict === 'RESEARCH_PASS_CASH') return 'candidate';
+  if (verdict === 'WATCH') return 'watch';
+  return 'reject';
+}
+
+function renderTournament(root) {
+  const tournament = state.tournament;
+  const summary = root.querySelector('#tournamentSummary');
+  const table = root.querySelector('#tournamentTable');
+
+  if (!tournament?.rows?.length) {
+    summary.innerHTML = '<p class="muted">Nog niet gedraaid. Het tournament vergelijkt strategie-families op full sample, OOS, stresskosten en rolling walk-forward.</p>';
+    table.innerHTML = '';
+    return;
+  }
+
+  const best = tournament.best;
+  summary.innerHTML = `
+    <div class="edge-verdict ${verdictClass(best.verdict)}">${best.verdict}</div>
+    <p>${tournament.message}</p>
+    <div class="data-facts">
+      <span>Beste: ${best.strategyName}</span>
+      <span>Score: ${Number.isFinite(best.score) ? best.score.toFixed(2) : 'n.v.t.'}</span>
+      <span>Rolling edge: ${formatPercent(best.rolling?.edge)}</span>
+      <span>Beat-rate: ${formatPercent(best.rolling?.beatRate)}</span>
+      <span>Signaal: ${best.currentSignal?.label || 'CASH'}</span>
+    </div>
+  `;
+
+  table.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Strategie</th>
+          <th>Verdict</th>
+          <th>Score</th>
+          <th>Full</th>
+          <th>Benchmark</th>
+          <th>OOS</th>
+          <th>Rolling</th>
+          <th>Beat</th>
+          <th>DD</th>
+          <th>PF</th>
+          <th>Fails</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tournament.rows.map((row) => `
+          <tr>
+            <td>${row.strategyName}</td>
+            <td>${row.verdict}</td>
+            <td>${Number.isFinite(row.score) ? row.score.toFixed(2) : 'n.v.t.'}</td>
+            <td>${formatPercent(row.strategyReturn)}</td>
+            <td>${formatPercent(row.benchmarkReturn)}</td>
+            <td>${formatPercent(row.oosReturn)} / ${formatPercent(row.oosBenchmarkReturn)}</td>
+            <td>${formatPercent(row.rolling?.strategyCompoundReturn)} / ${formatPercent(row.rolling?.benchmarkCompoundReturn)}</td>
+            <td>${formatPercent(row.rolling?.beatRate)}</td>
+            <td>${formatPercent(row.maxDrawdown)}</td>
+            <td>${Number.isFinite(row.profitFactor) ? row.profitFactor.toFixed(2) : 'oneindig'}</td>
+            <td>${row.failed.filter((check) => check.id !== 'current-exposure').map((check) => check.id).join(', ') || 'geen'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
 function renderGuardrails(root, result) {
   const list = root.querySelector('#guardList');
   const checks = result?.gate?.checks || [];
@@ -651,6 +730,7 @@ function renderAll(root) {
   renderDiagnostics(root);
   renderOptimizer(root);
   renderWalkForward(root);
+  renderTournament(root);
   renderCharts(root, state.backtest);
   renderRanking(root, state.backtest);
   renderForward(root);
@@ -683,6 +763,7 @@ async function runAnalysis(root) {
     });
     state.optimizer = null;
     state.walkForward = null;
+    state.tournament = null;
     state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
     setText(root, '#statusText', state.backtest.ok ? 'Backtest klaar.' : state.backtest.error);
     renderAll(root);
@@ -755,6 +836,31 @@ function wireEvents(root) {
         renderWalkForward(root);
       } catch (error) {
         setText(root, '#statusText', `Walk-forward fout: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        button.disabled = false;
+      }
+    }, 20);
+  });
+
+  root.querySelector('#runTournament').addEventListener('click', () => {
+    if (!state.marketData) {
+      setText(root, '#statusText', 'Run eerst een backtest voordat je strategieen vergelijkt.');
+      return;
+    }
+    const button = root.querySelector('#runTournament');
+    button.disabled = true;
+    setText(root, '#statusText', 'Strategy tournament draait: meerdere strategieen door dezelfde gate...');
+    setTimeout(() => {
+      try {
+        state.tournament = runStrategyTournament({
+          candlesByAsset: state.marketData.candlesByAsset,
+          baseConfig: state.config,
+          assets: SUPPORTED_ASSETS,
+        });
+        setText(root, '#statusText', `Tournament klaar: ${state.tournament.message}`);
+        renderTournament(root);
+      } catch (error) {
+        setText(root, '#statusText', `Tournament fout: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
         button.disabled = false;
       }
