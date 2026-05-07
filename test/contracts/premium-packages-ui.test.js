@@ -96,3 +96,18 @@ test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () =
   assert.doesNotMatch(routesSection, /CRM vanaf €200 eenmalig/);
   assert.doesNotMatch(routesSection, /Minimaal €30 per maand/);
 });
+
+test('pakketkaarten gebruiken interne Softora CTA labels', () => {
+  const pageSource = readPage();
+  const ctaLabels = Array.from(
+    pageSource.matchAll(/<button class="card-cta[^"]*" type="button">([^<]+)<\/button>/g),
+    (match) => match[1].trim()
+  );
+
+  assert.equal(ctaLabels.length, 32);
+  assert.deepEqual([...new Set(ctaLabels)], ['Softora']);
+  assert.doesNotMatch(
+    pageSource,
+    />\s*(?:Pakket Aanvragen|Pakket aanvragen|Meer Informatie|Meer informatie|Selecteren|Offerte Aanvragen|Offerte aanvragen|Contact Opnemen|Contact opnemen)\s*</
+  );
+});
