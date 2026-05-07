@@ -12,6 +12,7 @@ const pages = [
   'premium-database.html',
   'premium-klanten.html',
   'premium-mailbox.html',
+  'premium-websitegenerator.html',
   'premium-pakketten.html',
   'premium-pdfs.html',
   'premium-boekhouding.html',
@@ -93,6 +94,12 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const packagesPath = path.join(__dirname, '../../assets/premium-packages.js');
         const packagesSource = fs.readFileSync(packagesPath, 'utf8');
         assert.match(packagesSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
+      } else if (file === 'premium-websitegenerator.html') {
+        assert.match(source, /<script src="assets\/premium-websitegenerator\.js\?v=20260501a" defer><\/script>/, file);
+        assert.match(source, /<script src="assets\/premium-websitegenerator-boot\.js\?v=20260507a" defer><\/script>/, file);
+        const websitegeneratorPath = path.join(__dirname, '../../assets/premium-websitegenerator-boot.js');
+        const websitegeneratorSource = fs.readFileSync(websitegeneratorPath, 'utf8');
+        assert.match(websitegeneratorSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else {
         assert.match(source, /SoftoraPremiumBoot\.setShellBooting\(false\)|SoftoraPremiumBootTiming\?\.release/, file);
       }
