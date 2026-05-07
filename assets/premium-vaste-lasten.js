@@ -1,7 +1,7 @@
 let data = {
   'Totale kosten:': [
     { id:1, naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
-    { id:3, naam:'API kosten', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
+    { id:3, naam:'API kosten', note:'OpenAI kosten laden...', freq:'maandelijks', bedrag:null, amountLabel:'...', status:'loading', highlighted:true },
   ],
 };
 const MONTHLY_COSTS_REMOTE_SCOPE = 'premium_monthly_costs';
@@ -142,13 +142,34 @@ function getCostItem(cat, id) {
 }
 
 function toMonthly(item) {
-  if (item.freq === 'jaarlijks') return item.bedrag;
-  if (item.freq === 'kwartaal') return item.bedrag / 3;
-  return item.bedrag;
+  const bedrag = Number(item && item.bedrag);
+  if (!Number.isFinite(bedrag) || bedrag < 0) return 0;
+  const currency = normalizeString(item && item.currency).toLowerCase();
+  if (currency && currency !== 'eur') return 0;
+  if (item.freq === 'jaarlijks') return bedrag;
+  if (item.freq === 'kwartaal') return bedrag / 3;
+  return bedrag;
 }
 
 function fmtEur(n) {
   return '€' + n.toLocaleString('nl-NL', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+function formatCostItemAmount(item) {
+  const explicitLabel = normalizeString(item && item.amountLabel);
+  if (explicitLabel) return explicitLabel;
+
+  const amount = Number(item && item.bedrag);
+  if (!Number.isFinite(amount) || amount < 0) return '-';
+
+  const currency = normalizeString(item && item.currency).toLowerCase();
+  if (currency === 'usd') {
+    return '$' + amount.toLocaleString('nl-NL', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  }
+  if (currency && currency !== 'eur') {
+    return amount.toLocaleString('nl-NL', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' ' + currency.toUpperCase();
+  }
+  return fmtEur(amount);
 }
 
 function setTotalsLoading() {
@@ -335,7 +356,7 @@ function createCostItemRow(item, key) {
 
   const amountWrap = document.createElement('div');
   amountWrap.className = item.highlighted ? 'cost-amount-wrap is-static' : 'cost-amount-wrap';
-  appendCostTextElement(amountWrap, 'div', 'cost-amount', fmtEur(item.bedrag));
+  appendCostTextElement(amountWrap, 'div', 'cost-amount', formatCostItemAmount(item));
 
   if (!item.highlighted) {
     const rowActions = document.createElement('div');

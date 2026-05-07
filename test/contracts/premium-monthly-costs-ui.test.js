@@ -101,7 +101,7 @@ test('premium terugkerende kosten toont dynamische posten bovenaan met paarse st
 
   assert.match(combinedSource, /naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
   assert.doesNotMatch(combinedSource, /naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
-  assert.match(combinedSource, /naam:'API kosten', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
+  assert.match(combinedSource, /naam:'API kosten', note:'OpenAI kosten laden\.\.\.', freq:'maandelijks', bedrag:null, amountLabel:'\.\.\.', status:'loading', highlighted:true/);
   assert.match(combinedSource, /let nextId = 4;/);
   assert.doesNotMatch(pageSource, /naam:'Hostinger VPS'/);
   assert.doesNotMatch(pageSource, /naam:'softora\.nl domein'/);
@@ -123,7 +123,7 @@ test('premium terugkerende kosten toont dynamische posten bovenaan met paarse st
   assert.match(combinedSource, /row\.className = item\.highlighted \? 'cost-row cost-row-accent' : 'cost-row';/);
   assert.match(combinedSource, /const displayFreqLabel = item\.highlighted && item\.freq === 'maandelijks'[\s\S]*'Deze maand'[\s\S]*freqLabel\[item\.freq\] \|\| item\.freq \|\| '-';/);
   assert.match(combinedSource, /amountWrap\.className = item\.highlighted \? 'cost-amount-wrap is-static' : 'cost-amount-wrap';/);
-  assert.match(combinedSource, /appendCostTextElement\(amountWrap, 'div', 'cost-amount', fmtEur\(item\.bedrag\)\);/);
+  assert.match(combinedSource, /appendCostTextElement\(amountWrap, 'div', 'cost-amount', formatCostItemAmount\(item\)\);/);
   assert.match(combinedSource, /createCostActionButton\('edit', key, item\.id, 'btn-edit', 'Bewerken'\)/);
   assert.match(combinedSource, /createCostActionButton\('delete', key, item\.id, 'btn-del', 'Verwijderen'\)/);
 });
@@ -164,7 +164,7 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
 
   assert.match(scriptSource, /const COST_SUMMARY_ENDPOINT = '\/api\/coldcalling\/cost-summary\?scope=month';/);
-  assert.match(scriptSource, /const API_COST_SUMMARY_ENDPOINT = '\/api\/api-cost-summary\?scope=month';/);
+  assert.match(scriptSource, /const API_COST_SUMMARY_ENDPOINT = '\/api\/openai-costs';/);
   assert.match(scriptSource, /async function fetchMonthlyCostSummary\(\)/);
   assert.match(scriptSource, /async function fetchApiCostSummary\(\)/);
   assert.match(scriptSource, /function applyColdcallingCost\(amountEur, note\)/);
@@ -173,18 +173,19 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /const summary = await fetchMonthlyCostSummary\(\);/);
   assert.match(scriptSource, /const amountEur = Number\(summary\.costEur \|\| 0\) \|\| 0;/);
   assert.match(scriptSource, /window\.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;/);
-  assert.match(scriptSource, /const API_COST_NOTE = 'OpenAI factuurkosten deze maand';/);
-  assert.match(scriptSource, /const API_COST_UNAVAILABLE_NOTE = 'API factuurkoppeling ontbreekt';/);
-  assert.match(scriptSource, /const API_COST_SCOPE = 'premium_api_costs';/);
-  assert.match(scriptSource, /const API_COST_KEY = 'softora_api_cost_events_v1';/);
-  assert.match(scriptSource, /function applyApiCost\(amountEur, note\)/);
+  assert.match(scriptSource, /const API_COST_NOTE = 'Status: succesvol';/);
+  assert.match(scriptSource, /const API_COST_UNAVAILABLE_NOTE = 'OpenAI kosten konden niet worden opgehaald';/);
+  assert.match(scriptSource, /function applyApiCostSnapshot\(snapshot\)/);
+  assert.match(scriptSource, /function applyApiCostUnavailable\(error\)/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'api kosten'/);
-  assert.match(scriptSource, /function buildApiCostNote\(summary\)/);
-  assert.match(scriptSource, /OpenAI factuur: \$' \+ usd\.toLocaleString\('nl-NL'/);
-  assert.match(scriptSource, /return missing\.length \? 'Onvolledig: mist ' \+ missing\.join\(', '\) : API_COST_NOTE;/);
+  assert.doesNotMatch(scriptSource, /softora_api_cost_events_v1/);
+  assert.doesNotMatch(scriptSource, /premium_api_costs/);
+  assert.doesNotMatch(scriptSource, /function applyApiCost\(amountEur, note\)/);
+  assert.doesNotMatch(scriptSource, /function buildApiCostNote\(summary\)/);
+  assert.doesNotMatch(scriptSource, /OpenAI factuur:/);
   assert.match(scriptSource, /const summary = await fetchApiCostSummary\(\);/);
-  assert.match(scriptSource, /return \{ ok: true, updated: applyApiCost\(amountEur, buildApiCostNote\(summary\)\), amountEur, source: 'api-costs' \};/);
-  assert.match(scriptSource, /applyApiCost\(0, API_COST_UNAVAILABLE_NOTE\);/);
+  assert.match(scriptSource, /return \{ ok: true, updated: applyApiCostSnapshot\(summary\), amount, currency: summary\.currency, source: 'openai-costs' \};/);
+  assert.match(scriptSource, /applyApiCostUnavailable\(error\);/);
   assert.match(scriptSource, /window\.refreshMonthlyApiCosts = refreshMonthlyApiCosts;/);
   assert.match(scriptSource, /let coldcallingRefreshPromise = null;/);
   assert.match(scriptSource, /let apiCostRefreshPromise = null;/);

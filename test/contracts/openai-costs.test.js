@@ -3,10 +3,13 @@ const assert = require('node:assert/strict');
 
 const {
   buildCostWindow,
+  buildOpenAiDashboardPeriods,
   collectAnthropicCostAmounts,
   collectOpenAiCostAmounts,
+  createOpenAiCostSummaryCoordinator,
   fetchAnthropicCostSummary,
   fetchCombinedApiCostSummary,
+  fetchOpenAiCostsDashboardSnapshot,
   fetchOpenAiCostSummary,
   parseUsdToEurRateResponse,
   resolveUsdToEurRateDetails,
@@ -205,7 +208,7 @@ test('anthropic costs service fetches official Claude cost report and converts c
   assert.equal(summary.costEur, 11.25);
 });
 
-test('combined api costs use only OpenAI factuurkosten', async () => {
+test('combined api costs use only OpenAI organization costs', async () => {
   const summary = await fetchCombinedApiCostSummary(
     {
       openAiCostsApiKey: 'openai-admin-key',
@@ -243,4 +246,124 @@ test('openai costs service fails closed when no costs key is configured', async 
       return true;
     }
   );
+});
+
+test('openai costs dashboard builds all required periods', () => {
+  const periods = buildOpenAiDashboardPeriods(Date.UTC(2026, 4, 7, 10, 30, 0));
+
+  assert.deepEqual(periods.map((period) => period.key), [
+    'current_month',
+    'today',
+    'last_7_days',
+    'last_30_days',
+  ]);
+  assert.equal(periods[0].label, 'Huidige maand tot nu toe');
+  assert.equal(periods[1].label, 'Vandaag');
+  assert.equal(periods[2].label, 'Afgelopen 7 dagen');
+  assert.equal(periods[3].label, 'Afgelopen 30 dagen');
+});
+
+test('openai costs dashboard fetches official costs with pagination and cache', async () => {
+  const calls = [];
+  const cache = {};
+  const logger = { info() {} };
+  const snapshot = await fetchOpenAiCostsDashboardSnapshot(
+    {
+      env: { OPENAI_ADMIN_KEY: 'admin-key' },
+      openAiApiBaseUrl: 'https://api.openai.test/v1',
+      openAiCostsCache: cache,
+      logger,
+      fetchJsonWithTimeout: async (url, options) => {
+        calls.push({ url, options });
+        const parsed = new URL(url);
+        const page = parsed.searchParams.get('page') || '';
+        return {
+          response: { ok: true, status: 200 },
+          data: {
+            data: [
+              {
+                results: [
+                  { amount: { value: page ? 0.25 : 1.5, currency: 'usd' } },
+                ],
+              },
+            ],
+            has_more: !page,
+            next_page: page ? null : 'next-cursor',
+          },
+        };
+      },
+    },
+    { nowMs: Date.UTC(2026, 4, 7, 10, 30, 0) }
+  );
+
+  assert.equal(snapshot.status, 'success');
+  assert.equal(snapshot.source, 'openai-organization-costs');
+  assert.equal(snapshot.endpoint, '/v1/organization/costs');
+  assert.equal(snapshot.exact, true);
+  assert.equal(snapshot.currency, 'usd');
+  assert.equal(snapshot.currentMonth.amount, 1.75);
+  assert.equal(snapshot.periods.today.amount, 1.75);
+  assert.equal(snapshot.periods.last_7_days.amount, 1.75);
+  assert.equal(snapshot.periods.last_30_days.amount, 1.75);
+  assert.equal(snapshot.cache.hit, false);
+  assert.equal(calls.length, 8);
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer admin-key');
+  assert.match(calls[0].url, /^https:\/\/api\.openai\.test\/v1\/organization\/costs\?/);
+  assert.match(calls[1].url, /page=next-cursor/);
+
+  const cachedSnapshot = await fetchOpenAiCostsDashboardSnapshot(
+    {
+      env: { OPENAI_ADMIN_KEY: 'admin-key' },
+      openAiApiBaseUrl: 'https://api.openai.test/v1',
+      openAiCostsCache: cache,
+      logger,
+      fetchJsonWithTimeout: async () => {
+        throw new Error('cache should prevent a second API call');
+      },
+    },
+    { nowMs: Date.UTC(2026, 4, 7, 10, 31, 0) }
+  );
+
+  assert.equal(cachedSnapshot.cache.hit, true);
+  assert.equal(cachedSnapshot.currentMonth.amount, 1.75);
+});
+
+test('openai costs dashboard returns a safe error payload with last success', async () => {
+  const cache = {
+    lastSuccessfulSnapshot: {
+      status: 'success',
+      currentMonth: { amount: 11.22, currency: 'usd' },
+      lastSuccessfulUpdate: '2026-05-07T10:30:00.000Z',
+    },
+  };
+  const coordinator = createOpenAiCostSummaryCoordinator({
+    env: {},
+    openAiCostsCache: cache,
+    logger: { info() {} },
+    fetchJsonWithTimeout: async () => ({ response: { ok: true, status: 200 }, data: {} }),
+  });
+
+  let statusCode = 0;
+  let payload = null;
+  await coordinator.sendOpenAiCostsDashboardResponse(
+    { query: {} },
+    {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(body) {
+        payload = body;
+        return body;
+      },
+    }
+  );
+
+  assert.equal(statusCode, 503);
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, 'error');
+  assert.equal(payload.message, 'OpenAI kosten konden niet worden opgehaald');
+  assert.equal(payload.error, 'OPENAI_ADMIN_KEY_MISSING');
+  assert.equal(payload.lastSuccessful.currentMonth.amount, 11.22);
+  assert.doesNotMatch(JSON.stringify(payload), /€0|0,00/);
 });
