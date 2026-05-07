@@ -1,5 +1,6 @@
 import { fetchMarketData, SUPPORTED_ASSETS } from '../data/binanceProvider.js';
 import { runBacktest } from '../core/backtester.js';
+import { optimizeStrategy } from '../core/optimizer.js';
 import { runResearchDiagnostics } from '../core/researchEngine.js';
 import { DEFAULT_CONFIG } from '../core/riskEngine.js';
 import {
@@ -17,6 +18,7 @@ const state = {
   marketData: null,
   backtest: null,
   diagnostics: null,
+  optimizer: null,
   forwardState: null,
   running: false,
 };
@@ -166,6 +168,15 @@ function renderShell(root) {
         <ul id="edgeList" class="guard-list"></ul>
       </section>
 
+      <section class="panel optimizer-panel">
+        <div class="panel-title">
+          <h2>Profit Optimizer</h2>
+          <button id="runOptimizer" type="button">Zoek betere set</button>
+        </div>
+        <div id="optimizerSummary" class="optimizer-summary"></div>
+        <div id="optimizerTable" class="table-wrap"></div>
+      </section>
+
       <section class="panel chart-panel">
         <div class="panel-title">
           <h2>Equity Curve</h2>
@@ -284,6 +295,7 @@ function renderDataSummary(root) {
       <span>Rebalance: ${config.rebalanceBars} candles</span>
       <span>Asset cap: ${formatPercent(config.assetCap, 0)}</span>
       <span>Noodrem: ${formatPercent(config.emergencyDrawdownStop, 0)}</span>
+      <span>Vol target: ${formatPercent(config.targetVolatility, 0)}</span>
       <span>Assets: ${SUPPORTED_ASSETS.join(', ')}</span>
     </div>
   `;
@@ -331,6 +343,62 @@ function renderDiagnostics(root) {
       </li>
     `).join('')
     : '<li class="fail"><span>WAIT</span><div><strong>Nog geen edge-check</strong><small>Run eerst de strategie.</small></div></li>';
+}
+
+function renderOptimizer(root) {
+  const optimizer = state.optimizer;
+  const summary = root.querySelector('#optimizerSummary');
+  const table = root.querySelector('#optimizerTable');
+
+  if (!optimizer?.best) {
+    summary.innerHTML = '<p class="muted">Nog niet gedraaid. De optimizer test een compacte parameter-grid en stresstest alleen de beste kandidaten.</p>';
+    table.innerHTML = '';
+    return;
+  }
+
+  const best = optimizer.best;
+  summary.innerHTML = `
+    <div class="edge-verdict ${best.verdict.toLowerCase()}">${best.verdict}</div>
+    <p>Beste set uit ${optimizer.tested} varianten, ${optimizer.stressed} zwaar getest.</p>
+    <div class="data-facts">
+      <span>Return: ${formatPercent(best.strategyReturn)}</span>
+      <span>Benchmark: ${formatPercent(best.benchmarkReturn)}</span>
+      <span>Drawdown: ${formatPercent(best.maxDrawdown)}</span>
+      <span>PF: ${Number.isFinite(best.profitFactor) ? best.profitFactor.toFixed(2) : 'oneindig'}</span>
+      <span>Stress: ${formatPercent(best.stressReturn)}</span>
+    </div>
+  `;
+
+  table.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Verdict</th>
+          <th>Return</th>
+          <th>DD</th>
+          <th>PF</th>
+          <th>WF</th>
+          <th>Rebalance</th>
+          <th>Noodrem</th>
+          <th>Vol target</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${optimizer.candidates.map((candidate) => `
+          <tr>
+            <td>${candidate.verdict}</td>
+            <td>${formatPercent(candidate.strategyReturn)}</td>
+            <td>${formatPercent(candidate.maxDrawdown)}</td>
+            <td>${Number.isFinite(candidate.profitFactor) ? candidate.profitFactor.toFixed(2) : 'oneindig'}</td>
+            <td>${formatPercent(candidate.walkForwardBeatRate)}</td>
+            <td>${candidate.config.rebalanceBars}</td>
+            <td>${formatPercent(candidate.config.emergencyDrawdownStop, 0)}</td>
+            <td>${formatPercent(candidate.config.targetVolatility, 0)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
 }
 
 function renderGuardrails(root, result) {
@@ -516,6 +584,7 @@ function renderAll(root) {
   renderSignal(root, state.backtest);
   renderGuardrails(root, state.backtest);
   renderDiagnostics(root);
+  renderOptimizer(root);
   renderCharts(root, state.backtest);
   renderRanking(root, state.backtest);
   renderForward(root);
@@ -546,6 +615,7 @@ async function runAnalysis(root) {
       baseResult: state.backtest,
       assets: SUPPORTED_ASSETS,
     });
+    state.optimizer = null;
     state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
     setText(root, '#statusText', state.backtest.ok ? 'Backtest klaar.' : state.backtest.error);
     renderAll(root);
@@ -569,6 +639,33 @@ function downloadText(filename, contents, type = 'text/plain') {
 
 function wireEvents(root) {
   root.querySelector('#runBacktest').addEventListener('click', () => runAnalysis(root));
+
+  root.querySelector('#runOptimizer').addEventListener('click', () => {
+    if (!state.marketData) {
+      setText(root, '#statusText', 'Run eerst een backtest voordat je optimaliseert.');
+      return;
+    }
+    const button = root.querySelector('#runOptimizer');
+    button.disabled = true;
+    setText(root, '#statusText', 'Optimizer test kandidaat-instellingen...');
+    setTimeout(() => {
+      try {
+        state.optimizer = optimizeStrategy({
+          candlesByAsset: state.marketData.candlesByAsset,
+          baseConfig: state.config,
+          assets: SUPPORTED_ASSETS,
+        });
+        setText(root, '#statusText', state.optimizer.best
+          ? `Optimizer klaar: beste verdict ${state.optimizer.best.verdict}.`
+          : 'Optimizer vond geen kandidaat.');
+        renderOptimizer(root);
+      } catch (error) {
+        setText(root, '#statusText', `Optimizer fout: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        button.disabled = false;
+      }
+    }, 20);
+  });
 
   root.querySelector('#logForward').addEventListener('click', () => {
     if (!state.backtest || !state.marketData) {

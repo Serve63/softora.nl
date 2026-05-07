@@ -5,6 +5,8 @@ import { analyzeBtcMacro, applyRiskControls, DEFAULT_CONFIG } from '../core/risk
 
 export const FROZEN_CANDIDATE_NAME = 'Frozen Candidate v1';
 
+const analysisCacheByDataset = new WeakMap();
+
 function addWeight(weights, symbol, value) {
   weights[symbol] = (weights[symbol] || 0) + value;
 }
@@ -37,6 +39,35 @@ function scoreRotationCandidate(candles, decisionIndex) {
     momentum180,
     trendPass: Number.isFinite(close) && Number.isFinite(sma200) && close > sma200,
   };
+}
+
+function getCachedAnalysis({ candlesByAsset, assets, decisionIndex, activeConfig }) {
+  let datasetCache = analysisCacheByDataset.get(candlesByAsset);
+  if (!datasetCache) {
+    datasetCache = new Map();
+    analysisCacheByDataset.set(candlesByAsset, datasetCache);
+  }
+
+  const key = [
+    assets.join('|'),
+    decisionIndex,
+    activeConfig.guardMode,
+  ].join(':');
+
+  if (datasetCache.has(key)) return datasetCache.get(key);
+
+  const btcCandles = candlesByAsset.BTCUSDT || [];
+  const btcMacro = analyzeBtcMacro(btcCandles, decisionIndex, activeConfig.guardMode);
+  const ranking = assets
+    .map((symbol) => {
+      const score = scoreRotationCandidate(candlesByAsset[symbol] || [], decisionIndex);
+      return { symbol, ...score };
+    })
+    .sort((a, b) => b.rotationScore - a.rotationScore || b.score - a.score);
+
+  const analysis = { btcMacro, ranking };
+  datasetCache.set(key, analysis);
+  return analysis;
 }
 
 function buildRawWeights({ ranking, btcMacro, config, currentDrawdown }) {
@@ -72,15 +103,12 @@ export function generateFrozenCandidateSignal({
 } = {}) {
   const activeConfig = { ...DEFAULT_CONFIG, ...config };
   const decisionIndex = getDecisionIndex(index, activeConfig);
-  const btcCandles = candlesByAsset.BTCUSDT || [];
-  const btcMacro = analyzeBtcMacro(btcCandles, decisionIndex, activeConfig.guardMode);
-
-  const ranking = assets
-    .map((symbol) => {
-      const score = scoreRotationCandidate(candlesByAsset[symbol] || [], decisionIndex);
-      return { symbol, ...score };
-    })
-    .sort((a, b) => b.rotationScore - a.rotationScore || b.score - a.score);
+  const { btcMacro, ranking } = getCachedAnalysis({
+    candlesByAsset,
+    assets,
+    decisionIndex,
+    activeConfig,
+  });
 
   const rawWeights = buildRawWeights({
     ranking,

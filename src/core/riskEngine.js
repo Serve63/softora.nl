@@ -17,7 +17,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   rebalanceBars: 30,
   minRotationMomentum: 0,
   emergencyDrawdownStop: 0.26,
-  targetVolatility: 0.09,
+  targetVolatility: 0.1,
 });
 
 export function analyzeBtcMacro(btcCandles, index = btcCandles.length - 1, guardMode = 'Strict') {

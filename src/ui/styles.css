@@ -318,7 +318,8 @@ h2 {
 
 .data-panel,
 .guard-panel,
-.edge-panel {
+.edge-panel,
+.optimizer-panel {
   min-height: 290px;
 }
 
@@ -396,10 +397,17 @@ h2 {
   margin-bottom: 12px;
 }
 
-.edge-summary p {
+.edge-summary p,
+.optimizer-summary p {
   margin: 0;
   color: var(--muted);
   line-height: 1.45;
+}
+
+.optimizer-summary {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .edge-verdict {
