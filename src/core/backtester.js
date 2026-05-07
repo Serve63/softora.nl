@@ -86,15 +86,20 @@ export function runBacktest({
   const config = mergeConfig(rawConfig);
   const aligned = alignCandles(candlesByAsset || {}, assets);
 
+  const warmupBars = config.warmupBars || 220;
+  const requestedStartIndex = Number.isFinite(config.backtestStartIndex)
+    ? Math.floor(config.backtestStartIndex)
+    : warmupBars;
+  const startIndex = Math.max(1, requestedStartIndex);
+
   if (aligned.error) return createEmptyResult({ config, error: aligned.error });
-  if (aligned.times.length < 240) {
+  if (aligned.times.length <= startIndex) {
     return createEmptyResult({
       config,
-      error: `Te weinig overlappende candles (${aligned.times.length}). Minimaal 240 nodig voor de macrofilter.`,
+      error: `Te weinig overlappende candles (${aligned.times.length}) voor start-index ${startIndex}.`,
     });
   }
 
-  const startIndex = 220;
   let equity = config.initialCapital;
   let benchmarkEquity = config.initialCapital;
   let weights = {};

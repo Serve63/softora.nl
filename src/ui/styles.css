@@ -319,7 +319,8 @@ h2 {
 .data-panel,
 .guard-panel,
 .edge-panel,
-.optimizer-panel {
+.optimizer-panel,
+.walkforward-panel {
   min-height: 290px;
 }
 

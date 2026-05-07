@@ -1,6 +1,7 @@
 import { accountingTestCases } from './accountingTests.js';
 import { optimizerTestCases } from './optimizerTests.js';
 import { parityTestCases } from './parityTests.js';
+import { walkForwardTestCases } from './walkForwardTests.js';
 
 async function executeTest(name, fn) {
   try {
@@ -24,7 +25,12 @@ function createAssert() {
 export async function runAllTests() {
   const assert = createAssert();
   const results = [];
-  const cases = [...parityTestCases(), ...accountingTestCases(), ...optimizerTestCases()];
+  const cases = [
+    ...parityTestCases(),
+    ...accountingTestCases(),
+    ...optimizerTestCases(),
+    ...walkForwardTestCases(),
+  ];
 
   for (const testCase of cases) {
     results.push(await executeTest(testCase.name, () => testCase.run(assert)));

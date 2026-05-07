@@ -3,6 +3,7 @@ import { runBacktest } from '../core/backtester.js';
 import { optimizeStrategy } from '../core/optimizer.js';
 import { runResearchDiagnostics } from '../core/researchEngine.js';
 import { DEFAULT_CONFIG } from '../core/riskEngine.js';
+import { runRollingWalkForward } from '../core/walkForward.js';
 import {
   exportForwardCsv,
   exportForwardJson,
@@ -19,6 +20,7 @@ const state = {
   backtest: null,
   diagnostics: null,
   optimizer: null,
+  walkForward: null,
   forwardState: null,
   running: false,
 };
@@ -175,6 +177,15 @@ function renderShell(root) {
         </div>
         <div id="optimizerSummary" class="optimizer-summary"></div>
         <div id="optimizerTable" class="table-wrap"></div>
+      </section>
+
+      <section class="panel walkforward-panel wide-panel">
+        <div class="panel-title">
+          <h2>Rolling Walk-Forward</h2>
+          <button id="runWalkForward" type="button">Valideer op toekomstblokken</button>
+        </div>
+        <div id="walkForwardSummary" class="optimizer-summary"></div>
+        <div id="walkForwardTable" class="table-wrap"></div>
       </section>
 
       <section class="panel chart-panel">
@@ -401,6 +412,60 @@ function renderOptimizer(root) {
   `;
 }
 
+function renderWalkForward(root) {
+  const walkForward = state.walkForward;
+  const summary = root.querySelector('#walkForwardSummary');
+  const table = root.querySelector('#walkForwardTable');
+
+  if (!walkForward?.summary) {
+    summary.innerHTML = '<p class="muted">Nog niet gedraaid. Deze check optimaliseert steeds op het verleden en test daarna op het volgende toekomstblok.</p>';
+    table.innerHTML = '';
+    return;
+  }
+
+  const { summary: result } = walkForward;
+  summary.innerHTML = `
+    <div class="edge-verdict ${result.verdict === 'PASS' ? 'candidate' : 'reject'}">${result.verdict}</div>
+    <p>${result.folds} rolling folds · train ${walkForward.trainBars} candles · test ${walkForward.testBars} candles.</p>
+    <div class="data-facts">
+      <span>Compound: ${formatPercent(result.strategyCompoundReturn)}</span>
+      <span>Benchmark: ${formatPercent(result.benchmarkCompoundReturn)}</span>
+      <span>Beat-rate: ${formatPercent(result.beatRate)}</span>
+      <span>Profitable: ${formatPercent(result.profitableRate)}</span>
+      <span>Worst fold: ${formatPercent(result.worstFoldReturn)}</span>
+    </div>
+  `;
+
+  table.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Fold</th>
+          <th>Testperiode</th>
+          <th>Return</th>
+          <th>Benchmark</th>
+          <th>DD</th>
+          <th>PF</th>
+          <th>Config</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${walkForward.folds.map((fold) => `
+          <tr>
+            <td>${fold.index}</td>
+            <td>${formatDate(fold.testStart)} - ${formatDate(fold.testEnd)}</td>
+            <td>${formatPercent(fold.testReturn)}</td>
+            <td>${formatPercent(fold.benchmarkReturn)}</td>
+            <td>${formatPercent(fold.maxDrawdown)}</td>
+            <td>${Number.isFinite(fold.profitFactor) ? fold.profitFactor.toFixed(2) : 'oneindig'}</td>
+            <td>${fold.config.rebalanceBars}d · stop ${formatPercent(fold.config.emergencyDrawdownStop, 0)} · vol ${formatPercent(fold.config.targetVolatility, 0)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
 function renderGuardrails(root, result) {
   const list = root.querySelector('#guardList');
   const checks = result?.gate?.checks || [];
@@ -585,6 +650,7 @@ function renderAll(root) {
   renderGuardrails(root, state.backtest);
   renderDiagnostics(root);
   renderOptimizer(root);
+  renderWalkForward(root);
   renderCharts(root, state.backtest);
   renderRanking(root, state.backtest);
   renderForward(root);
@@ -616,6 +682,7 @@ async function runAnalysis(root) {
       assets: SUPPORTED_ASSETS,
     });
     state.optimizer = null;
+    state.walkForward = null;
     state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
     setText(root, '#statusText', state.backtest.ok ? 'Backtest klaar.' : state.backtest.error);
     renderAll(root);
@@ -661,6 +728,33 @@ function wireEvents(root) {
         renderOptimizer(root);
       } catch (error) {
         setText(root, '#statusText', `Optimizer fout: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        button.disabled = false;
+      }
+    }, 20);
+  });
+
+  root.querySelector('#runWalkForward').addEventListener('click', () => {
+    if (!state.marketData) {
+      setText(root, '#statusText', 'Run eerst een backtest voordat je walk-forward valideert.');
+      return;
+    }
+    const button = root.querySelector('#runWalkForward');
+    button.disabled = true;
+    setText(root, '#statusText', 'Rolling walk-forward validatie draait...');
+    setTimeout(() => {
+      try {
+        state.walkForward = runRollingWalkForward({
+          candlesByAsset: state.marketData.candlesByAsset,
+          baseConfig: state.config,
+          assets: SUPPORTED_ASSETS,
+        });
+        setText(root, '#statusText', state.walkForward.ok
+          ? `Walk-forward klaar: ${state.walkForward.summary.verdict}, beat-rate ${formatPercent(state.walkForward.summary.beatRate)}.`
+          : state.walkForward.error);
+        renderWalkForward(root);
+      } catch (error) {
+        setText(root, '#statusText', `Walk-forward fout: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
         button.disabled = false;
       }
