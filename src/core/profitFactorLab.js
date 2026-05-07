@@ -6,10 +6,11 @@ import { DEFAULT_CONFIG } from './riskEngine.js';
 import { runRollingWalkForward } from './walkForward.js';
 
 export const DEFAULT_PROFIT_FACTOR_GRID = Object.freeze({
-  rebalanceBars: [18, 30],
-  scoreThreshold: [55, 65, 75],
-  targetVolatility: [0.06, 0.1],
+  rebalanceBars: [42, 60, 90],
+  scoreThreshold: [65, 75],
+  targetVolatility: [0.04, 0.06],
   emergencyDrawdownStop: [0.2, 0.24],
+  assetCap: [0.45],
 });
 
 export const DEFAULT_PROFIT_FACTOR_STRATEGIES = Object.freeze([
@@ -74,6 +75,7 @@ function summarizeRow({ strategy, config, result, rolling = null }) {
     profitFactor: result.profitFactor,
     trades: result.trades,
     currentSignal: result.currentSignal,
+    currentRiskExposure: result.preGateSignal?.risk?.exposure || result.preGateSignal?.exposure || 0,
     rolling,
   };
   row.validatedScore = scoreValidatedRow(row);
@@ -103,21 +105,53 @@ function uniqueRows(rows) {
   return output;
 }
 
-function verdictForRow(row, config) {
+function buildRowChecks(row, config) {
   const rolling = row.rolling?.summary;
-  if (!rolling) return 'REJECT';
 
-  const checks = [
-    row.strategyReturn > row.benchmarkReturn,
-    row.profitFactor >= config.minProfitFactor,
-    row.maxDrawdown <= config.maxDrawdownTarget,
-    rolling.strategyCompoundReturn > rolling.benchmarkCompoundReturn,
-    rolling.beatRate >= config.minWalkForwardBeatRate,
+  return [
+    {
+      id: 'full-edge',
+      label: 'Strategy return > buy & hold',
+      pass: row.strategyReturn > row.benchmarkReturn,
+    },
+    {
+      id: 'oos-edge',
+      label: 'OOS return > OOS benchmark',
+      pass: row.oosReturn > row.oosBenchmarkReturn,
+    },
+    {
+      id: 'drawdown',
+      label: 'Max drawdown binnen limiet',
+      pass: row.maxDrawdown <= config.maxDrawdownTarget,
+    },
+    {
+      id: 'profit-factor',
+      label: 'Profit factor hoog genoeg',
+      pass: row.profitFactor >= config.minProfitFactor,
+    },
+    {
+      id: 'rolling-edge',
+      label: 'Rolling walk-forward verslaat benchmark',
+      pass: Boolean(rolling) && rolling.strategyCompoundReturn > rolling.benchmarkCompoundReturn,
+    },
+    {
+      id: 'rolling-beat-rate',
+      label: 'Rolling beat-rate voldoende',
+      pass: Boolean(rolling) && rolling.beatRate >= config.minWalkForwardBeatRate,
+    },
+    {
+      id: 'current-exposure',
+      label: 'Huidige risk engine exposure > 0',
+      pass: row.currentRiskExposure > 0,
+    },
   ];
-  const passed = checks.filter(Boolean).length;
+}
 
-  if (checks.every(Boolean)) return 'CANDIDATE';
-  if (passed >= 3) return 'WATCH';
+function verdictForChecks(checks) {
+  const passed = checks.filter((check) => check.pass).length;
+
+  if (checks.every((check) => check.pass)) return 'CANDIDATE';
+  if (passed >= 4) return 'WATCH';
   return 'REJECT';
 }
 
@@ -185,12 +219,19 @@ export function runProfitFactorLab({
           profitFactor: row.profitFactor,
           trades: row.trades,
           currentSignal: row.currentSignal,
+          preGateSignal: {
+            risk: { exposure: row.currentRiskExposure },
+            exposure: row.currentRiskExposure,
+          },
         },
         rolling,
       });
+      const checks = buildRowChecks(validated, row.config);
       return {
         ...validated,
-        verdict: verdictForRow(validated, row.config),
+        checks,
+        failed: checks.filter((check) => !check.pass),
+        verdict: verdictForChecks(checks),
       };
     })
     .sort((a, b) => b.validatedScore - a.validatedScore);

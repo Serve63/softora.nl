@@ -27,6 +27,8 @@ const state = {
   tournament: null,
   timeframeResearch: null,
   profitFactorLab: null,
+  profitFactorMarketData: null,
+  activeStrategy: null,
   forwardState: null,
   running: false,
 };
@@ -67,8 +69,10 @@ function setText(root, selector, value) {
 }
 
 function readConfig(root) {
+  const previous = state.config || DEFAULT_CONFIG;
   return {
     ...DEFAULT_CONFIG,
+    ...previous,
     timeframe: root.querySelector('#timeframe').value,
     candleTarget: Number(root.querySelector('#candleTarget').value) || DEFAULT_CONFIG.candleTarget,
     initialCapital: Number(root.querySelector('#initialCapital').value) || DEFAULT_CONFIG.initialCapital,
@@ -79,6 +83,17 @@ function readConfig(root) {
     minProfitFactor: Number(root.querySelector('#minProfitFactor').value) || DEFAULT_CONFIG.minProfitFactor,
     oosRatio: 0.25,
   };
+}
+
+function writeConfigControls(root, config) {
+  root.querySelector('#timeframe').value = config.timeframe;
+  root.querySelector('#candleTarget').value = config.candleTarget;
+  root.querySelector('#initialCapital').value = config.initialCapital;
+  root.querySelector('#feeRate').value = (config.feeRate * 100).toFixed(2);
+  root.querySelector('#slippageRate').value = (config.slippageRate * 100).toFixed(2);
+  root.querySelector('#guardMode').value = config.guardMode;
+  root.querySelector('#maxDrawdownTarget').value = (config.maxDrawdownTarget * 100).toFixed(0);
+  root.querySelector('#minProfitFactor').value = config.minProfitFactor.toFixed(2);
 }
 
 function renderShell(root) {
@@ -659,6 +674,11 @@ function renderProfitFactorLab(root) {
       <span>Rolling: ${formatPercent(best.rolling?.summary?.strategyCompoundReturn)}</span>
       <span>Beat-rate: ${formatPercent(best.rolling?.summary?.beatRate)}</span>
     </div>
+    ${lab.candidate ? `
+      <div class="button-row">
+        <button id="applyProfitFactorCandidate" type="button">Gebruik kandidaat voor paper-run</button>
+      </div>
+    ` : ''}
   `;
 
   table.innerHTML = `
@@ -675,6 +695,7 @@ function renderProfitFactorLab(root) {
           <th>DD</th>
           <th>Trades</th>
           <th>Config</th>
+          <th>Fails</th>
         </tr>
       </thead>
       <tbody>
@@ -689,7 +710,8 @@ function renderProfitFactorLab(root) {
             <td>${formatPercent(row.rolling?.summary?.beatRate)}</td>
             <td>${formatPercent(row.maxDrawdown)}</td>
             <td>${row.trades}</td>
-            <td>${row.config.rebalanceBars} bars · score ${row.config.scoreThreshold} · vol ${formatPercent(row.config.targetVolatility, 0)} · stop ${formatPercent(row.config.emergencyDrawdownStop, 0)}</td>
+            <td>${row.config.rebalanceBars} bars · score ${row.config.scoreThreshold} · vol ${formatPercent(row.config.targetVolatility, 0)} · stop ${formatPercent(row.config.emergencyDrawdownStop, 0)} · cap ${formatPercent(row.config.assetCap, 0)}</td>
+            <td>${row.failed?.map((check) => check.id).join(', ') || 'geen'}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -907,12 +929,14 @@ async function runAnalysis(root) {
     state.backtest = runBacktest({
       candlesByAsset: state.marketData.candlesByAsset,
       config: state.config,
+      strategy: state.activeStrategy || undefined,
       assets: SUPPORTED_ASSETS,
     });
     state.diagnostics = runResearchDiagnostics({
       candlesByAsset: state.marketData.candlesByAsset,
       config: state.config,
       baseResult: state.backtest,
+      strategy: state.activeStrategy || undefined,
       assets: SUPPORTED_ASSETS,
     });
     state.optimizer = null;
@@ -920,6 +944,7 @@ async function runAnalysis(root) {
     state.tournament = null;
     state.timeframeResearch = null;
     state.profitFactorLab = null;
+    state.profitFactorMarketData = null;
     state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
     setText(root, '#statusText', state.backtest.ok ? 'Backtest klaar.' : state.backtest.error);
     renderAll(root);
@@ -941,7 +966,52 @@ function downloadText(filename, contents, type = 'text/plain') {
   URL.revokeObjectURL(url);
 }
 
+function applyProfitFactorCandidate(root) {
+  const candidate = state.profitFactorLab?.candidate;
+  if (!candidate || !state.profitFactorMarketData) {
+    setText(root, '#statusText', 'Geen toepasbare PF-kandidaat beschikbaar.');
+    return;
+  }
+
+  state.activeStrategy = candidate.strategy;
+  state.config = {
+    ...DEFAULT_CONFIG,
+    ...candidate.config,
+    timeframe: '4H',
+    candleTarget: 3000,
+  };
+  state.marketData = state.profitFactorMarketData;
+  state.backtest = runBacktest({
+    candlesByAsset: state.marketData.candlesByAsset,
+    config: state.config,
+    strategy: state.activeStrategy,
+    assets: SUPPORTED_ASSETS,
+  });
+  state.diagnostics = runResearchDiagnostics({
+    candlesByAsset: state.marketData.candlesByAsset,
+    config: state.config,
+    baseResult: state.backtest,
+    strategy: state.activeStrategy,
+    assets: SUPPORTED_ASSETS,
+  });
+  state.optimizer = null;
+  state.walkForward = null;
+  state.tournament = null;
+  state.timeframeResearch = null;
+  state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
+
+  writeConfigControls(root, state.config);
+  setText(root, '#statusText', `PF-kandidaat toegepast op paper-dashboard: ${state.backtest.currentSignal.label}.`);
+  renderAll(root);
+}
+
 function wireEvents(root) {
+  root.addEventListener('click', (event) => {
+    if (event.target?.id === 'applyProfitFactorCandidate') {
+      applyProfitFactorCandidate(root);
+    }
+  });
+
   root.querySelector('#runBacktest').addEventListener('click', () => runAnalysis(root));
 
   root.querySelector('#runOptimizer').addEventListener('click', () => {
@@ -1073,6 +1143,7 @@ function wireEvents(root) {
             timeframe: '4H',
             target: 3000,
           });
+        state.profitFactorMarketData = marketData4h;
         state.profitFactorLab = runProfitFactorLab({
           candlesByAsset: marketData4h.candlesByAsset,
           baseConfig: {

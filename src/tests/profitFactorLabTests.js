@@ -1,4 +1,4 @@
-import { runProfitFactorLab } from '../core/profitFactorLab.js';
+import { DEFAULT_PROFIT_FACTOR_GRID, runProfitFactorLab } from '../core/profitFactorLab.js';
 
 function makeCandles(symbol, count, drift, wave = 0.001) {
   const candles = [];
@@ -80,6 +80,18 @@ export function profitFactorLabTestCases() {
         assert(result.validated === 2, 'Profit Factor Lab valideert niet de top-kandidaten.');
         assert(result.best.strategyName === 'SOL PF Test', 'Profit Factor Lab kiest niet de sterkste synthetische kandidaat.');
         assert(result.best.rolling?.summary, 'Profit Factor Lab mist rolling summary op de beste kandidaat.');
+        assert(result.best.checks.some((check) => check.id === 'oos-edge'), 'Profit Factor Lab controleert OOS-edge niet expliciet.');
+        assert(result.best.checks.some((check) => check.id === 'current-exposure'), 'Profit Factor Lab controleert actuele exposure niet expliciet.');
+      },
+    },
+    {
+      name: 'Profit Factor Lab bevat conservatieve 4H PF-preset',
+      run(assert) {
+        assert(DEFAULT_PROFIT_FACTOR_GRID.rebalanceBars.includes(90), 'PF-grid mist de langere 4H rebalance-preset.');
+        assert(DEFAULT_PROFIT_FACTOR_GRID.scoreThreshold.includes(75), 'PF-grid mist de strengere scorefilter.');
+        assert(DEFAULT_PROFIT_FACTOR_GRID.targetVolatility.includes(0.04), 'PF-grid mist de lagere volatiliteitsdoelstelling.');
+        assert(DEFAULT_PROFIT_FACTOR_GRID.emergencyDrawdownStop.includes(0.2), 'PF-grid mist de strakkere drawdown-noodrem.');
+        assert(DEFAULT_PROFIT_FACTOR_GRID.assetCap.includes(0.45), 'PF-grid mist de asset cap die concentratierisico beperkt.');
       },
     },
     {
