@@ -1,5 +1,6 @@
 import { SUPPORTED_ASSETS } from '../data/binanceProvider.js';
 import frozenCandidate from '../strategies/frozenCandidate.js';
+import sprintRotation from '../strategies/sprintRotation.js';
 import trendParticipation from '../strategies/trendParticipation.js';
 import { runBacktest } from './backtester.js';
 import { runResearchDiagnostics } from './researchEngine.js';
@@ -9,6 +10,7 @@ import { runRollingWalkForward } from './walkForward.js';
 export const TOURNAMENT_STRATEGIES = Object.freeze([
   frozenCandidate,
   trendParticipation,
+  sprintRotation,
 ]);
 
 function formatPercent(value) {
@@ -188,6 +190,9 @@ export function runStrategyTournament({
   const best = rows[0] || null;
   const deployable = rows.find((row) => row.verdict === 'GATE_OPEN') || null;
   const researchPass = rows.find((row) => row.verdict === 'RESEARCH_PASS_CASH' || row.verdict === 'GATE_OPEN') || null;
+  const rollingLeader = [...rows]
+    .filter((row) => row.rolling)
+    .sort((a, b) => b.rolling.strategyCompoundReturn - a.rolling.strategyCompoundReturn)[0] || null;
 
   return {
     ok: rows.length > 0,
@@ -196,6 +201,7 @@ export function runStrategyTournament({
     best,
     deployable,
     researchPass,
+    rollingLeader,
     rows,
     message: deployable
       ? `${deployable.strategyName} heeft de tournament gate open.`

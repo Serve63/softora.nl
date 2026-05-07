@@ -1,4 +1,5 @@
 import frozenCandidate, { generateFrozenCandidateSignal } from './frozenCandidate.js';
+import sprintRotation from './sprintRotation.js';
 import trendParticipation from './trendParticipation.js';
 
 export function createStrategySandbox(overrides = {}) {
@@ -17,5 +18,5 @@ export function createStrategySandbox(overrides = {}) {
 }
 
 export function getAvailableStrategies() {
-  return [frozenCandidate, trendParticipation, createStrategySandbox()];
+  return [frozenCandidate, trendParticipation, sprintRotation, createStrategySandbox()];
 }

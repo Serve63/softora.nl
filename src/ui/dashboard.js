@@ -495,13 +495,16 @@ function renderTournament(root) {
   }
 
   const best = tournament.best;
+  const rollingLeader = tournament.rollingLeader;
   summary.innerHTML = `
     <div class="edge-verdict ${verdictClass(best.verdict)}">${best.verdict}</div>
     <p>${tournament.message}</p>
     <div class="data-facts">
       <span>Beste: ${best.strategyName}</span>
+      <span>Rolling leader: ${rollingLeader?.strategyName || 'n.v.t.'}</span>
       <span>Score: ${Number.isFinite(best.score) ? best.score.toFixed(2) : 'n.v.t.'}</span>
       <span>Rolling edge: ${formatPercent(best.rolling?.edge)}</span>
+      <span>Leader rolling: ${formatPercent(rollingLeader?.rolling?.strategyCompoundReturn)}</span>
       <span>Beat-rate: ${formatPercent(best.rolling?.beatRate)}</span>
       <span>Signaal: ${best.currentSignal?.label || 'CASH'}</span>
     </div>

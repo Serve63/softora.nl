@@ -1,6 +1,7 @@
 import { accountingTestCases } from './accountingTests.js';
 import { optimizerTestCases } from './optimizerTests.js';
 import { parityTestCases } from './parityTests.js';
+import { sprintRotationTestCases } from './sprintRotationTests.js';
 import { walkForwardTestCases } from './walkForwardTests.js';
 import { tournamentTestCases } from './tournamentTests.js';
 
@@ -30,6 +31,7 @@ export async function runAllTests() {
     ...parityTestCases(),
     ...accountingTestCases(),
     ...optimizerTestCases(),
+    ...sprintRotationTestCases(),
     ...walkForwardTestCases(),
     ...tournamentTestCases(),
   ];

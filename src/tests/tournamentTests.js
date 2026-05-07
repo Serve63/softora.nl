@@ -79,6 +79,7 @@ export function tournamentTestCases() {
 
         assert(tournament.rows.length === 2, 'Tournament geeft niet alle strategieen terug.');
         assert(tournament.best.strategyName === 'Always SOL Test', 'Tournament kiest niet de sterkste synthetische strategie.');
+        assert(tournament.rollingLeader.strategyName === 'Always SOL Test', 'Tournament meldt niet de juiste rolling leader.');
         assert(tournament.best.rolling.strategyCompoundReturn > tournament.best.rolling.benchmarkCompoundReturn, 'Rolling edge wordt niet correct gemeten.');
         assert(tournament.best.checks.some((check) => check.id === 'rolling-edge'), 'Tournament mist rolling-edge check.');
       },
