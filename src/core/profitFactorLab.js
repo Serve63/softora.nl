@@ -1,0 +1,216 @@
+import { SUPPORTED_ASSETS } from '../data/binanceProvider.js';
+import sprintRotation from '../strategies/sprintRotation.js';
+import trendParticipation from '../strategies/trendParticipation.js';
+import { runBacktest } from './backtester.js';
+import { DEFAULT_CONFIG } from './riskEngine.js';
+import { runRollingWalkForward } from './walkForward.js';
+
+export const DEFAULT_PROFIT_FACTOR_GRID = Object.freeze({
+  rebalanceBars: [18, 30],
+  scoreThreshold: [55, 65, 75],
+  targetVolatility: [0.06, 0.1],
+  emergencyDrawdownStop: [0.2, 0.24],
+});
+
+export const DEFAULT_PROFIT_FACTOR_STRATEGIES = Object.freeze([
+  trendParticipation,
+  sprintRotation,
+]);
+
+function cartesianProduct(grid) {
+  const keys = Object.keys(grid);
+  return keys.reduce((rows, key) => rows.flatMap((row) => (
+    grid[key].map((value) => ({ ...row, [key]: value }))
+  )), [{}]);
+}
+
+function finiteProfitFactor(value) {
+  if (value === Number.POSITIVE_INFINITY) return 8;
+  return Number.isFinite(value) ? value : 0;
+}
+
+function scoreRow({ result, config }) {
+  const pf = finiteProfitFactor(result.profitFactor);
+  const edge = result.strategyReturn - result.benchmarkReturn;
+  const oosEdge = result.oosReturn - result.oosBenchmarkReturn;
+  const drawdownPenalty = Math.max(0, result.maxDrawdown - config.maxDrawdownTarget) * 8;
+  const tradePenalty = result.trades < 3 ? 0.25 : 0;
+  const pfBonus = result.profitFactor >= config.minProfitFactor ? 1 : 0;
+
+  return Math.min(3, pf) * 0.85
+    + edge * 0.7
+    + Math.max(-0.4, oosEdge) * 0.35
+    + Math.min(0.6, result.strategyReturn) * 0.25
+    + pfBonus
+    - drawdownPenalty
+    - tradePenalty;
+}
+
+function scoreValidatedRow(row) {
+  const rolling = row.rolling?.summary;
+  if (!rolling) return row.score;
+  const rollingEdge = rolling.strategyCompoundReturn - rolling.benchmarkCompoundReturn;
+  const rollingPenalty = Math.max(0, rolling.maxFoldDrawdown - row.config.maxDrawdownTarget) * 6;
+
+  return row.score
+    + Math.max(-0.5, rollingEdge) * 0.65
+    + rolling.beatRate * 0.45
+    - rollingPenalty;
+}
+
+function summarizeRow({ strategy, config, result, rolling = null }) {
+  const row = {
+    strategyName: strategy.name,
+    strategy,
+    config,
+    score: scoreRow({ result, config }),
+    validatedScore: null,
+    strategyReturn: result.strategyReturn,
+    benchmarkReturn: result.benchmarkReturn,
+    edge: result.strategyReturn - result.benchmarkReturn,
+    oosReturn: result.oosReturn,
+    oosBenchmarkReturn: result.oosBenchmarkReturn,
+    maxDrawdown: result.maxDrawdown,
+    profitFactor: result.profitFactor,
+    trades: result.trades,
+    currentSignal: result.currentSignal,
+    rolling,
+  };
+  row.validatedScore = scoreValidatedRow(row);
+  return row;
+}
+
+function rowSignature(row) {
+  return [
+    row.strategyName,
+    row.strategyReturn.toFixed(8),
+    row.benchmarkReturn.toFixed(8),
+    row.maxDrawdown.toFixed(8),
+    Number.isFinite(row.profitFactor) ? row.profitFactor.toFixed(8) : 'inf',
+    row.trades,
+  ].join('|');
+}
+
+function uniqueRows(rows) {
+  const seen = new Set();
+  const output = [];
+  for (const row of rows) {
+    const signature = rowSignature(row);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    output.push(row);
+  }
+  return output;
+}
+
+function verdictForRow(row, config) {
+  const rolling = row.rolling?.summary;
+  if (!rolling) return 'REJECT';
+
+  const checks = [
+    row.strategyReturn > row.benchmarkReturn,
+    row.profitFactor >= config.minProfitFactor,
+    row.maxDrawdown <= config.maxDrawdownTarget,
+    rolling.strategyCompoundReturn > rolling.benchmarkCompoundReturn,
+    rolling.beatRate >= config.minWalkForwardBeatRate,
+  ];
+  const passed = checks.filter(Boolean).length;
+
+  if (checks.every(Boolean)) return 'CANDIDATE';
+  if (passed >= 3) return 'WATCH';
+  return 'REJECT';
+}
+
+export function runProfitFactorLab({
+  candlesByAsset,
+  baseConfig = {},
+  strategies = DEFAULT_PROFIT_FACTOR_STRATEGIES,
+  grid = DEFAULT_PROFIT_FACTOR_GRID,
+  assets = SUPPORTED_ASSETS,
+  topN = 4,
+  walkForwardOptions = {},
+} = {}) {
+  const config = {
+    ...DEFAULT_CONFIG,
+    ...baseConfig,
+    timeframe: baseConfig.timeframe || '4H',
+  };
+  const variants = cartesianProduct(grid).map((variant) => ({
+    ...config,
+    ...variant,
+  }));
+  const baseRows = [];
+
+  for (const strategy of strategies) {
+    for (const variant of variants) {
+      const result = runBacktest({
+        candlesByAsset,
+        config: variant,
+        strategy,
+        assets,
+      });
+      baseRows.push(summarizeRow({ strategy, config: variant, result }));
+    }
+  }
+
+  const shortlisted = uniqueRows(baseRows
+    .sort((a, b) => b.score - a.score)
+  )
+    .slice(0, topN)
+    .map((row) => {
+      const rolling = runRollingWalkForward({
+        candlesByAsset,
+        baseConfig: row.config,
+        strategy: row.strategy,
+        assets,
+        trainBars: 1080,
+        testBars: 270,
+        maxFolds: 5,
+        grid: {
+          rebalanceBars: [row.config.rebalanceBars],
+          emergencyDrawdownStop: [row.config.emergencyDrawdownStop],
+          targetVolatility: [row.config.targetVolatility],
+        },
+        ...walkForwardOptions,
+      });
+      const validated = summarizeRow({
+        strategy: row.strategy,
+        config: row.config,
+        result: {
+          strategyReturn: row.strategyReturn,
+          benchmarkReturn: row.benchmarkReturn,
+          oosReturn: row.oosReturn,
+          oosBenchmarkReturn: row.oosBenchmarkReturn,
+          maxDrawdown: row.maxDrawdown,
+          profitFactor: row.profitFactor,
+          trades: row.trades,
+          currentSignal: row.currentSignal,
+        },
+        rolling,
+      });
+      return {
+        ...validated,
+        verdict: verdictForRow(validated, row.config),
+      };
+    })
+    .sort((a, b) => b.validatedScore - a.validatedScore);
+
+  const best = shortlisted[0] || null;
+  const candidate = shortlisted.find((row) => row.verdict === 'CANDIDATE') || null;
+  const watch = shortlisted.find((row) => row.verdict === 'WATCH') || null;
+
+  return {
+    ok: true,
+    tested: baseRows.length,
+    validated: shortlisted.length,
+    best,
+    candidate,
+    watch,
+    rows: shortlisted,
+    message: candidate
+      ? `${candidate.strategyName} haalt de profit-factor lab gate.`
+      : watch
+        ? `${watch.strategyName} verbetert trade-quality, maar is nog watchlist.`
+        : 'Geen 4H variant haalt de profit-factor lab gate.',
+  };
+}

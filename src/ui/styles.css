@@ -322,7 +322,8 @@ h2 {
 .optimizer-panel,
 .walkforward-panel,
 .tournament-panel,
-.timeframe-panel {
+.timeframe-panel,
+.profit-factor-panel {
   min-height: 290px;
 }
 

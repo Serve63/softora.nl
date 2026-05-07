@@ -1,6 +1,7 @@
 import { fetchMarketData, SUPPORTED_ASSETS } from '../data/binanceProvider.js';
 import { runBacktest } from '../core/backtester.js';
 import { optimizeStrategy } from '../core/optimizer.js';
+import { runProfitFactorLab } from '../core/profitFactorLab.js';
 import { runResearchDiagnostics } from '../core/researchEngine.js';
 import { DEFAULT_CONFIG } from '../core/riskEngine.js';
 import { runStrategyTournament } from '../core/strategyTournament.js';
@@ -25,6 +26,7 @@ const state = {
   walkForward: null,
   tournament: null,
   timeframeResearch: null,
+  profitFactorLab: null,
   forwardState: null,
   running: false,
 };
@@ -208,6 +210,15 @@ function renderShell(root) {
         </div>
         <div id="timeframeSummary" class="optimizer-summary"></div>
         <div id="timeframeTable" class="table-wrap"></div>
+      </section>
+
+      <section class="panel profit-factor-panel wide-panel">
+        <div class="panel-title">
+          <h2>Profit Factor Lab</h2>
+          <button id="runProfitFactorLab" type="button">Verbeter 4H PF</button>
+        </div>
+        <div id="profitFactorSummary" class="optimizer-summary"></div>
+        <div id="profitFactorTable" class="table-wrap"></div>
       </section>
 
       <section class="panel chart-panel">
@@ -623,6 +634,69 @@ function renderTimeframeResearch(root) {
   `;
 }
 
+function renderProfitFactorLab(root) {
+  const lab = state.profitFactorLab;
+  const summary = root.querySelector('#profitFactorSummary');
+  const table = root.querySelector('#profitFactorTable');
+
+  if (!lab?.rows?.length) {
+    summary.innerHTML = '<p class="muted">Nog niet gedraaid. Dit lab zoekt compacte 4H filters die profit factor verbeteren zonder de harde gate te versoepelen.</p>';
+    table.innerHTML = '';
+    return;
+  }
+
+  const best = lab.best;
+  summary.innerHTML = `
+    <div class="edge-verdict ${best.verdict === 'CANDIDATE' ? 'candidate' : best.verdict === 'WATCH' ? 'watch' : 'reject'}">${best.verdict}</div>
+    <p>${lab.message}</p>
+    <div class="data-facts">
+      <span>Getest: ${lab.tested}</span>
+      <span>Rolling gevalideerd: ${lab.validated}</span>
+      <span>Beste: ${best.strategyName}</span>
+      <span>Return: ${formatPercent(best.strategyReturn)}</span>
+      <span>Benchmark: ${formatPercent(best.benchmarkReturn)}</span>
+      <span>PF: ${Number.isFinite(best.profitFactor) ? best.profitFactor.toFixed(2) : 'oneindig'}</span>
+      <span>Rolling: ${formatPercent(best.rolling?.summary?.strategyCompoundReturn)}</span>
+      <span>Beat-rate: ${formatPercent(best.rolling?.summary?.beatRate)}</span>
+    </div>
+  `;
+
+  table.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Verdict</th>
+          <th>Strategie</th>
+          <th>PF</th>
+          <th>Return</th>
+          <th>Benchmark</th>
+          <th>Rolling</th>
+          <th>Beat</th>
+          <th>DD</th>
+          <th>Trades</th>
+          <th>Config</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lab.rows.map((row) => `
+          <tr>
+            <td>${row.verdict}</td>
+            <td>${row.strategyName}</td>
+            <td>${Number.isFinite(row.profitFactor) ? row.profitFactor.toFixed(2) : 'oneindig'}</td>
+            <td>${formatPercent(row.strategyReturn)}</td>
+            <td>${formatPercent(row.benchmarkReturn)}</td>
+            <td>${formatPercent(row.rolling?.summary?.strategyCompoundReturn)} / ${formatPercent(row.rolling?.summary?.benchmarkCompoundReturn)}</td>
+            <td>${formatPercent(row.rolling?.summary?.beatRate)}</td>
+            <td>${formatPercent(row.maxDrawdown)}</td>
+            <td>${row.trades}</td>
+            <td>${row.config.rebalanceBars} bars · score ${row.config.scoreThreshold} · vol ${formatPercent(row.config.targetVolatility, 0)} · stop ${formatPercent(row.config.emergencyDrawdownStop, 0)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
 function renderGuardrails(root, result) {
   const list = root.querySelector('#guardList');
   const checks = result?.gate?.checks || [];
@@ -810,6 +884,7 @@ function renderAll(root) {
   renderWalkForward(root);
   renderTournament(root);
   renderTimeframeResearch(root);
+  renderProfitFactorLab(root);
   renderCharts(root, state.backtest);
   renderRanking(root, state.backtest);
   renderForward(root);
@@ -844,6 +919,7 @@ async function runAnalysis(root) {
     state.walkForward = null;
     state.tournament = null;
     state.timeframeResearch = null;
+    state.profitFactorLab = null;
     state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
     setText(root, '#statusText', state.backtest.ok ? 'Backtest klaar.' : state.backtest.error);
     renderAll(root);
@@ -978,6 +1054,38 @@ function wireEvents(root) {
         renderTimeframeResearch(root);
       } catch (error) {
         setText(root, '#statusText', `Timeframe research fout: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        button.disabled = false;
+      }
+    }, 20);
+  });
+
+  root.querySelector('#runProfitFactorLab').addEventListener('click', () => {
+    const button = root.querySelector('#runProfitFactorLab');
+    button.disabled = true;
+    setText(root, '#statusText', '4H profit-factor lab draait...');
+    setTimeout(async () => {
+      try {
+        const marketData4h = state.config.timeframe === '4H' && state.marketData
+          ? state.marketData
+          : await fetchMarketData({
+            assets: SUPPORTED_ASSETS,
+            timeframe: '4H',
+            target: 3000,
+          });
+        state.profitFactorLab = runProfitFactorLab({
+          candlesByAsset: marketData4h.candlesByAsset,
+          baseConfig: {
+            ...state.config,
+            timeframe: '4H',
+            candleTarget: 3000,
+          },
+          assets: SUPPORTED_ASSETS,
+        });
+        setText(root, '#statusText', `Profit Factor Lab klaar: ${state.profitFactorLab.message}`);
+        renderProfitFactorLab(root);
+      } catch (error) {
+        setText(root, '#statusText', `Profit Factor Lab fout: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
         button.disabled = false;
       }
