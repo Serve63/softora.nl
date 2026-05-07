@@ -13,6 +13,7 @@ const {
 } = require('../routes/premium-database-webdesign-jobs');
 const { registerOpenAiCostRoutes } = require('../routes/openai-costs');
 const { registerMailboxRoutes } = require('../routes/mailbox');
+const { registerPublicContactRoutes } = require('../routes/public-contact');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
 const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
@@ -40,6 +41,7 @@ function registerFeatureRoutes(app, deps = {}) {
     premiumDatabaseWebdesignJobsCoordinator = null,
     openAiCostSummary = null,
     mailboxCoordinator = null,
+    publicContactCoordinator = null,
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
@@ -54,6 +56,8 @@ function registerFeatureRoutes(app, deps = {}) {
     handleTwilioStatusWebhook,
     handleRetellWebhook,
   });
+
+  registerPublicContactRoutes(app, { coordinator: publicContactCoordinator });
 
   createPremiumRouteRuntime({
     app,

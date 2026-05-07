@@ -151,6 +151,18 @@ test('auth logout contract stays stable for public callers', async () => {
   assert.equal(body.authenticated, false);
 });
 
+test('public contact route validates anonymous contact requests server-side', async () => {
+  const { response, body } = await postJson('/api/public-contact', {
+    name: '',
+    email: 'geen-email',
+    message: '',
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(body.ok, false);
+  assert.equal(typeof body.error, 'string');
+});
+
 test('seo read routes keep their auth boundaries', async () => {
   const pagesResult = await getProtectedApiExpectation('/api/seo/pages');
   if (pagesResult.response.status === 200) {

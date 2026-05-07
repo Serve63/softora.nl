@@ -7,6 +7,7 @@ const {
   createPremiumDatabaseWebdesignJobsCoordinator,
 } = require('./premium-database-webdesign-jobs');
 const { createMailboxService } = require('./mailbox');
+const { createPublicContactService } = require('./public-contact');
 const {
   buildAgendaAppRuntimeOptions,
   buildAiDashboardRuntimeOptions,
@@ -42,6 +43,9 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     dataOpsStore: featureRouteOptions.dataOpsStore,
   });
   const mailboxCoordinator = createMailboxService(featureRouteOptions.mailbox || {});
+  const publicContactCoordinator = createPublicContactService(
+    featureRouteOptions.publicContact || {}
+  );
 
   registerFeatureRoutesImpl(
     app,
@@ -53,6 +57,7 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
       websitePreviewBatchCoordinator,
       premiumDatabaseWebdesignJobsCoordinator,
       mailboxCoordinator,
+      publicContactCoordinator,
     })
   );
 

@@ -408,3 +408,26 @@ test('premium homepage heeft een werkende cookie melding', () => {
   assert.doesNotMatch(source, /localStorage/);
   assert.doesNotMatch(source, /sessionStorage/);
 });
+
+test('premium website contactformulier verstuurt via server-side contact api', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+  const scriptPath = path.join(__dirname, '../../assets/premium-website-contact-form.js');
+  const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+
+  assert.match(source, /<form id="faq-contact-form" class="faq-contact-form" novalidate>/);
+  assert.match(
+    source,
+    /id="faq-contact-status" class="faq-contact-status" role="status" aria-live="polite"/
+  );
+  assert.match(
+    source,
+    /<script src="\/assets\/premium-website-contact-form\.js\?v=20260507a" defer><\/script>/
+  );
+  assert.doesNotMatch(source, /mailto:info@softora\.nl/);
+  assert.match(scriptSource, /fetch\('\/api\/public-contact',\s*\{/);
+  assert.match(scriptSource, /method:\s*'POST'/);
+  assert.match(scriptSource, /headers:\s*\{\s*'Content-Type':\s*'application\/json'\s*\}/);
+  assert.match(scriptSource, /setStatus\(statusElement, 'Bericht wordt verstuurd\.\.\.', false\)/);
+  assert.match(scriptSource, /Bericht verzenden mislukt\. Probeer het later opnieuw\./);
+});
