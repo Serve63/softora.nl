@@ -1356,7 +1356,7 @@
                                 <span class="manual-appointment-choice-sub">Plan een website-, software-, voice- of chatbotmeeting in.</span>
                             </button>
                             <button class="manual-appointment-choice" type="button" data-manual-kind="overig">
-                                <span class="manual-appointment-choice-title">Overig</span>
+                                <span class="manual-appointment-choice-title">Privé</span>
                                 <span class="manual-appointment-choice-sub">Plan een losse activiteit of herinnering in.</span>
                             </button>
                         </div>
@@ -1543,7 +1543,7 @@
                 <div class="legend-item"><div class="legend-dot manual-serve"></div> Activiteit Servé</div>
                 <div class="legend-item"><div class="legend-dot manual-martijn"></div> Activiteit Martijn</div>
                 <div class="legend-item"><div class="legend-dot manual-both"></div> Activiteit allebei</div>
-                <div class="legend-item"><div class="legend-dot manual-overig"></div> Overig</div>
+                <div class="legend-item"><div class="legend-dot manual-overig"></div> Privé</div>
                 <div class="legend-item"><div class="legend-dot completed"></div> Activiteit afgerond</div>
             </div>
         </div>
@@ -2433,7 +2433,7 @@
     function advanceManualAppointmentStep() {
         if (manualAppointmentStep === 'kind') {
             if (manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
-                setManualAppointmentStatus('Kies eerst Meeting of Overig.', 'error');
+                setManualAppointmentStatus('Kies eerst Meeting of Privé.', 'error');
                 return;
             }
             setManualAppointmentStep(manualAppointmentKind === 'meeting' ? 'meeting' : 'details');

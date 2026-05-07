@@ -155,7 +155,7 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /Locatie/);
   assert.match(pageSource, /id="manualAppointmentNotes"/);
   assert.match(pageSource, /Opmerkingen/);
-  assert.match(pageSource, /Overig/);
+  assert.match(pageSource, /Privé/);
   assert.match(pageSource, /id="manualAppointmentActivityTime"/);
   assert.match(pageSource, /id="manualAppointmentLegendChoice"/);
   assert.match(pageSource, /\/api\/agenda\/appointments\/manual/);
@@ -186,7 +186,7 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /legend-dot manual-both/);
   assert.match(pageSource, /Activiteit allebei/);
   assert.match(pageSource, /legend-dot manual-overig/);
-  assert.match(pageSource, /Overig/);
+  assert.match(pageSource, /Privé/);
   assert.match(pageSource, /\.legend-dot\.manual-overig \{ background: #ec4899; \}/);
   assert.match(pageSource, /\.appointment\.manual-overig \{[\s\S]*border-left: 3px solid #ec4899;/);
   assert.match(pageSource, /activityTime: timeVal/);
@@ -286,7 +286,7 @@ test('premium agenda verbergt dealacties voor handmatige overige afspraken en be
   assert.match(stabilitySource, /if \(kind === 'meeting'\) return false;/);
   assert.match(stabilitySource, /apt\.summary/);
   assert.match(stabilitySource, /choice === 'manual-overig' \|\| choice === 'manual-serve' \|\| choice === 'manual-martijn' \|\| choice === 'manual-both'/);
-  assert.match(stabilitySource, /modalBadge\.textContent = 'Overige afspraak';/);
+  assert.match(stabilitySource, /modalBadge\.textContent = 'Privé-afspraak';/);
   assert.match(stabilitySource, /modalPrimaryBtn\.hidden = true;/);
   assert.match(stabilitySource, /modalNoDealBtn\.hidden = true;/);
   assert.match(pageSource, /class="modal-btn primary magnetic" id="modalCompleteActivityBtn"[^>]*>Activiteit afgerond<\/button>/);
