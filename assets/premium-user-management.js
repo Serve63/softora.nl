@@ -50,6 +50,46 @@ function renderUserManagementEmptyState(container, message) {
   container.replaceChildren(empty);
 }
 
+function buildUserManagementRoleLabel(role) {
+  return String(role || '').trim().toLowerCase() === 'admin' ? 'Full Acces' : 'Medewerker';
+}
+
+function buildUserManagementSidebarRenderKey(session) {
+  var displayName = String((session && session.displayName) || 'Softora Premium').trim() || 'Softora Premium';
+  var role = String((session && session.role) || 'admin').trim().toLowerCase() || 'admin';
+  var avatarDataUrl = String((session && session.avatarDataUrl) || '').trim();
+  return [displayName, role, avatarDataUrl].join('\u0001');
+}
+
+function syncPremiumSidebarAfterUserManagementSave(session) {
+  if (!session || !session.authenticated) return false;
+  var nameEl = document.querySelector('[data-sidebar-user-name]');
+  var roleEl = document.querySelector('[data-sidebar-user-role]');
+  var avatarEl = document.querySelector('[data-sidebar-avatar]');
+  var sidebar = document.querySelector('.sidebar');
+  if (!nameEl || !roleEl || !avatarEl) return true;
+
+  var displayName = String(session.displayName || 'Softora Premium').trim() || 'Softora Premium';
+  var avatarDataUrl = String(session.avatarDataUrl || '').trim();
+  nameEl.textContent = displayName;
+  roleEl.textContent = buildUserManagementRoleLabel(session.role);
+  avatarEl.replaceChildren();
+  if (avatarDataUrl) {
+    var img = document.createElement('img');
+    img.src = avatarDataUrl;
+    img.alt = displayName + ' profielfoto';
+    img.loading = 'eager';
+    img.decoding = 'async';
+    avatarEl.appendChild(img);
+  } else {
+    avatarEl.textContent = initials(session.firstName || '', session.lastName || '', session.email || '');
+  }
+  if (sidebar) {
+    sidebar.dataset.sidebarProfileRenderKey = buildUserManagementSidebarRenderKey(session);
+  }
+  return true;
+}
+
 function createUserManagementSvgElement(tagName, attributes) {
   var svgNs = 'http://www.w3.org/2000/svg';
   var el = document.createElementNS(svgNs, tagName);
@@ -142,6 +182,7 @@ function normalizePersonRoleClass(value) {
 function createPersonRow(persoon) {
   var id = String(persoon && persoon.id || '');
   var roleClass = normalizePersonRoleClass(persoon && persoon.rol);
+  var avatarDataUrl = String((persoon && persoon.avatarDataUrl) || '').trim();
   var row = document.createElement('div');
   row.className = 'person-row';
 
@@ -152,7 +193,21 @@ function createPersonRow(persoon) {
   var avatar = document.createElement('div');
   avatar.className = 'person-avatar';
   avatar.style.background = getColor(id);
-  avatar.textContent = initials(persoon.voornaam || '', persoon.achternaam || '', persoon.email || '');
+  avatar.style.overflow = 'hidden';
+  if (avatarDataUrl) {
+    var avatarImg = document.createElement('img');
+    avatarImg.src = avatarDataUrl;
+    avatarImg.alt = getDisplayName(persoon) + ' profielfoto';
+    avatarImg.loading = 'lazy';
+    avatarImg.decoding = 'async';
+    avatarImg.style.width = '100%';
+    avatarImg.style.height = '100%';
+    avatarImg.style.objectFit = 'cover';
+    avatarImg.style.display = 'block';
+    avatar.appendChild(avatarImg);
+  } else {
+    avatar.textContent = initials(persoon.voornaam || '', persoon.achternaam || '', persoon.email || '');
+  }
   row.appendChild(avatar);
 
   var info = document.createElement('div');
@@ -548,6 +603,9 @@ async function saveEdit() {
     render();
     closeOverlay('edit-overlay');
     showToast('✓ Opgeslagen');
+    if (payload && payload.session) {
+      syncPremiumSidebarAfterUserManagementSave(payload.session);
+    }
     if (
       window.SoftoraPersonnelTheme &&
       typeof window.SoftoraPersonnelTheme.refreshPremiumSession === 'function'

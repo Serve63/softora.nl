@@ -107,14 +107,8 @@ function createPremiumUsersStoreStub(initialUsers = []) {
     validateUserEmail,
     normalizeUserInputNames(input = {}) {
       return {
-        firstName: truncateText(
-          input.firstName !== undefined ? input.firstName : input.voornaam || '',
-          80
-        ),
-        lastName: truncateText(
-          input.lastName !== undefined ? input.lastName : input.achternaam || '',
-          80
-        ),
+        firstName: truncateText(input.voornaam || input.firstName || '', 80),
+        lastName: truncateText(input.achternaam || input.lastName || '', 80),
       };
     },
     normalizeUserRole,
@@ -433,6 +427,51 @@ test('premium user coordinator admin update accepts profielfoto (data-url) en re
   assert.equal(resRemove.statusCode, 200);
   const cleared = resRemove.body.users.find((u) => u.id === 'usr_staff');
   assert.equal(cleared.avatarDataUrl, '');
+});
+
+test('premium user coordinator refreshes session when admin updates own profielfoto', async () => {
+  const tinyPng =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const { coordinator } = createCoordinatorFixture([
+    {
+      id: 'usr_admin',
+      email: 'admin@softora.nl',
+      firstName: 'Admin',
+      lastName: 'User',
+      role: 'admin',
+      status: 'active',
+      avatarDataUrl: '',
+    },
+  ]);
+
+  const req = createRequest({
+    originalUrl: '/api/premium-users/usr_admin',
+    body: {
+      voornaam: 'Serve',
+      achternaam: 'Creusen',
+      email: 'admin@softora.nl',
+      rol: 'admin',
+      status: 'active',
+      avatarDataUrl: tinyPng,
+    },
+    premiumAuth: {
+      authenticated: true,
+      isAdmin: true,
+      email: 'admin@softora.nl',
+      userId: 'usr_admin',
+      displayName: 'Admin User',
+      avatarDataUrl: '',
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.updatePremiumUserResponse(req, res, 'usr_admin');
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.user.avatarDataUrl, tinyPng);
+  assert.equal(res.body.session.authenticated, true);
+  assert.equal(res.body.session.displayName, 'Serve Creusen');
+  assert.equal(res.body.session.avatarDataUrl, tinyPng);
 });
 
 test('premium user coordinator prevents removing the last active administrator', async () => {
