@@ -210,6 +210,16 @@ async function handleAgendaNotesAudioUpload(file, button, input) {
 
     try {
         const audioDataUrl = await normalizeAgendaNotesAudioForUpload(file);
+        const apt = typeof getActiveAppointment === 'function' ? getActiveAppointment() : null;
+        const context = [
+            apt && apt.title ? `Titel: ${apt.title}` : '',
+            apt && apt.company ? `Bedrijf: ${apt.company}` : '',
+            apt && apt.service ? `Service: ${apt.service}` : '',
+            apt && apt.summary ? `Bestaande afspraakinfo: ${apt.summary}` : '',
+            workspaceTranscriptEl && workspaceTranscriptEl.value
+                ? `Bestaande notities: ${String(workspaceTranscriptEl.value).trim().slice(0, 1200)}`
+                : '',
+        ].filter(Boolean).join('\n');
         const result = await postAgendaAudioJsonWithFallback(
             ['/api/ai/notes-audio-to-text', '/api/ai-notes-audio-to-text'],
             {
@@ -217,20 +227,21 @@ async function handleAgendaNotesAudioUpload(file, button, input) {
                 fileName: String(file.name || 'meeting-audio').trim().slice(0, 160),
                 mimeType: getAgendaAudioUploadMimeType(file),
                 language: 'nl',
+                context,
                 appointmentId: activeAppointmentId,
             },
             { timeoutMs: 130000 }
         );
 
-        const extractedNotes = String(result.transcript || result.text || '').trim();
+        const extractedNotes = String(result.notes || result.summary || result.transcript || result.text || '').trim();
         if (!extractedNotes) {
-            throw new Error('Geen transcriptie gevonden in het audiobestand.');
+            throw new Error('Geen notities gevonden in het audiobestand.');
         }
 
         const currentNotes = String(workspaceTranscriptEl.value || '').trim();
         const audioLabel = String(file.name || '').trim()
-            ? `Transcriptie audiobestand (${String(file.name).trim()}):`
-            : 'Transcriptie audiobestand:';
+            ? `Meetingnotities uit audio (${String(file.name).trim()}):`
+            : 'Meetingnotities uit audio:';
         workspaceTranscriptEl.value = currentNotes
             ? `${currentNotes}\n\n${audioLabel}\n${extractedNotes}`
             : `${audioLabel}\n${extractedNotes}`;
@@ -240,8 +251,8 @@ async function handleAgendaNotesAudioUpload(file, button, input) {
             workspaceDraftPrompt = generatedPrompt;
         }
 
-        setVoiceStatus('Audio verwerkt. Transcriptie toegevoegd.', 'success');
-        setWorkspaceStatus('Notities uit audio toegevoegd.', 'success');
+        setVoiceStatus('Audio verwerkt. Samenvatting toegevoegd.', 'success');
+        setWorkspaceStatus('Meetingnotities uit audio toegevoegd.', 'success');
     } catch (error) {
         setVoiceStatus(`Audio verwerken mislukt: ${String(error && error.message || 'onbekende fout')}`, 'error');
     } finally {

@@ -44,6 +44,12 @@ function createAiToolsCoordinator(deps = {}) {
       model: '',
       usage: null,
     }),
+    summarizeMeetingTranscriptWithAi = async () => ({
+      notes: '',
+      source: '',
+      model: '',
+      usage: null,
+    }),
     transcribeMeetingAudioWithAi = async () => ({
       transcript: '',
       source: '',
@@ -452,6 +458,30 @@ function createAiToolsCoordinator(deps = {}) {
         language,
       });
 
+      let notesResult = null;
+      try {
+        notesResult = await summarizeMeetingTranscriptWithAi({
+          transcript: extraction.transcript,
+          language,
+          context,
+        });
+      } catch (_notesError) {
+        notesResult = {
+          notes: [
+            'Samenvatting audiomeeting',
+            '',
+            'Klantwens en afspraken:',
+            extraction.transcript,
+            '',
+            'Open punten:',
+            '- Controleer de transcriptie handmatig en vul ontbrekende details aan.',
+          ].join('\n'),
+          source: 'template-fallback',
+          model: null,
+          usage: null,
+        };
+      }
+
       let promptResult = null;
       try {
         promptResult = await generateWebsitePromptFromTranscriptWithAi({
@@ -475,12 +505,17 @@ function createAiToolsCoordinator(deps = {}) {
       return res.status(200).json({
         ok: true,
         transcript: extraction.transcript,
+        notes: String(notesResult?.notes || '').trim(),
+        summary: String(notesResult?.notes || '').trim(),
         prompt: String(promptResult?.prompt || '').trim(),
         source: extraction.source,
         model: extraction.model,
+        notesSource: String(notesResult?.source || ''),
+        notesModel: notesResult?.model || null,
         promptSource: String(promptResult?.source || ''),
         usage: {
           extraction: extraction.usage || null,
+          notes: notesResult?.usage || null,
           prompt: promptResult?.usage || null,
         },
         language,

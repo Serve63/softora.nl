@@ -384,6 +384,7 @@ test('premium agenda dossierwerkruimte biedt audio-upload voor meetingnotities',
   assert.match(stabilitySource, /input\.accept = 'audio\/mpeg/);
   assert.match(stabilitySource, /async function handleAgendaNotesAudioUpload\(file, button, input\)/);
   assert.match(stabilitySource, /\/api\/ai\/notes-audio-to-text/);
-  assert.match(stabilitySource, /Transcriptie audiobestand[\s\S]*workspaceTranscriptEl\.value = currentNotes/);
+  assert.match(stabilitySource, /result\.notes \|\| result\.summary \|\| result\.transcript/);
+  assert.match(stabilitySource, /Meetingnotities uit audio[\s\S]*workspaceTranscriptEl\.value = currentNotes/);
   assert.match(stabilitySource, /button\.addEventListener\('click'/);
 });
