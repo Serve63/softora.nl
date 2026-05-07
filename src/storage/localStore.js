@@ -1,6 +1,7 @@
 const memoryStore = new Map();
 
 export const FORWARD_STORE_KEY = 'softora.paperResearch.forwardState.v1';
+export const IMPROVEMENT_STORE_KEY = 'softora.paperResearch.improvementState.v1';
 
 function getStorage(storage) {
   if (storage) return storage;
@@ -54,6 +55,18 @@ export function saveForwardState(state, storage) {
 
 export function clearForwardState(storage) {
   removeJson(FORWARD_STORE_KEY, storage);
+}
+
+export function loadImprovementState(storage) {
+  return readJson(IMPROVEMENT_STORE_KEY, null, storage);
+}
+
+export function saveImprovementState(state, storage) {
+  return writeJson(IMPROVEMENT_STORE_KEY, state, storage);
+}
+
+export function clearImprovementState(storage) {
+  removeJson(IMPROVEMENT_STORE_KEY, storage);
 }
 
 export function createMemoryStorage() {

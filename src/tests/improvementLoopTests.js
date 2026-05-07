@@ -1,0 +1,145 @@
+import {
+  appendImprovementReview,
+  createEmptyImprovementState,
+  createImprovementReview,
+} from '../core/improvementLoop.js';
+
+const championCandidate = {
+  id: 'champion-v1',
+  label: 'Champion v1',
+  strategyName: 'Trend Participation v1',
+  config: {
+    timeframe: '4H',
+    guardMode: 'Strict',
+    maxDrawdownTarget: 0.3,
+    minProfitFactor: 1.65,
+    scoreThreshold: 65,
+    assetCap: 0.35,
+    rebalanceBars: 90,
+    emergencyDrawdownStop: 0.18,
+    targetVolatility: 0.03,
+  },
+};
+
+function makeBacktest(overrides = {}) {
+  return {
+    strategyName: championCandidate.strategyName,
+    strategyReturn: 0.44,
+    benchmarkReturn: -0.1,
+    oosReturn: 0.08,
+    oosBenchmarkReturn: -0.06,
+    maxDrawdown: 0.14,
+    profitFactor: 2.2,
+    trades: 18,
+    currentSignal: { label: 'BTC 30% / ETH 20%' },
+    ...overrides,
+  };
+}
+
+function makeLabCandidate(overrides = {}) {
+  return {
+    strategyName: 'Sprint Rotation v1',
+    verdict: 'CANDIDATE',
+    config: {
+      ...championCandidate.config,
+      scoreThreshold: 75,
+      assetCap: 0.45,
+    },
+    strategyReturn: 0.62,
+    benchmarkReturn: -0.1,
+    edge: 0.72,
+    oosReturn: 0.16,
+    oosBenchmarkReturn: -0.06,
+    maxDrawdown: 0.15,
+    profitFactor: 2.45,
+    trades: 24,
+    currentRiskExposure: 0.72,
+    currentSignal: { label: 'BTC 35% / SOL 30%' },
+    rolling: {
+      summary: {
+        strategyCompoundReturn: 0.24,
+        benchmarkCompoundReturn: -0.03,
+        beatRate: 0.8,
+        maxFoldDrawdown: 0.13,
+      },
+    },
+    robustness: {
+      verdict: 'PASS',
+      passRate: 0.5,
+      medianProfitFactor: 2,
+      medianEdge: 0.2,
+      medianOosEdge: 0.08,
+      worstDrawdown: 0.17,
+    },
+    failed: [],
+    ...overrides,
+  };
+}
+
+export function improvementLoopTestCases() {
+  return [
+    {
+      name: 'Improvement loop houdt kampioen als uitdager niet duidelijk beter is',
+      run(assert) {
+        const review = createImprovementReview({
+          asOf: Date.UTC(2026, 4, 8),
+          timeframe: '4H',
+          championCandidate,
+          championBacktest: makeBacktest(),
+          lab: {
+            candidate: makeLabCandidate({
+              strategyName: championCandidate.strategyName,
+              config: championCandidate.config,
+              strategyReturn: 0.44,
+              oosReturn: 0.08,
+              maxDrawdown: 0.14,
+              profitFactor: 2.2,
+            }),
+          },
+        });
+
+        assert(review.action === 'KEEP_CHAMPION', 'De loop mag dezelfde kandidaat niet als verbetering promoveren.');
+        assert(review.failed.some((check) => check.id === 'not-same-candidate'), 'De loop moet dezelfde config herkennen.');
+      },
+    },
+    {
+      name: 'Improvement loop markeert sterke uitdager alleen voor incubatie',
+      run(assert) {
+        const review = createImprovementReview({
+          asOf: Date.UTC(2026, 4, 8),
+          timeframe: '4H',
+          championCandidate,
+          championBacktest: makeBacktest(),
+          lab: {
+            candidate: makeLabCandidate(),
+          },
+        });
+
+        assert(review.action === 'INCUBATE_CHALLENGER', 'Sterke uitdager moet naar aparte incubatie.');
+        assert(review.autoPromote === false, 'De loop mag nooit automatisch de kampioen vervangen.');
+        assert(review.checks.every((check) => check.pass), 'Sterke uitdager moet alle improvement checks halen.');
+      },
+    },
+    {
+      name: 'Improvement loop logt geen dubbele review per dag',
+      run(assert) {
+        const review = createImprovementReview({
+          asOf: Date.UTC(2026, 4, 8),
+          timeframe: '4H',
+          championCandidate,
+          championBacktest: makeBacktest(),
+          lab: {
+            candidate: makeLabCandidate(),
+          },
+        });
+        const state = createEmptyImprovementState({ championId: championCandidate.id });
+        const first = appendImprovementReview({ state, review });
+        const second = appendImprovementReview({ state: first.state, review });
+
+        assert(first.skipped === false, 'Eerste improvement review moet bewaard worden.');
+        assert(second.skipped === true, 'Tweede review op dezelfde dag moet worden overgeslagen.');
+        assert(second.state.reviews.length === 1, 'Dubbele review mag de historie niet vervuilen.');
+      },
+    },
+  ];
+}
