@@ -1,0 +1,54 @@
+import { accountingTestCases } from './accountingTests.js';
+import { parityTestCases } from './parityTests.js';
+
+async function executeTest(name, fn) {
+  try {
+    await fn();
+    return { name, pass: true };
+  } catch (error) {
+    return {
+      name,
+      pass: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function createAssert() {
+  return (condition, message) => {
+    if (!condition) throw new Error(message);
+  };
+}
+
+export async function runAllTests() {
+  const assert = createAssert();
+  const results = [];
+  const cases = [...parityTestCases(), ...accountingTestCases()];
+
+  for (const testCase of cases) {
+    results.push(await executeTest(testCase.name, () => testCase.run(assert)));
+  }
+
+  const failed = results.filter((result) => !result.pass).length;
+  return {
+    passed: results.length - failed,
+    failed,
+    results,
+  };
+}
+
+function isNodeDirectRun() {
+  return typeof process !== 'undefined'
+    && process.argv?.[1]
+    && import.meta.url.endsWith(process.argv[1].replaceAll('\\', '/'));
+}
+
+if (isNodeDirectRun()) {
+  const summary = await runAllTests();
+  for (const result of summary.results) {
+    const status = result.pass ? 'PASS' : 'FAIL';
+    console.log(`${status} ${result.name}${result.error ? ` - ${result.error}` : ''}`);
+  }
+  console.log(`${summary.passed} passed, ${summary.failed} failed`);
+  if (summary.failed) process.exitCode = 1;
+}
