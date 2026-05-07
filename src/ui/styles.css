@@ -317,7 +317,8 @@ h2 {
 }
 
 .data-panel,
-.guard-panel {
+.guard-panel,
+.edge-panel {
   min-height: 290px;
 }
 
@@ -387,6 +388,41 @@ h2 {
 .guard-list small {
   margin-top: 3px;
   color: var(--muted);
+}
+
+.edge-summary {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.edge-summary p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.edge-verdict {
+  width: fit-content;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.edge-verdict.candidate {
+  color: #b8ffd0;
+  background: rgba(48, 209, 88, 0.16);
+}
+
+.edge-verdict.watch {
+  color: #ffe1a6;
+  background: rgba(255, 184, 77, 0.16);
+}
+
+.edge-verdict.reject {
+  color: #ffd0cd;
+  background: rgba(255, 95, 87, 0.16);
 }
 
 .chart-panel {

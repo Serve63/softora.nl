@@ -103,6 +103,7 @@ export function runBacktest({
   let feesPaid = 0;
   let slippagePaid = 0;
   let tradeEvents = 0;
+  let peakEquity = equity;
   let positionOpenEquity = null;
   let positionOpenTime = null;
   const closedTrades = [];
@@ -119,7 +120,8 @@ export function runBacktest({
     benchmarkEquity = applyPortfolioReturn(benchmarkEquity, benchmarkWeights, previousPrices, currentPrices).equity;
     benchmarkWeights = driftWeights(benchmarkWeights, previousPrices, currentPrices);
 
-    const currentDrawdown = maxDrawdown(equityCurve).value;
+    peakEquity = Math.max(peakEquity, equity);
+    const currentDrawdown = peakEquity > 0 ? Math.max(0, 1 - equity / peakEquity) : 0;
     latestSignal = strategy.generateSignal({
       candlesByAsset: aligned.candlesByAsset,
       index,

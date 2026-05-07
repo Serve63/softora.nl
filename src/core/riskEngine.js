@@ -11,9 +11,13 @@ export const DEFAULT_CONFIG = Object.freeze({
   maxDrawdownTarget: 0.3,
   minProfitFactor: 1.65,
   oosRatio: 0.25,
-  minWalkForwardBeatRate: 0.55,
-  scoreThreshold: 58,
-  assetCap: 0.45,
+  minWalkForwardBeatRate: 0.5,
+  scoreThreshold: 40,
+  assetCap: 1,
+  rebalanceBars: 30,
+  minRotationMomentum: 0,
+  emergencyDrawdownStop: 0.26,
+  targetVolatility: 0.09,
 });
 
 export function analyzeBtcMacro(btcCandles, index = btcCandles.length - 1, guardMode = 'Strict') {
@@ -83,6 +87,7 @@ export function applyRiskControls({
   const macroExposure = Number.isFinite(btcMacro?.exposureCap) ? btcMacro.exposureCap : 0;
   const exposureCap = Math.max(0, Math.min(1, macroExposure * drawdownThrottle));
   const assetCap = config.assetCap ?? DEFAULT_CONFIG.assetCap;
+  const targetVolatility = config.targetVolatility ?? DEFAULT_CONFIG.targetVolatility;
   const volatilityByAsset = Object.fromEntries(ranking.map((item) => [item.symbol, item.volatility]));
   const capped = {};
 
@@ -91,8 +96,8 @@ export function applyRiskControls({
   for (const [symbol, rawWeight] of Object.entries(rawWeights)) {
     const volatility = volatilityByAsset[symbol];
     const volatilityScale = Number.isFinite(volatility)
-      ? Math.max(0.35, Math.min(1, 0.055 / Math.max(volatility, 0.025)))
-      : 0.7;
+      ? Math.max(0.5, Math.min(1, targetVolatility / Math.max(volatility, 0.025)))
+      : 0.8;
     capped[symbol] = Math.min(assetCap, Math.max(0, rawWeight * volatilityScale));
   }
 

@@ -1,5 +1,5 @@
 import { SUPPORTED_ASSETS } from '../data/binanceProvider.js';
-import { computeAssetScore } from '../core/indicators.js';
+import { closes, computeAssetScore, latestValid, roc, sma } from '../core/indicators.js';
 import { sumWeights } from '../core/portfolio.js';
 import { analyzeBtcMacro, applyRiskControls, DEFAULT_CONFIG } from '../core/riskEngine.js';
 
@@ -9,24 +9,55 @@ function addWeight(weights, symbol, value) {
   weights[symbol] = (weights[symbol] || 0) + value;
 }
 
-function buildRawWeights({ ranking, btcMacro, config }) {
+function getDecisionIndex(index, config) {
+  const warmupBars = config.warmupBars || 220;
+  const rebalanceBars = config.rebalanceBars || DEFAULT_CONFIG.rebalanceBars;
+  if (index <= warmupBars) return index;
+  return Math.max(warmupBars, index - ((index - warmupBars) % rebalanceBars));
+}
+
+function scoreRotationCandidate(candles, decisionIndex) {
+  const score = computeAssetScore(candles, decisionIndex);
+  const history = candles.slice(0, decisionIndex + 1);
+  const closeValues = closes(history);
+  const close = closeValues[closeValues.length - 1];
+  const sma200 = latestValid(sma(closeValues, 200));
+  const momentum60 = latestValid(roc(closeValues, 60));
+  const momentum90 = latestValid(roc(closeValues, 90));
+  const momentum180 = latestValid(roc(closeValues, 180));
+  const rotationScore = (momentum60 ?? -1) * 0.2
+    + (momentum90 ?? -1) * 0.5
+    + (momentum180 ?? -1) * 0.3;
+
+  return {
+    ...score,
+    rotationScore,
+    momentum60,
+    momentum90,
+    momentum180,
+    trendPass: Number.isFinite(close) && Number.isFinite(sma200) && close > sma200,
+  };
+}
+
+function buildRawWeights({ ranking, btcMacro, config, currentDrawdown }) {
   if (btcMacro.state === 'weak' || btcMacro.exposureCap <= 0) return {};
+  if (currentDrawdown >= (config.emergencyDrawdownStop ?? DEFAULT_CONFIG.emergencyDrawdownStop)) return {};
 
-  const selected = ranking.filter((asset) => asset.score >= config.scoreThreshold);
-  if (!selected.length) return {};
+  const selected = ranking.find((asset) => (
+    asset.trendPass
+    && asset.score >= config.scoreThreshold
+    && asset.rotationScore > (config.minRotationMomentum ?? DEFAULT_CONFIG.minRotationMomentum)
+  ));
+  if (!selected) return {};
 
-  const rawWeights = {};
-  const scoreTotal = selected.slice(0, 3).reduce((sum, asset) => sum + asset.score, 0);
+  const rawWeights = { [selected.symbol]: 1 };
 
-  if (btcMacro.state === 'strong') {
-    const btcScore = ranking.find((asset) => asset.symbol === 'BTCUSDT')?.score || 0;
-    if (btcScore >= 45) addWeight(rawWeights, 'BTCUSDT', 0.32);
-  }
-
-  const tacticalBudget = btcMacro.state === 'strong' ? 0.68 : 0.9;
-  for (const asset of selected.slice(0, 3)) {
-    const scoreShare = scoreTotal > 0 ? asset.score / scoreTotal : 1 / selected.length;
-    addWeight(rawWeights, asset.symbol, tacticalBudget * scoreShare);
+  if (btcMacro.state === 'strong' && selected.symbol !== 'BTCUSDT') {
+    const btcCandidate = ranking.find((asset) => asset.symbol === 'BTCUSDT');
+    if (btcCandidate?.trendPass && btcCandidate.rotationScore > 0.02) {
+      rawWeights[selected.symbol] = 0.9;
+      addWeight(rawWeights, 'BTCUSDT', 0.1);
+    }
   }
 
   return rawWeights;
@@ -39,23 +70,30 @@ export function generateFrozenCandidateSignal({
   config = DEFAULT_CONFIG,
   currentDrawdown = 0,
 } = {}) {
+  const activeConfig = { ...DEFAULT_CONFIG, ...config };
+  const decisionIndex = getDecisionIndex(index, activeConfig);
   const btcCandles = candlesByAsset.BTCUSDT || [];
-  const btcMacro = analyzeBtcMacro(btcCandles, index, config.guardMode);
+  const btcMacro = analyzeBtcMacro(btcCandles, decisionIndex, activeConfig.guardMode);
 
   const ranking = assets
     .map((symbol) => {
-      const score = computeAssetScore(candlesByAsset[symbol] || [], index);
+      const score = scoreRotationCandidate(candlesByAsset[symbol] || [], decisionIndex);
       return { symbol, ...score };
     })
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.rotationScore - a.rotationScore || b.score - a.score);
 
-  const rawWeights = buildRawWeights({ ranking, btcMacro, config });
+  const rawWeights = buildRawWeights({
+    ranking,
+    btcMacro,
+    config: activeConfig,
+    currentDrawdown,
+  });
   const risk = applyRiskControls({
     rawWeights,
     ranking,
     btcMacro,
     currentDrawdown,
-    config,
+    config: activeConfig,
   });
 
   const exposure = sumWeights(risk.weights);
@@ -77,8 +115,9 @@ export function generateFrozenCandidateSignal({
     reasons: [
       btcMacro.reason,
       risk.reason,
+      `Decision candle: ${new Date((candlesByAsset.BTCUSDT || [])[decisionIndex]?.time || Date.now()).toISOString().slice(0, 10)}.`,
       exposure > 0
-        ? `Top ranking: ${ranking.slice(0, 3).map((asset) => `${asset.symbol.replace('USDT', '')} ${asset.score.toFixed(0)}`).join(', ')}.`
+        ? `Top rotation: ${ranking.slice(0, 3).map((asset) => `${asset.symbol.replace('USDT', '')} ${(asset.rotationScore * 100).toFixed(1)}`).join(', ')}.`
         : 'Geen asset haalt tegelijk de macro-, score- en risk gates.',
     ],
   };

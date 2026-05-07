@@ -1,5 +1,6 @@
 import { fetchMarketData, SUPPORTED_ASSETS } from '../data/binanceProvider.js';
 import { runBacktest } from '../core/backtester.js';
+import { runResearchDiagnostics } from '../core/researchEngine.js';
 import { DEFAULT_CONFIG } from '../core/riskEngine.js';
 import {
   exportForwardCsv,
@@ -15,6 +16,7 @@ const state = {
   config: { ...DEFAULT_CONFIG },
   marketData: null,
   backtest: null,
+  diagnostics: null,
   forwardState: null,
   running: false,
 };
@@ -155,6 +157,15 @@ function renderShell(root) {
         <ul id="guardList" class="guard-list"></ul>
       </section>
 
+      <section class="panel edge-panel">
+        <div class="panel-title">
+          <h2>Edge Check</h2>
+          <span id="edgeVerdict">Nog niet getest</span>
+        </div>
+        <div id="edgeSummary" class="edge-summary"></div>
+        <ul id="edgeList" class="guard-list"></ul>
+      </section>
+
       <section class="panel chart-panel">
         <div class="panel-title">
           <h2>Equity Curve</h2>
@@ -226,6 +237,8 @@ function renderMetrics(root, result) {
     ['Trades', String(result?.trades || 0)],
     ['Fees betaald', formatCurrency(result?.feesPaid || 0)],
     ['Slippage kosten', formatCurrency(result?.slippagePaid || 0)],
+    ['Walk-forward', formatPercent(result?.walkForwardBeatRate || 0)],
+    ['Stress return', formatPercent(state.diagnostics?.costStressReturn || 0)],
   ];
 
   root.querySelector('#metricsGrid').innerHTML = metrics.map(([label, value]) => `
@@ -268,6 +281,9 @@ function renderDataSummary(root) {
       <span>Fee: ${formatPercent(config.feeRate, 2)}</span>
       <span>Slippage: ${formatPercent(config.slippageRate, 2)}</span>
       <span>Guard: ${config.guardMode}</span>
+      <span>Rebalance: ${config.rebalanceBars} candles</span>
+      <span>Asset cap: ${formatPercent(config.assetCap, 0)}</span>
+      <span>Noodrem: ${formatPercent(config.emergencyDrawdownStop, 0)}</span>
       <span>Assets: ${SUPPORTED_ASSETS.join(', ')}</span>
     </div>
   `;
@@ -286,6 +302,35 @@ function renderSignal(root, result) {
   setText(root, '#signalValue', signal.label || 'CASH');
   root.querySelector('#signalWeights').innerHTML = formatWeightMap(signal.weights);
   setText(root, '#signalReason', signal.reasons?.[0] || gate.message);
+}
+
+function renderDiagnostics(root) {
+  const diagnostics = state.diagnostics;
+  const checks = diagnostics?.checks || [];
+  setText(root, '#edgeVerdict', diagnostics?.verdict || 'Nog niet getest');
+  root.querySelector('#edgeSummary').innerHTML = diagnostics
+    ? `
+      <div class="edge-verdict ${diagnostics.verdict.toLowerCase()}">${diagnostics.verdict}</div>
+      <p>${diagnostics.message}</p>
+      <div class="data-facts">
+        <span>Edge: ${formatPercent(diagnostics.edge)}</span>
+        <span>Stress edge: ${formatPercent(diagnostics.stressEdge)}</span>
+        <span>Stress PF: ${Number.isFinite(diagnostics.costStressProfitFactor) ? diagnostics.costStressProfitFactor.toFixed(2) : 'oneindig'}</span>
+      </div>
+    `
+    : '<p class="muted">Run eerst een backtest.</p>';
+
+  root.querySelector('#edgeList').innerHTML = checks.length
+    ? checks.map((check) => `
+      <li class="${check.pass ? 'pass' : 'fail'}">
+        <span>${check.pass ? 'PASS' : 'FAIL'}</span>
+        <div>
+          <strong>${check.label}</strong>
+          <small>${check.detail}</small>
+        </div>
+      </li>
+    `).join('')
+    : '<li class="fail"><span>WAIT</span><div><strong>Nog geen edge-check</strong><small>Run eerst de strategie.</small></div></li>';
 }
 
 function renderGuardrails(root, result) {
@@ -385,6 +430,7 @@ function renderRanking(root, result) {
           <th>Score</th>
           <th>Trend</th>
           <th>Momentum</th>
+          <th>Rotation</th>
           <th>Breakout</th>
           <th>Volatility</th>
         </tr>
@@ -397,6 +443,7 @@ function renderRanking(root, result) {
             <td><strong>${asset.score.toFixed(1)}</strong></td>
             <td>${asset.trend.toFixed(1)}</td>
             <td>${asset.momentum.toFixed(1)}</td>
+            <td>${Number.isFinite(asset.rotationScore) ? (asset.rotationScore * 100).toFixed(1) : 'n.v.t.'}</td>
             <td>${asset.breakout.toFixed(1)}</td>
             <td>${asset.volatility ? formatPercent(asset.volatility, 2) : 'n.v.t.'}</td>
           </tr>
@@ -468,6 +515,7 @@ function renderAll(root) {
   renderDataSummary(root);
   renderSignal(root, state.backtest);
   renderGuardrails(root, state.backtest);
+  renderDiagnostics(root);
   renderCharts(root, state.backtest);
   renderRanking(root, state.backtest);
   renderForward(root);
@@ -490,6 +538,12 @@ async function runAnalysis(root) {
     state.backtest = runBacktest({
       candlesByAsset: state.marketData.candlesByAsset,
       config: state.config,
+      assets: SUPPORTED_ASSETS,
+    });
+    state.diagnostics = runResearchDiagnostics({
+      candlesByAsset: state.marketData.candlesByAsset,
+      config: state.config,
+      baseResult: state.backtest,
       assets: SUPPORTED_ASSETS,
     });
     state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
