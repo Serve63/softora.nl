@@ -76,7 +76,7 @@ function syncManualAppointmentModalDetails(apt) {
     setModalDetailValueHidden('modalProvider', isManual);
     const modalBadge = document.getElementById('modalBadge');
     if (modalBadge && isManualOtherAppointment(apt)) {
-        modalBadge.textContent = 'Overige afspraak';
+        modalBadge.textContent = 'Privé-afspraak';
         modalBadge.className = 'modal-type-badge';
     }
     const contactEl = document.getElementById('modalContact');
