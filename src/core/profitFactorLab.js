@@ -166,34 +166,161 @@ function uniqueRows(rows) {
   return output;
 }
 
+function configRowSignature(row) {
+  const config = row.config || {};
+  return [
+    row.strategyName,
+    config.timeframe,
+    config.guardMode,
+    config.scoreThreshold,
+    config.assetCap,
+    config.rebalanceBars,
+    config.emergencyDrawdownStop,
+    config.targetVolatility,
+    row.strategyReturn.toFixed(8),
+    row.maxDrawdown.toFixed(8),
+  ].join('|');
+}
+
+function absoluteReturnScore(row) {
+  const pf = Math.min(3, finiteProfitFactor(row.profitFactor));
+  const tradePenalty = row.trades < 3 ? 0.35 : 0;
+
+  return row.strategyReturn * 1.15
+    + Math.max(-0.35, row.oosReturn) * 0.75
+    + pf * 0.22
+    + (row.strategyReturn > 0 ? 0.4 : -0.35)
+    + (row.oosReturn > 0 ? 0.25 : -0.15)
+    - row.maxDrawdown * 1.5
+    - tradePenalty;
+}
+
+function capitalPreservationScore(row) {
+  const pf = Math.min(3, finiteProfitFactor(row.profitFactor));
+  const targetDrawdown = row.config?.maxDrawdownTarget || DEFAULT_CONFIG.maxDrawdownTarget;
+  const drawdownBonus = row.maxDrawdown <= targetDrawdown * 0.5 ? 0.35 : 0;
+  const tradePenalty = row.trades < 3 ? 0.25 : 0;
+
+  return -row.maxDrawdown * 2
+    + Math.max(-0.35, row.edge) * 0.45
+    + Math.max(-0.3, row.strategyReturn) * 0.35
+    + pf * 0.24
+    + drawdownBonus
+    - tradePenalty;
+}
+
+function recentProfitScore(row) {
+  const pf = Math.min(3, finiteProfitFactor(row.profitFactor));
+  const oosEdge = row.oosReturn - row.oosBenchmarkReturn;
+
+  return Math.max(-0.35, row.oosReturn) * 1.05
+    + Math.max(-0.35, oosEdge) * 0.65
+    + Math.max(-0.3, row.strategyReturn) * 0.25
+    + pf * 0.16
+    - row.maxDrawdown * 0.8;
+}
+
+function addShortlistRow({
+  row,
+  source,
+  selected,
+  selectedSignatures,
+  strategyCounts,
+  sourceCounts,
+  topN,
+  maxRowsPerStrategy,
+}) {
+  if (selected.length >= topN) return false;
+  const signature = configRowSignature(row);
+  if (selectedSignatures.has(signature)) return false;
+  const strategyCount = strategyCounts.get(row.strategyName) || 0;
+  if (strategyCount >= maxRowsPerStrategy) return false;
+
+  selected.push({ ...row, shortlistSource: source });
+  selectedSignatures.add(signature);
+  strategyCounts.set(row.strategyName, strategyCount + 1);
+  sourceCounts.set(source, (sourceCounts.get(source) || 0) + 1);
+  return true;
+}
+
 function buildValidationShortlist(rows, topN, maxRowsPerStrategy = 2) {
-  const sorted = uniqueRows([...rows].sort((a, b) => b.score - a.score));
+  const unique = uniqueRows(rows);
+  const buckets = [
+    {
+      id: 'composite-score',
+      rows: [...unique].sort((a, b) => b.score - a.score),
+    },
+    {
+      id: 'absolute-return',
+      rows: [...unique].sort((a, b) => absoluteReturnScore(b) - absoluteReturnScore(a)),
+    },
+    {
+      id: 'capital-preservation',
+      rows: [...unique].sort((a, b) => capitalPreservationScore(b) - capitalPreservationScore(a)),
+    },
+    {
+      id: 'recent-profit',
+      rows: [...unique].sort((a, b) => recentProfitScore(b) - recentProfitScore(a)),
+    },
+  ];
   const selected = [];
   const selectedSignatures = new Set();
   const strategyCounts = new Map();
+  const sourceCounts = new Map();
   const activeCap = Math.max(1, Math.floor(Number(maxRowsPerStrategy) || 1));
 
-  for (const row of sorted) {
-    if (selected.length >= topN) break;
-    const count = strategyCounts.get(row.strategyName) || 0;
-    if (count >= activeCap) continue;
-
-    selected.push(row);
-    selectedSignatures.add(rowSignature(row));
-    strategyCounts.set(row.strategyName, count + 1);
+  for (const bucket of buckets) {
+    bucket.rows.some((row) => addShortlistRow({
+      row,
+      source: bucket.id,
+      selected,
+      selectedSignatures,
+      strategyCounts,
+      sourceCounts,
+      topN,
+      maxRowsPerStrategy: activeCap,
+    }));
   }
 
-  for (const row of sorted) {
-    if (selected.length >= topN) break;
-    const signature = rowSignature(row);
-    if (selectedSignatures.has(signature)) continue;
-    selected.push(row);
-    selectedSignatures.add(signature);
+  let madeProgress = true;
+  while (selected.length < topN && madeProgress) {
+    madeProgress = false;
+    for (const bucket of buckets) {
+      const added = bucket.rows.some((row) => addShortlistRow({
+        row,
+        source: bucket.id,
+        selected,
+        selectedSignatures,
+        strategyCounts,
+        sourceCounts,
+        topN,
+        maxRowsPerStrategy: activeCap,
+      }));
+      madeProgress = madeProgress || added;
+      if (selected.length >= topN) break;
+    }
+  }
+
+  for (const bucket of buckets) {
+    for (const row of bucket.rows) {
+      if (selected.length >= topN) break;
+      addShortlistRow({
+        row,
+        source: bucket.id,
+        selected,
+        selectedSignatures,
+        strategyCounts,
+        sourceCounts,
+        topN,
+        maxRowsPerStrategy: Number.POSITIVE_INFINITY,
+      });
+    }
   }
 
   return {
     rows: selected,
     strategyCounts: Object.fromEntries(strategyCounts),
+    sourceCounts: Object.fromEntries(sourceCounts),
   };
 }
 
@@ -516,6 +643,7 @@ export function runProfitFactorLab({
     diversity: {
       maxRowsPerStrategy,
       strategyCounts: validationShortlist.strategyCounts,
+      sourceCounts: validationShortlist.sourceCounts,
     },
     message: candidate
       ? `${candidate.strategyName} haalt de profit-factor lab gate.`

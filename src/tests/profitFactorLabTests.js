@@ -185,6 +185,8 @@ export function profitFactorLabTestCases() {
         assert(strategyNames.includes('SOL PF Test'), 'Sterke strategie ontbreekt in de gediversifieerde shortlist.');
         assert(strategyNames.includes('Cash PF Test'), 'Tweede strategiefamilie wordt niet meegenomen in de shortlist.');
         assert(result.diversity.strategyCounts['SOL PF Test'] === 1, 'Shortlist-cap per strategie wordt niet gerapporteerd.');
+        assert(result.diversity.sourceCounts['composite-score'] >= 1, 'Composite selectiebron wordt niet gerapporteerd.');
+        assert(Object.keys(result.diversity.sourceCounts).length >= 2, 'Shortlist gebruikt geen meerdere selectiebronnen.');
       },
     },
     {
