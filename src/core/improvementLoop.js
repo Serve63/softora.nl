@@ -279,6 +279,14 @@ export function normalizeImprovementState(state, options = {}) {
   };
 }
 
+function applyChallengerState(state, review) {
+  if (review.action === 'INCUBATE_CHALLENGER') {
+    state.pendingChallenger = review.challenger;
+  } else if (review.action === 'WATCH_CHALLENGER') {
+    state.watchlistChallenger = review.challenger;
+  }
+}
+
 export function appendImprovementReview({ state, review }) {
   const activeState = normalizeImprovementState(state, {
     championId: review?.champion?.id || 'unknown',
@@ -294,6 +302,7 @@ export function appendImprovementReview({ state, review }) {
   if (activeState.reviews.some((entry) => (
     entry.dateKey === review.dateKey && entry.timeframe === review.timeframe
   ))) {
+    applyChallengerState(activeState, review);
     return {
       state: activeState,
       skipped: true,
@@ -317,11 +326,7 @@ export function appendImprovementReview({ state, review }) {
   activeState.reviews.push(entry);
   activeState.latest = entry;
   activeState.championId = review.champion?.id || activeState.championId;
-  if (review.action === 'INCUBATE_CHALLENGER') {
-    activeState.pendingChallenger = review.challenger;
-  } else if (review.action === 'WATCH_CHALLENGER') {
-    activeState.watchlistChallenger = review.challenger;
-  }
+  applyChallengerState(activeState, review);
 
   return {
     state: activeState,

@@ -189,5 +189,38 @@ export function improvementLoopTestCases() {
         assert(logged.state.watchlistChallenger?.strategyName === 'Defensive Watch v1', 'Watchlist-uitdager wordt niet opgeslagen.');
       },
     },
+    {
+      name: 'Improvement loop ververst watchlist-status bij dubbele dagreview',
+      run(assert) {
+        const watch = makeLabCandidate({
+          verdict: 'WATCH',
+          strategyName: 'Duplicate Watch v1',
+          failed: [{ id: 'rolling-positive' }],
+        });
+        const review = createImprovementReview({
+          asOf: Date.UTC(2026, 4, 8),
+          timeframe: '4H',
+          championCandidate,
+          championBacktest: makeBacktest({ strategyReturn: -0.18, profitFactor: 0 }),
+          lab: { candidate: null, watch },
+        });
+        const staleState = {
+          ...createEmptyImprovementState({ championId: championCandidate.id }),
+          reviews: [{
+            id: review.id,
+            dateKey: review.dateKey,
+            timestamp: review.timestamp,
+            timeframe: review.timeframe,
+            action: 'KEEP_CHAMPION',
+          }],
+          watchlistChallenger: null,
+        };
+        const logged = appendImprovementReview({ state: staleState, review });
+
+        assert(logged.skipped === true, 'Dubbele dagreview moet geen extra review toevoegen.');
+        assert(logged.state.reviews.length === 1, 'Dubbele dagreview mag de reviewlijst niet verlengen.');
+        assert(logged.state.watchlistChallenger?.strategyName === 'Duplicate Watch v1', 'Dubbele dagreview moet watchlist-status wel verversen.');
+      },
+    },
   ];
 }

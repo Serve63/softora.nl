@@ -41,12 +41,15 @@ const DEFAULT_FORWARD_RULES = Object.freeze({
   maxLossBeforeReview: -0.1,
 });
 
-export function createEmptyForwardState(initialCapital = 10000) {
+export function createEmptyForwardState(
+  initialCapital = 10000,
+  candidate = FROZEN_INCUBATION_CANDIDATE,
+) {
   return {
     version: 2,
     createdAt: new Date().toISOString(),
     initialCapital,
-    candidate: FROZEN_INCUBATION_CANDIDATE,
+    candidate,
     logs: [],
     paperPortfolio: {
       equity: initialCapital,
@@ -59,14 +62,18 @@ export function createEmptyForwardState(initialCapital = 10000) {
   };
 }
 
-function normalizeForwardState(state, initialCapital = 10000) {
+function normalizeForwardState(
+  state,
+  initialCapital = 10000,
+  candidate = FROZEN_INCUBATION_CANDIDATE,
+) {
   if (!state || !Array.isArray(state.logs)) return null;
   const normalizedInitialCapital = Number(state.initialCapital || initialCapital) || 10000;
   return {
     ...state,
     version: 2,
     initialCapital: normalizedInitialCapital,
-    candidate: state.candidate || FROZEN_INCUBATION_CANDIDATE,
+    candidate: state.candidate || candidate,
     paperPortfolio: state.paperPortfolio || { equity: normalizedInitialCapital, weights: {} },
     benchmarkPortfolio: state.benchmarkPortfolio || { equity: normalizedInitialCapital, weights: {} },
     logs: state.logs,
@@ -87,6 +94,13 @@ function latestPricesFromCandles(candlesByAsset, assets) {
 
 export function loadOrCreateForwardState(initialCapital = 10000, storage) {
   return normalizeForwardState(loadForwardState(storage), initialCapital) || createEmptyForwardState(initialCapital);
+}
+
+export function loadOrCreateForwardStateForCandidate(candidate, initialCapital = 10000, storage) {
+  const activeCandidate = candidate || FROZEN_INCUBATION_CANDIDATE;
+  const loaded = normalizeForwardState(loadForwardState(storage), initialCapital, activeCandidate);
+  if (loaded?.candidate?.id === activeCandidate.id) return loaded;
+  return createEmptyForwardState(initialCapital, activeCandidate);
 }
 
 function configMatchesCandidate(config = {}, candidate = FROZEN_INCUBATION_CANDIDATE) {

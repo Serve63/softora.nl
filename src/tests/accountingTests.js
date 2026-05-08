@@ -5,6 +5,7 @@ import {
   createEmptyForwardState,
   evaluateForwardDiscipline,
   FROZEN_INCUBATION_CANDIDATE,
+  loadOrCreateForwardStateForCandidate,
   logForwardSignal,
 } from '../forward/forwardRunner.js';
 import { createMemoryStorage } from '../storage/localStore.js';
@@ -107,6 +108,40 @@ export function accountingTestCases() {
 
         assert(result.skipped === true, 'Forward-log accepteert een niet-gelockte config.');
         assert(result.state.logs.length === 0, 'Niet-gelockte config mag geen log toevoegen.');
+      },
+    },
+    {
+      name: 'Watchlist forward-state wisselt niet door kandidaten heen',
+      run(assert) {
+        const storage = createMemoryStorage();
+        const firstCandidate = {
+          ...FROZEN_INCUBATION_CANDIDATE,
+          id: 'watch-a',
+          label: 'Watch A',
+        };
+        const secondCandidate = {
+          ...FROZEN_INCUBATION_CANDIDATE,
+          id: 'watch-b',
+          label: 'Watch B',
+        };
+        const firstState = createEmptyForwardState(10000, firstCandidate);
+        firstState.logs.push({
+          timestamp: '2026-01-01T00:00:00.000Z',
+          dateKey: '2026-01-01',
+          timeframe: '4H',
+          paperEquity: 10100,
+          benchmarkEquity: 9900,
+          gateOpen: true,
+          signal: 'BTC',
+        });
+        storage.setItem('softora.paperResearch.forwardState.v1', JSON.stringify(firstState));
+
+        const loadedSame = loadOrCreateForwardStateForCandidate(firstCandidate, 10000, storage);
+        const loadedDifferent = loadOrCreateForwardStateForCandidate(secondCandidate, 10000, storage);
+
+        assert(loadedSame.logs.length === 1, 'Dezelfde watchlist-kandidaat moet bestaande forward logs houden.');
+        assert(loadedDifferent.logs.length === 0, 'Nieuwe watchlist-kandidaat mag oude forward logs niet erven.');
+        assert(loadedDifferent.candidate.id === 'watch-b', 'Nieuwe watchlist-state krijgt niet de nieuwe kandidaat.');
       },
     },
     {
