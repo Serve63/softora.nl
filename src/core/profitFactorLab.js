@@ -3,6 +3,7 @@ import frozenCandidate from '../strategies/frozenCandidate.js';
 import sprintRotation from '../strategies/sprintRotation.js';
 import trendParticipation from '../strategies/trendParticipation.js';
 import { runBacktest } from './backtester.js';
+import { runRegimeBreakdown } from './regimeLab.js';
 import { DEFAULT_CONFIG } from './riskEngine.js';
 import { runParameterRobustness } from './robustnessLab.js';
 import { runRollingWalkForward } from './walkForward.js';
@@ -52,7 +53,16 @@ function scoreRow({ result, config }) {
 
 function scoreValidatedRow(row) {
   const rolling = row.rolling?.summary;
-  if (!rolling) return row.score;
+  const regime = row.regime;
+  const regimeQuality = regime
+    ? regime.segmentBeatRate * 0.35
+      + Math.max(-0.4, regime.worstSegmentEdge) * 0.3
+      + (regime.verdict === 'PASS' ? 0.5 : 0)
+      - (regime.failed?.length || 0) * 0.25
+    : 0;
+
+  if (!rolling) return row.score + regimeQuality;
+
   const rollingEdge = rolling.strategyCompoundReturn - rolling.benchmarkCompoundReturn;
   const rollingPenalty = Math.max(0, rolling.maxFoldDrawdown - row.config.maxDrawdownTarget) * 6;
   const rollingProfitPenalty = rolling.strategyCompoundReturn > 0 ? 0 : 0.75;
@@ -62,11 +72,12 @@ function scoreValidatedRow(row) {
     + Math.max(-0.5, rollingEdge) * 0.65
     + rolling.beatRate * 0.45
     + (rolling.profitableRate || 0) * 0.25
+    + regimeQuality
     - rollingPenalty
     - rollingProfitPenalty;
 }
 
-function summarizeRow({ strategy, config, result, rolling = null }) {
+function summarizeRow({ strategy, config, result, rolling = null, regime = null }) {
   const row = {
     strategyName: strategy.name,
     strategy,
@@ -84,6 +95,7 @@ function summarizeRow({ strategy, config, result, rolling = null }) {
     currentSignal: result.currentSignal,
     currentRiskExposure: result.preGateSignal?.risk?.exposure || result.preGateSignal?.exposure || 0,
     rolling,
+    regime,
   };
   row.validatedScore = scoreValidatedRow(row);
   return row;
@@ -112,8 +124,9 @@ function uniqueRows(rows) {
   return output;
 }
 
-export function buildProfitFactorLabChecks(row, config, robustness = null) {
+export function buildProfitFactorLabChecks(row, config, robustness = null, regime = null) {
   const rolling = row.rolling?.summary;
+  const activeRegime = regime || row.regime || null;
   const checks = [
     {
       id: 'full-edge',
@@ -171,6 +184,15 @@ export function buildProfitFactorLabChecks(row, config, robustness = null) {
     });
   }
 
+  if (activeRegime) {
+    checks.push({
+      id: 'regime-lab',
+      label: 'Regime-lab blijft groen',
+      pass: activeRegime.verdict === 'PASS',
+      detail: `${activeRegime.verdict} · beat ${Math.round(activeRegime.segmentBeatRate * 100)}% · worst edge ${(activeRegime.worstSegmentEdge * 100).toFixed(1)}%`,
+    });
+  }
+
   return checks;
 }
 
@@ -191,6 +213,7 @@ export function runProfitFactorLab({
   topN = 4,
   walkForwardOptions = {},
   robustnessOptions = {},
+  regimeOptions = {},
 } = {}) {
   const config = {
     ...DEFAULT_CONFIG,
@@ -211,7 +234,14 @@ export function runProfitFactorLab({
         strategy,
         assets,
       });
-      baseRows.push(summarizeRow({ strategy, config: variant, result }));
+      const regime = regimeOptions.enabled === false
+        ? null
+        : runRegimeBreakdown({
+          candlesByAsset,
+          result,
+          thresholds: regimeOptions.thresholds,
+        });
+      baseRows.push(summarizeRow({ strategy, config: variant, result, regime }));
     }
   }
 
@@ -253,8 +283,9 @@ export function runProfitFactorLab({
           },
         },
         rolling,
+        regime: row.regime,
       });
-      const checks = buildProfitFactorLabChecks(validated, row.config);
+      const checks = buildProfitFactorLabChecks(validated, row.config, null, row.regime);
       return {
         ...validated,
         checks,
@@ -294,7 +325,7 @@ export function runProfitFactorLab({
           verdict: verdictForChecks(checks),
         };
       }
-      const checks = buildProfitFactorLabChecks(row, row.config, robustness);
+      const checks = buildProfitFactorLabChecks(row, row.config, robustness, row.regime);
       return {
         ...row,
         robustness,

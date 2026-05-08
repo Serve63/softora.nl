@@ -16,15 +16,16 @@ export const DEFAULT_IMPROVEMENT_RULES = Object.freeze({
   maxDrawdownWorsening: 0.02,
   minRobustPassRate: 0.35,
   minRollingBeatRate: 0.5,
+  minRegimeBeatRate: 0.5,
 });
 
 function dateKey(timestamp) {
   return new Date(timestamp || Date.now()).toISOString().slice(0, 10);
 }
 
-function formatPercent(value) {
+function formatPercent(value, digits = 1) {
   if (!Number.isFinite(value)) return 'n.v.t.';
-  return `${(value * 100).toFixed(1)}%`;
+  return `${(value * 100).toFixed(digits)}%`;
 }
 
 function finiteProfitFactor(value) {
@@ -75,6 +76,7 @@ function summarizeLabCandidate(row, source = 'candidate') {
   if (!row) return null;
   const rolling = row.rolling?.summary || null;
   const robustness = row.robustness || null;
+  const regime = row.regime || null;
 
   return {
     id: configSignature(row.config, row.strategyName),
@@ -109,6 +111,15 @@ function summarizeLabCandidate(row, source = 'candidate') {
       medianOosEdge: robustness.medianOosEdge || 0,
       worstDrawdown: robustness.worstDrawdown || 0,
     } : null,
+    regime: regime ? {
+      verdict: regime.verdict,
+      testedSegments: regime.testedSegments || 0,
+      coveredRegimes: regime.coveredRegimes || 0,
+      segmentBeatRate: regime.segmentBeatRate || 0,
+      worstSegmentEdge: regime.worstSegmentEdge || 0,
+      bearUnderperformance: regime.bearUnderperformance || 0,
+      failed: (regime.failed || []).map((check) => check.id),
+    } : null,
     failed: (row.failed || []).map((check) => check.id),
   };
 }
@@ -127,6 +138,7 @@ function buildImprovementChecks({ champion, challenger, rules }) {
   const oosLift = metricLift(challenger.oosEdge, champion.oosEdge);
   const rolling = challenger.rolling;
   const robustness = challenger.robustness;
+  const regime = challenger.regime;
 
   return [
     makeCheck(
@@ -179,6 +191,16 @@ function buildImprovementChecks({ champion, challenger, rules }) {
       robustness
         ? `${robustness.verdict} · ${formatPercent(robustness.passRate, 0)} buren groen`
         : 'Geen robustness-resultaat.',
+    ),
+    makeCheck(
+      'regime-quality',
+      'Uitdager houdt stand in meerdere BTC-regimes',
+      Boolean(regime)
+        && regime.verdict === 'PASS'
+        && regime.segmentBeatRate >= rules.minRegimeBeatRate,
+      regime
+        ? `${regime.verdict} · ${formatPercent(regime.segmentBeatRate, 0)} segment beat-rate · ${regime.coveredRegimes} regimes`
+        : 'Geen regime-lab resultaat.',
     ),
     makeCheck(
       'current-exposure',

@@ -4,12 +4,16 @@ import {
   runProfitFactorLab,
 } from '../core/profitFactorLab.js';
 
+function resolveDrift(drift, index, symbol) {
+  return typeof drift === 'function' ? drift(index, symbol) : drift;
+}
+
 function makeCandles(symbol, count, drift, wave = 0.001) {
   const candles = [];
   let price = symbol === 'SOLUSDT' ? 25 : 100;
 
   for (let index = 0; index < count; index += 1) {
-    price *= 1 + drift + Math.sin(index / 15) * wave;
+    price *= 1 + resolveDrift(drift, index, symbol) + Math.sin(index / 15) * wave;
     candles.push({
       symbol,
       time: Date.UTC(2024, 0, 1 + index),
@@ -38,6 +42,28 @@ const solStrategy = {
   },
 };
 
+function multiRegimeDrift(symbol) {
+  return (index) => {
+    if (index < 220) return symbol === 'SOLUSDT' ? 0.0015 : 0.0007;
+    if (index < 300) {
+      if (symbol === 'SOLUSDT') return -0.001;
+      if (symbol === 'ETHUSDT') return -0.005;
+      if (symbol === 'XRPUSDT') return -0.006;
+      return -0.004;
+    }
+    if (index < 340) {
+      if (symbol === 'SOLUSDT') return 0.006;
+      if (symbol === 'ETHUSDT') return 0.003;
+      if (symbol === 'XRPUSDT') return 0.002;
+      return 0.004;
+    }
+    if (symbol === 'SOLUSDT') return 0.0015;
+    if (symbol === 'ETHUSDT') return -0.0002;
+    if (symbol === 'XRPUSDT') return -0.0003;
+    return 0.0001;
+  };
+}
+
 const cashStrategy = {
   name: 'Cash PF Test',
   generateSignal() {
@@ -58,10 +84,10 @@ export function profitFactorLabTestCases() {
       name: 'Profit Factor Lab valideert top-kandidaten met rolling check',
       run(assert) {
         const candlesByAsset = {
-          BTCUSDT: makeCandles('BTCUSDT', 380, 0.0007),
-          ETHUSDT: makeCandles('ETHUSDT', 380, 0.0008),
-          SOLUSDT: makeCandles('SOLUSDT', 380, 0.002),
-          XRPUSDT: makeCandles('XRPUSDT', 380, 0.0004),
+          BTCUSDT: makeCandles('BTCUSDT', 380, multiRegimeDrift('BTCUSDT')),
+          ETHUSDT: makeCandles('ETHUSDT', 380, multiRegimeDrift('ETHUSDT')),
+          SOLUSDT: makeCandles('SOLUSDT', 380, multiRegimeDrift('SOLUSDT')),
+          XRPUSDT: makeCandles('XRPUSDT', 380, multiRegimeDrift('XRPUSDT')),
         };
         const result = runProfitFactorLab({
           candlesByAsset,
@@ -78,6 +104,14 @@ export function profitFactorLabTestCases() {
             testBars: 60,
             maxFolds: 2,
           },
+          regimeOptions: {
+            thresholds: {
+              segments: 6,
+              bullReturn: 0.08,
+              bearReturn: -0.08,
+              minCoveredRegimes: 2,
+            },
+          },
         });
 
         assert(result.tested === 4, 'Profit Factor Lab test niet het verwachte aantal varianten.');
@@ -85,9 +119,11 @@ export function profitFactorLabTestCases() {
         assert(result.best.strategyName === 'SOL PF Test', 'Profit Factor Lab kiest niet de sterkste synthetische kandidaat.');
         assert(result.best.rolling?.summary, 'Profit Factor Lab mist rolling summary op de beste kandidaat.');
         assert(result.best.robustness?.verdict === 'PASS', 'Profit Factor Lab mist robustness-validatie op de beste kandidaat.');
+        assert(result.best.regime?.verdict === 'PASS', 'Profit Factor Lab mist regime-validatie op de beste kandidaat.');
         assert(result.best.checks.some((check) => check.id === 'oos-edge'), 'Profit Factor Lab controleert OOS-edge niet expliciet.');
         assert(result.best.checks.some((check) => check.id === 'current-exposure'), 'Profit Factor Lab controleert actuele exposure niet expliciet.');
         assert(result.best.checks.some((check) => check.id === 'robustness'), 'Profit Factor Lab controleert parameterrobustheid niet expliciet.');
+        assert(result.best.checks.some((check) => check.id === 'regime-lab'), 'Profit Factor Lab controleert regime-robuustheid niet expliciet.');
       },
     },
     {

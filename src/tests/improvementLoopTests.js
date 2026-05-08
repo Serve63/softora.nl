@@ -71,6 +71,15 @@ function makeLabCandidate(overrides = {}) {
       medianOosEdge: 0.08,
       worstDrawdown: 0.17,
     },
+    regime: {
+      verdict: 'PASS',
+      testedSegments: 6,
+      coveredRegimes: 3,
+      segmentBeatRate: 0.83,
+      worstSegmentEdge: -0.02,
+      bearUnderperformance: 0,
+      failed: [],
+    },
     failed: [],
     ...overrides,
   };
