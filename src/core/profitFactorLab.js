@@ -4,6 +4,7 @@ import sprintRotation from '../strategies/sprintRotation.js';
 import trendParticipation from '../strategies/trendParticipation.js';
 import { runBacktest } from './backtester.js';
 import { runRegimeBreakdown } from './regimeLab.js';
+import { runRealityCheck } from './realityCheck.js';
 import { DEFAULT_CONFIG } from './riskEngine.js';
 import { runParameterRobustness } from './robustnessLab.js';
 import { runRollingWalkForward } from './walkForward.js';
@@ -54,14 +55,21 @@ function scoreRow({ result, config }) {
 function scoreValidatedRow(row) {
   const rolling = row.rolling?.summary;
   const regime = row.regime;
+  const reality = row.reality;
   const regimeQuality = regime
     ? regime.segmentBeatRate * 0.35
       + Math.max(-0.4, regime.worstSegmentEdge) * 0.3
       + (regime.verdict === 'PASS' ? 0.5 : 0)
       - (regime.failed?.length || 0) * 0.25
     : 0;
+  const realityQuality = reality
+    ? reality.positiveEdgeRate * 0.45
+      + Math.max(-0.4, reality.medianEdge) * 0.35
+      + (reality.verdict === 'PASS' ? 0.55 : 0)
+      - (reality.failed?.length || 0) * 0.28
+    : 0;
 
-  if (!rolling) return row.score + regimeQuality;
+  if (!rolling) return row.score + regimeQuality + realityQuality;
 
   const rollingEdge = rolling.strategyCompoundReturn - rolling.benchmarkCompoundReturn;
   const rollingPenalty = Math.max(0, rolling.maxFoldDrawdown - row.config.maxDrawdownTarget) * 6;
@@ -73,11 +81,12 @@ function scoreValidatedRow(row) {
     + rolling.beatRate * 0.45
     + (rolling.profitableRate || 0) * 0.25
     + regimeQuality
+    + realityQuality
     - rollingPenalty
     - rollingProfitPenalty;
 }
 
-function summarizeRow({ strategy, config, result, rolling = null, regime = null }) {
+function summarizeRow({ strategy, config, result, rolling = null, regime = null, reality = null }) {
   const row = {
     strategyName: strategy.name,
     strategy,
@@ -96,6 +105,7 @@ function summarizeRow({ strategy, config, result, rolling = null, regime = null 
     currentRiskExposure: result.preGateSignal?.risk?.exposure || result.preGateSignal?.exposure || 0,
     rolling,
     regime,
+    reality,
   };
   row.validatedScore = scoreValidatedRow(row);
   return row;
@@ -124,9 +134,10 @@ function uniqueRows(rows) {
   return output;
 }
 
-export function buildProfitFactorLabChecks(row, config, robustness = null, regime = null) {
+export function buildProfitFactorLabChecks(row, config, robustness = null, regime = null, reality = null) {
   const rolling = row.rolling?.summary;
   const activeRegime = regime || row.regime || null;
+  const activeReality = reality || row.reality || null;
   const checks = [
     {
       id: 'full-edge',
@@ -193,6 +204,15 @@ export function buildProfitFactorLabChecks(row, config, robustness = null, regim
     });
   }
 
+  if (activeReality) {
+    checks.push({
+      id: 'reality-check',
+      label: 'Reality check blijft groen',
+      pass: activeReality.verdict === 'PASS',
+      detail: `${activeReality.verdict} · positive edge ${Math.round(activeReality.positiveEdgeRate * 100)}% · median edge ${(activeReality.medianEdge * 100).toFixed(1)}%`,
+    });
+  }
+
   return checks;
 }
 
@@ -214,6 +234,7 @@ export function runProfitFactorLab({
   walkForwardOptions = {},
   robustnessOptions = {},
   regimeOptions = {},
+  realityOptions = {},
 } = {}) {
   const config = {
     ...DEFAULT_CONFIG,
@@ -241,7 +262,20 @@ export function runProfitFactorLab({
           result,
           thresholds: regimeOptions.thresholds,
         });
-      baseRows.push(summarizeRow({ strategy, config: variant, result, regime }));
+      const reality = realityOptions.enabled === false
+        ? null
+        : runRealityCheck({
+          result,
+          thresholds: realityOptions.thresholds,
+          seed: realityOptions.seed,
+        });
+      baseRows.push(summarizeRow({
+        strategy,
+        config: variant,
+        result,
+        regime,
+        reality,
+      }));
     }
   }
 
@@ -284,8 +318,9 @@ export function runProfitFactorLab({
         },
         rolling,
         regime: row.regime,
+        reality: row.reality,
       });
-      const checks = buildProfitFactorLabChecks(validated, row.config, null, row.regime);
+      const checks = buildProfitFactorLabChecks(validated, row.config, null, row.regime, row.reality);
       return {
         ...validated,
         checks,
@@ -325,7 +360,7 @@ export function runProfitFactorLab({
           verdict: verdictForChecks(checks),
         };
       }
-      const checks = buildProfitFactorLabChecks(row, row.config, robustness, row.regime);
+      const checks = buildProfitFactorLabChecks(row, row.config, robustness, row.regime, row.reality);
       return {
         ...row,
         robustness,

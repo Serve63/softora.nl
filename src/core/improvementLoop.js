@@ -17,6 +17,7 @@ export const DEFAULT_IMPROVEMENT_RULES = Object.freeze({
   minRobustPassRate: 0.35,
   minRollingBeatRate: 0.5,
   minRegimeBeatRate: 0.5,
+  minRealityPositiveEdgeRate: 0.6,
 });
 
 function dateKey(timestamp) {
@@ -77,6 +78,7 @@ function summarizeLabCandidate(row, source = 'candidate') {
   const rolling = row.rolling?.summary || null;
   const robustness = row.robustness || null;
   const regime = row.regime || null;
+  const reality = row.reality || null;
 
   return {
     id: configSignature(row.config, row.strategyName),
@@ -120,6 +122,15 @@ function summarizeLabCandidate(row, source = 'candidate') {
       bearUnderperformance: regime.bearUnderperformance || 0,
       failed: (regime.failed || []).map((check) => check.id),
     } : null,
+    reality: reality ? {
+      verdict: reality.verdict,
+      segmentCount: reality.segmentCount || 0,
+      positiveEdgeRate: reality.positiveEdgeRate || 0,
+      medianEdge: reality.medianEdge || 0,
+      fifthPercentileEdge: reality.fifthPercentileEdge || 0,
+      medianStrategyReturn: reality.medianStrategyReturn || 0,
+      failed: (reality.failed || []).map((check) => check.id),
+    } : null,
     failed: (row.failed || []).map((check) => check.id),
   };
 }
@@ -139,6 +150,7 @@ function buildImprovementChecks({ champion, challenger, rules }) {
   const rolling = challenger.rolling;
   const robustness = challenger.robustness;
   const regime = challenger.regime;
+  const reality = challenger.reality;
 
   return [
     makeCheck(
@@ -201,6 +213,16 @@ function buildImprovementChecks({ champion, challenger, rules }) {
       regime
         ? `${regime.verdict} · ${formatPercent(regime.segmentBeatRate, 0)} segment beat-rate · ${regime.coveredRegimes} regimes`
         : 'Geen regime-lab resultaat.',
+    ),
+    makeCheck(
+      'reality-quality',
+      'Uitdager houdt stand na bootstrap reality check',
+      Boolean(reality)
+        && reality.verdict === 'PASS'
+        && reality.positiveEdgeRate >= rules.minRealityPositiveEdgeRate,
+      reality
+        ? `${reality.verdict} · ${formatPercent(reality.positiveEdgeRate, 0)} positive edge · median edge ${formatPercent(reality.medianEdge)}`
+        : 'Geen reality-check resultaat.',
     ),
     makeCheck(
       'current-exposure',

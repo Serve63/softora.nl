@@ -120,10 +120,12 @@ export function profitFactorLabTestCases() {
         assert(result.best.rolling?.summary, 'Profit Factor Lab mist rolling summary op de beste kandidaat.');
         assert(result.best.robustness?.verdict === 'PASS', 'Profit Factor Lab mist robustness-validatie op de beste kandidaat.');
         assert(result.best.regime?.verdict === 'PASS', 'Profit Factor Lab mist regime-validatie op de beste kandidaat.');
+        assert(result.best.reality?.verdict === 'PASS', 'Profit Factor Lab mist bootstrap reality-check op de beste kandidaat.');
         assert(result.best.checks.some((check) => check.id === 'oos-edge'), 'Profit Factor Lab controleert OOS-edge niet expliciet.');
         assert(result.best.checks.some((check) => check.id === 'current-exposure'), 'Profit Factor Lab controleert actuele exposure niet expliciet.');
         assert(result.best.checks.some((check) => check.id === 'robustness'), 'Profit Factor Lab controleert parameterrobustheid niet expliciet.');
         assert(result.best.checks.some((check) => check.id === 'regime-lab'), 'Profit Factor Lab controleert regime-robuustheid niet expliciet.');
+        assert(result.best.checks.some((check) => check.id === 'reality-check'), 'Profit Factor Lab controleert bootstrap reality niet expliciet.');
       },
     },
     {

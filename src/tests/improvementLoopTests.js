@@ -80,6 +80,15 @@ function makeLabCandidate(overrides = {}) {
       bearUnderperformance: 0,
       failed: [],
     },
+    reality: {
+      verdict: 'PASS',
+      segmentCount: 12,
+      positiveEdgeRate: 0.82,
+      medianEdge: 0.18,
+      fifthPercentileEdge: -0.04,
+      medianStrategyReturn: 0.2,
+      failed: [],
+    },
     failed: [],
     ...overrides,
   };
@@ -229,6 +238,33 @@ export function improvementLoopTestCases() {
         assert(logged.skipped === true, 'Dubbele dagreview moet geen extra review toevoegen.');
         assert(logged.state.reviews.length === 1, 'Dubbele dagreview mag de reviewlijst niet verlengen.');
         assert(logged.state.watchlistChallenger?.strategyName === 'Duplicate Watch v1', 'Dubbele dagreview moet watchlist-status wel verversen.');
+      },
+    },
+    {
+      name: 'Improvement loop blokkeert uitdager als reality check faalt',
+      run(assert) {
+        const review = createImprovementReview({
+          asOf: Date.UTC(2026, 4, 8),
+          timeframe: '4H',
+          championCandidate,
+          championBacktest: makeBacktest(),
+          lab: {
+            candidate: makeLabCandidate({
+              reality: {
+                verdict: 'FAIL',
+                segmentCount: 12,
+                positiveEdgeRate: 0.42,
+                medianEdge: -0.03,
+                fifthPercentileEdge: -0.22,
+                medianStrategyReturn: -0.02,
+                failed: [{ id: 'reality-positive-edge-rate' }],
+              },
+            }),
+          },
+        });
+
+        assert(review.action === 'WATCH_CHALLENGER', 'Reality failure mag geen directe incubatie geven.');
+        assert(review.failed.some((check) => check.id === 'reality-quality'), 'Reality-quality failure ontbreekt.');
       },
     },
   ];

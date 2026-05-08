@@ -5,6 +5,7 @@ import { parityTestCases } from './parityTests.js';
 import { profitFactorLabTestCases } from './profitFactorLabTests.js';
 import { promotionGateTestCases } from './promotionGateTests.js';
 import { regimeLabTestCases } from './regimeLabTests.js';
+import { realityCheckTestCases } from './realityCheckTests.js';
 import { robustnessLabTestCases } from './robustnessLabTests.js';
 import { sprintRotationTestCases } from './sprintRotationTests.js';
 import { timeframeResearchTestCases } from './timeframeResearchTests.js';
@@ -41,6 +42,7 @@ export async function runAllTests() {
     ...profitFactorLabTestCases(),
     ...promotionGateTestCases(),
     ...regimeLabTestCases(),
+    ...realityCheckTestCases(),
     ...robustnessLabTestCases(),
     ...sprintRotationTestCases(),
     ...timeframeResearchTestCases(),
