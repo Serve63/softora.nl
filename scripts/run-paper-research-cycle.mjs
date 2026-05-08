@@ -127,6 +127,17 @@ function summarizeCycle(results) {
       gateOpenRatePct: replay.replay.gateOpenRatePct,
       latestSignal: replay.replay.latestSignal,
       failed: replay.failed || [],
+      multiWindow: replay.multiWindow ? {
+        verdict: replay.multiWindow.verdict,
+        windows: replay.multiWindow.windows,
+        passRatePct: replay.multiWindow.passRatePct,
+        positiveRatePct: replay.multiWindow.positiveRatePct,
+        beatRatePct: replay.multiWindow.beatRatePct,
+        medianReturnPct: replay.multiWindow.medianReturnPct,
+        worstReturnPct: replay.multiWindow.worstReturnPct,
+        worstDrawdownPct: replay.multiWindow.worstDrawdownPct,
+        failed: replay.multiWindow.failed || [],
+      } : null,
     } : null,
     promotion: {
       verdict: promotion.verdict || null,

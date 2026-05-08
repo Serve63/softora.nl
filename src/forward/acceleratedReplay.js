@@ -17,6 +17,15 @@ export const DEFAULT_REPLAY_RULES = Object.freeze({
   maxLossBeforeFail: -0.06,
 });
 
+export const DEFAULT_MULTI_WINDOW_RULES = Object.freeze({
+  minWindows: 4,
+  minPassRate: 0.6,
+  minPositiveRate: 0.5,
+  minBeatRate: 0.6,
+  maxWorstDrawdown: 0.12,
+  maxWorstReturn: -0.06,
+});
+
 function point(time, value) {
   return { time, value };
 }
@@ -43,6 +52,18 @@ function calculateDrawdown(equityCurve) {
     if (peak > 0) drawdown = Math.max(drawdown, 1 - item.value / peak);
   }
   return drawdown;
+}
+
+function average(values) {
+  const finite = values.filter(Number.isFinite);
+  return finite.length ? finite.reduce((sum, value) => sum + value, 0) / finite.length : 0;
+}
+
+function median(values) {
+  const finite = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!finite.length) return 0;
+  const middle = Math.floor(finite.length / 2);
+  return finite.length % 2 ? finite[middle] : (finite[middle - 1] + finite[middle]) / 2;
 }
 
 export function buildReplayIndexes({
@@ -127,6 +148,96 @@ export function evaluateAcceleratedReplay(metrics, rules = {}) {
       : verdict === 'WATCH'
         ? `Accelerated replay is watch: ${failed.map((check) => check.label).join(', ')}.`
         : `Accelerated replay faalt: ${failed.map((check) => check.label).join(', ')}.`,
+  };
+}
+
+function sliceAlignedUntil(aligned, endIndexInclusive) {
+  return Object.fromEntries(
+    aligned.assets.map((asset) => [asset, aligned.candlesByAsset[asset].slice(0, endIndexInclusive + 1)]),
+  );
+}
+
+function buildWindowRanges(replayIndexes, windowLogs, windowCount) {
+  const activeWindowLogs = Math.max(1, Number(windowLogs) || 60);
+  const activeWindowCount = Math.max(1, Number(windowCount) || 6);
+  const ranges = [];
+  let endPosition = replayIndexes.length - 1;
+
+  while (endPosition >= 0 && ranges.length < activeWindowCount) {
+    const startPosition = Math.max(0, endPosition - activeWindowLogs + 1);
+    const indexes = replayIndexes.slice(startPosition, endPosition + 1);
+    if (indexes.length) {
+      ranges.push({
+        startPosition,
+        endPosition,
+        startIndex: indexes[0],
+        endIndex: indexes[indexes.length - 1],
+        logs: indexes.length,
+      });
+    }
+    endPosition = startPosition - 1;
+  }
+
+  return ranges.reverse();
+}
+
+export function evaluateMultiWindowReplay(summary, rules = {}) {
+  const activeRules = { ...DEFAULT_MULTI_WINDOW_RULES, ...rules };
+  const checks = [
+    makeCheck(
+      'window-count',
+      'Multi-window replay heeft genoeg periodes',
+      summary.windows >= activeRules.minWindows,
+      `${summary.windows}/${activeRules.minWindows}`,
+    ),
+    makeCheck(
+      'pass-rate',
+      'Genoeg replay-ramen zijn groen',
+      summary.passRate >= activeRules.minPassRate,
+      `${(summary.passRate * 100).toFixed(0)}% minimum ${(activeRules.minPassRate * 100).toFixed(0)}%`,
+    ),
+    makeCheck(
+      'positive-rate',
+      'Genoeg replay-ramen zijn positief',
+      summary.positiveRate >= activeRules.minPositiveRate,
+      `${(summary.positiveRate * 100).toFixed(0)}% minimum ${(activeRules.minPositiveRate * 100).toFixed(0)}%`,
+    ),
+    makeCheck(
+      'beat-rate',
+      'Genoeg replay-ramen verslaan benchmark',
+      summary.beatRate >= activeRules.minBeatRate,
+      `${(summary.beatRate * 100).toFixed(0)}% minimum ${(activeRules.minBeatRate * 100).toFixed(0)}%`,
+    ),
+    makeCheck(
+      'worst-drawdown',
+      'Slechtste replay-drawdown blijft binnen limiet',
+      summary.worstDrawdown <= activeRules.maxWorstDrawdown,
+      `${(summary.worstDrawdown * 100).toFixed(2)}% limiet ${(activeRules.maxWorstDrawdown * 100).toFixed(2)}%`,
+    ),
+    makeCheck(
+      'worst-return',
+      'Slechtste replay-return blijft boven kill-grens',
+      summary.worstReturn >= activeRules.maxWorstReturn,
+      `${(summary.worstReturn * 100).toFixed(2)}% grens ${(activeRules.maxWorstReturn * 100).toFixed(2)}%`,
+    ),
+  ];
+  const failed = checks.filter((check) => !check.pass);
+  const verdict = failed.length === 0
+    ? 'PASS'
+    : failed.some((check) => ['worst-drawdown', 'worst-return'].includes(check.id))
+      ? 'FAIL'
+      : 'WATCH';
+
+  return {
+    verdict,
+    checks,
+    failed,
+    rules: activeRules,
+    message: verdict === 'PASS'
+      ? 'Multi-window replay is groen; strategie houdt in meerdere historische periodes stand.'
+      : verdict === 'WATCH'
+        ? `Multi-window replay is watch: ${failed.map((check) => check.label).join(', ')}.`
+        : `Multi-window replay faalt: ${failed.map((check) => check.label).join(', ')}.`,
   };
 }
 
@@ -287,6 +398,127 @@ export function runAcceleratedForwardReplay({
     equityCurve,
     benchmarkCurve,
     metrics,
+    discipline,
+    verdict: discipline.verdict,
+  };
+}
+
+export function runMultiWindowAcceleratedReplay({
+  candlesByAsset,
+  strategy,
+  config: rawConfig = {},
+  assets = SUPPORTED_ASSETS,
+  windowCount = 6,
+  windowLogs = 60,
+  logFrequency = 'daily',
+  replayRules = {},
+  multiWindowRules = {},
+  strictNoLookahead = true,
+} = {}) {
+  const config = { ...DEFAULT_CONFIG, ...rawConfig };
+  const aligned = alignCandles(candlesByAsset || {}, assets);
+
+  if (aligned.error) {
+    return {
+      ok: false,
+      error: aligned.error,
+      verdict: 'FAIL',
+      windows: [],
+      summary: null,
+      discipline: null,
+    };
+  }
+
+  const warmupBars = config.warmupBars || 240;
+  const replayIndexes = buildReplayIndexes({
+    times: aligned.times,
+    startIndex: warmupBars,
+    maxLogs: aligned.times.length,
+    logFrequency,
+  });
+  const ranges = buildWindowRanges(replayIndexes, windowLogs, windowCount);
+
+  if (!ranges.length) {
+    return {
+      ok: false,
+      error: 'Te weinig candles voor multi-window accelerated replay.',
+      verdict: 'FAIL',
+      windows: [],
+      summary: null,
+      discipline: null,
+    };
+  }
+
+  const windows = ranges.map((range, index) => {
+    const windowCandlesByAsset = sliceAlignedUntil(aligned, range.endIndex);
+    const replay = runAcceleratedForwardReplay({
+      candlesByAsset: windowCandlesByAsset,
+      strategy,
+      config,
+      assets: aligned.assets,
+      startIndex: range.startIndex,
+      maxLogs: range.logs,
+      logFrequency,
+      rules: {
+        minLogs: Math.min(range.logs, Number(replayRules.minLogs) || Math.min(20, range.logs)),
+        ...replayRules,
+      },
+      strictNoLookahead,
+    });
+    const metrics = replay.metrics || {};
+    return {
+      index: index + 1,
+      startTime: metrics.startTime || new Date(aligned.times[range.startIndex]).toISOString(),
+      endTime: metrics.endTime || new Date(aligned.times[range.endIndex]).toISOString(),
+      logs: metrics.logs || 0,
+      verdict: replay.verdict,
+      failed: replay.discipline?.failed?.map((check) => check.id) || [],
+      paperReturn: metrics.paperReturn || 0,
+      benchmarkReturn: metrics.benchmarkReturn || 0,
+      edge: metrics.edge || 0,
+      maxDrawdown: metrics.maxDrawdown || 0,
+      gateOpenRate: metrics.gateOpenRate || 0,
+      trades: metrics.trades || 0,
+      feesPaid: metrics.feesPaid || 0,
+      slippagePaid: metrics.slippagePaid || 0,
+      latestSignal: metrics.latestSignal || 'CASH',
+    };
+  });
+
+  const returns = windows.map((window) => window.paperReturn);
+  const edges = windows.map((window) => window.edge);
+  const drawdowns = windows.map((window) => window.maxDrawdown);
+  const passCount = windows.filter((window) => window.verdict === 'PASS').length;
+  const positiveCount = windows.filter((window) => window.paperReturn > 0).length;
+  const beatCount = windows.filter((window) => window.paperReturn > window.benchmarkReturn).length;
+  const summary = {
+    windows: windows.length,
+    windowLogs,
+    passRate: windows.length ? passCount / windows.length : 0,
+    positiveRate: windows.length ? positiveCount / windows.length : 0,
+    beatRate: windows.length ? beatCount / windows.length : 0,
+    averageReturn: average(returns),
+    medianReturn: median(returns),
+    worstReturn: Math.min(...returns),
+    averageEdge: average(edges),
+    medianEdge: median(edges),
+    worstEdge: Math.min(...edges),
+    worstDrawdown: Math.max(...drawdowns),
+    averageGateOpenRate: average(windows.map((window) => window.gateOpenRate)),
+    totalTrades: windows.reduce((sum, window) => sum + window.trades, 0),
+    totalFeesPaid: windows.reduce((sum, window) => sum + window.feesPaid, 0),
+    totalSlippagePaid: windows.reduce((sum, window) => sum + window.slippagePaid, 0),
+  };
+  const discipline = evaluateMultiWindowReplay(summary, multiWindowRules);
+
+  return {
+    ok: true,
+    mode: 'multi-window-accelerated-replay',
+    paperOnly: true,
+    strictNoLookahead,
+    logFrequency,
+    windows,
+    summary,
     discipline,
     verdict: discipline.verdict,
   };
