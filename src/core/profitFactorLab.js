@@ -166,6 +166,37 @@ function uniqueRows(rows) {
   return output;
 }
 
+function buildValidationShortlist(rows, topN, maxRowsPerStrategy = 2) {
+  const sorted = uniqueRows([...rows].sort((a, b) => b.score - a.score));
+  const selected = [];
+  const selectedSignatures = new Set();
+  const strategyCounts = new Map();
+  const activeCap = Math.max(1, Math.floor(Number(maxRowsPerStrategy) || 1));
+
+  for (const row of sorted) {
+    if (selected.length >= topN) break;
+    const count = strategyCounts.get(row.strategyName) || 0;
+    if (count >= activeCap) continue;
+
+    selected.push(row);
+    selectedSignatures.add(rowSignature(row));
+    strategyCounts.set(row.strategyName, count + 1);
+  }
+
+  for (const row of sorted) {
+    if (selected.length >= topN) break;
+    const signature = rowSignature(row);
+    if (selectedSignatures.has(signature)) continue;
+    selected.push(row);
+    selectedSignatures.add(signature);
+  }
+
+  return {
+    rows: selected,
+    strategyCounts: Object.fromEntries(strategyCounts),
+  };
+}
+
 export function buildProfitFactorLabChecks(
   row,
   config,
@@ -297,6 +328,7 @@ export function runProfitFactorLab({
   realityOptions = {},
   statValidationOptions = {},
   costStressOptions = {},
+  maxRowsPerStrategy = 2,
 } = {}) {
   const config = {
     ...DEFAULT_CONFIG,
@@ -351,10 +383,8 @@ export function runProfitFactorLab({
     }
   }
 
-  let shortlisted = uniqueRows(baseRows
-    .sort((a, b) => b.score - a.score)
-  )
-    .slice(0, topN)
+  const validationShortlist = buildValidationShortlist(baseRows, topN, maxRowsPerStrategy);
+  let shortlisted = validationShortlist.rows
     .map((row) => {
       const rolling = runRollingWalkForward({
         candlesByAsset,
@@ -483,6 +513,10 @@ export function runProfitFactorLab({
     candidate,
     watch,
     rows: shortlisted,
+    diversity: {
+      maxRowsPerStrategy,
+      strategyCounts: validationShortlist.strategyCounts,
+    },
     message: candidate
       ? `${candidate.strategyName} haalt de profit-factor lab gate.`
       : watch

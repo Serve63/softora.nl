@@ -150,6 +150,44 @@ export function profitFactorLabTestCases() {
       },
     },
     {
+      name: 'Profit Factor Lab valideert meerdere strategiefamilies in de shortlist',
+      run(assert) {
+        const candlesByAsset = {
+          BTCUSDT: makeCandles('BTCUSDT', 380, multiRegimeDrift('BTCUSDT')),
+          ETHUSDT: makeCandles('ETHUSDT', 380, multiRegimeDrift('ETHUSDT')),
+          SOLUSDT: makeCandles('SOLUSDT', 380, multiRegimeDrift('SOLUSDT')),
+          XRPUSDT: makeCandles('XRPUSDT', 380, multiRegimeDrift('XRPUSDT')),
+        };
+        const result = runProfitFactorLab({
+          candlesByAsset,
+          strategies: [solStrategy, cashStrategy],
+          grid: {
+            rebalanceBars: [18],
+            scoreThreshold: [45],
+            targetVolatility: [0.08],
+            emergencyDrawdownStop: [0.24],
+          },
+          topN: 2,
+          maxRowsPerStrategy: 1,
+          walkForwardOptions: {
+            trainBars: 260,
+            testBars: 60,
+            maxFolds: 1,
+          },
+          robustnessOptions: { enabled: false },
+          regimeOptions: { enabled: false },
+          realityOptions: { enabled: false },
+          statValidationOptions: { enabled: false },
+          costStressOptions: { enabled: false },
+        });
+        const strategyNames = result.rows.map((row) => row.strategyName);
+
+        assert(strategyNames.includes('SOL PF Test'), 'Sterke strategie ontbreekt in de gediversifieerde shortlist.');
+        assert(strategyNames.includes('Cash PF Test'), 'Tweede strategiefamilie wordt niet meegenomen in de shortlist.');
+        assert(result.diversity.strategyCounts['SOL PF Test'] === 1, 'Shortlist-cap per strategie wordt niet gerapporteerd.');
+      },
+    },
+    {
       name: 'Profit Factor Lab weigert negatieve rolling winst als kandidaat',
       run(assert) {
         const checks = buildProfitFactorLabChecks({

@@ -83,7 +83,8 @@ function dailyLabOptions() {
   if (process.env.FULL_PAPER_RESEARCH === '1') return {};
   return {
     grid: DAILY_PROFIT_FACTOR_GRID,
-    topN: 3,
+    topN: 6,
+    maxRowsPerStrategy: 2,
     robustnessOptions: {
       grid: DAILY_ROBUSTNESS_GRID,
     },
@@ -152,6 +153,11 @@ if (market.errors.length) {
     mode: 'paper-research-only',
     researchDepth: process.env.FULL_PAPER_RESEARCH === '1' ? 'full' : 'daily-compact',
     autoPromote: false,
+    lab: {
+      tested: lab.tested,
+      validated: lab.validated,
+      diversity: lab.diversity || null,
+    },
     champion: {
       id: review.champion.id,
       label: review.champion.label,
