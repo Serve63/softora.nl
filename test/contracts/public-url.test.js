@@ -75,12 +75,18 @@ test('getEffectivePublicBaseUrl prefers explicit config before request host', ()
 test('isPrivateIpAddress detects common private and loopback ranges', () => {
   assert.equal(isPrivateIpAddress('127.0.0.1'), true);
   assert.equal(isPrivateIpAddress('192.168.1.10'), true);
+  assert.equal(isPrivateIpAddress('100.64.0.10'), true);
+  assert.equal(isPrivateIpAddress('169.254.169.254'), true);
   assert.equal(isPrivateIpAddress('::1'), true);
+  assert.equal(isPrivateIpAddress('fe80::1'), true);
   assert.equal(isPrivateIpAddress('8.8.8.8'), false);
 });
 
 test('assertWebsitePreviewUrlIsPublic rejects localhost and private lookup targets', async () => {
   await assert.rejects(() => assertWebsitePreviewUrlIsPublic('http://localhost:3000'), {
+    status: 400,
+  });
+  await assert.rejects(() => assertWebsitePreviewUrlIsPublic('http://app.localhost'), {
     status: 400,
   });
 

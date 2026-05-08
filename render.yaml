@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: softora-retell-coldcalling
+    name: softora-nl-final
     env: node
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /healthz
     autoDeploy: true
@@ -33,6 +33,8 @@ services:
         value: core
       - key: TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE
         value: wss://twilio-media-bridge-ln3f.onrender.com/twilio-media
+      - key: TWILIO_MEDIA_BRIDGE_TOKEN
+        sync: false
       - key: TWILIO_API_KEY_SID
         sync: false
       - key: TWILIO_API_KEY_SECRET
@@ -42,7 +44,7 @@ services:
       - key: TWILIO_API_EDGE
         value: dublin
   - type: web
-    name: twilio-media-bridge-pjzd
+    name: twilio-media-bridge
     runtime: node
     rootDir: twilio-media-bridge
     buildCommand: npm install
@@ -78,5 +80,7 @@ services:
         value: 0.10
       - key: NOISE_GATE_RMS
         value: 250
+      - key: BRIDGE_MEDIA_TOKEN
+        sync: false
       - key: BRIDGE_DEBUG_TOKEN
         sync: false

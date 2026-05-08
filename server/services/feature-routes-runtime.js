@@ -64,7 +64,10 @@ function registerFeatureRoutes(app, deps = {}) {
     ...premiumRouteRuntime,
   });
 
-  registerColdcallingRoutes(app, coldcalling);
+  registerColdcallingRoutes(app, {
+    ...coldcalling,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
+  });
   registerColdmailingRoutes(app, coldmailing);
   registerAiDashboardRoutes(app, { coordinator: aiDashboardCoordinator });
   registerAiToolRoutes(app, { coordinator: aiToolsCoordinator });
@@ -74,8 +77,14 @@ function registerFeatureRoutes(app, deps = {}) {
   registerPremiumDatabaseWebdesignJobRoutes(app, {
     coordinator: premiumDatabaseWebdesignJobsCoordinator,
   });
-  registerOpenAiCostRoutes(app, openAiCostSummary || {});
-  registerMailboxRoutes(app, { coordinator: mailboxCoordinator });
+  registerOpenAiCostRoutes(app, {
+    ...(openAiCostSummary || {}),
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
+  });
+  registerMailboxRoutes(app, {
+    coordinator: mailboxCoordinator,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
+  });
   registerActiveOrderRoutes(app, { coordinator: activeOrdersCoordinator });
   registerPremiumDatabaseImportRoutes(app, {
     coordinator: premiumDatabaseImportCoordinator,

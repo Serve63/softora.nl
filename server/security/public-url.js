@@ -54,6 +54,7 @@ function isPrivateIpv4Address(valueRaw) {
     return false;
   }
   if (parts[0] === 10 || parts[0] === 127) return true;
+  if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
   if (parts[0] === 169 && parts[1] === 254) return true;
   if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
   if (parts[0] === 192 && parts[1] === 168) return true;
@@ -64,9 +65,10 @@ function isPrivateIpv4Address(valueRaw) {
 function isPrivateIpv6Address(valueRaw) {
   const value = normalizeIpAddress(valueRaw).toLowerCase();
   if (!value) return false;
-  if (value === '::1') return true;
+  if (value === '::' || value === '::1') return true;
   if (value.startsWith('fc') || value.startsWith('fd')) return true;
-  if (value.startsWith('fe80:')) return true;
+  if (/^fe[89ab][0-9a-f]?:/i.test(value) || value.startsWith('fe80:')) return true;
+  if (/^fe[cdef][0-9a-f]?:/i.test(value)) return true;
   return false;
 }
 
@@ -96,6 +98,7 @@ async function assertWebsitePreviewUrlIsPublic(valueRaw, options = {}) {
 
   if (
     hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
     hostname.endsWith('.local') ||
     hostname.endsWith('.internal') ||
     hostname.endsWith('.lan') ||
