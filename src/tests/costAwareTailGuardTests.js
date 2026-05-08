@@ -69,5 +69,25 @@ export function costAwareTailGuardTestCases() {
         assert(signal.exposure === 0, 'Cost-aware strategie moet cash blijven bij te hoge volatility/kostenbuffer.');
       },
     },
+    {
+      name: 'Cost Aware Tail Guard gebruikt fast-exit als recente BTC trend breekt',
+      run(assert) {
+        const candlesByAsset = {
+          BTCUSDT: makeCandles('BTCUSDT', 340, (index) => (index < 250 ? 0.0014 : -0.002)),
+          ETHUSDT: makeCandles('ETHUSDT', 340, 0.0013),
+          SOLUSDT: makeCandles('SOLUSDT', 340, 0.0018),
+          XRPUSDT: makeCandles('XRPUSDT', 340, 0.0009),
+        };
+        const signal = costAwareTailGuard.generateSignal({
+          candlesByAsset,
+          index: 339,
+          assets: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT'],
+          config: { scoreThreshold: 70, rebalanceBars: 120 },
+        });
+
+        assert(signal.exposure === 0, 'Fast-exit moet exposure sluiten wanneer BTC recent onderuit draait.');
+        assert(signal.reasons.some((reason) => reason.includes('Fast-exit filter sluit exposure')), 'Fast-exit reden ontbreekt.');
+      },
+    },
   ];
 }
