@@ -3,6 +3,7 @@ import { improvementLoopTestCases } from './improvementLoopTests.js';
 import { optimizerTestCases } from './optimizerTests.js';
 import { parityTestCases } from './parityTests.js';
 import { profitFactorLabTestCases } from './profitFactorLabTests.js';
+import { promotionGateTestCases } from './promotionGateTests.js';
 import { robustnessLabTestCases } from './robustnessLabTests.js';
 import { sprintRotationTestCases } from './sprintRotationTests.js';
 import { timeframeResearchTestCases } from './timeframeResearchTests.js';
@@ -37,6 +38,7 @@ export async function runAllTests() {
     ...improvementLoopTestCases(),
     ...optimizerTestCases(),
     ...profitFactorLabTestCases(),
+    ...promotionGateTestCases(),
     ...robustnessLabTestCases(),
     ...sprintRotationTestCases(),
     ...timeframeResearchTestCases(),
