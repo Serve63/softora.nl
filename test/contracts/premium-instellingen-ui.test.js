@@ -32,6 +32,15 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(source, /callSettingsGlobal\('togglePw', \[button\.dataset\.settingsPasswordToggle, button\]\);/);
   assert.match(source, /callSettingsGlobal\('onEditAvatarPicked', \[avatarFile\]\);/);
   assert.match(source, /bindSettingsStaticActions\(\);/);
+  assert.match(userManagementSource, /function injectSettingsExtraCategory\(\)/);
+  assert.match(userManagementSource, /button\.dataset\.settingsAction = 'open-extra'/);
+  assert.match(userManagementSource, /screen\.id = 'screen-extra'/);
+  assert.match(userManagementSource, /\[1, 2, 3, 4\]\.forEach\(function \(index\) \{/);
+  assert.match(
+    userManagementSource,
+    /appendUserManagementTextElement\(card, 'div', 'settings-extra-card-title', 'Template 0' \+ index\);/
+  );
+  assert.match(userManagementSource, /goTo\('screen-extra'\);/);
   assert.match(userManagementSource, /persoon && persoon\.avatarDataUrl/);
   assert.match(userManagementSource, /document\.createElement\('img'\)/);
   assert.match(userManagementSource, /avatarImg\.src = avatarDataUrl/);

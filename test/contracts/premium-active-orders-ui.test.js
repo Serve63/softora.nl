@@ -239,7 +239,8 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
   assert.match(source, /const opusPrompt = opusFromLayout \|\| buildShortOpusPrompt\(baseData\);/);
   assert.match(source, /if \(shouldHideLegacyDossierBlockTitle\(title\)\) return null;/);
   assert.match(source, /if \(cachedLayoutResponse\) \{[\s\S]*renderDossier\(baseData, cachedLayoutResponse\);/);
-  assert.match(source, /void persistDossierCache\(readChunkedStateValue\(values, DOSSIER_CACHE_KEY\), orderId, dossierFingerprint, layoutResponse\);/);
+  assert.match(source, /activeDossierCacheRaw = readChunkedStateValue\(values, DOSSIER_CACHE_KEY\);/);
+  assert.match(source, /void persistDossierCache\(activeDossierCacheRaw, orderId, dossierFingerprint, layoutResponse\);/);
   assert.doesNotMatch(source, /source-chip/);
   assert.doesNotMatch(source, /Dynamisch via/);
   assert.doesNotMatch(source, /Klantwensen \(bron\):/);

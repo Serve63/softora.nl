@@ -42,6 +42,134 @@ function appendUserManagementTextElement(parent, tagName, className, text) {
   return el;
 }
 
+function injectSettingsExtraStyle() {
+  if (document.getElementById('settings-extra-style')) return;
+  var style = document.createElement('style');
+  style.id = 'settings-extra-style';
+  style.textContent = '.settings-tegel-grid{display:grid;grid-template-columns:repeat(2,280px);gap:22px;align-items:stretch}.settings-extra-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.settings-extra-card{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;min-height:160px;padding:24px;box-shadow:0 8px 24px rgba(26,26,46,.04)}.settings-extra-card-label{font-family:Oswald,sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--crimson);margin-bottom:12px}.settings-extra-card-title{font-family:Oswald,sans-serif;font-size:1.35rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dark);margin-bottom:8px}.settings-extra-card-desc{font-size:.86rem;color:var(--text-light);line-height:1.55}@media (max-width:1180px){.settings-extra-grid{grid-template-columns:1fr}}@media (max-width:860px){.settings-tegel-grid{grid-template-columns:1fr}.tegel{width:100%}}';
+  document.head.appendChild(style);
+}
+
+function appendSettingsExtraArrow(parent) {
+  var arrow = createUserManagementSvgElement('svg', {
+    class: 'tegel-arrow',
+    width: '16',
+    height: '16',
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '2'
+  });
+  arrow.appendChild(createUserManagementSvgElement('polyline', { points: '9 18 15 12 9 6' }));
+  parent.appendChild(arrow);
+}
+
+function appendSettingsExtraTileIcon(parent) {
+  var wrap = document.createElement('div');
+  wrap.className = 'tegel-icon-wrap';
+  var icon = createUserManagementSvgElement('svg', {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '1.8',
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round'
+  });
+  ['M12 3v18', 'M3 12h18', 'M5 5l14 14', 'M19 5L5 19'].forEach(function (pathDefinition) {
+    icon.appendChild(createUserManagementSvgElement('path', { d: pathDefinition }));
+  });
+  wrap.appendChild(icon);
+  parent.appendChild(wrap);
+}
+
+function createSettingsExtraTile() {
+  var button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'tegel';
+  button.dataset.settingsAction = 'open-extra';
+  appendSettingsExtraArrow(button);
+  appendSettingsExtraTileIcon(button);
+  appendUserManagementTextElement(button, 'div', 'tegel-label', 'Extra');
+  appendUserManagementTextElement(
+    button,
+    'div',
+    'tegel-desc',
+    'Ruimte voor extra instellingen en toekomstige onderdelen.'
+  );
+  appendUserManagementTextElement(button, 'div', 'tegel-count', '4 templates');
+  button.addEventListener('click', function () {
+    goTo('screen-extra');
+  });
+  return button;
+}
+
+function createSettingsExtraScreen() {
+  var screen = document.createElement('div');
+  screen.className = 'screen';
+  screen.id = 'screen-extra';
+
+  var header = document.createElement('div');
+  header.className = 'beheer-header';
+  var headerCopy = document.createElement('div');
+  appendUserManagementTextElement(headerCopy, 'div', 'beheer-title', 'Extra');
+  appendUserManagementTextElement(headerCopy, 'div', 'beheer-subtitle', 'Templates voor latere instellingen');
+
+  var actions = document.createElement('div');
+  actions.className = 'beheer-header-actions';
+  var backButton = document.createElement('button');
+  backButton.type = 'button';
+  backButton.className = 'settings-lock-btn magnetic';
+  backButton.title = 'Terug naar instellingenoverzicht';
+  backButton.setAttribute('aria-label', 'Terug naar instellingen');
+  var backIcon = createUserManagementSvgElement('svg', {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '2',
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round'
+  });
+  backIcon.appendChild(createUserManagementSvgElement('path', { d: 'M15 18l-6-6 6-6' }));
+  backButton.appendChild(backIcon);
+  backButton.appendChild(document.createTextNode('Naar instellingen'));
+  backButton.addEventListener('click', function () {
+    backToInstellingenOverzicht();
+  });
+  actions.appendChild(backButton);
+  header.appendChild(headerCopy);
+  header.appendChild(actions);
+  screen.appendChild(header);
+
+  var grid = document.createElement('div');
+  grid.className = 'settings-extra-grid';
+  [1, 2, 3, 4].forEach(function (index) {
+    var card = document.createElement('div');
+    card.className = 'settings-extra-card';
+    appendUserManagementTextElement(card, 'div', 'settings-extra-card-label', 'Default');
+    appendUserManagementTextElement(card, 'div', 'settings-extra-card-title', 'Template 0' + index);
+    appendUserManagementTextElement(card, 'div', 'settings-extra-card-desc', 'Placeholder voor een extra instellingenblok.');
+    grid.appendChild(card);
+  });
+  screen.appendChild(grid);
+  return screen;
+}
+
+function injectSettingsExtraCategory() {
+  var personeelTile = document.querySelector('#screen-overzicht .tegel[data-settings-action="open-pin"]');
+  var screenPersoneel = document.getElementById('screen-personeel');
+  if (!personeelTile || !screenPersoneel) return;
+  var tileHost = personeelTile.parentElement;
+  if (!tileHost) return;
+  injectSettingsExtraStyle();
+  tileHost.classList.add('settings-tegel-grid');
+  if (!tileHost.querySelector('[data-settings-action="open-extra"]')) {
+    tileHost.appendChild(createSettingsExtraTile());
+  }
+  if (!document.getElementById('screen-extra')) {
+    screenPersoneel.parentNode.insertBefore(createSettingsExtraScreen(), screenPersoneel);
+  }
+}
+
 function renderUserManagementEmptyState(container, message) {
   if (!container) return;
   var empty = document.createElement('div');
@@ -789,6 +917,8 @@ function showToast(msg) {
     toast.classList.remove('show');
   }, 2800);
 }
+
+injectSettingsExtraCategory();
 
 (async function bootstrapPersoneelManager() {
   try {

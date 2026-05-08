@@ -854,7 +854,7 @@
             </div>
         </main>
     </div>
-
+    <script src="assets/order-dossier-prompt-voice.js?v=20260508a" defer></script>
     <script>
         (function initDossierPage() {
             const REMOTE_SCOPE = 'premium_active_orders';
@@ -864,7 +864,7 @@
             const DOSSIER_LAYOUT_SCHEMA_VERSION = '20260417a';
             const DOSSIER_LOADING_TITLE = 'uitvoerdossier laden';
             const root = document.getElementById('dossierRoot');
-
+            let activeDossierBaseData = null, activeDossierLayoutResponse = null, activeDossierFingerprint = '', activeDossierCacheRaw = '';
             function esc(value) {
                 return String(value || '')
                     .replace(/&/g, '&amp;')
@@ -1043,7 +1043,7 @@
                     actor: 'browser',
                 });
             }
-
+            function bindPromptVoiceControls(baseData, layoutResponse) { activeDossierBaseData = baseData; activeDossierLayoutResponse = layoutResponse; activeDossierFingerprint = buildDossierCacheFingerprint(baseData); window.SoftoraOrderDossierPromptVoiceConfig = { orderId: Number(baseData?.orderId) || 0, company: String(baseData?.company || ''), title: String(baseData?.title || ''), contact: String(baseData?.contact || ''), description: String(baseData?.description || ''), transcript: String(baseData?.transcript || ''), getCurrentPrompt() { const promptEl = document.getElementById('opusPromptDisplay'); return promptEl ? String(promptEl.textContent || '').trim() : ''; }, async onPromptUpdated(promptText) { const nextPrompt = clipText(String(promptText || '').trim(), 22000); if (!nextPrompt || !activeDossierBaseData) return; const currentLayout = normalizeLayoutPayload(activeDossierLayoutResponse?.layout || activeDossierLayoutResponse || {}, activeDossierBaseData); const nextLayoutResponse = { ...(activeDossierLayoutResponse || {}), ok: true, layout: { ...currentLayout, opusPrompt: nextPrompt }, source: activeDossierLayoutResponse?.source || 'voice-prompt-rewrite', promptVoiceUpdatedAt: new Date().toISOString() }; activeDossierLayoutResponse = nextLayoutResponse; await persistDossierCache(activeDossierCacheRaw, Number(activeDossierBaseData.orderId) || 0, activeDossierFingerprint, nextLayoutResponse); activeDossierCacheRaw = JSON.stringify(buildNextDossierCacheMap(activeDossierCacheRaw, Number(activeDossierBaseData.orderId) || 0, activeDossierFingerprint, nextLayoutResponse)); } }; if (window.SoftoraOrderDossierPromptVoice?.bind) window.SoftoraOrderDossierPromptVoice.bind(window.SoftoraOrderDossierPromptVoiceConfig); }
             function renderError(message) {
                 root.innerHTML = `<div class="error">${esc(message || 'Uitvoerdossier niet gevonden.')}</div>`;
             }
@@ -1626,24 +1626,24 @@
                                     ${warning ? `<div class="warning-note">${esc(warning)}</div>` : ''}
                                     ${blocksHtml}
 
-                                    <section class="layout-block">
-                                        <div class="layout-block-head"><h2 class="section-title">Website-bouwprompt</h2></div>
+                                    <section class="layout-block prompt-layout-block">
+                                        <div class="layout-block-head prompt-block-head"><h2 class="section-title">Website-bouwprompt</h2><button type="button" class="prompt-voice-btn screen-only" id="opusPromptVoiceBtn" aria-label="Website-bouwprompt aanpassen met spraak" title="Website-bouwprompt aanpassen met spraak"></button></div>
                                         <pre class="prompt-box" id="opusPromptDisplay">${esc(opusPrompt)}</pre>
+                                        <div class="prompt-voice-status screen-only" id="opusPromptVoiceStatus" role="status" aria-live="polite"></div>
                                     </section>
                                 </div>
                             </article>
                         </div>
                     </div>
                 `;
-
                 const printBtn = document.getElementById('printBtn');
                 if (printBtn) {
                     printBtn.addEventListener('click', () => {
                         window.print();
                     });
                 }
-
                 syncPaperScale();
+                bindPromptVoiceControls(baseData, layoutResponse);
                 requestAnimationFrame(() => {
                     syncPaperScale();
                 });
@@ -1658,6 +1658,7 @@
 
                 renderLoading(DOSSIER_LOADING_TITLE);
                 const values = await fetchUiStateValues(REMOTE_SCOPE);
+                activeDossierCacheRaw = readChunkedStateValue(values, DOSSIER_CACHE_KEY);
                 const customOrders = safeJsonParse(readChunkedStateValue(values, CUSTOM_ORDERS_KEY), []);
                 const runtimeMap = safeJsonParse(readChunkedStateValue(values, ORDER_RUNTIME_KEY), {});
                 const customOrder = Array.isArray(customOrders)
@@ -1666,16 +1667,14 @@
                 const runtimeOrder = runtimeMap && typeof runtimeMap === 'object'
                     ? runtimeMap[String(orderId)] || null
                     : null;
-
                 if (!customOrder && !runtimeOrder) {
                     renderError(`Geen dossierdata gevonden voor opdracht #${orderId}.`);
                     return;
                 }
-
                 const baseData = buildBaseOrderData(orderId, customOrder, runtimeOrder);
                 const dossierFingerprint = buildDossierCacheFingerprint(baseData);
                 const cachedLayoutResponse = getCachedDossierLayoutResponse(
-                    readChunkedStateValue(values, DOSSIER_CACHE_KEY),
+                    activeDossierCacheRaw,
                     orderId,
                     dossierFingerprint
                 );
@@ -1702,7 +1701,7 @@
                 }
 
                 renderDossier(baseData, layoutResponse);
-                void persistDossierCache(readChunkedStateValue(values, DOSSIER_CACHE_KEY), orderId, dossierFingerprint, layoutResponse);
+                void persistDossierCache(activeDossierCacheRaw, orderId, dossierFingerprint, layoutResponse);
 
                 if (shouldAutoPrint()) {
                     window.setTimeout(() => {

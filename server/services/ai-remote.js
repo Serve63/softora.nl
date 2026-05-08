@@ -1218,7 +1218,7 @@ function createAiRemoteService(deps = {}) {
     }
 
     const language = normalizeString(options.language || 'nl') || 'nl';
-    const context = truncateText(normalizeString(options.context || ''), 2000);
+    const context = truncateText(normalizeString(options.context || ''), 18000);
 
     const systemPrompt = [
       'Je bent een senior digital strategist en prompt engineer.',
@@ -1228,6 +1228,7 @@ function createAiRemoteService(deps = {}) {
       '- Als info ontbreekt, gebruik placeholders in vorm [VUL IN: ...].',
       '- Output alleen de prompttekst, zonder markdown fences of extra uitleg.',
       '- Schrijf in duidelijke professionele taal in de gevraagde taal.',
+      '- Als de context een bestaande website-bouwprompt bevat met een wijzigingsinstructie, herschrijf dan de volledige prompt coherent volgens die wijziging.',
     ].join('\n');
 
     const userPrompt = [
