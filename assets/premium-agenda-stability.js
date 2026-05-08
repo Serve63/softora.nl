@@ -381,21 +381,11 @@ syncWorkspaceExitControls = function syncWorkspaceExitControlsStable() {
 
 const baseOpenManualAppointmentModal = openManualAppointmentModal;
 openManualAppointmentModal = function openManualAppointmentModalStable(dateYmd) {
-    if (isAgendaDateBeforeToday(dateYmd)) return;
     return baseOpenManualAppointmentModal(dateYmd);
 };
 
 const baseSubmitManualAppointment = submitManualAppointment;
 submitManualAppointment = async function submitManualAppointmentStable() {
-    const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : '';
-    if (isAgendaDateBeforeToday(manualAppointmentSelectedDate)) {
-        setManualAppointmentStatus('Je kunt geen afspraak in het verleden inplannen.', 'error');
-        return;
-    }
-    if (isManualAppointmentStartInPast(manualAppointmentSelectedDate, timeVal)) {
-        setManualAppointmentStatus('Dit tijdstip is al voorbij. Kies een toekomstige datum of tijd.', 'error');
-        return;
-    }
     return baseSubmitManualAppointment();
 };
 
@@ -451,10 +441,7 @@ const baseRenderCalendar = renderCalendar;
 renderCalendar = function renderCalendarStable() {
     baseRenderCalendar();
     document.querySelectorAll('[data-calendar-date]').forEach((cell) => {
-        const date = cell.getAttribute('data-calendar-date');
-        if (!isAgendaDateBeforeToday(date)) return;
-        cell.classList.remove('calendar-day-selectable');
-        cell.removeAttribute('data-calendar-date');
+        cell.classList.add('calendar-day-selectable');
     });
 };
 

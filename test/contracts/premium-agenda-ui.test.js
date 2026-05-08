@@ -237,6 +237,7 @@ test('premium agenda toont handmatige lead-eigenaren in maandheader zonder losse
   assert.doesNotMatch(stabilitySource, /renderManualLeadStatsCard/);
   assert.doesNotMatch(stabilitySource, /Handmatige leads/);
   assert.match(stabilitySource, /renderCalendar = function renderCalendarStable\(\) \{[\s\S]*baseRenderCalendar\(\);[\s\S]*document\.querySelectorAll\('\[data-calendar-date\]'\)/);
+  assert.match(stabilitySource, /cell\.classList\.add\('calendar-day-selectable'\)/);
 });
 
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {
@@ -307,8 +308,11 @@ test('premium agenda verbergt dealacties voor handmatige overige afspraken en be
   assert.match(stabilitySource, /function setModalAudioBlockHidden\(hidden\)/);
   assert.match(stabilitySource, /syncManualAppointmentModalDetails\(apt\);/);
   assert.match(stabilitySource, /const agendaBootFailsafeTimer = window\.setTimeout\(releaseAgendaBootShell, 4500\);/);
-  assert.match(stabilitySource, /function isAgendaDateBeforeToday\(value\)/);
-  assert.match(stabilitySource, /if \(isManualAppointmentStartInPast\(manualAppointmentSelectedDate, timeVal\)\)/);
+  assert.match(stabilitySource, /return baseOpenManualAppointmentModal\(dateYmd\);/);
+  assert.match(stabilitySource, /return baseSubmitManualAppointment\(\);/);
+  assert.doesNotMatch(stabilitySource, /Dit tijdstip is al voorbij/);
+  assert.doesNotMatch(stabilitySource, /Je kunt geen afspraak in het verleden inplannen/);
+  assert.doesNotMatch(stabilitySource, /isManualAppointmentStartInPast\(manualAppointmentSelectedDate/);
 });
 
 test('premium agenda toont Ruben planning uitleg alleen in AI beheer modus', () => {
