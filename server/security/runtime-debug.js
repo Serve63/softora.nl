@@ -78,6 +78,24 @@ function createRuntimeDebugAccessGuard(options = {}) {
       return res.status(403).json({ ok: false, error: 'Alleen Full Acces-accounts hebben toegang.' });
     }
 
+    if (!authState.user) {
+      appendSecurityAuditEvent(
+        {
+          type: 'debug_admin_unverified',
+          severity: 'warning',
+          success: false,
+          email: authState.email || '',
+          ip: getClientIpFromRequest(req),
+          path: getRequestPathname(req),
+          origin: getRequestOriginFromHeaders(req),
+          userAgent: req.get('user-agent'),
+          detail: 'Runtime debug route geweigerd omdat adminstatus niet via gebruiker kon worden bevestigd.',
+        },
+        'security_debug_admin_unverified'
+      );
+      return res.status(403).json({ ok: false, error: 'Adminstatus kon niet veilig worden bevestigd.' });
+    }
+
     if (!isPremiumAdminIpAllowed(req)) {
       appendSecurityAuditEvent(
         {

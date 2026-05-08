@@ -104,6 +104,20 @@ test('call provider recording helpers prefer regional Twilio API keys when confi
   assert.equal(decoded, 'SKregional123:regional-secret');
 });
 
+test('call provider recording helpers append bridge media token to websocket urls', () => {
+  const helpers = createHelpers({
+    env: {
+      TWILIO_MEDIA_BRIDGE_TOKEN: 'bridge-token-123',
+      TWILIO_MEDIA_WS_URL_OPENAI_REALTIME_1_5: 'wss://openai.example/media?stack=openai',
+    },
+  });
+
+  assert.equal(
+    helpers.getTwilioMediaWsUrlForStack('openai'),
+    'wss://openai.example/media?stack=openai&token=bridge-token-123'
+  );
+});
+
 test('call provider recording helpers normalize references and resolve preferred proxy urls', () => {
   const helpers = createHelpers();
 

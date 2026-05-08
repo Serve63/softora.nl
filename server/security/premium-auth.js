@@ -3,7 +3,6 @@ const { normalizeRequestPathname } = require('./request-context');
 const PREMIUM_PUBLIC_API_EXACT_MATCHES = new Set([
   '/api/healthz',
   '/api/health/baseline',
-  '/api/health/dependencies',
   '/api/auth/login',
   '/api/auth/logout',
   '/api/auth/session',
@@ -377,6 +376,9 @@ function createPremiumApiAccessGuard(options = {}) {
     }
     if (!authState.isAdmin) {
       return res.status(403).json({ ok: false, error: 'Alleen Full Acces-accounts hebben toegang.' });
+    }
+    if (!authState.user) {
+      return res.status(403).json({ ok: false, error: 'Adminstatus kon niet veilig worden bevestigd.' });
     }
     return next();
   }

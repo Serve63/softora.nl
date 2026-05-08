@@ -342,6 +342,26 @@ test('call provider helpers fail early when realtime stacks miss a media websock
   );
 });
 
+test('call provider helpers append bridge media token before Twilio receives stream url', () => {
+  const helpers = createHelpers({
+    env: {
+      TWILIO_MEDIA_BRIDGE_TOKEN: 'bridge-token-123',
+      TWILIO_MEDIA_WS_URL_OPENAI_REALTIME_1_5: 'wss://openai.example/media',
+    },
+  });
+
+  assert.equal(
+    helpers.getTwilioMediaWsUrlForStack('openai'),
+    'wss://openai.example/media?token=bridge-token-123'
+  );
+
+  const payload = helpers.buildTwilioOutboundPayload(
+    { phone: '06 12 34 56 78' },
+    { coldcallingStack: 'openai', publicBaseUrl: 'https://demo.softora.test' }
+  );
+  assert.match(payload.Url, /stack=openai_realtime_1_5/);
+});
+
 test('call provider helpers rewrite the legacy dead Gemini bridge host to the live compat host', () => {
   const helpers = createHelpers({
     env: {

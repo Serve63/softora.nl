@@ -12,6 +12,44 @@ const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
 const DEFAULT_USD_TO_EUR_RATE = 0.92;
 const RETELL_COST_SUMMARY_CACHE_MS = 12000;
 const retellCostSummaryCacheByScope = new Map();
+const SENSITIVE_CALL_FIELD_NAMES = new Set([
+  'fullTranscript',
+  'recordingSid',
+  'recordingUrl',
+  'recordingUrlProxy',
+  'recordingMultiChannelUrl',
+  'recording_multi_channel_url',
+  'recording_url',
+  'scrubbedRecordingUrl',
+  'scrubbed_recording_url',
+  'transcript',
+  'transcriptFull',
+]);
+
+function canViewSensitiveCallData(req) {
+  return Boolean(req?.premiumAuth?.authenticated && req.premiumAuth.isAdmin && req.premiumAuth.user);
+}
+
+function redactSensitiveCallFields(value) {
+  if (Array.isArray(value)) return value.map((item) => redactSensitiveCallFields(item));
+  if (!value || typeof value !== 'object') return value;
+  const redacted = {};
+  Object.entries(value).forEach(([key, entryValue]) => {
+    if (SENSITIVE_CALL_FIELD_NAMES.has(key)) return;
+    redacted[key] = redactSensitiveCallFields(entryValue);
+  });
+  return redacted;
+}
+
+function filterSensitiveCallPayloadForRequest(req, value) {
+  return canViewSensitiveCallData(req) ? value : redactSensitiveCallFields(value);
+}
+
+function getAdminOnlyGuard(deps) {
+  return typeof deps.requirePremiumAdminApiAccess === 'function'
+    ? deps.requirePremiumAdminApiAccess
+    : (_req, _res, next) => next();
+}
 
 function hasKnownRetellCost(update) {
   const costUsdMilli = Number(update?.costUsdMilli ?? update?.cost_usd_milli);
@@ -147,14 +185,14 @@ async function buildRetellCostSummary(deps, scope, options = {}) {
 }
 
 function createSendColdcallingStatusResponse(deps) {
-  return async function sendColdcallingStatusResponse(res, callId) {
+  return async function sendColdcallingStatusResponse(req, res, callId) {
     const cached = deps.callUpdatesById.get(callId) || null;
     const provider = deps
       .normalizeString(cached?.provider || deps.inferCallProvider(callId, deps.getColdcallingProvider()))
       .toLowerCase();
 
-    const sendCached = (providerName) =>
-      res.status(200).json({
+    const sendCached = (providerName) => {
+      const payload = {
         ok: true,
         source: 'cache',
         provider: providerName,
@@ -165,7 +203,9 @@ function createSendColdcallingStatusResponse(deps) {
         endedAt: deps.normalizeString(cached?.endedAt || ''),
         durationSeconds: deps.parseNumberSafe(cached?.durationSeconds, null),
         recordingUrl: deps.normalizeString(cached?.recordingUrl || ''),
-      });
+      };
+      return res.status(200).json(filterSensitiveCallPayloadForRequest(req, payload));
+    };
 
     if (provider === 'twilio') {
       if (!deps.isTwilioStatusApiConfigured()) {
@@ -190,7 +230,7 @@ function createSendColdcallingStatusResponse(deps) {
           await deps.waitForQueuedRuntimeStatePersist();
         }
 
-        return res.status(200).json({
+        return res.status(200).json(filterSensitiveCallPayloadForRequest(req, {
           ok: true,
           endpoint,
           source: 'twilio',
@@ -204,7 +244,7 @@ function createSendColdcallingStatusResponse(deps) {
           endedAt: deps.normalizeString(update?.endedAt || deps.parseDateToIso(data?.end_time)),
           durationSeconds: deps.parseNumberSafe(update?.durationSeconds || data?.duration, null),
           recordingUrl: deps.normalizeString(update?.recordingUrl || data?.recording_url || ''),
-        });
+        }));
       } catch (error) {
         return res.status(Number(error?.status || 500)).json({
           ok: false,
@@ -229,7 +269,7 @@ function createSendColdcallingStatusResponse(deps) {
         await deps.waitForQueuedRuntimeStatePersist();
       }
 
-      return res.status(200).json({
+      return res.status(200).json(filterSensitiveCallPayloadForRequest(req, {
         ok: true,
         endpoint,
         source: 'retell',
@@ -253,7 +293,7 @@ function createSendColdcallingStatusResponse(deps) {
             data?.scrubbed_recording_url ||
             ''
         ),
-      });
+      }));
     } catch (error) {
       return res.status(Number(error?.status || 500)).json({
         ok: false,
@@ -332,6 +372,7 @@ function registerColdcallingWebhookRoutes(app, deps) {
 
 function registerColdcallingRoutes(app, deps) {
   const sendColdcallingStatusResponse = createSendColdcallingStatusResponse(deps);
+  const requireAdmin = getAdminOnlyGuard(deps);
 
   app.post('/api/coldcalling/start', async (req, res) => {
     const validated = deps.validateStartPayload(req.body);
@@ -462,7 +503,7 @@ function registerColdcallingRoutes(app, deps) {
     if (!callId) {
       return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
     }
-    return sendColdcallingStatusResponse(res, callId);
+    return sendColdcallingStatusResponse(req, res, callId);
   });
 
   app.get('/api/coldcalling/status', async (req, res) => {
@@ -470,10 +511,10 @@ function registerColdcallingRoutes(app, deps) {
     if (!callId) {
       return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
     }
-    return sendColdcallingStatusResponse(res, callId);
+    return sendColdcallingStatusResponse(req, res, callId);
   });
 
-  app.get('/api/coldcalling/recording-proxy', async (req, res) => {
+  app.get('/api/coldcalling/recording-proxy', requireAdmin, async (req, res) => {
     if (!deps.isTwilioStatusApiConfigured()) {
       return res
         .status(500)
@@ -719,11 +760,11 @@ function registerColdcallingRoutes(app, deps) {
     return res.status(200).json({
       ok: true,
       count: Math.min(limit, filtered.length),
-      updates: filtered.slice(0, limit),
+      updates: filterSensitiveCallPayloadForRequest(req, filtered.slice(0, limit)),
     });
   });
 
-  app.get('/api/coldcalling/cost-summary', async (req, res) => {
+  app.get('/api/coldcalling/cost-summary', requireAdmin, async (req, res) => {
     const scope = normalizeRetellCostSummaryScope(req.query?.scope);
     if (!deps.hasRetellApiKey()) {
       return res.status(503).json({
@@ -787,7 +828,7 @@ function registerColdcallingRoutes(app, deps) {
       }
       return res.status(200).json({
         ok: true,
-        detail,
+        detail: filterSensitiveCallPayloadForRequest(req, detail),
       });
     } catch (error) {
       return res.status(500).json({
@@ -869,7 +910,7 @@ function registerColdcallingRoutes(app, deps) {
     return res.status(200).json({
       ok: true,
       count: Math.min(limit, deps.recentAiCallInsights.length),
-      insights: deps.recentAiCallInsights.slice(0, limit),
+      insights: filterSensitiveCallPayloadForRequest(req, deps.recentAiCallInsights.slice(0, limit)),
       openAiEnabled: Boolean(deps.getOpenAiApiKey()),
       model: deps.openAiModel,
     });

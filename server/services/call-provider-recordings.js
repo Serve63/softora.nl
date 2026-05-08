@@ -180,13 +180,28 @@ function createCallProviderRecordingHelpers(options = {}) {
     );
   }
 
+  function appendTwilioMediaBridgeToken(value) {
+    const normalizedUrl = normalizeTwilioMediaWsUrl(value);
+    const token = normalizeString(env.TWILIO_MEDIA_BRIDGE_TOKEN || env.BRIDGE_MEDIA_TOKEN || '');
+    if (!normalizedUrl || !token) return normalizedUrl;
+    try {
+      const parsed = new URL(normalizedUrl);
+      if (!parsed.searchParams.has('token')) {
+        parsed.searchParams.set('token', token);
+      }
+      return parsed.toString();
+    } catch {
+      return normalizedUrl;
+    }
+  }
+
   function getTwilioMediaWsUrlForStack(stack) {
     const suffixes = getTwilioStackEnvSuffixes(stack);
     for (const suffix of suffixes) {
       const candidate = normalizeString(env[`TWILIO_MEDIA_WS_URL_${suffix}`]);
-      if (candidate) return normalizeTwilioMediaWsUrl(candidate);
+      if (candidate) return appendTwilioMediaBridgeToken(candidate);
     }
-    return normalizeTwilioMediaWsUrl(env.TWILIO_MEDIA_WS_URL || defaultTwilioMediaWsUrl);
+    return appendTwilioMediaBridgeToken(env.TWILIO_MEDIA_WS_URL || defaultTwilioMediaWsUrl);
   }
 
   function getTwilioFromNumberForStack(stack) {

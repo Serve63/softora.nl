@@ -179,9 +179,9 @@ function loadRuntimeEnv(env = process.env) {
       ),
       agendaAppSessionTtlDays: readBoundedNumberEnv(
         safeEnv.AGENDA_APP_SESSION_TTL_DAYS,
-        3650,
+        30,
         1,
-        3650
+        90
       ),
       mfaTotpSecret: normalizeString(safeEnv.PREMIUM_MFA_TOTP_SECRET || ''),
       adminIpAllowlist: normalizeString(safeEnv.PREMIUM_ADMIN_IP_ALLOWLIST || ''),

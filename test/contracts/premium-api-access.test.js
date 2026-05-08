@@ -190,7 +190,7 @@ test('premium admin api guard enforces login and admin role', () => {
   const adminRes = createResponseRecorder();
   let adminNext = false;
   guard.requirePremiumAdminApiAccess(
-    { premiumAuth: { authenticated: true, isAdmin: true } },
+    { premiumAuth: { authenticated: true, isAdmin: true, user: { id: 'usr_admin' } } },
     adminRes,
     () => {
       adminNext = true;
@@ -198,4 +198,17 @@ test('premium admin api guard enforces login and admin role', () => {
   );
   assert.equal(adminNext, true);
   assert.equal(adminRes.statusCode, null);
+
+  const unverifiedAdminRes = createResponseRecorder();
+  let unverifiedAdminNext = false;
+  guard.requirePremiumAdminApiAccess(
+    { premiumAuth: { authenticated: true, isAdmin: true, user: null } },
+    unverifiedAdminRes,
+    () => {
+      unverifiedAdminNext = true;
+    }
+  );
+  assert.equal(unverifiedAdminNext, false);
+  assert.equal(unverifiedAdminRes.statusCode, 403);
+  assert.equal(unverifiedAdminRes.body.error, 'Adminstatus kon niet veilig worden bevestigd.');
 });
