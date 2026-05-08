@@ -80,7 +80,8 @@ export function runRollingWalkForward({
       assets: aligned.assets,
       stressTop: 3,
     });
-    const chosenConfig = optimizer.best?.config || config;
+    const optimizerAccepted = optimizer.best?.verdict === 'CANDIDATE';
+    const chosenConfig = optimizerAccepted ? optimizer.best.config : config;
     const testResult = runBacktest({
       candlesByAsset: foldCandles,
       config: {
@@ -98,6 +99,7 @@ export function runRollingWalkForward({
       testStart: aligned.times[range.trainEnd],
       testEnd: aligned.times[range.testEnd - 1],
       optimizerVerdict: optimizer.best?.verdict || 'NONE',
+      optimizerAccepted,
       config: {
         rebalanceBars: chosenConfig.rebalanceBars,
         emergencyDrawdownStop: chosenConfig.emergencyDrawdownStop,
