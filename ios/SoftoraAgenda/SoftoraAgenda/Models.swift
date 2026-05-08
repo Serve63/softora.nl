@@ -189,17 +189,20 @@ struct NewAppointmentDraft {
     var notes = ""
     var repeatChoice: RepeatChoice = .none
     var appointmentType: AppointmentType = .personal
+    var businessKind: BusinessAppointmentKind = .appointment
     var businessMeetingType: BusinessMeetingType = .website
 
     init(
         planner: Planner = .serve,
         date: Date = Date(),
         appointmentType: AppointmentType = .personal,
+        businessKind: BusinessAppointmentKind = .appointment,
         businessMeetingType: BusinessMeetingType = .website
     ) {
         self.planner = planner
         self.date = date
         self.appointmentType = appointmentType
+        self.businessKind = businessKind
         self.businessMeetingType = businessMeetingType
     }
 
@@ -229,6 +232,31 @@ enum AppointmentType: String, CaseIterable, Identifiable {
             "Privé"
         case .business:
             "Zakelijk"
+        }
+    }
+}
+
+enum BusinessAppointmentKind: String, Identifiable {
+    case meeting
+    case appointment
+
+    var id: String { rawValue }
+
+    var apiValue: String {
+        switch self {
+        case .meeting:
+            "meeting"
+        case .appointment:
+            "appointment"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .meeting:
+            "Meeting"
+        case .appointment:
+            "Afspraak"
         }
     }
 }
@@ -311,7 +339,9 @@ struct ManualAppointmentPayload: Encodable {
     let recurrence: String
     let repeatChoice: String
     let appointmentType: String
+    let appointmentKind: String
     let businessMeetingType: String
+    let manualLeadOwner: String
     let actor: String
 }
 

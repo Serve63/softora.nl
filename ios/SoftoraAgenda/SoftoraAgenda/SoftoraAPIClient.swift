@@ -57,12 +57,13 @@ struct SoftoraAPIClient {
         let location = draft.location.trimmingCharacters(in: .whitespacesAndNewlines)
         let notes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let time = AgendaDateFormatter.time(from: draft.time)
+        let isBusinessMeeting = draft.appointmentType == .business && draft.businessKind == .meeting
         let legendChoice = draft.appointmentType == .business
             ? draft.businessMeetingType.apiValue
             : "manual-overig"
         let payload = ManualAppointmentPayload(
             date: AgendaDateFormatter.ymd(from: draft.date),
-            who: draft.planner.apiValue,
+            who: isBusinessMeeting ? Planner.both.apiValue : draft.planner.apiValue,
             title: title,
             time: time,
             activityTime: time,
@@ -73,7 +74,9 @@ struct SoftoraAPIClient {
             recurrence: draft.repeatChoice.apiValue,
             repeatChoice: draft.repeatChoice.apiValue,
             appointmentType: draft.appointmentType.apiValue,
+            appointmentKind: draft.appointmentType == .business ? draft.businessKind.apiValue : "",
             businessMeetingType: draft.businessMeetingType.apiValue,
+            manualLeadOwner: isBusinessMeeting ? draft.planner.apiValue : "",
             actor: "softora-ios-agenda"
         )
         let response: ManualAppointmentResponse = try await post(

@@ -13,6 +13,7 @@ struct AddAppointmentView: View {
         store: AgendaStore,
         date: Date = Date(),
         appointmentType: AppointmentType = .personal,
+        businessKind: BusinessAppointmentKind = .appointment,
         businessMeetingType: BusinessMeetingType = .website
     ) {
         self.store = store
@@ -21,6 +22,7 @@ struct AddAppointmentView: View {
                 planner: store.selectedPlanner,
                 date: date,
                 appointmentType: appointmentType,
+                businessKind: businessKind,
                 businessMeetingType: businessMeetingType
             )
         )
@@ -189,7 +191,7 @@ struct AddAppointmentView: View {
     }
 
     private var showsPlannerChoices: Bool {
-        draft.appointmentType == .business
+        draft.appointmentType == .business && draft.businessKind == .meeting
     }
 
     private var repeatRow: some View {
@@ -271,7 +273,7 @@ struct AddAppointmentView: View {
     }
 
     private func save() {
-        if draft.appointmentType == .personal {
+        if draft.appointmentType == .personal || draft.businessKind == .appointment {
             draft.planner = store.selectedPlanner
         }
 

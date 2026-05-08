@@ -6,6 +6,7 @@ struct AgendaListView: View {
     @State private var weekStart = AgendaDateFormatter.weekStart(containing: Date())
     @State private var pendingDate: Date?
     @State private var isChoosingAppointmentType = false
+    @State private var isChoosingBusinessKind = false
     @State private var isChoosingBusinessType = false
     @State private var selectedBusinessType: BusinessMeetingType = .website
     @State private var addConfiguration: AddAppointmentConfiguration?
@@ -64,9 +65,29 @@ struct AgendaListView: View {
                         openAddSheet(appointmentType: .personal)
                     },
                     onSelectBusiness: {
-                        selectedBusinessType = .website
                         isChoosingAppointmentType = false
+                        isChoosingBusinessKind = true
+                    }
+                )
+            }
+
+            if isChoosingBusinessKind {
+                BusinessKindOverlay(
+                    onBack: {
+                        isChoosingBusinessKind = false
+                        isChoosingAppointmentType = true
+                    },
+                    onSelectMeeting: {
+                        selectedBusinessType = .website
+                        isChoosingBusinessKind = false
                         isChoosingBusinessType = true
+                    },
+                    onSelectAppointment: {
+                        openAddSheet(
+                            appointmentType: .business,
+                            businessKind: .appointment,
+                            businessMeetingType: .software
+                        )
                     }
                 )
             }
@@ -76,11 +97,12 @@ struct AgendaListView: View {
                     selectedType: $selectedBusinessType,
                     onBack: {
                         isChoosingBusinessType = false
-                        isChoosingAppointmentType = true
+                        isChoosingBusinessKind = true
                     },
                     onNext: {
                         openAddSheet(
                             appointmentType: .business,
+                            businessKind: .meeting,
                             businessMeetingType: selectedBusinessType
                         )
                     }
@@ -92,6 +114,7 @@ struct AgendaListView: View {
                 store: store,
                 date: configuration.date,
                 appointmentType: configuration.appointmentType,
+                businessKind: configuration.businessKind,
                 businessMeetingType: configuration.businessMeetingType
             )
         }
@@ -106,7 +129,7 @@ struct AgendaListView: View {
     }
 
     private var overlayIsOpen: Bool {
-        isChoosingAppointmentType || isChoosingBusinessType
+        isChoosingAppointmentType || isChoosingBusinessKind || isChoosingBusinessType
     }
 
     private var appointmentsByDate: [String: [AgendaAppointment]] {
@@ -155,19 +178,24 @@ struct AgendaListView: View {
 
     private func closeAppointmentTypeChoice() {
         isChoosingAppointmentType = false
+        isChoosingBusinessKind = false
+        isChoosingBusinessType = false
         pendingDate = nil
     }
 
     private func openAddSheet(
         appointmentType: AppointmentType,
+        businessKind: BusinessAppointmentKind = .appointment,
         businessMeetingType: BusinessMeetingType = .website
     ) {
         addConfiguration = AddAppointmentConfiguration(
             date: pendingDate ?? Date(),
             appointmentType: appointmentType,
+            businessKind: businessKind,
             businessMeetingType: businessMeetingType
         )
         isChoosingAppointmentType = false
+        isChoosingBusinessKind = false
         isChoosingBusinessType = false
     }
 }
@@ -176,6 +204,7 @@ private struct AddAppointmentConfiguration: Identifiable {
     let id = UUID()
     let date: Date
     let appointmentType: AppointmentType
+    let businessKind: BusinessAppointmentKind
     let businessMeetingType: BusinessMeetingType
 }
 
@@ -595,6 +624,34 @@ private struct BusinessTypeOverlay: View {
                 }
 
                 ActionChoiceButton(title: "Volgende", isPrimary: true, action: onNext)
+            }
+        }
+    }
+}
+
+private struct BusinessKindOverlay: View {
+    let onBack: () -> Void
+    let onSelectMeeting: () -> Void
+    let onSelectAppointment: () -> Void
+
+    var body: some View {
+        BottomChoiceOverlay(onClose: onBack) {
+            VStack(spacing: 14) {
+                Text("Wat voor zakelijk?")
+                    .font(.softoraDisplay(20, weight: .semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+                    .foregroundStyle(Color.softoraInk)
+
+                HStack(spacing: 10) {
+                    TypeChoiceButton(title: BusinessAppointmentKind.meeting.title, isPrimary: true, action: onSelectMeeting)
+                    TypeChoiceButton(title: BusinessAppointmentKind.appointment.title, isPrimary: false, action: onSelectAppointment)
+                }
+
+                Color.clear
+                    .frame(height: 20)
+                    .padding(.top, 2)
+                    .accessibilityHidden(true)
             }
         }
     }
