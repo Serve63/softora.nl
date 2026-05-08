@@ -259,18 +259,24 @@ test('premium agenda keeps appointment color in sync with existing dossiers', ()
   );
 });
 
-test('premium agenda shows klantwerk label on Saturdays', () => {
+test('premium agenda shows klantwerk on Wednesdays and Saturdays without blocking planning', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /const isSaturday = Boolean\(dateStr\) && i % 7 === 5;/);
+  assert.match(pageSource, /function isYmdCalendarKlantwerkDay\(/);
+  assert.match(pageSource, /return day === 3 \|\| day === 6;/);
+  assert.match(pageSource, /const isKlantwerkDay = Boolean\(dateStr\) && isYmdCalendarKlantwerkDay\(dateStr\);/);
   assert.match(pageSource, /calendar-day--klantwerk/);
   assert.match(pageSource, /calendar-day-klantwerk-label/);
-  assert.match(pageSource, /function isYmdCalendarSaturday\(/);
-  assert.match(pageSource, /if \(isYmdCalendarSaturday\(item\.date\)\) return null;/);
-  assert.match(pageSource, /const withoutSaturday = appointments\.filter/);
-  assert.match(pageSource, /if \(cell\.classList\.contains\('calendar-day--klantwerk'\)\) return;/);
-  assert.match(pageSource, /if \(isYmdCalendarSaturday\(picked\)\) return;/);
+  assert.match(pageSource, /if \(!isOtherMonth\) classes \+= ' calendar-day-selectable';/);
+  assert.match(pageSource, /!isOtherMonth && dateStr \? ` data-calendar-date="\$\{dateStr\}"` : '';/);
+  assert.doesNotMatch(pageSource, /function isYmdCalendarSaturday\(/);
+  assert.doesNotMatch(pageSource, /if \(isYmdCalendarSaturday\(item\.date\)\) return null;/);
+  assert.doesNotMatch(pageSource, /const withoutSaturday = appointments\.filter/);
+  assert.doesNotMatch(pageSource, /if \(cell\.classList\.contains\('calendar-day--klantwerk'\)\) return;/);
+  assert.doesNotMatch(pageSource, /if \(isYmdCalendarSaturday\(picked\)\) return;/);
+  assert.doesNotMatch(pageSource, /Op zaterdag staan geen afspraken in de agenda\./);
+  assert.doesNotMatch(pageSource, /\.calendar-day--klantwerk:hover \{[\s\S]*background:\s*transparent;/);
 });
 
 test('premium agenda verbergt dealacties voor handmatige overige afspraken en behoudt boot-failsafe', () => {
