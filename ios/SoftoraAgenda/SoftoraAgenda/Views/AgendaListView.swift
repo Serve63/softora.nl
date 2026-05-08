@@ -637,7 +637,7 @@ private struct BusinessKindOverlay: View {
     var body: some View {
         BottomChoiceOverlay(onClose: onBack) {
             VStack(spacing: 14) {
-                Text("Wat voor zakelijk?")
+                Text("Maak een keuze")
                     .font(.softoraDisplay(20, weight: .semibold))
                     .textCase(.uppercase)
                     .tracking(0.8)
