@@ -93,6 +93,11 @@ export function profitFactorLabTestCases() {
     {
       name: 'Profit Factor Lab bevat conservatieve 4H PF-preset',
       run(assert) {
+        assert(DEFAULT_PROFIT_FACTOR_GRID.rebalanceBars.includes(120), 'PF-grid mist de defensieve 4H rebalance-preset.');
+        assert(DEFAULT_PROFIT_FACTOR_GRID.scoreThreshold.includes(70), 'PF-grid mist de defensieve scorefilter.');
+        assert(DEFAULT_PROFIT_FACTOR_GRID.targetVolatility.includes(0.02) && DEFAULT_PROFIT_FACTOR_GRID.targetVolatility.includes(0.025), 'PF-grid mist defensieve volatiliteitsdoelstellingen.');
+        assert(DEFAULT_PROFIT_FACTOR_GRID.emergencyDrawdownStop.includes(0.08) && DEFAULT_PROFIT_FACTOR_GRID.emergencyDrawdownStop.includes(0.1), 'PF-grid mist de defensieve drawdown-noodremmen.');
+        assert(DEFAULT_PROFIT_FACTOR_GRID.assetCap.includes(0.2), 'PF-grid mist defensieve asset cap.');
         assert(DEFAULT_PROFIT_FACTOR_GRID.rebalanceBars.includes(90), 'PF-grid mist de langere 4H rebalance-preset.');
         assert(DEFAULT_PROFIT_FACTOR_GRID.scoreThreshold.includes(65) && DEFAULT_PROFIT_FACTOR_GRID.scoreThreshold.includes(75), 'PF-grid mist de scorefilters.');
         assert(DEFAULT_PROFIT_FACTOR_GRID.targetVolatility.includes(0.03) && DEFAULT_PROFIT_FACTOR_GRID.targetVolatility.includes(0.04), 'PF-grid mist de lage volatiliteitsdoelstellingen.');

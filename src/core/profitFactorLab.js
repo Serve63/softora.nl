@@ -1,4 +1,5 @@
 import { SUPPORTED_ASSETS } from '../data/binanceProvider.js';
+import frozenCandidate from '../strategies/frozenCandidate.js';
 import sprintRotation from '../strategies/sprintRotation.js';
 import trendParticipation from '../strategies/trendParticipation.js';
 import { runBacktest } from './backtester.js';
@@ -7,14 +8,15 @@ import { runParameterRobustness } from './robustnessLab.js';
 import { runRollingWalkForward } from './walkForward.js';
 
 export const DEFAULT_PROFIT_FACTOR_GRID = Object.freeze({
-  rebalanceBars: [60, 90],
-  scoreThreshold: [65, 75],
-  targetVolatility: [0.03, 0.04],
-  emergencyDrawdownStop: [0.18, 0.2],
-  assetCap: [0.35, 0.45],
+  rebalanceBars: [60, 90, 120],
+  scoreThreshold: [65, 70, 75],
+  targetVolatility: [0.02, 0.025, 0.03, 0.04],
+  emergencyDrawdownStop: [0.08, 0.1, 0.18, 0.2],
+  assetCap: [0.2, 0.35, 0.45],
 });
 
 export const DEFAULT_PROFIT_FACTOR_STRATEGIES = Object.freeze([
+  frozenCandidate,
   trendParticipation,
   sprintRotation,
 ]);

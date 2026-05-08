@@ -141,5 +141,53 @@ export function improvementLoopTestCases() {
         assert(second.state.reviews.length === 1, 'Dubbele review mag de historie niet vervuilen.');
       },
     },
+    {
+      name: 'Improvement loop bewaart watchlist-uitdager zonder promotie',
+      run(assert) {
+        const watch = makeLabCandidate({
+          verdict: 'WATCH',
+          strategyName: 'Defensive Watch v1',
+          strategyReturn: 0.09,
+          oosReturn: -0.02,
+          maxDrawdown: 0.08,
+          profitFactor: 1.71,
+          currentSignal: { label: 'BTC 20%' },
+          rolling: {
+            summary: {
+              strategyCompoundReturn: -0.12,
+              benchmarkCompoundReturn: -0.5,
+              beatRate: 0.6,
+              maxFoldDrawdown: 0.1,
+            },
+          },
+          robustness: {
+            verdict: 'WATCH',
+            passRate: 0.3,
+            medianProfitFactor: 1.4,
+            medianEdge: 0.1,
+            medianOosEdge: 0.05,
+            worstDrawdown: 0.16,
+          },
+          failed: [
+            { id: 'rolling-positive' },
+            { id: 'robustness' },
+          ],
+        });
+        const review = createImprovementReview({
+          asOf: Date.UTC(2026, 4, 8),
+          timeframe: '4H',
+          championCandidate,
+          championBacktest: makeBacktest({ strategyReturn: -0.18, profitFactor: 0 }),
+          lab: { candidate: null, watch },
+        });
+        const state = createEmptyImprovementState({ championId: championCandidate.id });
+        const logged = appendImprovementReview({ state, review });
+
+        assert(review.action === 'WATCH_CHALLENGER', 'Watchlist-uitdager moet apart zichtbaar blijven.');
+        assert(review.challenger.source === 'watch', 'Watchlist bron moet bewaard blijven.');
+        assert(logged.state.pendingChallenger === null, 'Watchlist mag geen pending promotie worden.');
+        assert(logged.state.watchlistChallenger?.strategyName === 'Defensive Watch v1', 'Watchlist-uitdager wordt niet opgeslagen.');
+      },
+    },
   ];
 }

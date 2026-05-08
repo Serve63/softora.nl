@@ -71,7 +71,7 @@ function summarizeBacktest({ id, label, strategyName, config = {}, result = {} }
   };
 }
 
-function summarizeLabCandidate(row) {
+function summarizeLabCandidate(row, source = 'candidate') {
   if (!row) return null;
   const rolling = row.rolling?.summary || null;
   const robustness = row.robustness || null;
@@ -81,6 +81,7 @@ function summarizeLabCandidate(row) {
     label: `${row.strategyName} ${row.config?.timeframe || ''}`.trim(),
     strategyName: row.strategyName,
     verdict: row.verdict,
+    source,
     signature: configSignature(row.config, row.strategyName),
     config: Object.fromEntries(SIGNATURE_FIELDS.map((field) => [field, row.config?.[field]])),
     strategyReturn: row.strategyReturn || 0,
@@ -115,7 +116,7 @@ function summarizeLabCandidate(row) {
 function buildImprovementChecks({ champion, challenger, rules }) {
   if (!challenger) {
     return [
-      makeCheck('challenger-found', 'Er is een nieuwe uitdager gevonden', false, 'Profit Factor Lab leverde geen kandidaat op.'),
+      makeCheck('challenger-found', 'Er is een nieuwe uitdager gevonden', false, 'Profit Factor Lab leverde geen kandidaat of watchlist-variant op.'),
     ];
   }
 
@@ -191,6 +192,9 @@ function buildImprovementChecks({ champion, challenger, rules }) {
 function decideAction({ challenger, checks }) {
   if (!challenger) return 'NO_CHALLENGER';
   if (checks.every((check) => check.pass)) return 'INCUBATE_CHALLENGER';
+  if (challenger.verdict === 'WATCH' || challenger.source === 'watch') {
+    return 'WATCH_CHALLENGER';
+  }
   if (challenger.verdict === 'CANDIDATE' && checks.filter((check) => !check.pass).length <= 2) {
     return 'WATCH_CHALLENGER';
   }
@@ -226,7 +230,8 @@ export function createImprovementReview({
     config: championCandidate.config,
     result: championBacktest,
   });
-  const challenger = summarizeLabCandidate(lab.candidate);
+  const challenger = summarizeLabCandidate(lab.candidate, 'candidate')
+    || summarizeLabCandidate(lab.watch, 'watch');
   const checks = buildImprovementChecks({ champion, challenger, rules: activeRules });
   const failed = checks.filter((check) => !check.pass);
   const action = decideAction({ challenger, checks });
@@ -259,6 +264,7 @@ export function createEmptyImprovementState({ championId = 'unknown', initialCap
     reviews: [],
     latest: null,
     pendingChallenger: null,
+    watchlistChallenger: null,
   };
 }
 
@@ -313,6 +319,8 @@ export function appendImprovementReview({ state, review }) {
   activeState.championId = review.champion?.id || activeState.championId;
   if (review.action === 'INCUBATE_CHALLENGER') {
     activeState.pendingChallenger = review.challenger;
+  } else if (review.action === 'WATCH_CHALLENGER') {
+    activeState.watchlistChallenger = review.challenger;
   }
 
   return {

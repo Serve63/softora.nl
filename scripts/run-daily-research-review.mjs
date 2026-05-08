@@ -67,9 +67,18 @@ const DAILY_ROBUSTNESS_GRID = Object.freeze({
   assetCap: [0.35, 0.45],
 });
 
+const DAILY_PROFIT_FACTOR_GRID = Object.freeze({
+  rebalanceBars: [90, 120],
+  scoreThreshold: [70, 75],
+  targetVolatility: [0.02, 0.025],
+  emergencyDrawdownStop: [0.08, 0.1],
+  assetCap: [0.2, 0.25],
+});
+
 function dailyLabOptions() {
   if (process.env.FULL_PAPER_RESEARCH === '1') return {};
   return {
+    grid: DAILY_PROFIT_FACTOR_GRID,
     topN: 3,
     robustnessOptions: {
       grid: DAILY_ROBUSTNESS_GRID,
@@ -164,6 +173,7 @@ if (market.errors.length) {
     action: review.action,
     verdict: review.verdict,
     failed: review.failed.map((check) => check.id),
+    challengerFailed: review.challenger?.failed || [],
     checks: review.checks.map((check) => ({
       id: check.id,
       pass: check.pass,
@@ -171,5 +181,6 @@ if (market.errors.length) {
     })),
     reviews: logResult.state.reviews.length,
     pendingChallenger: Boolean(logResult.state.pendingChallenger),
+    watchlistChallenger: Boolean(logResult.state.watchlistChallenger),
   }, null, 2));
 }
