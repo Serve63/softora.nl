@@ -12,6 +12,11 @@ const STEPS = Object.freeze([
     args: ['scripts/run-watchlist-forward-snapshot.mjs'],
   },
   {
+    id: 'accelerated-replay',
+    label: 'Accelerated forward replay',
+    args: ['scripts/run-accelerated-forward-replay.mjs'],
+  },
+  {
     id: 'promotion-review',
     label: 'Forward promotion review',
     args: ['scripts/run-forward-promotion-review.mjs'],
@@ -72,6 +77,7 @@ function stepSummary(result) {
 function summarizeCycle(results) {
   const research = results.find((result) => result.id === 'research-review')?.parsed || {};
   const watchlist = results.find((result) => result.id === 'watchlist-forward')?.parsed || {};
+  const replay = results.find((result) => result.id === 'accelerated-replay')?.parsed || {};
   const promotion = results.find((result) => result.id === 'promotion-review')?.parsed || {};
   const ok = results.every((result) => result.ok);
   const promotionVerdict = promotion.verdict || 'UNKNOWN';
@@ -109,6 +115,18 @@ function summarizeCycle(results) {
       benchmarkReturnPct: watchlist.benchmarkReturnPct,
       edgePct: watchlist.edgePct,
       maxDrawdownPct: watchlist.maxDrawdownPct,
+    } : null,
+    acceleratedReplay: replay.replay ? {
+      verdict: replay.verdict,
+      message: replay.message,
+      logs: replay.replay.logs,
+      returnPct: replay.replay.returnPct,
+      benchmarkPct: replay.replay.benchmarkPct,
+      edgePct: replay.replay.edgePct,
+      maxDrawdownPct: replay.replay.maxDrawdownPct,
+      gateOpenRatePct: replay.replay.gateOpenRatePct,
+      latestSignal: replay.replay.latestSignal,
+      failed: replay.failed || [],
     } : null,
     promotion: {
       verdict: promotion.verdict || null,
