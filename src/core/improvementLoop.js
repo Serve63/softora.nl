@@ -19,6 +19,7 @@ export const DEFAULT_IMPROVEMENT_RULES = Object.freeze({
   minRegimeBeatRate: 0.5,
   minRealityPositiveEdgeRate: 0.6,
   minDeflatedSharpe: 0,
+  minCostStressReturn: 0,
 });
 
 function dateKey(timestamp) {
@@ -81,6 +82,7 @@ function summarizeLabCandidate(row, source = 'candidate') {
   const regime = row.regime || null;
   const reality = row.reality || null;
   const statistical = row.statistical || null;
+  const costStress = row.costStress || null;
 
   return {
     id: configSignature(row.config, row.strategyName),
@@ -143,6 +145,16 @@ function summarizeLabCandidate(row, source = 'candidate') {
       deflatedSharpe: statistical.deflatedSharpe || 0,
       failed: (statistical.failed || []).map((check) => check.id),
     } : null,
+    costStress: costStress ? {
+      verdict: costStress.verdict,
+      worstReturn: costStress.worstReturn || 0,
+      worstEdge: costStress.worstEdge || 0,
+      worstDrawdown: costStress.worstDrawdown || 0,
+      worstProfitFactor: costStress.worstProfitFactor || 0,
+      maxFeesPaid: costStress.maxFeesPaid || 0,
+      maxSlippagePaid: costStress.maxSlippagePaid || 0,
+      failed: (costStress.failed || []).map((check) => check.id),
+    } : null,
     failed: (row.failed || []).map((check) => check.id),
   };
 }
@@ -164,6 +176,7 @@ function buildImprovementChecks({ champion, challenger, rules }) {
   const regime = challenger.regime;
   const reality = challenger.reality;
   const statistical = challenger.statistical;
+  const costStress = challenger.costStress;
 
   return [
     makeCheck(
@@ -246,6 +259,16 @@ function buildImprovementChecks({ champion, challenger, rules }) {
       statistical
         ? `${statistical.verdict} · DSR ${statistical.deflatedSharpe.toFixed(2)} · penalty ${statistical.trialPenalty.toFixed(2)} · ${statistical.trialCount} trials`
         : 'Geen trial-ledger resultaat.',
+    ),
+    makeCheck(
+      'cost-stress-quality',
+      'Uitdager blijft overeind bij hogere fee/slippage',
+      Boolean(costStress)
+        && costStress.verdict === 'PASS'
+        && costStress.worstReturn > rules.minCostStressReturn,
+      costStress
+        ? `${costStress.verdict} · return ${formatPercent(costStress.worstReturn)} · edge ${formatPercent(costStress.worstEdge)} · PF ${finiteProfitFactor(costStress.worstProfitFactor).toFixed(2)}`
+        : 'Geen kostenstress resultaat.',
     ),
     makeCheck(
       'current-exposure',

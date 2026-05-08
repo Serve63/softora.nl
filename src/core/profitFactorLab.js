@@ -4,6 +4,7 @@ import sprintRotation from '../strategies/sprintRotation.js';
 import tailGuard from '../strategies/tailGuard.js';
 import trendParticipation from '../strategies/trendParticipation.js';
 import { runBacktest } from './backtester.js';
+import { runCostStressLab } from './costStressLab.js';
 import { runRegimeBreakdown } from './regimeLab.js';
 import { runRealityCheck } from './realityCheck.js';
 import { DEFAULT_CONFIG } from './riskEngine.js';
@@ -60,6 +61,7 @@ function scoreValidatedRow(row) {
   const regime = row.regime;
   const reality = row.reality;
   const statistical = row.statistical;
+  const costStress = row.costStress;
   const regimeQuality = regime
     ? regime.segmentBeatRate * 0.35
       + Math.max(-0.4, regime.worstSegmentEdge) * 0.3
@@ -78,8 +80,15 @@ function scoreValidatedRow(row) {
       + (statistical.verdict === 'PASS' ? 0.5 : 0)
       - (statistical.failed?.length || 0) * 0.25
     : 0;
+  const costStressQuality = costStress
+    ? Math.max(-0.4, costStress.worstReturn) * 0.25
+      + Math.max(-0.4, costStress.worstEdge) * 0.3
+      + Math.min(2, finiteProfitFactor(costStress.worstProfitFactor)) * 0.18
+      + (costStress.verdict === 'PASS' ? 0.45 : 0)
+      - (costStress.failed?.length || 0) * 0.28
+    : 0;
 
-  if (!rolling) return row.score + regimeQuality + realityQuality + statisticalQuality;
+  if (!rolling) return row.score + regimeQuality + realityQuality + statisticalQuality + costStressQuality;
 
   const rollingEdge = rolling.strategyCompoundReturn - rolling.benchmarkCompoundReturn;
   const rollingPenalty = Math.max(0, rolling.maxFoldDrawdown - row.config.maxDrawdownTarget) * 6;
@@ -93,6 +102,7 @@ function scoreValidatedRow(row) {
     + regimeQuality
     + realityQuality
     + statisticalQuality
+    + costStressQuality
     - rollingPenalty
     - rollingProfitPenalty;
 }
@@ -105,6 +115,7 @@ function summarizeRow({
   regime = null,
   reality = null,
   statistical = null,
+  costStress = null,
 }) {
   const row = {
     strategyName: strategy.name,
@@ -126,6 +137,7 @@ function summarizeRow({
     regime,
     reality,
     statistical,
+    costStress,
   };
   row.validatedScore = scoreValidatedRow(row);
   return row;
@@ -161,11 +173,13 @@ export function buildProfitFactorLabChecks(
   regime = null,
   reality = null,
   statistical = null,
+  costStress = null,
 ) {
   const rolling = row.rolling?.summary;
   const activeRegime = regime || row.regime || null;
   const activeReality = reality || row.reality || null;
   const activeStatistical = statistical || row.statistical || null;
+  const activeCostStress = costStress || row.costStress || null;
   const checks = [
     {
       id: 'full-edge',
@@ -250,6 +264,15 @@ export function buildProfitFactorLabChecks(
     });
   }
 
+  if (activeCostStress) {
+    checks.push({
+      id: 'cost-stress',
+      label: 'Kostenstress blijft groen',
+      pass: activeCostStress.verdict === 'PASS',
+      detail: `${activeCostStress.verdict} · return ${(activeCostStress.worstReturn * 100).toFixed(1)}% · edge ${(activeCostStress.worstEdge * 100).toFixed(1)}% · PF ${finiteProfitFactor(activeCostStress.worstProfitFactor).toFixed(2)}`,
+    });
+  }
+
   return checks;
 }
 
@@ -273,6 +296,7 @@ export function runProfitFactorLab({
   regimeOptions = {},
   realityOptions = {},
   statValidationOptions = {},
+  costStressOptions = {},
 } = {}) {
   const config = {
     ...DEFAULT_CONFIG,
@@ -347,6 +371,16 @@ export function runProfitFactorLab({
         },
         ...walkForwardOptions,
       });
+      const costStress = costStressOptions.enabled === false
+        ? null
+        : runCostStressLab({
+          candlesByAsset,
+          strategy: row.strategy,
+          baseConfig: row.config,
+          assets,
+          multipliers: costStressOptions.multipliers,
+          thresholds: costStressOptions.thresholds,
+        });
       const validated = summarizeRow({
         strategy: row.strategy,
         config: row.config,
@@ -368,6 +402,7 @@ export function runProfitFactorLab({
         regime: row.regime,
         reality: row.reality,
         statistical: row.statistical,
+        costStress,
       });
       const checks = buildProfitFactorLabChecks(
         validated,
@@ -376,6 +411,7 @@ export function runProfitFactorLab({
         row.regime,
         row.reality,
         row.statistical,
+        costStress,
       );
       return {
         ...validated,
@@ -423,6 +459,7 @@ export function runProfitFactorLab({
         row.regime,
         row.reality,
         row.statistical,
+        row.costStress,
       );
       return {
         ...row,

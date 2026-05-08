@@ -99,6 +99,16 @@ function makeLabCandidate(overrides = {}) {
       deflatedSharpe: 1.05,
       failed: [],
     },
+    costStress: {
+      verdict: 'PASS',
+      worstReturn: 0.21,
+      worstEdge: 0.13,
+      worstDrawdown: 0.14,
+      worstProfitFactor: 2.12,
+      maxFeesPaid: 120,
+      maxSlippagePaid: 60,
+      failed: [],
+    },
     failed: [],
     ...overrides,
   };
@@ -303,6 +313,34 @@ export function improvementLoopTestCases() {
 
         assert(review.action === 'WATCH_CHALLENGER', 'Trial-ledger failure mag geen directe incubatie geven.');
         assert(review.failed.some((check) => check.id === 'statistical-proof'), 'Statistical-proof failure ontbreekt.');
+      },
+    },
+    {
+      name: 'Improvement loop blokkeert uitdager als kostenstress faalt',
+      run(assert) {
+        const review = createImprovementReview({
+          asOf: Date.UTC(2026, 4, 8),
+          timeframe: '4H',
+          championCandidate,
+          championBacktest: makeBacktest(),
+          lab: {
+            candidate: makeLabCandidate({
+              costStress: {
+                verdict: 'FAIL',
+                worstReturn: -0.04,
+                worstEdge: -0.16,
+                worstDrawdown: 0.18,
+                worstProfitFactor: 0.8,
+                maxFeesPaid: 980,
+                maxSlippagePaid: 490,
+                failed: [{ id: 'cost-stress-return' }],
+              },
+            }),
+          },
+        });
+
+        assert(review.action === 'WATCH_CHALLENGER', 'Kostenstress failure mag geen directe incubatie geven.');
+        assert(review.failed.some((check) => check.id === 'cost-stress-quality'), 'Cost-stress-quality failure ontbreekt.');
       },
     },
   ];
