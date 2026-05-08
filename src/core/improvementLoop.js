@@ -110,6 +110,8 @@ function summarizeLabCandidate(row, source = 'candidate') {
       beatRate: rolling.beatRate || 0,
       profitableRate: rolling.profitableRate || 0,
       candidateRate: rolling.candidateRate || 0,
+      trainVerdictCounts: rolling.trainVerdictCounts || {},
+      trainFailureCounts: rolling.trainFailureCounts || {},
       worstFoldReturn: rolling.worstFoldReturn || 0,
       maxFoldDrawdown: rolling.maxFoldDrawdown || 0,
     } : null,

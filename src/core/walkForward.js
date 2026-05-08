@@ -19,6 +19,24 @@ function average(values) {
   return finite.length ? finite.reduce((sum, value) => sum + value, 0) / finite.length : 0;
 }
 
+function countValues(values) {
+  const counts = new Map();
+  for (const value of values) {
+    if (!value) continue;
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  return Object.fromEntries([...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+}
+
+function countFailedReasons(folds) {
+  const reasons = [];
+  for (const fold of folds) {
+    if (fold.optimizerAccepted) continue;
+    reasons.push(...(fold.optimizerFailed || []));
+  }
+  return countValues(reasons);
+}
+
 function sliceAligned(aligned, startIndex, endIndex) {
   const candlesByAsset = {};
   for (const asset of aligned.assets) {
@@ -100,6 +118,8 @@ export function runRollingWalkForward({
       testEnd: aligned.times[range.testEnd - 1],
       optimizerVerdict: optimizer.best?.verdict || 'NONE',
       optimizerAccepted,
+      optimizerFailed: optimizer.best?.failed || [],
+      optimizerScore: optimizer.best?.score ?? null,
       config: {
         rebalanceBars: chosenConfig.rebalanceBars,
         emergencyDrawdownStop: chosenConfig.emergencyDrawdownStop,
@@ -124,12 +144,16 @@ export function runRollingWalkForward({
   const candidateCount = folds.filter((fold) => fold.optimizerVerdict === 'CANDIDATE').length;
   const strategyCompoundReturn = compoundReturn(strategyReturns);
   const benchmarkCompoundReturn = compoundReturn(benchmarkReturns);
+  const trainVerdictCounts = countValues(folds.map((fold) => fold.optimizerVerdict));
+  const trainFailureCounts = countFailedReasons(folds);
 
   const summary = {
     folds: folds.length,
     beatRate: beatCount / folds.length,
     profitableRate: profitableCount / folds.length,
     candidateRate: candidateCount / folds.length,
+    trainVerdictCounts,
+    trainFailureCounts,
     strategyCompoundReturn,
     benchmarkCompoundReturn,
     edge: strategyCompoundReturn - benchmarkCompoundReturn,

@@ -92,6 +92,10 @@ export function walkForwardTestCases() {
         const fold = result.folds[0];
 
         assert(fold.optimizerAccepted === false, 'Afgekeurde train-config mag niet geaccepteerd worden.');
+        assert(Array.isArray(fold.optimizerFailed), 'Walk-forward bewaart geen train-failure redenen.');
+        assert(fold.optimizerFailed.length > 0, 'Afgekeurde train-fold mist failure redenen.');
+        assert(result.summary.trainFailureCounts['profit-quality'] > 0, 'Walk-forward vat train-failure redenen niet samen.');
+        assert(result.summary.trainVerdictCounts.REJECT === 1, 'Walk-forward telt train-verdicts niet samen.');
         assert(fold.config.rebalanceBars === 99, 'Walk-forward moet terugvallen op de basisconfig.');
         assert(fold.config.emergencyDrawdownStop === 0.11, 'Walk-forward bewaart de basis drawdown-stop bij optimizer failure.');
         assert(fold.config.targetVolatility === 0.04, 'Walk-forward bewaart de basis volatility target bij optimizer failure.');

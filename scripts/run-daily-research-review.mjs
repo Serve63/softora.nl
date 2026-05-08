@@ -182,6 +182,8 @@ if (market.errors.length) {
       rollingProfitableRatePct: pct(review.challenger.rolling?.profitableRate || 0),
       rollingCandidateRatePct: pct(review.challenger.rolling?.candidateRate || 0),
       rollingWorstFoldPct: pct(review.challenger.rolling?.worstFoldReturn || 0),
+      rollingTrainVerdicts: review.challenger.rolling?.trainVerdictCounts || null,
+      rollingTrainFailures: review.challenger.rolling?.trainFailureCounts || null,
       robustness: review.challenger.robustness?.verdict || null,
       robustPassRatePct: pct(review.challenger.robustness?.passRate || 0),
       regime: review.challenger.regime?.verdict || null,

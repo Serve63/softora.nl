@@ -484,6 +484,10 @@ function renderWalkForward(root) {
   }
 
   const { summary: result } = walkForward;
+  const trainFailures = Object.entries(result.trainFailureCounts || {})
+    .slice(0, 3)
+    .map(([id, count]) => `${id} (${count})`)
+    .join(', ') || 'geen';
   summary.innerHTML = `
     <div class="edge-verdict ${result.verdict === 'PASS' ? 'candidate' : 'reject'}">${result.verdict}</div>
     <p>${result.folds} rolling folds · train ${walkForward.trainBars} candles · test ${walkForward.testBars} candles.</p>
@@ -492,7 +496,9 @@ function renderWalkForward(root) {
       <span>Benchmark: ${formatPercent(result.benchmarkCompoundReturn)}</span>
       <span>Beat-rate: ${formatPercent(result.beatRate)}</span>
       <span>Profitable: ${formatPercent(result.profitableRate)}</span>
+      <span>Train groen: ${formatPercent(result.candidateRate)}</span>
       <span>Worst fold: ${formatPercent(result.worstFoldReturn)}</span>
+      <span>Train fails: ${trainFailures}</span>
     </div>
   `;
 
@@ -506,6 +512,7 @@ function renderWalkForward(root) {
           <th>Benchmark</th>
           <th>DD</th>
           <th>PF</th>
+          <th>Train</th>
           <th>Config</th>
         </tr>
       </thead>
@@ -518,6 +525,7 @@ function renderWalkForward(root) {
             <td>${formatPercent(fold.benchmarkReturn)}</td>
             <td>${formatPercent(fold.maxDrawdown)}</td>
             <td>${Number.isFinite(fold.profitFactor) ? fold.profitFactor.toFixed(2) : 'oneindig'}</td>
+            <td>${fold.optimizerVerdict}${fold.optimizerFailed?.length ? ` · ${fold.optimizerFailed.slice(0, 2).join(', ')}` : ''}</td>
             <td>${fold.config.rebalanceBars}d · stop ${formatPercent(fold.config.emergencyDrawdownStop, 0)} · vol ${formatPercent(fold.config.targetVolatility, 0)}</td>
           </tr>
         `).join('')}
