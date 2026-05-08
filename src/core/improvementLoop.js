@@ -16,6 +16,7 @@ export const DEFAULT_IMPROVEMENT_RULES = Object.freeze({
   maxDrawdownWorsening: 0.02,
   minRobustPassRate: 0.35,
   minRollingBeatRate: 0.5,
+  minRollingCandidateRate: 0.5,
   minRegimeBeatRate: 0.5,
   minRealityPositiveEdgeRate: 0.6,
   minDeflatedSharpe: 0,
@@ -107,6 +108,9 @@ function summarizeLabCandidate(row, source = 'candidate') {
       strategyCompoundReturn: rolling.strategyCompoundReturn || 0,
       benchmarkCompoundReturn: rolling.benchmarkCompoundReturn || 0,
       beatRate: rolling.beatRate || 0,
+      profitableRate: rolling.profitableRate || 0,
+      candidateRate: rolling.candidateRate || 0,
+      worstFoldReturn: rolling.worstFoldReturn || 0,
       maxFoldDrawdown: rolling.maxFoldDrawdown || 0,
     } : null,
     robustness: robustness ? {
@@ -215,9 +219,10 @@ function buildImprovementChecks({ champion, challenger, rules }) {
       Boolean(rolling)
         && rolling.strategyCompoundReturn > 0
         && rolling.strategyCompoundReturn > rolling.benchmarkCompoundReturn
-        && rolling.beatRate >= rules.minRollingBeatRate,
+        && rolling.beatRate >= rules.minRollingBeatRate
+        && rolling.candidateRate >= rules.minRollingCandidateRate,
       rolling
-        ? `${formatPercent(rolling.strategyCompoundReturn)} vs ${formatPercent(rolling.benchmarkCompoundReturn)} · beat ${formatPercent(rolling.beatRate, 0)}`
+        ? `${formatPercent(rolling.strategyCompoundReturn)} vs ${formatPercent(rolling.benchmarkCompoundReturn)} · beat ${formatPercent(rolling.beatRate, 0)} · train groen ${formatPercent(rolling.candidateRate, 0)}`
         : 'Geen rolling summary.',
     ),
     makeCheck(

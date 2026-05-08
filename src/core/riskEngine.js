@@ -12,6 +12,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   minProfitFactor: 1.65,
   oosRatio: 0.25,
   minWalkForwardBeatRate: 0.5,
+  minWalkForwardCandidateRate: 0.5,
   scoreThreshold: 40,
   assetCap: 1,
   rebalanceBars: 30,

@@ -93,18 +93,23 @@ function scoreValidatedRow(row) {
   const rollingEdge = rolling.strategyCompoundReturn - rolling.benchmarkCompoundReturn;
   const rollingPenalty = Math.max(0, rolling.maxFoldDrawdown - row.config.maxDrawdownTarget) * 6;
   const rollingProfitPenalty = rolling.strategyCompoundReturn > 0 ? 0 : 0.75;
+  const rollingTrainPenalty = (rolling.candidateRate || 0) >= (row.config.minWalkForwardCandidateRate ?? 0.5)
+    ? 0
+    : 0.45;
 
   return row.score
     + Math.max(-0.6, rolling.strategyCompoundReturn) * 0.5
     + Math.max(-0.5, rollingEdge) * 0.65
     + rolling.beatRate * 0.45
     + (rolling.profitableRate || 0) * 0.25
+    + (rolling.candidateRate || 0) * 0.25
     + regimeQuality
     + realityQuality
     + statisticalQuality
     + costStressQuality
     - rollingPenalty
-    - rollingProfitPenalty;
+    - rollingProfitPenalty
+    - rollingTrainPenalty;
 }
 
 function summarizeRow({
@@ -378,6 +383,15 @@ export function buildProfitFactorLabChecks(
       id: 'rolling-profitable-rate',
       label: 'Meeste rolling windows zijn winstgevend',
       pass: Boolean(rolling) && rolling.profitableRate >= 0.5,
+    },
+    {
+      id: 'rolling-train-accepted',
+      label: 'Training vindt vaak genoeg geldige kandidaten',
+      pass: Boolean(rolling)
+        && rolling.candidateRate >= (config.minWalkForwardCandidateRate ?? DEFAULT_CONFIG.minWalkForwardCandidateRate),
+      detail: rolling
+        ? `${Math.round((rolling.candidateRate || 0) * 100)}% minimum ${Math.round((config.minWalkForwardCandidateRate ?? DEFAULT_CONFIG.minWalkForwardCandidateRate) * 100)}%`
+        : 'Geen rolling summary.',
     },
     {
       id: 'current-exposure',

@@ -131,6 +131,7 @@ export function profitFactorLabTestCases() {
         assert(result.best.checks.some((check) => check.id === 'reality-check'), 'Profit Factor Lab controleert bootstrap reality niet expliciet.');
         assert(result.best.checks.some((check) => check.id === 'trial-ledger'), 'Profit Factor Lab controleert trial-ledger niet expliciet.');
         assert(result.best.checks.some((check) => check.id === 'cost-stress'), 'Profit Factor Lab controleert kostenstress niet expliciet.');
+        assert(result.best.checks.some((check) => check.id === 'rolling-train-accepted'), 'Profit Factor Lab controleert geldige train-fold kandidaten niet expliciet.');
       },
     },
     {
@@ -220,9 +221,11 @@ export function profitFactorLabTestCases() {
 
         const rollingPositive = checks.find((check) => check.id === 'rolling-positive');
         const profitableRate = checks.find((check) => check.id === 'rolling-profitable-rate');
+        const trainAccepted = checks.find((check) => check.id === 'rolling-train-accepted');
 
         assert(rollingPositive && rollingPositive.pass === false, 'Negatieve rolling return mag geen kandidaat blijven.');
         assert(profitableRate && profitableRate.pass === false, 'Te weinig winstgevende rolling windows moet falen.');
+        assert(trainAccepted && trainAccepted.pass === false, 'Te weinig geldige train-fold kandidaten moet falen.');
       },
     },
     {

@@ -60,6 +60,9 @@ function makeLabCandidate(overrides = {}) {
         strategyCompoundReturn: 0.24,
         benchmarkCompoundReturn: -0.03,
         beatRate: 0.8,
+        profitableRate: 0.8,
+        candidateRate: 0.8,
+        worstFoldReturn: -0.02,
         maxFoldDrawdown: 0.13,
       },
     },
@@ -195,6 +198,9 @@ export function improvementLoopTestCases() {
               strategyCompoundReturn: -0.12,
               benchmarkCompoundReturn: -0.5,
               beatRate: 0.6,
+              profitableRate: 0.2,
+              candidateRate: 0.2,
+              worstFoldReturn: -0.18,
               maxFoldDrawdown: 0.1,
             },
           },
@@ -341,6 +347,35 @@ export function improvementLoopTestCases() {
 
         assert(review.action === 'WATCH_CHALLENGER', 'Kostenstress failure mag geen directe incubatie geven.');
         assert(review.failed.some((check) => check.id === 'cost-stress-quality'), 'Cost-stress-quality failure ontbreekt.');
+      },
+    },
+    {
+      name: 'Improvement loop blokkeert uitdager als train-folds geen kandidaten vinden',
+      run(assert) {
+        const review = createImprovementReview({
+          asOf: Date.UTC(2026, 4, 8),
+          timeframe: '4H',
+          championCandidate,
+          championBacktest: makeBacktest(),
+          lab: {
+            candidate: makeLabCandidate({
+              rolling: {
+                summary: {
+                  strategyCompoundReturn: 0.24,
+                  benchmarkCompoundReturn: -0.03,
+                  beatRate: 0.8,
+                  profitableRate: 0.8,
+                  candidateRate: 0.25,
+                  worstFoldReturn: -0.02,
+                  maxFoldDrawdown: 0.13,
+                },
+              },
+            }),
+          },
+        });
+
+        assert(review.action === 'WATCH_CHALLENGER', 'Te weinig geldige train-folds mag geen incubatie geven.');
+        assert(review.failed.some((check) => check.id === 'rolling-quality'), 'Rolling-quality failure voor train-folds ontbreekt.');
       },
     },
   ];
