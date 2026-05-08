@@ -1,4 +1,5 @@
 import { accountingTestCases } from './accountingTests.js';
+import { costAwareTailGuardTestCases } from './costAwareTailGuardTests.js';
 import { costStressLabTestCases } from './costStressLabTests.js';
 import { improvementLoopTestCases } from './improvementLoopTests.js';
 import { optimizerTestCases } from './optimizerTests.js';
@@ -40,6 +41,7 @@ export async function runAllTests() {
   const cases = [
     ...parityTestCases(),
     ...accountingTestCases(),
+    ...costAwareTailGuardTestCases(),
     ...costStressLabTestCases(),
     ...improvementLoopTestCases(),
     ...optimizerTestCases(),

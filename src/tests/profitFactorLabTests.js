@@ -1,5 +1,6 @@
 import {
   buildProfitFactorLabChecks,
+  calculateTrainFailurePenalty,
   DEFAULT_PROFIT_FACTOR_GRID,
   DEFAULT_PROFIT_FACTOR_STRATEGIES,
   runProfitFactorLab,
@@ -148,6 +149,27 @@ export function profitFactorLabTestCases() {
         assert(DEFAULT_PROFIT_FACTOR_GRID.emergencyDrawdownStop.includes(0.18) && DEFAULT_PROFIT_FACTOR_GRID.emergencyDrawdownStop.includes(0.2), 'PF-grid mist de strakkere drawdown-noodremmen.');
         assert(DEFAULT_PROFIT_FACTOR_GRID.assetCap.includes(0.35) && DEFAULT_PROFIT_FACTOR_GRID.assetCap.includes(0.45), 'PF-grid mist de asset caps die concentratierisico beperken.');
         assert(DEFAULT_PROFIT_FACTOR_STRATEGIES.some((strategy) => strategy.name === 'Tail Guard v1'), 'PF-lab mist de defensieve Tail Guard strategie.');
+        assert(DEFAULT_PROFIT_FACTOR_STRATEGIES.some((strategy) => strategy.name === 'Cost Aware Tail Guard v1'), 'PF-lab mist de kostenbewuste Tail Guard strategie.');
+      },
+    },
+    {
+      name: 'Profit Factor Lab straft train-fails op winstkwaliteit en kostenstress af',
+      run(assert) {
+        const penalty = calculateTrainFailurePenalty({
+          trainFailureCounts: {
+            'profit-quality': 4,
+            'stress-edge': 4,
+            'oos-edge': 2,
+          },
+        });
+        const mildPenalty = calculateTrainFailurePenalty({
+          trainFailureCounts: {
+            'walk-forward': 1,
+          },
+        });
+
+        assert(penalty > 1.7, 'Kosten- en profit-failures moeten zwaar wegen in de ranking.');
+        assert(penalty > mildPenalty, 'Profit/stress failures moeten zwaarder wegen dan een lichte walk-forward fail.');
       },
     },
     {

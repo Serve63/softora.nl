@@ -1,4 +1,5 @@
 import { SUPPORTED_ASSETS } from '../data/binanceProvider.js';
+import costAwareTailGuard from '../strategies/costAwareTailGuard.js';
 import frozenCandidate from '../strategies/frozenCandidate.js';
 import sprintRotation from '../strategies/sprintRotation.js';
 import tailGuard from '../strategies/tailGuard.js';
@@ -25,7 +26,17 @@ export const DEFAULT_PROFIT_FACTOR_STRATEGIES = Object.freeze([
   trendParticipation,
   sprintRotation,
   tailGuard,
+  costAwareTailGuard,
 ]);
+
+export const TRAIN_FAILURE_PENALTY_WEIGHTS = Object.freeze({
+  'profit-quality': 0.2,
+  'stress-edge': 0.2,
+  'positive-edge': 0.14,
+  'oos-edge': 0.12,
+  'walk-forward': 0.1,
+  'drawdown-discipline': 0.08,
+});
 
 function cartesianProduct(grid) {
   const keys = Object.keys(grid);
@@ -37,6 +48,14 @@ function cartesianProduct(grid) {
 function finiteProfitFactor(value) {
   if (value === Number.POSITIVE_INFINITY) return 8;
   return Number.isFinite(value) ? value : 0;
+}
+
+export function calculateTrainFailurePenalty(summary = {}) {
+  const counts = summary.trainFailureCounts || {};
+  return Object.entries(counts).reduce((penalty, [id, count]) => {
+    const weight = TRAIN_FAILURE_PENALTY_WEIGHTS[id] || 0.06;
+    return penalty + Math.max(0, Number(count) || 0) * weight;
+  }, 0);
 }
 
 function scoreRow({ result, config }) {
@@ -96,6 +115,7 @@ function scoreValidatedRow(row) {
   const rollingTrainPenalty = (rolling.candidateRate || 0) >= (row.config.minWalkForwardCandidateRate ?? 0.5)
     ? 0
     : 0.45;
+  const trainFailurePenalty = calculateTrainFailurePenalty(rolling);
 
   return row.score
     + Math.max(-0.6, rolling.strategyCompoundReturn) * 0.5
@@ -109,7 +129,8 @@ function scoreValidatedRow(row) {
     + costStressQuality
     - rollingPenalty
     - rollingProfitPenalty
-    - rollingTrainPenalty;
+    - rollingTrainPenalty
+    - trainFailurePenalty;
 }
 
 function summarizeRow({

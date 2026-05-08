@@ -11,6 +11,7 @@ import {
   logForwardSignal,
 } from '../src/forward/forwardRunner.js';
 import { loadImprovementState } from '../src/storage/localStore.js';
+import costAwareTailGuard from '../src/strategies/costAwareTailGuard.js';
 import frozenCandidate from '../src/strategies/frozenCandidate.js';
 import sprintRotation from '../src/strategies/sprintRotation.js';
 import tailGuard from '../src/strategies/tailGuard.js';
@@ -61,6 +62,7 @@ function strategyForName(name) {
   if (name === frozenCandidate.name) return frozenCandidate;
   if (name === sprintRotation.name) return sprintRotation;
   if (name === tailGuard.name) return tailGuard;
+  if (name === costAwareTailGuard.name) return costAwareTailGuard;
   if (name === trendParticipation.name) return trendParticipation;
   return null;
 }
