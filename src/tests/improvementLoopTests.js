@@ -89,6 +89,16 @@ function makeLabCandidate(overrides = {}) {
       medianStrategyReturn: 0.2,
       failed: [],
     },
+    statistical: {
+      verdict: 'PASS',
+      trialCount: 64,
+      observations: 260,
+      sharpe: 1.4,
+      edgeSharpe: 1.1,
+      trialPenalty: 0.35,
+      deflatedSharpe: 1.05,
+      failed: [],
+    },
     failed: [],
     ...overrides,
   };
@@ -265,6 +275,34 @@ export function improvementLoopTestCases() {
 
         assert(review.action === 'WATCH_CHALLENGER', 'Reality failure mag geen directe incubatie geven.');
         assert(review.failed.some((check) => check.id === 'reality-quality'), 'Reality-quality failure ontbreekt.');
+      },
+    },
+    {
+      name: 'Improvement loop blokkeert uitdager als trial-ledger faalt',
+      run(assert) {
+        const review = createImprovementReview({
+          asOf: Date.UTC(2026, 4, 8),
+          timeframe: '4H',
+          championCandidate,
+          championBacktest: makeBacktest(),
+          lab: {
+            candidate: makeLabCandidate({
+              statistical: {
+                verdict: 'FAIL',
+                trialCount: 500,
+                observations: 180,
+                sharpe: 0.4,
+                edgeSharpe: -0.1,
+                trialPenalty: 1.1,
+                deflatedSharpe: -0.7,
+                failed: [{ id: 'trial-deflated-sharpe' }],
+              },
+            }),
+          },
+        });
+
+        assert(review.action === 'WATCH_CHALLENGER', 'Trial-ledger failure mag geen directe incubatie geven.');
+        assert(review.failed.some((check) => check.id === 'statistical-proof'), 'Statistical-proof failure ontbreekt.');
       },
     },
   ];

@@ -10,6 +10,7 @@ import { robustnessLabTestCases } from './robustnessLabTests.js';
 import { sprintRotationTestCases } from './sprintRotationTests.js';
 import { tailGuardTestCases } from './tailGuardTests.js';
 import { timeframeResearchTestCases } from './timeframeResearchTests.js';
+import { trialLedgerTestCases } from './trialLedgerTests.js';
 import { walkForwardTestCases } from './walkForwardTests.js';
 import { tournamentTestCases } from './tournamentTests.js';
 
@@ -48,6 +49,7 @@ export async function runAllTests() {
     ...sprintRotationTestCases(),
     ...tailGuardTestCases(),
     ...timeframeResearchTestCases(),
+    ...trialLedgerTestCases(),
     ...walkForwardTestCases(),
     ...tournamentTestCases(),
   ];

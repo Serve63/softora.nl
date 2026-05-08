@@ -54,6 +54,10 @@ function pf(value) {
   return Number.isFinite(value) ? Number(value.toFixed(2)) : null;
 }
 
+function num(value, digits = 2) {
+  return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
+}
+
 function latestCandleTime(candlesByAsset) {
   const candles = candlesByAsset?.BTCUSDT || [];
   return candles[candles.length - 1]?.time || Date.now();
@@ -176,6 +180,12 @@ if (market.errors.length) {
       realityPositiveEdgeRatePct: pct(review.challenger.reality?.positiveEdgeRate || 0),
       realityMedianEdgePct: pct(review.challenger.reality?.medianEdge || 0),
       realityTailEdgePct: pct(review.challenger.reality?.fifthPercentileEdge || 0),
+      statistical: review.challenger.statistical?.verdict || null,
+      trialCount: review.challenger.statistical?.trialCount || 0,
+      sharpe: num(review.challenger.statistical?.sharpe),
+      edgeSharpe: num(review.challenger.statistical?.edgeSharpe),
+      deflatedSharpe: num(review.challenger.statistical?.deflatedSharpe),
+      trialPenalty: num(review.challenger.statistical?.trialPenalty),
       signal: review.challenger.currentSignal,
     } : null,
     action: review.action,

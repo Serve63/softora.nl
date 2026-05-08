@@ -18,6 +18,7 @@ export const DEFAULT_IMPROVEMENT_RULES = Object.freeze({
   minRollingBeatRate: 0.5,
   minRegimeBeatRate: 0.5,
   minRealityPositiveEdgeRate: 0.6,
+  minDeflatedSharpe: 0,
 });
 
 function dateKey(timestamp) {
@@ -79,6 +80,7 @@ function summarizeLabCandidate(row, source = 'candidate') {
   const robustness = row.robustness || null;
   const regime = row.regime || null;
   const reality = row.reality || null;
+  const statistical = row.statistical || null;
 
   return {
     id: configSignature(row.config, row.strategyName),
@@ -131,6 +133,16 @@ function summarizeLabCandidate(row, source = 'candidate') {
       medianStrategyReturn: reality.medianStrategyReturn || 0,
       failed: (reality.failed || []).map((check) => check.id),
     } : null,
+    statistical: statistical ? {
+      verdict: statistical.verdict,
+      trialCount: statistical.trialCount || 0,
+      observations: statistical.observations || 0,
+      sharpe: statistical.sharpe || 0,
+      edgeSharpe: statistical.edgeSharpe || 0,
+      trialPenalty: statistical.trialPenalty || 0,
+      deflatedSharpe: statistical.deflatedSharpe || 0,
+      failed: (statistical.failed || []).map((check) => check.id),
+    } : null,
     failed: (row.failed || []).map((check) => check.id),
   };
 }
@@ -151,6 +163,7 @@ function buildImprovementChecks({ champion, challenger, rules }) {
   const robustness = challenger.robustness;
   const regime = challenger.regime;
   const reality = challenger.reality;
+  const statistical = challenger.statistical;
 
   return [
     makeCheck(
@@ -223,6 +236,16 @@ function buildImprovementChecks({ champion, challenger, rules }) {
       reality
         ? `${reality.verdict} · ${formatPercent(reality.positiveEdgeRate, 0)} positive edge · median edge ${formatPercent(reality.medianEdge)}`
         : 'Geen reality-check resultaat.',
+    ),
+    makeCheck(
+      'statistical-proof',
+      'Uitdager blijft geloofwaardig na trial-ledger correctie',
+      Boolean(statistical)
+        && statistical.verdict === 'PASS'
+        && statistical.deflatedSharpe >= rules.minDeflatedSharpe,
+      statistical
+        ? `${statistical.verdict} · DSR ${statistical.deflatedSharpe.toFixed(2)} · penalty ${statistical.trialPenalty.toFixed(2)} · ${statistical.trialCount} trials`
+        : 'Geen trial-ledger resultaat.',
     ),
     makeCheck(
       'current-exposure',
