@@ -1,6 +1,7 @@
 import {
   buildProfitFactorLabChecks,
   DEFAULT_PROFIT_FACTOR_GRID,
+  DEFAULT_PROFIT_FACTOR_STRATEGIES,
   runProfitFactorLab,
 } from '../core/profitFactorLab.js';
 
@@ -141,6 +142,7 @@ export function profitFactorLabTestCases() {
         assert(DEFAULT_PROFIT_FACTOR_GRID.targetVolatility.includes(0.03) && DEFAULT_PROFIT_FACTOR_GRID.targetVolatility.includes(0.04), 'PF-grid mist de lage volatiliteitsdoelstellingen.');
         assert(DEFAULT_PROFIT_FACTOR_GRID.emergencyDrawdownStop.includes(0.18) && DEFAULT_PROFIT_FACTOR_GRID.emergencyDrawdownStop.includes(0.2), 'PF-grid mist de strakkere drawdown-noodremmen.');
         assert(DEFAULT_PROFIT_FACTOR_GRID.assetCap.includes(0.35) && DEFAULT_PROFIT_FACTOR_GRID.assetCap.includes(0.45), 'PF-grid mist de asset caps die concentratierisico beperken.');
+        assert(DEFAULT_PROFIT_FACTOR_STRATEGIES.some((strategy) => strategy.name === 'Tail Guard v1'), 'PF-lab mist de defensieve Tail Guard strategie.');
       },
     },
     {

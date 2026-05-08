@@ -8,6 +8,7 @@ import { regimeLabTestCases } from './regimeLabTests.js';
 import { realityCheckTestCases } from './realityCheckTests.js';
 import { robustnessLabTestCases } from './robustnessLabTests.js';
 import { sprintRotationTestCases } from './sprintRotationTests.js';
+import { tailGuardTestCases } from './tailGuardTests.js';
 import { timeframeResearchTestCases } from './timeframeResearchTests.js';
 import { walkForwardTestCases } from './walkForwardTests.js';
 import { tournamentTestCases } from './tournamentTests.js';
@@ -45,6 +46,7 @@ export async function runAllTests() {
     ...realityCheckTestCases(),
     ...robustnessLabTestCases(),
     ...sprintRotationTestCases(),
+    ...tailGuardTestCases(),
     ...timeframeResearchTestCases(),
     ...walkForwardTestCases(),
     ...tournamentTestCases(),

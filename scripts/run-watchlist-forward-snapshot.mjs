@@ -13,6 +13,7 @@ import {
 import { loadImprovementState } from '../src/storage/localStore.js';
 import frozenCandidate from '../src/strategies/frozenCandidate.js';
 import sprintRotation from '../src/strategies/sprintRotation.js';
+import tailGuard from '../src/strategies/tailGuard.js';
 import trendParticipation from '../src/strategies/trendParticipation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -59,6 +60,7 @@ function pf(value) {
 function strategyForName(name) {
   if (name === frozenCandidate.name) return frozenCandidate;
   if (name === sprintRotation.name) return sprintRotation;
+  if (name === tailGuard.name) return tailGuard;
   if (name === trendParticipation.name) return trendParticipation;
   return null;
 }
