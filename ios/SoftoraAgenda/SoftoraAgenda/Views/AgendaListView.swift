@@ -290,41 +290,54 @@ private struct DayCellView: View {
     let onTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                Text(AgendaDateFormatter.shortWeekday(date))
-                    .font(.softoraBody(12))
-                    .foregroundStyle(Color.softoraMuted)
-
-                Text(dayNumber)
-                    .font(.softoraBody(15, weight: .bold))
-                    .foregroundStyle(Color.softoraInk)
-                    .frame(width: 26, height: 26)
-
-                Text(AgendaDateFormatter.shortMonth(date))
-                    .font(.softoraBody(11))
-                    .foregroundStyle(Color.softoraMuted)
+        ZStack {
+            if isClientWorkDay {
+                Text("Klantwerk")
+                    .font(.softoraDisplay(15, weight: .semibold))
+                    .textCase(.uppercase)
+                    .tracking(1.8)
+                    .foregroundStyle(Color.softoraMuted.opacity(0.32))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
 
-            ForEach(appointments.prefix(4)) { appointment in
-                CalendarEventChip(appointment: appointment) {
-                    onSelectAppointment(appointment)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 5) {
+                    Text(AgendaDateFormatter.shortWeekday(date))
+                        .font(.softoraBody(12))
+                        .foregroundStyle(Color.softoraMuted)
+
+                    Text(dayNumber)
+                        .font(.softoraBody(15, weight: .bold))
+                        .foregroundStyle(Color.softoraInk)
+                        .frame(width: 26, height: 26)
+
+                    Text(AgendaDateFormatter.shortMonth(date))
+                        .font(.softoraBody(11))
+                        .foregroundStyle(Color.softoraMuted)
                 }
-            }
 
-            if appointments.count > 4 {
-                Text("+\(appointments.count - 4) meer")
-                    .font(.softoraBody(11, weight: .semibold))
-                    .foregroundStyle(Color.softoraMuted)
-                    .padding(.top, 2)
-            }
+                ForEach(appointments.prefix(4)) { appointment in
+                    CalendarEventChip(appointment: appointment) {
+                        onSelectAppointment(appointment)
+                    }
+                }
 
-            Spacer(minLength: 0)
+                if appointments.count > 4 {
+                    Text("+\(appointments.count - 4) meer")
+                        .font(.softoraBody(11, weight: .semibold))
+                        .foregroundStyle(Color.softoraMuted)
+                        .padding(.top, 2)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 14)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
-        .padding(.top, 14)
-        .padding(.horizontal, 14)
-        .padding(.bottom, 10)
         .background(cellBackground)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
@@ -343,6 +356,11 @@ private struct DayCellView: View {
 
     private var cellBackground: Color {
         AgendaDateFormatter.isToday(date) ? Color.softoraPurpleLight : .white
+    }
+
+    private var isClientWorkDay: Bool {
+        let weekday = Calendar.current.component(.weekday, from: date)
+        return weekday == 4 || weekday == 7
     }
 }
 
