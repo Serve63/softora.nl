@@ -440,6 +440,9 @@ getCalendarAppointmentClass = function getCalendarAppointmentClassStable(apt) {
 const baseRenderCalendar = renderCalendar;
 renderCalendar = function renderCalendarStable() {
     baseRenderCalendar();
+    document.querySelectorAll('[data-calendar-date]').forEach((cell) => {
+        cell.classList.add('calendar-day-selectable');
+    });
 };
 
 const baseOpenAppointment = openAppointment;

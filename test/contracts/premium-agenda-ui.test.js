@@ -237,6 +237,7 @@ test('premium agenda toont handmatige lead-eigenaren in maandheader zonder losse
   assert.doesNotMatch(stabilitySource, /renderManualLeadStatsCard/);
   assert.doesNotMatch(stabilitySource, /Handmatige leads/);
   assert.match(stabilitySource, /renderCalendar = function renderCalendarStable\(\) \{[\s\S]*baseRenderCalendar\(\);[\s\S]*document\.querySelectorAll\('\[data-calendar-date\]'\)/);
+  assert.match(stabilitySource, /cell\.classList\.add\('calendar-day-selectable'\)/);
 });
 
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {
