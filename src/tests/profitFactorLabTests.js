@@ -1,4 +1,8 @@
-import { DEFAULT_PROFIT_FACTOR_GRID, runProfitFactorLab } from '../core/profitFactorLab.js';
+import {
+  buildProfitFactorLabChecks,
+  DEFAULT_PROFIT_FACTOR_GRID,
+  runProfitFactorLab,
+} from '../core/profitFactorLab.js';
 
 function makeCandles(symbol, count, drift, wave = 0.001) {
   const candles = [];
@@ -94,6 +98,42 @@ export function profitFactorLabTestCases() {
         assert(DEFAULT_PROFIT_FACTOR_GRID.targetVolatility.includes(0.03) && DEFAULT_PROFIT_FACTOR_GRID.targetVolatility.includes(0.04), 'PF-grid mist de lage volatiliteitsdoelstellingen.');
         assert(DEFAULT_PROFIT_FACTOR_GRID.emergencyDrawdownStop.includes(0.18) && DEFAULT_PROFIT_FACTOR_GRID.emergencyDrawdownStop.includes(0.2), 'PF-grid mist de strakkere drawdown-noodremmen.');
         assert(DEFAULT_PROFIT_FACTOR_GRID.assetCap.includes(0.35) && DEFAULT_PROFIT_FACTOR_GRID.assetCap.includes(0.45), 'PF-grid mist de asset caps die concentratierisico beperken.');
+      },
+    },
+    {
+      name: 'Profit Factor Lab weigert negatieve rolling winst als kandidaat',
+      run(assert) {
+        const checks = buildProfitFactorLabChecks({
+          strategyReturn: 0.3,
+          benchmarkReturn: -0.2,
+          oosReturn: 0.08,
+          oosBenchmarkReturn: -0.05,
+          maxDrawdown: 0.12,
+          profitFactor: 2.1,
+          currentRiskExposure: 0.7,
+          rolling: {
+            summary: {
+              strategyCompoundReturn: -0.02,
+              benchmarkCompoundReturn: -0.4,
+              beatRate: 0.8,
+              profitableRate: 0.4,
+            },
+          },
+        }, {
+          maxDrawdownTarget: 0.3,
+          minProfitFactor: 1.65,
+          minWalkForwardBeatRate: 0.5,
+        }, {
+          verdict: 'PASS',
+          passRate: 0.5,
+          medianProfitFactor: 2,
+        });
+
+        const rollingPositive = checks.find((check) => check.id === 'rolling-positive');
+        const profitableRate = checks.find((check) => check.id === 'rolling-profitable-rate');
+
+        assert(rollingPositive && rollingPositive.pass === false, 'Negatieve rolling return mag geen kandidaat blijven.');
+        assert(profitableRate && profitableRate.pass === false, 'Te weinig winstgevende rolling windows moet falen.');
       },
     },
     {

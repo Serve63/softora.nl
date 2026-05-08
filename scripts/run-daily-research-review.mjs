@@ -59,6 +59,24 @@ function latestCandleTime(candlesByAsset) {
   return candles[candles.length - 1]?.time || Date.now();
 }
 
+const DAILY_ROBUSTNESS_GRID = Object.freeze({
+  rebalanceBars: [60, 90, 120],
+  scoreThreshold: [65, 75],
+  targetVolatility: [0.03, 0.04],
+  emergencyDrawdownStop: [0.18, 0.2],
+  assetCap: [0.35, 0.45],
+});
+
+function dailyLabOptions() {
+  if (process.env.FULL_PAPER_RESEARCH === '1') return {};
+  return {
+    topN: 3,
+    robustnessOptions: {
+      grid: DAILY_ROBUSTNESS_GRID,
+    },
+  };
+}
+
 const config = {
   ...FROZEN_INCUBATION_CANDIDATE.config,
   initialCapital: 10000,
@@ -95,6 +113,7 @@ if (market.errors.length) {
     candlesByAsset: market.candlesByAsset,
     baseConfig: config,
     assets: SUPPORTED_ASSETS,
+    ...dailyLabOptions(),
   });
 
   const review = createImprovementReview({
@@ -118,6 +137,7 @@ if (market.errors.length) {
     message: logResult.message,
     statePath,
     mode: 'paper-research-only',
+    researchDepth: process.env.FULL_PAPER_RESEARCH === '1' ? 'full' : 'daily-compact',
     autoPromote: false,
     champion: {
       id: review.champion.id,

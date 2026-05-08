@@ -135,7 +135,9 @@ export function runRollingWalkForward({
     averageBenchmarkReturn: average(benchmarkReturns),
     worstFoldReturn: Math.min(...strategyReturns),
     maxFoldDrawdown: Math.max(...folds.map((fold) => fold.maxDrawdown)),
-    verdict: strategyCompoundReturn > benchmarkCompoundReturn && beatCount / folds.length >= 0.5
+    verdict: strategyCompoundReturn > 0
+      && strategyCompoundReturn > benchmarkCompoundReturn
+      && beatCount / folds.length >= 0.5
       ? 'PASS'
       : 'FAIL',
   };

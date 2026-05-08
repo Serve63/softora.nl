@@ -53,11 +53,15 @@ function scoreValidatedRow(row) {
   if (!rolling) return row.score;
   const rollingEdge = rolling.strategyCompoundReturn - rolling.benchmarkCompoundReturn;
   const rollingPenalty = Math.max(0, rolling.maxFoldDrawdown - row.config.maxDrawdownTarget) * 6;
+  const rollingProfitPenalty = rolling.strategyCompoundReturn > 0 ? 0 : 0.75;
 
   return row.score
+    + Math.max(-0.6, rolling.strategyCompoundReturn) * 0.5
     + Math.max(-0.5, rollingEdge) * 0.65
     + rolling.beatRate * 0.45
-    - rollingPenalty;
+    + (rolling.profitableRate || 0) * 0.25
+    - rollingPenalty
+    - rollingProfitPenalty;
 }
 
 function summarizeRow({ strategy, config, result, rolling = null }) {
@@ -106,7 +110,7 @@ function uniqueRows(rows) {
   return output;
 }
 
-function buildRowChecks(row, config, robustness = null) {
+export function buildProfitFactorLabChecks(row, config, robustness = null) {
   const rolling = row.rolling?.summary;
   const checks = [
     {
@@ -135,9 +139,19 @@ function buildRowChecks(row, config, robustness = null) {
       pass: Boolean(rolling) && rolling.strategyCompoundReturn > rolling.benchmarkCompoundReturn,
     },
     {
+      id: 'rolling-positive',
+      label: 'Rolling walk-forward is positief',
+      pass: Boolean(rolling) && rolling.strategyCompoundReturn > 0,
+    },
+    {
       id: 'rolling-beat-rate',
       label: 'Rolling beat-rate voldoende',
       pass: Boolean(rolling) && rolling.beatRate >= config.minWalkForwardBeatRate,
+    },
+    {
+      id: 'rolling-profitable-rate',
+      label: 'Meeste rolling windows zijn winstgevend',
+      pass: Boolean(rolling) && rolling.profitableRate >= 0.5,
     },
     {
       id: 'current-exposure',
@@ -238,7 +252,7 @@ export function runProfitFactorLab({
         },
         rolling,
       });
-      const checks = buildRowChecks(validated, row.config);
+      const checks = buildProfitFactorLabChecks(validated, row.config);
       return {
         ...validated,
         checks,
@@ -278,7 +292,7 @@ export function runProfitFactorLab({
           verdict: verdictForChecks(checks),
         };
       }
-      const checks = buildRowChecks(row, row.config, robustness);
+      const checks = buildProfitFactorLabChecks(row, row.config, robustness);
       return {
         ...row,
         robustness,
