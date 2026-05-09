@@ -296,12 +296,10 @@ function mountExtraSettingsCategory() {
     var style = document.createElement('style');
     style.id = 'settings-extra-style';
     style.textContent = [
-      '.settings-tile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,280px));gap:20px;align-items:stretch;}',
-      '.settings-extra-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:980px;}',
-      '.settings-extra-card{min-height:140px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:22px;box-shadow:0 8px 24px rgba(26,26,46,.04);display:flex;flex-direction:column;justify-content:space-between;gap:18px;}',
-      '.settings-extra-kicker{font-family:Oswald,sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.16em;color:var(--crimson);text-transform:uppercase;}',
-      '.settings-extra-title{font-family:Oswald,sans-serif;font-size:1.35rem;font-weight:800;letter-spacing:.02em;line-height:1.1;color:var(--text);text-transform:uppercase;}',
-      '.settings-extra-state{align-self:flex-start;font-family:Oswald,sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--text-light);text-transform:uppercase;border:1px solid var(--border);border-radius:999px;padding:4px 10px;}',
+      '.settings-tile-grid,.settings-extra-grid{display:grid;grid-template-columns:repeat(2,minmax(280px,280px));gap:20px;align-items:stretch;justify-content:start;}',
+      '.settings-extra-grid{max-width:580px;}',
+      '.settings-extra-card{cursor:default;}',
+      '@media (max-width:720px){.settings-tile-grid,.settings-extra-grid{grid-template-columns:minmax(280px,280px);}}',
     ].join('');
     document.head.appendChild(style);
   }
@@ -409,10 +407,47 @@ function mountExtraSettingsCategory() {
   extraItems.forEach(function (label, index) {
     var number = String(index + 1).padStart(2, '0');
     var card = document.createElement('div');
-    card.className = 'settings-extra-card';
-    appendUserManagementTextElement(card, 'div', 'settings-extra-kicker', 'Extra ' + number);
-    appendUserManagementTextElement(card, 'div', 'settings-extra-title', label);
-    appendUserManagementTextElement(card, 'div', 'settings-extra-state', 'Template');
+    card.className = 'tegel settings-extra-card';
+    var moduleArrow = createUserManagementSvgElement('svg', {
+      class: 'tegel-arrow',
+      width: '16',
+      height: '16',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '2',
+      'aria-hidden': 'true'
+    });
+    moduleArrow.appendChild(createUserManagementSvgElement('polyline', {
+      points: '9 18 15 12 9 6'
+    }));
+    card.appendChild(moduleArrow);
+
+    var moduleIconWrap = document.createElement('div');
+    moduleIconWrap.className = 'tegel-icon-wrap';
+    var moduleIcon = createUserManagementSvgElement('svg', {
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '1.8',
+      'aria-hidden': 'true'
+    });
+    moduleIcon.appendChild(createUserManagementSvgElement('rect', {
+      x: '4',
+      y: '4',
+      width: '16',
+      height: '16',
+      rx: '3'
+    }));
+    moduleIcon.appendChild(createUserManagementSvgElement('path', {
+      d: 'M8 9h8M8 13h5'
+    }));
+    moduleIconWrap.appendChild(moduleIcon);
+    card.appendChild(moduleIconWrap);
+
+    appendUserManagementTextElement(card, 'div', 'tegel-label', label);
+    appendUserManagementTextElement(card, 'div', 'tegel-desc', 'Interne template-module die later verder ingevuld kan worden.');
+    appendUserManagementTextElement(card, 'div', 'tegel-count', 'Extra ' + number);
     extraGrid.appendChild(card);
   });
   extraScreen.appendChild(extraGrid);
