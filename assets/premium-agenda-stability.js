@@ -56,10 +56,18 @@ function isManualOtherAppointment(apt) {
     return /\b(overig|other|manual-overig)\b/.test(kindText);
 }
 
+function isManualBusinessAppointment(apt) {
+    if (!apt || typeof apt !== 'object') return false;
+    if (!isManualAgendaAppointment(apt)) return false;
+    const kind = String(apt.appointmentKind || apt.manualAppointmentKind || apt.manualBusinessType || apt.manualKind || apt.kind || apt.type || '').trim().toLowerCase();
+    return kind === 'appointment' || kind === 'afspraak' || kind === 'business-appointment' || kind === 'zakelijk-afspraak';
+}
+
 function canCompleteAppointmentManually(apt) {
     if (!apt || typeof apt !== 'object') return false;
     const kind = String(apt.appointmentKind || apt.manualAppointmentKind || apt.manualKind || apt.kind || apt.type || '').trim().toLowerCase();
     if (kind === 'meeting') return false;
+    if (kind === 'appointment' || kind === 'afspraak' || kind === 'business-appointment' || kind === 'zakelijk-afspraak') return true;
     if (kind === 'overig' || kind === 'other' || kind === 'prive' || kind === 'privé' || kind === 'private') return true;
     return isManualOtherAppointment(apt);
 }
@@ -75,7 +83,10 @@ function syncManualAppointmentModalDetails(apt) {
     setModalDetailValueHidden('modalBranche', isManual);
     setModalDetailValueHidden('modalProvider', isManual);
     const modalBadge = document.getElementById('modalBadge');
-    if (modalBadge && isManualOtherAppointment(apt)) {
+    if (modalBadge && isManualBusinessAppointment(apt)) {
+        modalBadge.textContent = 'Klantenafspraak';
+        modalBadge.className = 'modal-type-badge';
+    } else if (modalBadge && isManualOtherAppointment(apt)) {
         modalBadge.textContent = 'Privé-afspraak';
         modalBadge.className = 'modal-type-badge';
     }

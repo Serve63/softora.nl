@@ -274,6 +274,7 @@
         .manual-appointment-modal .modal-footer {
             padding: 0.5rem 1.35rem 1.15rem;
         }
+        .manual-appointment-modal[data-manual-step="business"] #manualAppointmentCancelBtn,
         .manual-appointment-modal[data-manual-step="meeting"] #manualAppointmentCancelBtn,
         .manual-appointment-modal[data-manual-step="details"] #manualAppointmentCancelBtn {
             display: none !important;
@@ -1345,13 +1346,28 @@
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Wat wil je inplannen?</div>
                         <div class="manual-appointment-choice-grid" role="group" aria-label="Wat wil je inplannen?">
-                            <button class="manual-appointment-choice" type="button" data-manual-kind="meeting">
-                                <span class="manual-appointment-choice-title">Meeting</span>
-                                <span class="manual-appointment-choice-sub">Plan een website-, software-, voice- of chatbotmeeting in.</span>
+                            <button class="manual-appointment-choice" type="button" data-manual-kind="business">
+                                <span class="manual-appointment-choice-title">Zakelijk</span>
+                                <span class="manual-appointment-choice-sub">Plan een zakelijke afspraak of meeting in.</span>
                             </button>
                             <button class="manual-appointment-choice" type="button" data-manual-kind="overig">
                                 <span class="manual-appointment-choice-title">Privé</span>
                                 <span class="manual-appointment-choice-sub">Plan een losse activiteit of herinnering in.</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+                <section class="manual-appointment-step" id="manualAppointmentStepBusiness" hidden>
+                    <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Wat voor zakelijke afspraak?</div>
+                        <div class="manual-appointment-choice-grid" role="group" aria-label="Wat voor zakelijke afspraak?">
+                            <button class="manual-appointment-choice" type="button" data-manual-business-type="meeting">
+                                <span class="manual-appointment-choice-title">Meeting</span>
+                                <span class="manual-appointment-choice-sub">Plan een website-, software-, voice- of chatbotmeeting in.</span>
+                            </button>
+                            <button class="manual-appointment-choice" type="button" data-manual-business-type="appointment">
+                                <span class="manual-appointment-choice-title">Afspraak</span>
+                                <span class="manual-appointment-choice-sub">Plan een gewone klantenafspraak in.</span>
                             </button>
                         </div>
                     </div>
@@ -1606,6 +1622,7 @@
     let manualAppointmentSaving = false;
     let manualAppointmentStep = 'kind';
     let manualAppointmentKind = '';
+    let manualAppointmentBusinessType = '';
     let manualAppointmentMeetingType = '';
     let manualAppointmentWho = '';
     const modalAudioBlock = document.getElementById('modalAudioBlock');
@@ -2322,115 +2339,6 @@
         return '';
     }
 
-    function setManualAppointmentActiveChoices() {
-        document.querySelectorAll('[data-manual-kind]').forEach(function (button) {
-            button.classList.toggle('is-active', String(button.getAttribute('data-manual-kind') || '') === manualAppointmentKind);
-        });
-        document.querySelectorAll('[data-manual-meeting-type]').forEach(function (button) {
-            button.classList.toggle('is-active', String(button.getAttribute('data-manual-meeting-type') || '') === manualAppointmentMeetingType);
-        });
-        document.querySelectorAll('[data-manual-who]').forEach(function (button) {
-            button.classList.toggle('is-active', String(button.getAttribute('data-manual-who') || '') === manualAppointmentWho);
-        });
-    }
-
-    function getManualAppointmentLegendChoice() {
-        if (manualAppointmentKind === 'overig') return 'manual-overig';
-        return normalizeManualLegendChoice(manualAppointmentMeetingType);
-    }
-
-    function syncManualAppointmentDetailsMode() { const isMeeting = manualAppointmentKind === 'meeting', whoLabel = document.getElementById('manualAppointmentWhoLabel'), whoChoices = document.getElementById('manualAppointmentWhoChoices'), bothChoice = document.querySelector('[data-manual-who="both"]'); if (whoLabel) whoLabel.textContent = isMeeting ? 'Wie heeft deze lead geregeld?' : 'Voor wie?'; if (whoChoices) whoChoices.setAttribute('aria-label', isMeeting ? 'Wie heeft deze lead geregeld?' : 'Voor wie is deze afspraak?'); if (bothChoice) bothChoice.hidden = isMeeting; if (isMeeting && manualAppointmentWho === 'both') manualAppointmentWho = ''; }
-
-    function setManualAppointmentStep(step) {
-        manualAppointmentStep = step || 'kind';
-        const panels = {
-            kind: document.getElementById('manualAppointmentStepKind'),
-            meeting: document.getElementById('manualAppointmentStepMeeting'),
-            details: document.getElementById('manualAppointmentStepDetails'),
-        };
-        Object.keys(panels).forEach(function (key) {
-            if (panels[key]) panels[key].hidden = key !== manualAppointmentStep;
-        });
-        if (manualAppointmentModal) {
-            manualAppointmentModal.setAttribute('data-manual-step', manualAppointmentStep);
-        }
-        if (manualAppointmentBackBtn) {
-            manualAppointmentBackBtn.hidden = manualAppointmentStep === 'kind';
-        }
-        if (manualAppointmentSubmitBtn) manualAppointmentSubmitBtn.textContent = manualAppointmentStep === 'details' ? 'Toevoegen' : 'Volgende';
-        syncManualAppointmentDetailsMode();
-        setManualAppointmentActiveChoices();
-        setManualAppointmentStatus('');
-    }
-
-    function resetManualAppointmentWizard() {
-        manualAppointmentKind = 'meeting';
-        manualAppointmentMeetingType = '';
-        manualAppointmentWho = '';
-        if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '';
-        if (manualAppointmentActivityTimeEl) manualAppointmentActivityTimeEl.value = '';
-        if (manualAppointmentLegendChoiceEl) manualAppointmentLegendChoiceEl.value = '';
-        if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
-        if (manualAppointmentLocationEl) manualAppointmentLocationEl.value = '';
-        if (manualAppointmentNotesEl) manualAppointmentNotesEl.value = '';
-        setManualAppointmentStep('kind');
-    }
-
-    function focusManualAppointmentStep() {
-        window.setTimeout(() => {
-            if (manualAppointmentStep === 'kind') {
-                const first = document.querySelector('[data-manual-kind]');
-                if (first) first.focus();
-                return;
-            }
-            if (manualAppointmentStep === 'meeting') {
-                const first = document.querySelector('[data-manual-meeting-type]');
-                if (first) first.focus();
-                return;
-            }
-            if (manualAppointmentStep === 'details' && !manualAppointmentWho) {
-                const first = document.querySelector('[data-manual-who]');
-                if (first) {
-                    first.focus();
-                    return;
-                }
-            }
-            if (manualAppointmentActivityEl) manualAppointmentActivityEl.focus();
-        }, 30);
-    }
-
-    function goBackManualAppointmentStep() {
-        if (manualAppointmentStep === 'details') {
-            setManualAppointmentStep(manualAppointmentKind === 'meeting' ? 'meeting' : 'kind');
-            focusManualAppointmentStep();
-        } else if (manualAppointmentStep === 'meeting') {
-            setManualAppointmentStep('kind');
-            focusManualAppointmentStep();
-        }
-    }
-
-    function advanceManualAppointmentStep() {
-        if (manualAppointmentStep === 'kind') {
-            if (manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
-                setManualAppointmentStatus('Kies eerst Meeting of Privé.', 'error');
-                return;
-            }
-            setManualAppointmentStep(manualAppointmentKind === 'meeting' ? 'meeting' : 'details');
-            focusManualAppointmentStep();
-            return;
-        }
-        if (manualAppointmentStep === 'meeting') {
-            if (!normalizeManualLegendChoice(manualAppointmentMeetingType)) {
-                setManualAppointmentStatus('Kies welke meeting je wilt inplannen.', 'error');
-                return;
-            }
-            setManualAppointmentStep('details');
-            focusManualAppointmentStep();
-            return;
-        }
-        void submitManualAppointment();
-    }
-
     function setManualAppointmentStatus(message, variant = '') {
         if (!manualAppointmentStatusEl) return;
         manualAppointmentStatusEl.textContent = message || '';
@@ -2466,19 +2374,31 @@
         const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
         const location = manualAppointmentLocationEl ? String(manualAppointmentLocationEl.value || '').trim() : '';
         const notes = manualAppointmentNotesEl ? String(manualAppointmentNotesEl.value || '').trim() : '';
-        const isMeeting = manualAppointmentKind === 'meeting', who = isMeeting ? 'both' : String(manualAppointmentWho || '').trim(), leadOwnerKey = isMeeting && (manualAppointmentWho === 'serve' || manualAppointmentWho === 'martijn') ? manualAppointmentWho : '';
+        const isMeeting = isManualAppointmentMeetingFlow();
+        const isBusinessAppointment = manualAppointmentKind === 'business' && manualAppointmentBusinessType === 'appointment';
+        const appointmentKind = isMeeting ? 'meeting' : isBusinessAppointment ? 'appointment' : 'overig';
+        const who = isMeeting ? 'both' : String(manualAppointmentWho || '').trim();
+        const leadOwnerKey = isMeeting && (manualAppointmentWho === 'serve' || manualAppointmentWho === 'martijn') ? manualAppointmentWho : '';
 
-        if (manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
+        if (manualAppointmentKind !== 'business' && manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
             setManualAppointmentStatus('Kies eerst wat je wilt inplannen.', 'error');
             return;
         }
-        if (!legendChoice) {
+        if (manualAppointmentKind === 'business' && manualAppointmentBusinessType !== 'meeting' && manualAppointmentBusinessType !== 'appointment') {
+            setManualAppointmentStatus('Kies eerst Meeting of Afspraak.', 'error');
+            return;
+        }
+        if (isMeeting && !legendChoice) {
             setManualAppointmentStatus('Kies welke meeting je wilt inplannen.', 'error');
             return;
         }
         if (isMeeting && !leadOwnerKey) { setManualAppointmentStatus('Kies wie deze lead heeft geregeld.', 'error'); return; }
         if (!isMeeting && who !== 'serve' && who !== 'martijn' && who !== 'both') {
             setManualAppointmentStatus('Kies voor wie deze afspraak is.', 'error');
+            return;
+        }
+        if (!legendChoice) {
+            setManualAppointmentStatus('Kies eerst wat je wilt inplannen.', 'error');
             return;
         }
         if (!activity) {
@@ -2505,7 +2425,7 @@
                 title: activity,
                 time: timeVal,
                 activityTime: timeVal,
-                legendChoice, appointmentKind: manualAppointmentKind, manualLeadOwner: leadOwnerKey, leadOwnerKey,
+                legendChoice, appointmentKind, manualBusinessType: manualAppointmentBusinessType, manualLeadOwner: leadOwnerKey, leadOwnerKey,
                 activity,
                 location,
                 notes,
@@ -3508,7 +3428,8 @@
         applyWorkspaceMode(false);
     }
 </script>
-<script src="assets/premium-agenda-stability.js?v=20260508a"></script>
+	<script src="assets/premium-agenda-manual-business-flow.js?v=20260508a"></script>
+	<script src="assets/premium-agenda-stability.js?v=20260508a"></script>
 <script>
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
@@ -3585,7 +3506,16 @@
     document.querySelectorAll('[data-manual-kind]').forEach((button) => {
         button.addEventListener('click', () => {
             manualAppointmentKind = String(button.getAttribute('data-manual-kind') || '').trim();
-            if (manualAppointmentKind !== 'meeting') manualAppointmentMeetingType = '';
+            manualAppointmentBusinessType = '';
+            manualAppointmentMeetingType = '';
+            syncManualAppointmentDetailsMode();
+            setManualAppointmentActiveChoices();
+        });
+    });
+    document.querySelectorAll('[data-manual-business-type]').forEach((button) => {
+        button.addEventListener('click', () => {
+            manualAppointmentBusinessType = String(button.getAttribute('data-manual-business-type') || '').trim();
+            if (manualAppointmentBusinessType !== 'meeting') manualAppointmentMeetingType = '';
             syncManualAppointmentDetailsMode();
             setManualAppointmentActiveChoices();
         });

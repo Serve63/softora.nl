@@ -112,20 +112,29 @@ test('premium agenda gebruikt delegated acties voor agenda chrome en afspraken',
 
 test('premium agenda offers stepped manual add flow on day click', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
-  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const manualFlowPath = path.join(__dirname, '../../assets/premium-agenda-manual-business-flow.js');
+  const pageSource = `${fs.readFileSync(pagePath, 'utf8')}\n${fs.readFileSync(manualFlowPath, 'utf8')}`;
 
   assert.match(pageSource, /id="manualAppointmentOverlay"/);
+  assert.match(pageSource, /assets\/premium-agenda-manual-business-flow\.js/);
   assert.match(pageSource, /Wat wil je inplannen\?/);
-  assert.match(pageSource, /data-manual-kind="meeting"/);
+  assert.match(pageSource, /data-manual-kind="business"/);
   assert.match(pageSource, /data-manual-kind="overig"/);
+  assert.match(pageSource, /Zakelijk/);
   assert.match(pageSource, /\.manual-appointment-choice:focus \{[\s\S]*outline: none;/);
   assert.match(pageSource, /\.manual-appointment-choice:focus-visible,[\s\S]*\.manual-appointment-choice\.is-active \{[\s\S]*border-color: var\(--accent\);/);
-  assert.match(pageSource, /manualAppointmentKind = 'meeting';/);
+  assert.match(pageSource, /manualAppointmentKind = 'business';/);
+  assert.match(pageSource, /manualAppointmentBusinessType = '';/);
   assert.doesNotMatch(pageSource, /id="manualAppointmentCancelBtn"/);
   assert.match(pageSource, /class="modal manual-appointment-modal"[^>]*data-manual-step="kind"/);
+  assert.match(pageSource, /\.manual-appointment-modal\[data-manual-step="business"\] #manualAppointmentCancelBtn,/);
   assert.match(pageSource, /\.manual-appointment-modal\[data-manual-step="meeting"\] #manualAppointmentCancelBtn,/);
   assert.match(pageSource, /\.manual-appointment-modal\[data-manual-step="details"\] #manualAppointmentCancelBtn \{[\s\S]*display: none !important;/);
   assert.match(pageSource, /manualAppointmentModal\.setAttribute\('data-manual-step', manualAppointmentStep\);/);
+  assert.match(pageSource, /Wat voor zakelijke afspraak\?/);
+  assert.match(pageSource, /data-manual-business-type="meeting"/);
+  assert.match(pageSource, /data-manual-business-type="appointment"/);
+  assert.match(pageSource, /Afspraak/);
   assert.match(pageSource, /Welke meeting\?/);
   assert.match(pageSource, /data-manual-meeting-type="website"/);
   assert.match(pageSource, /data-manual-meeting-type="business"/);
@@ -171,6 +180,14 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   );
   assert.match(
     pageSource,
+    /document\.querySelectorAll\('\[data-manual-business-type\]'\)\.forEach\(\(button\) => \{[\s\S]*setManualAppointmentActiveChoices\(\);[\s\S]*\}\);\s*\}\);/
+  );
+  assert.doesNotMatch(
+    pageSource,
+    /document\.querySelectorAll\('\[data-manual-business-type\]'\)\.forEach\(\(button\) => \{[\s\S]*advanceManualAppointmentStep\(\);[\s\S]*\}\);\s*\}\);/
+  );
+  assert.match(
+    pageSource,
     /document\.querySelectorAll\('\[data-manual-meeting-type\]'\)\.forEach\(\(button\) => \{[\s\S]*setManualAppointmentActiveChoices\(\);[\s\S]*\}\);\s*\}\);/
   );
   assert.doesNotMatch(
@@ -190,11 +207,13 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /\.legend-dot\.manual-overig \{ background: #ec4899; \}/);
   assert.match(pageSource, /\.appointment\.manual-overig \{[\s\S]*border-left: 3px solid #ec4899;/);
   assert.match(pageSource, /activityTime: timeVal/);
-  assert.match(pageSource, /const isMeeting = manualAppointmentKind === 'meeting', who = isMeeting \? 'both' : String\(manualAppointmentWho \|\| ''\)\.trim\(\), leadOwnerKey = isMeeting && \(manualAppointmentWho === 'serve' \|\| manualAppointmentWho === 'martijn'\) \? manualAppointmentWho : '';/);
+  assert.match(pageSource, /const isMeeting = isManualAppointmentMeetingFlow\(\);/);
+  assert.match(pageSource, /const appointmentKind = isMeeting \? 'meeting' : isBusinessAppointment \? 'appointment' : 'overig';/);
   assert.match(pageSource, /Kies wie deze lead heeft geregeld\./);
   assert.match(pageSource, /Kies voor wie deze afspraak is\./);
   assert.match(pageSource, /legendChoice,/);
-  assert.match(pageSource, /appointmentKind: manualAppointmentKind,/);
+  assert.match(pageSource, /appointmentKind,/);
+  assert.match(pageSource, /manualBusinessType: manualAppointmentBusinessType,/);
   assert.match(pageSource, /manualLeadOwner: leadOwnerKey,/);
   assert.match(pageSource, /leadOwnerKey,/);
   assert.match(pageSource, /who,/);

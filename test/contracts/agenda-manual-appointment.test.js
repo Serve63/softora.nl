@@ -193,6 +193,36 @@ test('agenda manual meeting requires a lead owner only for the new meeting wizar
   assert.match(res.body.error, /Kies wie deze lead heeft geregeld/);
 });
 
+test('agenda manual business appointment stores as customer appointment without lead owner requirement', async () => {
+  const { coordinator } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        appointmentKind: 'appointment',
+        manualBusinessType: 'appointment',
+        who: 'both',
+        title: 'Klantafspraak',
+        time: '15:00',
+        legendChoice: 'manual-both',
+        location: 'Klantlocatie',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.appointment.appointmentKind, 'appointment');
+  assert.equal(res.body.appointment.manualPlannerWho, 'both');
+  assert.equal(res.body.appointment.manualLegendChoice, 'manual-both');
+  assert.equal(res.body.appointment.manualLeadOwnerKey, '');
+  assert.match(res.body.appointment.summary, /Wie: Servé en Martijn/);
+  assert.match(res.body.appointment.summary, /Legenda: manual-both/);
+});
+
 test('agenda manual appointment does not block on initial shared-state hydration', async () => {
   let hydrateCalls = 0;
   let syncCalls = 0;
