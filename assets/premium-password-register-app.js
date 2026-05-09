@@ -7,6 +7,7 @@
   var entryModalMode = "closed";
   var currentEditEntryId = null;
   var pendingDeleteEntryId = null;
+  var pendingMasterSecretResolver = null;
 
   var registerStatusEl = document.getElementById("register-status");
   var searchInputEl = document.getElementById("search");
@@ -14,6 +15,12 @@
   var pinNumpadEl = document.querySelector(".numpad");
   var lockRegisterBtnEl = document.getElementById("lock-register-btn");
   var addEntryBtnEl = document.getElementById("add-entry-btn");
+  var masterSecretOverlayEl = document.getElementById("master-secret-overlay");
+  var masterSecretFormEl = document.getElementById("master-secret-form");
+  var masterSecretInputEl = document.getElementById("master-secret-input");
+  var masterSecretErrorEl = document.getElementById("master-secret-error");
+  var masterSecretCancelEl = document.getElementById("master-secret-cancel");
+  var masterSecretCloseEl = document.getElementById("master-secret-close");
   var entryModalBackdrop = document.getElementById("entry-modal-backdrop");
   var entryModalEl = document.getElementById("entry-modal");
   var entryModalCloseEl = document.getElementById("entry-modal-close");
@@ -63,6 +70,52 @@
     if (!registerStatusEl) return;
     registerStatusEl.textContent = normalizeString(message);
     registerStatusEl.style.color = tone === "warning" ? "var(--red)" : "var(--text-tertiary)";
+  }
+
+  function setMasterSecretError(message) {
+    if (!masterSecretErrorEl) return;
+    masterSecretErrorEl.textContent = normalizeString(message);
+  }
+
+  function isMasterSecretDialogOpen() {
+    return Boolean(masterSecretOverlayEl && !masterSecretOverlayEl.hidden);
+  }
+
+  function finishMasterSecretDialog(value) {
+    if (!pendingMasterSecretResolver) return;
+    var resolve = pendingMasterSecretResolver;
+    pendingMasterSecretResolver = null;
+    if (masterSecretOverlayEl) {
+      masterSecretOverlayEl.hidden = true;
+      masterSecretOverlayEl.setAttribute("aria-hidden", "true");
+    }
+    if (masterSecretInputEl) {
+      masterSecretInputEl.value = "";
+      masterSecretInputEl.removeAttribute("aria-invalid");
+    }
+    setMasterSecretError("");
+    resolve(normalizeString(value));
+  }
+
+  function openMasterSecretDialog() {
+    if (!masterSecretOverlayEl || !masterSecretInputEl) {
+      setRegisterStatus("Master-wachtzin kan niet worden gevraagd. Vernieuw de pagina.", "warning");
+      return Promise.resolve("");
+    }
+    if (pendingMasterSecretResolver) {
+      finishMasterSecretDialog("");
+    }
+    return new Promise(function (resolve) {
+      pendingMasterSecretResolver = resolve;
+      masterSecretInputEl.value = "";
+      masterSecretInputEl.removeAttribute("aria-invalid");
+      setMasterSecretError("");
+      masterSecretOverlayEl.hidden = false;
+      masterSecretOverlayEl.setAttribute("aria-hidden", "false");
+      window.setTimeout(function () {
+        masterSecretInputEl.focus();
+      }, 0);
+    });
   }
 
   async function persistPasswordEntries(actor) {
@@ -293,6 +346,11 @@
   function bindEvents() {
     document.addEventListener("keydown", function (event) {
       if (event.key !== "Escape") return;
+      if (isMasterSecretDialogOpen()) {
+        event.preventDefault();
+        finishMasterSecretDialog("");
+        return;
+      }
       if (pwDeleteModalOverlay && pwDeleteModalOverlay.classList.contains("open")) {
         closeDeleteEntryModal();
         return;
@@ -301,6 +359,35 @@
         closeEditModal();
       }
     });
+
+    if (masterSecretFormEl) {
+      masterSecretFormEl.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var nextSecret = normalizeString(masterSecretInputEl && masterSecretInputEl.value);
+        if (!nextSecret) {
+          if (masterSecretInputEl) masterSecretInputEl.setAttribute("aria-invalid", "true");
+          setMasterSecretError("Vul je master-wachtzin in.");
+          if (masterSecretInputEl) masterSecretInputEl.focus();
+          return;
+        }
+        finishMasterSecretDialog(nextSecret);
+      });
+    }
+    if (masterSecretCancelEl) {
+      masterSecretCancelEl.addEventListener("click", function () {
+        finishMasterSecretDialog("");
+      });
+    }
+    if (masterSecretCloseEl) {
+      masterSecretCloseEl.addEventListener("click", function () {
+        finishMasterSecretDialog("");
+      });
+    }
+    if (masterSecretOverlayEl) {
+      masterSecretOverlayEl.addEventListener("click", function (event) {
+        if (event.target === masterSecretOverlayEl) finishMasterSecretDialog("");
+      });
+    }
 
     entryModalBackdrop.addEventListener("click", closeEditModal);
     entryModalCloseEl.addEventListener("click", closeEditModal);
@@ -335,11 +422,7 @@
   }
 
   async function unlockRegister() {
-    var masterSecret = normalizeString(
-      global.prompt(
-        "Voer je master-wachtzin in. Deze wordt niet opgeslagen en kan niet worden hersteld."
-      )
-    );
+    var masterSecret = normalizeString(await openMasterSecretDialog());
     if (!masterSecret) {
       setRegisterStatus("Master-wachtzin is nodig om de kluis te openen.", "warning");
       return;

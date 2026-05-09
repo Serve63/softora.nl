@@ -33,7 +33,7 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /assets\/premium-password-register-renderer\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/premium-password-register-store\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/premium-password-register-pin\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-password-register-app\.js\?v=20260427a/);
+  assert.match(pageSource, /assets\/premium-password-register-app\.js\?v=20260509a/);
   assert.match(rendererSource, /global\.SoftoraPasswordRegisterRenderer/);
   assert.match(storeSource, /global\.SoftoraPasswordRegisterStore/);
   assert.match(storeSource, /var PASSWORD_REGISTER_SCOPE = "premium_password_register";/);
@@ -49,7 +49,15 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(appSource, /global\.SoftoraPasswordRegisterStore\.create/);
   assert.match(appSource, /passwordRegisterStore\.unlock\(masterSecret\)/);
   assert.match(appSource, /passwordRegisterStore\.persist\(entries, actor \|\| "save"\)/);
-  assert.match(appSource, /global\.prompt\(/);
+  assert.match(pageSource, /id="master-secret-overlay"/);
+  assert.match(pageSource, /id="master-secret-input"/);
+  assert.match(pageSource, /class="master-secret-modal"/);
+  assert.match(pageSource, /Softora slaat hem niet op en kan hem niet herstellen\./);
+  assert.match(appSource, /openMasterSecretDialog/);
+  assert.match(appSource, /finishMasterSecretDialog/);
+  assert.match(appSource, /passwordRegisterStore\.unlock\(masterSecret\)/);
+  assert.doesNotMatch(appSource, /global\.prompt\(/);
+  assert.doesNotMatch(appSource, /window\.prompt\(/);
   assert.match(pinSource, /global\.SoftoraPasswordRegisterPin/);
   assert.match(storeSource, /hosting@example\.test/);
   assert.match(storeSource, /Voorbeeldgegevens geladen\. Vervang deze en sla daarna op om echte gegevens versleuteld te bewaren\./);
