@@ -254,7 +254,6 @@ body {
   min-height: 100vh;
 }
 
-/* Zelfde centering als premium-wachtwoordenregister (.main-content + #screen-pin) */
 main.main.is-premium-boot-host {
   display: flex;
   flex-direction: column;
@@ -284,6 +283,7 @@ main.main.is-premium-boot-host {
   color: var(--text-light);
   margin-bottom: 36px;
 }
+.settings-overview-grid,:is(#screen-extra,.screen-extra) > :last-child,.settings-extra-grid,.extra-modules-grid,.modules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;width:min(100%,calc(4 * 320px + 3 * 24px));align-items:stretch}.settings-overview-grid>*,#screen-extra > :last-child>*,.screen-extra > :last-child>*,.settings-extra-grid>*,.extra-modules-grid>*,.modules-grid>*{width:100%;min-width:0}
 
 .tegel {
   background: var(--card-bg);
@@ -1936,7 +1936,7 @@ body {
   <div class="screen active" id="screen-overzicht">
     <div class="page-title">Instellingen</div>
     <div class="page-subtitle">Kies een categorie om te beheren</div>
-    <div>
+    <div class="settings-overview-grid">
       <button type="button" class="tegel" data-settings-action="open-pin">
         <svg class="tegel-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         <div class="tegel-icon-wrap">
