@@ -7,6 +7,11 @@ const STEPS = Object.freeze([
     args: ['scripts/run-daily-research-review.mjs'],
   },
   {
+    id: 'champion-audit',
+    label: 'Champion audit',
+    args: ['scripts/run-champion-audit.mjs'],
+  },
+  {
     id: 'watchlist-forward',
     label: 'Watchlist forward snapshot',
     args: ['scripts/run-watchlist-forward-snapshot.mjs'],
@@ -76,6 +81,7 @@ function stepSummary(result) {
 
 function summarizeCycle(results) {
   const research = results.find((result) => result.id === 'research-review')?.parsed || {};
+  const championAudit = results.find((result) => result.id === 'champion-audit')?.parsed || {};
   const watchlist = results.find((result) => result.id === 'watchlist-forward')?.parsed || {};
   const replay = results.find((result) => result.id === 'accelerated-replay')?.parsed || {};
   const promotion = results.find((result) => result.id === 'promotion-review')?.parsed || {};
@@ -84,6 +90,8 @@ function summarizeCycle(results) {
   const replayVerdict = replay.verdict || null;
   const action = !ok
     ? 'CHECK_DATA_OR_SCRIPT'
+    : championAudit.verdict === 'RESEARCH_CHAMPION_REPLACEMENT'
+      ? 'HUMAN_REVIEW_CHAMPION_REPLACEMENT'
     : promotionVerdict === 'PROMOTE_READY'
       ? 'HUMAN_REVIEW_BEFORE_PROMOTION'
       : promotionVerdict === 'KILL_CHALLENGER'
@@ -110,6 +118,28 @@ function summarizeCycle(results) {
       profitFactor: research.challenger.profitFactor,
       rollingReturnPct: research.challenger.rollingReturnPct,
       signal: research.challenger.signal,
+    } : null,
+    championAudit: championAudit.champion ? {
+      verdict: championAudit.verdict,
+      action: championAudit.action,
+      champion: {
+        label: championAudit.champion.label,
+        returnPct: championAudit.champion.returnPct,
+        maxDrawdownPct: championAudit.champion.maxDrawdownPct,
+        profitFactor: championAudit.champion.profitFactor,
+        signal: championAudit.champion.currentSignal,
+      },
+      replacement: championAudit.replacement ? {
+        label: championAudit.replacement.label,
+        returnPct: championAudit.replacement.returnPct,
+        oosEdgePct: championAudit.replacement.oosEdgePct,
+        maxDrawdownPct: championAudit.replacement.maxDrawdownPct,
+        profitFactor: championAudit.replacement.profitFactor,
+        replayVerdict: championAudit.replacement.replay?.verdict || null,
+        multiWindowVerdict: championAudit.replacement.multiWindow?.verdict || null,
+        signal: championAudit.replacement.currentSignal,
+      } : null,
+      failed: championAudit.failed || [],
     } : null,
     watchlist: watchlist.candidate ? {
       label: watchlist.candidate.label,

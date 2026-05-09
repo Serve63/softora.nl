@@ -15,7 +15,7 @@ import {
   loadImprovementState,
   saveImprovementState,
 } from '../src/storage/localStore.js';
-import trendParticipation from '../src/strategies/trendParticipation.js';
+import { strategyForName } from '../src/strategies/registry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
@@ -118,13 +118,22 @@ const config = {
   minWalkForwardBeatRate: 0.5,
 };
 const storage = createFileStorage(statePath);
+const championStrategy = strategyForName(FROZEN_INCUBATION_CANDIDATE.strategyName);
 const market = await fetchMarketData({
   assets: SUPPORTED_ASSETS,
   timeframe: config.timeframe,
   target: config.candleTarget,
 });
 
-if (market.errors.length) {
+if (!championStrategy) {
+  console.log(JSON.stringify({
+    ok: false,
+    logged: false,
+    error: `Onbekende frozen champion-strategie: ${FROZEN_INCUBATION_CANDIDATE.strategyName}.`,
+    statePath,
+  }, null, 2));
+  process.exitCode = 1;
+} else if (market.errors.length) {
   console.log(JSON.stringify({
     ok: false,
     logged: false,
@@ -137,7 +146,7 @@ if (market.errors.length) {
   const championBacktest = runBacktest({
     candlesByAsset: market.candlesByAsset,
     config,
-    strategy: trendParticipation,
+    strategy: championStrategy,
     assets: SUPPORTED_ASSETS,
   });
 

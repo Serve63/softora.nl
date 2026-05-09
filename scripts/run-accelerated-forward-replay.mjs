@@ -8,13 +8,7 @@ import {
 import { FROZEN_INCUBATION_CANDIDATE } from '../src/forward/forwardRunner.js';
 import { fetchMarketData, SUPPORTED_ASSETS } from '../src/data/binanceProvider.js';
 import { loadImprovementState } from '../src/storage/localStore.js';
-import costAwareTailGuard from '../src/strategies/costAwareTailGuard.js';
-import convexBreakout from '../src/strategies/convexBreakout.js';
-import frozenCandidate from '../src/strategies/frozenCandidate.js';
-import sprintRotation from '../src/strategies/sprintRotation.js';
-import tailConvexMeta from '../src/strategies/tailConvexMeta.js';
-import tailGuard from '../src/strategies/tailGuard.js';
-import trendParticipation from '../src/strategies/trendParticipation.js';
+import { strategyForName } from '../src/strategies/registry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
@@ -43,17 +37,6 @@ function createFileStorage(filePath) {
       }
     },
   };
-}
-
-function strategyForName(name) {
-  if (name === frozenCandidate.name) return frozenCandidate;
-  if (name === sprintRotation.name) return sprintRotation;
-  if (name === tailGuard.name) return tailGuard;
-  if (name === costAwareTailGuard.name) return costAwareTailGuard;
-  if (name === convexBreakout.name) return convexBreakout;
-  if (name === tailConvexMeta.name) return tailConvexMeta;
-  if (name === trendParticipation.name) return trendParticipation;
-  return null;
 }
 
 function pct(value) {
@@ -85,7 +68,6 @@ function buildCandidate(challenger) {
   if (!challenger) {
     return {
       ...FROZEN_INCUBATION_CANDIDATE,
-      strategyName: trendParticipation.name,
     };
   }
 

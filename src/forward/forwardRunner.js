@@ -2,10 +2,10 @@ import { applyPortfolioReturn, equalWeight } from '../core/portfolio.js';
 import { clearForwardState, loadForwardState, saveForwardState } from '../storage/localStore.js';
 
 export const FROZEN_INCUBATION_CANDIDATE = Object.freeze({
-  id: 'trend-participation-4h-robust-v1',
-  label: 'Trend Participation 4H Robust v1',
-  strategyName: 'Trend Participation v1',
-  lockedAt: '2026-05-07',
+  id: 'tail-convex-meta-4h-audit-v1',
+  label: 'Tail Convex Meta 4H Audit v1',
+  strategyName: 'Tail Convex Meta v1',
+  lockedAt: '2026-05-09',
   paperOnly: true,
   config: Object.freeze({
     timeframe: '4H',

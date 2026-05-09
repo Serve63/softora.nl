@@ -14,14 +14,15 @@ import {
   exportForwardJson,
   FROZEN_INCUBATION_CANDIDATE,
   importForwardJson,
-  loadOrCreateForwardState,
+  loadOrCreateForwardStateForCandidate,
   logForwardSignal,
   resetForwardState,
 } from '../forward/forwardRunner.js';
 import { saveForwardState } from '../storage/localStore.js';
+import { strategyForName } from '../strategies/registry.js';
 
 const state = {
-  config: { ...DEFAULT_CONFIG },
+  config: { ...DEFAULT_CONFIG, ...FROZEN_INCUBATION_CANDIDATE.config },
   marketData: null,
   backtest: null,
   diagnostics: null,
@@ -31,7 +32,7 @@ const state = {
   timeframeResearch: null,
   profitFactorLab: null,
   profitFactorMarketData: null,
-  activeStrategy: null,
+  activeStrategy: strategyForName(FROZEN_INCUBATION_CANDIDATE.strategyName),
   forwardState: null,
   running: false,
 };
@@ -943,7 +944,10 @@ function renderForward(root) {
 }
 
 function createSafeForwardState() {
-  state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
+  state.forwardState = loadOrCreateForwardStateForCandidate(
+    FROZEN_INCUBATION_CANDIDATE,
+    state.config.initialCapital,
+  );
   return state.forwardState;
 }
 
@@ -1003,7 +1007,10 @@ async function runAnalysis(root) {
     state.timeframeResearch = null;
     state.profitFactorLab = null;
     state.profitFactorMarketData = null;
-    state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
+    state.forwardState = loadOrCreateForwardStateForCandidate(
+      FROZEN_INCUBATION_CANDIDATE,
+      state.config.initialCapital,
+    );
     setText(root, '#statusText', state.backtest.ok ? 'Backtest klaar.' : state.backtest.error);
     renderAll(root);
   } catch (error) {
@@ -1056,7 +1063,10 @@ function applyProfitFactorCandidate(root) {
   state.walkForward = null;
   state.tournament = null;
   state.timeframeResearch = null;
-  state.forwardState = loadOrCreateForwardState(state.config.initialCapital);
+  state.forwardState = loadOrCreateForwardStateForCandidate(
+    FROZEN_INCUBATION_CANDIDATE,
+    state.config.initialCapital,
+  );
 
   writeConfigControls(root, state.config);
   setText(root, '#statusText', `PF-kandidaat toegepast op paper-dashboard: ${state.backtest.currentSignal.label}.`);
@@ -1233,6 +1243,7 @@ function wireEvents(root) {
       assets: SUPPORTED_ASSETS,
       config: state.config,
       backtest: state.backtest,
+      candidate: FROZEN_INCUBATION_CANDIDATE,
     });
     state.forwardState = result.state;
     setText(root, '#statusText', result.message);
@@ -1293,7 +1304,11 @@ function wireEvents(root) {
 export function initDashboard(root) {
   if (!root) return;
   renderShell(root);
-  state.forwardState = loadOrCreateForwardState(DEFAULT_CONFIG.initialCapital);
+  writeConfigControls(root, state.config);
+  state.forwardState = loadOrCreateForwardStateForCandidate(
+    FROZEN_INCUBATION_CANDIDATE,
+    state.config.initialCapital || DEFAULT_CONFIG.initialCapital,
+  );
   wireEvents(root);
   renderAll(root);
   runAnalysis(root);
