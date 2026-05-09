@@ -84,6 +84,18 @@ function dateKey(timestamp) {
   return new Date(timestamp).toISOString().slice(0, 10);
 }
 
+function decisionKey(timestamp, timeframe = 'Daily') {
+  const iso = new Date(timestamp).toISOString();
+  if (timeframe === 'Daily') return iso.slice(0, 10);
+  return iso;
+}
+
+function decisionLabel(timestamp, timeframe = 'Daily') {
+  const iso = new Date(timestamp).toISOString();
+  if (timeframe === 'Daily') return iso.slice(0, 10);
+  return iso.replace('T', ' ').slice(0, 16);
+}
+
 function latestPricesFromCandles(candlesByAsset, assets) {
   return Object.fromEntries(assets.map((asset) => {
     const candles = candlesByAsset[asset] || [];
@@ -138,12 +150,16 @@ export function logForwardSignal({
   const asOf = timestamp || lastCandle?.time || Date.now();
   const key = dateKey(asOf);
   const timeframe = config?.timeframe || 'Daily';
+  const logKey = decisionKey(asOf, timeframe);
 
-  if (activeState.logs.some((entry) => entry.dateKey === key && entry.timeframe === timeframe)) {
+  if (activeState.logs.some((entry) => (
+    (entry.decisionKey || decisionKey(entry.timestamp || entry.dateKey, entry.timeframe || timeframe)) === logKey
+    && entry.timeframe === timeframe
+  ))) {
     return {
       state: activeState,
       skipped: true,
-      message: `Er bestaat al een forward-log voor ${key} (${timeframe}).`,
+      message: `Er bestaat al een forward-log voor ${decisionLabel(asOf, timeframe)} (${timeframe}).`,
     };
   }
 
@@ -172,8 +188,9 @@ export function logForwardSignal({
   const gate = backtest?.gate || {};
   const gateFailed = Array.isArray(gate.failed) ? gate.failed.map((check) => check.id) : [];
   const entry = {
-    id: `${key}-${timeframe}-${activeCandidate.id}`,
+    id: `${logKey}-${timeframe}-${activeCandidate.id}`,
     dateKey: key,
+    decisionKey: logKey,
     timestamp: new Date(asOf).toISOString(),
     timeframe,
     candidateId: activeCandidate.id,
@@ -216,7 +233,7 @@ export function logForwardSignal({
     state: activeState,
     skipped: false,
     entry,
-    message: `Forward-signaal gelogd voor ${key}.`,
+    message: `Forward-signaal gelogd voor ${decisionLabel(asOf, timeframe)}.`,
   };
 }
 
@@ -354,12 +371,13 @@ export function importForwardJson(raw, storage) {
 
 export function exportForwardCsv(state) {
   const rows = [
-    ['date', 'timeframe', 'candidate_id', 'signal', 'gate_open', 'gate_failed', 'paper_equity', 'benchmark_equity', 'edge', 'weights'],
+    ['date', 'decision_key', 'timeframe', 'candidate_id', 'signal', 'gate_open', 'gate_failed', 'paper_equity', 'benchmark_equity', 'edge', 'weights'],
   ];
 
   for (const entry of state?.logs || []) {
     rows.push([
       entry.dateKey,
+      entry.decisionKey || entry.timestamp || entry.dateKey,
       entry.timeframe,
       entry.candidateId || '',
       entry.signal,

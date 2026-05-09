@@ -67,7 +67,7 @@ export function accountingTestCases() {
       },
     },
     {
-      name: 'Geen dubbele forward-log per dag',
+      name: 'Geen dubbele forward-log voor dezelfde candle',
       run(assert) {
         const storage = createMemoryStorage();
         const forwardState = createEmptyForwardState(10000);
@@ -91,7 +91,43 @@ export function accountingTestCases() {
           storage,
         });
         assert(firstLog.state.logs.length === 1, 'Eerste forward-log is niet opgeslagen.');
-        assert(secondLog.skipped === true, 'Dubbele forward-log op dezelfde datum wordt niet geblokkeerd.');
+        assert(secondLog.skipped === true, 'Dubbele forward-log op dezelfde candle wordt niet geblokkeerd.');
+      },
+    },
+    {
+      name: '4H forward-log accepteert nieuwe candle op dezelfde dag',
+      run(assert) {
+        const storage = createMemoryStorage();
+        const forwardState = createEmptyForwardState(10000);
+        const firstCandles = {
+          BTCUSDT: [{ time: Date.UTC(2026, 0, 1, 0), close: 100 }],
+        };
+        const secondCandles = {
+          BTCUSDT: [
+            { time: Date.UTC(2026, 0, 1, 0), close: 100 },
+            { time: Date.UTC(2026, 0, 1, 4), close: 104 },
+          ],
+        };
+        const firstLog = logForwardSignal({
+          state: forwardState,
+          signal: { label: 'BTC 100%', weights: { BTCUSDT: 1 }, exposure: 1 },
+          candlesByAsset: firstCandles,
+          assets: ['BTCUSDT'],
+          config: { ...FROZEN_INCUBATION_CANDIDATE.config, initialCapital: 10000 },
+          storage,
+        });
+        const secondLog = logForwardSignal({
+          state: firstLog.state,
+          signal: { label: 'BTC 100%', weights: { BTCUSDT: 1 }, exposure: 1 },
+          candlesByAsset: secondCandles,
+          assets: ['BTCUSDT'],
+          config: { ...FROZEN_INCUBATION_CANDIDATE.config, initialCapital: 10000 },
+          storage,
+        });
+
+        assert(secondLog.skipped === false, 'Nieuwe 4H-candle op dezelfde dag moet gelogd worden.');
+        assert(secondLog.state.logs.length === 2, 'Tweede 4H-candle ontbreekt in forward logs.');
+        assert(secondLog.state.logs[0].decisionKey !== secondLog.state.logs[1].decisionKey, '4H candles moeten eigen decision keys krijgen.');
       },
     },
     {
