@@ -183,13 +183,13 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.doesNotMatch(pageSource, /AI-database/i);
   assert.doesNotMatch(pageSource, /ai-database-badge/);
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
+  assert.match(pageSource, /<button class="add-actions-item" id="manualAddButton" type="button" role="menuitem">Handmatig toevoegen<\/button>/);
   assert.match(pageSource, /<button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">Bedrijven toevoegen<\/button>/);
   assert.doesNotMatch(pageSource, /Volgende locatie doorzoeken/);
   assert.doesNotMatch(pageSource, /AI werkt de huidige plek automatisch af/);
   assert.doesNotMatch(pageSource, /100 bedrijven toevoegen/);
   assert.doesNotMatch(pageSource, />Uploaden</);
   assert.doesNotMatch(pageSource, />Google Sheet koppelen</);
-  assert.doesNotMatch(pageSource, />Handmatig toevoegen</);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.doesNotMatch(pageSource, /id="f-branche"/);
@@ -444,7 +444,10 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(pageSource, /stateKey: CUSTOMER_DB_DEEP_SEARCH_KEY/);
   assert.match(pageSource, /importRows: importCustomersFromRows/);
   assert.match(pageSource, /databaseDeepSearchController\.bind\(\);/);
-  assert.match(pageSource, /nodes\.deepSearchButton\.addEventListener\("click"/);
+  assert.match(pageSource, /nodes\.addActionsMenu\.addEventListener\("click"/);
+  assert.match(pageSource, /actionButton\.id === "manualAddButton"/);
+  assert.match(pageSource, /openModal\(\);/);
+  assert.match(pageSource, /actionButton\.id === "deepSearchButton"/);
   assert.match(pageSource, /databaseDeepSearchController\.open\(\);/);
   assert.match(deepSearchScriptSource, /function parseTargetLines\(raw\)/);
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT/);

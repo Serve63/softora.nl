@@ -1421,6 +1421,7 @@
                                     <svg class="btn-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                                 </button>
                                 <div class="add-actions-menu" id="addActionsMenu" role="menu">
+                                    <button class="add-actions-item" id="manualAddButton" type="button" role="menuitem">Handmatig toevoegen</button>
                                     <button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">Bedrijven toevoegen</button>
                                 </div>
                                 <input type="file" id="importFileInput" accept=".csv,text/csv,.tsv,text/tab-separated-values,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
@@ -3385,10 +3386,7 @@
         });
         photoBatchController.bind();
         databaseDeepSearchController.bind();
-        nodes.deepSearchButton.addEventListener("click", function () {
-            closeAddActions();
-            databaseDeepSearchController.open();
-        });
+        nodes.addActionsMenu.addEventListener("click", function (event) { const actionButton = event.target.closest(".add-actions-item"); if (!actionButton) return; closeAddActions(); if (actionButton.id === "manualAddButton") { openModal(); return; } if (actionButton.id === "deepSearchButton") databaseDeepSearchController.open(); });
         nodes.importFileInput.addEventListener("change", databaseImportController.handleFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
