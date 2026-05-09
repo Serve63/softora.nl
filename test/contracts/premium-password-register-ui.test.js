@@ -33,7 +33,7 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /assets\/premium-password-register-renderer\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/premium-password-register-store\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/premium-password-register-pin\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-password-register-app\.js\?v=20260509a/);
+  assert.match(pageSource, /assets\/premium-password-register-app\.js\?v=20260509b/);
   assert.match(rendererSource, /global\.SoftoraPasswordRegisterRenderer/);
   assert.match(storeSource, /global\.SoftoraPasswordRegisterStore/);
   assert.match(storeSource, /var PASSWORD_REGISTER_SCOPE = "premium_password_register";/);
@@ -52,7 +52,12 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /id="master-secret-overlay"/);
   assert.match(pageSource, /id="master-secret-input"/);
   assert.match(pageSource, /class="master-secret-modal"/);
-  assert.match(pageSource, /Softora slaat hem niet op en kan hem niet herstellen\./);
+  assert.match(pageSource, />Ontgrendelen</);
+  assert.doesNotMatch(pageSource, /Voer dezelfde master-wachtzin/);
+  assert.doesNotMatch(pageSource, /Softora slaat hem niet op/);
+  assert.doesNotMatch(`${pageSource}\n${appSource}`, /Kluis openen/);
+  assert.doesNotMatch(pageSource, /id="master-secret-cancel"/);
+  assert.doesNotMatch(appSource, /masterSecretCancelEl/);
   assert.match(appSource, /openMasterSecretDialog/);
   assert.match(appSource, /finishMasterSecretDialog/);
   assert.match(appSource, /passwordRegisterStore\.unlock\(masterSecret\)/);
