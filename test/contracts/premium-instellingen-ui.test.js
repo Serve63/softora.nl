@@ -56,10 +56,11 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /world watcher/);
   assert.match(userManagementSource, /Flynow/);
   assert.match(userManagementSource, /Transfermarkt/);
-  assert.match(userManagementSource, /Net Worth Index/);
-  assert.match(userManagementSource, /Pulse/);
   assert.match(userManagementSource, /Ruben’s Company/);
   assert.match(userManagementSource, /Ruben’s Trading System/);
+  assert.match(userManagementSource, /'7 onderdelen'/);
+  assert.doesNotMatch(userManagementSource, /Net Worth Index/);
+  assert.doesNotMatch(userManagementSource, /Pulse/);
   assert.match(userManagementSource, /mountExtraSettingsCategory\(\);/);
 
   assert.doesNotMatch(source, /\son(?:click|input|change|keydown|submit)=/);

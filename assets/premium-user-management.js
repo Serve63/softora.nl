@@ -286,8 +286,6 @@ function mountExtraSettingsCategory() {
     'world watcher',
     'Flynow',
     'Transfermarkt',
-    'Net Worth Index',
-    'Pulse',
     'Ruben’s Company',
     'Ruben’s Trading System',
   ];
@@ -359,7 +357,7 @@ function mountExtraSettingsCategory() {
     'tegel-desc',
     'Losse interne modules en extra onderdelen die later verder ingevuld kunnen worden.'
   );
-  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '9 onderdelen');
+  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '7 onderdelen');
   extraTile.addEventListener('click', function () {
     goTo('screen-extra');
   });
