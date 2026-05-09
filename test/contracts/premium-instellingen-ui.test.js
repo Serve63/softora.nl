@@ -39,8 +39,10 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /payload\.session/);
   assert.match(userManagementSource, /function mountExtraSettingsCategory\(\)/);
   assert.match(userManagementSource, /settings-tile-grid/);
-  assert.match(userManagementSource, /\.settings-tile-grid,\.settings-extra-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(280px,280px\)\);/);
-  assert.match(userManagementSource, /@media \(max-width:720px\)\{\.settings-tile-grid,\.settings-extra-grid\{grid-template-columns:minmax\(280px,280px\);\}\}/);
+  assert.match(userManagementSource, /\.settings-tile-grid,\.settings-extra-grid\{display:grid;grid-template-columns:repeat\(auto-fit,minmax\(240px,1fr\)\);/);
+  assert.match(userManagementSource, /max-width:calc\(4 \* 280px \+ 3 \* 20px\)/);
+  assert.match(userManagementSource, /\.settings-tile-grid>\.tegel,\.settings-extra-grid>\.tegel\{width:100%;min-width:0;\}/);
+  assert.match(userManagementSource, /@media \(max-width:720px\)\{\.settings-tile-grid,\.settings-extra-grid\{grid-template-columns:minmax\(0,1fr\);max-width:100%;\}\}/);
   assert.match(userManagementSource, /data-settings-extra-open/);
   assert.match(userManagementSource, /goTo\('screen-extra'\)/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
