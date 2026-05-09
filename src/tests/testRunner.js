@@ -1,5 +1,6 @@
 import { accountingTestCases } from './accountingTests.js';
 import { acceleratedReplayTestCases } from './acceleratedReplayTests.js';
+import { convexBreakoutTestCases } from './convexBreakoutTests.js';
 import { costAwareTailGuardTestCases } from './costAwareTailGuardTests.js';
 import { costStressLabTestCases } from './costStressLabTests.js';
 import { improvementLoopTestCases } from './improvementLoopTests.js';
@@ -44,6 +45,7 @@ export async function runAllTests() {
     ...parityTestCases(),
     ...accountingTestCases(),
     ...acceleratedReplayTestCases(),
+    ...convexBreakoutTestCases(),
     ...costAwareTailGuardTestCases(),
     ...costStressLabTestCases(),
     ...improvementLoopTestCases(),

@@ -150,6 +150,7 @@ export function profitFactorLabTestCases() {
         assert(DEFAULT_PROFIT_FACTOR_GRID.assetCap.includes(0.35) && DEFAULT_PROFIT_FACTOR_GRID.assetCap.includes(0.45), 'PF-grid mist de asset caps die concentratierisico beperken.');
         assert(DEFAULT_PROFIT_FACTOR_STRATEGIES.some((strategy) => strategy.name === 'Tail Guard v1'), 'PF-lab mist de defensieve Tail Guard strategie.');
         assert(DEFAULT_PROFIT_FACTOR_STRATEGIES.some((strategy) => strategy.name === 'Cost Aware Tail Guard v1'), 'PF-lab mist de kostenbewuste Tail Guard strategie.');
+        assert(DEFAULT_PROFIT_FACTOR_STRATEGIES.some((strategy) => strategy.name === 'Convex Breakout v1'), 'PF-lab mist de upside Convex Breakout strategie.');
       },
     },
     {

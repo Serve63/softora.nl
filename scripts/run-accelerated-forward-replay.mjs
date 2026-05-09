@@ -9,6 +9,7 @@ import { FROZEN_INCUBATION_CANDIDATE } from '../src/forward/forwardRunner.js';
 import { fetchMarketData, SUPPORTED_ASSETS } from '../src/data/binanceProvider.js';
 import { loadImprovementState } from '../src/storage/localStore.js';
 import costAwareTailGuard from '../src/strategies/costAwareTailGuard.js';
+import convexBreakout from '../src/strategies/convexBreakout.js';
 import frozenCandidate from '../src/strategies/frozenCandidate.js';
 import sprintRotation from '../src/strategies/sprintRotation.js';
 import tailGuard from '../src/strategies/tailGuard.js';
@@ -48,6 +49,7 @@ function strategyForName(name) {
   if (name === sprintRotation.name) return sprintRotation;
   if (name === tailGuard.name) return tailGuard;
   if (name === costAwareTailGuard.name) return costAwareTailGuard;
+  if (name === convexBreakout.name) return convexBreakout;
   if (name === trendParticipation.name) return trendParticipation;
   return null;
 }

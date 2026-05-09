@@ -1,5 +1,6 @@
 import { SUPPORTED_ASSETS } from '../data/binanceProvider.js';
 import costAwareTailGuard from '../strategies/costAwareTailGuard.js';
+import convexBreakout from '../strategies/convexBreakout.js';
 import frozenCandidate from '../strategies/frozenCandidate.js';
 import sprintRotation from '../strategies/sprintRotation.js';
 import tailGuard from '../strategies/tailGuard.js';
@@ -27,6 +28,7 @@ export const DEFAULT_PROFIT_FACTOR_STRATEGIES = Object.freeze([
   sprintRotation,
   tailGuard,
   costAwareTailGuard,
+  convexBreakout,
 ]);
 
 export const TRAIN_FAILURE_PENALTY_WEIGHTS = Object.freeze({

@@ -1,5 +1,6 @@
 import { SUPPORTED_ASSETS } from '../data/binanceProvider.js';
 import costAwareTailGuard from '../strategies/costAwareTailGuard.js';
+import convexBreakout from '../strategies/convexBreakout.js';
 import frozenCandidate from '../strategies/frozenCandidate.js';
 import sprintRotation from '../strategies/sprintRotation.js';
 import tailGuard from '../strategies/tailGuard.js';
@@ -15,6 +16,7 @@ export const TOURNAMENT_STRATEGIES = Object.freeze([
   sprintRotation,
   tailGuard,
   costAwareTailGuard,
+  convexBreakout,
 ]);
 
 function formatPercent(value) {
