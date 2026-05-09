@@ -28,6 +28,11 @@ function getManualAppointmentLegendChoice() {
     return '';
 }
 
+function getManualAppointmentPhoneValue() {
+    const input = document.getElementById('manualAppointmentPhone');
+    return input ? String(input.value || '').trim() : '';
+}
+
 function syncManualAppointmentDetailsMode() {
     const isMeeting = isManualAppointmentMeetingFlow();
     const whoLabel = document.getElementById('manualAppointmentWhoLabel');
@@ -67,6 +72,8 @@ function resetManualAppointmentWizard() {
     if (manualAppointmentActivityTimeEl) manualAppointmentActivityTimeEl.value = '';
     if (manualAppointmentLegendChoiceEl) manualAppointmentLegendChoiceEl.value = '';
     if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
+    const phoneInput = document.getElementById('manualAppointmentPhone');
+    if (phoneInput) phoneInput.value = '';
     if (manualAppointmentLocationEl) manualAppointmentLocationEl.value = '';
     if (manualAppointmentNotesEl) manualAppointmentNotesEl.value = '';
     setManualAppointmentStep('kind');

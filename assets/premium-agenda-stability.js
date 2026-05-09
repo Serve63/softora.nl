@@ -94,7 +94,9 @@ function syncManualAppointmentModalDetails(apt) {
     if (contactEl) {
         const contact = String((apt && apt.contact) || '').trim();
         const phone = String((apt && apt.phone) || '').trim();
-        contactEl.hidden = isManual && !((contact && contact !== '-' && contact !== '—') || phone);
+        const parts = [contact, phone].filter((part) => part && part !== '-' && part !== '—');
+        if (isManual) contactEl.textContent = parts.join('  ·  ');
+        contactEl.hidden = isManual && !parts.length;
     }
 }
 

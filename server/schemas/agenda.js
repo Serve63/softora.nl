@@ -278,6 +278,14 @@ function validateManualAgendaAppointmentRequest(req) {
       ),
       who: truncateText(normalizeString(body.who || body.manualWho || ''), 32),
       appointmentKind: truncateText(normalizeString(body.appointmentKind || body.manualAppointmentKind || ''), 32),
+      phone: truncateText(
+        normalizeString(body.phone || body.manualPhone || body.telefoon || body.telefoonnummer || ''),
+        80
+      ),
+      manualPhone: truncateText(
+        normalizeString(body.manualPhone || body.phone || body.telefoon || body.telefoonnummer || ''),
+        80
+      ),
       manualLeadOwner: truncateText(normalizeString(body.manualLeadOwner || body.leadOwnerKey || ''), 80),
       leadOwnerKey: truncateText(normalizeString(body.leadOwnerKey || body.manualLeadOwner || ''), 80),
       leadOwnerName: truncateText(normalizeString(body.leadOwnerName || ''), 120),

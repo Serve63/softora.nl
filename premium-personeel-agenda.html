@@ -1412,6 +1412,7 @@
                         <div class="modal-workspace-label">Titel</div>
                         <input type="text" class="modal-workspace-input" id="manualAppointmentActivity" placeholder="Titel van de afspraak" maxlength="500" autocomplete="off">
                     </div>
+                    <div class="modal-workspace-field"><div class="modal-workspace-label">Telefoonnummer (optioneel)</div><input type="tel" class="modal-workspace-input" id="manualAppointmentPhone" placeholder="Bijv. 06 12 34 56 78" maxlength="80" inputmode="tel" autocomplete="tel"></div>
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Tijdstip</div>
                         <input type="time" class="modal-workspace-input" id="manualAppointmentTime" step="300" autocomplete="off" required>
@@ -1434,7 +1435,6 @@
         </div>
     </div>
 </div>
-
     <div class="dashboard-layout" data-sidebar-shell="canonical">
 
     <!-- Sidebar -->
@@ -2055,7 +2055,7 @@
             activeOrderId: Number(item.activeOrderId || 0) || null,
             activeOrderAddedAt: String(item.activeOrderAddedAt || ''),
             referenceImages: normalizeReferenceImageList(item.referenceImages || item.attachments || []),
-            manualPlannerWho: String(item.manualPlannerWho || ''), manualLegendChoice: String(item.manualLegendChoice || item.legendChoice || ''), appointmentKind: String(item.appointmentKind || item.manualAppointmentKind || ''), manualLeadOwnerKey: String(item.manualLeadOwnerKey || ''), manualLeadOwnerName: String(item.manualLeadOwnerName || ''), leadOwnerKey: String(item.leadOwnerKey || ''), leadOwnerName: String(item.leadOwnerName || ''), leadOwnerFullName: String(item.leadOwnerFullName || ''),
+            manualPlannerWho: String(item.manualPlannerWho || ''), manualLegendChoice: String(item.manualLegendChoice || item.legendChoice || ''), appointmentKind: String(item.appointmentKind || item.manualAppointmentKind || ''), manualPhone: String(item.manualPhone || item.phone || ''), manualLeadOwnerKey: String(item.manualLeadOwnerKey || ''), manualLeadOwnerName: String(item.manualLeadOwnerName || ''), leadOwnerKey: String(item.leadOwnerKey || ''), leadOwnerName: String(item.leadOwnerName || ''), leadOwnerFullName: String(item.leadOwnerFullName || ''),
             manualAllDayUnavailable: Boolean(item.manualAllDayUnavailable),
             uiFallback: Boolean(item.uiFallback),
         };
@@ -2426,7 +2426,7 @@
                 time: timeVal,
                 activityTime: timeVal,
                 legendChoice, appointmentKind, manualBusinessType: manualAppointmentBusinessType, manualLeadOwner: leadOwnerKey, leadOwnerKey,
-                activity,
+                activity, phone: getManualAppointmentPhoneValue(), manualPhone: getManualAppointmentPhoneValue(),
                 location,
                 notes,
                 actor: 'premium-personeel-agenda',
@@ -3428,8 +3428,8 @@
         applyWorkspaceMode(false);
     }
 </script>
-	<script src="assets/premium-agenda-manual-business-flow.js?v=20260508a"></script>
-	<script src="assets/premium-agenda-stability.js?v=20260508a"></script>
+	<script src="assets/premium-agenda-manual-business-flow.js?v=20260509a"></script>
+	<script src="assets/premium-agenda-stability.js?v=20260509a"></script>
 <script>
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });

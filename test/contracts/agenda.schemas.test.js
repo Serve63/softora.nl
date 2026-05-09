@@ -87,6 +87,7 @@ test('manual appointment validator preserves meeting lead owner fields', () => {
       appointmentKind: ' meeting ',
       manualLeadOwner: ' martijn ',
       leadOwnerName: ' Martijn van de Ven ',
+      telefoonnummer: ' 06 12 34 56 78 ',
       notes: ' Intake voorbereid. ',
       legendChoice: ' website ',
     },
@@ -97,6 +98,8 @@ test('manual appointment validator preserves meeting lead owner fields', () => {
   assert.equal(result.body.title, 'Website intake');
   assert.equal(result.body.appointmentKind, 'meeting');
   assert.equal(result.body.manualLeadOwner, 'martijn');
+  assert.equal(result.body.phone, '06 12 34 56 78');
+  assert.equal(result.body.manualPhone, '06 12 34 56 78');
   assert.equal(result.body.leadOwnerKey, 'martijn');
   assert.equal(result.body.leadOwnerName, 'Martijn van de Ven');
   assert.equal(result.body.notes, 'Intake voorbereid.');
