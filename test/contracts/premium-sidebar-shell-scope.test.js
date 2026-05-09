@@ -218,6 +218,37 @@ test('premium mailbox behoudt eigen layout en vaste sidebar bij responsive mailw
   assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260507b"><\/script>/);
 });
 
+test('premium flynow gebruikt de dynamische canonical sidebar-host', () => {
+  const pageSource = readRepoFile('premium-flynow.html');
+  const flynowCssSource = readRepoFile('assets/flynow.css');
+
+  assert.match(
+    pageSource,
+    /<div class="dashboard-layout flynow-layout" data-sidebar-shell="canonical">/
+  );
+  assert.match(
+    pageSource,
+    /<aside class="sidebar" aria-label="Premium navigatie"><\/aside>/,
+    'FLYNOW hoort de gedeelde premium-sidebar dynamisch te laten vullen'
+  );
+  assert.match(pageSource, /<main class="main-content flynow-main">/);
+  assert.match(pageSource, /href="\/assets\/personnel-theme\.css\?v=20260502a"/);
+  assert.match(pageSource, /src="\/assets\/personnel-theme\.js\?v=20260502a" defer/);
+  assert.doesNotMatch(pageSource, /data-static-sidebar="1"/);
+  assert.match(
+    flynowCssSource,
+    /\.dashboard-layout\[data-sidebar-shell="canonical"\] > \.flynow-main/
+  );
+  assert.match(
+    flynowCssSource,
+    /body\[data-flynow-page\] \.sidebar\{[\s\S]*z-index:120 !important/
+  );
+  assert.match(
+    flynowCssSource,
+    /@media \(min-width:761px\)\{[\s\S]*\.bg-canvas\{left:var\(--premium-sidebar-width,320px\)\}[\s\S]*\.flynow-nav\{left:var\(--premium-sidebar-width,320px\)\}/
+  );
+});
+
 test('static premium sidebars ship the webdesign link in html', () => {
   for (const relativePath of staticSidebarPages) {
     const pageSource = readRepoFile(relativePath);
