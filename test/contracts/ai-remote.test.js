@@ -193,6 +193,23 @@ function createService(overrides = {}) {
   };
 }
 
+async function assertPublicPreviewTestUrl(value) {
+  const raw = String(value || '').trim();
+  const parsed = new URL(raw);
+  const hostname = parsed.hostname.toLowerCase();
+  if (
+    hostname === 'localhost' ||
+    hostname === '169.254.169.254' ||
+    hostname.startsWith('10.') ||
+    hostname.startsWith('192.168.')
+  ) {
+    const error = new Error('Private netwerk-IP’s zijn niet toegestaan voor Websitegenerator.');
+    error.status = 400;
+    throw error;
+  }
+  return raw;
+}
+
 test('ai remote service generates website preview image payload from OpenAI image output', async () => {
   const calls = [];
   const { service, state } = createService({
@@ -497,6 +514,114 @@ test('ai remote service fetches and normalizes website preview scan metadata inc
   ]);
   assert.deepEqual(result.scan.brandPalette, ['#8b2252', '#a62d65', '#f8f7f4', '#1a1a2e', '#ffffff']);
   assert.deepEqual(result.scan.fontHints, ['Oswald', 'Inter']);
+});
+
+test('ai remote service rejects server redirects to private metadata urls', async () => {
+  const calls = [];
+  const { service } = createService({
+    assertWebsitePreviewUrlIsPublic: assertPublicPreviewTestUrl,
+    fetchTextWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url: 'http://169.254.169.254/latest/meta-data/iam/security-credentials/',
+          headers: {
+            get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : ''),
+          },
+        },
+        text: '<html><body><h1>metadata</h1></body></html>',
+      };
+    },
+  });
+
+  await assert.rejects(() => service.fetchWebsitePreviewScanFromUrl('https://softora.nl'), {
+    status: 400,
+  });
+  assert.equal(calls.length, 1);
+});
+
+test('ai remote service rejects reader fallback source urls that point to private networks', async () => {
+  const { service } = createService({
+    assertWebsitePreviewUrlIsPublic: assertPublicPreviewTestUrl,
+    fetchTextWithTimeout: async (url) => {
+      if (String(url).startsWith('https://r.jina.ai/')) {
+        return {
+          response: {
+            ok: true,
+            status: 200,
+            url,
+            headers: {
+              get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/plain; charset=utf-8' : ''),
+            },
+          },
+          text: `Title: Metadata
+URL Source: http://169.254.169.254/latest/meta-data/
+
+Markdown Content:
+# Metadata
+
+Sensitive metadata endpoint.`,
+        };
+      }
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url,
+          headers: {
+            get: () => 'text/html; charset=utf-8',
+          },
+        },
+        text: '<html><head><title>Access denied</title></head><body>forbidden blocked</body></html>',
+      };
+    },
+  });
+
+  await assert.rejects(() => service.fetchWebsitePreviewScanFromUrl('https://softora.nl'), {
+    status: 400,
+  });
+});
+
+test('ai remote service skips stylesheet redirects to private network urls', async () => {
+  const calls = [];
+  const { service } = createService({
+    assertWebsitePreviewUrlIsPublic: assertPublicPreviewTestUrl,
+    fetchTextWithTimeout: async (url) => {
+      calls.push(String(url));
+      if (url === 'https://softora.nl/site.css') {
+        return {
+          response: {
+            ok: true,
+            status: 200,
+            url: 'http://169.254.169.254/latest/meta-data/style.css',
+            headers: {
+              get: () => 'text/css; charset=utf-8',
+            },
+          },
+          text: ':root { --accent: #ff0000; }',
+        };
+      }
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url: 'https://softora.nl',
+          headers: {
+            get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : ''),
+          },
+        },
+        text: '<html><head><link rel="stylesheet" href="/site.css"></head><body><h1>Softora</h1></body></html>',
+      };
+    },
+  });
+
+  const result = await service.fetchWebsitePreviewScanFromUrl('https://softora.nl');
+
+  assert.deepEqual(calls, ['https://softora.nl', 'https://softora.nl/site.css']);
+  assert.equal(result.scan.stylesheetCount, 0);
+  assert.equal(result.scan.brandColorHints, undefined);
 });
 
 test('ai remote service follows client-side redirect shells before scanning website previews', async () => {

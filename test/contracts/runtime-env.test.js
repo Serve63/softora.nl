@@ -11,7 +11,7 @@ test('loadRuntimeEnv normalizes premium auth and supabase-derived keys', () => {
     AGENDA_APP_PIN_HASH: ' sha256:abc123 ',
     AGENDA_APP_SERVE_EMAIL: ' Serve@Softora.NL ',
     AGENDA_APP_MARTIJN_EMAIL: ' MARTIJN@Softora.NL ',
-    AGENDA_APP_SESSION_TTL_DAYS: '730',
+    AGENDA_APP_SESSION_TTL_DAYS: '60',
     SUPABASE_STATE_KEY: ' core-v2 ',
   });
 
@@ -24,7 +24,7 @@ test('loadRuntimeEnv normalizes premium auth and supabase-derived keys', () => {
   assert.equal(runtimeEnv.premiumAuth.agendaAppPinHash, 'sha256:abc123');
   assert.equal(runtimeEnv.premiumAuth.agendaAppServeEmail, 'serve@softora.nl');
   assert.equal(runtimeEnv.premiumAuth.agendaAppMartijnEmail, 'martijn@softora.nl');
-  assert.equal(runtimeEnv.premiumAuth.agendaAppSessionTtlDays, 730);
+  assert.equal(runtimeEnv.premiumAuth.agendaAppSessionTtlDays, 60);
   assert.equal(runtimeEnv.supabase.stateKey, 'core-v2');
   assert.equal(runtimeEnv.supabase.callUpdateStateKeyPrefix, 'core-v2:call_update:');
   assert.equal(runtimeEnv.supabase.dismissedLeadsStateKey, 'core-v2:dismissed_leads');
@@ -122,6 +122,7 @@ test('loadRuntimeEnv defaults OpenAI text calls to GPT-5.5 Pro', () => {
 
   assert.equal(runtimeEnv.ai.openaiModel, 'gpt-5.5-pro');
   assert.equal(runtimeEnv.ai.openaiImageModel, 'gpt-image-2');
+  assert.equal(runtimeEnv.premiumAuth.agendaAppSessionTtlDays, 30);
 });
 
 test('loadRuntimeEnv reads Google Calendar sync configuration', () => {
@@ -169,7 +170,7 @@ test('loadRuntimeEnv preserves legacy boolean and numeric fallback rules', () =>
   assert.equal(runtimeEnv.premiumAuth.sessionRememberTtlDays, 365);
   assert.equal(runtimeEnv.premiumAuth.agendaAppServeEmail, 'serve@softora.nl');
   assert.equal(runtimeEnv.premiumAuth.agendaAppMartijnEmail, 'martijn@softora.nl');
-  assert.equal(runtimeEnv.premiumAuth.agendaAppSessionTtlDays, 3650);
+  assert.equal(runtimeEnv.premiumAuth.agendaAppSessionTtlDays, 90);
   assert.equal(runtimeEnv.mail.imapPollCooldownMs, 5_000);
   assert.equal(runtimeEnv.demoConfirmationTaskEnabled, true);
 });

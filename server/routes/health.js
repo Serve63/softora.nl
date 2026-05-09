@@ -16,29 +16,11 @@ function buildDeploymentPayload(deps) {
 }
 
 function buildBaselineHealthPayload(deps) {
-  const supabase = cloneObject(deps.getSupabaseStatus());
-  const runtime = cloneObject(deps.getRuntimeStatus());
   return {
     ok: true,
     service: deps.appName,
-    version: deps.appVersion,
     timestamp: new Date().toISOString(),
-    environment: {
-      production: Boolean(deps.isProduction),
-      serverless: Boolean(deps.isServerlessRuntime),
-    },
-    deployment: buildDeploymentPayload(deps),
-    flags: deps.getPublicFeatureFlags(),
-    supabase: {
-      enabled: Boolean(supabase.enabled),
-      hydrated: Boolean(supabase.hydrated),
-      table: supabase.table || null,
-      stateKey: supabase.stateKey || null,
-    },
-    runtime,
-    criticalFlows: Array.isArray(deps.routeManifest?.criticalFlowChecklist)
-      ? deps.routeManifest.criticalFlowChecklist.slice()
-      : [],
+    uptimeSeconds: Math.max(0, Math.round(Number(process.uptime?.() || 0))),
   };
 }
 
@@ -113,7 +95,7 @@ function registerHealthAndOpsRoutes(app, deps) {
   app.get('/api/health/baseline', sendBaseline);
 
   if (deps.featureFlags?.publicDependencyHealthEnabled) {
-    app.get('/api/health/dependencies', (_req, res) => {
+    app.get('/api/health/dependencies', deps.requireRuntimeDebugAccess, (_req, res) => {
       return res.status(200).json(buildDependencyHealthPayload(deps));
     });
   }

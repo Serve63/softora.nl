@@ -21,6 +21,7 @@ const {
 } = require('./gemini-payload');
 
 const PORT = Number(process.env.PORT || 3000);
+const IS_PRODUCTION = /^(production|prod)$/i.test(String(process.env.NODE_ENV || '').trim());
 const GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
 const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-live-preview';
 const LEGACY_GEMINI_MODEL_ALIASES = new Map([
@@ -33,6 +34,7 @@ const GEMINI_MODEL = GEMINI_MODEL_RAW.startsWith('models/')
   ? GEMINI_MODEL_RAW
   : `models/${GEMINI_MODEL_RAW}`;
 const GEMINI_VOICE = String(process.env.GEMINI_VOICE || 'Puck').trim();
+const BRIDGE_MEDIA_TOKEN = String(process.env.BRIDGE_MEDIA_TOKEN || '').trim();
 const BRIDGE_DEBUG_TOKEN = String(process.env.BRIDGE_DEBUG_TOKEN || '').trim();
 const BRIDGE_VERBOSE_LOGS = /^(1|true|yes)$/i.test(String(process.env.BRIDGE_VERBOSE_LOGS || ''));
 const GEMINI_WS_HANDSHAKE_TIMEOUT_MS = Math.max(
@@ -141,6 +143,26 @@ const PROMPT_OVERRIDE_QUERY_KEYS = [
 function hasPromptOverrideHints(searchParams) {
   if (!searchParams || typeof searchParams.get !== 'function') return false;
   return PROMPT_OVERRIDE_QUERY_KEYS.some((key) => String(searchParams.get(key) || '').trim().length > 0);
+}
+
+function timingSafeEqualString(left, right) {
+  const leftValue = String(left || '');
+  const rightValue = String(right || '');
+  if (!leftValue || !rightValue) return false;
+  const leftBuffer = Buffer.from(leftValue);
+  const rightBuffer = Buffer.from(rightValue);
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function isMediaRequestAuthorized(request, url) {
+  if (!BRIDGE_MEDIA_TOKEN) return !IS_PRODUCTION;
+  const queryToken = String(url.searchParams.get('token') || '').trim();
+  const headerToken = String(request.headers['x-bridge-media-token'] || '').trim();
+  return (
+    timingSafeEqualString(queryToken, BRIDGE_MEDIA_TOKEN) ||
+    timingSafeEqualString(headerToken, BRIDGE_MEDIA_TOKEN)
+  );
 }
 
 function int16ArrayToBuffer(pcm) {
@@ -294,7 +316,7 @@ function summarizeGeminiMessage(msg) {
 }
 
 function isDebugRequestAuthorized(req) {
-  if (!BRIDGE_DEBUG_TOKEN) return true;
+  if (!BRIDGE_DEBUG_TOKEN) return !IS_PRODUCTION;
   const queryToken = String(req.query?.token || '').trim();
   const headerToken = String(req.get('x-bridge-debug-token') || '').trim();
   return queryToken === BRIDGE_DEBUG_TOKEN || headerToken === BRIDGE_DEBUG_TOKEN;
@@ -377,44 +399,6 @@ app.get('/healthz', (_req, res) => {
     ok: true,
     service: 'twilio-media-bridge',
     geminiConfigured: Boolean(GEMINI_API_KEY),
-    requestedModel: GEMINI_MODEL_REQUESTED_RAW,
-    model: GEMINI_MODEL,
-    modelAliasApplied:
-      GEMINI_MODEL_REQUESTED_RAW !== GEMINI_MODEL_RAW
-        ? `${GEMINI_MODEL_REQUESTED_RAW} -> ${GEMINI_MODEL_RAW}`
-        : '',
-    voice: GEMINI_VOICE,
-    latencyTuning: {
-      wsPerMessageDeflate: false,
-      geminiHandshakeTimeoutMs: GEMINI_WS_HANDSHAKE_TIMEOUT_MS,
-      inputAudioFlushDelayMs: INPUT_AUDIO_FLUSH_DELAY_MS,
-    },
-    prompt: {
-      source: SYSTEM_PROMPT_SOURCE,
-      customConfigured: Boolean(CUSTOM_SYSTEM_PROMPT),
-      locked: GEMINI_SYSTEM_PROMPT_LOCKED,
-      requireCustom: GEMINI_REQUIRE_CUSTOM_PROMPT,
-      length: SYSTEM_PROMPT.length,
-      fingerprint: SYSTEM_PROMPT_FINGERPRINT,
-    },
-    autoStart: {
-      enabled: GEMINI_AUTO_START,
-      length: INITIAL_MESSAGE.length,
-      fingerprint: INITIAL_MESSAGE_FINGERPRINT,
-    },
-    ambient: {
-      enabled: AMBIENT_LOOP.enabled,
-      onlyMode: AMBIENT_ONLY_MODE,
-      filePath: AMBIENT_LOOP.path,
-      bytes: AMBIENT_LOOP.bytes,
-      durationMs: AMBIENT_LOOP.durationMs,
-      frameCount: AMBIENT_LOOP.frameCount,
-      reason: AMBIENT_LOOP.reason,
-      noiseLevel: AMBIENT_NOISE_LEVEL,
-      duckLevel: AMBIENT_DUCK_LEVEL,
-      noiseGateRms: NOISE_GATE_RMS,
-      forwardGateEndSilenceMs: 420,
-    },
     timestamp: new Date().toISOString(),
   });
 });
@@ -450,6 +434,11 @@ server.on('upgrade', (request, socket, head) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
   if (url.pathname !== '/twilio-media') {
     socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+  if (!isMediaRequestAuthorized(request, url)) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
     socket.destroy();
     return;
   }

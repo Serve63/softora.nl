@@ -39,6 +39,9 @@
     dotSelector: ".pin-dot",
     unlock: unlockRegister,
     onBeforeLock: function () {
+      passwordRegisterStore.lock();
+      entries = [];
+      visible = {};
       closeEditModal();
       closeDeleteEntryModal();
     }
@@ -68,8 +71,8 @@
     return result.response;
   }
 
-  async function ensurePasswordEntriesLoaded() {
-    entries = await passwordRegisterStore.load();
+  async function ensurePasswordEntriesLoaded(masterSecret) {
+    entries = await passwordRegisterStore.unlock(masterSecret);
     return entries;
   }
 
@@ -332,6 +335,15 @@
   }
 
   async function unlockRegister() {
+    var masterSecret = normalizeString(
+      global.prompt(
+        "Voer je master-wachtzin in. Deze wordt niet opgeslagen en kan niet worden hersteld."
+      )
+    );
+    if (!masterSecret) {
+      setRegisterStatus("Master-wachtzin is nodig om de kluis te openen.", "warning");
+      return;
+    }
     document.getElementById("screen-pin").style.display = "none";
     document.getElementById("screen-register").style.display = "block";
     var loaderEl = document.getElementById("register-data-loader");
@@ -340,8 +352,15 @@
       loaderEl.setAttribute("aria-hidden", "false");
     }
     try {
-      await ensurePasswordEntriesLoaded();
+      await ensurePasswordEntriesLoaded(masterSecret);
       render();
+    } catch (error) {
+      entries = [];
+      render();
+      document.getElementById("screen-register").style.display = "none";
+      document.getElementById("screen-pin").style.display = "grid";
+      setRegisterStatus(normalizeString(error && error.message) || "Kluis openen mislukt.", "warning");
+      toast("Kluis openen mislukt");
     } finally {
       if (loaderEl) {
         loaderEl.hidden = true;

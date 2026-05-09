@@ -76,31 +76,24 @@ test('health endpoints expose stable baseline payloads', async () => {
     assert.equal(response.status, 200, pathname);
     assert.equal(body.ok, true, pathname);
     assert.equal(typeof body.service, 'string', pathname);
-    assert.equal(typeof body.version, 'string', pathname);
     assert.equal(typeof body.timestamp, 'string', pathname);
-    assert.equal(typeof body.deployment, 'object', pathname);
-    assert.ok(
-      typeof body.deployment.commitSha === 'string' || body.deployment.commitSha === null,
-      pathname
-    );
-    assert.ok(
-      typeof body.deployment.commitRef === 'string' || body.deployment.commitRef === null,
-      pathname
-    );
-    assert.equal(typeof body.supabase, 'object', pathname);
-    assert.ok(Array.isArray(body.criticalFlows), pathname);
+    assert.equal(typeof body.uptimeSeconds, 'number', pathname);
+    assert.equal(body.deployment, undefined, pathname);
+    assert.equal(body.environment, undefined, pathname);
+    assert.equal(body.flags, undefined, pathname);
+    assert.equal(body.supabase, undefined, pathname);
+    assert.equal(body.mail, undefined, pathname);
+    assert.equal(body.ai, undefined, pathname);
+    assert.equal(body.runtime, undefined, pathname);
+    assert.equal(body.criticalFlows, undefined, pathname);
   }
 });
 
-test('dependency health endpoint exposes security-safe dependency state', async () => {
+test('dependency health endpoint is not public anymore', async () => {
   const { response, body } = await getJson('/api/health/dependencies');
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.equal(typeof body.dependencies, 'object');
-  assert.equal(typeof body.dependencies.supabase, 'object');
-  assert.equal(typeof body.dependencies.mail, 'object');
-  assert.equal(typeof body.dependencies.ai, 'object');
-  assert.equal(typeof body.dependencies.sessions, 'object');
+  assert.ok([401, 403, 404, 503].includes(response.status), response.status);
+  assert.ok(body.ok === false || Object.keys(body).length === 0);
+  assert.equal(body.dependencies, undefined);
 });
 
 test('auth session contract is stable for anonymous requests', async () => {
