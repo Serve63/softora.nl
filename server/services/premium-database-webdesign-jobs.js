@@ -24,6 +24,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const MAX_STORAGE_CHUNKS = 80;
   const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
   let processing = false;
+  const inlineProcessingJobIds = new Set();
 
   function pruneJobs() {
     const now = Date.now();
@@ -324,6 +325,34 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return job;
   }
 
+  function isStaleRunningJob(job) {
+    if (!job || job.status !== 'running') return false;
+    const startedAt = Number(job.startedAt) || 0;
+    if (!startedAt) return true;
+    return Date.now() - startedAt > JOB_PROCESS_TIMEOUT_MS + 30 * 1000;
+  }
+
+  async function processJobForStatusRequest(job) {
+    if (!processJobsInline || !job) return job;
+    const shouldProcess = job.status === 'queued' || isStaleRunningJob(job);
+    if (!shouldProcess || inlineProcessingJobIds.has(job.id)) return job;
+
+    if (job.status === 'running') {
+      job.status = 'queued';
+      job.error = null;
+      job.startedAt = null;
+      job.finishedAt = null;
+      await persistJob(job);
+    }
+
+    inlineProcessingJobIds.add(job.id);
+    try {
+      return await settleJob(job);
+    } finally {
+      inlineProcessingJobIds.delete(job.id);
+    }
+  }
+
   function queueProcessing() {
     if (processing) return;
     const next = Array.from(jobs.values()).find((job) => job.status === 'queued');
@@ -400,9 +429,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     };
     jobs.set(job.id, job);
     await persistJob(job);
-    if (processJobsInline) {
-      await settleJob(job);
-    } else {
+    if (!processJobsInline) {
       queueProcessing();
     }
 
@@ -444,7 +471,11 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       });
     }
     jobs.set(job.id, job);
-    if (job.status === 'queued') queueProcessing();
+    if (processJobsInline) {
+      await processJobForStatusRequest(job);
+    } else if (job.status === 'queued') {
+      queueProcessing();
+    }
 
     return res.status(200).json({
       ok: true,
@@ -461,7 +492,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         error: 'Niet ingelogd',
       });
     }
-    queueProcessing();
+    if (!processJobsInline) queueProcessing();
 
     return res.status(200).json({
       ok: true,

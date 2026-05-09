@@ -182,7 +182,7 @@
                         schedulePoll(jobId, POLL_INTERVAL_MS);
                         return;
                     }
-                    await finishPendingJob(storedJob, "");
+                    await finishPendingJob(storedJob, "Webdesign-opdracht niet gevonden. Probeer opnieuw.");
                     return;
                 }
                 if (!response.ok || !job) {
@@ -332,7 +332,6 @@
                     method: "POST",
                     credentials: "same-origin",
                     cache: "no-store",
-                    keepalive: true,
                     headers: { "Content-Type": "application/json", Accept: "application/json" },
                     body: JSON.stringify(buildJobPayload(target, jobId))
                 });

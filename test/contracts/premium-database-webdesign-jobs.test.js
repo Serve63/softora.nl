@@ -180,7 +180,21 @@ test('premium database webdesign jobs persist status and generated photos throug
   );
 
   assert.equal(startRes.statusCode, 202);
-  assert.equal(startRes.body.job.status, 'done');
+  assert.equal(startRes.body.job.status, 'queued');
+  assert.deepEqual(persistedJobs, ['queued']);
+  assert.equal(uploadedPhotos.length, 0);
+
+  const statusRes = createResponseRecorder();
+  await coordinator.getJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      params: { jobId: 'job_persist123456' },
+    },
+    statusRes
+  );
+
+  assert.equal(statusRes.statusCode, 200);
+  assert.equal(statusRes.body.job.status, 'done');
   assert.deepEqual(persistedJobs, ['queued', 'running', 'done']);
   assert.equal(uploadedPhotos[0].entry.customerId, 'customer-persist');
   assert.equal(uploadedPhotos[0].meta.source, 'premium-database-webdesign-jobs');
