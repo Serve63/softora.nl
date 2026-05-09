@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Gegenereerd FLYNOW kustbeeld">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fde68a"/><stop offset=".55" stop-color="#f97316"/><stop offset="1" stop-color="#111827"/></linearGradient>
+    <linearGradient id="cliff" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fb923c"/><stop offset="1" stop-color="#7c2d12"/></linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#22d3ee"/><stop offset="1" stop-color="#164e63"/></linearGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".95" numOctaves="2"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .12"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sky)"/>
+  <path d="M0 330 C190 375 370 315 560 355 C760 400 930 330 1200 360 L1200 800 L0 800 Z" fill="url(#sea)"/>
+  <path d="M0 430 C190 355 340 370 475 460 C610 550 820 570 1200 480 L1200 800 L0 800 Z" fill="url(#cliff)"/>
+  <path d="M0 595 C280 520 515 600 770 560 C945 532 1070 550 1200 530 L1200 800 L0 800 Z" fill="#fef3c7"/>
+  <path d="M210 585 C410 540 570 600 760 575 C920 552 1030 560 1140 540" stroke="#fff7ed" stroke-width="14" fill="none" opacity=".65"/>
+  <path d="M660 285 L710 575 M610 345 C665 305 735 290 820 315 M610 345 C545 315 480 320 430 360" stroke="#3f2b11" stroke-width="14" fill="none" stroke-linecap="round"/>
+  <rect width="1200" height="800" filter="url(#grain)" opacity=".72"/>
+</svg>

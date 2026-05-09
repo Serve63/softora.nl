@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Gegenereerd FLYNOW eilandbeeld">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#38bdf8"/><stop offset=".5" stop-color="#fb923c"/><stop offset="1" stop-color="#111827"/></linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#06b6d4"/><stop offset=".6" stop-color="#0ea5e9"/><stop offset="1" stop-color="#172554"/></linearGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="3"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .12"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="1200" height="800" fill="url(#g1)"/>
+  <path d="M0 360 C180 400 330 330 520 370 C710 410 890 330 1200 355 L1200 800 L0 800 Z" fill="url(#water)"/>
+  <path d="M85 610 C220 540 350 565 480 620 C620 680 760 660 920 600 C1030 560 1120 565 1200 590 L1200 800 L0 800 L0 665 C25 645 50 625 85 610 Z" fill="#fed7aa"/>
+  <path d="M640 260 L735 560 L555 560 Z" fill="#ffffff" opacity=".9"/>
+  <path d="M640 260 L640 560" stroke="#0f172a" stroke-width="10" opacity=".5"/>
+  <path d="M555 560 L735 560" stroke="#0f172a" stroke-width="18" stroke-linecap="round"/>
+  <path d="M110 250 C230 190 330 215 430 250" fill="none" stroke="#fff7ed" stroke-width="11" opacity=".42"/>
+  <path d="M790 205 C920 145 1010 165 1120 220" fill="none" stroke="#fff7ed" stroke-width="11" opacity=".34"/>
+  <rect width="1200" height="800" filter="url(#grain)" opacity=".7"/>
+</svg>
