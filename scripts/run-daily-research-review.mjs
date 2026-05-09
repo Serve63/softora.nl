@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runBacktest } from '../src/core/backtester.js';
+import { applyCandidateReplayGate } from '../src/core/candidateReplayGate.js';
 import {
   appendImprovementReview,
   createImprovementReview,
@@ -56,6 +57,23 @@ function pf(value) {
 
 function num(value, digits = 2) {
   return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
+}
+
+function summarizeReplayGate(gate) {
+  if (!gate) return null;
+  return {
+    strategyName: gate.strategyName,
+    source: gate.source,
+    verdict: gate.verdict,
+    returnPct: pct(gate.single?.return || 0),
+    maxDrawdownPct: pct(gate.single?.maxDrawdown || 0),
+    gateOpenRatePct: pct(gate.single?.gateOpenRate || 0),
+    multiVerdict: gate.multi?.verdict || null,
+    multiPositiveRatePct: pct(gate.multi?.positiveRate || 0),
+    multiBeatRatePct: pct(gate.multi?.beatRate || 0),
+    multiWorstReturnPct: pct(gate.multi?.worstReturn || 0),
+    failed: gate.failed || [],
+  };
 }
 
 function latestCandleTime(candlesByAsset) {
@@ -123,11 +141,15 @@ if (market.errors.length) {
     assets: SUPPORTED_ASSETS,
   });
 
-  const lab = runProfitFactorLab({
+  const lab = applyCandidateReplayGate({
+    lab: runProfitFactorLab({
+      candlesByAsset: market.candlesByAsset,
+      baseConfig: config,
+      assets: SUPPORTED_ASSETS,
+      ...dailyLabOptions(),
+    }),
     candlesByAsset: market.candlesByAsset,
-    baseConfig: config,
     assets: SUPPORTED_ASSETS,
-    ...dailyLabOptions(),
   });
 
   const review = createImprovementReview({
@@ -157,6 +179,10 @@ if (market.errors.length) {
       tested: lab.tested,
       validated: lab.validated,
       diversity: lab.diversity || null,
+      replayGate: {
+        candidate: summarizeReplayGate(lab.replayGate?.candidate),
+        watch: summarizeReplayGate(lab.replayGate?.watch),
+      },
     },
     champion: {
       id: review.champion.id,
