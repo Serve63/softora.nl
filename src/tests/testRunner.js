@@ -9,6 +9,7 @@ import { profitFactorLabTestCases } from './profitFactorLabTests.js';
 import { promotionGateTestCases } from './promotionGateTests.js';
 import { regimeLabTestCases } from './regimeLabTests.js';
 import { realityCheckTestCases } from './realityCheckTests.js';
+import { replayVariantLabTestCases } from './replayVariantLabTests.js';
 import { robustnessLabTestCases } from './robustnessLabTests.js';
 import { sprintRotationTestCases } from './sprintRotationTests.js';
 import { tailGuardTestCases } from './tailGuardTests.js';
@@ -51,6 +52,7 @@ export async function runAllTests() {
     ...promotionGateTestCases(),
     ...regimeLabTestCases(),
     ...realityCheckTestCases(),
+    ...replayVariantLabTestCases(),
     ...robustnessLabTestCases(),
     ...sprintRotationTestCases(),
     ...tailGuardTestCases(),

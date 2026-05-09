@@ -81,12 +81,17 @@ function summarizeCycle(results) {
   const promotion = results.find((result) => result.id === 'promotion-review')?.parsed || {};
   const ok = results.every((result) => result.ok);
   const promotionVerdict = promotion.verdict || 'UNKNOWN';
+  const replayVerdict = replay.verdict || null;
   const action = !ok
     ? 'CHECK_DATA_OR_SCRIPT'
     : promotionVerdict === 'PROMOTE_READY'
       ? 'HUMAN_REVIEW_BEFORE_PROMOTION'
       : promotionVerdict === 'KILL_CHALLENGER'
         ? 'RESEARCH_NEW_CHALLENGER'
+        : replayVerdict === 'FAIL'
+          ? 'RESEARCH_NEW_CHALLENGER'
+          : replayVerdict === 'WATCH'
+            ? 'RESEARCH_UPSIDE_VARIANT'
         : 'KEEP_INCUBATING';
 
   return {
