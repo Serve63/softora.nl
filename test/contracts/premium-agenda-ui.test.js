@@ -158,6 +158,8 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /if \(bothChoice\) bothChoice\.hidden = isMeeting;/);
   assert.match(pageSource, /if \(isMeeting && manualAppointmentWho === 'both'\) manualAppointmentWho = '';/);
   assert.match(pageSource, /Titel/);
+  assert.match(pageSource, /id="manualAppointmentPhone"/);
+  assert.match(pageSource, /Telefoonnummer \(optioneel\)/);
   assert.match(pageSource, /id="manualAppointmentTime"/);
   assert.match(pageSource, /Tijdstip/);
   assert.match(pageSource, /id="manualAppointmentLocation"/);
@@ -207,6 +209,9 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /\.legend-dot\.manual-overig \{ background: #ec4899; \}/);
   assert.match(pageSource, /\.appointment\.manual-overig \{[\s\S]*border-left: 3px solid #ec4899;/);
   assert.match(pageSource, /activityTime: timeVal/);
+  assert.match(pageSource, /function getManualAppointmentPhoneValue\(\)/);
+  assert.match(pageSource, /manualPhone: String\(item\.manualPhone \|\| item\.phone \|\| ''\),/);
+  assert.match(pageSource, /phone: getManualAppointmentPhoneValue\(\), manualPhone: getManualAppointmentPhoneValue\(\),/);
   assert.match(pageSource, /const isMeeting = isManualAppointmentMeetingFlow\(\);/);
   assert.match(pageSource, /const appointmentKind = isMeeting \? 'meeting' : isBusinessAppointment \? 'appointment' : 'overig';/);
   assert.match(pageSource, /Kies wie deze lead heeft geregeld\./);
@@ -225,13 +230,15 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /if \(who === 'both' \|\| who === 'allebei' \|\| who === 'beide'\) return 'appointment manual-both magnetic';/);
 });
 
-test('premium agenda handmatige afspraak-modal slaat locatie en opmerkingen op', () => {
+test('premium agenda handmatige afspraak-modal slaat optionele telefoon, locatie en opmerkingen op', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
+  assert.match(pageSource, /id="manualAppointmentPhone"/);
   assert.match(pageSource, /id="manualAppointmentLocation"/);
   assert.match(pageSource, /id="manualAppointmentNotes"/);
   assert.doesNotMatch(pageSource, /ensureAgendaPlacesReady/);
+  assert.match(pageSource, /phone: getManualAppointmentPhoneValue\(\), manualPhone: getManualAppointmentPhoneValue\(\),/);
   assert.match(pageSource, /location,/);
   assert.match(pageSource, /notes,/);
 });

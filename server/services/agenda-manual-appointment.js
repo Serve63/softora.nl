@@ -158,6 +158,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     let activityTime;
     let location;
     let activity;
+    let phone;
     let notes;
     let availableAgain;
     let legendChoice;
@@ -168,6 +169,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       availableAgain = '17:00';
       location = sanitizeAppointmentLocation('—');
       activity = 'Gehele dag niet beschikbaar';
+      phone = '';
       notes = '';
       legendChoice = normalizeManualLegendChoice(body, normalizeString) || 'manual-serve';
     } else {
@@ -176,6 +178,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       location =
         sanitizeAppointmentLocation(body.location || '') || '—';
       activity = truncateText(normalizeString(body.title || body.activity || ''), 500);
+      phone = truncateText(normalizeString(body.phone || body.manualPhone || body.telefoon || body.telefoonnummer || ''), 80);
       notes = truncateText(normalizeString(body.notes || body.opmerkingen || ''), 1000);
       availableAgain = normalizeTimeHhMm(body.availableAgain || '');
       legendChoice = normalizeManualLegendChoice(body, normalizeString);
@@ -226,6 +229,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       `Wie: ${whoLabel}`,
       activityTime ? `Tijdstip activiteit: ${activityTime}` : '',
       location && location !== '—' ? `Locatie: ${location}` : '',
+      phone ? `Telefoonnummer: ${phone}` : '',
       legendChoice ? `Legenda: ${legendChoice}` : '',
       manualLeadOwner ? `Lead geregeld door: ${manualLeadOwner.name}` : '',
       notes ? `Opmerkingen: ${notes}` : '',
@@ -238,7 +242,9 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       needsConfirmationEmail: false,
       company: activity,
       contact: '—',
-      phone: '',
+      phone,
+      manualPhone: phone,
+      contactPhone: phone,
       date: appointmentDate,
       time: appointmentTime,
       location,

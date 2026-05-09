@@ -93,6 +93,7 @@ test('agenda manual appointment stores stepped modal details', async () => {
         title: 'Interne planning',
         time: '18:30',
         legendChoice: 'manual-overig',
+        phone: '06 12 34 56 78',
         location: 'Kantoor',
         notes: 'Voorbereiden voor klantgesprek.',
       },
@@ -104,12 +105,16 @@ test('agenda manual appointment stores stepped modal details', async () => {
   assert.equal(res.body.ok, true);
   assert.equal(res.body.appointment.company, 'Interne planning');
   assert.equal(res.body.appointment.time, '18:30');
+  assert.equal(res.body.appointment.phone, '06 12 34 56 78');
+  assert.equal(res.body.appointment.manualPhone, '06 12 34 56 78');
+  assert.equal(res.body.appointment.contactPhone, '06 12 34 56 78');
   assert.equal(res.body.appointment.location, 'Kantoor');
   assert.equal(res.body.appointment.manualActivityTime, '18:30');
   assert.equal(res.body.appointment.manualLegendChoice, 'manual-overig');
   assert.equal(res.body.appointment.appointmentKind, 'overig');
   assert.equal(res.body.appointment.manualNotes, 'Voorbereiden voor klantgesprek.');
   assert.match(res.body.appointment.summary, /Locatie: Kantoor/);
+  assert.match(res.body.appointment.summary, /Telefoonnummer: 06 12 34 56 78/);
   assert.match(res.body.appointment.summary, /Opmerkingen: Voorbereiden voor klantgesprek\./);
 });
 
