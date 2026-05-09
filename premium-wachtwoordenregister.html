@@ -609,13 +609,6 @@ body {
   text-transform: uppercase;
 }
 
-.master-secret-sub {
-  color: var(--text-tertiary);
-  font-size: 0.94rem;
-  line-height: 1.65;
-  margin-bottom: 1rem;
-}
-
 .master-secret-close {
   width: 42px;
   height: 42px;
@@ -671,13 +664,6 @@ body {
 .master-secret-field input:focus {
   border-color: var(--crimson);
   box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.1);
-}
-
-.master-secret-note {
-  color: var(--text-tertiary);
-  font-size: 0.84rem;
-  line-height: 1.55;
-  margin-top: 0.75rem;
 }
 
 .master-secret-error {
@@ -1112,16 +1098,13 @@ body {
       </button>
     </div>
     <form id="master-secret-form">
-      <p class="master-secret-sub">Voer dezelfde master-wachtzin in waarmee deze kluis is aangemaakt.</p>
       <div class="master-secret-field">
         <label for="master-secret-input">Master-wachtzin</label>
         <input id="master-secret-input" name="masterSecret" type="password" autocomplete="off" spellcheck="false">
       </div>
-      <p class="master-secret-note">Deze zin blijft alleen in je browser voor het ontgrendelen. Softora slaat hem niet op en kan hem niet herstellen.</p>
       <p class="master-secret-error" id="master-secret-error" aria-live="polite"></p>
       <div class="master-secret-actions">
-        <button type="button" class="master-secret-btn" id="master-secret-cancel">Annuleren</button>
-        <button type="submit" class="master-secret-btn primary" id="master-secret-submit">Kluis openen</button>
+        <button type="submit" class="master-secret-btn primary" id="master-secret-submit">Ontgrendelen</button>
       </div>
     </form>
   </div>
@@ -1179,6 +1162,6 @@ body {
 <script src="assets/premium-password-register-renderer.js?v=20260427a"></script>
 <script src="assets/premium-password-register-store.js?v=20260427a"></script>
 <script src="assets/premium-password-register-pin.js?v=20260427a"></script>
-<script src="assets/premium-password-register-app.js?v=20260509a"></script>
+<script src="assets/premium-password-register-app.js?v=20260509b"></script>
 </body>
 </html>

@@ -19,7 +19,6 @@
   var masterSecretFormEl = document.getElementById("master-secret-form");
   var masterSecretInputEl = document.getElementById("master-secret-input");
   var masterSecretErrorEl = document.getElementById("master-secret-error");
-  var masterSecretCancelEl = document.getElementById("master-secret-cancel");
   var masterSecretCloseEl = document.getElementById("master-secret-close");
   var entryModalBackdrop = document.getElementById("entry-modal-backdrop");
   var entryModalEl = document.getElementById("entry-modal");
@@ -373,11 +372,6 @@
         finishMasterSecretDialog(nextSecret);
       });
     }
-    if (masterSecretCancelEl) {
-      masterSecretCancelEl.addEventListener("click", function () {
-        finishMasterSecretDialog("");
-      });
-    }
     if (masterSecretCloseEl) {
       masterSecretCloseEl.addEventListener("click", function () {
         finishMasterSecretDialog("");
@@ -442,8 +436,8 @@
       render();
       document.getElementById("screen-register").style.display = "none";
       document.getElementById("screen-pin").style.display = "grid";
-      setRegisterStatus(normalizeString(error && error.message) || "Kluis openen mislukt.", "warning");
-      toast("Kluis openen mislukt");
+      setRegisterStatus(normalizeString(error && error.message) || "Ontgrendelen mislukt.", "warning");
+      toast("Ontgrendelen mislukt");
     } finally {
       if (loaderEl) {
         loaderEl.hidden = true;
