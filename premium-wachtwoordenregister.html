@@ -557,6 +557,176 @@ body {
   background: var(--accent-light);
 }
 
+.master-secret-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1750;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(13, 15, 23, 0.54);
+  backdrop-filter: blur(4px);
+}
+
+.master-secret-overlay[hidden] {
+  display: none;
+}
+
+.master-secret-modal {
+  width: min(520px, 100%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(12, 15, 28, 0.2);
+  padding: 1.4rem;
+}
+
+.master-secret-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.05rem;
+}
+
+.master-secret-kicker {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--crimson);
+  margin-bottom: 0.35rem;
+}
+
+.master-secret-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.master-secret-sub {
+  color: var(--text-tertiary);
+  font-size: 0.94rem;
+  line-height: 1.65;
+  margin-bottom: 1rem;
+}
+
+.master-secret-close {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .15s;
+  flex-shrink: 0;
+}
+
+.master-secret-close:hover {
+  border-color: var(--crimson);
+  color: var(--crimson);
+}
+
+.master-secret-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.master-secret-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.master-secret-field label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.master-secret-field input {
+  width: 100%;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  background: var(--bg);
+  color: var(--text-dark);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.master-secret-field input:focus {
+  border-color: var(--crimson);
+  box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.1);
+}
+
+.master-secret-note {
+  color: var(--text-tertiary);
+  font-size: 0.84rem;
+  line-height: 1.55;
+  margin-top: 0.75rem;
+}
+
+.master-secret-error {
+  min-height: 1.25rem;
+  color: var(--red);
+  font-size: 0.84rem;
+  margin-top: 0.65rem;
+}
+
+.master-secret-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  margin-top: 1.3rem;
+}
+
+.master-secret-btn {
+  min-width: 132px;
+  padding: 0.9rem 1.25rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dark);
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.master-secret-btn.primary {
+  border-color: var(--crimson);
+  background: var(--crimson);
+  color: #fff;
+}
+
+.master-secret-btn:hover {
+  border-color: var(--crimson);
+  color: var(--crimson);
+}
+
+.master-secret-btn.primary:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-light);
+  color: #fff;
+}
+
 .entry-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -770,6 +940,12 @@ body {
     grid-template-columns: 1.4fr 1fr 1.2fr 100px;
     padding-inline: 14px;
   }
+  .master-secret-actions {
+    flex-direction: column-reverse;
+  }
+  .master-secret-btn {
+    width: 100%;
+  }
 }
 </style>
 </head>
@@ -922,6 +1098,34 @@ body {
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="master-secret-overlay" id="master-secret-overlay" hidden aria-hidden="true">
+  <div class="master-secret-modal" role="dialog" aria-modal="true" aria-labelledby="master-secret-title">
+    <div class="master-secret-header">
+      <div>
+        <div class="master-secret-kicker">Versleutelde kluis</div>
+        <div class="master-secret-title" id="master-secret-title">Master-wachtzin</div>
+      </div>
+      <button type="button" class="master-secret-close" id="master-secret-close" aria-label="Sluiten">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 6l12 12M18 6 6 18"></path>
+        </svg>
+      </button>
+    </div>
+    <form id="master-secret-form">
+      <p class="master-secret-sub">Voer dezelfde master-wachtzin in waarmee deze kluis is aangemaakt.</p>
+      <div class="master-secret-field">
+        <label for="master-secret-input">Master-wachtzin</label>
+        <input id="master-secret-input" name="masterSecret" type="password" autocomplete="off" spellcheck="false">
+      </div>
+      <p class="master-secret-note">Deze zin blijft alleen in je browser voor het ontgrendelen. Softora slaat hem niet op en kan hem niet herstellen.</p>
+      <p class="master-secret-error" id="master-secret-error" aria-live="polite"></p>
+      <div class="master-secret-actions">
+        <button type="button" class="master-secret-btn" id="master-secret-cancel">Annuleren</button>
+        <button type="submit" class="master-secret-btn primary" id="master-secret-submit">Kluis openen</button>
+      </div>
+    </form>
+  </div>
+</div>
 <div class="entry-modal-backdrop" id="entry-modal-backdrop" hidden></div>
 <div class="entry-modal" id="entry-modal" hidden>
   <div class="entry-modal-header">
@@ -975,6 +1179,6 @@ body {
 <script src="assets/premium-password-register-renderer.js?v=20260427a"></script>
 <script src="assets/premium-password-register-store.js?v=20260427a"></script>
 <script src="assets/premium-password-register-pin.js?v=20260427a"></script>
-<script src="assets/premium-password-register-app.js?v=20260427a"></script>
+<script src="assets/premium-password-register-app.js?v=20260509a"></script>
 </body>
 </html>
