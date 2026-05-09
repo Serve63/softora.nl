@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Gegenereerd FLYNOW sneeuwbeeld">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#dbeafe"/><stop offset=".55" stop-color="#60a5fa"/><stop offset="1" stop-color="#111827"/></linearGradient>
+    <linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f8fafc"/><stop offset="1" stop-color="#bae6fd"/></linearGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".75" numOctaves="2"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .14"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sky)"/>
+  <path d="M0 515 L260 185 L485 520 Z" fill="#e0f2fe"/>
+  <path d="M250 545 L610 110 L1010 545 Z" fill="#f8fafc"/>
+  <path d="M560 545 L885 245 L1200 530 L1200 800 L0 800 L0 560 Z" fill="url(#snow)"/>
+  <path d="M610 110 L535 320 L650 270 L705 405 L1010 545 Z" fill="#93c5fd" opacity=".55"/>
+  <path d="M120 640 C300 585 480 640 660 590 C820 545 990 575 1160 520" fill="none" stroke="#fff" stroke-width="16" opacity=".75"/>
+  <path d="M230 520 L300 590 L380 540" fill="none" stroke="#1e3a8a" stroke-width="12" stroke-linecap="round"/>
+  <rect width="1200" height="800" filter="url(#grain)" opacity=".7"/>
+</svg>

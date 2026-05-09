@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FLYNOW - AI Trips</title>
+  <link rel="preload" href="/assets/fonts/inter-latin.woff2?v=20260409a" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/oswald-latin.woff2?v=20260409a" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
+  <link rel="stylesheet" href="/assets/flynow.css?v=20260509a">
+</head>
+<body data-flynow-page>
+  <div class="bg-canvas zon" id="flynow-bg" aria-hidden="true">
+    <div class="collage" id="flynow-collage"></div>
+    <div class="collage-overlay"></div>
+  </div>
+
+  <button class="collage-btn" id="flynow-photo-button" type="button" title="Foto's toevoegen aan achtergrond">
+    <span class="collage-btn-icon" aria-hidden="true"></span>
+    Eigen foto's
+  </button>
+  <input type="file" id="flynow-photo-input" multiple accept="image/*" hidden>
+  <div id="flynow-particles" aria-hidden="true"></div>
+
+  <nav class="flynow-nav" aria-label="FLYNOW navigatie">
+    <a class="nav-logo" href="/premium-instellingen">SOFTORA.NL - FLYNOW</a>
+    <div class="type-switch" role="group" aria-label="Reistype">
+      <button class="ts-btn active" type="button" data-flynow-type="zon">
+        <span class="ts-icon ts-icon-sun" aria-hidden="true"></span>
+        Zon &amp; Strand
+      </button>
+      <button class="ts-btn" type="button" data-flynow-type="sneeuw">
+        <span class="ts-icon ts-icon-snow" aria-hidden="true"></span>
+        Sneeuw &amp; Ski
+      </button>
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero" aria-labelledby="flynow-title">
+      <p class="hero-eyebrow">AI-gestuurd reisadvies</p>
+      <h1 class="hero-title zon" id="flynow-title">De beste trip<br>voor de<br>beste prijs</h1>
+      <p class="hero-sub" id="flynow-sub">
+        De AI vergelijkt honderden aanbiedingen en serveert alleen de absolute topdeals. Jij kiest of je gaat.
+      </p>
+      <button class="btn-zoek zon" id="flynow-search" type="button">
+        <span class="btn-bolt" aria-hidden="true"></span>
+        AI laten zoeken
+      </button>
+      <div class="scroll-hint" id="flynow-scroll-hint" hidden>
+        <span>Scroll naar resultaten</span>
+        <span class="scroll-arrow" aria-hidden="true">v</span>
+      </div>
+    </section>
+
+    <section class="results-section" id="flynow-results" hidden aria-live="polite">
+      <div class="ai-bar">
+        <div class="ai-dot zon" id="flynow-ai-dot"></div>
+        <div class="ai-bar-text" id="flynow-ai-text"></div>
+      </div>
+      <div id="flynow-trips-wrap"></div>
+    </section>
+  </main>
+
+  <div class="toast" id="flynow-toast" role="status" aria-live="polite"></div>
+  <script src="/assets/flynow.js?v=20260509a" defer></script>
+</body>
+</html>

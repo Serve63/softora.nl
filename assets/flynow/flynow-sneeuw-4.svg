@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Gegenereerd FLYNOW winterresortbeeld">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8fafc"/><stop offset=".45" stop-color="#7dd3fc"/><stop offset="1" stop-color="#111827"/></linearGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .13"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sky)"/>
+  <path d="M0 500 L250 230 L470 510 Z" fill="#e0f2fe"/>
+  <path d="M325 530 L650 115 L1050 540 Z" fill="#fff"/>
+  <path d="M620 115 L565 325 L695 275 L780 420 L1050 540 Z" fill="#93c5fd" opacity=".5"/>
+  <path d="M0 610 C250 548 430 615 650 575 C865 535 1015 552 1200 505 L1200 800 L0 800 Z" fill="#f8fafc"/>
+  <rect x="170" y="525" width="190" height="120" rx="12" fill="#78350f"/>
+  <path d="M150 532 L265 435 L382 532 Z" fill="#fff"/>
+  <rect x="235" y="575" width="48" height="70" rx="8" fill="#111827" opacity=".7"/>
+  <rect x="305" y="560" width="34" height="34" rx="5" fill="#bfdbfe"/>
+  <path d="M770 500 L810 645 M840 485 L890 640 M930 470 L985 625" stroke="#1f2937" stroke-width="10" stroke-linecap="round"/>
+  <rect width="1200" height="800" filter="url(#grain)" opacity=".72"/>
+</svg>

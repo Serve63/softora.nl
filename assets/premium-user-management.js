@@ -299,6 +299,7 @@ function mountExtraSettingsCategory() {
       '.settings-tile-grid,.settings-extra-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;align-items:stretch;justify-content:start;max-width:calc(4 * 280px + 3 * 20px);}',
       '.settings-tile-grid>.tegel,.settings-extra-grid>.tegel{width:100%;min-width:0;}',
       '.settings-extra-card{cursor:default;}',
+      '.settings-extra-card[data-settings-extra-href]{cursor:pointer;}',
       '@media (max-width:720px){.settings-tile-grid,.settings-extra-grid{grid-template-columns:minmax(0,1fr);max-width:100%;}}',
     ].join('');
     document.head.appendChild(style);
@@ -406,8 +407,16 @@ function mountExtraSettingsCategory() {
   extraGrid.className = 'settings-extra-grid';
   extraItems.forEach(function (label, index) {
     var number = String(index + 1).padStart(2, '0');
-    var card = document.createElement('div');
+    var isFlynow = label === 'Flynow';
+    var card = document.createElement(isFlynow ? 'button' : 'div');
     card.className = 'tegel settings-extra-card';
+    if (isFlynow) {
+      card.type = 'button';
+      card.setAttribute('data-settings-extra-href', '/premium-flynow');
+      card.addEventListener('click', function () {
+        window.location.href = '/premium-flynow';
+      });
+    }
     var moduleArrow = createUserManagementSvgElement('svg', {
       class: 'tegel-arrow',
       width: '16',
@@ -446,7 +455,12 @@ function mountExtraSettingsCategory() {
     card.appendChild(moduleIconWrap);
 
     appendUserManagementTextElement(card, 'div', 'tegel-label', label);
-    appendUserManagementTextElement(card, 'div', 'tegel-desc', 'Interne template-module die later verder ingevuld kan worden.');
+    appendUserManagementTextElement(
+      card,
+      'div',
+      'tegel-desc',
+      isFlynow ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.' : 'Interne template-module die later verder ingevuld kan worden.'
+    );
     appendUserManagementTextElement(card, 'div', 'tegel-count', 'Extra ' + number);
     extraGrid.appendChild(card);
   });

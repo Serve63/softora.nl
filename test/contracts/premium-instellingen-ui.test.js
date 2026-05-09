@@ -45,6 +45,9 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /@media \(max-width:720px\)\{\.settings-tile-grid,\.settings-extra-grid\{grid-template-columns:minmax\(0,1fr\);max-width:100%;\}\}/);
   assert.match(userManagementSource, /data-settings-extra-open/);
   assert.match(userManagementSource, /goTo\('screen-extra'\)/);
+  assert.match(userManagementSource, /var isFlynow = label === 'Flynow';/);
+  assert.match(userManagementSource, /data-settings-extra-href', '\/premium-flynow'/);
+  assert.match(userManagementSource, /window\.location\.href = '\/premium-flynow';/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-count', 'Extra ' \+ number\);/);
