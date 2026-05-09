@@ -14,6 +14,7 @@ import { replayVariantLabTestCases } from './replayVariantLabTests.js';
 import { robustnessLabTestCases } from './robustnessLabTests.js';
 import { sprintRotationTestCases } from './sprintRotationTests.js';
 import { tailGuardTestCases } from './tailGuardTests.js';
+import { tailConvexMetaTestCases } from './tailConvexMetaTests.js';
 import { timeframeResearchTestCases } from './timeframeResearchTests.js';
 import { trialLedgerTestCases } from './trialLedgerTests.js';
 import { walkForwardTestCases } from './walkForwardTests.js';
@@ -58,6 +59,7 @@ export async function runAllTests() {
     ...robustnessLabTestCases(),
     ...sprintRotationTestCases(),
     ...tailGuardTestCases(),
+    ...tailConvexMetaTestCases(),
     ...timeframeResearchTestCases(),
     ...trialLedgerTestCases(),
     ...walkForwardTestCases(),

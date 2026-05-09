@@ -3,6 +3,7 @@ import costAwareTailGuard from '../strategies/costAwareTailGuard.js';
 import convexBreakout from '../strategies/convexBreakout.js';
 import frozenCandidate from '../strategies/frozenCandidate.js';
 import sprintRotation from '../strategies/sprintRotation.js';
+import tailConvexMeta from '../strategies/tailConvexMeta.js';
 import tailGuard from '../strategies/tailGuard.js';
 import trendParticipation from '../strategies/trendParticipation.js';
 import { runBacktest } from './backtester.js';
@@ -17,6 +18,7 @@ export const TOURNAMENT_STRATEGIES = Object.freeze([
   tailGuard,
   costAwareTailGuard,
   convexBreakout,
+  tailConvexMeta,
 ]);
 
 function formatPercent(value) {

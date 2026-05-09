@@ -4,6 +4,7 @@ import {
   DEFAULT_PROFIT_FACTOR_GRID,
   DEFAULT_PROFIT_FACTOR_STRATEGIES,
   runProfitFactorLab,
+  verdictForProfitFactorChecks,
 } from '../core/profitFactorLab.js';
 
 function resolveDrift(drift, index, symbol) {
@@ -151,6 +152,7 @@ export function profitFactorLabTestCases() {
         assert(DEFAULT_PROFIT_FACTOR_STRATEGIES.some((strategy) => strategy.name === 'Tail Guard v1'), 'PF-lab mist de defensieve Tail Guard strategie.');
         assert(DEFAULT_PROFIT_FACTOR_STRATEGIES.some((strategy) => strategy.name === 'Cost Aware Tail Guard v1'), 'PF-lab mist de kostenbewuste Tail Guard strategie.');
         assert(DEFAULT_PROFIT_FACTOR_STRATEGIES.some((strategy) => strategy.name === 'Convex Breakout v1'), 'PF-lab mist de upside Convex Breakout strategie.');
+        assert(DEFAULT_PROFIT_FACTOR_STRATEGIES.some((strategy) => strategy.name === 'Tail Convex Meta v1'), 'PF-lab mist de Tail/Convex meta-strategie.');
       },
     },
     {
@@ -249,6 +251,7 @@ export function profitFactorLabTestCases() {
         assert(rollingPositive && rollingPositive.pass === false, 'Negatieve rolling return mag geen kandidaat blijven.');
         assert(profitableRate && profitableRate.pass === false, 'Te weinig winstgevende rolling windows moet falen.');
         assert(trainAccepted && trainAccepted.pass === false, 'Te weinig geldige train-fold kandidaten moet falen.');
+        assert(verdictForProfitFactorChecks(checks) === 'REJECT', 'Negatieve rolling performance mag ook geen watchlist blijven.');
       },
     },
     {

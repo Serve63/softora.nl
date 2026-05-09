@@ -2,6 +2,7 @@ import costAwareTailGuard from './costAwareTailGuard.js';
 import convexBreakout from './convexBreakout.js';
 import frozenCandidate, { generateFrozenCandidateSignal } from './frozenCandidate.js';
 import sprintRotation from './sprintRotation.js';
+import tailConvexMeta from './tailConvexMeta.js';
 import trendParticipation from './trendParticipation.js';
 
 export function createStrategySandbox(overrides = {}) {
@@ -26,6 +27,7 @@ export function getAvailableStrategies() {
     sprintRotation,
     costAwareTailGuard,
     convexBreakout,
+    tailConvexMeta,
     createStrategySandbox(),
   ];
 }

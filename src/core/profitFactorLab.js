@@ -3,6 +3,7 @@ import costAwareTailGuard from '../strategies/costAwareTailGuard.js';
 import convexBreakout from '../strategies/convexBreakout.js';
 import frozenCandidate from '../strategies/frozenCandidate.js';
 import sprintRotation from '../strategies/sprintRotation.js';
+import tailConvexMeta from '../strategies/tailConvexMeta.js';
 import tailGuard from '../strategies/tailGuard.js';
 import trendParticipation from '../strategies/trendParticipation.js';
 import { runBacktest } from './backtester.js';
@@ -29,6 +30,7 @@ export const DEFAULT_PROFIT_FACTOR_STRATEGIES = Object.freeze([
   tailGuard,
   costAwareTailGuard,
   convexBreakout,
+  tailConvexMeta,
 ]);
 
 export const TRAIN_FAILURE_PENALTY_WEIGHTS = Object.freeze({
@@ -471,7 +473,15 @@ export function buildProfitFactorLabChecks(
   return checks;
 }
 
-function verdictForChecks(checks) {
+export function verdictForProfitFactorChecks(checks) {
+  const hardRejectIds = new Set([
+    'rolling-positive',
+    'rolling-train-accepted',
+    'trial-ledger',
+    'cost-stress',
+  ]);
+  if (checks.some((check) => hardRejectIds.has(check.id) && !check.pass)) return 'REJECT';
+
   const passed = checks.filter((check) => check.pass).length;
 
   if (checks.every((check) => check.pass)) return 'CANDIDATE';
@@ -611,7 +621,7 @@ export function runProfitFactorLab({
         ...validated,
         checks,
         failed: checks.filter((check) => !check.pass),
-        verdict: verdictForChecks(checks),
+        verdict: verdictForProfitFactorChecks(checks),
       };
     })
     .sort((a, b) => b.validatedScore - a.validatedScore);
@@ -643,7 +653,7 @@ export function runProfitFactorLab({
           ...row,
           checks,
           failed: checks.filter((check) => !check.pass),
-          verdict: verdictForChecks(checks),
+          verdict: verdictForProfitFactorChecks(checks),
         };
       }
       const checks = buildProfitFactorLabChecks(
@@ -660,7 +670,7 @@ export function runProfitFactorLab({
         robustness,
         checks,
         failed: checks.filter((check) => !check.pass),
-        verdict: verdictForChecks(checks),
+        verdict: verdictForProfitFactorChecks(checks),
       };
     }).sort((a, b) => b.validatedScore - a.validatedScore);
   }

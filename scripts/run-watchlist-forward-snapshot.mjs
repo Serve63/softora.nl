@@ -15,6 +15,7 @@ import costAwareTailGuard from '../src/strategies/costAwareTailGuard.js';
 import convexBreakout from '../src/strategies/convexBreakout.js';
 import frozenCandidate from '../src/strategies/frozenCandidate.js';
 import sprintRotation from '../src/strategies/sprintRotation.js';
+import tailConvexMeta from '../src/strategies/tailConvexMeta.js';
 import tailGuard from '../src/strategies/tailGuard.js';
 import trendParticipation from '../src/strategies/trendParticipation.js';
 
@@ -65,6 +66,7 @@ function strategyForName(name) {
   if (name === tailGuard.name) return tailGuard;
   if (name === costAwareTailGuard.name) return costAwareTailGuard;
   if (name === convexBreakout.name) return convexBreakout;
+  if (name === tailConvexMeta.name) return tailConvexMeta;
   if (name === trendParticipation.name) return trendParticipation;
   return null;
 }
