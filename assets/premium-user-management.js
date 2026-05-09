@@ -275,6 +275,150 @@ function backToInstellingenOverzicht() {
   goTo('screen-overzicht');
 }
 
+function mountExtraSettingsCategory() {
+  var overviewScreen = document.getElementById('screen-overzicht');
+  var personnelTile = overviewScreen && overviewScreen.querySelector('.tegel[data-settings-action="open-pin"]');
+  if (!overviewScreen || !personnelTile || document.getElementById('screen-extra')) return;
+
+  var extraItems = [
+    "Servé's gezondheidsdossier",
+    'Ruben zet toto',
+    'world watcher',
+    'Flynow',
+    'Transfermarkt',
+    'Net Worth Index',
+    'Pulse',
+    'Ruben’s Company',
+    'Ruben’s Trading System',
+  ];
+
+  if (!document.getElementById('settings-extra-style')) {
+    var style = document.createElement('style');
+    style.id = 'settings-extra-style';
+    style.textContent = [
+      '.settings-tile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,280px));gap:20px;align-items:stretch;}',
+      '.settings-extra-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:980px;}',
+      '.settings-extra-card{min-height:140px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:22px;box-shadow:0 8px 24px rgba(26,26,46,.04);display:flex;flex-direction:column;justify-content:space-between;gap:18px;}',
+      '.settings-extra-kicker{font-family:Oswald,sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.16em;color:var(--crimson);text-transform:uppercase;}',
+      '.settings-extra-title{font-family:Oswald,sans-serif;font-size:1.35rem;font-weight:800;letter-spacing:.02em;line-height:1.1;color:var(--text);text-transform:uppercase;}',
+      '.settings-extra-state{align-self:flex-start;font-family:Oswald,sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--text-light);text-transform:uppercase;border:1px solid var(--border);border-radius:999px;padding:4px 10px;}',
+    ].join('');
+    document.head.appendChild(style);
+  }
+
+  var tileParent = personnelTile.parentElement;
+  if (tileParent) tileParent.classList.add('settings-tile-grid');
+
+  var extraTile = document.createElement('button');
+  extraTile.type = 'button';
+  extraTile.className = 'tegel';
+  extraTile.setAttribute('data-settings-extra-open', 'true');
+  var arrowIcon = createUserManagementSvgElement('svg', {
+    class: 'tegel-arrow',
+    width: '16',
+    height: '16',
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '2',
+    'aria-hidden': 'true'
+  });
+  arrowIcon.appendChild(createUserManagementSvgElement('polyline', {
+    points: '9 18 15 12 9 6'
+  }));
+  extraTile.appendChild(arrowIcon);
+
+  var iconWrap = document.createElement('div');
+  iconWrap.className = 'tegel-icon-wrap';
+  var gridIcon = createUserManagementSvgElement('svg', {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '1.8',
+    'aria-hidden': 'true'
+  });
+  [
+    ['4', '4'],
+    ['14', '4'],
+    ['4', '14'],
+    ['14', '14']
+  ].forEach(function (position) {
+    gridIcon.appendChild(createUserManagementSvgElement('rect', {
+      x: position[0],
+      y: position[1],
+      width: '6',
+      height: '6',
+      rx: '1.4'
+    }));
+  });
+  iconWrap.appendChild(gridIcon);
+  extraTile.appendChild(iconWrap);
+  appendUserManagementTextElement(extraTile, 'div', 'tegel-label', 'Extra');
+  appendUserManagementTextElement(
+    extraTile,
+    'div',
+    'tegel-desc',
+    'Losse interne modules en extra onderdelen die later verder ingevuld kunnen worden.'
+  );
+  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '9 onderdelen');
+  extraTile.addEventListener('click', function () {
+    goTo('screen-extra');
+  });
+  if (tileParent) tileParent.insertBefore(extraTile, personnelTile);
+
+  var extraScreen = document.createElement('div');
+  extraScreen.className = 'screen';
+  extraScreen.id = 'screen-extra';
+
+  var header = document.createElement('div');
+  header.className = 'beheer-header';
+  var headerText = document.createElement('div');
+  appendUserManagementTextElement(headerText, 'div', 'beheer-title', 'Extra');
+  appendUserManagementTextElement(headerText, 'div', 'beheer-subtitle', 'Interne modules en placeholders');
+  header.appendChild(headerText);
+
+  var headerActions = document.createElement('div');
+  headerActions.className = 'beheer-header-actions';
+  var backButton = document.createElement('button');
+  backButton.type = 'button';
+  backButton.className = 'settings-lock-btn magnetic';
+  backButton.setAttribute('data-settings-extra-back', 'true');
+  backButton.title = 'Terug naar instellingenoverzicht';
+  backButton.setAttribute('aria-label', 'Terug naar instellingen');
+  var backIcon = createUserManagementSvgElement('svg', {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '2',
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+    'aria-hidden': 'true'
+  });
+  backIcon.appendChild(createUserManagementSvgElement('path', {
+    d: 'M15 18l-6-6 6-6'
+  }));
+  backButton.appendChild(backIcon);
+  backButton.appendChild(document.createTextNode('Naar instellingen'));
+  backButton.addEventListener('click', backToInstellingenOverzicht);
+  headerActions.appendChild(backButton);
+  header.appendChild(headerActions);
+  extraScreen.appendChild(header);
+
+  var extraGrid = document.createElement('div');
+  extraGrid.className = 'settings-extra-grid';
+  extraItems.forEach(function (label, index) {
+    var number = String(index + 1).padStart(2, '0');
+    var card = document.createElement('div');
+    card.className = 'settings-extra-card';
+    appendUserManagementTextElement(card, 'div', 'settings-extra-kicker', 'Extra ' + number);
+    appendUserManagementTextElement(card, 'div', 'settings-extra-title', label);
+    appendUserManagementTextElement(card, 'div', 'settings-extra-state', 'Template');
+    extraGrid.appendChild(card);
+  });
+  extraScreen.appendChild(extraGrid);
+  overviewScreen.insertAdjacentElement('afterend', extraScreen);
+}
+
 function renderAccessDenied() {
   document.getElementById('list-count').textContent = '';
   document.getElementById('tegel-count').textContent = 'Geen toegang';
@@ -789,6 +933,8 @@ function showToast(msg) {
     toast.classList.remove('show');
   }, 2800);
 }
+
+mountExtraSettingsCategory();
 
 (async function bootstrapPersoneelManager() {
   try {
