@@ -39,8 +39,13 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /payload\.session/);
   assert.match(userManagementSource, /function mountExtraSettingsCategory\(\)/);
   assert.match(userManagementSource, /settings-tile-grid/);
+  assert.match(userManagementSource, /\.settings-tile-grid,\.settings-extra-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(280px,280px\)\);/);
+  assert.match(userManagementSource, /@media \(max-width:720px\)\{\.settings-tile-grid,\.settings-extra-grid\{grid-template-columns:minmax\(280px,280px\);\}\}/);
   assert.match(userManagementSource, /data-settings-extra-open/);
   assert.match(userManagementSource, /goTo\('screen-extra'\)/);
+  assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
+  assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
+  assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-count', 'Extra ' \+ number\);/);
   assert.match(userManagementSource, /Servé's gezondheidsdossier/);
   assert.match(userManagementSource, /Ruben zet toto/);
   assert.match(userManagementSource, /world watcher/);
@@ -56,4 +61,5 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.doesNotMatch(source, /onclick=/);
   assert.doesNotMatch(source, /oninput=/);
   assert.doesNotMatch(source, /onchange=/);
+  assert.doesNotMatch(userManagementSource, /\.settings-extra-card\{min-height:140px/);
 });
