@@ -20,16 +20,16 @@
 
   var GENERATED_PHOTOS = {
     zon: [
-      '/assets/flynow/flynow-zon-1.svg',
-      '/assets/flynow/flynow-zon-2.svg',
-      '/assets/flynow/flynow-zon-3.svg',
-      '/assets/flynow/flynow-zon-4.svg',
+      '/assets/flynow/flynow-zon-photo-1.jpg',
+      '/assets/flynow/flynow-zon-photo-2.jpg',
+      '/assets/flynow/flynow-zon-photo-3.jpg',
+      '/assets/flynow/flynow-zon-photo-4.jpg',
     ],
     sneeuw: [
-      '/assets/flynow/flynow-sneeuw-1.svg',
-      '/assets/flynow/flynow-sneeuw-2.svg',
-      '/assets/flynow/flynow-sneeuw-3.svg',
-      '/assets/flynow/flynow-sneeuw-4.svg',
+      '/assets/flynow/flynow-sneeuw-photo-1.jpg',
+      '/assets/flynow/flynow-sneeuw-photo-2.jpg',
+      '/assets/flynow/flynow-sneeuw-photo-3.jpg',
+      '/assets/flynow/flynow-sneeuw-photo-4.jpg',
     ],
   };
 
