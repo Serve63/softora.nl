@@ -20,6 +20,7 @@ function normalizeManualLegendChoice(body, normalizeString) {
   if (raw === 'chatbot' || raw === 'chatbots') return 'chatbot';
   if (raw === 'website') return 'website';
   if (raw === 'manual-martijn' || raw === 'martijn') return 'manual-martijn';
+  if (raw === 'manual-both' || raw === 'both' || raw === 'allebei' || raw === 'beide') return 'manual-both';
   if (raw === 'manual-overig' || raw === 'overig' || raw === 'other') return 'manual-overig';
   if (raw === 'completed' || raw === 'afgerond') return 'completed';
   if (raw === 'manual-serve' || raw === 'serve' || raw === 'servé') return 'manual-serve';
