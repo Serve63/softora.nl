@@ -37,6 +37,20 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /avatarImg\.src = avatarDataUrl/);
   assert.match(userManagementSource, /syncPremiumSidebarAfterUserManagementSave\(payload\.session\)/);
   assert.match(userManagementSource, /payload\.session/);
+  assert.match(userManagementSource, /function mountExtraSettingsCategory\(\)/);
+  assert.match(userManagementSource, /settings-tile-grid/);
+  assert.match(userManagementSource, /data-settings-extra-open/);
+  assert.match(userManagementSource, /goTo\('screen-extra'\)/);
+  assert.match(userManagementSource, /Servé's gezondheidsdossier/);
+  assert.match(userManagementSource, /Ruben zet toto/);
+  assert.match(userManagementSource, /world watcher/);
+  assert.match(userManagementSource, /Flynow/);
+  assert.match(userManagementSource, /Transfermarkt/);
+  assert.match(userManagementSource, /Net Worth Index/);
+  assert.match(userManagementSource, /Pulse/);
+  assert.match(userManagementSource, /Ruben’s Company/);
+  assert.match(userManagementSource, /Ruben’s Trading System/);
+  assert.match(userManagementSource, /mountExtraSettingsCategory\(\);/);
 
   assert.doesNotMatch(source, /\son(?:click|input|change|keydown|submit)=/);
   assert.doesNotMatch(source, /onclick=/);
