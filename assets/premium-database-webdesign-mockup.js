@@ -160,6 +160,7 @@
         const persistCustomerPhotos = options.persistCustomerPhotos;
         const renderPage = options.renderPage;
         const setStatusMessage = options.setStatusMessage;
+        const toast = typeof options.toast === "function" ? options.toast : function () {};
         const pendingIds = new Set();
 
         function isPending(customerId) {
@@ -176,6 +177,9 @@
             if (!force && isValidWebsitePhotoSource(customer && customer.websiteMockup)) return true;
 
             pendingIds.add(id);
+            if (force && !isValidWebsitePhotoSource(customer && customer.websiteMockup)) {
+                toast("Device mockup wordt lokaal gemaakt, geen extra API-kosten");
+            }
             if (typeof renderPage === "function") renderPage();
             try {
                 const image = await loadImage(customer.websitePhoto);
