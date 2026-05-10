@@ -63,6 +63,20 @@ function registerAgendaMutationRoutes(app, deps) {
   );
 
   app.post(
+    '/api/agenda/appointments/:id/add-follow-up-lead',
+    withValidation(validateAddActiveOrderRequest, (req, res) =>
+      deps.addAgendaAppointmentToInterestedLeads(req, res, req.params.id)
+    )
+  );
+
+  app.post(
+    '/api/agenda/add-follow-up-lead',
+    withValidation(validateAddActiveOrderRequest, (req, res) =>
+      deps.addAgendaAppointmentToInterestedLeads(req, res, req.query.appointmentId)
+    )
+  );
+
+  app.post(
     '/api/agenda/interested-leads/set-in-agenda',
     withValidation(validateInterestedLeadSetInAgendaRequest, (req, res) =>
       deps.setInterestedLeadInAgendaResponse(req, res)

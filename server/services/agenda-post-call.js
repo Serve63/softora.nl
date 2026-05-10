@@ -320,6 +320,7 @@ function createAgendaPostCallCoordinator(deps = {}) {
     getGeneratedAppointmentIndexById = () => -1,
     getGeneratedAgendaAppointments = () => [],
     setGeneratedAgendaAppointmentAtIndex = () => null,
+    upsertGeneratedAgendaAppointment = () => null,
     appendDashboardActivity = () => {},
     getUiStateValues = async () => null,
     setUiStateValues = async () => null,
@@ -348,6 +349,131 @@ function createAgendaPostCallCoordinator(deps = {}) {
     getNextCustomOrderId,
     parseCustomOrdersFromUiState,
   } = resolvedHelpers;
+
+  function buildFollowUpLeadCallId(appointment) {
+    const existing = normalizeString(
+      appointment?.leadFollowUpCallId || appointment?.leadFollowUpSourceCallId || ''
+    );
+    if (existing) return existing;
+    const appointmentId = Number(appointment?.id || 0);
+    if (Number.isFinite(appointmentId) && appointmentId > 0) {
+      return `appointment-follow-up:${appointmentId}`;
+    }
+    const fallbackCallId = normalizeString(appointment?.callId || '');
+    return fallbackCallId ? `appointment-follow-up:${fallbackCallId}` : '';
+  }
+
+  function findExistingFollowUpLeadTaskIndex(appointment, followUpCallId) {
+    const sourceAppointmentId = Number(appointment?.id || 0);
+    const existingFollowUpId = Number(appointment?.leadFollowUpAppointmentId || 0);
+    return getGeneratedAgendaAppointments().findIndex((item) => {
+      if (!item || typeof item !== 'object') return false;
+      const itemId = Number(item?.id || 0);
+      const itemCallId = normalizeString(item?.callId || '');
+      const itemSourceAppointmentId = Number(item?.leadFollowUpSourceAppointmentId || 0);
+      if (followUpCallId && itemCallId === followUpCallId) return true;
+      if (existingFollowUpId > 0 && itemId === existingFollowUpId) return true;
+      if (sourceAppointmentId > 0 && itemSourceAppointmentId === sourceAppointmentId) return true;
+      return false;
+    });
+  }
+
+  function buildFollowUpLeadAppointmentFromAppointment(appointment, input = {}, followUpCallId) {
+    const nowIso = new Date().toISOString();
+    const transcript = sanitizePostCallText(
+      input.transcript || appointment?.postCallNotesTranscript || '',
+      25000
+    );
+    const prompt = sanitizePostCallText(
+      input.prompt || appointment?.postCallPrompt || '',
+      25000
+    );
+    const domainName = sanitizeLaunchDomainName(
+      input.domainName || input.domain || appointment?.postCallDomainName || appointment?.domainName || ''
+    );
+    const referenceImages = sanitizeReferenceImages(
+      input.referenceImages || input.attachments || appointment?.referenceImages || []
+    );
+    const summary =
+      truncateText(
+        normalizeString(
+          input.summary ||
+            appointment?.summary ||
+            appointment?.postCallNotesTranscript ||
+            'Lead wil verder in het traject.'
+        ),
+        4000
+      ) || 'Lead wil verder in het traject.';
+
+    return {
+      company: truncateText(normalizeString(appointment?.company || ''), 160) || 'Nieuwe lead',
+      contact: truncateText(normalizeString(appointment?.contact || ''), 160) || 'Onbekend',
+      phone: truncateText(
+        normalizeString(appointment?.phone || appointment?.telefoon || appointment?.contactPhone || ''),
+        80
+      ),
+      contactEmail: truncateText(
+        normalizeString(appointment?.contactEmail || appointment?.email || ''),
+        160
+      ),
+      type: normalizeString(appointment?.type || 'meeting') || 'meeting',
+      date: truncateText(normalizeString(appointment?.date || ''), 10) || '',
+      time: truncateText(normalizeString(appointment?.time || ''), 5) || '09:00',
+      value: truncateText(normalizeString(appointment?.value || ''), 80) || '',
+      branche: truncateText(normalizeString(appointment?.branche || ''), 160) || 'Onbekend',
+      source:
+        truncateText(
+          normalizeString(input.source || appointment?.source || 'Agenda vervolg na meeting'),
+          200
+        ) || 'Agenda vervolg na meeting',
+      summary,
+      leadConversationSummary: summary,
+      aiGenerated: false,
+      callId: followUpCallId,
+      createdAt:
+        normalizeString(appointment?.leadFollowUpAddedAt || appointment?.createdAt || '') || nowIso,
+      needsConfirmationEmail: false,
+      confirmationTaskType: 'lead_follow_up',
+      provider: truncateText(normalizeString(appointment?.provider || ''), 80) || '',
+      providerLabel: truncateText(normalizeString(appointment?.providerLabel || ''), 120) || '',
+      coldcallingStack: truncateText(normalizeString(appointment?.coldcallingStack || ''), 120) || '',
+      coldcallingStackLabel:
+        truncateText(
+          normalizeString(appointment?.coldcallingStackLabel || appointment?.providerLabel || ''),
+          120
+        ) || '',
+      location: truncateText(
+        normalizeString(input.location || appointment?.location || appointment?.appointmentLocation || ''),
+        220
+      ),
+      durationSeconds: Number(appointment?.durationSeconds || 0) || 0,
+      whatsappConfirmed: Boolean(appointment?.whatsappConfirmed),
+      whatsappInfo: truncateText(
+        normalizeString(appointment?.whatsappInfo || appointment?.whatsappNotes || ''),
+        4000
+      ),
+      recordingUrl: truncateText(normalizeString(appointment?.recordingUrl || ''), 4000),
+      postCallStatus:
+        normalizePostCallStatus(input.status || appointment?.postCallStatus || 'bezig') || 'bezig',
+      postCallNotesTranscript: transcript,
+      postCallPrompt: prompt,
+      postCallDomainName: domainName,
+      postCallUpdatedAt: nowIso,
+      postCallUpdatedBy: truncateText(normalizeString(input.actor || input.doneBy || ''), 120) || null,
+      referenceImages,
+      leadFollowUpSourceAppointmentId: Number(appointment?.id || 0) || null,
+      leadFollowUpSourceCallId: normalizeString(appointment?.callId || '') || null,
+      leadOwnerKey: truncateText(normalizeString(appointment?.leadOwnerKey || ''), 80) || '',
+      leadOwnerName: truncateText(normalizeString(appointment?.leadOwnerName || ''), 120) || '',
+      leadOwnerFullName:
+        truncateText(
+          normalizeString(appointment?.leadOwnerFullName || appointment?.leadOwnerName || ''),
+          160
+        ) || '',
+      leadOwnerUserId: truncateText(normalizeString(appointment?.leadOwnerUserId || ''), 120) || '',
+      leadOwnerEmail: truncateText(normalizeString(appointment?.leadOwnerEmail || ''), 160) || '',
+    };
+  }
 
   async function syncPremiumCustomerDatabaseStatusFromAppointment(appointment, lifecycleStatus, actor) {
     const status = normalizeLifecycleDatabaseStatus(lifecycleStatus);
@@ -673,8 +799,163 @@ function createAgendaPostCallCoordinator(deps = {}) {
     });
   }
 
+  async function addAgendaAppointmentToInterestedLeads(req, res, appointmentIdRaw) {
+    const idx = getGeneratedAppointmentIndexById(appointmentIdRaw);
+    if (idx < 0) {
+      return res.status(404).json({ ok: false, error: 'Afspraak niet gevonden' });
+    }
+
+    const appointment = getGeneratedAgendaAppointments()[idx];
+    if (!appointment || typeof appointment !== 'object') {
+      return res.status(404).json({ ok: false, error: 'Afspraak niet gevonden' });
+    }
+
+    const actor = truncateText(normalizeString(req.body?.actor || req.body?.doneBy || ''), 120);
+    const promptText = sanitizePostCallText(req.body?.prompt || appointment?.postCallPrompt || '', 25000);
+    const transcriptText = sanitizePostCallText(
+      req.body?.transcript || appointment?.postCallNotesTranscript || '',
+      25000
+    );
+    const domainName = sanitizeLaunchDomainName(
+      req.body?.domainName || req.body?.domain || appointment?.postCallDomainName || appointment?.domainName || ''
+    );
+    const referenceImages = sanitizeReferenceImages(
+      req.body?.referenceImages || req.body?.attachments || appointment?.referenceImages || []
+    );
+
+    if (!promptText) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Maak eerst een prompt voordat je doorgaat met vervolg.',
+      });
+    }
+
+    const followUpCallId = buildFollowUpLeadCallId(appointment);
+    if (!followUpCallId) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Kon geen vervolgreferentie maken voor deze afspraak.',
+      });
+    }
+
+    const followUpInput = {
+      ...req.body,
+      actor,
+      prompt: promptText,
+      transcript: transcriptText,
+      domainName:
+        domainName ||
+        sanitizeLaunchDomainName(appointment?.postCallDomainName || appointment?.domainName || ''),
+      referenceImages:
+        referenceImages.length > 0
+          ? referenceImages
+          : sanitizeReferenceImages(appointment?.referenceImages || []),
+      status: normalizePostCallStatus(req.body?.status || appointment?.postCallStatus || 'bezig') || 'bezig',
+    };
+
+    const existingFollowUpIdx = findExistingFollowUpLeadTaskIndex(appointment, followUpCallId);
+    const hadExistingLead = existingFollowUpIdx >= 0;
+    let followUpLead = null;
+
+    if (hadExistingLead) {
+      const existingFollowUp = getGeneratedAgendaAppointments()[existingFollowUpIdx] || {};
+      const builtFollowUp = buildFollowUpLeadAppointmentFromAppointment(
+        appointment,
+        followUpInput,
+        followUpCallId
+      );
+      const nowIso = new Date().toISOString();
+      const hintedUpdatedAtMs = Date.parse(nowIso) || Date.now();
+      followUpLead = setGeneratedAgendaAppointmentAtIndex(
+        existingFollowUpIdx,
+        {
+          ...existingFollowUp,
+          ...builtFollowUp,
+          id: Number(existingFollowUp?.id || 0) || Number(builtFollowUp?.id || 0) || null,
+          callId: followUpCallId,
+          createdAt: normalizeString(existingFollowUp?.createdAt || builtFollowUp?.createdAt || '') || nowIso,
+          updatedAt: nowIso,
+          updatedAtMs: hintedUpdatedAtMs,
+          needsConfirmationEmail: false,
+          confirmationTaskType: 'lead_follow_up',
+          confirmationEmailSent: false,
+          confirmationEmailSentAt: null,
+          confirmationEmailSentBy: null,
+          confirmationResponseReceived: false,
+          confirmationResponseReceivedAt: null,
+          confirmationResponseReceivedBy: null,
+          confirmationAppointmentCancelled: false,
+          confirmationAppointmentCancelledAt: null,
+          confirmationAppointmentCancelledBy: null,
+          confirmationTaskCreatedAt:
+            normalizeString(existingFollowUp?.confirmationTaskCreatedAt || existingFollowUp?.createdAt || '') ||
+            nowIso,
+        },
+        'agenda_follow_up_lead_update'
+      );
+    } else {
+      followUpLead = upsertGeneratedAgendaAppointment(
+        buildFollowUpLeadAppointmentFromAppointment(appointment, followUpInput, followUpCallId),
+        followUpCallId
+      );
+    }
+
+    if (!followUpLead) {
+      return res.status(500).json({ ok: false, error: 'Kon vervolg niet opslaan bij openstaande leads.' });
+    }
+
+    const nowIso = new Date().toISOString();
+    const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+      idx,
+      {
+        ...appointment,
+        postCallStatus: normalizePostCallStatus(req.body?.status || appointment?.postCallStatus),
+        postCallNotesTranscript: transcriptText,
+        postCallPrompt: promptText,
+        postCallDomainName:
+          domainName ||
+          sanitizeLaunchDomainName(appointment?.postCallDomainName || appointment?.domainName || ''),
+        referenceImages:
+          referenceImages.length > 0
+            ? referenceImages
+            : sanitizeReferenceImages(appointment?.referenceImages || []),
+        postCallUpdatedAt: nowIso,
+        postCallUpdatedBy: actor || null,
+        leadFollowUpAppointmentId: Number(followUpLead?.id || 0) || null,
+        leadFollowUpCallId: followUpCallId,
+        leadFollowUpAddedAt:
+          normalizeString(appointment?.leadFollowUpAddedAt || followUpLead?.createdAt || '') || nowIso,
+        leadFollowUpAddedBy: actor || normalizeString(appointment?.leadFollowUpAddedBy || '') || null,
+        leadFollowUpReferenceImageCount: referenceImages.length,
+      },
+      'agenda_add_follow_up_lead'
+    );
+
+    appendDashboardActivity(
+      {
+        type: 'follow_up_lead_added_from_agenda',
+        title: 'Toegevoegd aan openstaande leads',
+        detail: `Afspraak doorgeschoven naar openstaande leads (#${Number(followUpLead?.id) || '?'})`,
+        company: updatedAppointment?.company || appointment?.company || '',
+        actor,
+        taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
+        callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+        source: 'premium-personeel-agenda',
+      },
+      'dashboard_activity_follow_up_lead_added'
+    );
+
+    return res.status(200).json({
+      ok: true,
+      followUpLead,
+      appointment: updatedAppointment,
+      alreadyExisted: hadExistingLead,
+    });
+  }
+
   return {
     addAgendaAppointmentToPremiumActiveOrders,
+    addAgendaAppointmentToInterestedLeads,
     updateAgendaAppointmentPostCallDataById,
   };
 }

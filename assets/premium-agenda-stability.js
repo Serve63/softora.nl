@@ -423,6 +423,10 @@ refreshWorkspacePrimaryButtonLabel = function refreshWorkspacePrimaryButtonLabel
     if (!modalWorkspaceMode && isAppointmentCompleted(apt) && !getLinkedOrderIdForAppointment(apt)) {
         modalPrimaryBtn.hidden = true;
         modalPrimaryBtn.disabled = true;
+        if (modalFollowUpBtn) {
+            modalFollowUpBtn.hidden = true;
+            modalFollowUpBtn.disabled = true;
+        }
         modalNoDealBtn.hidden = true;
         modalNoDealBtn.disabled = true;
         if (modalSecondaryBtn) modalSecondaryBtn.textContent = 'Sluiten';
@@ -430,6 +434,10 @@ refreshWorkspacePrimaryButtonLabel = function refreshWorkspacePrimaryButtonLabel
     if (!modalWorkspaceMode && isManualOtherAppointment(apt)) {
         modalPrimaryBtn.hidden = true;
         modalPrimaryBtn.disabled = true;
+        if (modalFollowUpBtn) {
+            modalFollowUpBtn.hidden = true;
+            modalFollowUpBtn.disabled = true;
+        }
         modalNoDealBtn.hidden = true;
         modalNoDealBtn.disabled = true;
         if (modalSecondaryBtn) modalSecondaryBtn.textContent = 'Sluiten';
@@ -635,6 +643,7 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
         button.disabled = editSaving || workspaceBusy || !show;
         if (editMode) {
             modalPrimaryBtn.hidden = true;
+            if (modalFollowUpBtn) modalFollowUpBtn.hidden = true;
             modalNoDealBtn.hidden = true;
             modalCompleteActivityBtn.hidden = true;
             if (modalSecondaryBtn) modalSecondaryBtn.hidden = true;
@@ -644,6 +653,7 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
     function rememberButtonState() {
         editPreviousButtonState = {
             primary: modalPrimaryBtn.hidden,
+            followUp: modalFollowUpBtn ? modalFollowUpBtn.hidden : true,
             noDeal: modalNoDealBtn.hidden,
             complete: modalCompleteActivityBtn.hidden,
             secondary: modalSecondaryBtn ? modalSecondaryBtn.hidden : true,
@@ -653,6 +663,7 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
     function restoreButtonState() {
         if (!editPreviousButtonState) return;
         modalPrimaryBtn.hidden = editPreviousButtonState.primary;
+        if (modalFollowUpBtn) modalFollowUpBtn.hidden = editPreviousButtonState.followUp;
         modalNoDealBtn.hidden = editPreviousButtonState.noDeal;
         modalCompleteActivityBtn.hidden = editPreviousButtonState.complete;
         if (modalSecondaryBtn) modalSecondaryBtn.hidden = editPreviousButtonState.secondary;
