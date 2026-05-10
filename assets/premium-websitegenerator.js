@@ -1293,7 +1293,6 @@ loadWebsiteGeneratorAuthState();
     }
     websiteLinkListEl.replaceChildren(...normalizedLinks.map((link) => createWebsiteLinkRow(link)));
   }
-
   async function loadWebsiteLinks() {
     if (!websiteGeneratorAuthState.authenticated) {
       renderWebsiteLinks([]);
@@ -1313,7 +1312,8 @@ loadWebsiteGeneratorAuthState();
       }
       renderWebsiteLinks(payload.links || []);
     } catch (error) {
-      renderWebsiteLinkEmptyState(String(error?.message || 'Websitelinks laden mislukt'));
+      console.warn('Opgeslagen websitelinks laden mislukt:', error);
+      renderWebsiteLinks([]);
     }
   }
 

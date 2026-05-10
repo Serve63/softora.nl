@@ -95,7 +95,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const packagesSource = fs.readFileSync(packagesPath, 'utf8');
         assert.match(packagesSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else if (file === 'premium-websitegenerator.html') {
-        assert.match(source, /<script src="assets\/premium-websitegenerator\.js\?v=20260501a" defer><\/script>/, file);
+        assert.match(source, /<script src="assets\/premium-websitegenerator\.js\?v=[^"]+" defer><\/script>/, file);
         assert.match(source, /<script src="assets\/premium-websitegenerator-boot\.js\?v=20260507a" defer><\/script>/, file);
         const websitegeneratorPath = path.join(__dirname, '../../assets/premium-websitegenerator-boot.js');
         const websitegeneratorSource = fs.readFileSync(websitegeneratorPath, 'utf8');

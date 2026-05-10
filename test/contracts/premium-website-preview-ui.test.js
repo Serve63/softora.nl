@@ -70,6 +70,10 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.doesNotMatch(websiteGeneratorSource, /websiteLinkListEl\.innerHTML/);
   assert.match(websiteGeneratorSource, /\/api\/website-links'/);
   assert.match(websiteGeneratorSource, /\/api\/website-links\/create/);
+  assert.match(websiteGeneratorSource, /console\.warn\('Opgeslagen websitelinks laden mislukt:', error\);/);
+  assert.match(websiteGeneratorSource, /renderWebsiteLinks\(\[\]\);/);
+  assert.doesNotMatch(websiteGeneratorSource, /renderWebsiteLinkEmptyState\(String\(error\?\.message \|\| 'Websitelinks laden mislukt'\)\);/);
+  assert.doesNotMatch(websiteGeneratorSource, /Kon opgeslagen websitelinks niet ophalen/);
 });
 
 test('premium websitegenerator houdt sidebarbreedte en contentbreedte in sync', () => {

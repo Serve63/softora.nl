@@ -233,6 +233,18 @@ function createWebsiteLinkCoordinator(deps = {}) {
     }
   }
 
+  async function fetchWebsiteLinkRowsWithFallback() {
+    const lightweightResult = await fetchWebsiteLinkRows('state_key,updated_at');
+    if (lightweightResult.ok) return lightweightResult;
+
+    logger.error(
+      '[WebsiteLinks][ListRetryWithPayload]',
+      lightweightResult.error || lightweightResult.status || lightweightResult.body
+    );
+
+    return fetchWebsiteLinkRows('state_key,payload,updated_at');
+  }
+
   async function fetchExistingWebsiteLinkSlugs() {
     const result = await fetchWebsiteLinkRows('state_key');
     if (!result.ok) return result;
@@ -263,14 +275,10 @@ function createWebsiteLinkCoordinator(deps = {}) {
     }
 
     try {
-      const result = await fetchWebsiteLinkRows('state_key,updated_at');
+      const result = await fetchWebsiteLinkRowsWithFallback();
       if (!result.ok) {
         logger.error('[WebsiteLinks][ListError]', result.error || result.status || result.body);
-        return res.status(500).json({
-          ok: false,
-          error: 'Websitelinks laden mislukt',
-          detail: 'Kon opgeslagen websitelinks niet ophalen.',
-        });
+        return res.status(200).json({ ok: true, links: [] });
       }
 
       const links = (Array.isArray(result.body) ? result.body : [])

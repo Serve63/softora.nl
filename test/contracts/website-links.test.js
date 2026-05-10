@@ -296,3 +296,61 @@ test('website link coordinator lists links from lightweight state keys without l
     'https://www.softora.nl/voorbeelddesign2',
   ]);
 });
+
+test('website link coordinator retries the list with payload columns when the lightweight fetch fails', async () => {
+  const selectCalls = [];
+  const { coordinator } = createFixture({
+    fetchSupabaseRowsByStateKeyPrefixViaRest: async (_prefix, _limit, selectColumns) => {
+      selectCalls.push(selectColumns);
+      if (selectColumns === 'state_key,updated_at') {
+        return { ok: false, status: 400, error: 'column payload missing from lightweight select' };
+      }
+      return {
+        ok: true,
+        body: [
+          {
+            state_key: 'core:website_link:voorbeelddesign3',
+            payload: {
+              slug: 'voorbeelddesign3',
+              title: 'Voorbeelddesign 3',
+            },
+            updated_at: '2026-05-01T12:00:00.000Z',
+          },
+        ],
+      };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.listWebsiteLinksResponse({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(selectCalls, ['state_key,updated_at', 'state_key,payload,updated_at']);
+  assert.equal(res.body.ok, true);
+  assert.deepEqual(res.body.links, [
+    {
+      slug: 'voorbeelddesign3',
+      title: 'Voorbeelddesign 3',
+      url: 'https://www.softora.nl/voorbeelddesign3',
+      createdAt: '2026-05-01T12:00:00.000Z',
+      updatedAt: '2026-05-01T12:00:00.000Z',
+    },
+  ]);
+});
+
+test('website link coordinator falls back to an empty list when link storage cannot be read', async () => {
+  const { coordinator } = createFixture({
+    fetchSupabaseRowsByStateKeyPrefixViaRest: async () => ({
+      ok: false,
+      status: 500,
+      error: 'storage unavailable',
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.listWebsiteLinksResponse({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.deepEqual(res.body.links, []);
+});

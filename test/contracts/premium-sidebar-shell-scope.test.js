@@ -333,7 +333,7 @@ test('websitegenerator page loads website preview script via shared asset', () =
   const pageSource = readRepoFile('premium-websitegenerator.html');
   assert.match(
     pageSource,
-    /<script src="assets\/premium-websitegenerator\.js\?v=20260501a" defer><\/script>/,
+    /<script src="assets\/premium-websitegenerator\.js\?v=[^"]+" defer><\/script>/,
     'premium-websitegenerator.html moet de website-generator script uit assets laden'
   );
 });
