@@ -335,6 +335,21 @@ test('websitegenerator page loads website preview script via shared asset', () =
   );
 });
 
+test('websitegenerator layout gebruikt dezelfde sidebarbreedte als de premium shell', () => {
+  const pageSource = readRepoFile('premium-websitegenerator.html');
+
+  assert.match(
+    pageSource,
+    /\.sidebar\s*\{[\s\S]*width:\s*var\(--premium-sidebar-width,\s*320px\);/s,
+    'premium-websitegenerator.html hoort de gedeelde premium sidebarbreedte te gebruiken'
+  );
+  assert.match(
+    pageSource,
+    /\.main-content\s*\{[\s\S]*margin-left:\s*var\(--premium-sidebar-width,\s*320px\);[\s\S]*width:\s*calc\(100% - var\(--premium-sidebar-width,\s*320px\)\);/s,
+    'premium-websitegenerator.html hoort de contentbreedte af te stemmen op de gedeelde sidebarbreedte'
+  );
+});
+
 test('static premium sidebars share the same section order and public labels', () => {
   const expectedSections = [
     {

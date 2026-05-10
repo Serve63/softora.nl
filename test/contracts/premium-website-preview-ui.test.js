@@ -72,6 +72,17 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.match(websiteGeneratorSource, /\/api\/website-links\/create/);
 });
 
+test('premium websitegenerator houdt sidebarbreedte en contentbreedte in sync', () => {
+  const source = websiteGeneratorHtmlSource;
+
+  assert.match(source, /\.sidebar\s*\{[\s\S]*width:\s*var\(--premium-sidebar-width,\s*320px\);/);
+  assert.match(
+    source,
+    /\.main-content\s*\{[\s\S]*margin-left:\s*var\(--premium-sidebar-width,\s*320px\);[\s\S]*width:\s*calc\(100% - var\(--premium-sidebar-width,\s*320px\)\);/s
+  );
+  assert.doesNotMatch(source, /\.main-content\s*\{[\s\S]*width:\s*calc\(100% - 280px\);/s);
+});
+
 test('premium websitegenerator shows no recent scans section anymore', () => {
   const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
   const source = fs.readFileSync(filePath, 'utf8');
