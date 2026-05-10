@@ -124,7 +124,7 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /Zakelijk/);
   assert.match(pageSource, /\.manual-appointment-choice:focus \{[\s\S]*outline: none;/);
   assert.match(pageSource, /\.manual-appointment-choice:focus-visible,[\s\S]*\.manual-appointment-choice\.is-active \{[\s\S]*border-color: var\(--accent\);/);
-  assert.match(pageSource, /manualAppointmentKind = 'business';/);
+  assert.match(pageSource, /manualAppointmentKind = '';/);
   assert.match(pageSource, /manualAppointmentBusinessType = '';/);
   assert.doesNotMatch(pageSource, /id="manualAppointmentCancelBtn"/);
   assert.match(pageSource, /class="modal manual-appointment-modal"[^>]*data-manual-step="kind"/);
