@@ -8,29 +8,41 @@ function readActiveOrdersSources() {
   const bootScriptPath = path.join(__dirname, '../../assets/premium-active-orders-boot.js');
   const assigneeScriptPath = path.join(__dirname, '../../assets/premium-active-orders-assignee.js');
   const assigneeStylePath = path.join(__dirname, '../../assets/premium-active-orders-assignee.css');
+  const assignmentFilterScriptPath = path.join(__dirname, '../../assets/premium-personal-assignment-filter.js');
+  const assignmentFilterStylePath = path.join(__dirname, '../../assets/premium-personal-assignment-filter.css');
+  const assignmentPagesScriptPath = path.join(__dirname, '../../assets/premium-personal-assignment-pages.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
   const leadsTabScriptPath = path.join(__dirname, '../../assets/premium-active-orders-leads-tab.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const bootScriptSource = fs.readFileSync(bootScriptPath, 'utf8');
   const assigneeScriptSource = fs.readFileSync(assigneeScriptPath, 'utf8');
   const assigneeStyleSource = fs.readFileSync(assigneeStylePath, 'utf8');
+  const assignmentFilterScriptSource = fs.readFileSync(assignmentFilterScriptPath, 'utf8');
+  const assignmentFilterStyleSource = fs.readFileSync(assignmentFilterStylePath, 'utf8');
+  const assignmentPagesScriptSource = fs.readFileSync(assignmentPagesScriptPath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
   const leadsTabScriptSource = fs.readFileSync(leadsTabScriptPath, 'utf8');
   return {
     assigneeScriptSource,
     assigneeStyleSource,
+    assignmentFilterScriptSource,
+    assignmentFilterStyleSource,
+    assignmentPagesScriptSource,
     bootScriptSource,
     leadsTabScriptSource,
     pageSource,
     scriptSource,
-    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${scriptSource}\n${leadsTabScriptSource}`,
+    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${assignmentFilterStyleSource}\n${assignmentFilterScriptSource}\n${scriptSource}\n${leadsTabScriptSource}\n${assignmentPagesScriptSource}`,
   };
 }
 
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const { pageSource, scriptSource, leadsTabScriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260505b"><\/script><script src="assets\/premium-active-orders-leads-tab\.js\?v=20260510a"><\/script>/);
+  assert.match(pageSource, /assets\/premium-personal-assignment-filter\.css\?v=20260510a/);
+  assert.match(pageSource, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/);
+  assert.match(pageSource, /Enkel mijn toewijzingen bekijken/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260510c"><\/script><script src="assets\/premium-active-orders-leads-tab\.js\?v=20260510a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -167,6 +179,18 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(leadsTabScriptSource, /count\.id = TAB_COUNT_ID;/);
   assert.match(leadsTabScriptSource, /order:\s*0;/);
   assert.match(leadsTabScriptSource, /background:\s*var\(--green\);/);
+  assert.match(source, /const FILTER_STORAGE_PREFIX = 'softora_only_my_assignments_v1';/);
+  assert.match(source, /const FILTER_SCOPE = 'premium_assignment_filters';/);
+  assert.match(source, /function normalizeOwnerLabel\(value\) \{/);
+  assert.match(source, /\/api\/ui-state-get\?scope=\$\{encodedScope\}/);
+  assert.match(source, /JSON\.stringify\(nextPreferences\)/);
+  assert.doesNotMatch(source, /localStorage/);
+  assert.doesNotMatch(source, /sessionStorage/);
+  assert.match(source, /function syncActiveOrdersPage\(\) \{/);
+  assert.match(source, /function applyActiveOrdersSummary\(cards\) \{/);
+  assert.match(source, /function syncCreateOrderAgendaOptions\(\) \{/);
+  assert.match(source, /filterApi\.subscribe\(syncState\);/);
+  assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./);
   assert.match(source, /const refreshFn = window\.SoftoraPersonnelTheme\?\.refreshSidebarLeadsCount;/);
   assert.match(source, /leadFilterCountObserver = new MutationObserver\(\(\) => \{/);
   assert.match(source, /initLeadFilterCountMirror\(\);[\s\S]*refreshLeadFilterCount\(\);/);

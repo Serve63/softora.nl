@@ -167,18 +167,37 @@ test('page smoke: premium-ai-coldmailing.html promotes suppression after lead re
   );
 });
 
+test('page smoke: premium-ai-coldmailing.html can filter to only the current user assignments', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
+  const assignmentPagesScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-pages.js'), 'utf8');
+  const source = `${html}\n${assignmentPagesScript}`;
+  assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260510a/, 'Persoonlijke toewijzingsstijl ontbreekt op leads.');
+  assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op leads.');
+  assert.match(html, /id="onlyMyAssignmentsLeadsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Leads-toggle ontbreekt.');
+  assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260510a/, 'Leads pagina-asset voor persoonlijke toewijzingen ontbreekt.');
+  assert.match(source, /function syncLeadsPage\(\) \{/, 'Leads hoort persoonlijke toewijzingen te kunnen filteren.');
+  assert.match(source, /Nog geen leads aan jou toegewezen\./, 'Leads lege-state voor persoonlijke filter ontbreekt.');
+});
+
 test('page smoke: premium-actieve-opdrachten.html shows openstaande opdrachten as the primary tab label', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
   const script = fs.readFileSync(path.join(repoRoot, 'assets/premium-actieve-opdrachten.js'), 'utf8');
+  const assignmentFilterScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-filter.js'), 'utf8');
+  const assignmentPagesScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-pages.js'), 'utf8');
   const leadsTabScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-active-orders-leads-tab.js'), 'utf8');
-  const source = `${html}\n${script}\n${leadsTabScript}`;
+  const source = `${html}\n${assignmentFilterScript}\n${script}\n${leadsTabScript}\n${assignmentPagesScript}`;
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
+  assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260510a/, 'Persoonlijke toewijzingsstijl ontbreekt op opdrachten.');
+  assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
+  assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
   assert.match(html, /assets\/premium-active-orders-leads-tab\.js\?v=20260510a/, 'Losse leads-tab asset ontbreekt.');
+  assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260510a/, 'Opdrachten pagina-asset voor persoonlijke toewijzingen ontbreekt.');
   assert.match(source, /href = '\/premium-leads';/, 'Openstaande leads-link hoort naar de leads-pagina te wijzen.');
   assert.match(source, /const text = document\.createTextNode\('Openstaande leads'\);/, 'Leads-tablabel ontbreekt.');
   assert.match(source, /count\.id = TAB_COUNT_ID;/, 'Leads-teller ontbreekt.');
   assert.match(html, />Openstaande opdrachten<\/span>/, 'Primaire tab hoort Openstaande opdrachten te tonen.');
   assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
+  assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./, 'Persoonlijke lege-state voor opdrachten ontbreekt.');
   assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
   assert.match(source, /function syncLeadFilterCountFromSidebarBadge\(\) \{/, 'Leads-teller hoort mee te lopen met de sidebar badge.');
   assert.match(source, /function initLeadFilterCountMirror\(\) \{/, 'Leads-teller observer ontbreekt.');

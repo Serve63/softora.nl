@@ -7,10 +7,9 @@
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
         <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Softora | Leads Overzicht — Premium</title>
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260502a">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260502a"><link rel="stylesheet" href="assets/premium-personal-assignment-filter.css?v=20260510a">
     <script>
         (function () {
             document.documentElement.setAttribute('data-personnel-loading', 'true');
@@ -1043,6 +1042,7 @@
                     <p>Overzicht van leadnamen uit coldcalling</p>
                 </div>
                 <div class="topbar-actions">
+                    <label class="personal-assignment-toggle" for="onlyMyAssignmentsLeadsToggle"><input id="onlyMyAssignmentsLeadsToggle" data-only-my-assignments-toggle type="checkbox"><span class="personal-assignment-toggle-copy"><span class="personal-assignment-toggle-title">Enkel mijn toewijzingen bekijken</span></span></label>
                     <div class="lead-type-legend" role="note" aria-label="Legenda voor randkleur leadtypes">
                         <span class="legend-item website"><span class="legend-swatch" aria-hidden="true"></span>Website</span>
                         <span class="legend-item business"><span class="legend-swatch" aria-hidden="true"></span>Bedrijfssoftware</span>
@@ -1134,7 +1134,7 @@
         </div>
     </div>
 
-    <!-- SOFTORA_LEADS_BOOTSTRAP -->
+    <script src="assets/premium-personal-assignment-filter.js?v=20260510a"></script><!-- SOFTORA_LEADS_BOOTSTRAP -->
     <script>
         (function initLeadsOverview() {
             function readLeadsBootstrapPayload() {
@@ -4242,6 +4242,5 @@
 
             paintLocalLeadsBadge(Array.isArray(allLeads) ? allLeads.length : 0);
         })();
-    </script>
-</body>
+    </script><script src="assets/premium-personal-assignment-pages.js?v=20260510a"></script></body>
 </html>
