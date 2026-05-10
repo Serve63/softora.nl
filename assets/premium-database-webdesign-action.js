@@ -8,6 +8,7 @@
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
     const MOCKUP_ICON = "<svg class=\"photo-mockup-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 6.5h10.5v7H4zM3 16h13M17 8h3.5v8H17zM18.75 18h.01\"/></svg>";
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
+    const PHOTO_READY_SELECTOR = ".photo-drop[data-has-photo=\"true\"], .photo-drop--mockup[data-has-photo=\"true\"]";
 
     function normalizeString(value) {
         return String(value || "").trim();
@@ -21,7 +22,7 @@
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
         const style = global.document.createElement("style");
         style.id = STYLE_ID;
-        style.textContent = ".photo-cell{display:inline-flex;align-items:center;justify-content:center;gap:4px}.photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating,.photo-drop.is-restoring{cursor:wait}.photo-drop--mockup{border-style:solid;background:rgba(20,24,45,.04)}.photo-generate-icon,.photo-mockup-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon,.photo-drop:hover .photo-mockup-icon,.photo-drop:focus-visible .photo-mockup-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
+        style.textContent = ".photo-cell{display:inline-flex;align-items:center;justify-content:center;gap:4px}.photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating,.photo-drop.is-restoring,.photo-drop[data-has-photo=\"true\"][data-photo-loaded=\"false\"]{cursor:wait}.photo-drop--mockup{border-style:solid;background:rgba(20,24,45,.04)}.photo-drop-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.84);opacity:1;pointer-events:none;transition:opacity .16s ease;z-index:1}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-loader{opacity:0}.photo-drop-image{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-image{opacity:1}.photo-generate-icon,.photo-mockup-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon,.photo-drop:hover .photo-mockup-icon,.photo-drop:focus-visible .photo-mockup-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
         global.document.head.appendChild(style);
     }
 
@@ -43,7 +44,62 @@
         const pendingIds = new Set();
         const pendingJobs = new Map();
         const pollTimers = new Map();
+        let photoHydrationQueued = false;
         ensureStyles();
+
+        function runNextFrame(callback) {
+            const frame = typeof global.requestAnimationFrame === "function"
+                ? global.requestAnimationFrame
+                : function (next) { global.setTimeout(next, 0); };
+            frame(callback);
+        }
+
+        function markPhotoDropReady(drop) {
+            if (!drop || typeof drop.setAttribute !== "function") return;
+            drop.setAttribute("data-photo-loaded", "true");
+            drop.removeAttribute("data-photo-loading-bound");
+        }
+
+        function bindPhotoDropLoading(drop) {
+            if (!drop || typeof drop.querySelector !== "function") return;
+            const image = drop.querySelector(".photo-drop-image");
+            if (!image) {
+                markPhotoDropReady(drop);
+                return;
+            }
+            if (drop.getAttribute("data-photo-loaded") === "true") return;
+            const finish = function () { markPhotoDropReady(drop); };
+            const onLoad = function () {
+                if (typeof image.decode === "function") {
+                    image.decode().catch(function () {}).finally(finish);
+                    return;
+                }
+                finish();
+            };
+            if (image.complete && Number(image.naturalWidth) > 0) {
+                onLoad();
+                return;
+            }
+            if (drop.getAttribute("data-photo-loading-bound") === "true") return;
+            drop.setAttribute("data-photo-loading-bound", "true");
+            image.addEventListener("load", onLoad, { once: true });
+            image.addEventListener("error", finish, { once: true });
+        }
+
+        function hydratePhotoDrops(root) {
+            const scope = root && typeof root.querySelectorAll === "function" ? root : (global.document || null);
+            if (!scope || typeof scope.querySelectorAll !== "function") return;
+            Array.from(scope.querySelectorAll(PHOTO_READY_SELECTOR)).forEach(bindPhotoDropLoading);
+        }
+
+        function schedulePhotoDropHydration() {
+            if (photoHydrationQueued || !global.document) return;
+            photoHydrationQueued = true;
+            runNextFrame(function () {
+                photoHydrationQueued = false;
+                hydratePhotoDrops(global.document);
+            });
+        }
 
         function getCustomerById(customerId) {
             return (state.klanten || []).find(function (item) {
@@ -290,7 +346,7 @@
             const isRestoring = !hasPhoto && !isPending && Boolean(isRestoringPhotos(customer));
             const isLoading = isPending || isRestoring;
             const canGenerate = !hasPhoto && !isLoading && Boolean(resolveCustomerWebsiteUrl(customer));
-            const inner = hasPhoto ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"eager\" decoding=\"sync\">" : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
+            const inner = hasPhoto ? "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"eager\" decoding=\"sync\">" : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
             const remove = hasPhoto ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>" : "";
             const ariaLabel = hasPhoto ? "Websitefoto bekijken" : (isLoading ? (isPending ? "Webdesign wordt gemaakt" : "Websitefoto's worden hersteld") : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden"));
             const title = ariaLabel;
@@ -299,11 +355,12 @@
             const hasMockup = isValidWebsitePhotoDataUrl(mockup);
             const canUseMockup = hasPhoto || hasMockup;
             const mockupLoading = hasPhoto && !hasMockup && isMockupPending(customer.id);
-            const mockupInner = hasMockup ? "<img src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" decoding=\"sync\">" : (mockupLoading ? LOADING_ICON : MOCKUP_ICON);
+            const mockupInner = hasMockup ? "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" decoding=\"sync\">" : (mockupLoading ? LOADING_ICON : MOCKUP_ICON);
             const mockupAriaLabel = hasMockup ? "Device mockup bekijken" : (mockupLoading ? "Device mockup wordt gemaakt" : (canUseMockup ? "Device mockup maken" : "Device mockup nog niet beschikbaar"));
             const mockupTitle = hasMockup ? mockupLabel : (canUseMockup ? "Device mockup maken" : "Maak eerst een webdesign");
-            const mockupSlot = "<div class=\"photo-drop photo-drop--mockup" + (mockupLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-mockup-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasMockup ? "true" : "false") + "\" data-can-generate=\"" + (canUseMockup ? "true" : "false") + "\" data-mockup-disabled=\"" + (canUseMockup ? "false" : "true") + "\" aria-label=\"" + escapeHtml(mockupAriaLabel) + "\" title=\"" + escapeHtml(mockupTitle) + "\">" + mockupInner + "</div>";
-            return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + "</div>";
+            const mockupSlot = "<div class=\"photo-drop photo-drop--mockup" + (mockupLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-mockup-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasMockup ? "true" : "false") + "\" data-photo-loaded=\"" + (hasMockup ? "false" : "true") + "\" data-can-generate=\"" + (canUseMockup ? "true" : "false") + "\" data-mockup-disabled=\"" + (canUseMockup ? "false" : "true") + "\" aria-label=\"" + escapeHtml(mockupAriaLabel) + "\" title=\"" + escapeHtml(mockupTitle) + "\">" + mockupInner + "</div>";
+            if (hasPhoto || hasMockup) schedulePhotoDropHydration();
+            return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-photo-loaded=\"" + (hasPhoto ? "false" : "true") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + "</div>";
         }
 
         async function generateForCustomer(customerId) {
@@ -362,6 +419,7 @@
 
         return {
             generateForCustomer: generateForCustomer,
+            hydratePhotoDrops: hydratePhotoDrops,
             preloadPhotoImages: preloadPhotoImages,
             render: render,
             resumePendingJobs: resumePendingJobs
