@@ -38,6 +38,27 @@ function loadDatabasePhotoStorageClient() {
   return sandbox.window.SoftoraDatabasePhotoStorage;
 }
 
+function loadDatabaseWebdesignActionClient(options = {}) {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const document = options.document || {
+    getElementById: () => null,
+    createElement: () => ({ id: '', textContent: '' }),
+    head: { appendChild() {} },
+  };
+  const windowObject = {
+    document,
+    setTimeout,
+    clearTimeout,
+    requestAnimationFrame: options.requestAnimationFrame || ((callback) => callback()),
+    fetch: options.fetch || (async () => ({ ok: true, json: async () => ({ jobs: [] }) })),
+    Image: options.Image || function Image() {},
+  };
+  const sandbox = { window: windowObject };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseWebdesignAction;
+}
+
 function loadDatabaseDistanceClient() {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-distance.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
@@ -245,7 +266,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-drop/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-generate-icon\\"/);
-  assert.match(webdesignActionScriptSource, /photo-drop\.is-generating,\.photo-drop\.is-restoring\{cursor:wait\}/);
+  assert.match(webdesignActionScriptSource, /photo-drop\.is-generating,\.photo-drop\.is-restoring,\.photo-drop\[data-has-photo=\\"true\\"\]\[data-photo-loaded=\\"false\\"\]\{cursor:wait\}/);
   assert.doesNotMatch(webdesignActionScriptSource, /photo-drop\.is-generating,\.photo-drop\.is-restoring\{cursor:wait;width:58px;height:58px\}/);
   assert.match(webdesignActionScriptSource, /photo-generate-spinner\{width:18px;height:18px/);
   assert.doesNotMatch(webdesignActionScriptSource, /class=\\"photo-generate-cost\\"/);
@@ -275,8 +296,13 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /data-can-generate=\\"/);
   assert.match(webdesignActionScriptSource, /const LIGHTNING_ICON = "<svg class=\\"photo-generate-icon\\"/);
   assert.match(webdesignActionScriptSource, /const LOADING_ICON = "<span class=\\"photo-generate-spinner\\"/);
+  assert.match(webdesignActionScriptSource, /const PHOTO_READY_SELECTOR = ".photo-drop\[data-has-photo=\\"true\\"\], .photo-drop--mockup\[data-has-photo=\\"true\\"\]";/);
   assert.match(webdesignActionScriptSource, /const pendingIds = new Set\(\);/);
   assert.match(webdesignActionScriptSource, /const pollTimers = new Map\(\);/);
+  assert.match(webdesignActionScriptSource, /photo-drop-loader\{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;/);
+  assert.match(webdesignActionScriptSource, /photo-drop-image\{width:100%;height:100%;object-fit:cover;display:block;opacity:0;/);
+  assert.match(webdesignActionScriptSource, /function hydratePhotoDrops\(root\)/);
+  assert.match(webdesignActionScriptSource, /if \(hasPhoto \|\| hasMockup\) schedulePhotoDropHydration\(\);/);
   assert.match(webdesignActionScriptSource, /const isRestoringPhotos = typeof options\.isRestoringPhotos === "function"/);
   assert.match(webdesignActionScriptSource, /state && state\.photoRestorePending/);
   assert.match(webdesignActionScriptSource, /const isRestoring = !hasPhoto && !isPending && Boolean\(isRestoringPhotos\(customer\)\);/);
@@ -345,7 +371,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260509a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260510a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505c/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260505a/);
@@ -666,6 +692,34 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /label: "Status hersteld"/);
   assert.doesNotMatch(pageSource, /function isKnownBadOrderFallbackCustomer\(customer\)/);
   assert.doesNotMatch(pageSource, /Vaste klanten hersteld, statussen bijgewerkt en verkeerde rijen verwijderd\./);
+});
+
+test('premium database webdesign action keeps photo slots hidden behind a loader until the image is ready', () => {
+  const webdesignActionClient = loadDatabaseWebdesignActionClient();
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [] },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => '',
+    isWebdesignPhotoEligible: () => false,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+
+  const html = controller.render({
+    id: 'customer-1',
+    websitePhoto: 'data:image/png;base64,AAA',
+    websitePhotoName: 'Websitefoto',
+    websiteMockup: '',
+    websiteMockupName: '',
+  });
+
+  assert.match(html, /data-photo-loaded="false"/);
+  assert.match(html, /class="photo-drop-loader"/);
+  assert.match(html, /class="photo-drop-image"/);
 });
 
 test('premium database page exposes interesse as a lead-status step', () => {
