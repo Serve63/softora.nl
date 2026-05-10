@@ -113,7 +113,8 @@ test('premium agenda gebruikt delegated acties voor agenda chrome en afspraken',
 test('premium agenda offers stepped manual add flow on day click', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const manualFlowPath = path.join(__dirname, '../../assets/premium-agenda-manual-business-flow.js');
-  const pageSource = `${fs.readFileSync(pagePath, 'utf8')}\n${fs.readFileSync(manualFlowPath, 'utf8')}`;
+  const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
+  const pageSource = `${fs.readFileSync(pagePath, 'utf8')}\n${fs.readFileSync(manualFlowPath, 'utf8')}\n${fs.readFileSync(stabilityPath, 'utf8')}`;
 
   assert.match(pageSource, /id="manualAppointmentOverlay"/);
   assert.match(pageSource, /assets\/premium-agenda-manual-business-flow\.js/);
@@ -204,10 +205,14 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /Activiteit Martijn/);
   assert.match(pageSource, /legend-dot manual-both/);
   assert.match(pageSource, /Activiteit allebei/);
-  assert.match(pageSource, /legend-dot manual-overig/);
-  assert.match(pageSource, /Privé/);
-  assert.match(pageSource, /\.legend-dot\.manual-overig \{ background: #ec4899; \}/);
-  assert.match(pageSource, /\.appointment\.manual-overig \{[\s\S]*border-left: 3px solid #ec4899;/);
+  assert.match(pageSource, /legend-dot private-serve/);
+  assert.match(pageSource, /Privé Servé/);
+  assert.match(pageSource, /legend-dot private-martijn/);
+  assert.match(pageSource, /Privé Martijn/);
+  assert.match(pageSource, /\.legend-dot\.private-serve\{background:#111827\}/);
+  assert.match(pageSource, /\.legend-dot\.private-martijn\{background:#f43f5e\}/);
+  assert.match(pageSource, /\.appointment\.private-serve\{[\s\S]*border-left:3px solid #111827/);
+  assert.match(pageSource, /\.appointment\.private-martijn\{[\s\S]*border-left:3px solid #f43f5e/);
   assert.match(pageSource, /activityTime: timeVal/);
   assert.match(pageSource, /function getManualAppointmentPhoneValue\(\)/);
   assert.match(pageSource, /manualPhone: String\(item\.manualPhone \|\| item\.phone \|\| ''\),/);
@@ -226,8 +231,33 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /manualLegendChoice: String\(item\.manualLegendChoice \|\| item\.legendChoice \|\| ''\),/);
   assert.match(pageSource, /appointmentKind: String\(item\.appointmentKind \|\| item\.manualAppointmentKind \|\| ''\),/);
   assert.match(pageSource, /if \(manualLegendChoice === 'business'\) return 'appointment meeting magnetic meeting--business';/);
-  assert.match(pageSource, /if \(who === 'overig'\) return 'appointment manual-overig magnetic';/);
+  assert.match(pageSource, /if \(manualWho === 'martijn'\) return 'appointment private-martijn magnetic';/);
+  assert.match(pageSource, /if \(manualWho === 'serve' \|\| manualWho === 'servé'\) return 'appointment private-serve magnetic';/);
   assert.match(pageSource, /if \(who === 'both' \|\| who === 'allebei' \|\| who === 'beide'\) return 'appointment manual-both magnetic';/);
+});
+
+test('premium agenda kan handmatige afspraakgegevens wijzigen vanuit de detailmodal', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
+
+  assert.match(pageSource, /assets\/premium-agenda-stability\.js\?v=20260510a/);
+  assert.match(stabilitySource, /button\.id = 'modalEditAppointmentBtn';/);
+  assert.match(stabilitySource, /form\.id = 'appointmentEditForm';/);
+  assert.match(stabilitySource, /id="appointmentEditLegend"/);
+  assert.match(stabilitySource, /id="appointmentEditTitle"/);
+  assert.match(stabilitySource, /id="appointmentEditDate"/);
+  assert.match(stabilitySource, /id="appointmentEditTime"/);
+  assert.match(stabilitySource, /id="appointmentEditPhone"/);
+  assert.match(stabilitySource, /id="appointmentEditLocation"/);
+  assert.match(stabilitySource, /id="appointmentEditNotes"/);
+  assert.match(stabilitySource, /async function saveEdit\(\)/);
+  assert.match(stabilitySource, /\/api\/agenda\/appointments\/\$\{encodeURIComponent\(String\(apt\.id\)\)\}\/manual/);
+  assert.match(stabilitySource, /await loadServerAppointments\(\{ fresh: true, timeoutMs: 8000 \}\);/);
+  assert.match(stabilitySource, /refreshWorkspacePrimaryButtonLabel = function refreshWorkspacePrimaryButtonLabelWithEdit\(\)/);
+  assert.match(stabilitySource, /function rememberButtonState\(\)/);
+  assert.match(stabilitySource, /function restoreButtonState\(\)/);
 });
 
 test('premium agenda handmatige afspraak-modal slaat optionele telefoon, locatie en opmerkingen op', () => {
@@ -318,7 +348,7 @@ test('premium agenda verbergt dealacties voor handmatige overige afspraken en be
   assert.match(stabilitySource, /function canCompleteAppointmentManually\(apt\)/);
   assert.match(stabilitySource, /if \(kind === 'meeting'\) return false;/);
   assert.match(stabilitySource, /apt\.summary/);
-  assert.match(stabilitySource, /choice === 'manual-overig' \|\| choice === 'manual-serve' \|\| choice === 'manual-martijn' \|\| choice === 'manual-both'/);
+  assert.match(stabilitySource, /choice === 'manual-overig' \|\| choice === 'private-serve' \|\| choice === 'private-martijn'/);
   assert.match(stabilitySource, /modalBadge\.textContent = 'Privé-afspraak';/);
   assert.match(stabilitySource, /modalPrimaryBtn\.hidden = true;/);
   assert.match(stabilitySource, /modalNoDealBtn\.hidden = true;/);
@@ -336,6 +366,8 @@ test('premium agenda verbergt dealacties voor handmatige overige afspraken en be
   );
   assert.match(stabilitySource, /const baseMarkActiveAppointmentNoDeal = markActiveAppointmentNoDeal;/);
   assert.match(stabilitySource, /return baseIsAppointmentCompleted\(apt\) \|\| status === 'completed' \|\| status === 'afgerond';/);
+  assert.match(stabilitySource, /if \(choice === 'private-serve' && !isAppointmentCompleted\(apt\)\) return 'appointment private-serve magnetic';/);
+  assert.match(stabilitySource, /if \(choice === 'private-martijn' && !isAppointmentCompleted\(apt\)\) return 'appointment private-martijn magnetic';/);
   assert.doesNotMatch(stabilitySource, /status === 'afgerond' \|\| hasAppointmentStartPassed\(apt\)/);
   assert.match(stabilitySource, /function setModalAudioBlockHidden\(hidden\)/);
   assert.match(stabilitySource, /syncManualAppointmentModalDetails\(apt\);/);

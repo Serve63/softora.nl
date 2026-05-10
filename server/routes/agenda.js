@@ -21,6 +21,20 @@ function registerAgendaMutationRoutes(app, deps) {
   );
 
   app.post(
+    '/api/agenda/appointments/:id/manual',
+    withValidation(validateManualAgendaAppointmentRequest, (req, res) =>
+      deps.updateManualAgendaAppointmentResponse(req, res, req.params.id)
+    )
+  );
+
+  app.post(
+    '/api/agenda/appointment-manual',
+    withValidation(validateManualAgendaAppointmentRequest, (req, res) =>
+      deps.updateManualAgendaAppointmentResponse(req, res, req.query.appointmentId)
+    )
+  );
+
+  app.post(
     '/api/agenda/appointments/:id/post-call',
     withValidation(validatePostCallRequest, (req, res) =>
       deps.updateAgendaAppointmentPostCallDataById(req, res, req.params.id)

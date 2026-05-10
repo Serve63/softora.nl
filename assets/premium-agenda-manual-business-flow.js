@@ -24,7 +24,11 @@ function getManualAppointmentLegendChoice() {
         if (manualAppointmentWho === 'both') return 'manual-both';
         return 'manual-serve';
     }
-    if (manualAppointmentKind === 'overig') return 'manual-overig';
+    if (manualAppointmentKind === 'overig') {
+        if (manualAppointmentWho === 'martijn') return 'private-martijn';
+        if (manualAppointmentWho === 'both') return 'manual-both';
+        return 'private-serve';
+    }
     return '';
 }
 

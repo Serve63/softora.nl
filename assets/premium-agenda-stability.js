@@ -48,7 +48,8 @@ function isManualOtherAppointment(apt) {
     if (!apt || typeof apt !== 'object') return false;
     if (!isManualAgendaAppointment(apt)) return false;
     const choice = normalizeManualLegendChoice(apt.manualLegendChoice || apt.legendChoice || '');
-    if (choice === 'manual-overig' || choice === 'manual-serve' || choice === 'manual-martijn' || choice === 'manual-both') return true;
+    if (choice === 'manual-overig' || choice === 'private-serve' || choice === 'private-martijn') return true;
+    if (choice === 'manual-serve' || choice === 'manual-martijn' || choice === 'manual-both') return true;
     if (choice) return false;
     const kindText = [apt.manualKind, apt.kind, apt.type, apt.appointmentKind, apt.source, apt.summary]
         .map((value) => String(value || '').trim().toLowerCase())
@@ -446,7 +447,13 @@ isAppointmentCompleted = function isAppointmentCompletedStable(apt) {
 const baseGetCalendarAppointmentClass = getCalendarAppointmentClass;
 getCalendarAppointmentClass = function getCalendarAppointmentClassStable(apt) {
     const choice = normalizeManualLegendChoice((apt && (apt.manualLegendChoice || apt.legendChoice)) || '');
-    if (choice === 'manual-overig' && !isAppointmentCompleted(apt)) return 'appointment manual-overig magnetic';
+    if (choice === 'private-serve' && !isAppointmentCompleted(apt)) return 'appointment private-serve magnetic';
+    if (choice === 'private-martijn' && !isAppointmentCompleted(apt)) return 'appointment private-martijn magnetic';
+    if (choice === 'manual-overig' && !isAppointmentCompleted(apt)) {
+        const who = String((apt && (apt.manualPlannerWho || apt.manualWho)) || '').trim().toLowerCase();
+        if (who === 'martijn') return 'appointment private-martijn magnetic';
+        return 'appointment private-serve magnetic';
+    }
     return baseGetCalendarAppointmentClass(apt);
 };
 
@@ -481,6 +488,276 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
     if (isManualOtherAppointment(getActiveAppointment())) return undefined;
     return baseMarkActiveAppointmentNoDeal();
 };
+
+(function setupAgendaAppointmentEditDetails() {
+    let editMode = false;
+    let editSaving = false;
+    let editPreviousButtonState = null;
+
+    function ensureEditStyles() {
+        if (document.getElementById('agendaAppointmentEditStyles')) return;
+        const style = document.createElement('style');
+        style.id = 'agendaAppointmentEditStyles';
+        style.textContent = `
+            .appointment.private-serve{background:rgba(17,24,39,.16);color:#111827;border-left:3px solid #111827}
+            .appointment.private-martijn{background:rgba(244,63,94,.18);color:#9f1239;border-left:3px solid #f43f5e}
+            .legend-dot.private-serve{background:#111827}.legend-dot.private-martijn{background:#f43f5e}
+            .appointment-edit-form{margin-top:1rem;display:grid;gap:.85rem}.appointment-edit-form[hidden]{display:none!important}
+            .modal-overview.appointment-editing .modal-details,.modal-overview.appointment-editing>.modal-summary-label,.modal-overview.appointment-editing>.modal-summary,.modal-overview.appointment-editing>.modal-audio-block{display:none!important}
+            .appointment-edit-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}@media(max-width:640px){.appointment-edit-row{grid-template-columns:1fr}}
+        `;
+        document.head.appendChild(style);
+    }
+
+    function createField(label, inputHtml) {
+        const wrap = document.createElement('div');
+        wrap.className = 'modal-workspace-field';
+        wrap.innerHTML = `<div class="modal-workspace-label">${label}</div>${inputHtml}`;
+        return wrap;
+    }
+
+    function ensureEditUi() {
+        ensureEditStyles();
+        const overview = document.getElementById('modalOverview');
+        const summary = document.getElementById('modalSummary');
+        const footer = modalPrimaryBtn ? modalPrimaryBtn.closest('.modal-footer') : null;
+        if (footer && !document.getElementById('modalEditAppointmentBtn')) {
+            const button = document.createElement('button');
+            button.className = 'modal-btn secondary magnetic';
+            button.id = 'modalEditAppointmentBtn';
+            button.type = 'button';
+            button.hidden = true;
+            button.textContent = 'Gegevens wijzigen';
+            footer.insertBefore(button, modalPrimaryBtn);
+        }
+        if (!overview || !summary || document.getElementById('appointmentEditForm')) return;
+
+        const form = document.createElement('div');
+        form.className = 'appointment-edit-form';
+        form.id = 'appointmentEditForm';
+        form.hidden = true;
+        form.innerHTML = '<div class="modal-summary-label">Gegevens wijzigen</div><div class="modal-workspace-grid" id="appointmentEditGrid"></div><div class="modal-workspace-status" id="appointmentEditStatus"></div><div class="modal-footer" style="padding:0;border-top:0;background:transparent;"><button class="modal-btn secondary magnetic" id="appointmentEditCancelBtn" type="button">Annuleren</button><button class="modal-btn primary magnetic" id="appointmentEditSaveBtn" type="button">Opslaan</button></div>';
+        summary.insertAdjacentElement('afterend', form);
+
+        const grid = document.getElementById('appointmentEditGrid');
+        const topRow = document.createElement('div');
+        topRow.className = 'appointment-edit-row';
+        topRow.appendChild(createField('Legenda', '<select class="modal-workspace-input" id="appointmentEditLegend"><option value="website">Website Meeting</option><option value="business">Bedrijfssoftware Meeting</option><option value="voice">Voicesoftware Meeting</option><option value="chatbot">Chatbot Meeting</option><option value="manual-serve">Activiteit Servé</option><option value="manual-martijn">Activiteit Martijn</option><option value="manual-both">Activiteit allebei</option><option value="private-serve">Privé Servé</option><option value="private-martijn">Privé Martijn</option></select>'));
+        const owner = createField('Lead geregeld door', '<select class="modal-workspace-input" id="appointmentEditLeadOwner"><option value="">Kies eigenaar</option><option value="serve">Servé</option><option value="martijn">Martijn</option></select>');
+        owner.id = 'appointmentEditLeadOwnerField';
+        owner.hidden = true;
+        topRow.appendChild(owner);
+        grid.appendChild(topRow);
+        grid.appendChild(createField('Titel', '<input type="text" class="modal-workspace-input" id="appointmentEditTitle" maxlength="500" autocomplete="off">'));
+        const dateRow = document.createElement('div');
+        dateRow.className = 'appointment-edit-row';
+        dateRow.appendChild(createField('Datum', '<input type="date" class="modal-workspace-input" id="appointmentEditDate" autocomplete="off">'));
+        dateRow.appendChild(createField('Tijdstip', '<input type="time" class="modal-workspace-input" id="appointmentEditTime" step="300" autocomplete="off">'));
+        grid.appendChild(dateRow);
+        grid.appendChild(createField('Telefoonnummer (optioneel)', '<input type="tel" class="modal-workspace-input" id="appointmentEditPhone" maxlength="80" inputmode="tel" autocomplete="tel">'));
+        grid.appendChild(createField('Locatie', '<input type="text" class="modal-workspace-input" id="appointmentEditLocation" maxlength="240" autocomplete="off">'));
+        grid.appendChild(createField('Opmerkingen', '<textarea class="modal-workspace-input" id="appointmentEditNotes" maxlength="1000" autocomplete="off"></textarea>'));
+    }
+
+    function byId(id) {
+        return document.getElementById(id);
+    }
+
+    function isMeetingLegend(value) {
+        return ['website', 'business', 'voice', 'chatbot'].includes(String(value || '').trim());
+    }
+
+    function inferEditableLegend(apt) {
+        const choice = normalizeManualLegendChoice((apt && (apt.manualLegendChoice || apt.legendChoice)) || '');
+        if (choice === 'manual-overig') {
+            return String((apt && (apt.manualPlannerWho || apt.manualWho)) || '').toLowerCase() === 'martijn' ? 'private-martijn' : 'private-serve';
+        }
+        return choice || 'manual-serve';
+    }
+
+    function extractManualNotes(apt) {
+        const direct = String((apt && apt.manualNotes) || '').trim();
+        if (direct) return direct;
+        const found = String((apt && apt.summary) || '').split(/\n+/).find((line) => /^Opmerkingen:/i.test(String(line || '').trim()));
+        return found ? found.replace(/^Opmerkingen:\s*/i, '').trim() : '';
+    }
+
+    function setEditStatus(message, variant = '') {
+        const status = byId('appointmentEditStatus');
+        if (!status) return;
+        status.textContent = message || '';
+        status.className = `modal-workspace-status${variant ? ` ${variant}` : ''}`;
+    }
+
+    function syncLeadOwnerVisibility() {
+        const field = byId('appointmentEditLeadOwnerField');
+        const legend = byId('appointmentEditLegend');
+        if (field && legend) field.hidden = !isMeetingLegend(legend.value);
+    }
+
+    function canEditAppointment(apt) {
+        return Boolean(apt) && isManualAgendaAppointment(apt);
+    }
+
+    function populateEditForm(apt) {
+        byId('appointmentEditLegend').value = inferEditableLegend(apt);
+        byId('appointmentEditTitle').value = String((apt && apt.company) || '').trim();
+        byId('appointmentEditDate').value = normalizeAgendaDateYmd(apt && apt.date);
+        byId('appointmentEditTime').value = String((apt && (apt.time || apt.manualActivityTime)) || '').trim();
+        byId('appointmentEditPhone').value = String((apt && (apt.manualPhone || apt.phone || apt.contactPhone)) || '').trim();
+        byId('appointmentEditLocation').value = resolveAppointmentLocationDisplay(apt);
+        byId('appointmentEditNotes').value = extractManualNotes(apt);
+        byId('appointmentEditLeadOwner').value = String((apt && (apt.manualLeadOwnerKey || apt.leadOwnerKey)) || '').trim();
+        syncLeadOwnerVisibility();
+        setEditStatus('');
+    }
+
+    function syncEditButtonVisibility() {
+        const button = byId('modalEditAppointmentBtn');
+        if (!button) return;
+        const apt = getActiveAppointment();
+        const show = !editMode && !modalWorkspaceMode && canEditAppointment(apt);
+        button.hidden = !show;
+        button.disabled = editSaving || workspaceBusy || !show;
+        if (editMode) {
+            modalPrimaryBtn.hidden = true;
+            modalNoDealBtn.hidden = true;
+            modalCompleteActivityBtn.hidden = true;
+            if (modalSecondaryBtn) modalSecondaryBtn.hidden = true;
+        }
+    }
+
+    function rememberButtonState() {
+        editPreviousButtonState = {
+            primary: modalPrimaryBtn.hidden,
+            noDeal: modalNoDealBtn.hidden,
+            complete: modalCompleteActivityBtn.hidden,
+            secondary: modalSecondaryBtn ? modalSecondaryBtn.hidden : true,
+        };
+    }
+
+    function restoreButtonState() {
+        if (!editPreviousButtonState) return;
+        modalPrimaryBtn.hidden = editPreviousButtonState.primary;
+        modalNoDealBtn.hidden = editPreviousButtonState.noDeal;
+        modalCompleteActivityBtn.hidden = editPreviousButtonState.complete;
+        if (modalSecondaryBtn) modalSecondaryBtn.hidden = editPreviousButtonState.secondary;
+        editPreviousButtonState = null;
+    }
+
+    function setEditMode(enabled) {
+        if (Boolean(enabled) === editMode) return;
+        if (enabled) rememberButtonState();
+        if (!enabled) restoreButtonState();
+        editMode = Boolean(enabled);
+        const overview = byId('modalOverview');
+        const form = byId('appointmentEditForm');
+        if (overview) overview.classList.toggle('appointment-editing', editMode);
+        if (form) form.hidden = !editMode;
+        if (!editMode) setEditStatus('');
+        syncEditButtonVisibility();
+    }
+
+    function payloadFromEditForm() {
+        const legendChoice = normalizeManualLegendChoice(byId('appointmentEditLegend').value);
+        let who = 'serve';
+        let appointmentKind = 'appointment';
+        let manualLeadOwner = '';
+        if (isMeetingLegend(legendChoice)) {
+            who = 'both';
+            appointmentKind = 'meeting';
+            manualLeadOwner = String(byId('appointmentEditLeadOwner').value || '').trim();
+        } else if (legendChoice === 'manual-martijn' || legendChoice === 'private-martijn') {
+            who = 'martijn';
+            appointmentKind = legendChoice === 'private-martijn' ? 'overig' : 'appointment';
+        } else if (legendChoice === 'manual-both') {
+            who = 'both';
+        } else if (legendChoice === 'private-serve') {
+            appointmentKind = 'overig';
+        }
+        return {
+            date: String(byId('appointmentEditDate').value || '').trim(),
+            time: String(byId('appointmentEditTime').value || '').trim(),
+            activityTime: String(byId('appointmentEditTime').value || '').trim(),
+            title: String(byId('appointmentEditTitle').value || '').trim(),
+            activity: String(byId('appointmentEditTitle').value || '').trim(),
+            phone: String(byId('appointmentEditPhone').value || '').trim(),
+            manualPhone: String(byId('appointmentEditPhone').value || '').trim(),
+            location: String(byId('appointmentEditLocation').value || '').trim(),
+            notes: String(byId('appointmentEditNotes').value || '').trim(),
+            legendChoice,
+            appointmentKind,
+            manualLeadOwner,
+            leadOwnerKey: manualLeadOwner,
+            who,
+            actor: 'premium-personeel-agenda',
+        };
+    }
+
+    async function saveEdit() {
+        const apt = getActiveAppointment();
+        if (!apt || editSaving || workspaceBusy) return;
+        const payload = payloadFromEditForm();
+        const error = !payload.title ? 'Vul een titel in.' : !payload.date ? 'Vul een datum in.' : !payload.time ? 'Vul een tijdstip in.' : !payload.location ? 'Vul een locatie in.' : isMeetingLegend(payload.legendChoice) && !payload.manualLeadOwner ? 'Kies wie deze lead heeft geregeld.' : '';
+        if (error) {
+            setEditStatus(error, 'error');
+            return;
+        }
+        editSaving = true;
+        byId('appointmentEditSaveBtn').disabled = true;
+        byId('appointmentEditCancelBtn').disabled = true;
+        setEditStatus('Opslaan...', '');
+        try {
+            const result = await postJsonWithFallback(`/api/agenda/appointments/${encodeURIComponent(String(apt.id))}/manual`, payload, { timeoutMs: 20000 });
+            if (result && result.appointment) mergeServerAppointments([result.appointment]);
+            await loadServerAppointments({ fresh: true, timeoutMs: 8000 });
+            renderCalendar();
+            setEditMode(false);
+            await openAppointment(Number((result && result.appointment && result.appointment.id) || apt.id));
+        } catch (errorSave) {
+            setEditStatus(String((errorSave && errorSave.message) || 'Wijzigen mislukt.'), 'error');
+        } finally {
+            editSaving = false;
+            byId('appointmentEditSaveBtn').disabled = false;
+            byId('appointmentEditCancelBtn').disabled = false;
+            syncEditButtonVisibility();
+        }
+    }
+
+    ensureEditUi();
+    const baseRefreshForEdit = refreshWorkspacePrimaryButtonLabel;
+    refreshWorkspacePrimaryButtonLabel = function refreshWorkspacePrimaryButtonLabelWithEdit() {
+        baseRefreshForEdit();
+        syncEditButtonVisibility();
+    };
+    const baseApplyForEdit = applyWorkspaceMode;
+    applyWorkspaceMode = function applyWorkspaceModeWithEdit(enabled) {
+        if (enabled) setEditMode(false);
+        baseApplyForEdit(enabled);
+        syncEditButtonVisibility();
+    };
+    const baseOpenForEdit = openAppointment;
+    openAppointment = async function openAppointmentWithEdit(id) {
+        await baseOpenForEdit(id);
+        setEditMode(false);
+        syncEditButtonVisibility();
+    };
+    const baseCloseForEdit = closeModal;
+    closeModal = function closeModalWithEdit() {
+        setEditMode(false);
+        return baseCloseForEdit();
+    };
+    byId('modalEditAppointmentBtn')?.addEventListener('click', () => {
+        const apt = getActiveAppointment();
+        if (!canEditAppointment(apt)) return;
+        populateEditForm(apt);
+        setEditMode(true);
+    });
+    byId('appointmentEditCancelBtn')?.addEventListener('click', () => setEditMode(false));
+    byId('appointmentEditSaveBtn')?.addEventListener('click', () => { void saveEdit(); });
+    byId('appointmentEditLegend')?.addEventListener('change', syncLeadOwnerVisibility);
+    syncEditButtonVisibility();
+})();
 
 if (modalSecondaryBtn) modalSecondaryBtn.hidden = true;
 if (modalCompleteActivityBtn) modalCompleteActivityBtn.addEventListener('click', () => { void markActiveAppointmentCompletedByStaff(); });

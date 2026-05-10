@@ -1553,7 +1553,7 @@
                 <div class="legend-item"><div class="legend-dot manual-serve"></div> Activiteit Servé</div>
                 <div class="legend-item"><div class="legend-dot manual-martijn"></div> Activiteit Martijn</div>
                 <div class="legend-item"><div class="legend-dot manual-both"></div> Activiteit allebei</div>
-                <div class="legend-item"><div class="legend-dot manual-overig"></div> Privé</div>
+                <div class="legend-item"><div class="legend-dot private-serve"></div> Privé Servé</div><div class="legend-item"><div class="legend-dot private-martijn"></div> Privé Martijn</div>
                 <div class="legend-item"><div class="legend-dot completed"></div> Activiteit afgerond</div>
             </div>
         </div>
@@ -2331,7 +2331,7 @@
         if (raw === 'voice' || raw === 'voicesoftware') return 'voice';
         if (raw === 'chatbot' || raw === 'chatbots') return 'chatbot';
         if (raw === 'manual-martijn' || raw === 'martijn') return 'manual-martijn';
-        if (raw === 'manual-both' || raw === 'both' || raw === 'allebei' || raw === 'beide') return 'manual-both';
+        if (raw === 'manual-both' || raw === 'both' || raw === 'allebei' || raw === 'beide') return 'manual-both'; if (raw === 'private-serve' || raw === 'prive-serve' || raw === 'privé-serve') return 'private-serve'; if (raw === 'private-martijn' || raw === 'prive-martijn' || raw === 'privé-martijn') return 'private-martijn';
         if (raw === 'manual-overig' || raw === 'overig' || raw === 'other') return 'manual-overig';
         if (raw === 'completed' || raw === 'afgerond') return 'completed';
         if (raw === 'manual-serve' || raw === 'serve' || raw === 'servé') return 'manual-serve';
@@ -2835,14 +2835,14 @@
             if (manualLegendChoice === 'chatbot') return 'appointment meeting magnetic meeting--chatbot';
             if (manualLegendChoice === 'website') return 'appointment meeting magnetic';
             if (manualLegendChoice === 'manual-martijn') return 'appointment manual-martijn magnetic';
-            if (manualLegendChoice === 'manual-both') return 'appointment manual-both magnetic';
+            if (manualLegendChoice === 'manual-both') return 'appointment manual-both magnetic'; if (manualLegendChoice === 'private-serve') return 'appointment private-serve magnetic'; if (manualLegendChoice === 'private-martijn') return 'appointment private-martijn magnetic';
             if (manualLegendChoice === 'manual-overig') {
                 const manualWho = String(apt?.manualPlannerWho || apt?.manualWho || '').toLowerCase();
-                if (manualWho === 'martijn') return 'appointment manual-martijn magnetic';
+                if (manualWho === 'martijn') return 'appointment private-martijn magnetic';
                 if (manualWho === 'both' || manualWho === 'allebei' || manualWho === 'beide') return 'appointment manual-both magnetic';
-                if (manualWho === 'serve' || manualWho === 'servé') return 'appointment manual-serve magnetic';
+                if (manualWho === 'serve' || manualWho === 'servé') return 'appointment private-serve magnetic';
             }
-            if (manualLegendChoice === 'manual-overig') return 'appointment manual-overig magnetic';
+            if (manualLegendChoice === 'manual-overig') return 'appointment private-serve magnetic';
             if (manualLegendChoice === 'manual-serve') return 'appointment manual-serve magnetic';
             const who = String(apt?.manualPlannerWho || apt?.manualWho || '').toLowerCase();
             if (who === 'martijn') return 'appointment manual-martijn magnetic';
@@ -3428,8 +3428,8 @@
         applyWorkspaceMode(false);
     }
 </script>
-	<script src="assets/premium-agenda-manual-business-flow.js?v=20260509a"></script>
-	<script src="assets/premium-agenda-stability.js?v=20260509a"></script>
+	<script src="assets/premium-agenda-manual-business-flow.js?v=20260510a"></script>
+	<script src="assets/premium-agenda-stability.js?v=20260510a"></script>
 <script>
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
