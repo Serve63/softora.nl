@@ -42,6 +42,14 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*applyMailboxAccount\(email\);/);
 });
 
+test('premium mailbox houdt account-dropdown zichtbaar boven de inbox-layout', () => {
+  const pageSource = readPage();
+
+  assert.match(pageSource, /\.topbar \{[\s\S]*overflow:\s*visible;[\s\S]*position:\s*relative;[\s\S]*z-index:\s*40;/);
+  assert.match(pageSource, /\.topbar-title-wrap \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*45;/);
+  assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*max-height:\s*min\(320px,\s*calc\(100vh - 90px\)\);[\s\S]*overflow-y:\s*auto;[\s\S]*z-index:\s*60;/);
+});
+
 test('premium mailbox inboxbadge volgt de geladen inbox en niet een vast getal', () => {
   const pageSource = readPage();
   const scriptSource = readScript();

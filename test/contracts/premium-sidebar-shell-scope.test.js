@@ -214,6 +214,9 @@ test('premium mailbox behoudt eigen layout en vaste sidebar bij responsive mailw
   assert.match(pageSource, /<main class="main-content is-premium-boot-host">[\s\S]*<div class="mail-page-shell">/);
   assert.match(pageSource, /\.main-content \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
   assert.match(pageSource, /\.mail-page-shell \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
+  assert.match(pageSource, /\.topbar \{[\s\S]*overflow:\s*visible;[\s\S]*position:\s*relative;[\s\S]*z-index:\s*40;/);
+  assert.match(pageSource, /\.topbar-title-wrap \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*45;/);
+  assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*overflow-y:\s*auto;[\s\S]*z-index:\s*60;/);
   assert.match(pageSource, /\.mail-detail \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
   assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260507b"><\/script>/);
 });
