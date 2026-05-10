@@ -400,8 +400,11 @@ test('premium agenda toont Ruben planning uitleg alleen in AI beheer modus', () 
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /Ruben Nijhuis plant afspraken in/);
+  assert.doesNotMatch(pageSource, /Even alsof Ruben je dit mondeling vertelt/);
   assert.doesNotMatch(pageSource, /Zo zou Ruben je dag kunnen voorlezen/);
   assert.doesNotMatch(pageSource, /vervolgafspraak aansluit op het adres van de vorige stop/);
+  assert.match(pageSource, /is het een rustige dag\./);
+  assert.match(pageSource, /Geen afspraken, wel klantwerk op de planning\./);
   assert.match(
     pageSource,
     /html:not\(\[data-ai-management-mode="software"\]\) \.agenda-routing-bubble-wrap \{\s*display: none;\s*\}/
