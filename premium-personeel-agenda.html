@@ -325,22 +325,12 @@
             border-left: 3px solid #0d9488;
         }
 
-        .appointment.manual-martijn {
-            background: rgba(124, 58, 237, 0.2);
-            color: #4c1d95;
-            border-left: 3px solid #7c3aed;
-        }
-
-        .appointment.manual-both {
-            background: linear-gradient(135deg, rgba(13, 148, 136, 0.18), rgba(124, 58, 237, 0.18));
-            color: #312e81;
-            border-left: 3px solid #6366f1;
-        }
-
+        .appointment.manual-martijn,
+        .appointment.manual-both,
         .appointment.manual-overig {
-            background: rgba(236, 72, 153, 0.18);
-            color: #831843;
-            border-left: 3px solid #ec4899;
+            background: rgba(8, 145, 178, 0.16);
+            color: #164e63;
+            border-left: 3px solid #0891b2;
         }
 
         .appointment.completed {
@@ -377,7 +367,7 @@
         .legend-dot.manual-serve { background: #0d9488; }
         .legend-dot.manual-martijn { background: #7c3aed; }
         .legend-dot.manual-both { background: linear-gradient(135deg, #0d9488 0 50%, #7c3aed 50% 100%); }
-        .legend-dot.manual-overig { background: #ec4899; }
+        .legend-dot.manual-overig { background: #0891b2; }
 
         /* Ruben-planning uitleg: platte tekst, geen kader (onder de agenda) */
         .agenda-routing-bubble-wrap {
@@ -1551,8 +1541,7 @@
                 <div class="legend-item"><div class="legend-dot voice"></div> Voicesoftware Meeting</div>
                 <div class="legend-item"><div class="legend-dot chatbot"></div> Chatbot Meeting</div>
                 <div class="legend-item"><div class="legend-dot manual-serve"></div> Activiteit Servé</div>
-                <div class="legend-item"><div class="legend-dot manual-martijn"></div> Activiteit Martijn</div>
-                <div class="legend-item"><div class="legend-dot manual-both"></div> Activiteit allebei</div>
+                <div class="legend-item"><div class="legend-dot manual-overig"></div> Afspraak</div>
                 <div class="legend-item"><div class="legend-dot private-serve"></div> Privé Servé</div><div class="legend-item"><div class="legend-dot private-martijn"></div> Privé Martijn</div>
                 <div class="legend-item"><div class="legend-dot completed"></div> Activiteit afgerond</div>
             </div>
