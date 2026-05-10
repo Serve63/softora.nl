@@ -5,7 +5,8 @@ const path = require('path');
 
 test('premium agenda modal uses dossier flow for appointments that already have an active order', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
-  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const followUpPath = path.join(__dirname, '../../assets/premium-agenda-follow-up-leads.js');
+  const pageSource = `${fs.readFileSync(pagePath, 'utf8')}\n${fs.readFileSync(followUpPath, 'utf8')}`;
 
   assert.match(pageSource, /AI begrijpt en scant de dynamische agenda en houd rekening met reistijden\./);
   assert.match(pageSource, /Let op: Agenda functioneerd pas goed bij gebruik van Softora Agenda app\./);
@@ -17,6 +18,11 @@ test('premium agenda modal uses dossier flow for appointments that already have 
   assert.match(pageSource, /function getLinkedOrderDossierUrl\(apt\)/);
   assert.match(pageSource, /modalPrimaryBtn\.textContent = 'Open dossier';/);
   assert.match(pageSource, /modalPrimaryBtn\.textContent = 'Dossier aanmaken';/);
+  assert.match(pageSource, /assets\/premium-agenda-follow-up-leads\.js/);
+  assert.match(pageSource, /button\.id = 'modalFollowUpBtn';/);
+  assert.match(pageSource, /async function addFollowUpLeadForActiveAppointment\(options = \{\}\)/);
+  assert.match(pageSource, /\/api\/agenda\/appointments\/\$\{encodeURIComponent\(String\(apt\.id\)\)\}\/add-follow-up-lead/);
+  assert.match(pageSource, /window\.location\.assign\('\/premium-leads'\);/);
   assert.match(
     pageSource,
     /if \(!modalWorkspaceMode\) \{[\s\S]*if \(getLinkedOrderIdForAppointment\(apt\)\) \{[\s\S]*openLinkedOrderDossierForAppointment\(apt\);/
@@ -263,7 +269,7 @@ test('premium agenda kan handmatige afspraakgegevens wijzigen vanuit de detailmo
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-agenda-stability\.js\?v=20260510a/);
+  assert.match(pageSource, /assets\/premium-agenda-stability\.js\?v=20260510b/);
   assert.match(stabilitySource, /button\.id = 'modalEditAppointmentBtn';/);
   assert.match(stabilitySource, /form\.id = 'appointmentEditForm';/);
   assert.match(stabilitySource, /id="appointmentEditLegend"/);
@@ -373,7 +379,8 @@ test('premium agenda shows klantwerk on Wednesdays and Saturdays without blockin
 test('premium agenda verbergt dealacties voor handmatige overige afspraken en behoudt boot-failsafe', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
-  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const followUpPath = path.join(__dirname, '../../assets/premium-agenda-follow-up-leads.js');
+  const pageSource = `${fs.readFileSync(pagePath, 'utf8')}\n${fs.readFileSync(followUpPath, 'utf8')}`;
   const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
 
   assert.match(pageSource, /assets\/premium-agenda-stability\.js/);
@@ -386,6 +393,7 @@ test('premium agenda verbergt dealacties voor handmatige overige afspraken en be
   assert.match(stabilitySource, /choice === 'manual-overig' \|\| choice === 'private-serve' \|\| choice === 'private-martijn'/);
   assert.match(stabilitySource, /modalBadge\.textContent = 'Privé-afspraak';/);
   assert.match(stabilitySource, /modalPrimaryBtn\.hidden = true;/);
+  assert.match(stabilitySource, /modalFollowUpBtn\.hidden = true;/);
   assert.match(stabilitySource, /modalNoDealBtn\.hidden = true;/);
   assert.match(pageSource, /class="modal-btn primary magnetic" id="modalCompleteActivityBtn"[^>]*>Activiteit afgerond<\/button>/);
   assert.match(pageSource, /const modalCompleteActivityBtn = document\.getElementById\('modalCompleteActivityBtn'\);/);

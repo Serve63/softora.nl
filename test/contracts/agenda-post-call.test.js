@@ -79,12 +79,47 @@ function createFixture(overrides = {}) {
     ];
   const activityCalls = [];
   const uiStateWrites = [];
+  const appointmentIdByCallId = new Map(
+    appointments
+      .map((item) => [String(item?.callId || '').trim(), Number(item?.id || 0)])
+      .filter(([callId, id]) => callId && Number.isFinite(id) && id > 0)
+  );
 
   function setGeneratedAgendaAppointmentAtIndex(idx, nextValue, _reason) {
     appointments[idx] = {
       ...nextValue,
     };
     return appointments[idx];
+  }
+
+  function upsertGeneratedAgendaAppointment(appointment, callId) {
+    const normalizedCallId = normalizeString(callId || '');
+    if (!appointment || !normalizedCallId) return null;
+
+    const existingId = appointmentIdByCallId.get(normalizedCallId);
+    if (existingId) {
+      const existingIdx = appointments.findIndex((item) => Number(item?.id || 0) === Number(existingId));
+      if (existingIdx >= 0) {
+        appointments[existingIdx] = {
+          ...appointments[existingIdx],
+          ...appointment,
+          id: Number(existingId),
+          callId: normalizedCallId,
+        };
+        return appointments[existingIdx];
+      }
+    }
+
+    const nextId =
+      Math.max(0, ...appointments.map((item) => Number(item?.id || 0)).filter((id) => Number.isFinite(id))) + 1;
+    const record = {
+      ...appointment,
+      id: nextId,
+      callId: normalizedCallId,
+    };
+    appointments.push(record);
+    appointmentIdByCallId.set(normalizedCallId, nextId);
+    return record;
   }
 
   const helpers = createAgendaPostCallHelpers({
@@ -107,6 +142,8 @@ function createFixture(overrides = {}) {
       appointments.findIndex((item) => Number(item?.id || 0) === Number(raw)),
     getGeneratedAgendaAppointments: () => appointments,
     setGeneratedAgendaAppointmentAtIndex,
+    upsertGeneratedAgendaAppointment:
+      overrides.upsertGeneratedAgendaAppointment || upsertGeneratedAgendaAppointment,
     appendDashboardActivity: (payload, reason) => {
       activityCalls.push({ payload, reason });
     },
@@ -252,6 +289,37 @@ test('agenda post-call coordinator adds a new active order and links it back to 
   assert.equal(uiStateWrites[1].scope, 'premium_customers_database');
   assert.match(uiStateWrites[1].values.softora_customers_premium_v1, /"databaseStatus":"klant"/);
   assert.equal(activityCalls[0].reason, 'dashboard_activity_active_order_added');
+});
+
+test('agenda post-call coordinator zet vervolgafspraak als open lead klaar en koppelt die terug', async () => {
+  const { activityCalls, appointments, coordinator, uiStateWrites } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.addAgendaAppointmentToInterestedLeads(
+    {
+      body: {
+        prompt: 'Werk het vervolgdossier uit voor de volgende stap.',
+        transcript: 'Klant twijfelt nog, maar wil eerst een vervolgvoorstel zien.',
+        domainName: 'softora.nl',
+        actor: 'Serve',
+        referenceImages: [{ id: 'img-1' }],
+      },
+    },
+    res,
+    '42'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.alreadyExisted, false);
+  assert.equal(res.body.followUpLead.id, 43);
+  assert.equal(res.body.followUpLead.confirmationTaskType, 'lead_follow_up');
+  assert.equal(res.body.followUpLead.leadFollowUpSourceAppointmentId, 42);
+  assert.equal(res.body.followUpLead.callId, 'appointment-follow-up:42');
+  assert.equal(appointments[0].leadFollowUpAppointmentId, 43);
+  assert.equal(appointments[0].leadFollowUpCallId, 'appointment-follow-up:42');
+  assert.equal(uiStateWrites.length, 0);
+  assert.equal(activityCalls[0].reason, 'dashboard_activity_follow_up_lead_added');
 });
 
 test('agenda post-call coordinator keeps chunked active orders and customer rows intact', async () => {
