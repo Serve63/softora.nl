@@ -54,7 +54,7 @@ function createFixture(overrides = {}) {
   return { appointments, coordinator };
 }
 
-test('agenda manual appointment stores legend choice and activity time', async () => {
+test('agenda private manual appointment stores available again time for one person', async () => {
   const { coordinator } = createFixture();
   const res = createResponseRecorder();
 
@@ -65,8 +65,10 @@ test('agenda manual appointment stores legend choice and activity time', async (
         who: 'serve',
         time: '10:00',
         activityTime: '10:30',
-        legendChoice: 'business',
+        appointmentKind: 'overig',
+        legendChoice: 'private-serve',
         activity: 'Klantbespreking',
+        location: 'Kantoor',
         availableAgain: '12:00',
       },
     },
@@ -76,9 +78,11 @@ test('agenda manual appointment stores legend choice and activity time', async (
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.appointment.manualActivityTime, '10:30');
-  assert.equal(res.body.appointment.manualLegendChoice, 'business');
+  assert.equal(res.body.appointment.manualLegendChoice, 'private-serve');
+  assert.equal(res.body.appointment.manualAvailableAgain, '12:00');
   assert.match(res.body.appointment.summary, /Tijdstip activiteit: 10:30/);
-  assert.match(res.body.appointment.summary, /Legenda: business/);
+  assert.match(res.body.appointment.summary, /Legenda: private-serve/);
+  assert.match(res.body.appointment.summary, /Weer beschikbaar vanaf: 12:00/);
 });
 
 test('agenda manual appointment stores stepped modal details', async () => {
@@ -150,6 +154,7 @@ test('agenda manual appointment can be edited after creation', async () => {
         phone: '06 98 76 54 32',
         location: 'Klantlocatie',
         notes: 'Nieuwe opmerkingen.',
+        availableAgain: '13:15',
       },
       params: { id: '1' },
       query: {},
@@ -169,9 +174,11 @@ test('agenda manual appointment can be edited after creation', async () => {
   assert.equal(updateRes.body.appointment.manualPlannerWho, 'martijn');
   assert.equal(updateRes.body.appointment.manualLegendChoice, 'private-martijn');
   assert.equal(updateRes.body.appointment.appointmentKind, 'overig');
+  assert.equal(updateRes.body.appointment.manualAvailableAgain, '13:15');
   assert.match(updateRes.body.appointment.summary, /Wie: Martijn/);
   assert.match(updateRes.body.appointment.summary, /Telefoonnummer: 06 98 76 54 32/);
   assert.match(updateRes.body.appointment.summary, /Opmerkingen: Nieuwe opmerkingen\./);
+  assert.match(updateRes.body.appointment.summary, /Weer beschikbaar vanaf: 13:15/);
 });
 
 test('agenda manual appointment can be assigned to Serve and Martijn together', async () => {
@@ -185,8 +192,10 @@ test('agenda manual appointment can be assigned to Serve and Martijn together', 
         who: 'both',
         title: 'Gezamenlijke klantmeeting',
         time: '14:00',
-        legendChoice: 'business',
+        appointmentKind: 'overig',
+        legendChoice: 'manual-both',
         location: 'Teams',
+        availableAgain: '16:00',
       },
     },
     res
@@ -195,7 +204,9 @@ test('agenda manual appointment can be assigned to Serve and Martijn together', 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.appointment.manualPlannerWho, 'both');
+  assert.equal(res.body.appointment.manualAvailableAgain, '');
   assert.match(res.body.appointment.summary, /Wie: Servé en Martijn/);
+  assert.doesNotMatch(res.body.appointment.summary, /Weer beschikbaar vanaf:/);
 });
 
 test('agenda manual meeting stores the selected lead owner separately from planner visibility', async () => {
@@ -307,9 +318,10 @@ test('agenda manual appointment does not block on initial shared-state hydration
       body: {
         date: '2026-04-28',
         who: 'both',
+        appointmentKind: 'appointment',
         title: 'Snel overleg',
         time: '14:00',
-        legendChoice: 'business',
+        legendChoice: 'manual-both',
         location: 'Kantoor',
       },
     },
@@ -339,9 +351,10 @@ test('agenda manual appointment responds when shared persistence is locally veri
       body: {
         date: '2026-04-28',
         who: 'serve',
+        appointmentKind: 'appointment',
         title: 'Persist pending test',
         time: '15:00',
-        legendChoice: 'business',
+        legendChoice: 'manual-serve',
         location: 'Kantoor',
       },
     },
@@ -366,9 +379,10 @@ test('agenda manual appointment does not wait indefinitely for Google Calendar e
       body: {
         date: '2026-04-28',
         who: 'serve',
+        appointmentKind: 'appointment',
         title: 'Calendar timeout test',
         time: '16:00',
-        legendChoice: 'business',
+        legendChoice: 'manual-serve',
         location: 'Kantoor',
       },
     },

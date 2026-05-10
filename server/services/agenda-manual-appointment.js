@@ -79,6 +79,23 @@ function isMeetingLegendChoice(value) {
   return ['website', 'business', 'voice', 'chatbot'].includes(String(value || '').trim().toLowerCase());
 }
 
+function resolveManualAppointmentKind(rawKind, legendChoice) {
+  const normalizedKind = String(rawKind || '').trim().toLowerCase();
+  if (normalizedKind === 'meeting' || normalizedKind === 'appointment' || normalizedKind === 'overig') {
+    return normalizedKind;
+  }
+  const normalizedLegend = String(legendChoice || '').trim().toLowerCase();
+  if (isMeetingLegendChoice(normalizedLegend)) return 'meeting';
+  if (
+    normalizedLegend === 'private-serve' ||
+    normalizedLegend === 'private-martijn' ||
+    normalizedLegend === 'manual-overig'
+  ) {
+    return 'overig';
+  }
+  return 'appointment';
+}
+
 function isTruthyAllDayUnavailable(body) {
   const v = body?.allDayUnavailable ?? body?.geheleDagNietBeschikbaar;
   if (v === true || v === 1) return true;
@@ -181,7 +198,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     const whoKey = resolveManualPlannerKey(body, normalizeString);
     const whoLabel = resolveManualPlannerLabel(body, normalizeString);
     const actor = truncateText(normalizeString(body.actor || body.doneBy || ''), 120);
-    const appointmentKind = normalizeString(body.appointmentKind || body.manualAppointmentKind || '').toLowerCase();
+    const requestedAppointmentKind = normalizeString(body.appointmentKind || body.manualAppointmentKind || '').toLowerCase();
 
     let appointmentTime;
     let activityTime;
@@ -209,8 +226,18 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       activity = truncateText(normalizeString(body.title || body.activity || ''), 500);
       phone = truncateText(normalizeString(body.phone || body.manualPhone || body.telefoon || body.telefoonnummer || ''), 80);
       notes = truncateText(normalizeString(body.notes || body.opmerkingen || ''), 1000);
-      availableAgain = normalizeTimeHhMm(body.availableAgain || '');
       legendChoice = normalizeManualLegendChoice(body, normalizeString);
+    }
+    const appointmentKind =
+      allDayUnavailable && !requestedAppointmentKind
+        ? 'overig'
+        : resolveManualAppointmentKind(requestedAppointmentKind, legendChoice);
+    const canStoreAvailableAgain =
+      !allDayUnavailable &&
+      appointmentKind === 'overig' &&
+      (whoKey === 'serve' || whoKey === 'martijn');
+    if (!allDayUnavailable) {
+      availableAgain = canStoreAvailableAgain ? normalizeTimeHhMm(body.availableAgain || '') : '';
     }
     const manualLeadOwner = resolveManualLeadOwner(body, normalizeString);
     const requiresManualLeadOwner =
@@ -262,7 +289,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       legendChoice ? `Legenda: ${legendChoice}` : '',
       manualLeadOwner ? `Lead geregeld door: ${manualLeadOwner.name}` : '',
       notes ? `Opmerkingen: ${notes}` : '',
-      availableAgain ? `Weer thuis, beschikbaar voor een reis naar prospect: ${availableAgain}` : '',
+      availableAgain ? `Weer beschikbaar vanaf: ${availableAgain}` : '',
     ].filter(Boolean).join('\n\n');
 
     const baseAppointment = {
@@ -284,7 +311,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       coldcallingStack: 'manual',
       manualPlannerWho:
         whoKey || 'serve',
-      appointmentKind: appointmentKind || (isMeetingLegendChoice(legendChoice) ? 'meeting' : 'overig'),
+      appointmentKind,
       manualLegendChoice: legendChoice,
       manualActivityTime: activityTime,
       manualNotes: notes,
@@ -323,7 +350,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
         time: appointmentTime,
         location,
         appointmentLocation: location,
-        appointmentKind: appointmentKind || (isMeetingLegendChoice(legendChoice) ? 'meeting' : 'overig'),
+        appointmentKind,
         summary,
         summaryFormatVersion: 4,
         needsConfirmationEmail: false,
@@ -437,8 +464,15 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     const notes = truncateText(normalizeString(body.notes || body.opmerkingen || ''), 1000);
     const whoKey = resolveManualPlannerKey(body, normalizeString);
     const whoLabel = resolveManualPlannerLabel(body, normalizeString);
-    const appointmentKind = normalizeString(body.appointmentKind || body.manualAppointmentKind || '').toLowerCase();
     const legendChoice = normalizeManualLegendChoice(body, normalizeString);
+    const appointmentKind = resolveManualAppointmentKind(
+      normalizeString(body.appointmentKind || body.manualAppointmentKind || '').toLowerCase(),
+      legendChoice
+    );
+    const availableAgain =
+      appointmentKind === 'overig' && (whoKey === 'serve' || whoKey === 'martijn')
+        ? normalizeTimeHhMm(body.availableAgain || '')
+        : '';
     const manualLeadOwner = resolveManualLeadOwner(body, normalizeString);
     const requiresManualLeadOwner = appointmentKind === 'meeting' && isMeetingLegendChoice(legendChoice);
 
@@ -463,6 +497,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       legendChoice ? `Legenda: ${legendChoice}` : '',
       manualLeadOwner ? `Lead geregeld door: ${manualLeadOwner.name}` : '',
       notes ? `Opmerkingen: ${notes}` : '',
+      availableAgain ? `Weer beschikbaar vanaf: ${availableAgain}` : '',
     ].filter(Boolean).join('\n\n');
 
     const runtimeSnapshot = takeRuntimeMutationSnapshot();
@@ -486,10 +521,11 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
         providerLabel: 'Handmatig',
         coldcallingStack: 'manual',
         manualPlannerWho: whoKey,
-        appointmentKind: appointmentKind || (isMeetingLegendChoice(legendChoice) ? 'meeting' : 'overig'),
+        appointmentKind,
         manualLegendChoice: legendChoice,
         legendChoice,
         manualActivityTime: activityTime,
+        manualAvailableAgain: availableAgain,
         manualNotes: notes,
         manualLeadOwnerKey: manualLeadOwner?.key || '',
         manualLeadOwnerName: manualLeadOwner?.name || '',
