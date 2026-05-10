@@ -198,8 +198,8 @@
             font-family: 'Oswald', sans-serif; font-size: 1.3rem; font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; min-width: auto; line-height: 1; text-align: center;
         }
-        .agenda-header-owners { display: flex; align-items: center; gap: 0.55rem; margin-left: 0.45rem; color: var(--text-primary); font-family: 'Oswald', sans-serif; font-size: 0.94rem; font-weight: 600; letter-spacing: 0.04em; line-height: 1; text-transform: uppercase; white-space: nowrap; }
-        .agenda-header-owner:first-child { color: var(--accent); }
+        .agenda-header-owners { display: flex; flex-direction: column; align-items: flex-start; gap: 0.28rem; margin-left: 0.55rem; color: var(--text-primary); font-family: 'Oswald', sans-serif; font-size: 0.94rem; font-weight: 600; letter-spacing: 0.04em; line-height: 1; text-transform: uppercase; white-space: nowrap; }
+        .agenda-header-owner { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-primary); } .agenda-header-owner-count { min-width: 1.2rem; font-variant-numeric: tabular-nums; } .agenda-header-owner.is-leading { color: #7c3aed; }
 
         @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
 
@@ -1512,7 +1512,7 @@
                 <button class="month-nav-btn magnetic" data-month-offset="-1" type="button" aria-label="Vorige maand"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg></button>
                 <span class="month-label" id="monthLabel"></span>
                 <button class="month-nav-btn magnetic" data-month-offset="1" type="button" aria-label="Volgende maand"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></button>
-                <div class="agenda-header-owners" aria-label="Handmatige lead eigenaren"><span class="agenda-header-owner">Servé</span><span class="agenda-header-owner">Martijn</span></div>
+                <div class="agenda-header-owners" aria-label="Leadscore agenda"><span class="agenda-header-owner" data-agenda-owner="serve"><span class="agenda-header-owner-name">Servé</span><span class="agenda-header-owner-count" data-agenda-owner-count="serve">0</span></span><span class="agenda-header-owner" data-agenda-owner="martijn"><span class="agenda-header-owner-name">Martijn</span><span class="agenda-header-owner-count" data-agenda-owner-count="martijn">0</span></span></div>
             </div>
         </div>
 
@@ -3414,7 +3414,7 @@
 
 </script>
 	<script src="assets/premium-agenda-manual-business-flow.js?v=20260510a"></script>
-	<script src="assets/premium-agenda-follow-up-leads.js?v=20260510a"></script><script src="assets/premium-agenda-stability.js?v=20260510b"></script>
+	<script src="assets/premium-agenda-follow-up-leads.js?v=20260510a"></script><script src="assets/premium-agenda-stability.js?v=20260510b"></script><script src="assets/premium-agenda-lead-scoreboard.js?v=20260510a"></script>
 <script>
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
