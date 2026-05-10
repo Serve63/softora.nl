@@ -170,11 +170,18 @@ test('page smoke: premium-ai-coldmailing.html promotes suppression after lead re
 test('page smoke: premium-actieve-opdrachten.html shows openstaande opdrachten as the primary tab label', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
   const script = fs.readFileSync(path.join(repoRoot, 'assets/premium-actieve-opdrachten.js'), 'utf8');
-  const source = `${html}\n${script}`;
+  const leadsTabScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-active-orders-leads-tab.js'), 'utf8');
+  const source = `${html}\n${script}\n${leadsTabScript}`;
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
+  assert.match(html, /assets\/premium-active-orders-leads-tab\.js\?v=20260510a/, 'Losse leads-tab asset ontbreekt.');
+  assert.match(source, /href = '\/premium-leads';/, 'Openstaande leads-link hoort naar de leads-pagina te wijzen.');
+  assert.match(source, /const text = document\.createTextNode\('Openstaande leads'\);/, 'Leads-tablabel ontbreekt.');
+  assert.match(source, /count\.id = TAB_COUNT_ID;/, 'Leads-teller ontbreekt.');
   assert.match(html, />Openstaande opdrachten<\/span>/, 'Primaire tab hoort Openstaande opdrachten te tonen.');
   assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
   assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
+  assert.match(source, /function syncLeadFilterCountFromSidebarBadge\(\) \{/, 'Leads-teller hoort mee te lopen met de sidebar badge.');
+  assert.match(source, /function initLeadFilterCountMirror\(\) \{/, 'Leads-teller observer ontbreekt.');
 });
 
 test('page smoke: assets/personnel-theme.js persists sidebar counts across premium page loads', () => {
