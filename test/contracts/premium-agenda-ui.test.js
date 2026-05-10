@@ -331,6 +331,22 @@ test('premium agenda toont leadscore per eigenaar in de maandheader zonder losse
   assert.match(stabilitySource, /cell\.classList\.add\('calendar-day-selectable'\)/);
 });
 
+test('premium agenda toont een verwijderknop voor afspraken ongeacht verleden of toekomst', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const deleteButtonPath = path.join(__dirname, '../../assets/premium-agenda-delete-button.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const deleteButtonSource = fs.readFileSync(deleteButtonPath, 'utf8');
+
+  assert.match(pageSource, /id="modalDeleteAppointmentBtn"/);
+  assert.match(pageSource, /premium-agenda-delete-button\.js\?v=20260510a/);
+  assert.match(deleteButtonSource, /const canDelete = Boolean\(apt && Number\(apt\.id \|\| 0\) > 0\) && !modalWorkspaceMode;/);
+  assert.match(deleteButtonSource, /\/api\/agenda\/appointments\/\$\{encodeURIComponent\(String\(apt\.id\)\)\}\/delete/);
+  assert.match(deleteButtonSource, /title: 'Afspraak verwijderen'/);
+  assert.match(deleteButtonSource, /Het gekoppelde dossier blijft gewoon bestaan/);
+  assert.match(deleteButtonSource, /refreshWorkspacePrimaryButtonLabel = function refreshWorkspacePrimaryButtonLabelWithDelete\(\) \{/);
+  assert.match(deleteButtonSource, /deleteBtn\.addEventListener\('click', \(\) => \{ void deleteActiveAppointment\(\); \}\);/);
+});
+
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
