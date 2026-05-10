@@ -9,25 +9,28 @@ function readActiveOrdersSources() {
   const assigneeScriptPath = path.join(__dirname, '../../assets/premium-active-orders-assignee.js');
   const assigneeStylePath = path.join(__dirname, '../../assets/premium-active-orders-assignee.css');
   const scriptPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
+  const leadsTabScriptPath = path.join(__dirname, '../../assets/premium-active-orders-leads-tab.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const bootScriptSource = fs.readFileSync(bootScriptPath, 'utf8');
   const assigneeScriptSource = fs.readFileSync(assigneeScriptPath, 'utf8');
   const assigneeStyleSource = fs.readFileSync(assigneeStylePath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+  const leadsTabScriptSource = fs.readFileSync(leadsTabScriptPath, 'utf8');
   return {
     assigneeScriptSource,
     assigneeStyleSource,
     bootScriptSource,
+    leadsTabScriptSource,
     pageSource,
     scriptSource,
-    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${scriptSource}`,
+    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${scriptSource}\n${leadsTabScriptSource}`,
   };
 }
 
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
-  const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
+  const { pageSource, scriptSource, leadsTabScriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260505b"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260505b"><\/script><script src="assets\/premium-active-orders-leads-tab\.js\?v=20260510a"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -155,6 +158,18 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /companyName,\s*contactName: contactPerson,\s*contactPhone: linkedContactPhone,\s*contactEmail: linkedContactEmail,/);
   assert.match(source, /const companyName = String\(item\?\.companyName \|\| ''\)\.trim\(\);/);
   assert.match(source, /const contactName = String\(item\?\.contactName \|\| ''\)\.trim\(\);/);
+  assert.match(leadsTabScriptSource, /function ensureLeadFilterTab\(\) \{/);
+  assert.match(leadsTabScriptSource, /function syncLeadFilterCountFromSidebarBadge\(\) \{/);
+  assert.match(leadsTabScriptSource, /function initLeadFilterCountMirror\(\) \{/);
+  assert.match(leadsTabScriptSource, /function refreshLeadFilterCount\(\) \{/);
+  assert.match(leadsTabScriptSource, /href = '\/premium-leads';/);
+  assert.match(leadsTabScriptSource, /const text = document\.createTextNode\('Openstaande leads'\);/);
+  assert.match(leadsTabScriptSource, /count\.id = TAB_COUNT_ID;/);
+  assert.match(leadsTabScriptSource, /order:\s*0;/);
+  assert.match(leadsTabScriptSource, /background:\s*var\(--green\);/);
+  assert.match(source, /const refreshFn = window\.SoftoraPersonnelTheme\?\.refreshSidebarLeadsCount;/);
+  assert.match(source, /leadFilterCountObserver = new MutationObserver\(\(\) => \{/);
+  assert.match(source, /initLeadFilterCountMirror\(\);[\s\S]*refreshLeadFilterCount\(\);/);
 });
 
 test('premium actieve opdrachten start snel met server-bootstrap en korte boot-loader', () => {
