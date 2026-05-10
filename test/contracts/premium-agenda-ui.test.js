@@ -8,8 +8,7 @@ test('premium agenda modal uses dossier flow for appointments that already have 
   const followUpPath = path.join(__dirname, '../../assets/premium-agenda-follow-up-leads.js');
   const pageSource = `${fs.readFileSync(pagePath, 'utf8')}\n${fs.readFileSync(followUpPath, 'utf8')}`;
 
-  assert.match(pageSource, /AI begrijpt en scant de dynamische agenda en houd rekening met reistijden\./);
-  assert.match(pageSource, /Let op: Agenda functioneerd pas goed bij gebruik van Softora Agenda app\./);
+  assert.match(pageSource, /Dynamische agenda voor de medewerkers van Softora\.nl/);
   assert.doesNotMatch(pageSource, /Meetings ingepland door AI Lead Generator/);
   assert.match(
     pageSource,
