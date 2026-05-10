@@ -163,6 +163,9 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /Telefoonnummer \(optioneel\)/);
   assert.match(pageSource, /id="manualAppointmentTime"/);
   assert.match(pageSource, /Tijdstip/);
+  assert.match(pageSource, /id="manualAppointmentAvailableAgainField"/);
+  assert.match(pageSource, /id="manualAppointmentAvailableAgain"/);
+  assert.match(pageSource, /Weer beschikbaar vanaf \(optioneel\)/);
   assert.match(pageSource, /id="manualAppointmentLocation"/);
   assert.match(pageSource, /Locatie/);
   assert.match(pageSource, /id="manualAppointmentNotes"/);
@@ -183,6 +186,10 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   );
   assert.match(
     pageSource,
+    /document\.querySelectorAll\('\[data-manual-who\]'\)\.forEach\(\(button\) => \{[\s\S]*syncManualAppointmentDetailsMode\(\);[\s\S]*setManualAppointmentActiveChoices\(\);[\s\S]*\}\);\s*\}\);/
+  );
+  assert.match(
+    pageSource,
     /document\.querySelectorAll\('\[data-manual-business-type\]'\)\.forEach\(\(button\) => \{[\s\S]*setManualAppointmentActiveChoices\(\);[\s\S]*\}\);\s*\}\);/
   );
   assert.doesNotMatch(
@@ -199,6 +206,11 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   );
   assert.match(pageSource, /manualAppointmentSubmitBtn\.addEventListener\('click', \(\) => advanceManualAppointmentStep\(\)\);/);
   assert.match(pageSource, /function getManualAppointmentLegendChoice\(/);
+  assert.match(pageSource, /const manualAppointmentAvailableAgainEl = document\.getElementById\('manualAppointmentAvailableAgain'\);/);
+  assert.match(pageSource, /function isManualPrivateSingleAppointment\(\)/);
+  assert.match(pageSource, /if \(availableAgainField\) availableAgainField\.hidden = !isManualPrivateSingleAppointment\(\);/);
+  assert.match(pageSource, /if \(manualAppointmentAvailableAgainEl\) manualAppointmentAvailableAgainEl\.value = '';/);
+  assert.match(pageSource, /availableAgain: canStoreAvailableAgain \? availableAgainVal : ''/);
   assert.match(pageSource, /legend-dot manual-serve/);
   assert.match(pageSource, /Activiteit Servé/);
   assert.match(pageSource, /legend-dot manual-overig/);
@@ -218,6 +230,13 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /activityTime: timeVal/);
   assert.match(pageSource, /function getManualAppointmentPhoneValue\(\)/);
   assert.match(pageSource, /manualPhone: String\(item\.manualPhone \|\| item\.phone \|\| ''\),/);
+  assert.match(pageSource, /manualAvailableAgain: String\(item\.manualAvailableAgain \|\| item\.availableAgain \|\| item\.available_after \|\| ''\),/);
+  assert.match(pageSource, /availableAgain: String\(item\.availableAgain \|\| item\.available_after \|\| item\.manualAvailableAgain \|\| ''\),/);
+  assert.match(pageSource, /id="appointmentEditAvailableAgain"/);
+  assert.match(pageSource, /function syncAvailableAgainVisibility\(\)/);
+  assert.match(pageSource, /field\.hidden = choice !== 'private-serve' && choice !== 'private-martijn';/);
+  assert.match(pageSource, /byId\('appointmentEditAvailableAgain'\)\.value = String\(\(apt && \(apt\.manualAvailableAgain \|\| apt\.availableAgain\)\) \|\| ''\)\.trim\(\);/);
+  assert.match(pageSource, /availableAgain,\s*title: String\(byId\('appointmentEditTitle'\)\.value \|\| ''\)\.trim\(\),/);
   assert.match(pageSource, /phone: getManualAppointmentPhoneValue\(\), manualPhone: getManualAppointmentPhoneValue\(\),/);
   assert.match(pageSource, /const isMeeting = isManualAppointmentMeetingFlow\(\);/);
   assert.match(pageSource, /const appointmentKind = isMeeting \? 'meeting' : isBusinessAppointment \? 'appointment' : 'overig';/);

@@ -1407,6 +1407,7 @@
                         <div class="modal-workspace-label">Tijdstip</div>
                         <input type="time" class="modal-workspace-input" id="manualAppointmentTime" step="300" autocomplete="off" required>
                     </div>
+                    <div class="modal-workspace-field" id="manualAppointmentAvailableAgainField" hidden><div class="modal-workspace-label">Weer beschikbaar vanaf (optioneel)</div><input type="time" class="modal-workspace-input" id="manualAppointmentAvailableAgain" step="300" autocomplete="off"></div>
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Locatie</div>
                         <input type="text" class="modal-workspace-input" id="manualAppointmentLocation" placeholder="Bijv. kantoor, Teams, klantlocatie" maxlength="240" autocomplete="off">
@@ -1596,7 +1597,7 @@
     const manualAppointmentOverlay = document.getElementById('manualAppointmentOverlay');
     const manualAppointmentModal = manualAppointmentOverlay ? manualAppointmentOverlay.querySelector('.manual-appointment-modal') : null;
     const manualAppointmentDateLine = document.getElementById('manualAppointmentDateLine');
-    const manualAppointmentTimeEl = document.getElementById('manualAppointmentTime');
+    const manualAppointmentTimeEl = document.getElementById('manualAppointmentTime'); const manualAppointmentAvailableAgainEl = document.getElementById('manualAppointmentAvailableAgain');
     const manualAppointmentActivityTimeEl = document.getElementById('manualAppointmentActivityTime');
     const manualAppointmentLegendChoiceEl = document.getElementById('manualAppointmentLegendChoice');
     const manualAppointmentActivityEl = document.getElementById('manualAppointmentActivity');
@@ -2044,7 +2045,7 @@
             activeOrderId: Number(item.activeOrderId || 0) || null,
             activeOrderAddedAt: String(item.activeOrderAddedAt || ''),
             referenceImages: normalizeReferenceImageList(item.referenceImages || item.attachments || []),
-            manualPlannerWho: String(item.manualPlannerWho || ''), manualLegendChoice: String(item.manualLegendChoice || item.legendChoice || ''), appointmentKind: String(item.appointmentKind || item.manualAppointmentKind || ''), manualPhone: String(item.manualPhone || item.phone || ''), manualLeadOwnerKey: String(item.manualLeadOwnerKey || ''), manualLeadOwnerName: String(item.manualLeadOwnerName || ''), leadOwnerKey: String(item.leadOwnerKey || ''), leadOwnerName: String(item.leadOwnerName || ''), leadOwnerFullName: String(item.leadOwnerFullName || ''),
+            manualPlannerWho: String(item.manualPlannerWho || ''), manualLegendChoice: String(item.manualLegendChoice || item.legendChoice || ''), appointmentKind: String(item.appointmentKind || item.manualAppointmentKind || ''), manualPhone: String(item.manualPhone || item.phone || ''), manualLeadOwnerKey: String(item.manualLeadOwnerKey || ''), manualLeadOwnerName: String(item.manualLeadOwnerName || ''), leadOwnerKey: String(item.leadOwnerKey || ''), leadOwnerName: String(item.leadOwnerName || ''), leadOwnerFullName: String(item.leadOwnerFullName || ''), manualAvailableAgain: String(item.manualAvailableAgain || item.availableAgain || item.available_after || ''), availableAgain: String(item.availableAgain || item.available_after || item.manualAvailableAgain || ''),
             manualAllDayUnavailable: Boolean(item.manualAllDayUnavailable),
             uiFallback: Boolean(item.uiFallback),
         };
@@ -2355,7 +2356,7 @@
 
     async function submitManualAppointment() {
         if (!manualAppointmentSelectedDate || manualAppointmentSaving) return;
-        const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : '';
+        const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : ''; const availableAgainVal = manualAppointmentAvailableAgainEl ? String(manualAppointmentAvailableAgainEl.value || '').trim() : '';
         const legendChoice = getManualAppointmentLegendChoice();
         const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
         const location = manualAppointmentLocationEl ? String(manualAppointmentLocationEl.value || '').trim() : '';
@@ -2363,9 +2364,7 @@
         const isMeeting = isManualAppointmentMeetingFlow();
         const isBusinessAppointment = manualAppointmentKind === 'business' && manualAppointmentBusinessType === 'appointment';
         const appointmentKind = isMeeting ? 'meeting' : isBusinessAppointment ? 'appointment' : 'overig';
-        const who = isMeeting ? 'both' : String(manualAppointmentWho || '').trim();
-        const leadOwnerKey = isMeeting && (manualAppointmentWho === 'serve' || manualAppointmentWho === 'martijn') ? manualAppointmentWho : '';
-
+        const who = isMeeting ? 'both' : String(manualAppointmentWho || '').trim(); const leadOwnerKey = isMeeting && (manualAppointmentWho === 'serve' || manualAppointmentWho === 'martijn') ? manualAppointmentWho : ''; const canStoreAvailableAgain = appointmentKind === 'overig' && (who === 'serve' || who === 'martijn');
         if (manualAppointmentKind !== 'business' && manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
             setManualAppointmentStatus('Kies eerst wat je wilt inplannen.', 'error');
             return;
@@ -2395,6 +2394,7 @@
             setManualAppointmentStatus('Vul een geldig tijdstip in.', 'error');
             return;
         }
+        if (availableAgainVal && (!canStoreAvailableAgain || parseManualTimeToMinutes(availableAgainVal) === null)) { setManualAppointmentStatus('Vul een geldig tijdstip in bij weer beschikbaar vanaf.', 'error'); return; }
         if (!location) {
             setManualAppointmentStatus('Vul een locatie in.', 'error');
             return;
@@ -2410,7 +2410,7 @@
                 who,
                 title: activity,
                 time: timeVal,
-                activityTime: timeVal,
+                activityTime: timeVal, availableAgain: canStoreAvailableAgain ? availableAgainVal : '',
                 legendChoice, appointmentKind, manualBusinessType: manualAppointmentBusinessType, manualLeadOwner: leadOwnerKey, leadOwnerKey,
                 activity, phone: getManualAppointmentPhoneValue(), manualPhone: getManualAppointmentPhoneValue(),
                 location,
@@ -3515,7 +3515,7 @@
     document.querySelectorAll('[data-manual-who]').forEach((button) => {
         button.addEventListener('click', () => {
             manualAppointmentWho = String(button.getAttribute('data-manual-who') || '').trim();
-            setManualAppointmentActiveChoices();
+            syncManualAppointmentDetailsMode(); setManualAppointmentActiveChoices();
         });
     });
     if (manualAppointmentSubmitBtn) {

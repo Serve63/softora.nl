@@ -37,15 +37,21 @@ function getManualAppointmentPhoneValue() {
     return input ? String(input.value || '').trim() : '';
 }
 
+function isManualPrivateSingleAppointment() {
+    return manualAppointmentKind === 'overig' && (manualAppointmentWho === 'serve' || manualAppointmentWho === 'martijn');
+}
+
 function syncManualAppointmentDetailsMode() {
     const isMeeting = isManualAppointmentMeetingFlow();
     const whoLabel = document.getElementById('manualAppointmentWhoLabel');
     const whoChoices = document.getElementById('manualAppointmentWhoChoices');
     const bothChoice = document.querySelector('[data-manual-who="both"]');
+    const availableAgainField = document.getElementById('manualAppointmentAvailableAgainField');
     if (whoLabel) whoLabel.textContent = isMeeting ? 'Wie heeft deze lead geregeld?' : 'Voor wie?';
     if (whoChoices) whoChoices.setAttribute('aria-label', isMeeting ? 'Wie heeft deze lead geregeld?' : 'Voor wie is deze afspraak?');
     if (bothChoice) bothChoice.hidden = isMeeting;
     if (isMeeting && manualAppointmentWho === 'both') manualAppointmentWho = '';
+    if (availableAgainField) availableAgainField.hidden = !isManualPrivateSingleAppointment();
 }
 
 function setManualAppointmentStep(step) {
@@ -73,6 +79,7 @@ function resetManualAppointmentWizard() {
     manualAppointmentMeetingType = '';
     manualAppointmentWho = '';
     if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '';
+    if (manualAppointmentAvailableAgainEl) manualAppointmentAvailableAgainEl.value = '';
     if (manualAppointmentActivityTimeEl) manualAppointmentActivityTimeEl.value = '';
     if (manualAppointmentLegendChoiceEl) manualAppointmentLegendChoiceEl.value = '';
     if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';

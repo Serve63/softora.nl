@@ -554,6 +554,10 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
         dateRow.appendChild(createField('Datum', '<input type="date" class="modal-workspace-input" id="appointmentEditDate" autocomplete="off">'));
         dateRow.appendChild(createField('Tijdstip', '<input type="time" class="modal-workspace-input" id="appointmentEditTime" step="300" autocomplete="off">'));
         grid.appendChild(dateRow);
+        const availableAgain = createField('Weer beschikbaar vanaf (optioneel)', '<input type="time" class="modal-workspace-input" id="appointmentEditAvailableAgain" step="300" autocomplete="off">');
+        availableAgain.id = 'appointmentEditAvailableAgainField';
+        availableAgain.hidden = true;
+        grid.appendChild(availableAgain);
         grid.appendChild(createField('Telefoonnummer (optioneel)', '<input type="tel" class="modal-workspace-input" id="appointmentEditPhone" maxlength="80" inputmode="tel" autocomplete="tel">'));
         grid.appendChild(createField('Locatie', '<input type="text" class="modal-workspace-input" id="appointmentEditLocation" maxlength="240" autocomplete="off">'));
         grid.appendChild(createField('Opmerkingen', '<textarea class="modal-workspace-input" id="appointmentEditNotes" maxlength="1000" autocomplete="off"></textarea>'));
@@ -595,6 +599,14 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
         if (field && legend) field.hidden = !isMeetingLegend(legend.value);
     }
 
+    function syncAvailableAgainVisibility() {
+        const field = byId('appointmentEditAvailableAgainField');
+        const legend = byId('appointmentEditLegend');
+        if (!field || !legend) return;
+        const choice = normalizeManualLegendChoice(legend.value);
+        field.hidden = choice !== 'private-serve' && choice !== 'private-martijn';
+    }
+
     function canEditAppointment(apt) {
         return Boolean(apt) && isManualAgendaAppointment(apt);
     }
@@ -604,11 +616,13 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
         byId('appointmentEditTitle').value = String((apt && apt.company) || '').trim();
         byId('appointmentEditDate').value = normalizeAgendaDateYmd(apt && apt.date);
         byId('appointmentEditTime').value = String((apt && (apt.time || apt.manualActivityTime)) || '').trim();
+        byId('appointmentEditAvailableAgain').value = String((apt && (apt.manualAvailableAgain || apt.availableAgain)) || '').trim();
         byId('appointmentEditPhone').value = String((apt && (apt.manualPhone || apt.phone || apt.contactPhone)) || '').trim();
         byId('appointmentEditLocation').value = resolveAppointmentLocationDisplay(apt);
         byId('appointmentEditNotes').value = extractManualNotes(apt);
         byId('appointmentEditLeadOwner').value = String((apt && (apt.manualLeadOwnerKey || apt.leadOwnerKey)) || '').trim();
         syncLeadOwnerVisibility();
+        syncAvailableAgainVisibility();
         setEditStatus('');
     }
 
@@ -675,10 +689,15 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
         } else if (legendChoice === 'private-serve') {
             appointmentKind = 'overig';
         }
+        const availableAgain =
+            legendChoice === 'private-serve' || legendChoice === 'private-martijn'
+                ? String(byId('appointmentEditAvailableAgain').value || '').trim()
+                : '';
         return {
             date: String(byId('appointmentEditDate').value || '').trim(),
             time: String(byId('appointmentEditTime').value || '').trim(),
             activityTime: String(byId('appointmentEditTime').value || '').trim(),
+            availableAgain,
             title: String(byId('appointmentEditTitle').value || '').trim(),
             activity: String(byId('appointmentEditTitle').value || '').trim(),
             phone: String(byId('appointmentEditPhone').value || '').trim(),
@@ -756,6 +775,7 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
     byId('appointmentEditCancelBtn')?.addEventListener('click', () => setEditMode(false));
     byId('appointmentEditSaveBtn')?.addEventListener('click', () => { void saveEdit(); });
     byId('appointmentEditLegend')?.addEventListener('change', syncLeadOwnerVisibility);
+    byId('appointmentEditLegend')?.addEventListener('change', syncAvailableAgainVisibility);
     syncEditButtonVisibility();
 })();
 
