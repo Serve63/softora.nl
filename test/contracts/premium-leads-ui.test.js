@@ -5,8 +5,15 @@ const path = require('path');
 
 test('premium leads page bootstraps leads before async refresh starts', () => {
   const pagePath = path.join(__dirname, '../../premium-ai-coldmailing.html');
+  const assignmentPagesPath = path.join(__dirname, '../../assets/premium-personal-assignment-pages.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const assignmentPagesSource = fs.readFileSync(assignmentPagesPath, 'utf8');
+  const combinedSource = `${pageSource}\n${assignmentPagesSource}`;
 
+  assert.match(pageSource, /assets\/premium-personal-assignment-filter\.css\?v=20260510a/);
+  assert.match(pageSource, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/);
+  assert.match(pageSource, /id="onlyMyAssignmentsLeadsToggle" data-only-my-assignments-toggle type="checkbox"/);
+  assert.match(pageSource, /Enkel mijn toewijzingen bekijken/);
   assert.match(pageSource, /<!-- SOFTORA_LEADS_BOOTSTRAP -->/);
   assert.match(pageSource, /<div class="lead-status" id="leadStatus"><!-- SOFTORA_LEADS_STATUS --><\/div>/);
   assert.match(pageSource, /<div class="lead-list" id="leadList"(?: style="visibility:hidden;")?><!-- SOFTORA_LEADS_LIST --><\/div>/);
@@ -92,6 +99,10 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.doesNotMatch(pageSource, /\/api\/coldcalling\/call-updates\?limit=500', 10000/);
   assert.doesNotMatch(pageSource, /\/api\/ai\/call-insights\?limit=500', 10000/);
   assert.match(pageSource, /function leadRowsDiffer\(a, b\)/);
+  assert.match(combinedSource, /function syncLeadsPage\(\) \{/);
+  assert.match(combinedSource, /Nog geen leads aan jou toegewezen\./);
+  assert.match(combinedSource, /root\.__softoraLeadsPageCount = visibleCount;/);
+  assert.match(pageSource, /<script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
   assert.match(pageSource, /let lastLeadStatusTimestamp = 0;/);
   assert.match(pageSource, /lastLeadStatusTimestamp = safeDate\.getTime\(\);/);
   assert.match(pageSource, /function readSharedCallSummaryCache\(\) \{\s*return sharedCallSummaryCacheByCallId;\s*\}/);
