@@ -412,6 +412,11 @@ test('premium agenda verbergt dealacties voor handmatige overige afspraken en be
   assert.match(stabilitySource, /function isManualAgendaAppointment\(item\)/);
   assert.match(stabilitySource, /function isManualOtherAppointment\(apt\)/);
   assert.match(stabilitySource, /function canCompleteAppointmentManually\(apt\)/);
+  assert.match(stabilitySource, /function normalizeAgendaLegend\(\)/);
+  assert.match(stabilitySource, /label: 'Privé Servé'/);
+  assert.match(stabilitySource, /label: 'Privé Martijn'/);
+  assert.doesNotMatch(stabilitySource, /label: 'Activiteit Martijn'/);
+  assert.doesNotMatch(stabilitySource, /label: 'Activiteit allebei'/);
   assert.match(stabilitySource, /if \(kind === 'meeting'\) return false;/);
   assert.match(stabilitySource, /apt\.summary/);
   assert.match(stabilitySource, /choice === 'manual-overig' \|\| choice === 'private-serve' \|\| choice === 'private-martijn'/);

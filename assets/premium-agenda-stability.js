@@ -73,6 +73,68 @@ function canCompleteAppointmentManually(apt) {
     return isManualOtherAppointment(apt);
 }
 
+(function ensureAgendaLegendIsNormalized() {
+    const LEGEND_ITEMS = [
+        { className: 'website', label: 'Website Meeting' },
+        { className: 'business', label: 'Bedrijfssoftware Meeting' },
+        { className: 'voice', label: 'Voicesoftware Meeting' },
+        { className: 'chatbot', label: 'Chatbot Meeting' },
+        { className: 'manual-serve', label: 'Activiteit Servé' },
+        { className: 'manual-overig', label: 'Afspraak' },
+        { className: 'private-serve', label: 'Privé Servé' },
+        { className: 'private-martijn', label: 'Privé Martijn' },
+        { className: 'completed', label: 'Activiteit afgerond' },
+    ];
+
+    function createLegendItem(definition) {
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        const dot = document.createElement('div');
+        dot.className = `legend-dot ${definition.className}`;
+        item.appendChild(dot);
+        item.appendChild(document.createTextNode(` ${definition.label}`));
+        return item;
+    }
+
+    function normalizeLegendItem(item, definition) {
+        if (!item) return createLegendItem(definition);
+        let dot = item.querySelector('.legend-dot');
+        if (!dot) {
+            dot = document.createElement('div');
+            item.prepend(dot);
+        }
+        dot.className = `legend-dot ${definition.className}`;
+        item.className = 'legend-item';
+        item.replaceChildren(dot, document.createTextNode(` ${definition.label}`));
+        return item;
+    }
+
+    function normalizeAgendaLegend() {
+        const legend = document.querySelector('.calendar-legend');
+        if (!legend) return;
+
+        const existingByLabel = new Map();
+        legend.querySelectorAll('.legend-item').forEach((item) => {
+            const label = String(item.textContent || '').trim();
+            if (label) existingByLabel.set(label, item);
+        });
+
+        LEGEND_ITEMS.forEach((definition) => {
+            const existing = existingByLabel.get(definition.label);
+            existingByLabel.delete(definition.label);
+            legend.appendChild(normalizeLegendItem(existing, definition));
+        });
+
+        existingByLabel.forEach((item) => item.remove());
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', normalizeAgendaLegend, { once: true });
+    } else {
+        normalizeAgendaLegend();
+    }
+})();
+
 function setModalDetailValueHidden(valueElementId, hidden) {
     const valueElement = document.getElementById(valueElementId);
     const detailItem = valueElement ? valueElement.closest('.modal-detail-item') : null;
