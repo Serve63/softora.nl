@@ -66,6 +66,8 @@ test('premium dashboard verbergt selectors naast de datum en toont jaaromzet', (
   assert.doesNotMatch(pageSource, />PERSONEEL BEHEER<\/span>/);
   assert.match(pageSource, /class="dashboard-topbar-controls"/);
   assert.match(pageSource, /class="topbar-date"/);
+  assert.match(pageSource, /id="revenuePanelBadge">Omzet per maand<\/span>/);
+  assert.doesNotMatch(pageSource, /id="revenuePanelBadge">Betaald per maand<\/span>/);
   assert.doesNotMatch(pageSource, /id="dashboardPeriodDropdown"/);
   assert.doesNotMatch(pageSource, /id="dashboardPeriodTrigger"/);
   assert.doesNotMatch(pageSource, /id="dashboardPeriodMenu"/);
