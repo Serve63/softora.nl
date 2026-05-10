@@ -18,42 +18,78 @@
     { top: '62%', left: '62%', width: '45%', height: '52%', rotate: -4 },
   ];
 
-  var GENERATED_PHOTOS = {
+  var DESTINATION_PHOTOS = {
+    zon: {
+      Santorini: '/assets/flynow/flynow-zon-photo-1.jpg',
+      Curacao: '/assets/flynow/flynow-zon-photo-2.jpg',
+      Tenerife: '/assets/flynow/flynow-zon-photo-3.jpg',
+      Mykonos: '/assets/flynow/flynow-zon-photo-4.jpg',
+      Mallorca: '/assets/flynow/flynow-zon-photo-5.jpg',
+      Zanzibar: '/assets/flynow/flynow-zon-photo-6.jpg',
+      Dubai: '/assets/flynow/flynow-zon-photo-7.jpg',
+      Algarve: '/assets/flynow/flynow-zon-photo-8.jpg',
+      Kreta: '/assets/flynow/flynow-zon-photo-9.jpg',
+      Ibiza: '/assets/flynow/flynow-zon-photo-10.jpg',
+    },
+    sneeuw: {
+      Zermatt: '/assets/flynow/flynow-sneeuw-photo-1.jpg',
+      Chamonix: '/assets/flynow/flynow-sneeuw-photo-2.jpg',
+      'Val Thorens': '/assets/flynow/flynow-sneeuw-photo-3.jpg',
+      Verbier: '/assets/flynow/flynow-sneeuw-photo-4.jpg',
+      Innsbruck: '/assets/flynow/flynow-sneeuw-photo-5.jpg',
+      Bansko: '/assets/flynow/flynow-sneeuw-photo-6.jpg',
+      'St. Moritz': '/assets/flynow/flynow-sneeuw-photo-7.jpg',
+      'Zell am See': '/assets/flynow/flynow-sneeuw-photo-8.jpg',
+      Courchevel: '/assets/flynow/flynow-sneeuw-photo-9.jpg',
+    },
+  };
+
+  var COLLAGE_PHOTOS = {
     zon: [
-      '/assets/flynow/flynow-zon-photo-1.jpg',
-      '/assets/flynow/flynow-zon-photo-2.jpg',
-      '/assets/flynow/flynow-zon-photo-3.jpg',
-      '/assets/flynow/flynow-zon-photo-4.jpg',
+      DESTINATION_PHOTOS.zon.Santorini,
+      DESTINATION_PHOTOS.zon.Curacao,
+      DESTINATION_PHOTOS.zon.Tenerife,
+      DESTINATION_PHOTOS.zon.Mykonos,
+      DESTINATION_PHOTOS.zon.Mallorca,
+      DESTINATION_PHOTOS.zon.Zanzibar,
+      DESTINATION_PHOTOS.zon.Dubai,
+      DESTINATION_PHOTOS.zon.Algarve,
+      DESTINATION_PHOTOS.zon.Kreta,
     ],
     sneeuw: [
-      '/assets/flynow/flynow-sneeuw-photo-1.jpg',
-      '/assets/flynow/flynow-sneeuw-photo-2.jpg',
-      '/assets/flynow/flynow-sneeuw-photo-3.jpg',
-      '/assets/flynow/flynow-sneeuw-photo-4.jpg',
+      DESTINATION_PHOTOS.sneeuw.Zermatt,
+      DESTINATION_PHOTOS.sneeuw.Chamonix,
+      DESTINATION_PHOTOS.sneeuw['Val Thorens'],
+      DESTINATION_PHOTOS.sneeuw.Verbier,
+      DESTINATION_PHOTOS.sneeuw.Innsbruck,
+      DESTINATION_PHOTOS.sneeuw.Bansko,
+      DESTINATION_PHOTOS.sneeuw['St. Moritz'],
+      DESTINATION_PHOTOS.sneeuw['Zell am See'],
+      DESTINATION_PHOTOS.sneeuw.Courchevel,
     ],
   };
 
   var TRIP_POOL = {
     zon: [
-      { dest: 'Santorini', land: 'Griekenland', photo: GENERATED_PHOTOS.zon[0], tags: ['7 nachten', 'All-inclusive', 'Vliegtuig'], price: 749, was: 1199, score: 96, deal: 'best' },
-      { dest: 'Curacao', land: 'Caribbean', photo: GENERATED_PHOTOS.zon[1], tags: ['10 nachten', 'Ontbijt', 'Vliegtuig'], price: 1249, was: 1899, score: 94, deal: 'rare' },
-      { dest: 'Tenerife', land: 'Spanje', photo: GENERATED_PHOTOS.zon[2], tags: ['7 nachten', 'Halfpension', 'Vliegtuig'], price: 499, was: 749, score: 91, deal: null },
-      { dest: 'Mykonos', land: 'Griekenland', photo: GENERATED_PHOTOS.zon[3], tags: ['5 nachten', 'Ontbijt', 'Vliegtuig'], price: 889, was: 1299, score: 88, deal: 'hot' },
-      { dest: 'Mallorca', land: 'Spanje', photo: GENERATED_PHOTOS.zon[0], tags: ['10 nachten', 'Halfpension', 'Vliegtuig'], price: 649, was: 899, score: 87, deal: null },
-      { dest: 'Zanzibar', land: 'Tanzania', photo: GENERATED_PHOTOS.zon[1], tags: ['9 nachten', 'All-inclusive', 'Vliegtuig'], price: 1499, was: 2199, score: 93, deal: 'rare' },
-      { dest: 'Dubai', land: 'VAE', photo: GENERATED_PHOTOS.zon[2], tags: ['6 nachten', 'Ontbijt', 'Vliegtuig'], price: 999, was: 1499, score: 86, deal: null },
-      { dest: 'Algarve', land: 'Portugal', photo: GENERATED_PHOTOS.zon[3], tags: ['8 nachten', 'Halfpension', 'Vliegtuig'], price: 579, was: 799, score: 85, deal: null },
-      { dest: 'Kreta', land: 'Griekenland', photo: GENERATED_PHOTOS.zon[0], tags: ['7 nachten', 'All-inclusive', 'Vliegtuig'], price: 699, was: 949, score: 89, deal: 'hot' },
-      { dest: 'Ibiza', land: 'Spanje', photo: GENERATED_PHOTOS.zon[1], tags: ['5 nachten', 'Ontbijt', 'Vliegtuig'], price: 599, was: 899, score: 84, deal: null },
+      { dest: 'Santorini', land: 'Griekenland', photo: DESTINATION_PHOTOS.zon.Santorini, tags: ['7 nachten', 'All-inclusive', 'Vliegtuig'], price: 749, was: 1199, score: 96, deal: 'best' },
+      { dest: 'Curacao', land: 'Caribbean', photo: DESTINATION_PHOTOS.zon.Curacao, tags: ['10 nachten', 'Ontbijt', 'Vliegtuig'], price: 1249, was: 1899, score: 94, deal: 'rare' },
+      { dest: 'Tenerife', land: 'Spanje', photo: DESTINATION_PHOTOS.zon.Tenerife, tags: ['7 nachten', 'Halfpension', 'Vliegtuig'], price: 499, was: 749, score: 91, deal: null },
+      { dest: 'Mykonos', land: 'Griekenland', photo: DESTINATION_PHOTOS.zon.Mykonos, tags: ['5 nachten', 'Ontbijt', 'Vliegtuig'], price: 889, was: 1299, score: 88, deal: 'hot' },
+      { dest: 'Mallorca', land: 'Spanje', photo: DESTINATION_PHOTOS.zon.Mallorca, tags: ['10 nachten', 'Halfpension', 'Vliegtuig'], price: 649, was: 899, score: 87, deal: null },
+      { dest: 'Zanzibar', land: 'Tanzania', photo: DESTINATION_PHOTOS.zon.Zanzibar, tags: ['9 nachten', 'All-inclusive', 'Vliegtuig'], price: 1499, was: 2199, score: 93, deal: 'rare' },
+      { dest: 'Dubai', land: 'VAE', photo: DESTINATION_PHOTOS.zon.Dubai, tags: ['6 nachten', 'Ontbijt', 'Vliegtuig'], price: 999, was: 1499, score: 86, deal: null },
+      { dest: 'Algarve', land: 'Portugal', photo: DESTINATION_PHOTOS.zon.Algarve, tags: ['8 nachten', 'Halfpension', 'Vliegtuig'], price: 579, was: 799, score: 85, deal: null },
+      { dest: 'Kreta', land: 'Griekenland', photo: DESTINATION_PHOTOS.zon.Kreta, tags: ['7 nachten', 'All-inclusive', 'Vliegtuig'], price: 699, was: 949, score: 89, deal: 'hot' },
+      { dest: 'Ibiza', land: 'Spanje', photo: DESTINATION_PHOTOS.zon.Ibiza, tags: ['5 nachten', 'Ontbijt', 'Vliegtuig'], price: 599, was: 899, score: 84, deal: null },
     ],
     sneeuw: [
-      { dest: 'Zermatt', land: 'Zwitserland', photo: GENERATED_PHOTOS.sneeuw[0], tags: ['7 nachten', 'Halfpension', 'Ski-pass'], price: 1299, was: 1899, score: 95, deal: 'rare' },
-      { dest: 'Chamonix', land: 'Frankrijk', photo: GENERATED_PHOTOS.sneeuw[1], tags: ['7 nachten', 'Halfpension', 'Ski-pass'], price: 999, was: 1399, score: 91, deal: 'hot' },
-      { dest: 'Val Thorens', land: 'Frankrijk', photo: GENERATED_PHOTOS.sneeuw[2], tags: ['7 nachten', 'Halfpension', 'Ski-pass'], price: 1099, was: 1599, score: 90, deal: null },
-      { dest: 'Verbier', land: 'Zwitserland', photo: GENERATED_PHOTOS.sneeuw[3], tags: ['5 nachten', 'Ontbijt', 'Ski-pass'], price: 1199, was: 1799, score: 88, deal: null },
-      { dest: 'Innsbruck', land: 'Oostenrijk', photo: GENERATED_PHOTOS.sneeuw[0], tags: ['5 nachten', 'Ontbijt', 'Ski-pass'], price: 699, was: 999, score: 87, deal: null },
-      { dest: 'Bansko', land: 'Bulgarije', photo: GENERATED_PHOTOS.sneeuw[1], tags: ['7 nachten', 'All-in', 'Vliegtuig'], price: 449, was: 799, score: 83, deal: 'cheap' },
-      { dest: 'St. Moritz', land: 'Zwitserland', photo: GENERATED_PHOTOS.sneeuw[2], tags: ['6 nachten', 'Halfpension', 'Ski-pass'], price: 1599, was: 2199, score: 93, deal: 'rare' },
+      { dest: 'Zermatt', land: 'Zwitserland', photo: DESTINATION_PHOTOS.sneeuw.Zermatt, tags: ['7 nachten', 'Halfpension', 'Ski-pass'], price: 1299, was: 1899, score: 95, deal: 'rare' },
+      { dest: 'Chamonix', land: 'Frankrijk', photo: DESTINATION_PHOTOS.sneeuw.Chamonix, tags: ['7 nachten', 'Halfpension', 'Ski-pass'], price: 999, was: 1399, score: 91, deal: 'hot' },
+      { dest: 'Val Thorens', land: 'Frankrijk', photo: DESTINATION_PHOTOS.sneeuw['Val Thorens'], tags: ['7 nachten', 'Halfpension', 'Ski-pass'], price: 1099, was: 1599, score: 90, deal: null },
+      { dest: 'Verbier', land: 'Zwitserland', photo: DESTINATION_PHOTOS.sneeuw.Verbier, tags: ['5 nachten', 'Ontbijt', 'Ski-pass'], price: 1199, was: 1799, score: 88, deal: null },
+      { dest: 'Innsbruck', land: 'Oostenrijk', photo: DESTINATION_PHOTOS.sneeuw.Innsbruck, tags: ['5 nachten', 'Ontbijt', 'Ski-pass'], price: 699, was: 999, score: 87, deal: null },
+      { dest: 'Bansko', land: 'Bulgarije', photo: DESTINATION_PHOTOS.sneeuw.Bansko, tags: ['7 nachten', 'All-in', 'Vliegtuig'], price: 449, was: 799, score: 83, deal: 'cheap' },
+      { dest: 'St. Moritz', land: 'Zwitserland', photo: DESTINATION_PHOTOS.sneeuw['St. Moritz'], tags: ['6 nachten', 'Halfpension', 'Ski-pass'], price: 1599, was: 2199, score: 93, deal: 'rare' },
     ],
   };
 
@@ -93,8 +129,8 @@
     });
   }
 
-  function loadGeneratedPhotos() {
-    collagePhotos = GENERATED_PHOTOS[currentType].slice();
+  function loadCollagePhotos() {
+    collagePhotos = COLLAGE_PHOTOS[currentType].slice();
     renderCollage();
   }
 
@@ -187,7 +223,7 @@
     }
     rejected = [];
     spawnParticles();
-    loadGeneratedPhotos();
+    loadCollagePhotos();
     if (trips.length) searchTrips();
   }
 
@@ -421,6 +457,6 @@
   }
 
   bindEvents();
-  loadGeneratedPhotos();
+  loadCollagePhotos();
   spawnParticles();
 })();
