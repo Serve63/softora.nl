@@ -218,7 +218,7 @@ test('premium mailbox behoudt eigen layout en vaste sidebar bij responsive mailw
   assert.match(pageSource, /\.topbar-title-wrap \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*45;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*overflow-y:\s*auto;[\s\S]*z-index:\s*60;/);
   assert.match(pageSource, /\.mail-detail \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
-  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260507b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260511a"><\/script>/);
 });
 
 test('premium flynow gebruikt de dynamische canonical sidebar-host', () => {
