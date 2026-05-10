@@ -7,6 +7,7 @@ function readActiveOrdersSources() {
   const pagePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
   const bootScriptPath = path.join(__dirname, '../../assets/premium-active-orders-boot.js');
   const assigneeScriptPath = path.join(__dirname, '../../assets/premium-active-orders-assignee.js');
+  const customerDbScriptPath = path.join(__dirname, '../../assets/premium-active-orders-customer-db.js');
   const assigneeStylePath = path.join(__dirname, '../../assets/premium-active-orders-assignee.css');
   const assignmentFilterScriptPath = path.join(__dirname, '../../assets/premium-personal-assignment-filter.js');
   const assignmentFilterStylePath = path.join(__dirname, '../../assets/premium-personal-assignment-filter.css');
@@ -16,6 +17,7 @@ function readActiveOrdersSources() {
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const bootScriptSource = fs.readFileSync(bootScriptPath, 'utf8');
   const assigneeScriptSource = fs.readFileSync(assigneeScriptPath, 'utf8');
+  const customerDbScriptSource = fs.readFileSync(customerDbScriptPath, 'utf8');
   const assigneeStyleSource = fs.readFileSync(assigneeStylePath, 'utf8');
   const assignmentFilterScriptSource = fs.readFileSync(assignmentFilterScriptPath, 'utf8');
   const assignmentFilterStyleSource = fs.readFileSync(assignmentFilterStylePath, 'utf8');
@@ -29,20 +31,21 @@ function readActiveOrdersSources() {
     assignmentFilterStyleSource,
     assignmentPagesScriptSource,
     bootScriptSource,
+    customerDbScriptSource,
     leadsTabScriptSource,
     pageSource,
     scriptSource,
-    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${assignmentFilterStyleSource}\n${assignmentFilterScriptSource}\n${scriptSource}\n${leadsTabScriptSource}\n${assignmentPagesScriptSource}`,
+    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${customerDbScriptSource}\n${assignmentFilterStyleSource}\n${assignmentFilterScriptSource}\n${scriptSource}\n${leadsTabScriptSource}\n${assignmentPagesScriptSource}`,
   };
 }
 
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
-  const { pageSource, scriptSource, leadsTabScriptSource, combinedSource: source } = readActiveOrdersSources();
+  const { customerDbScriptSource, pageSource, scriptSource, leadsTabScriptSource, combinedSource: source } = readActiveOrdersSources();
 
   assert.match(pageSource, /assets\/premium-personal-assignment-filter\.css\?v=20260510a/);
   assert.match(pageSource, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/);
   assert.match(pageSource, /Enkel mijn toewijzingen bekijken/);
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260510c"><\/script><script src="assets\/premium-active-orders-leads-tab\.js\?v=20260510a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260510d"><\/script><script src="assets\/premium-active-orders-leads-tab\.js\?v=20260510a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -170,6 +173,15 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /companyName,\s*contactName: contactPerson,\s*contactPhone: linkedContactPhone,\s*contactEmail: linkedContactEmail,/);
   assert.match(source, /const companyName = String\(item\?\.companyName \|\| ''\)\.trim\(\);/);
   assert.match(source, /const contactName = String\(item\?\.contactName \|\| ''\)\.trim\(\);/);
+  assert.match(scriptSource, /const activeOrdersCustomerDb = window\.SoftoraActiveOrdersCustomerDb\?\.createCustomerDbHelpers\?\.\(\{/);
+  assert.match(scriptSource, /const readCustomerDatabase = activeOrdersCustomerDb\?\.readCustomerDatabase \|\| \(async \(\) => \[\]\);/);
+  assert.match(scriptSource, /const persistCustomerDatabase = activeOrdersCustomerDb\?\.persistCustomerDatabase \|\| \(async \(\) => \{\}\);/);
+  assert.match(scriptSource, /const syncCustomerDatabaseAfterOrderRemoval =[\s\S]*activeOrdersCustomerDb\?\.syncCustomerDatabaseAfterOrderRemoval \|\| \(async \(\) => \{\}\);/);
+  assert.match(customerDbScriptSource, /function createCustomerDbHelpers\(deps = \{\}\) \{/);
+  assert.match(customerDbScriptSource, /const rawCustomers = readRemoteStateValue\(remoteState\?\.values, customerDbKey\);[\s\S]*parseCustomerDatabase\(rawCustomers\);/);
+  assert.match(customerDbScriptSource, /patch: buildStatePatch\(customerDbKey, serialized\),/);
+  assert.match(customerDbScriptSource, /const currentOrders = Array\.isArray\(getCustomOrders\(\)\) \? getCustomOrders\(\) : \[\];/);
+  assert.match(source, /let customerCleanupError = null;[\s\S]*await syncCustomerDatabaseAfterOrderRemoval\(record\);[\s\S]*customerCleanupError = error;[\s\S]*refreshOrderSummaryCards\(\);[\s\S]*closeModal\(\);[\s\S]*if \(customerCleanupError\) \{[\s\S]*Project is verwijderd\. Het gekoppelde klantrecord kon niet automatisch worden opgeschoond\./);
   assert.match(leadsTabScriptSource, /function ensureLeadFilterTab\(\) \{/);
   assert.match(leadsTabScriptSource, /function syncLeadFilterCountFromSidebarBadge\(\) \{/);
   assert.match(leadsTabScriptSource, /function initLeadFilterCountMirror\(\) \{/);

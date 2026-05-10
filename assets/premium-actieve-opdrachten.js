@@ -373,6 +373,21 @@ function getOrderCustomerMatchKey(record) {
     return `${normalizeMatchValue(company)}|${normalizeMatchValue(name)}|${normalizeMatchValue(explicitPhone)}`;
 }
 
+const activeOrdersCustomerDb = window.SoftoraActiveOrdersCustomerDb?.createCustomerDbHelpers?.({
+    customerDbScope: CUSTOMER_DB_SCOPE,
+    customerDbKey: CUSTOMER_DB_KEY,
+    fetchUiStateGetWithFallback,
+    fetchUiStateSetWithFallback,
+    parseCustomerDatabase,
+    getOrderCustomerMatchKey,
+    getCustomOrders: () => customOrders
+}) || null;
+
+const readCustomerDatabase = activeOrdersCustomerDb?.readCustomerDatabase || (async () => []);
+const persistCustomerDatabase = activeOrdersCustomerDb?.persistCustomerDatabase || (async () => {});
+const syncCustomerDatabaseAfterOrderRemoval =
+    activeOrdersCustomerDb?.syncCustomerDatabaseAfterOrderRemoval || (async () => {});
+
 function parseCustomerDatabase(raw) {
     try {
         const parsed = JSON.parse(String(raw || '[]'));
@@ -411,27 +426,6 @@ function parseCustomerDatabase(raw) {
     }
 }
 
-async function readCustomerDatabase() {
-    try {
-        const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
-        const remoteCustomers = parseCustomerDatabase(remoteState?.values?.[CUSTOMER_DB_KEY]);
-        if (remoteCustomers.length) return remoteCustomers;
-    } catch (_) {
-        return [];
-    }
-}
-
-async function persistCustomerDatabase(customers) {
-    const serialized = JSON.stringify(Array.isArray(customers) ? customers : []);
-    await fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
-        patch: {
-            [CUSTOMER_DB_KEY]: serialized
-        },
-        source: 'premium-actieve-opdrachten',
-        actor: 'browser'
-    });
-}
-
 function removeGeneratedPreviewHtml(orderId) {
     writeStateValue(getPreviewStorageKey(orderId), '');
 }
@@ -451,26 +445,6 @@ function syncLastActiveOrderAfterRemoval(removedId) {
     }
 
     writeStateValue(ORDER_STATE_KEY, '');
-}
-
-async function syncCustomerDatabaseAfterOrderRemoval(record) {
-    const customerKey = getOrderCustomerMatchKey(record);
-    if (!customerKey) return;
-
-    const hasRemainingOrder = customOrders.some((item) => {
-        return Number(item?.id) !== Number(record?.id) && getOrderCustomerMatchKey(item) === customerKey;
-    });
-    if (hasRemainingOrder) return;
-
-    const customers = await readCustomerDatabase();
-    if (!customers.length) return;
-
-    const nextCustomers = customers.filter((customer) => {
-        return getOrderCustomerMatchKey(customer) !== customerKey;
-    });
-
-    if (nextCustomers.length === customers.length) return;
-    await persistCustomerDatabase(nextCustomers);
 }
 
 function setModalDeleteButtonState(label, disabled) {
@@ -2856,9 +2830,24 @@ async function removeProjectFromSystem(id) {
         const card = document.getElementById(`order-${numericId}`);
         if (card) card.remove();
 
-        await syncCustomerDatabaseAfterOrderRemoval(record);
+        let customerCleanupError = null;
+        try {
+            await syncCustomerDatabaseAfterOrderRemoval(record);
+        } catch (error) {
+            customerCleanupError = error;
+            console.error('Klantrecord opschonen na projectverwijdering mislukt:', error);
+        }
         refreshOrderSummaryCards();
         closeModal();
+        if (customerCleanupError) {
+            await showActiveOrderAlert(
+                'Project is verwijderd. Het gekoppelde klantrecord kon niet automatisch worden opgeschoond.',
+                {
+                    title: 'Project verwijderd',
+                    confirmText: 'Sluiten',
+                }
+            );
+        }
     } catch (error) {
         console.error('Project verwijderen mislukt:', error);
         customOrders = previousCustomOrders;
