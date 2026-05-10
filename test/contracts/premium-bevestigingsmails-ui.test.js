@@ -184,6 +184,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function renderCampaignRecipientList\(payload\)/);
   assert.match(pageSource, /\/api\/coldmailing\/campaigns\/recipients\?/);
   assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) params\.set\('mode', 'call'\);/);
+  assert.match(pageSource, /if \(serviceSelect && serviceSelect\.value\) params\.set\('service', serviceSelect\.value\);/);
+  assert.match(pageSource, /if \(specialActionSelect && specialActionSelect\.value\) params\.set\('specialAction', specialActionSelect\.value\);/);
   assert.match(pageSource, /recipient\.bedrijf \|\| 'Onbekend bedrijf'/);
   assert.match(pageSource, /const showPhone = isPremiumAiLeadGeneratorPath\(\);/);
   assert.match(pageSource, /function normalizeCampaignRecipientPhone\(value\)/);
@@ -204,16 +206,20 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /const pct = KM_OPTIES\.length > 1 \? \(index \/ \(KM_OPTIES\.length - 1\)\) \* 100 : 0;/);
   assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
   assert.match(pageSource, /Number\.isFinite\(Number\(countOverride\)\)/);
-  assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{[\s\S]*fetch\(getColdmailRecipientPreviewUrl\(\), \{ cache: 'no-store' \}\)[\s\S]*renderCampaignCompanyCount\(Number\(data && data\.selected\) \|\| recipients\.length\);/);
+  assert.match(pageSource, /const response = await fetch\(getColdmailRecipientPreviewUrl\(\), \{[\s\S]*method: 'GET',[\s\S]*credentials: 'same-origin',[\s\S]*headers: \{ Accept: 'application\/json' \},[\s\S]*cache: 'no-store',[\s\S]*\}\);/);
+  assert.match(pageSource, /const recipients = Array\.isArray\(data\.recipients\) \? data\.recipients : \[\];/);
+  assert.match(pageSource, /renderCampaignCompanyCount\(Number\(data\.selected\) \|\| recipients\.length\);/);
   assert.match(pageSource, /Math\.min\(requestedCount \|\| eligibleRows\.length, eligibleRows\.length\)/);
   assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\),/);
-  assert.match(pageSource, /renderCampaignCompanyCount\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);
+  assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);
   assert.match(pageSource, /initCampaignDatabaseAutoRefresh\(\);/);
   assert.match(pageSource, /const campaignBootTasks = \[/);
   assert.match(pageSource, /hydrateCampaignCompanyCountFromSupabase\(\),/);
   assert.match(pageSource, /setCampaignRecipientListOpen\(false\);/);
   assert.match(pageSource, /function configureCampaignVolumeControl\(\)/);
   assert.match(pageSource, /configureCampaignVolumeControl\(\);\s*updateSlider\(document\.getElementById\('mail-slider'\)/);
+  assert.match(pageSource, /if \(actualTotal <= 0\) \{[\s\S]*showToast\(firstFailure \|\| 'Er staan nog geen bedrijven met een klaar website-design voor deze campagne\.'\);[\s\S]*await hydrateCampaignCompanyCountFromSupabase\(\);[\s\S]*return;/);
+  assert.match(pageSource, /if \(actualTotal < n\) showToast\(actualTotal \+ ' bedrijf' \+ \(actualTotal === 1 \? '' : 'en'\) \+ ' zijn klaar met website-design en worden meegenomen\.'\);/);
 });
 
 test('premium bevestigingsmails hides mail onderwerp row only on lead-generator alias', () => {

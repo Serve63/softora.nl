@@ -312,7 +312,7 @@ test('coldmail campaign can disable automatic campaign end date', async () => {
   assert.equal(savedRows[0].activeColdmailCampaignUntil, '');
 });
 
-test('coldmail campaign refuses webdesign action when photo is missing', async () => {
+test('coldmail campaign refuses webdesign action when no ready website-design is available', async () => {
   const { service, sentMessages, getSavedState } = createService({
     rows: [
       {
@@ -336,9 +336,10 @@ test('coldmail campaign refuses webdesign action when photo is missing', async (
         specialAction: 'webdesign',
       }),
     (error) => {
-      assert.equal(error.code, 'SMTP_SEND_FAILED');
-      assert.match(error.message, /Geen webdesign-foto gevonden voor Bakkerij Zonder Foto/);
+      assert.equal(error.code, 'NO_RECIPIENTS');
+      assert.match(error.message, /Geen geschikte e-mailadressen gevonden/i);
       assert.equal(error.failedItems[0].email, 'ruben@example.test');
+      assert.match(error.failedItems[0].error, /Nog geen website-design klaar/i);
       return true;
     }
   );
@@ -625,6 +626,7 @@ test('coldcalling recipient preview selects callable phone rows', async () => {
   const result = await service.getColdmailCampaignRecipients({
     count: 10,
     mode: 'call',
+    service: 'Chatbots',
   });
 
   assert.equal(result.ok, true);
@@ -658,6 +660,7 @@ test('coldcalling recipient preview reads chunked lead database state', async ()
   const result = await service.getColdmailCampaignRecipients({
     count: 10,
     mode: 'call',
+    service: 'Chatbots',
   });
 
   assert.equal(result.ok, true);
@@ -706,6 +709,7 @@ test('coldcalling recipient preview supplements sparse lead rows from chunked cu
   const result = await service.getColdmailCampaignRecipients({
     count: 10,
     mode: 'call',
+    service: 'Chatbots',
   });
 
   assert.equal(result.ok, true);
@@ -747,6 +751,7 @@ test('coldcalling recipient preview accepts premium database telefoonnummer and 
     count: 10,
     mode: 'call',
     radiusKm: 40,
+    service: 'Chatbots',
   });
 
   assert.equal(result.ok, true);
@@ -784,6 +789,7 @@ test('coldcalling recipient preview skips phone numbers from the blocklist', asy
   const result = await service.getColdmailCampaignRecipients({
     count: 10,
     mode: 'call',
+    service: 'Chatbots',
     blockedPhones: '06 22 22 33 33',
   });
 
@@ -840,6 +846,124 @@ test('coldmailing recipient preview skips email addresses from the blocklist', a
       distanceKm: null,
     },
   ]);
+});
+
+test('coldmail preview for websites only counts companies with a ready website-design', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'ready-1',
+        bedrijf: 'Klaar Design BV',
+        naam: 'Servé',
+        email: 'klaar@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'missing-1',
+        bedrijf: 'Nog Geen Design BV',
+        naam: 'Martijn',
+        email: 'mist@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'ready-1': {
+        id: 'ready-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Klaar Design BV webdesign',
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    service: "Website's",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.selected, 1);
+  assert.deepEqual(result.recipients, [
+    {
+      id: 'ready-1',
+      bedrijf: 'Klaar Design BV',
+      email: 'klaar@example.test',
+      phone: '',
+      distanceKm: null,
+    },
+  ]);
+  assert.equal(result.failedItems.length, 1);
+  assert.equal(result.failedItems[0].bedrijf, 'Nog Geen Design BV');
+  assert.match(result.failedItems[0].error, /Nog geen website-design klaar/i);
+});
+
+test('coldcalling preview for websites only includes leads with a ready website-design match', async () => {
+  const customerRows = [
+    {
+      id: 'ready-customer',
+      bedrijf: 'Klaar Belbedrijf',
+      telefoon: '+31 6 11 11 22 22',
+      databaseStatus: 'benaderbaar',
+    },
+    {
+      id: 'missing-customer',
+      bedrijf: 'Zonder Design Belbedrijf',
+      telefoon: '+31 6 33 33 44 44',
+      databaseStatus: 'benaderbaar',
+    },
+  ];
+  const { service } = createService({
+    rows: [],
+    customerValues: buildChunkedStatePatch(
+      'softora_customers_premium_v1',
+      JSON.stringify(customerRows),
+      80
+    ),
+    leadRows: [
+      {
+        id: 'lead-ready',
+        company: 'Klaar Belbedrijf',
+        phone: '+31 6 11 11 22 22',
+        status: 'prospect',
+      },
+      {
+        id: 'lead-missing',
+        company: 'Zonder Design Belbedrijf',
+        phone: '+31 6 33 33 44 44',
+        status: 'prospect',
+      },
+    ],
+    photoMap: {
+      'ready-customer': {
+        id: 'ready-customer',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Klaar Belbedrijf webdesign',
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    mode: 'call',
+    service: "Website's",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.mode, 'call');
+  assert.equal(result.selected, 1);
+  assert.deepEqual(result.recipients, [
+    {
+      id: 'lead-ready',
+      bedrijf: 'Klaar Belbedrijf',
+      email: '',
+      phone: '+31 6 11 11 22 22',
+      distanceKm: null,
+    },
+  ]);
+  assert.equal(result.failedItems.length, 1);
+  assert.equal(result.failedItems[0].bedrijf, 'Zonder Design Belbedrijf');
+  assert.match(result.failedItems[0].error, /Nog geen website-design klaar/i);
 });
 
 test('coldmail campaign never sends to blocked email addresses', async () => {

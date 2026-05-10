@@ -1658,7 +1658,9 @@ function getColdmailRecipientPreviewUrl() {
   if (isPremiumAiLeadGeneratorPath()) params.set('mode', 'call');
   params.set('radiusKm', String(getSelectedCampaignRadiusKm()));
   const branchSelect = document.getElementById('branche');
+  const serviceSelect = document.getElementById('service'), specialActionSelect = document.getElementById('campaignSpecialAction');
   if (branchSelect && branchSelect.value) params.set('branch', branchSelect.value);
+  if (serviceSelect && serviceSelect.value) params.set('service', serviceSelect.value); if (specialActionSelect && specialActionSelect.value) params.set('specialAction', specialActionSelect.value);
   return '/api/coldmailing/campaigns/recipients?' + params.toString();
 }
 
@@ -1761,27 +1763,15 @@ function toggleCampaignRecipientsList(event) {
 }
 
 async function hydrateCampaignCompanyCountFromSupabase() {
-  if (isPremiumAiLeadGeneratorPath()) {
-    try {
-      const response = await fetch(getColdmailRecipientPreviewUrl(), { cache: 'no-store' });
-      if (!response.ok) throw new Error('Kon coldcalling ontvangers niet laden.');
-      const data = await response.json();
-      const recipients = Array.isArray(data && data.recipients) ? data.recipients : [];
-      renderCampaignCompanyCount(Number(data && data.selected) || recipients.length);
-    } catch (_) {
-      renderCampaignCompanyCount(0);
-    }
-    hydrateCampaignRecipientListSoon();
+  try {
+    const response = await fetch(getColdmailRecipientPreviewUrl(), { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
+    const data = response.ok ? await response.json().catch(function () { return null; }) : null;
+    if (!data || data.ok === false) throw new Error('Kon campagne-ontvangers niet laden.');
+    const recipients = Array.isArray(data.recipients) ? data.recipients : [];
+    renderCampaignCompanyCount(Number(data.selected) || recipients.length);
+  } catch (_) {
     return;
   }
-  try {
-    const data = await fetchColdmailingUiState(CUSTOMER_DB_SCOPE);
-    const values = data && data.values && typeof data.values === 'object' ? data.values : {};
-    coldmailingDatabaseRows = parseCustomerDatabaseRows(values);
-  } catch (_) {
-    coldmailingDatabaseRows = [];
-  }
-  renderCampaignCompanyCount();
   hydrateCampaignRecipientListSoon();
 }
 
@@ -2129,7 +2119,6 @@ function updateSlider(v) {
   document.getElementById('slider-val').textContent = String(value);
   if (slider) slider.style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
-  renderCampaignCompanyCount();
   void hydrateCampaignCompanyCountFromSupabase();
   hydrateCampaignRecipientListSoon();
 }
@@ -2144,7 +2133,6 @@ function updateKm(v) {
   const pct = KM_OPTIES.length > 1 ? (index / (KM_OPTIES.length - 1)) * 100 : 0;
   document.getElementById('km-slider').style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
-  renderCampaignCompanyCount();
   void hydrateCampaignCompanyCountFromSupabase();
   hydrateCampaignRecipientListSoon();
 }
@@ -2606,6 +2594,7 @@ async function startCampagneImmediate() {
     ? ' Provider: ' + getSelectedColdcallingStackLabel() + '.'
     : '';
   let sendResult = null;
+  let recipientPreview = null;
 
   if (!isPremiumAiLeadGeneratorPath()) {
     campaignSendInProgress = true;
@@ -2628,21 +2617,32 @@ async function startCampagneImmediate() {
     }
   }
 
+  try {
+    const previewResponse = await fetch(getColdmailRecipientPreviewUrl(), { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
+    const previewPayload = await previewResponse.json().catch(function () { return null; });
+    if (!previewResponse.ok || !previewPayload || previewPayload.ok === false) throw new Error((previewPayload && previewPayload.message) || 'Coldcalling bedrijven konden niet geladen worden.');
+    recipientPreview = previewPayload;
+  } catch (error) {
+    showToast(String(error && error.message || 'Coldcalling bedrijven konden niet geladen worden.'));
+    return;
+  }
+
+  const previewRecipients = Array.isArray(recipientPreview && recipientPreview.recipients) ? recipientPreview.recipients : [];
   const actualTotal = sendResult && Number.isFinite(Number(sendResult.sent))
-    ? Number(sendResult.sent)
-    : n;
+    ? Number(sendResult.sent) : (Number(recipientPreview && recipientPreview.selected) || previewRecipients.length);
+
+  if (actualTotal <= 0) {
+    const firstFailure = recipientPreview && Array.isArray(recipientPreview.failedItems) && recipientPreview.failedItems[0] ? String(recipientPreview.failedItems[0].error || '').trim() : '';
+    showToast(firstFailure || 'Er staan nog geen bedrijven met een klaar website-design voor deze campagne.');
+    await hydrateCampaignCompanyCountFromSupabase();
+    return;
+  }
+
+  if (actualTotal < n) showToast(actualTotal + ' bedrijf' + (actualTotal === 1 ? '' : 'en') + ' zijn klaar met website-design en worden meegenomen.');
 
   bedrijven = genBedrijven(actualTotal);
-  if (sendResult && Array.isArray(sendResult.sentItems) && sendResult.sentItems.length) {
-    bedrijven = sendResult.sentItems.map((item, index) => ({
-      id: index + 1,
-      naam: item.bedrijf || item.email || ('Bedrijf ' + (index + 1)),
-      domain: String(item.email || '').split('@')[1] || 'onbekend.nl',
-      branche: document.getElementById('branche') ? (document.getElementById('branche').value || 'Overig') : 'Overig',
-      stad: 'Database',
-      zone: 1,
-      laatste_mail: new Date().toLocaleDateString('nl-NL', {day:'2-digit',month:'short',year:'numeric'})
-    }));
+  if (previewRecipients.length) {
+    bedrijven = previewRecipients.map((item, index) => ({ id: index + 1, naam: item.bedrijf || item.email || item.phone || ('Bedrijf ' + (index + 1)), domain: String(item.email || '').split('@')[1] || 'onbekend.nl', branche: document.getElementById('branche') ? (document.getElementById('branche').value || 'Overig') : 'Overig', stad: 'Database', zone: 1, laatste_mail: new Date().toLocaleDateString('nl-NL', {day:'2-digit',month:'short',year:'numeric'}) }));
   }
   campTotal = actualTotal;
   campaignTimeline = buildCampaignTimeline(actualTotal, durationDays);
