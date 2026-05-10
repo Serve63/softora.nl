@@ -315,6 +315,20 @@ test('premium agenda keeps appointment color in sync with existing dossiers', ()
   );
 });
 
+test('premium agenda keeps month columns fixed when appointment titles are long', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /\.calendar-header \{[\s\S]*grid-template-columns: repeat\(7, minmax\(0, 1fr\)\);/);
+  assert.match(pageSource, /\.calendar-grid \{[\s\S]*grid-template-columns: repeat\(7, minmax\(0, 1fr\)\);/);
+  assert.match(pageSource, /\.calendar-header-day \{[\s\S]*min-width: 0;/);
+  assert.match(pageSource, /\.calendar-day \{[\s\S]*min-width: 0;/);
+  assert.match(
+    pageSource,
+    /\.appointment \{[\s\S]*display: block;[\s\S]*width: 100%;[\s\S]*max-width: 100%;[\s\S]*min-width: 0;[\s\S]*text-overflow: ellipsis;/
+  );
+});
+
 test('premium agenda shows klantwerk on Wednesdays and Saturdays without blocking planning', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
