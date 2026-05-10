@@ -38,6 +38,22 @@ const MAILBOX_TRACKING_HOST_PATTERNS = [
   /(^|\.)postmarkapp\.com$/i,
 ];
 const MAILBOX_IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
+const MAILBOX_REPLY_HEADER_PATTERNS = [
+  /^op .+\bschreef\b[:\s]*$/i,
+  /^on .+\bwrote\b[:\s]*$/i,
+  /^van:\s.+$/i,
+  /^from:\s.+$/i,
+];
+const MAILBOX_SIGNATURE_START_PATTERNS = [
+  /^met vriendelijke groet[,!]*$/i,
+  /^vriendelijke groet(?:en)?[,!]*$/i,
+  /^hartelijke groet(?:en)?[,!]*$/i,
+  /^groet(?:en)?[,!]*$/i,
+  /^kind regards[,!]*$/i,
+  /^best regards[,!]*$/i,
+  /^cheers[,!]*$/i,
+  /^--$/,
+];
 
 function parseMailboxUrl(value) {
   const raw = String(value || '')
@@ -100,8 +116,164 @@ function cleanMailboxText(value) {
     .trim();
 }
 
+function isMailboxReplyHeaderLine(line) {
+  const value = String(line || '').trim();
+  return MAILBOX_REPLY_HEADER_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function isMailboxSignatureStartLine(line) {
+  const value = String(line || '').trim();
+  return MAILBOX_SIGNATURE_START_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function stripMailboxQuotePrefix(line) {
+  return String(line || '').replace(/^\s*(?:>\s*)+/, '').trimEnd();
+}
+
+function buildMailboxBodySections(value) {
+  const text = cleanMailboxText(value);
+  if (!text) {
+    return [{ type: 'body', lines: ['Geen inhoud.'] }];
+  }
+  const sections = [];
+  const lines = text.split('\n');
+  let currentType = 'body';
+  let currentLines = [];
+  let signatureStarted = false;
+  let quotedThreadStarted = false;
+
+  function pushSection() {
+    if (!currentLines.length) return;
+    if (!currentLines.some((line) => String(line || '').trim())) {
+      currentLines = [];
+      return;
+    }
+    sections.push({ type: currentType, lines: currentLines.slice() });
+    currentLines = [];
+  }
+
+  lines.forEach((line) => {
+    const rawLine = String(line || '');
+    const trimmed = rawLine.trim();
+    const isReplyHeader = isMailboxReplyHeaderLine(trimmed);
+    const isQuoteLine = /^\s*>/.test(rawLine);
+
+    if (isReplyHeader) {
+      quotedThreadStarted = true;
+      signatureStarted = false;
+      if (currentType !== 'quote') {
+        pushSection();
+        currentType = 'quote';
+      }
+      currentLines.push(trimmed);
+      return;
+    }
+
+    if (isQuoteLine) {
+      quotedThreadStarted = true;
+      signatureStarted = false;
+      if (currentType !== 'quote') {
+        pushSection();
+        currentType = 'quote';
+      }
+      currentLines.push(stripMailboxQuotePrefix(rawLine));
+      return;
+    }
+
+    if (quotedThreadStarted) {
+      if (currentType !== 'quote') {
+        pushSection();
+        currentType = 'quote';
+      }
+      currentLines.push(rawLine);
+      return;
+    }
+
+    if (!signatureStarted && isMailboxSignatureStartLine(trimmed)) {
+      signatureStarted = true;
+      if (currentType !== 'signature') {
+        pushSection();
+        currentType = 'signature';
+      }
+      currentLines.push(rawLine);
+      return;
+    }
+
+    if (signatureStarted) {
+      if (currentType !== 'signature') {
+        pushSection();
+        currentType = 'signature';
+      }
+      currentLines.push(rawLine);
+      return;
+    }
+
+    if (currentType !== 'body') {
+      pushSection();
+      currentType = 'body';
+    }
+    currentLines.push(rawLine);
+  });
+
+  pushSection();
+  return sections.length ? sections : [{ type: 'body', lines: ['Geen inhoud.'] }];
+}
+
+function renderMailboxParagraphs(lines, options) {
+  const paragraphs = [];
+  let currentLines = [];
+  const quoteBody = Boolean(options && options.quoteBody);
+
+  function flushParagraph() {
+    if (!currentLines.length) return;
+    paragraphs.push(`<p>${currentLines.map((line) => escapeHtml(line)).join('<br>')}</p>`);
+    currentLines = [];
+  }
+
+  lines.forEach((line) => {
+    const value = String(line || '');
+    const cleaned = quoteBody ? stripMailboxQuotePrefix(value) : value.trimEnd();
+    if (!cleaned.trim()) {
+      flushParagraph();
+      return;
+    }
+    currentLines.push(cleaned);
+  });
+
+  flushParagraph();
+  return paragraphs.join('') || '<p>Geen inhoud.</p>';
+}
+
+function renderMailboxBodySection(section) {
+  if (!section || !Array.isArray(section.lines)) {
+    return '<section class="detail-mail-section"><p>Geen inhoud.</p></section>';
+  }
+  if (section.type === 'quote') {
+    const firstLine = String(section.lines[0] || '').trim();
+    const hasMeta = isMailboxReplyHeaderLine(firstLine);
+    const quoteMeta = hasMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(firstLine)}</div>` : '';
+    const quoteLines = hasMeta ? section.lines.slice(1) : section.lines;
+    return `
+      <section class="detail-mail-section detail-mail-section-quote">
+        <div class="detail-mail-section-label">Eerdere mail</div>
+        ${quoteMeta}
+        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true })}</div>
+      </section>`;
+  }
+  if (section.type === 'signature') {
+    return `
+      <section class="detail-mail-section detail-mail-section-signature">
+        ${renderMailboxParagraphs(section.lines)}
+      </section>`;
+  }
+  return `
+    <section class="detail-mail-section">
+      ${renderMailboxParagraphs(section.lines)}
+    </section>`;
+}
+
 function renderMailBody(value) {
-  return escapeHtml(cleanMailboxText(value) || 'Geen inhoud.');
+  return buildMailboxBodySections(value).map((section) => renderMailboxBodySection(section)).join('');
 }
 
 function findMailById(id) {
