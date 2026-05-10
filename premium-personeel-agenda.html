@@ -213,23 +213,23 @@
         }
 
         .calendar-header {
-            display: grid; grid-template-columns: repeat(7, 1fr);
+            display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
             border-bottom: 1px solid var(--border);
         }
         .calendar-header-day {
-            padding: 0.74rem; text-align: center;
+            min-width: 0; padding: 0.74rem; text-align: center;
             font-family: 'Oswald', sans-serif; font-size: 0.7rem; font-weight: 500;
             text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-tertiary);
         }
 
         .calendar-grid {
-            display: grid; grid-template-columns: repeat(7, 1fr);
+            display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
         }
 
         .calendar-day {
             min-height: clamp(82px, calc((100vh - 320px) / 6), 112px); border-right: 1px solid var(--border);
             border-bottom: 1px solid var(--border); padding: 0.5rem;
-            position: relative; transition: background 0.2s;
+            min-width: 0; position: relative; transition: background 0.2s;
         }
         .calendar-day:nth-child(7n) { border-right: none; }
         .calendar-day:hover { background: rgba(255,255,255,0.01); }
@@ -287,7 +287,7 @@
 
         /* Appointments — leesbaar op lichte kalender (personnel light theme) */
         .appointment {
-            padding: 0.32rem 0.5rem; margin-bottom: 0.22rem;
+            display: block; width: 100%; max-width: 100%; min-width: 0; padding: 0.32rem 0.5rem; margin-bottom: 0.22rem;
             font-size: 0.68rem; font-weight: 500; border-radius: 4px;
             cursor: none; transition: all 0.2s; line-height: 1.35;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
