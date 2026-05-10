@@ -1421,7 +1421,7 @@
                                     <svg class="btn-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                                 </button>
                                 <div class="add-actions-menu" id="addActionsMenu" role="menu">
-                                    <button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">Bedrijven toevoegen</button>
+                                    <button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">Bedrijven toevoegen</button><button class="add-actions-item" id="manualAddButton" type="button" role="menuitem">Handmatig toevoegen</button>
                                 </div>
                                 <input type="file" id="importFileInput" accept=".csv,text/csv,.tsv,text/tab-separated-values,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
                             </div>
@@ -1664,7 +1664,7 @@
             addButton: document.getElementById("addButton"),
             photoCostLabel: document.getElementById("photoCostLabel"),
             generatePhotosButton: document.getElementById("generatePhotosButton"),
-            deepSearchButton: document.getElementById("deepSearchButton"),
+            deepSearchButton: document.getElementById("deepSearchButton"), manualAddButton: document.getElementById("manualAddButton"),
             importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
             overlay: document.getElementById("ov"),
@@ -2754,7 +2754,7 @@
 
         function openModal() {
             resetModal();
-            nodes.modalBg.classList.add("on");
+            nodes.modalBg.classList.add("on"); nodes.modalCompany.focus();
         }
 
         function openEditCustomerModal(customerId) {
@@ -2927,7 +2927,7 @@
                 id: createId(),
                 naam: normalizeString(nodes.modalContact.value) || bedrijf,
                 bedrijf: bedrijf,
-                dom: dom,
+                dom: dom, website: normalizeString(nodes.modalDomain.value) || dom,
                 telefoon: normalizeString(nodes.modalPhone.value) || "—",
                 email: normalizeString(nodes.modalMail.value) || ("info@" + dom),
                 branche: "Overig",
@@ -3218,10 +3218,7 @@
         });
         photoBatchController.bind();
         databaseDeepSearchController.bind();
-        nodes.deepSearchButton.addEventListener("click", function () {
-            closeAddActions();
-            databaseDeepSearchController.open();
-        });
+        nodes.addActionsMenu.addEventListener("click", function (event) { const actionButton = event.target.closest(".add-actions-item"); if (!actionButton) return; closeAddActions(); if (actionButton === nodes.manualAddButton) { openModal(); return; } if (actionButton === nodes.deepSearchButton) databaseDeepSearchController.open(); });
         nodes.importFileInput.addEventListener("change", databaseImportController.handleFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);

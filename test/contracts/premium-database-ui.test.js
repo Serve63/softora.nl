@@ -197,12 +197,12 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /ai-database-badge/);
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
   assert.match(pageSource, /<button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">Bedrijven toevoegen<\/button>/);
+  assert.match(pageSource, /<button class="add-actions-item" id="manualAddButton" type="button" role="menuitem">Handmatig toevoegen<\/button>/);
   assert.doesNotMatch(pageSource, /Volgende locatie doorzoeken/);
   assert.doesNotMatch(pageSource, /AI werkt de huidige plek automatisch af/);
   assert.doesNotMatch(pageSource, /100 bedrijven toevoegen/);
   assert.doesNotMatch(pageSource, />Uploaden</);
   assert.doesNotMatch(pageSource, />Google Sheet koppelen</);
-  assert.doesNotMatch(pageSource, />Handmatig toevoegen</);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.doesNotMatch(pageSource, /id="f-branche"/);
@@ -416,6 +416,10 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /state\.modalEditId/);
   assert.match(pageSource, /nodes\.modalTitle\.textContent = "Bedrijf aanpassen"/);
   assert.match(pageSource, /nodes\.saveModalButton\.textContent = "Opslaan"/);
+  assert.match(pageSource, /deepSearchButton: document\.getElementById\("deepSearchButton"\), manualAddButton: document\.getElementById\("manualAddButton"\),/);
+  assert.match(pageSource, /nodes\.modalCompany\.focus\(\);/);
+  assert.match(pageSource, /nodes\.addActionsMenu\.addEventListener\("click", function \(event\) \{ const actionButton = event\.target\.closest\("\.add-actions-item"\); if \(!actionButton\) return; closeAddActions\(\); if \(actionButton === nodes\.manualAddButton\) \{ openModal\(\); return; \} if \(actionButton === nodes\.deepSearchButton\) databaseDeepSearchController\.open\(\); \}\);/);
+  assert.match(pageSource, /website: normalizeString\(nodes\.modalDomain\.value\) \|\| dom,/);
   assert.match(pageSource, /openEditCustomerModal\(editButton\.getAttribute\("data-edit-id"\)\)/);
   assert.match(pageSource, /removeWebsitePhotoForCustomer\(removePhotoButton\.getAttribute\("data-remove-photo-id"\)\)/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);
@@ -493,7 +497,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /stateKey: CUSTOMER_DB_DEEP_SEARCH_KEY/);
   assert.match(pageSource, /importRows: importCustomersFromRows/);
   assert.match(pageSource, /databaseDeepSearchController\.bind\(\);/);
-  assert.match(pageSource, /nodes\.deepSearchButton\.addEventListener\("click"/);
+  assert.match(pageSource, /nodes\.addActionsMenu\.addEventListener\("click"/);
   assert.match(pageSource, /databaseDeepSearchController\.open\(\);/);
   assert.match(deepSearchScriptSource, /function parseTargetLines\(raw\)/);
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT/);
