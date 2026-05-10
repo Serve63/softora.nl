@@ -461,24 +461,10 @@ body {
     font-weight: 400;
     margin-left: 4px;
   }
-  .price-note {
-    font-size: 11px;
-    color: var(--text-light);
-    margin-top: 4px;
-  }
-  .features-list {
-    list-style: none;
-    margin-bottom: 16px;
-  }
-  .features-list li {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    font-size: 12px;
-    color: var(--text-mid);
-    padding: 5px 0;
-    line-height: 1.4;
-  }
+  .price-note { font-size: 11px; color: var(--text-light); margin-top: 4px; }
+  .onderhoud-card .features-list::before { content: "Realistische taken"; display: block; margin: 18px 0 8px; font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--crimson); }
+  .features-list { list-style: none; margin-bottom: 16px; }
+  .features-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: var(--text-mid); padding: 5px 0; line-height: 1.4; }
 
   .check {
     width: 16px;
@@ -1551,7 +1537,7 @@ body {
         <div class="card-name">Basis</div>
         <div class="card-price">
           <div class="price-line"><div class="price-amount">€29<span class="price-suffix">/mnd</span></div><span class="price-hours">· 5 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>5 uur werk per maand</li>
@@ -1568,7 +1554,7 @@ body {
         <div class="card-name">Plus</div>
         <div class="card-price">
           <div class="price-line"><div class="price-amount">€59<span class="price-suffix">/mnd</span></div><span class="price-hours">· 10 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>10 uur werk per maand</li>
@@ -1584,7 +1570,7 @@ body {
         <div class="card-name">Premium</div>
         <div class="card-price">
           <div class="price-line"><div class="price-amount">€99<span class="price-suffix">/mnd</span></div><span class="price-hours">· 15 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>15 uur werk per maand</li>
@@ -1698,7 +1684,7 @@ body {
         <div class="card-desc">Stabiele basis met updates en monitoring voor kernmodules.</div>
         <div class="card-price">
           <div class="price-amount">€149<span class="price-suffix">/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Beveiligingsupdates</li>
@@ -1715,7 +1701,7 @@ body {
         <div class="card-desc">Onderhoud + doorontwikkeling met vaste ontwikkeluren.</div>
         <div class="card-price">
           <div class="price-amount">€349<span class="price-suffix">/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Essential</li>
@@ -1732,7 +1718,7 @@ body {
         <div class="card-desc">Prioriteit, extra capaciteit en snelle bugfix-cyclus.</div>
         <div class="card-price">
           <div class="price-amount">€699<span class="price-suffix">/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Plus</li>
@@ -1846,7 +1832,7 @@ body {
         <div class="card-desc">Monitoring en updates voor stabiele voice-prestaties.</div>
         <div class="card-price">
           <div class="price-amount">€99<span class="price-suffix">/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Prompt updates</li>
@@ -1863,7 +1849,7 @@ body {
         <div class="card-desc">Continu optimaliseren van scripts, prompts en conversie.</div>
         <div class="card-price">
           <div class="price-amount">€229<span class="price-suffix">/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Basic</li>
@@ -1880,7 +1866,7 @@ body {
         <div class="card-desc">Snelle verbetercyclus met prioriteit op performance.</div>
         <div class="card-price">
           <div class="price-amount">€499<span class="price-suffix">/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Plus</li>
@@ -1994,7 +1980,7 @@ body {
         <div class="card-desc">Updates aan kennisbank, kleine prompt-aanpassingen en foutmeldingen.</div>
         <div class="card-price">
           <div class="price-amount">€79<span class="price-suffix">/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Maandelijkse content refresh</li>
@@ -2011,7 +1997,7 @@ body {
         <div class="card-desc">Actief verbeteren van conversies en intents op basis van data.</div>
         <div class="card-price">
           <div class="price-amount">€199<span class="price-suffix">/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Monitor</li>
@@ -2028,7 +2014,7 @@ body {
         <div class="card-desc">Voor teams met hoge chatvolumes en strakke KPI&apos;s.</div>
         <div class="card-price">
           <div class="price-amount">€449<span class="price-suffix">/mnd</span></div>
-          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
         </div>
         <ul class="features-list">
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Optimize</li>

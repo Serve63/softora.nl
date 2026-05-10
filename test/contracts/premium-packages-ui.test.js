@@ -36,6 +36,9 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(pageSource, /id="tab-bouwen" class="tab-panel theme-website"/);
   assert.match(pageSource, /id="tab-onderhoud" class="tab-panel theme-website"/);
   assert.doesNotMatch(pageSource, /id="tab-onderhoud" class="tab-panel theme-website active"/);
+  assert.doesNotMatch(pageSource, /Maandelijks opzegbaar/);
+  assert.equal((pageSource.match(/Jaarlijks opzegbaar/g) || []).length, 12);
+  assert.match(pageSource, /\.onderhoud-card \.features-list::before\s*\{[\s\S]*content:\s*"Realistische taken";/);
   assert.match(scriptSource, /routes: \["routes"\]/);
   assert.match(scriptSource, /website: \["bouwen", "onderhoud"\]/);
   assert.match(scriptSource, /bedrijfssoftware: \["bedrijfssoftware", "bedrijfssoftware-onderhoud"\]/);
