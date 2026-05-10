@@ -573,6 +573,8 @@ function createAgendaRuntime(deps = {}) {
     mutationRouteDeps: {
       createManualAgendaAppointmentResponse:
         agendaManualAppointmentCoordinator.createManualAgendaAppointmentResponse,
+      updateManualAgendaAppointmentResponse:
+        agendaManualAppointmentCoordinator.updateManualAgendaAppointmentResponse,
       updateAgendaAppointmentPostCallDataById:
         agendaPostCallCoordinator.updateAgendaAppointmentPostCallDataById,
       addAgendaAppointmentToPremiumActiveOrders:

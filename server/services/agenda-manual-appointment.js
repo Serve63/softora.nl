@@ -3,13 +3,22 @@ const crypto = require('crypto');
 const { createAgendaConfirmationPersistenceHelpers } = require('./agenda-confirmation-persistence');
 
 function resolveManualPlannerLabel(body, normalizeString) {
+  const key = resolveManualPlannerKey(body, normalizeString);
+  if (key === 'serve') return 'Servé';
+  if (key === 'martijn') return 'Martijn';
+  if (key === 'both') return 'Servé en Martijn';
+  if (key === 'overig') return 'Overig';
+  return '';
+}
+
+function resolveManualPlannerKey(body, normalizeString) {
   const raw = normalizeString(body?.who || body?.manualWho || '').toLowerCase();
-  if (raw === 'serve' || raw === 'servé') return 'Servé';
-  if (raw === 'martijn') return 'Martijn';
+  if (raw === 'serve' || raw === 'servé') return 'serve';
+  if (raw === 'martijn') return 'martijn';
   if (raw === 'both' || raw === 'allebei' || raw === 'beide' || raw === 'serve-martijn') {
-    return 'Servé en Martijn';
+    return 'both';
   }
-  if (raw === 'overig' || raw === 'other') return 'Overig';
+  if (raw === 'overig' || raw === 'other') return 'overig';
   return '';
 }
 
@@ -21,10 +30,29 @@ function normalizeManualLegendChoice(body, normalizeString) {
   if (raw === 'website') return 'website';
   if (raw === 'manual-martijn' || raw === 'martijn') return 'manual-martijn';
   if (raw === 'manual-both' || raw === 'both' || raw === 'allebei' || raw === 'beide') return 'manual-both';
+  if (raw === 'private-serve' || raw === 'prive-serve' || raw === 'privé-serve') return 'private-serve';
+  if (raw === 'private-martijn' || raw === 'prive-martijn' || raw === 'privé-martijn') return 'private-martijn';
   if (raw === 'manual-overig' || raw === 'overig' || raw === 'other') return 'manual-overig';
   if (raw === 'completed' || raw === 'afgerond') return 'completed';
   if (raw === 'manual-serve' || raw === 'serve' || raw === 'servé') return 'manual-serve';
   return raw ? '' : 'manual-serve';
+}
+
+function isManualAppointmentRecord(appointment, normalizeString) {
+  if (!appointment || typeof appointment !== 'object') return false;
+  const callId = normalizeString(appointment.callId || '').toLowerCase();
+  if (callId.startsWith('manual_')) return true;
+  const marker = [
+    appointment.source,
+    appointment.provider,
+    appointment.providerLabel,
+    appointment.coldcallingStack,
+    appointment.createdFrom,
+    appointment.summary,
+  ]
+    .map((value) => normalizeString(value || '').toLowerCase())
+    .join(' ');
+  return /\b(handmatig|manual|premium-personeel-agenda)\b/.test(marker);
 }
 
 function normalizeManualLeadOwnerKey(value, normalizeString) {
@@ -150,6 +178,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const appointmentDate = normalizeDateYyyyMmDd(body.date || '');
     const allDayUnavailable = isTruthyAllDayUnavailable(body);
+    const whoKey = resolveManualPlannerKey(body, normalizeString);
     const whoLabel = resolveManualPlannerLabel(body, normalizeString);
     const actor = truncateText(normalizeString(body.actor || body.doneBy || ''), 120);
     const appointmentKind = normalizeString(body.appointmentKind || body.manualAppointmentKind || '').toLowerCase();
@@ -254,13 +283,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       providerLabel: 'Handmatig',
       coldcallingStack: 'manual',
       manualPlannerWho:
-        whoLabel === 'Martijn'
-          ? 'martijn'
-          : whoLabel === 'Servé en Martijn'
-            ? 'both'
-            : whoLabel === 'Overig'
-              ? 'overig'
-              : 'serve',
+        whoKey || 'serve',
       appointmentKind: appointmentKind || (isMeetingLegendChoice(legendChoice) ? 'meeting' : 'overig'),
       manualLegendChoice: legendChoice,
       manualActivityTime: activityTime,
@@ -386,8 +409,148 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     });
   }
 
+  async function updateManualAgendaAppointmentResponse(req, res, appointmentIdRaw) {
+    backfillInsightsAndAppointmentsFromRecentCallUpdates();
+
+    const appointmentId = Number(appointmentIdRaw || req.params?.id || req.query?.appointmentId || 0);
+    if (!Number.isFinite(appointmentId) || appointmentId <= 0) {
+      return res.status(400).json({ ok: false, error: 'Afspraak-id ontbreekt.' });
+    }
+
+    const idx = getGeneratedAppointmentIndexById(appointmentId);
+    if (idx < 0) {
+      return res.status(404).json({ ok: false, error: 'Afspraak niet gevonden.' });
+    }
+
+    const existing = getGeneratedAgendaAppointments()[idx] || null;
+    if (!isManualAppointmentRecord(existing, normalizeString)) {
+      return res.status(400).json({ ok: false, error: 'Alleen handmatige afspraken kunnen hier worden gewijzigd.' });
+    }
+
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const appointmentDate = normalizeDateYyyyMmDd(body.date || '');
+    const appointmentTime = normalizeTimeHhMm(body.time || '');
+    const activityTime = normalizeTimeHhMm(body.activityTime || body.activity_time || body.time || '');
+    const location = sanitizeAppointmentLocation(body.location || '') || '—';
+    const activity = truncateText(normalizeString(body.title || body.activity || ''), 500);
+    const phone = truncateText(normalizeString(body.phone || body.manualPhone || body.telefoon || body.telefoonnummer || ''), 80);
+    const notes = truncateText(normalizeString(body.notes || body.opmerkingen || ''), 1000);
+    const whoKey = resolveManualPlannerKey(body, normalizeString);
+    const whoLabel = resolveManualPlannerLabel(body, normalizeString);
+    const appointmentKind = normalizeString(body.appointmentKind || body.manualAppointmentKind || '').toLowerCase();
+    const legendChoice = normalizeManualLegendChoice(body, normalizeString);
+    const manualLeadOwner = resolveManualLeadOwner(body, normalizeString);
+    const requiresManualLeadOwner = appointmentKind === 'meeting' && isMeetingLegendChoice(legendChoice);
+
+    if (!appointmentDate) return res.status(400).json({ ok: false, error: 'Vul een geldige datum in (YYYY-MM-DD).' });
+    if (!appointmentTime) return res.status(400).json({ ok: false, error: 'Vul een geldige tijd in (HH:MM).' });
+    if (!activity) return res.status(400).json({ ok: false, error: 'Vul een titel in.' });
+    if (!activityTime) return res.status(400).json({ ok: false, error: 'Vul een geldig tijdstip van activiteit in (HH:MM).' });
+    if (!whoLabel || !whoKey) {
+      return res.status(400).json({ ok: false, error: 'Kies wie bij deze afspraak hoort.' });
+    }
+    if (!legendChoice) return res.status(400).json({ ok: false, error: 'Kies een geldige legenda keuze.' });
+    if (requiresManualLeadOwner && !manualLeadOwner) {
+      return res.status(400).json({ ok: false, error: 'Kies wie deze lead heeft geregeld.' });
+    }
+
+    const summary = [
+      activity,
+      `Wie: ${whoLabel}`,
+      activityTime ? `Tijdstip activiteit: ${activityTime}` : '',
+      location && location !== '—' ? `Locatie: ${location}` : '',
+      phone ? `Telefoonnummer: ${phone}` : '',
+      legendChoice ? `Legenda: ${legendChoice}` : '',
+      manualLeadOwner ? `Lead geregeld door: ${manualLeadOwner.name}` : '',
+      notes ? `Opmerkingen: ${notes}` : '',
+    ].filter(Boolean).join('\n\n');
+
+    const runtimeSnapshot = takeRuntimeMutationSnapshot();
+    const actor = truncateText(normalizeString(body.actor || body.doneBy || ''), 120);
+    const actorLabel = actor || 'premium-personeel-agenda';
+    const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+      idx,
+      {
+        ...existing,
+        company: activity,
+        contact: normalizeString(existing.contact || '') || '—',
+        phone,
+        manualPhone: phone,
+        contactPhone: phone,
+        date: appointmentDate,
+        time: appointmentTime,
+        location,
+        appointmentLocation: location,
+        source: 'Handmatig',
+        provider: 'manual',
+        providerLabel: 'Handmatig',
+        coldcallingStack: 'manual',
+        manualPlannerWho: whoKey,
+        appointmentKind: appointmentKind || (isMeetingLegendChoice(legendChoice) ? 'meeting' : 'overig'),
+        manualLegendChoice: legendChoice,
+        legendChoice,
+        manualActivityTime: activityTime,
+        manualNotes: notes,
+        manualLeadOwnerKey: manualLeadOwner?.key || '',
+        manualLeadOwnerName: manualLeadOwner?.name || '',
+        leadOwnerKey: manualLeadOwner?.key || '',
+        leadOwnerName: manualLeadOwner?.name || '',
+        leadOwnerFullName: manualLeadOwner?.fullName || '',
+        leadOwnerEmail: manualLeadOwner?.email || '',
+        summary,
+        summaryFormatVersion: 4,
+        needsConfirmationEmail: false,
+        confirmationEmailSent: true,
+        confirmationEmailSentAt: normalizeString(existing?.confirmationEmailSentAt || '') || new Date().toISOString(),
+        confirmationEmailSentBy: normalizeString(existing?.confirmationEmailSentBy || '') || actorLabel,
+        confirmationResponseReceived: true,
+        confirmationResponseReceivedAt: normalizeString(existing?.confirmationResponseReceivedAt || '') || new Date().toISOString(),
+        confirmationResponseReceivedBy: normalizeString(existing?.confirmationResponseReceivedBy || '') || actorLabel,
+      },
+      'manual_agenda_appointment_update'
+    );
+
+    appendDashboardActivity(
+      {
+        type: 'manual_agenda_appointment_update',
+        title: 'Handmatige afspraak gewijzigd',
+        detail: `${activity} op ${appointmentDate} om ${appointmentTime}. Door: ${whoLabel}.`,
+        company: activity,
+        actor: actorLabel,
+        taskId: Number(updatedAppointment?.id || 0) || null,
+        callId: normalizeString(updatedAppointment?.callId || ''),
+        source: 'premium-personeel-agenda',
+      },
+      'dashboard_activity_manual_agenda_appointment_update'
+    );
+
+    const persistOk = await ensureLeadMutationPersistedOrRespond(
+      res,
+      runtimeSnapshot,
+      'Afspraak kon niet veilig in gedeelde opslag worden bijgewerkt.',
+      {
+        allowPendingResponse: true,
+        pendingResponseAfterMs: 3000,
+        allowLocalVerifiedPending: true,
+        verifyPersisted: () =>
+          doesAgendaMutationMatchAppointment(
+            updatedAppointment,
+            resolveGeneratedAgendaAppointmentById(updatedAppointment?.id)
+          ),
+      }
+    );
+    if (!persistOk) return res;
+
+    return res.status(persistOk === 'pending' ? 202 : 200).json({
+      ok: true,
+      persistencePending: persistOk === 'pending',
+      appointment: updatedAppointment,
+    });
+  }
+
   return {
     createManualAgendaAppointmentResponse,
+    updateManualAgendaAppointmentResponse,
   };
 }
 

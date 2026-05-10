@@ -118,6 +118,62 @@ test('agenda manual appointment stores stepped modal details', async () => {
   assert.match(res.body.appointment.summary, /Opmerkingen: Voorbereiden voor klantgesprek\./);
 });
 
+test('agenda manual appointment can be edited after creation', async () => {
+  const { appointments, coordinator } = createFixture();
+  const createRes = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        who: 'serve',
+        title: 'Oude afspraak',
+        time: '10:00',
+        legendChoice: 'manual-serve',
+        location: 'Kantoor',
+      },
+    },
+    createRes
+  );
+
+  const updateRes = createResponseRecorder();
+  await coordinator.updateManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-29',
+        who: 'martijn',
+        title: 'Nieuwe afspraak',
+        time: '11:30',
+        activityTime: '11:30',
+        legendChoice: 'private-martijn',
+        appointmentKind: 'overig',
+        phone: '06 98 76 54 32',
+        location: 'Klantlocatie',
+        notes: 'Nieuwe opmerkingen.',
+      },
+      params: { id: '1' },
+      query: {},
+    },
+    updateRes,
+    '1'
+  );
+
+  assert.equal(updateRes.statusCode, 200);
+  assert.equal(updateRes.body.ok, true);
+  assert.equal(appointments.length, 1);
+  assert.equal(updateRes.body.appointment.id, 1);
+  assert.equal(updateRes.body.appointment.company, 'Nieuwe afspraak');
+  assert.equal(updateRes.body.appointment.date, '2026-04-29');
+  assert.equal(updateRes.body.appointment.time, '11:30');
+  assert.equal(updateRes.body.appointment.phone, '06 98 76 54 32');
+  assert.equal(updateRes.body.appointment.manualPlannerWho, 'martijn');
+  assert.equal(updateRes.body.appointment.manualLegendChoice, 'private-martijn');
+  assert.equal(updateRes.body.appointment.appointmentKind, 'overig');
+  assert.match(updateRes.body.appointment.summary, /Wie: Martijn/);
+  assert.match(updateRes.body.appointment.summary, /Telefoonnummer: 06 98 76 54 32/);
+  assert.match(updateRes.body.appointment.summary, /Opmerkingen: Nieuwe opmerkingen\./);
+});
+
 test('agenda manual appointment can be assigned to Serve and Martijn together', async () => {
   const { coordinator } = createFixture();
   const res = createResponseRecorder();
