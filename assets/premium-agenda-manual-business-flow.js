@@ -74,7 +74,7 @@ function setManualAppointmentStep(step) {
 }
 
 function resetManualAppointmentWizard() {
-    manualAppointmentKind = 'business';
+    manualAppointmentKind = '';
     manualAppointmentBusinessType = '';
     manualAppointmentMeetingType = '';
     manualAppointmentWho = '';
