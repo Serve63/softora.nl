@@ -319,6 +319,7 @@ function createAgendaRuntime(deps = {}) {
     getGeneratedAppointmentIndexById,
     getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
     setGeneratedAgendaAppointmentAtIndex,
+    upsertGeneratedAgendaAppointment,
     appendDashboardActivity,
     getUiStateValues,
     setUiStateValues,
@@ -579,6 +580,8 @@ function createAgendaRuntime(deps = {}) {
         agendaPostCallCoordinator.updateAgendaAppointmentPostCallDataById,
       addAgendaAppointmentToPremiumActiveOrders:
         agendaPostCallCoordinator.addAgendaAppointmentToPremiumActiveOrders,
+      addAgendaAppointmentToInterestedLeads:
+        agendaPostCallCoordinator.addAgendaAppointmentToInterestedLeads,
       setInterestedLeadInAgendaResponse:
         agendaInterestedLeadsCoordinator.setInterestedLeadInAgendaResponse,
       dismissInterestedLeadResponse:
