@@ -274,6 +274,28 @@ function createColdmailCampaignService(deps = {}) {
     return normalized === 'webdesign' || normalized === 'website-design' || normalized === 'website_design';
   }
 
+  function normalizeCampaignService(value) {
+    return normalizeString(value)
+      .toLowerCase()
+      .replace(/['’`]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function requiresReadyWebdesign(input = {}, mode = 'mail') {
+    if (isWebdesignSpecialAction(input.specialAction)) return true;
+    const service = normalizeCampaignService(input.service);
+    if (
+      service === 'website' ||
+      service === 'websites' ||
+      service === 'webdesign' ||
+      service === 'website design'
+    ) {
+      return true;
+    }
+    return mode === 'call' && !service;
+  }
+
   function getRowId(row, index) {
     return normalizeString(row.id || row.customerId || row.databaseId || '') || `row-${index}`;
   }
@@ -494,6 +516,70 @@ function createColdmailCampaignService(deps = {}) {
     (Array.isArray(leadRows) ? leadRows : []).forEach(addRow);
     (Array.isArray(customerRows) ? customerRows : []).forEach(addRow);
     return mergedRows;
+  }
+
+  function isResolvableWebsitePhotoValue(value) {
+    const text = normalizeString(value);
+    if (!text) return false;
+    if (parseDataUrlImage(text)) return true;
+    return /^https:\/\//i.test(text);
+  }
+
+  function findStoredPhotoRecordForRow(row, index, photoMap, photosByIdentity) {
+    const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
+    const byIdentity = photosByIdentity instanceof Map ? photosByIdentity : new Map();
+    const id = getRowId(row, index);
+    const identityKey = buildRowIdentityKey(row);
+    return photos[id] || byIdentity.get(identityKey) || null;
+  }
+
+  function hasReadyWebsitePhotoRecord(photo) {
+    if (!photo || typeof photo !== 'object') return false;
+    return Boolean(
+      isResolvableWebsitePhotoValue(photo.websitePhoto) ||
+        isResolvableWebsitePhotoValue(photo.websitePhotoUrl) ||
+        isResolvableWebsitePhotoValue(photo.signedUrl) ||
+        isResolvableWebsitePhotoValue(photo.storage && photo.storage.signedUrl)
+    );
+  }
+
+  function createReadyWebdesignMatcher(customerRows = [], photoMap = {}) {
+    const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
+    const photosByIdentity = new Map();
+    Object.keys(photos).forEach((key) => {
+      const item = photos[key];
+      if (!hasReadyWebsitePhotoRecord(item)) return;
+      const identityKey = normalizeString(item && item.identityKey).toLowerCase();
+      if (identityKey) photosByIdentity.set(identityKey, item);
+    });
+
+    const readyIds = new Set();
+    const readyIdentityKeys = new Set();
+    const readyPhoneKeys = new Set();
+
+    (Array.isArray(customerRows) ? customerRows : []).forEach((row, index) => {
+      const photo = findStoredPhotoRecordForRow(row, index, photos, photosByIdentity);
+      if (!hasReadyWebsitePhotoRecord(photo)) return;
+
+      const rowId = getRowId(row, index);
+      const identityKey = buildRowIdentityKey(row);
+      if (rowId) readyIds.add(rowId);
+      if (identityKey) readyIdentityKeys.add(identityKey);
+      getComparablePhoneKeys(getRowPhone(row)).forEach((key) => readyPhoneKeys.add(key));
+    });
+
+    return {
+      hasRow(row, index = 0) {
+        const rowId = getRowId(row, index);
+        if (rowId && readyIds.has(rowId)) return true;
+        const identityKey = buildRowIdentityKey(row);
+        if (identityKey && readyIdentityKeys.has(identityKey)) return true;
+        for (const key of getComparablePhoneKeys(getRowPhone(row))) {
+          if (readyPhoneKeys.has(key)) return true;
+        }
+        return false;
+      },
+    };
   }
 
   function getEmailDomain(email) {
@@ -954,18 +1040,27 @@ function createColdmailCampaignService(deps = {}) {
       : new Set();
     const state = await getUiStateValues(mode === 'call' ? leadDbScope : customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
+    const customerState =
+      mode === 'call' ? await getUiStateValues(customerDbScope) : state;
+    const customerValues =
+      customerState && typeof customerState.values === 'object' ? customerState.values : {};
+    const customerRows = parseDatabaseRows(customerValues);
     let rows = [];
     if (mode === 'call') {
-      const customerState = await getUiStateValues(customerDbScope);
-      const customerValues =
-        customerState && typeof customerState.values === 'object' ? customerState.values : {};
       rows = mergeColdcallingRowsWithCustomerRows(
         parseLeadDatabaseRows(values),
         parseLeadDatabaseRows(customerValues, customerDbKey)
       );
     } else {
-      rows = parseDatabaseRows(values);
+      rows = customerRows;
     }
+    const shouldRequireWebdesign = requiresReadyWebdesign(input, mode);
+    const customerPhotoMap = shouldRequireWebdesign ? await loadCustomerPhotoMap() : {};
+    const readyWebdesignMatcher = shouldRequireWebdesign
+      ? createReadyWebdesignMatcher(customerRows, customerPhotoMap)
+      : null;
+
+    const failed = [];
     const candidateRows = rows
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
       .filter(({ row }) =>
@@ -973,9 +1068,19 @@ function createColdmailCampaignService(deps = {}) {
           ? isEligibleColdcallingRow(row, input.branch, input.radiusKm, blockedPhoneKeys)
           : isEligibleColdmailRow(row, input.branch, input.radiusKm, blockedEmailKeys)
       )
+      .filter((item) => {
+        if (!readyWebdesignMatcher || readyWebdesignMatcher.hasRow(item.row, item.index)) return true;
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row),
+          email: getRowEmail(item.row),
+          phone: getRowPhone(item.row),
+          error: `Nog geen website-design klaar voor ${getRowCompany(item.row) || 'dit bedrijf'}.`,
+        });
+        return false;
+      })
       .slice(0, count);
     const selectedRows = [];
-    const failed = [];
 
     for (const item of candidateRows) {
       if (mode === 'call') {
@@ -1009,10 +1114,13 @@ function createColdmailCampaignService(deps = {}) {
       mode,
       radiusKm: parseRadiusKm(input.radiusKm),
       values,
+      customerValues,
+      customerRows,
       rows,
       candidateRows,
       selectedRows,
       failed,
+      customerPhotoMap,
     };
   }
 
@@ -1361,12 +1469,13 @@ function createColdmailCampaignService(deps = {}) {
 
   async function resolveRowWebdesignPhoto(row, photoMap) {
     const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
-    const direct = photos[getRowId(row, 0)];
-    const identityKey = buildRowIdentityKey(row);
-    const identity = Object.keys(photos)
-      .map((key) => photos[key])
-      .find((item) => normalizeString(item && item.identityKey) === identityKey);
-    const photo = direct || identity || null;
+    const photosByIdentity = new Map();
+    Object.keys(photos).forEach((key) => {
+      const item = photos[key];
+      const identityKey = normalizeString(item && item.identityKey).toLowerCase();
+      if (identityKey) photosByIdentity.set(identityKey, item);
+    });
+    const photo = findStoredPhotoRecordForRow(row, 0, photos, photosByIdentity);
     const parsed = await resolveImageAttachment(photo && (photo.websitePhoto || photo.websitePhotoUrl));
     if (!parsed) return null;
     const baseName = sanitizeFilename(photo.websitePhotoName || `${getRowCompany(row)} webdesign`, 'webdesign');
@@ -1455,15 +1564,16 @@ function createColdmailCampaignService(deps = {}) {
     const values = resolvedRecipients.values;
     const rows = resolvedRecipients.rows;
     const candidateRows = resolvedRecipients.candidateRows;
+    const failed = resolvedRecipients.failed;
 
     if (!candidateRows.length) {
       const error = new Error('Geen geschikte e-mailadressen gevonden in de database.');
       error.code = 'NO_RECIPIENTS';
+      error.failedItems = failed;
       throw error;
     }
 
     let selectedRows = resolvedRecipients.selectedRows;
-    const failed = resolvedRecipients.failed;
     const quota = await getColdmailSendQuota(senderEmail);
     const quotaRemaining = Math.min(quota.senderRemaining, quota.packageRemaining);
     if (quotaRemaining <= 0) {
