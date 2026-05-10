@@ -2168,10 +2168,7 @@
             .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
 
         if (!todays.length) {
-            host.innerHTML =
-                '<p>Even alsof Ruben je dit mondeling vertelt: voor vandaag (' +
-                escapeAgendaPlanningHtml(longDate) +
-                ') zie ik nog geen afspraken in de agenda. Zodra er iets ingepland staat, vult dit blok vanzelf bij—met een korte “van hier naar daar” en of het een rustige of drukke dag wordt.</p>';
+            host.innerHTML = '<p>Vandaag (' + escapeAgendaPlanningHtml(longDate) + ') is het een rustige dag. ' + (isYmdCalendarKlantwerkDay(ymd) ? 'Geen afspraken, wel klantwerk op de planning.' : 'Er staan geen afspraken in de agenda.') + '</p>';
             return;
         }
 
