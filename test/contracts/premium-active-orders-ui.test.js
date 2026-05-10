@@ -180,7 +180,12 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(leadsTabScriptSource, /order:\s*0;/);
   assert.match(leadsTabScriptSource, /background:\s*var\(--green\);/);
   assert.match(source, /const FILTER_STORAGE_PREFIX = 'softora_only_my_assignments_v1';/);
+  assert.match(source, /const FILTER_SCOPE = 'premium_assignment_filters';/);
   assert.match(source, /function normalizeOwnerLabel\(value\) \{/);
+  assert.match(source, /\/api\/ui-state-get\?scope=\$\{encodedScope\}/);
+  assert.match(source, /JSON\.stringify\(nextPreferences\)/);
+  assert.doesNotMatch(source, /localStorage/);
+  assert.doesNotMatch(source, /sessionStorage/);
   assert.match(source, /function syncActiveOrdersPage\(\) \{/);
   assert.match(source, /function applyActiveOrdersSummary\(cards\) \{/);
   assert.match(source, /function syncCreateOrderAgendaOptions\(\) \{/);

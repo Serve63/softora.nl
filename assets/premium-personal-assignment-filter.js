@@ -2,7 +2,7 @@
     'use strict';
 
     const FILTER_STORAGE_PREFIX = 'softora_only_my_assignments_v1';
-    const SESSION_STORAGE_KEY = 'softora_premium_sidebar_session_v1';
+    const FILTER_SCOPE = 'premium_assignment_filters';
     const TOGGLE_SELECTOR = '[data-only-my-assignments-toggle]';
     const listeners = new Set();
 
@@ -10,6 +10,8 @@
     let cachedEnabled = false;
     let stateLoaded = false;
     let currentSessionPromise = null;
+    let currentPreferencePromise = null;
+    let storedPreferences = Object.create(null);
 
     function normalizeOwnerLabel(value) {
         const raw = String(value || '').replace(/\s+/g, ' ').trim();
@@ -19,17 +21,6 @@
         if (words.includes('serve')) return 'Servé';
         if (words.includes('martijn')) return 'Martijn';
         return '';
-    }
-
-    function readSidebarSessionSnapshot() {
-        try {
-            const raw = root.sessionStorage ? root.sessionStorage.getItem(SESSION_STORAGE_KEY) : '';
-            if (!raw) return null;
-            const parsed = JSON.parse(raw);
-            return parsed && typeof parsed === 'object' ? parsed : null;
-        } catch (_) {
-            return null;
-        }
     }
 
     function resolveOwnerFromSessionLike(sessionLike) {
@@ -53,13 +44,51 @@
         return normalizeOwnerLabel(nameEl ? nameEl.textContent : '');
     }
 
+    function parseJsonObject(value) {
+        if (!value) return null;
+        if (typeof value === 'object' && !Array.isArray(value)) return value;
+        try {
+            const parsed = JSON.parse(String(value || '').trim());
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function getUiStateReadUrls(scope) {
+        const encodedScope = encodeURIComponent(String(scope || '').trim());
+        return [
+            `/api/ui-state-get?scope=${encodedScope}`,
+            `/api/ui-state/${encodedScope}`
+        ];
+    }
+
+    function getUiStateWriteUrls(scope) {
+        const encodedScope = encodeURIComponent(String(scope || '').trim());
+        return [
+            `/api/ui-state-set?scope=${encodedScope}`,
+            `/api/ui-state/${encodedScope}`
+        ];
+    }
+
+    async function requestJsonWithFallback(urls, options, label) {
+        let lastError = null;
+        for (const url of urls) {
+            try {
+                const response = await root.fetch(url, options);
+                if (!response.ok) throw new Error(`${label} mislukt (${response.status})`);
+                return await response.json().catch(() => ({}));
+            } catch (error) {
+                lastError = error;
+            }
+        }
+        throw lastError || new Error(`${label} mislukt`);
+    }
+
     async function loadSession() {
         if (currentSessionPromise) return currentSessionPromise;
 
         currentSessionPromise = (async () => {
-            const cachedSession = readSidebarSessionSnapshot();
-            if (cachedSession && cachedSession.authenticated) return cachedSession;
-
             if (root.SoftoraPersonnelTheme && typeof root.SoftoraPersonnelTheme.refreshPremiumSession === 'function') {
                 try {
                     const refreshed = await root.SoftoraPersonnelTheme.refreshPremiumSession();
@@ -89,12 +118,6 @@
     async function ensureOwner(options = {}) {
         if (cachedOwner && !options.force) return cachedOwner;
 
-        const fromSession = resolveOwnerFromSessionLike(readSidebarSessionSnapshot());
-        if (fromSession) {
-            cachedOwner = fromSession;
-            return cachedOwner;
-        }
-
         const fromDom = resolveOwnerFromDom();
         if (fromDom) {
             cachedOwner = fromDom;
@@ -111,22 +134,72 @@
         return `${FILTER_STORAGE_PREFIX}:${normalizedOwner || 'unknown'}`;
     }
 
-    function readStoredEnabled(owner) {
-        const normalizedOwner = normalizeOwnerLabel(owner);
-        if (!normalizedOwner) return false;
-        try {
-            return root.localStorage ? root.localStorage.getItem(buildStorageKey(normalizedOwner)) === '1' : false;
-        } catch (_) {
-            return false;
-        }
+    async function readStoredPreferences(options = {}) {
+        if (currentPreferencePromise) return currentPreferencePromise;
+        if (!options.force && Object.keys(storedPreferences).length) return storedPreferences;
+
+        currentPreferencePromise = (async () => {
+            try {
+                const payload = await requestJsonWithFallback(
+                    getUiStateReadUrls(FILTER_SCOPE),
+                    { method: 'GET', cache: 'no-store' },
+                    'Persoonlijke filter laden'
+                );
+                const values = payload && typeof payload === 'object' && payload.values && typeof payload.values === 'object'
+                    ? payload.values
+                    : {};
+                const rawMap = parseJsonObject(values[FILTER_STORAGE_PREFIX]) || {};
+                const nextPreferences = Object.create(null);
+                Object.entries(rawMap).forEach(([rawOwner, enabled]) => {
+                    const owner = normalizeOwnerLabel(rawOwner);
+                    if (owner) nextPreferences[owner] = Boolean(enabled);
+                });
+                storedPreferences = nextPreferences;
+            } catch (_) {
+                storedPreferences = storedPreferences && typeof storedPreferences === 'object'
+                    ? storedPreferences
+                    : Object.create(null);
+            } finally {
+                currentPreferencePromise = null;
+            }
+            return storedPreferences;
+        })();
+
+        return currentPreferencePromise;
     }
 
-    function writeStoredEnabled(owner, enabled) {
+    async function readStoredEnabled(owner) {
         const normalizedOwner = normalizeOwnerLabel(owner);
         if (!normalizedOwner) return false;
+        const preferences = await readStoredPreferences();
+        return Boolean(preferences[normalizedOwner]);
+    }
+
+    async function writeStoredEnabled(owner, enabled) {
+        const normalizedOwner = normalizeOwnerLabel(owner);
+        if (!normalizedOwner) return false;
+        const currentPreferences = await readStoredPreferences();
+        const nextPreferences = {
+            ...currentPreferences,
+            [normalizedOwner]: Boolean(enabled)
+        };
+        storedPreferences = nextPreferences;
         try {
-            if (!root.localStorage) return false;
-            root.localStorage.setItem(buildStorageKey(normalizedOwner), enabled ? '1' : '0');
+            await requestJsonWithFallback(
+                getUiStateWriteUrls(FILTER_SCOPE),
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patch: {
+                            [FILTER_STORAGE_PREFIX]: JSON.stringify(nextPreferences)
+                        },
+                        source: buildStorageKey(normalizedOwner),
+                        actor: 'browser'
+                    })
+                },
+                'Persoonlijke filter opslaan'
+            );
             return true;
         } catch (_) {
             return false;
@@ -169,7 +242,7 @@
 
     async function getState(options = {}) {
         const owner = await ensureOwner(options);
-        cachedEnabled = readStoredEnabled(owner);
+        cachedEnabled = await readStoredEnabled(owner);
         stateLoaded = true;
         syncToggleElements();
         return { enabled: cachedEnabled, owner };
@@ -178,7 +251,7 @@
     async function setEnabled(nextEnabled) {
         const owner = await ensureOwner();
         cachedEnabled = Boolean(nextEnabled) && Boolean(owner);
-        writeStoredEnabled(owner, cachedEnabled);
+        await writeStoredEnabled(owner, cachedEnabled);
         stateLoaded = true;
         syncToggleElements();
         notifyListeners();
