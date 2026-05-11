@@ -1599,7 +1599,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260511a"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260511b"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260511a"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260511a"></script>
@@ -2175,6 +2175,8 @@
         });
 
         const webdesignMockupController = window.SoftoraDatabaseWebdesignMockup.createController({ state, normalizeCustomer, sortCustomers, isValidWebsitePhotoSource, isValidWebsitePhotoDataUrl, persistCustomerPhotos, renderPage, setStatusMessage, toast });
+        let mockupAutoEnsureQueued = false;
+        function scheduleVisibleMockupEnsure() { if (mockupAutoEnsureQueued || state.photoRestorePending) return; mockupAutoEnsureQueued = true; setTimeout(function () { mockupAutoEnsureQueued = false; void webdesignMockupController.ensureVisibleMockups(getSortedCustomers(getFilteredCustomers()), 24).catch(function (error) { console.error("Device-mockups automatisch maken mislukt:", error); }); }, 0); }
         const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, ensureMockupForCustomer: function (customerId) { return webdesignMockupController.ensureForCustomer(customerId); }, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, refreshPhotos: async function (context) { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true }); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); if (context && context.customerId) await webdesignMockupController.ensureForCustomer(context.customerId); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
         function mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers) {
@@ -2404,9 +2406,7 @@
             }).join("");
         }
 
-        function renderPage() {
-            renderTable();
-        }
+        function renderPage() { renderTable(); scheduleVisibleMockupEnsure(); }
 
         function setStatus(status, button) {
             state.activeStatus = status;
@@ -3153,11 +3153,7 @@
             }
             const mockupDrop = event.target.closest("[data-mockup-photo-id]");
             if (mockupDrop) {
-                event.preventDefault();
-                event.stopPropagation(); if (mockupDrop.getAttribute("data-can-generate") !== "true") return;
-                state.photoTargetId = mockupDrop.getAttribute("data-mockup-photo-id");
-                if (openWebsitePhotoPreview(state.photoTargetId, "mockup")) return;
-                void webdesignMockupController.ensureForCustomer(state.photoTargetId, { force: true });
+                event.preventDefault(); event.stopPropagation(); state.photoTargetId = mockupDrop.getAttribute("data-mockup-photo-id"); openWebsitePhotoPreview(state.photoTargetId, "mockup");
                 return;
             }
             const photoDrop = event.target.closest(".photo-drop[data-photo-id]");

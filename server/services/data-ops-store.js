@@ -428,7 +428,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       });
       if (uploaded.error) throw uploaded.error;
       const legacyMeta = entry.legacyMeta && typeof entry.legacyMeta === 'object' ? { ...entry.legacyMeta } : {};
-      const mockup = parseImageDataUrl(entry.websiteMockup || entry.mockupDataUrl);
+      const mockup = parseImageDataUrl(entry.websiteMockup || entry.mockup || entry.websiteMockupDataUrl || entry.mockupDataUrl);
       if (mockup) {
         const mockupExt = extensionForMimeType(mockup.mimeType);
         const mockupPath = [
