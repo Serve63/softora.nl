@@ -9,6 +9,10 @@ const DEFAULT_MAILBOX_EMAILS = [
   'serve@softora.nl',
   'martijn@softora.nl',
 ];
+const MAILBOX_DISPLAY_NAMES = {
+  'serve@softora.nl': 'Servé Creusen',
+  'martijn@softora.nl': 'Martijn van de Ven',
+};
 
 const FOLDER_ALIASES = {
   inbox: ['INBOX'],
@@ -177,6 +181,15 @@ function createMailboxService(deps = {}) {
     return Boolean(email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
   }
 
+  function getMailboxDisplayName(email, preferredName) {
+    const address = normalizeEmail(email);
+    const name = normalizeString(preferredName);
+    const canonicalName = MAILBOX_DISPLAY_NAMES[address] || '';
+    const shortName = address.split('@')[0] || '';
+    if (canonicalName && (!name || name.toLowerCase() === shortName)) return canonicalName;
+    return name || canonicalName || address;
+  }
+
   function envKeyForEmail(email) {
     return normalizeEmail(email)
       .split('@')[0]
@@ -315,7 +328,7 @@ function createMailboxService(deps = {}) {
       const imapPort = Number(json.imapPort || envAccount.imapPort || envDomain.imapPort || baseAccount.imapPort || 993) || 993;
       const account = {
         email,
-        name: normalizeString(json.name || envAccount.name || envDomain.name || (useBase ? baseAccount.name : '')) || email,
+        name: getMailboxDisplayName(email, json.name || envAccount.name || envDomain.name || (useBase ? baseAccount.name : '')),
         smtpHost,
         smtpPort,
         smtpSecure:

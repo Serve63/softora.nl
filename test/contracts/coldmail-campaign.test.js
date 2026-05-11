@@ -170,6 +170,24 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[1].status, 'klant');
 });
 
+test('coldmail campaign sends Martijn mail with the full sender display name', async () => {
+  const { service, sentMessages } = createService();
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemiddag {{naam}}',
+    senderEmail: 'martijn@softora.nl',
+    branch: 'Horeca & Restaurants',
+    specialAction: '',
+    actor: 'Martijn',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].from, 'Martijn van de Ven <martijn@softora.nl>');
+});
+
 test('coldmail campaign replaces city variable with the recipient database location', async () => {
   const { service, sentMessages } = createService({
     rows: [

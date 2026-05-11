@@ -96,8 +96,49 @@ test('mailbox service sends mail through selected account smtp', async () => {
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.equal(sent[0].config.auth.user, 'serve@softora.nl');
-  assert.equal(sent[0].message.from, 'Serve <serve@softora.nl>');
+  assert.equal(sent[0].message.from, 'Servé Creusen <serve@softora.nl>');
   assert.equal(sent[0].message.to, 'klant@example.nl');
+});
+
+test('mailbox service sends Martijn mail with the full display name', async () => {
+  const sent = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'martijn@softora.nl',
+        name: 'Martijn',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'martijn@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    createTransport: (config) => ({
+      sendMail: async (message) => {
+        sent.push({ config, message });
+        return { messageId: 'm-1', accepted: [message.to], rejected: [] };
+      },
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await service.sendMessageResponse(
+    {
+      body: {
+        account: 'martijn@softora.nl',
+        to: 'klant@example.nl',
+        subject: 'Test',
+        body: 'Hallo',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(sent[0].config.auth.user, 'martijn@softora.nl');
+  assert.equal(sent[0].message.from, 'Martijn van de Ven <martijn@softora.nl>');
 });
 
 test('mailbox service derives imap settings from smtp settings when possible', async () => {

@@ -48,7 +48,7 @@ const TEST_RECIPIENT_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL]);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce', 'softora testmodus']);
 const SENDER_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
-  'martijn@softora.nl': 'Martijn',
+  'martijn@softora.nl': 'Martijn van de Ven',
   'ruben@softora.nl': 'Ruben',
 };
 const EXCLUDED_DATABASE_STATUSES = new Set([
