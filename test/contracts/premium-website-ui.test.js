@@ -206,6 +206,27 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
     source,
     /<div class="tilt-card fade-up" data-tilt style="transition-delay: 0\.3s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;">[\s\S]*<div class="card-number">04<\/div>/
   );
+  assert.match(
+    source,
+    /\.tilt-card\s*\{[\s\S]*background-image:[\s\S]*var\(--service-card-photo/
+  );
+  assert.match(
+    source,
+    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(1\)\s*\{[\s\S]*\/assets\/home-hero-generated-v2\.jpg\?v=20260511a/
+  );
+  assert.match(
+    source,
+    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(2\)\s*\{[\s\S]*\/assets\/home-over-office-meeting-ai\.jpg\?v=20260511a/
+  );
+  assert.match(
+    source,
+    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(3\)\s*\{[\s\S]*\/assets\/home-hero-generated-v2\.jpg\?v=20260511a/
+  );
+  assert.match(
+    source,
+    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(4\)\s*\{[\s\S]*\/assets\/home-over-office-meeting-ai\.jpg\?v=20260511a/
+  );
+  assert.match(source, /\.card-content\s*\{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
   assert.doesNotMatch(source, /diensten-arrow-wrap/);
 });
 
