@@ -308,7 +308,7 @@
                 button.style.fontWeight = styles.fontWeight;
                 button.style.letterSpacing = styles.letterSpacing;
                 button.style.textTransform = styles.textTransform;
-                button.style.cursor = styles.cursor || "pointer";
+                button.style.cursor = button.disabled ? "not-allowed" : (styles.cursor || "pointer");
             });
         }
 
@@ -342,12 +342,19 @@
             optionButtons.length = 0;
 
             Array.from(select.options).forEach((option) => {
+                const optionValue = String(option.value || "").trim();
+                const isServiceLockedOption = serviceLockOptionValues.has(optionValue);
+                if (isServiceLockedOption && !option.disabled) {
+                    option.disabled = true;
+                }
+                const isOptionDisabled = Boolean(option.disabled || isServiceLockedOption);
                 const optionButton = document.createElement("button");
                 optionButton.type = "button";
                 optionButton.className = "site-select-option";
                 optionButton.dataset.value = option.value;
                 optionButton.setAttribute("role", "option");
-                optionButton.disabled = option.disabled;
+                optionButton.disabled = isOptionDisabled;
+                optionButton.setAttribute("aria-disabled", isOptionDisabled ? "true" : "false");
                 optionButton.tabIndex = -1;
 
                 const rawLabel = String(option.textContent || "")
@@ -355,19 +362,14 @@
                     .replace(/^\uD83D\uDD12\s*/u, "")
                     .replace(/^🔒\s*/u, "")
                     .trim();
-                const useServiceLockSvg =
-                    option.disabled &&
-                    wrapper.classList.contains("site-select--pill") &&
-                    serviceLockOptionValues.has(String(option.value || "").trim());
-
-                if (useServiceLockSvg) {
+                if (isServiceLockedOption) {
                     optionButton.classList.add("site-select-option--locked");
                     optionButton.append(createServiceLockElement(), createOptionLabel(rawLabel));
                 } else {
                     optionButton.textContent = String(option.textContent || "").trim();
                 }
 
-                if (!option.disabled) {
+                if (!isOptionDisabled) {
                     optionButton.addEventListener("click", () => {
                         const forceChangeValue = String(select.dataset.forceChangeValue || "").trim();
                         const shouldForceChange = forceChangeValue && option.value === forceChangeValue;

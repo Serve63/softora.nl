@@ -222,6 +222,31 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /if \(actualTotal < n\) showToast\(actualTotal \+ ' bedrijf' \+ \(actualTotal === 1 \? '' : 'en'\) \+ ' zijn klaar met website-design en worden meegenomen\.'\);/);
 });
 
+test('premium bevestigingsmails keeps unavailable services locked in the campaign selector', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const selectsPath = path.join(__dirname, '../../assets/premium-campaign-selects.js');
+  const customSelectsCssPath = path.join(__dirname, '../../assets/custom-selects.css');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const selectsSource = fs.readFileSync(selectsPath, 'utf8');
+  const customSelectsCssSource = fs.readFileSync(customSelectsCssPath, 'utf8');
+
+  assert.match(pageSource, /<script src="assets\/premium-campaign-selects\.js\?v=20260511a"><\/script>/);
+  assert.match(
+    pageSource,
+    /<select class="sel" id="service">\s*<option value="websites" selected>Website's<\/option>\s*<option value="voice_software" disabled>Voicesoftware<\/option>\s*<option value="business_software" disabled>Bedrijfssoftware<\/option>\s*<option value="ai_chatbots" disabled>AI Chatbots<\/option>\s*<\/select>/
+  );
+  assert.doesNotMatch(pageSource, /function enhanceCampaignSelect\(select\)/);
+  assert.match(selectsSource, /const CAMPAIGN_SERVICE_LOCK_OPTION_VALUES = new Set\(\['voice_software', 'business_software', 'ai_chatbots'\]\);/);
+  assert.match(selectsSource, /function createCampaignServiceLockElement\(\)/);
+  assert.match(selectsSource, /const isLockedServiceOption = select\.id === 'service' && CAMPAIGN_SERVICE_LOCK_OPTION_VALUES\.has\(optionValue\);/);
+  assert.match(selectsSource, /if \(isLockedServiceOption && !option\.disabled\) option\.disabled = true;/);
+  assert.match(selectsSource, /optionButton\.disabled = isLockedOption;/);
+  assert.match(selectsSource, /optionButton\.setAttribute\('aria-disabled', String\(isLockedOption\)\);/);
+  assert.match(selectsSource, /optionButton\.classList\.add\('select-option--locked', 'is-disabled'\);/);
+  assert.match(selectsSource, /if \(!isLockedOption\) \{[\s\S]*?optionButton\.addEventListener\('click'/);
+  assert.match(customSelectsCssSource, /\.select-option--locked \{[\s\S]*?display: flex;[\s\S]*?gap: 8px;/);
+});
+
 test('premium bevestigingsmails toont mailinteresse op coldmailing zonder leads-pagina te mengen', () => {
   const root = path.join(__dirname, '../..');
   const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
@@ -436,13 +461,16 @@ test('premium bevestigingsmails hides campaign duration dropdown but keeps timel
 
 test('premium ai lead generator alias replaces branche with belmethode', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const selectsPath = path.join(__dirname, '../../assets/premium-campaign-selects.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const selectsSource = fs.readFileSync(selectsPath, 'utf8');
 
   assert.match(pageSource, /html\[data-softora-lead-generator-alias="1"\] \.lead-generator-branch-field \{ display: none !important; \}/);
   assert.match(pageSource, /html:not\(\[data-softora-lead-generator-alias="1"\]\) \.lead-generator-belmethod-field \{ display: none !important; \}/);
   assert.match(pageSource, /<div class="field lead-generator-belmethod-field">\s*<div class="field-label">Belmethode<\/div>\s*<select class="sel" id="callDispatchMode">/);
   assert.doesNotMatch(pageSource, /id="callDispatchMode" data-native-select="true"/);
-  assert.match(pageSource, /document\.querySelectorAll\('select\.sel, select\.mf-sel'\)\.forEach\(enhanceCampaignSelect\);/);
+  assert.match(pageSource, /assets\/premium-campaign-selects\.js\?v=20260511a/);
+  assert.match(selectsSource, /document\.querySelectorAll\('select\.sel, select\.mf-sel'\)\.forEach\(enhanceCampaignSelect\);/);
   assert.match(pageSource, /<option value="sequential" selected>Apart<\/option>/);
   assert.match(pageSource, /<option value="parallel">Alles tegelijk<\/option>/);
 });

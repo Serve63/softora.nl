@@ -73,6 +73,12 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<option value="business_software" data-dot-color="blue" disabled>Bedrijfssoftware<\/option>/);
   assert.match(pageSource, /<option value="ai_chatbots" data-dot-color="accent" disabled>AI Chatbots<\/option>/);
   assert.match(customSelectsSource, /serviceLockOptionValues = new Set\(\["voice_software", "business_software", "ai_chatbots"\]\)/);
+  assert.match(customSelectsSource, /const isServiceLockedOption = serviceLockOptionValues\.has\(optionValue\);/);
+  assert.match(customSelectsSource, /if \(isServiceLockedOption && !option\.disabled\) \{[\s\S]*?option\.disabled = true;[\s\S]*?\}/);
+  assert.match(customSelectsSource, /optionButton\.disabled = isOptionDisabled;/);
+  assert.match(customSelectsSource, /optionButton\.setAttribute\("aria-disabled", isOptionDisabled \? "true" : "false"\);/);
+  assert.match(customSelectsSource, /if \(isServiceLockedOption\) \{[\s\S]*?site-select-option--locked[\s\S]*?createServiceLockElement\(\)/);
+  assert.match(customSelectsSource, /if \(!isOptionDisabled\) \{[\s\S]*?optionButton\.addEventListener\("click"/);
   assert.match(customSelectsSource, /if \(select\.id === "regio"\) \{[\s\S]*?getElementById\("campaignRegioTip"\)/);
   assert.doesNotMatch(pageSource, /const customSelectInstances = \[\];/);
   assert.doesNotMatch(pageSource, /function initCustomFormSelect\(select\)/);

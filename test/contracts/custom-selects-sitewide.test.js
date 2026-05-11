@@ -58,12 +58,12 @@ test('pages with dropdowns all load the shared custom select assets', () => {
     const source = readRepoFile(relativePath);
     assert.match(
       source,
-      /assets\/custom-selects\.css\?v=20260421b/,
+      /assets\/custom-selects\.css\?v=20260511a/,
       `${relativePath} should load the shared custom select stylesheet`
     );
     assert.match(
       source,
-      /assets\/custom-selects\.js\?v=20260421a/,
+      /assets\/custom-selects\.js\?v=20260511a/,
       `${relativePath} should load the shared custom select script`
     );
   });
