@@ -51,6 +51,29 @@ test('runtime event store appends normalized security audit events and caps the 
   assert.equal(persistReasons[0], 'security_login_rejected');
 });
 
+test('runtime event store redacts sensitive detail text before persisting audit events', () => {
+  const { eventStore, recentSecurityAuditEvents } = createFixture();
+  const fakeSecret = `sk-${'1234567890abcdefghijklmnop'}`;
+
+  const entry = eventStore.appendSecurityAuditEvent(
+    {
+      detail:
+        `Mail serve@example.com telefoon 0612345678 key ${fakeSecret} audio https://media.softora.test/recordings/call.mp3`,
+    },
+    'security_redaction_test'
+  );
+
+  assert.equal(recentSecurityAuditEvents[0], entry);
+  assert.doesNotMatch(entry.detail, /serve@example\.com/);
+  assert.doesNotMatch(entry.detail, /0612345678/);
+  assert.doesNotMatch(entry.detail, new RegExp(fakeSecret));
+  assert.doesNotMatch(entry.detail, /https:\/\/media\.softora\.test/);
+  assert.match(entry.detail, /\[redacted-email\]/);
+  assert.match(entry.detail, /\[redacted-phone\]/);
+  assert.match(entry.detail, /\[redacted-secret\]/);
+  assert.match(entry.detail, /\[redacted-recording-url\]/);
+});
+
 test('runtime event store appends dashboard activities with stable defaults', () => {
   const { eventStore, persistReasons, recentDashboardActivities } = createFixture();
 

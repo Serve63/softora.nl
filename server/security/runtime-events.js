@@ -1,3 +1,5 @@
+const { redactSensitiveLogText } = require('./redaction');
+
 function createRuntimeEventStore(deps = {}) {
   const {
     recentDashboardActivities = [],
@@ -22,7 +24,7 @@ function createRuntimeEventStore(deps = {}) {
       ip: truncateText(normalizeIpAddress(input?.ip || ''), 80),
       path: truncateText(normalizeString(input?.path || ''), 200),
       origin: truncateText(normalizeOrigin(input?.origin || ''), 200),
-      detail: truncateText(normalizeString(input?.detail || input?.message || ''), 500),
+      detail: truncateText(redactSensitiveLogText(normalizeString(input?.detail || input?.message || '')), 500),
       userAgent: truncateText(normalizeString(input?.userAgent || ''), 280),
       createdAt: normalizeString(input?.createdAt || nowIso) || nowIso,
     };

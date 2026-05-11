@@ -65,7 +65,11 @@ test('runtime backup coordinator builds compact snapshot payloads with stable li
     recentCallUpdates: [
       {
         callId: 'call-1',
+        phone: '0612345678',
         company: 'Alpha BV',
+        transcriptFull: 'Geheim transcript met serve@example.com en telefoon 0612345678',
+        transcriptSnippet: 'Kort transcript',
+        recordingUrl: 'https://media.softora.test/recordings/call-1.mp3',
         summary: 'x'.repeat(3000),
         updatedAt: '2026-04-07T12:00:00.000Z',
       },
@@ -78,6 +82,9 @@ test('runtime backup coordinator builds compact snapshot payloads with stable li
       {
         callId: 'call-1',
         company: 'Alpha BV',
+        phone: '0612345678',
+        contactEmail: 'serve@example.com',
+        summary: 'Bel serve@example.com via 0612345678',
         estimatedValueEur: '1200',
       },
     ],
@@ -100,10 +107,16 @@ test('runtime backup coordinator builds compact snapshot payloads with stable li
         id: 44,
         type: 'meeting',
         company: 'Alpha BV',
+        contact: 'Serve Creusen',
+        phone: '0612345678',
         date: '2026-04-08',
         time: '13:30',
         durationSeconds: 95,
         callId: 'call-1',
+        contactEmail: 'serve@example.com',
+        recordingUrl: 'https://media.softora.test/recordings/call-1.mp3',
+        confirmationEmailDraft: 'Onderwerp: gevoelige afspraak',
+        postCallNotesTranscript: 'Volledig gesprek',
       },
     ],
     dismissedInterestedLeadCallIds: new Set(['call-1']),
@@ -133,6 +146,15 @@ test('runtime backup coordinator builds compact snapshot payloads with stable li
   assert.equal(snapshot.recentWebhookEvents.length, 10);
   assert.equal(snapshot.recentCallUpdates.length, 1);
   assert.equal(snapshot.recentCallUpdates[0].summary.length, 1400);
+  assert.equal(snapshot.recentCallUpdates[0].transcriptFull, '');
+  assert.equal(snapshot.recentCallUpdates[0].transcriptSnippet, '');
+  assert.equal(snapshot.recentCallUpdates[0].recordingUrl, '');
+  assert.match(snapshot.recentCallUpdates[0].phone, /\[redacted-phone\]/);
+  assert.match(snapshot.recentAiCallInsights[0].contactEmail, /\[redacted-email\]/);
+  assert.match(snapshot.recentAiCallInsights[0].summary, /\[redacted-email\]/);
+  assert.equal(snapshot.generatedAgendaAppointments[0].recordingUrl, '');
+  assert.equal(snapshot.generatedAgendaAppointments[0].confirmationEmailDraft, '');
+  assert.equal(snapshot.generatedAgendaAppointments[0].postCallNotesTranscript, '');
   assert.equal(snapshot.generatedAgendaAppointments[0].durationSeconds, 95);
   assert.equal(
     snapshot.dismissedInterestedLeadKeyUpdatedAtMsByKey['lead-1'],
@@ -175,6 +197,7 @@ test('runtime backup coordinator builds and extracts compact supabase call updat
 
   assert.equal(payload.type, 'call_update');
   assert.equal(payload.reason, 'manual_test');
+  assert.equal(payload.callUpdate.company, 'Softora');
   assert.equal(restored.callId, 'call-42');
   assert.equal(restored.company, 'Softora');
   assert.equal(restored.costUsd, 0.498);

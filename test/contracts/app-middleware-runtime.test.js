@@ -165,3 +165,27 @@ test('app middleware geeft audio-notitie uploads een grotere JSON-limiet', async
 
   assert.equal(selectedLimits.at(-1), '34mb');
 });
+
+test('app middleware registers focused rate limiters before the general API limiter', () => {
+  const app = createAppRecorder();
+
+  const result = applyAppMiddleware(app, createDeps());
+
+  const sensitiveLimiterIndex = app.uses.findIndex((args) => {
+    const paths = args[0];
+    return Array.isArray(paths) && paths.includes('/api/mailbox/send');
+  });
+  const aiLimiterIndex = app.uses.findIndex((args) => {
+    const paths = args[0];
+    return Array.isArray(paths) && paths.includes('/api/ai/order-dossier');
+  });
+  const generalLimiterIndex = app.uses.findIndex((args) => args[0] === '/api');
+
+  assert.ok(sensitiveLimiterIndex > -1);
+  assert.ok(aiLimiterIndex > -1);
+  assert.ok(generalLimiterIndex > -1);
+  assert.ok(sensitiveLimiterIndex < generalLimiterIndex);
+  assert.ok(aiLimiterIndex < generalLimiterIndex);
+  assert.equal(typeof result.sensitiveActionRateLimiter, 'function');
+  assert.equal(typeof result.aiApiRateLimiter, 'function');
+});

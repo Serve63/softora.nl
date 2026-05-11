@@ -1,3 +1,5 @@
+const { redactSensitiveLogText } = require('../security/redaction');
+
 function buildRuntimeBackupEnvelope(options = {}) {
   const appName = String(options.appName || 'softora-runtime').trim();
   const appVersion = String(options.appVersion || '0.0.0').trim();
@@ -141,6 +143,20 @@ function createRuntimeBackupCoordinator(deps = {}) {
     };
   }
 
+  function redactRuntimeSnapshotCallUpdateForBackup(item) {
+    const compact = compactRuntimeSnapshotCallUpdate(item);
+    return {
+      ...compact,
+      phone: redactSensitiveLogText(compact.phone),
+      address: redactSensitiveLogText(compact.address),
+      summary: redactSensitiveLogText(compact.summary),
+      transcriptSnippet: '',
+      transcriptFull: '',
+      recordingUrl: '',
+      recordingUrlProxy: '',
+    };
+  }
+
   function buildSupabaseCallUpdatePayload(callUpdate, reason = 'call_update_row') {
     const compact = compactRuntimeSnapshotCallUpdate(callUpdate || {});
     if (!normalizeString(compact?.callId || '')) return null;
@@ -224,6 +240,18 @@ function createRuntimeBackupCoordinator(deps = {}) {
     };
   }
 
+  function redactRuntimeSnapshotAiInsightForBackup(item) {
+    const compact = compactRuntimeSnapshotAiInsight(item);
+    return {
+      ...compact,
+      phone: redactSensitiveLogText(compact.phone),
+      summary: redactSensitiveLogText(compact.summary),
+      followUpReason: redactSensitiveLogText(compact.followUpReason),
+      contactEmail: redactSensitiveLogText(compact.contactEmail),
+      address: redactSensitiveLogText(compact.address),
+    };
+  }
+
   function compactRuntimeSnapshotDashboardActivity(item) {
     return {
       id: compactRuntimeSnapshotText(item?.id, 140),
@@ -251,7 +279,7 @@ function createRuntimeBackupCoordinator(deps = {}) {
       ip: compactRuntimeSnapshotText(item?.ip, 80),
       path: compactRuntimeSnapshotText(item?.path, 220),
       origin: compactRuntimeSnapshotText(item?.origin, 220),
-      detail: compactRuntimeSnapshotText(item?.detail || item?.message, 600),
+      detail: compactRuntimeSnapshotText(redactSensitiveLogText(item?.detail || item?.message), 600),
       userAgent: compactRuntimeSnapshotText(item?.userAgent, 300),
       createdAt: normalizeString(item?.createdAt || ''),
       updatedAt: normalizeString(item?.updatedAt || ''),
@@ -339,6 +367,25 @@ function createRuntimeBackupCoordinator(deps = {}) {
     };
   }
 
+  function redactRuntimeSnapshotGeneratedAgendaAppointmentForBackup(item) {
+    const compact = compactRuntimeSnapshotGeneratedAgendaAppointment(item);
+    if (!compact) return null;
+    return {
+      ...compact,
+      contact: redactSensitiveLogText(compact.contact),
+      phone: redactSensitiveLogText(compact.phone),
+      summary: redactSensitiveLogText(compact.summary),
+      whatsappInfo: '',
+      recordingUrl: '',
+      contactEmail: redactSensitiveLogText(compact.contactEmail),
+      confirmationEmailDraft: '',
+      confirmationEmailLastError: redactSensitiveLogText(compact.confirmationEmailLastError),
+      postCallNotesTranscript: '',
+      postCallPrompt: '',
+      leadOwnerEmail: redactSensitiveLogText(compact.leadOwnerEmail),
+    };
+  }
+
   function buildRuntimeStateSnapshotPayloadWithLimits(options = {}) {
     const maxWebhookEvents = Math.max(10, Math.min(200, Number(options?.maxWebhookEvents || 80) || 80));
     const maxCallUpdates = Math.max(20, Math.min(500, Number(options?.maxCallUpdates || 500) || 500));
@@ -379,11 +426,11 @@ function createRuntimeBackupCoordinator(deps = {}) {
         .map(compactRuntimeSnapshotWebhookEvent),
       recentCallUpdates: recentCallUpdates
         .slice(0, maxCallUpdates)
-        .map(compactRuntimeSnapshotCallUpdate)
+        .map(redactRuntimeSnapshotCallUpdateForBackup)
         .filter((item) => normalizeString(item?.callId || '')),
       recentAiCallInsights: recentAiCallInsights
         .slice(0, maxAiCallInsights)
-        .map(compactRuntimeSnapshotAiInsight)
+        .map(redactRuntimeSnapshotAiInsightForBackup)
         .filter((item) => normalizeString(item?.callId || '')),
       recentDashboardActivities: recentDashboardActivities
         .slice(0, maxDashboardActivities)
@@ -395,7 +442,7 @@ function createRuntimeBackupCoordinator(deps = {}) {
         .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || '')),
       generatedAgendaAppointments: generatedAgendaAppointments
         .slice(0, maxAgendaAppointments)
-        .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
+        .map(redactRuntimeSnapshotGeneratedAgendaAppointmentForBackup)
         .filter(Boolean),
       dismissedInterestedLeadCallIds: Array.from(dismissedInterestedLeadCallIds)
         .slice(0, maxDismissedCallIds)

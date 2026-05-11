@@ -1,0 +1,1489 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Softora Securityrapport - 11 mei 2026</title>
+<style>
+  @page { size: A4; margin: 18mm 15mm 20mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; color: #17202a; line-height: 1.48; font-size: 10.5pt; margin: 0; }
+  h1 { font-size: 25pt; margin: 0 0 8mm 0; color: #071421; page-break-after: avoid; }
+  h2 { font-size: 15.5pt; margin: 10mm 0 3mm; padding-top: 1mm; color: #102a43; page-break-after: avoid; border-top: 1px solid #d8e0e7; }
+  h3 { font-size: 12.2pt; margin: 6mm 0 2mm; color: #12395b; page-break-after: avoid; }
+  h4 { font-size: 10.8pt; margin: 4mm 0 1.5mm; color: #244b6b; page-break-after: avoid; }
+  p { margin: 0 0 3mm; }
+  ul, ol { margin-top: 1mm; margin-bottom: 4mm; padding-left: 5.5mm; }
+  li { margin: 0 0 1.4mm; }
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; font-size: 8.3pt; page-break-inside: auto; }
+  th, td { border: 1px solid #cfd8e3; padding: 5px 6px; vertical-align: top; overflow-wrap: anywhere; }
+  th { background: #eef4f8; color: #102a43; font-weight: 700; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  code { font-family: "SFMono-Regular", Menlo, Consolas, monospace; font-size: 8.8pt; background: #f4f7fa; padding: 1px 3px; border-radius: 3px; }
+  a { color: #064f8c; text-decoration: none; }
+  blockquote { border-left: 3px solid #aac2d8; margin: 3mm 0; padding: 2mm 4mm; background: #f7fafc; }
+  .report-shell { max-width: 100%; }
+  .cover { min-height: 248mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: always; padding: 6mm 0; }
+  .cover-kicker { text-transform: uppercase; letter-spacing: .08em; color: #406580; font-size: 9pt; font-weight: 700; margin-bottom: 5mm; }
+  .cover-title { font-size: 32pt; line-height: 1.05; font-weight: 800; color: #071421; margin-bottom: 5mm; }
+  .cover-subtitle { font-size: 13pt; color: #3b5368; max-width: 150mm; }
+  .cover-meta { display: grid; grid-template-columns: 36mm 1fr; gap: 2mm 5mm; font-size: 10pt; border-top: 1px solid #d8e0e7; padding-top: 6mm; }
+  .cover-meta strong { color: #102a43; }
+  .notice { padding: 4mm; border: 1px solid #d8e0e7; background: #f8fbfd; border-radius: 6px; margin: 4mm 0; }
+</style>
+</head>
+<body>
+<section class="cover">
+  <div>
+    <div class="cover-kicker">Defensieve security-audit - Safe Mode</div>
+    <div class="cover-title">Softora Securityrapport</div>
+    <div class="cover-subtitle">Technische applicatie-, Supabase-, auth-, AI-, mailbox-, privacy- en infrastructuurreview met concrete fixroadmap.</div>
+  </div>
+  <div class="cover-meta">
+    <strong>Datum</strong><span>11 mei 2026</span>
+    <strong>Project</strong><span>Softora - https://www.softora.nl</span>
+    <strong>Scope</strong><span>Eigen domein, codebase, infrastructuur en integraties</span>
+    <strong>Werkmodus</strong><span>SAFE MODE: lezen, rapporteren, geen fixes uitgevoerd</span>
+    <strong>Security-score</strong><span>61/100</span>
+  </div>
+</section>
+<main class="report-shell"><h1>Softora Securityrapport</h1>
+<p>Datum: 11 mei 2026<br>Project: Softora<br>Scope: eigen domein, eigen codebase, eigen infrastructuur, eigen integraties<br>Werkmodus: SAFE MODE - alleen lezen, inventariseren en rapporteren<br>Uitvoering: geen codewijzigingen, geen databasewijzigingen, geen productie-instellingen aangepast</p>
+<h2>1. Executive Summary</h2>
+<p>Algemene security-score: 61/100.</p>
+<p>Softora heeft al een aantal goede basismaatregelen: premium API-routes worden achter authenticatie gezet, sessiecookies zijn HttpOnly/SameSite en in productie Secure, er is basis-rate-limiting, same-origin bescherming voor state-changing API requests, mailboxroutes zijn admin-only, Supabase storage bucket voor designfoto&#39;s is private en beperkt op MIME type en grootte, en Retell/Twilio webhooks hebben verificatiechecks.</p>
+<p>De belangrijkste risico&#39;s zitten niet in een enkele duidelijke &quot;alles staat open&quot;-fout, maar in een combinatie van brede server/service-role toegang, gevoelige UI-state, veel gevoelige bedrijfsdata in runtime/backups/logs, AI/mailbox-datastromen en security headers die live niet overal consequent staan.</p>
+<p>Top 10 belangrijkste verbeteringen:</p>
+<ol>
+<li>Los eerst de huidige kwaliteitsblokkade op: <code>premium-website.html</code> groeit met +4 regels en blokkeert <code>verify:critical</code>.</li>
+<li>Roteer kritieke keys handmatig en bevestig dat service-role keys nergens in frontend/build/logs staan.</li>
+<li>Maak gevoelige UI-state scopes expliciet admin-only.</li>
+<li>Ontwerp Supabase RLS per tabel op basis van echte tenant/user/company isolatie.</li>
+<li>Minimaliseer runtime-backups en logs zodat telefoon, e-mail, transcript en recording URL niet volledig worden bewaard waar dat niet nodig is.</li>
+<li>Beperk boekhoudbestanden: niet als DataURL in UI-state bewaren; gebruik private storage met autorisatie.</li>
+<li>Zet security headers consequent op root, publieke pagina&#39;s, premium pagina&#39;s en API&#39;s.</li>
+<li>Maak route-specifieke rate limits voor login, formulieren, mailbox send, AI en webhooks.</li>
+<li>Voeg AI-guardrails toe tegen prompt injection en datalekken uit e-mail/transcripts.</li>
+<li>Leg privacy/GDPR concreet vast: verwerkers, AI-verwerking, bewaartermijnen, exports en verwijdering.</li>
+</ol>
+<p>Directe quick wins:</p>
+<ul>
+<li>Guardrail-blokkade oplossen.</li>
+<li>SPF DNS-record bevestigen of toevoegen.</li>
+<li>Root/public security headers gelijk trekken met API/premium login.</li>
+<li>Cookies met UI voorkeuren voorzien van <code>Secure</code> in productie.</li>
+<li>Logmasking invoeren voor telefoon, e-mail, transcript, recording URL en tokens.</li>
+<li>Sensitive UI-state scopes uitbreiden.</li>
+</ul>
+<p>Grootste datalekrisico&#39;s:</p>
+<ul>
+<li>Klantdata en leaddata in brede UI-state of runtime snapshots.</li>
+<li>Call transcripts en recording URLs in runtime backups.</li>
+<li>Boekhoudbestanden als DataURL in UI-state.</li>
+<li>AI-verwerking van transcripts/contactdata zonder harde dataminimalisatie.</li>
+</ul>
+<p>Grootste Supabase/auth-risico&#39;s:</p>
+<ul>
+<li>Server/service-role is het primaire model; dat is verdedigbaar, maar maakt server-side autorisatie extra kritiek.</li>
+<li>RLS is aanwezig in SQL, maar policies zijn vooral service-role gericht.</li>
+<li>Data-isolatie tussen gebruikers/klanten is nog niet live bewezen met twee testaccounts.</li>
+</ul>
+<p>Grootste AI/e-mail-risico&#39;s:</p>
+<ul>
+<li>AI ontvangt contactdata, transcript snippets en soms volledige transcripts.</li>
+<li>Mailbox toont gevoelige e-maildata; rendering is escaped, maar attachment/link safety en AI-contextisolatie moeten strakker.</li>
+<li>Coldmail/mailbox send flows moeten streng rate-limited en auditbaar blijven.</li>
+</ul>
+<h2>2. Scope, Methode En Bewijsniveau</h2>
+<p>Gebruikte kaders:</p>
+<ul>
+<li>OWASP ASVS-achtige controle op authenticatie, autorisatie, input/output, sessies en logging.</li>
+<li>OWASP WSTG-achtige route-, endpoint- en datastroominventarisatie.</li>
+<li>OWASP Top 10 als risicolens.</li>
+<li>Supabase securityprincipes: service-role nooit in frontend, RLS op exposed schemas, policies per toegangspad, storage private waar data gevoelig is.</li>
+<li>Zero Trust: elke route, actie en databasehandeling apart autoriseren.</li>
+<li>NIST CSF-achtige indeling: Govern, Identify, Protect, Detect, Respond, Recover.</li>
+</ul>
+<p>Bewijslabels:</p>
+<ul>
+<li>BEVESTIGD: direct bewijs in code, config, route, SQL of passieve live-check.</li>
+<li>WAARSCHIJNLIJK: sterke aanwijzing, maar live/runtime verificatie nodig.</li>
+<li>MOGELIJK: theoretisch risico dat door ontwerp of context kan spelen.</li>
+<li>NIET GENOEG BEWIJS: observatie of controlepunt, niet meetellen als echte kwetsbaarheid.</li>
+</ul>
+<p>Niet uitgevoerd:</p>
+<ul>
+<li>Geen brute force.</li>
+<li>Geen credential stuffing.</li>
+<li>Geen database writes.</li>
+<li>Geen productieconfig aangepast.</li>
+<li>Geen datadumps.</li>
+<li>Geen destructieve checks.</li>
+<li>Geen volledige secrets getoond.</li>
+</ul>
+<h2>3. Applicatiekaart</h2>
+<p>Publieke pagina&#39;s volgens code:</p>
+<table>
+<thead>
+<tr>
+<th>Route/pagina</th>
+<th>Status</th>
+<th>Bewijs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/</code></td>
+<td>publiek</td>
+<td><code>server/routes/public-pages.js</code></td>
+</tr>
+<tr>
+<td><code>premium-website.html</code></td>
+<td>publiek</td>
+<td><code>server/config/premium-public-html-files.js:6</code></td>
+</tr>
+<tr>
+<td><code>premium-personeel-login.html</code></td>
+<td>publiek/login</td>
+<td><code>server/config/premium-public-html-files.js:7</code></td>
+</tr>
+<tr>
+<td><code>premium-bedrijfssoftware.html</code></td>
+<td>publiek</td>
+<td><code>server/config/premium-public-html-files.js:8</code></td>
+</tr>
+<tr>
+<td><code>premium-voicesoftware.html</code></td>
+<td>publiek</td>
+<td><code>server/config/premium-public-html-files.js:9</code></td>
+</tr>
+<tr>
+<td><code>premium-chatbot.html</code></td>
+<td>publiek</td>
+<td><code>server/config/premium-public-html-files.js:10</code></td>
+</tr>
+<tr>
+<td><code>premium-websites.html</code></td>
+<td>publiek</td>
+<td><code>server/config/premium-public-html-files.js:11</code></td>
+</tr>
+<tr>
+<td><code>premium-blog.html</code></td>
+<td>publiek</td>
+<td><code>server/config/premium-public-html-files.js:12</code></td>
+</tr>
+<tr>
+<td><code>premium-algemene-voorwaarden.html</code></td>
+<td>publiek</td>
+<td><code>server/config/premium-public-html-files.js:13</code></td>
+</tr>
+<tr>
+<td><code>premium-privacy-policy.html</code></td>
+<td>publiek</td>
+<td><code>server/config/premium-public-html-files.js:14</code></td>
+</tr>
+<tr>
+<td><code>premium-over-softora.html</code></td>
+<td>publiek</td>
+<td><code>server/config/premium-public-html-files.js:15</code></td>
+</tr>
+<tr>
+<td><code>premium-pakketten.html</code></td>
+<td>publiek</td>
+<td><code>server/config/premium-public-html-files.js:16</code></td>
+</tr>
+<tr>
+<td><code>premium-seo.html</code></td>
+<td>publiek volgens configuratie</td>
+<td><code>server/config/premium-public-html-files.js:17</code></td>
+</tr>
+<tr>
+<td><code>premium-bevestigingsmails.html</code></td>
+<td>publiek volgens configuratie</td>
+<td><code>server/config/premium-public-html-files.js:18</code></td>
+</tr>
+<tr>
+<td><code>premium-websitegenerator.html</code></td>
+<td>publiek volgens configuratie</td>
+<td><code>server/config/premium-public-html-files.js:19</code></td>
+</tr>
+</tbody></table>
+<p>Admin-achtige pagina&#39;s volgens code:</p>
+<table>
+<thead>
+<tr>
+<th>Pagina</th>
+<th>Status</th>
+<th>Bewijs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>premium-instellingen.html</code></td>
+<td>admin</td>
+<td><code>server/config/premium-admin-html-files.js</code></td>
+</tr>
+<tr>
+<td><code>premium-wachtwoordenregister.html</code></td>
+<td>admin</td>
+<td><code>server/config/premium-admin-html-files.js</code></td>
+</tr>
+</tbody></table>
+<p>Businesskritische premium pagina&#39;s uit scope:</p>
+<table>
+<thead>
+<tr>
+<th>Pagina</th>
+<th>Functie</th>
+<th>Data</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/premium-database</code></td>
+<td>klanten/leads/database, CSV/export, websitepreview/photo jobs</td>
+<td>klantdata, contactdata, website/foto metadata</td>
+</tr>
+<tr>
+<td><code>/premium-mailbox</code></td>
+<td>mailbox lezen/verzenden</td>
+<td>e-mailaccounts, e-mailinhoud, ontvangers</td>
+</tr>
+<tr>
+<td><code>/premium-website</code></td>
+<td>publieke site/homepage</td>
+<td>marketing, cookies</td>
+</tr>
+<tr>
+<td><code>/premium-vaste-lasten</code></td>
+<td>terugkerende kosten</td>
+<td>kosten/boekhoudachtige bedrijfsdata</td>
+</tr>
+<tr>
+<td><code>/premium-pakketten</code></td>
+<td>pakketten/aanbod</td>
+<td>publieke content</td>
+</tr>
+<tr>
+<td><code>/premium-personeel-agenda</code></td>
+<td>afspraken, calls, post-call acties</td>
+<td>afspraken, klantdata, transcript/audio</td>
+</tr>
+<tr>
+<td><code>/premium-websitegenerator</code></td>
+<td>website previews/library/batches</td>
+<td>prompts, previews, website links</td>
+</tr>
+<tr>
+<td><code>/premium-actieve-opdrachten</code></td>
+<td>actieve orders/projecten</td>
+<td>klant/project/orderdata, factuurstatus</td>
+</tr>
+<tr>
+<td><code>/premium-klanten</code></td>
+<td>klantbeheer</td>
+<td>klantnamen, contact, status, verantwoordelijke</td>
+</tr>
+<tr>
+<td><code>/premium-boekhouding</code></td>
+<td>boekhoudlijst/bestanden</td>
+<td>bestanden, notities, checklist per maand</td>
+</tr>
+</tbody></table>
+<h2>4. Route Map En Endpoint Map</h2>
+<p>Belangrijke publieke/health endpoints:</p>
+<ul>
+<li><code>GET /</code></li>
+<li><code>GET /robots.txt</code></li>
+<li><code>GET /.well-known/security.txt</code></li>
+<li><code>GET /healthz</code></li>
+<li><code>GET /api/healthz</code></li>
+<li><code>GET /api/health/baseline</code></li>
+</ul>
+<p>Auth/session endpoints:</p>
+<ul>
+<li><code>GET /api/auth/session</code></li>
+<li><code>POST /api/auth/login</code></li>
+<li><code>POST /api/auth/logout</code></li>
+<li><code>POST /api/agenda-app/login</code></li>
+<li><code>GET /api/auth/profile</code></li>
+<li><code>PATCH /api/auth/profile</code></li>
+<li>Admin userbeheer: <code>/api/premium-users</code>, <code>/api/premium-users/:id</code>, <code>/api/premium-users/verify-pin</code></li>
+</ul>
+<p>Runtime/UI-state endpoints:</p>
+<ul>
+<li><code>GET /api/ui-state/:scope</code></li>
+<li><code>GET /api/ui-state-get</code></li>
+<li><code>POST /api/ui-state/:scope</code></li>
+<li><code>POST /api/ui-state-set</code></li>
+<li><code>GET/POST /api/dashboard/activity</code></li>
+<li>Debug/admin runtime: <code>/api/security/audit-log</code>, <code>/api/data-health</code>, <code>/api/runtime-sync-now</code>, <code>/api/runtime-backup</code></li>
+</ul>
+<p>Mailbox/coldmail endpoints:</p>
+<ul>
+<li><code>GET /api/mailbox/accounts</code></li>
+<li><code>GET /api/mailbox/messages</code></li>
+<li><code>POST /api/mailbox/send</code></li>
+<li><code>GET /api/coldmailing/mailbox-options</code></li>
+<li><code>GET /api/coldmailing/campaigns/recipients</code></li>
+<li><code>POST /api/coldmailing/campaigns/send</code></li>
+<li><code>GET /api/coldmailing/replies/follow-ups</code></li>
+<li><code>POST /api/coldmailing/replies/sync</code></li>
+</ul>
+<p>Agenda/coldcalling/AI endpoints:</p>
+<ul>
+<li><code>/api/agenda/appointments</code></li>
+<li><code>/api/agenda/appointments/manual</code></li>
+<li><code>/api/agenda/confirmation-tasks</code></li>
+<li><code>/api/agenda/interested-leads</code></li>
+<li><code>/api/coldcalling/start</code></li>
+<li><code>/api/coldcalling/status</code></li>
+<li><code>/api/coldcalling/call-updates</code></li>
+<li><code>/api/coldcalling/call-detail</code></li>
+<li><code>/api/coldcalling/recording-proxy</code></li>
+<li><code>/api/ai/call-insights</code></li>
+<li><code>/api/ai/ruben-chat</code></li>
+<li><code>/api/ai/dashboard-chat</code></li>
+<li><code>/api/ai/summarize</code></li>
+<li><code>/api/ai/order-dossier</code></li>
+<li><code>/api/ai/transcript-to-prompt</code></li>
+<li><code>/api/ai/notes-image-to-text</code></li>
+<li><code>/api/ai/notes-audio-to-text</code></li>
+</ul>
+<p>Webhooks:</p>
+<ul>
+<li><code>GET/POST /api/twilio/voice</code></li>
+<li><code>POST /api/twilio/status</code></li>
+<li><code>POST /api/retell/webhook</code></li>
+</ul>
+<p>Website/database endpoints:</p>
+<ul>
+<li><code>/api/website-preview/generate</code></li>
+<li><code>/api/website-preview/batch</code></li>
+<li><code>/api/website-preview-library</code></li>
+<li><code>/api/website-links</code></li>
+<li><code>/api/active-orders/generate-site</code></li>
+<li><code>/api/active-orders/launch-site</code></li>
+<li><code>/api/premium-database/import-spreadsheet</code></li>
+<li><code>/api/premium-database/sync-spreadsheet</code></li>
+<li><code>/api/premium-database/add-real-businesses</code></li>
+<li><code>/api/premium-database/deep-search-businesses</code></li>
+<li><code>/api/premium-database/webdesign-photo-jobs</code></li>
+</ul>
+<h2>5. Attack Surface Map</h2>
+<p>Inputpunten:</p>
+<ul>
+<li>Loginformulieren.</li>
+<li>Premium UI-state formulieren.</li>
+<li>Klant/leads database import en zoekfuncties.</li>
+<li>Agenda en afspraakformulieren.</li>
+<li>Mailbox send/reply flows.</li>
+<li>Coldmail/coldcalling start flows.</li>
+<li>AI prompt/transcript/image/audio endpoints.</li>
+<li>Websitegenerator prompts en preview library.</li>
+<li>Webhooks van Twilio en Retell.</li>
+<li>Uploads/foto&#39;s/bestanden.</li>
+</ul>
+<p>Datawijzigingspunten:</p>
+<ul>
+<li><code>POST /api/ui-state-set</code> en <code>POST /api/ui-state/:scope</code>.</li>
+<li>Agenda post/manual/set-in-agenda/dismiss/mark-sent acties.</li>
+<li>Mailbox send.</li>
+<li>Coldmail send/sync.</li>
+<li>Active order generate/launch.</li>
+<li>Database import/sync/deep-search/webdesign jobs.</li>
+<li>Premium user create/update/delete.</li>
+</ul>
+<p>Gevoelige datapunten:</p>
+<ul>
+<li>Klantdata: naam, bedrijf, contact, telefoon, e-mail.</li>
+<li>Leads en coldcalling status.</li>
+<li>Transcripts, summaries en recording URLs.</li>
+<li>Afspraken en bevestigingstaken.</li>
+<li>E-mails en mailboxmetadata.</li>
+<li>Boekhouding en factuurstatus.</li>
+<li>Website/order prompts.</li>
+<li>Runtime audit events en backups.</li>
+</ul>
+<p>Externe systemen:</p>
+<ul>
+<li>Supabase database en storage.</li>
+<li>OpenAI.</li>
+<li>Anthropic of AI-dienst in order dossier flow.</li>
+<li>Retell.</li>
+<li>Twilio.</li>
+<li>Mailserver/IMAP/SMTP.</li>
+<li>Vercel/hosting.</li>
+<li>DNS/e-mail: MX via <code>smtp.rzone.de</code>, DKIM aanwezig, DMARC reject, SPF niet passief bevestigd.</li>
+</ul>
+<h2>6. Data Flow Map</h2>
+<p>Kernstroom:</p>
+<ol>
+<li>Gebruiker opent publieke of premium pagina.</li>
+<li>Browser doet API-calls naar <code>/api/*</code>.</li>
+<li>Server checkt premium/auth/admin waar route achter middleware valt.</li>
+<li>Server leest/schrijft runtime state, Supabase tabellen, Supabase storage of externe API.</li>
+<li>Browser rendert data in premium UI.</li>
+<li>AI/mail/call flows sturen beperkte of brede context naar externe providers.</li>
+<li>Runtime backups/logs bewaren onderdelen van bedrijfs- en klantdata.</li>
+</ol>
+<p>Trust boundaries:</p>
+<ul>
+<li>Browser naar server: nooit vertrouwen op client-side checks.</li>
+<li>Server naar Supabase service-role: server moet alle autorisatie afdwingen.</li>
+<li>Server naar AI/mail/Retell/Twilio: dataminimalisatie en audit noodzakelijk.</li>
+<li>Webhook naar server: signature/secret checks noodzakelijk.</li>
+<li>Preview/staging naar productie: geen productiedata in preview.</li>
+<li>Logs/backups: behandelen als gevoelige data.</li>
+</ul>
+<h2>7. Businesskritische Pagina Review</h2>
+<table>
+<thead>
+<tr>
+<th>Pagina</th>
+<th>Data haalt op</th>
+<th>Data wijzigt</th>
+<th>Belangrijkste risico</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/premium-database</code></td>
+<td>UI-state, customers, design photos, website jobs</td>
+<td>import/sync/photo jobs, CSV/export</td>
+<td>klantdata, IDOR, exportlek</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td><code>/premium-mailbox</code></td>
+<td>mailbox accounts/messages</td>
+<td>send/reply/delete UI-acties</td>
+<td>e-maildata, HTML/link/attachment safety</td>
+<td>BEVESTIGD deels</td>
+</tr>
+<tr>
+<td><code>/premium-website</code></td>
+<td>publieke content/cookie consent</td>
+<td>cookie voorkeur</td>
+<td>headers/cookie Secure</td>
+<td>BEVESTIGD laag</td>
+</tr>
+<tr>
+<td><code>/premium-vaste-lasten</code></td>
+<td>UI-state costs</td>
+<td>terugkerende kosten</td>
+<td>financiele data in UI-state</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td><code>/premium-pakketten</code></td>
+<td>publieke content</td>
+<td>geen kritieke writes gevonden</td>
+<td>lage securityimpact</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td><code>/premium-personeel-agenda</code></td>
+<td>afspraken, confirmation tasks, leads, recordings</td>
+<td>afspraken/post-call/active order</td>
+<td>IDOR op IDs, transcript/audio</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td><code>/premium-websitegenerator</code></td>
+<td>library, batches, links</td>
+<td>previews, links, batches</td>
+<td>public configuratie moet businessmatig bevestigd</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td><code>/premium-actieve-opdrachten</code></td>
+<td>orders, afspraken, UI-state</td>
+<td>generate/launch/delete/status</td>
+<td>orderdata, factuurstatus, launch-acties</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td><code>/premium-klanten</code></td>
+<td>klanten UI-state</td>
+<td>klantmutaties</td>
+<td>klantdata-isolatie, export</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td><code>/premium-boekhouding</code></td>
+<td>UI-state bookkeeping</td>
+<td>bestanden/notities/checklists</td>
+<td>bestanden als DataURL in UI-state</td>
+<td>BEVESTIGD</td>
+</tr>
+</tbody></table>
+<p>Verplichte test per pagina:</p>
+<ul>
+<li>Zonder sessie directe URL openen.</li>
+<li>Met gewone premium gebruiker openen.</li>
+<li>Met admin openen.</li>
+<li>IDs in URL/API-call handmatig wijzigen met testdata.</li>
+<li>Console en network responses controleren op teveel data.</li>
+<li>Mutatieknoppen testen op server-side autorisatie.</li>
+<li>Rollback testen door oude state/config terug te zetten.</li>
+</ul>
+<h2>8. Threat Model Coverage Matrix</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Risico</th>
+<th>Waar in Softora</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Ongeautoriseerde toegang</td>
+<td>premium routes/API</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Privilege escalation</td>
+<td>premium/admin scopes/users</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Exposed admin/interne pagina&#39;s</td>
+<td>public premium config</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Direct URL access</td>
+<td>premium HTML/API</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Client-side-only beveiliging</td>
+<td>UI-state en premium browserlogica</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Broken access control</td>
+<td>scopes, IDs, service-role server model</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>7</td>
+<td>IDOR via IDs</td>
+<td>customer/lead/appointment/order IDs</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Supabase RLS bypass</td>
+<td>service-role server model</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Tabellen zonder RLS</td>
+<td>data-ops SQL zet RLS aan</td>
+<td>NIET GENOEG BEWIJS voor ontbrekend RLS</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Policies te breed</td>
+<td>service-role all policies</td>
+<td>BEVESTIGD</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Policies zonder tenant checks</td>
+<td>huidige policies zijn service-role gericht</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Public storage bucket</td>
+<td>design bucket private</td>
+<td>NIET GENOEG BEWIJS voor public leak</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Service-role key leakage</td>
+<td>niet gevonden in frontend, wel kritisch te controleren</td>
+<td>NIET GENOEG BEWIJS</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Anon key misuse</td>
+<td>Supabase clientgebruik controleren</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Gevoelige data in frontend</td>
+<td>klant/mail/call data in browser</td>
+<td>BEVESTIGD</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Gevoelige data in browser storage</td>
+<td>sessionStorage profile/sidebar</td>
+<td>BEVESTIGD laag/medium</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Gevoelige data in cookies</td>
+<td>UI cookies zonder Secure</td>
+<td>BEVESTIGD laag</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Hardcoded secrets</td>
+<td>geen volledige secret gerapporteerd</td>
+<td>NIET GENOEG BEWIJS</td>
+</tr>
+<tr>
+<td>19</td>
+<td>Secrets in frontend bundle</td>
+<td>moet in buildscan worden getest</td>
+<td>NIET GENOEG BEWIJS</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Secrets in logs</td>
+<td>logmasking nodig</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>21</td>
+<td>Secrets in sourcemaps</td>
+<td>productieconfig niet volledig bewezen</td>
+<td>NIET GENOEG BEWIJS</td>
+</tr>
+<tr>
+<td>22</td>
+<td>XSS</td>
+<td>veel innerHTML, meestal escaping nodig</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>23</td>
+<td>CSRF</td>
+<td>same-origin guard aanwezig</td>
+<td>MOGELIJK residu</td>
+</tr>
+<tr>
+<td>24</td>
+<td>SQL injection/query misuse</td>
+<td>Supabase client queries, geen SQL concat bewezen</td>
+<td>NIET GENOEG BEWIJS</td>
+</tr>
+<tr>
+<td>25</td>
+<td>Inputvalidatie onvoldoende</td>
+<td>agenda/import/AI/mail endpoints</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>26</td>
+<td>Output escaping onvoldoende</td>
+<td>mailbox escaped, andere innerHTML sinks testen</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>27</td>
+<td>Onveilige HTML-rendering</td>
+<td>blog/notepad/word/mail renderpaden</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>28</td>
+<td>innerHTML/dangerous rendering</td>
+<td>breed aanwezig</td>
+<td>BEVESTIGD</td>
+</tr>
+<tr>
+<td>29</td>
+<td>Onveilige redirects</td>
+<td>niet bevestigd</td>
+<td>NIET GENOEG BEWIJS</td>
+</tr>
+<tr>
+<td>30</td>
+<td>CORS misconfiguratie</td>
+<td>root had <code>access-control-allow-origin: *</code></td>
+<td>BEVESTIGD</td>
+</tr>
+<tr>
+<td>31</td>
+<td>Ontbrekende rate limiting</td>
+<td>algemene/login aanwezig, route-specifiek nodig</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>32</td>
+<td>Bot/spam</td>
+<td>formulieren/coldmail/login</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>33</td>
+<td>Login/session zwaktes</td>
+<td>sessiecookies positief, MFA ontbreekt als beleid</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>34</td>
+<td>Onveilige e-mailflows</td>
+<td>mailbox/coldmail send</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>35</td>
+<td>E-mail injection</td>
+<td>send flows moeten header/body validatie bewijzen</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>36</td>
+<td>Onveilige e-mail HTML</td>
+<td>mailbox body escaped</td>
+<td>MOGELIJK residu</td>
+</tr>
+<tr>
+<td>37</td>
+<td>Attachment risico&#39;s</td>
+<td>attachment safety niet bewezen</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>38</td>
+<td>SPF/DKIM/DMARC</td>
+<td>DMARC/DKIM positief, SPF niet gevonden</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>39</td>
+<td>AI prompt injection</td>
+<td>AI krijgt user/transcript input</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>40</td>
+<td>AI data leakage</td>
+<td>transcript/contact naar AI</td>
+<td>BEVESTIGD</td>
+</tr>
+<tr>
+<td>41</td>
+<td>AI tool/action misuse</td>
+<td>AI endpoints/action flows</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>42</td>
+<td>AI mailbox/context leakage</td>
+<td>AI en mail naast elkaar in premium context</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>43</td>
+<td>Logging gevoelige data</td>
+<td>lead trace/runtime audit/backups</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>44</td>
+<td>Onveilige error messages</td>
+<td>console/server errors controleren</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>45</td>
+<td>Stack traces</td>
+<td>server error route controleren</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>46</td>
+<td>Security headers ontbreken</td>
+<td>root passieve check incompleet</td>
+<td>BEVESTIGD</td>
+</tr>
+<tr>
+<td>47</td>
+<td>Clickjacking</td>
+<td>API/premium helmet positief, root check nodig</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>48</td>
+<td>MIME sniffing</td>
+<td>root check mist nosniff</td>
+<td>BEVESTIGD</td>
+</tr>
+<tr>
+<td>49</td>
+<td>Referrer leakage</td>
+<td>helmet referrer positief op API/premium</td>
+<td>MOGELIJK root residu</td>
+</tr>
+<tr>
+<td>50</td>
+<td>Dependency vulnerabilities</td>
+<td><code>npm audit --omit=dev</code> eerder 0</td>
+<td>NIET GENOEG BEWIJS actueel</td>
+</tr>
+<tr>
+<td>51</td>
+<td>Supply-chain</td>
+<td>geen lock/CI maturity volledig beoordeeld</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>52</td>
+<td>Third-party scripts</td>
+<td>cdnjs/fonts/AI providers</td>
+<td>MOGELIJK</td>
+</tr>
+<tr>
+<td>53</td>
+<td>Backups/recovery</td>
+<td>backups bestaan, restore test niet bewezen</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>54</td>
+<td>Monitoring</td>
+<td>audit events aanwezig, alerting onbekend</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>55</td>
+<td>Audit logging</td>
+<td>aanwezig maar PII/retention risico</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>56</td>
+<td>Klantdata-scheiding</td>
+<td>server/service-role en UI-state</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>57</td>
+<td>Privacy/GDPR</td>
+<td>privacytekst generiek/placeholder KVK</td>
+<td>BEVESTIGD</td>
+</tr>
+<tr>
+<td>58</td>
+<td>Deployment instellingen</td>
+<td>Vercel/root headers/preview onbekend</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>59</td>
+<td>Preview deployments</td>
+<td>niet live bewezen</td>
+<td>NIET GENOEG BEWIJS</td>
+</tr>
+<tr>
+<td>60</td>
+<td>DNS/e-mail spoofing</td>
+<td>SPF niet passief bevestigd</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>61</td>
+<td>Webhook misbruik</td>
+<td>signature checks positief</td>
+<td>MOGELIJK residu</td>
+</tr>
+<tr>
+<td>62</td>
+<td>Open endpoints zonder auth</td>
+<td>public API allowlist en webhooks</td>
+<td>WAARSCHIJNLIJK te reviewen</td>
+</tr>
+<tr>
+<td>63</td>
+<td>Source maps/build artifacts</td>
+<td>niet getest in productie</td>
+<td>NIET GENOEG BEWIJS</td>
+</tr>
+<tr>
+<td>64</td>
+<td>Test/demo credentials</td>
+<td>geen volledig bewijs</td>
+<td>NIET GENOEG BEWIJS</td>
+</tr>
+<tr>
+<td>65</td>
+<td>Least privilege</td>
+<td>service-role breed</td>
+<td>BEVESTIGD</td>
+</tr>
+<tr>
+<td>66</td>
+<td>Secret rotation</td>
+<td>beleid niet bewezen</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>67</td>
+<td>Incident response</td>
+<td>plan niet bewezen</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>68</td>
+<td>Rollback strategie</td>
+<td>docs aanwezig, restore test nodig</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+<tr>
+<td>69</td>
+<td>Staging/productie scheiding</td>
+<td>niet bewezen</td>
+<td>NIET GENOEG BEWIJS</td>
+</tr>
+<tr>
+<td>70</td>
+<td>Access review/MFA</td>
+<td>niet bewezen</td>
+<td>WAARSCHIJNLIJK</td>
+</tr>
+</tbody></table>
+<h2>9. Findings</h2>
+<h3>Critical</h3>
+<p>Geen bevestigde Critical findings gevonden in SAFE MODE.</p>
+<h3>High Findings</h3>
+<h4>H-01 - Gevoelige UI-state scopes zijn niet breed admin-only</h4>
+<p>Ernst: High<br>Status: BEVESTIGD<br>Kans: hoog<br>Impact: hoog<br>Bewijs: <code>server/config/admin-ui-state-scopes.js:5-7</code> bevat alleen <code>premium_password_register</code>.<br>Betrokken bestanden: <code>server/config/admin-ui-state-scopes.js</code>, <code>server/routes/runtime-ops.js</code>, premium UI-state clients.<br>Betrokken pagina&#39;s/routes: premium database, klanten, boekhouding, vaste lasten, actieve opdrachten, agenda, dashboard.<br>Betrokken endpoints: <code>/api/ui-state/:scope</code>, <code>/api/ui-state-get</code>, <code>/api/ui-state-set</code>.<br>Betrokken data: klantdata, boekhouding, kosten, notities, operationele state.<br>Oorzaak: gevoelige scopes worden niet expliciet als admin-only geclassificeerd.<br>Impactscenario: een premium gebruiker met te brede rechten kan gevoelige state lezen of wijzigen als de scope niet apart beschermd is.<br>Veilige fix: voeg een allowlist toe van gevoelige scopes die altijd admin-only zijn, met tests per scope.<br>Regressierisico: te strenge scope kan legitieme premium pagina&#39;s data ontnemen.<br>Testplan: gewone premium gebruiker en admin vergelijken; directe API-call per scope testen.<br>Rollbackplan: scope tijdelijk terughalen uit admin-only lijst.</p>
+<h4>H-02 - Supabase toegang is sterk afhankelijk van service-role serverpad</h4>
+<p>Ernst: High<br>Status: BEVESTIGD<br>Kans: medium<br>Impact: hoog<br>Bewijs: <code>supabase/production-hardening.sql:20-27</code> geeft <code>service_role</code> brede tabelrechten; <code>:52</code> maakt policies met <code>using (true)</code> en <code>with check (true)</code> voor service_role.<br>Betrokken bestanden: <code>supabase/production-hardening.sql</code>, Supabase repositories/services.<br>Betrokken data: runtime state, customers, active orders, order runtime, design photos, webdesign jobs.<br>Oorzaak: security wordt vooral door serverroutes gedragen; RLS is niet de primaire tenant-isolatielaag.<br>Impactscenario: als server-side autorisatie ergens tekortschiet, kan service-role pad te veel data bereiken.<br>Veilige fix: server-side auth behouden, maar RLS/policies per tenant/user/company ontwerpen als defense in depth.<br>Regressierisico: te strakke policies breken legitieme serverflows.<br>Testplan: twee testgebruikers, aparte testrecords, select/insert/update/delete per rol controleren.<br>Rollbackplan: migration met vorige policies terugzetten.</p>
+<h4>H-03 - Boekhoudbestanden worden als DataURL in UI-state bewaard</h4>
+<p>Ernst: High<br>Status: BEVESTIGD<br>Kans: hoog<br>Impact: hoog<br>Bewijs: <code>assets/premium-bookkeeping.js:6</code> gebruikt scope <code>premium_bookkeeping</code>; <code>:341-350</code> leest bestanden met FileReader als DataURL en slaat die op in state.<br>Betrokken pagina: <code>/premium-boekhouding</code>.<br>Betrokken data: boekhoudbestanden, mogelijk facturen of administratieve bijlagen.<br>Oorzaak: bestanden worden in algemene UI-state verwerkt in plaats van private storage met object-level autorisatie.<br>Impactscenario: iedereen met toegang tot die scope kan volledige bestandsinhoud ontvangen.<br>Veilige fix: bestanden opslaan in private Supabase Storage bucket met signed URLs, MIME/size checks en autorisatie per object.<br>Regressierisico: bestaande bestanden moeten gemigreerd of tijdelijk compatibel gehouden worden.<br>Testplan: upload/download/delete met admin en onbevoegde testgebruiker.<br>Rollbackplan: compat-leespad tijdelijk behouden, writes terug naar oude methode alleen als noodmaatregel.</p>
+<h4>H-04 - Runtime backups bevatten gevoelige klant/call/agenda data</h4>
+<p>Ernst: High<br>Status: BEVESTIGD<br>Kans: medium<br>Impact: hoog<br>Bewijs: <code>server/services/runtime-backup.js:102-128</code> bevat telefoon, naam, transcript en recording URL; <code>:262-285</code> bevat agenda contact, telefoon, summary en callId.<br>Betrokken data: telefoon, naam, transcript, recording URL, afspraken, call details.<br>Oorzaak: backups bewaren brede operationele snapshots.<br>Impactscenario: toegang tot backup/logbestand geeft veel gevoelige bedrijfs- en klantcontext.<br>Veilige fix: backup payload minimaliseren en gevoelige velden maskeren of apart versleuteld bewaren.<br>Regressierisico: debugging/herstel wordt minder rijk.<br>Testplan: runtime backup maken met testdata en controleren dat PII gemaskeerd of uitgesloten is.<br>Rollbackplan: vorige backup serializer tijdelijk terugzetten.</p>
+<h4>H-05 - Delete/retention is soft-delete of onvolledig bewezen</h4>
+<p>Ernst: High<br>Status: BEVESTIGD voor design photos soft-delete<br>Kans: medium<br>Impact: hoog<br>Bewijs: <code>server/services/data-ops-store.js:480-490</code> zet <code>deleted_at</code>, maar verwijdert storage object niet direct in dit pad.<br>Betrokken data: design photos en mogelijk klantbestanden.<br>Oorzaak: verwijdering markeert records als verwijderd, maar fysieke object-retentie is niet volledig geregeld.<br>Impactscenario: bestanden blijven bestaan na delete/privacyverzoek.<br>Veilige fix: lifecycle/retention job en expliciete storage delete toevoegen waar juridisch/operationeel nodig.<br>Regressierisico: herstel van per ongeluk verwijderde bestanden wordt lastiger.<br>Testplan: testobject uploaden, verwijderen, directe objecttoegang controleren.<br>Rollbackplan: soft-delete blijven gebruiken, hard-delete job pauzeren.</p>
+<h4>H-06 - Security headers live niet overal consequent</h4>
+<p>Ernst: High<br>Status: BEVESTIGD via passieve live-check<br>Kans: medium<br>Impact: hoog<br>Bewijs: root <code>https://www.softora.nl</code> gaf HSTS, maar geen volledige CSP/X-Frame-Options/nosniff; API en <code>/premium-personeel-login</code> hadden wel Helmet headers.<br>Betrokken routes: <code>/</code>, publieke HTML, premium HTML, <code>/api/*</code>.<br>Oorzaak: headerconfig wordt niet gelijk toegepast op alle responses/deploymentpaden.<br>Impactscenario: root/publieke routes missen browserbescherming tegen clickjacking, MIME sniffing en script-injectierisico&#39;s.<br>Veilige fix: security headers centraal afdwingen via server/hosting config.<br>Regressierisico: CSP kan inline scripts of externe assets blokkeren.<br>Testplan: headers controleren op root, publieke pagina, premium pagina en API.<br>Rollbackplan: CSP eerst Report-Only of gefaseerd terugzetten.</p>
+<h3>Medium Findings</h3>
+<h4>M-01 - Sommige premium-pagina&#39;s staan bewust of onbewust publiek</h4>
+<p>Status: WAARSCHIJNLIJK<br>Bewijs: <code>server/config/premium-public-html-files.js:5-20</code> bevat onder andere <code>premium-bevestigingsmails.html</code>, <code>premium-websitegenerator.html</code> en <code>premium-seo.html</code>.<br>Risico: interne functies kunnen publiek bereikbaar zijn als dit niet bewust bedoeld is.<br>Fix: per pagina labelen als publiek, login-only, premium-only of admin-only.</p>
+<h4>M-02 - AI ontvangt klant/call/transcript data</h4>
+<p>Status: BEVESTIGD<br>Bewijs: <code>server/services/ai-call-insights.js:674-708</code> stuurt call metadata en transcript naar OpenAI; <code>server/services/order-dossier.js:473-490</code> stuurt klantomschrijving/transcript naar AI-prompt.<br>Risico: datalek via AI-provider, prompt injection of teveel context.<br>Fix: dataminimalisatie, consent/beleid, prompt-injection guardrails, audit zonder inhoud.</p>
+<h4>M-03 - Logs en traces kunnen PII bevatten</h4>
+<p>Status: WAARSCHIJNLIJK<br>Bewijs: <code>server/services/lead-trace.js:80</code> logt payloads; runtime events slaan email/IP/path/origin/detail/userAgent op.<br>Risico: gevoelige klantdata in logs.<br>Fix: masking en retention.</p>
+<h4>M-04 - Browser/session storage bevat profieldata</h4>
+<p>Status: BEVESTIGD<br>Bewijs: <code>assets/personnel-theme.js:1529</code> schrijft sidebar session state; <code>assets/premium-sidebar-profile-prefill.js:92</code> leest sessionStorage.<br>Risico: lokale browserdata bevat profiel/avatar context.<br>Fix: minimaliseren, TTL, geen gevoelige data in sessionStorage.</p>
+<h4>M-05 - Veel HTML rendering sinks</h4>
+<p>Status: BEVESTIGD<br>Bewijs: brede aanwezigheid van <code>innerHTML</code> in premium pagina&#39;s en assets; mailbox body gebruikt wel <code>escapeHtml</code>.<br>Risico: XSS als een sink ooit ongesanitized user input krijgt.<br>Fix: centrale escape/sanitize helpers, CSP aanscherpen, risky sinks per pagina reduceren.</p>
+<h3>Low Findings</h3>
+<h4>L-01 - UI cookies missen <code>Secure</code> in sommige browserpaden</h4>
+<p>Status: BEVESTIGD<br>Bewijs: <code>premium-website.html:3558</code>, <code>premium-ai-coldmailing.html:3452</code>, <code>assets/personnel-theme.js:1247</code>.<br>Impact: laag tot medium; voorkeurcookies kunnen via niet-HTTPS context zwakker zijn.<br>Fix: <code>Secure</code> toevoegen wanneer <code>location.protocol === &#39;https:&#39;</code>.</p>
+<h4>L-02 - Privacyverklaring bevat placeholder-achtig KvK-nummer</h4>
+<p>Status: BEVESTIGD<br>Bewijs: <code>premium-privacy-policy.html:172</code> bevat <code>12345678</code>.<br>Impact: juridisch/vertrouwen.<br>Fix: echte KvK en bedrijfsgegevens invullen.</p>
+<h3>Observations</h3>
+<ul>
+<li><code>server/security/premium-session.js:104-110</code> bouwt sessiecookies met SameSite Lax en Secure in productie.</li>
+<li><code>server/services/premium-route-runtime.js:71</code> zet <code>/api</code> achter premium API access middleware.</li>
+<li><code>server/security/request-context.js:181-243</code> blokkeert state-changing cross-site requests via Fetch Metadata/Origin checks.</li>
+<li><code>server/routes/mailbox.js:9-11</code> zet mailbox accounts/messages/send achter admin access.</li>
+<li><code>assets/premium-mailbox.js:253</code> escaped e-mailbody bij weergave.</li>
+<li><code>supabase/data-ops-schema.sql:112-124</code> maakt design photo bucket private met MIME/size limits.</li>
+</ul>
+<h2>10. Supabase Security Review</h2>
+<p>Tabeloverzicht:</p>
+<table>
+<thead>
+<tr>
+<th>Tabel</th>
+<th>Gevoelige data</th>
+<th>RLS status in SQL</th>
+<th>Policy status</th>
+<th>Risico</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>softora_runtime_state</code></td>
+<td>brede UI/runtime state</td>
+<td>enabled</td>
+<td>service_role all</td>
+<td>High</td>
+</tr>
+<tr>
+<td><code>softora_customers</code></td>
+<td>klant/lead PII</td>
+<td>enabled</td>
+<td>service_role all</td>
+<td>High</td>
+</tr>
+<tr>
+<td><code>softora_active_orders</code></td>
+<td>klant/orderdata</td>
+<td>enabled</td>
+<td>service_role all</td>
+<td>High</td>
+</tr>
+<tr>
+<td><code>softora_order_runtime</code></td>
+<td>order runtime</td>
+<td>enabled</td>
+<td>service_role all</td>
+<td>Medium/High</td>
+</tr>
+<tr>
+<td><code>softora_design_photos</code></td>
+<td>klantfoto metadata/storage refs</td>
+<td>enabled</td>
+<td>service_role all</td>
+<td>High</td>
+</tr>
+<tr>
+<td><code>softora_webdesign_jobs</code></td>
+<td>job prompts/status</td>
+<td>enabled</td>
+<td>service_role all</td>
+<td>Medium</td>
+</tr>
+</tbody></table>
+<p>Bucket review:</p>
+<table>
+<thead>
+<tr>
+<th>Bucket</th>
+<th>Public</th>
+<th>MIME/size</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>softora-design-photos</code></td>
+<td>false</td>
+<td>PNG/JPEG/WebP, 10MB</td>
+<td>positief, object-level test nodig</td>
+</tr>
+</tbody></table>
+<p>Key review:</p>
+<ul>
+<li>Geen volledige secret getoond of gerapporteerd.</li>
+<li>Service-role hoort alleen server-side. Dit moet met build/bundle/log scan worden bevestigd.</li>
+<li>Roteer kritieke keys na audit/fixes.</li>
+</ul>
+<p>Concrete policy-fixes:</p>
+<ol>
+<li>Definieer tenant/company/user eigenaarschap per tabel.</li>
+<li>Maak RLS policies per operatie: select, insert, update, delete.</li>
+<li>Houd service-role alleen voor gecontroleerde serverjobs.</li>
+<li>Test met twee testgebruikers en gescheiden testrecords.</li>
+<li>Controleer views/functions op security-definer risico&#39;s voordat ze exposed worden.</li>
+</ol>
+<h2>11. Auth / Access-Control Review</h2>
+<p>Positieve controles:</p>
+<ul>
+<li>Premium session cookie is HttpOnly/SameSite/Secure in productie.</li>
+<li><code>/api</code> wordt na auth-routes beschermd met premium middleware.</li>
+<li>Admin-only API helper bestaat voor gevoelige routes.</li>
+<li>Mailbox en premium user management gebruiken admin access.</li>
+</ul>
+<p>Risico&#39;s:</p>
+<ul>
+<li>Public premium page list moet businessmatig worden gevalideerd.</li>
+<li>UI-state scopes zijn te beperkt geclassificeerd als admin-only.</li>
+<li>Server/service-role model maakt server-side autorisatie doorslaggevend.</li>
+<li>Directe URL en IDOR tests zijn nog nodig per businesskritische pagina.</li>
+</ul>
+<p>Aanbevolen fixes:</p>
+<ul>
+<li>Per pagina routeklasse vastleggen: publiek, login-only, premium-only, admin-only.</li>
+<li>Per actie server-side role check afdwingen.</li>
+<li>Geen gevoelige businessregel alleen in frontend.</li>
+<li>MFA verplicht maken voor beheeraccounts.</li>
+</ul>
+<h2>12. API Review</h2>
+<p>Belangrijkste API-risico&#39;s:</p>
+<ul>
+<li>Brede UI-state endpoints.</li>
+<li>Muterende agenda/order/database endpoints met ID parameters.</li>
+<li>AI endpoints met transcript/audio/image input.</li>
+<li>Mailbox send en coldmail send als misbruikgevoelige acties.</li>
+<li>Webhooks als externe ingang.</li>
+</ul>
+<p>Aanbevolen API hardening:</p>
+<ul>
+<li>Route-specifieke rate limits.</li>
+<li>Per endpoint inputschema en maximale payload.</li>
+<li>Per endpoint output-minimalisatie.</li>
+<li>IDOR-tests met handmatig aangepaste IDs.</li>
+<li>Audit events voor admin/export/delete/send/AI.</li>
+<li>Geen stack traces of interne errors in responses.</li>
+</ul>
+<h2>13. Frontend Security Review</h2>
+<p>Gecontroleerde oppervlakken:</p>
+<ul>
+<li>Forms, inputs, search/filter velden.</li>
+<li>Buttons die data wijzigen.</li>
+<li>Modals/detailviews.</li>
+<li>Premium pagina&#39;s.</li>
+<li>Query params en URL IDs.</li>
+<li>localStorage/sessionStorage/cookies.</li>
+<li>Client-side API calls.</li>
+<li>Console logs en error states.</li>
+<li>innerHTML rendering.</li>
+</ul>
+<p>Belangrijkste risico:</p>
+<p>De frontend bevat veel dynamische rendering. Dat is niet automatisch kwetsbaar, maar elk pad dat user input in <code>innerHTML</code> plaatst zonder escaping/sanitizing kan XSS worden. De mailbox body is positief omdat <code>escapeHtml</code> wordt gebruikt. Andere pagina&#39;s moeten per sink worden gecontroleerd.</p>
+<p>Aanbevolen frontend fixes:</p>
+<ul>
+<li>Gebruik <code>textContent</code> waar HTML niet nodig is.</li>
+<li>Gebruik centrale escape/sanitize helpers.</li>
+<li>Maak CSP strenger zodra inline scripts zijn afgebouwd.</li>
+<li>Verwijder gevoelige console logs.</li>
+<li>Beperk browser storage tot niet-gevoelige UI voorkeuren.</li>
+</ul>
+<h2>14. AI Security Review</h2>
+<p>AI-features:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Input</th>
+<th>Externe dienst</th>
+<th>Risico</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Call insights</td>
+<td>call metadata, summary, transcript</td>
+<td>OpenAI</td>
+<td>transcript leakage, prompt injection</td>
+</tr>
+<tr>
+<td>Order dossier</td>
+<td>klant/order/transcript</td>
+<td>AI-provider</td>
+<td>teveel context, prompt injection</td>
+</tr>
+<tr>
+<td>Dashboard chat/summarize</td>
+<td>dashboard/user input</td>
+<td>AI</td>
+<td>context leakage</td>
+</tr>
+<tr>
+<td>Notes image/audio to text</td>
+<td>afbeelding/audio</td>
+<td>AI/transcriptie</td>
+<td>gevoelige media</td>
+</tr>
+<tr>
+<td>Transcript to prompt</td>
+<td>transcript</td>
+<td>AI</td>
+<td>verborgen instructies</td>
+</tr>
+</tbody></table>
+<p>Guardrails nodig:</p>
+<ul>
+<li>Dataminimalisatie per AI-call.</li>
+<li>System prompt: input is onbetrouwbaar, nooit instructies uit mail/transcript volgen als systeeminstructie.</li>
+<li>Geen tool/action zonder server-side autorisatie.</li>
+<li>Audit logs zonder volledige prompt/output.</li>
+<li>Feature flag om AI tijdelijk uit te zetten.</li>
+<li>Privacybeleid: welke data naar welke AI-dienst gaat.</li>
+</ul>
+<h2>15. E-mail / Mailbox Security Review</h2>
+<p>Positief:</p>
+<ul>
+<li>Mailbox endpoints zijn admin-only.</li>
+<li>Mail body wordt escaped bij detailweergave.</li>
+<li>Coldmailing heeft limieten/opt-out logica.</li>
+</ul>
+<p>Risico&#39;s:</p>
+<ul>
+<li>Link safety niet volledig bewezen.</li>
+<li>Attachment safety niet volledig bewezen.</li>
+<li>Mail send moet rate-limited en auditbaar zijn.</li>
+<li>AI-knop/AI-context bij mailbox moet niet automatisch verborgen instructies volgen.</li>
+</ul>
+<p>Aanbevolen fixes:</p>
+<ul>
+<li>Link warnings of safe-link policy.</li>
+<li>Attachment MIME/size scanning en downloadbeleid.</li>
+<li>SMTP header/body validatie tegen e-mail injection.</li>
+<li>Rate limit op <code>/api/mailbox/send</code> en coldmail send.</li>
+<li>Logging zonder volledige mailbody.</li>
+</ul>
+<p>DNS/mail:</p>
+<ul>
+<li>DMARC passief gezien: <code>p=reject</code>.</li>
+<li>DKIM selector aanwezig.</li>
+<li>MX wijst naar <code>smtp.rzone.de</code>.</li>
+<li>SPF record niet passief bevestigd: toevoegen/bevestigen.</li>
+</ul>
+<h2>16. Privacy / GDPR Review</h2>
+<p>Persoonsgegevens in scope:</p>
+<ul>
+<li>Naam, bedrijfsnaam, functie.</li>
+<li>E-mail, telefoon, adres.</li>
+<li>Factuurgegevens, KvK, btw, betaalgegevens.</li>
+<li>Berichten, e-mails, contactformulieren.</li>
+<li>Projectinformatie, websitegegevens.</li>
+<li>Login/toegangsgegevens voor opdrachten.</li>
+<li>IP, browser/apparaatgegevens.</li>
+<li>Call transcripts, summaries, recording URLs.</li>
+<li>Afspraken en agenda items.</li>
+</ul>
+<p>Risico&#39;s:</p>
+<ul>
+<li>Privacyverklaring is generiek en bevat placeholder KVK.</li>
+<li>AI-verwerking en externe verwerkers zijn niet concreet genoeg benoemd.</li>
+<li>Bewaartermijnen zijn niet per systeem technisch afgedwongen.</li>
+<li>Logs/backups kunnen gevoelige data bevatten.</li>
+<li>Exports/downloads moeten extra beschermd worden.</li>
+</ul>
+<p>Aanbevolen privacy-fixes:</p>
+<ul>
+<li>Verwerkerslijst concreet maken.</li>
+<li>AI-verwerking expliciet beschrijven.</li>
+<li>Retentie per datatype technisch vastleggen.</li>
+<li>Export/delete procedure maken.</li>
+<li>Logging/backups maskeren en beperken.</li>
+<li>DPIA-light maken voor AI/mail/call processing.</li>
+</ul>
+<h2>17. Secrets / Config / Deployment Review</h2>
+<p>Secret-risico&#39;s:</p>
+<ul>
+<li>Geen volledige secret blootgelegd in dit rapport.</li>
+<li>Service-role en externe API keys moeten server-only blijven.</li>
+<li>Secrets mogen niet in tracked files, frontend bundle, logs of source maps staan.</li>
+</ul>
+<p>Deployment risico&#39;s:</p>
+<ul>
+<li>Root headers verschillen van API/premium login headers.</li>
+<li>Preview deployments en staging/productie scheiding zijn niet bewezen.</li>
+<li>Branch protection en CI bestaan als projectguardrail, maar huidige lokale guardrail faalt door bestaande diff.</li>
+</ul>
+<p>Aanbevolen fixes:</p>
+<ul>
+<li>Secret scanning lokaal en in CI.</li>
+<li>Bundle scan op private key patronen.</li>
+<li>Vercel/hosting env vars nalopen.</li>
+<li>Preview deployments zonder productiedata.</li>
+<li>Source maps in productie expliciet beleid geven.</li>
+</ul>
+<h2>18. Security Headers Advies</h2>
+<p>Aanbevolen headers:</p>
+<table>
+<thead>
+<tr>
+<th>Header</th>
+<th>Aanbevolen waarde</th>
+<th>Regressierisico</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Content-Security-Policy</td>
+<td>start met huidige CSP op alle routes; daarna <code>unsafe-inline</code> afbouwen</td>
+<td>inline scripts/styles kunnen breken</td>
+</tr>
+<tr>
+<td>Strict-Transport-Security</td>
+<td><code>max-age=31536000; includeSubDomains; preload</code> na bevestigde HTTPS</td>
+<td>subdomeinen moeten HTTPS-ready zijn</td>
+</tr>
+<tr>
+<td>X-Frame-Options</td>
+<td><code>DENY</code> of CSP <code>frame-ancestors &#39;none&#39;</code></td>
+<td>embeds kunnen breken</td>
+</tr>
+<tr>
+<td>X-Content-Type-Options</td>
+<td><code>nosniff</code></td>
+<td>laag</td>
+</tr>
+<tr>
+<td>Referrer-Policy</td>
+<td><code>strict-origin-when-cross-origin</code></td>
+<td>analytics detail kan dalen</td>
+</tr>
+<tr>
+<td>Permissions-Policy</td>
+<td>camera/mic/geolocation/payment/usb uit tenzij nodig</td>
+<td>features kunnen toestemming missen</td>
+</tr>
+<tr>
+<td>Cross-Origin-Opener-Policy</td>
+<td><code>same-origin</code> waar mogelijk</td>
+<td>externe popups/integraties testen</td>
+</tr>
+<tr>
+<td>Cross-Origin-Resource-Policy</td>
+<td><code>same-origin</code> waar mogelijk</td>
+<td>externe asset flows testen</td>
+</tr>
+</tbody></table>
+<p>Testmethode:</p>
+<ul>
+<li>Headers controleren op <code>/</code>, publieke pagina, premium login, premium pagina en <code>/api/healthz</code>.</li>
+<li>CSP eerst in Report-Only bij strenge wijzigingen.</li>
+<li>Browserconsole controleren op geblokkeerde legitieme assets.</li>
+</ul>
+<h2>19. Infrastructure / Operations Review</h2>
+<p>Status:</p>
+<ul>
+<li>HTTPS/HSTS aanwezig op live root.</li>
+<li>Vercel zichtbaar in live headers.</li>
+<li>DMARC reject positief.</li>
+<li>DKIM aanwezig.</li>
+<li>SPF niet passief bevestigd.</li>
+<li>Monitoring/alerting, restore tests en preview scheiding niet bewezen.</li>
+</ul>
+<p>Aanbevolen operations hardening:</p>
+<ul>
+<li>MFA voor hosting, Supabase, mail, GitHub en AI accounts.</li>
+<li>Least privilege voor alle beheeraccounts.</li>
+<li>Periodieke access reviews.</li>
+<li>Backup en restore test.</li>
+<li>Incident response runbook.</li>
+<li>Alerting op verdachte login/export/delete/admin/mail/AI-acties.</li>
+<li>WAF/CDN/botbescherming voor login/formulieren.</li>
+<li>Dependency scanning en secret scanning in CI.</li>
+</ul>
+<h2>20. Fixvoorstellen - Niet Uitgevoerd</h2>
+<p>Fixvolgorde:</p>
+<ol>
+<li>Secrets/key exposure: keys roteren en scans toevoegen.</li>
+<li>Auth/access control: admin-only scopes en routeklassen.</li>
+<li>Supabase RLS/policies: tenant/user/company policy ontwerp.</li>
+<li>API/data leakage: payloads minimaliseren.</li>
+<li>XSS/input/output: HTML sinks reduceren en sanitizen.</li>
+<li>Security headers/CSP: root en publieke paden gelijk trekken.</li>
+<li>Rate limiting/bot protection: route-specifieke limieten.</li>
+<li>AI security: dataminimalisatie en prompt-injection guardrails.</li>
+<li>Mailbox/e-mail: link/attachment safety en send limits.</li>
+<li>Logging/monitoring/backups: PII masking en alerts.</li>
+<li>Privacy/GDPR: verwerkers, AI, retentie, exports.</li>
+<li>Code cleanup: grote HTML splitsen naar assets.</li>
+</ol>
+<p>Elke fix moet klein, testbaar en terugdraaibaar zijn.</p>
+<h2>21. Veilig Validatieplan</h2>
+<p>Minimale acceptatietests:</p>
+<ol>
+<li>Publieke pagina&#39;s laden correct.</li>
+<li>Premium-pagina&#39;s zijn beschermd.</li>
+<li>Login/logout werkt.</li>
+<li>Sessies verlopen correct.</li>
+<li>Data ophalen werkt alleen voor bevoegde gebruiker.</li>
+<li>Data opslaan werkt alleen met server-side checks.</li>
+<li>Geen gevoelige data in browserconsole.</li>
+<li>Geen secrets in frontend bundle.</li>
+<li>Geen ongeautoriseerde directe URL-toegang.</li>
+<li>Geen klantdata zichtbaar voor verkeerde gebruiker.</li>
+<li>Supabase RLS werkt met twee testgebruikers.</li>
+<li>Formulieren werken en zijn rate-limited.</li>
+<li>Mailflows werken veilig met testmailbox.</li>
+<li>AI lekt geen gevoelige data en volgt geen verborgen instructies.</li>
+<li>Security headers staan goed.</li>
+<li>Rate limits/botbescherming werken.</li>
+<li>Error states lekken geen intern detail.</li>
+<li>File/media toegang is object-level beschermd.</li>
+<li>Storage buckets lekken geen data.</li>
+<li>Rollback is mogelijk.</li>
+<li>Backups/restore zijn getest of ingepland.</li>
+<li>Preview/staging/productie zijn gescheiden.</li>
+<li>Geen regressie op businesskritische pagina&#39;s.</li>
+</ol>
+<p>Bewijs per test:</p>
+<ul>
+<li>Datum.</li>
+<li>Omgeving.</li>
+<li>Accounttype.</li>
+<li>Route/actie.</li>
+<li>Verwacht resultaat.</li>
+<li>Werkelijk resultaat.</li>
+<li>Screenshot/logregel zonder gevoelige data.</li>
+<li>Status: geslaagd, gefaald of blokkade.</li>
+</ul>
+<h2>22. Extreme Hardening Roadmap</h2>
+<p>Fase 1 - Vandaag:</p>
+<ul>
+<li>Guardrail-blokkade oplossen.</li>
+<li>Keys roteren en server-only bevestigen.</li>
+<li>Sensitive UI-state scopes admin-only maken.</li>
+<li>Root security headers fixen.</li>
+<li>SPF bevestigen/toevoegen.</li>
+</ul>
+<p>Fase 2 - Deze week:</p>
+<ul>
+<li>Supabase RLS per tabel ontwerpen.</li>
+<li>Server-side authorization op acties aanscherpen.</li>
+<li>IDOR-tests met twee accounts.</li>
+<li>Route-specifieke rate limits.</li>
+<li>Logmasking.</li>
+<li>Mailbox link/attachment beleid.</li>
+</ul>
+<p>Fase 3 - Deze maand:</p>
+<ul>
+<li>CSP strenger maken.</li>
+<li>Grote premium HTML-bestanden opsplitsen.</li>
+<li>AI guardrails.</li>
+<li>Backup/restore test.</li>
+<li>Monitoring/alerting.</li>
+<li>Privacyverklaring en verwerkerslijst bijwerken.</li>
+</ul>
+<p>Fase 4 - Professioneel niveau:</p>
+<ul>
+<li>Zero Trust per route en actie.</li>
+<li>Least privilege overal.</li>
+<li>MFA verplicht voor beheer.</li>
+<li>Password manager beleid.</li>
+<li>Secret rotation schema.</li>
+<li>SAST, DAST, dependency scanning, secret scanning.</li>
+<li>Branch protection en PR reviews.</li>
+<li>Staging/productie strikt gescheiden.</li>
+<li>WAF/CDN/botbescherming.</li>
+<li><code>security.txt</code> actueel houden.</li>
+<li>Periodieke access reviews.</li>
+<li>Jaarlijkse externe pentest.</li>
+</ul>
+<h2>23. Huidige Blokkade</h2>
+<p>De verplichte projectcheck <code>npm run verify:critical</code> faalt op dit moment door bestaande lokale wijzigingen die niet in deze rapportactie zijn gemaakt. De concrete blokkade:</p>
+<ul>
+<li><code>premium-website.html</code> is een groot frontendbestand en is netto +4 regels gegroeid.</li>
+<li>Guardrailregel: grote frontendbestanden mogen niet verder groeien zonder opsplitsing naar <code>assets/*</code> of bewuste uitzondering.</li>
+</ul>
+<p>Deze blokkade moet worden opgelost voordat codefixes betrouwbaar afgerond kunnen worden.</p>
+<h2>24. Eindcontrole</h2>
+<p>Eindcontrole status:</p>
+<ul>
+<li>Routes geinventariseerd: ja, op basis van code.</li>
+<li>Premium pagina&#39;s meegenomen: ja.</li>
+<li>API endpoints meegenomen: ja, met focus op kritieke groepen.</li>
+<li>Supabase/RLS/key risico&#39;s meegenomen: ja.</li>
+<li>Auth/access-control meegenomen: ja.</li>
+<li>AI/mailbox risico&#39;s meegenomen: ja.</li>
+<li>Privacy/GDPR meegenomen: ja.</li>
+<li>Secrets/config/deployment meegenomen: ja.</li>
+<li>Security headers meegenomen: ja.</li>
+<li>Findings gelabeld met bewijsniveau: ja.</li>
+<li>Per finding bewijs gegeven: ja.</li>
+<li>Fixes voorgesteld, niet uitgevoerd: ja.</li>
+<li>Geen secrets volledig getoond: ja.</li>
+<li>Geen destructieve acties uitgevoerd: ja.</li>
+</ul>
+<h2>25. Aanbevolen Volgende Stap</h2>
+<p>Start met P0-fixronde 1, pas na expliciete toestemming:</p>
+<ol>
+<li>Guardrail-blokkade rond <code>premium-website.html</code> oplossen.</li>
+<li>Secrets/key scan en rotatiecheck voorbereiden.</li>
+<li>Admin-only UI-state scopes uitbreiden.</li>
+<li>Supabase RLS policyplan uitschrijven voor akkoord voordat databasewijzigingen worden uitgevoerd.</li>
+</ol>
+</main>
+</body>
+</html>

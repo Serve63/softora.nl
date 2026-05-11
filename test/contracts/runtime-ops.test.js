@@ -2,6 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createRuntimeOpsCoordinator } = require('../../server/services/runtime-ops');
+const {
+  ADMIN_ONLY_UI_STATE_SCOPES,
+  createAdminOnlyUiStateScopesSet,
+} = require('../../server/config/admin-ui-state-scopes');
 
 function createResponseRecorder() {
   return {
@@ -320,6 +324,26 @@ test('runtime ops coordinator blocks admin-only ui-state scopes for non-admin us
   assert.equal(securityAuditCalls[0].reason, 'security_admin_ui_state_scope_denied');
   assert.equal(securityAuditCalls[0].payload.type, 'admin_ui_state_scope_denied');
   assert.match(securityAuditCalls[0].payload.detail, /premium_password_register/);
+});
+
+test('admin-only ui-state scope config covers sensitive premium business data', () => {
+  const scopes = createAdminOnlyUiStateScopesSet();
+
+  [
+    'premium_password_register',
+    'premium_bookkeeping',
+    'premium_customers_database',
+    'premium_active_orders',
+    'premium_database_photos',
+    'premium_monthly_costs',
+    'premium_api_costs',
+    'premium_coldmailing_settings',
+    'premium_dashboard_ai_management',
+  ].forEach((scope) => {
+    assert.equal(scopes.has(scope), true, `${scope} hoort admin-only te zijn`);
+  });
+
+  assert.equal(ADMIN_ONLY_UI_STATE_SCOPES.includes('coldcalling'), false);
 });
 
 test('runtime ops coordinator allows admin users on admin-only ui-state scopes', async () => {
