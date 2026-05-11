@@ -722,6 +722,41 @@ test('coldmail campaign normaliseert geplakte e-mailadressen voor ontvangerselec
   assert.equal(result.recipients[0].email, 'info@moonsenmeis.nl');
 });
 
+test('coldmail campaign vult de preview aan wanneer een eerdere kandidaat afvalt', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'bad-domain',
+        bedrijf: 'Slechte Domein BV',
+        email: 'info@ongeldig.test',
+        status: 'benaderbaar',
+        mail: true,
+      },
+      {
+        id: 'good-1',
+        bedrijf: 'Goede Ontvanger 1',
+        email: 'goed1@example.test',
+        status: 'benaderbaar',
+        mail: true,
+      },
+      {
+        id: 'good-2',
+        bedrijf: 'Goede Ontvanger 2',
+        email: 'goed2@example.test',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+    invalidDomains: ['ongeldig.test'],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({ count: 2 });
+
+  assert.equal(result.selected, 2);
+  assert.deepEqual(result.recipients.map((recipient) => recipient.email), ['goed1@example.test', 'goed2@example.test']);
+  assert.equal(result.failedItems[0].email, 'info@ongeldig.test');
+});
+
 test('coldmail campaign recipient preview respects Oisterwijk radius', async () => {
   const { service } = createService({
     rows: [

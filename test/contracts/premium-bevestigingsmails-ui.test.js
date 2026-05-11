@@ -206,8 +206,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
   assert.match(pageSource, /Number\.isFinite\(Number\(countOverride\)\)/);
   assert.match(pageSource, /const response = await fetch\(getColdmailRecipientPreviewUrl\(\), \{[\s\S]*method: 'GET',[\s\S]*credentials: 'same-origin',[\s\S]*headers: \{ Accept: 'application\/json' \},[\s\S]*cache: 'no-store',[\s\S]*\}\);/);
-  assert.match(pageSource, /renderCampaignCompanyCount\(getCampaignRequestedCompanyCount\(\)\);/);
-  assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data\.selected\) \|\| recipients\.length\);/);
+  assert.match(pageSource, /const recipients = Array\.isArray\(data && data\.recipients\) \? data\.recipients : \[\]; renderCampaignCompanyCount\(Number\(data && data\.selected\) \|\| recipients\.length\);/);
+  assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(getCampaignRequestedCompanyCount\(\)\);/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data\.candidates/);
   assert.match(pageSource, /Math\.max\(0, requestedCount\)/);
   assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\),/);
