@@ -212,19 +212,19 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   );
   assert.match(
     source,
-    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(1\)\s*\{[\s\S]*\/assets\/home-hero-generated-v2\.jpg\?v=20260511a/
+    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(1\)\s*\{[\s\S]*\/assets\/home-service-websites-ai\.jpg\?v=20260511b/
   );
   assert.match(
     source,
-    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(2\)\s*\{[\s\S]*\/assets\/home-over-office-meeting-ai\.jpg\?v=20260511a/
+    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(2\)\s*\{[\s\S]*\/assets\/home-service-software-ai\.jpg\?v=20260511b/
   );
   assert.match(
     source,
-    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(3\)\s*\{[\s\S]*\/assets\/home-hero-generated-v2\.jpg\?v=20260511a/
+    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(3\)\s*\{[\s\S]*\/assets\/home-service-voice-ai\.jpg\?v=20260511b/
   );
   assert.match(
     source,
-    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(4\)\s*\{[\s\S]*\/assets\/home-over-office-meeting-ai\.jpg\?v=20260511a/
+    /#diensten \.diensten-product-grid \.tilt-card:nth-child\(4\)\s*\{[\s\S]*\/assets\/home-service-chatbot-ai\.jpg\?v=20260511b/
   );
   assert.match(source, /\.card-content\s*\{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
   assert.doesNotMatch(source, /diensten-arrow-wrap/);
