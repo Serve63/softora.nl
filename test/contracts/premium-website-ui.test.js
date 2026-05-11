@@ -208,12 +208,15 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   );
   assert.match(
     source,
-    /\.tilt-card::before\s*\{[\s\S]*inset:\s*-26px;[\s\S]*background-image:[\s\S]*linear-gradient\(90deg,[\s\S]*var\(--service-card-photo/
+    /\.tilt-card::before\s*\{[\s\S]*inset:\s*-26px;[\s\S]*background-image:[\s\S]*rgba\(9,\s*10,\s*18,\s*0\.48\)[\s\S]*linear-gradient\(90deg,[\s\S]*rgba\(9,\s*10,\s*18,\s*0\.96\)[\s\S]*var\(--service-card-photo/
   );
   assert.match(
     source,
     /\.tilt-card\s*\{[\s\S]*background-image:[\s\S]*background-size:\s*cover,\s*cover;/
   );
+  assert.match(source, /\.tilt-card\s*\{[\s\S]*background-color:\s*#0f1018;/);
+  assert.match(source, /\.tilt-card h3\s*\{[\s\S]*color:\s*#fff;/);
+  assert.match(source, /\.tilt-card p\s*\{[\s\S]*color:\s*rgba\(255,\s*255,\s*255,\s*0\.76\);/);
   assert.match(
     source,
     /#diensten \.diensten-product-grid \.tilt-card:nth-child\(1\)\s*\{[\s\S]*\/assets\/home-service-websites-ai\.jpg\?v=20260511b/
