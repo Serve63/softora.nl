@@ -167,16 +167,13 @@ test('page smoke: premium-ai-coldmailing.html promotes suppression after lead re
   );
 });
 
-test('page smoke: premium-ai-coldmailing.html can filter to only the current user assignments', () => {
+test('page smoke: premium-ai-coldmailing.html keeps personal assignment filter off the leads page', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
-  const assignmentPagesScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-pages.js'), 'utf8');
-  const source = `${html}\n${assignmentPagesScript}`;
-  assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260510a/, 'Persoonlijke toewijzingsstijl ontbreekt op leads.');
-  assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op leads.');
-  assert.match(html, /id="onlyMyAssignmentsLeadsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Leads-toggle ontbreekt.');
-  assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260510a/, 'Leads pagina-asset voor persoonlijke toewijzingen ontbreekt.');
-  assert.match(source, /function syncLeadsPage\(\) \{/, 'Leads hoort persoonlijke toewijzingen te kunnen filteren.');
-  assert.match(source, /Nog geen leads aan jou toegewezen\./, 'Leads lege-state voor persoonlijke filter ontbreekt.');
+  assert.doesNotMatch(html, /assets\/premium-personal-assignment-filter\.css/, 'Persoonlijke toewijzingsstijl hoort niet op leads.');
+  assert.doesNotMatch(html, /assets\/premium-personal-assignment-filter\.js/, 'Persoonlijke toewijzingsscript hoort niet op leads.');
+  assert.doesNotMatch(html, /onlyMyAssignmentsLeadsToggle/, 'Leads-toggle hoort weg te zijn.');
+  assert.doesNotMatch(html, /Enkel mijn toewijzingen bekijken/, 'Leads-toggle label hoort weg te zijn.');
+  assert.doesNotMatch(html, /assets\/premium-personal-assignment-pages\.js/, 'Leads pagina-asset voor persoonlijke toewijzingen hoort weg te zijn.');
 });
 
 test('page smoke: premium-actieve-opdrachten.html shows openstaande opdrachten as the primary tab label', () => {
