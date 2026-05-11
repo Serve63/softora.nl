@@ -208,7 +208,11 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   );
   assert.match(
     source,
-    /\.tilt-card\s*\{[\s\S]*background-image:[\s\S]*var\(--service-card-photo/
+    /\.tilt-card::before\s*\{[\s\S]*inset:\s*-26px;[\s\S]*background-image:[\s\S]*linear-gradient\(90deg,[\s\S]*var\(--service-card-photo/
+  );
+  assert.match(
+    source,
+    /\.tilt-card\s*\{[\s\S]*background-image:[\s\S]*background-size:\s*cover,\s*cover;/
   );
   assert.match(
     source,
