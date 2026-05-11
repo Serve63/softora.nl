@@ -19,6 +19,14 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Verzwak tests nooit met `.only`, `.skip` of `todo` in vaste testbestanden; de guardrails blokkeren dit.
 - Beschouw workflows, verificatiescripts en protocoldocs als beschermde kwaliteitscode.
 
+## Versie- en deploy-veiligheid
+- Werk altijd vanaf de allerlaatste actuele `origin/main` of vanaf een verse `codex/*` branch die daarop gebaseerd is; fetch/pull eerst en controleer je branch/worktree voordat je iets wijzigt.
+- Deploy nooit vanuit een oude lokale kopie, oude branch, vervuilde worktree of losse map op het bureaublad; als de bron niet aantoonbaar exact klopt, stop en onderzoek eerst.
+- Rebase/merge geen oude code over recente wijzigingen heen. Gebruik nooit reset/checkout om onbekende wijzigingen weg te gooien.
+- Voor iedere push of productie-deploy: controleer dat recente live wijzigingen behouden blijven en dat alleen de bedoelde diff meegaat.
+- Na iedere merge/deploy: controleer live dat `www.softora.nl` exact op de nieuwste `origin/main` draait en dat recente wijzigingen niet zijn teruggedraaid.
+- Als live gedrag ouder lijkt dan de repo: niet opnieuw deployen vanaf dezelfde staat, maar eerst de bron, branch, Vercel-deployment en live commit vergelijken.
+
 ## Bron van waarheid
 - Database en formele repositories zijn leidend zodra een pad is gemigreerd.
 - In-memory state in [server.js](server.js) is legacy en mag niet verder worden uitgebouwd als business-truth.

@@ -397,9 +397,15 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(agentsSource, /Productie deployen mag alleen via `npm run deploy:production`/);
   assert.match(agentsSource, /check:live-production-version/);
   assert.match(agentsSource, /Elke push\/merge naar `main`/);
+  assert.match(agentsSource, /allerlaatste actuele `origin\/main`/);
+  assert.match(agentsSource, /Deploy nooit vanuit een oude lokale kopie/);
+  assert.match(agentsSource, /recente live wijzigingen behouden blijven/);
   assert.match(protocolSource, /Productie deploys lopen alleen via `npm run deploy:production`/);
   assert.match(protocolSource, /check:live-production-version/);
   assert.match(protocolSource, /Elke push\/merge naar `main`/);
+  assert.match(protocolSource, /allerlaatste actuele `origin\/main`/);
+  assert.match(protocolSource, /Oude lokale kopieen/);
+  assert.match(protocolSource, /Recente live wijzigingen mogen niet verdwijnen/);
 });
 
 test('agent guardrails helpers recognize approved and high-risk paths', () => {
