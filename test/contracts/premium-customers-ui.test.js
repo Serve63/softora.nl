@@ -106,8 +106,8 @@ test('premium customers modal uses Softora custom dropdowns instead of native br
   ['fieldService', 'fieldMaintenanceEnabled', 'fieldStatus', 'fieldActive', 'fieldReview', 'fieldResponsible'].forEach((fieldId) => {
     assert.match(pageSource, new RegExp(`<select class="form-select" id="${fieldId}"[\\s\\S]*?data-custom-select="true"`));
   });
-  assert.match(pageSource, /assets\/custom-selects\.css\?v=20260421b/);
-  assert.match(pageSource, /assets\/custom-selects\.js\?v=20260421a/);
+  assert.match(pageSource, /assets\/custom-selects\.css\?v=20260511a/);
+  assert.match(pageSource, /assets\/custom-selects\.js\?v=20260511a/);
   assert.match(pageSource, /\.modal \.site-select-trigger\{min-height:2\.85rem!important/);
   assert.match(pageSource, /\.modal \.site-select-menu\{background:var\(--bg-secondary\)!important/);
   assert.match(pageSource, /function refreshCustomerCustomSelects\(\) \{ if \(typeof window\.refreshCustomFormSelects === "function"\) window\.refreshCustomFormSelects\(\); \}/);
