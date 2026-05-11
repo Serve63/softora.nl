@@ -1767,8 +1767,7 @@ async function hydrateCampaignCompanyCountFromSupabase() {
     const response = await fetch(getColdmailRecipientPreviewUrl(), { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
     const data = response.ok ? await response.json().catch(function () { return null; }) : null;
     if (!data || data.ok === false) throw new Error('Kon campagne-ontvangers niet laden.');
-    const recipients = Array.isArray(data.recipients) ? data.recipients : [];
-    renderCampaignCompanyCount(Number(data.selected) || recipients.length);
+    renderCampaignCompanyCount(Number(data.candidates ?? data.selected ?? (Array.isArray(data.recipients) ? data.recipients.length : 0)));
   } catch (_) {
     return;
   }
@@ -2629,7 +2628,7 @@ async function startCampagneImmediate() {
 
   const previewRecipients = Array.isArray(recipientPreview && recipientPreview.recipients) ? recipientPreview.recipients : [];
   const actualTotal = sendResult && Number.isFinite(Number(sendResult.sent))
-    ? Number(sendResult.sent) : (Number(recipientPreview && recipientPreview.selected) || previewRecipients.length);
+    ? Number(sendResult.sent) : Number(recipientPreview && (recipientPreview.candidates ?? recipientPreview.selected ?? previewRecipients.length));
 
   if (actualTotal <= 0) {
     const firstFailure = recipientPreview && Array.isArray(recipientPreview.failedItems) && recipientPreview.failedItems[0] ? String(recipientPreview.failedItems[0].error || '').trim() : '';
