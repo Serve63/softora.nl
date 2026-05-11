@@ -44,6 +44,16 @@
     };
   }
 
+  function buildTestCallLeads() {
+    return [{
+      name: 'Softora Testmodus',
+      company: 'Softora Testmodus',
+      phone: '+31000000000',
+      email: 'servec321@gmail.com',
+      region: 'Testmodus',
+    }];
+  }
+
   function buildStartButtonHtml(label) {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> ' + label;
   }
@@ -135,8 +145,32 @@
     };
   }
 
-  async function startCallCampaign() {
-    if (isTestModeEnabled()) return buildTestCallCampaignResult();
+  async function postColdcallingStart(campaign, leads, startConfirmPin) {
+    const startResponse = await fetch('/api/coldcalling/start', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        campaign,
+        leads,
+        testMode: isTestModeEnabled(),
+        startConfirmPin: String(startConfirmPin || '').trim(),
+      }),
+    });
+    const startPayload = await startResponse.json().catch(() => null);
+    if (!startResponse.ok || !startPayload || startPayload.ok === false) {
+      throw new Error(startPayload && (startPayload.error || startPayload.message) ? (startPayload.error || startPayload.message) : 'Bedrijven bellen is mislukt.');
+    }
+    return startPayload;
+  }
+
+  async function startCallCampaign(startConfirmPin) {
+    if (isTestModeEnabled()) {
+      return postColdcallingStart(getCampaignPayload(1), buildTestCallLeads(), startConfirmPin);
+    }
 
     const recipientsResponse = await fetch(getRecipientPreviewUrl(), {
       method: 'GET',
@@ -154,24 +188,7 @@
       throw new Error('Geen bedrijven met telefoonnummer gevonden om te bellen.');
     }
 
-    const startResponse = await fetch('/api/coldcalling/start', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        campaign: getCampaignPayload(leads.length),
-        leads,
-        testMode: isTestModeEnabled(),
-      }),
-    });
-    const startPayload = await startResponse.json().catch(() => null);
-    if (!startResponse.ok || !startPayload || startPayload.ok === false) {
-      throw new Error(startPayload && startPayload.error ? startPayload.error : 'Bedrijven bellen is mislukt.');
-    }
-    return startPayload;
+    return postColdcallingStart(getCampaignPayload(leads.length), leads, startConfirmPin);
   }
 
   function getStartedCount(result) {
@@ -188,16 +205,30 @@
     }
   }
 
+  async function requestCallStartConfirmPin() {
+    if (!global.SoftoraRiskyActionPin || typeof global.SoftoraRiskyActionPin.requestPin !== 'function') {
+      showToast('Beveiligingspopup kon niet worden geladen. Actie niet gestart.');
+      return '';
+    }
+    return global.SoftoraRiskyActionPin.requestPin({
+      title: 'Bedrijven bellen bevestigen',
+      description: 'Typ de pincode voordat de belactie wordt gestart.',
+      confirmLabel: 'Start bellen',
+    });
+  }
+
   async function startBeforeTimeline(original, context, args) {
     const button = document.getElementById('start-campaign-btn');
     if (button && button.dataset.callStartInProgress === '1') return undefined;
+    const startConfirmPin = await requestCallStartConfirmPin();
+    if (!startConfirmPin) return undefined;
     if (button) button.dataset.callStartInProgress = '1';
     if (typeof global.setCampaignStartButtonBusy === 'function') {
       global.setCampaignStartButtonBusy(true);
     }
     try {
       showToast(isTestModeEnabled() ? 'Testmodus wordt gestart...' : 'Bedrijven bellen wordt gestart...');
-      const result = await startCallCampaign();
+      const result = await startCallCampaign(startConfirmPin);
       const count = getStartedCount(result);
       if (!count) throw new Error('Er zijn geen belpogingen gestart.');
       showToast(result && result.testMode ? 'Testmodus klaar: geen echte bedrijven gebeld.' : '✓ ' + count + ' bedrijven klaargezet om te bellen');

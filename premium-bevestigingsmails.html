@@ -1433,7 +1433,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
-<script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260511a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260511a"></script>
+<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260511a"></script>
 <script src="assets/premium-campaign-selects.js?v=20260511a"></script>
 <script>
 // ── DATA ──
@@ -2351,7 +2351,7 @@ function setCampaignStartButtonBusy(isBusy) {
     : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> ' + (window.SoftoraAiLeadGeneratorCallStart ? window.SoftoraAiLeadGeneratorCallStart.getButtonLabel(isPremiumAiLeadGeneratorPath()) : 'Mails Versturen');
 }
 
-function getColdmailCampaignPayload() {
+function getColdmailCampaignPayload(startConfirmPin) {
   const branchSelect = document.getElementById('branche');
   const serviceSelect = document.getElementById('service');
   const databaseSelect = document.getElementById('database');
@@ -2372,11 +2372,11 @@ function getColdmailCampaignPayload() {
     senderEmail: senderSelect ? senderSelect.value : '',
     specialAction: specialActionSelect ? specialActionSelect.value : '',
     durationDays: getSelectedCampaignDurationDays(),
-    radiusKm: getSelectedCampaignRadiusKm(), testMode: Boolean(window.SoftoraCampaignTestMode && window.SoftoraCampaignTestMode.isEnabled()),
+    radiusKm: getSelectedCampaignRadiusKm(), testMode: Boolean(window.SoftoraCampaignTestMode && window.SoftoraCampaignTestMode.isEnabled()), startConfirmPin: String(startConfirmPin || '').trim(),
   };
 }
 
-async function sendColdmailCampaignNow() {
+async function sendColdmailCampaignNow(startConfirmPin) {
   const response = await fetch('/api/coldmailing/campaigns/send', {
     method: 'POST',
     credentials: 'same-origin',
@@ -2384,7 +2384,7 @@ async function sendColdmailCampaignNow() {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(getColdmailCampaignPayload()),
+    body: JSON.stringify(getColdmailCampaignPayload(startConfirmPin)),
   });
   const payload = await response.json().catch(() => null);
   function buildSendErrorMessage(defaultMessage) {
@@ -2518,15 +2518,15 @@ async function startCampagneImmediate() {
   const providerSuffix = isPremiumAiLeadGeneratorPath()
     ? ' Provider: ' + getSelectedColdcallingStackLabel() + '.'
     : '';
-  let sendResult = null;
-  let recipientPreview = null;
+  let sendResult = null; let recipientPreview = null;
 
   if (!isPremiumAiLeadGeneratorPath()) {
+    const startConfirmPin = await (window.SoftoraRiskyActionPin && window.SoftoraRiskyActionPin.requestMailSendPin ? window.SoftoraRiskyActionPin.requestMailSendPin(showToast) : (showToast('Beveiligingspopup kon niet worden geladen. Actie niet gestart.'), '')); if (!startConfirmPin) return;
     campaignSendInProgress = true;
     setCampaignStartButtonBusy(true);
     try {
       showToast('Mails worden verstuurd...');
-      sendResult = await sendColdmailCampaignNow();
+      sendResult = await sendColdmailCampaignNow(startConfirmPin);
       if (!sendResult.sent) {
         throw new Error('Er zijn geen mails verstuurd.');
       }

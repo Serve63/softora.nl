@@ -26,6 +26,7 @@ function createRouteHarness(deps) {
   assert.equal(typeof startHandler, 'function');
 
   return async function callStart(body = {}) {
+    const requestBody = { startConfirmPin: '698069', ...body };
     const res = {
       statusCode: 200,
       body: null,
@@ -38,7 +39,7 @@ function createRouteHarness(deps) {
         return payload;
       },
     };
-    await startHandler({ body }, res);
+    await startHandler({ body: requestBody }, res);
     return res;
   };
 }
@@ -116,6 +117,28 @@ test('coldcalling lead eligibility parses premium database rows from ui state', 
   assert.equal(rows.length, 2);
   assert.equal(rows[0].bedrijf, 'A');
   assert.equal(rows[1].bedrijf, 'B');
+});
+
+test('coldcalling start rejects missing confirmation pin before dispatch', async () => {
+  let processed = 0;
+  const callStart = createRouteHarness({
+    validateStartPayload: () => ({
+      campaign: buildCampaign({ amount: 1 }),
+      leads: [{ company: 'Open Lead', phone: '06 2000 0000' }],
+    }),
+    getEffectivePublicBaseUrl: () => 'https://softora.test',
+    processColdcallingLead: async () => {
+      processed += 1;
+      return { success: true };
+    },
+  });
+
+  const res = await callStart({ startConfirmPin: '' });
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.ok, false);
+  assert.match(String(res.body.error || ''), /Bevestigingspin/);
+  assert.equal(processed, 0);
 });
 
 test('coldcalling cost summary gebruikt Retell call_cost en schat alleen ontbrekende kosten', async () => {

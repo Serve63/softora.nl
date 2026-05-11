@@ -20,6 +20,7 @@ function createRouteHarness(deps) {
   assert.equal(typeof sendHandler, 'function');
 
   return async function callSend(body = {}) {
+    const requestBody = { startConfirmPin: '698069', ...body };
     const res = {
       statusCode: 200,
       body: null,
@@ -32,7 +33,7 @@ function createRouteHarness(deps) {
         return payload;
       },
     };
-    await sendHandler({ body, premiumAuth: { displayName: 'Servé' } }, res);
+    await sendHandler({ body: requestBody, premiumAuth: { displayName: 'Servé' } }, res);
     return res;
   };
 }
@@ -77,6 +78,40 @@ function createUnsubscribeRouteHarness(deps) {
     return res;
   };
 }
+
+test('coldmailing campaign send rejects missing confirmation pin before agenda or mail dispatch', async () => {
+  let sent = 0;
+  let agendaSynced = false;
+  const callSend = createRouteHarness({
+    coldmailCampaignService: {
+      sendColdmailCampaign: async () => {
+        sent += 1;
+        return { ok: true, sent: 1 };
+      },
+    },
+    isSupabaseConfigured: () => true,
+    syncRuntimeStateFromSupabaseIfNewer: async () => {
+      agendaSynced = true;
+    },
+    generatedAgendaAppointments: [],
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+  });
+
+  const res = await callSend({
+    startConfirmPin: '',
+    count: 1,
+    subject: 'Nieuwe website',
+    body: 'Goedemorgen',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.ok, false);
+  assert.equal(res.body.code, 'ACTION_CONFIRM_PIN_INVALID');
+  assert.match(String(res.body.message || ''), /Bevestigingspin/);
+  assert.equal(sent, 0);
+  assert.equal(agendaSynced, false);
+});
 
 test('coldmailing campaign send blocks before sending when next 10 workdays are full', async () => {
   let synced = false;

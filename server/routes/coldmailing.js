@@ -1,4 +1,5 @@
 const { createAgendaCapacityService } = require('../services/agenda-capacity');
+const { validateRiskyActionConfirmPin } = require('../security/risky-action-confirm-pin');
 
 async function resolveColdmailingAgendaCapacity(deps) {
   if (deps && typeof deps.backfillInsightsAndAppointmentsFromRecentCallUpdates === 'function') {
@@ -177,6 +178,15 @@ function registerColdmailingRoutes(app, deps = {}) {
   app.post('/api/coldmailing/campaigns/send', async (req, res) => {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const pinCheck = validateRiskyActionConfirmPin(body);
+      if (!pinCheck.ok) {
+        res.status(403).json({
+          ok: false,
+          code: 'ACTION_CONFIRM_PIN_INVALID',
+          message: pinCheck.error,
+        });
+        return;
+      }
       let agendaCapacity = null;
       try {
         agendaCapacity = await resolveColdmailingAgendaCapacity(deps);

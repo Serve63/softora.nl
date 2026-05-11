@@ -28,6 +28,17 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.doesNotMatch(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
 });
 
+test('risky action pin modal uses a typed input without exposing the pin in frontend assets', () => {
+  const pinAssetPath = path.join(__dirname, '../../assets/premium-risky-action-pin.js');
+  const pinAssetSource = fs.readFileSync(pinAssetPath, 'utf8');
+
+  assert.match(pinAssetSource, /type="password"/);
+  assert.match(pinAssetSource, /inputmode="numeric"/);
+  assert.doesNotMatch(pinAssetSource, /698069/);
+  assert.doesNotMatch(pinAssetSource, /data-[a-z-]*pin-digit/);
+  assert.doesNotMatch(pinAssetSource, /numpad/i);
+});
+
 test('premium ai lead generator alias rewrites the shared coldmailing subtitle to coldcalling', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -509,7 +520,8 @@ test('premium ai lead generator uses calling copy and the on-page prompt for col
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const callStartSource = fs.readFileSync(callStartPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-ai-lead-generator-call-start\.js\?v=20260511a/);
+  assert.match(pageSource, /assets\/premium-risky-action-pin\.js\?v=20260512a/);
+  assert.match(pageSource, /assets\/premium-ai-lead-generator-call-start\.js\?v=20260512a/);
   assert.match(pageSource, /SoftoraAiLeadGeneratorCallStart\.getBusyLabel\(isPremiumAiLeadGeneratorPath\(\)\)/);
   assert.match(pageSource, /SoftoraAiLeadGeneratorCallStart\.getButtonLabel\(isPremiumAiLeadGeneratorPath\(\)\)/);
   assert.match(callStartSource, /return isAlias \? 'Bedrijven bellen' : 'Mails Versturen'/);
@@ -518,6 +530,10 @@ test('premium ai lead generator uses calling copy and the on-page prompt for col
   assert.match(callStartSource, /extraInstructions: body \? body\.value : ''/);
   assert.match(callStartSource, /testMode: isTestModeEnabled\(\)/);
   assert.match(callStartSource, /function buildTestCallCampaignResult\(\)/);
+  assert.match(callStartSource, /function requestCallStartConfirmPin\(\)/);
+  assert.match(callStartSource, /SoftoraRiskyActionPin\.requestPin/);
+  assert.match(callStartSource, /startConfirmPin:\s*String\(startConfirmPin \|\| ''\)\.trim\(\)/);
+  assert.match(callStartSource, /return postColdcallingStart\(getCampaignPayload\(1\), buildTestCallLeads\(\), startConfirmPin\);/);
   assert.match(callStartSource, /fetch\('\/api\/coldcalling\/start'/);
   assert.match(callStartSource, /const original = global\.startCampagneImmediate;/);
   assert.match(callStartSource, /showToast\(isTestModeEnabled\(\) \? 'Testmodus wordt gestart\.\.\.' : 'Bedrijven bellen wordt gestart\.\.\.'\);/);
@@ -530,14 +546,17 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
 
   assert.match(pageSource, /id="start-campaign-btn"/);
   assert.match(pageSource, />\s*Mails Versturen\s*<\/button>/);
-  assert.match(pageSource, /function getColdmailCampaignPayload\(\)/);
+  assert.match(pageSource, /function getColdmailCampaignPayload\(startConfirmPin\)/);
   assert.match(pageSource, /subject: document\.getElementById\('subj1'\)/);
   assert.match(pageSource, /body: document\.getElementById\('body1'\)/);
   assert.match(pageSource, /aiInstructions: senderProfile && senderProfile\.aiInstructions/);
   assert.match(pageSource, /toneStyle: senderProfile && senderProfile\.toneStyle/);
   assert.match(pageSource, /fetch\('\/api\/coldmailing\/campaigns\/send'/);
+  assert.match(pageSource, /SoftoraRiskyActionPin\.requestMailSendPin/);
+  assert.match(pageSource, /startConfirmPin: String\(startConfirmPin \|\| ''\)\.trim\(\)/);
+  assert.match(pageSource, /const startConfirmPin = await \(window\.SoftoraRiskyActionPin && window\.SoftoraRiskyActionPin\.requestMailSendPin/);
+  assert.match(pageSource, /sendResult = await sendColdmailCampaignNow\(startConfirmPin\);/);
   assert.match(pageSource, /credentials: 'same-origin'/);
-  assert.match(pageSource, /sendResult = await sendColdmailCampaignNow\(\);/);
   assert.match(pageSource, /function buildSendErrorMessage\(defaultMessage\)/);
   assert.match(pageSource, /payload && Array\.isArray\(payload\.failedItems\) && payload\.failedItems\[0\]/);
   assert.match(pageSource, /if \(!payload\.sent && payload\.failed\) \{/);
