@@ -117,6 +117,7 @@ test('coldcalling runtime validateStartPayload normalizes campaign settings safe
       dispatchMode: 'delay',
       dispatchDelaySeconds: '9',
       coldcallingStack: 'openai',
+      testMode: '1',
     },
     leads: [{ id: 1 }, { id: 2 }],
   });
@@ -127,6 +128,7 @@ test('coldcalling runtime validateStartPayload normalizes campaign settings safe
   assert.equal(validated.campaign.dispatchDelaySeconds, 9);
   assert.equal(validated.campaign.coldcallingStack, 'openai_realtime_1_5');
   assert.equal(validated.campaign.coldcallingStackLabel, 'OpenAI Realtime 1.5');
+  assert.equal(validated.campaign.testMode, true);
 });
 
 test('coldcalling runtime processRetellColdcallingLead returns dial-failed result after refresh', async () => {

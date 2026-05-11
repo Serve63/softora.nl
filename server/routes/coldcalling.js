@@ -520,6 +520,24 @@ function buildColdcallingSummary({
   };
 }
 
+function buildColdcallingTestResult(lead, index) {
+  return {
+    index,
+    success: true,
+    testMode: true,
+    callId: `test-mode-${index + 1}`,
+    status: 'test_mode',
+    message: 'Testmodus: geen echte call gestart.',
+    lead: {
+      name: String(lead?.name || lead?.naam || '').trim(),
+      company: String(lead?.company || lead?.bedrijf || lead?.name || lead?.naam || '').trim(),
+      phone: String(lead?.phone || lead?.tel || lead?.telefoon || lead?.contactPhone || '').trim(),
+      email: String(lead?.email || '').trim(),
+      region: String(lead?.region || lead?.regio || '').trim(),
+    },
+  };
+}
+
 async function resolveColdcallingAgendaCapacity(deps) {
   if (deps && typeof deps.backfillInsightsAndAppointmentsFromRecentCallUpdates === 'function') {
     deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
@@ -597,6 +615,23 @@ function registerColdcallingRoutes(app, deps) {
 
     const { campaign, leads } = validated;
     campaign.publicBaseUrl = deps.getEffectivePublicBaseUrl(req);
+
+    if (campaign.testMode) {
+      const selectedLeads = leads.slice(0, Math.min(campaign.amount, leads.length));
+      const results = selectedLeads.map((lead, index) => buildColdcallingTestResult(lead, index));
+      return res.status(200).json({
+        ok: true,
+        testMode: true,
+        summary: buildColdcallingSummary({
+          leads,
+          selectedLeads,
+          results,
+          provider: 'test_mode',
+          campaign,
+        }),
+        results,
+      });
+    }
 
     let agendaCapacity = null;
     try {

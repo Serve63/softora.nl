@@ -379,6 +379,51 @@ test('coldmail campaign sends test recipient without marking database row as mai
   assert.equal(getSavedState(), null);
 });
 
+test('coldmail campaign test mode sends only the safe test inbox', async () => {
+  const { service, sentMessages, getSavedState, getSavedStates } = createService({
+    rows: [
+      {
+        id: 'real-prospect',
+        bedrijf: 'Echte Klant BV',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const preview = await service.getColdmailCampaignRecipients({
+    count: 10,
+    testMode: true,
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(preview.testMode, true);
+  assert.equal(preview.selected, 1);
+  assert.equal(preview.recipients[0].email, 'servec321@gmail.com');
+
+  const result = await service.sendColdmailCampaign({
+    count: 10,
+    subject: 'Test voor {{bedrijf}}',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+    testMode: true,
+  });
+
+  assert.equal(result.testMode, true);
+  assert.equal(result.sent, 1);
+  assert.equal(result.persisted, 0);
+  assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
+  assert.match(sentMessages[0].subject, /Softora Testmodus/);
+  assert.equal(sentMessages[0].attachments, undefined);
+  assert.equal(getSavedState(), null);
+  assert.deepEqual(getSavedStates(), []);
+});
+
 test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', async () => {
   const parsedInbound = {
     messageId: '<incoming-1@example.test>',

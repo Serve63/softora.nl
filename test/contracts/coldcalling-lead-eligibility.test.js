@@ -246,6 +246,51 @@ test('coldcalling start skips database-blocked leads before provider dispatch', 
   assert.equal(envChecked, false);
 });
 
+test('coldcalling start test mode does not dispatch real provider calls', async () => {
+  let processed = 0;
+  let envChecked = false;
+  let agendaChecked = false;
+  const callStart = createRouteHarness({
+    validateStartPayload: () => ({
+      campaign: buildCampaign({ amount: 2, testMode: true }),
+      leads: [
+        { company: 'Test Lead 1', phone: '06 1111 1111' },
+        { company: 'Test Lead 2', phone: '06 2222 2222' },
+      ],
+    }),
+    getEffectivePublicBaseUrl: () => 'https://softora.test',
+    getColdcallingAgendaCapacityNow: () => {
+      agendaChecked = true;
+      return new Date('2026-05-06T06:30:00.000Z');
+    },
+    resolveColdcallingProviderForCampaign: () => 'retell',
+    getUiStateValues: async () => ({ values: { softora_customers_premium_v1: '[]' }, source: 'supabase' }),
+    getMissingEnvVars: () => {
+      envChecked = true;
+      return [];
+    },
+    processColdcallingLead: async () => {
+      processed += 1;
+      return { success: true };
+    },
+    createSequentialDispatchQueue: () => ({ id: 'queue-1', leads: [], results: [] }),
+    advanceSequentialDispatchQueue: async () => null,
+    waitForQueuedRuntimeStatePersist: async () => null,
+    sleep: async () => null,
+  });
+
+  const res = await callStart({});
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.testMode, true);
+  assert.equal(res.body.summary.started, 2);
+  assert.equal(res.body.results[0].testMode, true);
+  assert.equal(processed, 0);
+  assert.equal(envChecked, false);
+  assert.equal(agendaChecked, false);
+});
+
 test('coldcalling start blocks provider dispatch when the next 10 workdays are full', async () => {
   let processed = 0;
   let envChecked = false;
