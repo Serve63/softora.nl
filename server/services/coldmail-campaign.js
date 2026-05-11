@@ -42,7 +42,8 @@ const PERSONAL_MAILBOX_DOMAINS = new Set([
 ]);
 const COLDMAIL_OPT_OUT_TEXT =
   'Geen interesse? Reageer met "stop" of "afmelden", dan mailen we u niet meer.';
-const TEST_RECIPIENT_EMAILS = new Set(['servec321@gmail.com']);
+const COLDMAIL_TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
+const TEST_RECIPIENT_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL]);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce']);
 const SENDER_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
@@ -319,6 +320,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function requiresReadyWebdesign(input = {}, mode = 'mail') {
+    if (isCampaignTestModeEnabled(input.testMode)) return false;
     if (isWebdesignSpecialAction(input.specialAction)) return true;
     const service = normalizeCampaignService(input.service);
     if (
@@ -330,6 +332,51 @@ function createColdmailCampaignService(deps = {}) {
       return true;
     }
     return mode === 'call' && !service;
+  }
+
+  function isCampaignTestModeEnabled(value) {
+    const normalized = normalizeString(value).toLowerCase();
+    return value === true || normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'aan';
+  }
+
+  function buildColdmailTestRecipientRow(mode = 'mail') {
+    return {
+      id: 'softora-test-mode-recipient',
+      bedrijf: 'Softora Testmodus',
+      naam: 'Serve',
+      email: COLDMAIL_TEST_RECIPIENT_EMAIL,
+      phone: '+31000000000',
+      telefoon: '+31000000000',
+      website: 'softora.nl',
+      stad: 'Oisterwijk',
+      plaats: 'Oisterwijk',
+      branche: 'Test',
+      status: 'benaderbaar',
+      mail: true,
+      call: mode === 'call',
+      canCall: mode === 'call',
+      distanceKm: 0,
+      testMode: true,
+    };
+  }
+
+  function buildResolvedColdmailTestRecipients(input = {}, mode = 'mail', count = 1) {
+    const row = buildColdmailTestRecipientRow(mode);
+    const item = { row, index: 0, id: getRowId(row, 0) };
+    return {
+      count,
+      mode,
+      radiusKm: parseRadiusKm(input.radiusKm),
+      values: {},
+      customerValues: {},
+      customerRows: [],
+      rows: [row],
+      candidateRows: [item],
+      selectedRows: [item],
+      failed: [],
+      customerPhotoMap: {},
+      testMode: true,
+    };
   }
 
   function getRowId(row, index) {
@@ -1105,6 +1152,7 @@ function createColdmailCampaignService(deps = {}) {
   async function resolveColdmailRecipients(input = {}) {
     const mode = normalizeString(input.mode || '').toLowerCase() === 'call' ? 'call' : 'mail';
     const count = parsePositiveInt(input.count, 10, 1, mode === 'call' ? 500 : getColdmailCampaignSendLimit());
+    if (isCampaignTestModeEnabled(input.testMode)) return buildResolvedColdmailTestRecipients(input, mode, count);
     const blockedPhoneKeys = mode === 'call'
       ? parseBlockedPhoneList(input.blockedPhones || input.callBlocklist || input.blockedPhoneNumbers)
       : new Set();
@@ -1206,6 +1254,7 @@ function createColdmailCampaignService(deps = {}) {
     return {
       ok: true,
       mode: resolved.mode,
+      testMode: Boolean(resolved.testMode),
       requested: resolved.count,
       radiusKm: resolved.radiusKm,
       candidates: resolved.candidateRows.length,
@@ -1851,6 +1900,7 @@ function createColdmailCampaignService(deps = {}) {
     }
 
     const resolvedRecipients = await resolveColdmailRecipients(input);
+    const testMode = Boolean(resolvedRecipients.testMode);
     const count = resolvedRecipients.count;
     const values = resolvedRecipients.values;
     const rows = resolvedRecipients.rows;
@@ -1866,8 +1916,8 @@ function createColdmailCampaignService(deps = {}) {
 
     let selectedRows = resolvedRecipients.selectedRows;
     const quota = await getColdmailSendQuota(senderEmail);
-    const quotaRemaining = Math.min(quota.senderRemaining, quota.packageRemaining);
-    if (quotaRemaining <= 0) {
+    const quotaRemaining = testMode ? selectedRows.length : Math.min(quota.senderRemaining, quota.packageRemaining);
+    if (!testMode && quotaRemaining <= 0) {
       const error = new Error(
         'Daglimiet bereikt: om je STRATO-mailbox en domeinreputatie te beschermen worden vandaag geen extra coldmails verzonden.'
       );
@@ -1875,7 +1925,7 @@ function createColdmailCampaignService(deps = {}) {
       error.quota = quota;
       throw error;
     }
-    if (selectedRows.length > quotaRemaining) {
+    if (!testMode && selectedRows.length > quotaRemaining) {
       selectedRows.slice(quotaRemaining).forEach((item) => {
         failed.push({
           id: item.id,
@@ -1886,7 +1936,7 @@ function createColdmailCampaignService(deps = {}) {
       });
       selectedRows = selectedRows.slice(0, quotaRemaining);
     }
-    const shouldIncludeWebdesignPhoto = isWebdesignSpecialAction(input.specialAction);
+    const shouldIncludeWebdesignPhoto = !testMode && isWebdesignSpecialAction(input.specialAction);
     const customerPhotoMap = shouldIncludeWebdesignPhoto ? await loadCustomerPhotoMap() : {};
 
     if (!selectedRows.length) {
@@ -2022,6 +2072,8 @@ function createColdmailCampaignService(deps = {}) {
         packageRemainingBefore: quota.packageRemaining,
       },
       senderEmail,
+      testMode,
+      testRecipientEmail: testMode ? COLDMAIL_TEST_RECIPIENT_EMAIL : undefined,
       specialAction: normalizeString(input.specialAction || ''),
       sentItems: sent,
       failedItems: failed,

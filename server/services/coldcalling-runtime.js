@@ -43,6 +43,11 @@ function createColdcallingRuntime(deps = {}) {
     }
   }
 
+  function parseBooleanFlag(value) {
+    const normalized = normalizeString(value).toLowerCase();
+    return value === true || normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'aan';
+  }
+
   const processRetellColdcallingLead = async (lead, campaign, index) => {
     try {
       const payload = buildRetellPayload(lead, campaign);
@@ -354,6 +359,7 @@ function createColdcallingRuntime(deps = {}) {
       coldcallingStack: normalizeColdcallingStack(
         campaign.coldcallingStack || campaign.callingEngine || campaign.callingStack
       ),
+      testMode: parseBooleanFlag(campaign.testMode === undefined ? body?.testMode : campaign.testMode),
     };
     normalizedCampaign.coldcallingStackLabel = getColdcallingStackLabel(normalizedCampaign.coldcallingStack);
 

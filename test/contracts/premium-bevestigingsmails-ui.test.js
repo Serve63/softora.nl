@@ -149,17 +149,22 @@ test('premium bevestigingsmails campaign volume uses a fixed mail company label'
 
 test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuwe Campagne', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const testModePath = path.join(__dirname, '../../assets/premium-campaign-test-mode.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const testModeSource = fs.readFileSync(testModePath, 'utf8');
 
   assert.match(pageSource, /<div class="campagne-head">[\s\S]*<div class="campagne-title">Nieuwe Campagne<\/div>[\s\S]*id="campaignCompanyCount"/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/softora-dossier-loader\.css\?v=20260424a">/);
   assert.match(pageSource, /<script src="assets\/premium-campaign-radius\.js\?v=20260501a"><\/script>/);
+  assert.match(pageSource, /assets\/premium-campaign-test-mode\.js\?v=20260511a/);
   assert.match(pageSource, /<main class="main-content is-premium-boot-host">/);
   assert.match(pageSource, /<div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">/);
   assert.match(pageSource, /<div class="premium-boot-shell is-booting" aria-busy="true">/);
   assert.match(pageSource, /function finishPremiumShellBoot\(\)/);
   assert.match(pageSource, /Promise\.allSettled\(campaignBootTasks\)\.finally\(finishPremiumShellBoot\);/);
   assert.match(pageSource, /<button class="campaign-company-count" id="campaignCompanyCount" type="button"[^>]*onclick="toggleCampaignRecipientsList\(event\)"/);
+  assert.match(pageSource, /id="campaignTestModeToggle"[^>]*aria-pressed="false"/);
+  assert.match(pageSource, /id="campaignTestModeToggle"[\s\S]*id="campaignCompanyCount"/);
   assert.match(pageSource, /<span id="campaignCompanyCountValue">0<\/span>/);
   assert.match(pageSource, /\.campaign-company-count \{[\s\S]*display: inline-flex;[\s\S]*border-radius: 999px;/);
   assert.match(pageSource, /id="campaignRecipientList" hidden/);
@@ -184,6 +189,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function renderCampaignRecipientList\(payload\)/);
   assert.match(pageSource, /\/api\/coldmailing\/campaigns\/recipients\?/);
   assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) params\.set\('mode', 'call'\);/);
+  assert.match(pageSource, /params\.set\('testMode', '1'\);/);
   assert.match(pageSource, /if \(serviceSelect && serviceSelect\.value\) params\.set\('service', serviceSelect\.value\);/);
   assert.match(pageSource, /if \(specialActionSelect && specialActionSelect\.value\) params\.set\('specialAction', specialActionSelect\.value\);/);
   assert.match(pageSource, /recipient\.bedrijf \|\| 'Onbekend bedrijf'/);
@@ -206,15 +212,20 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
   assert.match(pageSource, /Number\.isFinite\(Number\(countOverride\)\)/);
   assert.match(pageSource, /const response = await fetch\(getColdmailRecipientPreviewUrl\(\), \{[\s\S]*method: 'GET',[\s\S]*credentials: 'same-origin',[\s\S]*headers: \{ Accept: 'application\/json' \},[\s\S]*cache: 'no-store',[\s\S]*\}\);/);
-  assert.match(pageSource, /const requestedCount = getCampaignRequestedCompanyCount\(\), requestedRadiusKm = getSelectedCampaignRadiusKm\(\);/);
-  assert.match(pageSource, /if \(requestedCount !== getCampaignRequestedCompanyCount\(\) \|\| requestedRadiusKm !== getSelectedCampaignRadiusKm\(\)\) return;/);
+  assert.match(pageSource, /const requestedCount = getCampaignRequestedCompanyCount\(\), requestedRadiusKm = getSelectedCampaignRadiusKm\(\), requestedTestMode = Boolean/);
+  assert.match(pageSource, /requestedTestMode = Boolean\(window\.SoftoraCampaignTestMode && window\.SoftoraCampaignTestMode\.isEnabled\(\)\)/);
+  assert.match(pageSource, /if \(requestedCount !== getCampaignRequestedCompanyCount\(\) \|\| requestedRadiusKm !== getSelectedCampaignRadiusKm\(\) \|\| requestedTestMode !== Boolean/);
   assert.match(pageSource, /const serverCount = Number\(data && data\.selected\) \|\| recipients\.length;/);
   assert.match(pageSource, /renderCampaignCompanyCount\(serverCount > 0 \|\| requestedCount <= 0 \? serverCount : requestedCount\);/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(getCampaignRequestedCompanyCount\(\)\);/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data && data\.selected\) \|\| recipients\.length\);/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data\.candidates/);
   assert.match(pageSource, /Math\.max\(0, requestedCount\)/);
-  assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\),/);
+  assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\), testMode: Boolean\(window\.SoftoraCampaignTestMode && window\.SoftoraCampaignTestMode\.isEnabled\(\)\),/);
+  assert.match(pageSource, /if \(sendResult && sendResult\.testMode\) return 'Testmail verstuurd naar servec321@gmail\.com\.';/);
+  assert.match(testModeSource, /const TEST_RECIPIENT_EMAIL = 'servec321@gmail\.com';/);
+  assert.match(testModeSource, /button\.addEventListener\('click'/);
+  assert.match(testModeSource, /hydrateCampaignCompanyCountFromSupabase/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);
   assert.match(pageSource, /initCampaignDatabaseAutoRefresh\(\);/);
   assert.match(pageSource, /const campaignBootTasks = \[/);
@@ -487,16 +498,18 @@ test('premium ai lead generator uses calling copy and the on-page prompt for col
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const callStartSource = fs.readFileSync(callStartPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-ai-lead-generator-call-start\.js\?v=20260505a/);
+  assert.match(pageSource, /assets\/premium-ai-lead-generator-call-start\.js\?v=20260511a/);
   assert.match(pageSource, /SoftoraAiLeadGeneratorCallStart\.getBusyLabel\(isPremiumAiLeadGeneratorPath\(\)\)/);
   assert.match(pageSource, /SoftoraAiLeadGeneratorCallStart\.getButtonLabel\(isPremiumAiLeadGeneratorPath\(\)\)/);
   assert.match(callStartSource, /return isAlias \? 'Bedrijven bellen' : 'Mails Versturen'/);
   assert.match(callStartSource, /return isAlias \? 'Bellen\.\.\.' : 'Verzenden\.\.\.'/);
   assert.match(callStartSource, /function getCampaignPayload\(count\) \{/);
   assert.match(callStartSource, /extraInstructions: body \? body\.value : ''/);
+  assert.match(callStartSource, /testMode: isTestModeEnabled\(\)/);
+  assert.match(callStartSource, /function buildTestCallCampaignResult\(\)/);
   assert.match(callStartSource, /fetch\('\/api\/coldcalling\/start'/);
   assert.match(callStartSource, /const original = global\.startCampagneImmediate;/);
-  assert.match(callStartSource, /showToast\('Bedrijven bellen wordt gestart\.\.\.'\);/);
+  assert.match(callStartSource, /showToast\(isTestModeEnabled\(\) \? 'Testmodus wordt gestart\.\.\.' : 'Bedrijven bellen wordt gestart\.\.\.'\);/);
   assert.match(pageSource, /\? Number\(sendResult\.sent\) : Number\(recipientPreview && \(recipientPreview\.candidates \?\? recipientPreview\.selected \?\? previewRecipients\.length\)\);/);
 });
 

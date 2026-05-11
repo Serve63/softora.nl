@@ -87,6 +87,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         radiusKm: req.query.radiusKm,
         service: req.query.service,
         specialAction: req.query.specialAction,
+        testMode: req.query.testMode,
         blockedPhones: req.query.blockedPhones,
         blockedEmails: req.query.blockedEmails || req.query.emailBlocklist || req.query.mailBlocklist,
       });
@@ -139,6 +140,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         database: body.database,
         senderEmail: body.senderEmail,
         specialAction: body.specialAction,
+        testMode: body.testMode,
         durationDays: body.durationDays,
         radiusKm: body.radiusKm,
         mode: body.mode,

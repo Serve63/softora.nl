@@ -13,6 +13,37 @@
     return isAlias ? 'Bellen...' : 'Verzenden...';
   }
 
+  function isTestModeEnabled() {
+    return Boolean(global.SoftoraCampaignTestMode && typeof global.SoftoraCampaignTestMode.isEnabled === 'function' && global.SoftoraCampaignTestMode.isEnabled());
+  }
+
+  function buildTestCallCampaignResult() {
+    return {
+      ok: true,
+      testMode: true,
+      summary: {
+        requested: 1,
+        attempted: 1,
+        skipped: 0,
+        started: 1,
+        failed: 0,
+        provider: 'test_mode',
+        coldcallingStack: 'test_mode',
+        coldcallingStackLabel: 'Testmodus',
+        dispatchMode: 'sequential',
+        dispatchDelaySeconds: 0,
+        queuedRemaining: 0,
+      },
+      results: [{
+        index: 0,
+        success: true,
+        testMode: true,
+        lead: { company: 'Softora Testmodus', email: 'servec321@gmail.com' },
+        message: 'Testmodus: geen echte bedrijven gebeld.',
+      }],
+    };
+  }
+
   function buildStartButtonHtml(label) {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> ' + label;
   }
@@ -100,10 +131,13 @@
       dispatchMode: mode,
       dispatchDelaySeconds: 0,
       coldcallingStack: stack,
+      testMode: isTestModeEnabled(),
     };
   }
 
   async function startCallCampaign() {
+    if (isTestModeEnabled()) return buildTestCallCampaignResult();
+
     const recipientsResponse = await fetch(getRecipientPreviewUrl(), {
       method: 'GET',
       credentials: 'same-origin',
@@ -130,6 +164,7 @@
       body: JSON.stringify({
         campaign: getCampaignPayload(leads.length),
         leads,
+        testMode: isTestModeEnabled(),
       }),
     });
     const startPayload = await startResponse.json().catch(() => null);
@@ -161,11 +196,11 @@
       global.setCampaignStartButtonBusy(true);
     }
     try {
-      showToast('Bedrijven bellen wordt gestart...');
+      showToast(isTestModeEnabled() ? 'Testmodus wordt gestart...' : 'Bedrijven bellen wordt gestart...');
       const result = await startCallCampaign();
       const count = getStartedCount(result);
       if (!count) throw new Error('Er zijn geen belpogingen gestart.');
-      showToast('✓ ' + count + ' bedrijven klaargezet om te bellen');
+      showToast(result && result.testMode ? 'Testmodus klaar: geen echte bedrijven gebeld.' : '✓ ' + count + ' bedrijven klaargezet om te bellen');
       if (typeof global.hydrateCampaignCompanyCountFromSupabase === 'function') {
         await global.hydrateCampaignCompanyCountFromSupabase();
       }

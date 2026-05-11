@@ -419,10 +419,10 @@ html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { dis
 .campagne-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: visible; height: 100%; display: flex; flex-direction: column; }
 .campagne-head { padding: 14px 20px; border-bottom: 1px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .campagne-title { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dark); }
-.campaign-recipient-menu-wrap { position: relative; }
-.campaign-company-count { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 5px 9px; border: 1px solid rgba(155,35,85,.16); border-radius: 999px; background: rgba(155,35,85,.06); color: var(--crimson); font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .08em; cursor: pointer; }
-.campaign-company-count:hover { background: rgba(155,35,85,.1); }
-.campaign-company-count svg { width: 15px; height: 15px; stroke: currentColor; flex-shrink: 0; }
+.campaign-recipient-menu-wrap { position: relative; display: inline-flex; align-items: center; gap: 8px; }
+.campaign-company-count { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 28px; padding: 5px 9px; border: 1px solid rgba(155,35,85,.16); border-radius: 999px; background: rgba(155,35,85,.06); color: var(--crimson); font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .08em; cursor: pointer; }
+.campaign-company-count:hover, .campaign-company-count.is-active { background: rgba(155,35,85,.12); border-color: rgba(155,35,85,.32); box-shadow: 0 0 0 3px rgba(155,35,85,.08); }
+.campaign-company-count svg { width: 15px; height: 15px; stroke: currentColor; flex-shrink: 0; }.campaign-test-mode-toggle { min-width: 34px; padding-left: 8px; padding-right: 8px; }
 .campaign-recipient-list { position: absolute; top: calc(100% + 10px); right: 0; z-index: 40; width: min(330px, calc(100vw - 48px)); max-height: 300px; overflow: auto; padding: 8px; border: 1px solid rgba(155,35,85,.18); border-radius: 12px; background: #fff; box-shadow: 0 18px 45px rgba(26,26,46,.16); }
 .campaign-recipient-list[hidden] { display: none; }
 .campaign-recipient-list-title { padding: 6px 8px 9px; font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--dark); border-bottom: 1px solid rgba(155,35,85,.1); margin-bottom: 4px; }
@@ -1227,14 +1227,12 @@ Softora.nl | +31 6 43 26 27 92</textarea>
           </div>
         </div>
       </div>
-
     </div>
-
     <!-- CAMPAGNE INSTELLINGEN -->
     <div class="campagne-card">
       <div class="campagne-head">
         <div class="campagne-title">Nieuwe Campagne</div>
-        <div class="campaign-recipient-menu-wrap" id="campaignRecipientMenuWrap">
+        <div class="campaign-recipient-menu-wrap" id="campaignRecipientMenuWrap"><button class="campaign-company-count campaign-test-mode-toggle" id="campaignTestModeToggle" type="button" aria-label="Testmodus uit: normale campagne" aria-pressed="false" title="Testmodus: stuur alleen naar servec321@gmail.com"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M9 3h6"></path><path d="M10 3v5.5l-4.4 7.7A3 3 0 0 0 8.2 21h7.6a3 3 0 0 0 2.6-4.8L14 8.5V3"></path><path d="M8 16h8"></path></svg></button>
           <button class="campaign-company-count" id="campaignCompanyCount" type="button" aria-label="Toon geselecteerde ontvangers" aria-expanded="false" onclick="toggleCampaignRecipientsList(event)">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true">
               <path d="M3.75 21h16.5"></path>
@@ -1306,7 +1304,6 @@ Softora.nl | +31 6 43 26 27 92</textarea>
     </div>
   </div>
 </div>
-
 <!-- ══ SCHERM 2: ZONE DETAIL ══ -->
 <div class="screen" id="screen-zone">
   <div class="zone-hero" id="zone-hero">
@@ -1411,7 +1408,6 @@ Softora.nl | +31 6 43 26 27 92</textarea>
             <div class="campaign-metric-value" id="campaign-metric-conv">0%</div>
           </div>
         </div>
-
         <div class="campaign-panel-label" style="margin-top:18px">Live update</div>
         <div class="campaign-note" id="campaign-live-text"><strong>Mail 1 is verzonden.</strong> De campagne wacht nu op de eerste antwoorden voordat de volgende stap start.</div>
 
@@ -1435,7 +1431,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
-<script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260505a"></script>
+<script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260511a"></script>
 <script src="assets/premium-campaign-selects.js?v=20260511a"></script>
 <script>
 // ── DATA ──
@@ -1642,11 +1638,12 @@ function renderCampaignCompanyCount(countOverride) {
   const wrap = document.getElementById('campaignCompanyCount');
   if (!valueEl || !wrap) return;
   const requestedCount = getCampaignRequestedCompanyCount();
-  const count = Number.isFinite(Number(countOverride))
+  const testMode = window.SoftoraCampaignTestMode && typeof window.SoftoraCampaignTestMode.isEnabled === 'function' && window.SoftoraCampaignTestMode.isEnabled();
+  const count = testMode ? 1 : Number.isFinite(Number(countOverride))
     ? Math.max(0, Number(countOverride))
     : Math.max(0, requestedCount);
   valueEl.textContent = String(count);
-  wrap.title = count + ' ' + (count === 1 ? 'bedrijf wordt' : 'bedrijven worden') + (isPremiumAiLeadGeneratorPath() ? ' gebeld.' : ' gemaild.');
+  wrap.title = testMode ? 'Testmodus: 1 testontvanger (' + window.SoftoraCampaignTestMode.getRecipientEmail() + ').' : count + ' ' + (count === 1 ? 'bedrijf wordt' : 'bedrijven worden') + (isPremiumAiLeadGeneratorPath() ? ' gebeld.' : ' gemaild.');
   wrap.setAttribute('aria-label', wrap.title);
 }
 
@@ -1654,6 +1651,7 @@ function getColdmailRecipientPreviewUrl() {
   const params = new URLSearchParams();
   params.set('count', String(getCampaignRequestedCompanyCount() || 10));
   if (isPremiumAiLeadGeneratorPath()) params.set('mode', 'call');
+  if (window.SoftoraCampaignTestMode && typeof window.SoftoraCampaignTestMode.isEnabled === 'function' && window.SoftoraCampaignTestMode.isEnabled()) params.set('testMode', '1');
   params.set('radiusKm', String(getSelectedCampaignRadiusKm()));
   const branchSelect = document.getElementById('branche');
   const serviceSelect = document.getElementById('service'), specialActionSelect = document.getElementById('campaignSpecialAction');
@@ -1760,11 +1758,11 @@ function toggleCampaignRecipientsList(event) {
   setCampaignRecipientListOpen(!isCampaignRecipientListOpen());
 }
 
-async function hydrateCampaignCompanyCountFromSupabase() { const requestedCount = getCampaignRequestedCompanyCount(), requestedRadiusKm = getSelectedCampaignRadiusKm();
+async function hydrateCampaignCompanyCountFromSupabase() { const requestedCount = getCampaignRequestedCompanyCount(), requestedRadiusKm = getSelectedCampaignRadiusKm(), requestedTestMode = Boolean(window.SoftoraCampaignTestMode && window.SoftoraCampaignTestMode.isEnabled());
   try {
     const response = await fetch(getColdmailRecipientPreviewUrl(), { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
     const data = response.ok ? await response.json().catch(function () { return null; }) : null;
-    if (!data || data.ok === false) throw new Error('Kon campagne-ontvangers niet laden.'); if (requestedCount !== getCampaignRequestedCompanyCount() || requestedRadiusKm !== getSelectedCampaignRadiusKm()) return;
+    if (!data || data.ok === false) throw new Error('Kon campagne-ontvangers niet laden.'); if (requestedCount !== getCampaignRequestedCompanyCount() || requestedRadiusKm !== getSelectedCampaignRadiusKm() || requestedTestMode !== Boolean(window.SoftoraCampaignTestMode && window.SoftoraCampaignTestMode.isEnabled())) return;
     const recipients = Array.isArray(data && data.recipients) ? data.recipients : []; const serverCount = Number(data && data.selected) || recipients.length; renderCampaignCompanyCount(serverCount > 0 || requestedCount <= 0 ? serverCount : requestedCount);
   } catch (_) {
     return;
@@ -2446,7 +2444,7 @@ function getColdmailCampaignPayload() {
     senderEmail: senderSelect ? senderSelect.value : '',
     specialAction: specialActionSelect ? specialActionSelect.value : '',
     durationDays: getSelectedCampaignDurationDays(),
-    radiusKm: getSelectedCampaignRadiusKm(),
+    radiusKm: getSelectedCampaignRadiusKm(), testMode: Boolean(window.SoftoraCampaignTestMode && window.SoftoraCampaignTestMode.isEnabled()),
   };
 }
 
@@ -2493,6 +2491,7 @@ function isDailyLimitSkippedItem(item) {
 }
 
 function buildColdmailSendSuccessMessage(sendResult) {
+  if (sendResult && sendResult.testMode) return 'Testmail verstuurd naar servec321@gmail.com.';
   const sent = Number(sendResult && sendResult.sent) || 0;
   const failed = Number(sendResult && sendResult.failed) || 0;
   if (!failed) return '✓ ' + sent + ' mails verstuurd';
