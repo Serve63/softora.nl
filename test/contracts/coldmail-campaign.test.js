@@ -441,6 +441,65 @@ test('coldmail campaign test mode sends only the safe test inbox', async () => {
   assert.deepEqual(getSavedStates(), []);
 });
 
+test('coldmail campaign test mode infers webdesign assets from the mail content safely', async () => {
+  const { service, sentMessages, getSavedState, getSavedStates } = createService({
+    rows: [
+      {
+        id: 'softora-test-mode-recipient',
+        bedrijf: 'Softora Testmodus',
+        naam: 'Servé',
+        email: 'servec321@gmail.com',
+        website: 'softora.nl',
+        dom: 'softora.nl',
+        status: 'benaderbaar',
+        mail: true,
+      },
+      {
+        id: 'real-prospect',
+        bedrijf: 'Echte Klant BV',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'softora-test-mode-recipient': {
+        id: 'softora-test-mode-recipient',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Softora test webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Softora test device mockup',
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 10,
+    subject: 'Nieuw webdesign gemaakt!',
+    body:
+      'Afgelopen week kwam ik toevallig jullie website {{website}} tegen en vanuit enthousiasme heb ik een nieuw webdesign voor de site gemaakt.',
+    senderEmail: 'serve@softora.nl',
+    testMode: true,
+  });
+
+  assert.equal(result.testMode, true);
+  assert.equal(result.sent, 1);
+  assert.equal(result.persisted, 0);
+  assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
+  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt!');
+  assert.match(sentMessages[0].text, /website softora\.nl tegen/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-softora-test-mode-recipient@softora');
+  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-softora-test-mode-recipient@softora');
+  assert.equal(getSavedState(), null);
+  assert.deepEqual(getSavedStates(), []);
+});
+
 test('coldmail campaign test mode can send Softora webdesign attachment safely', async () => {
   const { service, sentMessages, getSavedState, getSavedStates } = createService({
     rows: [
@@ -468,6 +527,8 @@ test('coldmail campaign test mode can send Softora webdesign attachment safely',
         id: 'softora-test-mode-recipient',
         websitePhoto: TINY_PNG_DATA_URL,
         websitePhotoName: 'Softora test webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Softora test device mockup',
       },
     },
   });
@@ -503,9 +564,12 @@ test('coldmail campaign test mode can send Softora webdesign attachment safely',
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');
   assert.equal(sentMessages[0].subject, 'Test voor softora.nl');
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
-  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
+  assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-softora-test-mode-recipient@softora');
   assert.equal(sentMessages[0].attachments[0].contentType, 'image/png');
+  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-softora-test-mode-recipient@softora');
+  assert.equal(sentMessages[0].attachments[1].contentType, 'image/png');
   assert.equal(getSavedState(), null);
   assert.deepEqual(getSavedStates(), []);
 });

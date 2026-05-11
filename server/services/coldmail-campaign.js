@@ -320,8 +320,21 @@ function createColdmailCampaignService(deps = {}) {
       .trim();
   }
 
-  function requiresReadyWebdesign(input = {}, mode = 'mail') {
+  function campaignContentPromisesWebdesignAssets(input = {}) {
+    const subject = normalizeCampaignService(input.subject || '');
+    const body = normalizeCampaignService(input.body || input.text || input.content || '');
+    const combined = `${subject} ${body}`.replace(/\bwebsite design\b/g, 'webdesign');
+    if (!/\bwebdesign\b/.test(combined)) return false;
+    return /\bnieuw(?:e)? webdesign\b/.test(combined) && /\bgemaakt\b/.test(combined);
+  }
+
+  function shouldUseWebdesignAssets(input = {}, mode = 'mail') {
     if (isWebdesignSpecialAction(input.specialAction)) return true;
+    return mode === 'mail' && campaignContentPromisesWebdesignAssets(input);
+  }
+
+  function requiresReadyWebdesign(input = {}, mode = 'mail') {
+    if (shouldUseWebdesignAssets(input, mode)) return true;
     if (isCampaignTestModeEnabled(input.testMode)) return false;
     const service = normalizeCampaignService(input.service);
     return mode === 'call' && !service;
@@ -370,7 +383,7 @@ function createColdmailCampaignService(deps = {}) {
     const item = { row, index: 0, id: getRowId(row, 0) };
     const failed = [];
     const selectedRows = [];
-    const shouldRequireWebdesign = isWebdesignSpecialAction(input.specialAction);
+    const shouldRequireWebdesign = shouldUseWebdesignAssets(input, mode);
     if (shouldRequireWebdesign) {
       const readyWebdesignMatcher = createReadyWebdesignMatcher([row], customerPhotoMap);
       if (readyWebdesignMatcher.hasRow(row, 0)) {
@@ -1187,7 +1200,7 @@ function createColdmailCampaignService(deps = {}) {
       const customerValues =
         customerState && typeof customerState.values === 'object' ? customerState.values : {};
       const customerRows = parseDatabaseRows(customerValues);
-      const customerPhotoMap = isWebdesignSpecialAction(input.specialAction) ? await loadCustomerPhotoMap() : {};
+      const customerPhotoMap = shouldUseWebdesignAssets(input, mode) ? await loadCustomerPhotoMap() : {};
       return buildResolvedColdmailTestRecipients(input, mode, count, customerRows, customerPhotoMap);
     }
     const blockedPhoneKeys = mode === 'call'
@@ -1978,7 +1991,7 @@ function createColdmailCampaignService(deps = {}) {
       });
       selectedRows = selectedRows.slice(0, quotaRemaining);
     }
-    const shouldIncludeWebdesignPhoto = isWebdesignSpecialAction(input.specialAction);
+    const shouldIncludeWebdesignPhoto = shouldUseWebdesignAssets(input, 'mail');
     const customerPhotoMap = shouldIncludeWebdesignPhoto ? (resolvedRecipients.customerPhotoMap || await loadCustomerPhotoMap()) : {};
 
     if (!selectedRows.length) {
