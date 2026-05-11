@@ -59,6 +59,39 @@ const EXCLUDED_DATABASE_STATUSES = new Set([
   'buiten',
 ]);
 
+function isExpectedDnsMiss(error) {
+  return Boolean(
+    error &&
+      ['EBADNAME', 'ENODATA', 'ENODOMAIN', 'ENONAME', 'ENOTFOUND'].includes(String(error.code || '').toUpperCase())
+  );
+}
+
+async function resolveEmailDomainWithDoh(domain) {
+  const value = String(domain || '').trim().toLowerCase().replace(/\.+$/g, '');
+  if (!value || typeof fetch !== 'function') return false;
+  const queryTypes = ['MX', 'A', 'AAAA'];
+  for (const type of queryTypes) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 2500) : null;
+    try {
+      const url = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(value)}&type=${encodeURIComponent(type)}`;
+      const response = await fetch(url, {
+        headers: { accept: 'application/dns-json' },
+        signal: controller ? controller.signal : undefined,
+      });
+      if (!response.ok) continue;
+      const payload = await response.json().catch(() => null);
+      const answers = Array.isArray(payload && payload.Answer) ? payload.Answer : [];
+      if (answers.some((answer) => String(answer && answer.data || '').replace(/\.+$/g, ''))) return true;
+    } catch (_) {
+      // DNS-over-HTTPS is a best-effort fallback for server resolver misses.
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+  return false;
+}
+
 async function resolveEmailDomainWithDns(domain) {
   const value = String(domain || '').trim().toLowerCase();
   if (!value) return false;
@@ -66,20 +99,20 @@ async function resolveEmailDomainWithDns(domain) {
     const mxRecords = await dns.resolveMx(value);
     if (Array.isArray(mxRecords) && mxRecords.length) return true;
   } catch (error) {
-    if (error && error.code !== 'ENODATA' && error.code !== 'ENOTFOUND') throw error;
+    if (!isExpectedDnsMiss(error)) throw error;
   }
   try {
     const addresses = await dns.resolve4(value);
     if (Array.isArray(addresses) && addresses.length) return true;
   } catch (error) {
-    if (error && error.code !== 'ENODATA' && error.code !== 'ENOTFOUND') throw error;
+    if (!isExpectedDnsMiss(error)) throw error;
   }
   try {
     const addresses = await dns.resolve6(value);
     return Array.isArray(addresses) && addresses.length > 0;
   } catch (error) {
-    if (error && error.code !== 'ENODATA' && error.code !== 'ENOTFOUND') throw error;
-    return false;
+    if (!isExpectedDnsMiss(error)) throw error;
+    return resolveEmailDomainWithDoh(value);
   }
 }
 
@@ -139,7 +172,14 @@ function createColdmailCampaignService(deps = {}) {
   let smtpTransporter = null;
 
   function normalizeEmailAddress(value) {
-    return normalizeString(value).toLowerCase();
+    const raw = normalizeString(value)
+      .toLowerCase()
+      .replace(/[\u200B-\u200D\uFEFF]/g, '');
+    const match = raw.match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\.?/i);
+    return (match ? match[0] : raw)
+      .replace(/[<>()"[\]]/g, '')
+      .replace(/[.,;:!?]+$/g, '')
+      .trim();
   }
 
   function isLikelyValidEmail(value) {

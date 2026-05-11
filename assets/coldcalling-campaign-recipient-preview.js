@@ -40,6 +40,9 @@
       const branch = getSelectedText('branche');
       if (branch && !/^alles$/i.test(branch)) params.set('branch', branch);
 
+      const service = getSelectedText('service');
+      if (service && !/^alles$/i.test(service)) params.set('service', service);
+
       const radiusKm = resolveRadiusKm(byId('regio'));
       if (Number.isFinite(radiusKm) && radiusKm > 0) {
         params.set('radiusKm', String(Math.round(radiusKm)));
