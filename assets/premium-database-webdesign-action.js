@@ -8,6 +8,7 @@
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
     const MOCKUP_ICON = "<svg class=\"photo-mockup-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 6.5h10.5v7H4zM3 16h13M17 8h3.5v8H17zM18.75 18h.01\"/></svg>";
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
+    const FALLBACK_ICON = "<span class=\"photo-fallback-icon\" aria-hidden=\"true\">!</span>";
     const PHOTO_READY_SELECTOR = ".photo-drop[data-has-photo=\"true\"], .photo-drop--mockup[data-has-photo=\"true\"]";
 
     function normalizeString(value) {
@@ -22,7 +23,7 @@
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
         const style = global.document.createElement("style");
         style.id = STYLE_ID;
-        style.textContent = ".photo-cell{display:inline-flex;align-items:center;justify-content:center;gap:4px}.photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating,.photo-drop.is-restoring,.photo-drop[data-has-photo=\"true\"][data-photo-loaded=\"false\"]{cursor:wait}.photo-drop--mockup{border-style:solid;background:rgba(20,24,45,.04)}.photo-drop-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.84);opacity:1;pointer-events:none;transition:opacity .16s ease;z-index:1}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-loader{opacity:0}.photo-drop-image{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-image{opacity:1}.photo-generate-icon,.photo-mockup-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon,.photo-drop:hover .photo-mockup-icon,.photo-drop:focus-visible .photo-mockup-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
+        style.textContent = ".photo-cell{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0}.photo-drop{flex:0 0 34px;aspect-ratio:1/1;contain:layout paint}.photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating,.photo-drop.is-restoring,.photo-drop[data-has-photo=\"true\"][data-photo-loaded=\"false\"]{cursor:wait}.photo-drop[data-photo-error=\"true\"]{background:rgba(155,35,85,.06);cursor:default}.photo-drop--mockup{border-style:solid;background:rgba(20,24,45,.04)}.photo-drop-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.84);opacity:1;pointer-events:none;transition:opacity .16s ease;z-index:1}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-loader{opacity:0}.photo-drop-image{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-image{opacity:1}.photo-fallback-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;background:rgba(155,35,85,.1);color:var(--crimson);font:800 12px/1 Inter,sans-serif}.photo-generate-icon,.photo-mockup-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon,.photo-drop:hover .photo-mockup-icon,.photo-drop:focus-visible .photo-mockup-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
         global.document.head.appendChild(style);
     }
 
@@ -44,6 +45,8 @@
         const pendingIds = new Set();
         const pendingJobs = new Map();
         const pollTimers = new Map();
+        const loadedPhotoKeys = new Set();
+        const failedPhotoKeys = new Set();
         let photoHydrationQueued = false;
         ensureStyles();
 
@@ -54,9 +57,31 @@
             frame(callback);
         }
 
-        function markPhotoDropReady(drop) {
+        function hashText(value) {
+            let hash = 2166136261;
+            const text = normalizeString(value);
+            for (let index = 0; index < text.length; index += 1) {
+                hash ^= text.charCodeAt(index);
+                hash = Math.imul(hash, 16777619);
+            }
+            return (hash >>> 0).toString(36);
+        }
+
+        function buildPhotoLoadKey(kind, customerId, source) {
+            const raw = normalizeString(source);
+            return [normalizeString(kind) || "photo", normalizeString(customerId) || "unknown", raw.length, hashText(raw)].join("-");
+        }
+
+        function markPhotoDropReady(drop, failed) {
             if (!drop || typeof drop.setAttribute !== "function") return;
+            const key = normalizeString(drop.getAttribute("data-photo-key"));
+            if (key) {
+                if (failed) failedPhotoKeys.add(key);
+                else loadedPhotoKeys.add(key);
+            }
             drop.setAttribute("data-photo-loaded", "true");
+            if (failed) drop.setAttribute("data-photo-error", "true");
+            else drop.setAttribute("data-photo-error", "false");
             drop.removeAttribute("data-photo-loading-bound");
         }
 
@@ -68,7 +93,17 @@
                 return;
             }
             if (drop.getAttribute("data-photo-loaded") === "true") return;
-            const finish = function () { markPhotoDropReady(drop); };
+            const key = normalizeString(drop.getAttribute("data-photo-key"));
+            if (key && loadedPhotoKeys.has(key)) {
+                markPhotoDropReady(drop, false);
+                return;
+            }
+            if (key && failedPhotoKeys.has(key)) {
+                markPhotoDropReady(drop, true);
+                return;
+            }
+            const finish = function () { markPhotoDropReady(drop, false); };
+            const fail = function () { markPhotoDropReady(drop, true); };
             const onLoad = function () {
                 if (typeof image.decode === "function") {
                     image.decode().catch(function () {}).finally(finish);
@@ -83,7 +118,7 @@
             if (drop.getAttribute("data-photo-loading-bound") === "true") return;
             drop.setAttribute("data-photo-loading-bound", "true");
             image.addEventListener("load", onLoad, { once: true });
-            image.addEventListener("error", finish, { once: true });
+            image.addEventListener("error", fail, { once: true });
         }
 
         function hydratePhotoDrops(root) {
@@ -293,10 +328,10 @@
             return firstLoad;
         }
 
-        function waitForPhotoImage(photo, timeoutMs) {
+        function waitForPhotoImage(photo, timeoutMs, loadKey) {
             return new Promise(function (resolve) {
-                const dataUrl = normalizeString(photo);
-                if (!isValidWebsitePhotoDataUrl(dataUrl) || typeof global.Image !== "function") {
+                const source = normalizeString(photo);
+                if (!isValidWebsitePhotoDataUrl(source) || typeof global.Image !== "function") {
                     resolve(false);
                     return;
                 }
@@ -309,15 +344,24 @@
                     global.clearTimeout(timer);
                     resolve(true);
                 }
+                function fail() {
+                    if (loadKey) failedPhotoKeys.add(loadKey);
+                    finish();
+                }
                 image.onload = function () {
                     if (typeof image.decode === "function") {
-                        image.decode().catch(function () {}).finally(finish);
+                        image.decode().then(function () {
+                            if (loadKey) loadedPhotoKeys.add(loadKey);
+                        }).catch(function () {
+                            if (loadKey) loadedPhotoKeys.add(loadKey);
+                        }).finally(finish);
                         return;
                     }
+                    if (loadKey) loadedPhotoKeys.add(loadKey);
                     finish();
                 };
-                image.onerror = finish;
-                image.src = dataUrl;
+                image.onerror = fail;
+                image.src = source;
             });
         }
 
@@ -328,12 +372,17 @@
                 const photo = normalizeString(customer && customer.websitePhoto);
                 if (!isValidWebsitePhotoDataUrl(photo) || seen.has(photo)) return false;
                 seen.add(photo);
-                photos.push(photo);
+                photos.push({ source: photo, key: buildPhotoLoadKey("photo", customer && customer.id, photo) });
+                const mockup = normalizeString(customer && customer.websiteMockup);
+                if (isValidWebsitePhotoDataUrl(mockup) && !seen.has(mockup)) {
+                    seen.add(mockup);
+                    photos.push({ source: mockup, key: buildPhotoLoadKey("mockup", customer && customer.id, mockup) });
+                }
                 return photos.length >= Math.max(1, Number(limit) || 24);
             });
             if (!photos.length) return;
             await Promise.allSettled(photos.map(function (photo) {
-                return waitForPhotoImage(photo, timeoutMs || 450);
+                return waitForPhotoImage(photo.source, timeoutMs || 450, photo.key);
             }));
         }
 
@@ -342,25 +391,35 @@
             const photo = normalizeString(customer && customer.websitePhoto);
             const label = normalizeString(customer && customer.websitePhotoName) || "Websitefoto";
             const hasPhoto = isValidWebsitePhotoDataUrl(photo);
+            const photoLoadKey = buildPhotoLoadKey("photo", customer && customer.id, photo);
+            const photoLoaded = !hasPhoto || loadedPhotoKeys.has(photoLoadKey);
+            const photoFailed = hasPhoto && failedPhotoKeys.has(photoLoadKey);
             const isPending = pendingIds.has(customer.id);
             const isRestoring = !hasPhoto && !isPending && Boolean(isRestoringPhotos(customer));
             const isLoading = isPending || isRestoring;
             const canGenerate = !hasPhoto && !isLoading && Boolean(resolveCustomerWebsiteUrl(customer));
-            const inner = hasPhoto ? "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"eager\" decoding=\"sync\">" : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
+            const inner = hasPhoto
+                ? (photoFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"eager\" decoding=\"async\">")
+                : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
             const remove = hasPhoto ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>" : "";
-            const ariaLabel = hasPhoto ? "Websitefoto bekijken" : (isLoading ? (isPending ? "Webdesign wordt gemaakt" : "Websitefoto's worden hersteld") : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden"));
+            const ariaLabel = hasPhoto ? (photoFailed ? "Websitefoto kon niet geladen worden" : "Websitefoto bekijken") : (isLoading ? (isPending ? "Webdesign wordt gemaakt" : "Websitefoto's worden hersteld") : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden"));
             const title = ariaLabel;
             const mockup = normalizeString(customer && customer.websiteMockup);
             const mockupLabel = normalizeString(customer && customer.websiteMockupName) || "Device mockup";
             const hasMockup = isValidWebsitePhotoDataUrl(mockup);
+            const mockupLoadKey = buildPhotoLoadKey("mockup", customer && customer.id, mockup);
+            const mockupLoaded = !hasMockup || loadedPhotoKeys.has(mockupLoadKey);
+            const mockupFailed = hasMockup && failedPhotoKeys.has(mockupLoadKey);
             const canUseMockup = hasPhoto || hasMockup;
             const mockupLoading = hasPhoto && !hasMockup && isMockupPending(customer.id);
-            const mockupInner = hasMockup ? "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" decoding=\"sync\">" : (mockupLoading ? LOADING_ICON : MOCKUP_ICON);
-            const mockupAriaLabel = hasMockup ? "Device mockup bekijken" : (mockupLoading ? "Device mockup wordt gemaakt" : (canUseMockup ? "Device mockup maken zonder extra API-kosten" : "Device mockup nog niet beschikbaar"));
+            const mockupInner = hasMockup
+                ? (mockupFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" decoding=\"async\">")
+                : (mockupLoading ? LOADING_ICON : MOCKUP_ICON);
+            const mockupAriaLabel = hasMockup ? (mockupFailed ? "Device mockup kon niet geladen worden" : "Device mockup bekijken") : (mockupLoading ? "Device mockup wordt gemaakt" : (canUseMockup ? "Device mockup maken zonder extra API-kosten" : "Device mockup nog niet beschikbaar"));
             const mockupTitle = hasMockup ? mockupLabel : (canUseMockup ? "Device mockup maken zonder extra API-kosten" : "Maak eerst een webdesign");
-            const mockupSlot = "<div class=\"photo-drop photo-drop--mockup" + (mockupLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-mockup-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasMockup ? "true" : "false") + "\" data-photo-loaded=\"" + (hasMockup ? "false" : "true") + "\" data-can-generate=\"" + (canUseMockup ? "true" : "false") + "\" data-mockup-disabled=\"" + (canUseMockup ? "false" : "true") + "\" aria-label=\"" + escapeHtml(mockupAriaLabel) + "\" title=\"" + escapeHtml(mockupTitle) + "\">" + mockupInner + "</div>";
+            const mockupSlot = "<div class=\"photo-drop photo-drop--mockup" + (mockupLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-mockup-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasMockup ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(mockupLoadKey) + "\" data-photo-loaded=\"" + (mockupLoaded || mockupFailed ? "true" : "false") + "\" data-photo-error=\"" + (mockupFailed ? "true" : "false") + "\" data-can-generate=\"" + (canUseMockup ? "true" : "false") + "\" data-mockup-disabled=\"" + (canUseMockup ? "false" : "true") + "\" aria-label=\"" + escapeHtml(mockupAriaLabel) + "\" title=\"" + escapeHtml(mockupTitle) + "\">" + mockupInner + "</div>";
             if (hasPhoto || hasMockup) schedulePhotoDropHydration();
-            return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-photo-loaded=\"" + (hasPhoto ? "false" : "true") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + "</div>";
+            return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(photoLoadKey) + "\" data-photo-loaded=\"" + (photoLoaded || photoFailed ? "true" : "false") + "\" data-photo-error=\"" + (photoFailed ? "true" : "false") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + "</div>";
         }
 
         async function generateForCustomer(customerId) {
