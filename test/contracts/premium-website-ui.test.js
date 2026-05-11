@@ -9,7 +9,7 @@ test('premium website over-ons paneel gebruikt dezelfde accentrand-taal als wat 
 
   assert.match(source, /<div class="content-side about-panel fade-up">/);
   assert.ok(
-    source.includes('/assets/home-over-office-meeting-ai.jpg'),
+    source.includes('/assets/home-over-office-meeting-ai.jpg?v=20260511a'),
     'Nieuwe AI-gegenereerde bureau-aanpak foto moet in de pagina staan'
   );
   assert.match(source, /Vanuit Oisterwijk werken wij voor ambitieuze bedrijven door heel Nederland\./);
@@ -303,7 +303,7 @@ test('premium website hero gebruikt lokaal gegenereerde studiofotografie met don
   );
   assert.match(
     source,
-    /\.hero::before\s*\{[\s\S]*\/assets\/home-hero-generated-v2\.jpg[\s\S]*cover no-repeat;/s
+    /\.hero::before\s*\{[\s\S]*\/assets\/home-hero-generated-v2\.jpg\?v=20260511a[\s\S]*cover no-repeat;/s
   );
   assert.match(
     source,
