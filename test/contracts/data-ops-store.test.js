@@ -92,3 +92,62 @@ test('data ops store merges duplicate customer identities before structured upse
   );
   assert.deepEqual(recorder.deletedIds, ['lead-1']);
 });
+
+test('data ops store saves webdesign and device mockup as one photo record', async () => {
+  const uploads = [];
+  const upserts = [];
+  const client = {
+    storage: {
+      getBucket: async () => ({ data: { name: 'softora-design-photos' }, error: null }),
+      createBucket: async () => ({ data: null, error: null }),
+      from(bucket) {
+        return {
+          upload: async (path, buffer, options) => {
+            uploads.push({ bucket, path, byteLength: buffer.length, contentType: options.contentType });
+            return { data: { path }, error: null };
+          },
+        };
+      },
+    },
+    from(table) {
+      return {
+        upsert: async (row, options) => {
+          upserts.push({ table, row, options });
+          return { data: [row], error: null };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+  });
+
+  const result = await store.uploadDesignPhoto(
+    {
+      customerId: 'softora-test-mode-recipient',
+      identityKey: 'softora testmodus|serve|31000000000',
+      dataUrl: 'data:image/png;base64,aGVsbG8=',
+      fileName: 'softora.nl-webdesign.png',
+      mockup: 'data:image/jpeg;base64,bW9ja3Vw',
+      websiteMockupName: 'softora.nl-device-mockup.jpg',
+      legacyMeta: { websitePhotoName: 'softora.nl-webdesign.png' },
+    },
+    { source: 'premium-database-webdesign-jobs' }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(uploads.length, 2);
+  assert.equal(uploads[0].contentType, 'image/png');
+  assert.equal(uploads[1].contentType, 'image/jpeg');
+  assert.match(uploads[1].path, /mockup\.jpg$/);
+  assert.equal(upserts.length, 1);
+  assert.equal(upserts[0].table, 'softora_design_photos');
+  assert.equal(upserts[0].row.customer_id, 'softora-test-mode-recipient');
+  assert.equal(upserts[0].row.file_name, 'softora.nl-webdesign.png');
+  assert.equal(upserts[0].row.legacy_meta.websiteMockupName, 'softora.nl-device-mockup.jpg');
+  assert.equal(upserts[0].row.legacy_meta.mockup.fileName, 'softora.nl-device-mockup.jpg');
+  assert.equal(upserts[0].row.legacy_meta.mockup.storageBucket, 'softora-design-photos');
+  assert.equal(upserts[0].row.legacy_meta.mockup.mimeType, 'image/jpeg');
+});
