@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 
 const { registerColdmailingRoutes } = require('../../server/routes/coldmailing');
 
@@ -91,4 +93,15 @@ test('coldmailing campaign send blocks before sending when next 10 workdays are 
   assert.equal(res.body.agendaCapacity.availableSlots, 0);
   assert.equal(synced, true);
   assert.equal(sent, 0);
+});
+
+test('coldmailing exposes mail-interest follow-ups outside the coldcalling leads inbox', () => {
+  const routeSource = fs.readFileSync(path.join(__dirname, '../../server/routes/coldmailing.js'), 'utf8');
+  const leadsPageSource = fs.readFileSync(path.join(__dirname, '../../premium-ai-coldmailing.html'), 'utf8');
+  const sidebarSource = fs.readFileSync(path.join(__dirname, '../../assets/personnel-theme.js'), 'utf8');
+
+  assert.match(routeSource, /app\.get\('\/api\/coldmailing\/replies\/follow-ups'/);
+  assert.match(routeSource, /coldmailCampaignService\.listColdmailReplyFollowUps/);
+  assert.doesNotMatch(leadsPageSource, /\/api\/coldmailing\/replies\/follow-ups/);
+  assert.doesNotMatch(sidebarSource, /\/api\/coldmailing\/replies\/follow-ups/);
 });

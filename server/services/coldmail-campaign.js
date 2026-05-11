@@ -1180,6 +1180,76 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function getColdmailReplyHistoryEntry(row) {
+    const history = Array.isArray(row && row.hist) ? row.hist : [];
+    return history.find((item) => {
+      if (!item || typeof item !== 'object') return false;
+      const source = normalizeString(item.source).toLowerCase();
+      const type = normalizeDatabaseStatus(item.type || item.status, item);
+      return type === 'interesse' && source === 'coldmail-inbound-reply';
+    }) || null;
+  }
+
+  function hasColdmailReplyInterestSignal(row) {
+    if (!row || typeof row !== 'object') return false;
+    if (normalizeString(row.coldmailReplyIntent).toLowerCase() === 'interested') return true;
+    if (normalizeString(row.lastColdmailReplyAt || row.lastColdmailReplyMessageKey)) return true;
+    return Boolean(getColdmailReplyHistoryEntry(row));
+  }
+
+  function isColdmailReplyFollowUpRow(row) {
+    if (!row || typeof row !== 'object') return false;
+    const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
+    return status === 'interesse' && hasColdmailReplyInterestSignal(row);
+  }
+
+  function getColdmailReplyFollowUpTimestampMs(row) {
+    const historyEntry = getColdmailReplyHistoryEntry(row);
+    return Math.max(
+      parseTimestampMs(row && row.lastColdmailReplyAt),
+      parseTimestampMs(historyEntry && historyEntry.date),
+      parseTimestampMs(row && row.updatedAt)
+    );
+  }
+
+  function buildColdmailReplyFollowUpItem(row, index) {
+    const historyEntry = getColdmailReplyHistoryEntry(row);
+    const replyAt = normalizeString(row.lastColdmailReplyAt || (historyEntry && historyEntry.date) || row.updatedAt);
+    return {
+      id: getRowId(row, index),
+      bedrijf: getRowCompany(row),
+      naam: getRowContact(row),
+      email: getRowEmail(row),
+      telefoon: getRowPhone(row),
+      branche: normalizeString(row.branche || row.branch || ''),
+      plaats: getRowCity(row),
+      status: 'interesse',
+      replyAt,
+      subject: truncateText(normalizeString(row.lastColdmailReplySubject || (historyEntry && historyEntry.subject)), 240),
+      preview: truncateText(normalizeString(row.lastColdmailReplyPreview || (historyEntry && historyEntry.preview)), 500),
+      messageKey: normalizeString(row.lastColdmailReplyMessageKey || (historyEntry && historyEntry.messageKey)),
+    };
+  }
+
+  async function listColdmailReplyFollowUps(input = {}) {
+    const limit = parsePositiveInt(input.limit, 20, 1, 100);
+    const state = await getUiStateValues(customerDbScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const rows = parseDatabaseRows(values);
+    const items = rows
+      .map((row, index) => ({ row, index, timestampMs: getColdmailReplyFollowUpTimestampMs(row) }))
+      .filter(({ row }) => isColdmailReplyFollowUpRow(row))
+      .sort((left, right) => right.timestampMs - left.timestampMs)
+      .map(({ row, index }) => buildColdmailReplyFollowUpItem(row, index));
+
+    return {
+      ok: true,
+      total: items.length,
+      limit,
+      items: items.slice(0, limit),
+    };
+  }
+
   function personalizeTemplate(template, row) {
     const company = getRowCompany(row) || 'uw bedrijf';
     const contact = getRowContact(row) || company;
@@ -2114,6 +2184,7 @@ function createColdmailCampaignService(deps = {}) {
     isSmtpMailConfigured,
     isLikelyValidEmail,
     getColdmailCampaignRecipients,
+    listColdmailReplyFollowUps,
     sendColdmailCampaign,
     syncInboundColdmailRepliesFromImap,
   };

@@ -6,6 +6,7 @@ Datum eindcontrole: 2026-05-11
 
 - Coldcalling, agenda, interested-leads, deal/geen-deal en klantenfiltering zijn grotendeels goed en actief getest.
 - Coldmail verzending markeerde records al als `gemaild`, maar inbound replies kregen nog geen database-lifecycle status.
+- Na correctie van de productgrens is vastgelegd dat `/premium-leads` alleen coldcalling is; mailinteresse hoort in coldmailing.
 - Structured Supabase opslag kon binnen een replace-operatie dubbele customer/database identities met verschillende id's bewaren.
 - Statusnormalisatie bestaat op meerdere plekken en is daardoor kwetsbaar voor drift.
 - UI badges en filters hebben veel contracttests, maar frontendstatussen zijn nog niet volledig uit één centrale bron opgebouwd.
@@ -25,6 +26,7 @@ Datum eindcontrole: 2026-05-11
 - Coldmail en coldcalling gebruikten vergelijkbare, maar niet centraal gedeelde statusnormalisatie.
 - Duplicates konden ertoe leiden dat één record klant werd, terwijl een duplicate nog als lead/prospect bleef bestaan.
 - Coldmail inbound processing was vooral auto-reply gericht; lifecycle-status stond daar nog los van.
+- Positieve coldmail replies stonden na de eerste fix wel als `interesse` in de database, maar hadden nog geen eigen coldmailing-opvolgplek.
 - Algemene mailboxreacties buiten coldmailcampagnes zijn nog niet volledig gekoppeld aan lead/customer lifecycle.
 
 ## 4. Wat ontbrak
@@ -32,6 +34,7 @@ Datum eindcontrole: 2026-05-11
 - Positieve inbound coldmail reply naar `databaseStatus = interesse`.
 - Opt-out/geen-interesse inbound coldmail reply naar `databaseStatus = geblokkeerd`.
 - Idempotente coldmail-reply history via message-key.
+- Eigen coldmailing-follow-up lijst voor mailinteresse, zonder `/premium-leads` te gebruiken.
 - App-layer dedupe voor customer/database records met dezelfde identiteit in structured storage.
 - Een gedeelde backend lifecycle-helper voor statusnormalisatie en statusprioriteit.
 
@@ -48,6 +51,12 @@ Datum eindcontrole: 2026-05-11
   - Stop/afmelden/geen-interesse zet de row op `geblokkeerd` en schakelt mailing voor die row uit.
   - Lifecycle update gebeurt vóór de auto-reply en is niet afhankelijk van succesvol reply-verzenden.
   - History gebruikt `messageKey`, zodat dezelfde inbound mail niet dubbele historyregels blijft maken.
+  - Geeft positieve mailinteresse terug via `listColdmailReplyFollowUps`.
+- `server/routes/coldmailing.js`
+  - Nieuwe read-only route `GET /api/coldmailing/replies/follow-ups`.
+- `premium-bevestigingsmails.html` en `assets/premium-coldmail-followups.js`
+  - Tonen mailinteresse op de coldmailingpagina.
+  - Verbergen dit expliciet op de lead-generator/coldcalling alias.
 - `server/services/data-ops-store.js`
   - Customer/database rows worden vóór structured upsert gededuped op bruikbare `identity_key`.
   - Sterkere lifecycle-status wint, met `klant` bovenaan.
@@ -66,9 +75,15 @@ Datum eindcontrole: 2026-05-11
 - `docs/logic-audit/LOGICA_EINDCONTROLE.md`
 - `server/services/customer-lifecycle.js`
 - `server/services/coldmail-campaign.js`
+- `server/routes/coldmailing.js`
 - `server/services/data-ops-store.js`
+- `premium-bevestigingsmails.html`
+- `assets/premium-coldmail-followups.js`
 - `test/contracts/coldmail-campaign.test.js`
+- `test/contracts/coldmailing-routes.test.js`
 - `test/contracts/data-ops-store.test.js`
+- `test/contracts/premium-bevestigingsmails-ui.test.js`
+- `test/contracts/premium-leads-ui.test.js`
 
 Let op: de worktree bevat ook bestaande, niet door deze audit gewijzigde bestanden. Die zijn niet teruggedraaid en horen buiten deze wijzigingsset.
 
@@ -81,9 +96,13 @@ Let op: de worktree bevat ook bestaande, niet door deze audit gewijzigde bestand
 ## 8. Tests en checks uitgevoerd
 
 - `npm run backup:runtime`
-  - Backup gemaakt: `backups/runtime-backup-2026-05-11T13-28-32-374Z.json`.
+  - Backup gemaakt: `backups/runtime-backup-2026-05-11T13-40-33-436Z.json`.
 - Gericht:
   - `node --test test/contracts/coldmail-campaign.test.js`
+  - `node --test test/contracts/coldmailing-routes.test.js`
+  - `node --test test/contracts/premium-bevestigingsmails-ui.test.js`
+  - `node --test test/contracts/premium-leads-ui.test.js`
+  - `node --test test/contracts/premium-sidebar-leads-count.test.js`
   - `node --test test/contracts/data-ops-store.test.js`
   - `node --test test/contracts/coldcalling-lead-eligibility.test.js`
   - `node --test test/contracts/agenda-post-call.test.js`
@@ -91,11 +110,13 @@ Let op: de worktree bevat ook bestaande, niet door deze audit gewijzigde bestand
   - `node --test test/contracts/data-ops-ui-state-bridge.test.js`
   - `node --test test/contracts/premium-customers-core.test.js`
   - `node --check server/services/coldmail-campaign.js`
+  - `node --check server/routes/coldmailing.js`
+  - `node --check assets/premium-coldmail-followups.js`
   - `node --check server/services/data-ops-store.js`
 - Volledige kritieke poort:
   - `npm run verify:critical`
   - Resultaat: geslaagd.
-  - Contracttests: 848 geslaagd.
+  - Contracttests: 851 geslaagd.
   - Smoke-tests: 26 geslaagd.
   - Guardrails, repo hygiene, quality lock en secrets-check: geslaagd.
 - Afhankelijkheden:
@@ -122,11 +143,11 @@ Er zijn geen aparte `lint`, `typecheck` of `build` scripts aanwezig in `package.
 14. UI-badges, aantallen en filters blijven onder contracttests vallen: gecontroleerd via `verify:critical`.
 15. Refresh/persistent data: gecontroleerd via runtime/data-ops/ui-state contracten.
 16. Dubbele automatische acties: callId/appointment/order idempotency blijft getest; coldmail reply history is nu message-key idempotent.
-17. Cold call-flow en mail-flow delen nu minimaal dezelfde lifecycle-statussen voor `interesse`, `klant`, `afgehaakt` en blokkades.
+17. Cold call-flow en mail-flow delen nu minimaal dezelfde lifecycle-statussen voor `interesse`, `klant`, `afgehaakt` en blokkades, maar blijven in de UI gescheiden: `/premium-leads` voor coldcalling en coldmailing voor mailinteresse.
 
 ## 10. Overblijvende risico's
 
-- Positieve e-mailreply staat nu veilig als `interesse` in de database, maar maakt nog niet automatisch een lead-follow-up taak in de leads inbox.
+- Positieve e-mailreply staat nu veilig als `interesse` in de database en is zichtbaar in coldmailing. Er wordt bewust geen lead-follow-up taak in `/premium-leads` gemaakt, omdat die pagina coldcalling-only is.
 - Algemene mailboxreacties buiten coldmailcampagnes zijn nog niet volledig aan de lifecycle-helper gekoppeld.
 - Frontend en backend gebruiken nog niet overal dezelfde statusconfig als één gedeelde bron.
 - Supabase heeft nog geen unieke databaseconstraint op `identity_key`; duplicate-bescherming zit nu in de applicatielaag.
@@ -137,6 +158,7 @@ Er zijn geen aparte `lint`, `typecheck` of `build` scripts aanwezig in `package.
 - `databaseStatus` blijft leidend voor lifecyclebeslissingen.
 - `status` blijft legacy/visuele compat en wordt bij coldmail reply meegezet om oude UI-paden consistent te houden.
 - E-mailinteresse hoeft nog geen klantrecord of active order te maken zolang er geen akkoord/deal is.
+- E-mailinteresse hoort niet in `/premium-leads`; die pagina blijft alleen voor coldcalling.
 - Opt-out/geen-interesse via mail moet toekomstige mailing blokkeren en mag een bestaande `klant` status niet downgraden.
 - Geen destructieve migratie is veiliger dan een directe unique constraint zolang bestaande data niet eerst apart opgeschoond is.
 
@@ -145,6 +167,7 @@ Er zijn geen aparte `lint`, `typecheck` of `build` scripts aanwezig in `package.
 - Status: geslaagd binnen de gecontroleerde codebase en automatische checks.
 - Belangrijkste fixes:
   - Inbound coldmail lifecycle-status.
+  - Aparte coldmailing-follow-up voor mailinteresse.
   - Customer/database duplicate merge in structured opslag.
   - Gedeelde backend lifecycle-helper.
 - Tests uitgevoerd:
@@ -152,7 +175,7 @@ Er zijn geen aparte `lint`, `typecheck` of `build` scripts aanwezig in `package.
   - Volledige `verify:critical`.
   - Dependency audit.
 - Openstaande risico's:
-  - E-mailinteresse nog niet automatisch als lead-follow-up taak.
+  - Algemene mailboxreacties buiten coldmailcampagnes zijn nog niet volledig gekoppeld.
   - Volledige frontend/backend statuscentralisatie nog vervolgwerk.
 - Advies volgende stap:
-  - Voeg in een volgende kleine wijziging een centrale follow-up taak toe voor positieve e-mailreplies, zodat mailinteresse niet alleen in database staat maar ook actief in de leads-workflow verschijnt.
+  - Koppel later ook algemene mailboxreacties buiten coldmailcampagnes aan dezelfde lifecycle-helper, met dezelfde kanaalscheiding.

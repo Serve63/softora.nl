@@ -63,22 +63,30 @@ Legenda:
 
 ## 4. Inbound coldmail reply wordt als lifecycle verwerkt
 
-- Classificatie: ONTBREEKT
+- Classificatie: GOED MAAR KWETSBAAR
 - Bestanden:
   - `server/services/coldmail-campaign.js`
+  - `server/routes/coldmailing.js`
+  - `premium-bevestigingsmails.html`
+  - `assets/premium-coldmail-followups.js`
   - `test/contracts/coldmail-campaign.test.js`
+  - `test/contracts/coldmailing-routes.test.js`
+  - `test/contracts/premium-bevestigingsmails-ui.test.js`
 - Huidig gedrag:
   - Inbound replies worden gematcht en er wordt een automatische reply gestuurd.
   - Verwerkte messages worden opgeslagen.
-  - De database-status van de lead wordt niet zichtbaar bijgewerkt naar `interesse`, `afgehaakt` of `geblokkeerd`.
+  - Positieve coldmail replies zetten de database-status idempotent op `interesse`.
+  - Stop/afmeld/geen-interesse replies zetten de database-status op `geblokkeerd` en blokkeren toekomstige mailing.
+  - Mailinteresse is zichtbaar via de coldmailing-route en coldmailing-pagina, niet via `/premium-leads`.
 - Gewenst gedrag:
   - Positieve reply zet database-status idempotent op `interesse`.
   - Stop/afmeld/geen-interesse zet database-status op `geblokkeerd`.
   - Negatieve maar niet-opt-out reply zet database-status op `afgehaakt` of blijft neutraal als intent onduidelijk is.
   - De statusupdate mag niet afhangen van het slagen van de auto-reply.
+  - `/premium-leads` blijft coldcalling-only.
 - Waarom belangrijk:
-  - Iemand kan via e-mail interesse tonen maar daarna toch als gewone lead blijven meetellen of opnieuw benaderd worden.
-- Risico: hoog
+  - Iemand kan via e-mail interesse tonen en moet dan uit gewone outreach vallen, zonder coldcalling-leads en coldmailing door elkaar te halen.
+- Risico: laag/middel
 
 ## 5. Interested coldcall lead naar agenda
 

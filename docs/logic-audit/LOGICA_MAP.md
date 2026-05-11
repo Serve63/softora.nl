@@ -219,9 +219,12 @@ Deze map beschrijft de dynamische businesslogica die tijdens de codebase-scan is
 
 1. IMAP leest recente/unseen berichten.
 2. Bericht wordt gematcht op afzender e-mailadres en actieve coldmailcontext.
-3. Auto-reply wordt met OpenAI gegenereerd en via SMTP verzonden.
-4. Verwerkt bericht wordt vastgelegd in `premium_coldmail_auto_replies`.
-5. Tijdens de audit was geen database-lifecycle update naar `interesse`, `afgehaakt` of `geblokkeerd` zichtbaar voor inbound reply intent.
+3. Intent wordt geclassificeerd voordat de auto-reply wordt verzonden.
+4. Positieve reply zet het database record op `interesse`; stop/afmeld/geen-interesse zet het record op `geblokkeerd`.
+5. Coldmail reply history krijgt een `messageKey`, zodat dezelfde inbound mail geen dubbele historyregel maakt.
+6. Auto-reply wordt met OpenAI gegenereerd en via SMTP verzonden.
+7. Verwerkt bericht wordt vastgelegd in `premium_coldmail_auto_replies`.
+8. `GET /api/coldmailing/replies/follow-ups` toont mailinteresse alleen in de coldmailing-context, niet in `/premium-leads`.
 
 ### Coldcalling naar callupdate
 
@@ -368,24 +371,22 @@ Deze map beschrijft de dynamische businesslogica die tijdens de codebase-scan is
 
 ## 7. Risico's op inconsistente data
 
-- Coldmail inbound replies werden niet zichtbaar als lifecycle-status verwerkt. Daardoor kan iemand interesse tonen via mail maar nog als gewone lead/databaseprospect blijven staan.
+- Algemene mailboxreacties buiten coldmailcampagnes zijn nog niet volledig aan dezelfde lifecycle-helper gekoppeld.
+- Mailinteresse hoort zichtbaar te zijn in de coldmailing-context; `/premium-leads` blijft coldcalling-only.
 - Statusnormalisatie is verspreid over meerdere bestanden. Daardoor kan een status in de ene module geblokkeerd zijn en in de andere module nog selecteerbaar blijven.
 - Structured customer store gebruikt `customer_id` als upsert conflict en heeft alleen een niet-unieke `identity_key` index. Dubbele bedrijven/contacten met andere id's kunnen naast elkaar blijven bestaan.
 - Agenda post-call sync werkt op eerste match op telefoon of bedrijf. Bij dubbele records wordt maar één record bijgewerkt.
 - Frontend database-statusopties en serverstatussets zijn niet volledig centraal gedeeld.
 - Coldcalling en coldmailing hebben vergelijkbare einddoelen, maar aparte intent/statuspaden.
 - UI-state compat en structured Supabase bestaan naast elkaar. De bridge beperkt risico, maar dubbele bron-van-waarheid blijft migratiegevoelig.
-- Inbound e-mailverwerking was gekoppeld aan auto-reply. Als auto-reply faalt, kan lifecycleverwerking ook uitblijven.
-- Idempotency is goed aanwezig bij callId/appointment/order, maar minder expliciet bij coldmail inbound lifecycle updates.
+- Inbound e-mailverwerking buiten coldmailcampagnes heeft nog geen volledige lifecyclekoppeling.
+- Idempotency is goed aanwezig bij callId/appointment/order en nu ook bij coldmail inbound reply history; algemene mailboxflows blijven apart te controleren.
 
 ## 8. Vermoedelijk ontbrekende logica
 
 - Centrale lifecycle helper voor database/contactstatussen die backendmodules delen.
-- Intentclassificatie voor inbound coldmail replies naar:
-  - `interesse`
-  - `geblokkeerd` of `afgehaakt`
-  - neutraal/onduidelijk
-- Idempotente statusupdate voor inbound coldmail replies.
+- Lifecyclekoppeling voor algemene mailboxreacties buiten coldmailcampagnes.
+- Verdere verfijning voor negatieve maar niet-expliciet-afgemelde replies, bijvoorbeeld `afgehaakt`.
 - Dedupe of merge op `identity_key` in structured customer opslag.
 - Test die garandeert dat e-mailinteresse dezelfde blokkade activeert als coldcallinginteresse.
 - Test die garandeert dat dubbele database/customer records niet naast elkaar blijven bestaan in structured storage.
