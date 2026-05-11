@@ -1,0 +1,92 @@
+.assignment-toggle {
+    min-height: 3.2rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.86rem 1.1rem;
+    border: 1px solid rgba(139, 34, 82, 0.2);
+    background: rgba(255, 255, 255, 0.78);
+    color: var(--text-secondary);
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    cursor: none;
+    user-select: none;
+    transition: border-color 0.2s var(--ease-out-expo), background 0.2s var(--ease-out-expo), color 0.2s var(--ease-out-expo);
+}
+
+.assignment-toggle:hover,
+.assignment-toggle:focus-within {
+    border-color: rgba(139, 34, 82, 0.42);
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--text-primary);
+}
+
+.assignment-toggle-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.assignment-toggle-box {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 18px;
+    border: 1.5px solid rgba(139, 34, 82, 0.36);
+    background: #fff;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.88);
+    transition: border-color 0.2s var(--ease-out-expo), background 0.2s var(--ease-out-expo), box-shadow 0.2s var(--ease-out-expo);
+}
+
+.assignment-toggle-box::after {
+    content: '';
+    width: 5px;
+    height: 9px;
+    margin-top: -2px;
+    border-right: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+    transform: rotate(45deg) scale(0.7);
+    opacity: 0;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.assignment-toggle-input:checked + .assignment-toggle-box {
+    border-color: var(--accent-light);
+    background: var(--accent-light);
+    box-shadow: inset 0 0 0 2px rgba(166, 45, 101, 0.18);
+}
+
+.assignment-toggle-input:checked + .assignment-toggle-box::after {
+    opacity: 1;
+    transform: rotate(45deg) scale(1);
+}
+
+.assignment-toggle-input:focus-visible + .assignment-toggle-box {
+    outline: 2px solid rgba(166, 45, 101, 0.28);
+    outline-offset: 3px;
+}
+
+.assignment-toggle-text {
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .assignment-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .assignment-toggle-text {
+        white-space: normal;
+        text-align: center;
+        line-height: 1.2;
+    }
+}

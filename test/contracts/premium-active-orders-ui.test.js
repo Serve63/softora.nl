@@ -6,19 +6,25 @@ const path = require('path');
 function readActiveOrdersSources() {
   const pagePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
   const scriptPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
+  const assignmentToggleStylePath = path.join(__dirname, '../../assets/premium-active-order-assignment-toggle.css');
+  const assignmentToggleScriptPath = path.join(__dirname, '../../assets/premium-active-order-assignment-toggle.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+  const assignmentToggleStyleSource = fs.readFileSync(assignmentToggleStylePath, 'utf8');
+  const assignmentToggleScriptSource = fs.readFileSync(assignmentToggleScriptPath, 'utf8');
   return {
     pageSource,
     scriptSource,
-    combinedSource: `${pageSource}\n${scriptSource}`,
+    assignmentToggleStyleSource,
+    assignmentToggleScriptSource,
+    combinedSource: `${pageSource}\n${scriptSource}\n${assignmentToggleStyleSource}\n${assignmentToggleScriptSource}`,
   };
 }
 
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260427b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260511a"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -137,6 +143,13 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /companyName,\s*contactName: contactPerson,\s*contactPhone: linkedContactPhone,\s*contactEmail: linkedContactEmail,/);
   assert.match(source, /const companyName = String\(item\?\.companyName \|\| ''\)\.trim\(\);/);
   assert.match(source, /const contactName = String\(item\?\.contactName \|\| ''\)\.trim\(\);/);
+  assert.match(pageSource, /assets\/premium-active-order-assignment-toggle\.css\?v=20260511a/);
+  assert.match(pageSource, /assets\/premium-active-order-assignment-toggle\.js\?v=20260511a/);
+  assert.match(source, /const toggleId = 'myAssignmentsOnlyToggle';[\s\S]*const labelText = 'Enkel mijn toewijzingen bekijken';/);
+  assert.match(source, /\.assignment-toggle-box::after \{[\s\S]*border-right:\s*2px solid #fff;[\s\S]*border-bottom:\s*2px solid #fff;/);
+  assert.match(source, /const shouldHide = \(activeOrderFilter !== 'all' && group !== activeOrderFilter\) \|\| \(typeof window\.SoftoraActiveOrdersFilter\?\.shouldHideCard === 'function' && window\.SoftoraActiveOrdersFilter\.shouldHideCard\(card\)\);/);
+  assert.match(source, /filter\.shouldHideCard = function shouldHideCard\(card\) \{[\s\S]*return normalizeAssignee\(getClaimInfo\(orderId\)\?\.by \|\| ''\) !== currentAssignee;/);
+  assert.match(source, /topbarRight\.insertBefore\(label, topbarRight\.firstChild\);[\s\S]*if \(typeof window\.applyOrderFilter === 'function'\) window\.applyOrderFilter\(\);/);
 });
 
 test('premium actieve opdrachten gebruiken expliciete customer identity voor koppeling naar klanten', () => {

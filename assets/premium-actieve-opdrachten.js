@@ -781,7 +781,7 @@ function applyOrderFilter() {
     const cards = Array.from(document.querySelectorAll('#ordersGrid .order-card'));
     cards.forEach((card) => {
         const group = getOrderFilterGroupForCard(card);
-        const shouldHide = activeOrderFilter !== 'all' && group !== activeOrderFilter;
+        const shouldHide = (activeOrderFilter !== 'all' && group !== activeOrderFilter) || (typeof window.SoftoraActiveOrdersFilter?.shouldHideCard === 'function' && window.SoftoraActiveOrdersFilter.shouldHideCard(card));
         card.hidden = shouldHide;
     });
     updateOrderFilterButtonState();
