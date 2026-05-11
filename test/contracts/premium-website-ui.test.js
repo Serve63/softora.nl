@@ -180,6 +180,13 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
     source,
     /<div class="pricing-grid">[\s\S]*id="dienst-bedrijfssoftware" class="pricing-card fade-up"[\s\S]*id="dienst-premium-website" class="pricing-card featured fade-up"[\s\S]*id="dienst-voicesoftware" class="pricing-card fade-up"[\s\S]*id="dienst-chatbot" class="pricing-card fade-up"/
   );
+  assert.match(source, /\.pricing-card\s*\{[\s\S]*background-color:\s*#0f1018;[\s\S]*var\(--pricing-card-photo\)/);
+  assert.match(source, /#dienst-bedrijfssoftware\s*\{[\s\S]*\/assets\/home-service-software-ai\.jpg\?v=20260511b/);
+  assert.match(source, /#dienst-premium-website\s*\{[\s\S]*\/assets\/home-service-websites-ai\.jpg\?v=20260511b/);
+  assert.match(source, /#dienst-voicesoftware\s*\{[\s\S]*\/assets\/home-service-voice-ai\.jpg\?v=20260511b/);
+  assert.match(source, /#dienst-chatbot\s*\{[\s\S]*\/assets\/home-service-chatbot-ai\.jpg\?v=20260511b/);
+  assert.match(source, /\.pricing-card \.sessions, \.pricing-card h3\s*\{[\s\S]*color:\s*#fff;/);
+  assert.match(source, /\.pricing-card \.pricing-header p, \.pricing-features li\s*\{[\s\S]*color:\s*rgba\(255,\s*255,\s*255,\s*0\.76\) !important;/);
   assert.doesNotMatch(
     source,
     /id="dienst-premium-website" class="pricing-card fade-up"[\s\S]*id="dienst-bedrijfssoftware" class="pricing-card featured fade-up"/
