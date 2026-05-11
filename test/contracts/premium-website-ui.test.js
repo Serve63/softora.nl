@@ -180,9 +180,9 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
     source,
     /<div class="pricing-grid">[\s\S]*id="dienst-bedrijfssoftware" class="pricing-card fade-up"[\s\S]*id="dienst-premium-website" class="pricing-card featured fade-up"[\s\S]*id="dienst-voicesoftware" class="pricing-card fade-up"[\s\S]*id="dienst-chatbot" class="pricing-card fade-up"/
   );
-  assert.match(source, /\.pricing-card\s*\{[\s\S]*background-color:\s*#0f1018;[\s\S]*var\(--pricing-card-photo\)/);
+  assert.match(source, /\.pricing-card\s*\{[\s\S]*--pricing-card-scrim:[\s\S]*background-color:\s*#0f1018;[\s\S]*var\(--pricing-card-photo\)/);
   assert.match(source, /#dienst-bedrijfssoftware\s*\{[\s\S]*\/assets\/home-service-software-ai\.jpg\?v=20260511b/);
-  assert.match(source, /#dienst-premium-website\s*\{[\s\S]*\/assets\/home-service-websites-ai\.jpg\?v=20260511b/);
+  assert.match(source, /#dienst-premium-website\s*\{[\s\S]*\/assets\/home-hero-generated-v2\.jpg\?v=20260511c[\s\S]*--pricing-card-scrim:[\s\S]*rgba\(7,\s*8,\s*15,\s*0\.74\)/);
   assert.match(source, /#dienst-voicesoftware\s*\{[\s\S]*\/assets\/home-service-voice-ai\.jpg\?v=20260511b/);
   assert.match(source, /#dienst-chatbot\s*\{[\s\S]*\/assets\/home-service-chatbot-ai\.jpg\?v=20260511b/);
   assert.match(source, /\.pricing-card \.sessions, \.pricing-card h3\s*\{[\s\S]*color:\s*#fff;/);
