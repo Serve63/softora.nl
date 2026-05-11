@@ -93,6 +93,32 @@ function registerColdmailingRoutes(app, deps = {}) {
     }
   });
 
+  app.get('/api/coldmailing/replies/follow-ups', async (req, res) => {
+    try {
+      if (typeof coldmailCampaignService.listColdmailReplyFollowUps !== 'function') {
+        res.status(404).json({
+          ok: false,
+          code: 'COLDMAIL_REPLY_FOLLOW_UPS_UNAVAILABLE',
+          message: 'Coldmail follow-ups zijn niet beschikbaar.',
+        });
+        return;
+      }
+      const result = await coldmailCampaignService.listColdmailReplyFollowUps({
+        limit: req.query.limit,
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'COLDMAIL_REPLY_FOLLOW_UPS_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Coldmail follow-ups konden niet worden geladen.',
+          500
+        ),
+      });
+    }
+  });
+
   app.post('/api/coldmailing/replies/sync', async (req, res) => {
     try {
       if (typeof coldmailCampaignService.syncInboundColdmailRepliesFromImap !== 'function') {

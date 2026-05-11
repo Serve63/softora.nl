@@ -60,15 +60,16 @@ Doel: de kleinste veilige set verbeteringen doorvoeren die de gevonden hoge risi
 
 ### 2.2 Coldmail en coldcalling eindigen in dezelfde lifecycle
 
-- Status: eerst positieve/negatieve e-mailreply fix.
+- Status: database-lifecycle uitgevoerd; UI-opvolging gescheiden per kanaal.
 - Probleem:
-  - Coldcalling heeft agenda/follow-up routing; coldmail had alleen auto-reply.
+  - Coldcalling heeft een eigen leads-/agenda-opvolging; coldmail had vooral auto-reply en database-status.
 - Aanpak:
   - Fase 1: database-status correct zetten.
-  - Fase 2: positieve e-mailreply ook als lead-follow-up of taak tonen op leads-pagina.
+  - Fase 2: positieve e-mailreply tonen als coldmailing-follow-up op de coldmailingpagina.
+  - `/premium-leads` blijft expliciet coldcalling-only.
 - Tests:
   - Inbound mailreply toont minimaal status `interesse` in database.
-  - Later: inbound mailreply verschijnt als follow-up taak.
+  - Inbound mailreply verschijnt niet in `/premium-leads`, maar in de coldmailing-context.
 
 ## Prioriteit 3 - Dubbele/verspreide logica centraliseren
 
@@ -106,14 +107,15 @@ Doel: de kleinste veilige set verbeteringen doorvoeren die de gevonden hoge risi
 - Tests:
   - Coldmail contracttest controleert opgeslagen row.
 
-### 4.2 Leads-badge voor e-mailinteresse
+### 4.2 Coldmailing-follow-up voor e-mailinteresse
 
-- Status: later, tenzij directe infrastructuur eenvoudig blijkt.
+- Status: direct uitvoeren.
 - Aanpak:
-  - Na statusfix onderzoeken of positieve e-mailreplies als lead-follow-up taak moeten verschijnen.
-  - Dit moet via hetzelfde agenda/lead-follow-up pad als coldcalling, niet via losse UI-only state.
+  - Voeg een coldmailing-route toe die alleen positieve coldmail replies met `databaseStatus = interesse` teruggeeft.
+  - Toon deze records op `premium-bevestigingsmails.html`.
+  - Bewaak met tests dat `/premium-leads` en de leads-badge deze coldmailing-route niet gebruiken.
 - Risico als uitgesteld:
-  - Interesse staat wel veilig in database, maar mogelijk nog niet in leads inbox als taak.
+  - Interesse staat wel veilig in database, maar is minder actief opvolgbaar binnen coldmailing.
 
 ## Prioriteit 5 - Edge cases en fallback-logica
 

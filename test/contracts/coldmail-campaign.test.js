@@ -469,6 +469,56 @@ test('coldmail auto-reply marks positive inbound replies as interested in the da
   assert.equal(savedRows[0].hist[0].type, 'interesse');
 });
 
+test('coldmail campaign lists interested mail replies without using the leads inbox', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'mail-interest-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        telefoon: '+31 6 12345678',
+        branche: 'Horeca & Restaurants',
+        plaats: 'Oisterwijk',
+        status: 'interesse',
+        databaseStatus: 'interesse',
+        coldmailReplyIntent: 'interested',
+        lastColdmailReplyAt: '2026-04-24T12:00:00.000Z',
+        lastColdmailReplySubject: 'Re: Nieuwe website',
+        lastColdmailReplyPreview: 'Dit klinkt interessant. Kun je meer informatie sturen?',
+        lastColdmailReplyMessageKey: 'message:incoming-interest@example.test',
+      },
+      {
+        id: 'manual-interest',
+        bedrijf: 'Handmatig BV',
+        email: 'handmatig@example.test',
+        status: 'interesse',
+        databaseStatus: 'interesse',
+      },
+      {
+        id: 'customer-after-interest',
+        bedrijf: 'Klant BV',
+        email: 'klant@example.test',
+        status: 'klant',
+        databaseStatus: 'klant',
+        coldmailReplyIntent: 'interested',
+        lastColdmailReplyAt: '2026-04-23T12:00:00.000Z',
+      },
+    ],
+  });
+
+  const result = await service.listColdmailReplyFollowUps({ limit: 10 });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.total, 1);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].id, 'mail-interest-1');
+  assert.equal(result.items[0].bedrijf, 'Bakkerij Zon');
+  assert.equal(result.items[0].status, 'interesse');
+  assert.equal(result.items[0].messageKey, 'message:incoming-interest@example.test');
+  assert.match(result.items[0].preview, /interessant/);
+});
+
 test('coldmail auto-reply blocks opt-out replies without creating customer lifecycle data', async () => {
   const parsedInbound = {
     messageId: '<incoming-stop@example.test>',
