@@ -187,7 +187,7 @@ test('page smoke: premium-actieve-opdrachten.html shows openstaande opdrachten a
   const leadsTabScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-active-orders-leads-tab.js'), 'utf8');
   const source = `${html}\n${assignmentFilterScript}\n${script}\n${leadsTabScript}\n${assignmentPagesScript}`;
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
-  assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260510a/, 'Persoonlijke toewijzingsstijl ontbreekt op opdrachten.');
+  assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260511a/, 'Persoonlijke toewijzingsstijl ontbreekt op opdrachten.');
   assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
   assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
   assert.match(html, /assets\/premium-active-orders-leads-tab\.js\?v=20260510a/, 'Losse leads-tab asset ontbreekt.');
