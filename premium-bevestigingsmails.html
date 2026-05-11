@@ -1760,12 +1760,12 @@ function toggleCampaignRecipientsList(event) {
   setCampaignRecipientListOpen(!isCampaignRecipientListOpen());
 }
 
-async function hydrateCampaignCompanyCountFromSupabase() {
+async function hydrateCampaignCompanyCountFromSupabase() { const requestedCount = getCampaignRequestedCompanyCount(), requestedRadiusKm = getSelectedCampaignRadiusKm();
   try {
     const response = await fetch(getColdmailRecipientPreviewUrl(), { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
     const data = response.ok ? await response.json().catch(function () { return null; }) : null;
-    if (!data || data.ok === false) throw new Error('Kon campagne-ontvangers niet laden.');
-    const recipients = Array.isArray(data && data.recipients) ? data.recipients : []; renderCampaignCompanyCount(Number(data && data.selected) || recipients.length);
+    if (!data || data.ok === false) throw new Error('Kon campagne-ontvangers niet laden.'); if (requestedCount !== getCampaignRequestedCompanyCount() || requestedRadiusKm !== getSelectedCampaignRadiusKm()) return;
+    const recipients = Array.isArray(data && data.recipients) ? data.recipients : []; const serverCount = Number(data && data.selected) || recipients.length; renderCampaignCompanyCount(serverCount > 0 || requestedCount <= 0 ? serverCount : requestedCount);
   } catch (_) {
     return;
   }
