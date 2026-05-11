@@ -50,7 +50,7 @@ html,body{min-height:100vh;}
 </style>`,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
-const HOMEPAGE_HERO_IMAGE_URL = '/assets/home-hero-generated-v2.jpg';
+const HOMEPAGE_HERO_IMAGE_URL = '/assets/home-hero-generated-v2.jpg?v=20260511a';
 const HOMEPAGE_HERO_IMAGE_PRELOAD = `<link rel="preload" as="image" href="${HOMEPAGE_HERO_IMAGE_URL}">`;
 
 function createHtmlPageCoordinator(options = {}) {
