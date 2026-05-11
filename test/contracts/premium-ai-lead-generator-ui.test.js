@@ -23,7 +23,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
   assert.match(
     pageSource,
-    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=20260502a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260506a" defer><\/script>/
+    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=20260511a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260506a" defer><\/script>/
   );
   assert.match(
     pageSource,
@@ -150,6 +150,8 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(recipientPreviewSource, /const CAMPAIGN_RECIPIENT_PREVIEW_COUNT_LIMIT = 500;/);
   assert.match(recipientPreviewSource, /params\.set\('mode', 'call'\);/);
   assert.match(recipientPreviewSource, /params\.set\('count', String\(CAMPAIGN_RECIPIENT_PREVIEW_COUNT_LIMIT\)\);/);
+  assert.match(recipientPreviewSource, /const service = getSelectedText\('service'\);/);
+  assert.match(recipientPreviewSource, /params\.set\('service', service\);/);
   assert.match(recipientPreviewSource, /\/api\/coldmailing\/campaigns\/recipients\?\$\{key\}/);
   assert.match(recipientPreviewSource, /Number\(data\?\.candidates \?\? data\?\.selected \?\? data\?\.recipients\?\.length \?\? 0\)/);
   assert.match(recipientPreviewSource, /global\.SoftoraColdcallingCampaignRecipientPreview/);

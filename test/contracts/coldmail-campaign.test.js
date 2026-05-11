@@ -701,6 +701,27 @@ test('coldmail campaign previews recipients from chunked customer database state
   assert.equal(result.recipients[0].bedrijf, 'Chunked Winkel');
 });
 
+test('coldmail campaign normaliseert geplakte e-mailadressen voor ontvangerselectie', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'moon-meis',
+        bedrijf: "Moon's & Meis",
+        email: 'info@moonsenmeis.nl,',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({ count: 10 });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].bedrijf, "Moon's & Meis");
+  assert.equal(result.recipients[0].email, 'info@moonsenmeis.nl');
+});
+
 test('coldmail campaign recipient preview respects Oisterwijk radius', async () => {
   const { service } = createService({
     rows: [
