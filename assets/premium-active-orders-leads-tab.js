@@ -11,12 +11,11 @@
         const style = document.createElement('style');
         style.id = STYLE_ID;
         style.textContent = `
-.orders-filter-btn[data-order-link="leads"] {
+.orders-filter-btn[data-order-filter="leads"] {
     order: 0;
-    text-decoration: none;
 }
 
-.orders-filter-btn[data-order-link="leads"] .orders-filter-dot {
+.orders-filter-btn[data-order-filter="leads"] .orders-filter-dot {
     background: var(--green);
     opacity: 0.92;
 }
@@ -25,10 +24,11 @@
     }
 
     function buildLeadFilterTab() {
-        const link = document.createElement('a');
-        link.className = 'orders-filter-btn magnetic';
-        link.href = '/premium-leads';
-        link.dataset.orderLink = 'leads';
+        const button = document.createElement('button');
+        button.className = 'orders-filter-btn magnetic';
+        button.type = 'button';
+        button.dataset.orderFilter = 'leads';
+        button.setAttribute('aria-pressed', 'false');
 
         const label = document.createElement('span');
         label.className = 'orders-filter-label';
@@ -44,21 +44,21 @@
         count.id = TAB_COUNT_ID;
         count.textContent = '0';
 
-        link.append(label, count);
-        return link;
+        button.append(label, count);
+        return button;
     }
 
     function ensureLeadFilterTab() {
         const bar = document.querySelector('.orders-filter-bar');
         if (!bar) return null;
 
-        let link = bar.querySelector('[data-order-link="leads"]');
-        if (link) return link;
+        let button = bar.querySelector('[data-order-filter="leads"]');
+        if (button) return button;
 
         ensureLeadTabStyles();
-        link = buildLeadFilterTab();
-        bar.insertBefore(link, bar.firstChild);
-        return link;
+        button = buildLeadFilterTab();
+        bar.insertBefore(button, bar.firstChild);
+        return button;
     }
 
     function syncLeadFilterCountFromSidebarBadge() {
@@ -109,8 +109,8 @@
     }
 
     function initActiveOrdersLeadTab() {
-        const link = ensureLeadFilterTab();
-        if (!link) return;
+        const button = ensureLeadFilterTab();
+        if (!button) return;
         initLeadFilterCountMirror();
         refreshLeadFilterCount();
     }
