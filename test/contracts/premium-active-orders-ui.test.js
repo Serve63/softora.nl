@@ -48,7 +48,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle \{[\s\S]*border:\s*1px solid rgba\(139, 34, 82, 0\.2\);[\s\S]*background:\s*rgba\(255, 255, 255, 0\.78\);/);
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle input\[type="checkbox"\] \{[\s\S]*border:\s*1\.5px solid rgba\(139, 34, 82, 0\.36\);[\s\S]*background:\s*#fff;/);
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle input\[type="checkbox"\]::after \{[\s\S]*border-right:\s*2px solid #fff;[\s\S]*border-bottom:\s*2px solid #fff;[\s\S]*transform:\s*rotate\(45deg\) scale\(0\);/);
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260510d"><\/script><script src="assets\/premium-active-orders-leads-tab\.js\?v=20260510a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260511a"><\/script><script src="assets\/premium-active-orders-leads-tab\.js\?v=20260511a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -189,11 +189,16 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(leadsTabScriptSource, /function syncLeadFilterCountFromSidebarBadge\(\) \{/);
   assert.match(leadsTabScriptSource, /function initLeadFilterCountMirror\(\) \{/);
   assert.match(leadsTabScriptSource, /function refreshLeadFilterCount\(\) \{/);
-  assert.match(leadsTabScriptSource, /href = '\/premium-leads';/);
+  assert.match(leadsTabScriptSource, /button\.dataset\.orderFilter = 'leads';/);
+  assert.match(leadsTabScriptSource, /button\.setAttribute\('aria-pressed', 'false'\);/);
+  assert.doesNotMatch(leadsTabScriptSource, /href = '\/premium-leads';/);
+  assert.doesNotMatch(leadsTabScriptSource, /data-order-link="leads"/);
   assert.match(leadsTabScriptSource, /const text = document\.createTextNode\('Openstaande leads'\);/);
   assert.match(leadsTabScriptSource, /count\.id = TAB_COUNT_ID;/);
   assert.match(leadsTabScriptSource, /order:\s*0;/);
   assert.match(leadsTabScriptSource, /background:\s*var\(--green\);/);
+  assert.match(scriptSource, /leads: 'Geen openstaande leads\.'/);
+  assert.match(scriptSource, /document\.querySelector\('\.orders-filter-bar'\)\?\.addEventListener\('click', \(e\) => \{[\s\S]*const btn = e\.target\.closest\('\[data-order-filter\]'\);[\s\S]*setOrderFilter\(btn\.getAttribute\('data-order-filter'\)\);/);
   assert.match(source, /const FILTER_STORAGE_PREFIX = 'softora_only_my_assignments_v1';/);
   assert.match(source, /const FILTER_SCOPE = 'premium_assignment_filters';/);
   assert.match(source, /function normalizeOwnerLabel\(value\) \{/);

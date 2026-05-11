@@ -190,13 +190,15 @@ test('page smoke: premium-actieve-opdrachten.html shows openstaande opdrachten a
   assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260511a/, 'Persoonlijke toewijzingsstijl ontbreekt op opdrachten.');
   assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
   assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
-  assert.match(html, /assets\/premium-active-orders-leads-tab\.js\?v=20260510a/, 'Losse leads-tab asset ontbreekt.');
+  assert.match(html, /assets\/premium-active-orders-leads-tab\.js\?v=20260511a/, 'Losse leads-tab asset ontbreekt.');
   assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260510a/, 'Opdrachten pagina-asset voor persoonlijke toewijzingen ontbreekt.');
-  assert.match(source, /href = '\/premium-leads';/, 'Openstaande leads-link hoort naar de leads-pagina te wijzen.');
+  assert.match(source, /button\.dataset\.orderFilter = 'leads';/, 'Openstaande leads hoort een lokale tab te zijn.');
+  assert.doesNotMatch(source, /href = '\/premium-leads';/, 'Openstaande leads mag niet naar de leads-pagina linken.');
   assert.match(source, /const text = document\.createTextNode\('Openstaande leads'\);/, 'Leads-tablabel ontbreekt.');
   assert.match(source, /count\.id = TAB_COUNT_ID;/, 'Leads-teller ontbreekt.');
   assert.match(html, />Openstaande opdrachten<\/span>/, 'Primaire tab hoort Openstaande opdrachten te tonen.');
   assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
+  assert.match(source, /Geen openstaande leads\./, 'Lege-state voor de lokale leads-tab ontbreekt.');
   assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./, 'Persoonlijke lege-state voor opdrachten ontbreekt.');
   assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
   assert.match(source, /function syncLeadFilterCountFromSidebarBadge\(\) \{/, 'Leads-teller hoort mee te lopen met de sidebar badge.');

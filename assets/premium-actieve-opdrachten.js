@@ -692,8 +692,8 @@ function renderOrdersEmptyState() {
 
     if (!visibleCards.length) {
         const emptyTextByFilter = {
-            completed: 'Geen voltooide opdrachten.',
-            in_progress: 'Geen openstaande opdrachten.'
+            completed: 'Geen voltooide opdrachten.', in_progress: 'Geen openstaande opdrachten.',
+            leads: 'Geen openstaande leads.'
         };
         if (!empty) {
             empty = document.createElement('div');
@@ -2878,11 +2878,11 @@ function bindActiveOrdersPageUi() {
         });
     });
 
-    document.querySelectorAll('[data-order-filter]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            setOrderFilter(btn.getAttribute('data-order-filter'));
-        });
+    document.querySelector('.orders-filter-bar')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-order-filter]');
+        if (!btn) return;
+        e.stopPropagation();
+        setOrderFilter(btn.getAttribute('data-order-filter'));
     });
 
     document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
