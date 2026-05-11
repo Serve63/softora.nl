@@ -207,8 +207,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
   assert.match(pageSource, /Number\.isFinite\(Number\(countOverride\)\)/);
   assert.match(pageSource, /const response = await fetch\(getColdmailRecipientPreviewUrl\(\), \{[\s\S]*method: 'GET',[\s\S]*credentials: 'same-origin',[\s\S]*headers: \{ Accept: 'application\/json' \},[\s\S]*cache: 'no-store',[\s\S]*\}\);/);
-  assert.match(pageSource, /const recipients = Array\.isArray\(data\.recipients\) \? data\.recipients : \[\];/);
-  assert.match(pageSource, /renderCampaignCompanyCount\(Number\(data\.selected\) \|\| recipients\.length\);/);
+  assert.match(pageSource, /renderCampaignCompanyCount\(Number\(data\.candidates \?\? data\.selected \?\? \(Array\.isArray\(data\.recipients\) \? data\.recipients\.length : 0\)\)\);/);
+  assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data\.selected\) \|\| recipients\.length\);/);
   assert.match(pageSource, /Math\.min\(requestedCount \|\| eligibleRows\.length, eligibleRows\.length\)/);
   assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\),/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);
@@ -491,6 +491,7 @@ test('premium ai lead generator uses calling copy and the on-page prompt for col
   assert.match(callStartSource, /fetch\('\/api\/coldcalling\/start'/);
   assert.match(callStartSource, /const original = global\.startCampagneImmediate;/);
   assert.match(callStartSource, /showToast\('Bedrijven bellen wordt gestart\.\.\.'\);/);
+  assert.match(pageSource, /\? Number\(sendResult\.sent\) : Number\(recipientPreview && \(recipientPreview\.candidates \?\? recipientPreview\.selected \?\? previewRecipients\.length\)\);/);
 });
 
 test('premium bevestigingsmails sends real coldmail campaigns without opening timeline page', () => {
