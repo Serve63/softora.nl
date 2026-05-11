@@ -27,6 +27,13 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Laat compat-paden of feature flags tijdelijk naast nieuw gedrag bestaan als een domein nog half gemigreerd is.
 - Als een kritieke flow wankelt, eerst terug naar de laatst bewezen compatibele staat en dan pas verder verbeteren.
 
+## Versie- en deploy-veiligheid
+- Iedere agent werkt vanaf de allerlaatste actuele `origin/main` of een verse `codex/*` branch die daarop gebaseerd is.
+- Oude lokale kopieen, oude branches, vervuilde worktrees en losse bureaubladmappen mogen nooit als productiebron worden gebruikt.
+- Recente live wijzigingen mogen niet verdwijnen door een merge, rebase, reset, checkout of deploy vanaf een oude staat.
+- Voor push/deploy controleert de agent dat alleen de bedoelde diff meegaat en dat recente wijzigingen behouden blijven.
+- Na merge/deploy controleert de agent dat `www.softora.nl` exact op de nieuwste `origin/main` draait; bij afwijking eerst branch, bron en Vercel-deployment vergelijken.
+
 ## Verboden vervuiling
 - Geen nieuwe businesshelpers in `server.js` of in runtime-compositiebestanden.
 - Geen stille response-shape wijzigingen op bestaande routes.

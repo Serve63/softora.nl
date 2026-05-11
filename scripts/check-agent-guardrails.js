@@ -204,11 +204,28 @@ function getQualityBaselineViolations() {
   const protocolExpectations = [
     {
       filePath: 'AGENTS.md',
-      required: [/npm run verify:critical/, /Commit en push elke succesvolle wijziging/, /npm run check:guardrails/, /npm run check:quality-lock/],
+      required: [
+        /npm run verify:critical/,
+        /Commit en push elke succesvolle wijziging/,
+        /npm run check:guardrails/,
+        /npm run check:quality-lock/,
+        /allerlaatste actuele `origin\/main`/,
+        /Deploy nooit vanuit een oude lokale kopie/,
+        /recente live wijzigingen behouden blijven/,
+      ],
     },
     {
       filePath: 'docs/quality-protocol.md',
-      required: [/Definition Of Done/, /npm run verify:critical/, /check:guardrails/, /check:quality-lock/, /direct gecommit en gepusht/],
+      required: [
+        /Definition Of Done/,
+        /npm run verify:critical/,
+        /check:guardrails/,
+        /check:quality-lock/,
+        /direct gecommit en gepusht/,
+        /allerlaatste actuele `origin\/main`/,
+        /Oude lokale kopieen/,
+        /Recente live wijzigingen mogen niet verdwijnen/,
+      ],
     },
     {
       filePath: 'docs/repo-map.md',
