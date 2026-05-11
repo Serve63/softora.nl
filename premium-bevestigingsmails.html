@@ -1695,8 +1695,8 @@ function renderCampaignRecipientList(payload) {
     const empty = document.createElement('div');
     empty.className = 'campaign-recipient-list-empty';
     empty.textContent = skipped
-      ? 'Geen geldige ontvanger: ' + (skipped.bedrijf || 'Onbekend') + ' - ' + (skipped.email || '')
-      : 'Geen ontvangers geselecteerd.';
+      ? '0 geldige ontvangers. Eerste afgevallen bedrijf: ' + (skipped.bedrijf || 'Onbekend') + ' - ' + (skipped.email || skipped.error || '')
+      : Number(payload && payload.selected) > 0 ? Number(payload && payload.selected) + ' bedrijven geselecteerd, maar de namen konden niet geladen worden.' : '0 bedrijven geselecteerd voor deze filters.';
     list.appendChild(empty);
     return;
   }
@@ -1763,7 +1763,7 @@ async function hydrateCampaignCompanyCountFromSupabase() { const requestedCount 
     const response = await fetch(getColdmailRecipientPreviewUrl(), { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
     const data = response.ok ? await response.json().catch(function () { return null; }) : null;
     if (!data || data.ok === false) throw new Error('Kon campagne-ontvangers niet laden.'); if (requestedCount !== getCampaignRequestedCompanyCount() || requestedRadiusKm !== getSelectedCampaignRadiusKm() || requestedTestMode !== Boolean(window.SoftoraCampaignTestMode && window.SoftoraCampaignTestMode.isEnabled())) return;
-    const recipients = Array.isArray(data && data.recipients) ? data.recipients : []; const serverCount = Number(data && data.selected) || recipients.length; renderCampaignCompanyCount(serverCount > 0 || requestedCount <= 0 ? serverCount : requestedCount);
+    const recipients = Array.isArray(data && data.recipients) ? data.recipients : []; const serverCount = Number(data && data.selected) || recipients.length; renderCampaignCompanyCount(serverCount);
   } catch (_) {
     return;
   }

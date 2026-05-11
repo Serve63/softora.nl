@@ -216,7 +216,10 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /requestedTestMode = Boolean\(window\.SoftoraCampaignTestMode && window\.SoftoraCampaignTestMode\.isEnabled\(\)\)/);
   assert.match(pageSource, /if \(requestedCount !== getCampaignRequestedCompanyCount\(\) \|\| requestedRadiusKm !== getSelectedCampaignRadiusKm\(\) \|\| requestedTestMode !== Boolean/);
   assert.match(pageSource, /const serverCount = Number\(data && data\.selected\) \|\| recipients\.length;/);
-  assert.match(pageSource, /renderCampaignCompanyCount\(serverCount > 0 \|\| requestedCount <= 0 \? serverCount : requestedCount\);/);
+  assert.match(pageSource, /renderCampaignCompanyCount\(serverCount\);/);
+  assert.match(pageSource, /0 bedrijven geselecteerd voor deze filters\./);
+  assert.match(pageSource, /bedrijven geselecteerd, maar de namen konden niet geladen worden\./);
+  assert.match(pageSource, /0 geldige ontvangers\. Eerste afgevallen bedrijf:/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(getCampaignRequestedCompanyCount\(\)\);/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data && data\.selected\) \|\| recipients\.length\);/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data\.candidates/);
