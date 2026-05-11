@@ -268,8 +268,10 @@ test('premium agenda kan handmatige afspraakgegevens wijzigen vanuit de detailmo
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-agenda-stability\.js\?v=20260510b/);
+  assert.match(pageSource, /assets\/premium-agenda-stability\.js\?v=20260511a/);
   assert.match(stabilitySource, /button\.id = 'modalEditAppointmentBtn';/);
+  assert.match(stabilitySource, /button\.className = 'modal-btn primary magnetic';/);
+  assert.doesNotMatch(stabilitySource, /button\.className = 'modal-btn secondary magnetic';/);
   assert.match(stabilitySource, /form\.id = 'appointmentEditForm';/);
   assert.match(stabilitySource, /id="appointmentEditLegend"/);
   assert.match(stabilitySource, /id="appointmentEditTitle"/);

@@ -593,7 +593,7 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
         const footer = modalPrimaryBtn ? modalPrimaryBtn.closest('.modal-footer') : null;
         if (footer && !document.getElementById('modalEditAppointmentBtn')) {
             const button = document.createElement('button');
-            button.className = 'modal-btn secondary magnetic';
+            button.className = 'modal-btn primary magnetic';
             button.id = 'modalEditAppointmentBtn';
             button.type = 'button';
             button.hidden = true;
