@@ -1134,6 +1134,49 @@ test('coldmail preview for websites only counts companies with a ready website-d
   assert.match(result.failedItems[0].error, /Nog geen website-design klaar/i);
 });
 
+test('coldmail preview herkent opgeslagen website-design chunks zonder expliciete chunkCount', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'chunked-ready-1',
+        bedrijf: 'Chunked Design BV',
+        naam: 'Servé',
+        email: 'chunked@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoValues: {
+      softora_database_photos_v1: JSON.stringify({
+        'chunked-ready-1': {
+          id: 'chunked-ready-1',
+          photoKey: 'softora_photo_chunked_ready_1',
+          websitePhotoName: 'Chunked Design BV webdesign',
+        },
+      }),
+      softora_photo_chunked_ready_1_0: TINY_PNG_DATA_URL,
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    service: "Website's",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.selected, 1);
+  assert.deepEqual(result.recipients, [
+    {
+      id: 'chunked-ready-1',
+      bedrijf: 'Chunked Design BV',
+      email: 'chunked@example.test',
+      phone: '',
+      distanceKm: null,
+    },
+  ]);
+  assert.equal(result.failedItems.length, 0);
+});
+
 test('coldcalling preview for websites only includes leads with a ready website-design match', async () => {
   const customerRows = [
     {

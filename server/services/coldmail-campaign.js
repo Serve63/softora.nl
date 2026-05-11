@@ -1589,20 +1589,40 @@ function createColdmailCampaignService(deps = {}) {
     const parsed = safeJsonParse(raw || '{}', {});
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     const stateValues = values && typeof values === 'object' ? values : {};
+    const readChunkedPhotoDataUrl = (photoKey, chunkCount) => {
+      const key = normalizeString(photoKey);
+      if (!key) return '';
+      const explicitCount = Math.max(0, Math.min(80, Number(chunkCount || 0) || 0));
+      const chunks = [];
+      if (explicitCount) {
+        for (let index = 0; index < explicitCount; index += 1) {
+          chunks.push(normalizeString(stateValues[`${key}_${index}`]));
+        }
+      } else {
+        for (let index = 0; index < 80; index += 1) {
+          const value = stateValues[`${key}_${index}`];
+          if (typeof value !== 'string') break;
+          chunks.push(normalizeString(value));
+        }
+      }
+      const dataUrl = chunks.join('');
+      return parseDataUrlImage(dataUrl) ? dataUrl : '';
+    };
     Object.keys(parsed).forEach((key) => {
       const item = parsed[key];
       if (!item || typeof item !== 'object') return;
       const photoKey = normalizeString(item.photoKey);
-      const chunkCount = Math.max(0, Math.min(80, Number(item.chunkCount || 0) || 0));
-      if (photoKey && chunkCount && !parseDataUrlImage(item.websitePhoto)) {
-        const dataUrl = Array.from({ length: chunkCount }, (_, index) => normalizeString(stateValues[`${photoKey}_${index}`])).join('');
-        if (parseDataUrlImage(dataUrl)) item.websitePhoto = dataUrl;
+      if (photoKey && !parseDataUrlImage(item.websitePhoto)) {
+        const dataUrl = readChunkedPhotoDataUrl(photoKey, item.chunkCount);
+        if (dataUrl) item.websitePhoto = dataUrl;
       }
       const mockupPhotoKey = normalizeString(item.mockupPhotoKey || item.websiteMockupKey);
-      const mockupChunkCount = Math.max(0, Math.min(80, Number(item.mockupChunkCount || item.websiteMockupChunkCount || 0) || 0));
-      if (mockupPhotoKey && mockupChunkCount && !parseDataUrlImage(item.websiteMockup)) {
-        const mockupDataUrl = Array.from({ length: mockupChunkCount }, (_, index) => normalizeString(stateValues[`${mockupPhotoKey}_${index}`])).join('');
-        if (parseDataUrlImage(mockupDataUrl)) item.websiteMockup = mockupDataUrl;
+      if (mockupPhotoKey && !parseDataUrlImage(item.websiteMockup)) {
+        const mockupDataUrl = readChunkedPhotoDataUrl(
+          mockupPhotoKey,
+          item.mockupChunkCount || item.websiteMockupChunkCount
+        );
+        if (mockupDataUrl) item.websiteMockup = mockupDataUrl;
       }
     });
     return parsed;
