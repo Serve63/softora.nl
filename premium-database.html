@@ -1599,10 +1599,10 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260510b"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260511a"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
-    <script src="assets/premium-database-photo-storage.js?v=20260505c"></script>
-    <script src="assets/premium-database-webdesign-mockup.js?v=20260510b"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260511a"></script>
+    <script src="assets/premium-database-webdesign-mockup.js?v=20260511a"></script>
     <script src="assets/premium-database-deep-search.js?v=20260506a"></script><script src="assets/premium-database-distance.js?v=20260506a"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
@@ -2175,7 +2175,7 @@
         });
 
         const webdesignMockupController = window.SoftoraDatabaseWebdesignMockup.createController({ state, normalizeCustomer, sortCustomers, isValidWebsitePhotoSource, isValidWebsitePhotoDataUrl, persistCustomerPhotos, renderPage, setStatusMessage, toast });
-        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, ensureMockupForCustomer: function (customerId) { return webdesignMockupController.ensureForCustomer(customerId); }, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, refreshPhotos: async function (context) { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); if (context && context.customerId) await webdesignMockupController.ensureForCustomer(context.customerId); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, ensureMockupForCustomer: function (customerId) { return webdesignMockupController.ensureForCustomer(customerId); }, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, refreshPhotos: async function (context) { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true }); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); if (context && context.customerId) await webdesignMockupController.ensureForCustomer(context.customerId); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
         function mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
@@ -2203,8 +2203,8 @@
             }));
         }
 
-        function loadCustomerPhotoMap(customers) {
-            return customerPhotoStorageController.load(customers || state.klanten);
+        function loadCustomerPhotoMap(customers, options) {
+            return customerPhotoStorageController.load(customers || state.klanten, options);
         }
 
         function persistCustomerPhotos(customers, options) {

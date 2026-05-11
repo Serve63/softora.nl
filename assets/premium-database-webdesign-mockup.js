@@ -170,17 +170,32 @@
         async function ensureForCustomer(customerId, ensureOptions) {
             const id = normalizeString(customerId);
             const force = Boolean(ensureOptions && ensureOptions.force);
+            const pendingReserved = Boolean(ensureOptions && ensureOptions.pendingReserved);
+            const releaseReservedPending = function () {
+                if (!pendingReserved) return;
+                pendingIds.delete(id);
+                if (typeof renderPage === "function") renderPage();
+            };
             const customerIndex = (state.klanten || []).findIndex(function (item) { return item.id === id; });
-            if (customerIndex === -1 || pendingIds.has(id)) return false;
+            if (customerIndex === -1 || (pendingIds.has(id) && !pendingReserved)) {
+                releaseReservedPending();
+                return false;
+            }
             const customer = state.klanten[customerIndex];
-            if (!isValidWebsitePhotoSource(customer && customer.websitePhoto)) return false;
-            if (!force && isValidWebsitePhotoSource(customer && customer.websiteMockup)) return true;
+            if (!isValidWebsitePhotoSource(customer && customer.websitePhoto)) {
+                releaseReservedPending();
+                return false;
+            }
+            if (!force && isValidWebsitePhotoSource(customer && customer.websiteMockup)) {
+                releaseReservedPending();
+                return true;
+            }
 
-            pendingIds.add(id);
+            if (!pendingReserved) pendingIds.add(id);
             if (force && !isValidWebsitePhotoSource(customer && customer.websiteMockup)) {
                 toast("Device mockup wordt lokaal gemaakt, geen extra API-kosten");
             }
-            if (typeof renderPage === "function") renderPage();
+            if (!pendingReserved && typeof renderPage === "function") renderPage();
             try {
                 const image = await loadImage(customer.websitePhoto);
                 const mockupDataUrl = createMockupDataUrl(image);
@@ -214,12 +229,18 @@
         function ensureVisibleMockups(customers, limit) {
             const visible = (Array.isArray(customers) ? customers : [])
                 .filter(function (customer) {
+                    const id = normalizeString(customer && customer.id);
                     return isValidWebsitePhotoSource(customer && customer.websitePhoto)
-                        && !isValidWebsitePhotoSource(customer && customer.websiteMockup);
+                        && !isValidWebsitePhotoSource(customer && customer.websiteMockup)
+                        && id
+                        && !pendingIds.has(id);
                 })
                 .slice(0, Math.max(0, Number(limit) || 0));
+            const reservedPendingIds = visible.map(function (customer) { return normalizeString(customer && customer.id); }).filter(Boolean);
+            reservedPendingIds.forEach(function (id) { pendingIds.add(id); });
+            if (reservedPendingIds.length && typeof renderPage === "function") renderPage();
             return visible.reduce(function (promise, customer) {
-                return promise.then(function () { return ensureForCustomer(customer.id); });
+                return promise.then(function () { return ensureForCustomer(customer.id, { pendingReserved: true }); });
             }, Promise.resolve());
         }
 

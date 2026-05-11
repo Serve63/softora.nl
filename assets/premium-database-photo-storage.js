@@ -23,6 +23,8 @@
         const removalKey = options.removalKey || (key + "_removed_v1");
         const dataPrefix = options.dataPrefix;
         const chunkSize = Math.max(20000, Math.min(180000, Number(options.chunkSize) || 180000));
+        let cachedLoadKey = "";
+        let cachedLoadPromise = null;
 
         function wait(ms) {
             return new Promise(function (resolve) {
@@ -40,6 +42,18 @@
                     return getUiState(scope);
                 });
             });
+        }
+
+        function buildLoadCacheKey(customers) {
+            return (Array.isArray(customers) ? customers : []).map(function (customer, index) {
+                const normalized = normalizeCustomer(customer, "photo-load-" + index);
+                return normalizeString(normalized.id) + "@" + normalizeString(buildCustomerIdentityKey(normalized));
+            }).sort().join("|");
+        }
+
+        function clearLoadCache() {
+            cachedLoadKey = "";
+            cachedLoadPromise = null;
         }
 
         function buildDataKey(customerId) {
@@ -198,17 +212,23 @@
             return patch;
         }
 
-        function load(customers) {
-            return getUiState(scope).then(function (state) {
+        function load(customers, loadOptions) {
+            const loadKey = buildLoadCacheKey(customers);
+            if (!(loadOptions && loadOptions.force) && cachedLoadPromise && cachedLoadKey === loadKey) return cachedLoadPromise;
+            cachedLoadKey = loadKey;
+            cachedLoadPromise = getUiState(scope).then(function (state) {
                 const values = state && state.values && typeof state.values === "object" ? state.values : {};
                 return parsePhotoMap(values[key], values, customers);
             }).catch(function (error) {
                 console.error("Databasefoto's laden via Supabase mislukt:", error);
+                clearLoadCache();
                 return {};
             });
+            return cachedLoadPromise;
         }
 
         function persist(customers, persistOptions) {
+            clearLoadCache();
             return loadPersistState().then(function (state) {
                 const values = state && state.values && typeof state.values === "object" ? state.values : {};
                 const existing = parsePhotoMap(values[key], values, customers);
@@ -222,8 +242,10 @@
                     actor: "Premium database"
                 });
             }).then(function () {
+                clearLoadCache();
                 return { ok: true };
             }).catch(function (error) {
+                clearLoadCache();
                 if (typeof console !== "undefined" && typeof console.error === "function") {
                     console.error("Databasefoto's opslaan via Supabase mislukt:", error);
                 }
