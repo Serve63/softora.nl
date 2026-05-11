@@ -72,7 +72,7 @@ test('coldcalling pages load regio radius helpers before the dashboard bootstrap
     const pageSource = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
     assert.match(
       pageSource,
-      /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*(?:<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=(?:20260502a|20260511a)" defer><\/script>\s*)?<script src="assets\/coldcalling-dashboard\.js\?v=(?:20260427e|20260502a|20260506a)" defer><\/script>/,
+      /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*(?:<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=(?:20260502a|20260511a)" defer><\/script>\s*)?(?:<script src="assets\/premium-risky-action-pin\.js\?v=20260512a" defer><\/script>\s*)?<script src="assets\/coldcalling-dashboard\.js\?v=(?:20260427e|20260502a|20260506a|20260512a)" defer><\/script>/,
       relativePath
     );
   });

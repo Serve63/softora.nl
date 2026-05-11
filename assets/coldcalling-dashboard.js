@@ -7135,222 +7135,30 @@
   }
 
   function ensureStartCampaignConfirmModal() {
-    let overlay = byId('startCampaignConfirmOverlay');
-    if (overlay) return overlay;
-
-    const CAMPAIGN_CONFIRM_PIN_DIGITS = 6;
-    let pinBuffer = '';
-
-    overlay = document.createElement('div');
-    overlay.id = 'startCampaignConfirmOverlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-labelledby', 'startCampaignConfirmTitle');
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(8,10,16,0.72);display:none;align-items:center;justify-content:center;padding:16px;z-index:10050';
-
-    overlay.innerHTML = [
-      '<div id="startCampaignConfirmCard" style="width:min(400px,100%);border-radius:20px;border:1px solid rgba(0,0,0,0.08);background:#fff;',
-      'box-shadow:0 22px 50px rgba(17,19,34,0.12);color:#1a1a2e;padding:2.75rem 2.5rem 1.75rem;font-family:Inter,system-ui,sans-serif;position:relative;overflow:hidden;">',
-      '  <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,rgba(139,34,82,0.55),transparent);pointer-events:none;"></div>',
-      '  <button type="button" id="startCampaignConfirmClose" class="magnetic" aria-label="Sluiten" style="position:absolute;top:8px;right:8px;width:40px;height:40px;border:none;background:transparent;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#606272;padding:0;">',
-      '    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-      '  </button>',
-      '  <div style="display:flex;flex-direction:column;align-items:center;text-align:center;">',
-      '    <div style="width:52px;height:52px;background:linear-gradient(145deg,rgba(139,34,82,0.12),rgba(139,34,82,0.05));border:1px solid rgba(139,34,82,0.15);border-radius:16px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">',
-      '      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8b2252" stroke-width="1.65"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
-      '    </div>',
-      '    <p style="margin:0 0 6px;font-family:Oswald,system-ui,sans-serif;font-size:0.62rem;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#8b2252;">Beveiligde toegang</p>',
-      '    <h2 id="startCampaignConfirmTitle" style="margin:0 0 8px;font-size:1.28rem;font-weight:600;letter-spacing:-0.025em;color:#1a1a2e;line-height:1.2;">PIN invoeren</h2>',
-      '    <p style="margin:0 0 22px;font-size:0.875rem;line-height:1.5;color:#606272;max-width:300px;">Typ je zes cijfers. Is de pin juist, dan start coldcalling automatisch.</p>',
-      '  </div>',
-      '  <div id="startCampaignPinDotsHost" role="status" aria-live="polite" aria-label="Voortgang pin"></div>',
-      '  <div id="startCampaignNumpadHost"></div>',
-      '  <div id="startCampaignPinError" style="display:none;margin-top:14px;font-size:0.75rem;color:#c0392b;text-align:center;min-height:1.25em;font-weight:500;"></div>',
-      '</div>',
-    ].join('');
-
-    document.body.appendChild(overlay);
-
-    const dotsHost = byId('startCampaignPinDotsHost');
-    dotsHost.style.cssText =
-      'display:flex;gap:10px;align-items:center;justify-content:center;width:fit-content;max-width:100%;' +
-      'margin:0 auto 24px;padding:10px 14px;border-radius:999px;background:rgba(0,0,0,0.025);border:1px solid rgba(0,0,0,0.05);';
-
-    for (let i = 0; i < 6; i += 1) {
-      const d = document.createElement('div');
-      d.setAttribute('data-start-campaign-pin-dot', String(i));
-      d.style.cssText =
-        'width:11px;height:11px;border-radius:50%;border:2px solid rgba(22,25,44,0.12);background:transparent;transition:transform .18s ease,background .18s ease,border-color .18s ease,box-shadow .18s ease;';
-      dotsHost.appendChild(d);
-    }
-
-    const errEl = byId('startCampaignPinError');
-    const closeBtn = byId('startCampaignConfirmClose');
-    const numpadHost = byId('startCampaignNumpadHost');
-    numpadHost.style.cssText =
-      'display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;width:100%;max-width:280px;margin:0 auto;';
-
-    const numBtnBase =
-      'box-sizing:border-box;border:1px solid rgba(22,25,44,0.08);border-radius:12px;background:linear-gradient(180deg,#ffffff 0%,#fafafa 100%);' +
-      'font-family:Inter,system-ui,sans-serif;font-size:1.35rem;font-weight:500;font-variant-numeric:tabular-nums;color:#1a1a2e;cursor:pointer;' +
-      'display:flex;align-items:center;justify-content:center;user-select:none;width:100%;min-height:52px;box-shadow:0 1px 2px rgba(0,0,0,0.04);' +
-      'transition:border-color .15s,background .15s,box-shadow .15s,color .15s,transform .08s;';
-
-    function paintStartCampaignPinDots() {
-      const dots = overlay.querySelectorAll('[data-start-campaign-pin-dot]');
-      const n = pinBuffer.length;
-      dots.forEach((el, i) => {
-        const filled = n > 6 ? true : i < n;
-        el.style.background = filled ? '#8b2252' : 'transparent';
-        el.style.borderColor = filled ? '#8b2252' : 'rgba(22,25,44,0.12)';
-        el.style.boxShadow =
-          filled && n <= 6 ? '0 0 0 3px rgba(139,34,82,0.12)' : 'none';
-        el.style.transform = filled ? 'scale(1.12)' : 'scale(1)';
-      });
-    }
-
-    function flashStartCampaignPinDotsError() {
-      const dots = overlay.querySelectorAll('[data-start-campaign-pin-dot]');
-      dots.forEach((el) => {
-        el.style.background = '#c0392b';
-        el.style.borderColor = '#c0392b';
-        el.style.boxShadow = 'none';
-        el.style.transform = 'scale(1)';
-      });
-      window.setTimeout(() => paintStartCampaignPinDots(), 420);
-    }
-
-    function appendPinDigit(ch) {
-      if (pinBuffer.length >= CAMPAIGN_CONFIRM_PIN_DIGITS) return;
-      pinBuffer += ch;
-      paintStartCampaignPinDots();
-      setPinError('');
-      if (pinBuffer.length === CAMPAIGN_CONFIRM_PIN_DIGITS) {
-        window.setTimeout(() => confirmPinAndStart(), 120);
-      }
-    }
-
-    function backPinDigit() {
-      pinBuffer = pinBuffer.slice(0, -1);
-      paintStartCampaignPinDots();
-    }
-
-    function clearPinBuffer() {
-      pinBuffer = '';
-      paintStartCampaignPinDots();
-      setPinError('');
-    }
-
-    function addNumpadButton(labelHtml, ariaLabel, onClick, optStyle = '') {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'magnetic';
-      b.style.cssText = numBtnBase + optStyle;
-      if (ariaLabel) b.setAttribute('aria-label', ariaLabel);
-      if (labelHtml.indexOf('<') !== -1) b.innerHTML = labelHtml;
-      else b.textContent = labelHtml;
-      b.addEventListener('click', onClick);
-      numpadHost.appendChild(b);
-    }
-
-    ['1', '2', '3', '4', '5', '6', '7', '8', '9'].forEach((d) => {
-      addNumpadButton(d, '', () => appendPinDigit(d));
-    });
-    addNumpadButton(
-      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
-      'Volledige pin wissen',
-      () => clearPinBuffer(),
-      'color:#606272;'
-    );
-    addNumpadButton('0', '', () => appendPinDigit('0'));
-    addNumpadButton(
-      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>',
-      'Laatste cijfer wissen',
-      () => backPinDigit(),
-      'color:#606272;'
-    );
-
-    function setPinError(msg) {
-      if (!errEl) return;
-      if (!msg) {
-        errEl.style.display = 'none';
-        errEl.textContent = '';
-        return;
-      }
-      errEl.style.display = 'block';
-      errEl.textContent = msg;
-    }
-
-    function closeOverlay() {
-      overlay.style.display = 'none';
-      setPinError('');
-      pinBuffer = '';
-      paintStartCampaignPinDots();
-    }
-
-    function confirmPinAndStart() {
-      const entered = String(pinBuffer || '').trim();
-      setPinError('');
-      pendingStartConfirmPin = entered;
-      closeOverlay();
-      void startCampaignRequest();
-    }
-
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeOverlay();
-    });
-
-    if (closeBtn) {
-      closeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeOverlay();
-      });
-    }
-
-    document.addEventListener(
-      'keydown',
-      (e) => {
-        if (overlay.style.display === 'none') return;
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          closeOverlay();
-          return;
-        }
-        if (e.key === 'Backspace') {
-          e.preventDefault();
-          backPinDigit();
-          return;
-        }
-        if (e.key >= '0' && e.key <= '9') {
-          e.preventDefault();
-          appendPinDigit(e.key);
-        }
-      },
-      true
-    );
-
-    overlay.openStartCampaignConfirmModal = function openStartCampaignConfirmModalImpl() {
-      setPinError('');
-      pinBuffer = '';
-      paintStartCampaignPinDots();
-      overlay.style.display = 'flex';
-    };
-
-    return overlay;
+    return window.SoftoraRiskyActionPin || null;
   }
 
-  function openStartCampaignConfirmModal() {
+  async function openStartCampaignConfirmModal() {
     if (isSubmitting) return;
     if (activeSequentialClientDispatch && !activeSequentialClientDispatch.completed) {
       setStatusPill('loading', '1 voor 1 actief');
       setStatusMessage('loading', 'Er loopt al een 1 voor 1 campagne. Wacht tot deze klaar is.');
       return;
     }
-    const overlay = ensureStartCampaignConfirmModal();
-    if (overlay && typeof overlay.openStartCampaignConfirmModal === 'function') {
-      overlay.openStartCampaignConfirmModal();
+    const pinDialog = ensureStartCampaignConfirmModal();
+    if (!pinDialog || typeof pinDialog.requestPin !== 'function') {
+      setStatusPill('error', 'Fout');
+      setStatusMessage('error', 'Beveiligingspopup kon niet worden geladen. Campagne niet gestart.');
+      return;
     }
+    const entered = await pinDialog.requestPin({
+      title: 'Bedrijven bellen bevestigen',
+      description: 'Typ de pincode voordat de belcampagne wordt gestart.',
+      confirmLabel: 'Start bellen',
+    });
+    if (!entered) return;
+    pendingStartConfirmPin = entered;
+    await startCampaignRequest();
   }
 
   async function startCampaignRequest() {

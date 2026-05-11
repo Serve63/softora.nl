@@ -23,7 +23,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
   assert.match(
     pageSource,
-    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=20260511a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260506a" defer><\/script>/
+    /<script src="assets\/coldcalling-conversation-summary\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-regio-radius\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-manual-lead-prompt\.js\?v=20260427a" defer><\/script>\s*<script src="assets\/coldcalling-campaign-recipient-preview\.js\?v=20260511a" defer><\/script>\s*<script src="assets\/premium-risky-action-pin\.js\?v=20260512a" defer><\/script>\s*<script src="assets\/coldcalling-dashboard\.js\?v=20260512a" defer><\/script>/
   );
   assert.match(
     pageSource,
@@ -119,8 +119,13 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /<option value="sequential">Apart<\/option>/);
   assert.match(dashboardSource, /sector: getSelectedText\('branche'\) \|\| 'Alles'/);
   assert.match(dashboardSource, /function ensureStartCampaignConfirmModal\(\)/);
+  assert.match(pageSource, /assets\/premium-risky-action-pin\.js\?v=20260512a/);
+  assert.match(pageSource, /assets\/coldcalling-dashboard\.js\?v=20260512a/);
+  assert.match(dashboardSource, /SoftoraRiskyActionPin/);
+  assert.match(dashboardSource, /requestPin\(\{/);
   assert.match(dashboardSource, /confirmPin:\s*startConfirmPin/);
   assert.doesNotMatch(dashboardSource, /CAMPAIGN_START_CONFIRM_PIN\s*=\s*['"][0-9]{6}['"]/);
+  assert.doesNotMatch(dashboardSource, /startCampaignNumpadHost/);
   assert.match(dashboardSource, /pendingStartConfirmPin\s*=\s*entered;/);
   assert.match(dashboardSource, /openStartCampaignConfirmModal\(\);/);
   assert.match(
