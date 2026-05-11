@@ -396,19 +396,18 @@ test('coldmail campaign test mode sends only the safe test inbox', async () => {
   const preview = await service.getColdmailCampaignRecipients({
     count: 10,
     testMode: true,
-    specialAction: 'webdesign',
   });
 
   assert.equal(preview.testMode, true);
   assert.equal(preview.selected, 1);
   assert.equal(preview.recipients[0].email, 'servec321@gmail.com');
+  assert.equal(preview.recipients[0].website, 'softora.nl');
 
   const result = await service.sendColdmailCampaign({
     count: 10,
     subject: 'Test voor {{bedrijf}}',
     body: 'Hoi {{naam}}',
     senderEmail: 'info@softora.nl',
-    specialAction: 'webdesign',
     testMode: true,
   });
 
@@ -422,6 +421,105 @@ test('coldmail campaign test mode sends only the safe test inbox', async () => {
   assert.equal(sentMessages[0].attachments, undefined);
   assert.equal(getSavedState(), null);
   assert.deepEqual(getSavedStates(), []);
+});
+
+test('coldmail campaign test mode can send Softora webdesign attachment safely', async () => {
+  const { service, sentMessages, getSavedState, getSavedStates } = createService({
+    rows: [
+      {
+        id: 'softora-test-mode-recipient',
+        bedrijf: 'Softora Testmodus',
+        naam: 'Servé',
+        email: 'servec321@gmail.com',
+        website: 'softora.nl',
+        dom: 'softora.nl',
+        status: 'benaderbaar',
+        mail: true,
+      },
+      {
+        id: 'real-prospect',
+        bedrijf: 'Echte Klant BV',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'softora-test-mode-recipient': {
+        id: 'softora-test-mode-recipient',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Softora test webdesign',
+      },
+    },
+  });
+
+  const preview = await service.getColdmailCampaignRecipients({
+    count: 10,
+    testMode: true,
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(preview.testMode, true);
+  assert.equal(preview.selected, 1);
+  assert.equal(preview.failedItems.length, 0);
+  assert.equal(preview.recipients[0].id, 'softora-test-mode-recipient');
+  assert.equal(preview.recipients[0].bedrijf, 'Softora Testmodus');
+  assert.equal(preview.recipients[0].email, 'servec321@gmail.com');
+  assert.equal(preview.recipients[0].website, 'softora.nl');
+
+  const result = await service.sendColdmailCampaign({
+    count: 10,
+    subject: 'Test voor {{website}}',
+    body: 'Hoi {{naam}}, dit is de test voor {{website}}.',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+    testMode: true,
+  });
+
+  assert.equal(result.testMode, true);
+  assert.equal(result.sent, 1);
+  assert.equal(result.persisted, 0);
+  assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
+  assert.equal(sentMessages[0].subject, 'Test voor softora.nl');
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
+  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-softora-test-mode-recipient@softora');
+  assert.equal(sentMessages[0].attachments[0].contentType, 'image/png');
+  assert.equal(getSavedState(), null);
+  assert.deepEqual(getSavedStates(), []);
+});
+
+test('coldmail campaign keeps the dedicated Softora test row out of normal campaigns', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'softora-test-mode-recipient',
+        bedrijf: 'Softora Testmodus',
+        naam: 'Servé',
+        email: 'servec321@gmail.com',
+        website: 'softora.nl',
+        status: 'benaderbaar',
+        mail: true,
+      },
+      {
+        id: 'real-prospect',
+        bedrijf: 'Echte Klant BV',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({ count: 10 });
+
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].id, 'real-prospect');
+  assert.equal(result.recipients[0].email, 'ruben@example.test');
 });
 
 test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', async () => {
