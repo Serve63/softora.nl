@@ -9,6 +9,7 @@ const TINY_PNG_DATA_URL =
 function createService(overrides = {}) {
   const sentMessages = [];
   let savedState = null;
+  const savedStates = [];
   let replyState = overrides.replyState || { processed: {} };
   let sendGuardState = overrides.sendGuardState || { entries: [] };
   const rows = overrides.rows || [
@@ -88,6 +89,7 @@ function createService(overrides = {}) {
     },
     setUiStateValues: async (scope, values, meta) => {
       savedState = { scope, values, meta };
+      savedStates.push(savedState);
       if (scope === 'premium_coldmail_auto_replies') {
         replyState = JSON.parse(values.softora_coldmail_auto_replies_v1);
       }
@@ -125,6 +127,7 @@ function createService(overrides = {}) {
     service,
     sentMessages,
     getSavedState: () => savedState,
+    getSavedStates: () => savedStates,
     getReplyState: () => replyState,
     getSendGuardState: () => sendGuardState,
   };
@@ -401,6 +404,133 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
   assert.equal(sentMessages[0].inReplyTo, '<incoming-1@example.test>');
   assert.match(sentMessages[0].text, /Zullen we kort bellen/);
   assert.equal(Object.keys(getReplyState().processed).length, 1);
+});
+
+test('coldmail auto-reply marks positive inbound replies as interested in the database', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-interest@example.test>',
+    subject: 'Re: Nieuwe website',
+    text: 'Hoi Servé, dit klinkt interessant. Kun je meer informatie sturen?',
+    from: { value: [{ address: 'ruben@example.test', name: 'Ruben' }] },
+    to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
+    cc: { value: [] },
+    references: '<sent-interest@softora>',
+  };
+  const { service, getSavedStates } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    openAiApiKey: 'openai-secret',
+    coldmailAutoReplyEnabled: true,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        lastColdmailSentAt: '2026-04-24T12:00:00.000Z',
+        mail: true,
+        hist: [],
+      },
+    ],
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [1],
+      fetch: async function* () {
+        yield { uid: 1, source: 'raw-message', flags: new Set() };
+      },
+      messageFlagsAdd: async () => {},
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: {
+        model: 'gpt-5.5-pro',
+        choices: [{ message: { content: 'Hoi, leuk dat je reageert. Ik stuur je wat meer info.' } }],
+      },
+    }),
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+  const customerWrite = getSavedStates().find((item) => item.scope === 'premium_customers_database');
+  const savedRows = JSON.parse(customerWrite.values.softora_customers_premium_v1);
+
+  assert.equal(result.lifecycleUpdated, 1);
+  assert.equal(savedRows[0].databaseStatus, 'interesse');
+  assert.equal(savedRows[0].status, 'interesse');
+  assert.equal(savedRows[0].coldmailReplyIntent, 'interested');
+  assert.equal(savedRows[0].lastColdmailReplyMessageKey, 'message:incoming-interest@example.test');
+  assert.equal(savedRows[0].activeColdmailCampaignUntil, '');
+  assert.equal(savedRows[0].hist[0].type, 'interesse');
+});
+
+test('coldmail auto-reply blocks opt-out replies without creating customer lifecycle data', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-stop@example.test>',
+    subject: 'Re: Nieuwe website',
+    text: 'Geen interesse, graag afmelden en niet meer mailen.',
+    from: { value: [{ address: 'ruben@example.test', name: 'Ruben' }] },
+    to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
+    cc: { value: [] },
+    references: '<sent-stop@softora>',
+  };
+  const { service, getSavedStates } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    openAiApiKey: 'openai-secret',
+    coldmailAutoReplyEnabled: true,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        lastColdmailSentAt: '2026-04-24T12:00:00.000Z',
+        mail: true,
+        hist: [],
+      },
+    ],
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [1],
+      fetch: async function* () {
+        yield { uid: 1, source: 'raw-message', flags: new Set() };
+      },
+      messageFlagsAdd: async () => {},
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: {
+        model: 'gpt-5.5-pro',
+        choices: [{ message: { content: 'Helder, we halen u van de lijst.' } }],
+      },
+    }),
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+  const customerWrite = getSavedStates().find((item) => item.scope === 'premium_customers_database');
+  const savedRows = JSON.parse(customerWrite.values.softora_customers_premium_v1);
+
+  assert.equal(result.lifecycleUpdated, 1);
+  assert.equal(savedRows[0].databaseStatus, 'geblokkeerd');
+  assert.equal(savedRows[0].status, 'geblokkeerd');
+  assert.equal(savedRows[0].mail, false);
+  assert.equal(savedRows[0].canMail, false);
+  assert.equal(savedRows[0].doNotMail, true);
+  assert.equal(savedRows[0].coldmailReplyIntent, 'opt_out');
+  assert.equal(savedRows[0].hist[0].type, 'geblokkeerd');
 });
 
 test('coldmail campaign keeps MCV E-commerce reusable even after earlier mailed status', async () => {

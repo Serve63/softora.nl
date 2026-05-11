@@ -6,6 +6,11 @@ const {
   resolveRecordId,
   sanitizeStorageSegment,
 } = require('./data-ops-serialization');
+const {
+  chooseStrongerContactStatus,
+  getContactStatusPriority,
+  normalizeContactStatus,
+} = require('./customer-lifecycle');
 
 const TABLES = Object.freeze({
   customers: 'softora_customers',
@@ -92,6 +97,148 @@ function createSoftoraDataOpsStore(deps = {}) {
     };
   }
 
+  function hasUsableCustomerIdentityKey(identityKey) {
+    const parts = normalizeString(identityKey).split('|');
+    const company = normalizeString(parts[0]);
+    const contact = normalizeString(parts[1]);
+    const phone = normalizeString(parts[2]).replace(/[^\d]/g, '');
+    return phone.length >= 7 || Boolean(company && contact);
+  }
+
+  function getCustomerRowStatus(row) {
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    return normalizeContactStatus(
+      row?.database_status || row?.lifecycle_status || payload.databaseStatus || payload.status,
+      payload
+    );
+  }
+
+  function parseCustomerRowTimestampMs(row) {
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const candidates = [
+      row && row.updated_at,
+      payload.updatedAt,
+      payload.lastColdmailReplyAt,
+      payload.lastColdmailSentAt,
+      payload.datum,
+    ];
+    return candidates
+      .map((value) => Date.parse(normalizeString(value)))
+      .filter(Number.isFinite)
+      .reduce((max, value) => Math.max(max, value), 0);
+  }
+
+  function isCustomerRowPreferred(left, right) {
+    const leftPriority = getContactStatusPriority(getCustomerRowStatus(left));
+    const rightPriority = getContactStatusPriority(getCustomerRowStatus(right));
+    if (rightPriority !== leftPriority) return rightPriority > leftPriority;
+    const leftUpdatedAt = parseCustomerRowTimestampMs(left);
+    const rightUpdatedAt = parseCustomerRowTimestampMs(right);
+    if (rightUpdatedAt !== leftUpdatedAt) return rightUpdatedAt > leftUpdatedAt;
+    return false;
+  }
+
+  function isMissingPayloadValue(value) {
+    return value === null || value === undefined || normalizeString(value) === '';
+  }
+
+  function mergeCustomerHistories(primaryPayload, secondaryPayload) {
+    const combined = [
+      ...(Array.isArray(primaryPayload.hist) ? primaryPayload.hist : []),
+      ...(Array.isArray(secondaryPayload.hist) ? secondaryPayload.hist : []),
+    ].filter(Boolean);
+    const seen = new Set();
+    return combined
+      .filter((entry) => {
+        const key = normalizeString(entry && entry.messageKey)
+          || [
+            normalizeString(entry && entry.type),
+            normalizeString(entry && entry.label),
+            normalizeString(entry && entry.date),
+            normalizeString(entry && entry.actor),
+          ].join('|');
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 50);
+  }
+
+  function collectMergedCustomerIds(primaryPayload, secondaryPayload, primaryId, secondaryId) {
+    return Array.from(
+      new Set(
+        [
+          ...(Array.isArray(primaryPayload.mergedCustomerIds) ? primaryPayload.mergedCustomerIds : []),
+          ...(Array.isArray(secondaryPayload.mergedCustomerIds) ? secondaryPayload.mergedCustomerIds : []),
+          primaryId,
+          secondaryId,
+        ]
+          .map(normalizeString)
+          .filter(Boolean)
+      )
+    );
+  }
+
+  function mergeCustomerRowsByIdentity(existingRow, incomingRow, index, source) {
+    const incomingPreferred = isCustomerRowPreferred(existingRow, incomingRow);
+    const primary = incomingPreferred ? incomingRow : existingRow;
+    const secondary = incomingPreferred ? existingRow : incomingRow;
+    const primaryPayload = primary && primary.payload && typeof primary.payload === 'object' ? primary.payload : {};
+    const secondaryPayload =
+      secondary && secondary.payload && typeof secondary.payload === 'object' ? secondary.payload : {};
+    const mergedPayload = {
+      ...secondaryPayload,
+      ...primaryPayload,
+    };
+
+    Object.keys(secondaryPayload).forEach((key) => {
+      if (isMissingPayloadValue(mergedPayload[key]) && !isMissingPayloadValue(secondaryPayload[key])) {
+        mergedPayload[key] = secondaryPayload[key];
+      }
+    });
+
+    const mergedStatus = chooseStrongerContactStatus(getCustomerRowStatus(primary), getCustomerRowStatus(secondary));
+    if (mergedStatus) {
+      mergedPayload.status = mergedStatus;
+      mergedPayload.databaseStatus = mergedStatus;
+    }
+    mergedPayload.id = primary.customer_id;
+    mergedPayload.hist = mergeCustomerHistories(primaryPayload, secondaryPayload);
+    mergedPayload.mergedCustomerIds = collectMergedCustomerIds(
+      primaryPayload,
+      secondaryPayload,
+      primary.customer_id,
+      secondary.customer_id
+    );
+
+    return buildCustomerRow(mergedPayload, index, source);
+  }
+
+  function dedupeCustomerRowsForReplace(rows, source) {
+    const output = [];
+    const indexByIdentityKey = new Map();
+    rows.forEach((row) => {
+      const identityKey = normalizeString(row && row.identity_key);
+      if (!hasUsableCustomerIdentityKey(identityKey)) {
+        output.push(row);
+        return;
+      }
+      const existingIndex = indexByIdentityKey.get(identityKey);
+      if (existingIndex === undefined) {
+        indexByIdentityKey.set(identityKey, output.length);
+        output.push(row);
+        return;
+      }
+      output[existingIndex] = mergeCustomerRowsByIdentity(
+        output[existingIndex],
+        row,
+        existingIndex,
+        source
+      );
+    });
+    return output;
+  }
+
   async function markMissingDeleted(table, idColumn, incomingIds, source) {
     const current = await run(`list-${table}-ids`, (client) =>
       client.from(table).select(idColumn).is('deleted_at', null).limit(5000)
@@ -131,8 +278,11 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   async function replaceCustomers(customers, meta = {}) {
-    const rows = (Array.isArray(customers) ? customers : []).map((item, index) =>
-      buildCustomerRow(item, index, meta.source)
+    const rows = dedupeCustomerRowsForReplace(
+      (Array.isArray(customers) ? customers : []).map((item, index) =>
+        buildCustomerRow(item, index, meta.source)
+      ),
+      meta.source
     );
     if (rows.length) {
       const upsert = await run('upsert-customers', (client) =>

@@ -2,6 +2,10 @@ const nodemailer = require('nodemailer');
 const dns = require('node:dns').promises;
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const {
+  canAdvanceContactStatus,
+  normalizeContactStatus,
+} = require('./customer-lifecycle');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -196,15 +200,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function normalizeDatabaseStatus(value, row = {}) {
-    const raw = normalizeString(value).toLowerCase();
-    if (raw === 'interested' || raw === 'geinteresseerd' || raw === 'geïnteresseerd') {
-      return 'interesse';
-    }
-    if (raw === 'no_deal' || raw === 'geendeal' || raw === 'lost') return 'afgehaakt';
-    if (raw === 'betaald') return 'klant';
-    if (raw === 'open') return 'benaderbaar';
-    if (normalizeString(row.actief).toLowerCase() === 'nee') return 'buiten';
-    return raw || 'prospect';
+    return normalizeContactStatus(value, row) || 'prospect';
   }
 
   function parseDatabaseRows(values = {}) {
@@ -513,6 +509,45 @@ function createColdmailCampaignService(deps = {}) {
       .filter((line) => !/^(from|to|subject|onderwerp|sent|verzonden|cc):/i.test(line))
       .join('\n')
       .trim();
+  }
+
+  function normalizeInboundIntentText(value) {
+    return normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[’']/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function classifyInboundColdmailReplyLifecycle(inboundText) {
+    const text = normalizeInboundIntentText(inboundText);
+    if (!text) return { status: '', intent: 'unknown', label: 'Geen duidelijke mailreactie' };
+
+    const optOutPattern =
+      /\b(stop|afmelden|uitschrijven|unsubscribe|verwijder|remove me|mail mij niet|niet meer mailen|geen interesse|geen behoefte|niet geinteresseerd|niet interessant|laat maar)\b/i;
+    if (optOutPattern.test(text)) {
+      return {
+        status: 'geblokkeerd',
+        intent: 'opt_out',
+        label: 'Afmelding of geen interesse via mail',
+        disableMail: true,
+      };
+    }
+
+    const positivePattern =
+      /\b(interessant|interesse|klinkt goed|klinkt interessant|vertel|meer info|meer informatie|informatie ontvangen|bel mij|bel me|bellen|afspraak|kennismaking|inplannen|plannen|offerte|prijs|kosten|hoe werkt|wanneer kunnen|neem contact|contact opnemen|tell me more|sounds good|interested)\b/i;
+    if (positivePattern.test(text)) {
+      return {
+        status: 'interesse',
+        intent: 'interested',
+        label: 'Interesse via mail',
+        disableMail: false,
+      };
+    }
+
+    return { status: '', intent: 'unclear', label: 'Mailreactie zonder duidelijke lifecycle-status' };
   }
 
   function isOwnMailboxAddress(email) {
@@ -1286,6 +1321,130 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function buildColdmailReplyHistoryEntry({
+    classification,
+    parsedMail,
+    inboundText,
+    processedKey,
+    actor,
+  }) {
+    const date = now().toISOString();
+    return {
+      type: classification.status,
+      label: classification.label,
+      date,
+      actor: normalizeString(actor) || 'Coldmailing',
+      source: 'coldmail-inbound-reply',
+      messageKey: normalizeString(processedKey),
+      subject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+      preview: truncateText(inboundText, 500),
+    };
+  }
+
+  function mergeColdmailReplyHistory(row, entry) {
+    const existingHistory = Array.isArray(row && row.hist) ? row.hist.filter(Boolean) : [];
+    const messageKey = normalizeString(entry && entry.messageKey);
+    const alreadyTracked = messageKey
+      ? existingHistory.some((item) => normalizeString(item && item.messageKey) === messageKey)
+      : false;
+    return (alreadyTracked ? existingHistory : [entry, ...existingHistory]).slice(0, 50);
+  }
+
+  function markRowFromColdmailReply(row, classification, parsedMail, inboundText, processedKey, actor) {
+    const date = now().toISOString();
+    const currentStatus = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
+    const canAdvance = canAdvanceContactStatus(currentStatus, classification.status);
+    const nextStatus = canAdvance ? classification.status : currentStatus;
+    const historyEntry = buildColdmailReplyHistoryEntry({
+      classification,
+      parsedMail,
+      inboundText,
+      processedKey,
+      actor,
+    });
+    const shouldClearCampaignWindow =
+      ['interesse', 'geblokkeerd'].includes(nextStatus) ||
+      ['interesse', 'geblokkeerd'].includes(classification.status);
+    const mailFields = classification.disableMail
+      ? {
+          mail: false,
+          canMail: false,
+          doNotMail: true,
+        }
+      : {};
+
+    return {
+      ...row,
+      ...mailFields,
+      status: nextStatus || row.status,
+      databaseStatus: nextStatus || row.databaseStatus,
+      coldmailReplyIntent: classification.intent,
+      lastColdmailReplyAt: date,
+      lastColdmailReplySubject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+      lastColdmailReplyPreview: truncateText(inboundText, 1000),
+      lastColdmailReplyMessageKey: normalizeString(processedKey),
+      activeColdmailCampaignUntil: shouldClearCampaignWindow ? '' : row.activeColdmailCampaignUntil,
+      coldmailCampaignEndsAt: shouldClearCampaignWindow ? '' : row.coldmailCampaignEndsAt,
+      updatedAt: date,
+      hist: mergeColdmailReplyHistory(row, historyEntry),
+    };
+  }
+
+  async function persistColdmailReplyLifecycle({
+    values,
+    rows,
+    match,
+    parsedMail,
+    inboundText,
+    processedKey,
+    actor,
+  }) {
+    const classification = classifyInboundColdmailReplyLifecycle(inboundText);
+    if (!classification.status) {
+      return {
+        persisted: false,
+        rows,
+        classification,
+        reason: 'unclear_intent',
+      };
+    }
+    if (!match || !Number.isInteger(match.index) || !rows[match.index]) {
+      return {
+        persisted: false,
+        rows,
+        classification,
+        reason: 'missing_match',
+      };
+    }
+
+    const nextRows = rows.slice();
+    nextRows[match.index] = markRowFromColdmailReply(
+      rows[match.index],
+      classification,
+      parsedMail,
+      inboundText,
+      processedKey,
+      actor
+    );
+    await setUiStateValues(
+      customerDbScope,
+      {
+        ...values,
+        [customerDbKey]: JSON.stringify(nextRows),
+      },
+      {
+        source: 'coldmail-inbound-reply',
+        actor: normalizeString(actor) || 'coldmail-auto-reply',
+      }
+    );
+    return {
+      persisted: true,
+      rows: nextRows,
+      classification,
+      reason: 'updated',
+    };
+  }
+
   async function sendColdmailCampaign(input = {}) {
     if (!isSmtpMailConfigured()) {
       const error = new Error('Mail is nog niet gekoppeld. Vul eerst de SMTP-gegevens op de server in.');
@@ -1514,11 +1673,13 @@ function createColdmailCampaignService(deps = {}) {
         skippedProcessed: 0,
         ignored: 0,
         markedSeen: 0,
+        lifecycleUpdated: 0,
+        lifecycleSkipped: 0,
         errors: [],
       };
       const dbState = await getUiStateValues(customerDbScope);
       const values = dbState && typeof dbState.values === 'object' ? dbState.values : {};
-      const rows = parseDatabaseRows(values);
+      let rows = parseDatabaseRows(values);
       const replyState = await loadColdmailReplyState();
       const client = createImapClient({
         host: imapHost,
@@ -1580,6 +1741,31 @@ function createColdmailCampaignService(deps = {}) {
               stats.matched += 1;
               const from = getParsedMailFromEmail(parsedMail);
               try {
+                try {
+                  const lifecycle = await persistColdmailReplyLifecycle({
+                    values,
+                    rows,
+                    match,
+                    parsedMail,
+                    inboundText,
+                    processedKey,
+                    actor: 'Coldmailing',
+                  });
+                  rows = lifecycle.rows;
+                  if (lifecycle.persisted) {
+                    stats.lifecycleUpdated += 1;
+                  } else {
+                    stats.lifecycleSkipped += 1;
+                  }
+                } catch (error) {
+                  stats.errors.push(
+                    `${from.address || 'onbekende afzender'} lifecycle: ${truncateText(
+                      error && error.message ? error.message : String(error),
+                      220
+                    )}`
+                  );
+                }
+
                 const senderEmail = resolveInboundSenderEmail(parsedMail);
                 const aiReply = await generateColdmailAutoReplyWithOpenAi({
                   row: match.row,
@@ -1600,6 +1786,12 @@ function createColdmailCampaignService(deps = {}) {
                   subject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
                   model: aiReply.model,
                   messageId: normalizeString(info && info.messageId),
+                  lifecycleStatus: normalizeString(
+                    classifyInboundColdmailReplyLifecycle(inboundText).status
+                  ),
+                  lifecycleIntent: normalizeString(
+                    classifyInboundColdmailReplyLifecycle(inboundText).intent
+                  ),
                 };
                 await saveColdmailReplyState(replyState, 'coldmail-auto-reply');
                 stats.replied += 1;
