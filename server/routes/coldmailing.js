@@ -52,14 +52,84 @@ async function resolveColdmailingAgendaCapacity(deps) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderColdmailUnsubscribePage({ title, message, ok = true }) {
+  const accent = ok ? '#a92561' : '#6b7280';
+  return `<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#faf9f7;color:#1b1b2f;font-family:Arial,sans-serif}
+    main{width:min(520px,calc(100% - 32px));padding:42px 34px;border:1px solid #ead8e1;border-radius:18px;background:#fff;box-shadow:0 22px 60px rgba(45,35,45,.08);text-align:center}
+    h1{margin:0 0 12px;font-size:clamp(32px,7vw,54px);letter-spacing:.02em;color:${accent};font-weight:800}
+    p{margin:0;color:#5f6070;font-size:18px;line-height:1.55}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>${escapeHtml(title)}</h1>
+    <p>${escapeHtml(message)}</p>
+  </main>
+</body>
+</html>`;
+}
+
 function registerColdmailingRoutes(app, deps = {}) {
   const {
     coldmailCampaignService,
+    getEffectivePublicBaseUrl = () => '',
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
   } = deps;
 
   if (!coldmailCampaignService) return;
+
+  app.get(['/afmelden', '/coldmailing/afmelden'], async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    try {
+      if (typeof coldmailCampaignService.unsubscribeColdmailRecipient !== 'function') {
+        res.status(404).type('html').send(
+          renderColdmailUnsubscribePage({
+            ok: false,
+            title: 'Niet gevonden',
+            message: 'Deze afmeldlink is niet beschikbaar.',
+          })
+        );
+        return;
+      }
+      await coldmailCampaignService.unsubscribeColdmailRecipient({
+        token: req.query.t || req.query.token,
+        actor: 'coldmail-unsubscribe-link',
+      });
+      res.status(200).type('html').send(
+        renderColdmailUnsubscribePage({
+          title: 'Afgemeld',
+          message: 'U bent afgemeld. We mailen u niet meer.',
+        })
+      );
+    } catch (error) {
+      const status = normalizeString(error && error.code) === 'INVALID_UNSUBSCRIBE_TOKEN' ? 400 : 404;
+      res.status(status).type('html').send(
+        renderColdmailUnsubscribePage({
+          ok: false,
+          title: 'Niet afgemeld',
+          message: normalizeString(error && error.message) || 'Deze afmeldlink is ongeldig.',
+        })
+      );
+    }
+  });
 
   app.get('/api/coldmailing/mailbox-options', (_req, res) => {
     res.json({
@@ -148,6 +218,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         mode: body.mode,
         blockedPhones: body.blockedPhones || body.callBlocklist,
         blockedEmails: body.blockedEmails || body.emailBlocklist || body.mailBlocklist || body.blockedMailAddresses,
+        publicBaseUrl: getEffectivePublicBaseUrl(req),
         actor:
           normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
           'Coldmailing',

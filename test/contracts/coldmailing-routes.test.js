@@ -37,6 +37,47 @@ function createRouteHarness(deps) {
   };
 }
 
+function createUnsubscribeRouteHarness(deps) {
+  let unsubscribeHandler = null;
+  const app = {
+    get(routePath, ...handlers) {
+      const paths = Array.isArray(routePath) ? routePath : [routePath];
+      if (paths.includes('/afmelden')) {
+        unsubscribeHandler = handlers[handlers.length - 1];
+      }
+    },
+    post() {},
+  };
+
+  registerColdmailingRoutes(app, deps);
+  assert.equal(typeof unsubscribeHandler, 'function');
+
+  return async function callUnsubscribe(query = {}) {
+    const res = {
+      statusCode: 200,
+      headers: {},
+      body: '',
+      setHeader(key, value) {
+        this.headers[key.toLowerCase()] = value;
+      },
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      type(value) {
+        this.contentType = value;
+        return this;
+      },
+      send(payload) {
+        this.body = payload;
+        return payload;
+      },
+    };
+    await unsubscribeHandler({ query }, res);
+    return res;
+  };
+}
+
 test('coldmailing campaign send blocks before sending when next 10 workdays are full', async () => {
   let synced = false;
   let sent = 0;
@@ -122,6 +163,29 @@ test('coldmailing campaign send forwards sender AI instructions to the service',
   assert.equal(received.aiInstructions, 'Gebruik de afsluiting van Servé.');
   assert.equal(received.toneStyle, 'Informeel & persoonlijk');
   assert.equal(received.senderEmail, 'serve@softora.nl');
+});
+
+test('coldmailing unsubscribe page updates the recipient and shows confirmation', async () => {
+  let received = null;
+  const callUnsubscribe = createUnsubscribeRouteHarness({
+    coldmailCampaignService: {
+      unsubscribeColdmailRecipient: async (payload) => {
+        received = payload;
+        return { ok: true, unsubscribed: true };
+      },
+    },
+    normalizeString: (value) => String(value || '').trim(),
+  });
+
+  const res = await callUnsubscribe({ t: 'signed-token' });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(received.token, 'signed-token');
+  assert.equal(received.actor, 'coldmail-unsubscribe-link');
+  assert.match(res.body, /<h1>Afgemeld<\/h1>/);
+  assert.match(res.body, /We mailen u niet meer/);
+  assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
+  assert.equal(res.headers['cache-control'], 'no-store');
 });
 
 test('coldmailing exposes mail-interest follow-ups outside the coldcalling leads inbox', () => {

@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const crypto = require('node:crypto');
 const dns = require('node:dns').promises;
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
@@ -40,8 +41,8 @@ const PERSONAL_MAILBOX_DOMAINS = new Set([
   'yahoo.com',
   'ymail.com',
 ]);
-const COLDMAIL_OPT_OUT_TEXT =
-  'Geen interesse? Reageer met "stop" of "afmelden", dan mailen we u niet meer.';
+const COLDMAIL_OPT_OUT_LABEL = 'afmelden';
+const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
 const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
 const TEST_RECIPIENT_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL]);
@@ -157,6 +158,8 @@ function createColdmailCampaignService(deps = {}) {
     mailFromAddress = '',
     mailFromName = 'Softora',
     mailReplyTo = '',
+    publicBaseUrl: mailPublicBaseUrl = '',
+    coldmailUnsubscribeSecret = '',
     imapHost = '',
     imapPort = 993,
     imapSecure = false,
@@ -1416,15 +1419,21 @@ function createColdmailCampaignService(deps = {}) {
       .trim();
   }
 
-  function appendColdmailOptOutText(text) {
+  function appendColdmailOptOutText(text, unsubscribeUrl = '') {
     const cleanText = normalizeString(text);
-    if (!cleanText) return COLDMAIL_OPT_OUT_TEXT;
-    if (/(afmelden|uitschrijven|unsubscribe)/i.test(cleanText)) return cleanText;
-    return `${cleanText}\n\n${COLDMAIL_OPT_OUT_TEXT}`;
+    const cleanUrl = normalizeString(unsubscribeUrl);
+    const optOutText = cleanUrl
+      ? `${COLDMAIL_OPT_OUT_LABEL}: ${cleanUrl}`
+      : COLDMAIL_OPT_OUT_LABEL;
+    if (!cleanText) return optOutText;
+    if (!shouldAppendColdmailOptOutText(cleanText)) return cleanText;
+    return `${cleanText}\n\n${optOutText}`;
   }
 
   function shouldAppendColdmailOptOutText(text) {
-    return !/(afmelden|uitschrijven|unsubscribe)/i.test(normalizeString(text));
+    return !/(?:afmelden:\s*https?:\/\/|\/afmelden\?t=|\/coldmailing\/afmelden\?t=|unsubscribe:\s*https?:\/\/)/i.test(
+      normalizeString(text)
+    );
   }
 
   function buildColdmailReference(row, id) {
@@ -1434,6 +1443,97 @@ function createColdmailCampaignService(deps = {}) {
       .toUpperCase();
     const stamp = now().toISOString().slice(0, 10).replace(/-/g, '');
     return `SF-${stamp}-${seed || 'MAIL'}`;
+  }
+
+  function encodeBase64Url(value) {
+    return Buffer.from(String(value || ''), 'utf8')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  }
+
+  function decodeBase64Url(value) {
+    const normalized = normalizeString(value).replace(/-/g, '+').replace(/_/g, '/');
+    const padded = `${normalized}${'='.repeat((4 - (normalized.length % 4)) % 4)}`;
+    return Buffer.from(padded, 'base64').toString('utf8');
+  }
+
+  function getColdmailUnsubscribeSecret() {
+    return normalizeString(coldmailUnsubscribeSecret || smtpPass || imapPass || mailFromAddress || 'softora-coldmail');
+  }
+
+  function signColdmailUnsubscribePayload(encodedPayload) {
+    return crypto
+      .createHmac('sha256', getColdmailUnsubscribeSecret())
+      .update(normalizeString(encodedPayload))
+      .digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  }
+
+  function buildColdmailUnsubscribeToken(row, id, reference) {
+    const payload = {
+      v: 1,
+      id: normalizeString(id || getRowId(row, 0)),
+      email: getRowEmail(row),
+      ref: normalizeString(reference),
+      ts: now().toISOString(),
+    };
+    const encodedPayload = encodeBase64Url(JSON.stringify(payload));
+    return `${encodedPayload}.${signColdmailUnsubscribePayload(encodedPayload)}`;
+  }
+
+  function verifyColdmailUnsubscribeToken(token) {
+    const cleanToken = normalizeString(token);
+    const parts = cleanToken.split('.');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      const error = new Error('Deze afmeldlink is ongeldig.');
+      error.code = 'INVALID_UNSUBSCRIBE_TOKEN';
+      throw error;
+    }
+    const expected = signColdmailUnsubscribePayload(parts[0]);
+    const expectedBuffer = Buffer.from(expected);
+    const actualBuffer = Buffer.from(parts[1]);
+    if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
+      const error = new Error('Deze afmeldlink is ongeldig.');
+      error.code = 'INVALID_UNSUBSCRIBE_TOKEN';
+      throw error;
+    }
+    const payload = safeJsonParse(decodeBase64Url(parts[0]), {});
+    const email = normalizeEmailAddress(payload && payload.email);
+    if (!payload || typeof payload !== 'object' || !email) {
+      const error = new Error('Deze afmeldlink is ongeldig.');
+      error.code = 'INVALID_UNSUBSCRIBE_TOKEN';
+      throw error;
+    }
+    return {
+      v: Number(payload.v || 1),
+      id: normalizeString(payload.id),
+      email,
+      ref: normalizeString(payload.ref),
+      ts: normalizeString(payload.ts),
+    };
+  }
+
+  function normalizePublicBaseUrl(value) {
+    const raw = normalizeString(value).replace(/\/+$/g, '');
+    if (!/^https?:\/\//i.test(raw)) return '';
+    try {
+      const parsed = new URL(raw);
+      return parsed.origin;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function buildColdmailUnsubscribeUrl(row, id, reference, input = {}) {
+    const baseUrl =
+      normalizePublicBaseUrl(input.publicBaseUrl || mailPublicBaseUrl) ||
+      'https://www.softora.nl';
+    const token = buildColdmailUnsubscribeToken(row, id, reference);
+    return `${baseUrl}${COLDMAIL_UNSUBSCRIBE_PATH}?t=${encodeURIComponent(token)}`;
   }
 
   function appendColdmailReference(text, reference) {
@@ -1447,6 +1547,14 @@ function createColdmailCampaignService(deps = {}) {
     const cleanReference = normalizeString(reference);
     if (!cleanReference) return html;
     return `${html}\n<!-- Softora referentie ${escapeHtml(cleanReference)} -->`;
+  }
+
+  function appendColdmailOptOutHtml(html, unsubscribeUrl = '') {
+    const cleanUrl = normalizeString(unsubscribeUrl);
+    if (!cleanUrl) return html;
+    return `${html}\n<p style="margin:18px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="${escapeHtml(
+      cleanUrl
+    )}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(COLDMAIL_OPT_OUT_LABEL)}</a></p>`;
   }
 
   function escapeHtml(value) {
@@ -1530,10 +1638,13 @@ function createColdmailCampaignService(deps = {}) {
   function appendWebdesignImageHtml(html, attachment, options = {}) {
     if (!attachment || !attachment.cid) return html;
     const optOutText = normalizeString(options.optOutText || '');
+    const optOutUrl = normalizeString(options.optOutUrl || '');
     const optOutHtml = optOutText
-      ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;">${escapeHtml(
-          optOutText
-        )}</p>`
+      ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;">${
+          optOutUrl
+            ? `<a href="${escapeHtml(optOutUrl)}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(optOutText)}</a>`
+            : escapeHtml(optOutText)
+        }</p>`
       : '';
     const mockupHtml = attachment.mockup && attachment.mockup.cid
       ? `\n<p style="margin:18px 0 0 0;"><img src="cid:${escapeHtml(attachment.mockup.cid)}" alt="${escapeHtml(
@@ -1842,6 +1953,53 @@ function createColdmailCampaignService(deps = {}) {
     return (alreadyTracked ? existingHistory : [entry, ...existingHistory]).slice(0, 50);
   }
 
+  function findColdmailUnsubscribeRow(payload, rows = []) {
+    const targetId = normalizeString(payload && payload.id);
+    const targetEmail = normalizeEmailAddress(payload && payload.email);
+    const items = (Array.isArray(rows) ? rows : []).map((row, index) => ({
+      row,
+      index,
+      id: getRowId(row, index),
+      email: getRowEmail(row),
+    }));
+    const exact = items.find((item) => item.id === targetId && item.email === targetEmail);
+    if (exact) return exact;
+    const emailMatches = items.filter((item) => item.email === targetEmail);
+    return emailMatches.length === 1 ? emailMatches[0] : null;
+  }
+
+  function markRowFromColdmailUnsubscribe(row, payload, actor) {
+    const date = now().toISOString();
+    const currentStatus = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
+    const nextStatus = canAdvanceContactStatus(currentStatus, 'geblokkeerd')
+      ? 'geblokkeerd'
+      : currentStatus || 'geblokkeerd';
+    const historyEntry = {
+      type: 'geblokkeerd',
+      label: 'Afgemeld via afmeldlink',
+      date,
+      actor: normalizeString(actor) || 'coldmail-unsubscribe-link',
+      source: 'coldmail-unsubscribe-link',
+      messageKey: normalizeString(payload && payload.ref) || `unsubscribe-${normalizeEmailAddress(payload && payload.email)}`,
+      preview: 'Ontvanger heeft op afmelden geklikt.',
+    };
+    return {
+      ...row,
+      mail: false,
+      canMail: false,
+      doNotMail: true,
+      status: nextStatus,
+      databaseStatus: nextStatus,
+      coldmailReplyIntent: 'opt_out',
+      lastColdmailReplyAt: date,
+      lastColdmailUnsubscribedAt: date,
+      activeColdmailCampaignUntil: '',
+      coldmailCampaignEndsAt: '',
+      updatedAt: date,
+      hist: mergeColdmailReplyHistory(row, historyEntry),
+    };
+  }
+
   function markRowFromColdmailReply(row, classification, parsedMail, inboundText, processedKey, actor) {
     const date = now().toISOString();
     const currentStatus = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
@@ -1937,6 +2095,43 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  async function unsubscribeColdmailRecipient(input = {}) {
+    const payload = verifyColdmailUnsubscribeToken(input.token || input.t);
+    const state = await getUiStateValues(customerDbScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const rows = parseDatabaseRows(values);
+    const match = findColdmailUnsubscribeRow(payload, rows);
+    if (!match || !Number.isInteger(match.index) || !rows[match.index]) {
+      const error = new Error('Deze afmeldlink hoort niet meer bij een bekende ontvanger.');
+      error.code = 'UNSUBSCRIBE_TARGET_NOT_FOUND';
+      throw error;
+    }
+
+    const nextRows = rows.slice();
+    const actor = normalizeString(input.actor || 'coldmail-unsubscribe-link');
+    nextRows[match.index] = markRowFromColdmailUnsubscribe(rows[match.index], payload, actor);
+    await setUiStateValues(
+      customerDbScope,
+      {
+        ...values,
+        [customerDbKey]: JSON.stringify(nextRows),
+      },
+      {
+        source: 'coldmail-unsubscribe-link',
+        actor,
+      }
+    );
+
+    return {
+      ok: true,
+      unsubscribed: true,
+      id: match.id,
+      email: match.email,
+      bedrijf: getRowCompany(nextRows[match.index]),
+      status: normalizeDatabaseStatus(nextRows[match.index].databaseStatus || nextRows[match.index].status),
+    };
+  }
+
   async function sendColdmailCampaign(input = {}) {
     if (!isSmtpMailConfigured()) {
       const error = new Error('Mail is nog niet gekoppeld. Vul eerst de SMTP-gegevens op de server in.');
@@ -2010,7 +2205,11 @@ function createColdmailCampaignService(deps = {}) {
       const to = getRowEmail(row);
       const reference = buildColdmailReference(row, item.id);
       const baseText = buildMailText(bodyTemplate, row);
-      const text = appendColdmailOptOutText(baseText);
+      const shouldAppendOptOut = shouldAppendColdmailOptOutText(baseText);
+      const unsubscribeUrl = shouldAppendOptOut
+        ? buildColdmailUnsubscribeUrl(row, item.id, reference, input)
+        : '';
+      const text = shouldAppendOptOut ? appendColdmailOptOutText(baseText, unsubscribeUrl) : baseText;
       const subject = personalizeTemplate(subjectTemplate, row);
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? await resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
@@ -2022,13 +2221,13 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
-      const htmlBodyText = webdesignPhoto ? baseText : text;
-      const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(htmlBodyText), reference);
+      const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(baseText), reference);
       const html = webdesignPhoto
         ? appendWebdesignImageHtml(htmlBase, webdesignPhoto, {
-            optOutText: shouldAppendColdmailOptOutText(baseText) ? COLDMAIL_OPT_OUT_TEXT : '',
+            optOutText: shouldAppendOptOut ? COLDMAIL_OPT_OUT_LABEL : '',
+            optOutUrl: unsubscribeUrl,
           })
-        : htmlBase;
+        : appendColdmailOptOutHtml(htmlBase, unsubscribeUrl);
       const attachments = webdesignPhoto
         ? [
             {
@@ -2356,6 +2555,7 @@ function createColdmailCampaignService(deps = {}) {
     listColdmailReplyFollowUps,
     sendColdmailCampaign,
     syncInboundColdmailRepliesFromImap,
+    unsubscribeColdmailRecipient,
   };
 }
 

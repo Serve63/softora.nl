@@ -230,6 +230,8 @@ function buildServerAppFeatureWiringRuntimeContext({
             mailFromAddress: envConfig.MAIL_FROM_ADDRESS,
             mailFromName: envConfig.MAIL_FROM_NAME,
             mailReplyTo: envConfig.MAIL_REPLY_TO,
+            publicBaseUrl: envConfig.PUBLIC_BASE_URL,
+            coldmailUnsubscribeSecret: envConfig.PREMIUM_SESSION_SECRET || envConfig.MAIL_SMTP_PASS,
             imapHost: envConfig.MAIL_IMAP_HOST,
             imapPort: envConfig.MAIL_IMAP_PORT,
             imapSecure: envConfig.MAIL_IMAP_SECURE,
@@ -265,6 +267,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
         syncRuntimeStateFromSupabaseIfNewer:
           runtimeSyncRuntime.syncRuntimeStateFromSupabaseIfNewer,
+        getEffectivePublicBaseUrl,
         generatedAgendaAppointments: runtimeMemory.generatedAgendaAppointments,
         isGeneratedAppointmentVisibleForAgenda:
           agendaSupportRuntime.isGeneratedAppointmentVisibleForAgenda,
