@@ -420,9 +420,10 @@ html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { dis
 .campagne-head { padding: 14px 20px; border-bottom: 1px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .campagne-title { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dark); }
 .campaign-recipient-menu-wrap { position: relative; display: inline-flex; align-items: center; gap: 8px; }
-.campaign-company-count { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 28px; padding: 5px 9px; border: 1px solid rgba(155,35,85,.16); border-radius: 999px; background: rgba(155,35,85,.06); color: var(--crimson); font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .08em; cursor: pointer; }
+.campaign-company-count { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 28px; padding: 5px 9px; border: 1px solid rgba(155,35,85,.16); border-radius: 999px; background: rgba(155,35,85,.06); color: var(--crimson); font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .08em; cursor: pointer; transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease, transform .15s ease; }
 .campaign-company-count:hover, .campaign-company-count.is-active { background: rgba(155,35,85,.12); border-color: rgba(155,35,85,.32); box-shadow: 0 0 0 3px rgba(155,35,85,.08); }
-.campaign-company-count svg { width: 15px; height: 15px; stroke: currentColor; flex-shrink: 0; }.campaign-test-mode-toggle { min-width: 34px; padding-left: 8px; padding-right: 8px; }
+.campaign-company-count svg { width: 15px; height: 15px; stroke: currentColor; flex-shrink: 0; }.campaign-test-mode-toggle { position: relative; min-width: 34px; padding-left: 8px; padding-right: 8px; }
+.campaign-test-mode-toggle.is-active { background: var(--crimson); border-color: var(--crimson); color: #fff; box-shadow: 0 0 0 4px rgba(155,35,85,.16), 0 10px 22px rgba(155,35,85,.22); transform: translateY(-1px); }.campaign-test-mode-toggle.is-active::after { content: ""; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border: 2px solid #fff; border-radius: 50%; background: #16a34a; box-shadow: 0 2px 6px rgba(22,163,74,.35); }
 .campaign-recipient-list { position: absolute; top: calc(100% + 10px); right: 0; z-index: 40; width: min(330px, calc(100vw - 48px)); max-height: 300px; overflow: auto; padding: 8px; border: 1px solid rgba(155,35,85,.18); border-radius: 12px; background: #fff; box-shadow: 0 18px 45px rgba(26,26,46,.16); }
 .campaign-recipient-list[hidden] { display: none; }
 .campaign-recipient-list-title { padding: 6px 8px 9px; font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--dark); border-bottom: 1px solid rgba(155,35,85,.1); margin-bottom: 4px; }
@@ -1549,11 +1550,8 @@ function getCampaignRowPhone(row) {
   );
 }
 
-function isColdmailTestCampaignCompany(row) {
-  return COLDMAIL_TEST_COMPANIES.includes(
-    normalizeLowerText(row && (row.bedrijf || row.company || row.companyName || row.naam || row.name))
-  );
-}
+function isColdmailTestCampaignCompany(row) { return COLDMAIL_TEST_COMPANIES.includes(normalizeLowerText(row && (row.bedrijf || row.company || row.companyName || row.naam || row.name))); }
+function isDedicatedColdmailTestCampaignRow(row) { return normalizeLowerText(row && (row.id || row.customerId || row.databaseId)) === 'softora-test-mode-recipient'; }
 
 function isRowInActiveColdmailCampaign(row) {
   const untilMs = Math.max(
@@ -1572,7 +1570,7 @@ function isRowInActiveColdmailCampaign(row) {
 }
 
 function isEligibleColdmailCampaignRow(row) {
-  if (!row || typeof row !== 'object') return false;
+  if (!row || typeof row !== 'object' || isDedicatedColdmailTestCampaignRow(row)) return false;
   if (isColdmailTestCampaignCompany(row)) return isLikelyCampaignEmail(getCampaignRowEmail(row));
   const status = normalizeCampaignDatabaseStatus(row.databaseStatus || row.status, row);
   if (['gemaild', 'interesse', 'afspraak', 'klant', 'afgehaakt', 'geblokkeerd', 'buiten'].includes(status)) return false;
@@ -1581,7 +1579,7 @@ function isEligibleColdmailCampaignRow(row) {
 }
 
 function isEligibleColdcallingCampaignRow(row) {
-  if (!row || typeof row !== 'object') return false;
+  if (!row || typeof row !== 'object' || isDedicatedColdmailTestCampaignRow(row)) return false;
   if (!getCampaignRowPhone(row)) return false;
   const status = normalizeCampaignDatabaseStatus(row.databaseStatus || row.status, row);
   if (['interesse', 'afspraak', 'klant', 'afgehaakt', 'geblokkeerd', 'buiten'].includes(status)) return false;
@@ -1713,7 +1711,7 @@ function renderCampaignRecipientList(payload) {
     const recipientPhone = getCampaignRowPhone(recipient);
     email.textContent = showPhone
       ? (recipientPhone || 'Geen telefoonnummer ingevuld')
-      : (recipient.email || 'Geen e-mailadres');
+      : [recipient.email || 'Geen e-mailadres', normalizeText(recipient && (recipient.website || recipient.dom || recipient.domain))].filter(Boolean).join(' · ');
     item.appendChild(company);
     item.appendChild(email);
     list.appendChild(item);

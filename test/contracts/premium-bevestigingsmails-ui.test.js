@@ -167,6 +167,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /id="campaignTestModeToggle"[\s\S]*id="campaignCompanyCount"/);
   assert.match(pageSource, /<span id="campaignCompanyCountValue">0<\/span>/);
   assert.match(pageSource, /\.campaign-company-count \{[\s\S]*display: inline-flex;[\s\S]*border-radius: 999px;/);
+  assert.match(pageSource, /\.campaign-test-mode-toggle\.is-active \{[\s\S]*background: var\(--crimson\);[\s\S]*color: #fff;/);
+  assert.match(pageSource, /\.campaign-test-mode-toggle\.is-active::after \{[\s\S]*background: #16a34a;/);
   assert.match(pageSource, /id="campaignRecipientList" hidden/);
   assert.match(pageSource, /\.campaign-recipient-list \{[\s\S]*position: absolute;[\s\S]*max-height: 300px;/);
   assert.match(pageSource, /const CUSTOMER_DB_SCOPE = 'premium_customers_database';/);
@@ -174,6 +176,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /CUSTOMER_DB_KEY \+ '_chunks_v1'/);
   assert.match(pageSource, /CUSTOMER_DB_KEY \+ '_chunk_' \+ index/);
   assert.match(pageSource, /const COLDMAIL_TEST_COMPANIES = \['mcv e-commerce'\];/);
+  assert.match(pageSource, /function isDedicatedColdmailTestCampaignRow\(row\)/);
+  assert.match(pageSource, /if \(!row \|\| typeof row !== 'object' \|\| isDedicatedColdmailTestCampaignRow\(row\)\) return false;/);
   assert.match(pageSource, /function isColdmailTestCampaignCompany\(row\)/);
   assert.match(pageSource, /if \(isColdmailTestCampaignCompany\(row\)\) return isLikelyCampaignEmail\(getCampaignRowEmail\(row\)\);/);
   assert.match(pageSource, /function hydrateCampaignCompanyCountFromSupabase\(\)/);
