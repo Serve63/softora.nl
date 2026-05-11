@@ -323,14 +323,6 @@ function createColdmailCampaignService(deps = {}) {
     if (isCampaignTestModeEnabled(input.testMode)) return false;
     if (isWebdesignSpecialAction(input.specialAction)) return true;
     const service = normalizeCampaignService(input.service);
-    if (
-      service === 'website' ||
-      service === 'websites' ||
-      service === 'webdesign' ||
-      service === 'website design'
-    ) {
-      return true;
-    }
     return mode === 'call' && !service;
   }
 

@@ -1129,7 +1129,33 @@ test('coldmailing recipient preview skips email addresses from the blocklist', a
   ]);
 });
 
-test('coldmail preview for websites only counts companies with a ready website-design', async () => {
+test('coldmail preview for websites service does not require a ready website-design', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'moon-meis',
+        bedrijf: "Moon's & Meis",
+        naam: 'Moon',
+        email: 'info@moonsenmeis.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    service: "Website's",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].bedrijf, "Moon's & Meis");
+  assert.equal(result.recipients[0].email, 'info@moonsenmeis.nl');
+  assert.equal(result.failedItems.length, 0);
+});
+
+test('coldmail preview for webdesign action only counts companies with a ready website-design', async () => {
   const { service } = createService({
     rows: [
       {
@@ -1161,6 +1187,7 @@ test('coldmail preview for websites only counts companies with a ready website-d
   const result = await service.getColdmailCampaignRecipients({
     count: 10,
     service: "Website's",
+    specialAction: 'webdesign',
   });
 
   assert.equal(result.ok, true);
@@ -1179,7 +1206,7 @@ test('coldmail preview for websites only counts companies with a ready website-d
   assert.match(result.failedItems[0].error, /Nog geen website-design klaar/i);
 });
 
-test('coldmail preview herkent opgeslagen website-design chunks zonder expliciete chunkCount', async () => {
+test('coldmail webdesign action herkent opgeslagen website-design chunks zonder expliciete chunkCount', async () => {
   const { service } = createService({
     rows: [
       {
@@ -1206,6 +1233,7 @@ test('coldmail preview herkent opgeslagen website-design chunks zonder expliciet
   const result = await service.getColdmailCampaignRecipients({
     count: 10,
     service: "Website's",
+    specialAction: 'webdesign',
   });
 
   assert.equal(result.ok, true);
@@ -1222,7 +1250,7 @@ test('coldmail preview herkent opgeslagen website-design chunks zonder expliciet
   assert.equal(result.failedItems.length, 0);
 });
 
-test('coldcalling preview for websites only includes leads with a ready website-design match', async () => {
+test('coldcalling preview for webdesign action only includes leads with a ready website-design match', async () => {
   const customerRows = [
     {
       id: 'ready-customer',
@@ -1271,6 +1299,7 @@ test('coldcalling preview for websites only includes leads with a ready website-
     count: 10,
     mode: 'call',
     service: "Website's",
+    specialAction: 'webdesign',
   });
 
   assert.equal(result.ok, true);

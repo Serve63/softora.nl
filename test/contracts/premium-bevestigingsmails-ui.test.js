@@ -343,7 +343,7 @@ test('premium bevestigingsmails places sender dropdown in the campaign card and 
   assert.doesNotMatch(pageSource, /<div class="mf-label">Campagne afgerond na<\/div>/);
   assert.doesNotMatch(pageSource, /<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
   assert.match(pageSource, /<div class="mf-row lead-generator-hidden-setting">\s*<div class="mf-label">Speciale handeling<\/div>\s*<select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">/);
-  assert.match(pageSource, /<option value="webdesign" selected>Webdesign<\/option>/);
+  assert.match(pageSource, /<option value="" selected>Geen<\/option>\s*<option value="webdesign">Webdesign<\/option>/);
   assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-mail-blocklist\.js\?v=20260506a"><\/script>/);
   assert.doesNotMatch(pageSource, /id="delay1"/);
   assert.doesNotMatch(pageSource, /Antwoord snelheid/);
@@ -398,6 +398,7 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /function hydrateColdmailingSettingsFromSupabase\(\)/);
   assert.match(pageSource, /function bindColdmailingSettingsPersistence\(\)/);
   assert.match(pageSource, /\['campaignSenderEmail', 'campaignSpecialAction', 'coldcallingStack'\]/);
+  assert.doesNotMatch(pageSource, /setSelectValueIfAvailable\(document\.getElementById\('campaignSpecialAction'\), normalized\.specialAction\)/);
   assert.match(pageSource, /\['subj1', 'body1'\]/);
   assert.match(pageSource, /input\.addEventListener\('input', persistColdmailingSettingsSoon\);/);
   assert.match(pageSource, /if \(subjectInput && normalized\.subject\) subjectInput\.value = normalized\.subject;/);
