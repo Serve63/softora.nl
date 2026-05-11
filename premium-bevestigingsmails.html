@@ -1184,7 +1184,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
         <div class="mail-fields">
           <div class="mf-row">
             <div class="mf-label">Toon & stijl</div>
-            <select class="mf-sel">
+            <select class="mf-sel" id="ai-tone-style">
               <option>Vriendelijk & professioneel</option>
               <option>Zakelijk & direct</option>
               <option>Informeel & persoonlijk</option>
@@ -1433,7 +1433,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
-<script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260511a"></script>
+<script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260511a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260511a"></script>
 <script src="assets/premium-campaign-selects.js?v=20260511a"></script>
 <script>
 // ── DATA ──
@@ -1827,17 +1827,6 @@ function initColdmailReplyAutoSync() {
   void syncColdmailRepliesFromMailbox({ force: true });
 }
 
-function normalizeColdmailingSettings(value) {
-  const raw = value && typeof value === 'object' ? value : {};
-  return {
-    senderEmail: String(raw.senderEmail || '').trim().toLowerCase(),
-    specialAction: String(raw.specialAction || '').trim().toLowerCase(),
-    coldcallingStack: normalizeColdcallingStack(raw.coldcallingStack || 'retell_ai'),
-    subject: String(raw.subject || ''),
-    body: String(raw.body || ''),
-  };
-}
-
 function setSelectValueIfAvailable(select, value) {
   if (!select || !value) return false;
   const safeValue = String(value || '').trim();
@@ -1848,18 +1837,8 @@ function setSelectValueIfAvailable(select, value) {
 }
 
 function collectColdmailingSettings() {
-  const senderSelect = document.getElementById('campaignSenderEmail');
-  const specialActionSelect = document.getElementById('campaignSpecialAction');
-  const stackSelect = document.getElementById('coldcallingStack');
-  const subjectInput = document.getElementById('subj1');
-  const bodyInput = document.getElementById('body1');
-  return normalizeColdmailingSettings({
-    senderEmail: senderSelect ? senderSelect.value : '',
-    specialAction: specialActionSelect ? specialActionSelect.value : '',
-    coldcallingStack: stackSelect ? stackSelect.value : '',
-    subject: subjectInput ? subjectInput.value : '',
-    body: bodyInput ? bodyInput.value : '',
-  });
+  const controller = getColdmailingSettingsController();
+  return controller ? controller.collectSettings() : {};
 }
 
 function getCampaignSettingsScope() {
@@ -1870,100 +1849,46 @@ function getCampaignSettingsKey() {
   return isPremiumAiLeadGeneratorPath() ? LEAD_GENERATOR_SETTINGS_KEY : COLDMAILING_SETTINGS_KEY;
 }
 
-async function fetchColdmailingUiState(scope) {
-  const encodedScope = encodeURIComponent(String(scope || ''));
-  const urls = [
-    '/api/ui-state-get?scope=' + encodedScope,
-    '/api/ui-state/' + encodedScope
-  ];
-  let lastError = null;
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, { method: 'GET', cache: 'no-store' });
-      if (!response.ok) throw new Error('UI-state GET mislukt (' + response.status + ')');
-      return await response.json().catch(() => ({}));
-    } catch (error) {
-      lastError = error;
-    }
+function getColdmailingSettingsController() {
+  if (!window.SoftoraCampaignSenderSettings || typeof window.SoftoraCampaignSenderSettings.createController !== 'function') return null;
+  if (!window.softoraColdmailingSenderSettingsController) {
+    window.softoraColdmailingSenderSettingsController = window.SoftoraCampaignSenderSettings.createController({
+      getScope: getCampaignSettingsScope,
+      getKey: getCampaignSettingsKey,
+      normalizeColdcallingStack,
+    });
   }
-  throw lastError || new Error('UI-state GET mislukt');
+  return window.softoraColdmailingSenderSettingsController;
 }
 
-async function saveColdmailingUiState(scope, values) {
-  const encodedScope = encodeURIComponent(String(scope || ''));
-  const urls = [
-    '/api/ui-state-set?scope=' + encodedScope,
-    '/api/ui-state/' + encodedScope
-  ];
-  let lastError = null;
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values: values && typeof values === 'object' ? values : {} }),
-      });
-      if (!response.ok) throw new Error('UI-state SET mislukt (' + response.status + ')');
-      return await response.json().catch(() => ({}));
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError || new Error('UI-state SET mislukt');
+function normalizeColdmailingSettings(value) {
+  const controller = getColdmailingSettingsController();
+  return controller ? controller.normalizeSettings(value) : {};
 }
 
 function persistColdmailingSettingsSoon() {
-  if (coldmailingSettingsSaveTimer) window.clearTimeout(coldmailingSettingsSaveTimer);
-  coldmailingSettingsSaveTimer = window.setTimeout(() => {
-    const settings = collectColdmailingSettings();
-    saveColdmailingUiState(getCampaignSettingsScope(), {
-      [getCampaignSettingsKey()]: JSON.stringify(settings),
-    }).catch(() => {
-      /* De campagne zelf blijft werken; alleen voorkeur bewaren is mislukt. */
-    });
-  }, 250);
+  const controller = getColdmailingSettingsController();
+  if (controller) controller.persistSoon();
 }
 
 function applyColdmailingSettings(settings) {
-  const normalized = normalizeColdmailingSettings(settings);
-  const subjectInput = document.getElementById('subj1');
-  const bodyInput = document.getElementById('body1');
-  setSelectValueIfAvailable(document.getElementById('campaignSenderEmail'), normalized.senderEmail);
-  setSelectValueIfAvailable(document.getElementById('coldcallingStack'), normalized.coldcallingStack);
-  if (subjectInput && normalized.subject) subjectInput.value = normalized.subject;
-  if (bodyInput && normalized.body) bodyInput.value = normalized.body;
+  const controller = getColdmailingSettingsController();
+  if (controller) controller.applySettings(settings);
 }
 
 async function hydrateColdmailingSettingsFromSupabase() {
-  try {
-    const data = await fetchColdmailingUiState(getCampaignSettingsScope());
-    const values = data && data.values && typeof data.values === 'object' ? data.values : {};
-    const rawSettings = JSON.parse(String(values[getCampaignSettingsKey()] || '{}'));
-    applyColdmailingSettings(rawSettings);
-  } catch (_) {
-    /* Voorkeuren zijn optioneel; default formulier blijft bruikbaar. */
-  }
+  const controller = getColdmailingSettingsController();
+  if (controller) await controller.hydrate();
 }
 
 function bindColdmailingSettingsPersistence() {
-  ['campaignSenderEmail', 'campaignSpecialAction', 'coldcallingStack'].forEach((id) => {
-    const select = document.getElementById(id);
-    if (!select || select.dataset.supabaseSettingsBound === '1') return;
-    select.dataset.supabaseSettingsBound = '1';
-    select.addEventListener('change', persistColdmailingSettingsSoon);
-  });
-  ['subj1', 'body1'].forEach((id) => {
-    const input = document.getElementById(id);
-    if (!input || input.dataset.supabaseSettingsBound === '1') return;
-    input.dataset.supabaseSettingsBound = '1';
-    input.addEventListener('input', persistColdmailingSettingsSoon);
-    input.addEventListener('change', persistColdmailingSettingsSoon);
-  });
+  const controller = getColdmailingSettingsController();
+  if (controller) controller.bind();
 }
 
 async function initColdmailingSettingsPersistence() {
-  await hydrateColdmailingSettingsFromSupabase();
-  bindColdmailingSettingsPersistence();
+  const controller = getColdmailingSettingsController();
+  if (controller) await controller.init();
 }
 
 function initCampaignDurationSetting() {
@@ -2432,10 +2357,15 @@ function getColdmailCampaignPayload() {
   const databaseSelect = document.getElementById('database');
   const senderSelect = document.getElementById('campaignSenderEmail');
   const specialActionSelect = document.getElementById('campaignSpecialAction');
+  const senderProfile = getColdmailingSettingsController()
+    ? getColdmailingSettingsController().getCurrentSenderProfile()
+    : {};
   return {
     count: parseInt(document.getElementById('mail-slider').value, 10) || 10,
     subject: document.getElementById('subj1') ? document.getElementById('subj1').value : '',
     body: document.getElementById('body1') ? document.getElementById('body1').value : '',
+    aiInstructions: senderProfile && senderProfile.aiInstructions ? senderProfile.aiInstructions : (document.getElementById('ai-instructies') ? document.getElementById('ai-instructies').value : ''),
+    toneStyle: senderProfile && senderProfile.toneStyle ? senderProfile.toneStyle : (document.getElementById('ai-tone-style') ? document.getElementById('ai-tone-style').value : ''),
     branch: branchSelect ? branchSelect.value : '',
     service: serviceSelect ? serviceSelect.value : '',
     database: databaseSelect ? databaseSelect.value : '',

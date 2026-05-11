@@ -95,6 +95,35 @@ test('coldmailing campaign send blocks before sending when next 10 workdays are 
   assert.equal(sent, 0);
 });
 
+test('coldmailing campaign send forwards sender AI instructions to the service', async () => {
+  let received = null;
+  const callSend = createRouteHarness({
+    coldmailCampaignService: {
+      sendColdmailCampaign: async (payload) => {
+        received = payload;
+        return { ok: true, sent: 1 };
+      },
+    },
+    normalizeString: (value) => String(value || '').trim(),
+    generatedAgendaAppointments: [],
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+  });
+
+  const res = await callSend({
+    count: 1,
+    subject: 'Nieuwe website',
+    body: 'Goedemorgen',
+    aiInstructions: 'Gebruik de afsluiting van Servé.',
+    toneStyle: 'Informeel & persoonlijk',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(received.aiInstructions, 'Gebruik de afsluiting van Servé.');
+  assert.equal(received.toneStyle, 'Informeel & persoonlijk');
+  assert.equal(received.senderEmail, 'serve@softora.nl');
+});
+
 test('coldmailing exposes mail-interest follow-ups outside the coldcalling leads inbox', () => {
   const routeSource = fs.readFileSync(path.join(__dirname, '../../server/routes/coldmailing.js'), 'utf8');
   const leadsPageSource = fs.readFileSync(path.join(__dirname, '../../premium-ai-coldmailing.html'), 'utf8');

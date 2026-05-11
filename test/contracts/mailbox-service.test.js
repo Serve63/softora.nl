@@ -349,6 +349,11 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
     to: 'klant@example.nl',
     subject: 'Re: Vraag',
     body: 'hoi ik stuur dit ff',
+    senderProfile: {
+      toneStyle: 'Informeel & persoonlijk',
+      aiInstructions: 'Eindig altijd met Groetjes, Servé.',
+      body: 'Groetjes,\nServé',
+    },
     context: {
       from: 'Klant',
       email: 'klant@example.nl',
@@ -367,8 +372,11 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
   assert.equal(calls[0].timeout, 65000);
   assert.equal(calls[0].payload.model, 'gpt-test');
   assert.match(calls[0].payload.messages[0].content, /Verzin geen feiten/);
+  assert.match(calls[0].payload.messages[0].content, /afzenderProfiel\.aiInstructions/);
   assert.match(calls[0].payload.messages[1].content, /Kan dit voor vrijdag/);
   assert.match(calls[0].payload.messages[1].content, /hoi ik stuur dit ff/);
+  assert.match(calls[0].payload.messages[1].content, /Groetjes[\s\S]*Servé/);
+  assert.match(calls[0].payload.messages[1].content, /Informeel & persoonlijk/);
 });
 
 test('mailbox service refuses rewrite without OpenAI key', async () => {
