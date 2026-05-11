@@ -21,6 +21,7 @@ function buildBaselineHealthPayload(deps) {
     service: deps.appName,
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.max(0, Math.round(Number(process.uptime?.() || 0))),
+    deployment: buildDeploymentPayload(deps),
   };
 }
 

@@ -78,7 +78,10 @@ test('health endpoints expose stable baseline payloads', async () => {
     assert.equal(typeof body.service, 'string', pathname);
     assert.equal(typeof body.timestamp, 'string', pathname);
     assert.equal(typeof body.uptimeSeconds, 'number', pathname);
-    assert.equal(body.deployment, undefined, pathname);
+    assert.equal(typeof body.deployment, 'object', pathname);
+    assert.equal(Object.prototype.hasOwnProperty.call(body.deployment, 'commitSha'), true, pathname);
+    assert.equal(Object.prototype.hasOwnProperty.call(body.deployment, 'commitRef'), true, pathname);
+    assert.equal(Object.prototype.hasOwnProperty.call(body.deployment, 'provider'), true, pathname);
     assert.equal(body.environment, undefined, pathname);
     assert.equal(body.flags, undefined, pathname);
     assert.equal(body.supabase, undefined, pathname);
