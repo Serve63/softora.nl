@@ -138,7 +138,14 @@ function createColdmailCampaignService(deps = {}) {
   let smtpTransporter = null;
 
   function normalizeEmailAddress(value) {
-    return normalizeString(value).toLowerCase();
+    const raw = normalizeString(value)
+      .toLowerCase()
+      .replace(/[\u200B-\u200D\uFEFF]/g, '');
+    const match = raw.match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\.?/i);
+    return (match ? match[0] : raw)
+      .replace(/[<>()"[\]]/g, '')
+      .replace(/[.,;:!?]+$/g, '')
+      .trim();
   }
 
   function isLikelyValidEmail(value) {
