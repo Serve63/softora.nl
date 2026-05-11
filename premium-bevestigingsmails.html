@@ -1766,7 +1766,7 @@ async function hydrateCampaignCompanyCountFromSupabase() {
     const response = await fetch(getColdmailRecipientPreviewUrl(), { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
     const data = response.ok ? await response.json().catch(function () { return null; }) : null;
     if (!data || data.ok === false) throw new Error('Kon campagne-ontvangers niet laden.');
-    renderCampaignCompanyCount(getCampaignRequestedCompanyCount());
+    const recipients = Array.isArray(data && data.recipients) ? data.recipients : []; renderCampaignCompanyCount(Number(data && data.selected) || recipients.length);
   } catch (_) {
     return;
   }

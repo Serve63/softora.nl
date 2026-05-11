@@ -1136,15 +1136,18 @@ function createColdmailCampaignService(deps = {}) {
       : null;
 
     const failed = [];
-    const candidateRows = rows
+    const eligibleRows = rows
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
       .filter(({ row }) =>
         mode === 'call'
           ? isEligibleColdcallingRow(row, input.branch, input.radiusKm, blockedPhoneKeys)
           : isEligibleColdmailRow(row, input.branch, input.radiusKm, blockedEmailKeys)
-      )
-      .filter((item) => {
-        if (!readyWebdesignMatcher || readyWebdesignMatcher.hasRow(item.row, item.index)) return true;
+      );
+    const candidateRows = [];
+    const selectedRows = [];
+
+    for (const item of eligibleRows) {
+      if (readyWebdesignMatcher && !readyWebdesignMatcher.hasRow(item.row, item.index)) {
         failed.push({
           id: item.id,
           bedrijf: getRowCompany(item.row),
@@ -1152,14 +1155,12 @@ function createColdmailCampaignService(deps = {}) {
           phone: getRowPhone(item.row),
           error: `Nog geen website-design klaar voor ${getRowCompany(item.row) || 'dit bedrijf'}.`,
         });
-        return false;
-      })
-      .slice(0, count);
-    const selectedRows = [];
-
-    for (const item of candidateRows) {
+        continue;
+      }
+      candidateRows.push(item);
       if (mode === 'call') {
         selectedRows.push(item);
+        if (selectedRows.length >= count) break;
         continue;
       }
       const email = getRowEmail(item.row);
@@ -1174,6 +1175,7 @@ function createColdmailCampaignService(deps = {}) {
       }
       if (await isDeliverableEmailDomain(email)) {
         selectedRows.push(item);
+        if (selectedRows.length >= count) break;
       } else {
         failed.push({
           id: item.id,
