@@ -199,7 +199,6 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function isEligibleColdcallingCampaignRow\(row\)/);
   assert.match(pageSource, /function isEligibleCampaignCountRow\(row\) \{\s*return isPremiumAiLeadGeneratorPath\(\)[\s\S]*isEligibleColdcallingCampaignRow\(row\)[\s\S]*isEligibleColdmailCampaignRow\(row\);/);
   assert.match(pageSource, /function isCampaignRowWithinRadius\(row\)/);
-  assert.match(pageSource, /const eligibleRows = coldmailingDatabaseRows\.filter\(\(row\) => isEligibleCampaignCountRow\(row\) && isCampaignRowWithinRadius\(row\)\);/);
   assert.match(pageSource, /params\.set\('radiusKm', String\(getSelectedCampaignRadiusKm\(\)\)\);/);
   assert.match(pageSource, /<input class="slider" type="range" min="0" max="11" value="4" id="km-slider" oninput="updateKm\(this\.value\)">/);
   assert.match(pageSource, /const index = Math\.max\(0, Math\.min\(KM_OPTIES\.length - 1,/);
@@ -207,9 +206,10 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
   assert.match(pageSource, /Number\.isFinite\(Number\(countOverride\)\)/);
   assert.match(pageSource, /const response = await fetch\(getColdmailRecipientPreviewUrl\(\), \{[\s\S]*method: 'GET',[\s\S]*credentials: 'same-origin',[\s\S]*headers: \{ Accept: 'application\/json' \},[\s\S]*cache: 'no-store',[\s\S]*\}\);/);
-  assert.match(pageSource, /renderCampaignCompanyCount\(Number\(data\.candidates \?\? data\.selected \?\? \(Array\.isArray\(data\.recipients\) \? data\.recipients\.length : 0\)\)\);/);
+  assert.match(pageSource, /renderCampaignCompanyCount\(getCampaignRequestedCompanyCount\(\)\);/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data\.selected\) \|\| recipients\.length\);/);
-  assert.match(pageSource, /Math\.min\(requestedCount \|\| eligibleRows\.length, eligibleRows\.length\)/);
+  assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data\.candidates/);
+  assert.match(pageSource, /Math\.max\(0, requestedCount\)/);
   assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\),/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);
   assert.match(pageSource, /initCampaignDatabaseAutoRefresh\(\);/);
@@ -217,6 +217,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /hydrateCampaignCompanyCountFromSupabase\(\),/);
   assert.match(pageSource, /setCampaignRecipientListOpen\(false\);/);
   assert.match(pageSource, /function configureCampaignVolumeControl\(\)/);
+  assert.match(pageSource, /document\.getElementById\('slider-val'\)\.textContent = String\(value\);\s*renderCampaignCompanyCount\(value\);/);
   assert.match(pageSource, /configureCampaignVolumeControl\(\);\s*updateSlider\(document\.getElementById\('mail-slider'\)/);
   assert.match(pageSource, /if \(actualTotal <= 0\) \{[\s\S]*showToast\(firstFailure \|\| 'Er staan nog geen bedrijven met een klaar website-design voor deze campagne\.'\);[\s\S]*await hydrateCampaignCompanyCountFromSupabase\(\);[\s\S]*return;/);
   assert.match(pageSource, /if \(actualTotal < n\) showToast\(actualTotal \+ ' bedrijf' \+ \(actualTotal === 1 \? '' : 'en'\) \+ ' zijn klaar met website-design en worden meegenomen\.'\);/);

@@ -1642,11 +1642,10 @@ function renderCampaignCompanyCount(countOverride) {
   const valueEl = document.getElementById('campaignCompanyCountValue');
   const wrap = document.getElementById('campaignCompanyCount');
   if (!valueEl || !wrap) return;
-  const eligibleRows = coldmailingDatabaseRows.filter((row) => isEligibleCampaignCountRow(row) && isCampaignRowWithinRadius(row));
   const requestedCount = getCampaignRequestedCompanyCount();
   const count = Number.isFinite(Number(countOverride))
     ? Math.max(0, Number(countOverride))
-    : Math.min(requestedCount || eligibleRows.length, eligibleRows.length);
+    : Math.max(0, requestedCount);
   valueEl.textContent = String(count);
   wrap.title = count + ' ' + (count === 1 ? 'bedrijf wordt' : 'bedrijven worden') + (isPremiumAiLeadGeneratorPath() ? ' gebeld.' : ' gemaild.');
   wrap.setAttribute('aria-label', wrap.title);
@@ -1767,7 +1766,7 @@ async function hydrateCampaignCompanyCountFromSupabase() {
     const response = await fetch(getColdmailRecipientPreviewUrl(), { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
     const data = response.ok ? await response.json().catch(function () { return null; }) : null;
     if (!data || data.ok === false) throw new Error('Kon campagne-ontvangers niet laden.');
-    renderCampaignCompanyCount(Number(data.candidates ?? data.selected ?? (Array.isArray(data.recipients) ? data.recipients.length : 0)));
+    renderCampaignCompanyCount(getCampaignRequestedCompanyCount());
   } catch (_) {
     return;
   }
@@ -2116,6 +2115,7 @@ function updateSlider(v) {
   const max = Number(slider ? slider.max : 100) || 100;
   const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
   document.getElementById('slider-val').textContent = String(value);
+  renderCampaignCompanyCount(value);
   if (slider) slider.style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
   void hydrateCampaignCompanyCountFromSupabase();
