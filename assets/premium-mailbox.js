@@ -2,6 +2,8 @@
 "use strict";
 
 const MAILBOX_ACCOUNT_DEFAULT = 'info@softora.nl';
+const MAILBOX_SENDER_SETTINGS_SCOPE = 'premium_coldmailing_settings';
+const MAILBOX_SENDER_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 let activeMailboxAccount = MAILBOX_ACCOUNT_DEFAULT;
 let mailboxAccounts = [
   { email: 'info@softora.nl', name: 'info@softora.nl', imapConfigured: false, smtpConfigured: false },
@@ -287,6 +289,18 @@ function getMailboxAccounts() {
 
 function getMailboxAccount() {
   return activeMailboxAccount;
+}
+
+async function loadMailboxSenderProfile() {
+  if (!window.SoftoraCampaignSenderSettings || typeof window.SoftoraCampaignSenderSettings.loadProfileForSender !== 'function') return null;
+  try {
+    return await window.SoftoraCampaignSenderSettings.loadProfileForSender(getMailboxAccount(), {
+      scope: MAILBOX_SENDER_SETTINGS_SCOPE,
+      key: MAILBOX_SENDER_SETTINGS_KEY,
+    });
+  } catch (_) {
+    return null;
+  }
 }
 
 function closeMailboxAccountMenu() {
@@ -635,6 +649,7 @@ async function rewriteComposeBody() {
   }
   if (sendBtn) sendBtn.disabled = true;
   try {
+    const senderProfile = await loadMailboxSenderProfile();
     const response = await fetch('/api/mailbox/rewrite', {
       method: 'POST',
       credentials: 'same-origin',
@@ -645,6 +660,7 @@ async function rewriteComposeBody() {
         to: getComposeFieldValue('c-to'),
         subject: getComposeFieldValue('c-subject'),
         body: draft,
+        senderProfile,
         context: buildComposeRewriteContext(),
       }),
     });

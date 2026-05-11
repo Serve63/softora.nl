@@ -571,7 +571,17 @@ function createMailboxService(deps = {}) {
     return truncateText(sanitizeMailboxDisplayText(normalizeString(value)), maxLength);
   }
 
-  function buildRewritePromptPayload({ accountEmail, to, subject, body, context }) {
+  function normalizeSenderProfile(value) {
+    const raw = value && typeof value === 'object' ? value : {};
+    return {
+      toneStyle: cleanPromptText(raw.toneStyle, 160),
+      aiInstructions: cleanPromptText(raw.aiInstructions, 1800),
+      signature: cleanPromptText(raw.signature, 1200),
+      bodyTemplate: cleanPromptText(raw.body || raw.bodyTemplate, 4000),
+    };
+  }
+
+  function buildRewritePromptPayload({ accountEmail, to, subject, body, context, senderProfile }) {
     const original = context && typeof context === 'object'
       ? {
           from: cleanPromptText(context.from, 240),
@@ -591,12 +601,13 @@ function createMailboxService(deps = {}) {
         to: cleanPromptText(to, 240),
         subject: cleanPromptText(subject, 240),
       },
+      afzenderProfiel: normalizeSenderProfile(senderProfile),
       origineleMail: original,
       conceptAntwoord: cleanPromptText(body, 8000),
     };
   }
 
-  async function rewriteDraft({ accountEmail, to, subject, body, context }) {
+  async function rewriteDraft({ accountEmail, to, subject, body, context, senderProfile }) {
     const draft = cleanPromptText(body, 8000);
     if (!draft) {
       const error = new Error('Typ eerst je mailtekst.');
@@ -617,13 +628,15 @@ function createMailboxService(deps = {}) {
       'Herschrijf alleen het conceptantwoord van de medewerker.',
       'Maak de tekst duidelijker, netter en professioneler, maar behoud exact de bedoeling.',
       'Gebruik de context van de originele mail om toon en inhoud passend te houden.',
+      'Gebruik afzenderProfiel.aiInstructions en afzenderProfiel.toneStyle als persoonlijke schrijfinstructies van het geselecteerde afzenderadres.',
+      'Als afzenderProfiel.signature of afzenderProfiel.bodyTemplate een afsluiting bevat, behoud die afzender/afsluiting en gebruik geen naam van een ander mailadres.',
       'Verzin geen feiten, beloftes, bedragen, datums, namen, afspraken, URLs of voorwaarden.',
       'Wijzig belangrijke gegevens niet.',
       'Maak het niet overdreven formeel als dat niet nodig is.',
       'Geef alleen de verbeterde mailtekst terug, zonder uitleg, markdown of extra analyse.',
     ].join('\n');
 
-    const payload = buildRewritePromptPayload({ accountEmail, to, subject, body: draft, context });
+    const payload = buildRewritePromptPayload({ accountEmail, to, subject, body: draft, context, senderProfile });
     const baseUrl = normalizeString(openAiApiBaseUrl) || 'https://api.openai.com/v1';
     const { response, data } = await fetchJsonWithTimeout(
       `${baseUrl}/chat/completions`,
@@ -746,6 +759,7 @@ function createMailboxService(deps = {}) {
         to: body.to,
         subject: body.subject,
         body: body.body || body.text || '',
+        senderProfile: body.senderProfile,
         context: body.context,
       });
       return res.status(200).json({ ok: true, text: result.text, result });

@@ -376,37 +376,40 @@ test('premium bevestigingsmails toont plaats en website als zichtbare variabelen
 
 test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const senderSettingsPath = path.join(__dirname, '../../assets/premium-campaign-sender-settings.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const senderSettingsSource = fs.readFileSync(senderSettingsPath, 'utf8');
 
   assert.match(pageSource, /const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';/);
   assert.match(pageSource, /const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';/);
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';/);
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';/);
+  assert.match(pageSource, /assets\/premium-campaign-sender-settings\.js\?v=20260511a/);
+  assert.match(pageSource, /<select class="mf-sel" id="ai-tone-style">/);
   assert.match(pageSource, /function getCampaignSettingsScope\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_SCOPE : COLDMAILING_SETTINGS_SCOPE;\s*\}/);
   assert.match(pageSource, /function getCampaignSettingsKey\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_KEY : COLDMAILING_SETTINGS_KEY;\s*\}/);
+  assert.match(pageSource, /function getColdmailingSettingsController\(\)/);
+  assert.match(pageSource, /SoftoraCampaignSenderSettings\.createController/);
   assert.match(pageSource, /function collectColdmailingSettings\(\)/);
-  assert.match(pageSource, /senderEmail: senderSelect \? senderSelect\.value : ''/);
-  assert.match(pageSource, /specialAction: specialActionSelect \? specialActionSelect\.value : ''/);
-  assert.match(pageSource, /coldcallingStack: stackSelect \? stackSelect\.value : ''/);
-  assert.match(pageSource, /subject: subjectInput \? subjectInput\.value : ''/);
-  assert.match(pageSource, /body: bodyInput \? bodyInput\.value : ''/);
-  assert.match(pageSource, /function fetchColdmailingUiState\(scope\)/);
-  assert.match(pageSource, /\/api\/ui-state-get\?scope=/);
-  assert.match(pageSource, /\/api\/ui-state\//);
-  assert.match(pageSource, /function saveColdmailingUiState\(scope, values\)/);
-  assert.match(pageSource, /\/api\/ui-state-set\?scope=/);
-  assert.match(pageSource, /\[getCampaignSettingsKey\(\)\]: JSON\.stringify\(settings\)/);
-  assert.match(pageSource, /saveColdmailingUiState\(getCampaignSettingsScope\(\),/);
-  assert.match(pageSource, /fetchColdmailingUiState\(getCampaignSettingsScope\(\)\)/);
-  assert.match(pageSource, /values\[getCampaignSettingsKey\(\)\]/);
+  assert.match(pageSource, /controller \? controller\.collectSettings\(\) : \{\}/);
   assert.match(pageSource, /function hydrateColdmailingSettingsFromSupabase\(\)/);
   assert.match(pageSource, /function bindColdmailingSettingsPersistence\(\)/);
-  assert.match(pageSource, /\['campaignSenderEmail', 'campaignSpecialAction', 'coldcallingStack'\]/);
+  assert.match(pageSource, /controller\.hydrate\(\)/);
+  assert.match(pageSource, /controller\.bind\(\)/);
+  assert.match(senderSettingsSource, /const DEFAULT_SCOPE = "premium_coldmailing_settings";/);
+  assert.match(senderSettingsSource, /const DEFAULT_KEY = "softora_coldmailing_settings_v1";/);
+  assert.match(senderSettingsSource, /senders\[senderEmail\]/);
+  assert.match(senderSettingsSource, /if \(!Object\.keys\(senders\)\.length && senderEmail/);
+  assert.match(senderSettingsSource, /state\.settings\.senders\[activeSender\] = normalizeProfile\(rawSettings, readDocumentDefaults\(\)\);/);
+  assert.match(senderSettingsSource, /state\.needsMigrationPersist = true;/);
+  assert.match(senderSettingsSource, /await persistNow\(state\.activeSenderEmail \|\| getCurrentSenderEmail\(\)\)\.catch\(\(\) => null\);/);
+  assert.match(senderSettingsSource, /function switchSenderProfile\(\)/);
+  assert.match(senderSettingsSource, /state\.settings = buildSettingsSnapshot\(previousSender\);/);
+  assert.match(senderSettingsSource, /\["subj1", "body1", "ai-instructies", "ai-tone-style"\]/);
+  assert.match(senderSettingsSource, /senderSelect\.addEventListener\("change", \(\) => \{ void switchSenderProfile\(\); \}\);/);
+  assert.match(senderSettingsSource, /loadProfileForSender/);
+  assert.match(senderSettingsSource, /SoftoraCampaignSenderSettings/);
   assert.doesNotMatch(pageSource, /setSelectValueIfAvailable\(document\.getElementById\('campaignSpecialAction'\), normalized\.specialAction\)/);
-  assert.match(pageSource, /\['subj1', 'body1'\]/);
-  assert.match(pageSource, /input\.addEventListener\('input', persistColdmailingSettingsSoon\);/);
-  assert.match(pageSource, /if \(subjectInput && normalized\.subject\) subjectInput\.value = normalized\.subject;/);
-  assert.match(pageSource, /if \(bodyInput && normalized\.body\) bodyInput\.value = normalized\.body;/);
   assert.match(
     pageSource,
     /initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\)/
@@ -530,6 +533,8 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
   assert.match(pageSource, /function getColdmailCampaignPayload\(\)/);
   assert.match(pageSource, /subject: document\.getElementById\('subj1'\)/);
   assert.match(pageSource, /body: document\.getElementById\('body1'\)/);
+  assert.match(pageSource, /aiInstructions: senderProfile && senderProfile\.aiInstructions/);
+  assert.match(pageSource, /toneStyle: senderProfile && senderProfile\.toneStyle/);
   assert.match(pageSource, /fetch\('\/api\/coldmailing\/campaigns\/send'/);
   assert.match(pageSource, /credentials: 'same-origin'/);
   assert.match(pageSource, /sendResult = await sendColdmailCampaignNow\(\);/);

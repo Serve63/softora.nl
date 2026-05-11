@@ -135,6 +135,8 @@ function registerColdmailingRoutes(app, deps = {}) {
         count: body.count,
         subject: body.subject,
         body: body.body,
+        aiInstructions: body.aiInstructions,
+        toneStyle: body.toneStyle,
         branch: body.branch,
         service: body.service,
         database: body.database,

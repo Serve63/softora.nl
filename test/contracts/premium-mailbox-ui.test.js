@@ -25,7 +25,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260511a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-campaign-sender-settings\.js\?v=20260511a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260511b"><\/script>/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
@@ -85,6 +85,10 @@ test('premium mailbox kan conceptantwoord met mailcontext laten herschrijven', (
   assert.match(scriptSource, /function buildComposeRewriteContext\(\)/);
   assert.match(scriptSource, /async function rewriteComposeBody\(\)/);
   assert.match(scriptSource, /\/api\/mailbox\/rewrite/);
+  assert.match(scriptSource, /function loadMailboxSenderProfile\(\)/);
+  assert.match(scriptSource, /SoftoraCampaignSenderSettings\.loadProfileForSender/);
+  assert.match(scriptSource, /const senderProfile = await loadMailboxSenderProfile\(\);/);
+  assert.match(scriptSource, /senderProfile,/);
   assert.match(scriptSource, /context: buildComposeRewriteContext\(\)/);
   assert.match(scriptSource, /case 'rewrite-compose':[\s\S]*void rewriteComposeBody\(\);/);
   assert.match(scriptSource, /function replyMail\(mail\) \{[\s\S]*setComposeReplyContext\(mail\);/);
