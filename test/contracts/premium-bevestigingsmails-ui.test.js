@@ -222,6 +222,24 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /if \(actualTotal < n\) showToast\(actualTotal \+ ' bedrijf' \+ \(actualTotal === 1 \? '' : 'en'\) \+ ' zijn klaar met website-design en worden meegenomen\.'\);/);
 });
 
+test('premium bevestigingsmails toont mailinteresse op coldmailing zonder leads-pagina te mengen', () => {
+  const root = path.join(__dirname, '../..');
+  const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
+  const followUpsSource = fs.readFileSync(path.join(root, 'assets/premium-coldmail-followups.js'), 'utf8');
+
+  assert.match(pageSource, /assets\/premium-coldmail-followups\.js\?v=20260511a/);
+  assert.doesNotMatch(pageSource, /id="coldmailFollowUps"/);
+  assert.match(followUpsSource, /coldmailFollowUps/);
+  assert.match(followUpsSource, /coldmailFollowUpsCount/);
+  assert.match(followUpsSource, /Mailinteresse/);
+  assert.match(followUpsSource, /html\[data-softora-lead-generator-alias="1"\] \.coldmail-followups\{display:none!important\}/);
+  assert.match(followUpsSource, /\/api\/coldmailing\/replies\/follow-ups\?limit=8/);
+  assert.match(followUpsSource, /isLeadGeneratorAlias/);
+  assert.doesNotMatch(followUpsSource, /\/premium-leads/);
+  assert.doesNotMatch(followUpsSource, /\/api\/agenda\/interested-leads/);
+  assert.doesNotMatch(followUpsSource, /\/api\/agenda\/confirmation-tasks/);
+});
+
 test('premium bevestigingsmails hides mail onderwerp row only on lead-generator alias', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');

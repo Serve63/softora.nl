@@ -96,6 +96,7 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?fresh=1&fast=1&limit=400', timeoutMs: 7000/);
   assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?fresh=1&limit=400', timeoutMs: 12000/);
   assert.match(pageSource, /\/api\/agenda\/interested-leads\?fresh=1&limit=500', 10000/);
+  assert.doesNotMatch(pageSource, /\/api\/coldmailing\/replies\/follow-ups/);
   assert.doesNotMatch(pageSource, /\/api\/coldcalling\/call-updates\?limit=500', 10000/);
   assert.doesNotMatch(pageSource, /\/api\/ai\/call-insights\?limit=500', 10000/);
   assert.match(pageSource, /function leadRowsDiffer\(a, b\)/);
