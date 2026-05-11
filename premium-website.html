@@ -2724,18 +2724,18 @@
             min-height: 100%;
             padding: 2rem 1.9rem;
             border-radius: 30px;
-            border: 1px solid rgba(139, 34, 82, 0.06);
-            border-top: 1px solid rgba(139, 34, 82, 0.06);
-            box-shadow: 0 18px 44px rgba(15, 17, 28, 0.08), inset 18px 0 34px rgba(255, 250, 247, 0.62), inset -18px 0 34px rgba(255, 250, 247, 0.76);
+            border: 1px solid rgba(255, 255, 255, 0.11);
+            border-top: 1px solid rgba(255, 255, 255, 0.16);
+            box-shadow: 0 18px 44px rgba(15, 17, 28, 0.16), inset 18px 0 34px rgba(9, 10, 18, 0.48), inset -18px 0 34px rgba(9, 10, 18, 0.62);
             clip-path: none; isolation: isolate;
-            background-color: #fffaf7; background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.84) 38%, rgba(247, 239, 233, 0.93) 100%), linear-gradient(145deg, rgba(var(--card-accent-rgb, 139,34,82), 0.16) 0%, rgba(255, 255, 255, 0) 58%); background-position: center, center; background-repeat: no-repeat; background-size: cover, cover;
+            background-color: #0f1018; background-image: linear-gradient(180deg, rgba(9, 10, 18, 0.5) 0%, rgba(9, 10, 18, 0.68) 42%, rgba(8, 8, 14, 0.9) 100%), linear-gradient(145deg, rgba(var(--card-accent-rgb, 139,34,82), 0.3) 0%, rgba(255, 255, 255, 0) 58%); background-position: center, center; background-repeat: no-repeat; background-size: cover, cover;
         }
         #diensten .diensten-product-grid .tilt-card:nth-child(1) { --service-card-photo: url('/assets/home-service-websites-ai.jpg?v=20260511b'); --service-card-position: 44% 46%; }
         #diensten .diensten-product-grid .tilt-card:nth-child(2) { --service-card-photo: url('/assets/home-service-software-ai.jpg?v=20260511b'); --service-card-position: 46% 48%; }
         #diensten .diensten-product-grid .tilt-card:nth-child(3) { --service-card-photo: url('/assets/home-service-voice-ai.jpg?v=20260511b'); --service-card-position: 48% 50%; }
         #diensten .diensten-product-grid .tilt-card:nth-child(4) { --service-card-photo: url('/assets/home-service-chatbot-ai.jpg?v=20260511b'); --service-card-position: 58% 50%; }
         .tilt-card::before {
-            inset: -26px; background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.76) 42%, rgba(247, 239, 233, 0.9) 100%), linear-gradient(90deg, rgba(255, 250, 247, 0.94) 0%, rgba(255, 250, 247, 0.2) 18%, rgba(255, 250, 247, 0.2) 82%, rgba(255, 250, 247, 0.96) 100%), var(--service-card-photo); background-position: center, center, var(--service-card-position, center); background-repeat: no-repeat; background-size: cover, cover, cover; opacity: 1; z-index: 0;
+            inset: -26px; background-image: linear-gradient(180deg, rgba(9, 10, 18, 0.48) 0%, rgba(9, 10, 18, 0.62) 42%, rgba(8, 8, 14, 0.86) 100%), linear-gradient(90deg, rgba(9, 10, 18, 0.96) 0%, rgba(9, 10, 18, 0.34) 18%, rgba(9, 10, 18, 0.34) 82%, rgba(9, 10, 18, 0.97) 100%), var(--service-card-photo); background-position: center, center, var(--service-card-position, center); background-repeat: no-repeat; background-size: cover, cover, cover; opacity: 1; z-index: 0;
         }
         .tilt-card::after {
             content: '';
@@ -2744,24 +2744,21 @@
             right: 2rem;
             bottom: 1.05rem;
             height: 1px;
-            background: linear-gradient(90deg, rgba(139, 34, 82, 0), rgba(139, 34, 82, 0.24), rgba(139, 34, 82, 0));
-            opacity: 0.42; z-index: 0;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(207, 79, 132, 0.42), rgba(255, 255, 255, 0));
+            opacity: 0.55; z-index: 0;
         }
         .card-content {
             display: flex;
             flex-direction: column;
             min-height: 100%; position: relative; z-index: 1;
         }
+        .card-number { color: rgba(255, 255, 255, 0.18); }
+        .tilt-card:hover .card-number { color: rgba(255, 255, 255, 0.26); }
         .tilt-card h3 {
-            font-size: 1.7rem;
+            color: #fff; font-size: 1.7rem;
         }
 
-        .tilt-card p {
-            margin-top: auto;
-            padding-top: 1rem;
-            font-size: 0.98rem;
-            line-height: 1.7;
-        }
+        .tilt-card p { margin-top: auto; padding-top: 1rem; color: rgba(255, 255, 255, 0.76); font-size: 0.98rem; line-height: 1.7; }
 
         .image-text-frame {
             gap: clamp(1.6rem, 3vw, 2.5rem);
