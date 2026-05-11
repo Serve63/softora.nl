@@ -1222,7 +1222,8 @@ Softora.nl | +31 6 43 26 27 92</textarea>
           <div class="mf-row lead-generator-hidden-setting">
             <div class="mf-label">Speciale handeling</div>
             <select class="mf-sel" id="campaignSpecialAction" aria-label="Speciale handeling">
-              <option value="webdesign" selected>Webdesign</option>
+              <option value="" selected>Geen</option>
+              <option value="webdesign">Webdesign</option>
             </select>
           </div>
         </div>
@@ -1930,7 +1931,6 @@ function applyColdmailingSettings(settings) {
   const subjectInput = document.getElementById('subj1');
   const bodyInput = document.getElementById('body1');
   setSelectValueIfAvailable(document.getElementById('campaignSenderEmail'), normalized.senderEmail);
-  setSelectValueIfAvailable(document.getElementById('campaignSpecialAction'), normalized.specialAction);
   setSelectValueIfAvailable(document.getElementById('coldcallingStack'), normalized.coldcallingStack);
   if (subjectInput && normalized.subject) subjectInput.value = normalized.subject;
   if (bodyInput && normalized.body) bodyInput.value = normalized.body;
