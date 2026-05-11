@@ -168,6 +168,10 @@ test('html page coordinator renders SEO-managed html and respects handled premiu
   assert.equal(res.headers['Content-Type'], 'text/html; charset=utf-8');
   assert.equal(res.headers['Cache-Control'], 'public, max-age=300, stale-while-revalidate=900');
   assert.match(res.body, /Softora \| SEO Test/);
+  assert.match(
+    res.body,
+    /<link rel="preload" as="image" href="\/assets\/home-hero-generated-v2\.jpg\?v=20260511a">/
+  );
   assert.match(res.body, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(res.body, /href="\/assets\/fonts\/inter-latin\.woff2\?v=20260409a"/);
   assert.doesNotMatch(res.body, /fonts\.googleapis\.com/);
