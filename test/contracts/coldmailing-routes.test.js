@@ -91,6 +91,46 @@ function createUnsubscribeRouteHarness(deps) {
   };
 }
 
+function createPreviewImageRouteHarness(deps) {
+  let previewImageHandler = null;
+  const app = {
+    get(routePath, ...handlers) {
+      if (routePath === '/coldmailing/webdesign-foto') {
+        previewImageHandler = handlers[handlers.length - 1];
+      }
+    },
+    post() {},
+  };
+
+  registerColdmailingRoutes(app, deps);
+  assert.equal(typeof previewImageHandler, 'function');
+
+  return async function callPreviewImage(query = {}) {
+    const res = {
+      statusCode: 200,
+      headers: {},
+      body: null,
+      setHeader(key, value) {
+        this.headers[key.toLowerCase()] = value;
+      },
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      type(value) {
+        this.contentType = value;
+        return this;
+      },
+      send(payload) {
+        this.body = payload;
+        return payload;
+      },
+    };
+    await previewImageHandler({ query }, res);
+    return res;
+  };
+}
+
 test('coldmailing campaign send rejects missing confirmation pin before agenda or mail dispatch', async () => {
   let sent = 0;
   let agendaSynced = false;
@@ -265,6 +305,35 @@ test('coldmailing unsubscribe confirmation updates the recipient', async () => {
   assert.match(res.body, /We mailen u hierover niet meer/);
   assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
   assert.equal(res.headers['cache-control'], 'no-store');
+});
+
+test('coldmailing preview image route serves linked webdesign photos inline', async () => {
+  let received = null;
+  const callPreviewImage = createPreviewImageRouteHarness({
+    coldmailCampaignService: {
+      getColdmailPreviewImage: async (payload) => {
+        received = payload;
+        return {
+          ok: true,
+          content: Buffer.from('mockup-image'),
+          contentType: 'image/png',
+          filename: 'Bakkerij-Zon-device-mockup.png',
+        };
+      },
+    },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+  });
+
+  const res = await callPreviewImage({ t: 'signed-image-token' });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(received.token, 'signed-image-token');
+  assert.equal(res.headers['content-type'], 'image/png');
+  assert.equal(res.headers['content-disposition'], 'inline; filename="Bakkerij-Zon-device-mockup.png"');
+  assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
+  assert.equal(res.headers['cache-control'], 'private, max-age=86400');
+  assert.equal(Buffer.compare(res.body, Buffer.from('mockup-image')), 0);
 });
 
 test('coldmailing exposes mail-interest follow-ups outside the coldcalling leads inbox', () => {

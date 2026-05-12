@@ -112,6 +112,29 @@ function registerColdmailingRoutes(app, deps = {}) {
 
   if (!coldmailCampaignService) return;
 
+  app.get('/coldmailing/webdesign-foto', async (req, res) => {
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    try {
+      if (typeof coldmailCampaignService.getColdmailPreviewImage !== 'function') {
+        res.status(404).type('text').send('Deze foto is niet beschikbaar.');
+        return;
+      }
+      const image = await coldmailCampaignService.getColdmailPreviewImage({
+        token: req.query.t || req.query.token,
+      });
+      const safeFilename = normalizeString(image && image.filename).replace(/["\r\n]/g, '') || 'webdesign-foto.png';
+      res.setHeader('Content-Type', normalizeString(image && image.contentType) || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${safeFilename}"`);
+      res.status(200).send(image.content);
+    } catch (error) {
+      const status = normalizeString(error && error.code) === 'INVALID_UNSUBSCRIBE_TOKEN' ? 400 : 404;
+      res.status(status).type('text').send(
+        truncateText(normalizeString(error && error.message) || 'Deze foto is niet beschikbaar.', 200)
+      );
+    }
+  });
+
   app.get(['/afmelden', '/coldmailing/afmelden'], async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');

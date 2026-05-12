@@ -45,6 +45,8 @@ const PERSONAL_MAILBOX_DOMAINS = new Set([
 const COLDMAIL_OPT_OUT_LABEL = 'Liever geen e-mails meer ontvangen';
 const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Liever geen e-mails meer ontvangen? Bevestig dat hier';
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
+const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
+const COLDMAIL_MOCKUP_CAPTION = 'Zo gaat het eruitzien op verschillende devices ✨';
 const COLDMAIL_TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
 const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
 const TEST_RECIPIENT_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL]);
@@ -1631,6 +1633,37 @@ function createColdmailCampaignService(deps = {}) {
     return `${baseUrl}${COLDMAIL_UNSUBSCRIBE_PATH}?t=${encodeURIComponent(token)}`;
   }
 
+  function buildColdmailPreviewImageToken(row, id, reference, type = 'webdesign') {
+    const payload = {
+      v: 1,
+      id: normalizeString(id || getRowId(row, 0)),
+      email: getRowEmail(row),
+      ref: normalizeString(reference),
+      type: normalizeString(type || 'webdesign').toLowerCase() === 'mockup' ? 'mockup' : 'webdesign',
+      ts: now().toISOString(),
+    };
+    const encodedPayload = encodeBase64Url(JSON.stringify(payload));
+    return `${encodedPayload}.${signColdmailUnsubscribePayload(encodedPayload)}`;
+  }
+
+  function verifyColdmailPreviewImageToken(token) {
+    const payload = verifyColdmailUnsubscribeToken(token);
+    const decoded = safeJsonParse(decodeBase64Url(normalizeString(token).split('.')[0]), {});
+    const type = normalizeString(decoded && decoded.type).toLowerCase();
+    return {
+      ...payload,
+      type: type === 'mockup' ? 'mockup' : 'webdesign',
+    };
+  }
+
+  function buildColdmailPreviewImageUrl(row, id, reference, input = {}, type = 'webdesign') {
+    const baseUrl =
+      normalizePublicBaseUrl(input.publicBaseUrl || mailPublicBaseUrl) ||
+      'https://www.softora.nl';
+    const token = buildColdmailPreviewImageToken(row, id, reference, type);
+    return `${baseUrl}${COLDMAIL_PREVIEW_IMAGE_PATH}?t=${encodeURIComponent(token)}`;
+  }
+
   function appendColdmailReference(text, reference) {
     const cleanText = normalizeString(text);
     const cleanReference = normalizeString(reference);
@@ -1730,10 +1763,34 @@ function createColdmailCampaignService(deps = {}) {
     return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
   }
 
+  function getWebdesignPhotoSource(photo) {
+    if (!photo || typeof photo !== 'object') return '';
+    return normalizeString(
+      photo.websitePhoto ||
+        photo.websitePhotoUrl ||
+        photo.signedUrl ||
+        (photo.storage && photo.storage.signedUrl)
+    );
+  }
+
+  function getWebdesignMockupSource(photo) {
+    if (!photo || typeof photo !== 'object') return '';
+    return normalizeString(
+      photo.websiteMockup ||
+        photo.websiteMockupUrl ||
+        photo.mockupUrl ||
+        photo.signedMockupUrl ||
+        (photo.mockupStorage && photo.mockupStorage.signedUrl)
+    );
+  }
+
   function appendWebdesignImageHtml(html, attachment, options = {}) {
     if (!attachment || !attachment.cid) return html;
     const optOutText = normalizeString(options.optOutText || '');
     const optOutUrl = normalizeString(options.optOutUrl || '');
+    const imageHref = normalizeString(options.imageHref || '');
+    const mockupHref = normalizeString(options.mockupHref || '');
+    const mockupCaption = normalizeString(options.mockupCaption || COLDMAIL_MOCKUP_CAPTION);
     const optOutHtml = optOutText
       ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;">${
           optOutUrl
@@ -1741,14 +1798,20 @@ function createColdmailCampaignService(deps = {}) {
             : escapeHtml(optOutText)
         }</p>`
       : '';
-    const mockupHtml = attachment.mockup && attachment.mockup.cid
-      ? `\n<p style="margin:18px 0 0 0;"><img src="cid:${escapeHtml(attachment.mockup.cid)}" alt="${escapeHtml(
-          attachment.mockup.alt || 'Device mockup'
-        )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>`
-      : '';
-    return `${html}\n<p style="margin:24px 0 0 0;"><img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
+    const imageHtml = `<img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
       attachment.alt || 'Webdesign'
-    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>${mockupHtml}${optOutHtml}`;
+    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" />`;
+    const linkedImageHtml = imageHref
+      ? `<a href="${escapeHtml(imageHref)}" target="_blank" style="display:block;text-decoration:none;border:0;">${imageHtml}</a>`
+      : imageHtml;
+    const mockupHtml = attachment.mockup && attachment.mockup.cid
+      ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(mockupCaption)}</p>\n<p style="margin:0;"><a href="${escapeHtml(
+          mockupHref || `cid:${attachment.mockup.cid}`
+        )}" target="_blank" style="display:block;text-decoration:none;border:0;"><img src="cid:${escapeHtml(attachment.mockup.cid)}" alt="${escapeHtml(
+          attachment.mockup.alt || 'Device mockup'
+        )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></a></p>`
+      : '';
+    return `${html}\n<p style="margin:24px 0 0 0;">${linkedImageHtml}</p>${mockupHtml}${optOutHtml}`;
   }
 
   async function loadColdmailReplyState() {
@@ -1954,13 +2017,13 @@ function createColdmailCampaignService(deps = {}) {
       if (identityKey) photosByIdentity.set(identityKey, item);
     });
     const photo = findStoredPhotoRecordForRow(row, 0, photos, photosByIdentity);
-    const parsed = await resolveImageAttachment(photo && (photo.websitePhoto || photo.websitePhotoUrl));
+    const parsed = await resolveImageAttachment(getWebdesignPhotoSource(photo));
     if (!parsed) return null;
     const baseName = sanitizeFilename(photo.websitePhotoName || `${getRowCompany(row)} webdesign`, 'webdesign');
     const extension = getImageExtension(parsed.contentType);
     const filename = `${baseName}.${extension}`;
     const cid = `webdesign-${sanitizeFilename(getRowId(row, 0), 'image')}@softora`;
-    const mockupParsed = await resolveImageAttachment(photo && (photo.websiteMockup || photo.websiteMockupUrl));
+    const mockupParsed = await resolveImageAttachment(getWebdesignMockupSource(photo));
     const mockupBaseName = sanitizeFilename(photo && (photo.websiteMockupName || `${getRowCompany(row)} device mockup`), 'device-mockup');
     const mockup = mockupParsed
       ? {
@@ -2247,6 +2310,50 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  async function getColdmailPreviewImage(input = {}) {
+    const payload = verifyColdmailPreviewImageToken(input.token || input.t);
+    const state = await getUiStateValues(customerDbScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const rows = parseDatabaseRows(values);
+    const match = findColdmailUnsubscribeRow(payload, rows);
+    if (!match || !rows[match.index]) {
+      const error = new Error('Deze foto hoort niet meer bij een bekende ontvanger.');
+      error.code = 'PREVIEW_IMAGE_TARGET_NOT_FOUND';
+      throw error;
+    }
+
+    const photoMap = await loadCustomerPhotoMap();
+    const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
+    const photosByIdentity = new Map();
+    Object.keys(photos).forEach((key) => {
+      const item = photos[key];
+      const identityKey = normalizeString(item && item.identityKey).toLowerCase();
+      if (identityKey) photosByIdentity.set(identityKey, item);
+    });
+    const photo = findStoredPhotoRecordForRow(rows[match.index], match.index, photos, photosByIdentity);
+    const source = payload.type === 'mockup'
+      ? getWebdesignMockupSource(photo)
+      : getWebdesignPhotoSource(photo);
+    const image = await resolveImageAttachment(source);
+    if (!image) {
+      const error = new Error('Deze foto is niet meer beschikbaar.');
+      error.code = 'PREVIEW_IMAGE_NOT_FOUND';
+      throw error;
+    }
+
+    const company = getRowCompany(rows[match.index]) || 'Softora webdesign';
+    const baseName = payload.type === 'mockup'
+      ? normalizeString(photo && photo.websiteMockupName) || `${company} device mockup`
+      : normalizeString(photo && photo.websitePhotoName) || `${company} webdesign`;
+    return {
+      ok: true,
+      type: payload.type,
+      content: image.content,
+      contentType: image.contentType,
+      filename: `${sanitizeFilename(baseName, payload.type === 'mockup' ? 'device-mockup' : 'webdesign')}.${getImageExtension(image.contentType)}`,
+    };
+  }
+
   async function sendColdmailCampaign(input = {}) {
     if (!isSmtpMailConfigured()) {
       const error = new Error('Mail is nog niet gekoppeld. Vul eerst de SMTP-gegevens op de server in.');
@@ -2344,10 +2451,18 @@ function createColdmailCampaignService(deps = {}) {
         continue;
       }
       const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(baseText), reference);
+      const webdesignImageUrl = webdesignPhoto
+        ? buildColdmailPreviewImageUrl(row, item.id, reference, input, 'webdesign')
+        : '';
+      const mockupImageUrl = webdesignPhoto && webdesignPhoto.mockup
+        ? buildColdmailPreviewImageUrl(row, item.id, reference, input, 'mockup')
+        : '';
       const html = webdesignPhoto
         ? appendWebdesignImageHtml(htmlBase, webdesignPhoto, {
             optOutText: shouldAppendOptOut ? COLDMAIL_OPT_OUT_LABEL : '',
             optOutUrl: unsubscribeUrl,
+            imageHref: webdesignImageUrl,
+            mockupHref: mockupImageUrl,
           })
         : appendColdmailOptOutHtml(htmlBase, unsubscribeUrl);
       const attachments = webdesignPhoto
@@ -2685,6 +2800,7 @@ function createColdmailCampaignService(deps = {}) {
     isSmtpMailConfigured,
     isLikelyValidEmail,
     getColdmailCampaignRecipients,
+    getColdmailPreviewImage,
     getColdmailUnsubscribePreview,
     listColdmailReplyFollowUps,
     sendColdmailCampaign,
