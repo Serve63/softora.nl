@@ -320,9 +320,11 @@ test('premium agenda toont leadscore per eigenaar in de maandheader zonder losse
   assert.match(pageSource, /\.month-nav\s*\{[\s\S]*gap:\s*0\.45rem;/);
   assert.match(pageSource, /\.month-label\s*\{[\s\S]*min-width:\s*auto;/);
   assert.match(pageSource, /\.agenda-header-owners\s*\{[\s\S]*flex-direction:\s*column;/);
-  assert.match(pageSource, /\.agenda-header-owner\.is-leading\s*\{[\s\S]*#7c3aed/);
-  assert.match(pageSource, /premium-agenda-lead-scoreboard\.js\?v=20260510a/);
-  assert.match(scoreboardSource, /function refreshAgendaHeaderLeadOwnerScoreboard\(\) \{[\s\S]*const counts = \{ serve: 0, martijn: 0 \};[\s\S]*row\.classList\.toggle\('is-leading', highestCount > 0 && count === highestCount\);/);
+  assert.match(pageSource, /\.agenda-header-owner\.is-leading\s*\{[\s\S]*color:\s*var\(--accent\);/);
+  assert.match(pageSource, /premium-agenda-lead-scoreboard\.js\?v=20260512a/);
+  assert.match(scoreboardSource, /function refreshAgendaHeaderLeadOwnerScoreboard\(\) \{[\s\S]*const counts = \{ serve: 0, martijn: 0 \};[\s\S]*\.sort\(\(a, b\) => \{[\s\S]*const countDiff = Number\(counts\[b\.ownerKey\] \|\| 0\) - Number\(counts\[a\.ownerKey\] \|\| 0\);[\s\S]*return countDiff \|\| a\.index - b\.index;/);
+  assert.match(scoreboardSource, /if \(container\) container\.appendChild\(entry\.row\);/);
+  assert.match(scoreboardSource, /row\.classList\.toggle\('is-leading', highestCount > 0 && count === highestCount\);/);
   assert.match(scoreboardSource, /renderCalendar = function renderCalendarWithLeadScoreboard\(\) \{[\s\S]*baseRenderCalendar\(\);[\s\S]*refreshAgendaHeaderLeadOwnerScoreboard\(\);/);
   assert.doesNotMatch(pageSource, /agendaManualLeadStatsCard/);
   assert.doesNotMatch(pageSource, />\s*Handmatige leads\s*</);

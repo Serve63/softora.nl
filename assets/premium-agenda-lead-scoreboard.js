@@ -30,6 +30,17 @@
         });
 
         const highestCount = Math.max(counts.serve, counts.martijn, 0);
+        ownerRows
+            .map((row, index) => ({ row, index, ownerKey: String(row.dataset.agendaOwner || '').trim().toLowerCase() }))
+            .sort((a, b) => {
+                const countDiff = Number(counts[b.ownerKey] || 0) - Number(counts[a.ownerKey] || 0);
+                return countDiff || a.index - b.index;
+            })
+            .forEach((entry) => {
+                const container = entry.row.parentElement;
+                if (container) container.appendChild(entry.row);
+            });
+
         ownerRows.forEach((row) => {
             const ownerKey = String(row.dataset.agendaOwner || '').trim().toLowerCase();
             const count = Number(counts[ownerKey] || 0);
