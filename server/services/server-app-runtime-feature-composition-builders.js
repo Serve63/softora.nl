@@ -259,6 +259,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
           leadDbScope: 'coldcalling',
           leadDbKey: 'softora_coldcalling_lead_rows_json',
+          mailboxAccountsRaw: env.MAILBOX_ACCOUNTS || '',
           normalizeString: shared.normalizeString,
           truncateText: shared.truncateText,
         }),

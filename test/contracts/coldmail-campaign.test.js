@@ -9,6 +9,7 @@ const TINY_PNG_DATA_URL =
 
 function createService(overrides = {}) {
   const sentMessages = [];
+  const transportConfigs = [];
   let savedState = null;
   const savedStates = [];
   let replyState = overrides.replyState || { processed: {} };
@@ -101,13 +102,17 @@ function createService(overrides = {}) {
       }
       return { ok: true };
     },
-    createTransport: () => ({
-      sendMail: async (message) => {
-        if (overrides.sendMailError) throw new Error(overrides.sendMailError);
-        sentMessages.push(message);
-        return { messageId: `msg-${sentMessages.length}`, response: '250 ok' };
-      },
-    }),
+    createTransport: (config) => {
+      transportConfigs.push(config);
+      return {
+        sendMail: async (message) => {
+          if (overrides.sendMailError) throw new Error(overrides.sendMailError);
+          sentMessages.push(message);
+          return { messageId: `msg-${sentMessages.length}`, response: '250 ok' };
+        },
+      };
+    },
+    mailboxAccountsRaw: overrides.mailboxAccountsRaw || '',
     createImapClient: overrides.createImapClient,
     parseMailSource: overrides.parseMailSource,
     getOpenAiApiKey: () => overrides.openAiApiKey || '',
@@ -129,6 +134,7 @@ function createService(overrides = {}) {
   return {
     service,
     sentMessages,
+    transportConfigs,
     getSavedState: () => savedState,
     getSavedStates: () => savedStates,
     getReplyState: () => replyState,
@@ -1813,6 +1819,39 @@ test('coldmail campaign uses personal sender name for Serve mailbox', async () =
   });
 
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
+});
+
+test('coldmail campaign sends through the selected mailbox smtp account when configured', async () => {
+  const { service, sentMessages, transportConfigs } = createService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.strato.com',
+        smtpPort: 465,
+        smtpSecure: true,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+  });
+
+  await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Test',
+    body: 'Test',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
+  assert.equal(sentMessages[0].replyTo, 'reply@softora.nl');
+  assert.equal(transportConfigs[0].host, 'smtp.strato.com');
+  assert.equal(transportConfigs[0].port, 465);
+  assert.equal(transportConfigs[0].secure, true);
+  assert.deepEqual(transportConfigs[0].auth, {
+    user: 'serve@softora.nl',
+    pass: 'serve-secret',
+  });
 });
 
 test('coldmail campaign refuses to send when SMTP is not configured', async () => {
