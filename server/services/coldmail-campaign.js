@@ -1793,8 +1793,6 @@ function createColdmailCampaignService(deps = {}) {
     if (!attachment || !attachment.cid) return html;
     const optOutText = normalizeString(options.optOutText || '');
     const optOutUrl = normalizeString(options.optOutUrl || '');
-    const imageHref = normalizeString(options.imageHref || '');
-    const mockupHref = normalizeString(options.mockupHref || '');
     const mockupCaption = normalizeString(options.mockupCaption || COLDMAIL_MOCKUP_CAPTION);
     const optOutHtml = optOutText
       ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;">${
@@ -1806,17 +1804,12 @@ function createColdmailCampaignService(deps = {}) {
     const imageHtml = `<img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
       attachment.alt || 'Webdesign'
     )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" />`;
-    const linkedImageHtml = imageHref
-      ? `<a href="${escapeHtml(imageHref)}" target="_blank" style="display:block;text-decoration:none;border:0;">${imageHtml}</a>`
-      : imageHtml;
     const mockupHtml = attachment.mockup && attachment.mockup.cid
-      ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(mockupCaption)}</p>\n<p style="margin:0;"><a href="${escapeHtml(
-          mockupHref || `cid:${attachment.mockup.cid}`
-        )}" target="_blank" style="display:block;text-decoration:none;border:0;"><img src="cid:${escapeHtml(attachment.mockup.cid)}" alt="${escapeHtml(
+      ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(mockupCaption)}</p>\n<p style="margin:0;"><img src="cid:${escapeHtml(attachment.mockup.cid)}" alt="${escapeHtml(
           attachment.mockup.alt || 'Device mockup'
-        )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></a></p>`
+        )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>`
       : '';
-    return `${html}\n<p style="margin:24px 0 0 0;">${linkedImageHtml}</p>${mockupHtml}${optOutHtml}`;
+    return `${html}\n<p style="margin:24px 0 0 0;">${imageHtml}</p>${mockupHtml}${optOutHtml}`;
   }
 
   async function loadColdmailReplyState() {
@@ -2456,18 +2449,10 @@ function createColdmailCampaignService(deps = {}) {
         continue;
       }
       const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(baseText), reference);
-      const webdesignImageUrl = webdesignPhoto
-        ? buildColdmailPreviewImageUrl(row, item.id, reference, input, 'webdesign')
-        : '';
-      const mockupImageUrl = webdesignPhoto && webdesignPhoto.mockup
-        ? buildColdmailPreviewImageUrl(row, item.id, reference, input, 'mockup')
-        : '';
       const html = webdesignPhoto
         ? appendWebdesignImageHtml(htmlBase, webdesignPhoto, {
             optOutText: shouldAppendOptOut ? COLDMAIL_OPT_OUT_LABEL : '',
             optOutUrl: unsubscribeUrl,
-            imageHref: webdesignImageUrl,
-            mockupHref: mockupImageUrl,
           })
         : appendColdmailOptOutHtml(htmlBase, unsubscribeUrl);
       const attachments = webdesignPhoto
