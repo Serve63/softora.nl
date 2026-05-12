@@ -1,4 +1,4 @@
-import { fetchMarketData, SUPPORTED_ASSETS } from '../data/binanceProvider.js';
+import { fetchMarketData, fetchTickerPrices, SUPPORTED_ASSETS } from '../data/binanceProvider.js';
 import { runBacktest } from '../core/backtester.js';
 import { optimizeStrategy } from '../core/optimizer.js';
 import { runProfitFactorLab } from '../core/profitFactorLab.js';
@@ -9,6 +9,7 @@ import { DEFAULT_TIMEFRAME_RESEARCH, runTimeframeResearch } from '../core/timefr
 import { runRollingWalkForward } from '../core/walkForward.js';
 import {
   calculateForwardMetrics,
+  calculateLiveMarkToMarket,
   evaluateForwardDiscipline,
   exportForwardCsv,
   exportForwardJson,
@@ -32,6 +33,7 @@ const state = {
   timeframeResearch: null,
   profitFactorLab: null,
   profitFactorMarketData: null,
+  liveMark: null,
   activeStrategy: strategyForName(FROZEN_INCUBATION_CANDIDATE.strategyName),
   forwardState: null,
   running: false,
@@ -42,6 +44,15 @@ function formatCurrency(value) {
     style: 'currency',
     currency: 'EUR',
     maximumFractionDigits: 0,
+  }).format(Number(value) || 0);
+}
+
+function formatCurrencyExact(value) {
+  return new Intl.NumberFormat('nl-NL', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(Number(value) || 0);
 }
 
@@ -270,8 +281,10 @@ function renderShell(root) {
           <span id="paperEquity">n.v.t.</span>
         </div>
         <div id="paperPortfolio" class="portfolio-box"></div>
+        <div id="liveMarkBox" class="optimizer-summary"></div>
         <div class="button-row">
-          <button id="logForward" type="button">Log dagelijks signaal</button>
+          <button id="logForward" type="button">Log 4H signaal</button>
+          <button id="refreshLiveMark" type="button">Live waarde</button>
           <button id="exportCsv" type="button">CSV export</button>
           <button id="exportJson" type="button">JSON export</button>
           <button id="importJson" type="button">JSON import</button>
@@ -870,6 +883,7 @@ function renderForward(root) {
   const logs = forwardState.logs || [];
   const metrics = calculateForwardMetrics(forwardState, state.config);
   const discipline = evaluateForwardDiscipline(forwardState, state.config);
+  const liveMark = state.liveMark;
   setText(root, '#paperEquity', formatCurrency(forwardState.paperPortfolio?.equity || state.config.initialCapital));
   setText(root, '#forwardCount', `${logs.length} logs`);
   setText(root, '#forwardVerdict', discipline.verdict);
@@ -884,6 +898,15 @@ function renderForward(root) {
     </div>
     <div class="weights-row">${formatWeightMap(forwardState.paperPortfolio?.weights || {})}</div>
   `;
+  root.querySelector('#liveMarkBox').innerHTML = liveMark?.ok ? `
+    <div class="data-facts">
+      <span>Live paper: ${formatCurrencyExact(liveMark.paperEquity)}</span>
+      <span>Live benchmark: ${formatCurrencyExact(liveMark.benchmarkEquity)}</span>
+      <span>Live edge: ${formatCurrencyExact(liveMark.edgeMoney)}</span>
+      <span>Sinds laatste log: ${formatCurrencyExact(liveMark.paperUnrealizedSinceLog)}</span>
+      <span>Laatste log: ${formatDate(liveMark.lastLogTime)}</span>
+    </div>
+  ` : '<p class="muted">Live waarde nog niet opgehaald.</p>';
 
   root.querySelector('#forwardPerformance').innerHTML = `
     <div class="edge-verdict ${discipline.verdict === 'PROMOTE_READY' || discipline.verdict === 'PASS' ? 'candidate' : discipline.verdict === 'WATCH' || discipline.verdict === 'INCUBATING' ? 'watch' : 'reject'}">${discipline.verdict}</div>
@@ -1073,6 +1096,41 @@ function applyProfitFactorCandidate(root) {
   renderAll(root);
 }
 
+async function refreshLiveMark(root) {
+  const button = root.querySelector('#refreshLiveMark');
+  if (!state.forwardState?.logs?.length) {
+    setText(root, '#statusText', 'Log eerst een paper-forward signaal voordat live waardering kan draaien.');
+    return;
+  }
+
+  button.disabled = true;
+  setText(root, '#statusText', 'Live Binance-prijzen ophalen...');
+  try {
+    const prices = await fetchTickerPrices({ assets: SUPPORTED_ASSETS });
+    if (!prices.ok) {
+      state.liveMark = null;
+      setText(root, '#statusText', `Live prijsfout: ${prices.errors.map((error) => error.symbol).join(', ')}`);
+      renderForward(root);
+      return;
+    }
+    state.liveMark = calculateLiveMarkToMarket({
+      state: state.forwardState,
+      prices: prices.prices,
+      assets: SUPPORTED_ASSETS,
+      config: state.config,
+      timestamp: prices.timestamp,
+    });
+    setText(root, '#statusText', state.liveMark.ok
+      ? `Live waarde klaar: ${formatCurrencyExact(state.liveMark.paperEquity)} paper.`
+      : state.liveMark.error);
+    renderForward(root);
+  } catch (error) {
+    setText(root, '#statusText', `Live waarde fout: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function wireEvents(root) {
   root.addEventListener('click', (event) => {
     if (event.target?.id === 'applyProfitFactorCandidate') {
@@ -1248,6 +1306,10 @@ function wireEvents(root) {
     state.forwardState = result.state;
     setText(root, '#statusText', result.message);
     renderForward(root);
+  });
+
+  root.querySelector('#refreshLiveMark').addEventListener('click', () => {
+    refreshLiveMark(root);
   });
 
   root.querySelector('#exportCsv').addEventListener('click', () => {

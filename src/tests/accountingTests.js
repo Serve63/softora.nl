@@ -1,6 +1,7 @@
 import { maxDrawdown, profitFactor } from '../core/metrics.js';
 import { rebalancePortfolio, simulateTradeAccounting } from '../core/portfolio.js';
 import {
+  calculateLiveMarkToMarket,
   calculateForwardMetrics,
   createEmptyForwardState,
   evaluateForwardDiscipline,
@@ -196,6 +197,37 @@ export function accountingTestCases() {
         assert(approx(metrics.edge, 0.19), 'Forward edge klopt niet.');
         assert(approx(metrics.maxDrawdown, 0.1), 'Forward drawdown klopt niet.');
         assert(approx(metrics.gateOpenRate, 2 / 3), 'Forward gate-open rate klopt niet.');
+      },
+    },
+    {
+      name: 'Live mark-to-market waardeert open paper weights zonder nieuwe log',
+      run(assert) {
+        const forwardState = createEmptyForwardState(10000);
+        forwardState.logs = [{
+          timestamp: '2026-01-01T00:00:00.000Z',
+          dateKey: '2026-01-01',
+          decisionKey: '2026-01-01T00:00:00.000Z',
+          timeframe: '4H',
+          paperEquity: 10000,
+          benchmarkEquity: 10000,
+          weights: { BTCUSDT: 0.5 },
+          benchmarkWeights: { BTCUSDT: 0.5, ETHUSDT: 0.5 },
+          prices: { BTCUSDT: 100, ETHUSDT: 100 },
+          gateOpen: true,
+          signal: 'BTC 50%',
+        }];
+        const live = calculateLiveMarkToMarket({
+          state: forwardState,
+          prices: { BTCUSDT: 110, ETHUSDT: 90 },
+          assets: ['BTCUSDT', 'ETHUSDT'],
+          config: { initialCapital: 10000 },
+          timestamp: Date.UTC(2026, 0, 1, 1),
+        });
+
+        assert(live.ok, 'Live mark-to-market moet slagen met een bestaande log.');
+        assert(approx(live.paperEquity, 10500), 'Live paper equity waardeert open weights niet correct.');
+        assert(approx(live.benchmarkEquity, 10000), 'Live benchmark equity klopt niet.');
+        assert(forwardState.logs.length === 1, 'Live mark-to-market mag geen extra forward-log schrijven.');
       },
     },
     {

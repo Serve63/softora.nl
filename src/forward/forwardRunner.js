@@ -283,6 +283,68 @@ export function calculateForwardMetrics(state, config = {}) {
   };
 }
 
+export function calculateLiveMarkToMarket({
+  state,
+  prices,
+  assets = [],
+  config = {},
+  timestamp = Date.now(),
+} = {}) {
+  const activeState = normalizeForwardState(state, config.initialCapital || 10000);
+  const logs = activeState?.logs || [];
+  const last = logs[logs.length - 1] || null;
+  const initialCapital = activeState?.initialCapital || config.initialCapital || 10000;
+
+  if (!last?.prices) {
+    return {
+      ok: false,
+      error: 'Nog geen forward-log met prijzen beschikbaar voor live waardering.',
+      timestamp: new Date(timestamp).toISOString(),
+    };
+  }
+
+  const activeAssets = assets.length ? assets : Object.keys(last.prices || {});
+  const livePrices = Object.fromEntries(
+    activeAssets.map((asset) => [asset, Number(prices?.[asset]) || last.prices?.[asset] || null]),
+  );
+  const paper = applyPortfolioReturn(
+    last.paperEquity ?? initialCapital,
+    last.weights || {},
+    last.prices,
+    livePrices,
+  );
+  const benchmark = applyPortfolioReturn(
+    last.benchmarkEquity ?? initialCapital,
+    last.benchmarkWeights || equalWeight(activeAssets, 1),
+    last.prices,
+    livePrices,
+  );
+  const paperReturn = initialCapital > 0 ? paper.equity / initialCapital - 1 : 0;
+  const benchmarkReturn = initialCapital > 0 ? benchmark.equity / initialCapital - 1 : 0;
+
+  return {
+    ok: true,
+    mode: 'live-mark-to-market',
+    paperOnly: true,
+    timestamp: new Date(timestamp).toISOString(),
+    lastLogTime: last.timestamp || null,
+    lastSignal: last.signal || 'n.v.t.',
+    lastWeights: last.weights || {},
+    livePrices,
+    logPaperEquity: last.paperEquity ?? initialCapital,
+    logBenchmarkEquity: last.benchmarkEquity ?? initialCapital,
+    paperEquity: paper.equity,
+    benchmarkEquity: benchmark.equity,
+    paperReturn,
+    benchmarkReturn,
+    edge: paperReturn - benchmarkReturn,
+    edgeMoney: paper.equity - benchmark.equity,
+    paperUnrealizedSinceLog: paper.equity - (last.paperEquity ?? initialCapital),
+    benchmarkUnrealizedSinceLog: benchmark.equity - (last.benchmarkEquity ?? initialCapital),
+    logs: logs.length,
+  };
+}
+
 export function evaluateForwardDiscipline(state, config = {}, rules = {}) {
   const activeRules = { ...DEFAULT_FORWARD_RULES, ...rules };
   const metrics = calculateForwardMetrics(state, config);

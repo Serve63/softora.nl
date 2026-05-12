@@ -6,6 +6,7 @@ export const TIMEFRAMES = Object.freeze({
 });
 
 const BINANCE_KLINES_URL = 'https://api.binance.com/api/v3/klines';
+const BINANCE_TICKER_PRICE_URL = 'https://api.binance.com/api/v3/ticker/price';
 const MAX_BINANCE_LIMIT = 1000;
 
 export class BinanceDataError extends Error {
@@ -136,6 +137,58 @@ export async function fetchMarketData({
     candlesByAsset,
     errors,
     summaries: buildDataSummaries(candlesByAsset, timeframe),
+  };
+}
+
+export async function fetchTickerPrices({
+  assets = SUPPORTED_ASSETS,
+  fetchImpl = globalThis.fetch,
+  signal,
+} = {}) {
+  if (typeof fetchImpl !== 'function') {
+    throw new BinanceDataError('Er is geen fetch-functie beschikbaar om Binance prijzen op te halen.');
+  }
+
+  const prices = {};
+  const errors = [];
+
+  for (const symbol of assets) {
+    if (!SUPPORTED_ASSETS.includes(symbol)) {
+      errors.push({ symbol, message: `Asset ${symbol} wordt niet ondersteund.` });
+      continue;
+    }
+
+    try {
+      const url = new URL(BINANCE_TICKER_PRICE_URL);
+      url.searchParams.set('symbol', symbol);
+      const response = await fetchImpl(url, { signal });
+      if (!response.ok) {
+        throw new BinanceDataError(`Binance gaf geen geldige prijsresponse voor ${symbol}.`, {
+          symbol,
+          status: response.status,
+          statusText: response.statusText,
+        });
+      }
+      const payload = await response.json();
+      const price = Number(payload?.price);
+      if (!Number.isFinite(price)) {
+        throw new BinanceDataError(`Binance gaf geen geldige prijs terug voor ${symbol}.`, { symbol });
+      }
+      prices[symbol] = price;
+    } catch (error) {
+      errors.push({
+        symbol,
+        message: error instanceof Error ? error.message : String(error),
+        details: error?.details || {},
+      });
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    prices,
+    errors,
+    timestamp: new Date().toISOString(),
   };
 }
 
