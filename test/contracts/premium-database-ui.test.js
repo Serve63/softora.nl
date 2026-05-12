@@ -48,8 +48,8 @@ function loadDatabaseWebdesignActionClient(options = {}) {
   };
   const windowObject = {
     document,
-    setTimeout,
-    clearTimeout,
+    setTimeout: options.setTimeout || setTimeout,
+    clearTimeout: options.clearTimeout || clearTimeout,
     requestAnimationFrame: options.requestAnimationFrame || ((callback) => callback()),
     fetch: options.fetch || (async () => ({ ok: true, json: async () => ({ jobs: [] }) })),
     Image: options.Image || function Image() {},
@@ -309,6 +309,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /const pollTimers = new Map\(\);/);
   assert.match(webdesignActionScriptSource, /const loadedPhotoKeys = new Set\(\);/);
   assert.match(webdesignActionScriptSource, /const failedPhotoKeys = new Set\(\);/);
+  assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_FALLBACK_MS = 1800;/);
   assert.match(webdesignActionScriptSource, /function buildPhotoLoadKey\(kind, customerId, source\)/);
   assert.match(webdesignActionScriptSource, /data-photo-key=\\"/);
   assert.match(webdesignActionScriptSource, /data-photo-error=\\"/);
@@ -817,6 +818,64 @@ test('premium database webdesign action remembers failed photo slots as a quiet 
   assert.equal(attrs.get('data-photo-loaded'), 'true');
   assert.equal(attrs.get('data-photo-error'), 'true');
   assert.match(controller.render(customer), /class="photo-fallback-icon"/);
+});
+
+test('premium database webdesign action releases slow saved photo loaders after a short fallback', () => {
+  let fallbackHandler = null;
+  let clearedTimer = null;
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    setTimeout(handler) {
+      fallbackHandler = handler;
+      return 42;
+    },
+    clearTimeout(timerId) {
+      clearedTimer = timerId;
+    },
+  });
+  const customer = {
+    id: 'customer-1',
+    websitePhoto: 'data:image/png;base64,AAA',
+    websitePhotoName: 'Websitefoto',
+    websiteMockup: '',
+    websiteMockupName: '',
+  };
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [] },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => '',
+    isWebdesignPhotoEligible: () => false,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+  const html = controller.render(customer);
+  const key = html.match(/data-photo-key="([^"]+)"/)[1];
+  const attrs = new Map([
+    ['data-photo-key', key],
+    ['data-photo-loaded', 'false'],
+    ['data-photo-error', 'false'],
+  ]);
+  const drop = {
+    querySelector: (selector) => selector === '.photo-drop-image'
+      ? { complete: false, naturalWidth: 0, addEventListener() {} }
+      : null,
+    getAttribute: (name) => attrs.get(name) || '',
+    setAttribute: (name, value) => attrs.set(name, String(value)),
+    removeAttribute: (name) => attrs.delete(name),
+  };
+
+  controller.hydratePhotoDrops({ querySelectorAll: () => [drop] });
+
+  assert.equal(attrs.get('data-photo-loaded'), 'false');
+  assert.equal(typeof fallbackHandler, 'function');
+  fallbackHandler();
+  assert.equal(attrs.get('data-photo-loaded'), 'true');
+  assert.equal(attrs.get('data-photo-error'), 'false');
+  assert.equal(clearedTimer, 42);
+  assert.match(controller.render(customer), /data-photo-loaded="true"/);
 });
 
 test('premium database page exposes interesse as a lead-status step', () => {
