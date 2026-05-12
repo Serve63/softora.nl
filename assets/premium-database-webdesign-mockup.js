@@ -1,7 +1,7 @@
 (function (global) {
     "use strict";
 
-    const DEVICE_MOCKUP_VERSION = "v3";
+    const DEVICE_MOCKUP_VERSION = "v4";
 
     function normalizeString(value) {
         return String(value || "").trim();
@@ -215,7 +215,7 @@
         drawDevice(context, image, {
             x: 1275, y: 390, w: 190, h: 390, pad: 10, padTop: 22, padBottom: 16, radius: 34, screenRadius: 20,
             frame: "#030712", shadow: "rgba(15,23,42,.28)", blur: 30, offsetY: 18,
-            fitMode: "viewport-width", cropTopRatio: 0.02,
+            fitMode: "viewport", cropTopRatio: 0, cropFocusX: 0, viewportHeightRatio: 1,
         });
 
         return canvas.toDataURL("image/jpeg", 0.86);
