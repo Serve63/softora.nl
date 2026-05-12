@@ -59,6 +59,13 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept/i);
   assert.match(prompt, /aangeleverde screenshot alleen dient als moodboard voor merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep/i);
   assert.match(prompt, /ontwerp vanaf nul een radicaal andere Awwwards-level website/i);
+  assert.match(prompt, /NIEUW-DESIGN REGEL/i);
+  assert.match(prompt, /maak nooit een letterlijke screenshot, crop, browserweergave of bijna-kopie/i);
+  assert.match(prompt, /FULL-PAGE FRAME REGEL/i);
+  assert.match(prompt, /volledige homepage moet binnen één afbeelding zichtbaar zijn/i);
+  assert.match(prompt, /footer is verplicht en moet volledig zichtbaar onderaan in beeld staan/i);
+  assert.match(prompt, /Snijd de onderkant nooit af/i);
+  assert.match(prompt, /schaal of schrap tussenliggende content wanneer nodig/i);
   assert.match(prompt, /totaal nieuwe informatiearchitectuur/i);
   assert.match(prompt, /geen herkenbare kopie van layout, hero, sectievolgorde, grids, kaartenrijen, iconenblokken, USP-blokken of footerstructuur/i);
   assert.match(prompt, /rustige, ruimtelijke, branche-passende editorial compositie/i);
@@ -75,7 +82,7 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /Gebruik nergens laadspinners, skeleton-loaders, progress-ringen/i);
   assert.match(prompt, /shimmer-blokken, broken-image-iconen, lege placeholders/i);
   assert.match(prompt, /half-geladen panelen/i);
-  assert.match(prompt, /kies altijd de website-screenshot met duidelijke UI-elementen/i);
+  assert.match(prompt, /kies altijd het nieuwe gerenderde webdesign met duidelijke UI-elementen/i);
   assert.match(prompt, /Er zijn 2 referentiebeeld\(en\) meegegeven; behandel die uitsluitend als moodboard/i);
   assert.doesNotMatch(prompt, /DESIGN-DNA LOCK/);
   assert.doesNotMatch(prompt, /COPY LOCK/);
@@ -90,6 +97,7 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /Gedetecteerde typografie\/font hints: Oswald \| Inter\./);
   assert.match(prompt, /Gedetecteerde layout\/stijl hints: sterke hero\/above-the-fold \| split-layout met tekst en beeld\./);
   assert.match(prompt, /exact 1 hoge portrait full-page desktop homepage screenshot/i);
+  assert.match(prompt, /complete pagina inclusief zichtbare footer en onderste eindsectie/i);
   assert.equal(designDna.brand, 'softora.nl');
   assert.deepEqual(designDna.mandatoryPalette, ['#8b2252', '#a62d65', '#f8f7f4', '#1a1a2e']);
   assert.deepEqual(designDna.navigationSignals, ['Home', 'Diensten', 'Contact']);

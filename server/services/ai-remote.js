@@ -863,6 +863,18 @@ function createAiRemoteService(deps = {}) {
   }
 
   async function fetchWebsitePreviewReferenceImages(scan = {}) {
+    const referenceMode = normalizeString(
+      scan.referenceImageMode || scan.websitePreviewReferenceMode || ''
+    ).toLowerCase();
+    if (
+      scan.disableReferenceImages === true ||
+      scan.websitePreviewDisableReferenceImages === true ||
+      referenceMode === 'none' ||
+      referenceMode === 'prompt-only'
+    ) {
+      return [];
+    }
+
     const candidates = Array.isArray(scan.referenceImageUrls)
       ? scan.referenceImageUrls.map((item) => normalizeString(item || '')).filter(Boolean)
       : [];
@@ -1013,6 +1025,11 @@ function createAiRemoteService(deps = {}) {
     return /size|resolution|dimension|width|height|pixels/.test(message);
   }
 
+  function isOpenAiImageRetryableTransportError(error) {
+    const message = normalizeString(error && (error.message || error.name || error.code)).toLowerCase();
+    return /abort|timeout|timed out|fetch failed|terminated|econnreset|socket/i.test(message);
+  }
+
   async function generateWebsitePreviewImageWithAi(scan = {}) {
     const apiKey = getOpenAiApiKey();
     if (!apiKey) {
@@ -1035,34 +1052,60 @@ function createAiRemoteService(deps = {}) {
       throw err;
     }
 
+    const requestedImageSize = normalizeString(
+      scan.imageSize || scan.websitePreviewImageSize || scan.previewImageSize || ''
+    );
+    const primaryImageSize = requestedImageSize || '2160x3840';
+    const fallbackImageSize = primaryImageSize === '1024x1536' ? '' : '1024x1536';
     const referenceImages = await fetchWebsitePreviewReferenceImages(scan);
     const prompt = buildWebsitePreviewPromptFromScan({
       ...scan,
       referenceImageCount: referenceImages.length,
     });
 
-    let { response, data } = await requestOpenAiWebsitePreviewImageGeneration({
-      apiKey,
-      imageModel,
-      prompt,
-      referenceImages,
-      imageSize: '2160x3840',
-    });
-    if (!response.ok && isOpenAiImageSizeError(response, data)) {
-      ({ response, data } = await requestOpenAiWebsitePreviewImageGeneration({
-        apiKey,
-        imageModel,
-        prompt,
-        referenceImages,
-        imageSize: '1024x1536',
-      }));
+    const attempts = [
+      { imageModel, imageSize: primaryImageSize },
+      ...(fallbackImageSize ? [{ imageModel, imageSize: fallbackImageSize }] : []),
+    ];
+    let response = null;
+    let data = null;
+    let usedImageModel = imageModel;
+    let lastTransportError = null;
+
+    for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex += 1) {
+      const attempt = attempts[attemptIndex];
+      try {
+        ({ response, data } = await requestOpenAiWebsitePreviewImageGeneration({
+          apiKey,
+          imageModel: attempt.imageModel,
+          prompt,
+          referenceImages,
+          imageSize: attempt.imageSize,
+        }));
+        usedImageModel = attempt.imageModel;
+      } catch (error) {
+        if (!isOpenAiImageRetryableTransportError(error) || attemptIndex === attempts.length - 1) {
+          throw error;
+        }
+        lastTransportError = error;
+        continue;
+      }
+
+      if (!response.ok && isOpenAiImageSizeError(response, data) && attemptIndex < attempts.length - 1) {
+        continue;
+      }
+      break;
+    }
+
+    if (!response && lastTransportError) {
+      throw lastTransportError;
     }
 
     if (!response.ok) {
       const err = new Error(`OpenAI websitegenerator mislukt (${response.status})`);
       err.status = response.status;
       err.data = data;
-      err.model = imageModel;
+      err.model = usedImageModel;
       throw err;
     }
 
@@ -1072,14 +1115,14 @@ function createAiRemoteService(deps = {}) {
       const err = new Error('OpenAI gaf geen afbeelding terug voor de websitegenerator.');
       err.status = 502;
       err.data = data;
-      err.model = imageModel;
+      err.model = usedImageModel;
       throw err;
     }
 
     return {
       prompt,
       brief: buildWebsitePreviewBriefFromScan(scan),
-      model: imageModel,
+      model: usedImageModel,
       mimeType: 'image/png',
       dataUrl: `data:image/png;base64,${b64}`,
       fileName: buildWebsitePreviewDownloadFileName(scan),
