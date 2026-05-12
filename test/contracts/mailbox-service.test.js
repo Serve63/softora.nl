@@ -19,6 +19,41 @@ function createResponseRecorder() {
   };
 }
 
+function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
+  let activeMailbox = '';
+  return {
+    usable: true,
+    lockedMailboxes: [],
+    async connect() {},
+    async list() {
+      return boxes;
+    },
+    async getMailboxLock(mailboxName) {
+      activeMailbox = mailboxName;
+      this.lockedMailboxes.push(mailboxName);
+      if (!Object.prototype.hasOwnProperty.call(messagesByMailbox, mailboxName)) {
+        throw new Error('Command failed');
+      }
+      return { release() {} };
+    },
+    async search() {
+      return (messagesByMailbox[activeMailbox] || []).map((message) => message.uid);
+    },
+    fetch(uids) {
+      const messages = messagesByMailbox[activeMailbox] || [];
+      return (async function* fetchMessages() {
+        for (const uid of uids) {
+          const message = messages.find((item) => item.uid === uid);
+          if (message) yield message;
+        }
+      })();
+    },
+    async logout() {
+      this.usable = false;
+    },
+  };
+}
+
 test('mailbox service exposes configured softora mailbox accounts', async () => {
   const service = createMailboxService({
     mailConfig: {
@@ -98,6 +133,78 @@ test('mailbox service sends mail through selected account smtp', async () => {
   assert.equal(sent[0].config.auth.user, 'serve@softora.nl');
   assert.equal(sent[0].message.from, 'Serve <serve@softora.nl>');
   assert.equal(sent[0].message.to, 'klant@example.nl');
+});
+
+test('mailbox service resolves sent folders through IMAP special-use metadata', async () => {
+  const sentDate = new Date('2026-05-12T11:15:00.000Z');
+  const client = createFakeImapClient({
+    boxes: [
+      { path: 'INBOX' },
+      { path: 'INBOX/Verstuurd', specialUse: '\\Sent' },
+    ],
+    messagesByMailbox: {
+      'INBOX/Verstuurd': [
+        {
+          uid: 42,
+          flags: ['\\Seen'],
+          internalDate: sentDate,
+          source: {
+            date: sentDate,
+            text: 'Hallo klant',
+            subject: 'Verzonden bericht',
+            from: { value: [{ name: 'Serve', address: 'serve@softora.nl' }] },
+            to: { value: [{ name: 'Klant', address: 'klant@example.nl' }] },
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
+
+  assert.deepEqual(client.lockedMailboxes, ['INBOX/Verstuurd']);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].subject, 'Verzonden bericht');
+  assert.equal(messages[0].from, 'Serve');
+  assert.equal(messages[0].email, 'serve@softora.nl');
+  assert.equal(messages[0].to, 'klant@example.nl');
+});
+
+test('mailbox service returns an empty list when an optional folder is missing', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX' }],
+    messagesByMailbox: { INBOX: [] },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
+
+  assert.deepEqual(messages, []);
+  assert.deepEqual(client.lockedMailboxes, []);
 });
 
 test('mailbox service derives imap settings from smtp settings when possible', async () => {
