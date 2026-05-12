@@ -39,21 +39,28 @@ function createRouteHarness(deps) {
 }
 
 function createUnsubscribeRouteHarness(deps) {
-  let unsubscribeHandler = null;
+  let unsubscribeGetHandler = null;
+  let unsubscribePostHandler = null;
   const app = {
     get(routePath, ...handlers) {
       const paths = Array.isArray(routePath) ? routePath : [routePath];
       if (paths.includes('/afmelden')) {
-        unsubscribeHandler = handlers[handlers.length - 1];
+        unsubscribeGetHandler = handlers[handlers.length - 1];
       }
     },
-    post() {},
+    post(routePath, ...handlers) {
+      const paths = Array.isArray(routePath) ? routePath : [routePath];
+      if (paths.includes('/afmelden')) {
+        unsubscribePostHandler = handlers[handlers.length - 1];
+      }
+    },
   };
 
   registerColdmailingRoutes(app, deps);
-  assert.equal(typeof unsubscribeHandler, 'function');
+  assert.equal(typeof unsubscribeGetHandler, 'function');
+  assert.equal(typeof unsubscribePostHandler, 'function');
 
-  return async function callUnsubscribe(query = {}) {
+  async function call(handler, query = {}, body = {}) {
     const res = {
       statusCode: 200,
       headers: {},
@@ -74,8 +81,13 @@ function createUnsubscribeRouteHarness(deps) {
         return payload;
       },
     };
-    await unsubscribeHandler({ query }, res);
+    await handler({ query, body, path: '/afmelden' }, res);
     return res;
+  }
+
+  return {
+    get: (query = {}) => call(unsubscribeGetHandler, query),
+    post: (query = {}, body = {}) => call(unsubscribePostHandler, query, body),
   };
 }
 
@@ -200,10 +212,42 @@ test('coldmailing campaign send forwards sender AI instructions to the service',
   assert.equal(received.senderEmail, 'serve@softora.nl');
 });
 
-test('coldmailing unsubscribe page updates the recipient and shows confirmation', async () => {
-  let received = null;
-  const callUnsubscribe = createUnsubscribeRouteHarness({
+test('coldmailing unsubscribe page asks for confirmation before updating the recipient', async () => {
+  let previewReceived = null;
+  let unsubscribeCalls = 0;
+  const unsubscribe = createUnsubscribeRouteHarness({
     coldmailCampaignService: {
+      getColdmailUnsubscribePreview: async (payload) => {
+        previewReceived = payload;
+        return { ok: true, email: 'ruben@example.test', bedrijf: 'Bakkerij Zon' };
+      },
+      unsubscribeColdmailRecipient: async (payload) => {
+        unsubscribeCalls += 1;
+        return { ok: true, unsubscribed: true };
+      },
+    },
+    normalizeString: (value) => String(value || '').trim(),
+  });
+
+  const res = await unsubscribe.get({ t: 'signed-token' });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(previewReceived.token, 'signed-token');
+  assert.equal(unsubscribeCalls, 0);
+  assert.match(res.body, /<h1>Geen e-mails meer ontvangen\?<\/h1>/);
+  assert.match(res.body, /Klik hieronder om te bevestigen/);
+  assert.match(res.body, /Dit geldt voor Bakkerij Zon\./);
+  assert.match(res.body, /<form method="post" action="\/afmelden\?t=signed-token">/);
+  assert.match(res.body, /Ja, geen e-mails meer hierover/);
+  assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
+  assert.equal(res.headers['cache-control'], 'no-store');
+});
+
+test('coldmailing unsubscribe confirmation updates the recipient', async () => {
+  let received = null;
+  const unsubscribe = createUnsubscribeRouteHarness({
+    coldmailCampaignService: {
+      getColdmailUnsubscribePreview: async () => ({ ok: true, email: 'ruben@example.test' }),
       unsubscribeColdmailRecipient: async (payload) => {
         received = payload;
         return { ok: true, unsubscribed: true };
@@ -212,13 +256,13 @@ test('coldmailing unsubscribe page updates the recipient and shows confirmation'
     normalizeString: (value) => String(value || '').trim(),
   });
 
-  const res = await callUnsubscribe({ t: 'signed-token' });
+  const res = await unsubscribe.post({ t: 'signed-token' });
 
   assert.equal(res.statusCode, 200);
   assert.equal(received.token, 'signed-token');
   assert.equal(received.actor, 'coldmail-unsubscribe-link');
-  assert.match(res.body, /<h1>Afgemeld<\/h1>/);
-  assert.match(res.body, /We mailen u niet meer/);
+  assert.match(res.body, /<h1>Bevestigd<\/h1>/);
+  assert.match(res.body, /We mailen u hierover niet meer/);
   assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
   assert.equal(res.headers['cache-control'], 'no-store');
 });
