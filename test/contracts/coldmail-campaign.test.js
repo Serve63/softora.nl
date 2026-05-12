@@ -164,7 +164,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.match(sentMessages[0].text, /Goedemorgen Ruben/);
   assert.match(
     sentMessages[0].text,
-    /Liever geen e-mails meer ontvangen\? Bevestig dat hier: https:\/\/www\.softora\.nl\/afmelden\?t=/
+    /Past dit niet\? Laat het me hier weten: https:\/\/www\.softora\.nl\/afmelden\?t=/
   );
   assert.doesNotMatch(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].text, /Referentie: SF-/);
@@ -172,7 +172,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
   assert.match(
     sentMessages[0].html,
-    /<a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Liever geen e-mails meer ontvangen<\/a>/
+    /<a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Past dit niet\? Laat het me hier weten<\/a>/
   );
   assert.match(sentMessages[0].html, /<!-- Softora referentie SF-20260424-PROSPECT/);
   assert.doesNotMatch(sentMessages[0].html, />Referentie: SF-/);
@@ -361,16 +361,16 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
   );
   assert.match(
     sentMessages[0].text,
-    /Liever geen e-mails meer ontvangen\? Bevestig dat hier: https:\/\/www\.softora\.nl\/afmelden\?t=/
+    /Past dit niet\? Laat het me hier weten: https:\/\/www\.softora\.nl\/afmelden\?t=/
   );
   assert.doesNotMatch(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].html, /<p>Geen interesse\? Reageer met/);
   assert.match(
     sentMessages[0].html,
-    /font-size:11px;line-height:1\.35;color:#9ca3af;"><a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Liever geen e-mails meer ontvangen<\/a>/
+    /font-size:11px;line-height:1\.35;color:#9ca3af;"><a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Past dit niet\? Laat het me hier weten<\/a>/
   );
   assert.ok(
-    sentMessages[0].html.indexOf('>Liever geen e-mails meer ontvangen</a>') >
+    sentMessages[0].html.indexOf('>Past dit niet? Laat het me hier weten</a>') >
       sentMessages[0].html.indexOf('<img src="cid:webdesign-mockup-prospect-1@softora"')
   );
   const mockupUrl = sentMessages[0].html
