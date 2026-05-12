@@ -382,13 +382,15 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
   assert.equal(sentMessages.length, 1);
   assert.match(
     sentMessages[0].html,
-    /<a href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+" target="_blank"[^>]*><img src="cid:webdesign-prospect-1@softora"/
+    /<p style="margin:24px 0 0 0;"><img src="cid:webdesign-prospect-1@softora"/
   );
   assert.match(sentMessages[0].html, /Zo ziet het eruit op elk device 🤩/);
   assert.match(
     sentMessages[0].html,
-    /<a href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+" target="_blank"[^>]*><img src="cid:webdesign-mockup-prospect-1@softora"/
+    /<p style="margin:0;"><img src="cid:webdesign-mockup-prospect-1@softora"/
   );
+  assert.doesNotMatch(sentMessages[0].html, /href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assert.doesNotMatch(sentMessages[0].html, /target="_blank"[^>]*><img src="cid:webdesign/);
   assert.match(
     sentMessages[0].text,
     /Had je liever geen webdesign willen ontvangen\? Laat het me hier weten!: https:\/\/www\.softora\.nl\/afmelden\?t=/
@@ -403,17 +405,6 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
     sentMessages[0].html.indexOf('>Had je liever geen webdesign willen ontvangen? Laat het me hier weten!</a>') >
       sentMessages[0].html.indexOf('<img src="cid:webdesign-mockup-prospect-1@softora"')
   );
-  const mockupUrl = sentMessages[0].html
-    .match(/href="([^"]+)" target="_blank"[^>]*><img src="cid:webdesign-mockup-prospect-1@softora"/)[1]
-    .replace(/&amp;/g, '&');
-  const previewImage = await service.getColdmailPreviewImage({
-    token: new URL(mockupUrl).searchParams.get('t'),
-  });
-
-  assert.equal(previewImage.ok, true);
-  assert.equal(previewImage.type, 'mockup');
-  assert.equal(previewImage.contentType, 'image/png');
-  assert.equal(previewImage.filename, 'Bakkerij-Zon-device-mockup.png');
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-prospect-1@softora');
   assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
