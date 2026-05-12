@@ -234,6 +234,7 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.match(String(calls[0].options.body || ''), /"size":"2160x3840"/);
   assert.match(String(calls[0].options.body || ''), /"quality":"high"/);
   assert.doesNotMatch(String(calls[0].options.body || ''), /response_format/);
+  assert.equal(calls[0].timeoutMs, 540000);
   assert.equal(result.model, 'gpt-image-2');
   assert.equal(result.brief, 'Brief softora.nl');
   assert.equal(result.fileName, 'softora.nl.png');
@@ -250,8 +251,8 @@ test('ai remote service uses OpenAI image edits with fetched website reference i
       return `Preview met ${scan.referenceImageCount || 0} referentie`;
     },
     sanitizeReferenceImages: (images) => images,
-    fetchJsonWithTimeout: async (url, options) => {
-      calls.push({ url, options });
+    fetchJsonWithTimeout: async (url, options, timeoutMs) => {
+      calls.push({ url, options, timeoutMs });
       return {
         response: { ok: true, status: 200 },
         data: {
@@ -285,6 +286,7 @@ test('ai remote service uses OpenAI image edits with fetched website reference i
   assert.equal(calls[0].options.body.get('model'), 'gpt-image-2');
   assert.equal(calls[0].options.body.get('size'), '2160x3840');
   assert.equal(calls[0].options.body.get('quality'), 'high');
+  assert.equal(calls[0].timeoutMs, 540000);
   assert.equal(calls[0].options.body.get('prompt'), 'Preview met 1 referentie');
   assert.equal(calls[0].options.body.getAll('image[]').length, 1);
 });
@@ -363,6 +365,25 @@ test('ai remote service retries the smaller image size when the primary image re
   assert.match(String(calls[0].options.body || ''), /"size":"2160x3840"/);
   assert.match(String(calls[1].options.body || ''), /"size":"1024x1536"/);
   assert.equal(result.dataUrl, 'data:image/png;base64,YWJjZA==');
+});
+
+test('ai remote service reports a clear timeout when gpt-image-2 image generation keeps aborting', async () => {
+  const { service } = createService({
+    fetchJsonWithTimeout: async () => {
+      const error = new Error('This operation was aborted');
+      error.name = 'AbortError';
+      throw error;
+    },
+  });
+
+  await assert.rejects(
+    () => service.generateWebsitePreviewImageWithAi({ host: 'softora.nl', imageSize: '1024x1536' }),
+    (error) => {
+      assert.equal(error.status, 504);
+      assert.match(error.message, /OpenAI webdesign maken duurde te lang \(540s\)/);
+      return true;
+    }
+  );
 });
 
 test('ai remote service keeps gpt-image-2 and surfaces verification errors without fallback', async () => {

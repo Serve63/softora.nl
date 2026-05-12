@@ -312,7 +312,7 @@
             clearPollTimer(job.jobId);
             removePendingJob(job.customerId);
             await refreshFinishedPhotos(job.customerId);
-            if (message) setStatusMessage(message, "error", true);
+            if (message) setStatusMessage(message, "error");
             if (typeof renderPage === "function") renderPage();
         }
 
@@ -502,7 +502,7 @@
                 return;
             }
             if (!isWebdesignPhotoEligible(target)) {
-                setStatusMessage("Geen geldige website gevonden voor " + target.bedrijf + ".", "error", true);
+                setStatusMessage("Geen geldige website gevonden voor " + target.bedrijf + ".", "error");
                 return;
             }
             setStatusMessage("");

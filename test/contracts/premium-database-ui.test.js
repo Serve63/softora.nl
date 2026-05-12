@@ -55,7 +55,7 @@ function loadDatabaseWebdesignActionClient(options = {}) {
     Image: options.Image || function Image() {},
     URL,
   };
-  const sandbox = { window: windowObject };
+  const sandbox = { window: windowObject, fetch: windowObject.fetch };
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseWebdesignAction;
 }
@@ -398,7 +398,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260511b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260512c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260512a/);
@@ -430,6 +430,8 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /keepalive: true/);
   assert.match(webdesignActionScriptSource, /Webdesign-opdracht niet gevonden\. Probeer opnieuw\./);
+  assert.doesNotMatch(webdesignActionScriptSource, /setStatusMessage\(message, "error", true\)/);
+  assert.doesNotMatch(webdesignActionScriptSource, /Geen geldige website gevonden voor " \+ target\.bedrijf \+ "\.", "error", true/);
   assert.match(webdesignActionScriptSource, /function resumePendingJobs\(\)/);
   assert.match(webdesignActionScriptSource, /return firstLoad;/);
   assert.match(webdesignActionScriptSource, /async function loadRunningJobs\(\)/);
@@ -819,6 +821,72 @@ test('premium database webdesign action remembers loaded photos when the page co
   firstController.hydratePhotoDrops({ querySelectorAll: () => [drop] });
 
   assert.match(createController().render(customer), /data-photo-loaded="true"/);
+});
+
+test('premium database webdesign action keeps generation errors visible until the next action', async () => {
+  const messages = [];
+  const chargeLabels = [];
+  const document = {
+    getElementById: () => null,
+    createElement: () => ({ ...createClassListNode(), style: {} }),
+    querySelectorAll: () => chargeLabels,
+    head: { appendChild() {} },
+    body: {
+      appendChild(node) {
+        node.parentNode = {
+          removeChild(child) {
+            const index = chargeLabels.indexOf(child);
+            if (index >= 0) chargeLabels.splice(index, 1);
+            child.parentNode = null;
+          },
+        };
+        chargeLabels.push(node);
+      },
+    },
+  };
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    document,
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        job: {
+          id: 'job-timeout-1',
+          customerId: 'customer-1',
+          status: 'error',
+          error: 'Webdesign maken duurde te lang. Probeer opnieuw.',
+        },
+      }),
+    }),
+  });
+  const controller = webdesignActionClient.createController({
+    state: {
+      klanten: [{
+        id: 'customer-1',
+        bedrijf: 'Softora Testmodus',
+        website: 'softora.nl',
+        dom: 'softora.nl',
+        websitePhoto: '',
+      }],
+    },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => 'https://softora.nl/',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage(message, tone, autoClear) {
+      messages.push({ message, tone, autoClear });
+    },
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+
+  await controller.generateForCustomer('customer-1');
+
+  const errorMessage = messages.find((item) => item.tone === 'error');
+  assert.ok(errorMessage);
+  assert.equal(errorMessage.message, 'Webdesign maken duurde te lang. Probeer opnieuw.');
+  assert.equal(errorMessage.autoClear, undefined);
 });
 
 test('premium database webdesign action remembers failed photo slots as a quiet fallback', () => {
