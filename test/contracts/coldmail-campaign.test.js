@@ -414,6 +414,50 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
   assert.equal(sentMessages[0].attachments[1].contentType, 'image/png');
 });
 
+test('coldmail campaign places webdesign photos before the closing signature', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        stad: 'Haaren',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuw webdesign gemaakt!',
+    body: 'Goedemorgen {{naam}}\n\nIk ben benieuwd wat je ervan vindt.\n\nMet vriendelijke groeten:\nServé Creusen\n\n📍 {{stad}}\n\n0629917185',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  const html = sentMessages[0].html;
+  const imageIndex = html.indexOf('<img src="cid:webdesign-prospect-1@softora"');
+  const captionIndex = html.indexOf('Zo ziet het eruit op elk device 🤩');
+  const closingIndex = html.indexOf('Met vriendelijke groeten');
+  const phoneIndex = html.indexOf('0629917185');
+  assert.ok(imageIndex > 0);
+  assert.ok(captionIndex > imageIndex);
+  assert.ok(closingIndex > captionIndex);
+  assert.ok(phoneIndex > closingIndex);
+  assert.doesNotMatch(html, /href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+});
+
 test('coldmail campaign can disable automatic campaign end date', async () => {
   const { service, getSavedState } = createService({
     rows: [

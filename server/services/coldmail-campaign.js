@@ -1789,6 +1789,19 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
+  function insertWebdesignBlockBeforeClosing(html, blockHtml) {
+    const cleanHtml = String(html || '');
+    const cleanBlock = String(blockHtml || '');
+    if (!normalizeString(cleanHtml) || !normalizeString(cleanBlock)) return cleanHtml || cleanBlock;
+    const closingMatch = cleanHtml.match(
+      /\n?<p>\s*(?:met vriendelijke groeten|met vriendelijke groet|vriendelijke groeten|vriendelijke groet)\b[^<]*(?:<br>|<\/p>)/i
+    );
+    if (!closingMatch || typeof closingMatch.index !== 'number') {
+      return `${cleanHtml}${cleanBlock}`;
+    }
+    return `${cleanHtml.slice(0, closingMatch.index)}${cleanBlock}\n${cleanHtml.slice(closingMatch.index)}`;
+  }
+
   function appendWebdesignImageHtml(html, attachment, options = {}) {
     if (!attachment || !attachment.cid) return html;
     const optOutText = normalizeString(options.optOutText || '');
@@ -1809,7 +1822,8 @@ function createColdmailCampaignService(deps = {}) {
           attachment.mockup.alt || 'Device mockup'
         )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>`
       : '';
-    return `${html}\n<p style="margin:24px 0 0 0;">${imageHtml}</p>${mockupHtml}${optOutHtml}`;
+    const imageBlockHtml = `\n<p style="margin:24px 0 0 0;">${imageHtml}</p>${mockupHtml}`;
+    return `${insertWebdesignBlockBeforeClosing(html, imageBlockHtml)}${optOutHtml}`;
   }
 
   async function loadColdmailReplyState() {
