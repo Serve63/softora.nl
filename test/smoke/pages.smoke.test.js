@@ -32,6 +32,16 @@ for (const target of pageSmokeTargets) {
   });
 }
 
+test('page smoke: /ai-telefonist exposes the low-touch voice offer', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/ai-telefonist`, { cache: 'no-store' });
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(html, /AI-telefonist voor het MKB/);
+  assert.match(html, /Start zonder gesprek/);
+  assert.match(html, /€349 per maand/);
+  assert.match(html, /250 klanten met gemiddeld €333 per maand/);
+});
+
 const repoRoot = path.resolve(__dirname, '..', '..');
 const unifiedPersonnelThemeTargets = [
   'premium-ai-coldmailing.html',

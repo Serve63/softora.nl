@@ -361,6 +361,10 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const hygieneSource = readRepoFile('scripts/check-repo-hygiene.sh');
   const cleanSource = readRepoFile('scripts/clean-local-artifacts.sh');
 
+  assert.equal(packageJson.private, true);
+  assert.equal(packageJson.type, 'commonjs');
+  assert.equal(packageJson.repository.url, 'git+https://github.com/Serve63/softora.nl.git');
+  assert.equal(packageJson.license, 'ISC');
   assert.equal(packageJson.scripts['check:repo-hygiene'], 'bash scripts/check-repo-hygiene.sh');
   assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');

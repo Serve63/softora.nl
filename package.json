@@ -35,5 +35,23 @@
   },
   "overrides": {
     "path-to-regexp": "0.1.13"
-  }
+  },
+  "directories": {
+    "doc": "docs",
+    "lib": "lib",
+    "test": "test"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Serve63/softora.nl.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Serve63/softora.nl/issues"
+  },
+  "homepage": "https://github.com/Serve63/softora.nl#readme"
 }
