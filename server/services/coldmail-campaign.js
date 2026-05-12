@@ -4,6 +4,7 @@ const dns = require('node:dns').promises;
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const { readChunkedStateValue } = require('./data-ops-serialization');
+const { createMailboxService } = require('./mailbox');
 const {
   canAdvanceContactStatus,
   normalizeContactStatus,
@@ -134,6 +135,7 @@ function createColdmailCampaignService(deps = {}) {
     coldmailReplyKey = DEFAULT_COLDMAIL_REPLY_KEY,
     coldmailSendGuardScope = DEFAULT_COLDMAIL_SEND_GUARD_SCOPE,
     coldmailSendGuardKey = DEFAULT_COLDMAIL_SEND_GUARD_KEY,
+    mailboxAccountsRaw = '',
     createTransport = (config) => nodemailer.createTransport(config),
     createImapClient = (config) => new ImapFlow(config),
     parseMailSource = (source) => simpleParser(source),
@@ -175,6 +177,26 @@ function createColdmailCampaignService(deps = {}) {
   } = mailConfig;
 
   let smtpTransporter = null;
+  const senderSmtpTransporters = new Map();
+  const mailboxAccountService = createMailboxService({
+    mailConfig: {
+      smtpHost,
+      smtpPort,
+      smtpSecure,
+      smtpUser,
+      smtpPass,
+      mailFromAddress,
+      mailFromName,
+      imapHost,
+      imapPort,
+      imapSecure,
+      imapUser,
+      imapPass,
+    },
+    mailboxAccountsRaw,
+    normalizeString,
+    truncateText,
+  });
 
   function normalizeEmailAddress(value) {
     const raw = normalizeString(value)
@@ -243,6 +265,74 @@ function createColdmailCampaignService(deps = {}) {
       },
     });
     return smtpTransporter;
+  }
+
+  function getConfiguredMailboxSmtpAccounts() {
+    return mailboxAccountService
+      .getAccounts()
+      .filter((account) => account && account.smtpConfigured && isLikelyValidEmail(account.email));
+  }
+
+  function buildBaseSmtpAccount(senderEmail = '') {
+    const selected = normalizeEmailAddress(senderEmail);
+    const fallbackEmail = normalizeEmailAddress(mailFromAddress || smtpUser);
+    const email = selected || fallbackEmail;
+    return {
+      email,
+      name: normalizeString(SENDER_DISPLAY_NAMES[email] || mailFromName || 'Softora'),
+      smtpHost,
+      smtpPort: Number(smtpPort),
+      smtpSecure: Boolean(smtpSecure),
+      smtpUser,
+      smtpPass,
+    };
+  }
+
+  function resolveSenderSmtpAccount(senderEmail) {
+    const selected = normalizeEmailAddress(senderEmail || mailFromAddress || smtpUser);
+    const account = getConfiguredMailboxSmtpAccounts().find((item) => normalizeEmailAddress(item.email) === selected);
+    if (account) {
+      const email = normalizeEmailAddress(account.email);
+      return {
+        email,
+        name: normalizeString(SENDER_DISPLAY_NAMES[email] || account.name),
+        smtpHost: account.smtpHost,
+        smtpPort: Number(account.smtpPort) || 587,
+        smtpSecure: Boolean(account.smtpSecure),
+        smtpUser: account.smtpUser,
+        smtpPass: account.smtpPass,
+      };
+    }
+    return buildBaseSmtpAccount(selected);
+  }
+
+  function getSenderSmtpTransport(senderEmail) {
+    const account = resolveSenderSmtpAccount(senderEmail);
+    if (!account.smtpHost || !account.smtpUser || !account.smtpPass) return null;
+    const key = [
+      account.smtpHost,
+      account.smtpPort,
+      account.smtpSecure ? 'secure' : 'plain',
+      account.smtpUser,
+    ].join('|');
+    if (!senderSmtpTransporters.has(key)) {
+      senderSmtpTransporters.set(
+        key,
+        createTransport({
+          host: account.smtpHost,
+          port: Number(account.smtpPort),
+          secure: Boolean(account.smtpSecure),
+          auth: {
+            user: account.smtpUser,
+            pass: account.smtpPass,
+          },
+        })
+      );
+    }
+    return {
+      account,
+      transporter: senderSmtpTransporters.get(key),
+    };
   }
 
   function normalizeDatabaseStatus(value, row = {}) {
@@ -894,6 +984,7 @@ function createColdmailCampaignService(deps = {}) {
         [
           mailFromAddress,
           smtpUser,
+          ...getConfiguredMailboxSmtpAccounts().map((account) => account.email),
           'info@softora.nl',
           'zakelijk@softora.nl',
           'ruben@softora.nl',
@@ -916,9 +1007,12 @@ function createColdmailCampaignService(deps = {}) {
     throw error;
   }
 
-  function formatMailFromHeader(senderEmail) {
+  function formatMailFromHeader(senderEmail, smtpAccount = null) {
     const address = normalizeEmailAddress(senderEmail || mailFromAddress);
-    const name = normalizeString(SENDER_DISPLAY_NAMES[address] || mailFromName || 'Softora');
+    const accountName = smtpAccount && normalizeEmailAddress(smtpAccount.email) === address
+      ? normalizeString(smtpAccount.name)
+      : '';
+    const name = normalizeString(accountName || SENDER_DISPLAY_NAMES[address] || mailFromName || 'Softora');
     return name ? `${name} <${address}>` : address;
   }
 
@@ -1780,7 +1874,8 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function sendColdmailAutoReply({ parsedMail, row, senderEmail, replyText }) {
-    const transporter = getSmtpTransporter();
+    const delivery = getSenderSmtpTransport(senderEmail);
+    const transporter = delivery && delivery.transporter;
     if (!transporter) {
       const error = new Error('SMTP transporter kon niet worden opgebouwd.');
       error.code = 'SMTP_TRANSPORT_UNAVAILABLE';
@@ -1790,7 +1885,7 @@ function createColdmailCampaignService(deps = {}) {
     const messageId = normalizeString(parsedMail && parsedMail.messageId);
     const references = collectMessageReferenceHeader(parsedMail);
     return transporter.sendMail({
-      from: formatMailFromHeader(senderEmail),
+      from: formatMailFromHeader(senderEmail, delivery.account),
       to: from.address,
       replyTo: mailReplyTo || senderEmail || mailFromAddress || undefined,
       subject: buildReplySubject(parsedMail && parsedMail.subject),
@@ -2197,7 +2292,14 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
 
-    const transporter = getSmtpTransporter();
+    const delivery = getSenderSmtpTransport(senderEmail);
+    const transporter = delivery && delivery.transporter;
+    if (!transporter) {
+      const error = new Error('SMTP transporter kon niet worden opgebouwd voor deze afzender.');
+      error.code = 'SMTP_TRANSPORT_UNAVAILABLE';
+      throw error;
+    }
+    const smtpAccount = delivery.account;
     const sent = [];
 
     for (const item of selectedRows) {
@@ -2250,20 +2352,31 @@ function createColdmailCampaignService(deps = {}) {
         : undefined;
       try {
         const info = await transporter.sendMail({
-          from: formatMailFromHeader(senderEmail),
+          from: formatMailFromHeader(senderEmail, smtpAccount),
           to,
-          replyTo: mailReplyTo || mailFromAddress || undefined,
+          replyTo: mailReplyTo || senderEmail || mailFromAddress || undefined,
           subject,
           text,
           html,
           attachments,
         });
+        const accepted = Array.isArray(info && info.accepted)
+          ? info.accepted.map(normalizeEmailAddress).filter(Boolean)
+          : [];
+        const rejected = Array.isArray(info && info.rejected)
+          ? info.rejected.map(normalizeEmailAddress).filter(Boolean)
+          : [];
+        if (rejected.includes(normalizeEmailAddress(to)) || (Array.isArray(info && info.accepted) && !accepted.length)) {
+          throw new Error('SMTP accepteerde de ontvanger niet.');
+        }
         sent.push({
           id: item.id,
           bedrijf: getRowCompany(row),
           email: to,
           messageId: normalizeString(info && info.messageId),
           response: truncateText(normalizeString(info && info.response), 500),
+          accepted,
+          rejected,
         });
       } catch (error) {
         failed.push({
