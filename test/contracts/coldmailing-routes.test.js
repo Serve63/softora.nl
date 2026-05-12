@@ -274,11 +274,11 @@ test('coldmailing unsubscribe page asks for confirmation before updating the rec
   assert.equal(res.statusCode, 200);
   assert.equal(previewReceived.token, 'signed-token');
   assert.equal(unsubscribeCalls, 0);
-  assert.match(res.body, /<h1>Geen e-mails meer ontvangen\?<\/h1>/);
-  assert.match(res.body, /Klik hieronder om te bevestigen/);
+  assert.match(res.body, /<h1>Past dit niet\?<\/h1>/);
+  assert.match(res.body, /Bevestig hieronder dat je hierover geen bericht meer wilt ontvangen/);
   assert.match(res.body, /Dit geldt voor Bakkerij Zon\./);
   assert.match(res.body, /<form method="post" action="\/afmelden\?t=signed-token">/);
-  assert.match(res.body, /Ja, geen e-mails meer hierover/);
+  assert.match(res.body, /Ja, laat dit verder rusten/);
   assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
   assert.equal(res.headers['cache-control'], 'no-store');
 });
@@ -301,8 +301,8 @@ test('coldmailing unsubscribe confirmation updates the recipient', async () => {
   assert.equal(res.statusCode, 200);
   assert.equal(received.token, 'signed-token');
   assert.equal(received.actor, 'coldmail-unsubscribe-link');
-  assert.match(res.body, /<h1>Bevestigd<\/h1>/);
-  assert.match(res.body, /We mailen u hierover niet meer/);
+  assert.match(res.body, /<h1>Helemaal goed<\/h1>/);
+  assert.match(res.body, /Ik laat dit verder rusten/);
   assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
   assert.equal(res.headers['cache-control'], 'no-store');
 });

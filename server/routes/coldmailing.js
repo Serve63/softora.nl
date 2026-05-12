@@ -157,13 +157,13 @@ function registerColdmailingRoutes(app, deps = {}) {
       const actionUrl = `${requestPath}?t=${encodeURIComponent(token)}`;
       res.status(200).type('html').send(
         renderColdmailUnsubscribePage({
-          title: 'Geen e-mails meer ontvangen?',
-          message: 'Klik hieronder om te bevestigen dat u hierover geen e-mails meer wilt ontvangen.',
+          title: 'Past dit niet?',
+          message: 'Bevestig hieronder dat je hierover geen bericht meer wilt ontvangen.',
           detail: preview && preview.bedrijf
             ? `Dit geldt voor ${preview.bedrijf}.`
-            : 'Dit gebeurt pas nadat u bevestigt.',
+            : 'Dit gebeurt pas nadat je bevestigt.',
           actionUrl,
-          buttonLabel: 'Ja, geen e-mails meer hierover',
+          buttonLabel: 'Ja, laat dit verder rusten',
         })
       );
     } catch (error) {
@@ -198,8 +198,8 @@ function registerColdmailingRoutes(app, deps = {}) {
       });
       res.status(200).type('html').send(
         renderColdmailUnsubscribePage({
-          title: 'Bevestigd',
-          message: 'Dank u. We mailen u hierover niet meer.',
+          title: 'Helemaal goed',
+          message: 'Dank je. Ik laat dit verder rusten.',
         })
       );
     } catch (error) {
