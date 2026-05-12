@@ -315,6 +315,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /const pollTimers = new Map\(\);/);
   assert.match(webdesignActionScriptSource, /const loadedPhotoKeys = getSharedLoadedPhotoKeys\(\);/);
   assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";/);
+  assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_CACHE_LIMIT = 2500;/);
   assert.match(webdesignActionScriptSource, /function trimLoadedPhotoKeys\(\)/);
   assert.match(webdesignActionScriptSource, /const failedPhotoKeys = new Set\(\);/);
   assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_FALLBACK_MS = 1800;/);
@@ -398,7 +399,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260512c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260512d/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260512a/);
@@ -821,6 +822,51 @@ test('premium database webdesign action remembers loaded photos when the page co
   firstController.hydratePhotoDrops({ querySelectorAll: () => [drop] });
 
   assert.match(createController().render(customer), /data-photo-loaded="true"/);
+});
+
+test('premium database webdesign action keeps loaded photo memory for large database pages', () => {
+  const webdesignActionClient = loadDatabaseWebdesignActionClient();
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [] },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => '',
+    isWebdesignPhotoEligible: () => false,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+  const customers = Array.from({ length: 800 }, (_, index) => ({
+    id: `customer-${index}`,
+    websitePhoto: `data:image/png;base64,PHOTO${index}`,
+    websitePhotoName: 'Websitefoto',
+    websiteMockup: '',
+    websiteMockupName: '',
+  }));
+
+  customers.forEach((customer) => {
+    const html = controller.render(customer);
+    const key = html.match(/data-photo-key="([^"]+)"/)[1];
+    const attrs = new Map([
+      ['data-photo-key', key],
+      ['data-photo-loaded', 'false'],
+      ['data-photo-error', 'false'],
+    ]);
+    const drop = {
+      querySelector: (selector) => selector === '.photo-drop-image'
+        ? { complete: true, naturalWidth: 12, addEventListener() {} }
+        : null,
+      getAttribute: (name) => attrs.get(name) || '',
+      setAttribute: (name, value) => attrs.set(name, String(value)),
+      removeAttribute: (name) => attrs.delete(name),
+    };
+    controller.hydratePhotoDrops({ querySelectorAll: () => [drop] });
+  });
+
+  assert.match(controller.render(customers[0]), /data-photo-loaded="true"/);
+  assert.match(controller.render(customers[799]), /data-photo-loaded="true"/);
 });
 
 test('premium database webdesign action keeps generation errors visible until the next action', async () => {
