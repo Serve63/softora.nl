@@ -5,6 +5,21 @@
  */
 (function () {
     var STORAGE_KEY = "softora_premium_sidebar_session_v1";
+    var NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1";
+    var NAV_STATE_TTL_MS = 1000 * 30;
+
+    function readCookieValue(name) {
+        var needle = String(name || "").trim() + "=";
+        if (!needle) return "";
+        var parts = String(document.cookie || "").split(";");
+        for (var i = 0; i < parts.length; i += 1) {
+            var part = String(parts[i] || "").trim();
+            if (part.indexOf(needle) === 0) {
+                return decodeURIComponent(part.slice(needle.length));
+            }
+        }
+        return "";
+    }
 
     function isLeadsPagePath(path) {
         var p = String(path || "").toLowerCase();
@@ -64,6 +79,26 @@
         sidebar.setAttribute("data-sidebar-active-prefilled", "1");
     }
 
+    function prefillPremiumSidebarScrollState() {
+        var sidebar = document.querySelector(".sidebar[data-static-sidebar='1']");
+        if (!sidebar) return;
+        var nav = sidebar.querySelector(".sidebar-nav");
+        if (!nav) return;
+        try {
+            var raw = readCookieValue(NAV_STATE_KEY);
+            if (!raw) return;
+            var state = JSON.parse(raw);
+            var savedAt = Number(state && state.savedAt);
+            var scrollTop = Number(state && state.scrollTop);
+            if (!Number.isFinite(savedAt) || Date.now() - savedAt > NAV_STATE_TTL_MS) return;
+            if (!Number.isFinite(scrollTop) || scrollTop < 0) return;
+            nav.scrollTop = Math.max(0, scrollTop);
+            sidebar.setAttribute("data-sidebar-scroll-prefilled", "1");
+        } catch (_) {
+            /* ignore */
+        }
+    }
+
     function roleLabel(role) {
         return String(role || "").toLowerCase() === "admin" ? "Full Acces" : "Medewerker";
     }
@@ -88,6 +123,7 @@
 
     try {
         prefillPremiumSidebarActiveState();
+        prefillPremiumSidebarScrollState();
 
         var raw = sessionStorage.getItem(STORAGE_KEY);
         if (!raw) return;

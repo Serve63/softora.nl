@@ -12,6 +12,11 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   ...LOCAL_FONT_PRELOAD_LINKS,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
+const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260512b';
+const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
+  `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
+  `<script src="/assets/premium-sidebar-stability.js?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}" defer></script>`,
+].join('\n');
 const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
   `<script id="softora-personnel-first-paint">(function(){try{document.documentElement.setAttribute("data-personnel-loading","true");document.documentElement.setAttribute("data-theme-mode","light");document.documentElement.setAttribute("data-theme","light");}catch(_){}})();</script>`,
   ...LOCAL_FONT_PRELOAD_LINKS,
@@ -294,6 +299,11 @@ function createHtmlPageCoordinator(options = {}) {
         renderedHtml,
         PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET,
         'id="softora-premium-sidebar-critical"'
+      );
+      renderedHtml = injectSnippetAfterHeadOpen(
+        renderedHtml,
+        PREMIUM_SIDEBAR_STABILITY_ASSETS,
+        'premium-sidebar-stability.js'
       );
     }
     renderedHtml = optimizeLocalFontDelivery(renderedHtml, { preferHeadStart: hasStaticSidebar });

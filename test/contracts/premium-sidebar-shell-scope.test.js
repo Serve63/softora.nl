@@ -75,6 +75,8 @@ const staticSidebarPages = [
 test('personnel theme canonical shell is explicitly opt-in', () => {
   const themeSource = readRepoFile('assets/personnel-theme.css');
   const themeJsSource = readRepoFile('assets/personnel-theme.js');
+  const stabilitySource = readRepoFile('assets/premium-sidebar-stability.css');
+  const stabilityJsSource = readRepoFile('assets/premium-sidebar-stability.js');
   const prefillSource = readRepoFile('assets/premium-sidebar-profile-prefill.js');
   const htmlPagesSource = readRepoFile('server/services/html-pages.js');
 
@@ -98,12 +100,15 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /@view-transition\s*\{[\s\S]*navigation:\s*auto;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*view-transition-name:\s*softora-premium-sidebar;/);
   assert.match(themeSource, /::view-transition-old\(softora-premium-sidebar\),[\s\S]*::view-transition-new\(softora-premium-sidebar\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
+  assert.match(stabilitySource, /::view-transition-old\(root\),[\s\S]*::view-transition-new\(root\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
   assert.match(themeSource, /--premium-sidebar-font-display:\s*'SoftoraSidebarOswald', 'Oswald', sans-serif;/);
   assert.match(themeSource, /\.sidebar-logo\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-display\) !important;[\s\S]*font-synthesis:\s*none !important;/);
   assert.match(themeSource, /\.sidebar-link \.sidebar-link-text\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-sans\) !important;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*font-size:\s*14px !important;[\s\S]*line-height:\s*1\.2 !important;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-logo\s*\{[\s\S]*margin:\s*0 0 11px !important;[\s\S]*font-size:\s*25px !important;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-link\s*\{[\s\S]*min-height:\s*0 !important;[\s\S]*font-size:\s*14px !important;[\s\S]*line-height:\s*1\.12 !important;/);
+  assert.match(stabilitySource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-link\s*\{[\s\S]*transition:\s*none !important;[\s\S]*transform:\s*none !important;/);
+  assert.match(stabilitySource, /html\[data-premium-sidebar-route-changing="true"\] \.sidebar\[data-static-sidebar="1"\],[\s\S]*body\[data-premium-sidebar-route-changing="true"\] \.sidebar\[data-static-sidebar="1"\]/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-flow-section::before\s*\{[\s\S]*top:\s*59px !important;/);
   assert.match(themeSource, /\.sidebar\s*\{[\s\S]*transform:\s*none !important;[\s\S]*overflow-anchor:\s*none !important;[\s\S]*overscroll-behavior:\s*contain !important;/);
   assert.match(themeSource, /\.sidebar-nav\s*\{[\s\S]*overflow-anchor:\s*none !important;[\s\S]*scrollbar-gutter:\s*stable !important;/);
@@ -115,6 +120,12 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /link\.rel = "prefetch";/);
   assert.match(themeJsSource, /link\.setAttribute\("data-sidebar-prefetch", "1"\);/);
   assert.match(themeJsSource, /function warmVisibleSidebarNavigationTargets\(\) \{/);
+  assert.match(stabilityJsSource, /NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1"/);
+  assert.match(stabilityJsSource, /function persistSidebarNavState\(sidebar, targetHref\) \{/);
+  assert.match(stabilityJsSource, /function isCurrentTarget\(href\) \{/);
+  assert.match(stabilityJsSource, /event\.stopImmediatePropagation\(\);/);
+  assert.match(stabilityJsSource, /document\.documentElement\.setAttribute\("data-premium-sidebar-route-changing", "true"\);/);
+  assert.match(stabilityJsSource, /document\.addEventListener\("click", handleSidebarNavigationStart, true\);/);
   assert.match(themeJsSource, /function initPremiumSidebarStabilityGuards\(\) \{/);
   assert.match(themeJsSource, /document\.addEventListener\("pointerdown", function \(event\) \{/);
   assert.match(themeJsSource, /window\.addEventListener\("focus", function \(\) \{\s*schedulePremiumSidebarStability\(\);/s);
@@ -147,10 +158,17 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /getAttribute\("data-sidebar-profile-render-key"\)/);
   assert.match(prefillSource, /function prefillPremiumSidebarActiveState\(\) \{/);
   assert.match(prefillSource, /link\.classList\.toggle\("active", key === activeKey\);/);
+  assert.match(prefillSource, /NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1"/);
+  assert.match(prefillSource, /function readCookieValue\(name\) \{/);
+  assert.match(prefillSource, /function prefillPremiumSidebarScrollState\(\) \{/);
+  assert.match(prefillSource, /nav\.scrollTop = Math\.max\(0, scrollTop\);/);
   assert.match(prefillSource, /avatarEl\.replaceChildren\(\);/);
   assert.doesNotMatch(prefillSource, /avatarEl\.innerHTML\s*=/);
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
+  assert.match(htmlPagesSource, /premium-sidebar-stability\.css\?v=/);
+  assert.match(htmlPagesSource, /premium-sidebar-stability\.js\?v=/);
   assert.match(htmlPagesSource, /id="softora-premium-sidebar-critical"/);
   assert.match(htmlPagesSource, /function injectSnippetAfterHeadOpen\(html, snippet, marker\) \{/);
   assert.match(htmlPagesSource, /function hasPremiumStaticSidebar\(html\) \{/);
