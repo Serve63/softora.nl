@@ -42,7 +42,8 @@ const PERSONAL_MAILBOX_DOMAINS = new Set([
   'yahoo.com',
   'ymail.com',
 ]);
-const COLDMAIL_OPT_OUT_LABEL = 'afmelden';
+const COLDMAIL_OPT_OUT_LABEL = 'Liever geen e-mails meer ontvangen';
+const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Liever geen e-mails meer ontvangen? Bevestig dat hier';
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
 const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
@@ -1517,7 +1518,7 @@ function createColdmailCampaignService(deps = {}) {
     const cleanText = normalizeString(text);
     const cleanUrl = normalizeString(unsubscribeUrl);
     const optOutText = cleanUrl
-      ? `${COLDMAIL_OPT_OUT_LABEL}: ${cleanUrl}`
+      ? `${COLDMAIL_OPT_OUT_TEXT_PREFIX}: ${cleanUrl}`
       : COLDMAIL_OPT_OUT_LABEL;
     if (!cleanText) return optOutText;
     if (!shouldAppendColdmailOptOutText(cleanText)) return cleanText;
@@ -1525,7 +1526,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function shouldAppendColdmailOptOutText(text) {
-    return !/(?:afmelden:\s*https?:\/\/|\/afmelden\?t=|\/coldmailing\/afmelden\?t=|unsubscribe:\s*https?:\/\/)/i.test(
+    return !/(?:liever geen e-mails meer ontvangen|geen e-mails meer ontvangen.*https?:\/\/|afmelden:\s*https?:\/\/|\/afmelden\?t=|\/coldmailing\/afmelden\?t=|unsubscribe:\s*https?:\/\/)/i.test(
       normalizeString(text)
     );
   }
@@ -2227,6 +2228,25 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  async function getColdmailUnsubscribePreview(input = {}) {
+    const payload = verifyColdmailUnsubscribeToken(input.token || input.t);
+    const state = await getUiStateValues(customerDbScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const rows = parseDatabaseRows(values);
+    const match = findColdmailUnsubscribeRow(payload, rows);
+    if (!match) {
+      const error = new Error('Deze link hoort niet meer bij een bekende ontvanger.');
+      error.code = 'UNSUBSCRIBE_TARGET_NOT_FOUND';
+      throw error;
+    }
+    return {
+      ok: true,
+      id: match.id,
+      email: match.email,
+      bedrijf: getRowCompany(rows[match.index]),
+    };
+  }
+
   async function sendColdmailCampaign(input = {}) {
     if (!isSmtpMailConfigured()) {
       const error = new Error('Mail is nog niet gekoppeld. Vul eerst de SMTP-gegevens op de server in.');
@@ -2665,6 +2685,7 @@ function createColdmailCampaignService(deps = {}) {
     isSmtpMailConfigured,
     isLikelyValidEmail,
     getColdmailCampaignRecipients,
+    getColdmailUnsubscribePreview,
     listColdmailReplyFollowUps,
     sendColdmailCampaign,
     syncInboundColdmailRepliesFromImap,

@@ -61,8 +61,18 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;');
 }
 
-function renderColdmailUnsubscribePage({ title, message, ok = true }) {
+function renderColdmailUnsubscribePage({ title, message, ok = true, actionUrl = '', buttonLabel = '', detail = '' }) {
   const accent = ok ? '#a92561' : '#6b7280';
+  const safeActionUrl = String(actionUrl || '').trim();
+  const safeButtonLabel = String(buttonLabel || '').trim();
+  const formHtml = safeActionUrl && safeButtonLabel
+    ? `<form method="post" action="${escapeHtml(safeActionUrl)}">
+      <button type="submit">${escapeHtml(safeButtonLabel)}</button>
+    </form>`
+    : '';
+  const detailHtml = detail
+    ? `<p class="detail">${escapeHtml(detail)}</p>`
+    : '';
   return `<!doctype html>
 <html lang="nl">
 <head>
@@ -75,12 +85,18 @@ function renderColdmailUnsubscribePage({ title, message, ok = true }) {
     main{width:min(520px,calc(100% - 32px));padding:42px 34px;border:1px solid #ead8e1;border-radius:18px;background:#fff;box-shadow:0 22px 60px rgba(45,35,45,.08);text-align:center}
     h1{margin:0 0 12px;font-size:clamp(32px,7vw,54px);letter-spacing:.02em;color:${accent};font-weight:800}
     p{margin:0;color:#5f6070;font-size:18px;line-height:1.55}
+    .detail{margin-top:12px;font-size:14px;color:#8a8c99}
+    form{margin-top:26px}
+    button{appearance:none;border:0;border-radius:999px;background:#a92561;color:#fff;font-weight:800;font-size:15px;padding:13px 20px;cursor:pointer;box-shadow:0 12px 28px rgba(169,37,97,.22)}
+    button:hover{background:#8d1e51}
   </style>
 </head>
 <body>
   <main>
     <h1>${escapeHtml(title)}</h1>
     <p>${escapeHtml(message)}</p>
+    ${detailHtml}
+    ${formHtml}
   </main>
 </body>
 </html>`;
@@ -100,24 +116,31 @@ function registerColdmailingRoutes(app, deps = {}) {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     try {
-      if (typeof coldmailCampaignService.unsubscribeColdmailRecipient !== 'function') {
+      if (typeof coldmailCampaignService.getColdmailUnsubscribePreview !== 'function') {
         res.status(404).type('html').send(
           renderColdmailUnsubscribePage({
             ok: false,
             title: 'Niet gevonden',
-            message: 'Deze afmeldlink is niet beschikbaar.',
+            message: 'Deze link is niet beschikbaar.',
           })
         );
         return;
       }
-      await coldmailCampaignService.unsubscribeColdmailRecipient({
-        token: req.query.t || req.query.token,
-        actor: 'coldmail-unsubscribe-link',
+      const token = normalizeString(req.query.t || req.query.token);
+      const preview = await coldmailCampaignService.getColdmailUnsubscribePreview({
+        token,
       });
+      const requestPath = normalizeString(req.path || req.originalUrl || '/afmelden').split('?')[0] || '/afmelden';
+      const actionUrl = `${requestPath}?t=${encodeURIComponent(token)}`;
       res.status(200).type('html').send(
         renderColdmailUnsubscribePage({
-          title: 'Afgemeld',
-          message: 'U bent afgemeld. We mailen u niet meer.',
+          title: 'Geen e-mails meer ontvangen?',
+          message: 'Klik hieronder om te bevestigen dat u hierover geen e-mails meer wilt ontvangen.',
+          detail: preview && preview.bedrijf
+            ? `Dit geldt voor ${preview.bedrijf}.`
+            : 'Dit gebeurt pas nadat u bevestigt.',
+          actionUrl,
+          buttonLabel: 'Ja, geen e-mails meer hierover',
         })
       );
     } catch (error) {
@@ -125,8 +148,44 @@ function registerColdmailingRoutes(app, deps = {}) {
       res.status(status).type('html').send(
         renderColdmailUnsubscribePage({
           ok: false,
-          title: 'Niet afgemeld',
-          message: normalizeString(error && error.message) || 'Deze afmeldlink is ongeldig.',
+          title: 'Niet bevestigd',
+          message: normalizeString(error && error.message) || 'Deze link is ongeldig.',
+        })
+      );
+    }
+  });
+
+  app.post(['/afmelden', '/coldmailing/afmelden'], async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    try {
+      if (typeof coldmailCampaignService.unsubscribeColdmailRecipient !== 'function') {
+        res.status(404).type('html').send(
+          renderColdmailUnsubscribePage({
+            ok: false,
+            title: 'Niet gevonden',
+            message: 'Deze link is niet beschikbaar.',
+          })
+        );
+        return;
+      }
+      await coldmailCampaignService.unsubscribeColdmailRecipient({
+        token: req.query.t || req.query.token || (req.body && (req.body.t || req.body.token)),
+        actor: 'coldmail-unsubscribe-link',
+      });
+      res.status(200).type('html').send(
+        renderColdmailUnsubscribePage({
+          title: 'Bevestigd',
+          message: 'Dank u. We mailen u hierover niet meer.',
+        })
+      );
+    } catch (error) {
+      const status = normalizeString(error && error.code) === 'INVALID_UNSUBSCRIBE_TOKEN' ? 400 : 404;
+      res.status(status).type('html').send(
+        renderColdmailUnsubscribePage({
+          ok: false,
+          title: 'Niet bevestigd',
+          message: normalizeString(error && error.message) || 'Deze link is ongeldig.',
         })
       );
     }
