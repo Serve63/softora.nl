@@ -54,6 +54,7 @@ test('server app runtime composition builders barrel keeps domain builder seams 
 test('server app runtime composition builders preserve feature wiring groups and warmup callbacks', async () => {
   let hydratedAttempts = 0;
   let backfillCalls = 0;
+  const bridgeReads = [];
   const isGeneratedAppointmentVisibleForAgenda = () => true;
 
   const context = buildServerAppFeatureWiringRuntimeContext({
@@ -206,6 +207,44 @@ test('server app runtime composition builders preserve feature wiring groups and
     uiSeoRuntime: {
       getUiStateValues: async () => ({}),
       setUiStateValues: async () => ({}),
+      dataOpsUiStateBridge: {
+        canHandleScope: (scope) => scope === 'premium_customers' || scope === 'premium_database_photos',
+        getUiStateValues: async (scope) => {
+          bridgeReads.push(scope);
+          if (scope === 'premium_customers') {
+            return {
+              values: {
+                customers_key: JSON.stringify([
+                  {
+                    id: 'softora-test-mode-recipient',
+                    bedrijf: 'Softora Testmodus',
+                    naam: 'Servé',
+                    email: 'servec321@gmail.com',
+                    telefoon: '+31000000000',
+                    dom: 'softora.nl',
+                  },
+                ]),
+              },
+            };
+          }
+          if (scope === 'premium_database_photos') {
+            return {
+              values: {
+                softora_database_photos_v1: JSON.stringify({
+                  'softora-test-mode-recipient': {
+                    id: 'softora-test-mode-recipient',
+                    photoKey: 'photo_softora_test',
+                    chunkCount: 1,
+                    websitePhotoName: 'softora-test.png',
+                  },
+                }),
+                photo_softora_test_0: 'data:image/png;base64,AAAA',
+              },
+            };
+          }
+          return { values: {} };
+        },
+      },
       websiteLinkCoordinator: {},
       websitePreviewLibraryCoordinator: {},
       runtimeOpsCoordinator: {},
@@ -296,6 +335,15 @@ test('server app runtime composition builders preserve feature wiring groups and
     'serve@softora.nl',
     'martijn@softora.nl',
   ]);
+  const testRecipients =
+    await context.featureRouteOptions.coldmailing.coldmailCampaignService.getColdmailCampaignRecipients({
+      count: 1,
+      specialAction: 'webdesign',
+      testMode: true,
+    });
+  assert.equal(testRecipients.selected, 1);
+  assert.equal(testRecipients.recipients[0].email, 'servec321@gmail.com');
+  assert.deepEqual(bridgeReads, ['premium_customers', 'premium_database_photos']);
   assert.equal(
     context.featureRouteOptions.coldmailing.generatedAgendaAppointments,
     context.aiDashboardOptions.generatedAgendaAppointments
