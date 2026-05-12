@@ -42,8 +42,8 @@ const PERSONAL_MAILBOX_DOMAINS = new Set([
   'yahoo.com',
   'ymail.com',
 ]);
-const COLDMAIL_OPT_OUT_LABEL = 'Had je liever geen webdesign willen ontvangen? Laat het me hier weten!';
-const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Had je liever geen webdesign willen ontvangen? Laat het me hier weten!';
+const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
+const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const COLDMAIL_MOCKUP_CAPTION = 'Zo ziet het eruit op elk device 🤩';
@@ -1540,7 +1540,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function shouldAppendColdmailOptOutText(text) {
-    return !/(?:had je liever geen webdesign willen ontvangen\?\s*laat het me hier weten!?|past dit niet\?\s*laat het me hier weten|liever geen e-mails meer ontvangen|geen e-mails meer ontvangen.*https?:\/\/|afmelden:\s*https?:\/\/|\/afmelden\?t=|\/coldmailing\/afmelden\?t=|unsubscribe:\s*https?:\/\/)/i.test(
+    return !/(?:geen webdesign willen ontvangen\?\s*laat het me weten!?|had je liever geen webdesign willen ontvangen\?\s*laat het me hier weten!?|past dit niet\?\s*laat het me hier weten|liever geen e-mails meer ontvangen|geen e-mails meer ontvangen.*https?:\/\/|afmelden:\s*https?:\/\/|\/afmelden\?t=|\/coldmailing\/afmelden\?t=|unsubscribe:\s*https?:\/\/)/i.test(
       normalizeString(text)
     );
   }

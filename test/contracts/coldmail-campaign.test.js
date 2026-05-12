@@ -164,7 +164,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.match(sentMessages[0].text, /Goedemorgen Ruben/);
   assert.match(
     sentMessages[0].text,
-    /Had je liever geen webdesign willen ontvangen\? Laat het me hier weten!: https:\/\/www\.softora\.nl\/afmelden\?t=/
+    /Geen webdesign willen ontvangen\? Laat het me weten!: https:\/\/www\.softora\.nl\/afmelden\?t=/
   );
   assert.doesNotMatch(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].text, /Referentie: SF-/);
@@ -172,7 +172,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
   assert.match(
     sentMessages[0].html,
-    /<a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Had je liever geen webdesign willen ontvangen\? Laat het me hier weten!<\/a>/
+    /<a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Geen webdesign willen ontvangen\? Laat het me weten!<\/a>/
   );
   assert.match(sentMessages[0].html, /<!-- Softora referentie SF-20260424-PROSPECT/);
   assert.doesNotMatch(sentMessages[0].html, />Referentie: SF-/);
@@ -401,16 +401,16 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
   assert.doesNotMatch(sentMessages[0].html, /target="_blank"[^>]*><img src="cid:webdesign/);
   assert.match(
     sentMessages[0].text,
-    /Had je liever geen webdesign willen ontvangen\? Laat het me hier weten!: https:\/\/www\.softora\.nl\/afmelden\?t=/
+    /Geen webdesign willen ontvangen\? Laat het me weten!: https:\/\/www\.softora\.nl\/afmelden\?t=/
   );
   assert.doesNotMatch(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].html, /<p>Geen interesse\? Reageer met/);
   assert.match(
     sentMessages[0].html,
-    /font-size:11px;line-height:1\.35;color:#9ca3af;"><a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Had je liever geen webdesign willen ontvangen\? Laat het me hier weten!<\/a>/
+    /font-size:11px;line-height:1\.35;color:#9ca3af;"><a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Geen webdesign willen ontvangen\? Laat het me weten!<\/a>/
   );
   assert.ok(
-    sentMessages[0].html.indexOf('>Had je liever geen webdesign willen ontvangen? Laat het me hier weten!</a>') >
+    sentMessages[0].html.indexOf('>Geen webdesign willen ontvangen? Laat het me weten!</a>') >
       sentMessages[0].html.indexOf('<img src="cid:webdesign-mockup-prospect-1@softora"')
   );
   assert.equal(sentMessages[0].attachments.length, 2);
