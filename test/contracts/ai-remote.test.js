@@ -395,6 +395,31 @@ test('ai remote service keeps gpt-image-2 and surfaces verification errors witho
   );
 });
 
+test('ai remote service includes OpenAI upstream detail in image generation errors', async () => {
+  const { service } = createService({
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: false, status: 400 },
+      data: {
+        error: {
+          message: 'Billing hard limit has been reached.',
+          code: 'billing_hard_limit_reached',
+        },
+      },
+    }),
+  });
+
+  await assert.rejects(
+    () => service.generateWebsitePreviewImageWithAi({ host: 'softora.nl' }),
+    (error) => {
+      assert.equal(error.status, 400);
+      assert.equal(error.model, 'gpt-image-2');
+      assert.match(String(error.message || ''), /Billing hard limit has been reached/);
+      assert.equal(error?.data?.error?.code, 'billing_hard_limit_reached');
+      return true;
+    }
+  );
+});
+
 test('ai remote service keeps b64_json response format for legacy dall-e image models', async () => {
   const calls = [];
   const { service } = createService({
