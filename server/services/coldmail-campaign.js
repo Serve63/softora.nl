@@ -1514,6 +1514,13 @@ function createColdmailCampaignService(deps = {}) {
       .replace(/\{\{\s*website\s*\}\}/gi, domain || company);
   }
 
+  function appendTestSubjectMarker(subject) {
+    const cleanSubject = normalizeString(subject);
+    const stamp = now().toISOString().replace(/\.\d{3}Z$/i, 'Z').replace(/[:-]/g, '');
+    const suffix = ` (test ${stamp})`;
+    return `${truncateText(cleanSubject, Math.max(1, 200 - suffix.length))}${suffix}`;
+  }
+
   function buildMailText(body, row) {
     return personalizeTemplate(body, row)
       .replace(/\r\n?/g, '\n')
@@ -1814,7 +1821,7 @@ function createColdmailCampaignService(deps = {}) {
             : escapeHtml(optOutText)
         }</p>`
       : '';
-    const imageHtml = `<img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
+    const previewHtml = `<img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
       attachment.alt || 'Webdesign'
     )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" />`;
     const mockupHtml = attachment.mockup && attachment.mockup.cid
@@ -1822,7 +1829,10 @@ function createColdmailCampaignService(deps = {}) {
           attachment.mockup.alt || 'Device mockup'
         )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>`
       : '';
-    const imageBlockHtml = `\n<p style="margin:24px 0 0 0;">${imageHtml}</p>${mockupHtml}`;
+    const previewBlockHtml = `\n<p style="margin:16px 0 0 0;">${previewHtml}</p>`;
+    const imageBlockHtml = attachment.mockup && attachment.mockup.cid
+      ? `${mockupHtml}${previewBlockHtml}`
+      : `\n<p style="margin:24px 0 0 0;">${previewHtml}</p>`;
     return `${insertWebdesignBlockBeforeClosing(html, imageBlockHtml)}${optOutHtml}`;
   }
 
@@ -2451,7 +2461,10 @@ function createColdmailCampaignService(deps = {}) {
         ? buildColdmailUnsubscribeUrl(row, item.id, reference, input)
         : '';
       const text = shouldAppendOptOut ? appendColdmailOptOutText(baseText, unsubscribeUrl) : baseText;
-      const subject = personalizeTemplate(subjectTemplate, row);
+      const personalizedSubject = personalizeTemplate(subjectTemplate, row);
+      const subject = testMode && shouldIncludeWebdesignPhoto
+        ? appendTestSubjectMarker(personalizedSubject)
+        : personalizedSubject;
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? await resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
         failed.push({
