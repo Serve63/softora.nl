@@ -1,7 +1,7 @@
 (function (global) {
     "use strict";
 
-    const DEVICE_MOCKUP_VERSION = "v2";
+    const DEVICE_MOCKUP_VERSION = "v3";
 
     function normalizeString(value) {
         return String(value || "").trim();
@@ -115,6 +115,23 @@
         context.drawImage(image, sx, sy, sw, sh, x, y, width, height);
     }
 
+    function drawImageViewportFitWidth(context, image, x, y, width, height, options) {
+        const sourceWidth = image.naturalWidth || image.width || 1;
+        const sourceHeight = image.naturalHeight || image.height || 1;
+        const scale = width / sourceWidth;
+        const renderedHeight = sourceHeight * scale;
+        const cropTopRatio = clamp(normalizeRatio(options && options.cropTopRatio, 0), 0, 1);
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+        if (renderedHeight > height) {
+            const visibleSourceHeight = Math.max(1, height / scale);
+            const sy = clamp((sourceHeight - visibleSourceHeight) * cropTopRatio, 0, Math.max(0, sourceHeight - visibleSourceHeight));
+            context.drawImage(image, 0, sy, sourceWidth, visibleSourceHeight, x, y, width, height);
+            return;
+        }
+        context.drawImage(image, 0, 0, sourceWidth, sourceHeight, x, y, width, renderedHeight);
+    }
+
     function drawDevice(context, image, device) {
         context.save();
         context.shadowColor = device.shadow || "rgba(15, 23, 42, 0.2)";
@@ -138,7 +155,9 @@
         context.clip();
         context.fillStyle = "#ffffff";
         context.fillRect(sx, sy, sw, sh);
-        if (device.fitMode === "viewport") {
+        if (device.fitMode === "viewport-width") {
+            drawImageViewportFitWidth(context, image, sx, sy, sw, sh, device);
+        } else if (device.fitMode === "viewport") {
             drawImageViewportCover(context, image, sx, sy, sw, sh, device);
         } else {
             drawImageCover(context, image, sx, sy, sw, sh, device.crop || 0, device.cropFocusX);
@@ -191,12 +210,12 @@
         drawDevice(context, image, {
             x: 1040, y: 210, w: 310, h: 450, pad: 14, padTop: 18, padBottom: 18, radius: 34, screenRadius: 22,
             frame: "#1f2937", shadow: "rgba(15,23,42,.22)", blur: 34, offsetY: 22,
-            fitMode: "viewport", cropTopRatio: 0.02, cropFocusX: 0.5, viewportHeightRatio: 0.72,
+            fitMode: "viewport-width", cropTopRatio: 0.02,
         });
         drawDevice(context, image, {
             x: 1275, y: 390, w: 190, h: 390, pad: 10, padTop: 22, padBottom: 16, radius: 34, screenRadius: 20,
             frame: "#030712", shadow: "rgba(15,23,42,.28)", blur: 30, offsetY: 18,
-            fitMode: "viewport", cropTopRatio: 0.02, cropFocusX: 0.5, viewportHeightRatio: 0.58,
+            fitMode: "viewport-width", cropTopRatio: 0.02,
         });
 
         return canvas.toDataURL("image/jpeg", 0.86);
