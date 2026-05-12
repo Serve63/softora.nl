@@ -1102,7 +1102,15 @@ function createAiRemoteService(deps = {}) {
     }
 
     if (!response.ok) {
-      const err = new Error(`OpenAI websitegenerator mislukt (${response.status})`);
+      const upstreamDetail = truncateText(
+        normalizeString(data?.error?.message || data?.error?.detail || data?.error || data?.message || ''),
+        500
+      );
+      const err = new Error(
+        upstreamDetail
+          ? `OpenAI websitegenerator mislukt (${response.status}): ${upstreamDetail}`
+          : `OpenAI websitegenerator mislukt (${response.status})`
+      );
       err.status = response.status;
       err.data = data;
       err.model = usedImageModel;
