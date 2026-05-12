@@ -384,7 +384,7 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
     sentMessages[0].html,
     /<a href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+" target="_blank"[^>]*><img src="cid:webdesign-prospect-1@softora"/
   );
-  assert.match(sentMessages[0].html, /Zo gaat het eruitzien op verschillende devices ✨/);
+  assert.match(sentMessages[0].html, /Zo ziet het eruit op elk device 🤩/);
   assert.match(
     sentMessages[0].html,
     /<a href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+" target="_blank"[^>]*><img src="cid:webdesign-mockup-prospect-1@softora"/
@@ -613,7 +613,7 @@ test('coldmail campaign test mode infers webdesign assets from the mail content 
   assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt!');
   assert.match(sentMessages[0].text, /website softora\.nl tegen/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
-  assert.match(sentMessages[0].html, /Zo gaat het eruitzien op verschillende devices ✨/);
+  assert.match(sentMessages[0].html, /Zo ziet het eruit op elk device 🤩/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-softora-test-mode-recipient@softora');
