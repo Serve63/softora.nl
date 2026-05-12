@@ -274,7 +274,7 @@ test('coldmailing unsubscribe page asks for confirmation before updating the rec
   assert.equal(res.statusCode, 200);
   assert.equal(previewReceived.token, 'signed-token');
   assert.equal(unsubscribeCalls, 0);
-  assert.match(res.body, /<h1>Past dit niet\?<\/h1>/);
+  assert.match(res.body, /<h1>Had je liever geen webdesign willen ontvangen\?<\/h1>/);
   assert.match(res.body, /Bevestig hieronder dat je hierover geen bericht meer wilt ontvangen/);
   assert.match(res.body, /Dit geldt voor Bakkerij Zon\./);
   assert.match(res.body, /<form method="post" action="\/afmelden\?t=signed-token">/);

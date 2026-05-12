@@ -157,7 +157,7 @@ function registerColdmailingRoutes(app, deps = {}) {
       const actionUrl = `${requestPath}?t=${encodeURIComponent(token)}`;
       res.status(200).type('html').send(
         renderColdmailUnsubscribePage({
-          title: 'Past dit niet?',
+          title: 'Had je liever geen webdesign willen ontvangen?',
           message: 'Bevestig hieronder dat je hierover geen bericht meer wilt ontvangen.',
           detail: preview && preview.bedrijf
             ? `Dit geldt voor ${preview.bedrijf}.`
