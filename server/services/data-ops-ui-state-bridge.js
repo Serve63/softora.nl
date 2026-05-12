@@ -208,7 +208,8 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
       }
       if (scope === SCOPES.photos && Object.prototype.hasOwnProperty.call(stateValues, KEYS.photos)) {
         const entries = extractPhotoEntries(stateValues);
-        const removalIds = extractPhotoRemovalIds(stateValues);
+        const upsertedPhotoIds = new Set(entries.map((entry) => normalizeString(entry.customerId)).filter(Boolean));
+        const removalIds = extractPhotoRemovalIds(stateValues).filter((id) => !upsertedPhotoIds.has(id));
         if (entries.length) {
           const saved = typeof store.upsertDesignPhotos === 'function'
             ? await store.upsertDesignPhotos(entries, sourceMeta)

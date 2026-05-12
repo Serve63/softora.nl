@@ -34,7 +34,9 @@ async function waitForJobDone(coordinator, jobId) {
 }
 
 test('premium database webdesign jobs generate and persist a customer photo in the background', async () => {
-  let values = {};
+  let values = {
+    softora_database_photos_removed_v1: JSON.stringify(['customer-1']),
+  };
   const pipelineCalls = [];
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: { error() {} },
@@ -90,6 +92,7 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(photoMap['customer-1'].id, 'customer-1');
   assert.equal(photoMap['customer-1'].identityKey, 'softora|serve|31612345678');
   assert.equal(values['softora_database_photo_data_v1_customer-1_0'], 'data:image/png;base64,AAAA');
+  assert.deepEqual(JSON.parse(values.softora_database_photos_removed_v1), []);
   assert.equal(pipelineCalls[0].options.imageSize, '2160x3840');
   assert.equal(pipelineCalls[0].options.disableReferenceImages, true);
   assert.equal(pipelineCalls[0].options.referenceImageMode, 'prompt-only');
