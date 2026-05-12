@@ -290,6 +290,11 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /mockupDrop\.getAttribute\("data-can-generate"\) !== "true"/);
   assert.doesNotMatch(pageSource, /webdesignMockupController\.ensureForCustomer\(state\.photoTargetId, \{ force: true \}\)/);
   assert.match(webdesignMockupScriptSource, /global\.SoftoraDatabaseWebdesignMockup =/);
+  assert.match(webdesignMockupScriptSource, /const DEVICE_MOCKUP_VERSION = "v2";/);
+  assert.match(webdesignMockupScriptSource, /function drawImageViewportCover/);
+  assert.match(webdesignMockupScriptSource, /fitMode: "viewport", cropTopRatio: 0\.02, cropFocusX: 0\.5, viewportHeightRatio: 0\.72/);
+  assert.match(webdesignMockupScriptSource, /fitMode: "viewport", cropTopRatio: 0\.02, cropFocusX: 0\.5, viewportHeightRatio: 0\.58/);
+  assert.match(webdesignMockupScriptSource, /hasCurrentMockup\(customer, isValidWebsitePhotoSource\)/);
   assert.match(webdesignMockupScriptSource, /Laptop - iPad - iPhone/);
   assert.match(webdesignMockupScriptSource, /ensureVisibleMockups/);
   assert.match(webdesignMockupScriptSource, /toast\("Device mockup wordt lokaal gemaakt, geen extra API-kosten"\);/);
@@ -393,7 +398,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260511b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260511a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260512a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260506a/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
