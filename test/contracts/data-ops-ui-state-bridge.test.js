@@ -196,6 +196,37 @@ test('data ops ui-state bridge upserts partial photo saves instead of replacing 
   assert.equal(store.calls[0].entries[0].customerId, 'cust-2');
 });
 
+test('data ops ui-state bridge does not delete a photo that is saved again in the same state', async () => {
+  const store = createStore({
+    replaceDesignPhotos: async () => {
+      throw new Error('replaceDesignPhotos should not be used for regenerated photos');
+    },
+  });
+  const bridge = createSoftoraDataOpsUiStateBridge({ store });
+  const dataUrl = 'data:image/png;base64,aGVsbG8=';
+  const photoKey = 'softora_database_photo_data_v1_cust_1';
+
+  await bridge.setUiStateValues(
+    SCOPES.photos,
+    {
+      [KEYS.photos]: JSON.stringify({
+        'cust-1': {
+          id: 'cust-1',
+          photoKey,
+          chunkCount: 1,
+          websitePhotoName: 'regenerated.png',
+        },
+      }),
+      [`${photoKey}_0`]: dataUrl,
+      [KEYS.photoRemovals]: JSON.stringify(['cust-1']),
+    },
+    { source: 'premium-database-webdesign-jobs' }
+  );
+
+  assert.deepEqual(store.calls.map((call) => call.type), ['photos-upsert']);
+  assert.equal(store.calls[0].entries[0].customerId, 'cust-1');
+});
+
 test('data ops ui-state bridge deletes only explicitly removed photo ids', async () => {
   const store = createStore({
     replaceDesignPhotos: async () => {

@@ -11,6 +11,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     dataOpsStore = null,
     photoScope = 'premium_database_photos',
     photoKey = 'softora_database_photos_v1',
+    photoRemovalKey = 'softora_database_photos_removed_v1',
     photoDataPrefix = 'softora_database_photo_data_v1_',
     jobProcessTimeoutMs = 4 * 60 * 1000,
     processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
@@ -112,6 +113,15 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
     } catch (_) {
       return {};
+    }
+  }
+
+  function safeParseJsonArray(raw) {
+    try {
+      const parsed = JSON.parse(String(raw || '[]'));
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
     }
   }
 
@@ -218,6 +228,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const existingMap = safeParseJsonObject(values[photoKey]);
+    const remainingRemovalIds = safeParseJsonArray(values[photoRemovalKey])
+      .map(normalizeString)
+      .filter(Boolean)
+      .filter((id) => id !== customer.id);
     const photoDataKey = buildDataKey(customer.id);
     const chunks = dataUrl.match(new RegExp(`[\\s\\S]{1,${CHUNK_SIZE}}`, 'g')) || [];
     if (chunks.length > MAX_STORAGE_CHUNKS) {
@@ -255,6 +269,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         ...values,
         ...patch,
         [photoKey]: JSON.stringify(mergedMap),
+        [photoRemovalKey]: JSON.stringify(remainingRemovalIds),
       },
       {
         source: 'premium-database-webdesign-jobs',
