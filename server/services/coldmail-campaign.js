@@ -1514,13 +1514,6 @@ function createColdmailCampaignService(deps = {}) {
       .replace(/\{\{\s*website\s*\}\}/gi, domain || company);
   }
 
-  function appendTestSubjectMarker(subject) {
-    const cleanSubject = normalizeString(subject);
-    const stamp = now().toISOString().replace(/\.\d{3}Z$/i, 'Z').replace(/[:-]/g, '');
-    const suffix = ` (test ${stamp})`;
-    return `${truncateText(cleanSubject, Math.max(1, 200 - suffix.length))}${suffix}`;
-  }
-
   function buildMailText(body, row) {
     return personalizeTemplate(body, row)
       .replace(/\r\n?/g, '\n')
@@ -2446,10 +2439,7 @@ function createColdmailCampaignService(deps = {}) {
         ? buildColdmailUnsubscribeUrl(row, item.id, reference, input)
         : '';
       const text = shouldAppendOptOut ? appendColdmailOptOutText(baseText, unsubscribeUrl) : baseText;
-      const personalizedSubject = personalizeTemplate(subjectTemplate, row);
-      const subject = testMode && shouldIncludeWebdesignPhoto
-        ? appendTestSubjectMarker(personalizedSubject)
-        : personalizedSubject;
+      const subject = personalizeTemplate(subjectTemplate, row);
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? await resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
         failed.push({

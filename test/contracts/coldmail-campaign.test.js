@@ -655,7 +655,8 @@ test('coldmail campaign test mode infers webdesign assets from the mail content 
   assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');
-  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt! (test 20260424T120000Z)');
+  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt!');
+  assert.doesNotMatch(sentMessages[0].subject, /\(test \d{8}T\d{6}Z\)/);
   assert.match(sentMessages[0].text, /website softora\.nl tegen/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
   assert.match(sentMessages[0].html, /Zo ziet het eruit op elk device 🤩/);
@@ -729,7 +730,8 @@ test('coldmail campaign test mode can send Softora webdesign attachment safely',
   assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');
-  assert.equal(sentMessages[0].subject, 'Test voor softora.nl (test 20260424T120000Z)');
+  assert.equal(sentMessages[0].subject, 'Test voor softora.nl');
+  assert.doesNotMatch(sentMessages[0].subject, /\(test \d{8}T\d{6}Z\)/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
   assert.equal(sentMessages[0].attachments.length, 2);
