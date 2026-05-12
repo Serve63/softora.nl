@@ -383,19 +383,19 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
   assert.match(sentMessages[0].html, /Zo ziet het eruit op elk device 🤩/);
   assert.match(
     sentMessages[0].html,
-    /<p style="margin:0;"><img src="cid:webdesign-mockup-prospect-1@softora"/
+    /<p style="margin:24px 0 0 0;"><img src="cid:webdesign-prospect-1@softora"/
   );
   assert.match(
     sentMessages[0].html,
-    /<p style="margin:16px 0 0 0;"><img src="cid:webdesign-prospect-1@softora"/
+    /<p style="margin:0;"><img src="cid:webdesign-mockup-prospect-1@softora"/
+  );
+  assert.ok(
+    sentMessages[0].html.indexOf('<img src="cid:webdesign-prospect-1@softora"') <
+      sentMessages[0].html.indexOf('Zo ziet het eruit op elk device 🤩')
   );
   assert.ok(
     sentMessages[0].html.indexOf('Zo ziet het eruit op elk device 🤩') <
       sentMessages[0].html.indexOf('<img src="cid:webdesign-mockup-prospect-1@softora"')
-  );
-  assert.ok(
-    sentMessages[0].html.indexOf('<img src="cid:webdesign-mockup-prospect-1@softora"') <
-      sentMessages[0].html.indexOf('<img src="cid:webdesign-prospect-1@softora"')
   );
   assert.doesNotMatch(sentMessages[0].html, /href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.doesNotMatch(sentMessages[0].html, /target="_blank"[^>]*><img src="cid:webdesign/);
@@ -422,7 +422,7 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
   assert.equal(sentMessages[0].attachments[1].contentType, 'image/png');
 });
 
-test('coldmail campaign places webdesign photos before the closing signature', async () => {
+test('coldmail campaign keeps the closing signature before webdesign photos', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -455,16 +455,16 @@ test('coldmail campaign places webdesign photos before the closing signature', a
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   const html = sentMessages[0].html;
-  const captionIndex = html.indexOf('Zo ziet het eruit op elk device 🤩');
-  const mockupIndex = html.indexOf('<img src="cid:webdesign-mockup-prospect-1@softora"');
-  const imageIndex = html.indexOf('<img src="cid:webdesign-prospect-1@softora"');
   const closingIndex = html.indexOf('Met vriendelijke groeten');
   const phoneIndex = html.indexOf('0629917185');
-  assert.ok(captionIndex > 0);
-  assert.ok(mockupIndex > captionIndex);
-  assert.ok(imageIndex > mockupIndex);
-  assert.ok(closingIndex > imageIndex);
+  const imageIndex = html.indexOf('<img src="cid:webdesign-prospect-1@softora"');
+  const captionIndex = html.indexOf('Zo ziet het eruit op elk device 🤩');
+  const mockupIndex = html.indexOf('<img src="cid:webdesign-mockup-prospect-1@softora"');
+  assert.ok(closingIndex > 0);
   assert.ok(phoneIndex > closingIndex);
+  assert.ok(imageIndex > phoneIndex);
+  assert.ok(captionIndex > imageIndex);
+  assert.ok(mockupIndex > captionIndex);
   assert.doesNotMatch(html, /href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
 });
 
