@@ -527,6 +527,7 @@ function createColdmailCampaignService(deps = {}) {
   function cleanPlaceLabel(value) {
     return normalizeString(value)
       .replace(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b/g, '')
+      .replace(/\s*\([A-Z]{2,3}\)\s*$/i, '')
       .replace(/\b(Nederland|The Netherlands)\b/gi, '')
       .replace(/^[\s,.;-]+|[\s,.;-]+$/g, '')
       .replace(/\s+/g, ' ')
@@ -585,7 +586,11 @@ function createColdmailCampaignService(deps = {}) {
       row && row.town,
       row && row.village,
     ]
-      .map(cleanPlaceLabel)
+      .map((value) => {
+        const cleaned = cleanPlaceLabel(value);
+        if (!cleaned) return '';
+        return looksLikeStreetAddress(cleaned) ? extractPlaceFromAddress(cleaned) : cleaned;
+      })
       .find(Boolean);
     if (explicit) return explicit;
 

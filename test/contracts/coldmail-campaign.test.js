@@ -287,6 +287,36 @@ test('coldmail campaign replaces city variable with the recipient database locat
   assert.doesNotMatch(sentMessages[0].text, /Haaren/);
 });
 
+test('coldmail campaign keeps city variable to the place name when a place field contains an address', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        plaats: 'Reitselaan 45 Haaren (NB)',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}\n\n📍 {{stad}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: '',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].text, /📍 Haaren/);
+  assert.doesNotMatch(sentMessages[0].text, /Reitselaan/);
+  assert.doesNotMatch(sentMessages[0].text, /\(NB\)/);
+});
+
 test('coldmail campaign replaces website variable from database website aliases', async () => {
   const { service, sentMessages } = createService({
     rows: [
