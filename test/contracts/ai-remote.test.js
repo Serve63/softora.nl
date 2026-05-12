@@ -289,6 +289,82 @@ test('ai remote service uses OpenAI image edits with fetched website reference i
   assert.equal(calls[0].options.body.getAll('image[]').length, 1);
 });
 
+test('ai remote service skips reference image edits when prompt-only previews are requested', async () => {
+  const calls = [];
+  let binaryFetches = 0;
+  let capturedPromptScan = null;
+  const { service } = createService({
+    buildWebsitePreviewPromptFromScan: (scan) => {
+      capturedPromptScan = scan;
+      return `Preview met ${scan.referenceImageCount || 0} referentie`;
+    },
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          data: [{ b64_json: 'YWJjZA==' }],
+        },
+      };
+    },
+    fetchBinaryWithTimeout: async () => {
+      binaryFetches += 1;
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url: 'https://softora.nl/og-softora.png',
+          headers: { get: () => 'image/png' },
+        },
+        bytes: Buffer.alloc(2048, 1),
+      };
+    },
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({
+    host: 'softora.nl',
+    sourceUrl: 'https://softora.nl/',
+    referenceImageUrls: ['https://softora.nl/og-softora.png'],
+    disableReferenceImages: true,
+    referenceImageMode: 'prompt-only',
+    imageSize: '2160x3840',
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://api.openai.test/v1/images/generations');
+  assert.equal(binaryFetches, 0);
+  assert.equal(capturedPromptScan.referenceImageCount, 0);
+  assert.match(String(calls[0].options.body || ''), /"size":"2160x3840"/);
+  assert.equal(result.referenceImageCount, 0);
+});
+
+test('ai remote service retries the smaller image size when the primary image request aborts', async () => {
+  const calls = [];
+  const { service } = createService({
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      if (calls.length === 1) {
+        const error = new Error('This operation was aborted');
+        error.name = 'AbortError';
+        throw error;
+      }
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          data: [{ b64_json: 'YWJjZA==' }],
+        },
+      };
+    },
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({ host: 'softora.nl' });
+
+  assert.equal(calls.length, 2);
+  assert.match(String(calls[0].options.body || ''), /"size":"2160x3840"/);
+  assert.match(String(calls[1].options.body || ''), /"size":"1024x1536"/);
+  assert.equal(result.dataUrl, 'data:image/png;base64,YWJjZA==');
+});
+
 test('ai remote service keeps gpt-image-2 and surfaces verification errors without fallback', async () => {
   const calls = [];
   const { service } = createService({

@@ -139,6 +139,36 @@ test('ai tools coordinator validates website preview input and returns generated
   assert.equal(activities[0].reason, 'dashboard_activity_website_preview_generated');
 });
 
+test('ai tools coordinator forwards database preview generation controls to the image generator', async () => {
+  let capturedScan = null;
+  const { coordinator } = createFixture({
+    generateWebsitePreviewImageWithAi: async (scan) => {
+      capturedScan = scan;
+      return {
+        brief: 'Korte briefing',
+        prompt: 'Maak een moderne hero',
+        dataUrl: 'data:image/png;base64,abcd',
+        mimeType: 'image/png',
+        fileName: 'preview.png',
+        model: 'gpt-image-2',
+        revisedPrompt: '',
+        usage: null,
+      };
+    },
+  });
+
+  const payload = await coordinator.runWebsitePreviewGeneratePipeline('https://softora.nl', {
+    imageSize: '2160x3840',
+    disableReferenceImages: true,
+    referenceImageMode: 'prompt-only',
+  });
+
+  assert.equal(payload.ok, true);
+  assert.equal(capturedScan.imageSize, '2160x3840');
+  assert.equal(capturedScan.disableReferenceImages, true);
+  assert.equal(capturedScan.referenceImageMode, 'prompt-only');
+});
+
 test('ai tools coordinator wraps website preview failures in a stable error payload', async () => {
   const { coordinator } = createFixture({
     fetchWebsitePreviewScanFromUrl: async () => {

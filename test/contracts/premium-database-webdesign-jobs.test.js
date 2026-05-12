@@ -35,19 +35,23 @@ async function waitForJobDone(coordinator, jobId) {
 
 test('premium database webdesign jobs generate and persist a customer photo in the background', async () => {
   let values = {};
+  const pipelineCalls = [];
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: { error() {} },
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     aiToolsCoordinator: {
-      runWebsitePreviewGeneratePipeline: async (url, options) => ({
-        ok: true,
-        site: { host: new URL(url).hostname },
-        image: {
-          dataUrl: 'data:image/png;base64,AAAA',
-          fileName: `${options.body.company}-webdesign.png`,
-        },
-      }),
+      runWebsitePreviewGeneratePipeline: async (url, options) => {
+        pipelineCalls.push({ url, options });
+        return {
+          ok: true,
+          site: { host: new URL(url).hostname },
+          image: {
+            dataUrl: 'data:image/png;base64,AAAA',
+            fileName: `${options.body.company}-webdesign.png`,
+          },
+        };
+      },
     },
     getUiStateValues: async () => ({ values }),
     setUiStateValues: async (_scope, nextValues) => {
@@ -86,6 +90,10 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(photoMap['customer-1'].id, 'customer-1');
   assert.equal(photoMap['customer-1'].identityKey, 'softora|serve|31612345678');
   assert.equal(values['softora_database_photo_data_v1_customer-1_0'], 'data:image/png;base64,AAAA');
+  assert.equal(pipelineCalls[0].options.imageSize, '2160x3840');
+  assert.equal(pipelineCalls[0].options.disableReferenceImages, true);
+  assert.equal(pipelineCalls[0].options.referenceImageMode, 'prompt-only');
+  assert.equal(pipelineCalls[0].options.body.source, 'premium-database');
 });
 
 test('premium database webdesign jobs keep status access scoped to the logged in user', async () => {

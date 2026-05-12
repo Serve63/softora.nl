@@ -179,8 +179,10 @@ function createWebsiteGenerationHelpers(deps = {}) {
         ? `Er zijn ${referenceImageCount} referentiebeeld(en) meegegeven; behandel die uitsluitend als moodboard voor merkidentiteit, kleuren, sfeer en doelgroep.`
         : '',
       'Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept waarbij de aangeleverde screenshot alleen dient als moodboard voor merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep, maar ontwerp vanaf nul een radicaal andere Awwwards-level website met een totaal nieuwe informatiearchitectuur, geen herkenbare kopie van layout, hero, sectievolgorde, grids, kaartenrijen, iconenblokken, USP-blokken of footerstructuur, en creëer in plaats daarvan een rustige, ruimtelijke, branche-passende editorial compositie met veel negative space, sterke visual hierarchy, hoogwaardige beeldregie, asymmetrische layout, subtiele diepte, verfijnde CTA’s, premium typografie en maximaal 5 grote ademende contentmomenten.',
+      'NIEUW-DESIGN REGEL: maak nooit een letterlijke screenshot, crop, browserweergave of bijna-kopie van de huidige website. De output moet zichtbaar een nieuw ontworpen homepage zijn met eigen compositie, nieuwe sectie-opbouw, vernieuwde visuele hiërarchie en herkenbare maar opnieuw geïnterpreteerde merkstijl.',
+      'FULL-PAGE FRAME REGEL: de volledige homepage moet binnen één afbeelding zichtbaar zijn van bovenste navigatie/hero tot en met de laatste footer/onderkant. De footer is verplicht en moet volledig zichtbaar onderaan in beeld staan met merk/contactinformatie. Snijd de onderkant nooit af, maak geen partial scrollshot of viewport-crop, en schaal of schrap tussenliggende content wanneer nodig zodat de footer en laatste CTA volledig in beeld blijven.',
       'UI-ONLY OUTPUT: de afbeelding moet duidelijk een gerenderde desktop website-interface zijn, met zichtbare navigatie, hero, typografie, secties, knoppen en footer als onderdeel van één full-page webdesign. Maak géén losse stockfoto, kantoorinterieur, teamfoto, lifestylebeeld, mockup-scene of fotografische sfeerplaat als eindresultaat. Fotografie mag alleen klein en ingebed binnen het website-ontwerp voorkomen, nooit als volledige afbeelding.',
-      'Als je twijfelt tussen een mooie foto en een website-screenshot: kies altijd de website-screenshot met duidelijke UI-elementen.',
+      'Als je twijfelt tussen een mooie foto, een bestaande screenshot of een nieuw webdesign: kies altijd het nieuwe gerenderde webdesign met duidelijke UI-elementen.',
       host ? `Domein of merk: ${host}.` : '',
       title ? `Huidige paginatitel: ${title}.` : '',
       description ? `Huidige meta-omschrijving: ${description}.` : '',
@@ -195,7 +197,7 @@ function createWebsiteGenerationHelpers(deps = {}) {
       fontHints.length ? `Gedetecteerde typografie/font hints: ${fontHints.join(' | ')}.` : '',
       layoutHints.length ? `Gedetecteerde layout/stijl hints: ${layoutHints.join(' | ')}.` : '',
       bodyTextSample ? `Tekstsample van de huidige site: ${bodyTextSample}` : '',
-      'Lever exact 1 hoge portrait full-page desktop homepage screenshot op.',
+      'Lever exact 1 hoge portrait full-page desktop homepage screenshot op waarin de complete pagina inclusief zichtbare footer en onderste eindsectie past.',
     ]
       .filter(Boolean)
       .join('\n');

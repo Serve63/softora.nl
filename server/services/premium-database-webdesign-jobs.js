@@ -22,7 +22,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const MAX_JOBS = 500;
   const CHUNK_SIZE = 180000;
   const MAX_STORAGE_CHUNKS = 80;
-  const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
+  const DATABASE_PHOTO_IMAGE_SIZE = '2160x3840';
   let processing = false;
   const inlineProcessingJobIds = new Set();
 
@@ -279,6 +279,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, {
       allowScanFallback: true,
       imageSize: DATABASE_PHOTO_IMAGE_SIZE,
+      disableReferenceImages: true,
+      referenceImageMode: 'prompt-only',
       body: {
         source: 'premium-database',
         action: 'webdesign',

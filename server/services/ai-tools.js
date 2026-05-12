@@ -108,7 +108,13 @@ function createAiToolsCoordinator(deps = {}) {
       if (!options.allowScanFallback) throw error;
       fetched = buildDatabasePreviewFallbackScan(inputUrl, options.body || {});
     }
-    const generated = await generateWebsitePreviewImageWithAi(fetched.scan);
+    const generationScan = {
+      ...fetched.scan,
+      imageSize: normalizeString(options.imageSize || ''),
+      disableReferenceImages: options.disableReferenceImages === true,
+      referenceImageMode: normalizeString(options.referenceImageMode || ''),
+    };
+    const generated = await generateWebsitePreviewImageWithAi(generationScan);
 
     appendDashboardActivity(
       {
