@@ -6,6 +6,8 @@
     const PENDING_TTL_MS = 6 * 60 * 60 * 1000;
     const POLL_INTERVAL_MS = 2200;
     const PHOTO_LOAD_FALLBACK_MS = 1800;
+    const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";
+    const PHOTO_LOAD_CACHE_LIMIT = 500;
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
     const MOCKUP_ICON = "<svg class=\"photo-mockup-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 6.5h10.5v7H4zM3 16h13M17 8h3.5v8H17zM18.75 18h.01\"/></svg>";
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
@@ -46,10 +48,28 @@
         const pendingIds = new Set();
         const pendingJobs = new Map();
         const pollTimers = new Map();
-        const loadedPhotoKeys = new Set();
+        const loadedPhotoKeys = getSharedLoadedPhotoKeys();
         const failedPhotoKeys = new Set();
         let photoHydrationQueued = false;
         ensureStyles();
+
+        function getSharedLoadedPhotoKeys() {
+            try {
+                if (!global[PHOTO_LOAD_CACHE_PROPERTY] || typeof global[PHOTO_LOAD_CACHE_PROPERTY].has !== "function") {
+                    global[PHOTO_LOAD_CACHE_PROPERTY] = new Set();
+                }
+                return global[PHOTO_LOAD_CACHE_PROPERTY];
+            } catch (error) {
+                return new Set();
+            }
+        }
+
+        function trimLoadedPhotoKeys() {
+            while (loadedPhotoKeys.size > PHOTO_LOAD_CACHE_LIMIT) {
+                const oldest = loadedPhotoKeys.values().next().value;
+                loadedPhotoKeys.delete(oldest);
+            }
+        }
 
         function runNextFrame(callback) {
             const frame = typeof global.requestAnimationFrame === "function"
@@ -68,17 +88,47 @@
             return (hash >>> 0).toString(36);
         }
 
-        function buildPhotoLoadKey(kind, customerId, source) {
+        function buildPhotoSourceFingerprint(source) {
             const raw = normalizeString(source);
-            return [normalizeString(kind) || "photo", normalizeString(customerId) || "unknown", raw.length, hashText(raw)].join("-");
+            if (/^https?:\/\//i.test(raw)) {
+                try {
+                    const UrlConstructor = global.URL || (typeof URL === "function" ? URL : null);
+                    if (UrlConstructor) {
+                        const parsed = new UrlConstructor(raw);
+                        return [parsed.origin, parsed.pathname].join("");
+                    }
+                } catch (error) {
+                    return [raw.length, hashText(raw)].join("-");
+                }
+            }
+            return [raw.length, hashText(raw)].join("-");
+        }
+
+        function buildPhotoLoadKey(kind, customerId, source) {
+            return [normalizeString(kind) || "photo", normalizeString(customerId) || "unknown", buildPhotoSourceFingerprint(source)].join("-");
+        }
+
+        function markPhotoKeyLoaded(key) {
+            const normalized = normalizeString(key);
+            if (!normalized) return;
+            failedPhotoKeys.delete(normalized);
+            loadedPhotoKeys.add(normalized);
+            trimLoadedPhotoKeys();
+        }
+
+        function markPhotoKeyFailed(key) {
+            const normalized = normalizeString(key);
+            if (!normalized) return;
+            loadedPhotoKeys.delete(normalized);
+            failedPhotoKeys.add(normalized);
         }
 
         function markPhotoDropReady(drop, failed) {
             if (!drop || typeof drop.setAttribute !== "function") return;
             const key = normalizeString(drop.getAttribute("data-photo-key"));
             if (key) {
-                if (failed) failedPhotoKeys.add(key);
-                else loadedPhotoKeys.add(key);
+                if (failed) markPhotoKeyFailed(key);
+                else markPhotoKeyLoaded(key);
             }
             drop.setAttribute("data-photo-loaded", "true");
             if (failed) drop.setAttribute("data-photo-error", "true");
@@ -352,28 +402,29 @@
                 }
                 const image = new global.Image();
                 let finished = false;
-                const timer = global.setTimeout(finish, Math.max(250, Number(timeoutMs) || 900));
-                function finish() {
+                const timer = global.setTimeout(function () { finish(true); }, Math.max(250, Number(timeoutMs) || 900));
+                function finish(markReady) {
                     if (finished) return;
                     finished = true;
+                    if (markReady && loadKey) markPhotoKeyLoaded(loadKey);
                     global.clearTimeout(timer);
                     resolve(true);
                 }
                 function fail() {
-                    if (loadKey) failedPhotoKeys.add(loadKey);
-                    finish();
+                    if (loadKey) markPhotoKeyFailed(loadKey);
+                    finish(false);
                 }
                 image.onload = function () {
                     if (typeof image.decode === "function") {
                         image.decode().then(function () {
-                            if (loadKey) loadedPhotoKeys.add(loadKey);
+                            if (loadKey) markPhotoKeyLoaded(loadKey);
                         }).catch(function () {
-                            if (loadKey) loadedPhotoKeys.add(loadKey);
-                        }).finally(finish);
+                            if (loadKey) markPhotoKeyLoaded(loadKey);
+                        }).finally(function () { finish(false); });
                         return;
                     }
-                    if (loadKey) loadedPhotoKeys.add(loadKey);
-                    finish();
+                    if (loadKey) markPhotoKeyLoaded(loadKey);
+                    finish(false);
                 };
                 image.onerror = fail;
                 image.src = source;
