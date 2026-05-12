@@ -23,7 +23,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const MAX_JOBS = 500;
   const CHUNK_SIZE = 180000;
   const MAX_STORAGE_CHUNKS = 80;
-  const DATABASE_PHOTO_IMAGE_SIZE = '2160x3840';
+  const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
   let processing = false;
   const inlineProcessingJobIds = new Set();
 
