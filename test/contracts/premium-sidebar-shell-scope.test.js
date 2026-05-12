@@ -266,7 +266,7 @@ test('premium flynow gebruikt de dynamische canonical sidebar-host', () => {
   );
   assert.match(
     flynowCssSource,
-    /@media \(min-width:761px\)\{[\s\S]*\.bg-canvas\{left:var\(--premium-sidebar-width,320px\)\}[\s\S]*\.flynow-nav\{left:var\(--premium-sidebar-width,320px\)\}/
+    /@media \(min-width:901px\)\{[\s\S]*\.bg-canvas\{left:var\(--premium-sidebar-width,320px\)\}[\s\S]*\.flynow-nav\{left:var\(--premium-sidebar-width,320px\)\}/
   );
 });
 

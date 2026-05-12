@@ -179,27 +179,6 @@
     });
   }
 
-  function spawnParticles() {
-    var wrap = byId('flynow-particles');
-    if (!wrap) return;
-    var colors = currentType === 'zon'
-      ? ['rgba(251,191,36,.62)', 'rgba(249,115,22,.54)', 'rgba(255,255,255,.42)', 'rgba(239,68,68,.42)']
-      : ['rgba(186,230,253,.72)', 'rgba(129,140,248,.62)', 'rgba(255,255,255,.82)', 'rgba(56,189,248,.55)'];
-    wrap.replaceChildren();
-    for (var index = 0; index < 18; index += 1) {
-      var particle = document.createElement('div');
-      var size = 4 + Math.random() * 10;
-      particle.className = 'flynow-particle';
-      particle.style.width = size + 'px';
-      particle.style.height = size + 'px';
-      particle.style.left = (Math.random() * 100) + '%';
-      particle.style.animationDuration = (8 + Math.random() * 16) + 's';
-      particle.style.animationDelay = '-' + (Math.random() * 12) + 's';
-      particle.style.background = colors[Math.floor(Math.random() * colors.length)];
-      wrap.appendChild(particle);
-    }
-  }
-
   function setType(type) {
     currentType = type === 'sneeuw' ? 'sneeuw' : 'zon';
     var bg = byId('flynow-bg');
@@ -211,6 +190,7 @@
     if (title) title.className = 'hero-title ' + currentType;
     if (search) search.className = 'btn-zoek ' + currentType;
     if (dot) dot.className = 'ai-dot ' + currentType;
+    if (document.body) document.body.setAttribute('data-flynow-type', currentType);
     document.querySelectorAll('[data-flynow-type]').forEach(function (button) {
       button.classList.toggle('active', button.dataset.flynowType === currentType);
     });
@@ -222,7 +202,6 @@
       setText(sub, 'Van Zermatt tot Bansko: de AI vindt de beste ski deals zodat jij alleen nog hoeft te pakken.');
     }
     rejected = [];
-    spawnParticles();
     loadCollagePhotos();
     if (trips.length) searchTrips();
   }
@@ -457,6 +436,5 @@
   }
 
   bindEvents();
-  loadCollagePhotos();
-  spawnParticles();
+  setType(currentType);
 })();
