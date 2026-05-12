@@ -3,6 +3,29 @@ const {
 } = require('./server-app-runtime-composition-options');
 const { createColdmailCampaignService } = require('./coldmail-campaign');
 
+function createDataOpsAwareUiStateGetter(uiSeoRuntime = {}) {
+  const legacyGetUiStateValues =
+    typeof uiSeoRuntime.getUiStateValues === 'function'
+      ? (...args) => uiSeoRuntime.getUiStateValues(...args)
+      : async () => null;
+
+  return async (scope, ...args) => {
+    const dataOpsBridge = uiSeoRuntime.dataOpsUiStateBridge;
+    if (
+      dataOpsBridge &&
+      typeof dataOpsBridge.canHandleScope === 'function' &&
+      dataOpsBridge.canHandleScope(scope) &&
+      typeof dataOpsBridge.getUiStateValues === 'function'
+    ) {
+      const bridged = await dataOpsBridge.getUiStateValues(scope, {
+        legacyGetUiStateValues,
+      });
+      if (bridged) return bridged;
+    }
+    return legacyGetUiStateValues(scope, ...args);
+  };
+}
+
 function buildServerAppFeatureWiringRuntimeContext({
   app,
   env,
@@ -26,6 +49,8 @@ function buildServerAppFeatureWiringRuntimeContext({
   upsertRecentCallUpdate,
   shared,
 }) {
+  const dataOpsAwareUiStateGetter = createDataOpsAwareUiStateGetter(uiSeoRuntime);
+
   return buildServerAppFeatureWiringContext({
     app,
     aiDashboardOptions: {
@@ -253,7 +278,7 @@ function buildServerAppFeatureWiringRuntimeContext({
             env.COLDMAIL_AUTOREPLY_OPENAI_MODEL || env.COLDMAIL_AUTOREPLY_MODEL || envConfig.OPENAI_MODEL || 'gpt-5.5-pro'
           ),
           coldmailAutoReplyEnabled: /^true$/i.test(shared.normalizeString(env.COLDMAIL_AUTOREPLY_ENABLED || '')),
-          getUiStateValues: uiSeoRuntime.getUiStateValues,
+          getUiStateValues: dataOpsAwareUiStateGetter,
           setUiStateValues: uiSeoRuntime.setUiStateValues,
           customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
           customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
