@@ -1,8 +1,20 @@
 (function (global) {
     "use strict";
 
+    const DEVICE_MOCKUP_VERSION = "v2";
+
     function normalizeString(value) {
         return String(value || "").trim();
+    }
+
+    function isCurrentMockupName(fileName) {
+        return new RegExp("-device-mockup-" + DEVICE_MOCKUP_VERSION + "\\.jpe?g$", "i").test(normalizeString(fileName));
+    }
+
+    function hasCurrentMockup(customer, isValidWebsitePhotoSource) {
+        return Boolean(customer)
+            && isValidWebsitePhotoSource(customer.websiteMockup)
+            && isCurrentMockupName(customer.websiteMockupName);
     }
 
     function replaceExtension(fileName, suffix) {
@@ -51,7 +63,16 @@
         context.closePath();
     }
 
-    function drawImageCover(context, image, x, y, width, height, cropTopRatio) {
+    function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    function normalizeRatio(value, fallback) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function drawImageCover(context, image, x, y, width, height, cropTopRatio, cropFocusX) {
         const sourceWidth = image.naturalWidth || image.width || 1;
         const sourceHeight = image.naturalHeight || image.height || 1;
         const targetRatio = width / height;
@@ -62,11 +83,35 @@
         let sh = sourceHeight;
         if (sourceRatio > targetRatio) {
             sw = sourceHeight * targetRatio;
-            sx = (sourceWidth - sw) / 2;
+            sx = (sourceWidth - sw) * clamp(normalizeRatio(cropFocusX, 0.5), 0, 1);
         } else {
             sh = sourceWidth / targetRatio;
-            sy = Math.max(0, Math.min(sourceHeight - sh, sourceHeight * (cropTopRatio || 0)));
+            sy = clamp(sourceHeight * normalizeRatio(cropTopRatio, 0), 0, Math.max(0, sourceHeight - sh));
         }
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+        context.drawImage(image, sx, sy, sw, sh, x, y, width, height);
+    }
+
+    function drawImageViewportCover(context, image, x, y, width, height, options) {
+        const sourceWidth = image.naturalWidth || image.width || 1;
+        const sourceHeight = image.naturalHeight || image.height || 1;
+        const targetRatio = width / height;
+        const viewportHeightRatio = clamp(normalizeRatio(options && options.viewportHeightRatio, 0.68), 0.38, 1);
+        let sh = Math.max(1, sourceHeight * viewportHeightRatio);
+        let sw = sh * targetRatio;
+        if (sw > sourceWidth) {
+            sw = sourceWidth;
+            sh = sw / targetRatio;
+        }
+        sh = Math.min(sh, sourceHeight);
+        sw = Math.min(sw, sourceWidth);
+        const focusX = clamp(normalizeRatio(options && options.cropFocusX, 0.5), 0, 1);
+        const cropTopRatio = clamp(normalizeRatio(options && options.cropTopRatio, 0), 0, 1);
+        const sx = clamp((sourceWidth - sw) * focusX, 0, Math.max(0, sourceWidth - sw));
+        const sy = clamp((sourceHeight - sh) * cropTopRatio, 0, Math.max(0, sourceHeight - sh));
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
         context.drawImage(image, sx, sy, sw, sh, x, y, width, height);
     }
 
@@ -93,7 +138,11 @@
         context.clip();
         context.fillStyle = "#ffffff";
         context.fillRect(sx, sy, sw, sh);
-        drawImageCover(context, image, sx, sy, sw, sh, device.crop || 0);
+        if (device.fitMode === "viewport") {
+            drawImageViewportCover(context, image, sx, sy, sw, sh, device);
+        } else {
+            drawImageCover(context, image, sx, sy, sw, sh, device.crop || 0, device.cropFocusX);
+        }
         context.restore();
 
         if (device.base) {
@@ -141,11 +190,13 @@
         });
         drawDevice(context, image, {
             x: 1040, y: 210, w: 310, h: 450, pad: 14, padTop: 18, padBottom: 18, radius: 34, screenRadius: 22,
-            frame: "#1f2937", shadow: "rgba(15,23,42,.22)", blur: 34, offsetY: 22, crop: 0.05,
+            frame: "#1f2937", shadow: "rgba(15,23,42,.22)", blur: 34, offsetY: 22,
+            fitMode: "viewport", cropTopRatio: 0.02, cropFocusX: 0.5, viewportHeightRatio: 0.72,
         });
         drawDevice(context, image, {
             x: 1275, y: 390, w: 190, h: 390, pad: 10, padTop: 22, padBottom: 16, radius: 34, screenRadius: 20,
-            frame: "#030712", shadow: "rgba(15,23,42,.28)", blur: 30, offsetY: 18, crop: 0.1,
+            frame: "#030712", shadow: "rgba(15,23,42,.28)", blur: 30, offsetY: 18,
+            fitMode: "viewport", cropTopRatio: 0.02, cropFocusX: 0.5, viewportHeightRatio: 0.58,
         });
 
         return canvas.toDataURL("image/jpeg", 0.86);
@@ -186,7 +237,7 @@
                 releaseReservedPending();
                 return false;
             }
-            if (!force && isValidWebsitePhotoSource(customer && customer.websiteMockup)) {
+            if (!force && hasCurrentMockup(customer, isValidWebsitePhotoSource)) {
                 releaseReservedPending();
                 return true;
             }
@@ -203,7 +254,7 @@
                 const nextCustomer = normalizeCustomer({
                     ...customer,
                     websiteMockup: mockupDataUrl,
-                    websiteMockupName: replaceExtension(customer.websitePhotoName || customer.dom || customer.bedrijf, "-device-mockup"),
+                    websiteMockupName: replaceExtension(customer.websitePhotoName || customer.dom || customer.bedrijf, "-device-mockup-" + DEVICE_MOCKUP_VERSION),
                     updatedAt: new Date().toISOString().slice(0, 10),
                 }, id);
                 state.klanten = sortCustomers(state.klanten.map(function (item) {
@@ -231,7 +282,7 @@
                 .filter(function (customer) {
                     const id = normalizeString(customer && customer.id);
                     return isValidWebsitePhotoSource(customer && customer.websitePhoto)
-                        && !isValidWebsitePhotoSource(customer && customer.websiteMockup)
+                        && !hasCurrentMockup(customer, isValidWebsitePhotoSource)
                         && id
                         && !pendingIds.has(id);
                 })
