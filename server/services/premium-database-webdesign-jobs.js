@@ -13,7 +13,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     photoKey = 'softora_database_photos_v1',
     photoRemovalKey = 'softora_database_photos_removed_v1',
     photoDataPrefix = 'softora_database_photo_data_v1_',
-    jobProcessTimeoutMs = 4 * 60 * 1000,
+    jobProcessTimeoutMs = 10 * 60 * 1000,
     processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
   } = deps;
 

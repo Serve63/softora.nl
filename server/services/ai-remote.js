@@ -962,6 +962,7 @@ function createAiRemoteService(deps = {}) {
     prompt,
     referenceImages = [],
     imageSize = '2160x3840',
+    timeoutMs = 180000,
   }) {
     if (referenceImages.length > 0 && supportsOpenAiReferenceImageEdits(imageModel)) {
       const body = new FormData();
@@ -988,7 +989,7 @@ function createAiRemoteService(deps = {}) {
           },
           body,
         },
-        180000
+        timeoutMs
       );
     }
 
@@ -1012,7 +1013,7 @@ function createAiRemoteService(deps = {}) {
         },
         body: JSON.stringify(requestBody),
       },
-      180000
+      timeoutMs
     );
   }
 
@@ -1028,6 +1029,25 @@ function createAiRemoteService(deps = {}) {
   function isOpenAiImageRetryableTransportError(error) {
     const message = normalizeString(error && (error.message || error.name || error.code)).toLowerCase();
     return /abort|timeout|timed out|fetch failed|terminated|econnreset|socket/i.test(message);
+  }
+
+  function resolveOpenAiImageGenerationTimeoutMs() {
+    const explicit = Number(env.OPENAI_IMAGE_GENERATION_TIMEOUT_MS || env.WEBSITE_PREVIEW_IMAGE_TIMEOUT_MS || 0) || 0;
+    const fallback = Math.max(Number(websiteGenerationTimeoutMs) || 0, 9 * 60 * 1000);
+    return Math.max(180000, Math.min(600000, explicit || fallback));
+  }
+
+  function buildOpenAiImageTransportError(error, timeoutMs) {
+    const message = normalizeString(error && (error.message || error.name || error.code));
+    const timeoutSeconds = Math.round((Number(timeoutMs) || 0) / 1000);
+    const err = new Error(
+      /abort|timeout|timed out/i.test(message)
+        ? `OpenAI webdesign maken duurde te lang (${timeoutSeconds}s). Probeer het opnieuw.`
+        : `OpenAI webdesign maken is onderbroken: ${message || 'netwerkfout'}`
+    );
+    err.status = 504;
+    err.cause = error;
+    throw err;
   }
 
   async function generateWebsitePreviewImageWithAi(scan = {}) {
@@ -1062,6 +1082,7 @@ function createAiRemoteService(deps = {}) {
       ...scan,
       referenceImageCount: referenceImages.length,
     });
+    const imageGenerationTimeoutMs = resolveOpenAiImageGenerationTimeoutMs();
 
     const attempts = [
       { imageModel, imageSize: primaryImageSize },
@@ -1081,10 +1102,14 @@ function createAiRemoteService(deps = {}) {
           prompt,
           referenceImages,
           imageSize: attempt.imageSize,
+          timeoutMs: imageGenerationTimeoutMs,
         }));
         usedImageModel = attempt.imageModel;
       } catch (error) {
-        if (!isOpenAiImageRetryableTransportError(error) || attemptIndex === attempts.length - 1) {
+        if (isOpenAiImageRetryableTransportError(error) && attemptIndex === attempts.length - 1) {
+          buildOpenAiImageTransportError(error, imageGenerationTimeoutMs);
+        }
+        if (!isOpenAiImageRetryableTransportError(error)) {
           throw error;
         }
         lastTransportError = error;
