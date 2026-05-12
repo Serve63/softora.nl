@@ -85,6 +85,11 @@ test('premium websitegenerator houdt sidebarbreedte en contentbreedte in sync', 
     /\.main-content\s*\{[\s\S]*margin-left:\s*var\(--premium-sidebar-width,\s*320px\);[\s\S]*width:\s*calc\(100% - var\(--premium-sidebar-width,\s*320px\)\);/s
   );
   assert.doesNotMatch(source, /\.main-content\s*\{[\s\S]*width:\s*calc\(100% - 280px\);/s);
+  assert.match(source, /\.page-shell\s*\{[\s\S]*width:\s*min\(1380px,\s*100%\);[\s\S]*max-width:\s*100%;[\s\S]*\}/);
+  assert.match(
+    source,
+    /\.main-content \.premium-boot-shell > \.page-shell\s*\{[\s\S]*margin-left:\s*auto !important;[\s\S]*margin-right:\s*auto !important;[\s\S]*\}/
+  );
 });
 
 test('premium websitegenerator shows no recent scans section anymore', () => {
