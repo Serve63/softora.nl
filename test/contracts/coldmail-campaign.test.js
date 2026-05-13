@@ -5,6 +5,7 @@ const { createColdmailCampaignService } = require('../../server/services/coldmai
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+const CHUNKED_PNG_DATA_URL = 'data:image/png;base64,TQ==';
 
 function createService(overrides = {}) {
   const sentMessages = [];
@@ -311,6 +312,93 @@ test('coldmail campaign refuses webdesign action when photo is missing', async (
 
   assert.equal(sentMessages.length, 0);
   assert.equal(getSavedState(), null);
+});
+
+test('coldmail campaign uses chunked webdesign photo when websitePhoto is stale', async () => {
+  const photoKey = 'photo-prospect-1';
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        photoKey,
+        chunkCount: 1,
+        websitePhoto: TINY_PNG_DATA_URL,
+      },
+    },
+    photoValues: {
+      softora_database_photos_v1: JSON.stringify({
+        'prospect-1': {
+          id: 'prospect-1',
+          photoKey,
+          chunkCount: 1,
+          websitePhoto: TINY_PNG_DATA_URL,
+        },
+      }),
+      [`${photoKey}_0`]: CHUNKED_PNG_DATA_URL,
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments[0].content.toString('base64'), 'TQ==');
+});
+
+test('coldmail campaign uses recovered webdesign chunks over stale inline photo', async () => {
+  const photoKey = 'softora_database_photo_data_v1_prospect-1';
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoValues: {
+      softora_database_photos_v1: JSON.stringify({
+        'prospect-1': {
+          id: 'prospect-1',
+          websitePhoto: TINY_PNG_DATA_URL,
+          websitePhotoName: 'Oude webdesign mockup',
+        },
+      }),
+      [`${photoKey}_0`]: CHUNKED_PNG_DATA_URL,
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments[0].content.toString('base64'), 'TQ==');
 });
 
 test('coldmail campaign sends test recipient without marking database row as mailed', async () => {

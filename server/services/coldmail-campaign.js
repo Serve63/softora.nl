@@ -1313,26 +1313,73 @@ function createColdmailCampaignService(deps = {}) {
     });
   }
 
-  function parseCustomerPhotoMap(raw, values = {}) {
+  function buildCustomerPhotoDataKey(row) {
+    return `softora_database_photo_data_v1_${normalizeString(getRowId(row, 0)).replace(/[^a-z0-9_-]+/gi, '_').slice(0, 80)}`;
+  }
+
+  function readChunkedCustomerPhoto(values, photoKey, chunkCount = 0) {
+    const key = normalizeString(photoKey);
+    if (!key) return null;
+    const count = Math.max(0, Math.min(80, Number(chunkCount || 0) || 0));
+    const chunks = [];
+    if (count) {
+      for (let index = 0; index < count; index += 1) {
+        chunks.push(normalizeString(values[`${key}_${index}`]));
+      }
+    } else {
+      for (let index = 0; index < 80; index += 1) {
+        const value = values[`${key}_${index}`];
+        if (typeof value !== 'string') break;
+        chunks.push(normalizeString(value));
+      }
+    }
+    const dataUrl = chunks.join('');
+    const parsed = parseDataUrlImage(dataUrl);
+    return parsed ? { dataUrl, chunkCount: chunks.length } : null;
+  }
+
+  function parseCustomerPhotoMap(raw, values = {}, rows = []) {
     const parsed = safeJsonParse(raw || '{}', {});
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     const stateValues = values && typeof values === 'object' ? values : {};
     Object.keys(parsed).forEach((key) => {
       const item = parsed[key];
-      if (!item || typeof item !== 'object' || parseDataUrlImage(item.websitePhoto)) return;
+      if (!item || typeof item !== 'object') return;
       const photoKey = normalizeString(item.photoKey);
       const chunkCount = Math.max(0, Math.min(80, Number(item.chunkCount || 0) || 0));
-      if (!photoKey || !chunkCount) return;
-      const dataUrl = Array.from({ length: chunkCount }, (_, index) => normalizeString(stateValues[`${photoKey}_${index}`])).join('');
-      if (parseDataUrlImage(dataUrl)) item.websitePhoto = dataUrl;
+      const chunked = readChunkedCustomerPhoto(stateValues, photoKey, chunkCount);
+      if (chunked) {
+        item.websitePhoto = chunked.dataUrl;
+        item.chunkCount = chunked.chunkCount;
+        return;
+      }
+      if (parseDataUrlImage(item.websitePhoto)) return;
+    });
+    (Array.isArray(rows) ? rows : []).forEach((entry, index) => {
+      const row = entry && entry.row && typeof entry.row === 'object' ? entry.row : entry;
+      const id = normalizeString(entry && entry.id) || getRowId(row, index);
+      if (!id) return;
+      const photoKey = buildCustomerPhotoDataKey(row);
+      const chunked = readChunkedCustomerPhoto(stateValues, photoKey, 0);
+      if (!chunked) return;
+      const existing = parsed[id] && typeof parsed[id] === 'object' ? parsed[id] : null;
+      if (existing && normalizeString(existing.photoKey) && parseDataUrlImage(existing.websitePhoto)) return;
+      parsed[id] = {
+        id,
+        identityKey: buildRowIdentityKey(row),
+        photoKey,
+        chunkCount: chunked.chunkCount,
+        websitePhoto: chunked.dataUrl,
+        websitePhotoName: normalizeString(row.websitePhotoName || row.photoName || row.websiteImageName) || 'Websitefoto',
+      };
     });
     return parsed;
   }
 
-  async function loadCustomerPhotoMap() {
+  async function loadCustomerPhotoMap(rows = []) {
     const state = await getUiStateValues(customerPhotoScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
-    return parseCustomerPhotoMap(values[customerPhotoKey], values);
+    return parseCustomerPhotoMap(values[customerPhotoKey], values, rows);
   }
 
   function resolveRowWebdesignPhoto(row, photoMap) {
@@ -1575,7 +1622,7 @@ function createColdmailCampaignService(deps = {}) {
       selectedRows = selectedRows.slice(0, quotaRemaining);
     }
     const shouldIncludeWebdesignPhoto = isWebdesignSpecialAction(input.specialAction);
-    const customerPhotoMap = shouldIncludeWebdesignPhoto ? await loadCustomerPhotoMap() : {};
+    const customerPhotoMap = shouldIncludeWebdesignPhoto ? await loadCustomerPhotoMap(candidateRows) : {};
 
     if (!selectedRows.length) {
       const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
