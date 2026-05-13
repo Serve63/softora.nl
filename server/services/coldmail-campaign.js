@@ -47,6 +47,7 @@ const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het 
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const COLDMAIL_MOCKUP_CAPTION = 'Bekijk je design op mobiel, tablet en desktop 👀👇';
+const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
 const COLDMAIL_TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
 const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
 const TEST_RECIPIENT_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL]);
@@ -1801,13 +1802,15 @@ function createColdmailCampaignService(deps = {}) {
             : escapeHtml(optOutText)
         }</p>`
       : '';
+    const emailImageStyle =
+      `display:block;width:100%;max-width:${COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH}px;height:auto;border:0;border-radius:12px;`;
     const previewHtml = `<img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
       attachment.alt || 'Webdesign'
-    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" />`;
+    )}" style="${emailImageStyle}" />`;
     const mockupHtml = attachment.mockup && attachment.mockup.cid
       ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(mockupCaption)}</p>\n<p style="margin:0;"><img src="cid:${escapeHtml(attachment.mockup.cid)}" alt="${escapeHtml(
           attachment.mockup.alt || 'Device mockup'
-        )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>`
+        )}" style="${emailImageStyle}" /></p>`
       : '';
     const previewBlockHtml = `\n<p style="margin:24px 0 0 0;">${previewHtml}</p>`;
     const imageBlockHtml = `${previewBlockHtml}${mockupHtml}`;

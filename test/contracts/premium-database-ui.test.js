@@ -292,7 +292,10 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /mockupDrop\.getAttribute\("data-can-generate"\) !== "true"/);
   assert.doesNotMatch(pageSource, /webdesignMockupController\.ensureForCustomer\(state\.photoTargetId, \{ force: true \}\)/);
   assert.match(webdesignMockupScriptSource, /global\.SoftoraDatabaseWebdesignMockup =/);
-  assert.match(webdesignMockupScriptSource, /const DEVICE_MOCKUP_VERSION = "v4";/);
+  assert.match(webdesignMockupScriptSource, /const DEVICE_MOCKUP_VERSION = "v5";/);
+  assert.match(webdesignMockupScriptSource, /gradient\.addColorStop\(0, "#f7f9fc"\);/);
+  assert.match(webdesignMockupScriptSource, /rgba\(59, 130, 246, 0\.10\)/);
+  assert.doesNotMatch(webdesignMockupScriptSource, /rgba\(139, 34, 82, 0\.08\)/);
   assert.match(webdesignMockupScriptSource, /function drawImageViewportCover/);
   assert.match(webdesignMockupScriptSource, /function drawImageViewportFitWidth/);
   assert.match(webdesignMockupScriptSource, /const scale = width \/ sourceWidth;/);
@@ -407,7 +410,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260512d/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260512c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260506a/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
