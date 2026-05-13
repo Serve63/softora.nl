@@ -624,6 +624,52 @@ test('coldmail campaign uses recovered webdesign chunks over stale inline photo'
   assert.equal(sentMessages[0].attachments[0].content.toString('base64'), 'TQ==');
 });
 
+test('coldmail campaign prefers fresh row mockup data over stale stored photo map data', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'softora-test-mode-recipient',
+        bedrijf: 'Softora Testmodus',
+        naam: 'Serve',
+        email: 'servec321@gmail.com',
+        website: 'softora.nl',
+        dom: 'softora.nl',
+        status: 'benaderbaar',
+        mail: true,
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Nieuw webdesign',
+        websiteMockup: CHUNKED_PNG_DATA_URL,
+        websiteMockupName: 'Nieuwe mockup achtergrond',
+      },
+    ],
+    photoMap: {
+      'softora-test-mode-recipient': {
+        id: 'softora-test-mode-recipient',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Oude webdesign versie',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Oude mockup achtergrond',
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Test voor {{bedrijf}}',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+    testMode: true,
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[0].content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
+  assert.equal(sentMessages[0].attachments[1].content.toString('base64'), 'TQ==');
+  assert.equal(sentMessages[0].attachments[1].filename, 'Nieuwe-mockup-achtergrond.png');
+});
+
 test('coldmail campaign sends test recipient without marking database row as mailed', async () => {
   const { service, sentMessages, getSavedState } = createService({
     rows: [
