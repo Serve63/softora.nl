@@ -113,7 +113,7 @@ function registerColdmailingRoutes(app, deps = {}) {
   if (!coldmailCampaignService) return;
 
   app.get('/coldmailing/webdesign-foto', async (req, res) => {
-    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     try {
       if (typeof coldmailCampaignService.getColdmailPreviewImage !== 'function') {
