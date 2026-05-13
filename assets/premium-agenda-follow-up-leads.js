@@ -179,7 +179,7 @@ var modalFollowUpBtn = null;
             }
             if (options?.redirectToLeads !== false) {
                 window.setTimeout(() => {
-                    window.location.assign('/premium-leads');
+                    window.location.assign('/premium-actieve-opdrachten?filter=leads');
                 }, 140);
             }
             return result;

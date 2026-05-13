@@ -395,7 +395,7 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';/);
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';/);
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';/);
-  assert.match(pageSource, /assets\/premium-campaign-sender-settings\.js\?v=20260511a/);
+  assert.match(pageSource, /assets\/premium-campaign-sender-settings\.js\?v=20260513a/);
   assert.match(pageSource, /<select class="mf-sel" id="ai-tone-style">/);
   assert.match(pageSource, /function getCampaignSettingsScope\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_SCOPE : COLDMAILING_SETTINGS_SCOPE;\s*\}/);
   assert.match(pageSource, /function getCampaignSettingsKey\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_KEY : COLDMAILING_SETTINGS_KEY;\s*\}/);
@@ -407,6 +407,11 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /function bindColdmailingSettingsPersistence\(\)/);
   assert.match(pageSource, /controller\.hydrate\(\)/);
   assert.match(pageSource, /controller\.bind\(\)/);
+  assert.match(pageSource, /async function initColdmailingSettingsPersistence\(\) \{[\s\S]*const hydrated = await controller\.init\(\);[\s\S]*if \(!hydrated\) markColdmailingSettingsUnavailable\(\);[\s\S]*return hydrated;/);
+  assert.match(pageSource, /function markColdmailingSettingsUnavailable\(\)/);
+  assert.match(pageSource, /Prompt & AI instructies konden niet veilig worden geladen\./);
+  assert.match(pageSource, /field\.value = '';/);
+  assert.match(pageSource, /startButton\.disabled = true;/);
   assert.match(senderSettingsSource, /const DEFAULT_SCOPE = "premium_coldmailing_settings";/);
   assert.match(senderSettingsSource, /const DEFAULT_KEY = "softora_coldmailing_settings_v1";/);
   assert.match(senderSettingsSource, /senders\[senderEmail\]/);
@@ -418,6 +423,8 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(senderSettingsSource, /state\.settings = buildSettingsSnapshot\(previousSender\);/);
   assert.match(senderSettingsSource, /\["subj1", "body1", "ai-instructies", "ai-tone-style"\]/);
   assert.match(senderSettingsSource, /senderSelect\.addEventListener\("change", \(\) => \{ void switchSenderProfile\(\); \}\);/);
+  assert.match(senderSettingsSource, /state\.hydrationFailed = true;/);
+  assert.match(senderSettingsSource, /return hydrated;/);
   assert.match(senderSettingsSource, /loadProfileForSender/);
   assert.match(senderSettingsSource, /SoftoraCampaignSenderSettings/);
   assert.doesNotMatch(pageSource, /setSelectValueIfAvailable\(document\.getElementById\('campaignSpecialAction'\), normalized\.specialAction\)/);

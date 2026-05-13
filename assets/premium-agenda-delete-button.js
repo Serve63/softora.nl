@@ -1,19 +1,20 @@
 (function setupAgendaDeleteButton() {
     const deleteBtn = document.getElementById('modalDeleteAppointmentBtn');
-    if (!deleteBtn) return;
+    const deleteIconBtn = document.getElementById('modalDeleteAppointmentIconBtn');
+    if (!deleteBtn && !deleteIconBtn) return;
 
     function ensureDeleteButtonStyles() {
         if (document.getElementById('agendaDeleteButtonStyles')) return;
         const style = document.createElement('style');
         style.id = 'agendaDeleteButtonStyles';
         style.textContent = `
-            #modalDeleteAppointmentBtn[hidden]{display:none!important}
+            #modalDeleteAppointmentBtn{display:none!important}
+            #modalDeleteAppointmentIconBtn[hidden]{display:none!important}
             @media (max-width: 720px) {
                 #modal .modal-footer { flex-wrap: wrap; }
                 #modalPrimaryBtn,
                 #modalCompleteActivityBtn,
                 #modalNoDealBtn,
-                #modalDeleteAppointmentBtn,
                 #modalSecondaryBtn { flex: 1 1 calc(50% - 0.28rem); }
             }
         `;
@@ -23,8 +24,14 @@
     function syncDeleteButtonState() {
         const apt = typeof getActiveAppointment === 'function' ? getActiveAppointment() : null;
         const canDelete = Boolean(apt && Number(apt.id || 0) > 0) && !modalWorkspaceMode;
-        deleteBtn.hidden = !canDelete;
-        deleteBtn.disabled = !canDelete || workspaceBusy;
+        if (deleteBtn) {
+            deleteBtn.hidden = true;
+            deleteBtn.disabled = !canDelete || workspaceBusy;
+        }
+        if (deleteIconBtn) {
+            deleteIconBtn.hidden = !canDelete;
+            deleteIconBtn.disabled = !canDelete || workspaceBusy;
+        }
     }
 
     async function confirmDeleteAppointment(apt) {
@@ -90,7 +97,8 @@
         syncDeleteButtonState();
     };
 
-    deleteBtn.addEventListener('click', () => { void deleteActiveAppointment(); });
+    deleteBtn?.addEventListener('click', () => { void deleteActiveAppointment(); });
+    deleteIconBtn?.addEventListener('click', () => { void deleteActiveAppointment(); });
     ensureDeleteButtonStyles();
     syncDeleteButtonState();
 })();

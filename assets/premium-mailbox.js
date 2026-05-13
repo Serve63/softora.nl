@@ -4,7 +4,12 @@
 const MAILBOX_ACCOUNT_DEFAULT = 'info@softora.nl';
 const MAILBOX_SENDER_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const MAILBOX_SENDER_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
+const MAILBOX_PIN_SCOPE = 'premium_mailbox_preferences';
+const MAILBOX_PIN_KEY = 'softora_mailbox_pinned_account_v1';
 let activeMailboxAccount = MAILBOX_ACCOUNT_DEFAULT;
+let pinnedMailboxAccount = '';
+let mailboxAccountPreferenceIdentity = 'anonymous';
+let mailboxPinPreferences = Object.create(null);
 let mailboxAccounts = [
   { email: 'info@softora.nl', name: 'info@softora.nl', imapConfigured: false, smtpConfigured: false },
 ];
@@ -28,6 +33,89 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function normalizeMailboxEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getMailboxAccountEmails() {
+  return mailboxAccounts.map((account) => normalizeMailboxEmail(account.email)).filter(Boolean);
+}
+
+function hasMailboxAccount(email) {
+  const normalized = normalizeMailboxEmail(email);
+  return Boolean(normalized && getMailboxAccountEmails().includes(normalized));
+}
+
+function resolveMailboxPreferenceIdentity(session) {
+  const source = session && typeof session === 'object' ? session : {};
+  const value = String(source.userId || source.email || source.displayName || '').trim().toLowerCase();
+  return value.replace(/[^a-z0-9@._-]+/g, '_') || 'anonymous';
+}
+
+function parseMailboxJsonObject(value) {
+  if (!value) return null;
+  if (typeof value === 'object' && !Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(String(value || '').trim());
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function readMailboxPinPreferences() {
+  try {
+    const client = window.SoftoraUiStateClient;
+    if (!client || typeof client.get !== 'function') return Object.create(null);
+    const payload = await client.get(MAILBOX_PIN_SCOPE);
+    const values = payload && typeof payload === 'object' && payload.values && typeof payload.values === 'object' ? payload.values : {};
+    const parsed = parseMailboxJsonObject(values[MAILBOX_PIN_KEY]) || {};
+    return Object.entries(parsed).reduce((next, [identity, email]) => {
+      const cleanIdentity = String(identity || '').replace(/[^a-z0-9@._-]+/g, '_') || 'anonymous';
+      const cleanEmail = normalizeMailboxEmail(email);
+      if (cleanEmail) next[cleanIdentity] = cleanEmail;
+      return next;
+    }, Object.create(null));
+  } catch (_) {
+    return mailboxPinPreferences && typeof mailboxPinPreferences === 'object' ? mailboxPinPreferences : Object.create(null);
+  }
+}
+
+async function writePinnedMailboxAccount(email) {
+  const normalized = normalizeMailboxEmail(email);
+  if (normalized) mailboxPinPreferences[mailboxAccountPreferenceIdentity] = normalized;
+  else delete mailboxPinPreferences[mailboxAccountPreferenceIdentity];
+  try {
+    const client = window.SoftoraUiStateClient;
+    if (!client || typeof client.set !== 'function') return false;
+    await client.set(MAILBOX_PIN_SCOPE, {
+      patch: { [MAILBOX_PIN_KEY]: JSON.stringify(mailboxPinPreferences) },
+      source: 'premium-mailbox',
+      actor: 'browser'
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function initializeMailboxAccountPreference() {
+  try {
+    const response = await fetch('/api/auth/session', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const payload = await response.json().catch(() => ({}));
+    const session = payload && payload.session ? payload.session : payload;
+    mailboxAccountPreferenceIdentity = resolveMailboxPreferenceIdentity(session);
+  } catch (_) {
+    mailboxAccountPreferenceIdentity = 'anonymous';
+  }
+  mailboxPinPreferences = await readMailboxPinPreferences();
+  pinnedMailboxAccount = normalizeMailboxEmail(mailboxPinPreferences[mailboxAccountPreferenceIdentity] || '');
 }
 
 const MAILBOX_TRACKING_HOST_PATTERNS = [
@@ -284,7 +372,7 @@ function findMailById(id) {
 }
 
 function getMailboxAccounts() {
-  return mailboxAccounts.map((account) => account.email);
+  return getMailboxAccountEmails();
 }
 
 function getMailboxAccount() {
@@ -314,13 +402,25 @@ function renderMailboxAccountMenu() {
   const menu = document.getElementById('mailbox-account-menu');
   if (!menu) return;
   const activeEmail = getMailboxAccount();
-  menu.innerHTML = mailboxAccounts.map((account) => {
-    const email = account.email;
+  const accountsForMenu = mailboxAccounts.slice().sort((a, b) => {
+    const aPinned = normalizeMailboxEmail(a.email) === pinnedMailboxAccount;
+    const bPinned = normalizeMailboxEmail(b.email) === pinnedMailboxAccount;
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+    return String(a.email || '').localeCompare(String(b.email || ''), 'nl');
+  });
+  menu.innerHTML = accountsForMenu.map((account) => {
+    const email = normalizeMailboxEmail(account.email);
     const unavailable = !account.imapConfigured && !account.smtpConfigured;
+    const isPinned = email === pinnedMailboxAccount;
     return `
-    <button class="topbar-mailbox-option${email === activeEmail ? ' active' : ''}" type="button" data-mailbox-email="${escapeHtml(email)}" role="menuitemradio" aria-checked="${email === activeEmail ? 'true' : 'false'}">
-      <span>${escapeHtml(email)}${unavailable ? ' · niet gekoppeld' : ''}</span>
-    </button>
+    <div class="topbar-mailbox-option-row${isPinned ? ' pinned' : ''}">
+      <button class="topbar-mailbox-option${email === activeEmail ? ' active' : ''}" type="button" data-mailbox-email="${escapeHtml(email)}" role="menuitemradio" aria-checked="${email === activeEmail ? 'true' : 'false'}">
+        <span>${escapeHtml(email)}${unavailable ? ' · niet gekoppeld' : ''}</span>
+      </button>
+      <button class="topbar-mailbox-pin${isPinned ? ' active' : ''}" type="button" data-mailbox-pin-email="${escapeHtml(email)}" aria-label="${isPinned ? 'Vastgepind mailadres' : 'Mailadres vastpinnen'}" title="${isPinned ? 'Vastgepind mailadres' : 'Mailadres vastpinnen'}">
+        <svg viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 4l6 6-4 1-4.5 4.5L11 20l-7-7 4.5-.5L13 8l1-4z"/><path d="M8.5 15.5 4 20"/></svg>
+      </button>
+    </div>
   `;
   }).join('');
 }
@@ -383,9 +483,13 @@ async function loadMailboxAccounts() {
     });
     const data = await response.json().catch(() => ({}));
     if (response.ok && data?.ok && Array.isArray(data.accounts) && data.accounts.length) {
-      mailboxAccounts = data.accounts;
-      if (!mailboxAccounts.some((account) => account.email === activeMailboxAccount)) {
-        activeMailboxAccount = mailboxAccounts[0].email;
+      mailboxAccounts = data.accounts
+        .map((account) => Object.assign({}, account, { email: normalizeMailboxEmail(account.email) }))
+        .filter((account) => account.email);
+      if (pinnedMailboxAccount && hasMailboxAccount(pinnedMailboxAccount)) {
+        activeMailboxAccount = pinnedMailboxAccount;
+      } else if (!hasMailboxAccount(activeMailboxAccount)) {
+        activeMailboxAccount = hasMailboxAccount(MAILBOX_ACCOUNT_DEFAULT) ? MAILBOX_ACCOUNT_DEFAULT : mailboxAccounts[0].email;
       }
       renderMailboxAccountMenu();
       setMailboxAccountUi(activeMailboxAccount);
@@ -423,15 +527,26 @@ async function loadMailboxMessages() {
 }
 
 async function applyMailboxAccount(email) {
-  activeMailboxAccount = email;
+  const normalizedEmail = normalizeMailboxEmail(email);
+  activeMailboxAccount = hasMailboxAccount(normalizedEmail) ? normalizedEmail : (mailboxAccounts[0]?.email || MAILBOX_ACCOUNT_DEFAULT);
   activeFolder = 'inbox';
   activeMail = null;
   const searchInput = document.getElementById('search-input');
   if (searchInput) searchInput.value = '';
   document.querySelectorAll('.folder-item').forEach((f, i) => f.classList.toggle('active', i === 0));
-  setMailboxAccountUi(email);
+  setMailboxAccountUi(activeMailboxAccount);
   resetDetailEmpty();
   await loadMailboxMessages();
+}
+
+async function pinMailboxAccount(email) {
+  const normalizedEmail = normalizeMailboxEmail(email);
+  if (!hasMailboxAccount(normalizedEmail)) return;
+  pinnedMailboxAccount = normalizedEmail;
+  const saved = await writePinnedMailboxAccount(normalizedEmail);
+  renderMailboxAccountMenu();
+  await applyMailboxAccount(normalizedEmail);
+  toast(saved ? `Mailbox vastgepind: ${normalizedEmail}` : `Mailbox gekozen: ${normalizedEmail}. Vastpinnen opslaan mislukt.`);
 }
 
 function setFolder(folder, el) {
@@ -815,6 +930,14 @@ if (mailboxAccountSwitcher) {
 
 if (mailboxAccountMenu) {
   mailboxAccountMenu.addEventListener('click', function(event) {
+    const pinButton = event.target.closest('[data-mailbox-pin-email]');
+    if (pinButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const email = String(pinButton.dataset.mailboxPinEmail || '').trim();
+      void pinMailboxAccount(email);
+      return;
+    }
     const option = event.target.closest('[data-mailbox-email]');
     if (!option) return;
     const email = String(option.dataset.mailboxEmail || '').trim();
@@ -835,6 +958,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 (async function initMailboxAccount() {
+  await initializeMailboxAccountPreference();
   await loadMailboxAccounts();
   await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT);
 })();

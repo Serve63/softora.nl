@@ -708,6 +708,7 @@ function renderOrdersEmptyState() {
 }
 
 function getOrderFilterGroupForCard(card) {
+    const explicitGroup = String(card?.dataset?.orderFilterGroup || '').trim().toLowerCase(); if (explicitGroup) return explicitGroup;
     const id = Number(String(card?.id || '').replace('order-', ''));
     const order = orders[id];
     const ui = resolveOrderUiState(order);
@@ -735,20 +736,16 @@ function updateOrderFilterButtonState() {
 }
 
 function updateOrderFilterCounts(cards) {
-    const counts = {
-        completed: 0,
-        in_progress: 0
-    };
+    const counts = { completed: 0, in_progress: 0, leads: 0 };
 
     cards.forEach((card) => {
         const group = getOrderFilterGroupForCard(card);
         counts[group] = (counts[group] || 0) + 1;
     });
 
-    const completedEl = document.getElementById('filterCountCompleted');
-    if (completedEl) completedEl.textContent = String(counts.completed);
-    const progressEl = document.getElementById('filterCountProgress');
-    if (progressEl) progressEl.textContent = String(counts.in_progress);
+    const completedEl = document.getElementById('filterCountCompleted'); if (completedEl) completedEl.textContent = String(counts.completed);
+    const progressEl = document.getElementById('filterCountProgress'); if (progressEl) progressEl.textContent = String(counts.in_progress);
+    const leadsEl = document.getElementById('filterCountLeads'); if (leadsEl) leadsEl.textContent = String(counts.leads);
 }
 
 function applyOrderFilter() {
@@ -2922,7 +2919,7 @@ async function initializeActiveOrdersPageState(options = {}) {
     loadCustomOrderCards();
     restoreOrdersRuntimeFromState();
     refreshOrderSummaryCards();
-    void fetchAgendaLeadOptions().catch(() => {});
+    void fetchAgendaLeadOptions().then(() => window.SoftoraActiveOrdersLeadTab?.renderOpenLeads?.()).catch(() => {});
 }
 
 async function bootActiveOrdersPage() {

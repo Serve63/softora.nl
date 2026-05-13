@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260512b" sizes="any">
-    <link rel="apple-touch-icon" href="/assets/softora-favicon-round.png?v=20260512b">
+    <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">
+    <link rel="apple-touch-icon" href="/assets/softora-favicon-round.png?v=20260513a">
         <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Softora | Dashboard</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260502a">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260513a">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true"); document.documentElement.setAttribute("data-dashboard-boot-loading", "true");
@@ -28,7 +28,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260502a" defer></script><script src="assets/premium-boot-one-second.js?v=20260502a"></script>
+    <script src="assets/personnel-theme.js?v=20260513a" defer></script><script src="assets/premium-boot-one-second.js?v=20260502a"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -734,12 +734,7 @@
         }
 
         /* KPI Cards */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
+        .kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.5rem; margin-bottom: 3rem; }
 
         .kpi-card {
             background: var(--bg-secondary);
@@ -972,6 +967,7 @@
             border: 1px solid rgba(178, 47, 112, 0.22);
             border-left: 3px solid var(--accent-light);
             padding: 1.25rem 1.45rem;
+            min-height: 280px;
             margin-bottom: 1.5rem;
             box-shadow: 0 12px 28px rgba(20, 18, 40, 0.04);
             opacity: 0;
@@ -1918,7 +1914,7 @@
             <div class="topbar">
                 <div class="topbar-left">
                     <h1>Dashboard</h1>
-                    <p>Vergeet niet je omzet upto-date te houden!</p>
+                    <p>Vergeet niet om de omzet up to-date te houden!</p>
                 </div>
                 <div class="topbar-right dashboard-topbar-right">
                     <div class="dashboard-topbar-controls">
@@ -2030,6 +2026,7 @@
                     <div class="kpi-label kpi-label-tight">Waarvan Website Onderhoud</div>
                     <div class="kpi-value" id="kpiMaintenanceMonth"><!-- SOFTORA_DASHBOARD_MAINTENANCE_REVENUE --></div>
                 </div>
+                <div class="kpi-card"><div class="kpi-label kpi-label-tight">Terugkerende inkomsten</div><div class="kpi-value" id="kpiRecurringRevenue"><!-- SOFTORA_DASHBOARD_RECURRING_REVENUE --></div></div>
                 <div class="kpi-card">
                     <div class="kpi-label">Totale Klanten</div>
                     <div class="kpi-value" id="kpiTotalClients"><!-- SOFTORA_DASHBOARD_TOTAL_CLIENTS --></div>
@@ -3100,6 +3097,7 @@
             if (revenueYearEl) revenueYearEl.textContent = formatMoneyEUR(selectedRevenue.total);
             const maintenanceMonthEl = document.getElementById('kpiMaintenanceMonth');
             if (maintenanceMonthEl) maintenanceMonthEl.textContent = formatMoneyEUR(selectedRevenue.maintenance);
+            const recurringRevenueEl = document.getElementById('kpiRecurringRevenue'); if (recurringRevenueEl) recurringRevenueEl.textContent = formatMoneyEUR(selectedRevenue.maintenance);
             const totalClientsEl = document.getElementById('kpiTotalClients');
             if (totalClientsEl) totalClientsEl.textContent = String(hasCustomerDatabase ? customers.length : uniqueClients.size);
             updateKpiActiveOrdersDisplay(activeOrders);

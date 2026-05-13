@@ -25,7 +25,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-campaign-sender-settings\.js\?v=20260511a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260511b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260513a"><\/script>/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
@@ -34,12 +34,20 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(scriptSource, /async function loadMailboxAccounts\(\)/);
   assert.match(scriptSource, /async function loadMailboxMessages\(\)/);
   assert.match(scriptSource, /async function sendMail\(\)/);
-  assert.match(scriptSource, /function getMailboxAccounts\(\) \{\s*return mailboxAccounts\.map\(\(account\) => account\.email\);\s*\}/);
+  assert.match(scriptSource, /const MAILBOX_PIN_SCOPE = 'premium_mailbox_preferences';/);
+  assert.match(scriptSource, /const MAILBOX_PIN_KEY = 'softora_mailbox_pinned_account_v1';/);
+  assert.match(scriptSource, /window\.SoftoraUiStateClient/);
+  assert.match(scriptSource, /async function initializeMailboxAccountPreference\(\)/);
+  assert.match(scriptSource, /function getMailboxAccounts\(\) \{\s*return getMailboxAccountEmails\(\);\s*\}/);
   assert.match(scriptSource, /function getMailboxAccount\(\) \{\s*return activeMailboxAccount;\s*\}/);
   assert.match(scriptSource, /function renderMailboxAccountMenu\(\) \{[\s\S]*data-mailbox-email="\$\{escapeHtml\(email\)\}"/);
-  assert.match(scriptSource, /async function applyMailboxAccount\(email\) \{[\s\S]*activeMailboxAccount = email;[\s\S]*setMailboxAccountUi\(email\);/);
+  assert.match(scriptSource, /data-mailbox-pin-email="\$\{escapeHtml\(email\)\}"/);
+  assert.match(scriptSource, /async function pinMailboxAccount\(email\)/);
+  assert.match(scriptSource, /async function applyMailboxAccount\(email\) \{[\s\S]*activeMailboxAccount = hasMailboxAccount\(normalizedEmail\)[\s\S]*setMailboxAccountUi\(activeMailboxAccount\);/);
+  assert.match(scriptSource, /await initializeMailboxAccountPreference\(\);[\s\S]*await loadMailboxAccounts\(\);/);
   assert.match(scriptSource, /mailboxAccountSwitcher\.addEventListener\('click', function\(event\) \{/);
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*applyMailboxAccount\(email\);/);
+  assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*pinMailboxAccount\(email\);/);
 });
 
 test('premium mailbox houdt account-dropdown zichtbaar boven de inbox-layout', () => {
@@ -48,6 +56,8 @@ test('premium mailbox houdt account-dropdown zichtbaar boven de inbox-layout', (
   assert.match(pageSource, /\.topbar \{[\s\S]*overflow:\s*visible;[\s\S]*position:\s*relative;[\s\S]*z-index:\s*40;/);
   assert.match(pageSource, /\.topbar-title-wrap \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*45;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*max-height:\s*min\(320px,\s*calc\(100vh - 90px\)\);[\s\S]*overflow-y:\s*auto;[\s\S]*z-index:\s*60;/);
+  assert.match(pageSource, /\.topbar-mailbox-option-row \{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;/);
+  assert.match(pageSource, /\.topbar-mailbox-pin\.active \{[\s\S]*color:\s*var\(--crimson\);/);
 });
 
 test('premium mailbox inboxbadge volgt de geladen inbox en niet een vast getal', () => {

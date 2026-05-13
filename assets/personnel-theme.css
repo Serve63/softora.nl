@@ -1332,7 +1332,7 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
     margin-bottom: var(--sidebar-shell-gap) !important;
 }
 
-.dashboard-layout[data-sidebar-shell="canonical"] :is(.topbar-left, .topbar-copy, .page-header > div, .page-hero > div:first-child, .header > div, .reg-header > div, .notepad-shell > header, .hero, .coming-shell) {
+.dashboard-layout[data-sidebar-shell="canonical"] :is(.topbar-left, .topbar-copy, .page-header > div, .page-hero > div:first-child, .header > div, .reg-header > div, .notepad-shell > header, .word-shell > header, .bookkeeping-header-copy, .hero, .coming-shell) {
     display: grid !important;
     gap: 0.3rem !important;
 }

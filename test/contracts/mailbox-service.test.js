@@ -21,9 +21,11 @@ function createResponseRecorder() {
 
 function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
   let activeMailbox = '';
+  const appendedMessages = [];
   return {
     usable: true,
     lockedMailboxes: [],
+    appendedMessages,
     async connect() {},
     async list() {
       return boxes;
@@ -47,6 +49,10 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
           if (message) yield message;
         }
       })();
+    },
+    async append(mailboxName, source, flags, internalDate) {
+      appendedMessages.push({ mailboxName, source, flags, internalDate });
+      return { uid: 999 };
     },
     async logout() {
       this.usable = false;
@@ -174,6 +180,54 @@ test('mailbox service sends Martijn mail with the full display name', async () =
   assert.equal(res.body.ok, true);
   assert.equal(sent[0].config.auth.user, 'martijn@softora.nl');
   assert.equal(sent[0].message.from, 'Martijn van de Ven <martijn@softora.nl>');
+});
+
+test('mailbox service stores app-sent mail in the resolved sent folder when IMAP is available', async () => {
+  const sent = [];
+  const client = createFakeImapClient({
+    boxes: [
+      { path: 'INBOX' },
+      { path: 'INBOX/Verstuurd', specialUse: '\\Sent' },
+    ],
+    messagesByMailbox: {
+      'INBOX/Verstuurd': [],
+    },
+  });
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createTransport: (config) => ({
+      sendMail: async (message) => {
+        sent.push({ config, message });
+        return { messageId: 'm-1', accepted: [message.to], rejected: [] };
+      },
+    }),
+    createImapClient: () => client,
+  });
+
+  await service.sendMessage({
+    accountEmail: 'serve@softora.nl',
+    to: 'klant@example.nl',
+    subject: 'Test verzonden',
+    text: 'Hallo klant',
+  });
+
+  assert.equal(sent.length, 1);
+  assert.equal(client.appendedMessages.length, 1);
+  assert.equal(client.appendedMessages[0].mailboxName, 'INBOX/Verstuurd');
+  assert.deepEqual(client.appendedMessages[0].flags, ['\\Seen']);
 });
 
 test('mailbox service resolves sent folders through IMAP special-use metadata', async () => {

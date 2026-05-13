@@ -65,6 +65,22 @@ function getHighlightedCostItems(cat = DEFAULT_MONTHLY_COSTS_CATEGORY) {
     : DEFAULT_MONTHLY_COSTS_HIGHLIGHTED_ITEMS.map(cloneCostItem);
 }
 
+function compareMonthlyCostItemsDesc(a, b) {
+  const amountDiff = toMonthly(b) - toMonthly(a);
+  if (Math.abs(amountDiff) > 0.005) return amountDiff;
+  return normalizeString(a && a.naam).localeCompare(normalizeString(b && b.naam), 'nl');
+}
+
+function sortMonthlyCostItemsForDisplay(items) {
+  const source = Array.isArray(items) ? items.slice() : [];
+  const pinnedTopItems = source.filter((item) => item && item.highlighted).slice(0, 2);
+  const pinnedIds = new Set(pinnedTopItems.map((item) => item && item.id));
+  const sortableItems = source
+    .filter((item) => !pinnedIds.has(item && item.id))
+    .sort(compareMonthlyCostItemsDesc);
+  return pinnedTopItems.concat(sortableItems);
+}
+
 function sanitizeStoredCostItem(item, index) {
   const naam = normalizeString(item && item.naam).slice(0, 120);
   if (!naam) return null;
@@ -125,7 +141,7 @@ function sanitizeStoredCostItems(rawEntries) {
 
 function applyStoredMonthlyCostItems(rawEntries) {
   data[DEFAULT_MONTHLY_COSTS_CATEGORY] = getHighlightedCostItems(DEFAULT_MONTHLY_COSTS_CATEGORY)
-    .concat(sanitizeStoredCostItems(rawEntries));
+    .concat(sanitizeStoredCostItems(rawEntries).sort(compareMonthlyCostItemsDesc));
   syncNextId();
 }
 
@@ -462,10 +478,12 @@ async function fetchUiStateSetWithFallback(scope, body) {
 }
 
 async function persistMonthlyCostEntries(actor = 'browser') {
-  const editableItems = getEditableCostItems(DEFAULT_MONTHLY_COSTS_CATEGORY).map((item) => ({
-    ...item,
-    highlighted: false,
-  }));
+  const editableItems = getEditableCostItems(DEFAULT_MONTHLY_COSTS_CATEGORY)
+    .sort(compareMonthlyCostItemsDesc)
+    .map((item) => ({
+      ...item,
+      highlighted: false,
+    }));
   const result = await fetchUiStateSetWithFallback(MONTHLY_COSTS_REMOTE_SCOPE, {
     patch: {
       [MONTHLY_COSTS_REMOTE_KEY]: JSON.stringify(editableItems),
@@ -544,7 +562,7 @@ function render() {
   wrap.replaceChildren();
 
   Object.entries(data).forEach(([cat, items]) => {
-    const visibleItems = monthlyCostsBootstrapDone ? items : [];
+    const visibleItems = monthlyCostsBootstrapDone ? sortMonthlyCostItemsForDisplay(items) : [];
     const catTotal = visibleItems.reduce((s, i) => s + toMonthly(i), 0);
     const key = catKey(cat);
     const block = document.createElement('div');
