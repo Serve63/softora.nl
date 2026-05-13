@@ -7,6 +7,7 @@
     var STORAGE_KEY = "softora_premium_sidebar_session_v1";
     var NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1";
     var NAV_STATE_TTL_MS = 1000 * 30;
+    var persistedSessionSnapshot = null;
 
     function readCookieValue(name) {
         var needle = String(name || "").trim() + "=";
@@ -121,6 +122,81 @@
         return [displayName, role, avatarDataUrl].join("\u0001");
     }
 
+    function countDisplayNameWords(value) {
+        return String(value || "").trim().split(/\s+/).filter(Boolean).length;
+    }
+
+    function chooseRicherDisplayName(primaryValue, fallbackValue) {
+        var primary = String(primaryValue || "").trim();
+        var fallback = String(fallbackValue || "").trim();
+        if (!primary) return fallback;
+        if (!fallback) return primary;
+        var primaryWords = countDisplayNameWords(primary);
+        var fallbackWords = countDisplayNameWords(fallback);
+        if (fallbackWords > primaryWords) return fallback;
+        if (fallbackWords === primaryWords && fallback.length > primary.length) return fallback;
+        return primary;
+    }
+
+    function normalizeSessionCandidate(sessionLike) {
+        if (!sessionLike || typeof sessionLike !== "object" || !sessionLike.authenticated) return null;
+        return {
+            authenticated: true,
+            email: String(sessionLike.email || "").trim().toLowerCase(),
+            userId: String(sessionLike.userId || "").trim(),
+            displayName: String(sessionLike.displayName || "").trim(),
+            firstName: String(sessionLike.firstName || "").trim(),
+            lastName: String(sessionLike.lastName || "").trim(),
+            avatarDataUrl: String(sessionLike.avatarDataUrl || "").trim(),
+            role: String(sessionLike.role || "").trim(),
+        };
+    }
+
+    function mergeSessions(primarySession, fallbackSession) {
+        var primary = normalizeSessionCandidate(primarySession);
+        var fallback = normalizeSessionCandidate(fallbackSession);
+        if (!primary) return fallback;
+        if (!fallback) return primary;
+        var sameUser =
+            (primary.userId && fallback.userId && primary.userId === fallback.userId) ||
+            (primary.email && fallback.email && primary.email === fallback.email);
+        if (!sameUser) return primary;
+        return {
+            ...fallbackSession,
+            ...primarySession,
+            displayName: chooseRicherDisplayName(primary.displayName, fallback.displayName),
+            firstName: primary.firstName || fallback.firstName || "",
+            lastName: primary.lastName || fallback.lastName || "",
+            avatarDataUrl: primary.avatarDataUrl || fallback.avatarDataUrl || "",
+        };
+    }
+
+    function shouldEnrichSession(sessionLike) {
+        var normalized = normalizeSessionCandidate(sessionLike);
+        if (!normalized) return false;
+        if (!normalized.avatarDataUrl) return true;
+        return countDisplayNameWords(normalized.displayName) < 2;
+    }
+
+    async function enrichSession(sessionLike, fetchJsonNoStore) {
+        var merged = mergeSessions(sessionLike, persistedSessionSnapshot);
+        if (!shouldEnrichSession(merged) || typeof fetchJsonNoStore !== "function") {
+            return merged;
+        }
+        var profilePayload = await fetchJsonNoStore("/api/auth/profile");
+        var profileUser = profilePayload && profilePayload.ok && profilePayload.user && typeof profilePayload.user === "object"
+            ? profilePayload.user
+            : null;
+        if (!profileUser) return merged;
+        return mergeSessions({
+            ...merged,
+            displayName: String(profileUser.displayName || (merged && merged.displayName) || "").trim(),
+            firstName: String(profileUser.voornaam || profileUser.firstName || (merged && merged.firstName) || "").trim(),
+            lastName: String(profileUser.achternaam || profileUser.lastName || (merged && merged.lastName) || "").trim(),
+            avatarDataUrl: String(profileUser.avatarDataUrl || (merged && merged.avatarDataUrl) || "").trim(),
+        }, merged);
+    }
+
     try {
         prefillPremiumSidebarActiveState();
         prefillPremiumSidebarScrollState();
@@ -129,6 +205,7 @@
         if (!raw) return;
         var s = JSON.parse(raw);
         if (!s || typeof s !== "object" || !s.authenticated) return;
+        persistedSessionSnapshot = s;
 
         var nameEl = document.querySelector("[data-sidebar-user-name]");
         var roleEl = document.querySelector("[data-sidebar-user-role]");
@@ -164,4 +241,10 @@
     } catch (_) {
         /* ignore */
     }
+
+    window.SoftoraPremiumSidebarProfileSession = {
+        enrichSession: enrichSession,
+        mergeSessions: mergeSessions,
+        shouldEnrichSession: shouldEnrichSession
+    };
 })();

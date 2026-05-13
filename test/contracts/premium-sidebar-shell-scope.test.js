@@ -142,6 +142,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
     /window\.SoftoraPersonnelTheme\.refreshPremiumStaticSidebarActiveState\s*=\s*refreshPremiumStaticSidebarActiveState/
   );
   assert.match(themeJsSource, /persistPremiumSidebarSessionSnapshot/);
+  assert.match(themeJsSource, /window\.SoftoraPremiumSidebarProfileSession/);
+  assert.match(themeJsSource, /profileSessionHelper\.enrichSession\(payload, fetchJsonNoStore\)/);
   assert.match(themeJsSource, /buildSidebarProfileRenderKey/);
   assert.match(themeJsSource, /sidebar\.dataset\.sidebarProfileRenderKey === renderKey/);
   assert.match(themeJsSource, /document\.querySelector\("\[data-sidebar-profile-trigger\]"\) \|\| document\.querySelector\("\.sidebar-user \.sidebar-user-trigger"\);/);
@@ -164,6 +166,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /nav\.scrollTop = Math\.max\(0, scrollTop\);/);
   assert.match(prefillSource, /avatarEl\.replaceChildren\(\);/);
   assert.doesNotMatch(prefillSource, /avatarEl\.innerHTML\s*=/);
+  assert.match(prefillSource, /function mergeSessions\(primarySession, fallbackSession\) \{/);
+  assert.match(prefillSource, /function shouldEnrichSession\(sessionLike\) \{/);
+  assert.match(prefillSource, /function enrichSession\(sessionLike, fetchJsonNoStore\) \{/);
+  assert.match(prefillSource, /window\.SoftoraPremiumSidebarProfileSession = \{/);
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);

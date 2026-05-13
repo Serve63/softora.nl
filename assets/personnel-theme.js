@@ -1535,7 +1535,6 @@
             /* ignore quota / private mode */
         }
     }
-
     async function loadPremiumSession(options) {
         if (!isPremiumPersonnelContext) return null;
         const force = Boolean(options && options.force);
@@ -1543,8 +1542,10 @@
         premiumSessionPromise = (async function () {
             try {
                 const payload = await fetchJsonNoStore("/api/auth/session");
+                const profileSessionHelper = window.SoftoraPremiumSidebarProfileSession || null;
+                const nextSnapshot = profileSessionHelper && typeof profileSessionHelper.enrichSession === "function" ? await profileSessionHelper.enrichSession(payload, fetchJsonNoStore) : payload;
                 premiumInitialSessionFetched = true;
-                premiumSessionSnapshot = payload && payload.authenticated ? payload : null;
+                premiumSessionSnapshot = nextSnapshot && nextSnapshot.authenticated ? nextSnapshot : null;
                 persistPremiumSidebarSessionSnapshot(premiumSessionSnapshot);
                 applyPremiumSidebarProfile(premiumSessionSnapshot);
                 return premiumSessionSnapshot;
@@ -1558,7 +1559,6 @@
         })();
         return premiumSessionPromise;
     }
-
     function setPremiumProfileFeedback(message, tone) {
         if (!premiumProfileModalRef || !premiumProfileModalRef.feedback) return;
         const feedbackEl = premiumProfileModalRef.feedback;
