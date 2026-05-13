@@ -1,7 +1,7 @@
 (function (global) {
     "use strict";
 
-    const DEVICE_MOCKUP_VERSION = "v4";
+    const DEVICE_MOCKUP_VERSION = "v5";
 
     function normalizeString(value) {
         return String(value || "").trim();
@@ -179,17 +179,17 @@
         if (!context) throw new Error("Device-mockup maken is mislukt.");
 
         const gradient = context.createLinearGradient(0, 0, 1600, 1000);
-        gradient.addColorStop(0, "#f8f4f6");
-        gradient.addColorStop(0.52, "#ffffff");
-        gradient.addColorStop(1, "#efe7eb");
+        gradient.addColorStop(0, "#f7f9fc");
+        gradient.addColorStop(0.48, "#ffffff");
+        gradient.addColorStop(1, "#e8edf5");
         context.fillStyle = gradient;
         context.fillRect(0, 0, 1600, 1000);
 
-        context.fillStyle = "rgba(139, 34, 82, 0.08)";
+        context.fillStyle = "rgba(59, 130, 246, 0.10)";
         context.beginPath();
         context.arc(1260, 160, 340, 0, Math.PI * 2);
         context.fill();
-        context.fillStyle = "rgba(20, 24, 45, 0.05)";
+        context.fillStyle = "rgba(15, 23, 42, 0.08)";
         context.beginPath();
         context.arc(280, 820, 300, 0, Math.PI * 2);
         context.fill();

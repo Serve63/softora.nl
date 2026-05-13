@@ -385,6 +385,7 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
     sentMessages[0].html,
     /<p style="margin:24px 0 0 0;"><img src="cid:webdesign-prospect-1@softora"/
   );
+  assert.match(sentMessages[0].html, /width:100%;max-width:760px;height:auto;border:0;border-radius:12px/);
   assert.match(
     sentMessages[0].html,
     /<p style="margin:0;"><img src="cid:webdesign-mockup-prospect-1@softora"/
