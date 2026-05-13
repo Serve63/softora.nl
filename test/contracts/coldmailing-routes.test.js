@@ -332,8 +332,17 @@ test('coldmailing preview image route serves linked webdesign photos inline', as
   assert.equal(res.headers['content-type'], 'image/png');
   assert.equal(res.headers['content-disposition'], 'inline; filename="Bakkerij-Zon-device-mockup.png"');
   assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
-  assert.equal(res.headers['cache-control'], 'private, max-age=86400');
+  assert.equal(res.headers['cache-control'], 'no-store');
   assert.equal(Buffer.compare(res.body, Buffer.from('mockup-image')), 0);
+});
+
+test('coldmail preview image lookup reuses the fresh mockup preference logic', () => {
+  const serviceSource = fs.readFileSync(path.join(__dirname, '../../server/services/coldmail-campaign.js'), 'utf8');
+
+  assert.match(
+    serviceSource,
+    /const photo = preferFreshRowPhotoFields\(\s*rows\[match\.index\],\s*findStoredPhotoRecordForRow\(rows\[match\.index\], match\.index, photos, photosByIdentity\)\s*\);/
+  );
 });
 
 test('coldmailing exposes mail-interest follow-ups outside the coldcalling leads inbox', () => {

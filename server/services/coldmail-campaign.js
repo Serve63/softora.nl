@@ -2386,7 +2386,10 @@ function createColdmailCampaignService(deps = {}) {
       const identityKey = normalizeString(item && item.identityKey).toLowerCase();
       if (identityKey) photosByIdentity.set(identityKey, item);
     });
-    const photo = findStoredPhotoRecordForRow(rows[match.index], match.index, photos, photosByIdentity);
+    const photo = preferFreshRowPhotoFields(
+      rows[match.index],
+      findStoredPhotoRecordForRow(rows[match.index], match.index, photos, photosByIdentity)
+    );
     const source = payload.type === 'mockup'
       ? getWebdesignMockupSource(photo)
       : getWebdesignPhotoSource(photo);
