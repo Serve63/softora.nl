@@ -565,3 +565,17 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
   assert.match(pageSource, /showToast\(buildColdmailSendSuccessMessage\(sendResult\)\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
   assert.match(pageSource, /showScreen\('screen-campaign'\);/);
 });
+
+test('premium campaign test mode keeps mail copy and switches to call copy on the lead-generator alias', () => {
+  const testModePath = path.join(__dirname, '../../assets/premium-campaign-test-mode.js');
+  const testModeSource = fs.readFileSync(testModePath, 'utf8');
+
+  assert.match(testModeSource, /document\.documentElement\.getAttribute\('data-softora-lead-generator-alias'\) === '1'/);
+  assert.match(testModeSource, /const TEST_CALL_PHONE = '\+31000000000';/);
+  assert.match(testModeSource, /shortLabel: 'Testmodus aan: testoproep naar ' \+ TEST_CALL_PHONE/);
+  assert.match(testModeSource, /toast: 'Testmodus aan: testoproep gaat naar ' \+ TEST_CALL_PHONE \+ '\.'/);
+  assert.match(testModeSource, /shortLabel: 'Testmodus aan: alleen naar ' \+ TEST_RECIPIENT_EMAIL/);
+  assert.match(testModeSource, /toast: 'Testmodus aan: verzending gaat alleen naar ' \+ TEST_RECIPIENT_EMAIL \+ '\.'/);
+  assert.doesNotMatch(testModeSource, /verzending gaat alleen naar '\s*\+\s*TEST_CALL_PHONE/);
+  assert.doesNotMatch(testModeSource, /testoproep naar '\s*\+\s*TEST_RECIPIENT_EMAIL/);
+});
