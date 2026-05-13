@@ -45,10 +45,13 @@
   }
 
   function buildTestCallLeads() {
+    const testPhone = global.SoftoraCampaignTestMode && typeof global.SoftoraCampaignTestMode.getTestPhone === 'function'
+      ? String(global.SoftoraCampaignTestMode.getTestPhone() || '').trim()
+      : '';
     return [{
       name: 'Softora Testmodus',
       company: 'Softora Testmodus',
-      phone: '+31000000000',
+      phone: testPhone || '0629917185',
       email: 'servec321@gmail.com',
       region: 'Testmodus',
     }];

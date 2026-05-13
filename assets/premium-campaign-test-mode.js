@@ -2,7 +2,7 @@
   'use strict';
 
   const TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
-  const TEST_CALL_PHONE = '+31000000000';
+  const TEST_CALL_PHONE = '0629917185';
 
   function isLeadGeneratorAlias() {
     return document.documentElement.getAttribute('data-softora-lead-generator-alias') === '1';

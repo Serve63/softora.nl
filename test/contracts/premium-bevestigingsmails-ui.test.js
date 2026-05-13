@@ -533,6 +533,8 @@ test('premium ai lead generator uses calling copy and the on-page prompt for col
   assert.match(callStartSource, /function requestCallStartConfirmPin\(\)/);
   assert.match(callStartSource, /SoftoraRiskyActionPin\.requestPin/);
   assert.match(callStartSource, /startConfirmPin:\s*String\(startConfirmPin \|\| ''\)\.trim\(\)/);
+  assert.match(callStartSource, /typeof global\.SoftoraCampaignTestMode\.getTestPhone === 'function'/);
+  assert.match(callStartSource, /phone: testPhone \|\| '0629917185'/);
   assert.match(callStartSource, /return postColdcallingStart\(getCampaignPayload\(1\), buildTestCallLeads\(\), startConfirmPin\);/);
   assert.match(callStartSource, /fetch\('\/api\/coldcalling\/start'/);
   assert.match(callStartSource, /const original = global\.startCampagneImmediate;/);
@@ -571,7 +573,7 @@ test('premium campaign test mode keeps mail copy and switches to call copy on th
   const testModeSource = fs.readFileSync(testModePath, 'utf8');
 
   assert.match(testModeSource, /document\.documentElement\.getAttribute\('data-softora-lead-generator-alias'\) === '1'/);
-  assert.match(testModeSource, /const TEST_CALL_PHONE = '\+31000000000';/);
+  assert.match(testModeSource, /const TEST_CALL_PHONE = '0629917185';/);
   assert.match(testModeSource, /shortLabel: 'Testmodus aan: testoproep naar ' \+ TEST_CALL_PHONE/);
   assert.match(testModeSource, /toast: 'Testmodus aan: testoproep gaat naar ' \+ TEST_CALL_PHONE \+ '\.'/);
   assert.match(testModeSource, /shortLabel: 'Testmodus aan: alleen naar ' \+ TEST_RECIPIENT_EMAIL/);
