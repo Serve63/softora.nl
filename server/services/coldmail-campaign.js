@@ -755,6 +755,32 @@ function createColdmailCampaignService(deps = {}) {
     return photos[id] || byIdentity.get(identityKey) || null;
   }
 
+  function preferFreshRowPhotoFields(row, storedPhoto) {
+    const base = storedPhoto && typeof storedPhoto === 'object' ? { ...storedPhoto } : {};
+    const next = { ...base };
+    const rowPhotoSource = getWebdesignPhotoSource(row);
+    const rowMockupSource = getWebdesignMockupSource(row);
+    if (rowPhotoSource) {
+      next.websitePhoto = row.websitePhoto || row.websitePhotoUrl || row.signedUrl || (row.storage && row.storage.signedUrl) || rowPhotoSource;
+      const rowPhotoName = normalizeString(row.websitePhotoName || row.photoName || row.websiteImageName);
+      if (rowPhotoName) next.websitePhotoName = rowPhotoName;
+    }
+    if (rowMockupSource) {
+      next.websiteMockup =
+        row.websiteMockup ||
+        row.websiteMockupUrl ||
+        row.mockupUrl ||
+        row.signedMockupUrl ||
+        (row.mockupStorage && row.mockupStorage.signedUrl) ||
+        rowMockupSource;
+      const rowMockupName = normalizeString(row.websiteMockupName || row.mockupName);
+      if (rowMockupName) next.websiteMockupName = rowMockupName;
+    }
+    if (!normalizeString(next.id)) next.id = getRowId(row, 0);
+    if (!normalizeString(next.identityKey)) next.identityKey = buildRowIdentityKey(row);
+    return next;
+  }
+
   function hasReadyWebsitePhotoRecord(photo) {
     if (!photo || typeof photo !== 'object') return false;
     return Boolean(
@@ -2046,7 +2072,7 @@ function createColdmailCampaignService(deps = {}) {
       const identityKey = normalizeString(item && item.identityKey).toLowerCase();
       if (identityKey) photosByIdentity.set(identityKey, item);
     });
-    const photo = findStoredPhotoRecordForRow(row, 0, photos, photosByIdentity);
+    const photo = preferFreshRowPhotoFields(row, findStoredPhotoRecordForRow(row, 0, photos, photosByIdentity));
     const parsed = await resolveImageAttachment(getWebdesignPhotoSource(photo));
     if (!parsed) return null;
     const baseName = sanitizeFilename(photo.websitePhotoName || `${getRowCompany(row)} webdesign`, 'webdesign');
