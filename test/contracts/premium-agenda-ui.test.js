@@ -21,7 +21,7 @@ test('premium agenda modal uses dossier flow for appointments that already have 
   assert.match(pageSource, /button\.id = 'modalFollowUpBtn';/);
   assert.match(pageSource, /async function addFollowUpLeadForActiveAppointment\(options = \{\}\)/);
   assert.match(pageSource, /\/api\/agenda\/appointments\/\$\{encodeURIComponent\(String\(apt\.id\)\)\}\/add-follow-up-lead/);
-  assert.match(pageSource, /window\.location\.assign\('\/premium-leads'\);/);
+  assert.match(pageSource, /window\.location\.assign\('\/premium-actieve-opdrachten\?filter=leads'\);/);
   assert.match(
     pageSource,
     /if \(!modalWorkspaceMode\) \{[\s\S]*if \(getLinkedOrderIdForAppointment\(apt\)\) \{[\s\S]*openLinkedOrderDossierForAppointment\(apt\);/
@@ -268,9 +268,12 @@ test('premium agenda kan handmatige afspraakgegevens wijzigen vanuit de detailmo
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-agenda-stability\.js\?v=20260511a/);
+  assert.match(pageSource, /assets\/premium-agenda-stability\.js\?v=20260513a/);
+  assert.match(pageSource, /id="modalEditAppointmentIconBtn"/);
   assert.match(stabilitySource, /button\.id = 'modalEditAppointmentBtn';/);
   assert.match(stabilitySource, /button\.className = 'modal-btn primary magnetic';/);
+  assert.match(stabilitySource, /const iconButton = byId\('modalEditAppointmentIconBtn'\);/);
+  assert.match(stabilitySource, /byId\('modalEditAppointmentIconBtn'\)\?\.addEventListener\('click', startEditFromButton\);/);
   assert.doesNotMatch(stabilitySource, /button\.className = 'modal-btn secondary magnetic';/);
   assert.match(stabilitySource, /form\.id = 'appointmentEditForm';/);
   assert.match(stabilitySource, /id="appointmentEditLegend"/);
@@ -342,13 +345,18 @@ test('premium agenda toont een verwijderknop voor afspraken ongeacht verleden of
   const deleteButtonSource = fs.readFileSync(deleteButtonPath, 'utf8');
 
   assert.match(pageSource, /id="modalDeleteAppointmentBtn"/);
-  assert.match(pageSource, /premium-agenda-delete-button\.js\?v=20260510a/);
+  assert.match(pageSource, /id="modalDeleteAppointmentIconBtn"/);
+  assert.match(pageSource, /premium-agenda-delete-button\.js\?v=20260513a/);
+  assert.match(deleteButtonSource, /const deleteIconBtn = document\.getElementById\('modalDeleteAppointmentIconBtn'\);/);
   assert.match(deleteButtonSource, /const canDelete = Boolean\(apt && Number\(apt\.id \|\| 0\) > 0\) && !modalWorkspaceMode;/);
+  assert.match(deleteButtonSource, /deleteBtn\.hidden = true;/);
+  assert.match(deleteButtonSource, /deleteIconBtn\.hidden = !canDelete;/);
   assert.match(deleteButtonSource, /\/api\/agenda\/appointments\/\$\{encodeURIComponent\(String\(apt\.id\)\)\}\/delete/);
   assert.match(deleteButtonSource, /title: 'Afspraak verwijderen'/);
   assert.match(deleteButtonSource, /Het gekoppelde dossier blijft gewoon bestaan/);
   assert.match(deleteButtonSource, /refreshWorkspacePrimaryButtonLabel = function refreshWorkspacePrimaryButtonLabelWithDelete\(\) \{/);
-  assert.match(deleteButtonSource, /deleteBtn\.addEventListener\('click', \(\) => \{ void deleteActiveAppointment\(\); \}\);/);
+  assert.match(deleteButtonSource, /deleteBtn\?\.addEventListener\('click', \(\) => \{ void deleteActiveAppointment\(\); \}\);/);
+  assert.match(deleteButtonSource, /deleteIconBtn\?\.addEventListener\('click', \(\) => \{ void deleteActiveAppointment\(\); \}\);/);
 });
 
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {

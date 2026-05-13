@@ -86,7 +86,7 @@ test('page smoke: premium sidebar pages pin the refreshed personnel theme script
     const html = fs.readFileSync(path.join(repoRoot, filePath), 'utf8');
     assert.match(
       html,
-      /assets\/personnel-theme\.js\?v=20260502a/,
+      /assets\/personnel-theme\.js\?v=20260513a/,
       `Nieuwe sidebar scriptversie ontbreekt voor ${filePath}`
     );
   }
@@ -187,7 +187,7 @@ test('page smoke: premium-actieve-opdrachten.html shows openstaande opdrachten a
   assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260511a/, 'Persoonlijke toewijzingsstijl ontbreekt op opdrachten.');
   assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
   assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
-  assert.match(html, /assets\/premium-active-orders-leads-tab\.js\?v=20260511a/, 'Losse leads-tab asset ontbreekt.');
+  assert.match(html, /assets\/premium-active-orders-leads-tab\.js\?v=20260513a/, 'Losse leads-tab asset ontbreekt.');
   assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260510a/, 'Opdrachten pagina-asset voor persoonlijke toewijzingen ontbreekt.');
   assert.match(source, /button\.dataset\.orderFilter = 'leads';/, 'Openstaande leads hoort een lokale tab te zijn.');
   assert.doesNotMatch(source, /href = '\/premium-leads';/, 'Openstaande leads mag niet naar de leads-pagina linken.');

@@ -37,7 +37,7 @@ test('premium boekhouding toont Softora bedrijfsgegevens rechtsboven in de heade
   assert.match(pageSource, /KVK-nummer[\s\S]*93827504/);
   assert.match(pageSource, /Btw-identificatienummer[\s\S]*NL866541925B01/);
   assert.match(pageSource, /Omzetbelastingnummer[\s\S]*866541925B01/);
-  assert.match(pageSource, /Aangiftetijdvak[\s\S]*kwartaal/);
+  assert.match(pageSource, /Aangiftetijdvak[\s\S]*Kwartaal/);
   assert.match(pageSource, /\.bookkeeping-header\s*\{[\s\S]*justify-content:\s*space-between;/);
   assert.match(pageSource, /\.company-tax-card\s*\{[\s\S]*width:\s*min\(100%, 380px\);/);
 });

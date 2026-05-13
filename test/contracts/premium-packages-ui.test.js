@@ -28,7 +28,7 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(pageSource, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/);
   assert.match(scriptSource, /var packageTabGroups = \{/);
   assert.match(pageSource, /Losse oplevering/);
-  assert.match(pageSource, /Losse oplevering mét CRM/);
+  assert.match(pageSource, /Losse oplevering mét CMS/);
   assert.match(pageSource, /Softora Volledig beheer/);
   assert.match(pageSource, /<div class="card-badge">Aanbevolen<\/div>/);
   assert.doesNotMatch(pageSource, /<div class="card-badge">Flexibel<\/div>/);
@@ -59,10 +59,10 @@ test('website onderhoudspakketten tonen vaste uren per maand met taakvoorbeelden
   assert.doesNotMatch(websiteMaintenanceSection, /10 uur per maand voor doorlopend beheer en zichtbare verbeteringen\./);
   assert.doesNotMatch(websiteMaintenanceSection, /15 uur per maand voor actief optimaliseren en sneller doorpakken\./);
   assert.doesNotMatch(websiteMaintenanceSection, /25 uur per maand voor intensief beheer, campagnes en doorontwikkeling\./);
-  assert.match(websiteMaintenanceSection, /<div class="price-amount">€29<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 5 uur\/mnd<\/span>/);
-  assert.match(websiteMaintenanceSection, /<div class="price-amount">€59<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 10 uur\/mnd<\/span>/);
-  assert.match(websiteMaintenanceSection, /<div class="price-amount">€99<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 15 uur\/mnd<\/span>/);
-  assert.match(websiteMaintenanceSection, /<div class="price-amount">Op<span class="price-suffix"> aanvraag<\/span><\/div><span class="price-hours">· 25 uur\/mnd<\/span>/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">€89<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 1 uur\/mnd<\/span>/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">€199<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 3 uur\/mnd<\/span>/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">€329<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 5 uur\/mnd<\/span>/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">€649<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 10 uur\/mnd<\/span>/);
   assert.match(websiteMaintenanceSection, /Updates, backups en monitoring/);
   assert.match(websiteMaintenanceSection, /Kleine tekst- en fotowijzigingen/);
   assert.match(websiteMaintenanceSection, /Nieuwe secties, acties of pagina-updates/);
@@ -85,7 +85,11 @@ test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () =
   );
   assert.match(
     routesSection,
-    /Softora ontwikkelt de website met een eigen CRM-\/beheersysteem\. Minimaal €200 extra voor tekst- en fotobeheer\. Extra wijzigingsopties zijn mogelijk maar verhogen de prijs\./
+    /Softora ontwikkelt de website met een eigen CMS-\/beheersysteem\. Minimaal €200 extra voor tekst- en fotobeheer\. Extra wijzigingsopties zijn mogelijk maar verhogen de prijs\./
+  );
+  assert.match(
+    routesSection,
+    /Elke database wordt gehost via Softora\.nl\. De kosten voor uitsluitend databasehosting bedragen €15 per maand\./
   );
   assert.match(
     routesSection,
@@ -103,12 +107,15 @@ test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () =
 test('pakketkaarten gebruiken interne Softora CTA labels', () => {
   const pageSource = readPage();
   const ctaLabels = Array.from(
-    pageSource.matchAll(/<button class="card-cta[^"]*" type="button">([^<]+)<\/button>/g),
+    pageSource.matchAll(/<button class="card-cta(?![^"]*is-locked)[^"]*" type="button">([^<]+)<\/button>/g),
     (match) => match[1].trim()
   );
 
-  assert.equal(ctaLabels.length, 32);
+  assert.equal(ctaLabels.length, 29);
   assert.deepEqual([...new Set(ctaLabels)], ['Softora']);
+  assert.equal((pageSource.match(/class="card-cta[^"]*is-locked/g) || []).length, 3);
+  assert.match(pageSource, /€749,-/);
+  assert.match(pageSource, /€1\.350,-/);
   assert.doesNotMatch(
     pageSource,
     />\s*(?:Pakket Aanvragen|Pakket aanvragen|Meer Informatie|Meer informatie|Selecteren|Offerte Aanvragen|Offerte aanvragen|Contact Opnemen|Contact opnemen)\s*</

@@ -329,13 +329,18 @@
     }
 
     async function init() {
-      if (state.initialized) return;
+      if (state.initialized) return !state.hydrationFailed;
       state.initialized = true;
-      await hydrate().catch(() => {
-        readDocumentDefaults();
+      let hydrated = false;
+      await hydrate().then(() => {
+        hydrated = true;
+        state.hydrationFailed = false;
+      }).catch(() => {
+        state.hydrationFailed = true;
         state.activeSenderEmail = getCurrentSenderEmail();
       });
       bind();
+      return hydrated;
     }
 
     return {

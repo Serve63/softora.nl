@@ -8,6 +8,14 @@ function isManualAgendaAppointment(item) {
     return /\b(handmatig|manual|premium-personeel-agenda)\b/.test(sourceText);
 }
 
+(function ensureAgendaModalIconActionStyles() {
+    if (document.getElementById('agendaModalIconActionStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'agendaModalIconActionStyles';
+    style.textContent = '.modal-icon-action{width:36px;height:36px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.52);color:var(--text-tertiary);cursor:none;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}.modal-icon-action[hidden]{display:none!important}.modal-icon-action svg{width:15px;height:15px}.modal-icon-action:hover{border-color:rgba(139,34,82,.42);color:var(--accent);background:rgba(139,34,82,.06)}.modal-icon-action--delete:hover{border-color:rgba(192,57,43,.42);color:var(--red);background:rgba(192,57,43,.06)}';
+    document.head.appendChild(style);
+})();
+
 function normalizeManualAgendaDate(value) {
     const ymd = typeof normalizeAgendaDateYmd === 'function' ? normalizeAgendaDateYmd(value) : String(value || '').trim();
     return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : '';
@@ -698,11 +706,18 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
 
     function syncEditButtonVisibility() {
         const button = byId('modalEditAppointmentBtn');
-        if (!button) return;
+        const iconButton = byId('modalEditAppointmentIconBtn');
+        if (!button && !iconButton) return;
         const apt = getActiveAppointment();
         const show = !editMode && !modalWorkspaceMode && canEditAppointment(apt);
-        button.hidden = !show;
-        button.disabled = editSaving || workspaceBusy || !show;
+        if (button) {
+            button.hidden = true;
+            button.disabled = editSaving || workspaceBusy || !show;
+        }
+        if (iconButton) {
+            iconButton.hidden = !show;
+            iconButton.disabled = editSaving || workspaceBusy || !show;
+        }
         if (editMode) {
             modalPrimaryBtn.hidden = true;
             if (modalFollowUpBtn) modalFollowUpBtn.hidden = true;
@@ -839,12 +854,14 @@ markActiveAppointmentNoDeal = function markActiveAppointmentNoDealStable() {
         setEditMode(false);
         return baseCloseForEdit();
     };
-    byId('modalEditAppointmentBtn')?.addEventListener('click', () => {
+    function startEditFromButton() {
         const apt = getActiveAppointment();
         if (!canEditAppointment(apt)) return;
         populateEditForm(apt);
         setEditMode(true);
-    });
+    }
+    byId('modalEditAppointmentBtn')?.addEventListener('click', startEditFromButton);
+    byId('modalEditAppointmentIconBtn')?.addEventListener('click', startEditFromButton);
     byId('appointmentEditCancelBtn')?.addEventListener('click', () => setEditMode(false));
     byId('appointmentEditSaveBtn')?.addEventListener('click', () => { void saveEdit(); });
     byId('appointmentEditLegend')?.addEventListener('change', syncLeadOwnerVisibility);

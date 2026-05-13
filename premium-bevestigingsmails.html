@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260512b" sizes="any">
-<link rel="apple-touch-icon" href="/assets/softora-favicon-round.png?v=20260512b">
+<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">
+<link rel="apple-touch-icon" href="/assets/softora-favicon-round.png?v=20260513a">
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Cold Mailing – Softora.nl</title>
 <script>
@@ -28,7 +28,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="assets/personnel-theme.css?v=20260502a">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260513a">
 <script>
     (function () {
         document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -57,7 +57,7 @@
         }
     })();
 </script>
-<script src="assets/personnel-theme.js?v=20260502a" defer></script><script src="assets/premium-boot-one-second.js?v=20260502a"></script>
+<script src="assets/personnel-theme.js?v=20260513a" defer></script><script src="assets/premium-boot-one-second.js?v=20260502a"></script>
 <script src="assets/ai-management-mode.js?v=20260423a" defer></script>
 <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a">
 <link rel="stylesheet" href="assets/softora-dossier-loader.css?v=20260424a">
@@ -1433,7 +1433,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
-<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260511a"></script>
+<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260513a"></script>
 <script src="assets/premium-campaign-selects.js?v=20260511a"></script>
 <script>
 // ── DATA ──
@@ -1886,10 +1886,9 @@ function bindColdmailingSettingsPersistence() {
   if (controller) controller.bind();
 }
 
-async function initColdmailingSettingsPersistence() {
-  const controller = getColdmailingSettingsController();
-  if (controller) await controller.init();
-}
+async function initColdmailingSettingsPersistence() { const controller = getColdmailingSettingsController(); if (!controller) return false; const hydrated = await controller.init(); if (!hydrated) markColdmailingSettingsUnavailable(); return hydrated; }
+
+function markColdmailingSettingsUnavailable() { ['subj1', 'body1', 'ai-instructies'].forEach((id) => { const field = document.getElementById(id); if (!field) return; field.value = ''; field.placeholder = 'Instellingen konden niet worden geladen. Ververs de pagina of probeer het opnieuw.'; field.disabled = true; }); const toneSelect = document.getElementById('ai-tone-style'); if (toneSelect) toneSelect.disabled = true; const startButton = document.getElementById('start-campaign-btn'); if (startButton) { startButton.disabled = true; startButton.title = 'Instellingen konden niet worden geladen'; } if (typeof showToast === 'function') showToast('Prompt & AI instructies konden niet veilig worden geladen.'); }
 
 function initCampaignDurationSetting() {
   const select = document.getElementById('campaignDurationDays');

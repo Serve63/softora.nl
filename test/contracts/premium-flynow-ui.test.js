@@ -15,8 +15,8 @@ test('premium flynow gebruikt losse assets en lokale reisfoto\'s voor collage en
   assert.match(html, /<div class="dashboard-layout flynow-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" aria-label="Premium navigatie"><\/aside>/);
   assert.match(html, /<main class="main-content flynow-main">/);
-  assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260502a"/);
-  assert.match(html, /src="\/assets\/personnel-theme\.js\?v=20260502a" defer/);
+  assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260513a"/);
+  assert.match(html, /src="\/assets\/personnel-theme\.js\?v=20260513a" defer/);
   assert.match(html, /href="\/assets\/flynow\.css\?v=20260512a"/);
   assert.match(html, /src="\/assets\/flynow\.js\?v=20260512a" defer/);
   assert.doesNotMatch(html, /flynow-particles/);

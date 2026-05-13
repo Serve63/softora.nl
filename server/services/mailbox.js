@@ -25,9 +25,28 @@ const FOLDER_ALIASES = {
     'INBOX.Sent Items',
     'INBOX.Sent Mail',
     'INBOX.Sent Messages',
+    'INBOX/Sent',
+    'INBOX/Sent Items',
+    'INBOX/Sent Mail',
+    'Sent objects',
+    'Sent-mails',
+    'Sent Mails',
+    'SentMail',
+    'Gesendet',
     'Verzonden',
     'Verzonden items',
     'Verzonden berichten',
+    'Verstuurd',
+    'Verstuurde items',
+    'Verstuurde berichten',
+    'INBOX.Verzonden',
+    'INBOX.Verzonden items',
+    'INBOX.Verstuurd',
+    'INBOX.Verstuurde items',
+    'INBOX/Verzonden',
+    'INBOX/Verzonden items',
+    'INBOX/Verstuurd',
+    'INBOX/Verstuurde items',
   ],
   drafts: ['Drafts', 'Draft', 'Concepts', 'INBOX.Drafts', 'INBOX.Concepts', 'Concepten'],
   spam: ['Spam', 'Junk', 'Junk E-mail', 'INBOX.Spam', 'INBOX.Junk'],
@@ -646,23 +665,59 @@ function createMailboxService(deps = {}) {
       error.status = 400;
       throw error;
     }
+    const message = {
+      from: account.name ? `${account.name} <${account.email}>` : account.email,
+      to: normalizeEmail(to),
+      subject: cleanSubject,
+      text: normalizeString(text),
+      date: new Date(),
+    };
     const transporter = createTransport({
       host: account.smtpHost,
       port: account.smtpPort,
       secure: account.smtpSecure,
       auth: { user: account.smtpUser, pass: account.smtpPass },
     });
-    const info = await transporter.sendMail({
-      from: account.name ? `${account.name} <${account.email}>` : account.email,
-      to: normalizeEmail(to),
-      subject: cleanSubject,
-      text: normalizeString(text),
+    const info = await transporter.sendMail(message);
+    await appendMessageToSentFolder(account, message).catch((error) => {
+      logger.warn?.('Mailbox sent append failed', {
+        account: account.email,
+        error: normalizeString(error && error.message),
+      });
     });
     return {
       messageId: normalizeString(info?.messageId || ''),
       accepted: Array.isArray(info?.accepted) ? info.accepted : [],
       rejected: Array.isArray(info?.rejected) ? info.rejected : [],
     };
+  }
+
+  async function buildRawSentMessage(message) {
+    const streamTransport = nodemailer.createTransport({
+      streamTransport: true,
+      buffer: true,
+      newline: 'unix',
+    });
+    const info = await streamTransport.sendMail(message);
+    return info && info.message ? info.message : null;
+  }
+
+  async function appendMessageToSentFolder(account, message) {
+    if (!account || !account.imapConfigured) return false;
+    const rawMessage = await buildRawSentMessage(message);
+    if (!rawMessage) return false;
+    const client = createClient(account);
+    try {
+      await client.connect();
+      const sentMailboxName = await resolveMailboxName(client, 'sent');
+      if (!sentMailboxName || typeof client.append !== 'function') return false;
+      await client.append(sentMailboxName, rawMessage, ['\\Seen'], message.date || new Date());
+      return true;
+    } finally {
+      try {
+        if (client.usable) await client.logout();
+      } catch (_) {}
+    }
   }
 
   function cleanPromptText(value, maxLength = 6000) {
