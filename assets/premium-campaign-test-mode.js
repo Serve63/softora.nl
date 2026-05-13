@@ -2,6 +2,24 @@
   'use strict';
 
   const TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
+  const TEST_CALL_PHONE = '+31000000000';
+
+  function isLeadGeneratorAlias() {
+    return document.documentElement.getAttribute('data-softora-lead-generator-alias') === '1';
+  }
+
+  function getEnabledCopy() {
+    if (isLeadGeneratorAlias()) {
+      return {
+        shortLabel: 'Testmodus aan: testoproep naar ' + TEST_CALL_PHONE,
+        toast: 'Testmodus aan: testoproep gaat naar ' + TEST_CALL_PHONE + '.',
+      };
+    }
+    return {
+      shortLabel: 'Testmodus aan: alleen naar ' + TEST_RECIPIENT_EMAIL,
+      toast: 'Testmodus aan: verzending gaat alleen naar ' + TEST_RECIPIENT_EMAIL + '.',
+    };
+  }
 
   function getToggleButton() {
     return document.getElementById('campaignTestModeToggle');
@@ -18,7 +36,7 @@
     button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
     button.classList.toggle('is-active', enabled);
     button.title = enabled
-      ? 'Testmodus aan: alleen naar ' + TEST_RECIPIENT_EMAIL
+      ? getEnabledCopy().shortLabel
       : 'Testmodus uit: normale campagne';
     button.setAttribute('aria-label', button.title);
   }
@@ -40,7 +58,7 @@
     if (!options.silent && typeof global.showToast === 'function') {
       global.showToast(
         isEnabled()
-          ? 'Testmodus aan: verzending gaat alleen naar ' + TEST_RECIPIENT_EMAIL + '.'
+          ? getEnabledCopy().toast
           : 'Testmodus uit: normale campagne actief.'
       );
     }
@@ -61,6 +79,7 @@
 
   global.SoftoraCampaignTestMode = {
     getRecipientEmail: function () { return TEST_RECIPIENT_EMAIL; },
+    getTestPhone: function () { return TEST_CALL_PHONE; },
     install,
     isEnabled,
     setEnabled,
