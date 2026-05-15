@@ -38,9 +38,6 @@
       ".secure-action-pin-key:active{transform:scale(.96)}",
       ".secure-action-pin-key svg{width:20px;height:20px}",
       ".secure-action-pin-message{min-height:1.3em;margin-top:14px;color:#c0392b;font-size:.86rem;font-weight:700}",
-      ".secure-action-pin-actions{display:flex;gap:12px;justify-content:center;margin-top:20px}",
-      ".secure-action-pin-cancel{min-width:154px;height:54px;border:1px solid rgba(155,35,85,.22);border-radius:12px;background:#fff;color:#7b7f91;cursor:pointer;font-family:Oswald,Inter,system-ui,sans-serif;font-size:1rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}",
-      ".secure-action-pin-cancel:hover{border-color:rgba(155,35,85,.42);color:#9b2355}",
       "@media(max-width:560px){.secure-action-pin-card{padding:34px 20px 24px}.secure-action-pin-close{right:14px;top:14px}.secure-action-pin-desc{font-size:1rem}.secure-action-pin-slot{width:44px;height:44px;font-size:1.2rem}.secure-action-pin-key{height:50px}}",
     ].join("");
     document.head.appendChild(style);
@@ -77,9 +74,6 @@
       '  <div class="secure-action-pin-slots" role="status" aria-live="polite" aria-label="Voortgang pincode" data-secure-action-pin-slots></div>',
       '  <div class="secure-action-pin-pad" data-secure-action-pin-pad></div>',
       '  <div class="secure-action-pin-message" data-secure-action-pin-message></div>',
-      '  <div class="secure-action-pin-actions">',
-      '    <button type="button" class="secure-action-pin-cancel" data-secure-action-pin-cancel>Annuleren</button>',
-      "  </div>",
       "</div>",
     ].join("");
 
@@ -249,7 +243,7 @@
         backspace();
         return;
       }
-      if (event.target.closest("[data-secure-action-pin-close], [data-secure-action-pin-cancel]")) {
+      if (event.target.closest("[data-secure-action-pin-close]")) {
         closeWithCancel();
       }
     });
