@@ -38,6 +38,19 @@ struct DeleteAppointmentResponse: Decodable {
     let error: String?
 }
 
+struct MailboxAccountsResponse: Decodable {
+    let ok: Bool
+    let accounts: [MailboxAccount]
+    let error: String?
+}
+
+struct MailboxMessagesResponse: Decodable {
+    let ok: Bool
+    let messages: [MailboxMessage]
+    let error: String?
+    let detail: String?
+}
+
 struct APIErrorEnvelope: Decodable {
     let ok: Bool?
     let error: String?
@@ -124,6 +137,98 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
 
     var sortKey: String {
         "\(date)T\(time)"
+    }
+}
+
+struct MailboxAccount: Identifiable, Decodable, Hashable {
+    let email: String
+    let name: String
+    let imapConfigured: Bool
+    let smtpConfigured: Bool
+
+    var id: String { email }
+
+    var displayName: String {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedName.isEmpty ? email : trimmedName
+    }
+}
+
+struct MailboxMessage: Identifiable, Decodable, Hashable {
+    let id: String
+    let uid: Int
+    let folder: String
+    let from: String
+    let email: String
+    let to: String
+    let subject: String
+    let preview: String
+    let body: String
+    let date: String
+    let unread: Bool
+    let starred: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case uid
+        case folder
+        case from
+        case email
+        case to
+        case subject
+        case preview
+        case body
+        case date
+        case unread
+        case starred
+    }
+
+    init(
+        id: String,
+        uid: Int = 0,
+        folder: String = "inbox",
+        from: String,
+        email: String = "",
+        to: String = "",
+        subject: String,
+        preview: String,
+        body: String,
+        date: String,
+        unread: Bool = false,
+        starred: Bool = false
+    ) {
+        self.id = id
+        self.uid = uid
+        self.folder = folder
+        self.from = from
+        self.email = email
+        self.to = to
+        self.subject = subject
+        self.preview = preview
+        self.body = body
+        self.date = date
+        self.unread = unread
+        self.starred = starred
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedID = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+
+        self.init(
+            id: decodedID,
+            uid: (try? container.decode(Int.self, forKey: .uid)) ?? 0,
+            folder: (try? container.decode(String.self, forKey: .folder)) ?? "inbox",
+            from: (try? container.decode(String.self, forKey: .from)) ?? "Onbekend",
+            email: (try? container.decode(String.self, forKey: .email)) ?? "",
+            to: (try? container.decode(String.self, forKey: .to)) ?? "",
+            subject: (try? container.decode(String.self, forKey: .subject)) ?? "(Geen onderwerp)",
+            preview: (try? container.decode(String.self, forKey: .preview)) ?? "",
+            body: (try? container.decode(String.self, forKey: .body)) ?? "",
+            date: (try? container.decode(String.self, forKey: .date)) ?? "",
+            unread: (try? container.decode(Bool.self, forKey: .unread)) ?? false,
+            starred: (try? container.decode(Bool.self, forKey: .starred)) ?? false
+        )
     }
 }
 

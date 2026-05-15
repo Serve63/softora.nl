@@ -12,6 +12,10 @@ const DEFAULT_MAILBOX_EMAILS = [
 
 const FOLDER_ALIASES = {
   inbox: ['INBOX'],
+  starred: ['INBOX'],
+  important: ['INBOX'],
+  promotions: ['Promotions', 'INBOX.Promotions', 'Reclame', 'Reclamefolder', 'Bulk Mail'],
+  reclame: ['Promotions', 'INBOX.Promotions', 'Reclame', 'Reclamefolder', 'Bulk Mail'],
   sent: ['Sent', 'Sent Items', 'INBOX.Sent', 'Verzonden', 'Verzonden items'],
   drafts: ['Drafts', 'Concepts', 'INBOX.Drafts', 'Concepten'],
   spam: ['Spam', 'Junk', 'INBOX.Spam', 'INBOX.Junk'],
@@ -266,6 +270,7 @@ function createMailboxService(deps = {}) {
       const hit = names.find((name) => normalizeString(name).toLowerCase() === candidate.toLowerCase());
       if (hit) return hit;
     }
+    if (folder !== 'inbox') return '';
     return candidates[0];
   }
 
@@ -305,6 +310,8 @@ function createMailboxService(deps = {}) {
   }
 
   async function listMessages({ accountEmail, folder = 'inbox', limit = 50 }) {
+    const requestedFolder = normalizeString(folder || 'inbox').toLowerCase();
+    const mailboxFolder = requestedFolder === 'starred' || requestedFolder === 'important' ? 'inbox' : requestedFolder;
     const account = getAccount(accountEmail);
     if (!account) {
       const error = new Error('Mailbox-account niet gevonden.');
@@ -320,7 +327,8 @@ function createMailboxService(deps = {}) {
     const client = createClient(account);
     try {
       await client.connect();
-      const mailboxName = await resolveMailboxName(client, folder);
+      const mailboxName = await resolveMailboxName(client, mailboxFolder);
+      if (!mailboxName) return [];
       const lock = await client.getMailboxLock(mailboxName);
       try {
         const allUids = await client.search(['ALL']);
@@ -329,9 +337,12 @@ function createMailboxService(deps = {}) {
         const messages = [];
         for await (const message of client.fetch(uids, { uid: true, flags: true, internalDate: true, source: true })) {
           const parsed = await parseMailSource(message.source);
-          messages.push(toClientMessage(parsed, message, folder, account));
+          messages.push(toClientMessage(parsed, message, requestedFolder, account));
         }
-        return messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const visibleMessages = requestedFolder === 'starred' || requestedFolder === 'important'
+          ? messages.filter((item) => item.starred)
+          : messages;
+        return visibleMessages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       } finally {
         lock.release();
       }

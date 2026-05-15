@@ -3,7 +3,6 @@ import SwiftUI
 struct AgendaListView: View {
     let store: AgendaStore
 
-    @Environment(\.openURL) private var openURL
     @State private var weekStart = AgendaDateFormatter.weekStart(containing: Date())
     @State private var pendingDate: Date?
     @State private var isChoosingAppointmentType = false
@@ -12,6 +11,7 @@ struct AgendaListView: View {
     @State private var selectedBusinessType: BusinessMeetingType = .website
     @State private var addConfiguration: AddAppointmentConfiguration?
     @State private var selectedAppointment: AgendaAppointment?
+    @State private var isShowingMailbox = false
     @State private var weekTransitionDirection = 1
 
     var body: some View {
@@ -129,6 +129,9 @@ struct AgendaListView: View {
         .fullScreenCover(item: $selectedAppointment) { appointment in
             AppointmentDetailView(store: store, appointment: appointment)
         }
+        .fullScreenCover(isPresented: $isShowingMailbox) {
+            MailboxView(apiClient: SoftoraAPIClient())
+        }
         .alert("MELDING", isPresented: alertBinding) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -208,8 +211,7 @@ struct AgendaListView: View {
     }
 
     private func openMailbox() {
-        guard let mailboxURL = URL(string: "https://www.softora.nl/premium-mailbox") else { return }
-        openURL(mailboxURL)
+        isShowingMailbox = true
     }
 
     private func openGymShortcut() {
@@ -331,6 +333,595 @@ private struct AgendaShortcutButton: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct MailboxView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let apiClient: SoftoraAPIClient
+
+    @State private var accounts: [MailboxAccount] = []
+    @State private var selectedAccount: MailboxAccount?
+    @State private var selectedFolder: MailboxFolder = .inbox
+    @State private var messages: [MailboxMessage] = []
+    @State private var selectedMessage: MailboxMessage?
+    @State private var isShowingFolderMenu = false
+    @State private var isLoadingAccounts = false
+    @State private var isLoadingMessages = false
+    @State private var alertMessage: String?
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            LinearGradient(
+                colors: [.white, Color.softoraSheetBackground],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                mailboxHeader
+
+                HStack {
+                    Text(selectedFolder.title)
+                        .font(.softoraDisplay(18, weight: .bold))
+                        .textCase(.uppercase)
+                        .tracking(1.0)
+                        .foregroundStyle(Color.softoraInk)
+
+                    Spacer()
+
+                    if isLoadingMessages {
+                        ProgressView()
+                            .tint(Color.softoraCrimson)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 8)
+
+                mailboxContent
+
+                MailboxAccountSelector(
+                    accounts: accounts,
+                    selectedAccount: selectedAccount,
+                    isLoading: isLoadingAccounts,
+                    isLocked: selectedMessage != nil,
+                    onSelect: selectAccount
+                )
+            }
+
+            if isShowingFolderMenu {
+                MailboxFolderDrawer(
+                    selectedFolder: selectedFolder,
+                    onSelect: selectFolder,
+                    onClose: { isShowingFolderMenu = false }
+                )
+                .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+        }
+        .animation(.smooth(duration: 0.24), value: isShowingFolderMenu)
+        .task {
+            await loadAccounts()
+        }
+        .alert("MELDING", isPresented: alertBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text((alertMessage ?? "").softoraUppercased)
+        }
+    }
+
+    private var mailboxHeader: some View {
+        HStack(spacing: 12) {
+            Button {
+                isShowingFolderMenu = true
+            } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(Color.softoraInk)
+                    .frame(width: 42, height: 42)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Mappen")
+
+            Text("Mailbox")
+                .font(.softoraDisplay(21, weight: .bold))
+                .textCase(.uppercase)
+                .tracking(1.0)
+                .foregroundStyle(Color.softoraInk)
+
+            Spacer()
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.softoraMuted)
+                    .frame(width: 42, height: 42)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Sluiten")
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 18)
+        .padding(.bottom, 12)
+        .background(Color.white)
+    }
+
+    @ViewBuilder
+    private var mailboxContent: some View {
+        if isLoadingMessages && messages.isEmpty {
+            VStack(spacing: 10) {
+                ProgressView()
+                    .tint(Color.softoraCrimson)
+
+                Text("MAILS LADEN...")
+                    .font(.softoraBody(13, weight: .semibold))
+                    .foregroundStyle(Color.softoraMuted)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let selectedMessage {
+            MailboxMessageDetail(message: selectedMessage) {
+                self.selectedMessage = nil
+            }
+        } else if messages.isEmpty {
+            VStack(spacing: 8) {
+                Text(emptyTitle)
+                    .font(.softoraDisplay(20, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(1.0)
+                    .foregroundStyle(Color.softoraInk)
+
+                Text(emptySubtitle)
+                    .font(.softoraBody(13, weight: .medium))
+                    .foregroundStyle(Color.softoraMuted)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 28)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(messages) { message in
+                        MailboxMessageRow(message: message) {
+                            selectedMessage = message
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 20)
+            }
+            .refreshable {
+                await loadMessages()
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private var emptyTitle: String {
+        selectedAccount?.imapConfigured == false ? "Mailbox niet gekoppeld" : "Geen mails"
+    }
+
+    private var emptySubtitle: String {
+        selectedAccount?.imapConfigured == false
+            ? "Deze mailbox heeft nog geen IMAP-koppeling."
+            : "Deze map is leeg."
+    }
+
+    private var alertBinding: Binding<Bool> {
+        Binding(
+            get: { alertMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    alertMessage = nil
+                }
+            }
+        )
+    }
+
+    private func loadAccounts() async {
+        guard !isLoadingAccounts else { return }
+        isLoadingAccounts = true
+        alertMessage = nil
+        defer { isLoadingAccounts = false }
+
+        do {
+            let loadedAccounts = try await apiClient.fetchMailboxAccounts()
+            accounts = loadedAccounts
+            if selectedAccount == nil || !loadedAccounts.contains(where: { $0.id == selectedAccount?.id }) {
+                selectedAccount = loadedAccounts.first(where: \.imapConfigured) ?? loadedAccounts.first
+            }
+            await loadMessages()
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
+    private func loadMessages() async {
+        guard let account = selectedAccount else {
+            messages = []
+            selectedMessage = nil
+            return
+        }
+        guard account.imapConfigured else {
+            messages = []
+            selectedMessage = nil
+            return
+        }
+
+        isLoadingMessages = true
+        alertMessage = nil
+        defer { isLoadingMessages = false }
+
+        do {
+            messages = try await apiClient.fetchMailboxMessages(
+                account: account.email,
+                folder: selectedFolder.apiValue,
+                limit: 50
+            )
+            selectedMessage = nil
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
+    private func selectAccount(_ account: MailboxAccount) {
+        guard account.id != selectedAccount?.id else { return }
+        selectedAccount = account
+        Task { await loadMessages() }
+    }
+
+    private func selectFolder(_ folder: MailboxFolder) {
+        selectedFolder = folder
+        isShowingFolderMenu = false
+        Task { await loadMessages() }
+    }
+}
+
+private enum MailboxFolder: String, CaseIterable, Identifiable {
+    case inbox
+    case important
+    case promotions
+    case spam
+    case sent
+    case drafts
+    case trash
+
+    var id: String { rawValue }
+
+    var apiValue: String {
+        switch self {
+        case .important:
+            "starred"
+        case .promotions:
+            "promotions"
+        default:
+            rawValue
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .inbox:
+            "Inkomend"
+        case .important:
+            "Belangrijk"
+        case .promotions:
+            "Reclame"
+        case .spam:
+            "Spam"
+        case .sent:
+            "Verzonden"
+        case .drafts:
+            "Concepten"
+        case .trash:
+            "Prullenbak"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .inbox:
+            "tray.fill"
+        case .important:
+            "star.fill"
+        case .promotions:
+            "tag.fill"
+        case .spam:
+            "exclamationmark.octagon.fill"
+        case .sent:
+            "paperplane.fill"
+        case .drafts:
+            "doc.fill"
+        case .trash:
+            "trash.fill"
+        }
+    }
+}
+
+private struct MailboxFolderDrawer: View {
+    let selectedFolder: MailboxFolder
+    let onSelect: (MailboxFolder) -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Color.softoraInk.opacity(0.30)
+                .ignoresSafeArea()
+                .onTapGesture(perform: onClose)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Mappen")
+                    .font(.softoraDisplay(19, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(1.0)
+                    .foregroundStyle(Color.softoraInk)
+                    .padding(.bottom, 6)
+
+                ForEach(MailboxFolder.allCases) { folder in
+                    Button {
+                        onSelect(folder)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: folder.systemImage)
+                                .font(.system(size: 14, weight: .bold))
+                                .frame(width: 20)
+
+                            Text(folder.title)
+                                .font(.softoraDisplay(14, weight: .bold))
+                                .textCase(.uppercase)
+                                .tracking(0.7)
+
+                            Spacer()
+                        }
+                        .foregroundStyle(selectedFolder == folder ? Color.white : Color.softoraInk)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 13)
+                        .background(selectedFolder == folder ? Color.softoraCrimson : Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay {
+                            if selectedFolder != folder {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 60)
+            .padding(.bottom, 24)
+            .frame(width: 282)
+            .frame(maxHeight: .infinity)
+            .background(Color.softoraSheetBackground)
+            .shadow(color: Color.softoraInk.opacity(0.20), radius: 24, x: 16, y: 0)
+        }
+    }
+}
+
+private struct MailboxMessageRow: View {
+    let message: MailboxMessage
+    let onOpen: () -> Void
+
+    var body: some View {
+        Button(action: onOpen) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Text(message.from.isEmpty ? "ONBEKEND" : message.from.softoraUppercased)
+                        .font(.softoraDisplay(14, weight: message.unread ? .bold : .semibold))
+                        .tracking(0.5)
+                        .foregroundStyle(Color.softoraInk)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    if message.starred {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.softoraCrimson)
+                    }
+
+                    Text(MailboxDateFormatter.label(message.date))
+                        .font(.softoraBody(10, weight: .semibold))
+                        .foregroundStyle(Color.softoraMuted)
+                }
+
+                Text(message.subject.isEmpty ? "(GEEN ONDERWERP)" : message.subject.softoraUppercased)
+                    .font(.softoraBody(13, weight: message.unread ? .bold : .semibold))
+                    .foregroundStyle(Color.softoraInk)
+                    .lineLimit(1)
+
+                Text(message.preview.softoraUppercased)
+                    .font(.softoraBody(12))
+                    .foregroundStyle(Color.softoraMuted)
+                    .lineLimit(2)
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(message.unread ? Color.softoraCrimson : Color.softoraPurpleLight, lineWidth: message.unread ? 1.5 : 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct MailboxMessageDetail: View {
+    let message: MailboxMessage
+    let onBack: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Button(action: onBack) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.left")
+                        Text("Terug")
+                    }
+                    .font(.softoraDisplay(13, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+                    .foregroundStyle(Color.softoraCrimson)
+                }
+                .buttonStyle(.plain)
+
+                Text(message.subject.isEmpty ? "(GEEN ONDERWERP)" : message.subject.softoraUppercased)
+                    .font(.softoraDisplay(24, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(0.9)
+                    .foregroundStyle(Color.softoraInk)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    MailboxDetailMeta(label: "Van", value: message.from)
+                    MailboxDetailMeta(label: "Aan", value: message.to)
+                    MailboxDetailMeta(label: "Datum", value: MailboxDateFormatter.label(message.date))
+                }
+
+                Text((message.body.isEmpty ? message.preview : message.body).trimmingCharacters(in: .whitespacesAndNewlines))
+                    .font(.softoraBody(14))
+                    .foregroundStyle(Color.softoraInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                    }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+private struct MailboxDetailMeta: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.softoraDisplay(11, weight: .bold))
+                .textCase(.uppercase)
+                .tracking(1.0)
+                .foregroundStyle(Color.softoraMuted)
+
+            Text(value.isEmpty ? "—" : value.softoraUppercased)
+                .font(.softoraBody(12, weight: .semibold))
+                .foregroundStyle(Color.softoraInk)
+        }
+    }
+}
+
+private struct MailboxAccountSelector: View {
+    let accounts: [MailboxAccount]
+    let selectedAccount: MailboxAccount?
+    let isLoading: Bool
+    let isLocked: Bool
+    let onSelect: (MailboxAccount) -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text("Mailbox")
+                .font(.softoraDisplay(12, weight: .bold))
+                .textCase(.uppercase)
+                .tracking(1.0)
+                .foregroundStyle(Color.softoraMuted)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    if isLoading && accounts.isEmpty {
+                        Text("LADEN...")
+                            .font(.softoraBody(12, weight: .semibold))
+                            .foregroundStyle(Color.softoraMuted)
+                            .padding(.horizontal, 18)
+                    } else {
+                        ForEach(accounts) { account in
+                            let isSelected = selectedAccount?.id == account.id
+                            let lockedBackground = isSelected ? Color.softoraCrimson.opacity(0.52) : Color.white.opacity(0.72)
+                            let enabledBackground = isSelected ? Color.softoraCrimson : Color.white
+
+                            Button {
+                                onSelect(account)
+                            } label: {
+                                Text(account.email)
+                                    .font(.softoraDisplay(11.5, weight: .bold))
+                                    .textCase(.uppercase)
+                                    .tracking(0.4)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.78)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                .foregroundStyle(isSelected ? Color.white : (isLocked ? Color.softoraMuted : Color.softoraInk))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 16)
+                                .frame(width: 178, alignment: .leading)
+                                .background(isLocked ? lockedBackground : enabledBackground)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay {
+                                    if isSelected && isLocked {
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                    } else if !isSelected {
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                    }
+                                }
+                                .opacity(account.imapConfigured ? (isLocked ? 0.72 : 1) : 0.38)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isLocked)
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .padding(.top, 10)
+        .padding(.bottom, 10)
+        .background(Color.white)
+    }
+}
+
+private enum MailboxDateFormatter {
+    static let isoFormatter = ISO8601DateFormatter()
+
+    static let displayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "nl_NL")
+        formatter.dateFormat = "dd MMM HH:mm"
+        return formatter
+    }()
+
+    static func label(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let date = isoFormatter.date(from: trimmed) else {
+            return trimmed.isEmpty ? "—" : trimmed
+        }
+        return displayFormatter.string(from: date)
     }
 }
 

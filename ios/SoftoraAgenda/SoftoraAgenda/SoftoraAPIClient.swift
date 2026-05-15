@@ -52,6 +52,26 @@ struct SoftoraAPIClient {
         return response.appointments
     }
 
+    func fetchMailboxAccounts() async throws -> [MailboxAccount] {
+        let response: MailboxAccountsResponse = try await get("/api/mailbox/accounts")
+        guard response.ok else {
+            throw SoftoraAPIError.server(response.error ?? "Mailbox-accounts laden mislukt.")
+        }
+        return response.accounts
+    }
+
+    func fetchMailboxMessages(account: String, folder: String, limit: Int = 50) async throws -> [MailboxMessage] {
+        let encodedAccount = queryEncoded(account)
+        let encodedFolder = queryEncoded(folder)
+        let response: MailboxMessagesResponse = try await get(
+            "/api/mailbox/messages?account=\(encodedAccount)&folder=\(encodedFolder)&limit=\(limit)"
+        )
+        guard response.ok else {
+            throw SoftoraAPIError.server(response.detail ?? response.error ?? "Mailbox laden mislukt.")
+        }
+        return response.messages
+    }
+
     func createManualAppointment(_ draft: NewAppointmentDraft) async throws -> AgendaAppointment? {
         let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let location = draft.location.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -104,6 +124,10 @@ struct SoftoraAPIClient {
 
     private func post<Response: Decodable, Body: Encodable>(_ path: String, body: Body) async throws -> Response {
         try await send(path: path, method: "POST", body: body)
+    }
+
+    private func queryEncoded(_ value: String) -> String {
+        value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
     }
 
     private func send<Response: Decodable, Body: Encodable>(

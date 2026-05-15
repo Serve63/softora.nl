@@ -50,8 +50,18 @@ test('mailbox service exposes configured softora mailbox accounts', async () => 
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
-  assert.ok(res.body.accounts.some((account) => account.email === 'info@softora.nl'));
-  assert.ok(res.body.accounts.some((account) => account.email === 'ruben@softora.nl'));
+  for (const email of [
+    'info@softora.nl',
+    'zakelijk@softora.nl',
+    'ruben@softora.nl',
+    'serve@softora.nl',
+    'martijn@softora.nl',
+  ]) {
+    assert.ok(
+      res.body.accounts.some((account) => account.email === email),
+      `Mailbox account ${email} should be available to the web and iOS mailbox.`
+    );
+  }
   assert.equal(
     res.body.accounts.find((account) => account.email === 'ruben@softora.nl').imapConfigured,
     true
@@ -214,6 +224,91 @@ test('mailbox service can intentionally expose aliases through the base mailbox 
   } finally {
     process.env = oldEnv;
   }
+});
+
+test('mailbox service filters belangrijk from flagged inbox messages', async () => {
+  const openedMailboxes = [];
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async (mailboxName) => {
+        openedMailboxes.push(mailboxName);
+        return { release() {} };
+      },
+      search: async () => [1, 2],
+      fetch: async function* (uids) {
+        for (const uid of uids) {
+          yield {
+            uid,
+            flags: uid === 2 ? ['\\Flagged'] : [],
+            internalDate: new Date(`2026-05-0${uid}T10:00:00Z`),
+            source: {
+              date: new Date(`2026-05-0${uid}T10:00:00Z`),
+              from: { value: [{ name: `Klant ${uid}`, address: `klant${uid}@example.nl` }] },
+              to: { value: [{ address: 'serve@softora.nl' }] },
+              subject: `Mail ${uid}`,
+              text: `Bericht ${uid}`,
+            },
+          };
+        }
+      },
+      logout: async () => {},
+    }),
+    parseMailSource: async (source) => source,
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'starred', limit: '10' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(openedMailboxes[0], 'INBOX');
+  assert.deepEqual(res.body.messages.map((message) => message.uid), [2]);
+  assert.equal(res.body.messages[0].folder, 'starred');
+});
+
+test('mailbox service returns empty reclame folder when no matching mailbox exists', async () => {
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async () => {
+        throw new Error('Promotions folder should not be opened when it is missing.');
+      },
+      search: async () => [],
+      logout: async () => {},
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'promotions', limit: '10' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.messages, []);
 });
 
 test('mailbox routes expose accounts, messages and send endpoints', () => {

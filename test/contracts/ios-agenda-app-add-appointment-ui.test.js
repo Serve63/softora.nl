@@ -50,9 +50,12 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   );
   assert.match(
     agendaListSource,
-    /URL\(string: "https:\/\/www\.softora\.nl\/premium-mailbox"\)/,
-    'The mail shortcut should open the existing Softora mailbox.'
+    /@State private var isShowingMailbox = false/,
+    'The mail shortcut should open a native mailbox screen inside the app.'
   );
+  assert.match(agendaListSource, /MailboxView\(apiClient: SoftoraAPIClient\(\)\)/);
+  assert.match(agendaListSource, /private struct MailboxView: View/);
+  assert.doesNotMatch(agendaListSource, /premium-mailbox/);
   assert.match(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
   assert.match(agendaListSource, /title: "Gym"[^]*systemImage: "dumbbell\.fill"/);
   assert.match(agendaListSource, /prefilledTitle: "Gym"/);
@@ -63,4 +66,40 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   );
   assert.match(addViewSource, /prefilledTitle: String = ""/);
   assert.match(addViewSource, /initialDraft\.title = trimmedTitle\.softoraUppercased/);
+});
+
+test('ios agenda native mailbox has folders, account selector and mailbox api calls', () => {
+  const modelsSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Models.swift');
+  const apiClientSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/SoftoraAPIClient.swift');
+  const agendaListSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AgendaListView.swift');
+  const infoPlistSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Info.plist');
+
+  assert.match(modelsSource, /struct MailboxAccount: Identifiable, Decodable, Hashable/);
+  assert.match(modelsSource, /struct MailboxMessage: Identifiable, Decodable, Hashable/);
+  assert.match(apiClientSource, /func fetchMailboxAccounts\(\) async throws -> \[MailboxAccount\]/);
+  assert.match(apiClientSource, /\/api\/mailbox\/accounts/);
+  assert.match(apiClientSource, /func fetchMailboxMessages\(account: String, folder: String, limit: Int = 50\) async throws -> \[MailboxMessage\]/);
+  assert.match(apiClientSource, /\/api\/mailbox\/messages\?account=/);
+  assert.match(agendaListSource, /private enum MailboxFolder: String, CaseIterable, Identifiable/);
+  assert.match(agendaListSource, /case important/);
+  assert.match(agendaListSource, /case promotions/);
+  assert.match(agendaListSource, /case spam/);
+  assert.match(agendaListSource, /\"starred\"/);
+  assert.match(agendaListSource, /\"Reclame\"/);
+  assert.match(agendaListSource, /MailboxFolderDrawer/);
+  assert.match(agendaListSource, /MailboxAccountSelector/);
+  assert.match(agendaListSource, /ScrollView\(\.horizontal, showsIndicators: false\)/);
+  assert.match(agendaListSource, /Text\(account\.email\)/);
+  assert.match(agendaListSource, /frame\(maxWidth: \.infinity, alignment: \.center\)/);
+  assert.match(agendaListSource, /isLocked: selectedMessage != nil/);
+  assert.match(agendaListSource, /\.disabled\(isLocked\)/);
+  assert.match(agendaListSource, /lockedBackground/);
+  assert.doesNotMatch(agendaListSource, /Text\(selectedAccount\?\.email \?\? "Geen account"\)/);
+  assert.doesNotMatch(agendaListSource, /Image\(systemName: "arrow\.clockwise"\)/);
+  assert.doesNotMatch(
+    agendaListSource,
+    /Text\(account\.displayName\)[^]*Text\(account\.email\)/,
+    'Mailbox account buttons should not show the same email twice.'
+  );
+  assert.match(infoPlistSource, /<key>CFBundleDisplayName<\/key>\s*<string>Softora\.nl<\/string>/);
 });
