@@ -748,6 +748,15 @@ document.addEventListener('keydown', (event) => {
 
 window.softoraMonthlyCostsData = data;
 window.softoraMonthlyCostsRender = render;
+window.softoraMonthlyCostsHelpers = {
+  appendCostTextElement,
+  createCostActionIcon,
+  fetchUiStateGetWithFallback,
+  fetchUiStateSetWithFallback,
+  fmtEur,
+  normalizeString,
+  showToast,
+};
 
 syncNextId();
 setMonthlyCostsStageBooting(true);

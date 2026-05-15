@@ -22,6 +22,9 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(source, /data-settings-avatar-preview/);
   assert.match(source, /data-settings-action="cancel-admin-pin"/);
   assert.match(source, /class="settings-overview-grid"/);
+  assert.match(source, /href="\/premium-vaste-lasten\?view=klantdekking"/);
+  assert.match(source, /Worden alle kosten betaald\?/);
+  assert.match(source, /Klantkosten-check/);
   assert.match(source, /grid-template-columns:repeat\(auto-fit,minmax\(260px,1fr\)\)/);
   assert.match(source, /calc\(4 \* 320px \+ 3 \* 24px\)/);
   assert.match(source, /\.tegel \{[\s\S]*font:\s*inherit;[\s\S]*text-align:\s*left;/);

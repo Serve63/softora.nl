@@ -6,12 +6,15 @@ const path = require('path');
 function readMonthlyCostsSources() {
   const pagePath = path.join(__dirname, '../../premium-vaste-lasten.html');
   const scriptPath = path.join(__dirname, '../../assets/premium-vaste-lasten.js');
+  const coverageScriptPath = path.join(__dirname, '../../assets/premium-customer-cost-coverage.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+  const coverageScriptSource = fs.readFileSync(coverageScriptPath, 'utf8');
   return {
     pageSource,
     scriptSource,
-    combinedSource: `${pageSource}\n${scriptSource}`,
+    coverageScriptSource,
+    combinedSource: `${pageSource}\n${scriptSource}\n${coverageScriptSource}`,
   };
 }
 
@@ -55,7 +58,7 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
     /<div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">/
   );
   assert.match(pageSource, /<div class="monthly-costs-stage" id="monthly-costs-stage">/);
-  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260516a"><\/script>/);
   assert.doesNotMatch(pageSource, /let data = \{/);
   assert.match(
     combinedSource,
@@ -152,6 +155,33 @@ test('premium terugkerende kosten bewaart bewerkbare posten via supabase ui-stat
   assert.match(combinedSource, /await persistMonthlyCostEntries\('browser_delete'\);/);
   assert.match(combinedSource, /await persistMonthlyCostEntries\('browser_edit'\);/);
   assert.match(combinedSource, /void bootstrapMonthlyCostsPage\(\);/);
+});
+
+test('premium terugkerende kosten bevat klantkosten-check voor betaalde kosten per klant', () => {
+  const { pageSource, scriptSource, coverageScriptSource } = readMonthlyCostsSources();
+
+  assert.match(pageSource, /<section class="coverage-panel" id="customer-cost-coverage"/);
+  assert.match(pageSource, /Worden alle kosten betaald\?/);
+  assert.match(pageSource, /id="coverage-cost-description"/);
+  assert.match(pageSource, /id="coverage-cost-amount"/);
+  assert.match(pageSource, /id="coverage-revenue-amount"/);
+  assert.match(pageSource, /id="coverage-term"/);
+  assert.match(pageSource, /<option value="maandelijks_opzegbaar">Maandelijks opzegbaar<\/option>/);
+  assert.match(pageSource, /assets\/premium-database-import\.js\?v=20260427c/);
+  assert.match(pageSource, /assets\/premium-customer-cost-coverage\.js\?v=20260516a/);
+
+  assert.match(scriptSource, /window\.softoraMonthlyCostsHelpers = \{/);
+  assert.match(scriptSource, /fetchUiStateGetWithFallback,/);
+  assert.match(scriptSource, /fetchUiStateSetWithFallback,/);
+  assert.match(coverageScriptSource, /const CUSTOMER_COST_COVERAGE_KEY = 'customer_cost_coverage_v1';/);
+  assert.match(coverageScriptSource, /const CUSTOMER_DB_SCOPE = 'premium_customers_database';/);
+  assert.match(coverageScriptSource, /const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';/);
+  assert.match(coverageScriptSource, /readChunkedStateValue\(values, CUSTOMER_DB_KEY\)/);
+  assert.match(coverageScriptSource, /amountToMonthly\(amount, frequency\)/);
+  assert.match(coverageScriptSource, /record\.costFrequency === 'jaarlijks' && record\.customerTerm === 'maandelijks_opzegbaar'/);
+  assert.match(coverageScriptSource, /\[CUSTOMER_COST_COVERAGE_KEY\]: JSON\.stringify\(records\)/);
+  assert.match(coverageScriptSource, /source: 'premium-customer-cost-coverage'/);
+  assert.doesNotMatch(coverageScriptSource, /localStorage|sessionStorage|indexedDB/);
 });
 
 test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze maand', () => {
