@@ -164,7 +164,7 @@ struct AddAppointmentView: View {
 
     private var appointmentTargetChoices: some View {
         plannerChoiceRow(
-            options: Planner.appointmentTargetCases,
+            options: orderedPlannerOptions(Planner.appointmentTargetCases),
             selection: Binding(
                 get: { draft.planner },
                 set: { draft.planner = $0 }
@@ -174,7 +174,7 @@ struct AddAppointmentView: View {
 
     private var leadOwnerChoices: some View {
         plannerChoiceRow(
-            options: Planner.leadOwnerCases,
+            options: orderedPlannerOptions(Planner.leadOwnerCases),
             selection: Binding(
                 get: { draft.leadOwner },
                 set: { draft.leadOwner = $0 }
@@ -207,6 +207,12 @@ struct AddAppointmentView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private func orderedPlannerOptions(_ options: [Planner]) -> [Planner] {
+        let selectedPlanner = store.selectedPlanner
+        guard options.contains(selectedPlanner) else { return options }
+        return [selectedPlanner] + options.filter { $0 != selectedPlanner }
     }
 
     private var showsLeadOwnerChoices: Bool {

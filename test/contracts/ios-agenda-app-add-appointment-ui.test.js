@@ -26,6 +26,10 @@ test('ios agenda add appointment keeps appointment target separate from meeting 
   );
   assert.match(addViewSource, /FormLabel\("Voor wie\?"\)[^]*appointmentTargetChoices/);
   assert.match(addViewSource, /FormLabel\("Wie heeft deze lead geregeld\?"\)[^]*leadOwnerChoices/);
+  assert.match(addViewSource, /options: orderedPlannerOptions\(Planner\.appointmentTargetCases\)/);
+  assert.match(addViewSource, /options: orderedPlannerOptions\(Planner\.leadOwnerCases\)/);
+  assert.match(addViewSource, /let selectedPlanner = store\.selectedPlanner/);
+  assert.match(addViewSource, /return \[selectedPlanner\] \+ options\.filter \{ \$0 != selectedPlanner \}/);
   assert.match(apiClientSource, /who: draft\.planner\.apiValue/);
   assert.match(apiClientSource, /manualLeadOwner: isBusinessMeeting \? draft\.leadOwner\.apiValue : ""/);
   assert.doesNotMatch(
