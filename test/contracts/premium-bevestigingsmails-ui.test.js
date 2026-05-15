@@ -23,8 +23,29 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.match(pageSource, /<div class="campagne-title">Nieuwe Campagne<\/div>/);
   assert.match(pageSource, /Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
   assert.doesNotMatch(pageSource, /Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
-  assert.match(pageSource, /<button class="btn-start" id="start-campaign-btn" onclick="startCampagne\(\)">/);
+  assert.match(pageSource, /<button class="btn-start" id="start-campaign-btn" onclick="startCampagne\(\)" data-secure-mail-send-pin>/);
   assert.doesNotMatch(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
+});
+
+test('premium bevestigingsmails bevestigt mailverzending met pincode-bolletjes zonder wachtwoordveld', () => {
+  const root = path.join(__dirname, '../..');
+  const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
+  const pinSource = fs.readFileSync(path.join(root, 'assets/premium-secure-action-pin.js'), 'utf8');
+
+  assert.match(pageSource, /assets\/premium-secure-action-pin\.js\?v=20260516a/);
+  assert.match(pageSource, /id="start-campaign-btn" onclick="startCampagne\(\)" data-secure-mail-send-pin/);
+
+  assert.match(pinSource, /secure-action-pin-slot/);
+  assert.match(pinSource, /data-secure-action-pin-digit/);
+  assert.match(pinSource, /function confirmMailSend\(\)/);
+  assert.match(pinSource, /title: "Mails versturen bevestigen"/);
+  assert.match(pinSource, /description: "Typ de pincode om te voorkomen dat deze actie per ongeluk start\."/);
+  assert.match(pinSource, /data-secure-mail-send-pin/);
+  assert.match(pinSource, /window\.startCampagne/);
+  assert.match(pinSource, /fetch\(verifyUrl/);
+  assert.match(pinSource, /\/api\/premium-users\/verify-pin/);
+  assert.doesNotMatch(pinSource, /type=["']password["']/);
+  assert.doesNotMatch(pinSource, /autocomplete=["']current-password["']/);
 });
 
 test('premium bevestigingsmails toont een aparte AI beheer pagina wanneer de modus op software staat', () => {
