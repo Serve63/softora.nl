@@ -1053,14 +1053,21 @@ test('premium database webdesign action releases slow saved photo loaders after 
   assert.match(controller.render(customer), /data-photo-loaded="true"/);
 });
 
-test('premium database page exposes interesse as a lead-status step', () => {
+test('premium database page combines contact filters into one benaderd step', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(
     pageSource,
-    /<button class="sf-btn act" data-s="alle" type="button">Alle<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="gebeld" type="button">Gebeld<\/button>\s*<button class="sf-btn" data-s="gemaild" type="button">Gemaild<\/button>\s*<button class="sf-btn" data-s="afspraak" type="button">Afspraak<\/button>\s*<button class="sf-btn" data-s="interesse" type="button">Interesse<\/button>\s*<button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>\s*<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>/
+    /<button class="sf-btn act" data-s="alle" type="button">Alle<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
   );
+  assert.match(pageSource, /state\.activeStatus === "benaderd"/);
+  assert.match(pageSource, /!hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\)/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gebeld" type="button">Gebeld<\/button>/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gemaild" type="button">Gemaild<\/button>/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="afspraak" type="button">Afspraak<\/button>/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="interesse" type="button">Interesse<\/button>/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>/);
   assert.match(pageSource, /<option value="interesse">Interesse<\/option>/);
   assert.match(pageSource, /<option value="afgehaakt">Afgehaakt<\/option>/);
   assert.match(pageSource, /const DATABASE_STATUS_OPTIONS = \[[^\]]*"interesse"[^\]]*\];/);
