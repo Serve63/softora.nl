@@ -278,11 +278,32 @@ main.main.is-premium-boot-host {
   text-transform: uppercase;
   margin-bottom: 4px;
 }
-
 .page-subtitle {
   font-size: 14px;
   color: var(--text-light);
   margin-bottom: 36px;
+}
+
+.settings-overview-grid,
+:is(#screen-extra, .screen-extra) > :last-child,
+.settings-extra-grid,
+.extra-modules-grid,
+.modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+  width: min(100%, calc(4 * 320px + 3 * 24px));
+  align-items: stretch;
+}
+
+.settings-overview-grid > *,
+#screen-extra > :last-child > *,
+.screen-extra > :last-child > *,
+.settings-extra-grid > *,
+.extra-modules-grid > *,
+.modules-grid > * {
+  width: 100%;
+  min-width: 0;
 }
 
 .tegel {
@@ -300,7 +321,7 @@ main.main.is-premium-boot-host {
   width: 280px;
   font: inherit;
   color: inherit;
-  text-align: left;
+  text-align: left; text-decoration: none;
   box-shadow: 0 8px 24px rgba(26, 26, 46, 0.04);
 }
 
@@ -1936,7 +1957,8 @@ body {
   <div class="screen active" id="screen-overzicht">
     <div class="page-title">Instellingen</div>
     <div class="page-subtitle">Kies een categorie om te beheren</div>
-    <div>
+    <div class="settings-overview-grid">
+      <a class="tegel" href="/premium-vaste-lasten?view=klantdekking"><svg class="tegel-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg><div class="tegel-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16"/><path d="M7 4v16"/><path d="M17 4v16"/><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 14l2 2 4-5"/></svg></div><div class="tegel-label">Worden alle kosten betaald?</div><div class="tegel-desc">Controleer per klant welke kosten wij betalen, welke inkomsten terugkomen en of het maandelijks of jaarlijks loopt.</div><div class="tegel-count">Klantkosten-check</div></a>
       <button type="button" class="tegel" data-settings-action="open-pin">
         <svg class="tegel-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         <div class="tegel-icon-wrap">
