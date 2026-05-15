@@ -38,3 +38,24 @@ test('ios agenda add appointment keeps appointment target separate from meeting 
     'Business meetings must no longer force the appointment target to both.'
   );
 });
+
+test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => {
+  const agendaListSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AgendaListView.swift');
+  const addViewSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AddAppointmentView.swift');
+
+  assert.match(
+    agendaListSource,
+    /AgendaShortcutBar\([^]*showGymShortcut: store\.selectedPlanner == \.serve/,
+    'The gym shortcut should only be visible for the Serve account.'
+  );
+  assert.match(
+    agendaListSource,
+    /URL\(string: "https:\/\/www\.softora\.nl\/premium-mailbox"\)/,
+    'The mail shortcut should open the existing Softora mailbox.'
+  );
+  assert.match(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
+  assert.match(agendaListSource, /title: "Gym"[^]*systemImage: "dumbbell\.fill"/);
+  assert.match(agendaListSource, /prefilledTitle: "Gym"/);
+  assert.match(addViewSource, /prefilledTitle: String = ""/);
+  assert.match(addViewSource, /initialDraft\.title = trimmedTitle\.softoraUppercased/);
+});

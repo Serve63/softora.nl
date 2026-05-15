@@ -3,6 +3,7 @@ import SwiftUI
 struct AgendaListView: View {
     let store: AgendaStore
 
+    @Environment(\.openURL) private var openURL
     @State private var weekStart = AgendaDateFormatter.weekStart(containing: Date())
     @State private var pendingDate: Date?
     @State private var isChoosingAppointmentType = false
@@ -50,6 +51,12 @@ struct AgendaListView: View {
                             }
                             moveWeek(value.translation.width < 0 ? 1 : -1)
                         }
+                )
+
+                AgendaShortcutBar(
+                    showGymShortcut: store.selectedPlanner == .serve,
+                    onOpenMail: openMailbox,
+                    onOpenGym: openGymShortcut
                 )
             }
             .blur(radius: overlayIsOpen ? 7 : 0)
@@ -115,7 +122,8 @@ struct AgendaListView: View {
                 date: configuration.date,
                 appointmentType: configuration.appointmentType,
                 businessKind: configuration.businessKind,
-                businessMeetingType: configuration.businessMeetingType
+                businessMeetingType: configuration.businessMeetingType,
+                prefilledTitle: configuration.prefilledTitle
             )
         }
         .fullScreenCover(item: $selectedAppointment) { appointment in
@@ -198,6 +206,23 @@ struct AgendaListView: View {
         isChoosingBusinessKind = false
         isChoosingBusinessType = false
     }
+
+    private func openMailbox() {
+        guard let mailboxURL = URL(string: "https://www.softora.nl/premium-mailbox") else { return }
+        openURL(mailboxURL)
+    }
+
+    private func openGymShortcut() {
+        addConfiguration = AddAppointmentConfiguration(
+            date: Date(),
+            appointmentType: .personal,
+            prefilledTitle: "Gym"
+        )
+        isChoosingAppointmentType = false
+        isChoosingBusinessKind = false
+        isChoosingBusinessType = false
+        pendingDate = nil
+    }
 }
 
 private struct AddAppointmentConfiguration: Identifiable {
@@ -206,6 +231,21 @@ private struct AddAppointmentConfiguration: Identifiable {
     let appointmentType: AppointmentType
     let businessKind: BusinessAppointmentKind
     let businessMeetingType: BusinessMeetingType
+    let prefilledTitle: String
+
+    init(
+        date: Date,
+        appointmentType: AppointmentType,
+        businessKind: BusinessAppointmentKind = .appointment,
+        businessMeetingType: BusinessMeetingType = .website,
+        prefilledTitle: String = ""
+    ) {
+        self.date = date
+        self.appointmentType = appointmentType
+        self.businessKind = businessKind
+        self.businessMeetingType = businessMeetingType
+        self.prefilledTitle = prefilledTitle
+    }
 }
 
 private struct AgendaTopBar: View {
@@ -233,6 +273,69 @@ private struct AgendaTopBar: View {
                 .fill(Color.softoraPurpleLight)
                 .frame(height: 1.5)
         }
+    }
+}
+
+private struct AgendaShortcutBar: View {
+    let showGymShortcut: Bool
+    let onOpenMail: () -> Void
+    let onOpenGym: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            AgendaShortcutButton(
+                title: "Mail",
+                systemImage: "envelope.fill",
+                action: onOpenMail
+            )
+
+            if showGymShortcut {
+                AgendaShortcutButton(
+                    title: "Gym",
+                    systemImage: "dumbbell.fill",
+                    action: onOpenGym
+                )
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
+        .background(Color.white)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.softoraPurpleLight)
+                .frame(height: 1.5)
+        }
+    }
+}
+
+private struct AgendaShortcutButton: View {
+    let title: String
+    let systemImage: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .bold))
+
+                Text(title)
+                    .font(.softoraDisplay(13, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+            }
+            .foregroundStyle(Color.softoraInk)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.softoraCrimson, lineWidth: 1.5)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

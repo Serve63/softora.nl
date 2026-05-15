@@ -14,17 +14,23 @@ struct AddAppointmentView: View {
         date: Date = Date(),
         appointmentType: AppointmentType = .personal,
         businessKind: BusinessAppointmentKind = .appointment,
-        businessMeetingType: BusinessMeetingType = .website
+        businessMeetingType: BusinessMeetingType = .website,
+        prefilledTitle: String = ""
     ) {
         self.store = store
+        var initialDraft = NewAppointmentDraft(
+            planner: store.selectedPlanner,
+            date: date,
+            appointmentType: appointmentType,
+            businessKind: businessKind,
+            businessMeetingType: businessMeetingType
+        )
+        let trimmedTitle = prefilledTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedTitle.isEmpty {
+            initialDraft.title = trimmedTitle.softoraUppercased
+        }
         _draft = State(
-            initialValue: NewAppointmentDraft(
-                planner: store.selectedPlanner,
-                date: date,
-                appointmentType: appointmentType,
-                businessKind: businessKind,
-                businessMeetingType: businessMeetingType
-            )
+            initialValue: initialDraft
         )
     }
 
