@@ -72,6 +72,8 @@ test('premium bevestigingsmails bevestigt mailverzending met pincode-bolletjes z
   assert.match(pinSource, /window\.startCampagne/);
   assert.match(pinSource, /fetch\(verifyUrl/);
   assert.match(pinSource, /\/api\/premium-users\/verify-pin/);
+  assert.doesNotMatch(pinSource, /secure-action-pin-cancel/);
+  assert.doesNotMatch(pinSource, />Annuleren</);
   assert.doesNotMatch(pinSource, /type=["']password["']/);
   assert.doesNotMatch(pinSource, /autocomplete=["']current-password["']/);
 });
