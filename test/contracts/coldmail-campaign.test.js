@@ -232,6 +232,10 @@ test('coldmail campaign attaches webdesign photo inline and as attachment', asyn
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
+  assert.match(sentMessages[0].html, /<table role="presentation" width="100%"/);
+  assert.match(sentMessages[0].html, /<td style="[^"]*overflow:visible;"/);
+  assert.match(sentMessages[0].html, /width="640" style="display:block;width:100%;max-width:640px;height:auto;max-height:none;/);
+  assert.match(sentMessages[0].html, /object-fit:contain;/);
   assert.match(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].html, /<p>Geen interesse\? Reageer met/);
   assert.match(

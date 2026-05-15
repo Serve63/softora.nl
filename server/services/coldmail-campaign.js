@@ -1164,9 +1164,9 @@ function createColdmailCampaignService(deps = {}) {
           optOutText
         )}</p>`
       : '';
-    return `${html}\n<p style="margin:24px 0 0 0;"><img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
+    return `${html}\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:24px 0 0 0;"><tr><td style="padding:0;margin:0;width:100%;font-size:0;line-height:0;overflow:visible;"><img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
       attachment.alt || 'Webdesign'
-    )}" style="display:block;max-width:100%;height:auto;border:0;border-radius:12px;" /></p>${optOutHtml}`;
+    )}" width="640" style="display:block;width:100%;max-width:640px;height:auto;max-height:none;border:0;outline:none;text-decoration:none;border-radius:12px;object-fit:contain;" /></td></tr></table>${optOutHtml}`;
   }
 
   async function loadColdmailReplyState() {
