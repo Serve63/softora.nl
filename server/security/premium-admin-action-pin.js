@@ -2,7 +2,8 @@ const { timingSafeEqualStrings } = require('./crypto-utils');
 
 /**
  * Wanneer PREMIUM_SETTINGS_CONFIRM_PIN of (fallback) COLDCALLING_START_CONFIRM_PIN gezet is,
- * moeten gevoelige premium-admin-acties (zoals POST/PATCH /api/premium-users) body.actionConfirmPin sturen.
+ * moeten gevoelige premium-admin-acties (zoals POST/PATCH /api/premium-users)
+ * body.actionConfirmCode sturen. body.actionConfirmPin blijft tijdelijk werken voor oudere clients.
  * Als geen van beide env-vars gezet is, wordt niet gecontroleerd (lokaal/dev).
  *
  * @param {object} body
@@ -20,7 +21,12 @@ function validatePremiumAdminActionPin(body, options = {}) {
   if (!expected) {
     return { ok: true };
   }
-  const provided = String(body?.actionConfirmPin ?? '').trim();
+  const payload = body && typeof body === 'object' ? body : {};
+  const provided = String(
+    Object.prototype.hasOwnProperty.call(payload, 'actionConfirmCode')
+      ? payload.actionConfirmCode
+      : payload.actionConfirmPin
+  ).trim();
   if (!timingSafeEqualStrings(provided, expected)) {
     return { ok: false, error: 'Bevestigingspin is onjuist of ontbreekt.' };
   }

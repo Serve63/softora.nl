@@ -32,7 +32,7 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*padding:\s*3rem 3rem 1\.8rem;/s);
   assert.match(pageSource, /assets\/premium-password-register-renderer\.js\?v=20260427a/);
   assert.match(pageSource, /assets\/premium-password-register-store\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-password-register-pin\.js\?v=20260427a/);
+  assert.match(pageSource, /assets\/premium-password-register-pin\.js\?v=20260516a/);
   assert.match(pageSource, /assets\/premium-password-register-app\.js\?v=20260509b/);
   assert.match(rendererSource, /global\.SoftoraPasswordRegisterRenderer/);
   assert.match(storeSource, /global\.SoftoraPasswordRegisterStore/);
@@ -111,7 +111,7 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /id="entry-password"/);
   assert.doesNotMatch(pageSource, /const PIN\s*=\s*['"][0-9]{6}['"]/);
   assert.match(pinSource, /fetch\("\/api\/premium-users\/verify-pin"/);
-  assert.match(pinSource, /body:\s*JSON\.stringify\(\{\s*actionConfirmPin:\s*pin\s*\}\)/);
+  assert.match(pinSource, /body:\s*JSON\.stringify\(\{\s*actionConfirmCode:\s*pin\s*\}\)/);
 });
 
 function loadPasswordRegisterStoreWithUiState(initialValues = {}) {
