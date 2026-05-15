@@ -32,7 +32,7 @@ test('premium bevestigingsmails bevestigt mailverzending met pincode-bolletjes z
   const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
   const pinSource = fs.readFileSync(path.join(root, 'assets/premium-secure-action-pin.js'), 'utf8');
 
-  assert.match(pageSource, /assets\/premium-secure-action-pin\.js\?v=20260516a/);
+  assert.match(pageSource, /assets\/premium-secure-action-pin\.js\?v=20260516b/);
   assert.match(pageSource, /id="start-campaign-btn" onclick="startCampagne\(\)" data-secure-mail-send-pin/);
 
   assert.match(pinSource, /secure-action-pin-slot/);
@@ -44,6 +44,14 @@ test('premium bevestigingsmails bevestigt mailverzending met pincode-bolletjes z
   assert.match(pinSource, /window\.startCampagne/);
   assert.match(pinSource, /fetch\(verifyUrl/);
   assert.match(pinSource, /\/api\/premium-users\/verify-pin/);
+  assert.match(pinSource, /autocomplete="one-time-code"/);
+  assert.match(pinSource, /name="softora_action_code"/);
+  assert.match(pinSource, /data-1p-ignore="true"/);
+  assert.match(pinSource, /data-lpignore="true"/);
+  assert.match(pinSource, /data-bwignore="true"/);
+  assert.match(pinSource, /data-form-type="other"/);
+  assert.match(pinSource, /JSON\.stringify\(\{ actionConfirmCode: pin \}\)/);
+  assert.doesNotMatch(pinSource, /actionConfirmPin/);
   assert.doesNotMatch(pinSource, /secure-action-pin-cancel/);
   assert.doesNotMatch(pinSource, />Annuleren</);
   assert.doesNotMatch(pinSource, /type=["']password["']/);

@@ -352,9 +352,9 @@ async function addPersoneel() {
   if (wachtwoord.length < 8) {
     return showToast('Wachtwoord minimaal 8 tekens');
   }
-  var actionConfirmPin;
+  var actionConfirmCode;
   try {
-    actionConfirmPin = await requestAdminActionPin('Toevoegen bevestigen');
+    actionConfirmCode = await requestAdminActionPin('Toevoegen bevestigen');
   } catch (error) {
     if (error && error.message === 'Geannuleerd') return;
     showToast((error && error.message) || 'Bevestigen mislukt');
@@ -370,7 +370,7 @@ async function addPersoneel() {
         email: email,
         password: wachtwoord,
         rol: document.getElementById('new-rol').value,
-        actionConfirmPin: actionConfirmPin
+        actionConfirmCode: actionConfirmCode
       })
     });
     team = Array.isArray(payload.users) ? payload.users : team;
@@ -518,9 +518,9 @@ async function saveEdit() {
   if (wachtwoord && wachtwoord.length < 8) {
     return showToast('Wachtwoord minimaal 8 tekens');
   }
-  var actionConfirmPin;
+  var actionConfirmCode;
   try {
-    actionConfirmPin = await requestAdminActionPin('Opslaan bevestigen');
+    actionConfirmCode = await requestAdminActionPin('Opslaan bevestigen');
   } catch (error) {
     if (error && error.message === 'Geannuleerd') return;
     showToast((error && error.message) || 'Bevestigen mislukt');
@@ -535,7 +535,7 @@ async function saveEdit() {
       password: wachtwoord,
       rol: document.getElementById('edit-rol').value,
       status: (bestaandePersoon && bestaandePersoon.status) || 'active',
-      actionConfirmPin: actionConfirmPin
+      actionConfirmCode: actionConfirmCode
     };
     if (editAvatarMutation !== 'unchanged') {
       patchBody.avatarDataUrl = editAvatarMutation;
