@@ -1294,9 +1294,9 @@
                         <div class="ws-customer-reminder-body">
                             <div class="ws-customer-reminder-label">Actie vereist</div>
                             <div class="ws-customer-reminder-text" id="wsReminderText"></div>
-                            <a class="ws-customer-reminder-link" id="wsKlantenLink" href="/premium-klanten" target="_blank" rel="noopener">
+                            <a class="ws-customer-reminder-link" id="wsKlantenLink" href="/premium-database?status=benaderd" target="_blank" rel="noopener">
                                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                                Klanten database openen
+                                Database openen bij Benaderd
                             </a>
                         </div>
                     </div>
@@ -1631,7 +1631,7 @@
     const workspaceInputArea = document.getElementById('workspaceInputArea');
     const workspaceSuccessState = document.getElementById('workspaceSuccessState');
     const workspaceSuccessTitle = document.getElementById('workspaceSuccessTitle');
-    const wsReminderText = document.getElementById('wsReminderText');
+    const wsReminderText = document.getElementById('wsReminderText'); const wsKlantenLink = document.getElementById('wsKlantenLink');
     const wsCustomerAddedCheck = document.getElementById('wsCustomerAddedCheck');
     const wsCustomerAddedLabel = document.getElementById('wsCustomerAddedLabel');
     const ACTIVE_ORDERS_UI_SCOPE = 'premium_active_orders';
@@ -2457,7 +2457,7 @@
             workspaceSuccessTitle.textContent = successMessage || 'Dossier aangemaakt.';
             workspaceSuccessTitle.hidden = true;
         }
-        if (wsReminderText) wsReminderText.textContent = `Vergeet ${name} niet toe te voegen aan je klantenbestand.`;
+        if (wsReminderText) wsReminderText.textContent = `Vergeet ${name} niet toe te voegen aan je klantenbestand.`; if (wsKlantenLink) wsKlantenLink.href = buildCustomerDatabaseReminderUrl(name);
         if (wsCustomerAddedCheck) wsCustomerAddedCheck.checked = false;
         if (wsCustomerAddedLabel) wsCustomerAddedLabel.textContent = `Ik heb ${name} toegevoegd aan het klantenbestand`;
         if (workspaceSuccessState) workspaceSuccessState.classList.add('show');
@@ -2486,9 +2486,8 @@
         return text;
     }
 
-    function resolveReminderCustomerName(apt) {
-        return normalizeReminderName(apt?.contact) || normalizeReminderName(apt?.company) || 'deze klant';
-    }
+    function resolveReminderCustomerName(apt) { return normalizeReminderName(apt?.contact) || normalizeReminderName(apt?.company) || 'deze klant'; }
+    function buildCustomerDatabaseReminderUrl(name) { const customerName = normalizeReminderName(name); const params = new URLSearchParams(); params.set('status', 'benaderd'); if (customerName) params.set('q', customerName); return `/premium-database?${params.toString()}`; }
 
     function hideCustomerDbReminder() {
         if (!customerDbReminderEl) return;
