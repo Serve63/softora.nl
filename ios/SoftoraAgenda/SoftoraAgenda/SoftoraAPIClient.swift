@@ -63,7 +63,7 @@ struct SoftoraAPIClient {
             : "manual-overig"
         let payload = ManualAppointmentPayload(
             date: AgendaDateFormatter.ymd(from: draft.date),
-            who: isBusinessMeeting ? Planner.both.apiValue : draft.planner.apiValue,
+            who: draft.planner.apiValue,
             title: title,
             time: time,
             activityTime: time,
@@ -76,7 +76,7 @@ struct SoftoraAPIClient {
             appointmentType: draft.appointmentType.apiValue,
             appointmentKind: draft.appointmentType == .business ? draft.businessKind.apiValue : "",
             businessMeetingType: draft.businessMeetingType.apiValue,
-            manualLeadOwner: isBusinessMeeting ? draft.planner.apiValue : "",
+            manualLeadOwner: isBusinessMeeting ? draft.leadOwner.apiValue : "",
             actor: "softora-ios-agenda"
         )
         let response: ManualAppointmentResponse = try await post(

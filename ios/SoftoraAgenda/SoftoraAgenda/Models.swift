@@ -136,6 +136,8 @@ enum Planner: String, CaseIterable, Codable, Identifiable {
     var id: String { rawValue }
 
     static let appAccessCases: [Planner] = [.serve, .martijn]
+    static let appointmentTargetCases: [Planner] = [.serve, .martijn, .both]
+    static let leadOwnerCases: [Planner] = [.serve, .martijn]
 
     init(rawAPIValue: String) {
         let normalized = rawAPIValue
@@ -182,6 +184,7 @@ enum Planner: String, CaseIterable, Codable, Identifiable {
 
 struct NewAppointmentDraft {
     var planner: Planner = .serve
+    var leadOwner: Planner = .serve
     var title = ""
     var date = Date()
     var time = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
@@ -194,12 +197,14 @@ struct NewAppointmentDraft {
 
     init(
         planner: Planner = .serve,
+        leadOwner: Planner? = nil,
         date: Date = Date(),
         appointmentType: AppointmentType = .personal,
         businessKind: BusinessAppointmentKind = .appointment,
         businessMeetingType: BusinessMeetingType = .website
     ) {
         self.planner = planner
+        self.leadOwner = leadOwner ?? planner
         self.date = date
         self.appointmentType = appointmentType
         self.businessKind = businessKind

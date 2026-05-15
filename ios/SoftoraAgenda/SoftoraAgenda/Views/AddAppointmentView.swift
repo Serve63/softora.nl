@@ -42,10 +42,13 @@ struct AddAppointmentView: View {
                     sheetHeader
 
                     VStack(alignment: .leading, spacing: 11) {
-                        if showsPlannerChoices {
+                        if showsLeadOwnerChoices {
                             FormLabel("Wie heeft deze lead geregeld?")
-                            plannerChoices
+                            leadOwnerChoices
                         }
+
+                        FormLabel("Voor wie?")
+                        appointmentTargetChoices
 
                         FormLabel("Titel")
                         SoftoraTextField(
@@ -159,14 +162,34 @@ struct AddAppointmentView: View {
         .padding(.bottom, 10)
     }
 
-    private var plannerChoices: some View {
+    private var appointmentTargetChoices: some View {
+        plannerChoiceRow(
+            options: Planner.appointmentTargetCases,
+            selection: Binding(
+                get: { draft.planner },
+                set: { draft.planner = $0 }
+            )
+        )
+    }
+
+    private var leadOwnerChoices: some View {
+        plannerChoiceRow(
+            options: Planner.leadOwnerCases,
+            selection: Binding(
+                get: { draft.leadOwner },
+                set: { draft.leadOwner = $0 }
+            )
+        )
+    }
+
+    private func plannerChoiceRow(options: [Planner], selection: Binding<Planner>) -> some View {
         HStack(spacing: 10) {
-            ForEach(plannerOptions) { planner in
+            ForEach(options) { planner in
                 Button {
-                    draft.planner = planner
+                    selection.wrappedValue = planner
                 } label: {
                     Text(planner.title)
-                        .font(.softoraDisplay(14, weight: .bold))
+                        .font(.softoraDisplay(13, weight: .bold))
                         .textCase(.uppercase)
                         .tracking(0.7)
                         .foregroundStyle(Color.softoraInk)
@@ -178,7 +201,7 @@ struct AddAppointmentView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(draft.planner == planner ? Color.softoraCrimson : Color.softoraPurpleLight, lineWidth: draft.planner == planner ? 2 : 1)
+                                .stroke(selection.wrappedValue == planner ? Color.softoraCrimson : Color.softoraPurpleLight, lineWidth: selection.wrappedValue == planner ? 2 : 1)
                         }
                 }
                 .buttonStyle(.plain)
@@ -186,11 +209,7 @@ struct AddAppointmentView: View {
         }
     }
 
-    private var plannerOptions: [Planner] {
-        Planner.appAccessCases
-    }
-
-    private var showsPlannerChoices: Bool {
+    private var showsLeadOwnerChoices: Bool {
         draft.appointmentType == .business && draft.businessKind == .meeting
     }
 
@@ -273,10 +292,6 @@ struct AddAppointmentView: View {
     }
 
     private func save() {
-        if draft.appointmentType == .personal || draft.businessKind == .appointment {
-            draft.planner = store.selectedPlanner
-        }
-
         let trimmedTime = timeText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedTime.count == 5, trimmedTime.contains(":") else {
             store.alertMessage = "Vul een tijdstip in als HH:MM."
