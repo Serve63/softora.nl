@@ -35,7 +35,7 @@ test('premium rol-labels tonen Full Acces in plaats van Administrator', () => {
   const settingsSource = fs.readFileSync(path.join(root, 'premium-instellingen.html'), 'utf8');
   assert.match(
     settingsSource,
-    /assets\/premium-user-management\.js\?v=20260421c/,
+    /assets\/premium-user-management\.js\?v=20260516a/,
     'premium-instellingen moet een versie op premium-user-management.js zetten zodat ADMIN niet uit browsercache terugkomt'
   );
 });
@@ -52,7 +52,7 @@ test('premium instellingen valideert de pagina-pin server-side zonder hardcoded 
 
   assert.doesNotMatch(source, /SETTINGS_PAGE_PIN\s*=\s*['"][0-9]{6}['"]/);
   assert.match(source, /fetch\('\/api\/premium-users\/verify-pin'/);
-  assert.match(source, /body:\s*JSON\.stringify\(\{\s*actionConfirmPin:\s*pin\s*\}\)/);
+  assert.match(source, /body:\s*JSON\.stringify\(\{\s*actionConfirmCode:\s*pin\s*\}\)/);
   assert.match(source, /window\.__premiumSettingsUnlockedPin\s*=\s*unlockedPin/);
 });
 
@@ -65,4 +65,6 @@ test('premium gebruikersbeheer rendert personeelsrijen zonder html strings', () 
   assert.doesNotMatch(source, /list\.innerHTML\s*=/);
   assert.doesNotMatch(source, /onclick="openEdit/);
   assert.doesNotMatch(source, /escapeJsString/);
+  assert.match(source, /actionConfirmCode:\s*actionConfirmCode/);
+  assert.doesNotMatch(source, /actionConfirmPin:\s*actionConfirmPin/);
 });

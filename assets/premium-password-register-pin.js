@@ -54,7 +54,7 @@
       var response = await fetch("/api/premium-users/verify-pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionConfirmPin: pin })
+        body: JSON.stringify({ actionConfirmCode: pin })
       });
       var data = {};
       try {

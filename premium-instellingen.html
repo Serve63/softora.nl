@@ -2099,7 +2099,7 @@ body {
             <div class="admin-pin-dot"></div>
             <div class="admin-pin-dot"></div>
           </div>
-          <input class="admin-pin-hidden-input" type="password" id="admin-action-pin-input" autocomplete="off" maxlength="6" inputmode="numeric" pattern="[0-9]*" aria-label="Pincode invoeren" tabindex="-1">
+          <input class="admin-pin-hidden-input" type="text" id="admin-action-pin-input" name="softora_action_code" autocomplete="one-time-code" maxlength="6" inputmode="numeric" pattern="[0-9]*" aria-label="Eenmalige bevestigingscode" tabindex="-1" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other">
           <div class="admin-pin-numpad">
             <button type="button" class="admin-num-btn" data-admin-pin-digit="1">1</button>
             <button type="button" class="admin-num-btn" data-admin-pin-digit="2">2</button>
@@ -2182,7 +2182,7 @@ body {
     var response = await fetch('/api/premium-users/verify-pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actionConfirmPin: pin })
+      body: JSON.stringify({ actionConfirmCode: pin })
     });
     var data = {};
     try {
@@ -2422,6 +2422,6 @@ body {
   bindSettingsStaticActions();
 })();
 </script>
-<script src="assets/premium-user-management.js?v=20260421c" defer></script>
+<script src="assets/premium-user-management.js?v=20260516a" defer></script>
 </body>
 </html>

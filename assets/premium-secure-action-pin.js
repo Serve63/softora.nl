@@ -38,6 +38,7 @@
       ".secure-action-pin-key:active{transform:scale(.96)}",
       ".secure-action-pin-key svg{width:20px;height:20px}",
       ".secure-action-pin-message{min-height:1.3em;margin-top:14px;color:#c0392b;font-size:.86rem;font-weight:700}",
+      ".secure-action-code-capture{position:fixed;left:-1000px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;background:transparent;color:transparent}",
       "@media(max-width:560px){.secure-action-pin-card{padding:34px 20px 24px}.secure-action-pin-close{right:14px;top:14px}.secure-action-pin-desc{font-size:1rem}.secure-action-pin-slot{width:44px;height:44px;font-size:1.2rem}.secure-action-pin-key{height:50px}}",
     ].join("");
     document.head.appendChild(style);
@@ -63,14 +64,19 @@
     overlay.setAttribute("aria-modal", "true");
     overlay.setAttribute("aria-labelledby", "secure-action-pin-title");
     overlay.setAttribute("tabindex", "-1");
+    overlay.setAttribute("data-1p-ignore", "true");
+    overlay.setAttribute("data-lpignore", "true");
+    overlay.setAttribute("data-bwignore", "true");
+    overlay.setAttribute("data-form-type", "other");
 
     overlay.innerHTML = [
-      '<div class="secure-action-pin-card">',
+      '<div class="secure-action-pin-card" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other">',
       '  <button type="button" class="secure-action-pin-close" data-secure-action-pin-close aria-label="Sluiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>',
       '  <div class="secure-action-pin-icon" aria-hidden="true">' + iconSvg("lock") + "</div>",
       '  <p class="secure-action-pin-kicker" data-secure-action-pin-kicker>Beveiligde actie</p>',
       '  <h2 class="secure-action-pin-title" id="secure-action-pin-title" data-secure-action-pin-title>Actie bevestigen</h2>',
       '  <p class="secure-action-pin-desc" data-secure-action-pin-desc>Typ de pincode om te voorkomen dat deze actie per ongeluk start.</p>',
+      '  <input class="secure-action-code-capture" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Eenmalige bevestigingscode" tabindex="-1" name="softora_action_code" data-secure-action-code-capture data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other">',
       '  <div class="secure-action-pin-slots" role="status" aria-live="polite" aria-label="Voortgang pincode" data-secure-action-pin-slots></div>',
       '  <div class="secure-action-pin-pad" data-secure-action-pin-pad></div>',
       '  <div class="secure-action-pin-message" data-secure-action-pin-message></div>',
@@ -128,6 +134,25 @@
     setText("[data-secure-action-pin-message]", message || "");
   }
 
+  function getCaptureInput() {
+    return state.overlay ? state.overlay.querySelector("[data-secure-action-code-capture]") : null;
+  }
+
+  function syncCaptureInput() {
+    var input = getCaptureInput();
+    if (input && input.value !== state.buffer) input.value = state.buffer;
+  }
+
+  function focusCaptureInput() {
+    var input = getCaptureInput();
+    if (!input) return;
+    try {
+      input.focus({ preventScroll: true });
+    } catch (error) {
+      input.focus();
+    }
+  }
+
   function paintSlots(mode) {
     var slots = state.overlay.querySelectorAll("[data-secure-action-pin-slot]");
     slots.forEach(function (slot, index) {
@@ -150,6 +175,7 @@
     if (!state.pending || state.busy || state.buffer.length >= PIN_LENGTH) return;
     state.buffer += String(digit || "").replace(/\D+/g, "").slice(0, 1);
     setMessage("");
+    syncCaptureInput();
     paintSlots();
     if (state.buffer.length === PIN_LENGTH) {
       window.setTimeout(confirmPin, 120);
@@ -160,6 +186,7 @@
     if (!state.pending || state.busy) return;
     state.buffer = state.buffer.slice(0, -1);
     setMessage("");
+    syncCaptureInput();
     paintSlots();
   }
 
@@ -167,6 +194,7 @@
     if (!state.pending || state.busy) return;
     state.buffer = "";
     setMessage("");
+    syncCaptureInput();
     paintSlots();
   }
 
@@ -184,6 +212,7 @@
     state.options = {};
     state.pending = null;
     setMessage("");
+    syncCaptureInput();
     paintSlots();
   }
 
@@ -197,7 +226,7 @@
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ actionConfirmPin: pin }),
+      body: JSON.stringify({ actionConfirmCode: pin }),
     });
     var payload = await response.json().catch(function () { return null; });
     if (!response.ok || !payload || payload.ok === false) {
@@ -223,13 +252,33 @@
     } catch (error) {
       state.busy = false;
       state.buffer = "";
+      syncCaptureInput();
       flashError(String((error && error.message) || "Pincode klopt niet."));
     }
   }
 
   function bindOverlay() {
+    state.overlay.addEventListener("input", function (event) {
+      if (!event.target.matches("[data-secure-action-code-capture]")) return;
+      if (!state.pending || state.busy) {
+        syncCaptureInput();
+        return;
+      }
+      state.buffer = String(event.target.value || "").replace(/\D+/g, "").slice(0, PIN_LENGTH);
+      setMessage("");
+      syncCaptureInput();
+      paintSlots();
+      if (state.buffer.length === PIN_LENGTH) {
+        window.setTimeout(confirmPin, 120);
+      }
+    });
+
     state.overlay.addEventListener("click", function (event) {
-      if (event.target === state.overlay) closeWithCancel();
+      if (event.target === state.overlay) {
+        closeWithCancel();
+        return;
+      }
+      focusCaptureInput();
       var digitButton = event.target.closest("[data-secure-action-pin-digit]");
       if (digitButton && state.overlay.contains(digitButton)) {
         appendDigit(digitButton.getAttribute("data-secure-action-pin-digit"));
@@ -285,6 +334,8 @@
     paintSlots();
     state.overlay.classList.add("open");
     state.overlay.focus();
+    syncCaptureInput();
+    focusCaptureInput();
     return new Promise(function (resolve, reject) {
       state.pending = { resolve: resolve, reject: reject };
     });
