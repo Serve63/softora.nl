@@ -56,6 +56,11 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
   assert.match(agendaListSource, /title: "Gym"[^]*systemImage: "dumbbell\.fill"/);
   assert.match(agendaListSource, /prefilledTitle: "Gym"/);
+  assert.doesNotMatch(
+    agendaListSource,
+    /private struct AgendaShortcutBar:[^]*?\.overlay\(alignment: \.top\)[^]*?private struct AgendaShortcutButton:/,
+    'The bottom shortcut bar should not render a separator line above the buttons.'
+  );
   assert.match(addViewSource, /prefilledTitle: String = ""/);
   assert.match(addViewSource, /initialDraft\.title = trimmedTitle\.softoraUppercased/);
 });

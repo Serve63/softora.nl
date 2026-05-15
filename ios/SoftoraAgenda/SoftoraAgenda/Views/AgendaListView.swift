@@ -301,11 +301,6 @@ private struct AgendaShortcutBar: View {
         .padding(.top, 10)
         .padding(.bottom, 10)
         .background(Color.white)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Color.softoraPurpleLight)
-                .frame(height: 1.5)
-        }
     }
 }
 
