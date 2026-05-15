@@ -747,7 +747,6 @@ function openEdit(id) {
   document.getElementById('edit-email').value = persoon.email || '';
   document.getElementById('edit-pw').value = '';
   document.getElementById('edit-rol').value = persoon.rol || 'medewerker';
-  document.getElementById('edit-status').value = persoon.status || 'active';
   paintEditAvatarPreview();
   openOverlay('edit-overlay');
 }
@@ -759,6 +758,7 @@ async function saveEdit() {
   var id = document.getElementById('edit-id').value.trim();
   var email = document.getElementById('edit-email').value.trim();
   var wachtwoord = document.getElementById('edit-pw').value;
+  var bestaandePersoon = team.find(function (item) { return item.id === id; });
   var saveButton = document.querySelector('#edit-overlay .btn-save');
   if (!email) {
     return showToast('E-mail is verplicht');
@@ -782,7 +782,7 @@ async function saveEdit() {
       email: email,
       password: wachtwoord,
       rol: document.getElementById('edit-rol').value,
-      status: document.getElementById('edit-status').value,
+      status: (bestaandePersoon && bestaandePersoon.status) || 'active',
       actionConfirmPin: actionConfirmPin
     };
     if (editAvatarMutation !== 'unchanged') {
