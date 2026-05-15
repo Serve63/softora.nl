@@ -25,6 +25,8 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(source, /href="\/premium-vaste-lasten\?view=klantdekking"/);
   assert.match(source, /Worden alle kosten betaald\?/);
   assert.match(source, /Klantkosten-check/);
+  assert.doesNotMatch(source, /id="edit-status"/);
+  assert.doesNotMatch(source, /<label>Status<\/label><select id="edit-status"/);
   assert.match(source, /grid-template-columns:repeat\(auto-fit,minmax\(260px,1fr\)\)/);
   assert.match(source, /calc\(4 \* 320px \+ 3 \* 24px\)/);
   assert.match(source, /\.tegel \{[\s\S]*font:\s*inherit;[\s\S]*text-align:\s*left;/);
