@@ -2411,7 +2411,7 @@
             });
             renderPage();
         }
-
+        function applyDatabaseUrlIntent() { let params; try { params = new URLSearchParams(window.location.search || ""); } catch (error) { return; } const requestedStatus = (["status", "filter", "tab"].map(function (key) { return normalizeString(params.get(key)); }).find(Boolean) || "").toLowerCase(); const statusButton = requestedStatus ? nodes.statusButtons.find(function (button) { return (button.dataset.s || "") === requestedStatus; }) : null; if (statusButton) { state.activeStatus = requestedStatus; nodes.statusButtons.forEach(function (button) { button.classList.toggle("act", button === statusButton); }); } const requestedQuery = ["q", "zoek", "search", "customer", "klant", "naam"].map(function (key) { return normalizeString(params.get(key)); }).find(Boolean) || ""; if (requestedQuery) { state.query = requestedQuery; nodes.query.value = requestedQuery; } }
         function sort(key) {
             state.sortKey = "distance";
             state.sortAsc = true;
@@ -3084,6 +3084,7 @@
         if (initialBootstrapCustomers.length) {
             state.klanten = sortCustomers(initialBootstrapCustomers);
         }
+        applyDatabaseUrlIntent();
         renderPage();
         const databaseBootStartedAt = Date.now(), databaseHadBootstrapCustomers = initialBootstrapCustomers.length > 0, releaseDatabaseBootShell = () => window.SoftoraPremiumBootTiming?.release(databaseBootStartedAt, 1000) || window.SoftoraPremiumBoot?.setShellBooting?.(false);
 
