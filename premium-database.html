@@ -2239,8 +2239,7 @@
             return state.klanten.filter(function (customer) {
                 if (state.activeStatus === "benaderd") {
                     if (!hasUsedColdCalling(customer) && !hasUsedColdMailing(customer)) return false;
-                } else if (state.activeStatus === "reactie_ontvangen" && !outreachController.isActionRequired(customer)) {
-                    return false;
+                } else if (state.activeStatus === "reactie_ontvangen" && !outreachController.isActionRequired(customer)) { return false;
                 } else if (state.activeStatus !== "alle" && customer.status !== state.activeStatus) {
                     return false;
                 }
@@ -3063,11 +3062,8 @@
 
                     try {
                         const photoMap = await loadCustomerPhotoMap(enrichedCustomers);
-                        const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten);
-                        const outreachAutomation = outreachController.applyAutomation(customersWithPhotos);
-                        const sortedCustomers = getSortedCustomers(outreachAutomation.customers);
-                        applyCustomerList(sortedCustomers, false);
-                        if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
+                        const outreachAutomation = outreachController.applyAutomation(mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten));
+                        const sortedCustomers = getSortedCustomers(outreachAutomation.customers); applyCustomerList(sortedCustomers, false); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
                     } catch (error) {
                         console.error("Databasefoto's laden via Supabase mislukt:", error);
                     }
@@ -3137,8 +3133,7 @@
         });
 
         nodes.tbody.addEventListener("click", function (event) {
-            const outreachButton = event.target.closest(".outreach-action");
-            if (outreachButton) { event.preventDefault(); event.stopPropagation(); void outreachController.updateStatus(outreachButton.getAttribute("data-outreach-id"), outreachButton.getAttribute("data-outreach-status")); return; }
+            const outreachButton = event.target.closest(".outreach-action"); if (outreachButton) { event.preventDefault(); event.stopPropagation(); void outreachController.updateStatus(outreachButton.getAttribute("data-outreach-id"), outreachButton.getAttribute("data-outreach-status")); return; }
             const editButton = event.target.closest(".company-edit");
             if (editButton) {
                 event.preventDefault();
