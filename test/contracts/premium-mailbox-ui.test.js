@@ -25,18 +25,19 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-mailbox\.js\?v=20260516a"><\/script>/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
   assert.match(scriptSource, /\/api\/mailbox\/send/);
+  assert.match(scriptSource, /\/api\/coldmailing\/outreach\/status/);
   assert.match(scriptSource, /async function loadMailboxAccounts\(\)/);
   assert.match(scriptSource, /async function loadMailboxMessages\(\)/);
   assert.match(scriptSource, /async function sendMail\(\)/);
   assert.match(scriptSource, /function getMailboxAccounts\(\) \{\s*return mailboxAccounts\.map\(\(account\) => account\.email\);\s*\}/);
   assert.match(scriptSource, /function getMailboxAccount\(\) \{\s*return activeMailboxAccount;\s*\}/);
   assert.match(scriptSource, /function renderMailboxAccountMenu\(\) \{[\s\S]*data-mailbox-email="\$\{escapeHtml\(email\)\}"/);
-  assert.match(scriptSource, /async function applyMailboxAccount\(email\) \{[\s\S]*activeMailboxAccount = email;[\s\S]*setMailboxAccountUi\(email\);/);
+  assert.match(scriptSource, /async function applyMailboxAccount\(email, options = \{\}\) \{[\s\S]*activeMailboxAccount = email;[\s\S]*setMailboxAccountUi\(email\);/);
   assert.match(scriptSource, /mailboxAccountSwitcher\.addEventListener\('click', function\(event\) \{/);
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*applyMailboxAccount\(email\);/);
 });
@@ -54,4 +55,18 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
   assert.match(scriptSource, /<div class="detail-body-text">\$\{escapeHtml\(m\.body\)\}<\/div>/);
+});
+
+test('premium mailbox toont webdesign outreach acties alleen via databasekoppeling', () => {
+  const pageSource = readPage();
+  const scriptSource = readScript();
+
+  assert.match(pageSource, /\.outreach-quickbar/);
+  assert.match(scriptSource, /function hydrateMailboxOutreachContexts\(\)/);
+  assert.match(scriptSource, /isWebdesignOutreachCustomer/);
+  assert.match(scriptSource, /data-mailbox-action="outreach-status"/);
+  assert.match(scriptSource, /Interesse/);
+  assert.match(scriptSource, /Geen interesse/);
+  assert.match(scriptSource, /mailMatchesOutreachCustomer/);
+  assert.match(scriptSource, /collectCustomerMessageKeys/);
 });

@@ -73,6 +73,158 @@ let mails = [];
 
 let activeFolder = 'inbox';
 let activeMail = null;
+let outreachCustomers = [];
+let mailboxUrlIntentApplied = false;
+const CUSTOMER_DB_SCOPE = 'premium_customers_database';
+const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
+
+function normalizeText(value) {
+  return String(value || '').trim();
+}
+
+function normalizeEmail(value) {
+  const raw = normalizeText(value).toLowerCase();
+  const match = raw.match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/i);
+  return match ? match[0] : raw;
+}
+
+function normalizeOutreachKey(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function normalizeOutreachStatus(value) {
+  const key = normalizeOutreachKey(value);
+  if (['reactie_ontvangen', 'reply_received', 'action_required', 'actie_nodig'].includes(key)) return 'reactie_ontvangen';
+  if (['interesse', 'interested', 'geinteresseerd'].includes(key)) return 'interesse';
+  if (['geen_interesse', 'geblokkeerd', 'opt_out', 'unsubscribe'].includes(key)) return 'geen_interesse';
+  if (['afgehaakt', 'lost', 'no_deal', 'geendeal'].includes(key)) return 'afgehaakt';
+  if (['geen_gehoor', 'geengehoor', 'no_answer'].includes(key)) return 'geen_gehoor';
+  if (['klant_geworden', 'klant', 'customer'].includes(key)) return 'klant_geworden';
+  if (['benaderd', 'gemaild', 'sent', 'mailed'].includes(key)) return 'benaderd';
+  return '';
+}
+
+function normalizeMessageKey(value) {
+  const raw = normalizeText(value).toLowerCase();
+  if (!raw) return '';
+  if (/^[a-z]+:\d+$/i.test(raw)) return raw;
+  return raw.replace(/^message:/i, '').replace(/[<>]/g, '').trim();
+}
+
+function isWebdesignOutreachCustomer(customer) {
+  if (!customer) return false;
+  return [
+    customer.campaignType,
+    customer.campaign_type,
+    customer.outreachCampaignType,
+    customer.outreach_campaign_type,
+    customer.coldmailSpecialAction,
+  ].some((value) => {
+    const key = normalizeOutreachKey(value);
+    return key === 'webdesign' || key === 'website_design';
+  });
+}
+
+function isDefinitiveOutreachCustomer(customer) {
+  const outreachStatus = normalizeOutreachStatus(customer?.outreachStatus);
+  const databaseStatus = normalizeOutreachStatus(customer?.databaseStatus || customer?.status);
+  const finalStatuses = ['interesse', 'geen_interesse', 'afgehaakt', 'geen_gehoor', 'klant_geworden'];
+  return finalStatuses.includes(outreachStatus) || finalStatuses.includes(databaseStatus);
+}
+
+function hasOutreachReplySignal(customer) {
+  return Boolean(
+    customer?.actionRequired ||
+      customer?.outreachActionRequired ||
+      customer?.lastReplyAt ||
+      customer?.last_reply_at ||
+      customer?.lastColdmailReplyAt ||
+      customer?.replyMailboxId ||
+      customer?.replyMessageId
+  );
+}
+
+function readChunkedStateValue(values, key) {
+  if (!values || typeof values !== 'object') return '';
+  if (typeof values[key] === 'string') return values[key];
+  const chunks = [];
+  for (let index = 0; Object.prototype.hasOwnProperty.call(values, `${key}_${index}`); index += 1) {
+    chunks.push(String(values[`${key}_${index}`] || ''));
+  }
+  return chunks.join('');
+}
+
+function parseCustomers(value) {
+  try {
+    const parsed = JSON.parse(String(value || '[]'));
+    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item === 'object') : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+async function fetchCustomerState() {
+  const encodedScope = encodeURIComponent(CUSTOMER_DB_SCOPE);
+  const response = await fetch(`/api/ui-state-get?scope=${encodedScope}`, {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw new Error('Databasekoppeling laden mislukt');
+  const data = await response.json().catch(() => ({}));
+  return parseCustomers(readChunkedStateValue(data?.values, CUSTOMER_DB_KEY));
+}
+
+function collectCustomerMessageKeys(customer) {
+  return [
+    customer?.replyMailboxId,
+    customer?.replyThreadId,
+    customer?.replyMessageId,
+    customer?.lastColdmailReplyMessageKey,
+    customer?.outreachMessageId,
+    customer?.coldmailSentMessageId,
+  ].map(normalizeMessageKey).filter(Boolean);
+}
+
+function mailMatchesOutreachCustomer(mail, customer) {
+  if (!isWebdesignOutreachCustomer(customer)) return false;
+  if (normalizeOutreachKey(mail?.folder) !== 'inbox' || !hasOutreachReplySignal(customer)) return false;
+  const mailKeys = [
+    mail.id,
+    mail.messageId,
+    mail.inReplyTo,
+    mail.references,
+  ].flatMap((value) => normalizeText(value).split(/\s+/)).map(normalizeMessageKey).filter(Boolean);
+  const customerKeys = collectCustomerMessageKeys(customer);
+  if (mailKeys.some((key) => customerKeys.includes(key))) return true;
+  return normalizeEmail(mail.email) && normalizeEmail(mail.email) === normalizeEmail(customer.email);
+}
+
+async function hydrateMailboxOutreachContexts() {
+  try {
+    outreachCustomers = (await fetchCustomerState()).filter(isWebdesignOutreachCustomer);
+  } catch (_) {
+    outreachCustomers = [];
+  }
+  mails = mails.map((mail) => {
+    const outreach = outreachCustomers.find((customer) => mailMatchesOutreachCustomer(mail, customer));
+    if (!outreach || isDefinitiveOutreachCustomer(outreach)) return { ...mail, outreach: null };
+    return {
+      ...mail,
+      outreach: {
+        customerId: normalizeText(outreach.id),
+        company: normalizeText(outreach.bedrijf || outreach.company || outreach.naam) || normalizeEmail(mail.email),
+        email: normalizeEmail(outreach.email || mail.email),
+        status: normalizeOutreachStatus(outreach.outreachStatus) || 'reactie_ontvangen',
+      },
+    };
+  });
+}
 
 function resetDetailEmpty() {
   document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
@@ -99,6 +251,9 @@ function normalizeMailboxApiMessage(message) {
     subject: message.subject || '(Geen onderwerp)',
     preview: message.preview || '',
     body: message.body || message.preview || '',
+    messageId: message.messageId || '',
+    inReplyTo: message.inReplyTo || '',
+    references: message.references || '',
     time: when.time,
     date: when.date,
     unread: Boolean(message.unread),
@@ -144,7 +299,9 @@ async function loadMailboxMessages() {
       throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
     }
     mails = Array.isArray(data.messages) ? data.messages.map(normalizeMailboxApiMessage) : [];
+    await hydrateMailboxOutreachContexts();
     renderList();
+    applyMailboxUrlIntentAfterLoad();
   } catch (error) {
     mails = [];
     if (wrap) {
@@ -154,13 +311,13 @@ async function loadMailboxMessages() {
   }
 }
 
-async function applyMailboxAccount(email) {
+async function applyMailboxAccount(email, options = {}) {
   activeMailboxAccount = email;
-  activeFolder = 'inbox';
+  activeFolder = normalizeText(options.folder || 'inbox').toLowerCase() || 'inbox';
   activeMail = null;
   const searchInput = document.getElementById('search-input');
-  if (searchInput) searchInput.value = '';
-  document.querySelectorAll('.folder-item').forEach((f, i) => f.classList.toggle('active', i === 0));
+  if (searchInput && !options.keepSearch) searchInput.value = '';
+  applyMailboxFolderUi(activeFolder);
   setMailboxAccountUi(email);
   resetDetailEmpty();
   await loadMailboxMessages();
@@ -169,11 +326,8 @@ async function applyMailboxAccount(email) {
 function setFolder(folder, el) {
   activeFolder = folder;
   activeMail = null;
-  const folderEl = el || Array.from(document.querySelectorAll('[data-mailbox-folder]')).find(item => item.getAttribute('data-mailbox-folder') === folder);
-  document.querySelectorAll('.folder-item').forEach(f => f.classList.toggle('active', f === folderEl));
-  const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
-  const folderLabelEl = document.getElementById('folder-label');
-  if (folderLabelEl) folderLabelEl.textContent = labels[folder] || folder;
+  void el;
+  applyMailboxFolderUi(folder);
   resetDetailEmpty();
   void loadMailboxMessages();
 }
@@ -190,7 +344,7 @@ function renderList() {
   const searchInput = document.getElementById('search-input');
   const q = ((searchInput && searchInput.value) || '').toLowerCase();
   let list = getMailsForFolder(activeFolder);
-  if (q) list = list.filter(m => m.from.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q) || m.preview.toLowerCase().includes(q));
+  if (q) list = list.filter(m => m.from.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q) || m.preview.toLowerCase().includes(q));
   const wrap = document.getElementById('mail-items');
   if (!wrap) return;
   if (!list.length) { wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Geen e-mails gevonden.</div>`; return; }
@@ -218,6 +372,17 @@ function openMail(id) {
   activeMail = m.id;
   m.unread = false;
   renderList();
+  const outreachQuickbar = m.outreach ? `
+      <div class="outreach-quickbar">
+        <div class="outreach-quickbar-title">
+          <span>Webdesign-reactie</span>
+          <strong>${escapeHtml(m.outreach.company)}</strong>
+        </div>
+        <div class="outreach-quickbar-actions">
+          <button class="outreach-quickbar-btn primary" type="button" data-mailbox-action="outreach-status" data-outreach-status="interesse" data-mailbox-id="${escapeHtml(m.id)}">Interesse</button>
+          <button class="outreach-quickbar-btn" type="button" data-mailbox-action="outreach-status" data-outreach-status="geen_interesse" data-mailbox-id="${escapeHtml(m.id)}">Geen interesse</button>
+        </div>
+      </div>` : '';
 
   document.getElementById('mail-detail').innerHTML = `
     <div class="detail-header">
@@ -251,6 +416,7 @@ function openMail(id) {
     </div>
     <div class="detail-body">
       <div class="detail-body-text">${escapeHtml(m.body)}</div>
+      ${outreachQuickbar}
     </div>`;
 }
 
@@ -327,6 +493,87 @@ async function sendMail() {
   }
 }
 
+async function updateOutreachStatusFromMailbox(id, status) {
+  const mail = findMailById(id);
+  if (!mail || !mail.outreach) return;
+  try {
+    const response = await fetch('/api/coldmailing/outreach/status', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        customerId: mail.outreach.customerId,
+        email: mail.outreach.email || mail.email,
+        mailboxId: mail.id,
+        messageId: mail.messageId,
+        status,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.message || 'Outreach-status bijwerken mislukt');
+    }
+    mail.outreach = null;
+    toast(status === 'interesse' ? '✓ Interesse opgeslagen' : '✓ Geen interesse opgeslagen');
+    openMail(id);
+    renderList();
+  } catch (error) {
+    toast(String(error?.message || error || 'Outreach-status bijwerken mislukt'));
+  }
+}
+
+function readMailboxUrlIntent() {
+  try {
+    const params = new URLSearchParams(window.location.search || '');
+    return {
+      account: normalizeEmail(params.get('account') || ''),
+      folder: normalizeText(params.get('folder') || 'inbox').toLowerCase(),
+      message: normalizeText(params.get('message') || params.get('mail') || params.get('thread') || ''),
+      email: normalizeEmail(params.get('email') || ''),
+      query: normalizeText(params.get('q') || params.get('zoek') || params.get('search') || ''),
+    };
+  } catch (_) {
+    return { account: '', folder: 'inbox', message: '', email: '', query: '' };
+  }
+}
+
+function applyMailboxFolderUi(folder) {
+  const folderEl = Array.from(document.querySelectorAll('[data-mailbox-folder]')).find(item => item.getAttribute('data-mailbox-folder') === folder);
+  document.querySelectorAll('.folder-item').forEach(f => f.classList.toggle('active', f === folderEl));
+  const folderLabelEl = document.getElementById('folder-label');
+  const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
+  if (folderLabelEl) folderLabelEl.textContent = labels[folder] || folder;
+}
+
+function applyMailboxUrlIntentAfterLoad() {
+  if (mailboxUrlIntentApplied) return;
+  const intent = readMailboxUrlIntent();
+  const searchInput = document.getElementById('search-input');
+  const searchValue = intent.email || intent.query;
+  if (searchInput && searchValue) searchInput.value = searchValue;
+  const messageKey = normalizeMessageKey(intent.message);
+  const match = mails.find((mail) => {
+    if (messageKey) {
+      const keys = [mail.id, mail.messageId, mail.inReplyTo, mail.references]
+        .flatMap((value) => normalizeText(value).split(/\s+/))
+        .map(normalizeMessageKey)
+        .filter(Boolean);
+      if (keys.includes(messageKey)) return true;
+    }
+    return intent.email && normalizeEmail(mail.email) === intent.email;
+  });
+  mailboxUrlIntentApplied = true;
+  renderList();
+  if (match) {
+    openMail(match.id);
+    return;
+  }
+  if (searchValue) {
+    toast('Geen exacte thread gevonden, ik zoek op e-mailadres');
+  }
+}
+
 function toast(msg) {
   const t = document.getElementById('toast');
   if (!t) return;
@@ -366,6 +613,9 @@ function handleMailboxAction(actionEl) {
     }
     case 'delete-mail':
       deleteMail(id);
+      break;
+    case 'outreach-status':
+      void updateOutreachStatusFromMailbox(id, actionEl.getAttribute('data-outreach-status'));
       break;
   }
 }
@@ -440,8 +690,16 @@ window.addEventListener('keydown', (event) => {
 });
 
 (async function initMailboxAccount() {
+  const intent = readMailboxUrlIntent();
+  if (intent.account) activeMailboxAccount = intent.account;
   await loadMailboxAccounts();
-  await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT);
+  if (intent.account && mailboxAccounts.some((account) => account.email === intent.account)) {
+    activeMailboxAccount = intent.account;
+  }
+  await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT, {
+    folder: intent.folder || 'inbox',
+    keepSearch: true,
+  });
 })();
 
 function finishPremiumShellBoot() {
