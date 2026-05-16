@@ -692,8 +692,7 @@ function renderOrdersEmptyState() {
 
     if (!visibleCards.length) {
         const emptyTextByFilter = {
-            completed: 'Geen voltooide opdrachten.',
-            open_leads: 'Geen openstaande leads.',
+            completed: 'Geen voltooide opdrachten.', open_leads: 'Geen openstaande leads.',
             in_progress: 'Geen openstaande opdrachten.'
         };
         if (!empty) {
@@ -709,8 +708,7 @@ function renderOrdersEmptyState() {
 }
 
 function getOrderFilterGroupForCard(card) {
-    const explicitGroup = String(card?.dataset?.orderFilterGroup || '').trim().toLowerCase();
-    if (explicitGroup) return explicitGroup;
+    const explicitGroup = String(card?.dataset?.orderFilterGroup || '').trim().toLowerCase(); if (explicitGroup) return explicitGroup;
     const id = Number(String(card?.id || '').replace('order-', ''));
     const order = orders[id];
     const ui = resolveOrderUiState(order);
@@ -745,12 +743,9 @@ function updateOrderFilterCounts(cards) {
         counts[group] = (counts[group] || 0) + 1;
     });
 
-    const completedEl = document.getElementById('filterCountCompleted');
-    if (completedEl) completedEl.textContent = String(counts.completed);
-    const leadsEl = document.getElementById('filterCountOpenLeads');
-    if (leadsEl) leadsEl.textContent = String(counts.open_leads);
-    const progressEl = document.getElementById('filterCountProgress');
-    if (progressEl) progressEl.textContent = String(counts.in_progress);
+    const completedEl = document.getElementById('filterCountCompleted'); if (completedEl) completedEl.textContent = String(counts.completed);
+    const leadsEl = document.getElementById('filterCountOpenLeads'); if (leadsEl) leadsEl.textContent = String(counts.open_leads);
+    const progressEl = document.getElementById('filterCountProgress'); if (progressEl) progressEl.textContent = String(counts.in_progress);
 }
 
 function applyOrderFilter() {

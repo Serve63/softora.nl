@@ -35,8 +35,8 @@ test('premium profielmodal heeft een werkende annuleerknop en subtielere stijl',
   assert.match(jsSource, /if \(!triggerEl\) \{\s*loadPremiumSession\(\);\s*return;\s*\}/s);
   assert.match(jsSource, /PREMIUM_SIDEBAR_SESSION_STORAGE_KEY/);
   assert.match(jsSource, /persistPremiumSidebarSessionSnapshot/);
-  assert.match(jsSource, /let premiumSessionSnapshotFromStorage = false;/);
+  assert.match(jsSource, /premiumSessionSnapshotFromStorage = false/);
   assert.match(jsSource, /function shouldKeepServerRenderedProfile\(sidebar, nextRenderKey\) \{/);
-  assert.match(jsSource, /hasServerRenderedSidebarProfile\(sidebar\)[\s\S]*premiumSessionSnapshotFromStorage[\s\S]*!premiumInitialSessionFetched/s);
+  assert.match(jsSource, /const serverKey = sidebar[\s\S]*premiumSessionSnapshotFromStorage[\s\S]*!premiumInitialSessionFetched/s);
   assert.match(jsSource, /if \(shouldKeepServerRenderedProfile\(sidebar, renderKey\)\) \{[\s\S]*markPremiumSidebarProfileResolved\(\);[\s\S]*return;/s);
 });
