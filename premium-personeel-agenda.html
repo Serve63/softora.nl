@@ -1334,7 +1334,7 @@
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Wat wil je inplannen?</div>
                         <div class="manual-appointment-choice-grid" role="group" aria-label="Wat wil je inplannen?">
-                            <button class="manual-appointment-choice" type="button" data-manual-kind="business">
+                            <button class="manual-appointment-choice is-active" type="button" data-manual-kind="business">
                                 <span class="manual-appointment-choice-title">Zakelijk</span>
                                 <span class="manual-appointment-choice-sub">Plan een zakelijke afspraak of meeting in.</span>
                             </button>
@@ -1349,7 +1349,7 @@
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Wat voor zakelijke afspraak?</div>
                         <div class="manual-appointment-choice-grid" role="group" aria-label="Wat voor zakelijke afspraak?">
-                            <button class="manual-appointment-choice" type="button" data-manual-business-type="meeting">
+                            <button class="manual-appointment-choice is-active" type="button" data-manual-business-type="meeting">
                                 <span class="manual-appointment-choice-title">Meeting</span>
                                 <span class="manual-appointment-choice-sub">Plan een website-, software-, voice- of chatbotmeeting in.</span>
                             </button>
@@ -1608,8 +1608,8 @@
     let manualAppointmentSelectedDate = '';
     let manualAppointmentSaving = false;
     let manualAppointmentStep = 'kind';
-    let manualAppointmentKind = '';
-    let manualAppointmentBusinessType = '';
+    let manualAppointmentKind = 'business';
+    let manualAppointmentBusinessType = 'meeting';
     let manualAppointmentMeetingType = '';
     let manualAppointmentWho = '';
     const modalAudioBlock = document.getElementById('modalAudioBlock');
