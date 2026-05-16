@@ -26,6 +26,7 @@
     let premiumSessionSnapshot = null;
     let premiumSessionPromise = null;
     let premiumInitialSessionFetched = false;
+    let premiumSessionSnapshotFromStorage = false;
     let premiumProfileModalRef = null;
     let premiumSidebarProfileResolved = !isPremiumPersonnelContext;
     let sidebarLeadsRefreshRequestId = 0;
@@ -39,6 +40,7 @@
                 const parsed = JSON.parse(raw);
                 if (parsed && typeof parsed === "object" && parsed.authenticated) {
                     premiumSessionSnapshot = parsed;
+                    premiumSessionSnapshotFromStorage = true;
                 }
             }
         }
@@ -1433,6 +1435,24 @@
         return [displayName, role, avatarDataUrl].join("\u0001");
     }
 
+    function hasServerRenderedSidebarProfile(sidebar) {
+        return Boolean(
+            sidebar &&
+            sidebar.dataset &&
+            sidebar.dataset.staticSidebar === "1" &&
+            String(sidebar.dataset.sidebarProfileRenderKey || "").trim()
+        );
+    }
+
+    function shouldKeepServerRenderedProfile(sidebar, nextRenderKey) {
+        return Boolean(
+            hasServerRenderedSidebarProfile(sidebar) &&
+            premiumSessionSnapshotFromStorage &&
+            !premiumInitialSessionFetched &&
+            String(sidebar.dataset.sidebarProfileRenderKey || "") !== String(nextRenderKey || "")
+        );
+    }
+
     function paintSidebarAvatar(avatarEl, session) {
         if (!avatarEl) return;
         const avatarDataUrl = String((session && session.avatarDataUrl) || "").trim();
@@ -1484,8 +1504,12 @@
                 role: "admin",
                 avatarDataUrl: "",
                 email: "",
-            };
+        };
         const renderKey = buildSidebarProfileRenderKey(resolvedSession);
+        if (shouldKeepServerRenderedProfile(sidebar, renderKey)) {
+            markPremiumSidebarProfileResolved();
+            return;
+        }
         if (sidebar && sidebar.dataset.sidebarProfileRenderKey === renderKey) {
             markPremiumSidebarProfileResolved();
             return;
@@ -1546,6 +1570,7 @@
                 const nextSnapshot = profileSessionHelper && typeof profileSessionHelper.enrichSession === "function" ? await profileSessionHelper.enrichSession(payload, fetchJsonNoStore) : payload;
                 premiumInitialSessionFetched = true;
                 premiumSessionSnapshot = nextSnapshot && nextSnapshot.authenticated ? nextSnapshot : null;
+                premiumSessionSnapshotFromStorage = false;
                 persistPremiumSidebarSessionSnapshot(premiumSessionSnapshot);
                 applyPremiumSidebarProfile(premiumSessionSnapshot);
                 return premiumSessionSnapshot;
@@ -1792,6 +1817,7 @@
                     }),
                 });
                 premiumSessionSnapshot = payload && payload.session ? payload.session : premiumSessionSnapshot;
+                premiumSessionSnapshotFromStorage = false;
                 persistPremiumSidebarSessionSnapshot(premiumSessionSnapshot);
                 applyPremiumSidebarProfile(premiumSessionSnapshot);
                 closePremiumProfileModal();
@@ -1836,7 +1862,12 @@
         document.documentElement.dataset.premiumSidebarProfileInit = "1";
         const triggerEl = document.querySelector("[data-sidebar-profile-trigger]") || document.querySelector(".sidebar-user .sidebar-user-trigger");
         if (!document.querySelector("[data-sidebar-user-name]")) {
+            loadPremiumSession();
             markPremiumSidebarProfileResolved();
+            return;
+        }
+        if (!triggerEl) {
+            loadPremiumSession();
             return;
         }
         if (triggerEl && String(triggerEl.tagName || "").toLowerCase() === "button") {
