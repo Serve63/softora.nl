@@ -25,6 +25,16 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(source, /data-settings-avatar-file/);
   assert.match(source, /data-settings-avatar-preview/);
   assert.match(source, /data-settings-action="cancel-admin-pin"/);
+  assert.match(source, /id="admin-action-pin-input" name="softora_action_code" autocomplete="one-time-code"/);
+  assert.match(source, /data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"/);
+  assert.match(source, /class="settings-overview-grid"/);
+  assert.match(source, /href="\/premium-vaste-lasten\?view=klantdekking"/);
+  assert.match(source, /Worden alle kosten betaald\?/);
+  assert.match(source, /Klantkosten-check/);
+  assert.doesNotMatch(source, /id="edit-status"/);
+  assert.doesNotMatch(source, /<label>Status<\/label><select id="edit-status"/);
+  assert.match(source, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(260px,\s*1fr\)\)/);
+  assert.match(source, /calc\(4 \* 320px \+ 3 \* 24px\)/);
   assert.match(source, /\.tegel \{[\s\S]*font:\s*inherit;[\s\S]*text-align:\s*left;/);
 
   assert.match(source, /function bindSettingsStaticActions\(\)/);

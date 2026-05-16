@@ -382,14 +382,17 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].html, /Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop👇/);
+  assert.match(sentMessages[0].html, /<table role="presentation" width="100%"/);
+  assert.match(sentMessages[0].html, /<td style="[^"]*overflow:visible;"/);
   assert.match(
     sentMessages[0].html,
-    /<p style="margin:24px 0 0 0;"><img src="cid:webdesign-prospect-1@softora"/
+    /margin:24px 0 0 0;"><tr><td style="[^"]*"><img src="cid:webdesign-prospect-1@softora"/
   );
-  assert.match(sentMessages[0].html, /width:100%;max-width:760px;height:auto;border:0;border-radius:12px/);
+  assert.match(sentMessages[0].html, /width="640" style="display:block;width:100%;max-width:640px;height:auto;max-height:none;/);
+  assert.match(sentMessages[0].html, /object-fit:contain;/);
   assert.match(
     sentMessages[0].html,
-    /<p style="margin:0;"><img src="cid:webdesign-mockup-prospect-1@softora"/
+    /margin:0;"><tr><td style="[^"]*"><img src="cid:webdesign-mockup-prospect-1@softora"/
   );
   assert.ok(
     sentMessages[0].html.indexOf('<img src="cid:webdesign-prospect-1@softora"') <

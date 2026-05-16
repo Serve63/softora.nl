@@ -1828,17 +1828,21 @@ function createColdmailCampaignService(deps = {}) {
             : escapeHtml(optOutText)
         }</p>`
       : '';
-    const emailImageStyle =
-      `display:block;width:100%;max-width:${COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH}px;height:auto;border:0;border-radius:12px;`;
-    const previewHtml = `<img src="cid:${escapeHtml(attachment.cid)}" alt="${escapeHtml(
-      attachment.alt || 'Webdesign'
-    )}" style="${emailImageStyle}" />`;
+    const emailImageMaxWidth = Math.min(COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH, 640);
+    const renderEmailImageTable = (cid, alt, margin) =>
+      `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td style="padding:0;margin:0;width:100%;font-size:0;line-height:0;overflow:visible;"><img src="cid:${escapeHtml(
+        cid
+      )}" alt="${escapeHtml(
+        alt
+      )}" width="${emailImageMaxWidth}" style="display:block;width:100%;max-width:${emailImageMaxWidth}px;height:auto;max-height:none;border:0;outline:none;text-decoration:none;border-radius:12px;object-fit:contain;" /></td></tr></table>`;
+    const previewBlockHtml = renderEmailImageTable(attachment.cid, attachment.alt || 'Webdesign', '24px 0 0 0');
     const mockupHtml = attachment.mockup && attachment.mockup.cid
-      ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(mockupCaption)}</p>\n<p style="margin:0;"><img src="cid:${escapeHtml(attachment.mockup.cid)}" alt="${escapeHtml(
-          attachment.mockup.alt || 'Device mockup'
-        )}" style="${emailImageStyle}" /></p>`
+      ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(mockupCaption)}</p>${renderEmailImageTable(
+          attachment.mockup.cid,
+          attachment.mockup.alt || 'Device mockup',
+          '0'
+        )}`
       : '';
-    const previewBlockHtml = `\n<p style="margin:24px 0 0 0;">${previewHtml}</p>`;
     const imageBlockHtml = `${previewBlockHtml}${mockupHtml}`;
     return `${html}${imageBlockHtml}${optOutHtml}`;
   }

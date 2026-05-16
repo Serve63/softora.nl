@@ -21,6 +21,13 @@ test('premium admin action pin accepts exact match on actionConfirmPin', () => {
   );
 });
 
+test('premium admin action pin accepts exact match on actionConfirmCode', () => {
+  assert.equal(
+    validatePremiumAdminActionPin({ actionConfirmCode: 'geheim' }, { expectedPin: 'geheim' }).ok,
+    true
+  );
+});
+
 test('premium user routes expose server-side admin pin verification without leaking the pin', () => {
   const routes = [];
   const app = {
@@ -69,7 +76,7 @@ test('premium user routes expose server-side admin pin verification without leak
         return this;
       },
     };
-    handler({ body: { actionConfirmPin: 'wrong' } }, badRes);
+    handler({ body: { actionConfirmCode: 'wrong' } }, badRes);
     assert.equal(badRes.statusCode, 403);
     assert.equal(badRes.body.ok, false);
 
@@ -85,7 +92,7 @@ test('premium user routes expose server-side admin pin verification without leak
         return this;
       },
     };
-    handler({ body: { actionConfirmPin: 'geheim' } }, okRes);
+    handler({ body: { actionConfirmCode: 'geheim' } }, okRes);
     assert.equal(okRes.statusCode, 200);
     assert.deepEqual(okRes.body, { ok: true });
   } finally {
