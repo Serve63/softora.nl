@@ -196,6 +196,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function renderCampaignRecipientList\(payload\)/);
   assert.match(pageSource, /\/api\/coldmailing\/campaigns\/recipients\?/);
   assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) params\.set\('mode', 'call'\);/);
+  assert.match(pageSource, /params\.set\('specialAction', specialActionSelect\.value\);/);
   assert.match(pageSource, /recipient\.bedrijf \|\| 'Onbekend bedrijf'/);
   assert.match(pageSource, /const showPhone = isPremiumAiLeadGeneratorPath\(\);/);
   assert.match(pageSource, /function normalizeCampaignRecipientPhone\(value\)/);
@@ -213,7 +214,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /params\.set\('radiusKm', String\(getSelectedCampaignRadiusKm\(\)\)\);/);
   assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
   assert.match(pageSource, /Number\.isFinite\(Number\(countOverride\)\)/);
-  assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{[\s\S]*fetch\(getColdmailRecipientPreviewUrl\(\), \{ cache: 'no-store' \}\)[\s\S]*renderCampaignCompanyCount\(Number\(data && data\.selected\) \|\| recipients\.length\);/);
+  assert.match(pageSource, /fetch\(getColdmailRecipientPreviewUrl\(\), \{ cache: 'no-store' \}\)[\s\S]*renderCampaignCompanyCount\(Number\(data && data\.selected\) \|\| recipients\.length\);/);
+  assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{[\s\S]*renderCampaignCompanyCount\(0\);[\s\S]*return;/);
   assert.match(pageSource, /Math\.min\(requestedCount \|\| eligibleRows\.length, eligibleRows\.length\)/);
   assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\),/);
   assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) \{\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);

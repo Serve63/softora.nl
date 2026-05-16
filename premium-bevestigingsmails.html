@@ -1665,8 +1665,9 @@ function getColdmailRecipientPreviewUrl() {
   params.set('count', String(getCampaignRequestedCompanyCount() || 10));
   if (isPremiumAiLeadGeneratorPath()) params.set('mode', 'call');
   params.set('radiusKm', String(getSelectedCampaignRadiusKm()));
-  const branchSelect = document.getElementById('branche');
+  const branchSelect = document.getElementById('branche'), specialActionSelect = document.getElementById('campaignSpecialAction');
   if (branchSelect && branchSelect.value) params.set('branch', branchSelect.value);
+  if (specialActionSelect && specialActionSelect.value) params.set('specialAction', specialActionSelect.value);
   return '/api/coldmailing/campaigns/recipients?' + params.toString();
 }
 
@@ -1769,19 +1770,15 @@ function toggleCampaignRecipientsList(event) {
 }
 
 async function hydrateCampaignCompanyCountFromSupabase() {
-  if (isPremiumAiLeadGeneratorPath()) {
-    try {
-      const response = await fetch(getColdmailRecipientPreviewUrl(), { cache: 'no-store' });
-      if (!response.ok) throw new Error('Kon coldcalling ontvangers niet laden.');
-      const data = await response.json();
-      const recipients = Array.isArray(data && data.recipients) ? data.recipients : [];
-      renderCampaignCompanyCount(Number(data && data.selected) || recipients.length);
-    } catch (_) {
-      renderCampaignCompanyCount(0);
-    }
+  try {
+    const response = await fetch(getColdmailRecipientPreviewUrl(), { cache: 'no-store' });
+    if (!response.ok) throw new Error('Kon ontvangers niet laden.');
+    const data = await response.json();
+    const recipients = Array.isArray(data && data.recipients) ? data.recipients : [];
+    renderCampaignCompanyCount(Number(data && data.selected) || recipients.length);
     hydrateCampaignRecipientListSoon();
     return;
-  }
+  } catch (_) { if (isPremiumAiLeadGeneratorPath()) { renderCampaignCompanyCount(0); hydrateCampaignRecipientListSoon(); return; } }
   try {
     const data = await fetchColdmailingUiState(CUSTOMER_DB_SCOPE);
     const values = data && data.values && typeof data.values === 'object' ? data.values : {};

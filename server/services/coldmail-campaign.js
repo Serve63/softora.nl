@@ -1112,16 +1112,30 @@ function createColdmailCampaignService(deps = {}) {
     const state = await getUiStateValues(mode === 'call' ? leadDbScope : customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = mode === 'call' ? parseLeadDatabaseRows(values) : parseDatabaseRows(values);
-    const candidateRows = rows
+    const requiresWebdesignPhoto = mode !== 'call' && isWebdesignSpecialAction(input.specialAction);
+    const customerPhotoMap = requiresWebdesignPhoto ? await loadCustomerPhotoMap(rows) : {};
+    const failed = [];
+    const eligibleRows = rows
       .map((row, index) => ({ row, index, id: getRowId(row, index) }))
       .filter(({ row }) =>
         mode === 'call'
           ? isEligibleColdcallingRow(row, input.branch, input.radiusKm, blockedPhoneKeys)
           : isEligibleColdmailRow(row, input.branch, input.radiusKm)
-      )
-      .slice(0, count);
+      );
+    const candidateRows = (requiresWebdesignPhoto
+      ? eligibleRows.filter((item) => {
+          if (resolveRowWebdesignPhoto(item.row, customerPhotoMap)) return true;
+          failed.push({
+            id: item.id,
+            bedrijf: getRowCompany(item.row),
+            email: getRowEmail(item.row),
+            error: `Geen webdesign-foto gevonden voor ${getRowCompany(item.row) || getRowEmail(item.row)}.`,
+          });
+          return false;
+        })
+      : eligibleRows
+    ).slice(0, count);
     const selectedRows = [];
-    const failed = [];
 
     for (const item of candidateRows) {
       if (mode === 'call') {
@@ -1159,6 +1173,7 @@ function createColdmailCampaignService(deps = {}) {
       candidateRows,
       selectedRows,
       failed,
+      customerPhotoMap,
     };
   }
 
@@ -2002,9 +2017,13 @@ function createColdmailCampaignService(deps = {}) {
     const rows = resolvedRecipients.rows;
     const candidateRows = resolvedRecipients.candidateRows;
 
+    const shouldIncludeWebdesignPhoto = isWebdesignSpecialAction(input.specialAction);
+
     if (!candidateRows.length) {
-      const error = new Error('Geen geschikte e-mailadressen gevonden in de database.');
-      error.code = 'NO_RECIPIENTS';
+      const firstFailure = resolvedRecipients.failed[0] && resolvedRecipients.failed[0].error ? resolvedRecipients.failed[0].error : '';
+      const error = new Error(firstFailure || 'Geen geschikte e-mailadressen gevonden in de database.');
+      error.code = shouldIncludeWebdesignPhoto && firstFailure ? 'NO_WEBDESIGN_PHOTOS' : 'NO_RECIPIENTS';
+      error.failedItems = resolvedRecipients.failed;
       throw error;
     }
 
@@ -2031,8 +2050,7 @@ function createColdmailCampaignService(deps = {}) {
       });
       selectedRows = selectedRows.slice(0, quotaRemaining);
     }
-    const shouldIncludeWebdesignPhoto = isWebdesignSpecialAction(input.specialAction);
-    const customerPhotoMap = shouldIncludeWebdesignPhoto ? await loadCustomerPhotoMap(candidateRows) : {};
+    const customerPhotoMap = shouldIncludeWebdesignPhoto ? resolvedRecipients.customerPhotoMap || await loadCustomerPhotoMap(candidateRows) : {};
 
     if (!selectedRows.length) {
       const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
