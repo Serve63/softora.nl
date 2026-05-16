@@ -1068,6 +1068,13 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "reactie_ontvangen"/);
   assert.match(pageSource, /Reactie ontvangen/);
+  assert.match(pageSource, /\.sf-btn\.act \{[\s\S]*border-color: rgba\(139, 34, 82, 0\.4\);[\s\S]*background: rgba\(139, 34, 82, 0\.12\);/);
+  assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="klant"\]\.act/);
+  assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="benaderd"\]\.act/);
+  assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="afgehaakt"\]\.act/);
+  assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="buiten"\]\.act/);
+  assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="benaderbaar"\]\.act/);
+  assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="geengehoor"\]\.act/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"klant_geworden\\"/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"afgehaakt\\"/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
