@@ -214,7 +214,8 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(pageSource, /formatPhoneNumber\(raw && \(raw\.tel \|\| raw\.telefoon \|\| raw\.contactPhone\)\)/);
   assert.match(pageSource, /class=\\"company-edit\\"/);
   assert.match(pageSource, /data-edit-id=\\"/);
-  assert.match(pageSource, /<th>Foto<\/th>/);
+  assert.match(pageSource, /<th>Foto <span id="photoHeaderCount">\(0\)<\/span><\/th>/);
+  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoDataUrl\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
   assert.match(pageSource, /colspan=\\"9\\"/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
