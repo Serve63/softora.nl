@@ -2852,10 +2852,13 @@ function createColdmailCampaignService(deps = {}) {
     const candidateRows = resolvedRecipients.candidateRows;
     const failed = resolvedRecipients.failed;
 
+    const shouldIncludeWebdesignPhoto = shouldUseWebdesignAssets(input, 'mail');
+
     if (!candidateRows.length) {
-      const error = new Error('Geen geschikte e-mailadressen gevonden in de database.');
-      error.code = 'NO_RECIPIENTS';
-      error.failedItems = failed;
+      const firstFailure = resolvedRecipients.failed[0] && resolvedRecipients.failed[0].error ? resolvedRecipients.failed[0].error : '';
+      const error = new Error(firstFailure || 'Geen geschikte e-mailadressen gevonden in de database.');
+      error.code = shouldIncludeWebdesignPhoto && firstFailure ? 'NO_WEBDESIGN_PHOTOS' : 'NO_RECIPIENTS';
+      error.failedItems = resolvedRecipients.failed;
       throw error;
     }
 
@@ -2881,7 +2884,6 @@ function createColdmailCampaignService(deps = {}) {
       });
       selectedRows = selectedRows.slice(0, quotaRemaining);
     }
-    const shouldIncludeWebdesignPhoto = shouldUseWebdesignAssets(input, 'mail');
     const customerPhotoMap = shouldIncludeWebdesignPhoto
       ? (resolvedRecipients.customerPhotoMap || await loadCustomerPhotoMap(candidateRows))
       : {};

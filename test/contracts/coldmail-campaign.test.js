@@ -638,8 +638,8 @@ test('coldmail campaign refuses webdesign action when no ready website-design is
         specialAction: 'webdesign',
       }),
     (error) => {
-      assert.equal(error.code, 'NO_RECIPIENTS');
-      assert.match(error.message, /Geen geschikte e-mailadressen gevonden/i);
+      assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
+      assert.match(error.message, /Nog geen website-design klaar voor Bakkerij Zonder Foto/);
       assert.equal(error.failedItems[0].email, 'ruben@example.test');
       assert.match(error.failedItems[0].error, /Nog geen website-design klaar/i);
       return true;
@@ -648,6 +648,47 @@ test('coldmail campaign refuses webdesign action when no ready website-design is
 
   assert.equal(sentMessages.length, 0);
   assert.equal(getSavedState(), null);
+});
+
+test('coldmail campaign preview only lists webdesign recipients with a generated photo', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'without-photo',
+        bedrijf: 'Zonder Design',
+        email: 'zonder@example.test',
+        status: 'benaderbaar',
+        mail: true,
+      },
+      {
+        id: 'with-photo',
+        bedrijf: 'Met Design',
+        email: 'met@example.test',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'with-photo': {
+        id: 'with-photo',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Met Design webdesign',
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.selected, 1);
+  assert.deepEqual(
+    result.recipients.map((recipient) => recipient.id),
+    ['with-photo']
+  );
+  assert.equal(result.failedItems[0].id, 'without-photo');
+  assert.match(result.failedItems[0].error, /Geen webdesign-foto gevonden voor Zonder Design/);
 });
 
 test('coldmail campaign uses chunked webdesign photo when websitePhoto is stale', async () => {
