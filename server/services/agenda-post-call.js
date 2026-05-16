@@ -353,6 +353,16 @@ function createAgendaPostCallCoordinator(deps = {}) {
     return key === 'lead_follow_up' || key === 'follow_up' || key === 'vervolg';
   }
 
+  function isAppointmentLeadFollowUpTask(appointment) {
+    if (!appointment || typeof appointment !== 'object') return false;
+    return [
+      appointment.postCallStatus,
+      appointment.confirmationTaskType,
+      appointment.taskType,
+      appointment.type,
+    ].some(isLeadFollowUpStatus);
+  }
+
   async function syncPremiumCustomerDatabaseStatusFromAppointment(appointment, lifecycleStatus, actor) {
     const status = normalizeLifecycleDatabaseStatus(lifecycleStatus);
     if (!status || !appointment || typeof appointment !== 'object') {
@@ -527,6 +537,9 @@ function createAgendaPostCallCoordinator(deps = {}) {
     const domainName = sanitizeLaunchDomainName(
       req.body?.domainName || req.body?.domain || appointment?.postCallDomainName || appointment?.domainName || ''
     );
+    const requestedTitle = truncateText(normalizeString(req.body?.title || ''), 200);
+    const requestedDescription = truncateText(normalizeString(req.body?.description || ''), 3000);
+    const requestedAmount = Math.round(Number(req.body?.amount));
     const referenceImages = sanitizeReferenceImages(
       req.body?.referenceImages || req.body?.attachments || appointment?.referenceImages || []
     );
@@ -559,7 +572,7 @@ function createAgendaPostCallCoordinator(deps = {}) {
           160
         ),
         location: truncateText(
-          normalizeString(existingOrder?.location || appointment?.contact || ''),
+          normalizeString(req.body?.location || existingOrder?.location || appointment?.contact || ''),
           160
         ),
         companyName: truncateText(
@@ -567,7 +580,7 @@ function createAgendaPostCallCoordinator(deps = {}) {
           160
         ),
         contactName: truncateText(
-          normalizeString(existingOrder?.contactName || appointment?.contact || existingOrder?.location || ''),
+          normalizeString(req.body?.location || existingOrder?.contactName || appointment?.contact || existingOrder?.location || ''),
           160
         ),
         contactPhone: truncateText(
@@ -584,6 +597,18 @@ function createAgendaPostCallCoordinator(deps = {}) {
           normalizeString(existingOrder?.contactEmail || appointment?.contactEmail || appointment?.email || ''),
           160
         ),
+        title:
+          requestedTitle ||
+          truncateText(normalizeString(existingOrder?.title || `Website opdracht voor ${appointment?.company || 'lead'}`), 200),
+        description:
+          requestedDescription ||
+          truncateText(normalizeString(existingOrder?.description || ''), 3000) ||
+          truncateText(normalizeString(appointment?.summary || transcriptText || promptText || ''), 3000) ||
+          'Nieuwe website-opdracht op basis van intakegesprek.',
+        amount:
+          Number.isFinite(requestedAmount) && requestedAmount > 0
+            ? requestedAmount
+            : Math.round(Number(existingOrder?.amount || 0)) || parseAmountFromEuroLabel(appointment?.value || '') || 2500,
         prompt: promptText,
         transcript: transcriptText || sanitizePostCallText(existingOrder?.transcript || '', 25000),
         domainName:
@@ -636,11 +661,14 @@ function createAgendaPostCallCoordinator(deps = {}) {
     }
 
     const nowIso = new Date().toISOString();
+    const wasLeadFollowUp = isAppointmentLeadFollowUpTask(appointment);
     const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
       idx,
       {
         ...appointment,
-        postCallStatus: normalizePostCallStatus(req.body?.status || appointment?.postCallStatus),
+        postCallStatus: wasLeadFollowUp
+          ? 'actieve_opdracht'
+          : normalizePostCallStatus(req.body?.status || appointment?.postCallStatus),
         postCallNotesTranscript: transcriptText,
         postCallPrompt: promptText,
         postCallDomainName:
@@ -656,6 +684,18 @@ function createAgendaPostCallCoordinator(deps = {}) {
         activeOrderAddedAt: nowIso,
         activeOrderAddedBy: actor || null,
         activeOrderReferenceImageCount: referenceImages.length,
+        activeOrderStatus: 'actieve_opdracht',
+        needsConfirmationEmail: wasLeadFollowUp ? false : appointment?.needsConfirmationEmail,
+        confirmationTaskType: wasLeadFollowUp ? 'actieve_opdracht' : appointment?.confirmationTaskType,
+        taskType: wasLeadFollowUp ? 'actieve_opdracht' : appointment?.taskType,
+        type: wasLeadFollowUp ? 'actieve_opdracht' : appointment?.type,
+        confirmationResponseReceived: wasLeadFollowUp ? true : appointment?.confirmationResponseReceived,
+        confirmationResponseReceivedAt: wasLeadFollowUp
+          ? nowIso
+          : appointment?.confirmationResponseReceivedAt || null,
+        confirmationResponseReceivedBy: wasLeadFollowUp
+          ? actor || null
+          : appointment?.confirmationResponseReceivedBy || null,
       },
       'agenda_add_active_order'
     );

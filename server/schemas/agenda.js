@@ -253,10 +253,14 @@ function validateConfirmationTaskSetInAgendaRequest(req) {
 function validateTaskActorRequest(req) {
   const taskResult = validateTaskQueryRequest(req, 'taskId');
   if (!taskResult.ok) return taskResult;
+  const body = req.body || {};
+  const status = truncateText(body.status || body.postCallStatus || '', 80);
   return {
     ...taskResult,
     body: {
-      ...normalizeActorFields(req.body || {}),
+      ...normalizeActorFields(body),
+      status,
+      postCallStatus: status,
     },
   };
 }
