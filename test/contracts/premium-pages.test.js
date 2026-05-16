@@ -161,7 +161,7 @@ test('protected premium pages clear expired sessions and redirect to login', asy
   assert.equal(result.handled, true);
   assert.equal(cleared.length, 1);
   assert.equal(res.redirectCode, 302);
-  assert.equal(res.redirectLocation, '/premium-personeel-login?next=%2Fpremium-personeel-agenda');
+  assert.equal(res.redirectLocation, '/premium-personeel-login?next=%2Fpremium-personeel-agenda&expired=1');
 });
 
 test('protected premium pages block disallowed admin ips and emit an audit event', async () => {
