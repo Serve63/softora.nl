@@ -8,16 +8,19 @@ function readActiveOrdersSources() {
   const scriptPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
   const assignmentToggleStylePath = path.join(__dirname, '../../assets/premium-active-order-assignment-toggle.css');
   const assignmentToggleScriptPath = path.join(__dirname, '../../assets/premium-active-order-assignment-toggle.js');
+  const openLeadsScriptPath = path.join(__dirname, '../../assets/premium-active-order-open-leads.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
   const assignmentToggleStyleSource = fs.readFileSync(assignmentToggleStylePath, 'utf8');
   const assignmentToggleScriptSource = fs.readFileSync(assignmentToggleScriptPath, 'utf8');
+  const openLeadsScriptSource = fs.readFileSync(openLeadsScriptPath, 'utf8');
   return {
     pageSource,
     scriptSource,
+    openLeadsScriptSource,
     assignmentToggleStyleSource,
     assignmentToggleScriptSource,
-    combinedSource: `${pageSource}\n${scriptSource}\n${assignmentToggleStyleSource}\n${assignmentToggleScriptSource}`,
+    combinedSource: `${pageSource}\n${scriptSource}\n${openLeadsScriptSource}\n${assignmentToggleStyleSource}\n${assignmentToggleScriptSource}`,
   };
 }
 
@@ -25,6 +28,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
   assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260511a"><\/script>/);
+  assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260516a/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -61,6 +65,13 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /function loadCustomOrderCards\(\) \{/);
   assert.match(scriptSource, /function setCreateOrderMessage\(message, type\) \{/);
   assert.match(scriptSource, /function normalizeAgendaLeadOption\(item\) \{/);
+  assert.match(source, /function normalizeOpenLeadOption\(item\) \{/);
+  assert.match(source, /function isOpenLeadFollowUpTask\(item\) \{/);
+  assert.match(source, /function renderOpenLeadCards\(\) \{/);
+  assert.match(source, /\/api\/agenda\/confirmation-tasks\?limit=250&quick=1&fresh=1/);
+  assert.match(source, /data-order-filter="open_leads"/);
+  assert.match(source, /id="filterCountOpenLeads"/);
+  assert.match(source, /let activeOrderFilter = 'open_leads';/);
   assert.match(scriptSource, /function syncOrderClaimsFromAgendaOwners\(\) \{/);
   assert.match(scriptSource, /function renderCreateOrderAgendaLeadOptions\(selectedId\) \{/);
   assert.match(scriptSource, /function handleCreateOrderSubmit\(event\) \{/);

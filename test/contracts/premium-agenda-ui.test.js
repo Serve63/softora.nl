@@ -27,6 +27,24 @@ test('premium agenda modal uses dossier flow for appointments that already have 
   );
 });
 
+test('premium agenda modal uses top icons for edit/delete and supports vervolg as open lead', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const followUpPath = path.join(__dirname, '../../assets/premium-agenda-follow-up.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const followUpSource = fs.readFileSync(followUpPath, 'utf8');
+
+  assert.match(pageSource, /id="modalEditBtn"[^>]*aria-label="Gegevens wijzigen"/);
+  assert.match(pageSource, /id="modalDeleteBtn"[^>]*aria-label="Afspraak verwijderen"/);
+  assert.match(pageSource, /id="modalFollowUpBtn"[^>]*>Vervolg<\/button>/);
+  assert.match(pageSource, /assets\/premium-agenda-follow-up\.js\?v=20260516a/);
+  assert.doesNotMatch(pageSource, />\s*Gegevens wijzigen\s*<\/button>/i);
+  assert.doesNotMatch(pageSource, /id="modalDeleteBtn"[^>]*>Verwijderen<\/button>/i);
+  assert.match(followUpSource, /function saveFollowUpLeadForActiveAppointment\(\)/);
+  assert.match(followUpSource, /status: 'lead_follow_up'/);
+  assert.match(followUpSource, /Vervolg staat bij openstaande leads\./);
+  assert.match(followUpSource, /event\.stopImmediatePropagation\(\);/);
+});
+
 test('premium agenda workspace locks modal exit while dossier flow is still mandatory', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');

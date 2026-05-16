@@ -348,6 +348,11 @@ function createAgendaPostCallCoordinator(deps = {}) {
     parseCustomOrdersFromUiState,
   } = resolvedHelpers;
 
+  function isLeadFollowUpStatus(value) {
+    const key = normalizeString(value || '').toLowerCase().replace(/[\s-]+/g, '_');
+    return key === 'lead_follow_up' || key === 'follow_up' || key === 'vervolg';
+  }
+
   async function syncPremiumCustomerDatabaseStatusFromAppointment(appointment, lifecycleStatus, actor) {
     const status = normalizeLifecycleDatabaseStatus(lifecycleStatus);
     if (!status || !appointment || typeof appointment !== 'object') {
@@ -415,26 +420,46 @@ function createAgendaPostCallCoordinator(deps = {}) {
     const appointment = getGeneratedAgendaAppointments()[idx];
     const payload = buildPostCallPayload(req.body || {});
     const nowIso = new Date().toISOString();
+    const shouldCreateOpenLead = isLeadFollowUpStatus(req.body?.status || req.body?.postCallStatus || payload.postCallStatus);
+    const nextAppointmentFields = {
+      ...appointment,
+      postCallStatus: shouldCreateOpenLead
+        ? 'lead_follow_up'
+        : payload.postCallStatus || normalizePostCallStatus(appointment?.postCallStatus),
+      postCallNotesTranscript:
+        payload.postCallNotesTranscript ||
+        sanitizePostCallText(appointment?.postCallNotesTranscript || '', 25000),
+      postCallPrompt:
+        payload.postCallPrompt || sanitizePostCallText(appointment?.postCallPrompt || '', 25000),
+      postCallDomainName:
+        payload.postCallDomainName ||
+        sanitizeLaunchDomainName(appointment?.postCallDomainName || appointment?.domainName || ''),
+      referenceImages:
+        Array.isArray(payload.referenceImages) && payload.referenceImages.length
+          ? sanitizeReferenceImages(payload.referenceImages)
+          : sanitizeReferenceImages(appointment?.referenceImages || []),
+      postCallUpdatedAt: nowIso,
+      postCallUpdatedBy: payload.postCallUpdatedBy || null,
+    };
+
+    if (shouldCreateOpenLead) {
+      nextAppointmentFields.needsConfirmationEmail = true;
+      nextAppointmentFields.confirmationTaskType = 'lead_follow_up';
+      nextAppointmentFields.type = 'lead_follow_up';
+      nextAppointmentFields.taskType = 'lead_follow_up';
+      nextAppointmentFields.confirmationTaskCreatedAt =
+        normalizeString(appointment?.confirmationTaskCreatedAt || '') || nowIso;
+      nextAppointmentFields.confirmationResponseReceived = false;
+      nextAppointmentFields.confirmationResponseReceivedAt = null;
+      nextAppointmentFields.confirmationResponseReceivedBy = null;
+      nextAppointmentFields.confirmationAppointmentCancelled = false;
+      nextAppointmentFields.confirmationAppointmentCancelledAt = null;
+      nextAppointmentFields.confirmationAppointmentCancelledBy = null;
+    }
+
     const updated = setGeneratedAgendaAppointmentAtIndex(
       idx,
-      {
-        ...appointment,
-        postCallStatus: payload.postCallStatus || normalizePostCallStatus(appointment?.postCallStatus),
-        postCallNotesTranscript:
-          payload.postCallNotesTranscript ||
-          sanitizePostCallText(appointment?.postCallNotesTranscript || '', 25000),
-        postCallPrompt:
-          payload.postCallPrompt || sanitizePostCallText(appointment?.postCallPrompt || '', 25000),
-        postCallDomainName:
-          payload.postCallDomainName ||
-          sanitizeLaunchDomainName(appointment?.postCallDomainName || appointment?.domainName || ''),
-        referenceImages:
-          Array.isArray(payload.referenceImages) && payload.referenceImages.length
-            ? sanitizeReferenceImages(payload.referenceImages)
-            : sanitizeReferenceImages(appointment?.referenceImages || []),
-        postCallUpdatedAt: nowIso,
-        postCallUpdatedBy: payload.postCallUpdatedBy || null,
-      },
+      nextAppointmentFields,
       'agenda_post_call_update'
     );
 
@@ -444,16 +469,18 @@ function createAgendaPostCallCoordinator(deps = {}) {
 
     appendDashboardActivity(
       {
-        type: 'post_call_notes_saved',
-        title: 'Klantwens opgeslagen',
-        detail: 'Na-afspraak transcriptie/prompt bijgewerkt.',
+        type: shouldCreateOpenLead ? 'lead_follow_up_added_from_agenda' : 'post_call_notes_saved',
+        title: shouldCreateOpenLead ? 'Vervolg toegevoegd aan openstaande leads' : 'Klantwens opgeslagen',
+        detail: shouldCreateOpenLead
+          ? 'Afspraak als open lead-opvolging klaargezet.'
+          : 'Na-afspraak transcriptie/prompt bijgewerkt.',
         company: updated?.company || appointment?.company || '',
         actor: payload.postCallUpdatedBy || '',
         taskId: Number(updated?.id || appointment?.id || 0) || null,
         callId: normalizeString(updated?.callId || appointment?.callId || ''),
         source: 'premium-personeel-agenda',
       },
-      'dashboard_activity_post_call_saved'
+      shouldCreateOpenLead ? 'dashboard_activity_lead_follow_up_added' : 'dashboard_activity_post_call_saved'
     );
 
     const shouldMarkAfgehaakt = normalizeLifecycleDatabaseStatus(req.body?.status) === 'afgehaakt';

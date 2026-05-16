@@ -277,3 +277,44 @@ test('agenda post-call coordinator marks the premium database row as afgehaakt a
   assert.equal(savedRows[0].databaseStatus, 'afgehaakt');
   assert.equal(savedRows[0].hist[0].type, 'afgehaakt');
 });
+
+test('agenda post-call coordinator can turn an appointment into an open lead follow-up', async () => {
+  const { activityCalls, appointments, coordinator } = createFixture({
+    appointments: [
+      {
+        id: 55,
+        company: 'Administratieportaal',
+        contact: 'Marco',
+        phone: '0611111111',
+        callId: 'manual_55',
+        summary: 'Website meeting met vervolg nodig.',
+        confirmationResponseReceived: true,
+        confirmationResponseReceivedAt: '2026-05-13T09:00:00.000Z',
+        confirmationTaskType: '',
+        needsConfirmationEmail: false,
+      },
+    ],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.updateAgendaAppointmentPostCallDataById(
+    {
+      body: {
+        status: 'lead_follow_up',
+        transcript: 'Klant wil eerst intern overleggen en later vervolg oppakken.',
+        actor: 'Serve',
+      },
+    },
+    res,
+    '55'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(appointments[0].postCallStatus, 'lead_follow_up');
+  assert.equal(appointments[0].confirmationTaskType, 'lead_follow_up');
+  assert.equal(appointments[0].needsConfirmationEmail, true);
+  assert.equal(appointments[0].confirmationResponseReceived, false);
+  assert.equal(appointments[0].confirmationResponseReceivedAt, null);
+  assert.equal(activityCalls[0].reason, 'dashboard_activity_lead_follow_up_added');
+});

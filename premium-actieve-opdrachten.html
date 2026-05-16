@@ -483,6 +483,7 @@
             position: relative;
         }
 
+        .orders-filter-btn[data-order-filter="open_leads"] { order: 0; }
         .orders-filter-btn[data-order-filter="in_progress"] { order: 1; }
         .orders-filter-btn[data-order-filter="completed"] { order: 2; }
 
@@ -1653,21 +1654,16 @@
             </div>
 
             <div class="orders-filter-bar" aria-label="Opdrachten filter">
-                <button class="orders-filter-btn magnetic" type="button" data-order-filter="in_progress" aria-pressed="false">
-                    <span class="orders-filter-label"><span class="orders-filter-dot"></span>Openstaande opdrachten</span>
-                    <span class="orders-filter-count" id="filterCountProgress">0</span>
-                </button>
-                <button class="orders-filter-btn magnetic" type="button" data-order-filter="completed" aria-pressed="false">
-                    <span class="orders-filter-label"><span class="orders-filter-dot"></span>Voltooide opdrachten</span>
-                    <span class="orders-filter-count" id="filterCountCompleted">0</span>
-                </button>
+                <button class="orders-filter-btn magnetic" type="button" data-order-filter="open_leads" aria-pressed="false"><span class="orders-filter-label"><span class="orders-filter-dot"></span>Openstaande leads</span><span class="orders-filter-count" id="filterCountOpenLeads">0</span></button>
+                <button class="orders-filter-btn magnetic" type="button" data-order-filter="in_progress" aria-pressed="false"><span class="orders-filter-label"><span class="orders-filter-dot"></span>Openstaande opdrachten</span><span class="orders-filter-count" id="filterCountProgress">0</span></button>
+                <button class="orders-filter-btn magnetic" type="button" data-order-filter="completed" aria-pressed="false"><span class="orders-filter-label"><span class="orders-filter-dot"></span>Voltooide opdrachten</span><span class="orders-filter-count" id="filterCountCompleted">0</span></button>
             </div>
 
             <div class="orders-grid" id="ordersGrid"></div>
             </div>
         </main>
     </div>
-    <script src="assets/premium-actieve-opdrachten.js?v=20260511a"></script>
+    <script src="assets/premium-actieve-opdrachten.js?v=20260511a"></script><script src="assets/premium-active-order-open-leads.js?v=20260516a"></script>
     <script src="assets/premium-active-order-assignment-toggle.js?v=20260511a"></script>
 </body>
 </html>
