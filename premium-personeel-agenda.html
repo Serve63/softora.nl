@@ -1308,7 +1308,7 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="modal-btn primary magnetic" id="modalPrimaryBtn" type="button">Akkoord</button><button class="modal-btn primary magnetic" id="modalCompleteActivityBtn" type="button">Activiteit afgerond</button>
+            <button class="modal-btn primary magnetic" id="modalPrimaryBtn" type="button">Akkoord</button><button class="modal-btn primary magnetic" id="modalCompleteActivityBtn" type="button">Activiteit afgerond</button><button class="modal-btn secondary magnetic" id="modalFollowUpBtn" type="button" hidden>Vervolg</button>
             <button class="modal-btn danger magnetic" id="modalNoDealBtn" type="button">Geen deal</button><button class="modal-btn danger magnetic" id="modalDeleteAppointmentBtn" type="button" hidden>Verwijderen</button>
             <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>
         </div>
@@ -1334,7 +1334,7 @@
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Wat wil je inplannen?</div>
                         <div class="manual-appointment-choice-grid" role="group" aria-label="Wat wil je inplannen?">
-                            <button class="manual-appointment-choice" type="button" data-manual-kind="business">
+                            <button class="manual-appointment-choice is-active" type="button" data-manual-kind="business">
                                 <span class="manual-appointment-choice-title">Zakelijk</span>
                                 <span class="manual-appointment-choice-sub">Plan een zakelijke afspraak of meeting in.</span>
                             </button>
@@ -1349,7 +1349,7 @@
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Wat voor zakelijke afspraak?</div>
                         <div class="manual-appointment-choice-grid" role="group" aria-label="Wat voor zakelijke afspraak?">
-                            <button class="manual-appointment-choice" type="button" data-manual-business-type="meeting">
+                            <button class="manual-appointment-choice is-active" type="button" data-manual-business-type="meeting">
                                 <span class="manual-appointment-choice-title">Meeting</span>
                                 <span class="manual-appointment-choice-sub">Plan een website-, software-, voice- of chatbotmeeting in.</span>
                             </button>
@@ -1608,8 +1608,8 @@
     let manualAppointmentSelectedDate = '';
     let manualAppointmentSaving = false;
     let manualAppointmentStep = 'kind';
-    let manualAppointmentKind = '';
-    let manualAppointmentBusinessType = '';
+    let manualAppointmentKind = 'business';
+    let manualAppointmentBusinessType = 'meeting';
     let manualAppointmentMeetingType = '';
     let manualAppointmentWho = '';
     const modalAudioBlock = document.getElementById('modalAudioBlock');
@@ -3412,7 +3412,7 @@
 
 </script>
 	<script src="assets/premium-agenda-manual-business-flow.js?v=20260510a"></script>
-	<script src="assets/premium-agenda-follow-up-leads.js?v=20260513a"></script><script src="assets/premium-agenda-stability.js?v=20260513a"></script><script src="assets/premium-agenda-lead-scoreboard.js?v=20260512a"></script><script src="assets/premium-agenda-delete-button.js?v=20260513a"></script>
+		<script src="assets/premium-agenda-stability.js?v=20260513a"></script><script src="assets/premium-agenda-follow-up.js?v=20260516a"></script><script src="assets/premium-agenda-lead-scoreboard.js?v=20260512a"></script><script src="assets/premium-agenda-delete-button.js?v=20260513a"></script>
 <script>
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });

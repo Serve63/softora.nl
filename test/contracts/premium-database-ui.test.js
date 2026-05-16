@@ -250,7 +250,8 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /tel: normalizeString\(nodes\.modalPhone\.value\) \|\| "—",/);
   assert.match(pageSource, /class=\\"company-edit\\"/);
   assert.match(pageSource, /data-edit-id=\\"/);
-  assert.match(pageSource, /<th>Foto<\/th>/);
+  assert.match(pageSource, /<th>Foto <span id="photoHeaderCount">\(0\)<\/span><\/th>/);
+  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoDataUrl\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
   assert.match(pageSource, /colspan=\\"9\\"/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
@@ -493,6 +494,8 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /website: normalizeString\(nodes\.modalDomain\.value\) \|\| dom,/);
   assert.match(pageSource, /openEditCustomerModal\(editButton\.getAttribute\("data-edit-id"\)\)/);
   assert.match(pageSource, /removeWebsitePhotoForCustomer\(removePhotoButton\.getAttribute\("data-remove-photo-id"\)\)/);
+  assert.doesNotMatch(pageSource, /const row = event\.target\.closest\("tr\[data-id\]"\);[\s\S]*openPanel\(row\.getAttribute\("data-id"\)\);/);
+  assert.doesNotMatch(pageSource, /tbody tr \{[^}]*cursor: pointer;/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);

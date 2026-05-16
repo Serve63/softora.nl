@@ -395,6 +395,87 @@ test('agenda post-call coordinator keeps chunked active orders and customer rows
   assert.equal(savedRows[0].databaseStatus, 'klant');
 });
 
+test('agenda post-call coordinator promotes an open lead without creating duplicate active orders', async () => {
+  const existingOrders = [
+    {
+      id: 12,
+      clientName: 'Administratieportaal',
+      location: 'Marco',
+      companyName: 'Administratieportaal',
+      contactName: 'Marco',
+      title: 'Website opdracht voor Administratieportaal',
+      description: 'Oude notitie',
+      amount: 3000,
+      status: 'wacht',
+      sourceAppointmentId: 55,
+      prompt: 'Oude prompt',
+      transcript: 'Oude transcriptie',
+    },
+  ];
+  const { appointments, coordinator, uiStateWrites } = createFixture({
+    appointments: [
+      {
+        id: 55,
+        company: 'Administratieportaal',
+        contact: 'Marco',
+        phone: '0611111111',
+        callId: 'manual_55',
+        summary: 'Website meeting met vervolg nodig.',
+        postCallStatus: 'lead_follow_up',
+        confirmationTaskType: 'lead_follow_up',
+        taskType: 'lead_follow_up',
+        type: 'lead_follow_up',
+        needsConfirmationEmail: true,
+        confirmationResponseReceived: false,
+      },
+    ],
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_active_orders') {
+        return {
+          values: {
+            softora_custom_orders_premium_v1: JSON.stringify(existingOrders),
+          },
+        };
+      }
+      return { values: {} };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.addAgendaAppointmentToPremiumActiveOrders(
+    {
+      body: {
+        prompt: 'Nieuwe dossierprompt',
+        transcript: 'Nieuwe dossiernotitie uit opname.',
+        actor: 'Serve',
+        title: 'Nieuwe titel',
+        description: 'Nieuwe omschrijving',
+        amount: 4500,
+        status: 'actieve_opdracht',
+      },
+    },
+    res,
+    '55'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.alreadyExisted, true);
+  assert.equal(res.body.order.id, 12);
+  assert.equal(appointments[0].activeOrderId, 12);
+  assert.equal(appointments[0].postCallStatus, 'actieve_opdracht');
+  assert.equal(appointments[0].confirmationTaskType, 'actieve_opdracht');
+  assert.equal(appointments[0].confirmationResponseReceived, true);
+  const savedOrders = JSON.parse(uiStateWrites[0].values.softora_custom_orders_premium_v1);
+  assert.equal(savedOrders.length, 1);
+  assert.equal(savedOrders[0].id, 12);
+  assert.equal(savedOrders[0].title, 'Nieuwe titel');
+  assert.equal(savedOrders[0].description, 'Nieuwe omschrijving');
+  assert.equal(savedOrders[0].amount, 4500);
+  assert.equal(savedOrders[0].prompt, 'Nieuwe dossierprompt');
+  assert.equal(savedOrders[0].transcript, 'Nieuwe dossiernotitie uit opname.');
+});
+
 test('agenda post-call coordinator marks the premium database row as afgehaakt after no deal', async () => {
   const { coordinator, uiStateWrites } = createFixture({
     getUiStateValues: async (scope) => {
@@ -439,4 +520,45 @@ test('agenda post-call coordinator marks the premium database row as afgehaakt a
   const savedRows = JSON.parse(uiStateWrites[0].values.softora_customers_premium_v1);
   assert.equal(savedRows[0].databaseStatus, 'afgehaakt');
   assert.equal(savedRows[0].hist[0].type, 'afgehaakt');
+});
+
+test('agenda post-call coordinator can turn an appointment into an open lead follow-up', async () => {
+  const { activityCalls, appointments, coordinator } = createFixture({
+    appointments: [
+      {
+        id: 55,
+        company: 'Administratieportaal',
+        contact: 'Marco',
+        phone: '0611111111',
+        callId: 'manual_55',
+        summary: 'Website meeting met vervolg nodig.',
+        confirmationResponseReceived: true,
+        confirmationResponseReceivedAt: '2026-05-13T09:00:00.000Z',
+        confirmationTaskType: '',
+        needsConfirmationEmail: false,
+      },
+    ],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.updateAgendaAppointmentPostCallDataById(
+    {
+      body: {
+        status: 'lead_follow_up',
+        transcript: 'Klant wil eerst intern overleggen en later vervolg oppakken.',
+        actor: 'Serve',
+      },
+    },
+    res,
+    '55'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(appointments[0].postCallStatus, 'lead_follow_up');
+  assert.equal(appointments[0].confirmationTaskType, 'lead_follow_up');
+  assert.equal(appointments[0].needsConfirmationEmail, true);
+  assert.equal(appointments[0].confirmationResponseReceived, false);
+  assert.equal(appointments[0].confirmationResponseReceivedAt, null);
+  assert.equal(activityCalls[0].reason, 'dashboard_activity_lead_follow_up_added');
 });

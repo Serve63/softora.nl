@@ -13,3 +13,10 @@ test('legacy personeel login form uses delegated submit binding', () => {
   assert.doesNotMatch(source, /\sonsubmit=/);
   assert.doesNotMatch(source, /return handleLogin\(event\)/);
 });
+
+test('premium personeel login explains expired sessions clearly', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../premium-personeel-login.html'), 'utf8');
+
+  assert.match(source, /params\.get\('expired'\) === '1'/);
+  assert.match(source, /Je sessie is verlopen\. Log opnieuw in om verder te gaan\./);
+});

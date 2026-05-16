@@ -263,6 +263,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /if \(requestedCount !== getCampaignRequestedCompanyCount\(\) \|\| requestedRadiusKm !== getSelectedCampaignRadiusKm\(\) \|\| requestedTestMode !== Boolean/);
   assert.match(pageSource, /const serverCount = Number\(data && data\.selected\) \|\| recipients\.length;/);
   assert.match(pageSource, /renderCampaignCompanyCount\(serverCount\);/);
+  assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) renderCampaignCompanyCount\(0\);/);
   assert.match(pageSource, /0 bedrijven geselecteerd voor deze filters\./);
   assert.match(pageSource, /bedrijven geselecteerd, maar de namen konden niet geladen worden\./);
   assert.match(pageSource, /0 geldige ontvangers\. Eerste afgevallen bedrijf:/);

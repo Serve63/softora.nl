@@ -64,7 +64,7 @@ const premiumBuildSteps = [
 let currentModalId = null;
 let currentClaimOrderId = null;
 let buildMode = 'premium';
-let activeOrderFilter = 'in_progress';
+let activeOrderFilter = 'open_leads';
 const activeProgressAnimations = {};
 const apiCostEstimateRequests = {};
 const progressSimulationPlans = {
@@ -692,8 +692,8 @@ function renderOrdersEmptyState() {
 
     if (!visibleCards.length) {
         const emptyTextByFilter = {
-            completed: 'Geen voltooide opdrachten.', in_progress: 'Geen openstaande opdrachten.',
-            leads: 'Geen openstaande leads.'
+            completed: 'Geen voltooide opdrachten.', open_leads: 'Geen openstaande leads.',
+            in_progress: 'Geen openstaande opdrachten.'
         };
         if (!empty) {
             empty = document.createElement('div');
@@ -736,7 +736,7 @@ function updateOrderFilterButtonState() {
 }
 
 function updateOrderFilterCounts(cards) {
-    const counts = { completed: 0, in_progress: 0, leads: 0 };
+    const counts = { completed: 0, open_leads: 0, in_progress: 0 };
 
     cards.forEach((card) => {
         const group = getOrderFilterGroupForCard(card);
@@ -744,8 +744,8 @@ function updateOrderFilterCounts(cards) {
     });
 
     const completedEl = document.getElementById('filterCountCompleted'); if (completedEl) completedEl.textContent = String(counts.completed);
+    const leadsEl = document.getElementById('filterCountOpenLeads'); if (leadsEl) leadsEl.textContent = String(counts.open_leads);
     const progressEl = document.getElementById('filterCountProgress'); if (progressEl) progressEl.textContent = String(counts.in_progress);
-    const leadsEl = document.getElementById('filterCountLeads'); if (leadsEl) leadsEl.textContent = String(counts.leads);
 }
 
 function applyOrderFilter() {
@@ -761,7 +761,7 @@ function applyOrderFilter() {
 
 function setOrderFilter(nextFilter) {
     const normalized = String(nextFilter || '').trim().toLowerCase();
-    activeOrderFilter = normalized === 'open' ? 'in_progress' : normalized || 'in_progress';
+    activeOrderFilter = normalized === 'open' ? 'in_progress' : normalized || 'open_leads';
     applyOrderFilter();
 }
 
@@ -2919,7 +2919,7 @@ async function initializeActiveOrdersPageState(options = {}) {
     loadCustomOrderCards();
     restoreOrdersRuntimeFromState();
     refreshOrderSummaryCards();
-    void fetchAgendaLeadOptions().then(() => window.SoftoraActiveOrdersLeadTab?.renderOpenLeads?.()).catch(() => {});
+    void fetchAgendaLeadOptions().then(() => window.SoftoraActiveOrderOpenLeads?.load?.(true)).catch(() => {});
 }
 
 async function bootActiveOrdersPage() {

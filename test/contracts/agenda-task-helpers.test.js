@@ -115,6 +115,11 @@ test('agenda task helpers materialize confirmation task payloads with stable pro
     location: 'Rotterdam',
     whatsappInfo: 'App vooraf even',
     contactEmail: 'TEST@EXAMPLE.COM',
+    activeOrderId: 9,
+    postCallStatus: 'lead_follow_up',
+    postCallPrompt: 'Bouw de site op basis van de intake.',
+    postCallNotesTranscript: 'Klant wil rustig starten.',
+    postCallDomainName: 'softora.nl',
   });
 
   assert.equal(task.id, 42);
@@ -124,6 +129,11 @@ test('agenda task helpers materialize confirmation task payloads with stable pro
   assert.equal(task.location, 'Rotterdam');
   assert.equal(task.whatsappInfo, 'App vooraf even');
   assert.equal(task.contactEmail, 'test@example.com');
+  assert.equal(task.activeOrderId, 9);
+  assert.equal(task.postCallStatus, 'lead_follow_up');
+  assert.equal(task.postCallPrompt, 'Bouw de site op basis van de intake.');
+  assert.equal(task.postCallNotesTranscript, 'Klant wil rustig starten.');
+  assert.equal(task.postCallDomainName, 'softora.nl');
   assert.equal(task.mailDraftAvailable, true);
   assert.equal(task.mailSent, true);
   assert.equal(task.durationSeconds, 91);

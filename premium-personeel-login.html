@@ -849,12 +849,16 @@
                     showError('Premium login is nog niet geconfigureerd op de server.');
                 } else if (params.get('blocked') === '1') {
                     showError('Toegang geweigerd vanaf dit IP-adres.');
+                } else if (params.get('expired') === '1') {
+                    showError('Je sessie is verlopen. Log opnieuw in om verder te gaan.');
                 }
             } catch (_) {
                 if (params.get('setup') === '1') {
                     showError('Premium login is nog niet geconfigureerd op de server.');
                 } else if (params.get('blocked') === '1') {
                     showError('Toegang geweigerd vanaf dit IP-adres.');
+                } else if (params.get('expired') === '1') {
+                    showError('Je sessie is verlopen. Log opnieuw in om verder te gaan.');
                 }
             }
         }
