@@ -41,7 +41,37 @@ function hasLocalWorkingTreeChanges() {
   return Boolean(tryRunGit(['status', '--porcelain']));
 }
 
+let guardrailDiffBaseRef;
+function getGuardrailDiffBaseRef() {
+  if (guardrailDiffBaseRef !== undefined) return guardrailDiffBaseRef;
+
+  const explicitBase = String(process.env.GUARDRAILS_BASE_REF || '').trim();
+  const githubBase = String(process.env.GITHUB_BASE_REF || '').trim();
+  const candidates = [
+    explicitBase,
+    githubBase ? `origin/${githubBase}` : '',
+    'origin/main',
+  ].filter(Boolean);
+
+  const baseRef = candidates.find((candidate) =>
+    Boolean(tryRunGit(['rev-parse', '--verify', `${candidate}^{commit}`]))
+  );
+  if (!baseRef) {
+    guardrailDiffBaseRef = '';
+    return guardrailDiffBaseRef;
+  }
+
+  const mergeBase = tryRunGit(['merge-base', baseRef, 'HEAD']);
+  guardrailDiffBaseRef = mergeBase || '';
+  return guardrailDiffBaseRef;
+}
+
 function getDiffArgsForPath(filePath) {
+  const branchDiffBase = getGuardrailDiffBaseRef();
+  if (branchDiffBase) {
+    return ['diff', '--unified=0', branchDiffBase, '--', filePath];
+  }
+
   if (hasLocalWorkingTreeChanges()) {
     return ['diff', '--unified=0', 'HEAD', '--', filePath];
   }
@@ -57,6 +87,15 @@ function getChangedFiles() {
     .split('\n')
     .map(normalizeRepoPath)
     .filter(Boolean);
+
+  const branchDiffBase = getGuardrailDiffBaseRef();
+  if (branchDiffBase) {
+    const branchChanges = tryRunGit(['diff', '--name-only', '--diff-filter=ACMR', branchDiffBase, '--'])
+      .split('\n')
+      .map(normalizeRepoPath)
+      .filter(Boolean);
+    return Array.from(new Set([...branchChanges, ...untracked])).sort();
+  }
 
   const workingTreeChanges = tryRunGit(['diff', '--name-only', '--diff-filter=ACMR', 'HEAD', '--'])
     .split('\n')
@@ -82,6 +121,15 @@ function getAddedFiles() {
     .split('\n')
     .map(normalizeRepoPath)
     .filter(Boolean);
+
+  const branchDiffBase = getGuardrailDiffBaseRef();
+  if (branchDiffBase) {
+    const branchAdded = tryRunGit(['diff', '--name-only', '--diff-filter=A', branchDiffBase, '--'])
+      .split('\n')
+      .map(normalizeRepoPath)
+      .filter(Boolean);
+    return Array.from(new Set([...branchAdded, ...untracked])).sort();
+  }
 
   const addedFromHead = tryRunGit(['diff', '--name-only', '--diff-filter=A', 'HEAD', '--'])
     .split('\n')
@@ -387,7 +435,7 @@ const violations = buildGuardrailViolations({
 if (changedFiles.length > 0) {
   console.log(`[guardrails] Changed files: ${changedFiles.join(', ')}`);
 } else {
-  console.log('[guardrails] Geen lokale of laatste-commit diff gevonden; alleen statische guardrails gecontroleerd.');
+  console.log('[guardrails] Geen lokale, branch- of laatste-commit diff gevonden; alleen statische guardrails gecontroleerd.');
 }
 
 if (violations.length > 0) {
