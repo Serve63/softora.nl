@@ -3,6 +3,7 @@ function registerColdmailingRoutes(app, deps = {}) {
     coldmailCampaignService,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    requirePremiumAdminApiAccess = (_req, _res, next) => next(),
   } = deps;
 
   if (!coldmailCampaignService) return;
@@ -142,6 +143,43 @@ function registerColdmailingRoutes(app, deps = {}) {
         code,
         message: truncateText(
           normalizeString(error && error.message) || 'Coldmail replies konden niet worden verwerkt.',
+          500
+        ),
+      });
+    }
+  });
+
+  app.post('/api/coldmailing/outreach/status', requirePremiumAdminApiAccess, async (req, res) => {
+    try {
+      if (typeof coldmailCampaignService.updateWebdesignOutreachStatus !== 'function') {
+        res.status(404).json({
+          ok: false,
+          code: 'WEBDESIGN_OUTREACH_STATUS_UNAVAILABLE',
+          message: 'Webdesign-outreach statusupdates zijn niet beschikbaar.',
+        });
+        return;
+      }
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await coldmailCampaignService.updateWebdesignOutreachStatus({
+        customerId: body.customerId || body.id,
+        email: body.email,
+        messageId: body.messageId,
+        mailboxId: body.mailboxId,
+        replyThreadId: body.replyThreadId,
+        replyMessageId: body.replyMessageId,
+        status: body.status,
+        actor:
+          normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
+          normalizeString(body.actor) ||
+          'Mailbox',
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(error && error.status ? error.status : 400).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'WEBDESIGN_OUTREACH_STATUS_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Outreach-status kon niet worden bijgewerkt.',
           500
         ),
       });

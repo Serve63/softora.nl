@@ -64,7 +64,10 @@ function registerFeatureRoutes(app, deps = {}) {
     ...coldcalling,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
-  registerColdmailingRoutes(app, coldmailing);
+  registerColdmailingRoutes(app, {
+    ...coldmailing,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
+  });
   registerAiDashboardRoutes(app, { coordinator: aiDashboardCoordinator });
   registerAiToolRoutes(app, { coordinator: aiToolsCoordinator });
   registerWebsiteLinkRoutes(app, { coordinator: websiteLinkCoordinator });

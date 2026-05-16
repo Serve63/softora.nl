@@ -261,6 +261,107 @@ function createColdmailCampaignService(deps = {}) {
     return normalized === 'webdesign' || normalized === 'website-design' || normalized === 'website_design';
   }
 
+  function normalizeOutreachStatus(value) {
+    const normalized = normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (['benaderd', 'gemaild', 'mailed', 'sent'].includes(normalized)) return 'benaderd';
+    if (['reactie_ontvangen', 'reply_received', 'actie_nodig', 'action_required'].includes(normalized)) {
+      return 'reactie_ontvangen';
+    }
+    if (['interesse', 'interested', 'geinteresseerd'].includes(normalized)) return 'interesse';
+    if (['geen_interesse', 'geblokkeerd', 'opt_out', 'unsubscribe', 'geenbehoefte'].includes(normalized)) {
+      return 'geen_interesse';
+    }
+    if (['afgehaakt', 'lost', 'no_deal', 'geendeal'].includes(normalized)) return 'afgehaakt';
+    if (['geen_gehoor', 'geengehoor', 'no_answer'].includes(normalized)) return 'geen_gehoor';
+    if (['klant_geworden', 'klant', 'customer', 'paid'].includes(normalized)) return 'klant_geworden';
+    return '';
+  }
+
+  function isWebdesignOutreachRow(row) {
+    if (!row || typeof row !== 'object') return false;
+    return [
+      row.campaignType,
+      row.campaign_type,
+      row.outreachCampaignType,
+      row.outreach_campaign_type,
+      row.coldmailSpecialAction,
+      row.specialAction,
+    ].some(isWebdesignSpecialAction);
+  }
+
+  function mapOutreachStatusToDatabaseStatus(status, fallbackStatus = 'gemaild') {
+    const normalized = normalizeOutreachStatus(status);
+    if (normalized === 'interesse') return 'interesse';
+    if (normalized === 'geen_interesse') return 'geblokkeerd';
+    if (normalized === 'afgehaakt') return 'afgehaakt';
+    if (normalized === 'geen_gehoor') return 'geengehoor';
+    if (normalized === 'klant_geworden') return 'klant';
+    return normalizeDatabaseStatus(fallbackStatus) || 'gemaild';
+  }
+
+  function isOutreachDefinitiveStatus(status) {
+    return ['interesse', 'geen_interesse', 'afgehaakt', 'geen_gehoor', 'klant_geworden'].includes(
+      normalizeOutreachStatus(status)
+    );
+  }
+
+  function getOutreachStatusLabel(status) {
+    const labels = {
+      benaderd: 'Benaderd',
+      reactie_ontvangen: 'Reactie ontvangen',
+      interesse: 'Interesse',
+      geen_interesse: 'Geen interesse',
+      afgehaakt: 'Afgehaakt',
+      geen_gehoor: 'Geen gehoor',
+      klant_geworden: 'Klant geworden',
+    };
+    return labels[normalizeOutreachStatus(status)] || 'Benaderd';
+  }
+
+  function normalizeMailboxMessageKey(value) {
+    const raw = normalizeString(value).toLowerCase();
+    if (!raw) return '';
+    if (/^[a-z]+:\d+$/i.test(raw)) return raw;
+    return normalizeMessageIdToken(raw.replace(/^message:/i, ''));
+  }
+
+  function collectOutreachMessageKeys(row) {
+    const values = [
+      row && row.outreachMessageId,
+      row && row.coldmailSentMessageId,
+      row && row.replyMessageId,
+      row && row.replyThreadId,
+      row && row.replyMailboxId,
+      row && row.lastColdmailReplyMessageKey,
+    ];
+    return new Set(values.map(normalizeMailboxMessageKey).filter(Boolean));
+  }
+
+  function matchesOutreachMessage(row, value) {
+    const key = normalizeMailboxMessageKey(value);
+    if (!key) return false;
+    return collectOutreachMessageKeys(row).has(key);
+  }
+
+  function buildMailboxMessageId(folder, uid) {
+    const safeUid = normalizeString(uid);
+    if (!safeUid) return '';
+    const normalizedFolder = normalizeString(folder).toLowerCase();
+    const folderKey = normalizedFolder.includes('sent')
+      ? 'sent'
+      : normalizedFolder.includes('spam') || normalizedFolder.includes('junk')
+        ? 'spam'
+        : normalizedFolder.includes('trash') || normalizedFolder.includes('prullenbak')
+          ? 'trash'
+          : 'inbox';
+    return `${folderKey}:${safeUid}`;
+  }
+
   function getRowId(row, index) {
     return normalizeString(row.id || row.customerId || row.databaseId || '') || `row-${index}`;
   }
@@ -580,6 +681,14 @@ function createColdmailCampaignService(deps = {}) {
     ];
     const matched = recipients.find((entry) => allowed.has(entry.address));
     return matched ? matched.address : assertSenderAllowed(mailFromAddress);
+  }
+
+  function resolveInboundMailboxAccount(parsedMail) {
+    try {
+      return resolveInboundSenderEmail(parsedMail);
+    } catch (_) {
+      return normalizeEmailAddress(mailFromAddress || smtpUser || imapUser);
+    }
   }
 
   function findColdmailRowForInboundReply(parsedMail, rows) {
@@ -1416,16 +1525,48 @@ function createColdmailCampaignService(deps = {}) {
     return parsePositiveInt(value, 14, 1, 90);
   }
 
-  function markRowAsMailed(row, actor, durationDays) {
+  function markRowAsMailed(row, actor, durationDays, context = {}) {
     const date = now().toISOString();
     const safeDurationDays = normalizeCampaignDurationDays(durationDays);
     const campaignEndsAt = safeDurationDays > 0 ? addDaysIso(new Date(date), safeDurationDays) : '';
     const existingHistory = Array.isArray(row.hist) ? row.hist : [];
+    const senderEmail = normalizeEmailAddress(context.senderEmail);
+    const messageId = normalizeString(context.messageId);
+    const isWebdesignOutreach = isWebdesignSpecialAction(context.specialAction);
+    const outreachFields = isWebdesignOutreach
+      ? {
+          campaignType: 'webdesign',
+          campaign_type: 'webdesign',
+          outreachCampaignType: 'webdesign',
+          outreach_campaign_type: 'webdesign',
+          coldmailSpecialAction: 'webdesign',
+          outreachStatus: 'benaderd',
+          actionRequired: false,
+          outreachActionRequired: false,
+          sentFromEmail: senderEmail,
+          sent_from_email: senderEmail,
+          outreachSentFromEmail: senderEmail,
+          outreachSentAt: date,
+          outreach_sent_at: date,
+          coldmailSentMessageId: messageId,
+          outreachMessageId: messageId,
+          lastReplyAt: '',
+          last_reply_at: '',
+          replyThreadId: '',
+          reply_thread_id: '',
+          replyMessageId: '',
+          replyMailboxId: '',
+          replyMailboxAccount: '',
+          statusUpdatedAt: date,
+        }
+      : {};
     return {
       ...row,
+      ...outreachFields,
       status: 'gemaild',
       databaseStatus: 'gemaild',
       mail: true,
+      lastColdmailSenderEmail: senderEmail || normalizeString(row.lastColdmailSenderEmail),
       lastMailSentAt: date,
       lastColdmailSentAt: date,
       coldmailCampaignStartedAt: date,
@@ -1474,21 +1615,40 @@ function createColdmailCampaignService(deps = {}) {
     return (alreadyTracked ? existingHistory : [entry, ...existingHistory]).slice(0, 50);
   }
 
-  function markRowFromColdmailReply(row, classification, parsedMail, inboundText, processedKey, actor) {
+  function markRowFromColdmailReply(row, classification, parsedMail, inboundText, processedKey, actor, context = {}) {
     const date = now().toISOString();
     const currentStatus = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
+    const isWebdesignOutreach = isWebdesignOutreachRow(row);
+    const hasDefinitiveOutreachStatus =
+      isOutreachDefinitiveStatus(row.outreachStatus) || isOutreachDefinitiveStatus(currentStatus);
+    const shouldHoldForManualAction =
+      isWebdesignOutreach && classification.status !== 'geblokkeerd' && !hasDefinitiveOutreachStatus;
     const canAdvance = canAdvanceContactStatus(currentStatus, classification.status);
-    const nextStatus = canAdvance ? classification.status : currentStatus;
+    const nextStatus = shouldHoldForManualAction ? currentStatus : canAdvance ? classification.status : currentStatus;
+    const nextOutreachStatus =
+      shouldHoldForManualAction
+        ? 'reactie_ontvangen'
+        : classification.status === 'geblokkeerd'
+          ? 'geen_interesse'
+          : normalizeOutreachStatus(nextStatus) || normalizeOutreachStatus(row.outreachStatus) || 'reactie_ontvangen';
+    const historyClassification = shouldHoldForManualAction
+      ? {
+          ...classification,
+          status: 'reactie_ontvangen',
+          label: 'Reactie ontvangen op webdesign-mail',
+        }
+      : classification;
     const historyEntry = buildColdmailReplyHistoryEntry({
-      classification,
+      classification: historyClassification,
       parsedMail,
       inboundText,
       processedKey,
       actor,
     });
     const shouldClearCampaignWindow =
-      ['interesse', 'geblokkeerd'].includes(nextStatus) ||
-      ['interesse', 'geblokkeerd'].includes(classification.status);
+      !shouldHoldForManualAction &&
+      (['interesse', 'geblokkeerd'].includes(nextStatus) ||
+        ['interesse', 'geblokkeerd'].includes(classification.status));
     const mailFields = classification.disableMail
       ? {
           mail: false,
@@ -1496,10 +1656,30 @@ function createColdmailCampaignService(deps = {}) {
           doNotMail: true,
         }
       : {};
+    const inboundRecipientEmail = normalizeEmailAddress(context.mailboxAccount);
+    const replyMessageId = normalizeString(parsedMail && parsedMail.messageId);
+    const replyMailboxId = normalizeString(context.mailboxId);
+    const outreachFields = isWebdesignOutreach
+      ? {
+          lastReplyAt: date,
+          last_reply_at: date,
+          replyThreadId: replyMailboxId || normalizeString(processedKey),
+          reply_thread_id: replyMailboxId || normalizeString(processedKey),
+          replyMessageId,
+          replyMailboxId,
+          replyMailboxFolder: normalizeString(context.mailboxFolder),
+          replyMailboxAccount: inboundRecipientEmail,
+          outreachStatus: nextOutreachStatus,
+          actionRequired: shouldHoldForManualAction,
+          outreachActionRequired: shouldHoldForManualAction,
+          statusUpdatedAt: date,
+        }
+      : {};
 
     return {
       ...row,
       ...mailFields,
+      ...outreachFields,
       status: nextStatus || row.status,
       databaseStatus: nextStatus || row.databaseStatus,
       coldmailReplyIntent: classification.intent,
@@ -1522,9 +1702,14 @@ function createColdmailCampaignService(deps = {}) {
     inboundText,
     processedKey,
     actor,
+    mailboxId,
+    mailboxFolder,
+    mailboxAccount,
   }) {
     const classification = classifyInboundColdmailReplyLifecycle(inboundText);
-    if (!classification.status) {
+    const matchedRow = match && Number.isInteger(match.index) ? rows[match.index] : null;
+    const shouldPersistWebdesignReply = Boolean(matchedRow && isWebdesignOutreachRow(matchedRow));
+    if (!classification.status && !shouldPersistWebdesignReply) {
       return {
         persisted: false,
         rows,
@@ -1541,14 +1726,23 @@ function createColdmailCampaignService(deps = {}) {
       };
     }
 
+    const effectiveClassification = classification.status
+      ? classification
+      : {
+          status: 'reactie_ontvangen',
+          intent: 'unclear',
+          label: 'Reactie ontvangen op webdesign-mail',
+          disableMail: false,
+        };
     const nextRows = rows.slice();
     nextRows[match.index] = markRowFromColdmailReply(
       rows[match.index],
-      classification,
+      effectiveClassification,
       parsedMail,
       inboundText,
       processedKey,
-      actor
+      actor,
+      { mailboxId, mailboxFolder, mailboxAccount }
     );
     await setUiStateValues(
       customerDbScope,
@@ -1566,6 +1760,127 @@ function createColdmailCampaignService(deps = {}) {
       rows: nextRows,
       classification,
       reason: 'updated',
+    };
+  }
+
+  function findWebdesignOutreachRowIndex(rows, input = {}) {
+    const customerId = normalizeString(input.customerId || input.id);
+    const email = normalizeEmailAddress(input.email);
+    const messageKeys = [
+      input.messageId,
+      input.mailboxId,
+      input.replyThreadId,
+      input.replyMessageId,
+    ].map(normalizeMailboxMessageKey).filter(Boolean);
+    if (customerId) {
+      const index = rows.findIndex((row, rowIndex) => getRowId(row, rowIndex) === customerId);
+      if (index >= 0) return index;
+    }
+    if (messageKeys.length) {
+      const index = rows.findIndex((row) => messageKeys.some((key) => matchesOutreachMessage(row, key)));
+      if (index >= 0) return index;
+    }
+    if (email) {
+      const index = rows.findIndex((row) => getRowEmail(row) === email && isWebdesignOutreachRow(row));
+      if (index >= 0) return index;
+    }
+    return -1;
+  }
+
+  function buildOutreachManualHistoryEntry(status, actor) {
+    const databaseStatus = mapOutreachStatusToDatabaseStatus(status);
+    return {
+      type: databaseStatus,
+      label: getOutreachStatusLabel(status),
+      date: now().toISOString(),
+      actor: normalizeString(actor) || 'Mailbox',
+      source: 'webdesign-outreach-action',
+    };
+  }
+
+  function applyWebdesignOutreachStatus(row, status, actor) {
+    const date = now().toISOString();
+    const outreachStatus = normalizeOutreachStatus(status);
+    const databaseStatus = mapOutreachStatusToDatabaseStatus(outreachStatus, row.databaseStatus || row.status);
+    const historyEntry = buildOutreachManualHistoryEntry(outreachStatus, actor);
+    const existingHistory = Array.isArray(row.hist) ? row.hist.filter(Boolean) : [];
+    const noMailFields =
+      outreachStatus === 'geen_interesse'
+        ? {
+            mail: false,
+            canMail: false,
+            doNotMail: true,
+          }
+        : {};
+    return {
+      ...row,
+      ...noMailFields,
+      status: databaseStatus,
+      databaseStatus,
+      outreachStatus,
+      actionRequired: false,
+      outreachActionRequired: false,
+      statusUpdatedAt: date,
+      updatedAt: date,
+      activeColdmailCampaignUntil: isOutreachDefinitiveStatus(outreachStatus)
+        ? ''
+        : row.activeColdmailCampaignUntil,
+      coldmailCampaignEndsAt: isOutreachDefinitiveStatus(outreachStatus)
+        ? ''
+        : row.coldmailCampaignEndsAt,
+      hist: [historyEntry, ...existingHistory].slice(0, 50),
+    };
+  }
+
+  async function updateWebdesignOutreachStatus(input = {}) {
+    const status = normalizeOutreachStatus(input.status);
+    if (!status || status === 'benaderd') {
+      const error = new Error('Kies een geldige outreach-status.');
+      error.code = 'INVALID_OUTREACH_STATUS';
+      error.status = 400;
+      throw error;
+    }
+
+    const state = await getUiStateValues(customerDbScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const rows = parseDatabaseRows(values);
+    const index = findWebdesignOutreachRowIndex(rows, input);
+    if (index < 0 || !rows[index]) {
+      const error = new Error('Webdesign-outreach lead niet gevonden.');
+      error.code = 'OUTREACH_LEAD_NOT_FOUND';
+      error.status = 404;
+      throw error;
+    }
+    if (!isWebdesignOutreachRow(rows[index])) {
+      const error = new Error('Deze lead hoort niet bij een webdesign-outreachmail.');
+      error.code = 'NOT_WEBDESIGN_OUTREACH';
+      error.status = 422;
+      throw error;
+    }
+
+    const nextRows = rows.slice();
+    nextRows[index] = applyWebdesignOutreachStatus(
+      rows[index],
+      status,
+      normalizeString(input.actor) || 'Webdesign outreach'
+    );
+    await setUiStateValues(
+      customerDbScope,
+      {
+        ...values,
+        [customerDbKey]: JSON.stringify(nextRows),
+      },
+      {
+        source: 'webdesign-outreach-action',
+        actor: normalizeString(input.actor) || 'Webdesign outreach',
+      }
+    );
+
+    return {
+      ok: true,
+      status,
+      databaseStatus: nextRows[index].databaseStatus,
+      customer: nextRows[index],
     };
   }
 
@@ -1717,9 +2032,17 @@ function createColdmailCampaignService(deps = {}) {
     if (sentPersistableRowIds.size) {
       const actor = normalizeString(input.actor || 'Coldmailing');
       await recordColdmailSendGuardEntry({ senderEmail, count: sent.length, actor });
-      const updatedRows = rows.map((row, index) =>
-        sentPersistableRowIds.has(getRowId(row, index)) ? markRowAsMailed(row, actor, input.durationDays) : row
-      );
+      const sentByRowId = new Map(sent.map((item) => [item.id, item]));
+      const updatedRows = rows.map((row, index) => {
+        const rowId = getRowId(row, index);
+        if (!sentPersistableRowIds.has(rowId)) return row;
+        const sentItem = sentByRowId.get(rowId) || {};
+        return markRowAsMailed(row, actor, input.durationDays, {
+          senderEmail,
+          specialAction: input.specialAction,
+          messageId: sentItem.messageId,
+        });
+      });
       await setUiStateValues(
         customerDbScope,
         {
@@ -1874,6 +2197,9 @@ function createColdmailCampaignService(deps = {}) {
                     inboundText,
                     processedKey,
                     actor: 'Coldmailing',
+                    mailboxId: buildMailboxMessageId(mailboxName, message.uid),
+                    mailboxFolder: mailboxName,
+                    mailboxAccount: resolveInboundMailboxAccount(parsedMail),
                   });
                   rows = lifecycle.rows;
                   if (lifecycle.persisted) {
@@ -1975,6 +2301,7 @@ function createColdmailCampaignService(deps = {}) {
     listColdmailReplyFollowUps,
     sendColdmailCampaign,
     syncInboundColdmailRepliesFromImap,
+    updateWebdesignOutreachStatus,
   };
 }
 
