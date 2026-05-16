@@ -89,6 +89,17 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /function normalizeOpenLeadOption\(item\) \{/);
   assert.match(source, /function isOpenLeadFollowUpTask\(item\) \{/);
   assert.match(source, /function renderOpenLeadCards\(\) \{/);
+  assert.match(source, /function openOpenLeadActionModal\(lead\) \{/);
+  assert.match(source, /function submitOpenLeadConversion\(event\) \{/);
+  assert.match(source, /Uit systeem halen/);
+  assert.match(source, /Verplaatsen naar actieve opdrachten/);
+  assert.match(source, /Opname toevoegen/);
+  assert.match(source, /function revealConvertedOpenLeadOrder\(order\) \{/);
+  assert.match(source, /window\.appendCustomOrderCard/);
+  assert.doesNotMatch(source, /sessionStorage/);
+  assert.match(source, /\/api\/agenda\/confirmation-tasks\/\$\{encodeURIComponent\(String\(lead\.id\)\)\}\/mark-cancelled/);
+  assert.match(source, /\/api\/agenda\/appointments\/\$\{encodeURIComponent\(String\(lead\.id\)\)\}\/add-active-order/);
+  assert.match(source, /status: 'actieve_opdracht'/);
   assert.match(source, /\/api\/agenda\/confirmation-tasks\?limit=250&quick=1&fresh=1/);
   assert.match(source, /data-order-filter="open_leads"/);
   assert.match(source, /id="filterCountOpenLeads"/);

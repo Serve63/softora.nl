@@ -403,6 +403,7 @@ test('agenda confirmation coordinator waits for queued persist before removing a
     {
       body: {
         actor: 'Serve',
+        status: 'uit_systeem',
       },
     },
     res,
@@ -413,6 +414,8 @@ test('agenda confirmation coordinator waits for queued persist before removing a
   assert.equal(res.body.ok, true);
   assert.equal(res.body.cancelled, true);
   assert.equal(appointments[0].confirmationAppointmentCancelled, true);
+  assert.equal(appointments[0].postCallStatus, 'uit_systeem');
+  assert.equal(appointments[0].needsConfirmationEmail, false);
   assert.equal(dismissCalls[0].reason, 'confirmation_task_mark_cancelled_dismiss');
   assert.equal(activityCalls[0].reason, 'dashboard_activity_mark_cancelled');
   assert.deepEqual(persistWaitCalls, ['waited']);
