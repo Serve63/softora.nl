@@ -360,6 +360,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const verifyCriticalSource = readRepoFile('scripts/verify-critical.js');
   const hygieneSource = readRepoFile('scripts/check-repo-hygiene.sh');
   const cleanSource = readRepoFile('scripts/clean-local-artifacts.sh');
+  const guardrailsSource = readRepoFile('scripts/check-agent-guardrails.js');
   const deployGuardSource = readRepoFile('scripts/guard-production-deploy-source.js');
   const qualityLockSource = readRepoFile('scripts/check-quality-lock.js');
   const liveVersionSource = readRepoFile('scripts/check-live-production-version.js');
@@ -382,6 +383,13 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(hygieneSource, /npm run clean:local/);
   assert.match(cleanSource, /\.vercel\/output/);
   assert.doesNotMatch(cleanSource, /rm -rf -- "\.vercel"/);
+  assert.match(guardrailsSource, /function getGuardrailDiffBaseRef\(\)/);
+  assert.match(guardrailsSource, /GUARDRAILS_BASE_REF/);
+  assert.match(guardrailsSource, /GITHUB_BASE_REF/);
+  assert.match(guardrailsSource, /origin\/main/);
+  assert.match(guardrailsSource, /\['merge-base', baseRef, 'HEAD'\]/);
+  assert.match(guardrailsSource, /\['diff', '--name-only', '--diff-filter=ACMR', branchDiffBase, '--'\]/);
+  assert.match(guardrailsSource, /\['diff', '--unified=0', branchDiffBase, '--', filePath\]/);
   assert.match(deployGuardSource, /mainRef\.stdout !== headRef\.stdout/);
   assert.match(deployGuardSource, /exact origin\/main/);
   assert.match(qualityLockSource, /curl/);
