@@ -118,7 +118,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function resolveBootstrapCustomers\(\)/);
   assert.match(
     pageSource,
-    /const initialBootstrapCustomers = resolveBootstrapCustomers\(\);[\s\S]*state\.klanten = sortCustomers\(initialBootstrapCustomers\);[\s\S]*renderPage\(\);/
+    /const initialBootstrapCustomers = resolveBootstrapCustomers\(\);[\s\S]*state\.klanten = sortCustomers\(outreachController\.applyAutomation\(initialBootstrapCustomers\)\.customers\);[\s\S]*renderPage\(\);/
   );
   assert.match(pageSource, /const hadBootstrapCustomers = state\.klanten\.length > 0;/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
@@ -1056,12 +1056,19 @@ test('premium database webdesign action releases slow saved photo loaders after 
 test('premium database page combines contact filters into one benaderd step', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const webdesignActionSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-webdesign-action.js'), 'utf8');
 
   assert.match(
     pageSource,
-    /<button class="sf-btn act" data-s="alle" type="button">Alle<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
+    /<button class="sf-btn act" data-s="alle" type="button">Alle<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<button class="sf-btn" data-s="reactie_ontvangen" type="button">Reactie ontvangen<\/button>\s*<button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
   );
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
+  assert.match(pageSource, /state\.activeStatus === "reactie_ontvangen"/);
+  assert.match(pageSource, /Reactie ontvangen/);
+  assert.match(webdesignActionSource, /data-outreach-status=\\"klant_geworden\\"/);
+  assert.match(webdesignActionSource, /data-outreach-status=\\"afgehaakt\\"/);
+  assert.match(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
+  assert.match(webdesignActionSource, /Mail bekijken/);
   assert.match(pageSource, /!hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\)/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gebeld" type="button">Gebeld<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gemaild" type="button">Gemaild<\/button>/);

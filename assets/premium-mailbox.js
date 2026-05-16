@@ -465,6 +465,9 @@ function normalizeMailboxApiMessage(message) {
     subject: message.subject || '(Geen onderwerp)',
     preview,
     body,
+    messageId: message.messageId || '',
+    inReplyTo: message.inReplyTo || '',
+    references: message.references || '',
     time: when.time,
     date: when.date,
     uid: message.uid,
@@ -515,7 +518,13 @@ async function loadMailboxMessages() {
       throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
     }
     mails = Array.isArray(data.messages) ? data.messages.map(normalizeMailboxApiMessage) : [];
+    if (window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.hydrate === 'function') {
+      mails = await window.SoftoraMailboxOutreach.hydrate(mails);
+    }
     renderList();
+    if (window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.applyIntentAfterLoad === 'function') {
+      window.SoftoraMailboxOutreach.applyIntentAfterLoad({ getMails: () => mails, openMail, renderList, toast });
+    }
   } catch (error) {
     mails = [];
     syncInboxBadgeFromCurrentFolder();
@@ -526,14 +535,14 @@ async function loadMailboxMessages() {
   }
 }
 
-async function applyMailboxAccount(email) {
+async function applyMailboxAccount(email, options = {}) {
   const normalizedEmail = normalizeMailboxEmail(email);
   activeMailboxAccount = hasMailboxAccount(normalizedEmail) ? normalizedEmail : (mailboxAccounts[0]?.email || MAILBOX_ACCOUNT_DEFAULT);
-  activeFolder = 'inbox';
+  activeFolder = String(options.folder || 'inbox').trim().toLowerCase() || 'inbox';
   activeMail = null;
   const searchInput = document.getElementById('search-input');
-  if (searchInput) searchInput.value = '';
-  document.querySelectorAll('.folder-item').forEach((f, i) => f.classList.toggle('active', i === 0));
+  if (searchInput && !options.keepSearch) searchInput.value = '';
+  applyMailboxFolderUi(activeFolder);
   setMailboxAccountUi(activeMailboxAccount);
   resetDetailEmpty();
   await loadMailboxMessages();
@@ -552,11 +561,8 @@ async function pinMailboxAccount(email) {
 function setFolder(folder, el) {
   activeFolder = folder;
   activeMail = null;
-  const folderEl = el || Array.from(document.querySelectorAll('[data-mailbox-folder]')).find(item => item.getAttribute('data-mailbox-folder') === folder);
-  document.querySelectorAll('.folder-item').forEach(f => f.classList.toggle('active', f === folderEl));
-  const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
-  const folderLabelEl = document.getElementById('folder-label');
-  if (folderLabelEl) folderLabelEl.textContent = labels[folder] || folder;
+  void el;
+  applyMailboxFolderUi(folder);
   resetDetailEmpty();
   void loadMailboxMessages();
 }
@@ -588,7 +594,7 @@ function renderList() {
   const searchInput = document.getElementById('search-input');
   const q = ((searchInput && searchInput.value) || '').toLowerCase();
   let list = getMailsForFolder(activeFolder);
-  if (q) list = list.filter(m => m.from.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q) || m.preview.toLowerCase().includes(q));
+  if (q) list = list.filter(m => m.from.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q) || m.preview.toLowerCase().includes(q));
   const wrap = document.getElementById('mail-items');
   if (!wrap) return;
   syncInboxBadgeFromCurrentFolder();
@@ -641,6 +647,9 @@ function openMail(id) {
   m.unread = false;
   renderList();
   if (wasUnread) void persistMailReadState(m);
+  const outreachQuickbar = window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.renderQuickbar === 'function'
+    ? window.SoftoraMailboxOutreach.renderQuickbar(m, { escapeHtml })
+    : '';
 
   document.getElementById('mail-detail').innerHTML = `
     <div class="detail-header">
@@ -674,6 +683,7 @@ function openMail(id) {
     </div>
     <div class="detail-body">
       <div class="detail-body-text">${renderMailBody(m.body)}</div>
+      ${outreachQuickbar}
     </div>`;
 }
 
@@ -834,6 +844,14 @@ async function sendMail() {
   }
 }
 
+function applyMailboxFolderUi(folder) {
+  const folderEl = Array.from(document.querySelectorAll('[data-mailbox-folder]')).find(item => item.getAttribute('data-mailbox-folder') === folder);
+  document.querySelectorAll('.folder-item').forEach(f => f.classList.toggle('active', f === folderEl));
+  const folderLabelEl = document.getElementById('folder-label');
+  const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
+  if (folderLabelEl) folderLabelEl.textContent = labels[folder] || folder;
+}
+
 function toast(msg) {
   const t = document.getElementById('toast');
   if (!t) return;
@@ -846,6 +864,13 @@ function toast(msg) {
 function handleMailboxAction(actionEl) {
   const action = actionEl.getAttribute('data-mailbox-action');
   const id = actionEl.getAttribute('data-mailbox-id');
+  if (
+    window.SoftoraMailboxOutreach &&
+    typeof window.SoftoraMailboxOutreach.handleAction === 'function' &&
+    window.SoftoraMailboxOutreach.handleAction(actionEl, { findMailById, openMail, renderList, toast })
+  ) {
+    return;
+  }
 
   switch (action) {
     case 'open-compose':
@@ -959,8 +984,18 @@ window.addEventListener('keydown', (event) => {
 
 (async function initMailboxAccount() {
   await initializeMailboxAccountPreference();
+  const intent = window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.readIntent === 'function'
+    ? window.SoftoraMailboxOutreach.readIntent()
+    : {};
+  if (intent.account) activeMailboxAccount = intent.account;
   await loadMailboxAccounts();
-  await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT);
+  if (intent.account && mailboxAccounts.some((account) => account.email === intent.account)) {
+    activeMailboxAccount = intent.account;
+  }
+  await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT, {
+    folder: intent.folder || 'inbox',
+    keepSearch: true,
+  });
 })();
 
 function finishPremiumShellBoot() {

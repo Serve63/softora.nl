@@ -349,7 +349,7 @@ test('coldmail campaign replaces website variable from database website aliases'
 });
 
 test('coldmail campaign attaches webdesign photo and device mockup inline and as attachments', async () => {
-  const { service, sentMessages } = createService({
+  const { service, sentMessages, getSavedState } = createService({
     rows: [
       {
         id: 'prospect-1',
@@ -425,6 +425,13 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
   assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-prospect-1@softora');
   assert.equal(sentMessages[0].attachments[1].contentDisposition, 'inline');
   assert.equal(sentMessages[0].attachments[1].contentType, 'image/png');
+  const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
+  assert.equal(savedRows[0].campaignType, 'webdesign');
+  assert.equal(savedRows[0].outreachStatus, 'benaderd');
+  assert.equal(savedRows[0].sentFromEmail, 'info@softora.nl');
+  assert.equal(savedRows[0].outreachSentAt, '2026-04-24T12:00:00.000Z');
+  assert.equal(savedRows[0].coldmailSentMessageId, 'msg-1');
+  assert.equal(savedRows[0].actionRequired, false);
 });
 
 test('coldmail campaign keeps the closing signature before webdesign photos', async () => {
@@ -471,6 +478,109 @@ test('coldmail campaign keeps the closing signature before webdesign photos', as
   assert.ok(captionIndex > imageIndex);
   assert.ok(mockupIndex > captionIndex);
   assert.doesNotMatch(html, /href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+});
+
+test('webdesign outreach reply is marked action required without auto-interest status', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-webdesign@example.test>',
+    subject: 'Re: Nieuwe website',
+    text: 'Hoi Servé, dit klinkt interessant. Kun je meer informatie sturen?',
+    from: { value: [{ address: 'ruben@example.test', name: 'Ruben' }] },
+    to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
+    cc: { value: [] },
+    references: '<sent-webdesign@softora>',
+  };
+  const { service, getSavedStates } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    openAiApiKey: 'openai-secret',
+    coldmailAutoReplyEnabled: true,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        campaignType: 'webdesign',
+        outreachStatus: 'benaderd',
+        lastColdmailSentAt: '2026-04-24T12:00:00.000Z',
+        mail: true,
+        hist: [],
+      },
+    ],
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [7],
+      fetch: async function* () {
+        yield { uid: 7, source: 'raw-message', flags: new Set() };
+      },
+      messageFlagsAdd: async () => {},
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: {
+        model: 'gpt-5.5-pro',
+        choices: [{ message: { content: 'Hoi, leuk dat je reageert. Ik stuur je wat meer info.' } }],
+      },
+    }),
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+  const customerWrite = getSavedStates().find((item) => item.scope === 'premium_customers_database');
+  const savedRows = JSON.parse(customerWrite.values.softora_customers_premium_v1);
+
+  assert.equal(result.lifecycleUpdated, 1);
+  assert.equal(savedRows[0].databaseStatus, 'gemaild');
+  assert.equal(savedRows[0].status, 'gemaild');
+  assert.equal(savedRows[0].outreachStatus, 'reactie_ontvangen');
+  assert.equal(savedRows[0].actionRequired, true);
+  assert.equal(savedRows[0].replyMailboxId, 'inbox:7');
+  assert.equal(savedRows[0].replyMailboxAccount, 'serve@softora.nl');
+  assert.equal(savedRows[0].hist[0].type, 'reactie_ontvangen');
+});
+
+test('webdesign outreach status action promotes lead and clears action required', async () => {
+  const { service, getSavedState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        campaignType: 'webdesign',
+        outreachStatus: 'reactie_ontvangen',
+        actionRequired: true,
+        replyMailboxId: 'inbox:7',
+        mail: true,
+        hist: [],
+      },
+    ],
+  });
+
+  const result = await service.updateWebdesignOutreachStatus({
+    mailboxId: 'inbox:7',
+    status: 'geen_interesse',
+    actor: 'Servé',
+  });
+  const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'geen_interesse');
+  assert.equal(savedRows[0].databaseStatus, 'geblokkeerd');
+  assert.equal(savedRows[0].outreachStatus, 'geen_interesse');
+  assert.equal(savedRows[0].actionRequired, false);
+  assert.equal(savedRows[0].mail, false);
+  assert.equal(savedRows[0].doNotMail, true);
+  assert.equal(savedRows[0].hist[0].source, 'webdesign-outreach-action');
 });
 
 test('coldmail campaign can disable automatic campaign end date', async () => {
@@ -2104,6 +2214,43 @@ test('coldmail campaign sends through the selected mailbox smtp account when con
     user: 'serve@softora.nl',
     pass: 'serve-secret',
   });
+});
+
+test('coldmail campaign saves sent copies into the selected sender sent folder', async () => {
+  const appendedMessages = [];
+  const client = {
+    usable: true,
+    async connect() {},
+    async list() {
+      return [{ path: 'INBOX' }, { path: 'INBOX/Verstuurd' }];
+    },
+    async append(mailboxName, raw, flags) {
+      appendedMessages.push({ mailboxName, raw, flags });
+      return { path: mailboxName };
+    },
+    async logout() {
+      this.usable = false;
+    },
+  };
+  const { service } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    createImapClient: () => client,
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.sentItems[0].sentCopySaved, true);
+  assert.equal(appendedMessages.length, 1);
+  assert.equal(appendedMessages[0].mailboxName, 'INBOX/Verstuurd');
+  assert.match(String(appendedMessages[0].raw), /Subject: Nieuwe website voor Bakkerij Zon/);
 });
 
 test('coldmail campaign refuses to send when SMTP is not configured', async () => {

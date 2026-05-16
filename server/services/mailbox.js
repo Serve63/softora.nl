@@ -1,6 +1,11 @@
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const {
+  appendSentMessage,
+  publicListErrorMessage,
+  resolveMailboxName,
+} = require('./mailbox-sent-copy');
 
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
@@ -465,73 +470,6 @@ function createMailboxService(deps = {}) {
     });
   }
 
-  function normalizeMailboxKey(value) {
-    return normalizeString(value)
-      .toLowerCase()
-      .replace(/[\\/]+/g, '/')
-      .replace(/\.+/g, '/')
-      .replace(/\s+/g, ' ')
-      .replace(/\/+/g, '/');
-  }
-
-  function getMailboxPath(box) {
-    return normalizeString(box?.path || box?.name || '');
-  }
-
-  function normalizeSpecialUse(value) {
-    return normalizeString(value).replace(/^\\/, '').toLowerCase();
-  }
-
-  function getMailboxSpecialUses(box) {
-    const values = [];
-    if (box?.specialUse) values.push(box.specialUse);
-    const flags = box?.flags;
-    if (Array.isArray(flags)) {
-      values.push(...flags);
-    } else if (flags && typeof flags[Symbol.iterator] === 'function') {
-      values.push(...Array.from(flags));
-    }
-    return values.map(normalizeSpecialUse).filter(Boolean);
-  }
-
-  async function resolveMailboxName(client, folder) {
-    const candidates = FOLDER_ALIASES[folder] || ['INBOX'];
-    const boxes = await client.list();
-    const items = Array.isArray(boxes) ? boxes : [];
-    const names = items.map(getMailboxPath).filter(Boolean);
-    const specialUses = FOLDER_SPECIAL_USES[folder] || [];
-    if (specialUses.length) {
-      const specialUseHit = items.find((box) => {
-        const values = getMailboxSpecialUses(box);
-        return values.some((value) => specialUses.includes(value));
-      });
-      const specialUsePath = getMailboxPath(specialUseHit);
-      if (specialUsePath) return specialUsePath;
-    }
-    const candidateKeys = new Set(candidates.map(normalizeMailboxKey).filter(Boolean));
-    for (const candidate of candidates) {
-      const candidateKey = normalizeMailboxKey(candidate);
-      const hit = names.find((name) => normalizeMailboxKey(name) === candidateKey);
-      if (hit) return hit;
-    }
-    const leafHit = names.find((name) => {
-      const key = normalizeMailboxKey(name);
-      const leaf = key.split('/').filter(Boolean).pop();
-      return folder !== 'inbox' && leaf && candidateKeys.has(leaf);
-    });
-    if (leafHit) return leafHit;
-    return folder === 'inbox' ? candidates[0] : null;
-  }
-
-  function publicListErrorMessage(error, folder) {
-    const message = String(error?.message || '');
-    if (/command failed/i.test(message)) {
-      const label = FOLDER_LABELS[folder] || 'Mailboxmap';
-      return `${label} kon niet worden geopend. Controleer of deze map bestaat voor dit account.`;
-    }
-    return message || 'Onbekende fout';
-  }
-
   function addressText(address) {
     if (!address) return '';
     const list = Array.isArray(address) ? address : [address];
@@ -562,6 +500,11 @@ function createMailboxService(deps = {}) {
       preview,
       body: text || preview,
       date: date.toISOString(),
+      messageId: normalizeString(parsed.messageId || ''),
+      inReplyTo: normalizeString(parsed.inReplyTo || ''),
+      references: Array.isArray(parsed.references)
+        ? parsed.references.map((item) => normalizeString(item)).filter(Boolean).join(' ')
+        : normalizeString(parsed.references || ''),
       unread: !Array.from(message.flags || []).includes('\\Seen'),
       starred: Array.from(message.flags || []).includes('\\Flagged'),
     };
@@ -665,59 +608,33 @@ function createMailboxService(deps = {}) {
       error.status = 400;
       throw error;
     }
-    const message = {
-      from: account.name ? `${account.name} <${account.email}>` : account.email,
-      to: normalizeEmail(to),
-      subject: cleanSubject,
-      text: normalizeString(text),
-      date: new Date(),
-    };
     const transporter = createTransport({
       host: account.smtpHost,
       port: account.smtpPort,
       secure: account.smtpSecure,
       auth: { user: account.smtpUser, pass: account.smtpPass },
     });
-    const info = await transporter.sendMail(message);
-    await appendMessageToSentFolder(account, message).catch((error) => {
-      logger.warn?.('Mailbox sent append failed', {
-        account: account.email,
-        error: normalizeString(error && error.message),
-      });
+    const mail = {
+      from: account.name ? `${account.name} <${account.email}>` : account.email,
+      to: normalizeEmail(to),
+      subject: cleanSubject,
+      text: normalizeString(text),
+    };
+    const info = await transporter.sendMail(mail);
+    const sentCopySaved = await appendSentMessage({
+      account,
+      createImapClient,
+      nodemailer,
+      mail,
+      messageId: normalizeString(info?.messageId || ''),
+      sentAt: new Date(),
     });
     return {
       messageId: normalizeString(info?.messageId || ''),
       accepted: Array.isArray(info?.accepted) ? info.accepted : [],
       rejected: Array.isArray(info?.rejected) ? info.rejected : [],
+      sentCopySaved,
     };
-  }
-
-  async function buildRawSentMessage(message) {
-    const streamTransport = nodemailer.createTransport({
-      streamTransport: true,
-      buffer: true,
-      newline: 'unix',
-    });
-    const info = await streamTransport.sendMail(message);
-    return info && info.message ? info.message : null;
-  }
-
-  async function appendMessageToSentFolder(account, message) {
-    if (!account || !account.imapConfigured) return false;
-    const rawMessage = await buildRawSentMessage(message);
-    if (!rawMessage) return false;
-    const client = createClient(account);
-    try {
-      await client.connect();
-      const sentMailboxName = await resolveMailboxName(client, 'sent');
-      if (!sentMailboxName || typeof client.append !== 'function') return false;
-      await client.append(sentMailboxName, rawMessage, ['\\Seen'], message.date || new Date());
-      return true;
-    } finally {
-      try {
-        if (client.usable) await client.logout();
-      } catch (_) {}
-    }
   }
 
   function cleanPromptText(value, maxLength = 6000) {

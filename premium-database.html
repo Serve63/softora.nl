@@ -1432,13 +1432,7 @@
                             <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
                         <div class="status-filter">
-                            <button class="sf-btn act" data-s="alle" type="button">Alle</button>
-                            <button class="sf-btn" data-s="klant" type="button">Klant</button>
-                            <button class="sf-btn" data-s="benaderd" type="button">Benaderd</button>
-                            <button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt</button>
-                            <button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button>
-                            <button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar</button>
-                            <button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
+                            <button class="sf-btn act" data-s="alle" type="button">Alle</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="reactie_ontvangen" type="button">Reactie ontvangen</button><button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
@@ -1824,6 +1818,7 @@
             const normalized = normalizeString(value).toLowerCase();
             if (DATABASE_STATUS_OPTIONS.indexOf(normalized) !== -1) return normalized;
             if (normalized === "interested" || normalized === "geinteresseerd" || normalized === "geïnteresseerd") return "interesse";
+            if (normalized === "reactie_ontvangen" || normalized === "reply_received" || normalized === "benaderd") return "gemaild"; if (normalized === "geen_interesse" || normalized === "opt_out") return "geblokkeerd"; if (normalized === "geen_gehoor") return "geengehoor"; if (normalized === "klant_geworden") return "klant";
             if (normalized === "no_deal" || normalized === "geendeal" || normalized === "lost") return "afgehaakt";
             if (normalized === "betaald") return "klant";
             if (normalized === "open") return "benaderbaar";
@@ -1906,7 +1901,7 @@
                 bedrag: normalizeStoredAmount(raw && raw.bedrag),
                 actief: normalizeString(raw && raw.actief),
                 review: normalizeString(raw && raw.review),
-                datum: normalizeString(raw && raw.datum)
+                datum: normalizeString(raw && raw.datum), ...window.SoftoraDatabaseOutreach.normalizeCustomerFields(raw)
             };
         }
 
@@ -2171,6 +2166,7 @@
         function scheduleVisibleMockupEnsure() { if (mockupAutoEnsureQueued || state.photoRestorePending) return; mockupAutoEnsureQueued = true; setTimeout(function () { mockupAutoEnsureQueued = false; void webdesignMockupController.ensureVisibleMockups(getSortedCustomers(getFilteredCustomers()), 24).catch(function (error) { console.error("Device-mockups automatisch maken mislukt:", error); }); }, 0); }
         const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, ensureMockupForCustomer: function (customerId) { return webdesignMockupController.ensureForCustomer(customerId); }, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, refreshPhotos: async function (context) { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true }); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); if (context && context.customerId) await webdesignMockupController.ensureForCustomer(context.customerId); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
+        const outreachController = window.SoftoraDatabaseOutreach.createController({ state, nodes, escapeHtml, normalizeSearchValue, normalizeDatabaseStatus, formatDisplayDate, parseDateValue, normalizeCustomer, persistCustomerList, renderPage, setStatusMessage });
         function mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers) {
             const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
             const photosByIdentity = new Map();
@@ -2243,6 +2239,7 @@
             return state.klanten.filter(function (customer) {
                 if (state.activeStatus === "benaderd") {
                     if (!hasUsedColdCalling(customer) && !hasUsedColdMailing(customer)) return false;
+                } else if (state.activeStatus === "reactie_ontvangen" && !outreachController.isActionRequired(customer)) { return false;
                 } else if (state.activeStatus !== "alle" && customer.status !== state.activeStatus) {
                     return false;
                 }
@@ -2259,7 +2256,7 @@
                     customer.status,
                     customer.verantwoordelijk,
                     customer.website,
-                    formatCustomerServiceLabel(customer.service)
+                    formatCustomerServiceLabel(customer.service), outreachController.augmentSearchHaystack(customer)
                 ].join(" ").toLowerCase();
 
                 return haystack.indexOf(query) !== -1;
@@ -2314,7 +2311,7 @@
             if (isColdmailTestCompany(customer)) return false;
             const status = normalizeDatabaseStatus(customer && customer.status, customer);
             if (status === "gemaild") return true;
-            if (normalizeString(customer && (customer.lastColdmailSentAt || customer.lastMailSentAt || customer.lastMailedAt))) return true;
+            if (normalizeString(customer && (customer.outreachSentAt || customer.outreach_sent_at || customer.lastColdmailSentAt || customer.lastMailSentAt || customer.lastMailedAt))) return true;
             return hasHistorySignal(customer, function (text) {
                 return /\b(gemaild|mail verstuurd|mailcontact|coldmail|cold mailing|email)\b/.test(text);
             });
@@ -2384,18 +2381,19 @@
                 const websiteHtml = websiteHref
                     ? "<a class=\"website-link\" href=\"" + escapeHtml(websiteHref) + "\" target=\"_blank\" rel=\"noopener\">" + escapeHtml(websiteValue) + "</a>"
                     : escapeHtml(websiteValue);
+                const statusLabel = outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.getStatusLabel(outreachController.getEffectiveStatus(customer)) : getStatusLabel(customer.status);
                 return [
                     "<tr data-id=\"" + escapeHtml(customer.id) + "\">",
-                        "<td><div class=\"company-cell\"><button class=\"company-edit\" type=\"button\" data-edit-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Bedrijfsgegevens aanpassen\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z\"/></svg></button><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div></div></td>",
+                        "<td><div class=\"company-cell\"><button class=\"company-edit\" type=\"button\" data-edit-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Bedrijfsgegevens aanpassen\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z\"/></svg></button><div><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div>" + outreachController.renderMeta(customer) + "</div></div></td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.stad) + "</td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.email || "—") + "</td>",
                         "<td class=\"c-mid\">" + escapeHtml(formatPhoneNumber(customer.tel)) + "</td>",
                         "<td class=\"c-mid\">" + websiteHtml + "</td>",
                         "<td><div class=\"kanalen\">",
                             renderUsedChannelTags(customer),
-                        "</div></td>",
-                        "<td><div class=\"s-wrap s-" + escapeHtml(customer.status) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(getStatusLabel(customer.status)) + "</div></div></td>",
-                        "<td class=\"c-light\">" + escapeHtml(formatDisplayDate(customer.updatedAt)) + "</td>",
+                        "</div>" + outreachController.renderActions(customer) + "</td>",
+                        "<td><div class=\"s-wrap s-" + escapeHtml(customer.status) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(statusLabel) + "</div></div></td>",
+                        "<td class=\"c-light\">" + (outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderReplyInfo(customer) : escapeHtml(formatDisplayDate(customer.updatedAt))) + "</td>",
                         "<td>" + renderWebsitePhotoDrop(customer) + "</td>",
                     "</tr>"
                 ].join("");
@@ -3064,7 +3062,8 @@
 
                     try {
                         const photoMap = await loadCustomerPhotoMap(enrichedCustomers);
-                        applyCustomerList(mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten), false);
+                        const outreachAutomation = outreachController.applyAutomation(mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten));
+                        const sortedCustomers = getSortedCustomers(outreachAutomation.customers); applyCustomerList(sortedCustomers, false); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
                     } catch (error) {
                         console.error("Databasefoto's laden via Supabase mislukt:", error);
                     }
@@ -3082,7 +3081,7 @@
 
         const initialBootstrapCustomers = resolveBootstrapCustomers();
         if (initialBootstrapCustomers.length) {
-            state.klanten = sortCustomers(initialBootstrapCustomers);
+            state.klanten = sortCustomers(outreachController.applyAutomation(initialBootstrapCustomers).customers);
         }
         applyDatabaseUrlIntent();
         renderPage();
@@ -3134,6 +3133,7 @@
         });
 
         nodes.tbody.addEventListener("click", function (event) {
+            const outreachButton = event.target.closest(".outreach-action"); if (outreachButton) { event.preventDefault(); event.stopPropagation(); void outreachController.updateStatus(outreachButton.getAttribute("data-outreach-id"), outreachButton.getAttribute("data-outreach-status")); return; }
             const editButton = event.target.closest(".company-edit");
             if (editButton) {
                 event.preventDefault();

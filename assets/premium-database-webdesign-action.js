@@ -551,6 +551,248 @@
         };
     }
 
+    function createOutreachController(options) {
+        const state = options.state;
+        const nodes = options.nodes;
+        const escapeHtml = options.escapeHtml;
+        const normalizeSearchValue = options.normalizeSearchValue;
+        const normalizeDatabaseStatus = options.normalizeDatabaseStatus;
+        const formatDisplayDate = options.formatDisplayDate;
+        const parseDateValue = options.parseDateValue;
+        const normalizeCustomer = options.normalizeCustomer;
+        const persistCustomerList = options.persistCustomerList;
+        const renderPage = options.renderPage;
+        const setStatusMessage = options.setStatusMessage;
+        const STYLE_OUTREACH_ID = "softora-database-outreach-style";
+
+        function ensureOutreachStyles() {
+            if (!global.document || global.document.getElementById(STYLE_OUTREACH_ID)) return;
+            const style = global.document.createElement("style");
+            style.id = STYLE_OUTREACH_ID;
+            style.textContent = ".outreach-line{margin-top:4px;color:var(--light);font-size:11px;line-height:1.35;white-space:normal}.outreach-badge{display:inline-flex;align-items:center;width:fit-content;margin-top:6px;padding:3px 8px;border-radius:999px;background:rgba(22,115,60,.1);color:var(--green);font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}.outreach-reply{display:flex;flex-direction:column;gap:3px;color:var(--mid);font-size:12px;line-height:1.35}.outreach-reply strong{color:var(--dark);font-size:12px}.outreach-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.outreach-action{border:1px solid rgba(155,35,85,.18);border-radius:6px;background:rgba(255,255,255,.78);color:var(--crimson);cursor:pointer;font-family:Oswald,sans-serif;font-size:10px;font-weight:700;letter-spacing:.7px;line-height:1;padding:8px 9px;text-transform:uppercase;transition:background .15s ease,border-color .15s ease,color .15s ease}.outreach-action:hover{background:rgba(155,35,85,.08);border-color:rgba(155,35,85,.34)}.outreach-action[data-outreach-status=\"klant_geworden\"]{background:var(--crimson);border-color:var(--crimson);color:#fff}";
+            global.document.head.appendChild(style);
+        }
+
+        function normalizeOutreachValue(value) {
+            return normalizeString(value).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+        }
+
+        function normalizeOutreachStatus(value) {
+            const normalized = normalizeOutreachValue(value);
+            if (["benaderd", "gemaild", "sent", "mailed"].indexOf(normalized) !== -1) return "benaderd";
+            if (["reactie_ontvangen", "reply_received", "actie_nodig", "action_required"].indexOf(normalized) !== -1) return "reactie_ontvangen";
+            if (["interesse", "interested", "geinteresseerd"].indexOf(normalized) !== -1) return "interesse";
+            if (["geen_interesse", "geblokkeerd", "opt_out", "unsubscribe", "geenbehoefte"].indexOf(normalized) !== -1) return "geen_interesse";
+            if (["afgehaakt", "lost", "no_deal", "geendeal"].indexOf(normalized) !== -1) return "afgehaakt";
+            if (["geen_gehoor", "geengehoor", "no_answer"].indexOf(normalized) !== -1) return "geen_gehoor";
+            if (["klant_geworden", "klant", "customer", "paid"].indexOf(normalized) !== -1) return "klant_geworden";
+            return "";
+        }
+
+        function normalizeBooleanFlag(value) {
+            const normalized = normalizeString(value).toLowerCase();
+            if (["false", "nee", "no", "0", "uit"].indexOf(normalized) !== -1) return false;
+            return value === true || normalized === "true" || normalized === "ja" || normalized === "yes" || normalized === "1";
+        }
+
+        function normalizeCustomerFields(raw) {
+            return {
+                campaignType: normalizeString(raw && (raw.campaignType || raw.campaign_type)),
+                campaign_type: normalizeString(raw && (raw.campaign_type || raw.campaignType)),
+                outreachCampaignType: normalizeString(raw && (raw.outreachCampaignType || raw.outreach_campaign_type)),
+                outreach_campaign_type: normalizeString(raw && (raw.outreach_campaign_type || raw.outreachCampaignType)),
+                coldmailSpecialAction: normalizeString(raw && raw.coldmailSpecialAction),
+                outreachStatus: normalizeString(raw && raw.outreachStatus),
+                actionRequired: normalizeBooleanFlag(raw && (raw.actionRequired || raw.outreachActionRequired)),
+                outreachActionRequired: normalizeBooleanFlag(raw && (raw.outreachActionRequired || raw.actionRequired)),
+                sentFromEmail: normalizeString(raw && (raw.sentFromEmail || raw.sent_from_email || raw.outreachSentFromEmail || raw.lastColdmailSenderEmail)),
+                sent_from_email: normalizeString(raw && (raw.sent_from_email || raw.sentFromEmail || raw.outreachSentFromEmail || raw.lastColdmailSenderEmail)),
+                outreachSentFromEmail: normalizeString(raw && (raw.outreachSentFromEmail || raw.sentFromEmail || raw.sent_from_email || raw.lastColdmailSenderEmail)),
+                outreachSentAt: normalizeString(raw && (raw.outreachSentAt || raw.outreach_sent_at || raw.lastColdmailSentAt || raw.lastMailSentAt)),
+                outreach_sent_at: normalizeString(raw && (raw.outreach_sent_at || raw.outreachSentAt || raw.lastColdmailSentAt || raw.lastMailSentAt)),
+                lastReplyAt: normalizeString(raw && (raw.lastReplyAt || raw.last_reply_at || raw.lastColdmailReplyAt)),
+                last_reply_at: normalizeString(raw && (raw.last_reply_at || raw.lastReplyAt || raw.lastColdmailReplyAt)),
+                replyThreadId: normalizeString(raw && (raw.replyThreadId || raw.reply_thread_id || raw.replyMailboxId || raw.lastColdmailReplyMessageKey)),
+                reply_thread_id: normalizeString(raw && (raw.reply_thread_id || raw.replyThreadId || raw.replyMailboxId || raw.lastColdmailReplyMessageKey)),
+                replyMessageId: normalizeString(raw && raw.replyMessageId),
+                replyMailboxId: normalizeString(raw && raw.replyMailboxId),
+                replyMailboxFolder: normalizeString(raw && raw.replyMailboxFolder),
+                replyMailboxAccount: normalizeString(raw && raw.replyMailboxAccount),
+                coldmailSentMessageId: normalizeString(raw && raw.coldmailSentMessageId),
+                outreachMessageId: normalizeString(raw && raw.outreachMessageId),
+                lastColdmailSenderEmail: normalizeString(raw && raw.lastColdmailSenderEmail),
+                lastMailSentAt: normalizeString(raw && raw.lastMailSentAt),
+                lastColdmailSentAt: normalizeString(raw && raw.lastColdmailSentAt),
+                coldmailCampaignStartedAt: normalizeString(raw && raw.coldmailCampaignStartedAt),
+                coldmailCampaignDurationDays: raw && raw.coldmailCampaignDurationDays,
+                coldmailCampaignEndsAt: normalizeString(raw && raw.coldmailCampaignEndsAt),
+                activeColdmailCampaignUntil: normalizeString(raw && raw.activeColdmailCampaignUntil),
+                lastColdmailReplyAt: normalizeString(raw && raw.lastColdmailReplyAt),
+                lastColdmailReplySubject: normalizeString(raw && raw.lastColdmailReplySubject),
+                lastColdmailReplyPreview: normalizeString(raw && raw.lastColdmailReplyPreview),
+                lastColdmailReplyMessageKey: normalizeString(raw && raw.lastColdmailReplyMessageKey),
+                coldmailReplyIntent: normalizeString(raw && raw.coldmailReplyIntent),
+                statusUpdatedAt: normalizeString(raw && raw.statusUpdatedAt)
+            };
+        }
+
+        function isWebdesignOutreachCustomer(customer) {
+            return Boolean(customer) && [customer.campaignType, customer.campaign_type, customer.outreachCampaignType, customer.outreach_campaign_type, customer.coldmailSpecialAction].some(function (value) {
+                const normalized = normalizeOutreachValue(value);
+                return normalized === "webdesign" || normalized === "website_design";
+            });
+        }
+
+        function isDefinitiveOutreachStatus(status) {
+            return ["interesse", "geen_interesse", "afgehaakt", "geen_gehoor", "klant_geworden"].indexOf(normalizeOutreachStatus(status)) !== -1;
+        }
+
+        function mapDatabaseStatus(customer) {
+            const status = normalizeDatabaseStatus(customer && customer.status, customer);
+            if (status === "interesse") return "interesse";
+            if (status === "geblokkeerd") return "geen_interesse";
+            if (status === "afgehaakt") return "afgehaakt";
+            if (status === "geengehoor") return "geen_gehoor";
+            if (status === "klant") return "klant_geworden";
+            return "";
+        }
+
+        function isActionRequired(customer) {
+            const status = getEffectiveStatus(customer);
+            return isWebdesignOutreachCustomer(customer) && !isDefinitiveOutreachStatus(status) && (status === "reactie_ontvangen" || Boolean(customer && (customer.actionRequired || customer.outreachActionRequired)));
+        }
+
+        function getEffectiveStatus(customer) {
+            const outreachStatus = normalizeOutreachStatus(customer && customer.outreachStatus);
+            const databaseStatus = mapDatabaseStatus(customer);
+            if (isDefinitiveOutreachStatus(databaseStatus) && !isDefinitiveOutreachStatus(outreachStatus)) return databaseStatus;
+            if (outreachStatus) return outreachStatus;
+            if (databaseStatus) return databaseStatus;
+            return "benaderd";
+        }
+
+        function getStatusLabel(status) {
+            return {
+                benaderd: "Benaderd",
+                reactie_ontvangen: "Reactie ontvangen",
+                interesse: "Interesse",
+                geen_interesse: "Geen interesse",
+                afgehaakt: "Afgehaakt",
+                geen_gehoor: "Geen gehoor",
+                klant_geworden: "Klant geworden"
+            }[normalizeOutreachStatus(status)] || "Benaderd";
+        }
+
+        function getSentFromEmail(customer) {
+            return normalizeString(customer && (customer.sentFromEmail || customer.sent_from_email || customer.outreachSentFromEmail || customer.lastColdmailSenderEmail));
+        }
+
+        function getSentAt(customer) {
+            return normalizeString(customer && (customer.outreachSentAt || customer.outreach_sent_at || customer.lastColdmailSentAt || customer.lastMailSentAt));
+        }
+
+        function getReplyAt(customer) {
+            return normalizeString(customer && (customer.lastReplyAt || customer.last_reply_at || customer.lastColdmailReplyAt));
+        }
+
+        function augmentSearchHaystack(customer) {
+            return [getSentFromEmail(customer), getStatusLabel(getEffectiveStatus(customer)), isActionRequired(customer) ? "reactie ontvangen actie nodig" : ""].join(" ").toLowerCase();
+        }
+
+        function renderMeta(customer) {
+            if (!isWebdesignOutreachCustomer(customer)) return "";
+            const sentAt = getSentAt(customer);
+            return "<div class=\"outreach-line\">Verstuurd vanaf " + escapeHtml(getSentFromEmail(customer) || "onbekend mailadres") + (sentAt ? " · " + escapeHtml(formatDisplayDate(sentAt)) : "") + "</div>" + (isActionRequired(customer) ? "<span class=\"outreach-badge\">Reactie ontvangen</span>" : "");
+        }
+
+        function renderReplyInfo(customer) {
+            if (!isWebdesignOutreachCustomer(customer)) return "";
+            const replyAt = getReplyAt(customer);
+            return replyAt ? "<div class=\"outreach-reply\"><strong>Reactie ontvangen</strong><span>" + escapeHtml(formatDisplayDate(replyAt)) + "</span></div>" : "<div class=\"outreach-reply\"><strong>Nog geen reactie</strong><span>25 dagen regel actief</span></div>";
+        }
+
+        function renderActions(customer) {
+            if (!isWebdesignOutreachCustomer(customer)) return "";
+            const id = escapeHtml(customer.id);
+            return "<div class=\"outreach-actions\"><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"klant_geworden\" data-outreach-id=\"" + id + "\">Is klant geworden</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"afgehaakt\" data-outreach-id=\"" + id + "\">Afgehaakt</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"geen_interesse\" data-outreach-id=\"" + id + "\">Geen interesse</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"mail\" data-outreach-id=\"" + id + "\">Mail bekijken</button></div>";
+        }
+
+        function shouldAutoMarkNoReply(customer) {
+            const sentMs = parseDateValue(getSentAt(customer));
+            return isWebdesignOutreachCustomer(customer) && getEffectiveStatus(customer) === "benaderd" && !getReplyAt(customer) && sentMs && Math.floor((Date.now() - sentMs) / 86400000) >= 25;
+        }
+
+        function applyAutomation(customers) {
+            let changed = false;
+            const nowIso = new Date().toISOString();
+            return {
+                changed: (customers || []).some(shouldAutoMarkNoReply),
+                customers: (customers || []).map(function (customer) {
+                    if (!shouldAutoMarkNoReply(customer)) return customer;
+                    changed = true;
+                    return { ...customer, status: "geengehoor", databaseStatus: "geengehoor", outreachStatus: "geen_gehoor", actionRequired: false, outreachActionRequired: false, statusUpdatedAt: nowIso, updatedAt: nowIso, hist: [{ type: "geengehoor", label: "Geen gehoor na 25 dagen", date: nowIso, actor: "Premium database", source: "webdesign-outreach-automation" }].concat(Array.isArray(customer.hist) ? customer.hist : []).slice(0, 50) };
+                })
+            };
+        }
+
+        function findCustomerById(id) {
+            const key = normalizeString(id);
+            return (state.klanten || []).find(function (customer) { return normalizeString(customer.id) === key; }) || null;
+        }
+
+        function openMail(customer) {
+            const params = new URLSearchParams();
+            const account = normalizeString(customer.replyMailboxAccount || getSentFromEmail(customer));
+            const message = normalizeString(customer.replyMailboxId || customer.replyThreadId || customer.replyMessageId || customer.lastColdmailReplyMessageKey || customer.outreachMessageId || customer.coldmailSentMessageId);
+            if (account) params.set("account", account);
+            params.set("folder", "inbox");
+            if (message) params.set("message", message);
+            if (customer.email) params.set("email", customer.email);
+            params.set("q", customer.email || customer.bedrijf || "");
+            global.location.href = "/premium-mailbox?" + params.toString();
+        }
+
+        async function updateStatus(customerId, status) {
+            const customer = findCustomerById(customerId);
+            if (!customer) return;
+            if (status === "mail") return openMail(customer);
+            setStatusMessage("Outreach-status bijwerken...", "info");
+            try {
+                const response = await fetch("/api/coldmailing/outreach/status", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ customerId: customer.id, email: customer.email, mailboxId: customer.replyMailboxId, messageId: customer.replyMessageId || customer.outreachMessageId, status: status }) });
+                const data = await response.json().catch(function () { return {}; });
+                if (!response.ok || !data.ok) throw new Error(data.message || "Status kon niet worden bijgewerkt.");
+                const normalized = normalizeCustomer(data.customer || {}, data.customer && data.customer.id);
+                state.klanten = state.klanten.map(function (item) { return item.id === normalized.id ? normalized : item; });
+                renderPage();
+                setStatusMessage(getStatusLabel(status) + " opgeslagen.", "success", true);
+            } catch (error) {
+                setStatusMessage(String(error && error.message || error || "Status kon niet worden bijgewerkt."), "error");
+            }
+        }
+
+        ensureOutreachStyles();
+        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, isActionRequired: isActionRequired, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, updateStatus: updateStatus };
+    }
+
+    global.SoftoraDatabaseOutreach = {
+        createController: createOutreachController,
+        normalizeCustomerFields: function (raw) {
+            return createOutreachController({
+                state: {},
+                nodes: {},
+                escapeHtml: function (value) { return String(value || ""); },
+                normalizeSearchValue: normalizeString,
+                normalizeDatabaseStatus: function (value) { return normalizeString(value); },
+                formatDisplayDate: normalizeString,
+                parseDateValue: function () { return 0; },
+                normalizeCustomer: function (value) { return value || {}; },
+                persistCustomerList: function () {},
+                renderPage: function () {},
+                setStatusMessage: function () {}
+            }).normalizeCustomerFields(raw);
+        }
+    };
+
     global.SoftoraDatabaseWebdesignAction = {
         createController: createController
     };
