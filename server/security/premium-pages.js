@@ -87,10 +87,14 @@ function createPremiumHtmlPageAccessController(options = {}) {
       }
 
       if (!authState.authenticated) {
-        if (authState.expired || authState.revoked) {
+        const sessionEnded = Boolean(authState.expired || authState.revoked);
+        if (sessionEnded) {
           clearPremiumSessionCookie(req, res);
         }
-        res.redirect(302, `/premium-personeel-login?next=${encodeURIComponent(requestedPath)}`);
+        res.redirect(
+          302,
+          `/premium-personeel-login?next=${encodeURIComponent(requestedPath)}${sessionEnded ? '&expired=1' : ''}`
+        );
         return {
           handled: true,
           authState,
