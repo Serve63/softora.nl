@@ -413,48 +413,50 @@ private struct MailboxView: View {
     }
 
     private var mailboxHeader: some View {
-        HStack(spacing: 12) {
-            Button {
-                isShowingFolderMenu = true
-            } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(Color.softoraInk)
-                    .frame(width: 42, height: 42)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
-                    }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Mappen")
-
+        ZStack {
             Text("Mailbox")
                 .font(.softoraDisplay(21, weight: .bold))
                 .textCase(.uppercase)
                 .tracking(1.0)
                 .foregroundStyle(Color.softoraInk)
 
-            Spacer()
+            HStack {
+                Button {
+                    isShowingFolderMenu = true
+                } label: {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 19, weight: .bold))
+                        .foregroundStyle(Color.softoraInk)
+                        .frame(width: 42, height: 42)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Mappen")
 
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.softoraMuted)
-                    .frame(width: 42, height: 42)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
-                    }
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.softoraMuted)
+                        .frame(width: 42, height: 42)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Sluiten")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Sluiten")
         }
         .padding(.horizontal, 18)
         .padding(.top, 18)
@@ -475,7 +477,11 @@ private struct MailboxView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let selectedMessage {
-            MailboxMessageDetail(message: selectedMessage) {
+            MailboxMessageDetail(
+                message: selectedMessage,
+                selectedAccount: selectedAccount,
+                apiClient: apiClient
+            ) {
                 self.selectedMessage = nil
             }
         } else if messages.isEmpty {
@@ -547,6 +553,7 @@ private struct MailboxView: View {
             }
             await loadMessages()
         } catch {
+            guard !error.isMailboxCancellation else { return }
             alertMessage = error.localizedDescription
         }
     }
@@ -575,6 +582,7 @@ private struct MailboxView: View {
             )
             selectedMessage = nil
         } catch {
+            guard !error.isMailboxCancellation else { return }
             alertMessage = error.localizedDescription
         }
     }
@@ -589,6 +597,20 @@ private struct MailboxView: View {
         selectedFolder = folder
         isShowingFolderMenu = false
         Task { await loadMessages() }
+    }
+}
+
+private extension Error {
+    var isMailboxCancellation: Bool {
+        if self is CancellationError {
+            return true
+        }
+        if let urlError = self as? URLError, urlError.code == .cancelled {
+            return true
+        }
+
+        let nsError = self as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }
 
@@ -768,7 +790,15 @@ private struct MailboxMessageRow: View {
 
 private struct MailboxMessageDetail: View {
     let message: MailboxMessage
+    let selectedAccount: MailboxAccount?
+    let apiClient: SoftoraAPIClient
     let onBack: () -> Void
+
+    @State private var isReplying = false
+    @State private var replyBody = ""
+    @State private var isSendingReply = false
+    @State private var isImprovingReply = false
+    @State private var replyStatus: String?
 
     var body: some View {
         ScrollView {
@@ -808,11 +838,245 @@ private struct MailboxMessageDetail: View {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .stroke(Color.softoraPurpleLight, lineWidth: 1)
                     }
+
+                replyComposer
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+    }
+
+    @ViewBuilder
+    private var replyComposer: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(.smooth(duration: 0.22)) {
+                    isReplying.toggle()
+                }
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "arrowshape.turn.up.left.fill")
+                        .font(.system(size: 13, weight: .bold))
+
+                    Text(isReplying ? "Antwoord sluiten" : "Beantwoorden")
+                        .font(.softoraDisplay(13, weight: .bold))
+                        .textCase(.uppercase)
+                        .tracking(0.9)
+                }
+                .foregroundStyle(Color.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.softoraCrimson)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            if isReplying {
+                VStack(alignment: .leading, spacing: 10) {
+                    MailboxDetailMeta(label: "Aan", value: replyRecipient)
+                    MailboxDetailMeta(label: "Onderwerp", value: replySubject)
+
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $replyBody)
+                            .font(.softoraBody(14))
+                            .foregroundStyle(Color.softoraInk)
+                            .frame(minHeight: 142)
+                            .padding(10)
+                            .scrollContentBackground(.hidden)
+                            .background(Color.white)
+
+                        if replyBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text("TYP JE ANTWOORD...")
+                                .font(.softoraBody(13, weight: .medium))
+                                .foregroundStyle(Color.softoraMuted.opacity(0.55))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 18)
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                    }
+
+                    HStack(spacing: 10) {
+                        Button {
+                            Task { await improveReply() }
+                        } label: {
+                            Image(systemName: "wand.and.stars")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(Color.softoraCrimson)
+                                .frame(width: 50, height: 48)
+                                .background(Color.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isImprovingReply || isSendingReply)
+                        .opacity((isImprovingReply || isSendingReply) ? 0.55 : 1)
+                        .accessibilityLabel("Mailtekst verbeteren")
+
+                        Button {
+                            Task { await sendReply() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                if isSendingReply {
+                                    ProgressView()
+                                        .tint(Color.white)
+                                } else {
+                                    Image(systemName: "paperplane.fill")
+                                }
+
+                                Text("Versturen")
+                                    .font(.softoraDisplay(13, weight: .bold))
+                                    .textCase(.uppercase)
+                                    .tracking(0.9)
+                            }
+                            .foregroundStyle(Color.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background(canSendReply ? Color.softoraCrimson : Color.softoraMuted.opacity(0.35))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canSendReply || isSendingReply || isImprovingReply)
+                    }
+
+                    if isImprovingReply {
+                        Text("AI VERBETERT JE TEKST...")
+                            .font(.softoraDisplay(11, weight: .bold))
+                            .textCase(.uppercase)
+                            .tracking(0.9)
+                            .foregroundStyle(Color.softoraMuted)
+                    }
+
+                    if let replyStatus {
+                        Text(replyStatus.softoraUppercased)
+                            .font(.softoraDisplay(11, weight: .bold))
+                            .textCase(.uppercase)
+                            .tracking(0.9)
+                            .foregroundStyle(replyStatus == "Verzonden" ? Color.softoraCrimson : Color.softoraMuted)
+                    }
+                }
+                .padding(14)
+                .background(Color.softoraSheetBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+    }
+
+    private var replyRecipient: String {
+        firstReplyEmail(from: message.email)
+    }
+
+    private var replySubject: String {
+        let subject = message.subject.trimmingCharacters(in: .whitespacesAndNewlines)
+        if subject.range(of: #"^re\s*:"#, options: .regularExpression) != nil {
+            return subject
+        }
+        return "Re: \(subject.isEmpty ? "Geen onderwerp" : subject)"
+    }
+
+    private var canSendReply: Bool {
+        selectedAccount?.smtpConfigured == true &&
+            !replyRecipient.isEmpty &&
+            !replyBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func improveReply() async {
+        let cleanBody = replyBody.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanBody.isEmpty else {
+            replyStatus = "Schrijf eerst je antwoord"
+            return
+        }
+        guard let selectedAccount else {
+            replyStatus = "Kies eerst een mailadres"
+            return
+        }
+
+        isImprovingReply = true
+        replyStatus = nil
+        defer { isImprovingReply = false }
+
+        do {
+            replyBody = try await apiClient.improveMailboxDraft(
+                account: selectedAccount.email,
+                to: replyRecipient,
+                subject: replySubject,
+                body: cleanBody,
+                context: replyContext
+            )
+            replyStatus = "Tekst verbeterd"
+        } catch {
+            replyStatus = error.localizedDescription
+        }
+    }
+
+    private func sendReply() async {
+        guard let selectedAccount else {
+            replyStatus = "Kies eerst een mailadres"
+            return
+        }
+        guard selectedAccount.smtpConfigured else {
+            replyStatus = "Deze mailbox kan nog niet verzenden"
+            return
+        }
+        let cleanBody = replyBody.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanBody.isEmpty else {
+            replyStatus = "Schrijf eerst je antwoord"
+            return
+        }
+
+        isSendingReply = true
+        replyStatus = nil
+        defer { isSendingReply = false }
+
+        do {
+            try await apiClient.sendMailboxMessage(
+                account: selectedAccount.email,
+                to: replyRecipient,
+                subject: replySubject,
+                body: cleanBody
+            )
+            replyBody = ""
+            replyStatus = "Verzonden"
+        } catch {
+            replyStatus = error.localizedDescription
+        }
+    }
+
+    private var replyContext: MailboxDraftContextPayload {
+        MailboxDraftContextPayload(
+            from: message.from,
+            fromEmail: message.email,
+            to: message.to,
+            date: message.date,
+            subject: message.subject,
+            preview: message.preview,
+            body: message.body.isEmpty ? message.preview : message.body
+        )
+    }
+
+    private func firstReplyEmail(from raw: String) -> String {
+        let candidates = raw
+            .split(separator: ",")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+        let pattern = #"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"#
+        for candidate in candidates {
+            if let range = candidate.range(of: pattern, options: [.regularExpression, .caseInsensitive]) {
+                return String(candidate[range]).lowercased()
+            }
+        }
+        return ""
     }
 }
 
@@ -842,63 +1106,86 @@ private struct MailboxAccountSelector: View {
     let isLocked: Bool
     let onSelect: (MailboxAccount) -> Void
 
+    @State private var isExpanded = true
+
     var body: some View {
         VStack(spacing: 8) {
-            Text("Mailbox")
-                .font(.softoraDisplay(12, weight: .bold))
-                .textCase(.uppercase)
-                .tracking(1.0)
-                .foregroundStyle(Color.softoraMuted)
-                .frame(maxWidth: .infinity, alignment: .center)
+            Button {
+                withAnimation(.smooth(duration: 0.22)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                ZStack {
+                    Text("Kies het gewenste mailadres")
+                        .font(.softoraDisplay(12, weight: .bold))
+                        .textCase(.uppercase)
+                        .tracking(1.0)
+                        .foregroundStyle(Color.softoraMuted)
+                        .frame(maxWidth: .infinity, alignment: .center)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    if isLoading && accounts.isEmpty {
-                        Text("LADEN...")
-                            .font(.softoraBody(12, weight: .semibold))
+                    HStack {
+                        Spacer()
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Color.softoraMuted)
-                            .padding(.horizontal, 18)
-                    } else {
-                        ForEach(accounts) { account in
-                            let isSelected = selectedAccount?.id == account.id
-                            let lockedBackground = isSelected ? Color.softoraCrimson.opacity(0.52) : Color.white.opacity(0.72)
-                            let enabledBackground = isSelected ? Color.softoraCrimson : Color.white
-
-                            Button {
-                                onSelect(account)
-                            } label: {
-                                Text(account.email)
-                                    .font(.softoraDisplay(11.5, weight: .bold))
-                                    .textCase(.uppercase)
-                                    .tracking(0.4)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.78)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                .foregroundStyle(isSelected ? Color.white : (isLocked ? Color.softoraMuted : Color.softoraInk))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 16)
-                                .frame(width: 178, alignment: .leading)
-                                .background(isLocked ? lockedBackground : enabledBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                .overlay {
-                                    if isSelected && isLocked {
-                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
-                                    } else if !isSelected {
-                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
-                                    }
-                                }
-                                .opacity(account.imapConfigured ? (isLocked ? 0.72 : 1) : 0.38)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(isLocked)
-                        }
                     }
                 }
                 .padding(.horizontal, 18)
+                .frame(maxWidth: .infinity)
             }
-            .scrollIndicators(.hidden)
+            .buttonStyle(.plain)
+            .accessibilityLabel(isExpanded ? "Mailadressen inklappen" : "Mailadressen uitklappen")
+
+            if isExpanded {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        if isLoading && accounts.isEmpty {
+                            Text("LADEN...")
+                                .font(.softoraBody(12, weight: .semibold))
+                                .foregroundStyle(Color.softoraMuted)
+                                .padding(.horizontal, 18)
+                        } else {
+                            ForEach(accounts) { account in
+                                let isSelected = selectedAccount?.id == account.id
+                                let lockedBackground = isSelected ? Color.softoraCrimson.opacity(0.52) : Color.white.opacity(0.72)
+                                let enabledBackground = isSelected ? Color.softoraCrimson : Color.white
+
+                                Button {
+                                    onSelect(account)
+                                } label: {
+                                    Text(account.email)
+                                        .font(.softoraDisplay(11.5, weight: .bold))
+                                        .textCase(.uppercase)
+                                        .tracking(0.4)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.78)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    .foregroundStyle(isSelected ? Color.white : (isLocked ? Color.softoraMuted : Color.softoraInk))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 16)
+                                    .frame(width: 178, alignment: .leading)
+                                    .background(isLocked ? lockedBackground : enabledBackground)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay {
+                                        if isSelected && isLocked {
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                        } else if !isSelected {
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                        }
+                                    }
+                                    .opacity(account.imapConfigured ? (isLocked ? 0.72 : 1) : 0.38)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isLocked)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .padding(.top, 10)
         .padding(.bottom, 10)
@@ -907,21 +1194,64 @@ private struct MailboxAccountSelector: View {
 }
 
 private enum MailboxDateFormatter {
-    static let isoFormatter = ISO8601DateFormatter()
+    static let isoFormatterWithFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    static let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "nl_NL")
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
 
     static let displayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "nl_NL")
-        formatter.dateFormat = "dd MMM HH:mm"
+        formatter.dateFormat = "d MMM HH:mm"
         return formatter
     }()
 
-    static func label(_ value: String) -> String {
+    static let displayFormatterWithYear: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "nl_NL")
+        formatter.dateFormat = "d MMM yyyy HH:mm"
+        return formatter
+    }()
+
+    static func label(_ value: String, now: Date = Date(), calendar: Calendar = .current) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let date = isoFormatter.date(from: trimmed) else {
+        guard !trimmed.isEmpty, let date = parseDate(trimmed) else {
             return trimmed.isEmpty ? "—" : trimmed
         }
-        return displayFormatter.string(from: date)
+
+        if date <= now, now.timeIntervalSince(date) < 300 {
+            return "ZOJUIST"
+        }
+
+        let time = timeFormatter.string(from: date)
+        if calendar.isDateInToday(date) {
+            return "VANDAAG \(time)"
+        }
+        if calendar.isDateInYesterday(date) {
+            return "GISTEREN \(time)"
+        }
+        if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
+            return displayFormatter.string(from: date).uppercased(with: Locale(identifier: "nl_NL"))
+        }
+        return displayFormatterWithYear.string(from: date).uppercased(with: Locale(identifier: "nl_NL"))
+    }
+
+    private static func parseDate(_ value: String) -> Date? {
+        isoFormatterWithFractionalSeconds.date(from: value) ?? isoFormatter.date(from: value)
     }
 }
 

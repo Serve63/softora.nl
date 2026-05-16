@@ -9,6 +9,8 @@ const DEFAULT_MAILBOX_EMAILS = [
   'serve@softora.nl',
   'martijn@softora.nl',
 ];
+const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
+const DEFAULT_MAILBOX_DRAFT_MODEL = 'gpt-5.5-pro';
 
 const FOLDER_ALIASES = {
   inbox: ['INBOX'],
@@ -22,6 +24,23 @@ const FOLDER_ALIASES = {
   trash: ['Trash', 'Deleted Items', 'INBOX.Trash', 'Prullenbak'],
 };
 
+async function defaultFetchJsonWithTimeout(url, options = {}, timeoutMs = 65000) {
+  if (typeof fetch !== 'function') {
+    const error = new Error('Fetch API is niet beschikbaar.');
+    error.status = 500;
+    throw error;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    return { response, data };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function createMailboxService(deps = {}) {
   const {
     logger = console,
@@ -32,6 +51,11 @@ function createMailboxService(deps = {}) {
     createTransport = (config) => nodemailer.createTransport(config),
     createImapClient = (config) => new ImapFlow(config),
     parseMailSource = (source) => simpleParser(source),
+    getOpenAiApiKey = () => normalizeString(process.env.OPENAI_API_KEY || ''),
+    fetchJsonWithTimeout = defaultFetchJsonWithTimeout,
+    extractOpenAiTextContent = null,
+    openAiApiBaseUrl = process.env.OPENAI_API_BASE_URL || DEFAULT_OPENAI_API_BASE_URL,
+    mailboxDraftModel = process.env.MAILBOX_DRAFT_OPENAI_MODEL || process.env.OPENAI_MODEL || DEFAULT_MAILBOX_DRAFT_MODEL,
   } = deps;
 
   const baseAccount = {
@@ -288,6 +312,23 @@ function createMailboxService(deps = {}) {
     return normalizeString(first?.name || first?.address || '') || 'Onbekend';
   }
 
+  function extractOpenAiReplyText(content) {
+    if (typeof extractOpenAiTextContent === 'function') {
+      return normalizeString(extractOpenAiTextContent(content));
+    }
+    if (typeof content === 'string') return normalizeString(content);
+    if (!Array.isArray(content)) return '';
+    return normalizeString(
+      content
+        .map((item) => {
+          if (!item) return '';
+          if (typeof item === 'string') return item;
+          return typeof item.text === 'string' ? item.text : '';
+        })
+        .join('\n')
+    );
+  }
+
   function toClientMessage(parsed, message, folder, account) {
     const date = parsed.date || message.internalDate || new Date();
     const text = normalizeString(parsed.text || parsed.html || '');
@@ -395,6 +436,97 @@ function createMailboxService(deps = {}) {
     };
   }
 
+  async function improveDraft({ accountEmail, to, subject, text, context = {} }) {
+    const account = getAccount(accountEmail);
+    if (!account) {
+      const error = new Error('Mailbox-account niet gevonden.');
+      error.status = 404;
+      throw error;
+    }
+    const cleanText = truncateText(normalizeString(text), 6000);
+    if (!cleanText) {
+      const error = new Error('Schrijf eerst een antwoord voordat AI het kan verbeteren.');
+      error.status = 400;
+      throw error;
+    }
+    const apiKey = getOpenAiApiKey();
+    if (!apiKey) {
+      const error = new Error('OPENAI_API_KEY ontbreekt');
+      error.status = 503;
+      error.code = 'OPENAI_NOT_CONFIGURED';
+      throw error;
+    }
+
+    const model = normalizeString(mailboxDraftModel) || DEFAULT_MAILBOX_DRAFT_MODEL;
+    const system = [
+      'Je bent een Nederlandstalige mail-assistent voor Softora.',
+      'Verbeter de conceptmail van de gebruiker op spelling, toon, structuur en professionaliteit.',
+      'Gebruik de context van de originele mail om de reactie logisch en relevant te maken.',
+      'Behoud de bedoeling van de gebruiker. Voeg geen harde beloftes, prijzen, afspraken of feiten toe die niet in de context staan.',
+      'Schrijf menselijk, duidelijk en zakelijk. Geen markdown, geen onderwerpregel, alleen de verbeterde mailtekst.',
+    ].join('\n');
+    const payload = {
+      sender: {
+        name: account.name || 'Softora',
+        email: account.email,
+      },
+      reply: {
+        to: normalizeString(to),
+        subject: truncateText(normalizeString(subject), 240),
+        draft: cleanText,
+      },
+      originalMail: {
+        from: truncateText(normalizeString(context.from), 240),
+        fromEmail: truncateText(normalizeString(context.fromEmail), 240),
+        to: truncateText(normalizeString(context.to), 240),
+        date: truncateText(normalizeString(context.date), 80),
+        subject: truncateText(normalizeString(context.subject), 240),
+        preview: truncateText(normalizeString(context.preview), 800),
+        body: truncateText(normalizeString(context.body), 5000),
+      },
+    };
+
+    const { response, data } = await fetchJsonWithTimeout(
+      `${String(openAiApiBaseUrl || DEFAULT_OPENAI_API_BASE_URL).replace(/\/+$/, '')}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.25,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: JSON.stringify(payload) },
+          ],
+        }),
+      },
+      65000
+    );
+    if (!response.ok) {
+      const error = new Error(`OpenAI mailboxtekst verbeteren mislukt (${response.status})`);
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+    const improved = truncateText(
+      extractOpenAiReplyText(data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content),
+      6000
+    );
+    if (!improved) {
+      const error = new Error('OpenAI gaf geen verbeterde mailtekst terug.');
+      error.status = 502;
+      throw error;
+    }
+    return {
+      text: improved,
+      model: normalizeString(data && data.model) || model,
+      usage: data && data.usage ? data.usage : null,
+    };
+  }
+
   async function accountsResponse(_req, res) {
     return res.status(200).json({
       ok: true,
@@ -445,13 +577,36 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function improveDraftResponse(req, res) {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await improveDraft({
+        accountEmail: body.account,
+        to: body.to,
+        subject: body.subject,
+        text: body.body || body.text || '',
+        context: body.context && typeof body.context === 'object' ? body.context : {},
+      });
+      return res.status(200).json({ ok: true, draft: result.text, result });
+    } catch (error) {
+      logger.error('[Mailbox][ImproveDraft]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Mailtekst verbeteren mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
   return {
     accountsResponse,
     listMessagesResponse,
     sendMessageResponse,
+    improveDraftResponse,
     getAccounts,
     listMessages,
     sendMessage,
+    improveDraft,
   };
 }
 

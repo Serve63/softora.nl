@@ -72,6 +72,28 @@ struct SoftoraAPIClient {
         return response.messages
     }
 
+    func sendMailboxMessage(account: String, to: String, subject: String, body: String) async throws {
+        let response: MailboxSendResponse = try await post(
+            "/api/mailbox/send",
+            body: MailboxSendPayload(account: account, to: to, subject: subject, body: body)
+        )
+        guard response.ok else {
+            throw SoftoraAPIError.server(response.detail ?? response.error ?? "Mail verzenden mislukt.")
+        }
+    }
+
+    func improveMailboxDraft(account: String, to: String, subject: String, body: String, context: MailboxDraftContextPayload) async throws -> String {
+        let response: MailboxImproveDraftResponse = try await post(
+            "/api/mailbox/improve-draft",
+            body: MailboxImproveDraftPayload(account: account, to: to, subject: subject, body: body, context: context)
+        )
+        let draft = (response.draft ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard response.ok, !draft.isEmpty else {
+            throw SoftoraAPIError.server(response.detail ?? response.error ?? "Mailtekst verbeteren mislukt.")
+        }
+        return draft
+    }
+
     func createManualAppointment(_ draft: NewAppointmentDraft) async throws -> AgendaAppointment? {
         let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let location = draft.location.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -187,6 +209,31 @@ private struct AgendaAppLoginPayload: Encodable {
 }
 
 private struct EmptyPayload: Encodable {}
+
+private struct MailboxSendPayload: Encodable {
+    let account: String
+    let to: String
+    let subject: String
+    let body: String
+}
+
+private struct MailboxImproveDraftPayload: Encodable {
+    let account: String
+    let to: String
+    let subject: String
+    let body: String
+    let context: MailboxDraftContextPayload
+}
+
+struct MailboxDraftContextPayload: Encodable {
+    let from: String
+    let fromEmail: String
+    let to: String
+    let date: String
+    let subject: String
+    let preview: String
+    let body: String
+}
 
 private extension URLSession {
     static let softoraAgenda: URLSession = {

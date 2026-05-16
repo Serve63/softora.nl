@@ -263,6 +263,11 @@ function buildServerAppFeatureWiringRuntimeContext({
         logger: console,
         normalizeString: shared.normalizeString,
         truncateText: shared.truncateText,
+        getOpenAiApiKey: platformRuntime.getOpenAiApiKey,
+        fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
+        extractOpenAiTextContent: aiHelpers.extractOpenAiTextContent,
+        openAiApiBaseUrl: envConfig.OPENAI_API_BASE_URL,
+        mailboxDraftModel: shared.normalizeString(env.MAILBOX_DRAFT_OPENAI_MODEL || envConfig.OPENAI_MODEL || 'gpt-5.5-pro'),
         mailboxAccountsRaw: env.MAILBOX_ACCOUNTS || '',
         mailConfig: {
           smtpHost: envConfig.MAIL_SMTP_HOST,

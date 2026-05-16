@@ -110,6 +110,64 @@ test('mailbox service sends mail through selected account smtp', async () => {
   assert.equal(sent[0].message.to, 'klant@example.nl');
 });
 
+test('mailbox service improves a reply draft with mail context through OpenAI', async () => {
+  const fetchCalls = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé',
+        smtpHost: 'smtp.example.test',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    getOpenAiApiKey: () => 'openai-key',
+    openAiApiBaseUrl: 'https://api.openai.test/v1',
+    mailboxDraftModel: 'gpt-5.5-pro',
+    fetchJsonWithTimeout: async (url, options) => {
+      fetchCalls.push({ url, options });
+      return {
+        response: { ok: true },
+        data: {
+          model: 'gpt-5.5-pro',
+          choices: [{ message: { content: 'Beste klant,\n\nDank voor uw bericht. Ik kom hier vandaag op terug.\n\nMet vriendelijke groet,\nServé' } }],
+        },
+      };
+    },
+    extractOpenAiTextContent: (content) => String(content || ''),
+  });
+  const res = createResponseRecorder();
+
+  await service.improveDraftResponse(
+    {
+      body: {
+        account: 'serve@softora.nl',
+        to: 'klant@example.nl',
+        subject: 'Re: Vraag',
+        body: 'ik kom erop terug',
+        context: {
+          from: 'Klant',
+          fromEmail: 'klant@example.nl',
+          subject: 'Vraag',
+          body: 'Kunnen jullie helpen met bedrijfssoftware?',
+        },
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.match(res.body.draft, /Beste klant/);
+  assert.equal(fetchCalls[0].url, 'https://api.openai.test/v1/chat/completions');
+  const requestBody = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(requestBody.model, 'gpt-5.5-pro');
+  assert.match(requestBody.messages[0].content, /Verbeter de conceptmail/);
+  assert.match(requestBody.messages[1].content, /Kunnen jullie helpen met bedrijfssoftware/);
+});
+
 test('mailbox service derives imap settings from smtp settings when possible', async () => {
   const service = createMailboxService({
     mailConfig: {
@@ -327,10 +385,12 @@ test('mailbox routes expose accounts, messages and send endpoints', () => {
       accountsResponse() {},
       listMessagesResponse() {},
       sendMessageResponse() {},
+      improveDraftResponse() {},
     },
   });
 
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/accounts'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/improve-draft'));
 });
