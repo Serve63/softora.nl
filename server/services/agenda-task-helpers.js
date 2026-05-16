@@ -122,6 +122,7 @@ function createAgendaTaskHelpers(deps = {}) {
       value: normalizeString(appointment.value || ''),
       createdAt: normalizeString(appointment.confirmationTaskCreatedAt || appointment.createdAt || ''),
       appointmentId: Number(appointment.id) || 0,
+      activeOrderId: Number(appointment.activeOrderId || 0) || null,
       callId,
       contactEmail: normalizeEmailAddress(appointment.contactEmail || appointment.email || '') || '',
       location: resolveAgendaLocationValue(
@@ -154,6 +155,10 @@ function createAgendaTaskHelpers(deps = {}) {
       providerLabel: providerLabel || '',
       coldcallingStack: normalizedStack || '',
       coldcallingStackLabel: stackLabel || '',
+      postCallStatus: normalizeString(appointment.postCallStatus || '') || '',
+      postCallPrompt: normalizeString(appointment.postCallPrompt || '') || '',
+      postCallNotesTranscript: normalizeString(appointment.postCallNotesTranscript || '') || '',
+      postCallDomainName: normalizeString(appointment.postCallDomainName || appointment.domainName || '') || '',
       ...buildLeadOwnerFields(
         callId,
         appointment?.leadOwnerName || appointment?.leadOwnerFullName || appointment?.leadOwnerKey

@@ -628,6 +628,12 @@ function createAgendaConfirmationCoordinator(deps = {}) {
     }
 
     const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
+    const requestedStatus = normalizeString(req.body?.status || req.body?.postCallStatus || '')
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+    const isOutOfSystem = ['uit_systeem', 'gearchiveerd', 'verwijderd', 'archived', 'removed'].includes(
+      requestedStatus
+    );
     const callId = normalizeString(appointment?.callId || '');
     const runtimeSnapshot = takeRuntimeMutationSnapshot();
     const nowIso = new Date().toISOString();
@@ -644,6 +650,11 @@ function createAgendaConfirmationCoordinator(deps = {}) {
         confirmationAppointmentCancelled: true,
         confirmationAppointmentCancelledAt: nowIso,
         confirmationAppointmentCancelledBy: actor || null,
+        postCallStatus: isOutOfSystem
+          ? 'uit_systeem'
+          : normalizeString(appointment?.postCallStatus || ''),
+        postCallStatusUpdatedAt: isOutOfSystem ? nowIso : appointment?.postCallStatusUpdatedAt || null,
+        needsConfirmationEmail: isOutOfSystem ? false : appointment?.needsConfirmationEmail,
       },
       'confirmation_task_mark_cancelled'
     );
@@ -656,8 +667,10 @@ function createAgendaConfirmationCoordinator(deps = {}) {
     appendDashboardActivity(
       {
         type: 'appointment_cancelled',
-        title: 'Afspraak geannuleerd',
-        detail: 'Afspraak is geannuleerd vanuit het bevestigingsmailproces.',
+        title: isOutOfSystem ? 'Openstaande lead uit systeem gehaald' : 'Afspraak geannuleerd',
+        detail: isOutOfSystem
+          ? 'Openstaande lead is veilig verborgen/gearchiveerd vanuit actieve opdrachten.'
+          : 'Afspraak is geannuleerd vanuit het bevestigingsmailproces.',
         company: updatedAppointment?.company || appointment?.company || '',
         actor,
         taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
