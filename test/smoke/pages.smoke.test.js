@@ -176,30 +176,28 @@ test('page smoke: premium-ai-coldmailing.html keeps personal assignment filter o
   assert.doesNotMatch(html, /assets\/premium-personal-assignment-pages\.js/, 'Leads pagina-asset voor persoonlijke toewijzingen hoort weg te zijn.');
 });
 
-test('page smoke: premium-actieve-opdrachten.html shows openstaande opdrachten as the primary tab label', () => {
+test('page smoke: premium-actieve-opdrachten.html shows openstaande leads as the primary tab label', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
   const script = fs.readFileSync(path.join(repoRoot, 'assets/premium-actieve-opdrachten.js'), 'utf8');
   const assignmentFilterScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-filter.js'), 'utf8');
   const assignmentPagesScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-pages.js'), 'utf8');
-  const leadsTabScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-active-orders-leads-tab.js'), 'utf8');
-  const source = `${html}\n${assignmentFilterScript}\n${script}\n${leadsTabScript}\n${assignmentPagesScript}`;
+  const openLeadsScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-active-order-open-leads.js'), 'utf8');
+  const source = `${html}\n${assignmentFilterScript}\n${script}\n${openLeadsScript}\n${assignmentPagesScript}`;
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
+  assert.match(html, /data-order-filter="open_leads"/, 'Openstaande leads-tab hoort zichtbaar te zijn.');
   assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260511a/, 'Persoonlijke toewijzingsstijl ontbreekt op opdrachten.');
   assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
   assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
-  assert.match(html, /assets\/premium-active-orders-leads-tab\.js\?v=20260513a/, 'Losse leads-tab asset ontbreekt.');
+  assert.match(html, /assets\/premium-active-order-open-leads\.js\?v=20260516a/, 'Openstaande leads asset ontbreekt.');
   assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260510a/, 'Opdrachten pagina-asset voor persoonlijke toewijzingen ontbreekt.');
-  assert.match(source, /button\.dataset\.orderFilter = 'leads';/, 'Openstaande leads hoort een lokale tab te zijn.');
+  assert.match(html, />Openstaande leads<\/span>/, 'Primaire tab hoort Openstaande leads te tonen.');
   assert.doesNotMatch(source, /href = '\/premium-leads';/, 'Openstaande leads mag niet naar de leads-pagina linken.');
-  assert.match(source, /const text = document\.createTextNode\('Openstaande leads'\);/, 'Leads-tablabel ontbreekt.');
-  assert.match(source, /count\.id = TAB_COUNT_ID;/, 'Leads-teller ontbreekt.');
   assert.match(html, />Openstaande opdrachten<\/span>/, 'Primaire tab hoort Openstaande opdrachten te tonen.');
+  assert.match(source, /Geen openstaande leads\./, 'Lege-state hoort bij de openstaande leads-tab te passen.');
   assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
-  assert.match(source, /Geen openstaande leads\./, 'Lege-state voor de lokale leads-tab ontbreekt.');
   assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./, 'Persoonlijke lege-state voor opdrachten ontbreekt.');
-  assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
-  assert.match(source, /function syncLeadFilterCountFromSidebarBadge\(\) \{/, 'Leads-teller hoort mee te lopen met de sidebar badge.');
-  assert.match(source, /function initLeadFilterCountMirror\(\) \{/, 'Leads-teller observer ontbreekt.');
+  assert.match(source, /let activeOrderFilter = 'open_leads';/, 'Standaardfilter hoort op openstaande leads te staan.');
+  assert.match(source, /card\.dataset\.orderFilterGroup = 'open_leads';/, 'Openstaande lead-kaarten horen onder de open-leads filter te vallen.');
 });
 
 test('page smoke: assets/personnel-theme.js persists sidebar counts across premium page loads', () => {

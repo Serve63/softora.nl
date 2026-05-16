@@ -5,7 +5,7 @@ const path = require('path');
 
 test('premium agenda modal uses dossier flow for appointments that already have an active order', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
-  const followUpPath = path.join(__dirname, '../../assets/premium-agenda-follow-up-leads.js');
+  const followUpPath = path.join(__dirname, '../../assets/premium-agenda-follow-up.js');
   const pageSource = `${fs.readFileSync(pagePath, 'utf8')}\n${fs.readFileSync(followUpPath, 'utf8')}`;
 
   assert.match(pageSource, /Dynamische agenda voor de medewerkers van Softora\.nl/);
@@ -17,11 +17,11 @@ test('premium agenda modal uses dossier flow for appointments that already have 
   assert.match(pageSource, /function getLinkedOrderDossierUrl\(apt\)/);
   assert.match(pageSource, /modalPrimaryBtn\.textContent = 'Open dossier';/);
   assert.match(pageSource, /modalPrimaryBtn\.textContent = 'Dossier aanmaken';/);
-  assert.match(pageSource, /assets\/premium-agenda-follow-up-leads\.js/);
-  assert.match(pageSource, /button\.id = 'modalFollowUpBtn';/);
-  assert.match(pageSource, /async function addFollowUpLeadForActiveAppointment\(options = \{\}\)/);
-  assert.match(pageSource, /\/api\/agenda\/appointments\/\$\{encodeURIComponent\(String\(apt\.id\)\)\}\/add-follow-up-lead/);
-  assert.match(pageSource, /window\.location\.assign\('\/premium-actieve-opdrachten\?filter=leads'\);/);
+  assert.match(pageSource, /assets\/premium-agenda-follow-up\.js\?v=20260516a/);
+  assert.doesNotMatch(pageSource, /assets\/premium-agenda-follow-up-leads\.js/);
+  assert.match(pageSource, /id="modalFollowUpBtn"[^>]*>Vervolg<\/button>/);
+  assert.match(pageSource, /async function saveFollowUpLeadForActiveAppointment\(\)/);
+  assert.match(pageSource, /\/api\/agenda\/appointments\/\$\{encodeURIComponent\(String\(apt\.id\)\)\}\/post-call/);
   assert.match(
     pageSource,
     /if \(!modalWorkspaceMode\) \{[\s\S]*if \(getLinkedOrderIdForAppointment\(apt\)\) \{[\s\S]*openLinkedOrderDossierForAppointment\(apt\);/
@@ -30,6 +30,24 @@ test('premium agenda modal uses dossier flow for appointments that already have 
     pageSource,
     /if \(getLinkedOrderIdForAppointment\(apt\)\) \{[\s\S]*openLinkedOrderDossierForAppointment\(apt\);[\s\S]*return;[\s\S]*\}\s*void addActiveOrderForActiveAppointment/
   );
+});
+
+test('premium agenda modal uses top icons for edit/delete and supports vervolg as open lead', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const followUpPath = path.join(__dirname, '../../assets/premium-agenda-follow-up.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const followUpSource = fs.readFileSync(followUpPath, 'utf8');
+
+  assert.match(pageSource, /id="modalEditAppointmentIconBtn"[^>]*aria-label="Gegevens wijzigen"/);
+  assert.match(pageSource, /id="modalDeleteAppointmentIconBtn"[^>]*aria-label="Verwijderen"/);
+  assert.match(pageSource, /id="modalFollowUpBtn"[^>]*>Vervolg<\/button>/);
+  assert.match(pageSource, /assets\/premium-agenda-follow-up\.js\?v=20260516a/);
+  assert.doesNotMatch(pageSource, />\s*Gegevens wijzigen\s*<\/button>/i);
+  assert.doesNotMatch(pageSource, /id="modalDeleteBtn"[^>]*>Verwijderen<\/button>/i);
+  assert.match(followUpSource, /function saveFollowUpLeadForActiveAppointment\(\)/);
+  assert.match(followUpSource, /status: 'lead_follow_up'/);
+  assert.match(followUpSource, /Vervolg staat bij openstaande leads\./);
+  assert.match(followUpSource, /event\.stopImmediatePropagation\(\);/);
 });
 
 test('premium agenda workspace locks modal exit while dossier flow is still mandatory', () => {
@@ -415,7 +433,7 @@ test('premium agenda shows klantwerk on Wednesdays and Saturdays without blockin
 test('premium agenda verbergt dealacties voor handmatige overige afspraken en behoudt boot-failsafe', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
-  const followUpPath = path.join(__dirname, '../../assets/premium-agenda-follow-up-leads.js');
+  const followUpPath = path.join(__dirname, '../../assets/premium-agenda-follow-up.js');
   const pageSource = `${fs.readFileSync(pagePath, 'utf8')}\n${fs.readFileSync(followUpPath, 'utf8')}`;
   const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
 
