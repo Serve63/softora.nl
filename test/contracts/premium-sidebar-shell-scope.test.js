@@ -133,6 +133,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
+  assert.match(themeJsSource, /premiumSessionSnapshotFromStorage/);
   assert.match(themeJsSource, /function stabilizePremiumStaticSidebar\(sidebar, activeKey\) \{/);
   assert.doesNotMatch(themeJsSource, /sidebar\.dataset\.staticSidebar === "1"\) \{\s*sidebar\.innerHTML/);
   assert.doesNotMatch(themeJsSource, /getWebsiteGeneratorLibrarySidebarLink/);
