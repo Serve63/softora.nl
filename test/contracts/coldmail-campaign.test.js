@@ -688,7 +688,7 @@ test('coldmail campaign preview only lists webdesign recipients with a generated
     ['with-photo']
   );
   assert.equal(result.failedItems[0].id, 'without-photo');
-  assert.match(result.failedItems[0].error, /Geen webdesign-foto gevonden voor Zonder Design/);
+  assert.match(result.failedItems[0].error, /Nog geen website-design klaar voor Zonder Design/);
 });
 
 test('coldmail campaign uses chunked webdesign photo when websitePhoto is stale', async () => {
