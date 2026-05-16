@@ -353,6 +353,40 @@ test('html page coordinator inlines the premium sidebar profile prefill script',
   assert.doesNotMatch(res.body, /premium-sidebar-profile-prefill\.js\?v=/);
 });
 
+test('html page coordinator injects premium session watchdog on authenticated premium pages', async () => {
+  const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-watchdog-'));
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-personeel-agenda.html'),
+    '<!DOCTYPE html><html><head></head><body><aside class="sidebar" data-static-sidebar="1"></aside></body></html>'
+  );
+
+  const coordinator = createHtmlPageCoordinator({
+    pagesDir,
+    sanitizeKnownHtmlFileName: (value) =>
+      String(value || '').trim() === 'premium-personeel-agenda.html' ? 'premium-personeel-agenda.html' : '',
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: true,
+      authState: { authenticated: true, email: 'serve@softora.nl', role: 'admin' },
+    }),
+    getSeoConfigCached: async () => ({}),
+    applySeoOverridesToHtml: (_fileName, html) => html,
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/premium-personeel-agenda' },
+    res,
+    () => {},
+    'premium-personeel-agenda.html'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /assets\/premium-session-watchdog\.js\?v=20260516a/);
+  assert.match(res.body, /<script src="\/assets\/premium-session-watchdog\.js\?v=20260516a" defer><\/script>\s*<\/head>/);
+});
+
 test('html page coordinator injects authenticated premium sidebar profile html before first paint', async () => {
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-profile-'));
   fs.mkdirSync(path.join(pagesDir, 'assets'), { recursive: true });

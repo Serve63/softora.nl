@@ -52,6 +52,7 @@ html,body{min-height:100vh;}
 ].join('\n');
 const HOMEPAGE_HERO_IMAGE_URL = '/assets/home-hero-generated-v2.jpg?v=20260511a';
 const HOMEPAGE_HERO_IMAGE_PRELOAD = `<link rel="preload" as="image" href="${HOMEPAGE_HERO_IMAGE_URL}">`;
+const PREMIUM_SESSION_WATCHDOG_SCRIPT = '<script src="/assets/premium-session-watchdog.js?v=20260516a" defer></script>';
 
 function createHtmlPageCoordinator(options = {}) {
   const {
@@ -283,6 +284,13 @@ function createHtmlPageCoordinator(options = {}) {
     return renderedHtml;
   }
 
+  function injectPremiumSessionWatchdog(html, authState) {
+    const sourceHtml = String(html || '');
+    if (!authState || !authState.authenticated) return sourceHtml;
+    if (/assets\/premium-session-watchdog\.js/i.test(sourceHtml)) return sourceHtml;
+    return injectSnippetBeforeHeadClose(sourceHtml, PREMIUM_SESSION_WATCHDOG_SCRIPT);
+  }
+
   function optimizeHtmlDelivery(html, fileName, authState) {
     let renderedHtml = String(html || '')
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.googleapis\.com"[^>]*>\s*/gim, '')
@@ -303,6 +311,7 @@ function createHtmlPageCoordinator(options = {}) {
     }
 
     renderedHtml = injectPremiumSidebarProfileHtml(renderedHtml, authState);
+    renderedHtml = injectPremiumSessionWatchdog(renderedHtml, authState);
     renderedHtml = inlinePremiumSidebarProfilePrefill(renderedHtml);
 
     return renderedHtml;
