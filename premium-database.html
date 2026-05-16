@@ -500,7 +500,6 @@
         }
 
         tbody tr {
-            cursor: pointer;
             transition: background .1s ease;
         }
 
@@ -3164,9 +3163,6 @@
                 void webdesignActionController.generateForCustomer(state.photoTargetId);
                 return;
             }
-            const row = event.target.closest("tr[data-id]");
-            if (!row) return;
-            openPanel(row.getAttribute("data-id"));
         });
 
         nodes.tbody.addEventListener("dragover", function (event) {

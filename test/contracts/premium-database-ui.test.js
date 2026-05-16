@@ -493,6 +493,8 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /website: normalizeString\(nodes\.modalDomain\.value\) \|\| dom,/);
   assert.match(pageSource, /openEditCustomerModal\(editButton\.getAttribute\("data-edit-id"\)\)/);
   assert.match(pageSource, /removeWebsitePhotoForCustomer\(removePhotoButton\.getAttribute\("data-remove-photo-id"\)\)/);
+  assert.doesNotMatch(pageSource, /const row = event\.target\.closest\("tr\[data-id\]"\);[\s\S]*openPanel\(row\.getAttribute\("data-id"\)\);/);
+  assert.doesNotMatch(pageSource, /tbody tr \{[^}]*cursor: pointer;/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);
