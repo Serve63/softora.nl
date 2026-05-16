@@ -1,6 +1,11 @@
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const {
+  appendSentMessage,
+  publicListErrorMessage,
+  resolveMailboxName,
+} = require('./mailbox-sent-copy');
 
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
@@ -9,42 +14,6 @@ const DEFAULT_MAILBOX_EMAILS = [
   'serve@softora.nl',
   'martijn@softora.nl',
 ];
-
-const FOLDER_ALIASES = {
-  inbox: ['INBOX'],
-  sent: [
-    'Sent',
-    'Sent Items',
-    'Sent Mail',
-    'Sent Messages',
-    'INBOX.Sent',
-    'INBOX.Sent Items',
-    'INBOX.Sent Mail',
-    'INBOX.Sent Messages',
-    'Verzonden',
-    'Verzonden items',
-    'Verzonden berichten',
-  ],
-  drafts: ['Drafts', 'Draft', 'Concepts', 'INBOX.Drafts', 'INBOX.Concepts', 'Concepten'],
-  spam: ['Spam', 'Junk', 'Junk E-mail', 'INBOX.Spam', 'INBOX.Junk'],
-  trash: ['Trash', 'Deleted', 'Deleted Items', 'Deleted Messages', 'Bin', 'INBOX.Trash', 'Prullenbak'],
-};
-
-const FOLDER_SPECIAL_USES = {
-  inbox: ['inbox'],
-  sent: ['sent'],
-  drafts: ['drafts'],
-  spam: ['junk'],
-  trash: ['trash'],
-};
-
-const FOLDER_LABELS = {
-  inbox: 'Inbox',
-  sent: 'Verzonden',
-  drafts: 'Concepten',
-  spam: 'Spam',
-  trash: 'Prullenbak',
-};
 
 function createMailboxService(deps = {}) {
   const {
@@ -286,73 +255,6 @@ function createMailboxService(deps = {}) {
     });
   }
 
-  function normalizeMailboxKey(value) {
-    return normalizeString(value)
-      .toLowerCase()
-      .replace(/[\\/]+/g, '/')
-      .replace(/\.+/g, '/')
-      .replace(/\s+/g, ' ')
-      .replace(/\/+/g, '/');
-  }
-
-  function getMailboxPath(box) {
-    return normalizeString(box?.path || box?.name || '');
-  }
-
-  function normalizeSpecialUse(value) {
-    return normalizeString(value).replace(/^\\/, '').toLowerCase();
-  }
-
-  function getMailboxSpecialUses(box) {
-    const values = [];
-    if (box?.specialUse) values.push(box.specialUse);
-    const flags = box?.flags;
-    if (Array.isArray(flags)) {
-      values.push(...flags);
-    } else if (flags && typeof flags[Symbol.iterator] === 'function') {
-      values.push(...Array.from(flags));
-    }
-    return values.map(normalizeSpecialUse).filter(Boolean);
-  }
-
-  async function resolveMailboxName(client, folder) {
-    const candidates = FOLDER_ALIASES[folder] || ['INBOX'];
-    const boxes = await client.list();
-    const items = Array.isArray(boxes) ? boxes : [];
-    const names = items.map(getMailboxPath).filter(Boolean);
-    const specialUses = FOLDER_SPECIAL_USES[folder] || [];
-    if (specialUses.length) {
-      const specialUseHit = items.find((box) => {
-        const values = getMailboxSpecialUses(box);
-        return values.some((value) => specialUses.includes(value));
-      });
-      const specialUsePath = getMailboxPath(specialUseHit);
-      if (specialUsePath) return specialUsePath;
-    }
-    const candidateKeys = new Set(candidates.map(normalizeMailboxKey).filter(Boolean));
-    for (const candidate of candidates) {
-      const candidateKey = normalizeMailboxKey(candidate);
-      const hit = names.find((name) => normalizeMailboxKey(name) === candidateKey);
-      if (hit) return hit;
-    }
-    const leafHit = names.find((name) => {
-      const key = normalizeMailboxKey(name);
-      const leaf = key.split('/').filter(Boolean).pop();
-      return folder !== 'inbox' && leaf && candidateKeys.has(leaf);
-    });
-    if (leafHit) return leafHit;
-    return folder === 'inbox' ? candidates[0] : null;
-  }
-
-  function publicListErrorMessage(error, folder) {
-    const message = String(error?.message || '');
-    if (/command failed/i.test(message)) {
-      const label = FOLDER_LABELS[folder] || 'Mailboxmap';
-      return `${label} kon niet worden geopend. Controleer of deze map bestaat voor dit account.`;
-    }
-    return message || 'Onbekende fout';
-  }
-
   function addressText(address) {
     if (!address) return '';
     const list = Array.isArray(address) ? address : [address];
@@ -461,16 +363,26 @@ function createMailboxService(deps = {}) {
       secure: account.smtpSecure,
       auth: { user: account.smtpUser, pass: account.smtpPass },
     });
-    const info = await transporter.sendMail({
+    const mail = {
       from: account.name ? `${account.name} <${account.email}>` : account.email,
       to: normalizeEmail(to),
       subject: cleanSubject,
       text: normalizeString(text),
+    };
+    const info = await transporter.sendMail(mail);
+    const sentCopySaved = await appendSentMessage({
+      account,
+      createImapClient,
+      nodemailer,
+      mail,
+      messageId: normalizeString(info?.messageId || ''),
+      sentAt: new Date(),
     });
     return {
       messageId: normalizeString(info?.messageId || ''),
       accepted: Array.isArray(info?.accepted) ? info.accepted : [],
       rejected: Array.isArray(info?.rejected) ? info.rejected : [],
+      sentCopySaved,
     };
   }
 

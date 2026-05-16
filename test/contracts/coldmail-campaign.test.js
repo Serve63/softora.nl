@@ -1203,6 +1203,43 @@ test('coldmail campaign uses personal sender name for Serve mailbox', async () =
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
 });
 
+test('coldmail campaign saves sent copies into the selected sender sent folder', async () => {
+  const appendedMessages = [];
+  const client = {
+    usable: true,
+    async connect() {},
+    async list() {
+      return [{ path: 'INBOX' }, { path: 'INBOX/Verstuurd' }];
+    },
+    async append(mailboxName, raw, flags) {
+      appendedMessages.push({ mailboxName, raw, flags });
+      return { path: mailboxName };
+    },
+    async logout() {
+      this.usable = false;
+    },
+  };
+  const { service } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    createImapClient: () => client,
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.sentItems[0].sentCopySaved, true);
+  assert.equal(appendedMessages.length, 1);
+  assert.equal(appendedMessages[0].mailboxName, 'INBOX/Verstuurd');
+  assert.match(String(appendedMessages[0].raw), /Subject: Nieuwe website voor Bakkerij Zon/);
+});
+
 test('coldmail campaign refuses to send when SMTP is not configured', async () => {
   const { service } = createService({ smtpHost: '' });
 

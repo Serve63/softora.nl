@@ -6,6 +6,7 @@ const {
   canAdvanceContactStatus,
   normalizeContactStatus,
 } = require('./customer-lifecycle');
+const { appendSentMessage } = require('./mailbox-sent-copy');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -536,6 +537,97 @@ function createColdmailCampaignService(deps = {}) {
     const normalized = normalizeEmailAddress(email);
     const parts = normalized.split('@');
     return parts.length === 2 ? parts[1] : '';
+  }
+
+  function envKeyForEmail(email) {
+    return normalizeEmailAddress(email)
+      .split('@')[0]
+      .replace(/[^a-z0-9]+/g, '_')
+      .toUpperCase();
+  }
+
+  function envKeyForDomain(email) {
+    return normalizeEmailAddress(email)
+      .split('@')
+      .slice(1)
+      .join('@')
+      .replace(/[^a-z0-9]+/g, '_')
+      .toUpperCase();
+  }
+
+  function readBooleanEnv(value) {
+    const normalized = normalizeString(value);
+    if (!normalized) return null;
+    if (/^(1|true|yes)$/i.test(normalized)) return true;
+    if (/^(0|false|no)$/i.test(normalized)) return false;
+    return null;
+  }
+
+  function readPortEnv(value) {
+    const port = Number(value || 0);
+    return Number.isFinite(port) && port > 0 ? port : 0;
+  }
+
+  function readMailboxEnvForKey(key) {
+    const env = process.env || {};
+    const sharedUser = normalizeString(env[`MAILBOX_${key}_USER`] || '');
+    const sharedPass = normalizeString(env[`MAILBOX_${key}_PASS`] || '');
+    return {
+      imapHost: normalizeString(env[`MAILBOX_${key}_IMAP_HOST`] || ''),
+      imapPort: readPortEnv(env[`MAILBOX_${key}_IMAP_PORT`]),
+      imapSecure: readBooleanEnv(env[`MAILBOX_${key}_IMAP_SECURE`]),
+      imapUser: normalizeString(env[`MAILBOX_${key}_IMAP_USER`] || sharedUser),
+      imapPass: normalizeString(env[`MAILBOX_${key}_IMAP_PASS`] || sharedPass),
+      useBaseCredentials: readBooleanEnv(env[`MAILBOX_${key}_USE_BASE_CREDENTIALS`]) === true,
+    };
+  }
+
+  function resolveSentCopyAccount(senderEmail) {
+    const email = normalizeEmailAddress(senderEmail || mailFromAddress || smtpUser || imapUser);
+    const envAccount = readMailboxEnvForKey(envKeyForEmail(email));
+    const envDomain = readMailboxEnvForKey(envKeyForDomain(email));
+    const useBaseCredentials =
+      email === normalizeEmailAddress(mailFromAddress) ||
+      email === normalizeEmailAddress(smtpUser) ||
+      email === normalizeEmailAddress(imapUser) ||
+      envAccount.useBaseCredentials ||
+      envDomain.useBaseCredentials;
+    const port = Number(envAccount.imapPort || envDomain.imapPort || imapPort || 993) || 993;
+    const secure =
+      typeof envAccount.imapSecure === 'boolean'
+        ? envAccount.imapSecure
+        : typeof envDomain.imapSecure === 'boolean'
+          ? envDomain.imapSecure
+          : Boolean(imapSecure || port === 993);
+    const account = {
+      email,
+      imapHost: normalizeString(envAccount.imapHost || envDomain.imapHost || imapHost),
+      imapPort: port,
+      imapSecure: secure,
+      imapUser: normalizeString(
+        envAccount.imapUser ||
+          envDomain.imapUser ||
+          (useBaseCredentials ? imapUser : '') ||
+          email
+      ),
+      imapPass: normalizeString(
+        envAccount.imapPass ||
+          envDomain.imapPass ||
+          (useBaseCredentials ? imapPass : '')
+      ),
+    };
+    return account;
+  }
+
+  async function saveSentCopy(senderEmail, mail, info) {
+    return appendSentMessage({
+      account: resolveSentCopyAccount(senderEmail),
+      createImapClient,
+      nodemailer,
+      mail,
+      messageId: normalizeString(info && info.messageId),
+      sentAt: now(),
+    });
   }
 
   function isTestRecipientEmail(email) {
@@ -1411,7 +1503,7 @@ function createColdmailCampaignService(deps = {}) {
     const from = getParsedMailFromEmail(parsedMail);
     const messageId = normalizeString(parsedMail && parsedMail.messageId);
     const references = collectMessageReferenceHeader(parsedMail);
-    return transporter.sendMail({
+    const mail = {
       from: formatMailFromHeader(senderEmail),
       to: from.address,
       replyTo: mailReplyTo || senderEmail || mailFromAddress || undefined,
@@ -1419,7 +1511,10 @@ function createColdmailCampaignService(deps = {}) {
       text: replyText,
       inReplyTo: messageId || undefined,
       references: references || undefined,
-    });
+    };
+    const info = await transporter.sendMail(mail);
+    await saveSentCopy(senderEmail, mail, info);
+    return info;
   }
 
   function buildCustomerPhotoDataKey(row) {
@@ -1986,7 +2081,7 @@ function createColdmailCampaignService(deps = {}) {
           ]
         : undefined;
       try {
-        const info = await transporter.sendMail({
+        const mail = {
           from: formatMailFromHeader(senderEmail),
           to,
           replyTo: mailReplyTo || mailFromAddress || undefined,
@@ -1994,13 +2089,16 @@ function createColdmailCampaignService(deps = {}) {
           text,
           html,
           attachments,
-        });
+        };
+        const info = await transporter.sendMail(mail);
+        const sentCopySaved = await saveSentCopy(senderEmail, mail, info);
         sent.push({
           id: item.id,
           bedrijf: getRowCompany(row),
           email: to,
           messageId: normalizeString(info && info.messageId),
           response: truncateText(normalizeString(info && info.response), 500),
+          sentCopySaved,
         });
       } catch (error) {
         failed.push({
