@@ -50,9 +50,12 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
         }
       })();
     },
-    async append(mailboxName, source, flags, internalDate) {
-      appendedMessages.push({ mailboxName, source, flags, internalDate });
-      return { uid: 999 };
+    async append(mailboxName, raw, flags, date) {
+      appendedMessages.push({ mailboxName, raw, flags, date });
+      if (!Object.prototype.hasOwnProperty.call(messagesByMailbox, mailboxName)) {
+        throw new Error('Command failed');
+      }
+      return { path: mailboxName };
     },
     async logout() {
       this.usable = false;
@@ -276,6 +279,94 @@ test('mailbox service resolves sent folders through IMAP special-use metadata', 
   assert.equal(messages[0].from, 'Servé Creusen');
   assert.equal(messages[0].email, 'serve@softora.nl');
   assert.equal(messages[0].to, 'klant@example.nl');
+});
+
+test('mailbox service resolves Dutch sent folders without special-use metadata', async () => {
+  const sentDate = new Date('2026-05-12T11:15:00.000Z');
+  const client = createFakeImapClient({
+    boxes: [
+      { path: 'INBOX' },
+      { path: 'INBOX/Verstuurd' },
+    ],
+    messagesByMailbox: {
+      'INBOX/Verstuurd': [
+        {
+          uid: 43,
+          flags: ['\\Seen'],
+          internalDate: sentDate,
+          source: {
+            date: sentDate,
+            text: 'Hallo vanaf Serve',
+            subject: 'STRATO verzonden bericht',
+            from: { value: [{ name: 'Serve', address: 'serve@softora.nl' }] },
+            to: { value: [{ name: 'Klant', address: 'klant@example.nl' }] },
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
+
+  assert.deepEqual(client.lockedMailboxes, ['INBOX/Verstuurd']);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].subject, 'STRATO verzonden bericht');
+});
+
+test('mailbox service saves app-sent messages into the sent folder', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX' }, { path: 'INBOX/Verstuurd' }],
+    messagesByMailbox: { 'INBOX/Verstuurd': [] },
+  });
+  const sent = [];
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createTransport: (config) => ({
+      sendMail: async (message) => {
+        sent.push({ config, message });
+        return { messageId: '<m-serve-1@softora.nl>', accepted: [message.to], rejected: [] };
+      },
+    }),
+    createImapClient: () => client,
+  });
+
+  const result = await service.sendMessage({
+    accountEmail: 'serve@softora.nl',
+    to: 'klant@example.nl',
+    subject: 'Test vanuit mailbox',
+    text: 'Hallo klant',
+  });
+
+  assert.equal(result.sentCopySaved, true);
+  assert.equal(sent.length, 1);
+  assert.equal(client.appendedMessages.length, 1);
+  assert.equal(client.appendedMessages[0].mailboxName, 'INBOX/Verstuurd');
+  assert.match(String(client.appendedMessages[0].raw), /Subject: Test vanuit mailbox/);
 });
 
 test('mailbox service returns an empty list when an optional folder is missing', async () => {
