@@ -163,6 +163,50 @@ function applyAppMiddleware(app, deps = {}) {
     },
   });
 
+  function createFocusedApiRateLimiter(options = {}) {
+    const type = String(options.type || 'focused_rate_limit_hit').trim() || 'focused_rate_limit_hit';
+    const detail = String(options.detail || 'Gerichte API rate limit geraakt.').trim();
+    const error = String(options.error || 'Te veel verzoeken. Probeer het over enkele minuten opnieuw.').trim();
+    return rateLimit({
+      windowMs: Math.max(60 * 1000, Number(options.windowMs || 15 * 60 * 1000) || 15 * 60 * 1000),
+      max: Math.max(1, Number(options.max || 60) || 60),
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      handler: (req, res) => {
+        appendSecurityAuditEvent(
+          {
+            type,
+            severity: 'warning',
+            success: false,
+            email: getPremiumAuthState(req)?.email || '',
+            ip: getClientIpFromRequest(req),
+            path: getRequestPathname(req),
+            origin: getRequestOriginFromHeaders(req),
+            userAgent: req.get('user-agent'),
+            detail,
+          },
+          `security_${type}`
+        );
+        return res.status(429).json({
+          ok: false,
+          error,
+        });
+      },
+    });
+  }
+
+  const sensitiveActionRateLimiter = createFocusedApiRateLimiter({
+    type: 'sensitive_action_rate_limit_hit',
+    max: 40,
+    detail: 'Gerichte limiet geraakt voor mailbox, coldmail, coldcalling of order-actie.',
+  });
+
+  const aiApiRateLimiter = createFocusedApiRateLimiter({
+    type: 'ai_rate_limit_hit',
+    max: 80,
+    detail: 'Gerichte limiet geraakt voor AI endpoint.',
+  });
+
   const premiumLoginRateLimiter = rateLimit({
     windowMs: 10 * 60 * 1000,
     max: 8,
@@ -189,6 +233,43 @@ function applyAppMiddleware(app, deps = {}) {
       });
     },
   });
+
+  app.use(
+    [
+      '/api/mailbox/send',
+      '/api/coldmailing/campaigns/send',
+      '/api/coldmailing/outreach/status',
+      '/api/coldmailing/replies/sync',
+      '/api/coldcalling/start',
+      '/api/active-orders/generate-site',
+      '/api/active-order-generate-site',
+      '/api/active-orders/launch-site',
+      '/api/active-order-launch-site',
+      '/api/website-links/create',
+    ],
+    sensitiveActionRateLimiter
+  );
+
+  app.use(
+    [
+      '/api/ai/ruben-chat',
+      '/api/ai/dashboard-chat',
+      '/api/ai-dashboard-chat',
+      '/api/ai/summarize',
+      '/api/ai/order-dossier',
+      '/api/ai-order-dossier',
+      '/api/ai/transcript-to-prompt',
+      '/api/ai-transcript-to-prompt',
+      '/api/ai/notes-image-to-text',
+      '/api/ai-notes-image-to-text',
+      '/api/ai/notes-audio-to-text',
+      '/api/ai-notes-audio-to-text',
+      '/api/website-preview/generate',
+      '/api/website-preview-generate',
+      '/api/website-preview/batch',
+    ],
+    aiApiRateLimiter
+  );
 
   app.use('/api', generalApiRateLimiter);
 

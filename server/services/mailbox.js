@@ -562,6 +562,11 @@ function createMailboxService(deps = {}) {
       preview,
       body: text || preview,
       date: date.toISOString(),
+      messageId: normalizeString(parsed.messageId || ''),
+      inReplyTo: normalizeString(parsed.inReplyTo || ''),
+      references: Array.isArray(parsed.references)
+        ? parsed.references.map((item) => normalizeString(item)).filter(Boolean).join(' ')
+        : normalizeString(parsed.references || ''),
       unread: !Array.from(message.flags || []).includes('\\Seen'),
       starred: Array.from(message.flags || []).includes('\\Flagged'),
     };
