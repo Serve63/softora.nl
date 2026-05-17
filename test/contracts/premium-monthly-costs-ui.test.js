@@ -159,8 +159,13 @@ test('premium terugkerende kosten bewaart bewerkbare posten via supabase ui-stat
 
 test('premium terugkerende kosten bevat klantkosten-check voor betaalde kosten per klant', () => {
   const { pageSource, scriptSource, coverageScriptSource } = readMonthlyCostsSources();
+  const costsListIndex = pageSource.indexOf('<div id="categories-wrap"></div>');
+  const coveragePanelIndex = pageSource.indexOf('<section class="coverage-panel" id="customer-cost-coverage"');
 
   assert.match(pageSource, /<section class="coverage-panel" id="customer-cost-coverage"/);
+  assert.ok(costsListIndex !== -1);
+  assert.ok(coveragePanelIndex !== -1);
+  assert.ok(costsListIndex < coveragePanelIndex);
   assert.match(pageSource, /Worden alle kosten betaald\?/);
   assert.match(pageSource, /id="coverage-cost-description"/);
   assert.match(pageSource, /id="coverage-cost-amount"/);
