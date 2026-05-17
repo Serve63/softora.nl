@@ -577,6 +577,7 @@ function createCustomersPageBootstrapService(deps = {}) {
     return {
       SOFTORA_DASHBOARD_TOTAL_REVENUE: formatDashboardMoney(summary.totalRevenue),
       SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
+      SOFTORA_DASHBOARD_RECURRING_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
       SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardRevenueChartHtml(payload.customers),
       SOFTORA_DASHBOARD_TOTAL_CLIENTS:
         String(summary.totalCustomers) + buildDashboardActiveOrdersBootstrapScript(activeOrdersBreakdown),

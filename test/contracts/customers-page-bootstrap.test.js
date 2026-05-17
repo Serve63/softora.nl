@@ -62,6 +62,7 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   const replacements = service.buildDashboardHtmlReplacements(payload);
   assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac600');
   assert.equal(replacements.SOFTORA_DASHBOARD_MAINTENANCE_REVENUE, '\u20ac0');
+  assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '\u20ac0');
   assert.match(replacements.SOFTORA_DASHBOARD_REVENUE_CHART, /<span class="chart-label">Jan<\/span>/);
   assert.match(replacements.SOFTORA_DASHBOARD_REVENUE_CHART, /<span class="chart-label">Mrt<\/span>/);
   assert.match(
