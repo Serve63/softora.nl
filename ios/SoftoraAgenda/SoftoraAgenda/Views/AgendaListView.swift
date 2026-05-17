@@ -524,25 +524,27 @@ private struct GymExerciseRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(exercise.title)
-                    .font(.softoraDisplay(15, weight: .bold))
-                    .textCase(.uppercase)
-                    .tracking(0.7)
-                    .foregroundStyle(Color.softoraInk)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.82)
+                HStack(alignment: .top, spacing: 8) {
+                    Text(exercise.title)
+                        .font(.softoraDisplay(15, weight: .bold))
+                        .textCase(.uppercase)
+                        .tracking(0.7)
+                        .foregroundStyle(Color.softoraInk)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack(spacing: 5) {
+                        GymMetricField(label: "Sets", value: $sets, keyboardType: .numberPad)
+                        GymMetricField(label: "Reps", value: $reps, keyboardType: .numberPad)
+                        GymMetricField(label: "Kg", value: $kilograms, keyboardType: .decimalPad)
+                    }
+                }
 
                 Text(exercise.details)
                     .font(.softoraBody(12, weight: .semibold))
                     .textCase(.uppercase)
                     .foregroundStyle(Color.softoraMuted)
-
-                HStack(spacing: 8) {
-                    GymMetricField(label: "Sets", value: $sets, keyboardType: .numberPad)
-                    GymMetricField(label: "Reps", value: $reps, keyboardType: .numberPad)
-                    GymMetricField(label: "Kg", value: $kilograms, keyboardType: .decimalPad)
-                }
-                .padding(.top, 6)
             }
 
             Spacer(minLength: 0)
@@ -585,28 +587,27 @@ private struct GymMetricField: View {
     let keyboardType: UIKeyboardType
 
     var body: some View {
-        VStack(spacing: 3) {
-            Text(label)
-                .font(.softoraDisplay(10, weight: .bold))
-                .textCase(.uppercase)
-                .tracking(0.6)
-                .foregroundStyle(Color.softoraMuted)
-
+        VStack(spacing: 2) {
             TextField("", text: $value)
-                .font(.softoraDisplay(14, weight: .bold))
+                .font(.softoraDisplay(11, weight: .bold))
                 .foregroundStyle(Color.softoraInk)
                 .multilineTextAlignment(.center)
                 .keyboardType(keyboardType)
-                .frame(height: 24)
+                .frame(width: 30, height: 18)
+
+            Text(label)
+                .font(.softoraDisplay(7.5, weight: .bold))
+                .textCase(.uppercase)
+                .tracking(0.4)
+                .foregroundStyle(Color.softoraMuted.opacity(0.78))
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .padding(.horizontal, 4)
-        .background(Color.softoraSheetBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .frame(width: 36)
+        .padding(.vertical, 4)
+        .background(Color.softoraSheetBackground.opacity(0.64))
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(Color.softoraPurpleLight.opacity(0.75), lineWidth: 1)
         }
     }
 }
