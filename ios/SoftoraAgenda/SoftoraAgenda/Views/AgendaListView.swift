@@ -281,7 +281,12 @@ private struct AgendaTopBar: View {
 private struct GymWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
 
-    private let exercises = GymExercise.defaultWorkout
+    @State private var selectedDay: GymWorkoutDay = .today
+    @State private var isChoosingDay = false
+
+    private var exercises: [GymExercise] {
+        selectedDay.exercises
+    }
 
     var body: some View {
         ZStack {
@@ -317,7 +322,22 @@ private struct GymWorkoutView: View {
                 }
                 .scrollIndicators(.hidden)
             }
+
+            if isChoosingDay {
+                GymDayPickerOverlay(
+                    selectedDay: selectedDay,
+                    onSelect: { day in
+                        selectedDay = day
+                        isChoosingDay = false
+                    },
+                    onClose: {
+                        isChoosingDay = false
+                    }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(.smooth(duration: 0.24), value: isChoosingDay)
     }
 
     private var gymHeader: some View {
@@ -329,10 +349,16 @@ private struct GymWorkoutView: View {
                     .tracking(1.0)
                     .foregroundStyle(Color.softoraInk)
 
-                Text("Schema van vandaag")
-                    .font(.softoraBody(12, weight: .semibold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(Color.softoraMuted)
+                Button {
+                    isChoosingDay = true
+                } label: {
+                    Text(selectedDay.title)
+                        .font(.softoraBody(12, weight: .semibold))
+                        .textCase(.uppercase)
+                        .foregroundStyle(Color.softoraMuted)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dag kiezen")
             }
 
             HStack {
@@ -360,6 +386,116 @@ private struct GymWorkoutView: View {
         .padding(.top, 18)
         .padding(.bottom, 14)
         .background(Color.white)
+    }
+}
+
+private enum GymWorkoutDay: String, CaseIterable, Identifiable {
+    case today
+    case monday
+    case tuesday
+    case wednesday
+    case thursday
+    case friday
+    case saturday
+    case sunday
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .today:
+            "Vandaag"
+        case .monday:
+            "Maandag"
+        case .tuesday:
+            "Dinsdag"
+        case .wednesday:
+            "Woensdag"
+        case .thursday:
+            "Donderdag"
+        case .friday:
+            "Vrijdag"
+        case .saturday:
+            "Zaterdag"
+        case .sunday:
+            "Zondag"
+        }
+    }
+
+    var exercises: [GymExercise] {
+        GymExercise.defaultWorkout
+    }
+}
+
+private struct GymDayPickerOverlay: View {
+    let selectedDay: GymWorkoutDay
+    let onSelect: (GymWorkoutDay) -> Void
+    let onClose: () -> Void
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 10),
+        GridItem(.flexible(), spacing: 10)
+    ]
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Color.softoraInk.opacity(0.28)
+                .ignoresSafeArea()
+                .onTapGesture(perform: onClose)
+
+            VStack(spacing: 16) {
+                Text("Kies dag")
+                    .font(.softoraDisplay(21, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(1.0)
+                    .foregroundStyle(Color.softoraInk)
+
+                LazyVGrid(columns: columns, spacing: 10) {
+                    ForEach(GymWorkoutDay.allCases) { day in
+                        GymDayButton(
+                            day: day,
+                            isSelected: day == selectedDay,
+                            onSelect: { onSelect(day) }
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 22)
+            .padding(.bottom, 28)
+            .frame(maxWidth: .infinity)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .padding(.horizontal, 12)
+            .padding(.bottom, 10)
+        }
+    }
+}
+
+private struct GymDayButton: View {
+    let day: GymWorkoutDay
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            Text(day.title)
+                .font(.softoraDisplay(13, weight: .bold))
+                .textCase(.uppercase)
+                .tracking(0.8)
+                .foregroundStyle(isSelected ? Color.white : Color.softoraInk)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(isSelected ? Color.softoraCrimson : Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                    if !isSelected {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
     }
 }
 

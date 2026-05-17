@@ -62,6 +62,15 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /private struct MailboxView: View/);
   assert.match(agendaListSource, /GymWorkoutView\(\)/);
   assert.match(agendaListSource, /private struct GymWorkoutView: View/);
+  assert.match(agendaListSource, /@State private var selectedDay: GymWorkoutDay = \.today/);
+  assert.match(agendaListSource, /@State private var isChoosingDay = false/);
+  assert.match(agendaListSource, /private enum GymWorkoutDay: String, CaseIterable, Identifiable/);
+  assert.match(agendaListSource, /private struct GymDayPickerOverlay: View/);
+  assert.match(agendaListSource, /private struct GymDayButton: View/);
+  assert.match(agendaListSource, /Text\(selectedDay\.title\)/);
+  assert.match(agendaListSource, /case \.today:[^]*"Vandaag"/);
+  assert.match(agendaListSource, /ForEach\(GymWorkoutDay\.allCases\)/);
+  assert.doesNotMatch(agendaListSource, /Schema van vandaag/);
   assert.match(agendaListSource, /private struct GymExercise: Identifiable/);
   assert.match(agendaListSource, /isShowingGym = true/);
   assert.match(agendaListSource, /Text\("Oefeningen"\)/);
