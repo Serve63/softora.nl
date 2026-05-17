@@ -24,9 +24,9 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(source, /id="admin-action-pin-input" name="softora_action_code" autocomplete="one-time-code"/);
   assert.match(source, /data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"/);
   assert.match(source, /class="settings-overview-grid"/);
-  assert.match(source, /href="\/premium-vaste-lasten\?view=klantdekking"/);
-  assert.match(source, /Worden alle kosten betaald\?/);
-  assert.match(source, /Klantkosten-check/);
+  assert.doesNotMatch(source, /href="\/premium-vaste-lasten\?view=klantdekking"/);
+  assert.doesNotMatch(source, /Worden alle kosten betaald\?/);
+  assert.doesNotMatch(source, /Klantkosten-check/);
   assert.doesNotMatch(source, /id="edit-status"/);
   assert.doesNotMatch(source, /<label>Status<\/label><select id="edit-status"/);
   assert.match(source, /grid-template-columns:repeat\(auto-fit,minmax\(260px,1fr\)\)/);
