@@ -366,6 +366,17 @@ private struct GymWorkoutView: View {
 private struct GymExerciseRow: View {
     let exercise: GymExercise
 
+    @State private var sets: String
+    @State private var reps: String
+    @State private var kilograms: String
+
+    init(exercise: GymExercise) {
+        self.exercise = exercise
+        _sets = State(initialValue: exercise.defaultSets)
+        _reps = State(initialValue: exercise.defaultReps)
+        _kilograms = State(initialValue: "")
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 13) {
             Text(String(format: "%02d", exercise.order))
@@ -389,6 +400,13 @@ private struct GymExerciseRow: View {
                     .font(.softoraBody(12, weight: .semibold))
                     .textCase(.uppercase)
                     .foregroundStyle(Color.softoraMuted)
+
+                HStack(spacing: 8) {
+                    GymMetricField(label: "Sets", value: $sets, keyboardType: .numberPad)
+                    GymMetricField(label: "Reps", value: $reps, keyboardType: .numberPad)
+                    GymMetricField(label: "Kg", value: $kilograms, keyboardType: .decimalPad)
+                }
+                .padding(.top, 6)
             }
 
             Spacer(minLength: 0)
@@ -405,21 +423,56 @@ private struct GymExerciseRow: View {
 }
 
 private struct GymExercise: Identifiable {
-    let id = UUID()
+    var id: Int { order }
+
     let order: Int
     let title: String
     let details: String
+    let defaultSets: String
+    let defaultReps: String
 
     static let defaultWorkout: [GymExercise] = [
-        GymExercise(order: 1, title: "Bankdrukken", details: "4 sets - 8 tot 10 herhalingen"),
-        GymExercise(order: 2, title: "Schuine dumbbell press", details: "3 sets - 10 herhalingen"),
-        GymExercise(order: 3, title: "Seated row", details: "4 sets - 10 herhalingen"),
-        GymExercise(order: 4, title: "Lat pulldown", details: "3 sets - 10 herhalingen"),
-        GymExercise(order: 5, title: "Shoulder press", details: "3 sets - 8 tot 10 herhalingen"),
-        GymExercise(order: 6, title: "Biceps curl", details: "3 sets - 12 herhalingen"),
-        GymExercise(order: 7, title: "Triceps pushdown", details: "3 sets - 12 herhalingen"),
-        GymExercise(order: 8, title: "Plank", details: "3 rondes - 45 seconden")
+        GymExercise(order: 1, title: "Bankdrukken", details: "4 sets - 8 tot 10 herhalingen", defaultSets: "4", defaultReps: "10"),
+        GymExercise(order: 2, title: "Schuine dumbbell press", details: "3 sets - 10 herhalingen", defaultSets: "3", defaultReps: "10"),
+        GymExercise(order: 3, title: "Seated row", details: "4 sets - 10 herhalingen", defaultSets: "4", defaultReps: "10"),
+        GymExercise(order: 4, title: "Lat pulldown", details: "3 sets - 10 herhalingen", defaultSets: "3", defaultReps: "10"),
+        GymExercise(order: 5, title: "Shoulder press", details: "3 sets - 8 tot 10 herhalingen", defaultSets: "3", defaultReps: "10"),
+        GymExercise(order: 6, title: "Biceps curl", details: "3 sets - 12 herhalingen", defaultSets: "3", defaultReps: "12"),
+        GymExercise(order: 7, title: "Triceps pushdown", details: "3 sets - 12 herhalingen", defaultSets: "3", defaultReps: "12"),
+        GymExercise(order: 8, title: "Plank", details: "3 rondes - 45 seconden", defaultSets: "3", defaultReps: "45")
     ]
+}
+
+private struct GymMetricField: View {
+    let label: String
+    @Binding var value: String
+    let keyboardType: UIKeyboardType
+
+    var body: some View {
+        VStack(spacing: 3) {
+            Text(label)
+                .font(.softoraDisplay(10, weight: .bold))
+                .textCase(.uppercase)
+                .tracking(0.6)
+                .foregroundStyle(Color.softoraMuted)
+
+            TextField("", text: $value)
+                .font(.softoraDisplay(14, weight: .bold))
+                .foregroundStyle(Color.softoraInk)
+                .multilineTextAlignment(.center)
+                .keyboardType(keyboardType)
+                .frame(height: 24)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .background(Color.softoraSheetBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+        }
+    }
 }
 
 private struct AgendaShortcutBar: View {

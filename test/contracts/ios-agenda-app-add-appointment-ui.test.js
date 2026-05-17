@@ -66,6 +66,11 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /isShowingGym = true/);
   assert.match(agendaListSource, /Text\("Oefeningen"\)/);
   assert.match(agendaListSource, /GymExercise\(order: 1, title: "Bankdrukken"/);
+  assert.match(agendaListSource, /private struct GymMetricField: View/);
+  assert.match(agendaListSource, /GymMetricField\(label: "Sets"/);
+  assert.match(agendaListSource, /GymMetricField\(label: "Reps"/);
+  assert.match(agendaListSource, /GymMetricField\(label: "Kg"/);
+  assert.match(agendaListSource, /\.keyboardType\(keyboardType\)/);
   assert.doesNotMatch(agendaListSource, /premium-mailbox/);
   assert.match(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
   assert.match(agendaListSource, /title: "Gym"[^]*systemImage: "dumbbell\.fill"/);
