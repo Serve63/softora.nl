@@ -67,6 +67,8 @@ test('premium dashboard verbergt selectors naast de datum en toont jaaromzet', (
   assert.match(pageSource, /class="dashboard-topbar-controls"/);
   assert.match(pageSource, /class="topbar-date"/);
   assert.match(pageSource, /Vergeet niet om de omzet up to-date te houden!/);
+  assert.match(pageSource, /\.kpi-grid \{ display: grid; grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
+  assert.doesNotMatch(pageSource, /\.kpi-grid \{ display: grid; grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/);
   assert.match(pageSource, /Maandelijkse inkomsten/);
   assert.doesNotMatch(pageSource, /Terugkerende inkomsten/);
   assert.match(pageSource, /id="kpiRecurringRevenue"/);
