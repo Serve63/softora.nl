@@ -67,7 +67,8 @@ test('premium dashboard verbergt selectors naast de datum en toont jaaromzet', (
   assert.match(pageSource, /class="dashboard-topbar-controls"/);
   assert.match(pageSource, /class="topbar-date"/);
   assert.match(pageSource, /Vergeet niet om de omzet up to-date te houden!/);
-  assert.match(pageSource, /Terugkerende inkomsten/);
+  assert.match(pageSource, /Maandelijkse inkomsten/);
+  assert.doesNotMatch(pageSource, /Terugkerende inkomsten/);
   assert.match(pageSource, /id="kpiRecurringRevenue"/);
   assert.doesNotMatch(pageSource, /Overzicht van je bedrijfsprestaties/);
   assert.match(pageSource, /id="revenuePanelBadge">Omzet per maand<\/span>/);
@@ -111,8 +112,11 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
   assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_TOTAL_REVENUE -->/);
-  assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_MAINTENANCE_REVENUE -->/);
   assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_REVENUE_CHART -->/);
+  assert.doesNotMatch(pageSource, /Waarvan Website Onderhoud/);
+  assert.doesNotMatch(pageSource, /id="kpiMaintenanceMonth"/);
+  assert.doesNotMatch(pageSource, /<!-- SOFTORA_DASHBOARD_MAINTENANCE_REVENUE -->/);
+  assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_RECURRING_REVENUE -->/);
   assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_TOTAL_CLIENTS -->/);
   assert.match(coreSource, /function readDashboardCustomersBootstrapPayload\(scriptId = 'softoraCustomersBootstrap'\) \{/);
   assert.match(pageSource, /const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload\(\);/);

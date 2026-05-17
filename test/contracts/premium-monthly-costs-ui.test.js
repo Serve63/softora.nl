@@ -186,6 +186,10 @@ test('premium terugkerende kosten bevat klantkosten-check voor betaalde kosten p
   assert.match(coverageScriptSource, /readChunkedStateValue\(values, CUSTOMER_DB_KEY\)/);
   assert.match(coverageScriptSource, /amountToMonthly\(amount, frequency\)/);
   assert.match(coverageScriptSource, /record\.costFrequency === 'jaarlijks' && record\.customerTerm === 'maandelijks_opzegbaar'/);
+  assert.match(coverageScriptSource, /Maandelijkse inkomsten/);
+  assert.doesNotMatch(coverageScriptSource, /Terugkerende inkomsten/);
+  assert.match(coverageScriptSource, /fmtEur\(amountToMonthly\(record\.revenueAmount, record\.revenueFrequency\)\)/);
+  assert.match(coverageScriptSource, /nodes\.revenueAmount\.value = record\.revenueAmount \? String\(record\.revenueAmount\) : '0';/);
   assert.match(coverageScriptSource, /\[CUSTOMER_COST_COVERAGE_KEY\]: JSON\.stringify\(records\)/);
   assert.match(coverageScriptSource, /source: 'premium-customer-cost-coverage'/);
   assert.doesNotMatch(coverageScriptSource, /localStorage|sessionStorage|indexedDB/);

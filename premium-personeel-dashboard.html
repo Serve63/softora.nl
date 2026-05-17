@@ -2023,10 +2023,9 @@
                     <div class="kpi-value" id="kpiRevenueYear"><!-- SOFTORA_DASHBOARD_TOTAL_REVENUE --></div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label kpi-label-tight">Waarvan Website Onderhoud</div>
-                    <div class="kpi-value" id="kpiMaintenanceMonth"><!-- SOFTORA_DASHBOARD_MAINTENANCE_REVENUE --></div>
+                    <div class="kpi-label kpi-label-tight">Maandelijkse inkomsten</div>
+                    <div class="kpi-value" id="kpiRecurringRevenue"><!-- SOFTORA_DASHBOARD_RECURRING_REVENUE --></div>
                 </div>
-                <div class="kpi-card"><div class="kpi-label kpi-label-tight">Terugkerende inkomsten</div><div class="kpi-value" id="kpiRecurringRevenue"><!-- SOFTORA_DASHBOARD_RECURRING_REVENUE --></div></div>
                 <div class="kpi-card">
                     <div class="kpi-label">Totale Klanten</div>
                     <div class="kpi-value" id="kpiTotalClients"><!-- SOFTORA_DASHBOARD_TOTAL_CLIENTS --></div>
@@ -3095,8 +3094,6 @@
 
             const revenueYearEl = document.getElementById('kpiRevenueYear');
             if (revenueYearEl) revenueYearEl.textContent = formatMoneyEUR(selectedRevenue.total);
-            const maintenanceMonthEl = document.getElementById('kpiMaintenanceMonth');
-            if (maintenanceMonthEl) maintenanceMonthEl.textContent = formatMoneyEUR(selectedRevenue.maintenance);
             const recurringRevenueEl = document.getElementById('kpiRecurringRevenue'); if (recurringRevenueEl) recurringRevenueEl.textContent = formatMoneyEUR(selectedRevenue.maintenance);
             const totalClientsEl = document.getElementById('kpiTotalClients');
             if (totalClientsEl) totalClientsEl.textContent = String(hasCustomerDatabase ? customers.length : uniqueClients.size);

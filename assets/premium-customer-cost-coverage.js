@@ -274,7 +274,7 @@
   function tableHead() {
     const row = document.createElement('div');
     row.className = 'coverage-row head';
-    ['Klant', 'Kosten die wij betalen', 'Terugkerende inkomsten', 'Contract', 'Status', 'Acties']
+    ['Klant', 'Kosten die wij betalen', 'Maandelijkse inkomsten', 'Contract', 'Status', 'Acties']
       .forEach((label) => appendText(row, 'span', '', label));
     return row;
   }
@@ -313,7 +313,7 @@
       record.costAmount > 0 ? `${fmtEur(record.costAmount)} ${frequencyLabel[record.costFrequency].toLowerCase()}` : ''
     ));
     row.appendChild(cell(
-      record.revenueAmount > 0 ? fmtEur(record.revenueAmount) : 'Geen inkomsten',
+      fmtEur(amountToMonthly(record.revenueAmount, record.revenueFrequency)),
       `${frequencyLabel[record.revenueFrequency].toLowerCase()} - ${fmtEur(margin)}/mnd verschil`
     ));
     row.appendChild(cell(termLabel[record.customerTerm] || 'Maandelijks opzegbaar', record.note || ''));
@@ -374,7 +374,7 @@
     nodes.costDescription.value = record.isPlaceholder ? '' : record.costDescription || '';
     nodes.costAmount.value = record.isPlaceholder || !record.costAmount ? '' : String(record.costAmount);
     nodes.costFrequency.value = record.costFrequency || 'maandelijks';
-    nodes.revenueAmount.value = record.revenueAmount ? String(record.revenueAmount) : '';
+    nodes.revenueAmount.value = record.revenueAmount ? String(record.revenueAmount) : '0';
     nodes.revenueFrequency.value = record.revenueFrequency || 'maandelijks';
     nodes.customerTerm.value = record.customerTerm || 'maandelijks_opzegbaar';
     nodes.note.value = record.isPlaceholder ? '' : record.note || '';
