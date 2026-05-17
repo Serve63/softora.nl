@@ -12,6 +12,7 @@ struct AgendaListView: View {
     @State private var addConfiguration: AddAppointmentConfiguration?
     @State private var selectedAppointment: AgendaAppointment?
     @State private var isShowingMailbox = false
+    @State private var isShowingGym = false
     @State private var weekTransitionDirection = 1
 
     var body: some View {
@@ -132,6 +133,9 @@ struct AgendaListView: View {
         .fullScreenCover(isPresented: $isShowingMailbox) {
             MailboxView(apiClient: SoftoraAPIClient())
         }
+        .fullScreenCover(isPresented: $isShowingGym) {
+            GymWorkoutView()
+        }
         .alert("MELDING", isPresented: alertBinding) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -215,11 +219,7 @@ struct AgendaListView: View {
     }
 
     private func openGymShortcut() {
-        addConfiguration = AddAppointmentConfiguration(
-            date: Date(),
-            appointmentType: .personal,
-            prefilledTitle: "Gym"
-        )
+        isShowingGym = true
         isChoosingAppointmentType = false
         isChoosingBusinessKind = false
         isChoosingBusinessType = false
@@ -276,6 +276,150 @@ private struct AgendaTopBar: View {
                 .frame(height: 1.5)
         }
     }
+}
+
+private struct GymWorkoutView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private let exercises = GymExercise.defaultWorkout
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [.white, Color.softoraSheetBackground],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                gymHeader
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Oefeningen")
+                            .font(.softoraDisplay(18, weight: .bold))
+                            .textCase(.uppercase)
+                            .tracking(1.0)
+                            .foregroundStyle(Color.softoraInk)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
+
+                        LazyVStack(spacing: 10) {
+                            ForEach(exercises) { exercise in
+                                GymExerciseRow(exercise: exercise)
+                            }
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 28)
+                    }
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+    }
+
+    private var gymHeader: some View {
+        ZStack {
+            VStack(spacing: 2) {
+                Text("Gym")
+                    .font(.softoraDisplay(22, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(1.0)
+                    .foregroundStyle(Color.softoraInk)
+
+                Text("Schema van vandaag")
+                    .font(.softoraBody(12, weight: .semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(Color.softoraMuted)
+            }
+
+            HStack {
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.softoraMuted)
+                        .frame(width: 42, height: 42)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Sluiten")
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
+        .background(Color.white)
+    }
+}
+
+private struct GymExerciseRow: View {
+    let exercise: GymExercise
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 13) {
+            Text(String(format: "%02d", exercise.order))
+                .font(.softoraDisplay(14, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(Color.white)
+                .frame(width: 42, height: 42)
+                .background(Color.softoraCrimson)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(exercise.title)
+                    .font(.softoraDisplay(15, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(0.7)
+                    .foregroundStyle(Color.softoraInk)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
+
+                Text(exercise.details)
+                    .font(.softoraBody(12, weight: .semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(Color.softoraMuted)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+        }
+    }
+}
+
+private struct GymExercise: Identifiable {
+    let id = UUID()
+    let order: Int
+    let title: String
+    let details: String
+
+    static let defaultWorkout: [GymExercise] = [
+        GymExercise(order: 1, title: "Bankdrukken", details: "4 sets - 8 tot 10 herhalingen"),
+        GymExercise(order: 2, title: "Schuine dumbbell press", details: "3 sets - 10 herhalingen"),
+        GymExercise(order: 3, title: "Seated row", details: "4 sets - 10 herhalingen"),
+        GymExercise(order: 4, title: "Lat pulldown", details: "3 sets - 10 herhalingen"),
+        GymExercise(order: 5, title: "Shoulder press", details: "3 sets - 8 tot 10 herhalingen"),
+        GymExercise(order: 6, title: "Biceps curl", details: "3 sets - 12 herhalingen"),
+        GymExercise(order: 7, title: "Triceps pushdown", details: "3 sets - 12 herhalingen"),
+        GymExercise(order: 8, title: "Plank", details: "3 rondes - 45 seconden")
+    ]
 }
 
 private struct AgendaShortcutBar: View {

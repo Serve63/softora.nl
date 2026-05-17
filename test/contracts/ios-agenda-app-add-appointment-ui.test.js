@@ -53,12 +53,27 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
     /@State private var isShowingMailbox = false/,
     'The mail shortcut should open a native mailbox screen inside the app.'
   );
+  assert.match(
+    agendaListSource,
+    /@State private var isShowingGym = false/,
+    'The gym shortcut should open a native workout screen inside the app.'
+  );
   assert.match(agendaListSource, /MailboxView\(apiClient: SoftoraAPIClient\(\)\)/);
   assert.match(agendaListSource, /private struct MailboxView: View/);
+  assert.match(agendaListSource, /GymWorkoutView\(\)/);
+  assert.match(agendaListSource, /private struct GymWorkoutView: View/);
+  assert.match(agendaListSource, /private struct GymExercise: Identifiable/);
+  assert.match(agendaListSource, /isShowingGym = true/);
+  assert.match(agendaListSource, /Text\("Oefeningen"\)/);
+  assert.match(agendaListSource, /GymExercise\(order: 1, title: "Bankdrukken"/);
   assert.doesNotMatch(agendaListSource, /premium-mailbox/);
   assert.match(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
   assert.match(agendaListSource, /title: "Gym"[^]*systemImage: "dumbbell\.fill"/);
-  assert.match(agendaListSource, /prefilledTitle: "Gym"/);
+  assert.doesNotMatch(
+    agendaListSource,
+    /prefilledTitle: "Gym"/,
+    'The gym shortcut should not open the add-appointment form anymore.'
+  );
   assert.doesNotMatch(
     agendaListSource,
     /private struct AgendaShortcutBar:[^]*?\.overlay\(alignment: \.top\)[^]*?private struct AgendaShortcutButton:/,
