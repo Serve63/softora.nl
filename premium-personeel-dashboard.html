@@ -2061,10 +2061,6 @@
                     <div class="kpi-value" id="kpiRevenueYear"><!-- SOFTORA_DASHBOARD_TOTAL_REVENUE --></div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label kpi-label-tight">Waarvan Website Onderhoud</div>
-                    <div class="kpi-value" id="kpiMaintenanceMonth"><!-- SOFTORA_DASHBOARD_MAINTENANCE_REVENUE --></div>
-                </div>
-                <div class="kpi-card">
                     <div class="kpi-label">Totale Klanten</div>
                     <div class="kpi-value" id="kpiTotalClients"><!-- SOFTORA_DASHBOARD_TOTAL_CLIENTS --></div>
                 </div>
@@ -3139,8 +3135,6 @@
 
             const revenueYearEl = document.getElementById('kpiRevenueYear');
             if (revenueYearEl) revenueYearEl.textContent = formatMoneyEUR(selectedRevenue.total);
-            const maintenanceMonthEl = document.getElementById('kpiMaintenanceMonth');
-            if (maintenanceMonthEl) maintenanceMonthEl.textContent = formatMoneyEUR(selectedRevenue.maintenance);
             const totalClientsEl = document.getElementById('kpiTotalClients');
             if (totalClientsEl) totalClientsEl.textContent = String(hasCustomerDatabase ? customers.length : uniqueClients.size);
             updateKpiActiveOrdersDisplay(activeOrders);

@@ -100,7 +100,9 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
   assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_TOTAL_REVENUE -->/);
-  assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_MAINTENANCE_REVENUE -->/);
+  assert.doesNotMatch(pageSource, /Waarvan Website Onderhoud/);
+  assert.doesNotMatch(pageSource, /id="kpiMaintenanceMonth"/);
+  assert.doesNotMatch(pageSource, /<!-- SOFTORA_DASHBOARD_MAINTENANCE_REVENUE -->/);
   assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_TOTAL_CLIENTS -->/);
   assert.match(coreSource, /function readDashboardCustomersBootstrapPayload\(scriptId = 'softoraCustomersBootstrap'\) \{/);
   assert.match(pageSource, /const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload\(\);/);
