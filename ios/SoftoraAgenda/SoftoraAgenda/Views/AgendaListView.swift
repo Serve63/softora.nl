@@ -313,7 +313,8 @@ private struct GymWorkoutView: View {
 
                         LazyVStack(spacing: 10) {
                             ForEach(exercises) { exercise in
-                                GymExerciseRow(exercise: exercise)
+                                GymExerciseRow(day: selectedDay, exercise: exercise)
+                                    .id("\(selectedDay.storageID)-\(exercise.id)")
                             }
                         }
                         .padding(.horizontal, 18)
@@ -425,6 +426,34 @@ private enum GymWorkoutDay: String, CaseIterable, Identifiable {
     var exercises: [GymExercise] {
         Array(GymExercise.defaultWorkout.prefix(4))
     }
+
+    var storageID: String {
+        switch self {
+        case .today:
+            Self.currentWeekday.rawValue
+        default:
+            rawValue
+        }
+    }
+
+    private static var currentWeekday: GymWorkoutDay {
+        switch Calendar.current.component(.weekday, from: Date()) {
+        case 1:
+            .sunday
+        case 2:
+            .monday
+        case 3:
+            .tuesday
+        case 4:
+            .wednesday
+        case 5:
+            .thursday
+        case 6:
+            .friday
+        default:
+            .saturday
+        }
+    }
 }
 
 private struct GymDayPickerOverlay: View {
@@ -500,21 +529,38 @@ private struct GymDayButton: View {
 }
 
 private struct GymExerciseRow: View {
+    let day: GymWorkoutDay
     let exercise: GymExercise
 
-    @State private var exerciseName: String
-    @State private var notes: String
-    @State private var sets: String
-    @State private var reps: String
-    @State private var kilograms: String
+    @AppStorage private var exerciseName: String
+    @AppStorage private var notes: String
+    @AppStorage private var sets: String
+    @AppStorage private var reps: String
+    @AppStorage private var kilograms: String
 
-    init(exercise: GymExercise) {
+    init(day: GymWorkoutDay, exercise: GymExercise) {
+        self.day = day
         self.exercise = exercise
-        _exerciseName = State(initialValue: exercise.title.softoraUppercased)
-        _notes = State(initialValue: exercise.details.softoraUppercased)
-        _sets = State(initialValue: exercise.defaultSets)
-        _reps = State(initialValue: exercise.defaultReps)
-        _kilograms = State(initialValue: "")
+        _exerciseName = AppStorage(
+            wrappedValue: exercise.title.softoraUppercased,
+            GymExerciseStorage.key(day: day, exercise: exercise, field: .name)
+        )
+        _notes = AppStorage(
+            wrappedValue: exercise.details.softoraUppercased,
+            GymExerciseStorage.key(day: day, exercise: exercise, field: .notes)
+        )
+        _sets = AppStorage(
+            wrappedValue: exercise.defaultSets,
+            GymExerciseStorage.key(day: day, exercise: exercise, field: .sets)
+        )
+        _reps = AppStorage(
+            wrappedValue: exercise.defaultReps,
+            GymExerciseStorage.key(day: day, exercise: exercise, field: .reps)
+        )
+        _kilograms = AppStorage(
+            wrappedValue: "",
+            GymExerciseStorage.key(day: day, exercise: exercise, field: .kilograms)
+        )
     }
 
     var body: some View {
@@ -567,6 +613,20 @@ private struct GymExerciseRow: View {
             get: { notes },
             set: { notes = $0.softoraUppercased }
         )
+    }
+}
+
+private enum GymExerciseStorageField: String {
+    case name
+    case notes
+    case sets
+    case reps
+    case kilograms
+}
+
+private enum GymExerciseStorage {
+    static func key(day: GymWorkoutDay, exercise: GymExercise, field: GymExerciseStorageField) -> String {
+        "nl.softora.agenda.gym.\(day.storageID).exercise.\(exercise.order).\(field.rawValue)"
     }
 }
 
