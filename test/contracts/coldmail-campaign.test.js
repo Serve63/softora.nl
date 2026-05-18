@@ -2,7 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createColdmailCampaignService } = require('../../server/services/coldmail-campaign');
-const { buildChunkedStatePatch } = require('../../server/services/data-ops-serialization');
+const {
+  buildChunkedStatePatch,
+  readChunkedStateValue,
+} = require('../../server/services/data-ops-serialization');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -1382,6 +1385,45 @@ test('coldmail campaign previews recipients from chunked customer database state
   assert.equal(result.ok, true);
   assert.equal(result.selected, 1);
   assert.equal(result.recipients[0].bedrijf, 'Chunked Winkel');
+});
+
+test('coldmail campaign marks mailed rows inside chunked customer database state', async () => {
+  const rows = [
+    {
+      id: 'chunked-prospect',
+      bedrijf: 'Chunked Winkel',
+      naam: 'Romy',
+      email: 'chunked@example.test',
+      status: 'prospect',
+      databaseStatus: 'prospect',
+      branche: 'Retail & Winkels',
+      mail: true,
+    },
+  ];
+  const { service, getSavedStates } = createService({
+    rows: [],
+    customerValues: buildChunkedStatePatch('softora_customers_premium_v1', JSON.stringify(rows), 80),
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+    branch: 'Retail & Winkels',
+    actor: 'Servé',
+  });
+
+  assert.equal(result.sent, 1);
+  const customerSave = getSavedStates().find((state) => state.scope === 'premium_customers_database');
+  assert.ok(customerSave);
+  const savedRows = JSON.parse(
+    readChunkedStateValue(customerSave.values, 'softora_customers_premium_v1')
+  );
+  assert.equal(savedRows[0].status, 'gemaild');
+  assert.equal(savedRows[0].databaseStatus, 'gemaild');
+  assert.equal(savedRows[0].lastColdmailSentAt, '2026-04-24T12:00:00.000Z');
+  assert.equal(savedRows[0].hist[0].type, 'gemaild');
 });
 
 test('coldmail campaign normaliseert geplakte e-mailadressen voor ontvangerselectie', async () => {

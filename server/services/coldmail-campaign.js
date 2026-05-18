@@ -3,7 +3,7 @@ const crypto = require('node:crypto');
 const dns = require('node:dns').promises;
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
-const { readChunkedStateValue } = require('./data-ops-serialization');
+const { buildChunkedStatePatch, readChunkedStateValue } = require('./data-ops-serialization');
 const { createMailboxService } = require('./mailbox');
 const {
   canAdvanceContactStatus,
@@ -353,6 +353,13 @@ function createColdmailCampaignService(deps = {}) {
     } catch (_) {
       return [];
     }
+  }
+
+  function buildCustomerRowsStateValues(values, rows) {
+    return {
+      ...(values && typeof values === 'object' ? values : {}),
+      ...buildChunkedStatePatch(customerDbKey, JSON.stringify(Array.isArray(rows) ? rows : [])),
+    };
   }
 
   function parseLeadDatabaseRows(values = {}, rowsKey = leadDbKey) {
@@ -2586,10 +2593,7 @@ function createColdmailCampaignService(deps = {}) {
     );
     await setUiStateValues(
       customerDbScope,
-      {
-        ...values,
-        [customerDbKey]: JSON.stringify(nextRows),
-      },
+      buildCustomerRowsStateValues(values, nextRows),
       {
         source: 'coldmail-inbound-reply',
         actor: normalizeString(actor) || 'coldmail-auto-reply',
@@ -2620,10 +2624,7 @@ function createColdmailCampaignService(deps = {}) {
     nextRows[match.index] = markRowFromColdmailUnsubscribe(rows[match.index], payload, actor);
     await setUiStateValues(
       customerDbScope,
-      {
-        ...values,
-        [customerDbKey]: JSON.stringify(nextRows),
-      },
+      buildCustomerRowsStateValues(values, nextRows),
       {
         source: 'coldmail-unsubscribe-link',
         actor,
@@ -2762,10 +2763,7 @@ function createColdmailCampaignService(deps = {}) {
     );
     await setUiStateValues(
       customerDbScope,
-      {
-        ...values,
-        [customerDbKey]: JSON.stringify(nextRows),
-      },
+      buildCustomerRowsStateValues(values, nextRows),
       {
         source: 'webdesign-outreach-action',
         actor: normalizeString(input.actor) || 'Webdesign outreach',
@@ -3028,10 +3026,7 @@ function createColdmailCampaignService(deps = {}) {
       });
       await setUiStateValues(
         customerDbScope,
-        {
-          ...values,
-          [customerDbKey]: JSON.stringify(updatedRows),
-        },
+        buildCustomerRowsStateValues(values, updatedRows),
         {
           source: 'coldmail-campaign',
           actor,
