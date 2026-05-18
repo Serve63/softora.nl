@@ -199,9 +199,12 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /apiClient\.improveMailboxDraft/);
   assert.match(agendaListSource, /MailboxDraftContextPayload/);
   assert.match(agendaListSource, /Text\("TYP JE ANTWOORD\.\.\."\)/);
-  assert.match(agendaListSource, /isLocked: selectedMessage != nil/);
+  assert.match(agendaListSource, /isLocked: false/);
   assert.match(agendaListSource, /\.disabled\(isLocked\)/);
   assert.match(agendaListSource, /lockedBackground/);
+  assert.match(modelsSource, /case bodyImages/);
+  assert.match(modelsSource, /struct MailboxBodyImage: Decodable/);
+  assert.match(modelsSource, /decodedBodyImages/);
   assert.doesNotMatch(agendaListSource, /Text\(selectedAccount\?\.email \?\? "Geen account"\)/);
   assert.doesNotMatch(agendaListSource, /Image\(systemName: "arrow\.clockwise"\)/);
   assert.doesNotMatch(

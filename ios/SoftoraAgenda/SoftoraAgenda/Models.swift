@@ -190,6 +190,7 @@ struct MailboxMessage: Identifiable, Decodable, Hashable {
         case body
         case links
         case inlineImages
+        case bodyImages
         case date
         case unread
         case starred
@@ -230,6 +231,11 @@ struct MailboxMessage: Identifiable, Decodable, Hashable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let decodedID = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        let decodedInlineImages = (try? container.decode([MailboxInlineImage].self, forKey: .inlineImages)) ?? []
+        let decodedBodyImages = (try? container.decode([MailboxBodyImage].self, forKey: .bodyImages)) ?? []
+        let resolvedImages = decodedInlineImages.isEmpty
+            ? decodedBodyImages.enumerated().compactMap { index, image in image.inlineImage(index: index) }
+            : decodedInlineImages
 
         self.init(
             id: decodedID,
@@ -242,7 +248,7 @@ struct MailboxMessage: Identifiable, Decodable, Hashable {
             preview: (try? container.decode(String.self, forKey: .preview)) ?? "",
             body: (try? container.decode(String.self, forKey: .body)) ?? "",
             links: (try? container.decode([MailboxLink].self, forKey: .links)) ?? [],
-            inlineImages: (try? container.decode([MailboxInlineImage].self, forKey: .inlineImages)) ?? [],
+            inlineImages: resolvedImages,
             date: (try? container.decode(String.self, forKey: .date)) ?? "",
             unread: (try? container.decode(Bool.self, forKey: .unread)) ?? false,
             starred: (try? container.decode(Bool.self, forKey: .starred)) ?? false
@@ -265,6 +271,62 @@ struct MailboxInlineImage: Identifiable, Decodable, Hashable {
     let contentType: String
     let contentBase64: String
     let url: String
+}
+
+private struct MailboxBodyImage: Decodable {
+    let cid: String
+    let alt: String
+    let contentType: String
+    let dataUrl: String
+
+    enum CodingKeys: String, CodingKey {
+        case cid
+        case alt
+        case contentType
+        case dataUrl
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        cid = (try? container.decode(String.self, forKey: .cid)) ?? ""
+        alt = (try? container.decode(String.self, forKey: .alt)) ?? ""
+        contentType = (try? container.decode(String.self, forKey: .contentType)) ?? ""
+        dataUrl = (try? container.decode(String.self, forKey: .dataUrl)) ?? ""
+    }
+
+    func inlineImage(index: Int) -> MailboxInlineImage? {
+        let trimmedDataUrl = dataUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        let marker = ";base64,"
+        guard let markerRange = trimmedDataUrl.range(of: marker, options: .caseInsensitive) else {
+            return nil
+        }
+        let mimePart = String(trimmedDataUrl[..<markerRange.lowerBound])
+            .replacingOccurrences(of: "data:", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let base64Part = String(trimmedDataUrl[markerRange.upperBound...])
+            .replacingOccurrences(of: "\n", with: "")
+            .replacingOccurrences(of: "\r", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !base64Part.isEmpty else { return nil }
+
+        let resolvedAlt = alt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedContentType = contentType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? mimePart
+            : contentType
+        let resolvedID = cid.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "\(resolvedAlt.isEmpty ? "image" : resolvedAlt)-\(index + 1)"
+            : cid
+
+        return MailboxInlineImage(
+            id: resolvedID,
+            cid: cid,
+            alt: resolvedAlt,
+            filename: "",
+            contentType: resolvedContentType,
+            contentBase64: base64Part,
+            url: ""
+        )
+    }
 }
 
 enum Planner: String, CaseIterable, Codable, Identifiable {

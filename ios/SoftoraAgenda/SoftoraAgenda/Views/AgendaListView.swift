@@ -804,7 +804,7 @@ private struct MailboxView: View {
                     accounts: orderedAccounts,
                     selectedAccount: selectedAccount,
                     isLoading: isLoadingAccounts,
-                    isLocked: selectedMessage != nil,
+                    isLocked: false,
                     pinnedEmail: pinnedMailboxAccountEmail,
                     onMove: moveMailboxAccount,
                     onTogglePin: togglePinnedMailboxAccount,
@@ -1674,9 +1674,13 @@ private struct MailboxInlineImageView: View {
     }
 
     private var uiImage: UIImage? {
+        let cleanBase64 = image.contentBase64
+            .replacingOccurrences(of: "\n", with: "")
+            .replacingOccurrences(of: "\r", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard
-            !image.contentBase64.isEmpty,
-            let data = Data(base64Encoded: image.contentBase64)
+            !cleanBase64.isEmpty,
+            let data = Data(base64Encoded: cleanBase64)
         else {
             return nil
         }
@@ -1684,7 +1688,11 @@ private struct MailboxInlineImageView: View {
     }
 
     private var remoteURL: URL? {
-        URL(string: image.url)
+        let trimmedURL = image.url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedURL.isEmpty else {
+            return nil
+        }
+        return URL(string: trimmedURL)
     }
 }
 
