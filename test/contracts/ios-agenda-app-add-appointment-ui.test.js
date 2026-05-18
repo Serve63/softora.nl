@@ -203,15 +203,18 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /\"starred\"/);
   assert.match(agendaListSource, /\"Reclame\"/);
   assert.match(agendaListSource, /MailboxFolderDrawer/);
-  assert.match(agendaListSource, /MailboxAccountSelector/);
-  assert.match(agendaListSource, /private var mailboxHeader: some View \{[^]*ZStack \{[^]*Text\("Mailbox"\)[^]*HStack \{/);
-  assert.match(agendaListSource, /ScrollView\(\.horizontal, showsIndicators: false\)/);
+  assert.match(agendaListSource, /@State private var isShowingAccountMenu = false/);
+  assert.match(agendaListSource, /private var mailboxHeader: some View \{[^]*Button \{[^]*isShowingAccountMenu\.toggle\(\)[^]*Text\("Mailbox"\)/);
+  assert.match(agendaListSource, /Image\(systemName: isShowingAccountMenu \? "chevron\.up" : "chevron\.down"\)/);
+  assert.match(agendaListSource, /accessibilityLabel\("Mailadres kiezen"\)/);
+  assert.match(agendaListSource, /if isShowingAccountMenu \{[^]*MailboxAccountDropdown\(/);
+  assert.match(agendaListSource, /private struct MailboxAccountDropdown: View/);
+  assert.doesNotMatch(
+    agendaListSource,
+    /MailboxAccountSelector\(\s*accounts:/,
+    'Mailbox account selection should live in the header dropdown, not in a bottom bar.'
+  );
   assert.match(agendaListSource, /Text\(account\.email\)/);
-  assert.match(agendaListSource, /Text\("Kies het gewenste mailadres"\)/);
-  assert.match(agendaListSource, /@State private var isExpanded = true/);
-  assert.match(agendaListSource, /isExpanded\.toggle\(\)/);
-  assert.match(agendaListSource, /if isExpanded \{/);
-  assert.match(agendaListSource, /accessibilityLabel\(isExpanded \? "Mailadressen inklappen" : "Mailadressen uitklappen"\)/);
   assert.match(agendaListSource, /guard !error\.isMailboxCancellation else \{ return \}/);
   assert.match(agendaListSource, /var isMailboxCancellation: Bool/);
   assert.match(agendaListSource, /isoFormatterWithFractionalSeconds/);
@@ -226,9 +229,6 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /apiClient\.improveMailboxDraft/);
   assert.match(agendaListSource, /MailboxDraftContextPayload/);
   assert.match(agendaListSource, /Text\("TYP JE ANTWOORD\.\.\."\)/);
-  assert.match(agendaListSource, /isLocked: false/);
-  assert.match(agendaListSource, /\.disabled\(isLocked\)/);
-  assert.match(agendaListSource, /lockedBackground/);
   assert.match(modelsSource, /case bodyImages/);
   assert.match(modelsSource, /struct MailboxBodyImage: Decodable/);
   assert.match(modelsSource, /decodedBodyImages/);

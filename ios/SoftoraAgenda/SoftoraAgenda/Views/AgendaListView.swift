@@ -924,6 +924,7 @@ private struct MailboxView: View {
     @State private var messages: [MailboxMessage] = []
     @State private var selectedMessage: MailboxMessage?
     @State private var isShowingFolderMenu = false
+    @State private var isShowingAccountMenu = false
     @State private var isLoadingAccounts = false
     @State private var isLoadingMessages = false
     @State private var alertMessage: String?
@@ -966,17 +967,6 @@ private struct MailboxView: View {
                 .padding(.bottom, 8)
 
                 mailboxContent
-
-                MailboxAccountSelector(
-                    accounts: orderedAccounts,
-                    selectedAccount: selectedAccount,
-                    isLoading: isLoadingAccounts,
-                    isLocked: false,
-                    pinnedEmail: pinnedMailboxAccountEmail,
-                    onMove: moveMailboxAccount,
-                    onTogglePin: togglePinnedMailboxAccount,
-                    onSelect: selectAccount
-                )
             }
 
             if isShowingFolderMenu {
@@ -1020,54 +1010,88 @@ private struct MailboxView: View {
     }
 
     private var mailboxHeader: some View {
-        ZStack {
-            Text("Mailbox")
-                .font(.softoraDisplay(21, weight: .bold))
-                .textCase(.uppercase)
-                .tracking(1.0)
-                .foregroundStyle(Color.softoraInk)
-
-            HStack {
+        VStack(spacing: 0) {
+            ZStack {
                 Button {
-                    isShowingFolderMenu = true
+                    withAnimation(.smooth(duration: 0.22)) {
+                        isShowingFolderMenu = false
+                        isShowingAccountMenu.toggle()
+                    }
                 } label: {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 19, weight: .bold))
-                        .foregroundStyle(Color.softoraInk)
-                        .frame(width: 42, height: 42)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                .stroke(Color.softoraPurpleLight, lineWidth: 1)
-                        }
+                    HStack(spacing: 7) {
+                        Text("Mailbox")
+                            .font(.softoraDisplay(21, weight: .bold))
+                            .textCase(.uppercase)
+                            .tracking(1.0)
+
+                        Image(systemName: isShowingAccountMenu ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundStyle(Color.softoraInk)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Mappen")
+                .disabled(accounts.isEmpty && !isLoadingAccounts)
+                .accessibilityLabel("Mailadres kiezen")
 
-                Spacer()
-
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(Color.softoraMuted)
-                        .frame(width: 42, height: 42)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                HStack {
+                    Button {
+                        withAnimation(.smooth(duration: 0.22)) {
+                            isShowingAccountMenu = false
+                            isShowingFolderMenu = true
                         }
+                    } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 19, weight: .bold))
+                            .foregroundStyle(Color.softoraInk)
+                            .frame(width: 42, height: 42)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                    .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                            }
+                        }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Mappen")
+
+                    Spacer()
+
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(Color.softoraMuted)
+                            .frame(width: 42, height: 42)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                    .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                            }
+                        }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Sluiten")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Sluiten")
+                .padding(.horizontal, 18)
+            }
+            .padding(.top, 18)
+            .padding(.bottom, isShowingAccountMenu ? 8 : 12)
+
+            if isShowingAccountMenu {
+                MailboxAccountDropdown(
+                    accounts: orderedAccounts,
+                    selectedAccount: selectedAccount,
+                    isLoading: isLoadingAccounts,
+                    onSelect: selectAccount
+                )
+                .padding(.horizontal, 18)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 18)
-        .padding(.bottom, 12)
         .background(Color.white)
     }
 
@@ -1228,6 +1252,9 @@ private struct MailboxView: View {
     }
 
     private func selectAccount(_ account: MailboxAccount) {
+        withAnimation(.smooth(duration: 0.22)) {
+            isShowingAccountMenu = false
+        }
         guard account.id != selectedAccount?.id else { return }
         selectedAccount = account
         Task { await loadMessages() }
@@ -1251,6 +1278,7 @@ private struct MailboxView: View {
     private func selectFolder(_ folder: MailboxFolder) {
         selectedFolder = folder
         isShowingFolderMenu = false
+        isShowingAccountMenu = false
         Task { await loadMessages() }
     }
 
@@ -2190,6 +2218,79 @@ private struct MailboxDetailMeta: View {
                 .font(.softoraBody(12, weight: .semibold))
                 .foregroundStyle(Color.softoraInk)
         }
+    }
+}
+
+private struct MailboxAccountDropdown: View {
+    let accounts: [MailboxAccount]
+    let selectedAccount: MailboxAccount?
+    let isLoading: Bool
+    let onSelect: (MailboxAccount) -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if isLoading && accounts.isEmpty {
+                Text("LADEN...")
+                    .font(.softoraBody(12, weight: .semibold))
+                    .foregroundStyle(Color.softoraMuted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(accounts) { account in
+                            let isSelected = selectedAccount?.id == account.id
+
+                            Button {
+                                onSelect(account)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Text(account.email)
+                                        .font(.softoraDisplay(12, weight: .bold))
+                                        .textCase(.uppercase)
+                                        .tracking(0.4)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.68)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                                    if isSelected {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 11, weight: .bold))
+                                    }
+                                }
+                                .foregroundStyle(isSelected ? Color.white : Color.softoraInk)
+                                .padding(.horizontal, 13)
+                                .frame(height: 46)
+                                .background(isSelected ? Color.softoraCrimson : Color.softoraSheetBackground)
+                                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                                .overlay {
+                                    if !isSelected {
+                                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                    }
+                                }
+                                .opacity(account.imapConfigured ? 1 : 0.42)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .frame(maxHeight: menuMaxHeight)
+                .scrollIndicators(.hidden)
+            }
+        }
+        .padding(10)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+        }
+        .shadow(color: Color.softoraInk.opacity(0.08), radius: 18, x: 0, y: 10)
+    }
+
+    private var menuMaxHeight: CGFloat {
+        min(CGFloat(max(accounts.count, 1)) * 54, 264)
     }
 }
 
