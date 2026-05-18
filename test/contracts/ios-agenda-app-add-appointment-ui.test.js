@@ -83,6 +83,8 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /\.keyboardType\(keyboardType\)/);
   assert.match(agendaListSource, /TextField\("", text: \$value\)[^]*Text\(label\)/);
   assert.match(agendaListSource, /\.frame\(width: 36\)/);
+  assert.doesNotMatch(agendaListSource, /Text\(String\(format: "%02d", exercise\.order\)\)/);
+  assert.match(agendaListSource, /Text\(exercise\.title\)[^]*\.font\(\.softoraDisplay\(14, weight: \.bold\)\)[^]*\.lineLimit\(1\)[^]*\.minimumScaleFactor\(0\.58\)/);
   assert.doesNotMatch(agendaListSource, /premium-mailbox/);
   assert.match(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
   assert.match(agendaListSource, /title: "Gym"[^]*systemImage: "dumbbell\.fill"/);

@@ -514,40 +514,29 @@ private struct GymExerciseRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 13) {
-            Text(String(format: "%02d", exercise.order))
-                .font(.softoraDisplay(14, weight: .bold))
-                .tracking(0.8)
-                .foregroundStyle(Color.white)
-                .frame(width: 42, height: 42)
-                .background(Color.softoraCrimson)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .top, spacing: 8) {
-                    Text(exercise.title)
-                        .font(.softoraDisplay(15, weight: .bold))
-                        .textCase(.uppercase)
-                        .tracking(0.7)
-                        .foregroundStyle(Color.softoraInk)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    HStack(spacing: 5) {
-                        GymMetricField(label: "Sets", value: $sets, keyboardType: .numberPad)
-                        GymMetricField(label: "Reps", value: $reps, keyboardType: .numberPad)
-                        GymMetricField(label: "Kg", value: $kilograms, keyboardType: .decimalPad)
-                    }
-                }
-
-                Text(exercise.details)
-                    .font(.softoraBody(12, weight: .semibold))
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .center, spacing: 8) {
+                Text(exercise.title)
+                    .font(.softoraDisplay(14, weight: .bold))
                     .textCase(.uppercase)
-                    .foregroundStyle(Color.softoraMuted)
+                    .tracking(0.35)
+                    .foregroundStyle(Color.softoraInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.58)
+                    .allowsTightening(true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 5) {
+                    GymMetricField(label: "Sets", value: $sets, keyboardType: .numberPad)
+                    GymMetricField(label: "Reps", value: $reps, keyboardType: .numberPad)
+                    GymMetricField(label: "Kg", value: $kilograms, keyboardType: .decimalPad)
+                }
             }
 
-            Spacer(minLength: 0)
+            Text(exercise.details)
+                .font(.softoraBody(12, weight: .semibold))
+                .textCase(.uppercase)
+                .foregroundStyle(Color.softoraMuted)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
