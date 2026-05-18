@@ -235,6 +235,26 @@ function mergeMailboxBodyImages(primaryImages, fallbackImages, text) {
   return [...images, ...matchedFallbacks].slice(0, 8);
 }
 
+function bodyImageToInlineImage(image, index) {
+  const dataUrl = String(image && image.dataUrl ? image.dataUrl : '');
+  const match = dataUrl.match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-z0-9+/=\s]+)$/i);
+  const contentType = String((image && image.contentType) || (match && match[1]) || '')
+    .split(';')[0]
+    .toLowerCase();
+  const contentBase64 = match ? String(match[2] || '').replace(/\s+/g, '') : '';
+  const cid = String((image && image.cid) || '').trim();
+  const alt = String((image && image.alt) || '').trim() || 'Afbeelding';
+  return {
+    id: cid || `${normalizeImageLabel(alt) || 'image'}-${index + 1}`,
+    cid,
+    alt,
+    filename: '',
+    contentType,
+    contentBase64,
+    url: '',
+  };
+}
+
 function safeUrl(value) {
   const raw = String(value || '')
     .trim()
@@ -662,6 +682,7 @@ function createMailboxService(deps = {}) {
       preview,
       body: text || preview,
       bodyImages,
+      inlineImages: bodyImages.map(bodyImageToInlineImage),
       date: date.toISOString(),
       messageId: normalizeString(parsed.messageId || ''),
       inReplyTo: normalizeString(parsed.inReplyTo || ''),
