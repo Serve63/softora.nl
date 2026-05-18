@@ -31,6 +31,8 @@ test('premium flynow gebruikt losse assets en lokale reisfoto\'s voor collage en
   assert.match(js, /\/assets\/flynow\/flynow-sneeuw-photo-9\.jpg/);
   assert.match(js, /data-flynow-type/);
   assert.match(js, /document\.body\.setAttribute\('data-flynow-type', currentType\)/);
+  assert.match(js, /function setActiveDealPanel\(mode\)/);
+  assert.match(js, /data-flynow-tab/);
   assert.match(js, /window\.open\('https:\/\/www\.google\.com\/travel\/search\?q='/);
   assert.doesNotMatch(js, /images\.unsplash\.com/);
   assert.doesNotMatch(js, /spawnParticles/);
