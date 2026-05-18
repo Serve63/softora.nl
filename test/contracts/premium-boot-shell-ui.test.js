@@ -57,7 +57,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
     assert.match(source, /assets\/premium-boot-one-second\.js\?v=20260502a/, file);
     if (file !== 'premium-instellingen.html') {
       if (file === 'premium-actieve-opdrachten.html') {
-        assert.match(source, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260513a"><\/script><script src="assets\/premium-active-order-open-leads\.js\?v=20260516a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/, file);
+        assert.match(source, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260513a"><\/script><script src="assets\/premium-active-order-open-leads\.js\?v=20260518a"><\/script><script src="assets\/premium-active-order-manual-open-leads\.js\?v=20260518a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/, file);
         const activeOrdersBootPath = path.join(__dirname, '../../assets/premium-active-orders-boot.js');
         const activeOrdersPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
         const activeOrdersBootSource = fs.readFileSync(activeOrdersBootPath, 'utf8');
@@ -85,7 +85,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const bookkeepingSource = fs.readFileSync(bookkeepingPath, 'utf8');
         assert.match(bookkeepingSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else if (file === 'premium-mailbox.html') {
-        assert.match(source, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260516a"><\/script>/, file);
+        assert.match(source, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260518f"><\/script>/, file);
         const mailboxPath = path.join(__dirname, '../../assets/premium-mailbox.js');
         const mailboxSource = fs.readFileSync(mailboxPath, 'utf8');
         assert.match(mailboxSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);

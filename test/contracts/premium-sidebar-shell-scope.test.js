@@ -130,6 +130,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /document\.addEventListener\("pointerdown", function \(event\) \{/);
   assert.match(themeJsSource, /window\.addEventListener\("focus", function \(\) \{\s*schedulePremiumSidebarStability\(\);/s);
   assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords"\]\);/);
+  assert.match(themeJsSource, /PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*"coldcalling"/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
@@ -243,7 +244,7 @@ test('premium mailbox behoudt eigen layout en vaste sidebar bij responsive mailw
   assert.match(pageSource, /\.topbar-title-wrap \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*45;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*overflow-y:\s*auto;[\s\S]*z-index:\s*60;/);
   assert.match(pageSource, /\.mail-detail \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260516a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260518f"><\/script>/);
 });
 
 test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {
@@ -470,6 +471,7 @@ test('static premium sidebars share the same section order and public labels', (
     assert.equal(linkTargets.social_linkedin, '/premium-socialmedia#linkedin');
     assert.equal(linkTargets.qr_code, '/premium-qr-code');
     for (const lockedKey of [
+      'coldcalling',
       'seo',
       'qr_code',
       'ads_trustoo',

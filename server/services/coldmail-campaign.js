@@ -632,6 +632,10 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeString(row.id || row.customerId || row.databaseId || '') || `row-${index}`;
   }
 
+  function getExplicitRowId(row) {
+    return normalizeString((row && (row.id || row.customerId || row.databaseId)) || '');
+  }
+
   function getRowCompany(row) {
     return normalizeString(row.bedrijf || row.company || row.companyName || row.naam || row.name);
   }
@@ -839,6 +843,13 @@ function createColdmailCampaignService(deps = {}) {
       .join('|');
   }
 
+  function photoRecordMatchesRowIdentity(photo, row) {
+    const photoIdentityKey = normalizeString((photo && photo.identityKey) || '').toLowerCase();
+    if (!photoIdentityKey) return true;
+    const rowIdentityKey = buildRowIdentityKey(row);
+    return Boolean(rowIdentityKey && photoIdentityKey === rowIdentityKey);
+  }
+
   function mergeColdcallingRowsWithCustomerRows(leadRows = [], customerRows = []) {
     const mergedRows = [];
     const seenKeys = new Set();
@@ -865,9 +876,11 @@ function createColdmailCampaignService(deps = {}) {
   function findStoredPhotoRecordForRow(row, index, photoMap, photosByIdentity) {
     const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
     const byIdentity = photosByIdentity instanceof Map ? photosByIdentity : new Map();
-    const id = getRowId(row, index);
+    const id = getExplicitRowId(row);
     const identityKey = buildRowIdentityKey(row);
-    return photos[id] || byIdentity.get(identityKey) || null;
+    const directPhoto = id ? photos[id] : null;
+    if (directPhoto && photoRecordMatchesRowIdentity(directPhoto, row)) return directPhoto;
+    return byIdentity.get(identityKey) || null;
   }
 
   function preferFreshRowPhotoFields(row, storedPhoto) {
@@ -924,7 +937,7 @@ function createColdmailCampaignService(deps = {}) {
       const photo = findStoredPhotoRecordForRow(row, index, photos, photosByIdentity);
       if (!hasReadyWebsitePhotoRecord(photo)) return;
 
-      const rowId = getRowId(row, index);
+      const rowId = getExplicitRowId(row);
       const identityKey = buildRowIdentityKey(row);
       if (rowId) readyIds.add(rowId);
       if (identityKey) readyIdentityKeys.add(identityKey);
@@ -933,7 +946,7 @@ function createColdmailCampaignService(deps = {}) {
 
     return {
       hasRow(row, index = 0) {
-        const rowId = getRowId(row, index);
+        const rowId = getExplicitRowId(row);
         if (rowId && readyIds.has(rowId)) return true;
         const identityKey = buildRowIdentityKey(row);
         if (identityKey && readyIdentityKeys.has(identityKey)) return true;
@@ -2238,7 +2251,9 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function buildCustomerPhotoDataKey(row) {
-    return `softora_database_photo_data_v1_${normalizeString(getRowId(row, 0)).replace(/[^a-z0-9_-]+/gi, '_').slice(0, 80)}`;
+    const id = getExplicitRowId(row);
+    if (!id) return '';
+    return `softora_database_photo_data_v1_${id.replace(/[^a-z0-9_-]+/gi, '_').slice(0, 80)}`;
   }
 
   function readChunkedCustomerPhoto(values, photoKey, chunkCount = 0) {
@@ -2288,9 +2303,10 @@ function createColdmailCampaignService(deps = {}) {
     });
     (Array.isArray(rows) ? rows : []).forEach((entry, index) => {
       const row = entry && entry.row && typeof entry.row === 'object' ? entry.row : entry;
-      const id = normalizeString(entry && entry.id) || getRowId(row, index);
+      const id = getExplicitRowId(row);
       if (!id) return;
       const photoKey = buildCustomerPhotoDataKey(row);
+      if (!photoKey) return;
       const chunked = readChunkedCustomerPhoto(stateValues, photoKey, 0);
       if (!chunked) return;
       const existing = parsed[id] && typeof parsed[id] === 'object' ? parsed[id] : null;

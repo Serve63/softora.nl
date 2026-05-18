@@ -83,7 +83,7 @@
     function compareAgendaLeadOptions(a, b) {
         const aTs = Date.parse(`${String(a?.date || '1970-01-01')}T${String(a?.time || '00:00')}:00`) || 0;
         const bTs = Date.parse(`${String(b?.date || '1970-01-01')}T${String(b?.time || '00:00')}:00`) || 0;
-        if (aTs === bTs) return Number(b?.id || 0) - Number(a?.id || 0);
+        if (aTs === bTs) return String(b?.id || '').localeCompare(String(a?.id || ''));
         return bTs - aTs;
     }
 
@@ -164,16 +164,19 @@
         if (!force && openLeadOptions.length && (now - openLeadOptionsLoadedAt) < OPEN_LEAD_CACHE_MS) return openLeadOptions;
         if (openLeadOptionsPromise) return openLeadOptionsPromise;
         openLeadOptionsPromise = (async () => {
+            let agendaOptions = [];
             try {
                 const response = await fetch('/api/agenda/confirmation-tasks?limit=250&quick=1&fresh=1', { cache: 'no-store' });
                 const result = await response.json().catch(() => ({}));
                 if (!response.ok || !result?.ok || !Array.isArray(result?.tasks)) throw new Error('Openstaande leads niet beschikbaar.');
-                openLeadOptions = result.tasks.map(normalizeOpenLeadOption).filter(Boolean).sort(compareAgendaLeadOptions);
+                agendaOptions = result.tasks.map(normalizeOpenLeadOption).filter(Boolean);
             } catch (_) {
-                openLeadOptions = [];
+                agendaOptions = [];
             } finally {
                 openLeadOptionsLoadedAt = Date.now();
             }
+            const manualOptions = await Promise.resolve(window.SoftoraManualOpenLeads?.getOptions?.() || []).catch(() => []);
+            openLeadOptions = agendaOptions.concat(Array.isArray(manualOptions) ? manualOptions : []).sort(compareAgendaLeadOptions);
             return openLeadOptions;
         })().finally(() => {
             openLeadOptionsPromise = null;
@@ -523,9 +526,9 @@
     }
 
     function removeOpenLeadLocally(leadId) {
-        const numericId = Number(leadId);
-        openLeadOptions = openLeadOptions.filter((item) => Number(item?.id) !== numericId);
-        const card = document.getElementById(`open-lead-${numericId}`);
+        const key = String(leadId || '').trim();
+        openLeadOptions = openLeadOptions.filter((item) => String(item?.id || '').trim() !== key);
+        const card = document.getElementById(`open-lead-${key.replace(/[^a-z0-9_-]+/gi, '-')}`);
         if (card) card.remove();
         if (typeof window.refreshOrderSummaryCards === 'function') window.refreshOrderSummaryCards();
     }
@@ -564,14 +567,18 @@
         if (convertBtn) convertBtn.disabled = true;
         setOpenLeadActionMessage('Lead wordt uit systeem gehaald...', '');
         try {
-            await postOpenLeadJsonWithFallback(
-                [
-                    `/api/agenda/confirmation-tasks/${encodeURIComponent(String(lead.id))}/mark-cancelled`,
-                    `/api/agenda/confirmation-task-mark-cancelled?taskId=${encodeURIComponent(String(lead.id))}`
-                ],
-                { actor: 'premium-actieve-opdrachten', status: 'uit_systeem' },
-                { timeoutMs: 20000 }
-            );
+            if (lead.isManualOpenLead && typeof window.SoftoraManualOpenLeads?.remove === 'function') {
+                await window.SoftoraManualOpenLeads.remove(lead.id);
+            } else {
+                await postOpenLeadJsonWithFallback(
+                    [
+                        `/api/agenda/confirmation-tasks/${encodeURIComponent(String(lead.id))}/mark-cancelled`,
+                        `/api/agenda/confirmation-task-mark-cancelled?taskId=${encodeURIComponent(String(lead.id))}`
+                    ],
+                    { actor: 'premium-actieve-opdrachten', status: 'uit_systeem' },
+                    { timeoutMs: 20000 }
+                );
+            }
             removeOpenLeadLocally(lead.id);
             closeOpenLeadActionModal();
             await showOpenLeadFeedback('Lead is uit openstaande leads gehaald.', {
@@ -618,6 +625,27 @@
                 domain: values.domain,
                 notes
             });
+            if (lead.isManualOpenLead && typeof window.SoftoraManualOpenLeads?.convertToOrder === 'function') {
+                const order = await window.SoftoraManualOpenLeads.convertToOrder(lead, {
+                    companyName: company,
+                    contactName: contact,
+                    contactPhone: lead.phone,
+                    contactEmail: lead.contactEmail,
+                    title,
+                    description: notes,
+                    deliveryTime: delivery,
+                    amount,
+                    domainName: normalizeOpenLeadText(values.domain || lead.postCallDomainName || ''),
+                    transcript: joinLeadNotes(lead.postCallNotesTranscript, notes),
+                    prompt,
+                    leadOwnerName: lead.leadOwnerName,
+                    sourceOpenLeadId: lead.id
+                });
+                removeOpenLeadLocally(lead.id);
+                closeOpenLeadConversionModal(true);
+                if (!revealConvertedOpenLeadOrder(order)) window.location.reload();
+                return;
+            }
             const result = await postOpenLeadJsonWithFallback(
                 [
                     `/api/agenda/appointments/${encodeURIComponent(String(lead.id))}/add-active-order`,
@@ -654,7 +682,7 @@
         const color = getOpenLeadLineColor(lead.productLine);
         const card = document.createElement('div');
         card.className = 'order-card open-lead-card';
-        card.id = `open-lead-${lead.id}`;
+        card.id = `open-lead-${String(lead.id || '').replace(/[^a-z0-9_-]+/gi, '-')}`;
         card.dataset.openLeadCard = '1';
         card.dataset.orderFilterGroup = 'open_leads';
         card.dataset.leadLine = lead.productLine;

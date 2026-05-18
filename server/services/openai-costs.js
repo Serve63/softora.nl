@@ -669,11 +669,14 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
   const costEurDirect = Number((currencies.eur || 0).toFixed(8));
   const usdToEurRateDetails = await resolveUsdToEurRateDetails(deps);
   const costEur = Number((costEurDirect + costUsd * usdToEurRateDetails.rate).toFixed(2));
+  const fetchedAt = new Date(Math.max(0, Number(options.nowMs) || Date.now())).toISOString();
 
   return {
     scope: window.scope,
     source: 'openai-costs',
     exact: true,
+    fetchedAt,
+    lastSuccessfulUpdate: fetchedAt,
     startTime: window.startTime,
     endTime: window.endTime,
     costUsd,

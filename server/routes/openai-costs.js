@@ -9,7 +9,7 @@ function registerOpenAiCostRoutes(app, deps = {}) {
       : (_req, _res, next) => next();
 
   if (typeof coordinator.sendOpenAiCostsDashboardResponse === 'function') {
-    app.get('/api/openai-costs', (req, res) =>
+    app.get('/api/openai-costs', requireAdmin, (req, res) =>
       coordinator.sendOpenAiCostsDashboardResponse(req, res)
     );
   }

@@ -2,18 +2,25 @@
   'use strict';
 
   const COST_SUMMARY_ENDPOINT = '/api/coldcalling/cost-summary?scope=month';
-  const API_COST_SUMMARY_ENDPOINT = '/api/openai-costs';
+  const API_COST_SUMMARY_ENDPOINT = '/api/openai/cost-summary?scope=month';
+  const SUPABASE_COST_SUMMARY_ENDPOINT = '/api/supabase/cost-summary';
   const POLL_INTERVAL_MS = 15000;
+  const BILLING_POLL_INTERVAL_MS = 5 * 60 * 1000;
   const COLDCALLING_COST_NOTE = 'Retell AI kosten deze maand';
   const COLDCALLING_PARTIAL_NOTE = 'Retell AI deels exact, deels geschat';
-  const API_COST_NOTE = 'Status: succesvol';
+  const API_COST_NOTE = 'OpenAI API kosten deze maand live';
   const API_COST_UNAVAILABLE_NOTE = 'OpenAI kosten konden niet worden opgehaald';
+  const SUPABASE_COST_NOTE = 'Supabase kosten live bijgewerkt';
+  const SUPABASE_COST_PARTIAL_NOTE = 'Supabase live-kosten gedeeltelijk gekoppeld';
+  const SUPABASE_COST_UNAVAILABLE_NOTE = 'Supabase live-kosten niet gekoppeld';
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
 
   let coldcallingRefreshPromise = null;
   let apiCostRefreshPromise = null;
+  let supabaseCostRefreshPromise = null;
   let pollTimer = null;
+  let billingPollTimer = null;
   let syncListenersBound = false;
 
   function normalizeString(value) {
@@ -244,6 +251,16 @@
     );
   }
 
+  function resolveSupabaseCostItem() {
+    const state = getMonthlyCostsData();
+    const items = Array.isArray(state && state['Totale kosten:']) ? state['Totale kosten:'] : [];
+    return (
+      items.find(function (item) {
+        return normalizeSearchText(item && item.naam) === 'supabase';
+      }) || null
+    );
+  }
+
   function applyColdcallingCost(amountEur, note) {
     const item = resolveColdcallingCostItem();
     const render = getMonthlyCostsRender();
@@ -268,38 +285,117 @@
       : COLDCALLING_COST_NOTE;
   }
 
-  function applyApiCostSnapshot(snapshot) {
-    const item = resolveApiCostItem();
-    const render = getMonthlyCostsRender();
-    if (!item || !render) return false;
+  function normalizeOpenAiCostPayload(payload) {
+    const data = payload && typeof payload === 'object' ? payload : {};
+    const summary = data.summary && typeof data.summary === 'object' ? data.summary : null;
+    if (summary) {
+      const amountEur = Number(summary.costEur);
+      const costUsd = Number(summary.costUsd);
+      const fetchedAtLabel = formatDateTime(summary.lastSuccessfulUpdate || summary.fetchedAt);
+      const noteParts = [
+        API_COST_NOTE,
+        Number.isFinite(costUsd) && costUsd > 0 ? 'USD ' + formatCurrencyAmount(costUsd, 'usd') : '',
+        summary.usdToEurRateSource ? 'Koers ' + summary.usdToEurRateSource : '',
+        fetchedAtLabel ? 'Bijgewerkt ' + fetchedAtLabel : '',
+      ].filter(Boolean);
+      return {
+        amount: amountEur,
+        currency: 'eur',
+        amountLabel: formatCurrencyAmount(amountEur, 'eur'),
+        note: noteParts.join(' · '),
+      };
+    }
 
-    const currentMonth = snapshot && snapshot.currentMonth ? snapshot.currentMonth : null;
+    const currentMonth = data.currentMonth ? data.currentMonth : null;
     const amount = Number(currentMonth && currentMonth.amount);
-    const currency = normalizeString((currentMonth && currentMonth.currency) || snapshot.currency || 'usd').toLowerCase();
-    const fetchedAtLabel = formatDateTime(snapshot && (snapshot.lastSuccessfulUpdate || snapshot.fetchedAt));
-    const periods = snapshot && snapshot.periods && typeof snapshot.periods === 'object' ? snapshot.periods : {};
+    const currency = normalizeString((currentMonth && currentMonth.currency) || data.currency || 'usd').toLowerCase();
+    const fetchedAtLabel = formatDateTime(data.lastSuccessfulUpdate || data.fetchedAt);
+    const periods = data.periods && typeof data.periods === 'object' ? data.periods : {};
     const today = periods.today || {};
     const last7Days = periods.last_7_days || {};
     const last30Days = periods.last_30_days || {};
-
-    if (!Number.isFinite(amount) || amount < 0) {
-      return applyApiCostUnavailable({ message: API_COST_UNAVAILABLE_NOTE, payload: snapshot || {} });
-    }
-
-    const nextNote = [
+    const noteParts = [
       API_COST_NOTE,
       'Vandaag ' + formatCurrencyAmount(today.amount || 0, today.currency || currency),
       '7 dagen ' + formatCurrencyAmount(last7Days.amount || 0, last7Days.currency || currency),
       '30 dagen ' + formatCurrencyAmount(last30Days.amount || 0, last30Days.currency || currency),
       'Valuta ' + currency.toUpperCase(),
       fetchedAtLabel ? 'Bijgewerkt ' + fetchedAtLabel : '',
-    ].filter(Boolean).join(' · ');
+    ].filter(Boolean);
 
-    const nextAmount = Math.round(amount * 100000000) / 100000000;
-    const nextAmountLabel = formatCurrencyAmount(nextAmount, currency);
+    return {
+      amount,
+      currency,
+      amountLabel: formatCurrencyAmount(amount, currency),
+      note: noteParts.join(' · '),
+    };
+  }
+
+  function applyApiCostSnapshot(snapshot) {
+    const item = resolveApiCostItem();
+    const render = getMonthlyCostsRender();
+    if (!item || !render) return false;
+
+    const normalized = normalizeOpenAiCostPayload(snapshot);
+
+    if (!Number.isFinite(normalized.amount) || normalized.amount < 0) {
+      return applyApiCostUnavailable({ message: API_COST_UNAVAILABLE_NOTE, payload: snapshot || {} });
+    }
+
+    const nextAmount = Math.round(normalized.amount * 100000000) / 100000000;
+    const nextAmountLabel = normalized.amountLabel || formatCurrencyAmount(nextAmount, normalized.currency);
     const changed =
       Number(item.bedrag) !== nextAmount ||
-      normalizeString(item.currency) !== currency ||
+      normalizeString(item.currency) !== normalized.currency ||
+      normalizeString(item.amountLabel) !== nextAmountLabel ||
+      normalizeString(item.note) !== normalized.note ||
+      normalizeString(item.status) !== 'success';
+
+    if (!changed) return false;
+
+    item.bedrag = nextAmount;
+    item.currency = normalized.currency;
+    item.amountLabel = nextAmountLabel;
+    item.note = normalized.note;
+    item.status = 'success';
+    render();
+    return true;
+  }
+
+  function buildSupabaseCostNote(summary) {
+    const fetchedAtLabel = formatDateTime(summary && (summary.lastSuccessfulUpdate || summary.fetchedAt));
+    const addonCount = Number(summary && summary.selectedAddonCount);
+    return [
+      summary && summary.exact ? SUPABASE_COST_NOTE : SUPABASE_COST_PARTIAL_NOTE,
+      Number.isFinite(addonCount) ? addonCount + ' add-on(s)' : '',
+      summary && summary.baseCost && summary.baseCost.configured ? 'Basisbedrag gekoppeld' : 'Basisbedrag ontbreekt',
+      fetchedAtLabel ? 'Bijgewerkt ' + fetchedAtLabel : '',
+    ].filter(Boolean).join(' · ');
+  }
+
+  function applySupabaseCostSnapshot(payload) {
+    const item = resolveSupabaseCostItem();
+    const render = getMonthlyCostsRender();
+    if (!item || !render) return false;
+
+    const summary = payload && payload.summary && typeof payload.summary === 'object' ? payload.summary : payload;
+    const nextNote = buildSupabaseCostNote(summary || {});
+    const canReplaceAmount = Boolean(summary && summary.exact === true);
+    const amountEur = Number(summary && summary.costEur);
+
+    if (!canReplaceAmount || !Number.isFinite(amountEur) || amountEur < 0) {
+      if (normalizeString(item.note) === nextNote || !nextNote) return false;
+      item.note = nextNote || SUPABASE_COST_UNAVAILABLE_NOTE;
+      item.status = 'partial';
+      render();
+      return true;
+    }
+
+    const nextAmount = Math.round(amountEur * 100) / 100;
+    const nextAmountLabel = formatCurrencyAmount(nextAmount, 'eur');
+    const changed =
+      Number(item.bedrag) !== nextAmount ||
+      normalizeString(item.currency) !== 'eur' ||
       normalizeString(item.amountLabel) !== nextAmountLabel ||
       normalizeString(item.note) !== nextNote ||
       normalizeString(item.status) !== 'success';
@@ -307,10 +403,25 @@
     if (!changed) return false;
 
     item.bedrag = nextAmount;
-    item.currency = currency;
+    item.currency = 'eur';
     item.amountLabel = nextAmountLabel;
     item.note = nextNote;
     item.status = 'success';
+    render();
+    return true;
+  }
+
+  function applySupabaseCostUnavailable(error) {
+    const item = resolveSupabaseCostItem();
+    const render = getMonthlyCostsRender();
+    if (!item || !render) return false;
+
+    const currentNote = normalizeString(item.note);
+    const errorText = normalizeString(error && error.message);
+    const nextNote = [SUPABASE_COST_UNAVAILABLE_NOTE, errorText].filter(Boolean).join(' · ');
+    if (currentNote === nextNote) return false;
+    item.note = nextNote;
+    item.status = 'error';
     render();
     return true;
   }
@@ -373,10 +484,24 @@
     const data = await response.json().catch(function () {
       return {};
     });
-    if (!response.ok || !data || data.ok !== true || data.status !== 'success') {
+    if (!response.ok || !data || data.ok !== true || (!data.summary && data.status !== 'success')) {
       const error = new Error(String((data && (data.message || data.detail || data.error)) || API_COST_UNAVAILABLE_NOTE));
       error.payload = data || {};
       throw error;
+    }
+    return data;
+  }
+
+  async function fetchSupabaseCostSummary() {
+    const response = await fetch(SUPABASE_COST_SUMMARY_ENDPOINT, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    const data = await response.json().catch(function () {
+      return {};
+    });
+    if (!response.ok || !data || data.ok !== true || !data.summary || typeof data.summary !== 'object') {
+      throw new Error(String((data && (data.detail || data.error)) || SUPABASE_COST_UNAVAILABLE_NOTE));
     }
     return data;
   }
@@ -414,8 +539,14 @@
     apiCostRefreshPromise = (async function () {
       try {
         const summary = await fetchApiCostSummary();
-        const amount = Number(summary.currentMonth && summary.currentMonth.amount);
-        return { ok: true, updated: applyApiCostSnapshot(summary), amount, currency: summary.currency, source: 'openai-costs' };
+        const normalized = normalizeOpenAiCostPayload(summary);
+        return {
+          ok: true,
+          updated: applyApiCostSnapshot(summary),
+          amount: normalized.amount,
+          currency: normalized.currency,
+          source: 'openai-costs',
+        };
       } catch (error) {
         applyApiCostUnavailable(error);
         return {
@@ -430,18 +561,55 @@
     return apiCostRefreshPromise;
   }
 
+  async function refreshMonthlySupabaseCosts() {
+    if (supabaseCostRefreshPromise) return supabaseCostRefreshPromise;
+    if (!resolveSupabaseCostItem() || !getMonthlyCostsRender()) {
+      return { ok: true, updated: false };
+    }
+
+    supabaseCostRefreshPromise = (async function () {
+      try {
+        const summary = await fetchSupabaseCostSummary();
+        return {
+          ok: true,
+          updated: applySupabaseCostSnapshot(summary),
+          amountEur: Number(summary.summary && summary.summary.costEur),
+          source: 'supabase-costs',
+        };
+      } catch (error) {
+        applySupabaseCostUnavailable(error);
+        return {
+          ok: false,
+          error: normalizeString(error && error.message) || 'Supabase-kosten konden niet geladen worden.',
+        };
+      } finally {
+        supabaseCostRefreshPromise = null;
+      }
+    })();
+
+    return supabaseCostRefreshPromise;
+  }
+
   function startDynamicMonthlyCostsSync() {
     const hasColdcallingCostItem = Boolean(resolveColdcallingCostItem());
     const hasApiCostItem = Boolean(resolveApiCostItem());
-    if ((!hasColdcallingCostItem && !hasApiCostItem) || !getMonthlyCostsRender()) return;
+    const hasSupabaseCostItem = Boolean(resolveSupabaseCostItem());
+    if ((!hasColdcallingCostItem && !hasApiCostItem && !hasSupabaseCostItem) || !getMonthlyCostsRender()) return;
 
     if (hasColdcallingCostItem) void refreshMonthlyColdcallingCosts();
     if (hasApiCostItem) void refreshMonthlyApiCosts();
-    if (!pollTimer) {
+    if (hasSupabaseCostItem) void refreshMonthlySupabaseCosts();
+    if (hasColdcallingCostItem && !pollTimer) {
       pollTimer = window.setInterval(function () {
         void refreshMonthlyColdcallingCosts();
-        void refreshMonthlyApiCosts();
       }, POLL_INTERVAL_MS);
+    }
+
+    if ((hasApiCostItem || hasSupabaseCostItem) && !billingPollTimer) {
+      billingPollTimer = window.setInterval(function () {
+        void refreshMonthlyApiCosts();
+        void refreshMonthlySupabaseCosts();
+      }, BILLING_POLL_INTERVAL_MS);
     }
 
     if (syncListenersBound) return;
@@ -450,18 +618,21 @@
     window.addEventListener('focus', function () {
       void refreshMonthlyColdcallingCosts();
       void refreshMonthlyApiCosts();
+      void refreshMonthlySupabaseCosts();
     });
 
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) {
         void refreshMonthlyColdcallingCosts();
         void refreshMonthlyApiCosts();
+        void refreshMonthlySupabaseCosts();
       }
     });
   }
 
   window.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;
   window.refreshMonthlyApiCosts = refreshMonthlyApiCosts;
+  window.refreshMonthlySupabaseCosts = refreshMonthlySupabaseCosts;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', startDynamicMonthlyCostsSync, { once: true });

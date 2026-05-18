@@ -619,6 +619,9 @@ async function bootstrapMonthlyCostsPage() {
       if (typeof window.refreshMonthlyApiCosts === 'function') {
         refreshTasks.push(window.refreshMonthlyApiCosts());
       }
+      if (typeof window.refreshMonthlySupabaseCosts === 'function') {
+        refreshTasks.push(window.refreshMonthlySupabaseCosts());
+      }
       void Promise.allSettled(refreshTasks).then(() => {
         render();
       });

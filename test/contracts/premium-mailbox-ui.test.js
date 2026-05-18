@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const pagePath = path.join(__dirname, '../../premium-mailbox.html');
 const scriptPath = path.join(__dirname, '../../assets/premium-mailbox.js');
@@ -19,6 +20,59 @@ function readOutreachScript() {
   return fs.readFileSync(outreachScriptPath, 'utf8');
 }
 
+function renderMailboxBodyForTest(body, images, options) {
+  const element = {
+    innerHTML: '',
+    textContent: '',
+    value: '',
+    hidden: false,
+    dataset: {},
+    addEventListener() {},
+    classList: { add() {}, remove() {}, contains() { return false; }, toggle() {} },
+    setAttribute() {},
+    getAttribute() { return ''; },
+    contains() { return false; },
+    querySelector() { return null; },
+    closest() { return null; },
+  };
+  const document = {
+    readyState: 'complete',
+    addEventListener() {},
+    getElementById() { return element; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+  };
+  const window = {
+    addEventListener() {},
+    SoftoraMailboxOutreach: null,
+    SoftoraUiStateClient: null,
+    SoftoraCampaignSenderSettings: null,
+  };
+  const context = {
+    URL,
+    console,
+    document,
+    window,
+    clearTimeout() {},
+    setTimeout() { return 0; },
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        accounts: [{ email: 'serve@softora.nl', imapConfigured: true, smtpConfigured: true }],
+        messages: [],
+      }),
+    }),
+  };
+  const source = readScript().replace(
+    'bindMailboxActions();',
+    'window.__mailboxTest = { renderMailBody }; bindMailboxActions();'
+  );
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  return context.window.__mailboxTest.renderMailBody(body, images, options);
+}
+
 test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
@@ -30,7 +84,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260516a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260518f"><\/script>/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
@@ -128,13 +182,91 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /function cleanMailboxText\(value\)/);
   assert.match(scriptSource, /function isMailboxReplyHeaderLine\(line\)/);
   assert.match(scriptSource, /function buildMailboxBodySections\(value\)/);
-  assert.match(scriptSource, /function renderMailboxBodySection\(section\)/);
-  assert.match(scriptSource, /function renderMailBody\(value\)/);
+  assert.match(scriptSource, /function renderMailboxInlineImage\(image\)/);
+  assert.match(scriptSource, /function renderMailboxTextLine\(line, options\)/);
+  assert.match(scriptSource, /function isMailboxSafeOptOutUrl\(value\)/);
+  assert.match(scriptSource, /function normalizeMailboxImageLabel\(value\)/);
+  assert.match(scriptSource, /function isMailboxMockupImageLabel\(value\)/);
+  assert.match(scriptSource, /function isMailboxWebdesignImageLabel\(value\)/);
+  assert.match(scriptSource, /function sectionHasMailboxImagePlaceholder\(section\)/);
+  assert.match(scriptSource, /function renderUnusedMailboxInlineImages\(imageState\)/);
+  assert.match(scriptSource, /function normalizeMailboxBodyImages\(images\)/);
+  assert.match(scriptSource, /function renderMailboxBodySection\(section, imageState\)/);
+  assert.match(scriptSource, /function normalizeMailboxOptOutUrl\(value\)/);
+  assert.match(scriptSource, /function renderMailboxOptOutLink\(url\)/);
+  assert.match(scriptSource, /function renderMailBody\(value, images, options\)/);
+  assert.match(scriptSource, /section\.type === 'signature'/);
+  assert.match(scriptSource, /const hasImagePlaceholders = sections\.some\(sectionHasMailboxImagePlaceholder\);/);
+  assert.match(scriptSource, /if \(!hasImagePlaceholders && !injectedImages && section && section\.type === 'signature'\)/);
+  assert.match(scriptSource, /usedImages\.add\(imageEntry\.index\);/);
+  assert.match(scriptSource, /function pushTextLine\(line\)/);
+  assert.match(scriptSource, /detail-mail-line-empty/);
+  assert.match(scriptSource, /renderedLines\.push\(renderMailboxInlineImage\(imageEntry\.image\)\);/);
+  assert.match(scriptSource, /if \(imageAlt\) \{[\s\S]*return;/);
+  assert.match(scriptSource, /detail-mail-section-images/);
+  assert.match(scriptSource, /detail-mail-optout-link/);
+  assert.match(scriptSource, /MAILBOX_WEBDESIGN_MOCKUP_CAPTION/);
   assert.match(scriptSource, /sendgrid\\\.net/);
   assert.match(scriptSource, /cdn\.openai\.com/);
   assert.match(scriptSource, /Eerdere mail/);
+  assert.match(scriptSource, /const bodyImages = normalizeMailboxBodyImages\(message\.bodyImages\);/);
+  assert.match(scriptSource, /const optOutUrl = normalizeMailboxOptOutUrl\(message\.optOutUrl\);/);
   assert.match(scriptSource, /cleanMailboxText\(message\.body \|\| message\.preview \|\| ''\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(m\.body\)\}<\/div>/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(m\.body, m\.bodyImages, \{ optOutUrl: m\.optOutUrl \}\)\}<\/div>/);
+  assert.match(scriptSource, /imageAlt = cleaned\.trim\(\)\.match\(\/\^\\\[image:\\s\*\(\[\^\\\]\]\+\)\\\]\$\/i\)/);
+});
+
+test('premium mailbox behoudt mail-enters en vervangt image placeholders inline', () => {
+  const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
+  const body = [
+    'Goedemiddag,',
+    '',
+    'Afgelopen week kwam ik toevallig jullie website (softora.nl) tegen.',
+    'Vanuit enthousiasme heb ik een nieuw webdesign voor jullie site gemaakt,',
+    'gewoon omdat ik dat leuk vind. 🙂',
+    '',
+    'Ik ben erg benieuwd wat je ervan vindt!',
+    '',
+    'Als je wilt, kan ik je ook een linkje sturen, zodat je de site zelf kunt',
+    'bekijken en testen.',
+    '',
+    'Laat me vooral weten of je dat zou willen 🤝',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+    '📍 Haaren',
+    '📞 0629917185',
+    '',
+    '[image: softora.nl webdesign]',
+    'Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop👇',
+    '[image: Device mockup]',
+    '',
+    'Geen webdesign willen ontvangen? Laat het me weten!: https://www.softora.nl/afmelden?t=abc',
+  ].join('\n');
+
+  const html = renderMailboxBodyForTest(body, [
+    { alt: 'Softora Testmodus webdesign.png', dataUrl: tinyPng },
+    { alt: 'Softora Testmodus device mockup.png', dataUrl: tinyPng },
+  ]);
+
+  assert.equal((html.match(/detail-mail-line-empty/g) || []).length, 7);
+  assert.equal((html.match(/<figure class="detail-mail-image">/g) || []).length, 2);
+  assert.doesNotMatch(html, /\[image:/i);
+  assert.match(html, /detail-mail-optout-link/);
+  assert.match(html, /href="https:\/\/www\.softora\.nl\/afmelden\?t=abc"/);
+  assert.doesNotMatch(html, />https:\/\/www\.softora\.nl\/afmelden/);
+  assert.ok(html.indexOf('0629917185') < html.indexOf('<figure class="detail-mail-image">'));
+  assert.ok(html.indexOf('detail-mail-optout-link') > html.lastIndexOf('<figure class="detail-mail-image">'));
+
+  const labelOnlyHtml = renderMailboxBodyForTest(
+    'Geen webdesign willen ontvangen? Laat het me weten!',
+    [],
+    { optOutUrl: 'https://www.softora.nl/afmelden?t=abc' }
+  );
+
+  assert.match(labelOnlyHtml, /class="detail-mail-optout-link"/);
+  assert.match(labelOnlyHtml, /href="https:\/\/www\.softora\.nl\/afmelden\?t=abc"/);
+  assert.doesNotMatch(labelOnlyHtml, />https:\/\/www\.softora\.nl\/afmelden/);
 });
 
 test('premium mailbox voorkomt horizontale overflow door brede e-mails', () => {
@@ -148,6 +280,11 @@ test('premium mailbox voorkomt horizontale overflow door brede e-mails', () => {
   assert.match(pageSource, /\.mail-detail \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
   assert.match(pageSource, /\.detail-body \{[\s\S]*overflow-x:\s*hidden;/);
   assert.match(pageSource, /\.detail-body-text \{[\s\S]*overflow-wrap:\s*anywhere;[\s\S]*word-break:\s*break-word;[\s\S]*display:\s*flex;/);
+  assert.match(pageSource, /\.detail-mail-lines \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*gap:\s*0;/);
+  assert.match(pageSource, /\.detail-mail-line \{[\s\S]*min-height:\s*1\.8em;[\s\S]*white-space:\s*pre-wrap;/);
+  assert.match(pageSource, /\.detail-mail-line-empty \{[\s\S]*min-height:\s*1\.8em;/);
+  assert.match(pageSource, /\.detail-mail-optout-link \{[\s\S]*text-decoration:\s*underline;/);
+  assert.match(pageSource, /\.detail-mail-image-caption \{[\s\S]*font-weight:\s*600;/);
   assert.match(pageSource, /\.detail-mail-section-quote \{[\s\S]*background:\s*#f8f4ef;[\s\S]*border-left:\s*3px solid rgba\(155,35,85,.24\);/);
   assert.match(pageSource, /\.detail-mail-section-signature \{[\s\S]*border-top:\s*1px dashed var\(--border\);/);
 });
@@ -165,7 +302,7 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(scriptSource, /data-mailbox-action="toggle-star"/);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(m\.body\)\}<\/div>/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(m\.body, m\.bodyImages, \{ optOutUrl: m\.optOutUrl \}\)\}<\/div>/);
 });
 
 test('premium mailbox toont webdesign outreach acties alleen via databasekoppeling', () => {

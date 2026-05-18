@@ -128,6 +128,8 @@ const MAILBOX_TRACKING_HOST_PATTERNS = [
   /(^|\.)postmarkapp\.com$/i,
 ];
 const MAILBOX_IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
+const MAILBOX_COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
+const MAILBOX_WEBDESIGN_MOCKUP_CAPTION = 'Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop👇';
 const MAILBOX_REPLY_HEADER_PATTERNS = [
   /^op .+\bschreef\b[:\s]*$/i,
   /^on .+\bwrote\b[:\s]*$/i,
@@ -220,6 +222,63 @@ function stripMailboxQuotePrefix(line) {
   return String(line || '').replace(/^\s*(?:>\s*)+/, '').trimEnd();
 }
 
+function isMailboxSafeOptOutUrl(value) {
+  const parsed = parseMailboxUrl(value);
+  if (!parsed) return false;
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  return host === 'softora.nl' && parsed.pathname.replace(/\/+$/, '') === '/afmelden';
+}
+
+function normalizeMailboxOptOutUrl(value) {
+  const parsed = parseMailboxUrl(value);
+  return parsed && isMailboxSafeOptOutUrl(parsed.href) ? parsed.href : '';
+}
+
+function renderMailboxOptOutLink(url) {
+  return `<a class="detail-mail-optout-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(MAILBOX_COLDMAIL_OPT_OUT_LABEL)}</a>`;
+}
+
+function renderMailboxTextLine(line, options) {
+  const value = String(line || '');
+  const trimmed = value.trim();
+  if (trimmed === MAILBOX_WEBDESIGN_MOCKUP_CAPTION) {
+    return `<span class="detail-mail-image-caption">${escapeHtml(trimmed)}</span>`;
+  }
+  const optOutMatch = trimmed.match(/^(Geen webdesign willen ontvangen\? Laat het me weten!):?\s*(?:\[(https?:\/\/[^\]]+)\]|(https?:\/\/\S+))$/i);
+  const inlineOptOutUrl = optOutMatch ? normalizeMailboxOptOutUrl(optOutMatch[2] || optOutMatch[3] || '') : '';
+  if (inlineOptOutUrl) {
+    return renderMailboxOptOutLink(inlineOptOutUrl);
+  }
+  const fallbackOptOutUrl = normalizeMailboxOptOutUrl(options && options.optOutUrl);
+  if (fallbackOptOutUrl && /^Geen webdesign willen ontvangen\? Laat het me weten![:\s]*$/i.test(trimmed)) {
+    return renderMailboxOptOutLink(fallbackOptOutUrl);
+  }
+  return escapeHtml(value);
+}
+
+function normalizeMailboxImageLabel(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\.[a-z0-9]{2,5}$/gi, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function isMailboxMockupImageLabel(value) {
+  return /\b(?:device|mockup|laptop|ipad|iphone|tablet|mobiel)\b/i.test(String(value || ''));
+}
+
+function isMailboxWebdesignImageLabel(value) {
+  return /\b(?:webdesign|website|site|foto|screenshot)\b/i.test(String(value || ''));
+}
+
+function sectionHasMailboxImagePlaceholder(section) {
+  return Boolean(section && Array.isArray(section.lines) && section.lines.some((line) => /^\s*\[image:\s*[^\]]+\]\s*$/i.test(String(line || ''))));
+}
+
 function buildMailboxBodySections(value) {
   const text = cleanMailboxText(value);
   if (!text) {
@@ -310,31 +369,64 @@ function buildMailboxBodySections(value) {
 }
 
 function renderMailboxParagraphs(lines, options) {
-  const paragraphs = [];
-  let currentLines = [];
+  const renderedLines = [];
   const quoteBody = Boolean(options && options.quoteBody);
+  const images = Array.isArray(options && options.images) ? options.images : [];
+  const usedImages = options && options.usedImages instanceof Set ? options.usedImages : new Set();
 
-  function flushParagraph() {
-    if (!currentLines.length) return;
-    paragraphs.push(`<p>${currentLines.map((line) => escapeHtml(line)).join('<br>')}</p>`);
-    currentLines = [];
+  function pushTextLine(line) {
+    const value = String(line || '');
+    if (!value.trim()) {
+      renderedLines.push('<div class="detail-mail-line detail-mail-line-empty" aria-hidden="true">&nbsp;</div>');
+      return;
+    }
+    renderedLines.push(`<div class="detail-mail-line">${renderMailboxTextLine(value, options)}</div>`);
+  }
+
+  function findImageByAlt(alt) {
+    const rawAlt = String(alt || '').trim();
+    const normalizedAlt = normalizeMailboxImageLabel(rawAlt);
+    if (!normalizedAlt) return null;
+    const candidates = images
+      .map((image, index) => ({ image, index, label: normalizeMailboxImageLabel(image && image.alt) }))
+      .filter((entry) => entry.label && !usedImages.has(entry.index));
+    return candidates.find((entry) => entry.label === normalizedAlt) ||
+      candidates.find((entry) => entry.label.includes(normalizedAlt) || normalizedAlt.includes(entry.label)) ||
+      (isMailboxMockupImageLabel(rawAlt) ? candidates.find((entry) => isMailboxMockupImageLabel(entry.image && entry.image.alt)) : null) ||
+      (isMailboxWebdesignImageLabel(rawAlt) ? candidates.find((entry) => !isMailboxMockupImageLabel(entry.image && entry.image.alt)) : null) ||
+      candidates[0] ||
+      null;
   }
 
   lines.forEach((line) => {
     const value = String(line || '');
     const cleaned = quoteBody ? stripMailboxQuotePrefix(value) : value.trimEnd();
-    if (!cleaned.trim()) {
-      flushParagraph();
+    const imageAlt = cleaned.trim().match(/^\[image:\s*([^\]]+)\]$/i)?.[1] || '';
+    const imageEntry = findImageByAlt(imageAlt);
+    if (imageEntry) {
+      usedImages.add(imageEntry.index);
+      renderedLines.push(renderMailboxInlineImage(imageEntry.image));
       return;
     }
-    currentLines.push(cleaned);
+    if (imageAlt) {
+      return;
+    }
+    pushTextLine(cleaned);
   });
 
-  flushParagraph();
-  return paragraphs.join('') || '<p>Geen inhoud.</p>';
+  return renderedLines.length
+    ? `<div class="detail-mail-lines">${renderedLines.join('')}</div>`
+    : '<div class="detail-mail-lines"><div class="detail-mail-line">Geen inhoud.</div></div>';
 }
 
-function renderMailboxBodySection(section) {
+function renderMailboxInlineImage(image) {
+  const dataUrl = String(image && image.dataUrl || '').trim();
+  if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(dataUrl)) return '';
+  const alt = String(image && image.alt || 'Afbeelding').trim() || 'Afbeelding';
+  return `<figure class="detail-mail-image"><img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async"></figure>`;
+}
+
+function renderMailboxBodySection(section, imageState) {
   if (!section || !Array.isArray(section.lines)) {
     return '<section class="detail-mail-section"><p>Geen inhoud.</p></section>';
   }
@@ -347,23 +439,68 @@ function renderMailboxBodySection(section) {
       <section class="detail-mail-section detail-mail-section-quote">
         <div class="detail-mail-section-label">Eerdere mail</div>
         ${quoteMeta}
-        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true })}</div>
+        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: imageState.images, optOutUrl: imageState.optOutUrl, usedImages: imageState.usedImages })}</div>
       </section>`;
   }
   if (section.type === 'signature') {
     return `
       <section class="detail-mail-section detail-mail-section-signature">
-        ${renderMailboxParagraphs(section.lines)}
+        ${renderMailboxParagraphs(section.lines, imageState)}
       </section>`;
   }
   return `
     <section class="detail-mail-section">
-      ${renderMailboxParagraphs(section.lines)}
+      ${renderMailboxParagraphs(section.lines, imageState)}
     </section>`;
 }
 
-function renderMailBody(value) {
-  return buildMailboxBodySections(value).map((section) => renderMailboxBodySection(section)).join('');
+function renderUnusedMailboxInlineImages(imageState) {
+  if (!imageState || !Array.isArray(imageState.images) || !(imageState.usedImages instanceof Set)) return '';
+  const unusedImages = imageState.images
+    .map((image, index) => ({ image, index }))
+    .filter((entry) => !imageState.usedImages.has(entry.index));
+  if (!unusedImages.length) return '';
+  unusedImages.forEach((entry) => imageState.usedImages.add(entry.index));
+  const renderedImages = unusedImages
+    .map((entry) => renderMailboxInlineImage(entry.image))
+    .filter(Boolean)
+    .join('');
+  if (!renderedImages) return '';
+  return `<section class="detail-mail-section detail-mail-section-images">${renderedImages}</section>`;
+}
+
+function normalizeMailboxBodyImages(images) {
+  return (Array.isArray(images) ? images : [])
+    .map((image) => ({
+      alt: String(image && image.alt || '').trim(),
+      dataUrl: String(image && image.dataUrl || '').trim(),
+    }))
+    .filter((image) => image.alt && /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(image.dataUrl));
+}
+
+function renderMailBody(value, images, options) {
+  const imageState = {
+    images: normalizeMailboxBodyImages(images),
+    optOutUrl: normalizeMailboxOptOutUrl(options && options.optOutUrl),
+    usedImages: new Set()
+  };
+  const sections = buildMailboxBodySections(value);
+  const hasImagePlaceholders = sections.some(sectionHasMailboxImagePlaceholder);
+  const renderedSections = [];
+  let injectedImages = false;
+  sections.forEach((section) => {
+    if (!hasImagePlaceholders && !injectedImages && section && section.type === 'signature') {
+      const imagesHtml = renderUnusedMailboxInlineImages(imageState);
+      if (imagesHtml) renderedSections.push(imagesHtml);
+      injectedImages = true;
+    }
+    renderedSections.push(renderMailboxBodySection(section, imageState));
+  });
+  if (!injectedImages) {
+    const imagesHtml = renderUnusedMailboxInlineImages(imageState);
+    if (imagesHtml) renderedSections.push(imagesHtml);
+  }
+  return renderedSections.join('');
 }
 
 function findMailById(id) {
@@ -457,6 +594,8 @@ function normalizeMailboxApiMessage(message) {
   const when = formatMailDate(message.date);
   const body = cleanMailboxText(message.body || message.preview || '');
   const preview = cleanMailboxText(message.preview || body).replace(/\s+/g, ' ').slice(0, 160);
+  const bodyImages = normalizeMailboxBodyImages(message.bodyImages);
+  const optOutUrl = normalizeMailboxOptOutUrl(message.optOutUrl);
   return {
     id: message.id,
     folder: message.folder || activeFolder,
@@ -465,6 +604,8 @@ function normalizeMailboxApiMessage(message) {
     subject: message.subject || '(Geen onderwerp)',
     preview,
     body,
+    optOutUrl,
+    bodyImages,
     messageId: message.messageId || '',
     inReplyTo: message.inReplyTo || '',
     references: message.references || '',
@@ -682,7 +823,7 @@ function openMail(id) {
       </div>
     </div>
     <div class="detail-body">
-      <div class="detail-body-text">${renderMailBody(m.body)}</div>
+      <div class="detail-body-text">${renderMailBody(m.body, m.bodyImages, { optOutUrl: m.optOutUrl })}</div>
       ${outreachQuickbar}
     </div>`;
 }
