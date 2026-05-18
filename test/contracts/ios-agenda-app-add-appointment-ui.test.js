@@ -42,6 +42,7 @@ test('ios agenda add appointment keeps appointment target separate from meeting 
 test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => {
   const agendaListSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AgendaListView.swift');
   const addViewSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AddAppointmentView.swift');
+  const agendaStoreSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/AgendaStore.swift');
 
   assert.match(
     agendaListSource,
@@ -85,6 +86,11 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.doesNotMatch(agendaListSource, /premium-mailbox/);
   assert.match(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
   assert.match(agendaListSource, /title: "Gym"[^]*systemImage: "dumbbell\.fill"/);
+  assert.match(agendaStoreSource, /guard !isRecoverableSupabaseHydrationIssue\(error\) else \{ return \}/);
+  assert.match(agendaStoreSource, /private func isRecoverableSupabaseHydrationIssue\(_ error: Error\) -> Bool/);
+  assert.match(agendaStoreSource, /gedeelde supabase-opslag/);
+  assert.match(agendaStoreSource, /niet veilig geladen/);
+  assert.match(agendaStoreSource, /nog niet geladen/);
   assert.doesNotMatch(
     agendaListSource,
     /prefilledTitle: "Gym"/,

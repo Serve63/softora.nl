@@ -93,6 +93,7 @@ final class AgendaStore {
                 .sorted { $0.sortKey < $1.sortKey }
         } catch {
             guard !error.isSoftoraCancellation else { return }
+            guard !isRecoverableSupabaseHydrationIssue(error) else { return }
             alertMessage = error.localizedDescription
             if error.localizedDescription == "Niet ingelogd." {
                 isAuthenticated = false
@@ -143,6 +144,12 @@ final class AgendaStore {
         if !session.configured {
             alertMessage = "Softora-login is nog niet volledig ingesteld op de server."
         }
+    }
+
+    private func isRecoverableSupabaseHydrationIssue(_ error: Error) -> Bool {
+        let message = error.localizedDescription.lowercased()
+        return message.contains("gedeelde supabase-opslag") &&
+            (message.contains("niet veilig geladen") || message.contains("nog niet geladen"))
     }
 }
 
