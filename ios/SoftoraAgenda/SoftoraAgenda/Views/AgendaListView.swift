@@ -1601,6 +1601,8 @@ private struct MailboxBodySectionView: View {
                             .font(.softoraBody(14))
                             .foregroundStyle(Color.softoraInk)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                    case .textLink(let text, let link, _):
+                        MailboxInlineTextLinkView(text: text, link: link)
                     case .image(let image, _):
                         MailboxInlineImageView(image: image)
                     case .link(let link, _):
@@ -1616,6 +1618,28 @@ private struct MailboxBodySectionView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(section.isQuoted ? Color.softoraPurpleLight : Color.softoraCrimson.opacity(0.28), lineWidth: 1)
+        }
+    }
+}
+
+private struct MailboxInlineTextLinkView: View {
+    let text: String
+    let link: MailboxLink
+
+    var body: some View {
+        if let destination = URL(string: link.href) {
+            Link(destination: destination) {
+                Text(text)
+                    .font(.softoraBody(14, weight: .semibold))
+                    .foregroundStyle(Color.softoraCrimson)
+                    .underline()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else {
+            Text(text)
+                .font(.softoraBody(14))
+                .foregroundStyle(Color.softoraInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -1752,12 +1776,13 @@ private struct MailboxBodySection: Identifiable {
 
 private enum MailboxBodyBlock: Identifiable {
     case text(String, UUID = UUID())
+    case textLink(String, MailboxLink, UUID = UUID())
     case image(MailboxInlineImage, UUID = UUID())
     case link(MailboxLink, UUID = UUID())
 
     var id: UUID {
         switch self {
-        case .text(_, let id), .image(_, let id), .link(_, let id):
+        case .text(_, let id), .textLink(_, _, let id), .image(_, let id), .link(_, let id):
             id
         }
     }
@@ -1806,13 +1831,18 @@ private enum MailboxBodyFormatter {
         var output: [MailboxBodyBlock] = []
         var paragraph: [String] = []
         var unusedImages = images
+        var unusedLinks = uniqueLinks(links)
 
         func flushParagraph() {
             let text = paragraph
                 .joined(separator: "\n")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !text.isEmpty {
-                output.append(.text(text))
+                if let link = takeLink(matching: text, from: &unusedLinks) {
+                    output.append(.textLink(text, link))
+                } else {
+                    output.append(.text(text))
+                }
             }
             paragraph.removeAll()
         }
@@ -1845,7 +1875,7 @@ private enum MailboxBodyFormatter {
         for image in unusedImages {
             output.append(.image(image))
         }
-        for link in uniqueLinks(links) {
+        for link in unusedLinks {
             output.append(.link(link))
         }
         return output
@@ -1872,12 +1902,41 @@ private enum MailboxBodyFormatter {
         return images.removeFirst()
     }
 
+    private static func takeLink(matching text: String, from links: inout [MailboxLink]) -> MailboxLink? {
+        let normalizedText = normalizedLinkText(text)
+        guard !normalizedText.isEmpty else {
+            return nil
+        }
+        guard let index = links.firstIndex(where: { link in
+            let label = normalizedLinkText(link.label)
+            let href = normalizedLinkText(link.href)
+            return (!label.isEmpty && (normalizedText == label || normalizedText.contains(label) || label.contains(normalizedText))) ||
+                (!href.isEmpty && normalizedText.contains(href))
+        }) else {
+            return nil
+        }
+        return links.remove(at: index)
+    }
+
     private static func normalizedImageText(_ value: String) -> String {
         value
             .lowercased()
             .replacingOccurrences(of: ".png", with: "")
             .replacingOccurrences(of: ".jpg", with: "")
             .replacingOccurrences(of: ".jpeg", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func normalizedLinkText(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .replacingOccurrences(of: "www.", with: "")
+            .replacingOccurrences(of: "\n", with: " ")
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

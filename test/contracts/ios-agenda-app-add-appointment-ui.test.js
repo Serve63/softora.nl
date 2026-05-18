@@ -73,6 +73,7 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /Image\(uiImage: uiImage\)/);
   assert.match(agendaListSource, /AsyncImage\(url: remoteURL\)/);
   assert.match(agendaListSource, /private struct MailboxBodyLinkView: View/);
+  assert.match(agendaListSource, /private struct MailboxInlineTextLinkView: View/);
   assert.match(agendaListSource, /Link\(destination: destination\)/);
   assert.match(agendaListSource, /MailboxBodySection\(title: "Reactie"/);
   assert.match(agendaListSource, /MailboxBodySection\(title: "Eerdere mail"/);
@@ -81,6 +82,7 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /static func readable\(_ rawBody: String\) -> String/);
   assert.match(agendaListSource, /\.map\(stripQuotePrefix\)/);
   assert.match(agendaListSource, /imagePlaceholderLabel\(from: trimmed\)/);
+  assert.match(agendaListSource, /takeLink\(matching: text, from: &unusedLinks\)/);
   assert.match(agendaListSource, /uniqueLinks\(links\)/);
   assert.match(agendaListSource, /while output\.trimmingCharacters\(in: \.whitespaces\)\.hasPrefix\(">"\)/);
   assert.doesNotMatch(agendaListSource, /Text\(\(message\.body\.isEmpty \? message\.preview : message\.body\)\.trimmingCharacters/);
