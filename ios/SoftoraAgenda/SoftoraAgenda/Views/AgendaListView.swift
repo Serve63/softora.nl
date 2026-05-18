@@ -774,6 +774,10 @@ private struct MailboxView: View {
             VStack(spacing: 0) {
                 mailboxHeader
 
+                if selectedMessage != nil {
+                    mailboxBackButton
+                }
+
                 HStack {
                     Text(selectedFolder.title)
                         .font(.softoraDisplay(18, weight: .bold))
@@ -821,6 +825,26 @@ private struct MailboxView: View {
         } message: {
             Text((alertMessage ?? "").softoraUppercased)
         }
+    }
+
+    private var mailboxBackButton: some View {
+        Button {
+            selectedMessage = nil
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "chevron.left")
+                Text("Terug")
+            }
+            .font(.softoraDisplay(13, weight: .bold))
+            .textCase(.uppercase)
+            .tracking(0.8)
+            .foregroundStyle(Color.softoraCrimson)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 2)
     }
 
     private var mailboxHeader: some View {
@@ -892,9 +916,7 @@ private struct MailboxView: View {
                 message: selectedMessage,
                 selectedAccount: selectedAccount,
                 apiClient: apiClient
-            ) {
-                self.selectedMessage = nil
-            }
+            )
         } else if messages.isEmpty {
             VStack(spacing: 8) {
                 Text(emptyTitle)
@@ -1203,7 +1225,6 @@ private struct MailboxMessageDetail: View {
     let message: MailboxMessage
     let selectedAccount: MailboxAccount?
     let apiClient: SoftoraAPIClient
-    let onBack: () -> Void
 
     @State private var isReplying = false
     @State private var replyBody = ""
@@ -1214,18 +1235,6 @@ private struct MailboxMessageDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Button(action: onBack) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                        Text("Terug")
-                    }
-                    .font(.softoraDisplay(13, weight: .bold))
-                    .textCase(.uppercase)
-                    .tracking(0.8)
-                    .foregroundStyle(Color.softoraCrimson)
-                }
-                .buttonStyle(.plain)
-
                 Text(message.subject.isEmpty ? "(GEEN ONDERWERP)" : message.subject.softoraUppercased)
                     .font(.softoraDisplay(24, weight: .bold))
                     .textCase(.uppercase)
@@ -1233,7 +1242,7 @@ private struct MailboxMessageDetail: View {
                     .foregroundStyle(Color.softoraInk)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    MailboxDetailMeta(label: "Van", value: message.from)
+                    MailboxDetailMeta(label: "Van", value: senderAddress)
                     MailboxDetailMeta(label: "Aan", value: message.to)
                     MailboxDetailMeta(label: "Datum", value: MailboxDateFormatter.label(message.date))
                 }
@@ -1246,6 +1255,11 @@ private struct MailboxMessageDetail: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private var senderAddress: String {
+        let email = message.email.trimmingCharacters(in: .whitespacesAndNewlines)
+        return email.isEmpty ? message.from : email
     }
 
     @ViewBuilder
