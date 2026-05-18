@@ -2432,13 +2432,13 @@ function buildColdmailSendSuccessMessage(sendResult) {
   return '✓ ' + sent + ' mails verstuurd (' + failed + ' mislukt)';
 }
 
-async function startCampagne() {
+async function startCampagne(verifiedMailSendPin) {
   if (running) return;
   if (isPremiumAiLeadGeneratorPath()) {
     void startCampagneWithLeadGeneratorBoot();
     return;
   }
-  await startCampagneImmediate();
+  await startCampagneImmediate(verifiedMailSendPin);
 }
 
 async function startCampagneWithLeadGeneratorBoot() {
@@ -2507,7 +2507,7 @@ async function startCampagneWithLeadGeneratorBoot() {
   }
 }
 
-async function startCampagneImmediate() {
+async function startCampagneImmediate(verifiedMailSendPin) {
   if (running || campaignSendInProgress) return;
   const n = parseInt(document.getElementById('mail-slider').value, 10) || 100;
   const durationDays = getSelectedCampaignDurationDays();
@@ -2519,7 +2519,7 @@ async function startCampagneImmediate() {
   let sendResult = null; let recipientPreview = null;
 
   if (!isPremiumAiLeadGeneratorPath()) {
-    const startConfirmPin = await (window.SoftoraRiskyActionPin && window.SoftoraRiskyActionPin.requestMailSendPin ? window.SoftoraRiskyActionPin.requestMailSendPin(showToast) : (showToast('Beveiligingspopup kon niet worden geladen. Actie niet gestart.'), '')); if (!startConfirmPin) return;
+    let startConfirmPin = String(verifiedMailSendPin || '').trim(); if (!startConfirmPin) startConfirmPin = await (window.SoftoraSecureActionPin && window.SoftoraSecureActionPin.confirmMailSend ? window.SoftoraSecureActionPin.confirmMailSend() : (showToast('Beveiligingspopup kon niet worden geladen. Actie niet gestart.'), '')); startConfirmPin = String(startConfirmPin || '').trim(); if (!startConfirmPin) return;
     campaignSendInProgress = true;
     setCampaignStartButtonBusy(true);
     try {
