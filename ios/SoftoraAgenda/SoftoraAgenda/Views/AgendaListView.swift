@@ -1105,7 +1105,7 @@ private struct MailboxView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(spacing: 10) {
+                LazyVStack(spacing: 8) {
                     ForEach(messages) { message in
                         MailboxMessageRow(message: message) {
                             selectedMessage = message
@@ -1406,7 +1406,7 @@ private struct MailboxMessageRow: View {
 
     var body: some View {
         Button(action: onOpen) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 8) {
                     Text(message.from.isEmpty ? "ONBEKEND" : message.from.softoraUppercased)
                         .font(.softoraDisplay(14, weight: message.unread ? .bold : .semibold))
@@ -1431,13 +1431,9 @@ private struct MailboxMessageRow: View {
                     .font(.softoraBody(13, weight: message.unread ? .bold : .semibold))
                     .foregroundStyle(Color.softoraInk)
                     .lineLimit(1)
-
-                Text(message.preview.softoraUppercased)
-                    .font(.softoraBody(12))
-                    .foregroundStyle(Color.softoraMuted)
-                    .lineLimit(2)
             }
-            .padding(15)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))

@@ -86,6 +86,15 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /uniqueLinks\(links\)/);
   assert.match(agendaListSource, /while output\.trimmingCharacters\(in: \.whitespaces\)\.hasPrefix\(">"\)/);
   assert.doesNotMatch(agendaListSource, /Text\(\(message\.body\.isEmpty \? message\.preview : message\.body\)\.trimmingCharacters/);
+  const mailboxMessageRowStart = agendaListSource.indexOf('private struct MailboxMessageRow: View');
+  const mailboxMessageRowEnd = agendaListSource.indexOf('private struct MailboxMessageDetail: View');
+  assert.ok(mailboxMessageRowStart >= 0 && mailboxMessageRowEnd > mailboxMessageRowStart);
+  const mailboxMessageRowSource = agendaListSource.slice(mailboxMessageRowStart, mailboxMessageRowEnd);
+  assert.doesNotMatch(
+    mailboxMessageRowSource,
+    /message\.preview/,
+    'Mailbox list rows should not expose message contents before opening a mail.'
+  );
   assert.match(agendaListSource, /GymWorkoutView\(\)/);
   assert.match(agendaListSource, /private struct GymWorkoutView: View/);
   assert.match(agendaListSource, /@State private var selectedDay: GymWorkoutDay = \.today/);
