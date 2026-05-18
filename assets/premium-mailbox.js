@@ -388,6 +388,21 @@ function renderMailboxBodySection(section, imageState) {
     </section>`;
 }
 
+function renderUnusedMailboxInlineImages(imageState) {
+  if (!imageState || !Array.isArray(imageState.images) || !(imageState.usedImages instanceof Set)) return '';
+  const unusedImages = imageState.images
+    .map((image, index) => ({ image, index }))
+    .filter((entry) => !imageState.usedImages.has(entry.index));
+  if (!unusedImages.length) return '';
+  unusedImages.forEach((entry) => imageState.usedImages.add(entry.index));
+  const renderedImages = unusedImages
+    .map((entry) => renderMailboxInlineImage(entry.image))
+    .filter(Boolean)
+    .join('');
+  if (!renderedImages) return '';
+  return `<section class="detail-mail-section detail-mail-section-images">${renderedImages}</section>`;
+}
+
 function normalizeMailboxBodyImages(images) {
   return (Array.isArray(images) ? images : [])
     .map((image) => ({
@@ -399,7 +414,22 @@ function normalizeMailboxBodyImages(images) {
 
 function renderMailBody(value, images) {
   const imageState = { images: normalizeMailboxBodyImages(images), usedImages: new Set() };
-  return buildMailboxBodySections(value).map((section) => renderMailboxBodySection(section, imageState)).join('');
+  const sections = buildMailboxBodySections(value);
+  const renderedSections = [];
+  let injectedImages = false;
+  sections.forEach((section) => {
+    if (!injectedImages && section && section.type === 'signature') {
+      const imagesHtml = renderUnusedMailboxInlineImages(imageState);
+      if (imagesHtml) renderedSections.push(imagesHtml);
+      injectedImages = true;
+    }
+    renderedSections.push(renderMailboxBodySection(section, imageState));
+  });
+  if (!injectedImages) {
+    const imagesHtml = renderUnusedMailboxInlineImages(imageState);
+    if (imagesHtml) renderedSections.push(imagesHtml);
+  }
+  return renderedSections.join('');
 }
 
 function findMailById(id) {
