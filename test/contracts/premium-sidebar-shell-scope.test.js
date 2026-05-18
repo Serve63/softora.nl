@@ -265,7 +265,7 @@ test('premium flynow gebruikt de dynamische canonical sidebar-host', () => {
   assert.doesNotMatch(pageSource, /data-static-sidebar="1"/);
   assert.match(
     flynowCssSource,
-    /\.dashboard-layout\[data-sidebar-shell="canonical"\] > \.flynow-main/
+    /body\[data-flynow-page\]\s+\.dashboard-layout\[data-sidebar-shell="canonical"\]\s*>\s*main\.flynow-main/
   );
   assert.match(
     flynowCssSource,
@@ -273,7 +273,11 @@ test('premium flynow gebruikt de dynamische canonical sidebar-host', () => {
   );
   assert.match(
     flynowCssSource,
-    /@media \(min-width:\s*901px\)\s*\{[\s\S]*body\[data-flynow-page\] \.sidebar\s*\{[\s\S]*height:\s*100vh !important[\s\S]*\.dashboard-layout\[data-sidebar-shell="canonical"\] > \.flynow-main\s*\{[\s\S]*margin-left:\s*var\(--premium-sidebar-width,\s*320px\) !important/
+    /@media \(min-width:\s*901px\)\s*\{[\s\S]*body\[data-flynow-page\]\s+\.dashboard-layout\[data-sidebar-shell="canonical"\]\s*>\s*main\.flynow-main\s*\{[\s\S]*margin-left:\s*var\(--premium-sidebar-width,\s*320px\) !important/
+  );
+  assert.doesNotMatch(
+    flynowCssSource,
+    /body\[data-flynow-page\]\s+\.sidebar\s*\{[^}]*height:\s*100vh !important/
   );
   assert.match(
     flynowCssSource,

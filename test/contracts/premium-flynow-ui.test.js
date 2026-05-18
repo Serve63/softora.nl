@@ -51,11 +51,15 @@ test('premium flynow gebruikt de deals-layout binnen de premium sidebar', () => 
   assert.match(css, /:where\(\s*body\[data-flynow-page\] \.flynow-main/);
   assert.match(css, /body\[data-flynow-page\] \.flynow-main :is\(button,\s*a\)\s*\{[\s\S]*appearance:\s*none/);
   assert.match(css, /body\[data-flynow-page\] \.sidebar\s*\{[\s\S]*z-index:\s*120 !important/);
-  assert.match(css, /@media \(min-width:\s*901px\)\s*\{[\s\S]*body\[data-flynow-page\] \.sidebar\s*\{[\s\S]*box-sizing:\s*border-box !important[\s\S]*height:\s*100vh !important[\s\S]*max-height:\s*100vh !important/);
-  assert.match(css, /body\[data-flynow-page\] \.sidebar-footer \.sidebar-user \.sidebar-user-role\s*\{[\s\S]*display:\s*none !important/);
+  assert.match(css, /body\[data-flynow-page\]\s+\.dashboard-layout\[data-sidebar-shell="canonical"\]\s*>\s*main\.flynow-main\s*\{[\s\S]*padding:\s*0 !important/);
+  assert.match(css, /@media \(min-width:\s*901px\)\s*\{[\s\S]*body\[data-flynow-page\]\s+\.dashboard-layout\[data-sidebar-shell="canonical"\]\s*>\s*main\.flynow-main\s*\{[\s\S]*margin-left:\s*var\(--premium-sidebar-width,320px\) !important/);
+  assert.doesNotMatch(css, /body\[data-flynow-page\]\s+\.sidebar-logo\s*\{[\s\S]*font-size:\s*24px !important/);
+  assert.doesNotMatch(css, /body\[data-flynow-page\]\s+\.sidebar-link\s*\{[\s\S]*font-size:\s*12\.5px !important/);
+  assert.doesNotMatch(css, /body\[data-flynow-page\]\s+\.sidebar-footer\s+\.sidebar-user\s+\.sidebar-user-role\s*\{[\s\S]*display:\s*none !important/);
   assert.match(css, /\.deals-header\s*\{[\s\S]*position:\s*sticky;/);
   assert.match(css, /\.deals-tab\.active\s*\{[\s\S]*border-color:\s*var\(--flynow-cream\)/);
   assert.match(css, /body\[data-flynow-page\] \.flynow-main \.hero-deal \.hero-title\s*\{[\s\S]*color:\s*var\(--flynow-white\) !important/);
+  assert.match(css, /\.hero-deal--zon\s*\{background-image:\s*url\("\/assets\/flynow\/flynow-zon-photo-1\.jpg"\)/);
   assert.match(css, /\.deal-photo--mallorca\s*\{\s*background-image:\s*url\("\/assets\/flynow\/flynow-zon-photo-5\.jpg"\)/);
   assert.match(css, /\.deal-photo--zermatt\s*\{\s*background-image:\s*url\("\/assets\/flynow\/flynow-sneeuw-photo-1\.jpg"\)/);
   assert.doesNotMatch(css, /flynow-particle/);
