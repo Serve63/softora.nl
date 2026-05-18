@@ -1887,7 +1887,7 @@ function bindColdmailingSettingsPersistence() {
 
 async function initColdmailingSettingsPersistence() { const controller = getColdmailingSettingsController(); if (!controller) return false; const hydrated = await controller.init(); if (!hydrated) markColdmailingSettingsUnavailable(); return hydrated; }
 
-function markColdmailingSettingsUnavailable() { ['subj1', 'body1', 'ai-instructies'].forEach((id) => { const field = document.getElementById(id); if (!field) return; field.value = ''; field.placeholder = 'Instellingen konden niet worden geladen. Ververs de pagina of probeer het opnieuw.'; field.disabled = true; }); const toneSelect = document.getElementById('ai-tone-style'); if (toneSelect) toneSelect.disabled = true; const startButton = document.getElementById('start-campaign-btn'); if (startButton) { startButton.disabled = true; startButton.title = 'Instellingen konden niet worden geladen'; } if (typeof showToast === 'function') showToast('Prompt & AI instructies konden niet veilig worden geladen.'); }
+function markColdmailingSettingsUnavailable() { ['subj1', 'body1', 'ai-instructies'].forEach((id) => { const field = document.getElementById(id); if (!field) return; field.disabled = false; field.placeholder = ''; }); const toneSelect = document.getElementById('ai-tone-style'); if (toneSelect) toneSelect.disabled = false; const startButton = document.getElementById('start-campaign-btn'); if (startButton) { startButton.disabled = false; startButton.title = ''; } }
 
 function initCampaignDurationSetting() {
   const select = document.getElementById('campaignDurationDays');
