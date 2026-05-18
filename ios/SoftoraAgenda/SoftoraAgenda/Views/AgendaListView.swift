@@ -502,12 +502,16 @@ private struct GymDayButton: View {
 private struct GymExerciseRow: View {
     let exercise: GymExercise
 
+    @State private var exerciseName: String
+    @State private var notes: String
     @State private var sets: String
     @State private var reps: String
     @State private var kilograms: String
 
     init(exercise: GymExercise) {
         self.exercise = exercise
+        _exerciseName = State(initialValue: exercise.title.softoraUppercased)
+        _notes = State(initialValue: exercise.details.softoraUppercased)
         _sets = State(initialValue: exercise.defaultSets)
         _reps = State(initialValue: exercise.defaultReps)
         _kilograms = State(initialValue: "")
@@ -516,14 +520,15 @@ private struct GymExerciseRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .center, spacing: 8) {
-                Text(exercise.title)
+                TextField("OEFENING", text: uppercasedExerciseName)
                     .font(.softoraDisplay(14, weight: .bold))
-                    .textCase(.uppercase)
                     .tracking(0.35)
                     .foregroundStyle(Color.softoraInk)
                     .lineLimit(1)
                     .minimumScaleFactor(0.58)
                     .allowsTightening(true)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled(true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 HStack(spacing: 5) {
@@ -533,10 +538,12 @@ private struct GymExerciseRow: View {
                 }
             }
 
-            Text(exercise.details)
+            TextField("NOTITIES", text: uppercasedNotes, axis: .vertical)
                 .font(.softoraBody(12, weight: .semibold))
-                .textCase(.uppercase)
                 .foregroundStyle(Color.softoraMuted)
+                .lineLimit(1...2)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled(true)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -546,6 +553,20 @@ private struct GymExerciseRow: View {
             RoundedRectangle(cornerRadius: 15, style: .continuous)
                 .stroke(Color.softoraPurpleLight, lineWidth: 1)
         }
+    }
+
+    private var uppercasedExerciseName: Binding<String> {
+        Binding(
+            get: { exerciseName },
+            set: { exerciseName = $0.softoraUppercased }
+        )
+    }
+
+    private var uppercasedNotes: Binding<String> {
+        Binding(
+            get: { notes },
+            set: { notes = $0.softoraUppercased }
+        )
     }
 }
 
