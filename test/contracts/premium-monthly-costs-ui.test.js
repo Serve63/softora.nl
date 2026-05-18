@@ -45,6 +45,8 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*position:\s*relative;/);
   assert.match(pageSource, /<main class="main-content">[\s\S]*id="monthly-costs-boot-loader"/);
   assert.match(pageSource, /id="monthly-costs-boot-loader"/);
+  assert.match(pageSource, /\.monthly-costs-boot-loader\s*\{[\s\S]*position:\s*fixed;[\s\S]*left:\s*280px;[\s\S]*min-height:\s*100dvh;/);
+  assert.match(pageSource, /@media \(max-width: 1100px\) \{[\s\S]*\.monthly-costs-boot-loader\s*\{[\s\S]*left:\s*0;/);
   assert.match(pageSource, /<div class="monthly-costs-spinner"[^>]*>[\s\S]*softora-dossier-loader__orbit--outer/);
   const themePath = path.join(__dirname, '../../assets/personnel-theme.css');
   const themeSource = fs.readFileSync(themePath, 'utf8');

@@ -232,6 +232,22 @@ test('custom premium layouts stay outside the shared sidebar shell', () => {
   }
 });
 
+test('premium vaste lasten centreert bootloader in het zichtbare hoofdvlak', () => {
+  const pageSource = readRepoFile('premium-vaste-lasten.html');
+
+  assert.match(pageSource, /<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*>/);
+  assert.match(
+    pageSource,
+    /\.monthly-costs-boot-loader\s*\{[\s\S]*position:\s*fixed;[\s\S]*left:\s*280px;[\s\S]*min-height:\s*100dvh;/,
+    'de laadspinner moet aan het viewport-vlak naast de vaste sidebar hangen'
+  );
+  assert.match(
+    pageSource,
+    /@media \(max-width: 1100px\) \{[\s\S]*\.monthly-costs-boot-loader\s*\{[\s\S]*left:\s*0;/,
+    'op mobiel hoort de loader weer over de volledige breedte te centreren'
+  );
+});
+
 test('premium mailbox behoudt eigen layout en vaste sidebar bij responsive mailweergave', () => {
   const pageSource = readRepoFile('premium-mailbox.html');
 
