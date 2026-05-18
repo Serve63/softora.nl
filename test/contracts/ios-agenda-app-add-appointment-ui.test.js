@@ -61,6 +61,12 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   );
   assert.match(agendaListSource, /MailboxView\(apiClient: SoftoraAPIClient\(\)\)/);
   assert.match(agendaListSource, /private struct MailboxView: View/);
+  assert.match(agendaListSource, /Text\(readableBody\)/);
+  assert.match(agendaListSource, /private enum MailboxBodyFormatter/);
+  assert.match(agendaListSource, /static func readable\(_ rawBody: String\) -> String/);
+  assert.match(agendaListSource, /\.map\(stripQuotePrefix\)/);
+  assert.match(agendaListSource, /while output\.trimmingCharacters\(in: \.whitespaces\)\.hasPrefix\(">"\)/);
+  assert.doesNotMatch(agendaListSource, /Text\(\(message\.body\.isEmpty \? message\.preview : message\.body\)\.trimmingCharacters/);
   assert.match(agendaListSource, /GymWorkoutView\(\)/);
   assert.match(agendaListSource, /private struct GymWorkoutView: View/);
   assert.match(agendaListSource, /@State private var selectedDay: GymWorkoutDay = \.today/);

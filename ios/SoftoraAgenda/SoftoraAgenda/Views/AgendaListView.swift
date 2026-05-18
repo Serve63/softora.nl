@@ -1237,7 +1237,7 @@ private struct MailboxMessageDetail: View {
                     MailboxDetailMeta(label: "Datum", value: MailboxDateFormatter.label(message.date))
                 }
 
-                Text((message.body.isEmpty ? message.preview : message.body).trimmingCharacters(in: .whitespacesAndNewlines))
+                Text(readableBody)
                     .font(.softoraBody(14))
                     .foregroundStyle(Color.softoraInk)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1402,6 +1402,10 @@ private struct MailboxMessageDetail: View {
             !replyBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var readableBody: String {
+        MailboxBodyFormatter.readable(message.body.isEmpty ? message.preview : message.body)
+    }
+
     private func improveReply() async {
         let cleanBody = replyBody.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanBody.isEmpty else {
@@ -1487,6 +1491,30 @@ private struct MailboxMessageDetail: View {
             }
         }
         return ""
+    }
+}
+
+private enum MailboxBodyFormatter {
+    static func readable(_ rawBody: String) -> String {
+        rawBody
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .components(separatedBy: "\n")
+            .map(stripQuotePrefix)
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func stripQuotePrefix(from line: String) -> String {
+        var output = line
+        while output.trimmingCharacters(in: .whitespaces).hasPrefix(">") {
+            output = output.trimmingCharacters(in: .whitespaces)
+            output.removeFirst()
+            if output.hasPrefix(" ") {
+                output.removeFirst()
+            }
+        }
+        return output
     }
 }
 
