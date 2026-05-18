@@ -95,6 +95,14 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
     /message\.preview/,
     'Mailbox list rows should not expose message contents before opening a mail.'
   );
+  assert.match(agendaListSource, /@AppStorage\("softora\.mailbox\.openedMessageKeys"\)/);
+  assert.match(agendaListSource, /MailboxMessageRow\(message: message, isUnread: isUnread\(message\)\)/);
+  assert.match(agendaListSource, /private func isUnread\(_ message: MailboxMessage\) -> Bool \{[^]*message\.unread && !openedMailboxMessageKeys\.contains\(mailboxMessageKey\(message\)\)/);
+  assert.match(agendaListSource, /private func openMessage\(_ message: MailboxMessage\)/);
+  assert.match(agendaListSource, /openedKeys\.insert\(mailboxMessageKey\(message\)\)/);
+  assert.match(mailboxMessageRowSource, /let isUnread: Bool/);
+  assert.match(mailboxMessageRowSource, /Text\("Nieuw"\)/);
+  assert.match(mailboxMessageRowSource, /isUnread \? Color\.softoraCrimson : Color\.softoraPurpleLight/);
   assert.match(agendaListSource, /GymWorkoutView\(\)/);
   assert.match(agendaListSource, /private struct GymWorkoutView: View/);
   assert.match(agendaListSource, /@State private var selectedDay: GymWorkoutDay = \.today/);

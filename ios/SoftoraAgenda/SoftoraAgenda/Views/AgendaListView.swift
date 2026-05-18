@@ -929,6 +929,7 @@ private struct MailboxView: View {
     @State private var alertMessage: String?
     @AppStorage("softora.mailbox.accountOrder") private var mailboxAccountOrder = ""
     @AppStorage("softora.mailbox.pinnedAccount") private var pinnedMailboxAccountEmail = ""
+    @AppStorage("softora.mailbox.openedMessageKeys") private var openedMailboxMessageKeysRaw = ""
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -1107,8 +1108,8 @@ private struct MailboxView: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(messages) { message in
-                        MailboxMessageRow(message: message) {
-                            selectedMessage = message
+                        MailboxMessageRow(message: message, isUnread: isUnread(message)) {
+                            openMessage(message)
                         }
                     }
                 }
@@ -1134,6 +1135,32 @@ private struct MailboxView: View {
 
     private var orderedAccounts: [MailboxAccount] {
         Self.sortedMailboxAccounts(accounts, order: mailboxAccountOrder, pinnedEmail: pinnedMailboxAccountEmail)
+    }
+
+    private var openedMailboxMessageKeys: Set<String> {
+        Set(openedMailboxMessageKeysRaw.split(separator: "\n").map(String.init))
+    }
+
+    private func isUnread(_ message: MailboxMessage) -> Bool {
+        message.unread && !openedMailboxMessageKeys.contains(mailboxMessageKey(message))
+    }
+
+    private func openMessage(_ message: MailboxMessage) {
+        selectedMessage = message
+
+        guard message.unread else { return }
+        var openedKeys = openedMailboxMessageKeys
+        openedKeys.insert(mailboxMessageKey(message))
+        openedMailboxMessageKeysRaw = openedKeys.sorted().joined(separator: "\n")
+    }
+
+    private func mailboxMessageKey(_ message: MailboxMessage) -> String {
+        [
+            selectedAccount?.email ?? "",
+            message.folder,
+            String(message.uid),
+            message.id
+        ].joined(separator: "|")
     }
 
     private var alertBinding: Binding<Bool> {
@@ -1402,6 +1429,7 @@ private struct MailboxFolderDrawer: View {
 
 private struct MailboxMessageRow: View {
     let message: MailboxMessage
+    let isUnread: Bool
     let onOpen: () -> Void
 
     var body: some View {
@@ -1409,7 +1437,7 @@ private struct MailboxMessageRow: View {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 8) {
                     Text(message.from.isEmpty ? "ONBEKEND" : message.from.softoraUppercased)
-                        .font(.softoraDisplay(14, weight: message.unread ? .bold : .semibold))
+                        .font(.softoraDisplay(14, weight: isUnread ? .bold : .semibold))
                         .tracking(0.5)
                         .foregroundStyle(Color.softoraInk)
                         .lineLimit(1)
@@ -1422,13 +1450,25 @@ private struct MailboxMessageRow: View {
                             .foregroundStyle(Color.softoraCrimson)
                     }
 
+                    if isUnread {
+                        Text("Nieuw")
+                            .font(.softoraDisplay(9, weight: .bold))
+                            .textCase(.uppercase)
+                            .tracking(0.7)
+                            .foregroundStyle(Color.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(Color.softoraCrimson)
+                            .clipShape(Capsule())
+                    }
+
                     Text(MailboxDateFormatter.label(message.date))
                         .font(.softoraBody(10, weight: .semibold))
                         .foregroundStyle(Color.softoraMuted)
                 }
 
                 Text(message.subject.isEmpty ? "(GEEN ONDERWERP)" : message.subject.softoraUppercased)
-                    .font(.softoraBody(13, weight: message.unread ? .bold : .semibold))
+                    .font(.softoraBody(13, weight: isUnread ? .bold : .semibold))
                     .foregroundStyle(Color.softoraInk)
                     .lineLimit(1)
             }
@@ -1439,7 +1479,7 @@ private struct MailboxMessageRow: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(message.unread ? Color.softoraCrimson : Color.softoraPurpleLight, lineWidth: message.unread ? 1.5 : 1)
+                    .stroke(isUnread ? Color.softoraCrimson : Color.softoraPurpleLight, lineWidth: isUnread ? 1.5 : 1)
             }
         }
         .buttonStyle(.plain)
