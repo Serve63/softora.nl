@@ -4,6 +4,9 @@ const assert = require('node:assert/strict');
 const { createMailboxService } = require('../../server/services/mailbox');
 const { registerMailboxRoutes } = require('../../server/routes/mailbox');
 
+const TINY_PNG_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+
 function createResponseRecorder() {
   return {
     statusCode: null,
@@ -404,6 +407,78 @@ test('mailbox service exposes inline mail images and html links for the iOS mail
       href: 'https://softora.nl/geen-webdesign',
     },
   ]);
+});
+
+test('mailbox service restores quoted webdesign image placeholders from stored database photos', async () => {
+  const photoKey = 'softora_database_photo_data_v1_softora_testmodus';
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    getUiStateValues: async (scope) => {
+      assert.equal(scope, 'premium_database_photos');
+      return {
+        values: {
+          softora_database_photos_v1: JSON.stringify({
+            softora_testmodus: {
+              id: 'softora_testmodus',
+              photoKey,
+              chunkCount: 1,
+              websitePhotoName: 'Softora Testmodus webdesign.png',
+            },
+          }),
+          [`${photoKey}_0`]: TINY_PNG_DATA_URL,
+        },
+      };
+    },
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async () => ({ release() {} }),
+      search: async () => [1],
+      fetch: async function* () {
+        yield {
+          uid: 1,
+          flags: [],
+          internalDate: new Date('2026-05-18T10:00:00Z'),
+          source: {
+            date: new Date('2026-05-18T10:00:00Z'),
+            from: { value: [{ name: 'Klant', address: 'klant@example.nl' }] },
+            to: { value: [{ address: 'serve@softora.nl' }] },
+            subject: 'Webdesign',
+            text: [
+              'Ziet er goed uit.',
+              '[image: Softora Testmodus webdesign]',
+              'Geen webdesign willen ontvangen? Laat het me weten!',
+            ].join('\n'),
+            html: '',
+            attachments: [],
+          },
+        };
+      },
+      logout: async () => {},
+    }),
+    parseMailSource: async (source) => source,
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'inbox', limit: '10' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  const message = res.body.messages[0];
+  assert.equal(message.inlineImages.length, 1);
+  assert.equal(message.inlineImages[0].alt, 'Softora Testmodus webdesign');
+  assert.equal(message.inlineImages[0].contentType, 'image/png');
+  assert.equal(message.inlineImages[0].contentBase64, TINY_PNG_DATA_URL.split(',')[1]);
 });
 
 test('mailbox service returns empty reclame folder when no matching mailbox exists', async () => {

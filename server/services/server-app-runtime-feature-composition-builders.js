@@ -269,6 +269,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         openAiApiBaseUrl: envConfig.OPENAI_API_BASE_URL,
         mailboxDraftModel: shared.normalizeString(env.MAILBOX_DRAFT_OPENAI_MODEL || envConfig.OPENAI_MODEL || 'gpt-5.5-pro'),
         mailboxAccountsRaw: env.MAILBOX_ACCOUNTS || '',
+        getUiStateValues: uiSeoRuntime.getUiStateValues,
         mailConfig: {
           smtpHost: envConfig.MAIL_SMTP_HOST,
           smtpPort: envConfig.MAIL_SMTP_PORT,

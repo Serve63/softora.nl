@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const { parseImageDataUrl, safeParseJsonObject } = require('./data-ops-serialization');
 
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
@@ -9,6 +10,8 @@ const DEFAULT_MAILBOX_EMAILS = [
   'serve@softora.nl',
   'martijn@softora.nl',
 ];
+const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
+const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MAILBOX_DRAFT_MODEL = 'gpt-5.5-pro';
 const MAX_INLINE_IMAGE_BYTES = 5_000_000;
@@ -47,6 +50,9 @@ function createMailboxService(deps = {}) {
     logger = console,
     mailConfig = {},
     mailboxAccountsRaw = '',
+    getUiStateValues = async () => null,
+    customerPhotoScope = DEFAULT_CUSTOMER_PHOTO_SCOPE,
+    customerPhotoKey = DEFAULT_CUSTOMER_PHOTO_KEY,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     createTransport = (config) => nodemailer.createTransport(config),
@@ -362,6 +368,16 @@ function createMailboxService(deps = {}) {
     return normalizeString(value).replace(/\.[a-z0-9]{2,5}$/i, '');
   }
 
+  function normalizeImageLabel(value) {
+    return normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\.[a-z0-9]{2,5}$/gi, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
   function safeUrl(value) {
     const url = normalizeString(value);
     if (/^(https?:|mailto:|tel:)/i.test(url)) return url;
@@ -399,6 +415,19 @@ function createMailboxService(deps = {}) {
       });
     }
     return hints;
+  }
+
+  function extractBodyImageLabels(text) {
+    const labels = [];
+    const seen = new Set();
+    for (const match of String(text || '').matchAll(/\[image:\s*([^\]]+)\]/gi)) {
+      const label = normalizeString(match[1]);
+      const key = normalizeImageLabel(label);
+      if (!label || !key || seen.has(key)) continue;
+      seen.add(key);
+      labels.push(label);
+    }
+    return labels.slice(0, 8);
   }
 
   function attachmentContentBase64(attachment) {
@@ -451,12 +480,91 @@ function createMailboxService(deps = {}) {
     return images.slice(0, 8);
   }
 
-  function toClientMessage(parsed, message, folder, account) {
+  function photoLabelMatches(left, right) {
+    const normalizedLeft = normalizeImageLabel(left);
+    const normalizedRight = normalizeImageLabel(right);
+    return Boolean(
+      normalizedLeft &&
+        normalizedRight &&
+        (normalizedLeft === normalizedRight ||
+          normalizedLeft.includes(normalizedRight) ||
+          normalizedRight.includes(normalizedLeft))
+    );
+  }
+
+  function photoDataUrlFromState(values, meta) {
+    const direct = normalizeString(meta && meta.websitePhoto);
+    if (parseImageDataUrl(direct)) return direct;
+    const photoKey = normalizeString(meta && meta.photoKey);
+    const chunkCount = Math.max(0, Math.min(100, Number(meta && meta.chunkCount) || 0));
+    if (!photoKey || !chunkCount) return '';
+    return Array.from({ length: chunkCount }, (_, index) => normalizeString(values && values[`${photoKey}_${index}`])).join('');
+  }
+
+  async function loadStoredImagesForLabels(labels) {
+    const requestedLabels = (Array.isArray(labels) ? labels : []).filter(Boolean);
+    if (!requestedLabels.length || typeof getUiStateValues !== 'function') return [];
+
+    try {
+      const state = await getUiStateValues(customerPhotoScope);
+      const values = state && state.values && typeof state.values === 'object' ? state.values : {};
+      const map = safeParseJsonObject(values[customerPhotoKey]);
+      const images = [];
+      const seen = new Set();
+      for (const [id, meta] of Object.entries(map)) {
+        const aliases = [
+          id,
+          meta && meta.id,
+          meta && meta.websitePhotoName,
+          fileBaseName(meta && meta.websitePhotoName),
+        ].filter(Boolean);
+        const matchingLabel = requestedLabels.find((label) => aliases.some((alias) => photoLabelMatches(alias, label)));
+        if (!matchingLabel) continue;
+        const parsed = parseImageDataUrl(photoDataUrlFromState(values, meta));
+        if (!parsed || parsed.buffer.length > MAX_INLINE_IMAGE_BYTES) continue;
+        const key = normalizeImageLabel(matchingLabel);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        images.push({
+          id: `stored-webdesign-${normalizeString(id) || images.length + 1}`,
+          cid: '',
+          alt: matchingLabel,
+          filename: normalizeString(meta && meta.websitePhotoName) || `${matchingLabel}.png`,
+          contentType: parsed.mimeType,
+          contentBase64: parsed.buffer.toString('base64'),
+          url: '',
+        });
+      }
+      return images.slice(0, 8);
+    } catch (error) {
+      logger.warn('[Mailbox][inline-images]', error && error.message ? error.message : error);
+      return [];
+    }
+  }
+
+  function mergeInlineImages(primaryImages, fallbackImages, text) {
+    const images = Array.isArray(primaryImages) ? primaryImages : [];
+    const fallbacks = Array.isArray(fallbackImages) ? fallbackImages : [];
+    if (!fallbacks.length) return images;
+    const labels = extractBodyImageLabels(text);
+    const used = new Set(images.map((image) => normalizeImageLabel(image.alt || image.filename || image.id)).filter(Boolean));
+    const matchedFallbacks = fallbacks.filter((image) => {
+      const key = normalizeImageLabel(image.alt || image.filename || image.id);
+      if (!key || used.has(key)) return false;
+      if (!labels.some((label) => photoLabelMatches(image.alt || image.filename || image.id, label))) return false;
+      used.add(key);
+      return true;
+    });
+    return [...images, ...matchedFallbacks].slice(0, 8);
+  }
+
+  function toClientMessage(parsed, message, folder, account, options = {}) {
     const date = parsed.date || message.internalDate || new Date();
     const html = normalizeString(parsed.html || '');
     const text = normalizeString(parsed.text || stripHtmlTags(html));
     const preview = truncateText(text.replace(/\s+/g, ' '), 140);
     const fromText = folder === 'sent' ? account.name || account.email : displayName(parsed.from?.value);
+    const inlineImages = mergeInlineImages(extractInlineImages(parsed), options.storedImages, text || preview);
     return {
       id: `${folder}:${message.uid}`,
       uid: message.uid,
@@ -468,7 +576,7 @@ function createMailboxService(deps = {}) {
       preview,
       body: text || preview,
       links: extractHtmlLinks(html),
-      inlineImages: extractInlineImages(parsed),
+      inlineImages,
       date: date.toISOString(),
       unread: !Array.from(message.flags || []).includes('\\Seen'),
       starred: Array.from(message.flags || []).includes('\\Flagged'),
@@ -500,11 +608,19 @@ function createMailboxService(deps = {}) {
         const allUids = await client.search(['ALL']);
         const uids = (Array.isArray(allUids) ? allUids : []).slice(-Math.max(1, Math.min(100, Number(limit) || 50))).reverse();
         if (!uids.length) return [];
-        const messages = [];
+        const records = [];
+        const imageLabels = [];
         for await (const message of client.fetch(uids, { uid: true, flags: true, internalDate: true, source: true })) {
           const parsed = await parseMailSource(message.source);
-          messages.push(toClientMessage(parsed, message, requestedFolder, account));
+          const html = normalizeString(parsed && parsed.html || '');
+          const text = normalizeString(parsed && parsed.text || stripHtmlTags(html));
+          extractBodyImageLabels(text).forEach((label) => imageLabels.push(label));
+          records.push({ message, parsed });
         }
+        const storedImages = await loadStoredImagesForLabels(imageLabels);
+        const messages = records.map((record) =>
+          toClientMessage(record.parsed, record.message, requestedFolder, account, { storedImages })
+        );
         const visibleMessages = requestedFolder === 'starred' || requestedFolder === 'important'
           ? messages.filter((item) => item.starred)
           : messages;
