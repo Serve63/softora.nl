@@ -6,7 +6,13 @@ const {
   publicListErrorMessage,
   resolveMailboxName,
 } = require('./mailbox-sent-copy');
-const { parseImageDataUrl, safeParseJsonObject } = require('./data-ops-serialization');
+const {
+  buildCustomerIdentityKey,
+  parseImageDataUrl,
+  readChunkedStateValue,
+  safeParseJsonArray,
+  safeParseJsonObject,
+} = require('./data-ops-serialization');
 
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
@@ -21,6 +27,8 @@ const MAILBOX_DISPLAY_NAMES = {
 };
 const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
+const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
+const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const FOLDER_ALIASES = {
@@ -210,16 +218,34 @@ function photoLabelMatches(left, right) {
   );
 }
 
-function photoDataUrlFromState(values, meta, normalizeString) {
-  const direct = normalizeString(meta && meta.websitePhoto);
+function cleanImageAlt(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i, '')
+    .trim();
+}
+
+function photoDataUrlFromState(values, meta, normalizeString, options = {}) {
+  const direct = normalizeString(
+    options.mockup
+      ? meta && (meta.websiteMockup || meta.mockup || meta.websiteMockupDataUrl || meta.mockupDataUrl)
+      : meta && (meta.websitePhoto || meta.photo || meta.websitePhotoDataUrl || meta.photoDataUrl)
+  );
   if (parseImageDataUrl(direct)) return direct;
-  const photoKey = normalizeString(meta && meta.photoKey);
-  const chunkCount = Math.max(0, Math.min(100, Number(meta && meta.chunkCount) || 0));
+  const photoKey = normalizeString(
+    options.mockup
+      ? meta && (meta.mockupPhotoKey || meta.websiteMockupKey)
+      : meta && meta.photoKey
+  );
+  const chunkCount = Math.max(
+    0,
+    Math.min(100, Number(options.mockup ? meta && (meta.mockupChunkCount || meta.websiteMockupChunkCount) : meta && meta.chunkCount) || 0)
+  );
   if (!photoKey || !chunkCount) return '';
   return Array.from({ length: chunkCount }, (_item, index) => normalizeString(values && values[`${photoKey}_${index}`])).join('');
 }
 
-function mergeMailboxBodyImages(primaryImages, fallbackImages, text) {
+function mergeMailboxBodyImages(primaryImages, fallbackImages, text, options = {}) {
   const images = Array.isArray(primaryImages) ? primaryImages : [];
   const fallbacks = Array.isArray(fallbackImages) ? fallbackImages : [];
   if (!fallbacks.length) return images;
@@ -228,7 +254,7 @@ function mergeMailboxBodyImages(primaryImages, fallbackImages, text) {
   const matchedFallbacks = fallbacks.filter((image) => {
     const key = normalizeImageLabel(image.alt || image.cid || image.dataUrl);
     if (!key || used.has(key)) return false;
-    if (!labels.some((label) => photoLabelMatches(image.alt || image.cid || image.dataUrl, label))) return false;
+    if (!options.allowUnmatchedFallbacks && !labels.some((label) => photoLabelMatches(image.alt || image.cid || image.dataUrl, label))) return false;
     used.add(key);
     return true;
   });
@@ -335,6 +361,8 @@ function createMailboxService(deps = {}) {
     getUiStateValues = async () => null,
     customerPhotoScope = DEFAULT_CUSTOMER_PHOTO_SCOPE,
     customerPhotoKey = DEFAULT_CUSTOMER_PHOTO_KEY,
+    customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
+    customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     createTransport = (config) => nodemailer.createTransport(config),
@@ -628,47 +656,287 @@ function createMailboxService(deps = {}) {
     return normalizeString(first?.name || first?.address || '') || 'Onbekend';
   }
 
-  async function loadStoredImagesForLabels(labels) {
-    const requestedLabels = (Array.isArray(labels) ? labels : []).filter(Boolean);
-    if (!requestedLabels.length || typeof getUiStateValues !== 'function') return [];
+  function normalizeDomain(value) {
+    const raw = normalizeString(value)
+      .replace(/^<|>$/g, '')
+      .replace(/^\(|\)$/g, '')
+      .replace(/[.,;:!?]+$/g, '');
+    if (!raw) return '';
+    const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+      return normalizeString(new URL(candidate).hostname).replace(/^www\./i, '').toLowerCase();
+    } catch (_) {
+      return raw
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .replace(/\/.*$/g, '')
+        .replace(/[^\w.-]+/g, '')
+        .toLowerCase();
+    }
+  }
+
+  function getCustomerDomain(row = {}) {
+    return normalizeDomain(row.dom || row.domain || row.website || row.websiteUrl || row.website_url || row.url || row.site || row.domein);
+  }
+
+  function getCustomerEmail(row = {}) {
+    return normalizeEmail(row.email || row.contactEmail || row.mail || row.emailadres || row.emailAddress);
+  }
+
+  function getCustomerId(row = {}, index = 0) {
+    return normalizeString(row.id || row.customerId || row.databaseId || row.key || row.uuid || `customer-${index}`);
+  }
+
+  function parseCustomerRows(values = {}) {
+    return safeParseJsonArray(readChunkedStateValue(values, customerDbKey))
+      .map((entry) => (entry && entry.row && typeof entry.row === 'object' ? entry.row : entry))
+      .filter((row) => row && typeof row === 'object');
+  }
+
+  function extractMailDomains(parsed, text) {
+    const source = `${normalizeString(parsed && parsed.subject)}\n${text}\n${sanitizeMailboxDisplayText(parsed && parsed.html || '')}`;
+    const preferred = [];
+    const add = (value) => {
+      const domain = normalizeDomain(value);
+      if (domain && domain.includes('.') && !preferred.includes(domain)) preferred.push(domain);
+    };
+    for (const match of source.matchAll(/(?:website|site|domein)\s*(?:\(|:)?\s*(https?:\/\/)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)/gi)) {
+      add(`${match[1] || ''}${match[2] || ''}`);
+    }
+    for (const match of source.matchAll(/\b(?:https?:\/\/)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)\b/gi)) {
+      add(match[1]);
+    }
+    return preferred.slice(0, 8);
+  }
+
+  function looksLikeWebdesignOutreach(parsed, text) {
+    const haystack = `${normalizeString(parsed && parsed.subject)}\n${text}\n${sanitizeMailboxDisplayText(parsed && parsed.html || '')}`.toLowerCase();
+    return /\bnieuw(?:e)?\s+webdesign\b/.test(haystack) || (
+      /\bwebdesign\b/.test(haystack) &&
+      /(?:gemaakt|geen webdesign willen ontvangen|\/afmelden\?t=)/.test(haystack)
+    );
+  }
+
+  function getParsedAddressEmails(address) {
+    const list = Array.isArray(address && address.value) ? address.value : Array.isArray(address) ? address : [];
+    return list.map((item) => normalizeEmail(item && (item.address || item.name))).filter(isValidEmail);
+  }
+
+  function findCustomerRowsForMail(parsed, text, rows) {
+    const toEmails = new Set(getParsedAddressEmails(parsed && parsed.to));
+    const domains = new Set(extractMailDomains(parsed, text));
+    const matches = [];
+    (Array.isArray(rows) ? rows : []).forEach((row, index) => {
+      const email = getCustomerEmail(row);
+      const domain = getCustomerDomain(row);
+      if ((email && toEmails.has(email)) || (domain && domains.has(domain))) {
+        matches.push({ row, index });
+      }
+    });
+    return matches.slice(0, 2);
+  }
+
+  function getPhotoMetaForRow(row, index, photoMap, photoByIdentity) {
+    const id = getCustomerId(row, index);
+    const identity = buildCustomerIdentityKey(row).toLowerCase();
+    const stored = (id && photoMap[id]) || (identity && photoByIdentity.get(identity)) || null;
+    const rowMeta = row && typeof row === 'object' ? row : {};
+    return {
+      ...(stored && typeof stored === 'object' ? stored : {}),
+      ...rowMeta,
+      id: normalizeString((stored && stored.id) || rowMeta.id || id),
+      identityKey: normalizeString((stored && stored.identityKey) || buildCustomerIdentityKey(rowMeta)),
+    };
+  }
+
+  function buildPhotoByIdentity(photoMap) {
+    const byIdentity = new Map();
+    Object.values(photoMap || {}).forEach((meta) => {
+      const identity = normalizeString(meta && meta.identityKey).toLowerCase();
+      if (identity && !byIdentity.has(identity)) byIdentity.set(identity, meta);
+    });
+    return byIdentity;
+  }
+
+  function getPhotoSource(meta, options = {}) {
+    if (!meta || typeof meta !== 'object') return '';
+    return normalizeString(
+      options.mockup
+        ? meta.websiteMockup ||
+            meta.websiteMockupUrl ||
+            meta.mockup ||
+            meta.mockupUrl ||
+            meta.signedMockupUrl ||
+            (meta.mockupStorage && meta.mockupStorage.signedUrl)
+        : meta.websitePhoto ||
+            meta.websitePhotoUrl ||
+            meta.photo ||
+            meta.photoDataUrl ||
+            meta.signedUrl ||
+            meta.publicUrl ||
+            (meta.storage && meta.storage.signedUrl)
+    );
+  }
+
+  async function remoteImageDataUrl(source) {
+    const url = safeUrl(source);
+    if (!url || url.protocol !== 'https:' || typeof fetch !== 'function') return '';
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 9000) : null;
+    if (timer && typeof timer.unref === 'function') timer.unref();
+    try {
+      const response = await fetch(url.href, { signal: controller ? controller.signal : undefined });
+      if (!response || !response.ok) return '';
+      const contentType = normalizeString(response.headers && response.headers.get('content-type'))
+        .split(';')[0]
+        .toLowerCase();
+      if (!INLINE_DISPLAY_IMAGE_TYPES.test(contentType)) return '';
+      const contentLength = Number(response.headers && response.headers.get('content-length')) || 0;
+      if (contentLength > MAX_STORED_BODY_IMAGE_BYTES) return '';
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (!buffer.length || buffer.length > MAX_STORED_BODY_IMAGE_BYTES) return '';
+      return `data:${contentType};base64,${buffer.toString('base64')}`;
+    } catch (_) {
+      return '';
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  async function imageDataUrlFromPhotoMeta(values, meta, options = {}) {
+    const storedDataUrl = photoDataUrlFromState(values, meta, normalizeString, options);
+    if (parseImageDataUrl(storedDataUrl)) return storedDataUrl;
+    const directSource = getPhotoSource(meta, options);
+    if (parseImageDataUrl(directSource)) return directSource;
+    return remoteImageDataUrl(directSource);
+  }
+
+  async function imageFromPhotoMeta(values, meta, alt, options = {}) {
+    const dataUrl = await imageDataUrlFromPhotoMeta(values, meta, options);
+    const parsedImage = parseImageDataUrl(dataUrl);
+    if (!parsedImage || parsedImage.buffer.length > MAX_STORED_BODY_IMAGE_BYTES) return null;
+    return {
+      cid: '',
+      alt: cleanImageAlt(alt) || (options.mockup ? 'Device mockup' : 'Webdesign'),
+      contentType: parsedImage.mimeType,
+      dataUrl: parsedImage.dataUrl,
+    };
+  }
+
+  async function imagesFromPhotoMeta(values, meta, fallbackAlt) {
+    if (!meta || typeof meta !== 'object') return [];
+    const images = [];
+    const mainImage = await imageFromPhotoMeta(
+      values,
+      meta,
+      normalizeString(meta.websitePhotoName || meta.fileName || fallbackAlt || 'Webdesign')
+    );
+    if (mainImage) images.push(mainImage);
+    const mockupImage = await imageFromPhotoMeta(
+      values,
+      meta,
+      normalizeString(meta.websiteMockupName || meta.mockupFileName || 'Device mockup'),
+      { mockup: true }
+    );
+    if (mockupImage) images.push(mockupImage);
+    return images;
+  }
+
+  function directPhotoMetaMatchesMail(id, meta, parsed, text) {
+    if (!looksLikeWebdesignOutreach(parsed, text)) return false;
+    const haystack = normalizeImageLabel(`${normalizeString(parsed && parsed.subject)} ${text}`);
+    if (!haystack) return false;
+    const generic = new Set(['webdesign', 'website', 'mockup', 'device', 'foto', 'image', 'nieuw', 'nieuwe']);
+    const aliases = [id, meta && meta.id, meta && meta.websitePhotoName, meta && meta.fileName]
+      .map(normalizeImageLabel)
+      .filter(Boolean);
+    return aliases.some((alias) => {
+      if (alias.length >= 5 && haystack.includes(alias)) return true;
+      return alias.split(/\s+/).some((part) => part.length >= 5 && !generic.has(part) && haystack.includes(part));
+    });
+  }
+
+  async function loadStoredImagesForRecords(records) {
+    const candidates = (Array.isArray(records) ? records : []).filter((record) => {
+      if (!record || !record.key) return false;
+      if (Array.isArray(record.primaryBodyImages) && record.primaryBodyImages.length) return false;
+      const labels = extractBodyImageLabels(record.text);
+      return labels.length || looksLikeWebdesignOutreach(record.parsed, record.text);
+    });
+    if (!candidates.length || typeof getUiStateValues !== 'function') return new Map();
 
     try {
-      const state = await getUiStateValues(customerPhotoScope);
-      const values = state && state.values && typeof state.values === 'object' ? state.values : {};
-      const map = safeParseJsonObject(values[customerPhotoKey]);
-      const images = [];
-      const seen = new Set();
-      for (const [id, meta] of Object.entries(map)) {
-        const aliases = [
-          id,
-          meta && meta.id,
-          meta && meta.websitePhotoName,
-        ].filter(Boolean);
-        const matchingLabel = requestedLabels.find((label) => aliases.some((alias) => photoLabelMatches(alias, label)));
-        if (!matchingLabel) continue;
-        const parsedImage = parseImageDataUrl(photoDataUrlFromState(values, meta, normalizeString));
-        if (!parsedImage || parsedImage.buffer.length > MAX_STORED_BODY_IMAGE_BYTES) continue;
-        const key = normalizeImageLabel(matchingLabel);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        images.push({
-          cid: '',
-          alt: matchingLabel,
-          contentType: parsedImage.mimeType,
-          dataUrl: parsedImage.dataUrl,
-        });
+      const [photoState, customerState] = await Promise.all([
+        getUiStateValues(customerPhotoScope),
+        candidates.some((record) => !extractBodyImageLabels(record.text).length && looksLikeWebdesignOutreach(record.parsed, record.text))
+          ? getUiStateValues(customerDbScope)
+          : Promise.resolve(null),
+      ]);
+      const photoValues = photoState && photoState.values && typeof photoState.values === 'object' ? photoState.values : {};
+      const customerValues = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
+      const photoMap = safeParseJsonObject(photoValues[customerPhotoKey]);
+      const photoByIdentity = buildPhotoByIdentity(photoMap);
+      const customerRows = parseCustomerRows(customerValues);
+      const result = new Map();
+
+      for (const record of candidates) {
+        const images = [];
+        const seen = new Set();
+        const addImages = (items) => {
+          (Array.isArray(items) ? items : []).forEach((image) => {
+            const key = normalizeImageLabel(image && (image.alt || image.dataUrl));
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            images.push(image);
+          });
+        };
+
+        const labels = extractBodyImageLabels(record.text);
+        for (const label of labels) {
+          for (const [id, meta] of Object.entries(photoMap)) {
+            const aliases = [id, meta && meta.id, meta && meta.websitePhotoName, meta && meta.fileName].filter(Boolean);
+            if (!aliases.some((alias) => photoLabelMatches(alias, label))) continue;
+            addImages(await imagesFromPhotoMeta(photoValues, meta, label));
+          }
+        }
+
+        if (!images.length && looksLikeWebdesignOutreach(record.parsed, record.text)) {
+          const matches = findCustomerRowsForMail(record.parsed, record.text, customerRows);
+          for (const { row, index } of matches) {
+            addImages(await imagesFromPhotoMeta(
+              photoValues,
+              getPhotoMetaForRow(row, index, photoMap, photoByIdentity),
+              `${getCustomerDomain(row) || 'Webdesign'} webdesign`
+            ));
+          }
+        }
+
+        if (!images.length && looksLikeWebdesignOutreach(record.parsed, record.text)) {
+          for (const [id, meta] of Object.entries(photoMap)) {
+            if (!directPhotoMetaMatchesMail(id, meta, record.parsed, record.text)) continue;
+            addImages(await imagesFromPhotoMeta(photoValues, meta, meta && meta.websitePhotoName));
+            if (images.length) break;
+          }
+        }
+
+        if (images.length) {
+          result.set(record.key, images.slice(0, 8));
+        }
       }
-      return images.slice(0, 8);
+      return result;
     } catch (error) {
       logger.warn('[Mailbox][body-images]', error && error.message ? error.message : error);
-      return [];
+      return new Map();
     }
   }
 
   function toClientMessage(parsed, message, folder, account, options = {}) {
     const date = parsed.date || message.internalDate || new Date();
-    const text = sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
-    const bodyImages = mergeMailboxBodyImages(buildMailboxBodyImages(parsed), options.storedImages, text);
+    const text = options.text || sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
+    const primaryBodyImages = Array.isArray(options.primaryBodyImages) ? options.primaryBodyImages : buildMailboxBodyImages(parsed);
+    const bodyImages = mergeMailboxBodyImages(primaryBodyImages, options.storedImages, text, {
+      allowUnmatchedFallbacks: true,
+    });
     const preview = truncateText(text.replace(/^\s*\[image:[^\]]+\]\s*$/gim, '').replace(/\s+/g, ' '), 140);
     const fromText = folder === 'sent' ? account.name || account.email : displayName(parsed.from?.value);
     return {
@@ -718,16 +986,25 @@ function createMailboxService(deps = {}) {
         const uids = (Array.isArray(allUids) ? allUids : []).slice(-Math.max(1, Math.min(100, Number(limit) || 50))).reverse();
         if (!uids.length) return [];
         const records = [];
-        const imageLabels = [];
         for await (const message of client.fetch(uids, { uid: true, flags: true, internalDate: true, source: true })) {
           const parsed = await parseMailSource(message.source);
           const text = sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
-          extractBodyImageLabels(text).forEach((label) => imageLabels.push(label));
-          records.push({ message, parsed });
+          const primaryBodyImages = buildMailboxBodyImages(parsed);
+          records.push({
+            key: `${folder}:${message.uid}`,
+            message,
+            parsed,
+            text,
+            primaryBodyImages,
+          });
         }
-        const storedImages = await loadStoredImagesForLabels(imageLabels);
+        const storedImagesByKey = await loadStoredImagesForRecords(records);
         const messages = records.map((record) =>
-          toClientMessage(record.parsed, record.message, folder, account, { storedImages })
+          toClientMessage(record.parsed, record.message, folder, account, {
+            text: record.text,
+            primaryBodyImages: record.primaryBodyImages,
+            storedImages: storedImagesByKey.get(record.key) || [],
+          })
         );
         return messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       } finally {
