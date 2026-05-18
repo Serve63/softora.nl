@@ -242,6 +242,29 @@ function renderMailboxTextLine(line) {
   return escapeHtml(value);
 }
 
+function normalizeMailboxImageLabel(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\.[a-z0-9]{2,5}$/gi, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function isMailboxMockupImageLabel(value) {
+  return /\b(?:device|mockup|laptop|ipad|iphone|tablet|mobiel)\b/i.test(String(value || ''));
+}
+
+function isMailboxWebdesignImageLabel(value) {
+  return /\b(?:webdesign|website|site|foto|screenshot)\b/i.test(String(value || ''));
+}
+
+function sectionHasMailboxImagePlaceholder(section) {
+  return Boolean(section && Array.isArray(section.lines) && section.lines.some((line) => /^\s*\[image:\s*[^\]]+\]\s*$/i.test(String(line || ''))));
+}
+
 function buildMailboxBodySections(value) {
   const text = cleanMailboxText(value);
   if (!text) {
@@ -345,23 +368,33 @@ function renderMailboxParagraphs(lines, options) {
   }
 
   function findImageByAlt(alt) {
-    const normalizedAlt = String(alt || '').trim().toLowerCase();
+    const rawAlt = String(alt || '').trim();
+    const normalizedAlt = normalizeMailboxImageLabel(rawAlt);
     if (!normalizedAlt) return null;
-    return images.find((image, index) => {
-      if (usedImages.has(index)) return false;
-      return String(image && image.alt || '').trim().toLowerCase() === normalizedAlt;
-    }) || null;
+    const candidates = images
+      .map((image, index) => ({ image, index, label: normalizeMailboxImageLabel(image && image.alt) }))
+      .filter((entry) => entry.label && !usedImages.has(entry.index));
+    return candidates.find((entry) => entry.label === normalizedAlt) ||
+      candidates.find((entry) => entry.label.includes(normalizedAlt) || normalizedAlt.includes(entry.label)) ||
+      (isMailboxMockupImageLabel(rawAlt) ? candidates.find((entry) => isMailboxMockupImageLabel(entry.image && entry.image.alt)) : null) ||
+      (isMailboxWebdesignImageLabel(rawAlt) ? candidates.find((entry) => !isMailboxMockupImageLabel(entry.image && entry.image.alt)) : null) ||
+      candidates[0] ||
+      null;
   }
 
   lines.forEach((line) => {
     const value = String(line || '');
     const cleaned = quoteBody ? stripMailboxQuotePrefix(value) : value.trimEnd();
     const imageAlt = cleaned.trim().match(/^\[image:\s*([^\]]+)\]$/i)?.[1] || '';
-    const image = findImageByAlt(imageAlt);
-    if (image) {
+    const imageEntry = findImageByAlt(imageAlt);
+    if (imageEntry) {
       flushParagraph();
-      usedImages.add(images.indexOf(image));
-      paragraphs.push(renderMailboxInlineImage(image));
+      usedImages.add(imageEntry.index);
+      paragraphs.push(renderMailboxInlineImage(imageEntry.image));
+      return;
+    }
+    if (imageAlt) {
+      flushParagraph();
       return;
     }
     if (!cleaned.trim()) {
@@ -437,10 +470,11 @@ function normalizeMailboxBodyImages(images) {
 function renderMailBody(value, images) {
   const imageState = { images: normalizeMailboxBodyImages(images), usedImages: new Set() };
   const sections = buildMailboxBodySections(value);
+  const hasImagePlaceholders = sections.some(sectionHasMailboxImagePlaceholder);
   const renderedSections = [];
   let injectedImages = false;
   sections.forEach((section) => {
-    if (!injectedImages && section && section.type === 'signature') {
+    if (!hasImagePlaceholders && !injectedImages && section && section.type === 'signature') {
       const imagesHtml = renderUnusedMailboxInlineImages(imageState);
       if (imagesHtml) renderedSections.push(imagesHtml);
       injectedImages = true;

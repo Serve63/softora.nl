@@ -30,7 +30,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260518c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260518d"><\/script>/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
@@ -131,11 +131,19 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /function renderMailboxInlineImage\(image\)/);
   assert.match(scriptSource, /function renderMailboxTextLine\(line\)/);
   assert.match(scriptSource, /function isMailboxSafeOptOutUrl\(value\)/);
+  assert.match(scriptSource, /function normalizeMailboxImageLabel\(value\)/);
+  assert.match(scriptSource, /function isMailboxMockupImageLabel\(value\)/);
+  assert.match(scriptSource, /function isMailboxWebdesignImageLabel\(value\)/);
+  assert.match(scriptSource, /function sectionHasMailboxImagePlaceholder\(section\)/);
   assert.match(scriptSource, /function renderUnusedMailboxInlineImages\(imageState\)/);
   assert.match(scriptSource, /function normalizeMailboxBodyImages\(images\)/);
   assert.match(scriptSource, /function renderMailboxBodySection\(section, imageState\)/);
   assert.match(scriptSource, /function renderMailBody\(value, images\)/);
   assert.match(scriptSource, /section\.type === 'signature'/);
+  assert.match(scriptSource, /const hasImagePlaceholders = sections\.some\(sectionHasMailboxImagePlaceholder\);/);
+  assert.match(scriptSource, /if \(!hasImagePlaceholders && !injectedImages && section && section\.type === 'signature'\)/);
+  assert.match(scriptSource, /usedImages\.add\(imageEntry\.index\);/);
+  assert.match(scriptSource, /if \(imageAlt\) \{[\s\S]*flushParagraph\(\);[\s\S]*return;/);
   assert.match(scriptSource, /detail-mail-section-images/);
   assert.match(scriptSource, /detail-mail-optout-link/);
   assert.match(scriptSource, /MAILBOX_WEBDESIGN_MOCKUP_CAPTION/);
