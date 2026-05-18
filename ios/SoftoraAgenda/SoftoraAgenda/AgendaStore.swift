@@ -91,6 +91,8 @@ final class AgendaStore {
                 .filter(\.isUpcoming)
                 .sorted { $0.sortKey < $1.sortKey }
         } catch {
+            guard !error.isSoftoraCancellation else { return }
+            guard !isRecoverableSupabaseHydrationIssue(error) else { return }
             alertMessage = error.localizedDescription
             if error.localizedDescription == "Niet ingelogd." {
                 isAuthenticated = false
@@ -126,6 +128,12 @@ final class AgendaStore {
             alertMessage = "Softora-login is nog niet volledig ingesteld op de server."
         }
     }
+
+    private func isRecoverableSupabaseHydrationIssue(_ error: Error) -> Bool {
+        let message = error.localizedDescription.lowercased()
+        return message.contains("gedeelde supabase-opslag") &&
+            (message.contains("niet veilig geladen") || message.contains("nog niet geladen"))
+    }
 }
 
 final class AgendaAccessStorage {
@@ -152,5 +160,19 @@ final class AgendaAccessStorage {
 
     func clear() {
         defaults.removeObject(forKey: plannerKey)
+    }
+}
+
+private extension Error {
+    var isSoftoraCancellation: Bool {
+        if self is CancellationError {
+            return true
+        }
+        if let urlError = self as? URLError, urlError.code == .cancelled {
+            return true
+        }
+
+        let nsError = self as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }
