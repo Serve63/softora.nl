@@ -65,6 +65,9 @@ test('server app runtime composition builders preserve feature wiring groups and
       ANTHROPIC_ADMIN_API_KEY: 'anthropic-admin-key',
       ANTHROPIC_COSTS_API_BASE_URL: 'https://api.anthropic-cost.test',
       OPENAI_COST_USD_TO_EUR: '0.91',
+      SUPABASE_MANAGEMENT_ACCESS_TOKEN: 'supabase-management-token',
+      SUPABASE_PROJECT_REF: 'softora-ref',
+      SUPABASE_MONTHLY_BASE_COST_EUR: '25',
     },
     envConfig: {
       ACTIVE_ORDER_AUTOMATION_ENABLED: true,
@@ -326,6 +329,9 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(context.featureRouteOptions.openAiCostSummary.openAiAdminApiKey, 'admin-key');
   assert.equal(context.featureRouteOptions.openAiCostSummary.openAiCostsApiBaseUrl, 'https://api.openai.test');
   assert.equal(context.featureRouteOptions.openAiCostSummary.usdToEurRate, 0.91);
+  assert.equal(context.featureRouteOptions.supabaseCostSummary.supabaseManagementAccessToken, 'supabase-management-token');
+  assert.equal(context.featureRouteOptions.supabaseCostSummary.supabaseProjectRef, 'softora-ref');
+  assert.equal(context.featureRouteOptions.supabaseCostSummary.supabaseMonthlyBaseCostEur, 25);
   assert.equal(context.featureRouteOptions.coldmailing.coldmailCampaignService.isSmtpMailConfigured(), true);
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
     'info@softora.test',

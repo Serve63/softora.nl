@@ -58,7 +58,7 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
     /<div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">/
   );
   assert.match(pageSource, /<div class="monthly-costs-stage" id="monthly-costs-stage">/);
-  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260516a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260518b"><\/script>/);
   assert.doesNotMatch(pageSource, /let data = \{/);
   assert.match(
     combinedSource,
@@ -111,8 +111,8 @@ test('premium terugkerende kosten toont dynamische posten bovenaan met paarse st
   assert.doesNotMatch(pageSource, /naam:'TransIP backup'/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsData = data;/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsRender = render;/);
-  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260516a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260501b" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260518b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260518a" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(combinedSource, /function createCategoryHeader\(cat, catTotal\) \{/);
   assert.match(combinedSource, /appendCostTextElement\(header, 'div', 'category-title', cat\);/);
@@ -154,6 +154,7 @@ test('premium terugkerende kosten bewaart bewerkbare posten via supabase ui-stat
   assert.match(combinedSource, /const refreshTasks = \[\];/);
   assert.match(combinedSource, /refreshTasks\.push\(window\.refreshMonthlyColdcallingCosts\(\)\);/);
   assert.match(combinedSource, /refreshTasks\.push\(window\.refreshMonthlyApiCosts\(\)\);/);
+  assert.match(combinedSource, /refreshTasks\.push\(window\.refreshMonthlySupabaseCosts\(\)\);/);
   assert.match(combinedSource, /void Promise\.allSettled\(refreshTasks\)\.then/);
   assert.match(combinedSource, /const parsedEntries = JSON\.parse\(serializedEntries\);/);
   assert.match(combinedSource, /setMonthlyCostsStageBooting\(true\);/);
@@ -204,34 +205,51 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
 
   assert.match(scriptSource, /const COST_SUMMARY_ENDPOINT = '\/api\/coldcalling\/cost-summary\?scope=month';/);
-  assert.match(scriptSource, /const API_COST_SUMMARY_ENDPOINT = '\/api\/openai-costs';/);
+  assert.match(scriptSource, /const API_COST_SUMMARY_ENDPOINT = '\/api\/openai\/cost-summary\?scope=month';/);
+  assert.match(scriptSource, /const SUPABASE_COST_SUMMARY_ENDPOINT = '\/api\/supabase\/cost-summary';/);
+  assert.match(scriptSource, /const BILLING_POLL_INTERVAL_MS = 5 \* 60 \* 1000;/);
   assert.match(scriptSource, /async function fetchMonthlyCostSummary\(\)/);
   assert.match(scriptSource, /async function fetchApiCostSummary\(\)/);
+  assert.match(scriptSource, /async function fetchSupabaseCostSummary\(\)/);
   assert.match(scriptSource, /function applyColdcallingCost\(amountEur, note\)/);
   assert.match(scriptSource, /function buildColdcallingCostNote\(summary\)/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'coldcalling'/);
   assert.match(scriptSource, /const summary = await fetchMonthlyCostSummary\(\);/);
   assert.match(scriptSource, /const amountEur = Number\(summary\.costEur \|\| 0\) \|\| 0;/);
   assert.match(scriptSource, /window\.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;/);
-  assert.match(scriptSource, /const API_COST_NOTE = 'Status: succesvol';/);
+  assert.match(scriptSource, /const API_COST_NOTE = 'OpenAI API kosten deze maand live';/);
   assert.match(scriptSource, /const API_COST_UNAVAILABLE_NOTE = 'OpenAI kosten konden niet worden opgehaald';/);
+  assert.match(scriptSource, /const SUPABASE_COST_NOTE = 'Supabase kosten live bijgewerkt';/);
   assert.match(scriptSource, /function applyApiCostSnapshot\(snapshot\)/);
   assert.match(scriptSource, /function applyApiCostUnavailable\(error\)/);
+  assert.match(scriptSource, /function applySupabaseCostSnapshot\(payload\)/);
+  assert.match(scriptSource, /function applySupabaseCostUnavailable\(error\)/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'api kosten'/);
+  assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'supabase'/);
   assert.doesNotMatch(scriptSource, /softora_api_cost_events_v1/);
   assert.doesNotMatch(scriptSource, /premium_api_costs/);
   assert.doesNotMatch(scriptSource, /function applyApiCost\(amountEur, note\)/);
   assert.doesNotMatch(scriptSource, /function buildApiCostNote\(summary\)/);
   assert.doesNotMatch(scriptSource, /OpenAI factuur:/);
   assert.match(scriptSource, /const summary = await fetchApiCostSummary\(\);/);
-  assert.match(scriptSource, /return \{ ok: true, updated: applyApiCostSnapshot\(summary\), amount, currency: summary\.currency, source: 'openai-costs' \};/);
+  assert.match(scriptSource, /const normalized = normalizeOpenAiCostPayload\(summary\);/);
   assert.match(scriptSource, /applyApiCostUnavailable\(error\);/);
+  assert.match(scriptSource, /const summary = await fetchSupabaseCostSummary\(\);/);
+  assert.match(scriptSource, /applySupabaseCostUnavailable\(error\);/);
   assert.match(scriptSource, /window\.refreshMonthlyApiCosts = refreshMonthlyApiCosts;/);
+  assert.match(scriptSource, /window\.refreshMonthlySupabaseCosts = refreshMonthlySupabaseCosts;/);
   assert.match(scriptSource, /let coldcallingRefreshPromise = null;/);
   assert.match(scriptSource, /let apiCostRefreshPromise = null;/);
+  assert.match(scriptSource, /let supabaseCostRefreshPromise = null;/);
+  assert.match(scriptSource, /let billingPollTimer = null;/);
   assert.match(scriptSource, /const hasApiCostItem = Boolean\(resolveApiCostItem\(\)\);/);
+  assert.match(scriptSource, /const hasSupabaseCostItem = Boolean\(resolveSupabaseCostItem\(\)\);/);
   assert.match(
     scriptSource,
-    /window\.setInterval\(function \(\) \{\s*void refreshMonthlyColdcallingCosts\(\);\s*void refreshMonthlyApiCosts\(\);\s*\}, POLL_INTERVAL_MS\);/
+    /pollTimer = window\.setInterval\(function \(\) \{\s*void refreshMonthlyColdcallingCosts\(\);\s*\}, POLL_INTERVAL_MS\);/
+  );
+  assert.match(
+    scriptSource,
+    /billingPollTimer = window\.setInterval\(function \(\) \{\s*void refreshMonthlyApiCosts\(\);\s*void refreshMonthlySupabaseCosts\(\);\s*\}, BILLING_POLL_INTERVAL_MS\);/
   );
 });
