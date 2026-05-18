@@ -246,7 +246,7 @@ test('premium mailbox behoudt eigen layout en vaste sidebar bij responsive mailw
   assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260516a"><\/script>/);
 });
 
-test('premium flynow gebruikt de dynamische canonical sidebar-host', () => {
+test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {
   const pageSource = readRepoFile('premium-flynow.html');
   const flynowCssSource = readRepoFile('assets/flynow.css');
 
@@ -256,8 +256,8 @@ test('premium flynow gebruikt de dynamische canonical sidebar-host', () => {
   );
   assert.match(
     pageSource,
-    /<aside class="sidebar" aria-label="Premium navigatie"><\/aside>/,
-    'FLYNOW hoort de gedeelde premium-sidebar dynamisch te laten vullen'
+    /<aside class="sidebar" data-flynow-sidebar-host="1" aria-label="Premium navigatie"><\/aside>/,
+    'FLYNOW hoort leeg te starten en daarna de gedeelde premium-sidebar dynamisch te laten vullen'
   );
   assert.match(pageSource, /<main class="main-content flynow-main">/);
   assert.match(pageSource, /href="\/assets\/personnel-theme\.css\?v=20260513a"/);
@@ -273,11 +273,15 @@ test('premium flynow gebruikt de dynamische canonical sidebar-host', () => {
   );
   assert.match(
     flynowCssSource,
+    /body\[data-flynow-page\] \.sidebar\s*\{[\s\S]*box-sizing:\s*border-box !important/
+  );
+  assert.match(
+    flynowCssSource,
     /@media \(min-width:\s*901px\)\s*\{[\s\S]*body\[data-flynow-page\]\s+\.dashboard-layout\[data-sidebar-shell="canonical"\]\s*>\s*main\.flynow-main\s*\{[\s\S]*margin-left:\s*var\(--premium-sidebar-width,\s*320px\) !important/
   );
-  assert.doesNotMatch(
+  assert.match(
     flynowCssSource,
-    /body\[data-flynow-page\]\s+\.sidebar\s*\{[^}]*height:\s*100vh !important/
+    /@media \(min-width:\s*901px\)\s*\{[\s\S]*body\[data-flynow-page\] \.sidebar\s*\{[\s\S]*height:\s*100vh !important/
   );
   assert.match(
     flynowCssSource,

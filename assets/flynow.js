@@ -447,6 +447,29 @@
     return document.getElementById(id);
   }
 
+  function lockFlyNowSidebarShell() {
+    var sidebar = document.querySelector(".flynow-layout > .sidebar[data-flynow-sidebar-host='1']");
+    if (!sidebar || !sidebar.children.length) return false;
+    sidebar.setAttribute("data-static-sidebar", "1");
+    sidebar.setAttribute("data-sidebar-ready", "true");
+    sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
+    sidebar.style.transform = "";
+    sidebar.style.translate = "";
+    sidebar.style.willChange = "";
+    return true;
+  }
+
+  function initFlyNowSidebarShell() {
+    if (lockFlyNowSidebarShell()) return;
+    var sidebar = document.querySelector(".flynow-layout > .sidebar[data-flynow-sidebar-host='1']");
+    if (!sidebar || typeof MutationObserver === "undefined") return;
+    var observer = new MutationObserver(function () {
+      if (!lockFlyNowSidebarShell()) return;
+      observer.disconnect();
+    });
+    observer.observe(sidebar, { childList: true });
+  }
+
   function setActiveDealPanel(mode) {
     var selectedMode = mode === "snow" ? "snow" : "zon";
     document.body.setAttribute("data-flynow-type", selectedMode);
@@ -514,6 +537,7 @@
     });
   }
 
+  initFlyNowSidebarShell();
   bindTabs();
   bindFilters();
   bindDealActions();
