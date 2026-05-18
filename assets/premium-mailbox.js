@@ -128,6 +128,8 @@ const MAILBOX_TRACKING_HOST_PATTERNS = [
   /(^|\.)postmarkapp\.com$/i,
 ];
 const MAILBOX_IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
+const MAILBOX_COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
+const MAILBOX_WEBDESIGN_MOCKUP_CAPTION = 'Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop👇';
 const MAILBOX_REPLY_HEADER_PATTERNS = [
   /^op .+\bschreef\b[:\s]*$/i,
   /^on .+\bwrote\b[:\s]*$/i,
@@ -218,6 +220,26 @@ function isMailboxSignatureStartLine(line) {
 
 function stripMailboxQuotePrefix(line) {
   return String(line || '').replace(/^\s*(?:>\s*)+/, '').trimEnd();
+}
+
+function isMailboxSafeOptOutUrl(value) {
+  const parsed = parseMailboxUrl(value);
+  if (!parsed) return false;
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  return host === 'softora.nl' && parsed.pathname.replace(/\/+$/, '') === '/afmelden';
+}
+
+function renderMailboxTextLine(line) {
+  const value = String(line || '');
+  const trimmed = value.trim();
+  if (trimmed === MAILBOX_WEBDESIGN_MOCKUP_CAPTION) {
+    return `<span class="detail-mail-image-caption">${escapeHtml(trimmed)}</span>`;
+  }
+  const optOutMatch = trimmed.match(/^(Geen webdesign willen ontvangen\? Laat het me weten!):?\s+(https?:\/\/\S+)$/i);
+  if (optOutMatch && isMailboxSafeOptOutUrl(optOutMatch[2])) {
+    return `<a class="detail-mail-optout-link" href="${escapeHtml(optOutMatch[2])}" target="_blank" rel="noopener noreferrer">${escapeHtml(MAILBOX_COLDMAIL_OPT_OUT_LABEL)}</a>`;
+  }
+  return escapeHtml(value);
 }
 
 function buildMailboxBodySections(value) {
@@ -318,7 +340,7 @@ function renderMailboxParagraphs(lines, options) {
 
   function flushParagraph() {
     if (!currentLines.length) return;
-    paragraphs.push(`<p>${currentLines.map((line) => escapeHtml(line)).join('<br>')}</p>`);
+    paragraphs.push(`<p>${currentLines.map((line) => renderMailboxTextLine(line)).join('<br>')}</p>`);
     currentLines = [];
   }
 

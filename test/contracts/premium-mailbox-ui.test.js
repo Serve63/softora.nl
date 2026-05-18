@@ -30,7 +30,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260518b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260518c"><\/script>/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
@@ -129,12 +129,16 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /function isMailboxReplyHeaderLine\(line\)/);
   assert.match(scriptSource, /function buildMailboxBodySections\(value\)/);
   assert.match(scriptSource, /function renderMailboxInlineImage\(image\)/);
+  assert.match(scriptSource, /function renderMailboxTextLine\(line\)/);
+  assert.match(scriptSource, /function isMailboxSafeOptOutUrl\(value\)/);
   assert.match(scriptSource, /function renderUnusedMailboxInlineImages\(imageState\)/);
   assert.match(scriptSource, /function normalizeMailboxBodyImages\(images\)/);
   assert.match(scriptSource, /function renderMailboxBodySection\(section, imageState\)/);
   assert.match(scriptSource, /function renderMailBody\(value, images\)/);
   assert.match(scriptSource, /section\.type === 'signature'/);
   assert.match(scriptSource, /detail-mail-section-images/);
+  assert.match(scriptSource, /detail-mail-optout-link/);
+  assert.match(scriptSource, /MAILBOX_WEBDESIGN_MOCKUP_CAPTION/);
   assert.match(scriptSource, /sendgrid\\\.net/);
   assert.match(scriptSource, /cdn\.openai\.com/);
   assert.match(scriptSource, /Eerdere mail/);
@@ -155,6 +159,8 @@ test('premium mailbox voorkomt horizontale overflow door brede e-mails', () => {
   assert.match(pageSource, /\.mail-detail \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
   assert.match(pageSource, /\.detail-body \{[\s\S]*overflow-x:\s*hidden;/);
   assert.match(pageSource, /\.detail-body-text \{[\s\S]*overflow-wrap:\s*anywhere;[\s\S]*word-break:\s*break-word;[\s\S]*display:\s*flex;/);
+  assert.match(pageSource, /\.detail-mail-optout-link \{[\s\S]*text-decoration:\s*underline;/);
+  assert.match(pageSource, /\.detail-mail-image-caption \{[\s\S]*font-weight:\s*600;/);
   assert.match(pageSource, /\.detail-mail-section-quote \{[\s\S]*background:\s*#f8f4ef;[\s\S]*border-left:\s*3px solid rgba\(155,35,85,.24\);/);
   assert.match(pageSource, /\.detail-mail-section-signature \{[\s\S]*border-top:\s*1px dashed var\(--border\);/);
 });
