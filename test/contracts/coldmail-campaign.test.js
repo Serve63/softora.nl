@@ -694,6 +694,92 @@ test('coldmail campaign preview only lists webdesign recipients with a generated
   assert.match(result.failedItems[0].error, /Nog geen website-design klaar voor Zonder Design/);
 });
 
+test('coldmail campaign does not treat stale row-index photos as ready webdesign', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        bedrijf: 'Autobedrijf Den Breejen Almkerk B.V.',
+        email: 'info@denbreejen.com',
+        telefoon: '+31 18 340 25 21',
+        status: 'benaderbaar',
+        mail: true,
+      },
+      {
+        bedrijf: 'Slijterij & Tapverzorging Van Sundert v.o.f.',
+        email: 'info@slijterijvansundert.nl',
+        telefoon: '016 149 13 19',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'legacy-den-breejen': {
+        id: 'legacy-den-breejen',
+        identityKey:
+          'autobedrijf den breejen almkerk b.v.|autobedrijf den breejen almkerk b.v.|+31 18 340 25 21',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Autobedrijf Den Breejen webdesign',
+      },
+      'row-1': {
+        id: 'row-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Oude rijpositie webdesign',
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.selected, 1);
+  assert.deepEqual(
+    result.recipients.map((recipient) => recipient.bedrijf),
+    ['Autobedrijf Den Breejen Almkerk B.V.']
+  );
+  assert.equal(result.failedItems.length, 1);
+  assert.equal(result.failedItems[0].bedrijf, 'Slijterij & Tapverzorging Van Sundert v.o.f.');
+  assert.match(result.failedItems[0].error, /Nog geen website-design klaar/i);
+});
+
+test('coldmail campaign send rejects legacy row-index chunks without a stable customer id', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        bedrijf: 'Slijterij & Tapverzorging Van Sundert v.o.f.',
+        email: 'info@slijterijvansundert.nl',
+        telefoon: '016 149 13 19',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+    photoValues: {
+      softora_database_photos_v1: '{}',
+      'softora_database_photo_data_v1_row-0_0': TINY_PNG_DATA_URL,
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Nieuw webdesign gemaakt',
+        body: 'Goedemiddag, ik heb een nieuw webdesign gemaakt.',
+        senderEmail: 'info@softora.nl',
+        specialAction: 'webdesign',
+      }),
+    (error) => {
+      assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
+      assert.match(error.message, /Nog geen website-design klaar/i);
+      assert.equal(error.failedItems[0].bedrijf, 'Slijterij & Tapverzorging Van Sundert v.o.f.');
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+});
+
 test('coldmail campaign uses chunked webdesign photo when websitePhoto is stale', async () => {
   const photoKey = 'photo-prospect-1';
   const { service, sentMessages } = createService({
