@@ -182,14 +182,21 @@ test('page smoke: premium-actieve-opdrachten.html shows openstaande leads as the
   const assignmentFilterScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-filter.js'), 'utf8');
   const assignmentPagesScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-pages.js'), 'utf8');
   const openLeadsScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-active-order-open-leads.js'), 'utf8');
-  const source = `${html}\n${assignmentFilterScript}\n${script}\n${openLeadsScript}\n${assignmentPagesScript}`;
+  const manualLeadsScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-active-order-manual-open-leads.js'), 'utf8');
+  const source = `${html}\n${assignmentFilterScript}\n${script}\n${openLeadsScript}\n${manualLeadsScript}\n${assignmentPagesScript}`;
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
   assert.match(html, /data-order-filter="open_leads"/, 'Openstaande leads-tab hoort zichtbaar te zijn.');
   assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260511a/, 'Persoonlijke toewijzingsstijl ontbreekt op opdrachten.');
   assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
   assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
-  assert.match(html, /assets\/premium-active-order-open-leads\.js\?v=20260516a/, 'Openstaande leads asset ontbreekt.');
+  assert.match(html, /assets\/premium-active-order-open-leads\.js\?v=20260518a/, 'Openstaande leads asset ontbreekt.');
+  assert.match(html, /assets\/premium-active-order-manual-open-leads\.js\?v=20260518a/, 'Handmatige openstaande leads asset ontbreekt.');
   assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260510a/, 'Opdrachten pagina-asset voor persoonlijke toewijzingen ontbreekt.');
+  assert.match(manualLeadsScript, /overlay\.id = 'createChoiceModal';/, 'Keuzemodal voor aanmaken ontbreekt.');
+  assert.match(manualLeadsScript, /form\.id = 'createOpenLeadForm';/, 'Handmatige openstaande-lead form ontbreekt.');
+  assert.match(html, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/, 'Aanmaken-knop hoort neutraal te zijn.');
+  const createButtonHtml = html.match(/<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?<\/button>/)?.[0] || '';
+  assert.doesNotMatch(createButtonHtml, /Actieve Opdracht Aanmaken/, 'Topknop mag niet meer alleen actieve opdracht noemen.');
   assert.match(html, />Openstaande leads<\/span>/, 'Primaire tab hoort Openstaande leads te tonen.');
   assert.doesNotMatch(source, /href = '\/premium-leads';/, 'Openstaande leads mag niet naar de leads-pagina linken.');
   assert.match(html, />Openstaande opdrachten<\/span>/, 'Primaire tab hoort Openstaande opdrachten te tonen.');
@@ -198,6 +205,8 @@ test('page smoke: premium-actieve-opdrachten.html shows openstaande leads as the
   assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./, 'Persoonlijke lege-state voor opdrachten ontbreekt.');
   assert.match(source, /let activeOrderFilter = 'open_leads';/, 'Standaardfilter hoort op openstaande leads te staan.');
   assert.match(source, /card\.dataset\.orderFilterGroup = 'open_leads';/, 'Openstaande lead-kaarten horen onder de open-leads filter te vallen.');
+  assert.match(manualLeadsScript, /softora_manual_open_leads_v1/, 'Handmatige openstaande leads moeten persistent zijn.');
+  assert.match(manualLeadsScript, /openCreateModal,/, 'Openstaande lead aanmaken moet vanaf de keuzeknop open kunnen.');
 });
 
 test('page smoke: assets/personnel-theme.js persists sidebar counts across premium page loads', () => {
