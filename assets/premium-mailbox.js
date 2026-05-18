@@ -355,16 +355,18 @@ function buildMailboxBodySections(value) {
 }
 
 function renderMailboxParagraphs(lines, options) {
-  const paragraphs = [];
-  let currentLines = [];
+  const renderedLines = [];
   const quoteBody = Boolean(options && options.quoteBody);
   const images = Array.isArray(options && options.images) ? options.images : [];
   const usedImages = options && options.usedImages instanceof Set ? options.usedImages : new Set();
 
-  function flushParagraph() {
-    if (!currentLines.length) return;
-    paragraphs.push(`<p>${currentLines.map((line) => renderMailboxTextLine(line)).join('<br>')}</p>`);
-    currentLines = [];
+  function pushTextLine(line) {
+    const value = String(line || '');
+    if (!value.trim()) {
+      renderedLines.push('<div class="detail-mail-line detail-mail-line-empty" aria-hidden="true">&nbsp;</div>');
+      return;
+    }
+    renderedLines.push(`<div class="detail-mail-line">${renderMailboxTextLine(value)}</div>`);
   }
 
   function findImageByAlt(alt) {
@@ -388,24 +390,19 @@ function renderMailboxParagraphs(lines, options) {
     const imageAlt = cleaned.trim().match(/^\[image:\s*([^\]]+)\]$/i)?.[1] || '';
     const imageEntry = findImageByAlt(imageAlt);
     if (imageEntry) {
-      flushParagraph();
       usedImages.add(imageEntry.index);
-      paragraphs.push(renderMailboxInlineImage(imageEntry.image));
+      renderedLines.push(renderMailboxInlineImage(imageEntry.image));
       return;
     }
     if (imageAlt) {
-      flushParagraph();
       return;
     }
-    if (!cleaned.trim()) {
-      flushParagraph();
-      return;
-    }
-    currentLines.push(cleaned);
+    pushTextLine(cleaned);
   });
 
-  flushParagraph();
-  return paragraphs.join('') || '<p>Geen inhoud.</p>';
+  return renderedLines.length
+    ? `<div class="detail-mail-lines">${renderedLines.join('')}</div>`
+    : '<div class="detail-mail-lines"><div class="detail-mail-line">Geen inhoud.</div></div>';
 }
 
 function renderMailboxInlineImage(image) {
