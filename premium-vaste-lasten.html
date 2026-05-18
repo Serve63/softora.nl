@@ -70,14 +70,19 @@ body {
   width: min(1260px, 100%);
   margin: 0 auto;
 }
-/* Loader vult het hele hoofdvlak (main), niet alleen de page-shell-hoogte */
+/* Loader blijft midden in het zichtbare hoofdvlak naast de sidebar */
 .monthly-costs-boot-loader {
-  position: absolute;
-  inset: 0;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 280px;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2;
+  z-index: 90;
   pointer-events: none;
   transition: opacity 0.22s ease, visibility 0.22s ease;
 }
@@ -641,6 +646,9 @@ body {
     margin-left: 0;
     width: 100%;
     padding: 24px;
+  }
+  .monthly-costs-boot-loader {
+    left: 0;
   }
   .totals-row {
     grid-template-columns: 1fr;
