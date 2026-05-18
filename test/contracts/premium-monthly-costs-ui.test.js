@@ -174,6 +174,10 @@ test('premium terugkerende kosten bevat klantkosten-check voor betaalde kosten p
   assert.match(pageSource, /id="coverage-revenue-amount"/);
   assert.match(pageSource, /id="coverage-term"/);
   assert.match(pageSource, /<option value="maandelijks_opzegbaar">Maandelijks opzegbaar<\/option>/);
+  assert.ok(
+    pageSource.indexOf('<div id="categories-wrap"></div>') < pageSource.indexOf('<section class="coverage-panel"'),
+    'Klantkosten-check hoort onder de postenlijst te staan'
+  );
   assert.match(pageSource, /assets\/premium-database-import\.js\?v=20260427c/);
   assert.match(pageSource, /assets\/premium-customer-cost-coverage\.js\?v=20260516a/);
 
