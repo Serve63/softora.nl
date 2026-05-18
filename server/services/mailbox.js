@@ -331,6 +331,46 @@ function safeUrl(value) {
   }
 }
 
+function isColdmailOptOutUrl(value) {
+  const parsed = safeUrl(value);
+  if (!parsed) return false;
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  return host === 'softora.nl' && parsed.pathname.replace(/\/+$/, '') === '/afmelden';
+}
+
+function extractColdmailOptOutUrlFromText(text) {
+  const label = COLDMAIL_OPT_OUT_LABEL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`${label}:?\\s*(?:\\[(https?:\\/\\/[^\\]]+)\\]|(https?:\\/\\/\\S+))`, 'i');
+  const match = String(text || '').match(pattern);
+  const url = match && (match[1] || match[2] || '');
+  return isColdmailOptOutUrl(url) ? url : '';
+}
+
+function extractColdmailOptOutUrlFromHtml(html) {
+  const source = String(html || '');
+  if (!source) return '';
+  const anchorTags = source.match(/<a\b[\s\S]*?<\/a>/gi) || [];
+  for (const tag of anchorTags) {
+    const href = getHtmlAttribute(tag, 'href');
+    if (!isColdmailOptOutUrl(href)) continue;
+    const label = htmlToReadableText(tag).replace(/\s+/g, ' ').trim();
+    if (!label || label.includes(COLDMAIL_OPT_OUT_LABEL) || /afmelden/i.test(label)) return href;
+  }
+  const hrefMatches = source.match(/href=(?:"([^"]+)"|'([^']+)'|([^\s"'>]+))/gi) || [];
+  for (const rawMatch of hrefMatches) {
+    const href = getHtmlAttribute(`<a ${rawMatch}>`, 'href');
+    if (isColdmailOptOutUrl(href)) return href;
+  }
+  return '';
+}
+
+function resolveColdmailOptOutUrl(parsed, text) {
+  return extractColdmailOptOutUrlFromText(text) ||
+    extractColdmailOptOutUrlFromText(parsed && parsed.text) ||
+    extractColdmailOptOutUrlFromHtml(parsed && parsed.html) ||
+    '';
+}
+
 function isTrackingUrl(rawUrl) {
   const parsed = safeUrl(rawUrl);
   if (!parsed) return false;
@@ -969,6 +1009,7 @@ function createMailboxService(deps = {}) {
   function toClientMessage(parsed, message, folder, account, options = {}) {
     const date = parsed.date || message.internalDate || new Date();
     const text = options.text || sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
+    const optOutUrl = resolveColdmailOptOutUrl(parsed, text);
     const primaryBodyImages = Array.isArray(options.primaryBodyImages) ? options.primaryBodyImages : buildMailboxBodyImages(parsed);
     const storedImages = Array.isArray(options.storedImages) ? options.storedImages : [];
     const bodyImages = mergeMailboxBodyImages(primaryBodyImages, options.storedImages, text, {
@@ -989,6 +1030,7 @@ function createMailboxService(deps = {}) {
       subject: normalizeString(parsed.subject || '(Geen onderwerp)'),
       preview,
       body: bodyText || preview,
+      optOutUrl,
       bodyImages,
       inlineImages: bodyImages.map(bodyImageToInlineImage),
       date: date.toISOString(),

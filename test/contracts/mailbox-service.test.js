@@ -540,6 +540,56 @@ test('mailbox service restores quoted webdesign image placeholders from stored d
   assert.equal(messages[0].inlineImages[0].contentBase64, TINY_PNG_DATA_URL.split(',')[1]);
 });
 
+test('mailbox service exposes hidden coldmail opt-out links for clickable mail previews', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX/Verstuurd' }],
+    messagesByMailbox: {
+      'INBOX/Verstuurd': [
+        {
+          uid: 58,
+          flags: ['\\Seen'],
+          internalDate: new Date('2026-05-18T15:18:00.000Z'),
+          source: {
+            date: new Date('2026-05-18T15:18:00.000Z'),
+            text: [
+              'Goedemiddag,',
+              '',
+              'Geen webdesign willen ontvangen? Laat het me weten!',
+            ].join('\n'),
+            html: [
+              '<p>Goedemiddag,</p>',
+              '<p><a href="https://www.softora.nl/afmelden?t=test-token">Geen webdesign willen ontvangen? Laat het me weten!</a></p>',
+            ].join(''),
+            subject: 'Nieuw webdesign gemaakt!',
+            from: { value: [{ name: 'Servé Creusen', address: 'serve@softora.nl' }] },
+            to: { value: [{ name: 'Klant', address: 'klant@example.nl' }] },
+            attachments: [],
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
+
+  assert.equal(messages.length, 1);
+  assert.match(messages[0].body, /Geen webdesign willen ontvangen\? Laat het me weten!/);
+  assert.doesNotMatch(messages[0].body, /test-token/);
+  assert.equal(messages[0].optOutUrl, 'https://www.softora.nl/afmelden?t=test-token');
+});
+
 test('mailbox service recovers sent webdesign images from customer photos without placeholders', async () => {
   const photoUrl = 'https://example.supabase.co/storage/v1/object/sign/design-photo.png?token=photo';
   const mockupUrl = 'https://example.supabase.co/storage/v1/object/sign/design-mockup.png?token=mockup';
@@ -665,6 +715,7 @@ test('mailbox service recovers sent webdesign images from customer photos withou
     );
     assert.equal(messages[0].bodyImages[0].dataUrl, 'data:image/png;base64,d2ViZGVzaWduLXBob3Rv');
     assert.equal(messages[0].bodyImages[1].dataUrl, 'data:image/png;base64,ZGV2aWNlLW1vY2t1cC1waG90bw==');
+    assert.equal(messages[0].optOutUrl, 'https://www.softora.nl/afmelden?t=test');
     assert.deepEqual(fetchedUrls, [photoUrl, mockupUrl]);
   } finally {
     global.fetch = oldFetch;

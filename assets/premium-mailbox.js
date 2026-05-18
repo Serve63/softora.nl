@@ -229,15 +229,29 @@ function isMailboxSafeOptOutUrl(value) {
   return host === 'softora.nl' && parsed.pathname.replace(/\/+$/, '') === '/afmelden';
 }
 
-function renderMailboxTextLine(line) {
+function normalizeMailboxOptOutUrl(value) {
+  const parsed = parseMailboxUrl(value);
+  return parsed && isMailboxSafeOptOutUrl(parsed.href) ? parsed.href : '';
+}
+
+function renderMailboxOptOutLink(url) {
+  return `<a class="detail-mail-optout-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(MAILBOX_COLDMAIL_OPT_OUT_LABEL)}</a>`;
+}
+
+function renderMailboxTextLine(line, options) {
   const value = String(line || '');
   const trimmed = value.trim();
   if (trimmed === MAILBOX_WEBDESIGN_MOCKUP_CAPTION) {
     return `<span class="detail-mail-image-caption">${escapeHtml(trimmed)}</span>`;
   }
-  const optOutMatch = trimmed.match(/^(Geen webdesign willen ontvangen\? Laat het me weten!):?\s+(https?:\/\/\S+)$/i);
-  if (optOutMatch && isMailboxSafeOptOutUrl(optOutMatch[2])) {
-    return `<a class="detail-mail-optout-link" href="${escapeHtml(optOutMatch[2])}" target="_blank" rel="noopener noreferrer">${escapeHtml(MAILBOX_COLDMAIL_OPT_OUT_LABEL)}</a>`;
+  const optOutMatch = trimmed.match(/^(Geen webdesign willen ontvangen\? Laat het me weten!):?\s*(?:\[(https?:\/\/[^\]]+)\]|(https?:\/\/\S+))$/i);
+  const inlineOptOutUrl = optOutMatch ? normalizeMailboxOptOutUrl(optOutMatch[2] || optOutMatch[3] || '') : '';
+  if (inlineOptOutUrl) {
+    return renderMailboxOptOutLink(inlineOptOutUrl);
+  }
+  const fallbackOptOutUrl = normalizeMailboxOptOutUrl(options && options.optOutUrl);
+  if (fallbackOptOutUrl && /^Geen webdesign willen ontvangen\? Laat het me weten![:\s]*$/i.test(trimmed)) {
+    return renderMailboxOptOutLink(fallbackOptOutUrl);
   }
   return escapeHtml(value);
 }
@@ -366,7 +380,7 @@ function renderMailboxParagraphs(lines, options) {
       renderedLines.push('<div class="detail-mail-line detail-mail-line-empty" aria-hidden="true">&nbsp;</div>');
       return;
     }
-    renderedLines.push(`<div class="detail-mail-line">${renderMailboxTextLine(value)}</div>`);
+    renderedLines.push(`<div class="detail-mail-line">${renderMailboxTextLine(value, options)}</div>`);
   }
 
   function findImageByAlt(alt) {
@@ -425,7 +439,7 @@ function renderMailboxBodySection(section, imageState) {
       <section class="detail-mail-section detail-mail-section-quote">
         <div class="detail-mail-section-label">Eerdere mail</div>
         ${quoteMeta}
-        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: imageState.images, usedImages: imageState.usedImages })}</div>
+        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: imageState.images, optOutUrl: imageState.optOutUrl, usedImages: imageState.usedImages })}</div>
       </section>`;
   }
   if (section.type === 'signature') {
@@ -464,8 +478,12 @@ function normalizeMailboxBodyImages(images) {
     .filter((image) => image.alt && /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(image.dataUrl));
 }
 
-function renderMailBody(value, images) {
-  const imageState = { images: normalizeMailboxBodyImages(images), usedImages: new Set() };
+function renderMailBody(value, images, options) {
+  const imageState = {
+    images: normalizeMailboxBodyImages(images),
+    optOutUrl: normalizeMailboxOptOutUrl(options && options.optOutUrl),
+    usedImages: new Set()
+  };
   const sections = buildMailboxBodySections(value);
   const hasImagePlaceholders = sections.some(sectionHasMailboxImagePlaceholder);
   const renderedSections = [];
@@ -577,6 +595,7 @@ function normalizeMailboxApiMessage(message) {
   const body = cleanMailboxText(message.body || message.preview || '');
   const preview = cleanMailboxText(message.preview || body).replace(/\s+/g, ' ').slice(0, 160);
   const bodyImages = normalizeMailboxBodyImages(message.bodyImages);
+  const optOutUrl = normalizeMailboxOptOutUrl(message.optOutUrl);
   return {
     id: message.id,
     folder: message.folder || activeFolder,
@@ -585,6 +604,7 @@ function normalizeMailboxApiMessage(message) {
     subject: message.subject || '(Geen onderwerp)',
     preview,
     body,
+    optOutUrl,
     bodyImages,
     messageId: message.messageId || '',
     inReplyTo: message.inReplyTo || '',
@@ -803,7 +823,7 @@ function openMail(id) {
       </div>
     </div>
     <div class="detail-body">
-      <div class="detail-body-text">${renderMailBody(m.body, m.bodyImages)}</div>
+      <div class="detail-body-text">${renderMailBody(m.body, m.bodyImages, { optOutUrl: m.optOutUrl })}</div>
       ${outreachQuickbar}
     </div>`;
 }
