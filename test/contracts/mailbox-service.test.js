@@ -399,6 +399,10 @@ test('mailbox service exposes inline cid images for mail display placeholders', 
   );
   assert.equal(messages[0].bodyImages[0].dataUrl, 'data:image/png;base64,d2ViZGVzaWduLXBob3Rv');
   assert.equal(messages[0].bodyImages[1].dataUrl, 'data:image/png;base64,ZGV2aWNlLW1vY2t1cC1waG90bw==');
+  assert.equal(messages[0].inlineImages.length, 2);
+  assert.equal(messages[0].inlineImages[0].alt, 'Softora Testmodus webdesign');
+  assert.equal(messages[0].inlineImages[0].contentType, 'image/png');
+  assert.equal(messages[0].inlineImages[0].contentBase64, 'd2ViZGVzaWduLXBob3Rv');
   assert.doesNotMatch(messages[0].preview, /\[image:/);
 });
 
@@ -467,6 +471,10 @@ test('mailbox service restores quoted webdesign image placeholders from stored d
   assert.equal(messages[0].bodyImages[0].alt, 'Softora Testmodus webdesign');
   assert.equal(messages[0].bodyImages[0].contentType, 'image/png');
   assert.equal(messages[0].bodyImages[0].dataUrl, TINY_PNG_DATA_URL);
+  assert.equal(messages[0].inlineImages.length, 1);
+  assert.equal(messages[0].inlineImages[0].alt, 'Softora Testmodus webdesign');
+  assert.equal(messages[0].inlineImages[0].contentType, 'image/png');
+  assert.equal(messages[0].inlineImages[0].contentBase64, TINY_PNG_DATA_URL.split(',')[1]);
 });
 
 test('mailbox service saves app-sent messages into the sent folder', async () => {
