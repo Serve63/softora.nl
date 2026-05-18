@@ -1063,17 +1063,21 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<button class="sf-btn act" data-s="alle" type="button">Alle<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<button class="sf-btn" data-s="reactie_ontvangen" type="button">Reactie ontvangen<\/button>\s*<button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
+    /<button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar<\/button>\s*<button class="sf-btn" data-s="alle" type="button">Alle<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<button class="sf-btn" data-s="reactie_ontvangen" type="button">Reactie ontvangen<\/button>\s*<button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
   );
+  assert.match(pageSource, /activeStatus: "benaderbaar"/);
+  assert.match(pageSource, /<option value="benaderbaar">Beschikbaar<\/option>/);
+  assert.match(pageSource, /benaderbaar: "Beschikbaar"/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "reactie_ontvangen"/);
   assert.match(pageSource, /Reactie ontvangen/);
   assert.match(pageSource, /\.sf-btn\.act \{[\s\S]*border-color: rgba\(139, 34, 82, 0\.4\);[\s\S]*background: rgba\(139, 34, 82, 0\.12\);/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn act" data-s="alle" type="button">Alle<\/button>/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="klant"\]\.act/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="benaderd"\]\.act/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="afgehaakt"\]\.act/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="buiten"\]\.act/);
-  assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="benaderbaar"\]\.act/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar<\/button>/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="geengehoor"\]\.act/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"klant_geworden\\"/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"afgehaakt\\"/);
