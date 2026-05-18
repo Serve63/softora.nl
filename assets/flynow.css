@@ -704,6 +704,7 @@ body[data-flynow-page] .sidebar-nav{overflow-x: hidden !important;overflow-y: au
 .deals-footer strong{color: rgba(255,255,255,0.85);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 13px;letter-spacing: 2px}
 .flynow-toast{position: fixed;right: 24px;bottom: 24px;z-index: 140;max-width: min(360px,calc(100vw - 48px));border: 1px solid rgba(139,34,82,0.2);border-radius: 999px;background: rgba(255,255,255,0.92);box-shadow: 0 12px 28px rgba(30,16,24,0.16);color: var(--flynow-brand);font-size: 12px;font-weight: 700;opacity: 0;padding: 10px 18px;pointer-events: none;transform: translateY(8px);transition: opacity 0.25s ease,transform 0.25s ease}
 .flynow-toast.on{opacity: 1;transform: none}
+body[data-flynow-page] .flynow-main .hero-deal .hero-title{margin: 0 0 8px !important;background: none !important;color: var(--flynow-white) !important;-webkit-background-clip: border-box !important;background-clip: border-box !important;font-size: 28px !important;font-weight: 700 !important;line-height: 1.05 !important;text-shadow: none !important}
 @keyframes flynowFadeUp{from{opacity: 0;transform: translateY(16px)}
 to{opacity: 1;transform: translateY(0)}
 }

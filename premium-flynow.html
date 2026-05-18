@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FLYNOW - AI Trips</title>
+  <title>Mijn Beste Deals - Fly Now</title>
   <link rel="preload" href="/assets/fonts/inter-latin.woff2?v=20260409a" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/assets/fonts/oswald-latin.woff2?v=20260409a" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
   <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260513a">
-  <link rel="stylesheet" href="/assets/flynow.css?v=20260512a">
+  <link rel="stylesheet" href="/assets/flynow.css?v=20260518a">
   <script src="/assets/personnel-theme.js?v=20260513a" defer></script>
 </head>
 <body data-flynow-page>
@@ -16,58 +16,409 @@
     <aside class="sidebar" aria-label="Premium navigatie"></aside>
 
     <main class="main-content flynow-main">
-      <div class="bg-canvas zon" id="flynow-bg" aria-hidden="true">
-        <div class="collage" id="flynow-collage"></div>
-        <div class="collage-overlay"></div>
-      </div>
+      <section class="deals-shell" aria-label="Mijn Beste Deals">
+        <header class="deals-header">
+          <div class="deals-header-top">
+            <a class="deals-logo" href="/premium-instellingen" aria-label="Terug naar instellingen">
+              <span class="deals-logo-icon" aria-hidden="true"></span>
+              <span>
+                <span class="deals-logo-text">My Deals</span>
+                <span class="deals-logo-sub">Jouw persoonlijke reisoverzicht</span>
+              </span>
+            </a>
+            <div class="deals-header-meta">
+              <strong>Prijzen v.a. p.p.</strong>
+              Inclusief vluchten &amp; hotel
+            </div>
+          </div>
+          <nav class="deals-tabs" aria-label="Reisdeals">
+            <button class="deals-tab active" id="tab-zon" type="button" data-flynow-tab="zon">
+              <span class="deals-tab-mark deals-tab-mark--sun" aria-hidden="true"></span>
+              Zon &amp; Strand
+            </button>
+            <button class="deals-tab" id="tab-snow" type="button" data-flynow-tab="snow">
+              <span class="deals-tab-mark deals-tab-mark--snow" aria-hidden="true"></span>
+              Sneeuw &amp; Ski
+            </button>
+          </nav>
+        </header>
 
-      <button class="collage-btn" id="flynow-photo-button" type="button" title="Foto's toevoegen aan achtergrond">
-        <span class="collage-btn-icon" aria-hidden="true"></span>
-        Eigen foto's
-      </button>
-      <input type="file" id="flynow-photo-input" multiple accept="image/*" hidden>
+        <div class="deals-main">
+          <section class="deals-panel active" id="panel-zon" data-flynow-panel="zon" aria-labelledby="tab-zon">
+            <article class="hero-deal hero-deal--zon">
+              <div class="hero-copy">
+                <div class="hero-label">Deal van de week</div>
+                <h1 class="hero-title">Kreta - Rethymnon</h1>
+                <div class="hero-details">
+                  <span class="hero-detail">5-sterren all inclusive</span>
+                  <span class="hero-detail">14 jun - 21 jun</span>
+                  <span class="hero-detail">7 nachten</span>
+                  <span class="hero-detail">Amsterdam</span>
+                  <span class="hero-detail hero-detail--urgent">Nog 3 kamers</span>
+                </div>
+              </div>
+              <div class="hero-right">
+                <div class="hero-old-price">&euro; 989</div>
+                <div class="hero-price"><span>&euro;</span> 649</div>
+                <div class="hero-pp">per persoon</div>
+                <button class="hero-btn deal-action" type="button" data-deal-title="Kreta - Rethymnon">Nu boeken</button>
+              </div>
+            </article>
 
-      <nav class="flynow-nav" aria-label="FLYNOW navigatie">
-        <a class="nav-logo" href="/premium-instellingen">SOFTORA.NL - FLYNOW</a>
-        <div class="type-switch" role="group" aria-label="Reistype">
-          <button class="ts-btn active" type="button" data-flynow-type="zon">
-            <span class="ts-icon ts-icon-sun" aria-hidden="true"></span>
-            Zon &amp; Strand
-          </button>
-          <button class="ts-btn" type="button" data-flynow-type="sneeuw">
-            <span class="ts-icon ts-icon-snow" aria-hidden="true"></span>
-            Sneeuw &amp; Ski
-          </button>
+            <div class="deals-filters" aria-label="Zonfilters">
+              <button class="chip active" type="button">Alle bestemmingen</button>
+              <button class="chip" type="button">Spanje</button>
+              <button class="chip" type="button">Griekenland</button>
+              <button class="chip" type="button">Turkije</button>
+              <button class="chip" type="button">Egypte</button>
+              <button class="chip" type="button">Portugal</button>
+              <button class="chip" type="button">Canarische Eilanden</button>
+            </div>
+
+            <div class="section-header">
+              <div>
+                <h2 class="section-title">Top Zondeals</h2>
+                <p class="section-sub">Beste prijs-kwaliteitverhouding van dit moment</p>
+              </div>
+              <button class="see-all" type="button" data-scroll-target="zon-last-minute">Alle deals</button>
+            </div>
+
+            <div class="deals-grid">
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--mallorca">
+                  <div class="badge badge--hot">Populair</div>
+                  <div class="deal-country">ES</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Mallorca</h3>
+                  <p class="deal-card-info">4 sterren halfpension - 7 nachten<br>22 jun - vertrek Eindhoven</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 749</div>
+                      <div class="deal-card-price">&euro; 519 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Mallorca">Boek</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--santorini">
+                  <div class="badge">Aanbevolen</div>
+                  <div class="deal-country">GR</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Santorini</h3>
+                  <p class="deal-card-info">4 sterren ontbijt - 7 nachten<br>5 jul - vertrek Amsterdam</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 1.199</div>
+                      <div class="deal-card-price">&euro; 849 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Santorini">Boek</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--antalya">
+                  <div class="badge badge--sale">-34%</div>
+                  <div class="deal-country">TR</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Antalya</h3>
+                  <p class="deal-card-info">5 sterren all inclusive - 10 nachten<br>18 jun - vertrek Rotterdam</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 1.050</div>
+                      <div class="deal-card-price">&euro; 689 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Antalya">Boek</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--algarve">
+                  <div class="badge badge--new">Nieuw</div>
+                  <div class="deal-country">PT</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Algarve</h3>
+                  <p class="deal-card-info">4 sterren halfpension - 8 nachten<br>29 jun - vertrek Amsterdam</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 899</div>
+                      <div class="deal-card-price">&euro; 619 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Algarve">Boek</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--hurghada">
+                  <div class="badge badge--hot">Topseller</div>
+                  <div class="deal-country">EG</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Hurghada</h3>
+                  <p class="deal-card-info">5 sterren all inclusive - 7 nachten<br>12 jul - vertrek Amsterdam</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 879</div>
+                      <div class="deal-card-price">&euro; 549 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Hurghada">Boek</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--tenerife">
+                  <div class="badge">Top deal</div>
+                  <div class="deal-country">ES</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Tenerife</h3>
+                  <p class="deal-card-info">4 sterren all inclusive - 14 nachten<br>20 jul - vertrek Eindhoven</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 1.149</div>
+                      <div class="deal-card-price">&euro; 799 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Tenerife">Boek</button>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <section class="deals-strip" id="zon-last-minute">
+              <h2 class="strip-title">Last minute - Vertrek binnen 2 weken</h2>
+              <div class="strip-items">
+                <button class="strip-item deal-action" type="button" data-deal-title="Ibiza">
+                  <span class="strip-dest">Ibiza</span>
+                  <span class="strip-date">14 mei - 5 nachten</span>
+                  <span class="strip-price">&euro; 389 p.p.</span>
+                </button>
+                <button class="strip-item deal-action" type="button" data-deal-title="Rhodos">
+                  <span class="strip-dest">Rhodos</span>
+                  <span class="strip-date">17 mei - 7 nachten</span>
+                  <span class="strip-price">&euro; 449 p.p.</span>
+                </button>
+                <button class="strip-item deal-action" type="button" data-deal-title="Fuerteventura">
+                  <span class="strip-dest">Fuerteventura</span>
+                  <span class="strip-date">19 mei - 7 nachten</span>
+                  <span class="strip-price">&euro; 479 p.p.</span>
+                </button>
+                <button class="strip-item deal-action" type="button" data-deal-title="Lanzarote">
+                  <span class="strip-dest">Lanzarote</span>
+                  <span class="strip-date">21 mei - 10 nachten</span>
+                  <span class="strip-price">&euro; 529 p.p.</span>
+                </button>
+                <button class="strip-item deal-action" type="button" data-deal-title="Side">
+                  <span class="strip-dest">Side (TR)</span>
+                  <span class="strip-date">22 mei - 7 nachten</span>
+                  <span class="strip-price">&euro; 399 p.p.</span>
+                </button>
+                <button class="strip-item deal-action" type="button" data-deal-title="Korfu">
+                  <span class="strip-dest">Korfu</span>
+                  <span class="strip-date">24 mei - 7 nachten</span>
+                  <span class="strip-price">&euro; 419 p.p.</span>
+                </button>
+              </div>
+            </section>
+          </section>
+
+          <section class="deals-panel" id="panel-snow" data-flynow-panel="snow" aria-labelledby="tab-snow">
+            <article class="hero-deal hero-deal--snow">
+              <div class="hero-copy">
+                <div class="hero-label">Ski deal van de week</div>
+                <h1 class="hero-title">Solden - Otztal</h1>
+                <div class="hero-details">
+                  <span class="hero-detail">4-sterren halfpension</span>
+                  <span class="hero-detail">6 dec - 13 dec</span>
+                  <span class="hero-detail">7 nachten</span>
+                  <span class="hero-detail">Skipas inbegrepen</span>
+                  <span class="hero-detail hero-detail--urgent">Beperkte beschikbaarheid</span>
+                </div>
+              </div>
+              <div class="hero-right">
+                <div class="hero-old-price">&euro; 1.199</div>
+                <div class="hero-price"><span>&euro;</span> 879</div>
+                <div class="hero-pp">per persoon</div>
+                <button class="hero-btn deal-action" type="button" data-deal-title="Solden - Otztal">Nu boeken</button>
+              </div>
+            </article>
+
+            <div class="deals-filters" aria-label="Skifilters">
+              <button class="chip active" type="button">Alle skigebieden</button>
+              <button class="chip" type="button">Oostenrijk</button>
+              <button class="chip" type="button">Zwitserland</button>
+              <button class="chip" type="button">Italie</button>
+              <button class="chip" type="button">Frankrijk</button>
+              <button class="chip" type="button">Andorra</button>
+            </div>
+
+            <div class="section-header">
+              <div>
+                <h2 class="section-title">Top Ski Deals</h2>
+                <p class="section-sub">Inclusief skipas - Beste aanbiedingen winter 2025/2026</p>
+              </div>
+              <button class="see-all" type="button" data-scroll-target="snow-last-minute">Alle deals</button>
+            </div>
+
+            <div class="deals-grid">
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--innsbruck">
+                  <div class="badge badge--hot">Populair</div>
+                  <div class="deal-country">AT</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Innsbruck</h3>
+                  <p class="deal-card-info">4 sterren halfpension - 7 nachten<br>13 dec - skipas inbegrepen</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 1.099</div>
+                      <div class="deal-card-price">&euro; 749 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Innsbruck">Boek</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--zermatt">
+                  <div class="badge">Luxe pick</div>
+                  <div class="deal-country">CH</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Zermatt</h3>
+                  <p class="deal-card-info">5 sterren halfpension - 7 nachten<br>20 dec - skipas inbegrepen</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 2.199</div>
+                      <div class="deal-card-price">&euro; 1.649 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Zermatt">Boek</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--campiglio">
+                  <div class="badge badge--sale">-28%</div>
+                  <div class="deal-country">IT</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Madonna di Campiglio</h3>
+                  <p class="deal-card-info">4 sterren ontbijt - 6 nachten<br>3 jan - skipas inbegrepen</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 1.249</div>
+                      <div class="deal-card-price">&euro; 899 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Madonna di Campiglio">Boek</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--deux-alpes">
+                  <div class="badge badge--new">Nieuw</div>
+                  <div class="deal-country">FR</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Les Deux Alpes</h3>
+                  <p class="deal-card-info">3 sterren halfpension - 7 nachten<br>17 jan - skipas inbegrepen</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 999</div>
+                      <div class="deal-card-price">&euro; 679 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Les Deux Alpes">Boek</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--andorra">
+                  <div class="badge badge--hot">Budget tip</div>
+                  <div class="deal-country">AD</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Andorra - Grandvalira</h3>
+                  <p class="deal-card-info">4 sterren all inclusive - 7 nachten<br>10 jan - skipas inbegrepen</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 879</div>
+                      <div class="deal-card-price">&euro; 579 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Andorra - Grandvalira">Boek</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="deal-card">
+                <div class="deal-card-media deal-photo--kitzbuhel">
+                  <div class="badge">Top deal</div>
+                  <div class="deal-country">AT</div>
+                </div>
+                <div class="deal-card-body">
+                  <h3 class="deal-card-dest">Kitzbuhel</h3>
+                  <p class="deal-card-info">4 sterren halfpension - 7 nachten<br>24 jan - skipas inbegrepen</p>
+                  <div class="deal-card-bottom">
+                    <div>
+                      <div class="deal-card-price-old">&euro; 1.399</div>
+                      <div class="deal-card-price">&euro; 999 <sub>p.p.</sub></div>
+                    </div>
+                    <button class="deal-card-btn deal-action" type="button" data-deal-title="Kitzbuhel">Boek</button>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <section class="deals-strip" id="snow-last-minute">
+              <h2 class="strip-title">Vroegboekkorting - Kerst &amp; Nieuwjaar</h2>
+              <div class="strip-items">
+                <button class="strip-item deal-action" type="button" data-deal-title="St. Anton">
+                  <span class="strip-dest">St. Anton</span>
+                  <span class="strip-date">23 dec - 7 nachten</span>
+                  <span class="strip-price">&euro; 1.149 p.p.</span>
+                </button>
+                <button class="strip-item deal-action" type="button" data-deal-title="Chamonix">
+                  <span class="strip-dest">Chamonix</span>
+                  <span class="strip-date">24 dec - 7 nachten</span>
+                  <span class="strip-price">&euro; 999 p.p.</span>
+                </button>
+                <button class="strip-item deal-action" type="button" data-deal-title="Verbier">
+                  <span class="strip-dest">Verbier</span>
+                  <span class="strip-date">26 dec - 7 nachten</span>
+                  <span class="strip-price">&euro; 1.499 p.p.</span>
+                </button>
+                <button class="strip-item deal-action" type="button" data-deal-title="Saalbach">
+                  <span class="strip-dest">Saalbach</span>
+                  <span class="strip-date">27 dec - 7 nachten</span>
+                  <span class="strip-price">&euro; 879 p.p.</span>
+                </button>
+                <button class="strip-item deal-action" type="button" data-deal-title="Val Thorens">
+                  <span class="strip-dest">Val Thorens</span>
+                  <span class="strip-date">28 dec - 7 nachten</span>
+                  <span class="strip-price">&euro; 1.099 p.p.</span>
+                </button>
+              </div>
+            </section>
+          </section>
         </div>
-      </nav>
 
-      <section class="hero" aria-labelledby="flynow-title">
-        <p class="hero-eyebrow">AI-gestuurd reisadvies</p>
-        <h1 class="hero-title zon" id="flynow-title">De beste trip<br>voor de<br>beste prijs</h1>
-        <p class="hero-sub" id="flynow-sub">
-          De AI vergelijkt honderden aanbiedingen en serveert alleen de absolute topdeals. Jij kiest of je gaat.
-        </p>
-        <button class="btn-zoek zon" id="flynow-search" type="button">
-          <span class="btn-bolt" aria-hidden="true"></span>
-          AI laten zoeken
-        </button>
-        <div class="scroll-hint" id="flynow-scroll-hint" hidden>
-          <span>Scroll naar resultaten</span>
-          <span class="scroll-arrow" aria-hidden="true">v</span>
-        </div>
+        <footer class="deals-footer">
+          <strong>MY DEALS</strong>
+          <span>Alle prijzen zijn per persoon op basis van 2 personen - Onder voorbehoud van beschikbaarheid</span>
+        </footer>
       </section>
-
-      <section class="results-section" id="flynow-results" hidden aria-live="polite">
-        <div class="ai-bar">
-          <div class="ai-dot zon" id="flynow-ai-dot"></div>
-          <div class="ai-bar-text" id="flynow-ai-text"></div>
-        </div>
-        <div id="flynow-trips-wrap"></div>
-      </section>
-
-      <div class="toast" id="flynow-toast" role="status" aria-live="polite"></div>
+      <div class="flynow-toast" id="flynow-toast" role="status" aria-live="polite"></div>
     </main>
   </div>
-  <script src="/assets/flynow.js?v=20260512a" defer></script>
+  <script src="/assets/flynow.js?v=20260518a" defer></script>
 </body>
 </html>

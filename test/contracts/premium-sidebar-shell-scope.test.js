@@ -269,11 +269,19 @@ test('premium flynow gebruikt de dynamische canonical sidebar-host', () => {
   );
   assert.match(
     flynowCssSource,
-    /body\[data-flynow-page\] \.sidebar\{[\s\S]*z-index:120 !important/
+    /body\[data-flynow-page\] \.sidebar\s*\{[\s\S]*z-index:\s*120 !important/
   );
   assert.match(
     flynowCssSource,
-    /@media \(min-width:901px\)\{[\s\S]*\.bg-canvas\{left:var\(--premium-sidebar-width,320px\)\}[\s\S]*\.flynow-nav\{left:var\(--premium-sidebar-width,320px\)\}/
+    /@media \(min-width:\s*901px\)\s*\{[\s\S]*body\[data-flynow-page\] \.sidebar\s*\{[\s\S]*height:\s*100vh !important[\s\S]*\.dashboard-layout\[data-sidebar-shell="canonical"\] > \.flynow-main\s*\{[\s\S]*margin-left:\s*var\(--premium-sidebar-width,\s*320px\) !important/
+  );
+  assert.match(
+    flynowCssSource,
+    /\.deals-header\s*\{[\s\S]*position:\s*sticky;/
+  );
+  assert.match(
+    flynowCssSource,
+    /\.deals-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(230px,\s*1fr\)\)/
   );
 });
 
