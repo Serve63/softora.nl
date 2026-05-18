@@ -448,9 +448,12 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /controller\.bind\(\)/);
   assert.match(pageSource, /async function initColdmailingSettingsPersistence\(\) \{[\s\S]*const hydrated = await controller\.init\(\);[\s\S]*if \(!hydrated\) markColdmailingSettingsUnavailable\(\);[\s\S]*return hydrated;/);
   assert.match(pageSource, /function markColdmailingSettingsUnavailable\(\)/);
-  assert.match(pageSource, /Prompt & AI instructies konden niet veilig worden geladen\./);
-  assert.match(pageSource, /field\.value = '';/);
-  assert.match(pageSource, /startButton\.disabled = true;/);
+  assert.match(pageSource, /field\.disabled = false;/);
+  assert.match(pageSource, /field\.placeholder = '';/);
+  assert.match(pageSource, /startButton\.disabled = false;/);
+  assert.doesNotMatch(pageSource, /Instellingen konden niet worden geladen/);
+  assert.doesNotMatch(pageSource, /Prompt & AI instructies konden niet veilig worden geladen\./);
+  assert.doesNotMatch(pageSource, /field\.value = '';/);
   assert.match(senderSettingsSource, /const DEFAULT_SCOPE = "premium_coldmailing_settings";/);
   assert.match(senderSettingsSource, /const DEFAULT_KEY = "softora_coldmailing_settings_v1";/);
   assert.match(senderSettingsSource, /senders\[senderEmail\]/);
