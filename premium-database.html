@@ -1452,7 +1452,7 @@
                                         <th>Gebruikte kanalen</th>
                                         <th data-sort-key="status">Status</th>
                                         <th data-sort-key="updatedAt">Laatste actie</th>
-                                        <th>Foto's</th>
+                                        <th>Foto's <span id="photoHeaderCount">(0)</span></th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody"></tbody>
@@ -2360,7 +2360,7 @@
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
-            renderPhotoCostLabel(filtered);
+            renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
 
             if (!filtered.length) {
                 nodes.tbody.innerHTML = "<tr><td colspan=\"9\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
