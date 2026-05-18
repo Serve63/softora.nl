@@ -130,6 +130,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /document\.addEventListener\("pointerdown", function \(event\) \{/);
   assert.match(themeJsSource, /window\.addEventListener\("focus", function \(\) \{\s*schedulePremiumSidebarStability\(\);/s);
   assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords"\]\);/);
+  assert.match(themeJsSource, /PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*"coldcalling"/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
@@ -462,6 +463,7 @@ test('static premium sidebars share the same section order and public labels', (
     assert.equal(linkTargets.social_linkedin, '/premium-socialmedia#linkedin');
     assert.equal(linkTargets.qr_code, '/premium-qr-code');
     for (const lockedKey of [
+      'coldcalling',
       'seo',
       'qr_code',
       'ads_trustoo',
