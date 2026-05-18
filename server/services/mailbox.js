@@ -85,6 +85,7 @@ const TRACKING_HOST_PATTERNS = [
 ];
 
 const IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
+const INLINE_DISPLAY_IMAGE_TYPES = /^image\/(?:png|jpe?g|webp|gif)$/i;
 
 function decodeBasicHtmlEntities(value) {
   return String(value || '')
@@ -96,12 +97,31 @@ function decodeBasicHtmlEntities(value) {
     .replace(/&gt;/gi, '>');
 }
 
+function getHtmlAttribute(tag, name) {
+  const pattern = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i');
+  const match = String(tag || '').match(pattern);
+  return decodeBasicHtmlEntities(match?.[1] || match?.[2] || match?.[3] || '').trim();
+}
+
+function normalizeContentId(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^cid:/i, '')
+    .replace(/^<|>$/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 function htmlToReadableText(value) {
   return decodeBasicHtmlEntities(value)
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
-    .replace(/<img\b[^>]*(?:width=["']?1["']?|height=["']?1["']?)[^>]*>/gi, ' ')
+    .replace(/<img\b[^>]*>/gi, (tag) => {
+      if (/(?:width=["']?1["']?|height=["']?1["']?)/i.test(tag)) return ' ';
+      const alt = getHtmlAttribute(tag, 'alt');
+      return alt ? `\n[image: ${alt}]\n` : ' ';
+    })
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(?:p|div|section|article|tr|li|h[1-6])>/gi, '\n')
     .replace(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_match, href, label) => {
@@ -112,6 +132,42 @@ function htmlToReadableText(value) {
       return `${text} [${url}]`;
     })
     .replace(/<[^>]+>/g, ' ');
+}
+
+function buildMailboxBodyImages(parsed = {}) {
+  const html = String(parsed.html || '');
+  const attachments = Array.isArray(parsed.attachments) ? parsed.attachments : [];
+  if (!html || !attachments.length) return [];
+
+  const attachmentByCid = new Map();
+  attachments.forEach((attachment) => {
+    const cid = normalizeContentId(attachment?.cid || attachment?.contentId || attachment?.contentID);
+    const contentType = String(attachment?.contentType || '').split(';')[0].toLowerCase();
+    const content = attachment?.content;
+    if (!cid || !INLINE_DISPLAY_IMAGE_TYPES.test(contentType) || !content) return;
+    const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+    if (!buffer.length || buffer.length > 10 * 1024 * 1024) return;
+    attachmentByCid.set(cid, { cid, contentType, buffer });
+  });
+  if (!attachmentByCid.size) return [];
+
+  const images = [];
+  const seen = new Set();
+  const imgTags = html.match(/<img\b[^>]*>/gi) || [];
+  imgTags.forEach((tag) => {
+    if (/(?:width=["']?1["']?|height=["']?1["']?)/i.test(tag)) return;
+    const cid = normalizeContentId(getHtmlAttribute(tag, 'src'));
+    const attachment = attachmentByCid.get(cid);
+    if (!attachment || seen.has(cid)) return;
+    seen.add(cid);
+    images.push({
+      cid: attachment.cid,
+      alt: getHtmlAttribute(tag, 'alt') || 'Afbeelding',
+      contentType: attachment.contentType,
+      dataUrl: `data:${attachment.contentType};base64,${attachment.buffer.toString('base64')}`,
+    });
+  });
+  return images;
 }
 
 function safeUrl(value) {
@@ -486,8 +542,9 @@ function createMailboxService(deps = {}) {
 
   function toClientMessage(parsed, message, folder, account) {
     const date = parsed.date || message.internalDate || new Date();
+    const bodyImages = buildMailboxBodyImages(parsed);
     const text = sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
-    const preview = truncateText(text.replace(/\s+/g, ' '), 140);
+    const preview = truncateText(text.replace(/^\s*\[image:[^\]]+\]\s*$/gim, '').replace(/\s+/g, ' '), 140);
     const fromText = folder === 'sent' ? account.name || account.email : displayName(parsed.from?.value);
     return {
       id: `${folder}:${message.uid}`,
@@ -499,6 +556,7 @@ function createMailboxService(deps = {}) {
       subject: normalizeString(parsed.subject || '(Geen onderwerp)'),
       preview,
       body: text || preview,
+      bodyImages,
       date: date.toISOString(),
       messageId: normalizeString(parsed.messageId || ''),
       inReplyTo: normalizeString(parsed.inReplyTo || ''),
