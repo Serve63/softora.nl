@@ -580,6 +580,11 @@ test('mailbox service recovers sent webdesign images from customer photos withou
                 'Afgelopen week kwam ik toevallig jullie website (softora.nl) tegen.',
                 'Vanuit enthousiasme heb ik een nieuw webdesign voor jullie site gemaakt.',
                 '',
+                'Met vriendelijke groet,',
+                'Servé Creusen',
+                '📍 Haaren',
+                '📞 0629917185',
+                '',
                 'Geen webdesign willen ontvangen? Laat het me weten!: https://www.softora.nl/afmelden?t=test',
               ].join('\n'),
               html: '',
@@ -643,7 +648,16 @@ test('mailbox service recovers sent webdesign images from customer photos withou
     const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
 
     assert.equal(messages.length, 1);
-    assert.doesNotMatch(messages[0].body, /\[image:/);
+    const phoneIndex = messages[0].body.indexOf('0629917185');
+    const webdesignIndex = messages[0].body.indexOf('[image: Softora Testmodus webdesign]');
+    const captionIndex = messages[0].body.indexOf('Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop');
+    const mockupIndex = messages[0].body.indexOf('[image: Softora Testmodus device mockup]');
+    const optOutIndex = messages[0].body.indexOf('Geen webdesign willen ontvangen? Laat het me weten!');
+    assert.ok(phoneIndex > 0);
+    assert.ok(webdesignIndex > phoneIndex);
+    assert.ok(captionIndex > webdesignIndex);
+    assert.ok(mockupIndex > captionIndex);
+    assert.ok(optOutIndex > mockupIndex);
     assert.equal(messages[0].bodyImages.length, 2);
     assert.deepEqual(
       messages[0].bodyImages.map((image) => image.alt),

@@ -29,6 +29,8 @@ const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
+const COLDMAIL_MOCKUP_CAPTION = 'Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop👇';
+const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const FOLDER_ALIASES = {
@@ -259,6 +261,40 @@ function mergeMailboxBodyImages(primaryImages, fallbackImages, text, options = {
     return true;
   });
   return [...images, ...matchedFallbacks].slice(0, 8);
+}
+
+function isMockupBodyImage(image) {
+  return /\b(?:device|mockup|laptop|ipad|iphone|tablet|mobiel)\b/i.test(String(image && image.alt || ''));
+}
+
+function decorateRecoveredWebdesignImagesText(text, images) {
+  const bodyImages = (Array.isArray(images) ? images : []).filter((image) => image && image.alt && image.dataUrl);
+  if (!bodyImages.length || extractBodyImageLabels(text).length) return text;
+  const lines = String(text || '').split('\n');
+  const hasMockupCaption = lines.some((line) => normalizeImageLabel(line) === normalizeImageLabel(COLDMAIL_MOCKUP_CAPTION));
+  const imageLines = [];
+  let hasMainImage = false;
+  bodyImages.forEach((image) => {
+    if (isMockupBodyImage(image) && hasMainImage && !hasMockupCaption) {
+      imageLines.push(COLDMAIL_MOCKUP_CAPTION);
+    }
+    imageLines.push(`[image: ${cleanImageAlt(image.alt)}]`);
+    if (!isMockupBodyImage(image)) hasMainImage = true;
+  });
+  if (!imageLines.length) return text;
+  const optOutIndex = lines.findIndex((line) => String(line || '').includes(COLDMAIL_OPT_OUT_LABEL));
+  const insertIndex = optOutIndex >= 0 ? optOutIndex : lines.length;
+  return [
+    ...lines.slice(0, insertIndex),
+    '',
+    ...imageLines,
+    '',
+    ...lines.slice(insertIndex),
+  ]
+    .join('\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function bodyImageToInlineImage(image, index) {
@@ -934,10 +970,14 @@ function createMailboxService(deps = {}) {
     const date = parsed.date || message.internalDate || new Date();
     const text = options.text || sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
     const primaryBodyImages = Array.isArray(options.primaryBodyImages) ? options.primaryBodyImages : buildMailboxBodyImages(parsed);
+    const storedImages = Array.isArray(options.storedImages) ? options.storedImages : [];
     const bodyImages = mergeMailboxBodyImages(primaryBodyImages, options.storedImages, text, {
       allowUnmatchedFallbacks: true,
     });
-    const preview = truncateText(text.replace(/^\s*\[image:[^\]]+\]\s*$/gim, '').replace(/\s+/g, ' '), 140);
+    const bodyText = storedImages.length && !primaryBodyImages.length
+      ? decorateRecoveredWebdesignImagesText(text, bodyImages)
+      : text;
+    const preview = truncateText(bodyText.replace(/^\s*\[image:[^\]]+\]\s*$/gim, '').replace(/\s+/g, ' '), 140);
     const fromText = folder === 'sent' ? account.name || account.email : displayName(parsed.from?.value);
     return {
       id: `${folder}:${message.uid}`,
@@ -948,7 +988,7 @@ function createMailboxService(deps = {}) {
       to: addressText(parsed.to?.value),
       subject: normalizeString(parsed.subject || '(Geen onderwerp)'),
       preview,
-      body: text || preview,
+      body: bodyText || preview,
       bodyImages,
       inlineImages: bodyImages.map(bodyImageToInlineImage),
       date: date.toISOString(),
