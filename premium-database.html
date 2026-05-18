@@ -1424,7 +1424,7 @@
                             <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
                         <div class="status-filter">
-                            <button class="sf-btn act" data-s="alle" type="button">Alle</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="reactie_ontvangen" type="button">Reactie ontvangen</button><button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
+                            <button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar</button><button class="sf-btn" data-s="alle" type="button">Alle</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="reactie_ontvangen" type="button">Reactie ontvangen</button><button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
@@ -1492,7 +1492,7 @@
             <div class="mrow"><label class="mlabel" for="m-stad">Adres</label><input class="minp" id="m-stad" placeholder="Tilburg"></div>
             <div class="mrow"><label class="mlabel" for="m-status">Status</label>
                 <select class="msel" id="m-status">
-                    <option value="benaderbaar">Benaderbaar</option>
+                    <option value="benaderbaar">Beschikbaar</option>
                     <option value="prospect">Prospect</option>
                     <option value="gebeld">Gebeld</option>
                     <option value="geengehoor">Geen gehoor</option>
@@ -1620,7 +1620,7 @@
             klanten: [],
             orders: [],
             query: "",
-            activeStatus: "alle",
+            activeStatus: "benaderbaar",
             sortKey: "distance",
             sortAsc: true,
             openId: null,
@@ -1764,7 +1764,7 @@
         function buildFallbackHistory(status, updatedAt) {
             const labelMap = {
                 prospect: "Toegevoegd als prospect",
-                benaderbaar: "Gemarkeerd als benaderbaar",
+                benaderbaar: "Gemarkeerd als beschikbaar",
                 gebeld: "Gebeld",
                 geengehoor: "Geen gehoor",
                 gemaild: "Mail verstuurd",
@@ -1836,7 +1836,7 @@
         function createStatusTimelineLabel(status) {
             const labelMap = {
                 prospect: "Toegevoegd als prospect",
-                benaderbaar: "Gemarkeerd als benaderbaar",
+                benaderbaar: "Gemarkeerd als beschikbaar",
                 gebeld: "Belpoging geregistreerd",
                 geengehoor: "Geen gehoor geregistreerd",
                 gemaild: "Mailcontact geregistreerd",
@@ -2270,7 +2270,7 @@
                 afgehaakt: "Afgehaakt",
                 geblokkeerd: "Geen interesse",
                 buiten: "Buiten gebruik",
-                benaderbaar: "Benaderbaar",
+                benaderbaar: "Beschikbaar",
                 geengehoor: "Geen gehoor"
             };
             return labels[status] || "Prospect";
