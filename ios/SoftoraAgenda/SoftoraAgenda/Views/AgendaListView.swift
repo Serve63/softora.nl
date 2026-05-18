@@ -284,10 +284,7 @@ private struct GymWorkoutView: View {
 
     @State private var selectedDay: GymWorkoutDay = .today
     @State private var isChoosingDay = false
-
-    private var exercises: [GymExercise] {
-        selectedDay.exercises
-    }
+    @State private var exercises: [GymExercise] = GymExercisePlanStorage.exercises(for: .today)
 
     var body: some View {
         ZStack {
@@ -303,18 +300,15 @@ private struct GymWorkoutView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("Oefeningen")
-                            .font(.softoraDisplay(18, weight: .bold))
-                            .textCase(.uppercase)
-                            .tracking(1.0)
-                            .foregroundStyle(Color.softoraInk)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 16)
+                        exercisesHeader
 
                         LazyVStack(spacing: 10) {
                             ForEach(exercises) { exercise in
-                                GymExerciseRow(day: selectedDay, exercise: exercise)
+                                GymExerciseSwipeRow(
+                                    day: selectedDay,
+                                    exercise: exercise,
+                                    onDelete: { deleteExercise(exercise) }
+                                )
                                     .id("\(selectedDay.storageID)-\(exercise.id)")
                             }
                         }
@@ -330,6 +324,7 @@ private struct GymWorkoutView: View {
                     selectedDay: selectedDay,
                     onSelect: { day in
                         selectedDay = day
+                        reloadExercises(for: day)
                         isChoosingDay = false
                     },
                     onClose: {
@@ -340,6 +335,35 @@ private struct GymWorkoutView: View {
             }
         }
         .animation(.smooth(duration: 0.24), value: isChoosingDay)
+    }
+
+    private var exercisesHeader: some View {
+        HStack(spacing: 12) {
+            Text("Oefeningen")
+                .font(.softoraDisplay(18, weight: .bold))
+                .textCase(.uppercase)
+                .tracking(1.0)
+                .foregroundStyle(Color.softoraInk)
+
+            Spacer()
+
+            Button(action: addExercise) {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.softoraCrimson)
+                    .frame(width: 40, height: 36)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Oefening toevoegen")
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
     }
 
     private var gymHeader: some View {
@@ -392,6 +416,28 @@ private struct GymWorkoutView: View {
         .padding(.bottom, 14)
         .background(Color.white)
     }
+
+    private func reloadExercises(for day: GymWorkoutDay) {
+        exercises = GymExercisePlanStorage.exercises(for: day)
+    }
+
+    private func addExercise() {
+        let addedExercise = GymExercisePlanStorage.addExercise(for: selectedDay)
+        exercises = GymExercisePlanStorage.exercises(for: selectedDay)
+        UserDefaults.standard.set(
+            addedExercise.title.softoraUppercased,
+            forKey: GymExerciseStorage.key(day: selectedDay, exercise: addedExercise, field: .name)
+        )
+        UserDefaults.standard.set(
+            addedExercise.details.softoraUppercased,
+            forKey: GymExerciseStorage.key(day: selectedDay, exercise: addedExercise, field: .notes)
+        )
+    }
+
+    private func deleteExercise(_ exercise: GymExercise) {
+        GymExercisePlanStorage.deleteExercise(exercise, for: selectedDay)
+        exercises = GymExercisePlanStorage.exercises(for: selectedDay)
+    }
 }
 
 private enum GymWorkoutDay: String, CaseIterable, Identifiable {
@@ -425,10 +471,6 @@ private enum GymWorkoutDay: String, CaseIterable, Identifiable {
         case .sunday:
             "Zondag"
         }
-    }
-
-    var exercises: [GymExercise] {
-        Array(GymExercise.defaultWorkout.prefix(4))
     }
 
     var storageID: String {
@@ -532,6 +574,72 @@ private struct GymDayButton: View {
     }
 }
 
+private struct GymExerciseSwipeRow: View {
+    let day: GymWorkoutDay
+    let exercise: GymExercise
+    let onDelete: () -> Void
+
+    @State private var settledOffset: CGFloat = 0
+    @State private var dragOffset: CGFloat = 0
+
+    private let revealWidth: CGFloat = 112
+
+    private var currentOffset: CGFloat {
+        max(0, min(revealWidth, settledOffset + dragOffset))
+    }
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Button {
+                withAnimation(.smooth(duration: 0.2)) {
+                    onDelete()
+                    settledOffset = 0
+                    dragOffset = 0
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 12, weight: .bold))
+
+                    Text("Verwijder")
+                        .font(.softoraDisplay(11, weight: .bold))
+                        .textCase(.uppercase)
+                        .tracking(0.7)
+                }
+                .foregroundStyle(Color.white)
+                .frame(width: revealWidth, height: 72)
+                .background(Color.softoraCrimson)
+                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            GymExerciseRow(day: day, exercise: exercise)
+                .offset(x: currentOffset)
+                .gesture(
+                    DragGesture(minimumDistance: 18)
+                        .onChanged { value in
+                            guard abs(value.translation.width) > abs(value.translation.height) else {
+                                return
+                            }
+                            dragOffset = max(-settledOffset, min(revealWidth - settledOffset, value.translation.width))
+                        }
+                        .onEnded { value in
+                            guard abs(value.translation.width) > abs(value.translation.height) else {
+                                dragOffset = 0
+                                return
+                            }
+                            let predictedOffset = settledOffset + value.predictedEndTranslation.width
+                            withAnimation(.smooth(duration: 0.22)) {
+                                settledOffset = predictedOffset > revealWidth * 0.48 ? revealWidth : 0
+                                dragOffset = 0
+                            }
+                        }
+                )
+        }
+        .animation(.smooth(duration: 0.2), value: currentOffset)
+    }
+}
+
 private struct GymExerciseRow: View {
     let day: GymWorkoutDay
     let exercise: GymExercise
@@ -631,6 +739,64 @@ private enum GymExerciseStorageField: String {
 private enum GymExerciseStorage {
     static func key(day: GymWorkoutDay, exercise: GymExercise, field: GymExerciseStorageField) -> String {
         "nl.softora.agenda.gym.\(day.storageID).exercise.\(exercise.order).\(field.rawValue)"
+    }
+}
+
+private enum GymExercisePlanStorage {
+    private static let defaultOrders = Array(GymExercise.defaultWorkout.prefix(4)).map(\.order)
+
+    static func exercises(for day: GymWorkoutDay) -> [GymExercise] {
+        orders(for: day).map(exercise(for:))
+    }
+
+    @discardableResult
+    static func addExercise(for day: GymWorkoutDay) -> GymExercise {
+        var storedOrders = orders(for: day)
+        let nextOrder = max((storedOrders + [100]).max() ?? 100, 100) + 1
+        storedOrders.append(nextOrder)
+        saveOrders(storedOrders, for: day)
+        return exercise(for: nextOrder)
+    }
+
+    static func deleteExercise(_ exercise: GymExercise, for day: GymWorkoutDay) {
+        let nextOrders = orders(for: day).filter { $0 != exercise.order }
+        saveOrders(nextOrders, for: day)
+    }
+
+    private static func exercise(for order: Int) -> GymExercise {
+        if let defaultExercise = GymExercise.defaultWorkout.first(where: { $0.order == order }) {
+            return defaultExercise
+        }
+        return GymExercise(order: order, title: "Nieuwe oefening", details: "Notities", defaultSets: "", defaultReps: "")
+    }
+
+    private static func orders(for day: GymWorkoutDay) -> [Int] {
+        let key = orderKey(for: day)
+        guard UserDefaults.standard.object(forKey: key) != nil else {
+            return defaultOrders
+        }
+        let rawValue = UserDefaults.standard.string(forKey: key) ?? ""
+        let storedOrders = rawValue
+            .split(separator: ",")
+            .compactMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        return storedOrders
+    }
+
+    private static func saveOrders(_ orders: [Int], for day: GymWorkoutDay) {
+        let normalizedOrders = orders.reduce(into: [Int]()) { result, order in
+            guard !result.contains(order) else {
+                return
+            }
+            result.append(order)
+        }
+        UserDefaults.standard.set(
+            normalizedOrders.map(String.init).joined(separator: ","),
+            forKey: orderKey(for: day)
+        )
+    }
+
+    private static func orderKey(for day: GymWorkoutDay) -> String {
+        "nl.softora.agenda.gym.\(day.storageID).exercise.order"
     }
 }
 

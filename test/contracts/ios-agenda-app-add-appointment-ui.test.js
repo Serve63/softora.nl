@@ -96,9 +96,15 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /Text\(selectedDay\.title\)/);
   assert.match(agendaListSource, /case \.today:[^]*"Vandaag"/);
   assert.match(agendaListSource, /ForEach\(GymWorkoutDay\.allCases\)/);
-  assert.match(agendaListSource, /Array\(GymExercise\.defaultWorkout\.prefix\(4\)\)/);
-  assert.match(agendaListSource, /GymExerciseRow\(day: selectedDay, exercise: exercise\)/);
+  assert.match(agendaListSource, /GymExercisePlanStorage\.exercises\(for: \.today\)/);
+  assert.match(agendaListSource, /GymExerciseSwipeRow\(/);
+  assert.match(agendaListSource, /GymExerciseRow\(day: day, exercise: exercise\)/);
   assert.ok(agendaListSource.includes('.id("\\(selectedDay.storageID)-\\(exercise.id)")'));
+  assert.match(agendaListSource, /Image\(systemName: "plus"\)/);
+  assert.match(agendaListSource, /addExercise\(\)/);
+  assert.match(agendaListSource, /deleteExercise\(_ exercise: GymExercise\)/);
+  assert.match(agendaListSource, /DragGesture\(minimumDistance: 18\)/);
+  assert.match(agendaListSource, /Image\(systemName: "trash\.fill"\)/);
   assert.doesNotMatch(agendaListSource, /Schema van vandaag/);
   assert.match(agendaListSource, /private struct GymExercise: Identifiable/);
   assert.match(agendaListSource, /isShowingGym = true/);
@@ -119,6 +125,8 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /@AppStorage private var kilograms: String/);
   assert.match(agendaListSource, /private enum GymExerciseStorageField: String/);
   assert.match(agendaListSource, /private enum GymExerciseStorage/);
+  assert.match(agendaListSource, /private enum GymExercisePlanStorage/);
+  assert.match(agendaListSource, /saveOrders\(_ orders: \[Int\], for day: GymWorkoutDay\)/);
   assert.match(agendaListSource, /"nl\.softora\.agenda\.gym\.\\\(day\.storageID\)\.exercise\.\\\(exercise\.order\)\.\\\(field\.rawValue\)"/);
   assert.match(agendaListSource, /TextField\("OEFENING", text: uppercasedExerciseName\)[^]*\.font\(\.softoraDisplay\(14, weight: \.bold\)\)[^]*\.lineLimit\(1\)[^]*\.minimumScaleFactor\(0\.58\)/);
   assert.match(agendaListSource, /TextField\("NOTITIES", text: uppercasedNotes, axis: \.vertical\)[^]*\.lineLimit\(1\.\.\.2\)/);
