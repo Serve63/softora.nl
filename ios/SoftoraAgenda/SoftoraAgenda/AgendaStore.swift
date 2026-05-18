@@ -89,7 +89,6 @@ final class AgendaStore {
 
         do {
             appointments = try await apiClient.fetchAppointments(fresh: fresh)
-                .filter(\.isUpcoming)
                 .sorted { $0.sortKey < $1.sortKey }
         } catch {
             guard !error.isSoftoraCancellation else { return }
@@ -110,7 +109,6 @@ final class AgendaStore {
             if let created = try await apiClient.createManualAppointment(draft) {
                 appointments.append(created)
                 appointments = appointments
-                    .filter(\.isUpcoming)
                     .sorted { $0.sortKey < $1.sortKey }
             }
             await loadAppointments(fresh: true)

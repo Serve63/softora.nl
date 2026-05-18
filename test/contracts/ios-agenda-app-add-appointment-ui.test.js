@@ -90,6 +90,11 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
   assert.match(agendaListSource, /title: "Gym"[^]*systemImage: "dumbbell\.fill"/);
   assert.match(agendaStoreSource, /guard !isRecoverableSupabaseHydrationIssue\(error\) else \{ return \}/);
+  assert.doesNotMatch(
+    agendaStoreSource,
+    /\.filter\(\\\.isUpcoming\)/,
+    'The app must keep past appointments so swiping back to older weeks matches the web agenda.'
+  );
   assert.match(agendaStoreSource, /private func isRecoverableSupabaseHydrationIssue\(_ error: Error\) -> Bool/);
   assert.match(agendaStoreSource, /gedeelde supabase-opslag/);
   assert.match(agendaStoreSource, /niet veilig geladen/);

@@ -143,11 +143,6 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
         )
     }
 
-    var isUpcoming: Bool {
-        guard !date.isEmpty else { return false }
-        return date >= AgendaDateFormatter.todayYMD()
-    }
-
     var sortKey: String {
         "\(date)T\(time)"
     }
