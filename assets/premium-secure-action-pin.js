@@ -373,8 +373,9 @@
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
+      var pin = "";
       try {
-        await confirmMailSend();
+        pin = await confirmMailSend();
       } catch (error) {
         showGuardError(error);
         return;
@@ -382,7 +383,7 @@
       trigger.setAttribute("data-secure-mail-send-pin-skip", "1");
       try {
         if (typeof window.startCampagne === "function") {
-          await window.startCampagne();
+          await window.startCampagne(pin);
         } else {
           trigger.click();
         }

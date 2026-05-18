@@ -76,7 +76,7 @@ test('premium bevestigingsmails bevestigt mailverzending met pincode-bolletjes z
   assert.match(pinSource, /title: "Mails versturen bevestigen"/);
   assert.match(pinSource, /description: "Typ de pincode om te voorkomen dat deze actie per ongeluk start\."/);
   assert.match(pinSource, /data-secure-mail-send-pin/);
-  assert.match(pinSource, /window\.startCampagne/);
+  assert.match(pinSource, /window\.startCampagne\(pin\)/);
   assert.match(pinSource, /fetch\(verifyUrl/);
   assert.match(pinSource, /\/api\/premium-users\/verify-pin/);
   assert.match(pinSource, /autocomplete="one-time-code"/);
@@ -176,7 +176,7 @@ test('premium bevestigingsmails includes lead-generator campaign boot overlay be
   assert.match(pageSource, /function startCampagneImmediate/);
   assert.match(
     pageSource,
-    /function startCampagne\(\) \{[\s\S]*?isPremiumAiLeadGeneratorPath\(\)[\s\S]*?startCampagneWithLeadGeneratorBoot/
+    /function startCampagne\(verifiedMailSendPin\) \{[\s\S]*?isPremiumAiLeadGeneratorPath\(\)[\s\S]*?startCampagneWithLeadGeneratorBoot/
   );
 });
 
@@ -600,9 +600,12 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
   assert.match(pageSource, /aiInstructions: senderProfile && senderProfile\.aiInstructions/);
   assert.match(pageSource, /toneStyle: senderProfile && senderProfile\.toneStyle/);
   assert.match(pageSource, /fetch\('\/api\/coldmailing\/campaigns\/send'/);
-  assert.match(pageSource, /SoftoraRiskyActionPin\.requestMailSendPin/);
+  assert.doesNotMatch(pageSource, /SoftoraRiskyActionPin\.requestMailSendPin/);
   assert.match(pageSource, /startConfirmPin: String\(startConfirmPin \|\| ''\)\.trim\(\)/);
-  assert.match(pageSource, /const startConfirmPin = await \(window\.SoftoraRiskyActionPin && window\.SoftoraRiskyActionPin\.requestMailSendPin/);
+  assert.match(pageSource, /async function startCampagne\(verifiedMailSendPin\)/);
+  assert.match(pageSource, /async function startCampagneImmediate\(verifiedMailSendPin\)/);
+  assert.match(pageSource, /let startConfirmPin = String\(verifiedMailSendPin \|\| ''\)\.trim\(\);/);
+  assert.match(pageSource, /window\.SoftoraSecureActionPin\.confirmMailSend/);
   assert.match(pageSource, /sendResult = await sendColdmailCampaignNow\(startConfirmPin\);/);
   assert.match(pageSource, /credentials: 'same-origin'/);
   assert.match(pageSource, /function buildSendErrorMessage\(defaultMessage\)/);
