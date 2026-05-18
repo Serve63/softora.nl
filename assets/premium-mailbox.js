@@ -313,6 +313,8 @@ function renderMailboxParagraphs(lines, options) {
   const paragraphs = [];
   let currentLines = [];
   const quoteBody = Boolean(options && options.quoteBody);
+  const images = Array.isArray(options && options.images) ? options.images : [];
+  const usedImages = options && options.usedImages instanceof Set ? options.usedImages : new Set();
 
   function flushParagraph() {
     if (!currentLines.length) return;
@@ -320,9 +322,26 @@ function renderMailboxParagraphs(lines, options) {
     currentLines = [];
   }
 
+  function findImageByAlt(alt) {
+    const normalizedAlt = String(alt || '').trim().toLowerCase();
+    if (!normalizedAlt) return null;
+    return images.find((image, index) => {
+      if (usedImages.has(index)) return false;
+      return String(image && image.alt || '').trim().toLowerCase() === normalizedAlt;
+    }) || null;
+  }
+
   lines.forEach((line) => {
     const value = String(line || '');
     const cleaned = quoteBody ? stripMailboxQuotePrefix(value) : value.trimEnd();
+    const imageAlt = cleaned.trim().match(/^\[image:\s*([^\]]+)\]$/i)?.[1] || '';
+    const image = findImageByAlt(imageAlt);
+    if (image) {
+      flushParagraph();
+      usedImages.add(images.indexOf(image));
+      paragraphs.push(renderMailboxInlineImage(image));
+      return;
+    }
     if (!cleaned.trim()) {
       flushParagraph();
       return;
@@ -334,7 +353,14 @@ function renderMailboxParagraphs(lines, options) {
   return paragraphs.join('') || '<p>Geen inhoud.</p>';
 }
 
-function renderMailboxBodySection(section) {
+function renderMailboxInlineImage(image) {
+  const dataUrl = String(image && image.dataUrl || '').trim();
+  if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(dataUrl)) return '';
+  const alt = String(image && image.alt || 'Afbeelding').trim() || 'Afbeelding';
+  return `<figure class="detail-mail-image"><img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async"></figure>`;
+}
+
+function renderMailboxBodySection(section, imageState) {
   if (!section || !Array.isArray(section.lines)) {
     return '<section class="detail-mail-section"><p>Geen inhoud.</p></section>';
   }
@@ -347,23 +373,33 @@ function renderMailboxBodySection(section) {
       <section class="detail-mail-section detail-mail-section-quote">
         <div class="detail-mail-section-label">Eerdere mail</div>
         ${quoteMeta}
-        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true })}</div>
+        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: imageState.images, usedImages: imageState.usedImages })}</div>
       </section>`;
   }
   if (section.type === 'signature') {
     return `
       <section class="detail-mail-section detail-mail-section-signature">
-        ${renderMailboxParagraphs(section.lines)}
+        ${renderMailboxParagraphs(section.lines, imageState)}
       </section>`;
   }
   return `
     <section class="detail-mail-section">
-      ${renderMailboxParagraphs(section.lines)}
+      ${renderMailboxParagraphs(section.lines, imageState)}
     </section>`;
 }
 
-function renderMailBody(value) {
-  return buildMailboxBodySections(value).map((section) => renderMailboxBodySection(section)).join('');
+function normalizeMailboxBodyImages(images) {
+  return (Array.isArray(images) ? images : [])
+    .map((image) => ({
+      alt: String(image && image.alt || '').trim(),
+      dataUrl: String(image && image.dataUrl || '').trim(),
+    }))
+    .filter((image) => image.alt && /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(image.dataUrl));
+}
+
+function renderMailBody(value, images) {
+  const imageState = { images: normalizeMailboxBodyImages(images), usedImages: new Set() };
+  return buildMailboxBodySections(value).map((section) => renderMailboxBodySection(section, imageState)).join('');
 }
 
 function findMailById(id) {
@@ -457,6 +493,7 @@ function normalizeMailboxApiMessage(message) {
   const when = formatMailDate(message.date);
   const body = cleanMailboxText(message.body || message.preview || '');
   const preview = cleanMailboxText(message.preview || body).replace(/\s+/g, ' ').slice(0, 160);
+  const bodyImages = normalizeMailboxBodyImages(message.bodyImages);
   return {
     id: message.id,
     folder: message.folder || activeFolder,
@@ -465,6 +502,7 @@ function normalizeMailboxApiMessage(message) {
     subject: message.subject || '(Geen onderwerp)',
     preview,
     body,
+    bodyImages,
     messageId: message.messageId || '',
     inReplyTo: message.inReplyTo || '',
     references: message.references || '',
@@ -682,7 +720,7 @@ function openMail(id) {
       </div>
     </div>
     <div class="detail-body">
-      <div class="detail-body-text">${renderMailBody(m.body)}</div>
+      <div class="detail-body-text">${renderMailBody(m.body, m.bodyImages)}</div>
       ${outreachQuickbar}
     </div>`;
 }

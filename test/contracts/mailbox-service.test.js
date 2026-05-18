@@ -326,6 +326,79 @@ test('mailbox service resolves Dutch sent folders without special-use metadata',
   assert.equal(messages[0].subject, 'STRATO verzonden bericht');
 });
 
+test('mailbox service exposes inline cid images for mail display placeholders', async () => {
+  const sentDate = new Date('2026-05-18T13:18:00.000Z');
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX' }],
+    messagesByMailbox: {
+      INBOX: [
+        {
+          uid: 44,
+          flags: ['\\Seen'],
+          internalDate: sentDate,
+          source: {
+            date: sentDate,
+            text: [
+              'Ziet er goed uit.',
+              '',
+              'Op ma 18 mei 2026 om 15:18 schreef Servé Creusen',
+              '[image: Softora Testmodus webdesign]',
+              '[image: Softora Testmodus device mockup]',
+            ].join('\n'),
+            html: [
+              '<p>Ziet er goed uit.</p>',
+              '<blockquote>',
+              '<img src="cid:webdesign-softora-test-mode-recipient@softora" alt="Softora Testmodus webdesign">',
+              '<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora" alt="Softora Testmodus device mockup">',
+              '</blockquote>',
+            ].join(''),
+            subject: 'Re: Nieuw webdesign gemaakt',
+            from: { value: [{ name: 'Klant', address: 'klant@example.nl' }] },
+            to: { value: [{ name: 'Serve', address: 'serve@softora.nl' }] },
+            attachments: [
+              {
+                cid: 'webdesign-softora-test-mode-recipient@softora',
+                contentType: 'image/png',
+                content: Buffer.from('webdesign-photo'),
+              },
+              {
+                contentId: '<webdesign-mockup-softora-test-mode-recipient@softora>',
+                contentType: 'image/png',
+                content: Buffer.from('device-mockup-photo'),
+              },
+            ],
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'inbox' });
+
+  assert.equal(messages.length, 1);
+  assert.match(messages[0].body, /\[image: Softora Testmodus webdesign\]/);
+  assert.equal(messages[0].bodyImages.length, 2);
+  assert.deepEqual(
+    messages[0].bodyImages.map((image) => image.alt),
+    ['Softora Testmodus webdesign', 'Softora Testmodus device mockup']
+  );
+  assert.equal(messages[0].bodyImages[0].dataUrl, 'data:image/png;base64,d2ViZGVzaWduLXBob3Rv');
+  assert.equal(messages[0].bodyImages[1].dataUrl, 'data:image/png;base64,ZGV2aWNlLW1vY2t1cC1waG90bw==');
+  assert.doesNotMatch(messages[0].preview, /\[image:/);
+});
+
 test('mailbox service saves app-sent messages into the sent folder', async () => {
   const client = createFakeImapClient({
     boxes: [{ path: 'INBOX' }, { path: 'INBOX/Verstuurd' }],

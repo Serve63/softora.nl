@@ -30,7 +30,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260516a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260518a"><\/script>/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
@@ -128,13 +128,17 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /function cleanMailboxText\(value\)/);
   assert.match(scriptSource, /function isMailboxReplyHeaderLine\(line\)/);
   assert.match(scriptSource, /function buildMailboxBodySections\(value\)/);
-  assert.match(scriptSource, /function renderMailboxBodySection\(section\)/);
-  assert.match(scriptSource, /function renderMailBody\(value\)/);
+  assert.match(scriptSource, /function renderMailboxInlineImage\(image\)/);
+  assert.match(scriptSource, /function normalizeMailboxBodyImages\(images\)/);
+  assert.match(scriptSource, /function renderMailboxBodySection\(section, imageState\)/);
+  assert.match(scriptSource, /function renderMailBody\(value, images\)/);
   assert.match(scriptSource, /sendgrid\\\.net/);
   assert.match(scriptSource, /cdn\.openai\.com/);
   assert.match(scriptSource, /Eerdere mail/);
+  assert.match(scriptSource, /const bodyImages = normalizeMailboxBodyImages\(message\.bodyImages\);/);
   assert.match(scriptSource, /cleanMailboxText\(message\.body \|\| message\.preview \|\| ''\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(m\.body\)\}<\/div>/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(m\.body, m\.bodyImages\)\}<\/div>/);
+  assert.match(scriptSource, /imageAlt = cleaned\.trim\(\)\.match\(\/\^\\\[image:\\s\*\(\[\^\\\]\]\+\)\\\]\$\/i\)/);
 });
 
 test('premium mailbox voorkomt horizontale overflow door brede e-mails', () => {
@@ -165,7 +169,7 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(scriptSource, /data-mailbox-action="toggle-star"/);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(m\.body\)\}<\/div>/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(m\.body, m\.bodyImages\)\}<\/div>/);
 });
 
 test('premium mailbox toont webdesign outreach acties alleen via databasekoppeling', () => {
