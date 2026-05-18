@@ -761,6 +761,8 @@ private struct MailboxView: View {
     @State private var isLoadingAccounts = false
     @State private var isLoadingMessages = false
     @State private var alertMessage: String?
+    @AppStorage("softora.mailbox.accountOrder") private var mailboxAccountOrder = ""
+    @AppStorage("softora.mailbox.pinnedAccount") private var pinnedMailboxAccountEmail = ""
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -799,10 +801,13 @@ private struct MailboxView: View {
                 mailboxContent
 
                 MailboxAccountSelector(
-                    accounts: accounts,
+                    accounts: orderedAccounts,
                     selectedAccount: selectedAccount,
                     isLoading: isLoadingAccounts,
                     isLocked: selectedMessage != nil,
+                    pinnedEmail: pinnedMailboxAccountEmail,
+                    onMove: moveMailboxAccount,
+                    onTogglePin: togglePinnedMailboxAccount,
                     onSelect: selectAccount
                 )
             }
@@ -961,6 +966,10 @@ private struct MailboxView: View {
             : "Deze map is leeg."
     }
 
+    private var orderedAccounts: [MailboxAccount] {
+        Self.sortedMailboxAccounts(accounts, order: mailboxAccountOrder, pinnedEmail: pinnedMailboxAccountEmail)
+    }
+
     private var alertBinding: Binding<Bool> {
         Binding(
             get: { alertMessage != nil },
@@ -982,7 +991,12 @@ private struct MailboxView: View {
             let loadedAccounts = try await apiClient.fetchMailboxAccounts()
             accounts = loadedAccounts
             if selectedAccount == nil || !loadedAccounts.contains(where: { $0.id == selectedAccount?.id }) {
-                selectedAccount = loadedAccounts.first(where: \.imapConfigured) ?? loadedAccounts.first
+                let preferredAccounts = Self.sortedMailboxAccounts(
+                    loadedAccounts,
+                    order: mailboxAccountOrder,
+                    pinnedEmail: pinnedMailboxAccountEmail
+                )
+                selectedAccount = preferredAccounts.first(where: \.imapConfigured) ?? preferredAccounts.first
             }
             await loadMessages()
         } catch {
@@ -1026,10 +1040,59 @@ private struct MailboxView: View {
         Task { await loadMessages() }
     }
 
+    private func moveMailboxAccount(_ account: MailboxAccount, direction: Int) {
+        var emails = orderedAccounts.map(\.email)
+        guard let currentIndex = emails.firstIndex(where: { $0.caseInsensitiveCompare(account.email) == .orderedSame }) else { return }
+        let targetIndex = currentIndex + direction
+        guard emails.indices.contains(targetIndex) else { return }
+        emails.swapAt(currentIndex, targetIndex)
+        mailboxAccountOrder = emails.joined(separator: ",")
+    }
+
+    private func togglePinnedMailboxAccount(_ account: MailboxAccount) {
+        pinnedMailboxAccountEmail = pinnedMailboxAccountEmail.caseInsensitiveCompare(account.email) == .orderedSame
+            ? ""
+            : account.email
+    }
+
     private func selectFolder(_ folder: MailboxFolder) {
         selectedFolder = folder
         isShowingFolderMenu = false
         Task { await loadMessages() }
+    }
+
+    private static func sortedMailboxAccounts(
+        _ accounts: [MailboxAccount],
+        order: String,
+        pinnedEmail: String
+    ) -> [MailboxAccount] {
+        let orderEmails = order
+            .split(separator: ",")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+        var used = Set<String>()
+        var sorted: [MailboxAccount] = []
+
+        for email in orderEmails {
+            guard let account = accounts.first(where: { $0.email.lowercased() == email }), !used.contains(email) else { continue }
+            sorted.append(account)
+            used.insert(email)
+        }
+
+        for account in accounts {
+            let email = account.email.lowercased()
+            guard !used.contains(email) else { continue }
+            sorted.append(account)
+            used.insert(email)
+        }
+
+        let pinned = pinnedEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !pinned.isEmpty, let pinnedIndex = sorted.firstIndex(where: { $0.email.lowercased() == pinned }) {
+            let pinnedAccount = sorted.remove(at: pinnedIndex)
+            sorted.insert(pinnedAccount, at: 0)
+        }
+
+        return sorted
     }
 }
 
@@ -1866,37 +1929,64 @@ private struct MailboxAccountSelector: View {
     let selectedAccount: MailboxAccount?
     let isLoading: Bool
     let isLocked: Bool
+    let pinnedEmail: String
+    let onMove: (MailboxAccount, Int) -> Void
+    let onTogglePin: (MailboxAccount) -> Void
     let onSelect: (MailboxAccount) -> Void
 
     @State private var isExpanded = true
+    @State private var isEditingOrder = false
 
     var body: some View {
         VStack(spacing: 8) {
-            Button {
-                withAnimation(.smooth(duration: 0.22)) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                ZStack {
-                    Text("Kies het gewenste mailadres")
-                        .font(.softoraDisplay(12, weight: .bold))
-                        .textCase(.uppercase)
-                        .tracking(1.0)
-                        .foregroundStyle(Color.softoraMuted)
-                        .frame(maxWidth: .infinity, alignment: .center)
+            ZStack {
+                Text("Kies het gewenste mailadres")
+                    .font(.softoraDisplay(12, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(1.0)
+                    .foregroundStyle(Color.softoraMuted)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
-                    HStack {
-                        Spacer()
+                HStack {
+                    Button {
+                        withAnimation(.smooth(duration: 0.22)) {
+                            if !isExpanded {
+                                isExpanded = true
+                            }
+                            isEditingOrder.toggle()
+                        }
+                    } label: {
+                        Image(systemName: isEditingOrder ? "checkmark" : "arrow.up.arrow.down")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(isEditingOrder ? Color.softoraCrimson : Color.softoraMuted)
+                            .frame(width: 34, height: 30)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isLocked)
+                    .opacity(isLocked ? 0.3 : 1)
+                    .accessibilityLabel(isEditingOrder ? "Volgorde klaar" : "Mailadressen volgorde aanpassen")
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(.smooth(duration: 0.22)) {
+                            isExpanded.toggle()
+                            if !isExpanded {
+                                isEditingOrder = false
+                            }
+                        }
+                    } label: {
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Color.softoraMuted)
+                            .frame(width: 34, height: 30)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(isExpanded ? "Mailadressen inklappen" : "Mailadressen uitklappen")
                 }
-                .padding(.horizontal, 18)
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isExpanded ? "Mailadressen inklappen" : "Mailadressen uitklappen")
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity)
 
             if isExpanded {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -1911,36 +2001,72 @@ private struct MailboxAccountSelector: View {
                                 let isSelected = selectedAccount?.id == account.id
                                 let lockedBackground = isSelected ? Color.softoraCrimson.opacity(0.52) : Color.white.opacity(0.72)
                                 let enabledBackground = isSelected ? Color.softoraCrimson : Color.white
+                                let cardBackground = isLocked ? lockedBackground : enabledBackground
 
-                                Button {
-                                    onSelect(account)
-                                } label: {
-                                    Text(account.email)
-                                        .font(.softoraDisplay(11.5, weight: .bold))
-                                        .textCase(.uppercase)
-                                        .tracking(0.4)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.78)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                    .foregroundStyle(isSelected ? Color.white : (isLocked ? Color.softoraMuted : Color.softoraInk))
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 16)
-                                    .frame(width: 178, alignment: .leading)
-                                    .background(isLocked ? lockedBackground : enabledBackground)
-                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                    .overlay {
-                                        if isSelected && isLocked {
-                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                                .stroke(Color.softoraPurpleLight, lineWidth: 1)
-                                        } else if !isSelected {
-                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                                .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                if isEditingOrder {
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        accountLabel(account, isSelected: isSelected)
+
+                                        HStack(spacing: 8) {
+                                            editIconButton(
+                                                systemName: "chevron.left",
+                                                isDisabled: !canMoveAccount(account, direction: -1),
+                                                isSelected: isSelected
+                                            ) {
+                                                onMove(account, -1)
+                                            }
+
+                                            editIconButton(
+                                                systemName: isPinned(account) ? "pin.fill" : "pin",
+                                                isDisabled: isLocked,
+                                                isSelected: isSelected
+                                            ) {
+                                                onTogglePin(account)
+                                            }
+
+                                            editIconButton(
+                                                systemName: "chevron.right",
+                                                isDisabled: !canMoveAccount(account, direction: 1),
+                                                isSelected: isSelected
+                                            ) {
+                                                onMove(account, 1)
+                                            }
                                         }
                                     }
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 12)
+                                    .frame(width: 196, alignment: .leading)
+                                    .background(cardBackground)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(isPinned(account) ? Color.softoraCrimson : Color.softoraPurpleLight, lineWidth: isPinned(account) ? 1.4 : 1)
+                                    }
                                     .opacity(account.imapConfigured ? (isLocked ? 0.72 : 1) : 0.38)
+                                } else {
+                                    Button {
+                                        onSelect(account)
+                                    } label: {
+                                        accountLabel(account, isSelected: isSelected)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 16)
+                                            .frame(width: 178, alignment: .leading)
+                                            .background(cardBackground)
+                                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                            .overlay {
+                                                if isSelected && isLocked {
+                                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                        .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                                } else if !isSelected {
+                                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                        .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                                                }
+                                            }
+                                            .opacity(account.imapConfigured ? (isLocked ? 0.72 : 1) : 0.38)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(isLocked)
                                 }
-                                .buttonStyle(.plain)
-                                .disabled(isLocked)
                             }
                         }
                     }
@@ -1952,6 +2078,58 @@ private struct MailboxAccountSelector: View {
         .padding(.top, 10)
         .padding(.bottom, 10)
         .background(Color.white)
+    }
+
+    private func accountLabel(_ account: MailboxAccount, isSelected: Bool) -> some View {
+        HStack(spacing: 7) {
+            Text(account.email)
+                .font(.softoraDisplay(11.5, weight: .bold))
+                .textCase(.uppercase)
+                .tracking(0.4)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if isPinned(account) {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 10, weight: .bold))
+            }
+        }
+        .foregroundStyle(isSelected ? Color.white : (isLocked ? Color.softoraMuted : Color.softoraInk))
+    }
+
+    private func editIconButton(
+        systemName: String,
+        isDisabled: Bool,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(isSelected ? Color.softoraCrimson : Color.softoraInk)
+                .frame(width: 42, height: 30)
+                .background(isSelected ? Color.white : Color.softoraSheetBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.35 : 1)
+    }
+
+    private func isPinned(_ account: MailboxAccount) -> Bool {
+        pinnedEmail.caseInsensitiveCompare(account.email) == .orderedSame
+    }
+
+    private func canMoveAccount(_ account: MailboxAccount, direction: Int) -> Bool {
+        guard !isLocked, !isPinned(account), direction != 0 else { return false }
+        let movableAccounts = accounts.filter { !isPinned($0) }
+        guard let currentIndex = movableAccounts.firstIndex(where: { $0.id == account.id }) else { return false }
+        return movableAccounts.indices.contains(currentIndex + direction)
     }
 }
 
