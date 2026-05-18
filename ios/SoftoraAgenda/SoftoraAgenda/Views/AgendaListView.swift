@@ -423,7 +423,7 @@ private enum GymWorkoutDay: String, CaseIterable, Identifiable {
     }
 
     var exercises: [GymExercise] {
-        GymExercise.defaultWorkout
+        Array(GymExercise.defaultWorkout.prefix(4))
     }
 }
 

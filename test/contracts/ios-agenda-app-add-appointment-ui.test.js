@@ -71,6 +71,7 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /Text\(selectedDay\.title\)/);
   assert.match(agendaListSource, /case \.today:[^]*"Vandaag"/);
   assert.match(agendaListSource, /ForEach\(GymWorkoutDay\.allCases\)/);
+  assert.match(agendaListSource, /Array\(GymExercise\.defaultWorkout\.prefix\(4\)\)/);
   assert.doesNotMatch(agendaListSource, /Schema van vandaag/);
   assert.match(agendaListSource, /private struct GymExercise: Identifiable/);
   assert.match(agendaListSource, /isShowingGym = true/);
