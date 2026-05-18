@@ -49,6 +49,8 @@ test('premium flynow gebruikt losse assets en lokale reisfoto\'s voor collage en
   assert.match(css, /body\[data-flynow-type="sneeuw"\] \.ts-btn\.active\{background:linear-gradient\(135deg,#38bdf8,#818cf8\);color:#04131f\}/);
   assert.match(css, /@media \(min-width:901px\)\{[\s\S]*\.bg-canvas\{left:var\(--premium-sidebar-width,320px\)\}/);
   assert.match(css, /\.flynow-nav\{left:var\(--premium-sidebar-width,320px\)\}/);
+  assert.match(css, /\.deals-shell\{[\s\S]*var\(--flynow-cream\)/);
+  assert.match(css, /\.deals-grid\{[\s\S]*grid-template-columns: repeat\(auto-fill,minmax\(230px,1fr\)\)/);
   assert.doesNotMatch(css, /flynow-particle/);
   assert.doesNotMatch(css, /flynowDrift/);
   assert.match(css, /\.trips-grid\{[\s\S]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);

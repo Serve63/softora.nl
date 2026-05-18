@@ -599,3 +599,147 @@ body[data-flynow-type="sneeuw"] .ts-btn.active{background:linear-gradient(135deg
   .collage-btn{left:16px;bottom:16px}
   .toast{left:16px;right:16px;text-align:center}
 }
+
+
+/* Fly Now deals page */
+:where( body[data-flynow-page] .flynow-main,body[data-flynow-page] .flynow-main *,body[data-flynow-page] .flynow-main *::before,body[data-flynow-page] .flynow-main *::after ){box-sizing: border-box;margin: 0;padding: 0}
+body[data-flynow-page]{--flynow-brand: #8b2252;--flynow-brand-hover: #a3275f;--flynow-cream: #f6f1ea;--flynow-cream-dark: #ede5d8;--flynow-cream-mid: #e8e0d0;--flynow-text-dark: #1e1018;--flynow-text-mid: #6b5060;--flynow-text-light: #a08898;--flynow-white: #ffffff;--flynow-shadow: rgba(139,34,82,0.1);min-height: 100vh;background: var(--flynow-cream);color: var(--flynow-text-dark);font-family: "SoftoraInter","Inter",system-ui,sans-serif}
+body[data-flynow-page] .flynow-main :is(button,a){appearance: none;-webkit-appearance: none;font: inherit;line-height: 1;text-decoration: none;-webkit-tap-highlight-color: transparent}
+body[data-flynow-page] .sidebar{z-index: 120 !important}
+body[data-flynow-page] .sidebar-nav{overflow-x: hidden !important;overflow-y: auto !important}
+.dashboard-layout[data-sidebar-shell="canonical"]>.flynow-main{width: calc(100% - var(--premium-sidebar-width,320px)) !important;min-height: 100vh !important;padding: 0 !important;background: var(--flynow-cream) !important;color: var(--flynow-text-dark) !important;overflow: visible !important}
+.deals-shell{min-height: 100vh;background: radial-gradient(circle at 86% 8%,rgba(139,34,82,0.08),transparent 28%),linear-gradient(180deg,#fbfaf7 0%,var(--flynow-cream) 42%,#f4eee5 100%)}
+.deals-header{position: sticky;top: 0;z-index: 50;padding: 0 32px;background: var(--flynow-brand);box-shadow: 0 2px 20px rgba(0,0,0,0.18)}
+.deals-header-top{display: flex;align-items: center;justify-content: space-between;gap: 24px;padding: 16px 0 0}
+.deals-logo{display: inline-flex;align-items: center;gap: 12px;color: var(--flynow-white)}
+.deals-logo-icon{width: 36px;height: 36px;border-radius: 8px;background: var(--flynow-cream);position: relative;flex: 0 0 auto}
+.deals-logo-icon::before,.deals-logo-icon::after{content: "";position: absolute;background: var(--flynow-brand);transform-origin: center}
+.deals-logo-icon::before{width: 18px;height: 4px;left: 9px;top: 16px;border-radius: 999px 999px 2px 2px;transform: rotate(-18deg)}
+.deals-logo-icon::after{width: 6px;height: 18px;left: 15px;top: 9px;border-radius: 999px;transform: rotate(60deg)}
+.deals-logo-text{display: block;font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 22px;font-weight: 700;letter-spacing: 3px;line-height: 1;text-transform: uppercase}
+.deals-logo-sub{display: block;margin-top: 3px;color: rgba(255,255,255,0.55);font-size: 10px;letter-spacing: 2px;line-height: 1.2;text-transform: uppercase}
+.deals-header-meta{color: rgba(255,255,255,0.6);font-size: 12px;line-height: 1.45;text-align: right}
+.deals-header-meta strong{display: block;color: rgba(255,255,255,0.9);font-size: 13px}
+.deals-tabs{display: flex;gap: 0;margin-top: 16px}
+.deals-tab{display: inline-flex;align-items: center;gap: 8px;border: 0;border-bottom: 3px solid transparent;padding: 12px 28px 14px;background: transparent;color: rgba(255,255,255,0.5);cursor: pointer;font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 14px;font-weight: 600;letter-spacing: 1.5px;text-transform: uppercase;transition: color 0.2s ease,background 0.2s ease,border-color 0.2s ease}
+.deals-tab.active{border-color: var(--flynow-cream);background: rgba(255,255,255,0.07);color: var(--flynow-white)}
+.deals-tab:hover:not(.active){color: rgba(255,255,255,0.82)}
+.deals-tab-mark{width: 16px;height: 16px;position: relative;display: inline-block;flex: 0 0 auto}
+.deals-tab-mark--sun{border: 2px solid currentColor;border-radius: 50%}
+.deals-tab-mark--sun::before,.deals-tab-mark--sun::after,.deals-tab-mark--snow::before,.deals-tab-mark--snow::after{content: "";position: absolute;left: 50%;top: 50%;width: 20px;height: 2px;border-radius: 999px;background: currentColor}
+.deals-tab-mark--sun::before{transform: translate(-50%,-50%)}
+.deals-tab-mark--sun::after{transform: translate(-50%,-50%) rotate(90deg)}
+.deals-tab-mark--snow{border-left: 2px solid currentColor;transform: rotate(90deg)}
+.deals-tab-mark--snow::before{transform: translate(-50%,-50%) rotate(30deg)}
+.deals-tab-mark--snow::after{transform: translate(-50%,-50%) rotate(-30deg)}
+.deals-main{width: min(1100px,100%);margin: 0 auto;padding: 32px 24px 60px}
+.deals-panel{display: none}
+.deals-panel.active{display: block}
+.hero-deal{position: relative;display: flex;align-items: center;justify-content: space-between;gap: 20px;margin-bottom: 32px;overflow: hidden;border-radius: 16px;background: var(--flynow-brand);padding: 28px 32px}
+.hero-deal::before,.hero-deal::after{content: "";position: absolute;border-radius: 50%;background: rgba(255,255,255,0.05);pointer-events: none}
+.hero-deal::before{right: -40px;top: -60px;width: 240px;height: 240px}
+.hero-deal::after{right: 40px;bottom: -80px;width: 180px;height: 180px}
+.hero-label{margin-bottom: 6px;color: var(--flynow-cream);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 11px;font-weight: 600;letter-spacing: 2px;opacity: 0.75;text-transform: uppercase}
+.hero-title{margin-bottom: 8px;color: var(--flynow-white);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 28px;font-weight: 700;letter-spacing: 1px;line-height: 1.05;text-transform: uppercase}
+.hero-details{display: flex;flex-wrap: wrap;gap: 9px 12px;color: rgba(255,255,255,0.68);font-size: 13px}
+.hero-detail{display: inline-flex;align-items: center;gap: 5px}
+.hero-detail::before{content: "";width: 5px;height: 5px;border-radius: 50%;background: rgba(246,241,234,0.62)}
+.hero-detail--urgent{color: #ffcf86}
+.hero-right{position: relative;z-index: 1;flex: 0 0 auto;text-align: right}
+.hero-old-price{margin-bottom: 2px;color: rgba(255,255,255,0.45);font-size: 14px;text-decoration: line-through}
+.hero-price{color: var(--flynow-cream);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 42px;font-weight: 700;line-height: 1}
+.hero-price span{font-size: 20px;font-weight: 400}
+.hero-pp{margin-bottom: 14px;color: rgba(246,241,234,0.65);font-size: 12px}
+.hero-btn{border: 0;border-radius: 8px;background: var(--flynow-cream);color: var(--flynow-brand);cursor: pointer;font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 13px;font-weight: 600;letter-spacing: 1.5px;padding: 10px 22px;text-transform: uppercase;transition: transform 0.18s ease,background 0.18s ease;white-space: nowrap}
+.hero-btn:hover{background: var(--flynow-white);transform: translateY(-1px)}
+.deals-filters{display: flex;flex-wrap: wrap;gap: 8px;margin-bottom: 22px}
+.chip{border: 1.5px solid rgba(139,34,82,0.2);border-radius: 20px;background: var(--flynow-white);color: var(--flynow-brand);cursor: pointer;font-size: 12px;font-weight: 500;padding: 6px 16px;transition: background 0.15s ease,border-color 0.15s ease,color 0.15s ease;white-space: nowrap}
+.chip.active,.chip:hover{border-color: var(--flynow-brand);background: var(--flynow-brand);color: var(--flynow-white)}
+.section-header{display: flex;align-items: flex-end;justify-content: space-between;gap: 12px;margin-bottom: 18px}
+.section-title{color: var(--flynow-brand);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 20px;font-weight: 700;letter-spacing: 1px;line-height: 1.15;text-transform: uppercase}
+.section-sub{margin-top: 3px;color: var(--flynow-text-light);font-size: 12px}
+.see-all{flex: 0 0 auto;border: 1.5px solid var(--flynow-brand);border-radius: 6px;background: transparent;color: var(--flynow-brand);cursor: pointer;font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 12px;font-weight: 600;letter-spacing: 1px;padding: 6px 14px;text-transform: uppercase;transition: background 0.15s ease,color 0.15s ease;white-space: nowrap}
+.see-all:hover{background: var(--flynow-brand);color: var(--flynow-white)}
+.deals-grid{display: grid;grid-template-columns: repeat(auto-fill,minmax(230px,1fr));gap: 18px;margin-bottom: 36px}
+.deal-card{position: relative;overflow: hidden;border: 1px solid rgba(139,34,82,0.08);border-radius: 14px;background: var(--flynow-white);cursor: pointer;transition: transform 0.2s ease,box-shadow 0.2s ease}
+.deal-card:hover{box-shadow: 0 12px 32px var(--flynow-shadow);transform: translateY(-4px)}
+.deal-card-media{position: relative;display: flex;align-items: flex-end;justify-content: flex-end;min-height: 150px;background-color: var(--flynow-cream-mid);background-position: center;background-size: cover}
+.deal-card-media::after{content: "";position: absolute;inset: 0;background: linear-gradient(180deg,rgba(30,16,24,0.05),rgba(30,16,24,0.42))}
+.deal-photo--mallorca{background-image: url("/assets/flynow/flynow-zon-photo-5.jpg")}
+.deal-photo--santorini{background-image: url("/assets/flynow/flynow-zon-photo-1.jpg")}
+.deal-photo--antalya{background-image: url("/assets/flynow/flynow-zon-photo-9.jpg")}
+.deal-photo--algarve{background-image: url("/assets/flynow/flynow-zon-photo-8.jpg")}
+.deal-photo--hurghada{background-image: url("/assets/flynow/flynow-zon-photo-6.jpg")}
+.deal-photo--tenerife{background-image: url("/assets/flynow/flynow-zon-photo-3.jpg")}
+.deal-photo--innsbruck{background-image: url("/assets/flynow/flynow-sneeuw-photo-5.jpg")}
+.deal-photo--zermatt{background-image: url("/assets/flynow/flynow-sneeuw-photo-1.jpg")}
+.deal-photo--campiglio{background-image: url("/assets/flynow/flynow-sneeuw-photo-7.jpg")}
+.deal-photo--deux-alpes{background-image: url("/assets/flynow/flynow-sneeuw-photo-3.jpg")}
+.deal-photo--andorra{background-image: url("/assets/flynow/flynow-sneeuw-photo-6.jpg")}
+.deal-photo--kitzbuhel{background-image: url("/assets/flynow/flynow-sneeuw-photo-8.jpg")}
+.badge{position: absolute;left: 10px;top: 10px;z-index: 2;border-radius: 4px;background: var(--flynow-brand);color: var(--flynow-white);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 10px;font-weight: 600;letter-spacing: 1px;padding: 4px 10px;text-transform: uppercase}
+.badge--hot{background: #c84a00}
+.badge--sale{background: #1a6e3c}
+.badge--new{background: #1a4a8a}
+.deal-country{position: relative;z-index: 2;margin: 0 12px 10px 0;color: rgba(255,255,255,0.9);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 30px;font-weight: 700;letter-spacing: 1px;text-shadow: 0 3px 18px rgba(0,0,0,0.45)}
+.deal-card-body{padding: 14px 16px 16px}
+.deal-card-dest{margin-bottom: 4px;color: var(--flynow-text-dark);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 16px;font-weight: 700;letter-spacing: 0.5px;line-height: 1.15;text-transform: uppercase}
+.deal-card-info{margin-bottom: 12px;color: var(--flynow-text-light);font-size: 12px;line-height: 1.5}
+.deal-card-bottom{display: flex;align-items: flex-end;justify-content: space-between;gap: 8px}
+.deal-card-price-old{margin-bottom: 1px;color: #bbb;font-size: 11px;line-height: 1;text-decoration: line-through}
+.deal-card-price{color: var(--flynow-brand);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 22px;font-weight: 700;line-height: 1}
+.deal-card-price sub{bottom: 0;color: var(--flynow-text-light);font-size: 12px;font-weight: 400}
+.deal-card-btn{flex: 0 0 auto;border: 0;border-radius: 6px;background: var(--flynow-brand);color: var(--flynow-white);cursor: pointer;font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 11px;font-weight: 600;letter-spacing: 1px;padding: 8px 14px;text-transform: uppercase;transition: background 0.15s ease;white-space: nowrap}
+.deal-card-btn:hover{background: var(--flynow-brand-hover)}
+.deals-strip{scroll-margin-top: 120px;margin-bottom: 32px;border: 1px solid rgba(139,34,82,0.1);border-radius: 12px;background: var(--flynow-cream-dark);padding: 20px 24px}
+.strip-title{display: flex;align-items: center;gap: 8px;margin-bottom: 14px;color: var(--flynow-brand);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 16px;font-weight: 700;letter-spacing: 1px;line-height: 1.2;text-transform: uppercase}
+.strip-title::before{content: "";width: 8px;height: 18px;background: var(--flynow-brand);clip-path: polygon(52% 0,0 56%,42% 56%,30% 100%,100% 42%,56% 42%)}
+.strip-items{display: flex;gap: 12px;overflow-x: auto;padding-bottom: 4px;scrollbar-width: thin}
+.strip-item{flex: 0 0 auto;display: flex;flex-direction: column;gap: 3px;border: 1px solid rgba(139,34,82,0.1);border-radius: 10px;background: var(--flynow-white);cursor: pointer;padding: 14px 18px;text-align: left;transition: border-color 0.15s ease,transform 0.15s ease;white-space: nowrap}
+.strip-item:hover{border-color: var(--flynow-brand);transform: translateY(-2px)}
+.strip-dest{color: var(--flynow-text-dark);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 14px;font-weight: 700;line-height: 1.15;text-transform: uppercase}
+.strip-date{color: var(--flynow-text-light);font-size: 11px}
+.strip-price{color: var(--flynow-brand);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 18px;font-weight: 700;line-height: 1}
+.deals-footer{display: flex;flex-direction: column;gap: 6px;align-items: center;justify-content: center;background: var(--flynow-brand);color: rgba(255,255,255,0.5);font-size: 12px;letter-spacing: 1px;padding: 20px 32px;text-align: center}
+.deals-footer strong{color: rgba(255,255,255,0.85);font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 13px;letter-spacing: 2px}
+.flynow-toast{position: fixed;right: 24px;bottom: 24px;z-index: 140;max-width: min(360px,calc(100vw - 48px));border: 1px solid rgba(139,34,82,0.2);border-radius: 999px;background: rgba(255,255,255,0.92);box-shadow: 0 12px 28px rgba(30,16,24,0.16);color: var(--flynow-brand);font-size: 12px;font-weight: 700;opacity: 0;padding: 10px 18px;pointer-events: none;transform: translateY(8px);transition: opacity 0.25s ease,transform 0.25s ease}
+.flynow-toast.on{opacity: 1;transform: none}
+@keyframes flynowFadeUp{from{opacity: 0;transform: translateY(16px)}
+to{opacity: 1;transform: translateY(0)}
+}
+.deals-panel.active .hero-deal,.deals-panel.active .deals-grid .deal-card,.deals-panel.active .deals-strip{animation: flynowFadeUp 0.35s ease both}
+.deals-panel.active .deals-grid .deal-card:nth-child(2){animation-delay: 0.05s}
+.deals-panel.active .deals-grid .deal-card:nth-child(3){animation-delay: 0.10s}
+.deals-panel.active .deals-grid .deal-card:nth-child(4){animation-delay: 0.15s}
+.deals-panel.active .deals-grid .deal-card:nth-child(5){animation-delay: 0.20s}
+.deals-panel.active .deals-grid .deal-card:nth-child(6){animation-delay: 0.25s}
+@media (min-width: 901px){body[data-flynow-page] .sidebar{position: fixed !important;box-sizing: border-box !important;top: 0 !important;left: 0 !important;width: var(--premium-sidebar-width,320px) !important;height: 100vh !important;min-height: 100vh !important;max-height: 100vh !important;overflow: hidden !important;padding-top: 16px !important}
+body[data-flynow-page] .sidebar-logo{padding: 0 22px !important;margin-bottom: 8px !important;font-size: 24px !important}
+body[data-flynow-page] .sidebar-section{margin-bottom: 4px !important}
+body[data-flynow-page] .sidebar-section-label{padding: 0 22px !important;margin-bottom: 1px !important;font-size: 9px !important;line-height: 1.2 !important;letter-spacing: 0.12em !important}
+body[data-flynow-page] .sidebar-link{gap: 8px !important;padding: 2px 22px !important;font-size: 12.5px !important;line-height: 1.08 !important}
+body[data-flynow-page] .sidebar-flow-section .sidebar-link{padding-left: 30px !important}
+body[data-flynow-page] .sidebar-link svg,body[data-flynow-page] .sidebar-link .sidebar-link-lock .sidebar-link-lock-icon{width: 16px !important;height: 16px !important}
+body[data-flynow-page] .sidebar-flow-section::before{top: 54px !important;bottom: 8px !important;left: 9px !important;width: 9px !important}
+body[data-flynow-page] .sidebar-footer{padding: 5px 22px !important}
+body[data-flynow-page] .sidebar-user{min-height: 28px !important}
+body[data-flynow-page] .sidebar-user-info{min-height: 28px !important}
+body[data-flynow-page] .sidebar-avatar{width: 28px !important;height: 28px !important;font-size: 10px !important}
+body[data-flynow-page] .sidebar-user-name{font-size: 12px !important;line-height: 1.05 !important}
+body[data-flynow-page] .sidebar-footer .sidebar-user .sidebar-user-role{display: none !important}
+.dashboard-layout[data-sidebar-shell="canonical"]>.flynow-main{margin-left: var(--premium-sidebar-width,320px) !important}
+}
+@media (max-width: 900px){.dashboard-layout[data-sidebar-shell="canonical"]>.flynow-main{width: 100% !important;margin-left: 0 !important}
+.deals-header{position: sticky}
+}
+@media (max-width: 720px){.deals-header{padding: 0 16px}
+.deals-main{padding: 20px 14px 40px}
+.deals-header-meta{display: none}
+.deals-tab{flex: 1 1 0;justify-content: center;padding: 10px 12px 12px;font-size: 12px}
+.hero-deal{flex-direction: column;align-items: flex-start}
+.hero-right{text-align: left}
+.hero-price{font-size: 32px}
+.section-header{align-items: flex-start;flex-direction: column}
+.deal-card-media{min-height: 165px}
+.flynow-toast{left: 16px;right: 16px;max-width: none;text-align: center}
+}
