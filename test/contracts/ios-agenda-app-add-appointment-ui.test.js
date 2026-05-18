@@ -101,7 +101,9 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /private var uppercasedNotes: Binding<String>/);
   assert.doesNotMatch(agendaListSource, /premium-mailbox/);
   assert.match(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
-  assert.match(agendaListSource, /title: "Gym"[^]*systemImage: "dumbbell\.fill"/);
+  assert.match(agendaListSource, /Text\("Servé's logboek"\)/);
+  assert.match(agendaListSource, /title: "Servé's logboek"[^]*systemImage: "dumbbell\.fill"/);
+  assert.doesNotMatch(agendaListSource, /Text\("Gym"\)/);
   assert.match(agendaStoreSource, /guard !isRecoverableSupabaseHydrationIssue\(error\) else \{ return \}/);
   assert.doesNotMatch(
     agendaStoreSource,

@@ -344,11 +344,14 @@ private struct GymWorkoutView: View {
     private var gymHeader: some View {
         ZStack {
             VStack(spacing: 2) {
-                Text("Gym")
-                    .font(.softoraDisplay(22, weight: .bold))
+                Text("Servé's logboek")
+                    .font(.softoraDisplay(19, weight: .bold))
                     .textCase(.uppercase)
                     .tracking(1.0)
                     .foregroundStyle(Color.softoraInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .allowsTightening(true)
 
                 Button {
                     isChoosingDay = true
@@ -697,7 +700,7 @@ private struct AgendaShortcutBar: View {
 
             if showGymShortcut {
                 AgendaShortcutButton(
-                    title: "Gym",
+                    title: "Servé's logboek",
                     systemImage: "dumbbell.fill",
                     action: onOpenGym
                 )
@@ -725,6 +728,9 @@ private struct AgendaShortcutButton: View {
                     .font(.softoraDisplay(13, weight: .bold))
                     .textCase(.uppercase)
                     .tracking(0.8)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+                    .allowsTightening(true)
             }
             .foregroundStyle(Color.softoraInk)
             .frame(maxWidth: .infinity)
