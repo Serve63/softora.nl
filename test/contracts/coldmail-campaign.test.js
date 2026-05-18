@@ -2336,6 +2336,62 @@ test('coldmail campaign saves sent copies into the selected sender sent folder',
   assert.match(String(appendedMessages[0].raw), /Subject: Nieuwe website voor Bakkerij Zon/);
 });
 
+test('coldmail campaign saves sent copies with the selected mailbox account imap settings', async () => {
+  const appendedMessages = [];
+  const imapConfigs = [];
+  const client = {
+    usable: true,
+    async connect() {},
+    async list() {
+      return [{ path: 'INBOX' }, { path: 'INBOX/Verzonden', specialUse: '\\Sent' }];
+    },
+    async append(mailboxName, raw, flags) {
+      appendedMessages.push({ mailboxName, raw, flags });
+      return { path: mailboxName };
+    },
+    async logout() {
+      this.usable = false;
+    },
+  };
+  const { service } = createService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.strato.com',
+        smtpPort: 465,
+        smtpSecure: true,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-smtp-secret',
+        imapHost: 'imap.strato.com',
+        imapPort: 993,
+        imapSecure: true,
+        imapUser: 'serve@softora.nl',
+        imapPass: 'serve-imap-secret',
+      },
+    ]),
+    createImapClient: (config) => {
+      imapConfigs.push(config);
+      return client;
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.sentItems[0].sentCopySaved, true);
+  assert.equal(imapConfigs[0].host, 'imap.strato.com');
+  assert.equal(imapConfigs[0].auth.user, 'serve@softora.nl');
+  assert.equal(imapConfigs[0].auth.pass, 'serve-imap-secret');
+  assert.equal(appendedMessages.length, 1);
+  assert.equal(appendedMessages[0].mailboxName, 'INBOX/Verzonden');
+});
+
 test('coldmail campaign refuses to send when SMTP is not configured', async () => {
   const { service } = createService({ smtpHost: '' });
 

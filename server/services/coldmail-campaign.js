@@ -290,6 +290,11 @@ function createColdmailCampaignService(deps = {}) {
       smtpSecure: Boolean(smtpSecure),
       smtpUser,
       smtpPass,
+      imapHost,
+      imapPort: Number(imapPort),
+      imapSecure: Boolean(imapSecure),
+      imapUser,
+      imapPass,
     };
   }
 
@@ -299,6 +304,7 @@ function createColdmailCampaignService(deps = {}) {
     if (account) {
       const email = normalizeEmailAddress(account.email);
       return {
+        ...account,
         email,
         name: normalizeString(SENDER_DISPLAY_NAMES[email] || account.name),
         smtpHost: account.smtpHost,
@@ -988,46 +994,74 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function resolveSentCopyAccount(senderEmail) {
-    const email = normalizeEmailAddress(senderEmail || mailFromAddress || smtpUser || imapUser);
+  function resolveSentCopyAccount(senderEmail, senderAccount = null) {
+    const email = normalizeEmailAddress(
+      senderEmail ||
+        (senderAccount && senderAccount.email) ||
+        mailFromAddress ||
+        smtpUser ||
+        imapUser
+    );
     const envAccount = readMailboxEnvForKey(envKeyForEmail(email));
     const envDomain = readMailboxEnvForKey(envKeyForDomain(email));
+    const configuredAccount =
+      senderAccount && normalizeEmailAddress(senderAccount.email) === email
+        ? senderAccount
+        : getConfiguredMailboxSmtpAccounts().find((item) => normalizeEmailAddress(item.email) === email);
     const useBaseCredentials =
       email === normalizeEmailAddress(mailFromAddress) ||
       email === normalizeEmailAddress(smtpUser) ||
       email === normalizeEmailAddress(imapUser) ||
       envAccount.useBaseCredentials ||
       envDomain.useBaseCredentials;
-    const port = Number(envAccount.imapPort || envDomain.imapPort || imapPort || 993) || 993;
+    const port =
+      Number(
+        (configuredAccount && configuredAccount.imapPort) ||
+          envAccount.imapPort ||
+          envDomain.imapPort ||
+          imapPort ||
+          993
+      ) || 993;
     const secure =
-      typeof envAccount.imapSecure === 'boolean'
+      configuredAccount && typeof configuredAccount.imapSecure === 'boolean'
+        ? Boolean(configuredAccount.imapSecure)
+        : typeof envAccount.imapSecure === 'boolean'
         ? envAccount.imapSecure
         : typeof envDomain.imapSecure === 'boolean'
           ? envDomain.imapSecure
           : Boolean(imapSecure || port === 993);
     const account = {
       email,
-      imapHost: normalizeString(envAccount.imapHost || envDomain.imapHost || imapHost),
+      imapHost: normalizeString(
+        (configuredAccount && configuredAccount.imapHost) ||
+          envAccount.imapHost ||
+          envDomain.imapHost ||
+          imapHost
+      ),
       imapPort: port,
       imapSecure: secure,
       imapUser: normalizeString(
-        envAccount.imapUser ||
+        (configuredAccount && configuredAccount.imapUser) ||
+          envAccount.imapUser ||
           envDomain.imapUser ||
           (useBaseCredentials ? imapUser : '') ||
+          (configuredAccount && configuredAccount.smtpUser) ||
           email
       ),
       imapPass: normalizeString(
-        envAccount.imapPass ||
+        (configuredAccount && configuredAccount.imapPass) ||
+          envAccount.imapPass ||
           envDomain.imapPass ||
-          (useBaseCredentials ? imapPass : '')
+          (useBaseCredentials ? imapPass : '') ||
+          (configuredAccount && configuredAccount.smtpPass)
       ),
     };
     return account;
   }
 
-  async function saveSentCopy(senderEmail, mail, info) {
+  async function saveSentCopy(senderEmail, mail, info, senderAccount = null) {
     return appendSentMessage({
-      account: resolveSentCopyAccount(senderEmail),
+      account: resolveSentCopyAccount(senderEmail, senderAccount),
       createImapClient,
       nodemailer,
       mail,
@@ -2199,7 +2233,7 @@ function createColdmailCampaignService(deps = {}) {
       references: references || undefined,
     };
     const info = await transporter.sendMail(mail);
-    await saveSentCopy(senderEmail, mail, info);
+    await saveSentCopy(senderEmail, mail, info, delivery.account);
     return info;
   }
 
@@ -2972,7 +3006,7 @@ function createColdmailCampaignService(deps = {}) {
         if (rejected.includes(normalizeEmailAddress(to)) || (Array.isArray(info && info.accepted) && !accepted.length)) {
           throw new Error('SMTP accepteerde de ontvanger niet.');
         }
-        const sentCopySaved = await saveSentCopy(senderEmail, mail, info);
+        const sentCopySaved = await saveSentCopy(senderEmail, mail, info, smtpAccount);
         sent.push({
           id: item.id,
           bedrijf: getRowCompany(row),
