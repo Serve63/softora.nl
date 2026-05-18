@@ -40,6 +40,7 @@ test('ios agenda add appointment keeps appointment target separate from meeting 
 });
 
 test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => {
+  const modelsSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Models.swift');
   const agendaListSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AgendaListView.swift');
   const addViewSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AddAppointmentView.swift');
   const agendaStoreSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/AgendaStore.swift');
@@ -61,10 +62,26 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   );
   assert.match(agendaListSource, /MailboxView\(apiClient: SoftoraAPIClient\(\)\)/);
   assert.match(agendaListSource, /private struct MailboxView: View/);
-  assert.match(agendaListSource, /Text\(readableBody\)/);
+  assert.match(modelsSource, /struct MailboxLink: Identifiable, Decodable, Hashable/);
+  assert.match(modelsSource, /struct MailboxInlineImage: Identifiable, Decodable, Hashable/);
+  assert.match(modelsSource, /let links: \[MailboxLink\]/);
+  assert.match(modelsSource, /let inlineImages: \[MailboxInlineImage\]/);
+  assert.match(agendaListSource, /MailboxBodyView\(presentation: bodyPresentation\)/);
+  assert.match(agendaListSource, /private struct MailboxBodyView: View/);
+  assert.match(agendaListSource, /private struct MailboxBodySectionView: View/);
+  assert.match(agendaListSource, /private struct MailboxInlineImageView: View/);
+  assert.match(agendaListSource, /Image\(uiImage: uiImage\)/);
+  assert.match(agendaListSource, /AsyncImage\(url: remoteURL\)/);
+  assert.match(agendaListSource, /private struct MailboxBodyLinkView: View/);
+  assert.match(agendaListSource, /Link\(destination: destination\)/);
+  assert.match(agendaListSource, /MailboxBodySection\(title: "Reactie"/);
+  assert.match(agendaListSource, /MailboxBodySection\(title: "Eerdere mail"/);
   assert.match(agendaListSource, /private enum MailboxBodyFormatter/);
+  assert.match(agendaListSource, /static func presentation\(rawBody: String, images: \[MailboxInlineImage\], links: \[MailboxLink\]\) -> MailboxBodyPresentation/);
   assert.match(agendaListSource, /static func readable\(_ rawBody: String\) -> String/);
   assert.match(agendaListSource, /\.map\(stripQuotePrefix\)/);
+  assert.match(agendaListSource, /imagePlaceholderLabel\(from: trimmed\)/);
+  assert.match(agendaListSource, /uniqueLinks\(links\)/);
   assert.match(agendaListSource, /while output\.trimmingCharacters\(in: \.whitespaces\)\.hasPrefix\(">"\)/);
   assert.doesNotMatch(agendaListSource, /Text\(\(message\.body\.isEmpty \? message\.preview : message\.body\)\.trimmingCharacters/);
   assert.match(agendaListSource, /GymWorkoutView\(\)/);

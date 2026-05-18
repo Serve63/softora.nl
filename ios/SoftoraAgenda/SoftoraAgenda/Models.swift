@@ -172,6 +172,8 @@ struct MailboxMessage: Identifiable, Decodable, Hashable {
     let subject: String
     let preview: String
     let body: String
+    let links: [MailboxLink]
+    let inlineImages: [MailboxInlineImage]
     let date: String
     let unread: Bool
     let starred: Bool
@@ -186,6 +188,8 @@ struct MailboxMessage: Identifiable, Decodable, Hashable {
         case subject
         case preview
         case body
+        case links
+        case inlineImages
         case date
         case unread
         case starred
@@ -201,6 +205,8 @@ struct MailboxMessage: Identifiable, Decodable, Hashable {
         subject: String,
         preview: String,
         body: String,
+        links: [MailboxLink] = [],
+        inlineImages: [MailboxInlineImage] = [],
         date: String,
         unread: Bool = false,
         starred: Bool = false
@@ -214,6 +220,8 @@ struct MailboxMessage: Identifiable, Decodable, Hashable {
         self.subject = subject
         self.preview = preview
         self.body = body
+        self.links = links
+        self.inlineImages = inlineImages
         self.date = date
         self.unread = unread
         self.starred = starred
@@ -233,11 +241,30 @@ struct MailboxMessage: Identifiable, Decodable, Hashable {
             subject: (try? container.decode(String.self, forKey: .subject)) ?? "(Geen onderwerp)",
             preview: (try? container.decode(String.self, forKey: .preview)) ?? "",
             body: (try? container.decode(String.self, forKey: .body)) ?? "",
+            links: (try? container.decode([MailboxLink].self, forKey: .links)) ?? [],
+            inlineImages: (try? container.decode([MailboxInlineImage].self, forKey: .inlineImages)) ?? [],
             date: (try? container.decode(String.self, forKey: .date)) ?? "",
             unread: (try? container.decode(Bool.self, forKey: .unread)) ?? false,
             starred: (try? container.decode(Bool.self, forKey: .starred)) ?? false
         )
     }
+}
+
+struct MailboxLink: Identifiable, Decodable, Hashable {
+    let label: String
+    let href: String
+
+    var id: String { "\(label)-\(href)" }
+}
+
+struct MailboxInlineImage: Identifiable, Decodable, Hashable {
+    let id: String
+    let cid: String
+    let alt: String
+    let filename: String
+    let contentType: String
+    let contentBase64: String
+    let url: String
 }
 
 enum Planner: String, CaseIterable, Codable, Identifiable {

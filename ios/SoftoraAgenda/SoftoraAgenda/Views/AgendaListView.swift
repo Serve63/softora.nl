@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AgendaListView: View {
     let store: AgendaStore
@@ -1237,17 +1238,7 @@ private struct MailboxMessageDetail: View {
                     MailboxDetailMeta(label: "Datum", value: MailboxDateFormatter.label(message.date))
                 }
 
-                Text(readableBody)
-                    .font(.softoraBody(14))
-                    .foregroundStyle(Color.softoraInk)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.softoraPurpleLight, lineWidth: 1)
-                    }
+                MailboxBodyView(presentation: bodyPresentation)
 
                 replyComposer
             }
@@ -1402,8 +1393,12 @@ private struct MailboxMessageDetail: View {
             !replyBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private var readableBody: String {
-        MailboxBodyFormatter.readable(message.body.isEmpty ? message.preview : message.body)
+    private var bodyPresentation: MailboxBodyPresentation {
+        MailboxBodyFormatter.presentation(
+            rawBody: message.body.isEmpty ? message.preview : message.body,
+            images: message.inlineImages,
+            links: message.links
+        )
     }
 
     private func improveReply() async {
@@ -1494,7 +1489,223 @@ private struct MailboxMessageDetail: View {
     }
 }
 
+private struct MailboxBodyView: View {
+    let presentation: MailboxBodyPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(presentation.sections) { section in
+                MailboxBodySectionView(section: section)
+            }
+        }
+    }
+}
+
+private struct MailboxBodySectionView: View {
+    let section: MailboxBodySection
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(section.isQuoted ? Color.softoraMuted.opacity(0.35) : Color.softoraCrimson)
+                .frame(width: 4)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(section.title)
+                    .font(.softoraDisplay(11, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(0.9)
+                    .foregroundStyle(section.isQuoted ? Color.softoraMuted : Color.softoraCrimson)
+
+                ForEach(section.blocks) { block in
+                    switch block {
+                    case .text(let text, _):
+                        Text(text)
+                            .font(.softoraBody(14))
+                            .foregroundStyle(Color.softoraInk)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    case .image(let image, _):
+                        MailboxInlineImageView(image: image)
+                    case .link(let link, _):
+                        MailboxBodyLinkView(link: link)
+                    }
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(section.isQuoted ? Color.softoraSheetBackground : Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(section.isQuoted ? Color.softoraPurpleLight : Color.softoraCrimson.opacity(0.28), lineWidth: 1)
+        }
+    }
+}
+
+private struct MailboxInlineImageView: View {
+    let image: MailboxInlineImage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            imageContent
+
+            if !image.alt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(image.alt.softoraUppercased)
+                    .font(.softoraDisplay(10, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+                    .foregroundStyle(Color.softoraMuted)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var imageContent: some View {
+        if let uiImage {
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.softoraPurpleLight, lineWidth: 1)
+                }
+        } else if let remoteURL {
+            AsyncImage(url: remoteURL) { phase in
+                switch phase {
+                case .success(let renderedImage):
+                    renderedImage
+                        .resizable()
+                        .scaledToFit()
+                case .failure:
+                    MailboxImagePlaceholder(text: "AFBEELDING KON NIET LADEN")
+                case .empty:
+                    MailboxImagePlaceholder(text: "AFBEELDING LADEN")
+                @unknown default:
+                    MailboxImagePlaceholder(text: "AFBEELDING LADEN")
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.softoraPurpleLight, lineWidth: 1)
+            }
+        }
+    }
+
+    private var uiImage: UIImage? {
+        guard
+            !image.contentBase64.isEmpty,
+            let data = Data(base64Encoded: image.contentBase64)
+        else {
+            return nil
+        }
+        return UIImage(data: data)
+    }
+
+    private var remoteURL: URL? {
+        URL(string: image.url)
+    }
+}
+
+private struct MailboxImagePlaceholder: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.softoraDisplay(11, weight: .bold))
+            .textCase(.uppercase)
+            .tracking(0.8)
+            .foregroundStyle(Color.softoraMuted)
+            .frame(maxWidth: .infinity)
+            .frame(height: 150)
+            .background(Color.softoraPurpleLight.opacity(0.38))
+    }
+}
+
+private struct MailboxBodyLinkView: View {
+    let link: MailboxLink
+
+    var body: some View {
+        if let destination = URL(string: link.href) {
+            Link(destination: destination) {
+                HStack(spacing: 8) {
+                    Image(systemName: "link")
+                        .font(.system(size: 12, weight: .bold))
+
+                    Text((link.label.isEmpty ? link.href : link.label).softoraUppercased)
+                        .font(.softoraDisplay(12, weight: .bold))
+                        .textCase(.uppercase)
+                        .tracking(0.8)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.78)
+                }
+                .foregroundStyle(Color.softoraCrimson)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 11)
+                .background(Color.softoraPurpleLight.opacity(0.45))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+    }
+}
+
+private struct MailboxBodyPresentation {
+    let sections: [MailboxBodySection]
+}
+
+private struct MailboxBodySection: Identifiable {
+    let id = UUID()
+    let title: String
+    let blocks: [MailboxBodyBlock]
+    let isQuoted: Bool
+}
+
+private enum MailboxBodyBlock: Identifiable {
+    case text(String, UUID = UUID())
+    case image(MailboxInlineImage, UUID = UUID())
+    case link(MailboxLink, UUID = UUID())
+
+    var id: UUID {
+        switch self {
+        case .text(_, let id), .image(_, let id), .link(_, let id):
+            id
+        }
+    }
+}
+
 private enum MailboxBodyFormatter {
+    static func presentation(rawBody: String, images: [MailboxInlineImage], links: [MailboxLink]) -> MailboxBodyPresentation {
+        let blocks = blocks(from: rawBody, images: images, links: links)
+        let splitIndex = blocks.firstIndex { block in
+            if case .text(let text, _) = block {
+                return isReplyHeader(text)
+            }
+            return false
+        }
+
+        if let splitIndex, splitIndex > 0 {
+            let replyBlocks = Array(blocks[..<splitIndex])
+            let originalBlocks = Array(blocks[splitIndex...])
+            return MailboxBodyPresentation(
+                sections: [
+                    MailboxBodySection(title: "Reactie", blocks: replyBlocks, isQuoted: false),
+                    MailboxBodySection(title: "Eerdere mail", blocks: originalBlocks, isQuoted: true),
+                ].filter { !$0.blocks.isEmpty }
+            )
+        }
+
+        return MailboxBodyPresentation(
+            sections: [
+                MailboxBodySection(title: "Bericht", blocks: blocks.isEmpty ? [.text("Geen inhoud")] : blocks, isQuoted: false),
+            ]
+        )
+    }
+
     static func readable(_ rawBody: String) -> String {
         rawBody
             .replacingOccurrences(of: "\r\n", with: "\n")
@@ -1503,6 +1714,105 @@ private enum MailboxBodyFormatter {
             .map(stripQuotePrefix)
             .joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func blocks(from rawBody: String, images: [MailboxInlineImage], links: [MailboxLink]) -> [MailboxBodyBlock] {
+        let lines = readable(rawBody).components(separatedBy: "\n")
+        var output: [MailboxBodyBlock] = []
+        var paragraph: [String] = []
+        var unusedImages = images
+
+        func flushParagraph() {
+            let text = paragraph
+                .joined(separator: "\n")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty {
+                output.append(.text(text))
+            }
+            paragraph.removeAll()
+        }
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                flushParagraph()
+                continue
+            }
+
+            if let imageLabel = imagePlaceholderLabel(from: trimmed) {
+                flushParagraph()
+                if let image = takeImage(matching: imageLabel, from: &unusedImages) {
+                    output.append(.image(image))
+                }
+                continue
+            }
+
+            if isReplyHeader(trimmed) {
+                flushParagraph()
+                output.append(.text(trimmed))
+                continue
+            }
+
+            paragraph.append(line)
+        }
+        flushParagraph()
+
+        for image in unusedImages {
+            output.append(.image(image))
+        }
+        for link in uniqueLinks(links) {
+            output.append(.link(link))
+        }
+        return output
+    }
+
+    private static func imagePlaceholderLabel(from line: String) -> String? {
+        guard line.lowercased().hasPrefix("[image:") && line.hasSuffix("]") else {
+            return nil
+        }
+        return String(line.dropFirst(7).dropLast())
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func takeImage(matching label: String, from images: inout [MailboxInlineImage]) -> MailboxInlineImage? {
+        if let exactIndex = images.firstIndex(where: { normalizedImageText($0.alt) == normalizedImageText(label) }) {
+            return images.remove(at: exactIndex)
+        }
+        if let looseIndex = images.firstIndex(where: { normalizedImageText($0.alt).contains(normalizedImageText(label)) || normalizedImageText(label).contains(normalizedImageText($0.alt)) }) {
+            return images.remove(at: looseIndex)
+        }
+        guard !images.isEmpty else {
+            return nil
+        }
+        return images.removeFirst()
+    }
+
+    private static func normalizedImageText(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: ".png", with: "")
+            .replacingOccurrences(of: ".jpg", with: "")
+            .replacingOccurrences(of: ".jpeg", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func uniqueLinks(_ links: [MailboxLink]) -> [MailboxLink] {
+        var seen = Set<String>()
+        return links.filter { link in
+            guard !link.href.isEmpty, !seen.contains(link.href) else {
+                return false
+            }
+            seen.insert(link.href)
+            return true
+        }
+    }
+
+    private static func isReplyHeader(_ text: String) -> Bool {
+        let lowercased = text.lowercased()
+        return lowercased.hasPrefix("op ") && lowercased.contains(" schreef") ||
+            lowercased.hasPrefix("on ") && lowercased.contains(" wrote") ||
+            lowercased.hasPrefix("from:") ||
+            lowercased.hasPrefix("van:")
     }
 
     private static func stripQuotePrefix(from line: String) -> String {

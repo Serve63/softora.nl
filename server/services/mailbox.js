@@ -11,6 +11,7 @@ const DEFAULT_MAILBOX_EMAILS = [
 ];
 const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MAILBOX_DRAFT_MODEL = 'gpt-5.5-pro';
+const MAX_INLINE_IMAGE_BYTES = 5_000_000;
 
 const FOLDER_ALIASES = {
   inbox: ['INBOX'],
@@ -329,9 +330,131 @@ function createMailboxService(deps = {}) {
     );
   }
 
+  function decodeHtmlEntities(value) {
+    return normalizeString(value)
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'");
+  }
+
+  function stripHtmlTags(value) {
+    return decodeHtmlEntities(String(value || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '));
+  }
+
+  function readHtmlAttribute(tag, name) {
+    const pattern = new RegExp(`${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i');
+    const match = String(tag || '').match(pattern);
+    return decodeHtmlEntities(match ? match[2] || match[3] || match[4] || '' : '');
+  }
+
+  function normalizeCid(value) {
+    return normalizeString(value)
+      .replace(/^cid:/i, '')
+      .replace(/[<>]/g, '')
+      .trim()
+      .toLowerCase();
+  }
+
+  function fileBaseName(value) {
+    return normalizeString(value).replace(/\.[a-z0-9]{2,5}$/i, '');
+  }
+
+  function safeUrl(value) {
+    const url = normalizeString(value);
+    if (/^(https?:|mailto:|tel:)/i.test(url)) return url;
+    return '';
+  }
+
+  function extractHtmlLinks(html) {
+    const links = [];
+    const seen = new Set();
+    const source = String(html || '');
+    for (const match of source.matchAll(/<a\b[^>]*href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
+      const href = safeUrl(match[2] || match[3] || match[4] || '');
+      if (!href || seen.has(href)) continue;
+      seen.add(href);
+      links.push({
+        label: stripHtmlTags(match[5] || href) || href,
+        href,
+      });
+    }
+    return links.slice(0, 12);
+  }
+
+  function extractHtmlImageHints(html) {
+    const hints = [];
+    const source = String(html || '');
+    for (const match of source.matchAll(/<img\b[^>]*>/gi)) {
+      const tag = match[0] || '';
+      const src = readHtmlAttribute(tag, 'src');
+      const cid = normalizeCid(src);
+      const url = safeUrl(src);
+      hints.push({
+        cid,
+        url,
+        alt: readHtmlAttribute(tag, 'alt'),
+      });
+    }
+    return hints;
+  }
+
+  function attachmentContentBase64(attachment) {
+    const content = attachment && attachment.content;
+    if (!content) return '';
+    const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+    if (!buffer.length || buffer.length > MAX_INLINE_IMAGE_BYTES) return '';
+    return buffer.toString('base64');
+  }
+
+  function extractInlineImages(parsed) {
+    const htmlHints = extractHtmlImageHints(parsed && parsed.html);
+    const images = [];
+    const seen = new Set();
+    const attachments = Array.isArray(parsed && parsed.attachments) ? parsed.attachments : [];
+    for (const attachment of attachments) {
+      const contentType = normalizeString(attachment && attachment.contentType).toLowerCase();
+      if (!contentType.startsWith('image/')) continue;
+      const cid = normalizeCid(attachment.cid || attachment.contentId);
+      const hint = htmlHints.find((item) => item.cid && item.cid === cid) || {};
+      const contentBase64 = attachmentContentBase64(attachment);
+      if (!contentBase64) continue;
+      const filename = normalizeString(attachment.filename);
+      const id = cid || filename || `image-${images.length + 1}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      images.push({
+        id,
+        cid,
+        alt: hint.alt || fileBaseName(filename) || 'Afbeelding',
+        filename,
+        contentType,
+        contentBase64,
+        url: '',
+      });
+    }
+    for (const hint of htmlHints) {
+      if (!hint.url || seen.has(hint.url)) continue;
+      seen.add(hint.url);
+      images.push({
+        id: hint.url,
+        cid: '',
+        alt: hint.alt || 'Afbeelding',
+        filename: '',
+        contentType: '',
+        contentBase64: '',
+        url: hint.url,
+      });
+    }
+    return images.slice(0, 8);
+  }
+
   function toClientMessage(parsed, message, folder, account) {
     const date = parsed.date || message.internalDate || new Date();
-    const text = normalizeString(parsed.text || parsed.html || '');
+    const html = normalizeString(parsed.html || '');
+    const text = normalizeString(parsed.text || stripHtmlTags(html));
     const preview = truncateText(text.replace(/\s+/g, ' '), 140);
     const fromText = folder === 'sent' ? account.name || account.email : displayName(parsed.from?.value);
     return {
@@ -344,6 +467,8 @@ function createMailboxService(deps = {}) {
       subject: normalizeString(parsed.subject || '(Geen onderwerp)'),
       preview,
       body: text || preview,
+      links: extractHtmlLinks(html),
+      inlineImages: extractInlineImages(parsed),
       date: date.toISOString(),
       unread: !Array.from(message.flags || []).includes('\\Seen'),
       starred: Array.from(message.flags || []).includes('\\Flagged'),

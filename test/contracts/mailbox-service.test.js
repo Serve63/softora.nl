@@ -337,6 +337,75 @@ test('mailbox service filters belangrijk from flagged inbox messages', async () 
   assert.equal(res.body.messages[0].folder, 'starred');
 });
 
+test('mailbox service exposes inline mail images and html links for the iOS mailbox reader', async () => {
+  const imageContent = Buffer.from('fake-image-bytes');
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async () => ({ release() {} }),
+      search: async () => [1],
+      fetch: async function* () {
+        yield {
+          uid: 1,
+          flags: [],
+          internalDate: new Date('2026-05-18T10:00:00Z'),
+          source: {
+            date: new Date('2026-05-18T10:00:00Z'),
+            from: { value: [{ name: 'Klant', address: 'klant@example.nl' }] },
+            to: { value: [{ address: 'serve@softora.nl' }] },
+            subject: 'Webdesign',
+            text: 'Ziet er goed uit.\n[image: Softora Testmodus webdesign]\nGeen webdesign willen ontvangen? Laat het me weten!',
+            html: [
+              '<p>Ziet er goed uit.</p>',
+              '<img src="cid:webdesign-1@softora" alt="Softora Testmodus webdesign">',
+              '<p><a href="https://softora.nl/geen-webdesign">Geen webdesign willen ontvangen?</a> Laat het me weten!</p>',
+            ].join(''),
+            attachments: [
+              {
+                cid: 'webdesign-1@softora',
+                filename: 'Softora Testmodus webdesign.png',
+                contentType: 'image/png',
+                content: imageContent,
+              },
+            ],
+          },
+        };
+      },
+      logout: async () => {},
+    }),
+    parseMailSource: async (source) => source,
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'inbox', limit: '10' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  const message = res.body.messages[0];
+  assert.equal(message.inlineImages.length, 1);
+  assert.equal(message.inlineImages[0].alt, 'Softora Testmodus webdesign');
+  assert.equal(message.inlineImages[0].contentType, 'image/png');
+  assert.equal(message.inlineImages[0].contentBase64, imageContent.toString('base64'));
+  assert.deepEqual(message.links, [
+    {
+      label: 'Geen webdesign willen ontvangen?',
+      href: 'https://softora.nl/geen-webdesign',
+    },
+  ]);
+});
+
 test('mailbox service returns empty reclame folder when no matching mailbox exists', async () => {
   const service = createMailboxService({
     mailboxAccountsRaw: JSON.stringify([
