@@ -438,3 +438,85 @@
   bindEvents();
   setType(currentType);
 })();
+
+
+(function () {
+  "use strict";
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function setActiveDealPanel(mode) {
+    var selectedMode = mode === "snow" ? "snow" : "zon";
+    document.body.setAttribute("data-flynow-type", selectedMode);
+    document.querySelectorAll("[data-flynow-tab]").forEach(function (button) {
+      var isActive = button.getAttribute("data-flynow-tab") === selectedMode;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    document.querySelectorAll("[data-flynow-panel]").forEach(function (panel) {
+      var isActive = panel.getAttribute("data-flynow-panel") === selectedMode;
+      panel.classList.toggle("active", isActive);
+      panel.hidden = !isActive;
+    });
+  }
+
+  function bindTabs() {
+    document.querySelectorAll("[data-flynow-tab]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        setActiveDealPanel(button.getAttribute("data-flynow-tab"));
+      });
+    });
+  }
+
+  function bindFilters() {
+    document.querySelectorAll(".deals-filters").forEach(function (filtersEl) {
+      filtersEl.querySelectorAll(".chip").forEach(function (chip) {
+        chip.addEventListener("click", function () {
+          filtersEl.querySelectorAll(".chip").forEach(function (item) {
+            item.classList.remove("active");
+          });
+          chip.classList.add("active");
+        });
+      });
+    });
+  }
+
+  function showToast(message) {
+    var toast = byId("flynow-toast");
+    if (!toast) return;
+    toast.textContent = String(message || "");
+    toast.classList.add("on");
+    window.clearTimeout(showToast.lastTimer);
+    showToast.lastTimer = window.setTimeout(function () {
+      toast.classList.remove("on");
+    }, 2600);
+  }
+
+  function bindDealActions() {
+    document.querySelectorAll(".deal-action").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var title = button.getAttribute("data-deal-title") || "deze deal";
+        showToast(title + " staat klaar om te boeken.");
+      });
+    });
+  }
+
+  function bindScrollButtons() {
+    document.querySelectorAll("[data-scroll-target]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var target = byId(button.getAttribute("data-scroll-target"));
+        if (target && typeof target.scrollIntoView === "function") {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    });
+  }
+
+  bindTabs();
+  bindFilters();
+  bindDealActions();
+  bindScrollButtons();
+  setActiveDealPanel("zon");
+})();
