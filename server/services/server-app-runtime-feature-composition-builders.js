@@ -360,6 +360,23 @@ function buildServerAppFeatureWiringRuntimeContext({
         fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
         usdToEurRate: Number(env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR || 0),
       },
+      supabaseCostSummary: {
+        env,
+        supabaseManagementAccessToken: shared.normalizeString(
+          env.SUPABASE_MANAGEMENT_ACCESS_TOKEN || env.SUPABASE_ACCESS_TOKEN || env.SUPABASE_PERSONAL_ACCESS_TOKEN || ''
+        ),
+        supabaseProjectRef: shared.normalizeString(env.SUPABASE_PROJECT_REF || env.SUPABASE_PROJECT_ID || ''),
+        supabaseUrl: envConfig.SUPABASE_URL || env.SUPABASE_URL || '',
+        supabaseMonthlyBaseCostEur: Number(
+          env.SUPABASE_MONTHLY_BASE_COST_EUR || env.SUPABASE_BILLING_BASE_EUR || env.SUPABASE_PLAN_COST_EUR || 0
+        ),
+        supabaseMonthlyBaseCostUsd: Number(
+          env.SUPABASE_MONTHLY_BASE_COST_USD || env.SUPABASE_BILLING_BASE_USD || env.SUPABASE_PLAN_COST_USD || 0
+        ),
+        supabaseManagementApiBaseUrl: env.SUPABASE_MANAGEMENT_API_BASE_URL || '',
+        fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
+        usdToEurRate: Number(env.SUPABASE_COST_USD_TO_EUR || env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR || 0),
+      },
       getUiStateValues: uiSeoRuntime.getUiStateValues,
       setUiStateValues: uiSeoRuntime.setUiStateValues,
     },
