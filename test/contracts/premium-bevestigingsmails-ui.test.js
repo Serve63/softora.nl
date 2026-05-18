@@ -189,10 +189,14 @@ test('premium bevestigingsmails campaign volume uses a fixed mail company label'
   assert.doesNotMatch(pageSource, /campaign-count-mode-label/);
   assert.doesNotMatch(pageSource, /Hoeveel afspraken inplannen\?/);
   assert.match(pageSource, /<div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen\?<\/div>/);
-  assert.match(pageSource, /<input class="slider" type="range" min="5" max="30" step="5" value="10" id="mail-slider"/);
-  assert.match(pageSource, /const COLDMAIL_VOLUME_CONTROL = \{ min: 5, max: 30, step: 5, value: 10/);
+  assert.match(pageSource, /<input class="field-val campaign-volume-input" id="slider-val" type="number" min="1" max="30" step="1" value="10"[\s\S]*onfocus="this\.select\(\)" oninput="updateSlider\(this\.value\)" onblur="updateSlider\(this\.value\)"/);
+  assert.match(pageSource, /<input class="slider" type="range" min="1" max="30" step="1" value="10" id="mail-slider"/);
+  assert.match(pageSource, /const COLDMAIL_VOLUME_CONTROL = \{ min: 1, max: 30, step: 1, value: 10/);
   assert.match(pageSource, /const COLDCALL_VOLUME_CONTROL = \{ min: 10, max: 500, step: 10, value: 100/);
   assert.match(pageSource, /campaignVolumeLabel\.textContent = 'Hoeveel bedrijven bellen\?';/);
+  assert.match(pageSource, /const raw = Number\.parseInt\(v \|\| \(slider && slider\.value\) \|\| min, 10\);/);
+  assert.match(pageSource, /Math\.max\(min, Math\.min\(max, Number\.isFinite\(raw\) \? raw : min\)\)/);
+  assert.match(pageSource, /input\.setAttribute\('aria-label', isPremiumAiLeadGeneratorPath\(\) \? 'Aantal bedrijven bellen' : 'Aantal bedrijven mailen'\);/);
   assert.doesNotMatch(pageSource, /Aantal te mailen bedrijven/);
 });
 
@@ -289,7 +293,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /hydrateCampaignCompanyCountFromSupabase\(\),/);
   assert.match(pageSource, /setCampaignRecipientListOpen\(false\);/);
   assert.match(pageSource, /function configureCampaignVolumeControl\(\)/);
-  assert.match(pageSource, /document\.getElementById\('slider-val'\)\.textContent = String\(value\);\s*renderCampaignCompanyCount\(value\);/);
+  assert.match(pageSource, /if \(slider\) slider\.value = String\(value\); if \(input\) input\.value = String\(value\);\s*renderCampaignCompanyCount\(value\);/);
   assert.match(pageSource, /configureCampaignVolumeControl\(\);\s*updateSlider\(document\.getElementById\('mail-slider'\)/);
   assert.match(pageSource, /if \(actualTotal <= 0\) \{[\s\S]*showToast\(firstFailure \|\| 'Er staan nog geen bedrijven met een klaar website-design voor deze campagne\.'\);[\s\S]*await hydrateCampaignCompanyCountFromSupabase\(\);[\s\S]*return;/);
   assert.match(pageSource, /if \(actualTotal < n\) showToast\(actualTotal \+ ' bedrijf' \+ \(actualTotal === 1 \? '' : 'en'\) \+ ' zijn klaar met website-design en worden meegenomen\.'\);/);

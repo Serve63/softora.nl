@@ -437,7 +437,7 @@ html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { dis
 .field { margin-bottom: 18px; position: relative; }
 .field.is-open { z-index: 25; }
 .field-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); margin-bottom: 8px; display: block; }
-.field-val { font-family: 'Oswald', sans-serif; font-size: 28px; font-weight: 700; color: var(--crimson); line-height: 1; margin-bottom: 6px; }
+.field-val { font-family: 'Oswald', sans-serif; font-size: 28px; font-weight: 700; color: var(--crimson); line-height: 1; margin-bottom: 6px; } .campaign-volume-input { width: 2.4em; max-width: 100%; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 0 2px 2px 0; outline: none; cursor: text; appearance: textfield; } .campaign-volume-input:focus { border-bottom-color: rgba(155,35,85,.34); color: var(--crimson); } .campaign-volume-input::-webkit-outer-spin-button, .campaign-volume-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 .slider { width: 100%; -webkit-appearance: none; height: 4px; border-radius: 2px; background: var(--border); outline: none; cursor: pointer; }
 .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--crimson); cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
@@ -1252,9 +1252,9 @@ Softora.nl | +31 6 43 26 27 92</textarea>
       <div class="campagne-body">
         <div class="field">
           <div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen?</div>
-          <div class="field-val" id="slider-val">10</div>
-          <input class="slider" type="range" min="5" max="30" step="5" value="10" id="mail-slider" oninput="updateSlider(this.value)">
-          <div class="slider-row" id="campaignVolumeSliderLabels"><span>5</span><span>20</span><span>30</span></div>
+          <input class="field-val campaign-volume-input" id="slider-val" type="number" min="1" max="30" step="1" value="10" inputmode="numeric" aria-label="Aantal bedrijven mailen" onfocus="this.select()" oninput="updateSlider(this.value)" onblur="updateSlider(this.value)">
+          <input class="slider" type="range" min="1" max="30" step="1" value="10" id="mail-slider" oninput="updateSlider(this.value)">
+          <div class="slider-row" id="campaignVolumeSliderLabels"><span>1</span><span>15</span><span>30</span></div>
         </div>
 
         <div class="field lead-generator-hidden-setting">
@@ -1444,7 +1444,7 @@ const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';
 const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';
-const COLDMAIL_VOLUME_CONTROL = { min: 5, max: 30, step: 5, value: 10, labels: ['5', '20', '30'] };
+const COLDMAIL_VOLUME_CONTROL = { min: 1, max: 30, step: 1, value: 10, labels: ['1', '15', '30'] };
 const COLDCALL_VOLUME_CONTROL = { min: 10, max: 500, step: 10, value: 100, labels: ['10', '250', '500'] };
 const COLDMAIL_TEST_COMPANIES = ['mcv e-commerce'];
 const COLDMAIL_AUTO_REPLY_ENABLED = false;
@@ -2012,13 +2012,13 @@ function genBedrijven(n) {
 // ── SLIDER ──
 function configureCampaignVolumeControl() {
   const slider = document.getElementById('mail-slider');
-  const labels = document.getElementById('campaignVolumeSliderLabels');
+  const labels = document.getElementById('campaignVolumeSliderLabels'), input = document.getElementById('slider-val');
   if (!slider) return;
   const config = isPremiumAiLeadGeneratorPath() ? COLDCALL_VOLUME_CONTROL : COLDMAIL_VOLUME_CONTROL;
   slider.min = String(config.min);
   slider.max = String(config.max);
   slider.step = String(config.step);
-  slider.value = String(config.value);
+  slider.value = String(config.value); if (input) { input.min = String(config.min); input.max = String(config.max); input.step = String(config.step); input.value = String(config.value); input.setAttribute('aria-label', isPremiumAiLeadGeneratorPath() ? 'Aantal bedrijven bellen' : 'Aantal bedrijven mailen'); }
   if (labels) {
     labels.innerHTML = config.labels.map(function (label) {
       return '<span>' + label + '</span>';
@@ -2028,11 +2028,11 @@ function configureCampaignVolumeControl() {
 
 function updateSlider(v) {
   const slider = document.getElementById('mail-slider');
-  const value = Number(v || (slider && slider.value) || 0);
-  const min = Number(slider ? slider.min : 0) || 0;
-  const max = Number(slider ? slider.max : 100) || 100;
+  const input = document.getElementById('slider-val'), min = Number(slider ? slider.min : 1) || 1, max = Number(slider ? slider.max : 30) || 30;
+  const raw = Number.parseInt(v || (slider && slider.value) || min, 10);
+  const value = Math.max(min, Math.min(max, Number.isFinite(raw) ? raw : min));
   const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
-  document.getElementById('slider-val').textContent = String(value);
+  if (slider) slider.value = String(value); if (input) input.value = String(value);
   renderCampaignCompanyCount(value);
   if (slider) slider.style.background =
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
@@ -2359,7 +2359,7 @@ function getColdmailCampaignPayload(startConfirmPin) {
     ? getColdmailingSettingsController().getCurrentSenderProfile()
     : {};
   return {
-    count: parseInt(document.getElementById('mail-slider').value, 10) || 10,
+    count: getCampaignRequestedCompanyCount() || (isPremiumAiLeadGeneratorPath() ? 100 : 10),
     subject: document.getElementById('subj1') ? document.getElementById('subj1').value : '',
     body: document.getElementById('body1') ? document.getElementById('body1').value : '',
     aiInstructions: senderProfile && senderProfile.aiInstructions ? senderProfile.aiInstructions : (document.getElementById('ai-instructies') ? document.getElementById('ai-instructies').value : ''),
@@ -2509,7 +2509,7 @@ async function startCampagneWithLeadGeneratorBoot() {
 
 async function startCampagneImmediate(verifiedMailSendPin) {
   if (running || campaignSendInProgress) return;
-  const n = parseInt(document.getElementById('mail-slider').value, 10) || 100;
+  const n = getCampaignRequestedCompanyCount() || (isPremiumAiLeadGeneratorPath() ? 100 : 10);
   const durationDays = getSelectedCampaignDurationDays();
   const durationLabel = formatCampaignDurationLabel(durationDays);
   const durationCopy = durationDays === 0 ? 'zonder automatische afronding' : 'in ' + durationLabel;
