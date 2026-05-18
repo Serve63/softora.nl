@@ -41,6 +41,9 @@ body[data-flynow-page] .dashboard-layout[data-sidebar-shell="canonical"] > main.
   position:relative !important;
   width:calc(100% - var(--premium-sidebar-width,320px)) !important;
   min-height:100vh !important;
+  margin-top:0 !important;
+  margin-right:0 !important;
+  margin-bottom:0 !important;
   padding:0 !important;
   background:var(--flynow-dark) !important;
   overflow:hidden !important;
@@ -533,7 +536,7 @@ body[data-flynow-page]{--flynow-brand: #8b2252;--flynow-brand-hover: #a3275f;--f
 body[data-flynow-page] .flynow-main :is(button,a){appearance: none;-webkit-appearance: none;font: inherit;line-height: 1;text-decoration: none;-webkit-tap-highlight-color: transparent}
 body[data-flynow-page] .sidebar{z-index: 120 !important}
 body[data-flynow-page] .sidebar-nav{overflow-x: hidden !important;overflow-y: auto !important}
-body[data-flynow-page] .dashboard-layout[data-sidebar-shell="canonical"]>main.flynow-main{width: calc(100% - var(--premium-sidebar-width,320px)) !important;min-height: 100vh !important;padding: 0 !important;background: var(--flynow-cream) !important;color: var(--flynow-text-dark) !important;overflow: visible !important}
+body[data-flynow-page] .dashboard-layout[data-sidebar-shell="canonical"]>main.flynow-main{width: calc(100% - var(--premium-sidebar-width,320px)) !important;min-height: 100vh !important;margin-top: 0 !important;margin-right: 0 !important;margin-bottom: 0 !important;padding: 0 !important;background: var(--flynow-cream) !important;color: var(--flynow-text-dark) !important;overflow: visible !important}
 .deals-shell{min-height: 100vh;background: radial-gradient(circle at 86% 8%,rgba(139,34,82,0.08),transparent 28%),linear-gradient(180deg,#fbfaf7 0%,var(--flynow-cream) 42%,#f4eee5 100%)}
 .deals-header{position: sticky;top: 0;z-index: 50;padding: 0 32px;background: var(--flynow-brand);box-shadow: 0 2px 20px rgba(0,0,0,0.18)}
 .deals-header-top{display: flex;align-items: center;justify-content: space-between;gap: 24px;padding: 16px 0 0}
