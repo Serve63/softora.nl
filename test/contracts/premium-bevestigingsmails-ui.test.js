@@ -625,13 +625,13 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
   assert.match(pageSource, /function buildSendErrorMessage\(defaultMessage\)/);
   assert.match(pageSource, /payload && Array\.isArray\(payload\.failedItems\) && payload\.failedItems\[0\]/);
   assert.match(pageSource, /if \(!payload\.sent && payload\.failed\) \{/);
-  assert.match(pageSource, /assets\/premium-coldmail-send-copy\.js\?v=20260519a/);
+  assert.match(pageSource, /assets\/premium-coldmail-send-copy\.js\?v=20260519b/);
   assert.doesNotMatch(pageSource, /function buildColdmailSendSuccessMessage\(sendResult\)/);
   assert.match(pageSource, /showToast\(buildColdmailSendSuccessMessage\(sendResult\)\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
   assert.match(pageSource, /showScreen\('screen-campaign'\);/);
 });
 
-test('premium bevestigingsmails noemt niet-klare webdesigns overgeslagen in plaats van mislukt', () => {
+test('premium bevestigingsmails houdt succesvolle verzendmelding kort als extra kandidaten geen klaar webdesign hebben', () => {
   const assetPath = path.join(__dirname, '../../assets/premium-coldmail-send-copy.js');
   const assetSource = fs.readFileSync(assetPath, 'utf8');
   const context = { window: {} };
@@ -646,7 +646,8 @@ test('premium bevestigingsmails noemt niet-klare webdesigns overgeslagen in plaa
     })),
   });
 
-  assert.equal(message, '✓ 1 mail verstuurd. 107 overgeslagen: website-design nog niet klaar');
+  assert.equal(message, '✓ 1 mail verstuurd');
+  assert.doesNotMatch(message, /107 overgeslagen/);
   assert.doesNotMatch(message, /107 mislukt/);
 });
 

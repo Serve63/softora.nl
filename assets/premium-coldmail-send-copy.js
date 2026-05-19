@@ -20,14 +20,9 @@
     const dailyLimitSkipped = failedItems.filter(isDailyLimitSkippedItem).length;
     const webdesignNotReadySkipped = failedItems.filter(isWebdesignNotReadySkippedItem).length;
     const realFailed = Math.max(0, failed - dailyLimitSkipped - webdesignNotReadySkipped);
-    const resultParts = [
-      dailyLimitSkipped ? dailyLimitSkipped + ' overgeslagen door daglimiet' : '',
-      webdesignNotReadySkipped ? webdesignNotReadySkipped + ' overgeslagen: website-design nog niet klaar' : '',
-      realFailed ? realFailed + ' mislukt' : '',
-    ].filter(Boolean);
-    if (resultParts.length) {
-      return '✓ ' + formatColdmailSentCount(sent) + '. ' + resultParts.join(', ');
-    }
+    if (realFailed > 0) return '✓ ' + formatColdmailSentCount(sent) + '. ' + realFailed + ' mislukt';
+    if (dailyLimitSkipped > 0) return '✓ ' + formatColdmailSentCount(sent) + '. Daglimiet bereikt';
+    if (webdesignNotReadySkipped > 0) return '✓ ' + formatColdmailSentCount(sent);
     return '✓ ' + formatColdmailSentCount(sent) + ' (' + failed + ' mislukt)';
   }
 

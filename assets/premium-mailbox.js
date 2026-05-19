@@ -601,6 +601,7 @@ function normalizeMailboxApiMessage(message) {
     folder: message.folder || activeFolder,
     from: message.from || 'Onbekend',
     email: message.email || '',
+    to: message.to || '',
     subject: message.subject || '(Geen onderwerp)',
     preview,
     body,
@@ -735,7 +736,8 @@ function renderList() {
   const searchInput = document.getElementById('search-input');
   const q = ((searchInput && searchInput.value) || '').toLowerCase();
   let list = getMailsForFolder(activeFolder);
-  if (q) list = list.filter(m => m.from.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q) || m.preview.toLowerCase().includes(q));
+  const displayOptions = { activeFolder, account: getMailboxAccount() };
+  if (q) list = list.filter(m => window.SoftoraMailboxDisplay.buildSearchText(m, displayOptions).includes(q));
   const wrap = document.getElementById('mail-items');
   if (!wrap) return;
   syncInboxBadgeFromCurrentFolder();
@@ -745,7 +747,7 @@ function renderList() {
     <div class="mail-item ${m.unread ? 'unread' : ''} ${String(activeMail) === String(m.id) ? 'active' : ''}" data-mailbox-action="open-mail" data-mailbox-id="${escapeHtml(m.id)}" role="button" tabindex="0">
       ${m.unread ? '<div class="unread-dot"></div>' : ''}
       <div class="mail-item-top">
-        <div class="mail-from">${escapeHtml(m.from)}</div>
+        <div class="mail-from">${escapeHtml(window.SoftoraMailboxDisplay.getListPrimaryText(m, displayOptions))}</div>
         <div class="mail-time">${escapeHtml(m.time)}</div>
       </div>
       <div class="mail-subject">${escapeHtml(m.subject)}</div>
@@ -791,16 +793,20 @@ function openMail(id) {
   const outreachQuickbar = window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.renderQuickbar === 'function'
     ? window.SoftoraMailboxOutreach.renderQuickbar(m, { escapeHtml })
     : '';
+  const displayOptions = { activeFolder, account: getMailboxAccount() };
+  const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
+  const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
+  const detailSecondary = window.SoftoraMailboxDisplay.getDetailSecondaryText(m, displayOptions);
 
   document.getElementById('mail-detail').innerHTML = `
     <div class="detail-header">
       <div class="detail-subject">${escapeHtml(m.subject)}</div>
       <div class="detail-meta">
         <div class="detail-from-wrap">
-          <div class="detail-avatar" style="background:${getColor(m.from)}">${escapeHtml(initials(m.from))}</div>
+          <div class="detail-avatar" style="background:${getColor(avatarText)}">${escapeHtml(initials(avatarText))}</div>
           <div>
-            <div class="detail-from">${escapeHtml(m.from)}</div>
-            <div class="detail-email">${escapeHtml(m.email)}</div>
+            <div class="detail-from">${escapeHtml(detailPrimary)}</div>
+            <div class="detail-email">${escapeHtml(detailSecondary)}</div>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
@@ -876,7 +882,7 @@ function replyMail(mail) {
   setComposeReplyContext(mail);
   const toField = document.getElementById('c-to');
   const subjectField = document.getElementById('c-subject');
-  if (toField) toField.value = mail.email || '';
+  if (toField) toField.value = window.SoftoraMailboxDisplay.getReplyToAddress(mail, { activeFolder, account: getMailboxAccount() });
   if (subjectField) {
     const subject = mail.subject || '';
     subjectField.value = /^re:/i.test(subject) ? subject : `Re: ${subject}`;
