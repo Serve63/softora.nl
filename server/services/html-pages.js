@@ -36,7 +36,8 @@ html[data-softora-sidebar-content-frame="1"] .dashboard-layout[data-sidebar-shel
 html[data-softora-sidebar-content-frame="1"] .dashboard-layout[data-sidebar-shell="canonical"] > main.main-content,
 html[data-softora-sidebar-content-frame="1"] .dashboard-layout[data-sidebar-shell="canonical"] > .page-shell,
 html[data-softora-sidebar-content-frame="1"] .dashboard-layout[data-sidebar-shell="canonical"] > main.page-shell{margin-left:0 !important;width:100% !important;max-width:none !important;}
-html[data-softora-sidebar-content-frame="1"] .premium-boot-loader{left:0 !important;}
+html[data-softora-sidebar-content-frame="1"] .premium-boot-loader,
+html[data-softora-sidebar-content-frame="1"] .monthly-costs-boot-loader{left:0 !important;}
 </style>`;
 const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
   `<script id="softora-personnel-first-paint">(function(){try{document.documentElement.setAttribute("data-personnel-loading","true");document.documentElement.setAttribute("data-theme-mode","light");document.documentElement.setAttribute("data-theme","light");}catch(_){}})();</script>`,
