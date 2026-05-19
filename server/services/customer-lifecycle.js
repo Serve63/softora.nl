@@ -61,7 +61,7 @@ function normalizeContactStatus(value, row = {}) {
   if (['benaderbaar', 'open', 'callable', 'mailbaar'].includes(key)) return 'benaderbaar';
   if (['gebeld', 'called'].includes(key)) return 'gebeld';
   if (['geengehoor', 'geenbereik', 'noanswer', 'nietbereikbaar'].includes(key)) return 'geengehoor';
-  if (['gemaild', 'mailed', 'emailsent'].includes(key)) return 'gemaild';
+  if (['gemaild', 'benaderd', 'mailed', 'emailsent', 'sent'].includes(key)) return 'gemaild';
   if (['interesse', 'interested', 'geinteresseerd'].includes(key)) return 'interesse';
   if (['afspraak', 'appointment', 'meeting', 'ingepland'].includes(key)) return 'afspraak';
   if (['klant', 'customer', 'betaald', 'paid'].includes(key)) return 'klant';

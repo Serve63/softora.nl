@@ -143,6 +143,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(stabilityJsSource, /document\.addEventListener\("click", handleSidebarNavigationStart, true\);/);
   assert.match(themeSource, /\.dashboard-layout\[data-sidebar-shell="canonical"\] > :is\(\.main-content, main\.main-content, \.main, main\.main\) > \.premium-boot-shell > :is\(\.page-content, \.page-header, \.topbar, \.page-hero, \.register-shell, \.coming-shell, \.screen, \.notepad-shell, \.word-shell\)/);
   assert.match(stabilitySource, /\.softora-premium-content-frame\s*\{[\s\S]*position:\s*fixed;[\s\S]*left:\s*var\(--premium-sidebar-width, 320px\);/);
+  assert.match(stabilitySource, /\.softora-premium-content-frame\s*\{[\s\S]*z-index:\s*45;/);
   assert.match(stabilitySource, /html\[data-premium-sidebar-shell-active\],[\s\S]*body\[data-premium-sidebar-shell-active\]\s*\{[\s\S]*overflow:\s*hidden !important;/);
   assert.match(themeJsSource, /function initPremiumSidebarStabilityGuards\(\) \{/);
   assert.match(themeJsSource, /document\.addEventListener\("pointerdown", function \(event\) \{/);
@@ -194,6 +195,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260519d'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE/);
   assert.match(htmlPagesSource, /function isPremiumSidebarContentFrameRequest\(req\) \{/);
