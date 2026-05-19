@@ -87,6 +87,57 @@ const SEO_CONTENT_PILLARS = Object.freeze([
   }),
 ]);
 
+const SEO_CONTENT_CLUSTERS = Object.freeze([
+  Object.freeze({
+    key: 'websites',
+    label: 'Website groei',
+    description: 'Website, SEO-structuur, conversie en lokale vindbaarheid.',
+    href: '/website-laten-maken',
+    ctaLabel: 'Website laten maken',
+    ctaHref: '/website-laten-maken',
+  }),
+  Object.freeze({
+    key: 'ai-automatisering',
+    label: 'AI automatisering',
+    description: 'Slimmere intake, opvolging, mailbox, rapportages en overdracht.',
+    href: '/ai-automatisering',
+    ctaLabel: 'AI automatisering',
+    ctaHref: '/ai-automatisering',
+  }),
+  Object.freeze({
+    key: 'software-crm',
+    label: 'Software en CRM',
+    description: 'Maatwerk software, CRM, dashboards en bedrijfsprocessen.',
+    href: '/bedrijfssoftware-op-maat',
+    ctaLabel: 'Bedrijfssoftware op maat',
+    ctaHref: '/bedrijfssoftware-op-maat',
+  }),
+  Object.freeze({
+    key: 'ai-contact',
+    label: 'AI klantcontact',
+    description: 'Chatbots, AI telefonie, voiceflows en veilige menselijke overdracht.',
+    href: '/chatbot-laten-maken',
+    ctaLabel: 'Chatbot laten maken',
+    ctaHref: '/chatbot-laten-maken',
+  }),
+  Object.freeze({
+    key: 'branches',
+    label: 'Branches',
+    description: 'Sectorpagina’s die diensten vertalen naar herkenbare praktijkproblemen.',
+    href: '/branches',
+    ctaLabel: 'Bekijk diensten',
+    ctaHref: '/diensten',
+  }),
+  Object.freeze({
+    key: 'lokaal',
+    label: 'Lokale SEO',
+    description: 'Regiopagina’s voor Oisterwijk, Tilburg, Den Bosch en Brabant.',
+    href: '/regio',
+    ctaLabel: 'Website laten maken',
+    ctaHref: '/website-laten-maken',
+  }),
+]);
+
 const SEO_CONTENT_ITEMS = Object.freeze([
   Object.freeze({
     collection: 'blog',
@@ -961,6 +1012,33 @@ function getSeoContentPillars() {
   return SEO_CONTENT_PILLARS;
 }
 
+function getSeoContentClusters() {
+  return SEO_CONTENT_CLUSTERS;
+}
+
+function getSeoContentClusterForItem(item) {
+  const collection = String(item && item.collection ? item.collection : '').trim().toLowerCase();
+  const category = String(item && item.category ? item.category : '').trim().toLowerCase();
+  const slug = String(item && item.slug ? item.slug : '').trim().toLowerCase();
+  const title = String(item && item.title ? item.title : '').trim().toLowerCase();
+  const combined = `${collection} ${category} ${slug} ${title}`;
+  let clusterKey = 'websites';
+
+  if (collection === 'regio') {
+    clusterKey = 'lokaal';
+  } else if (collection === 'branches') {
+    clusterKey = 'branches';
+  } else if (/chatbot|telefonie|telefonist|voice|klantcontact|livechat/.test(combined)) {
+    clusterKey = 'ai-contact';
+  } else if (/crm|bedrijfssoftware|software|platform|spreadsheet/.test(combined)) {
+    clusterKey = 'software-crm';
+  } else if (/ai automatisering|automatisering/.test(combined)) {
+    clusterKey = 'ai-automatisering';
+  }
+
+  return SEO_CONTENT_CLUSTERS.find((cluster) => cluster.key === clusterKey) || SEO_CONTENT_CLUSTERS[0];
+}
+
 function getSeoContentItems({ collection, now = new Date() } = {}) {
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   return SEO_CONTENT_ITEMS.filter((item) => {
@@ -1009,6 +1087,7 @@ function getSeoContentPublicationPlan({ now = new Date() } = {}) {
       slug: item.slug,
       path: getSeoContentPathForItem(item),
       title: item.title,
+      cluster: getSeoContentClusterForItem(item).key,
       publishedAt: item.publishedAt,
       status: Number.isFinite(publishedMs) && publishedMs <= nowMs ? 'live' : 'scheduled',
     };
@@ -1026,7 +1105,7 @@ function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', s
     `<link rel="canonical" href="${escapeHtml(canonicalUrl)}">`,
     '<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">',
     '<link rel="stylesheet" href="/assets/fonts.css?v=20260409a">',
-    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260519c">',
+    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260519d">',
     `<meta property="og:type" content="${escapeHtml(ogType)}">`,
     '<meta property="og:site_name" content="Softora">',
     '<meta property="og:locale" content="nl_NL">',
@@ -1131,9 +1210,10 @@ function resolvePrimaryCtaLink(item) {
     '/diensten',
   ]);
   const relatedLinks = Array.isArray(item && item.relatedLinks) ? item.relatedLinks : [];
+  const cluster = getSeoContentClusterForItem(item);
   return relatedLinks.find((link) => commercialTargets.has(String(link.href || ''))) || {
-    label: 'Bekijk wat Softora kan bouwen',
-    href: '/diensten',
+    label: cluster.ctaLabel || 'Bekijk wat Softora kan bouwen',
+    href: cluster.ctaHref || '/diensten',
   };
 }
 
@@ -1176,6 +1256,19 @@ function renderPillarCards() {
   ].join('\n');
 }
 
+function renderContentClusterNav() {
+  return [
+    '<section class="cluster-nav" data-softora-public-seo="content-clusters" aria-label="Content clusters">',
+    ...SEO_CONTENT_CLUSTERS.map(
+      (cluster) =>
+        `    <a class="cluster-link" data-content-cluster="${escapeHtml(cluster.key)}" href="${escapeHtml(
+          cluster.href
+        )}"><span>${escapeHtml(cluster.label)}</span><em>${escapeHtml(cluster.description)}</em></a>`
+    ),
+    '</section>',
+  ].join('\n');
+}
+
 function getBackLabelForCollection(collection) {
   if (!collection) return 'overzicht';
   if (collection.key === 'blog') return 'blog';
@@ -1187,6 +1280,7 @@ function getBackLabelForCollection(collection) {
 }
 
 function buildMainEntityForItem(item, site, canonicalUrl) {
+  const cluster = getSeoContentClusterForItem(item);
   if (item.schemaType === 'Service') {
     const entity = {
       '@type': 'Service',
@@ -1194,7 +1288,12 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
       name: item.title,
       description: item.description,
       provider: { '@id': `${site}/#organization` },
-      serviceType: item.serviceType || item.category,
+      serviceType: item.serviceType || cluster.label || item.category,
+      about: {
+        '@type': 'Thing',
+        name: cluster.label,
+        url: buildAbsoluteUrl(site, cluster.href),
+      },
     };
     if (item.areaServed) {
       entity.areaServed = {
@@ -1210,6 +1309,12 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
     '@id': `${canonicalUrl}#article`,
     headline: item.title,
     description: item.description,
+    articleSection: cluster.label,
+    about: {
+      '@type': 'Thing',
+      name: cluster.label,
+      url: buildAbsoluteUrl(site, cluster.href),
+    },
     datePublished: item.publishedAt,
     dateModified: item.updatedAt || item.publishedAt,
     inLanguage: 'nl-NL',
@@ -1229,13 +1334,15 @@ function renderArticleCards(items) {
     .map((item, index) => {
       const href = getSeoContentPathForItem(item);
       const featured = index === 0;
+      const cluster = getSeoContentClusterForItem(item);
       return [
-        `<article class="blog-card${featured ? ' featured' : ''}">`,
+        `<article class="blog-card${featured ? ' featured' : ''}" data-content-cluster="${escapeHtml(cluster.key)}">`,
         `  <a href="${escapeHtml(href)}">`,
         `    <div class="blog-card-img${featured ? ' featured' : ''}" style="background:${gradients[index % gradients.length]}">`,
         `      <div class="blog-card-img-label">${escapeHtml(item.category)}</div>`,
         '    </div>',
         '    <div class="blog-card-body">',
+        `      <div class="blog-card-cluster">${escapeHtml(cluster.label)}</div>`,
         `      <div class="blog-card-cat">${escapeHtml(item.category)}</div>`,
         `      <div class="blog-card-title">${escapeHtml(item.title)}</div>`,
         `      <div class="blog-card-excerpt">${escapeHtml(item.description)}</div>`,
@@ -1309,6 +1416,7 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
     '    <a class="filter-tab" href="/website-laten-maken">Websites</a>',
     '    <a class="filter-tab" href="/bedrijfssoftware-op-maat">Software</a>',
     '  </div>',
+    renderContentClusterNav(),
     '  <section class="blog-grid-wrap">',
     `    <div class="blog-grid">${renderArticleCards(items)}</div>`,
     '  </section>',
@@ -1341,6 +1449,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
   const pathName = getSeoContentPathForItem(item);
   const canonicalUrl = buildAbsoluteUrl(site, pathName);
   const mainEntity = buildMainEntityForItem(item, site, canonicalUrl);
+  const cluster = getSeoContentClusterForItem(item);
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -1370,6 +1479,9 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     '<main class="screen active" id="screen-artikel">',
     '  <section class="artikel-hero">',
     `    <a class="nav-back show inline-back" href="${escapeHtml(collection.path)}">Terug naar ${escapeHtml(getBackLabelForCollection(collection))}</a>`,
+    `    <a class="artikel-cluster" data-content-cluster="${escapeHtml(cluster.key)}" href="${escapeHtml(cluster.href)}">${escapeHtml(
+      cluster.label
+    )}</a>`,
     `    <div class="artikel-cat">${escapeHtml(item.category)}</div>`,
     `    <h1 class="artikel-title">${escapeHtml(item.title)}</h1>`,
     '    <div class="artikel-meta">',
@@ -1406,11 +1518,14 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
 }
 
 module.exports = {
+  SEO_CONTENT_CLUSTERS,
   SEO_CONTENT_COLLECTIONS,
   SEO_CONTENT_ITEMS,
   SEO_CONTENT_PILLARS,
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
+  getSeoContentClusterForItem,
+  getSeoContentClusters,
   getSeoContentCollection,
   getSeoContentCollectionPaths,
   getSeoContentItem,

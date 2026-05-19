@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const {
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
+  getSeoContentClusterForItem,
+  getSeoContentClusters,
   getSeoContentItem,
   getSeoContentItems,
   getSeoContentCollectionPaths,
@@ -59,6 +61,12 @@ test('seo content renders the existing blog visual language with real links', ()
   assert.match(html, /class="filter-bar"/);
   assert.match(html, /class="blog-card featured"/);
   assert.match(html, /SEO groeipijlers/);
+  assert.match(html, /data-softora-public-seo="content-clusters"/);
+  assert.match(html, /data-content-cluster="websites"/);
+  assert.match(html, /href="\/website-laten-maken">/);
+  assert.match(html, /Website groei/);
+  assert.match(html, /AI automatisering/);
+  assert.match(html, /Software en CRM/);
   assert.match(html, /Software, CRM en dashboards/);
   assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
   assert.match(html, /href="\/diensten">Diensten<\/a>/);
@@ -84,6 +92,8 @@ test('seo content article pages render Article schema and self canonicals', () =
     /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/ai-automatisering-mkb-waar-beginnen">/
   );
   assert.match(html, /"@type":"Article"/);
+  assert.match(html, /"articleSection":"AI automatisering"/);
+  assert.match(html, /data-content-cluster="ai-automatisering"/);
   assert.match(html, /AI automatisering voor het MKB: waar begin je\?/);
   assert.match(html, /href="\/blog">Terug naar blog<\/a>/);
   assert.match(html, /href="\/ai-telefonist"/);
@@ -145,6 +155,7 @@ test('seo content heeft een dagelijkse publicatiebuffer die pas live komt op pub
   const scheduled = plan.filter((item) => item.status === 'scheduled');
 
   assert.ok(scheduled.length >= 7, 'De contentmachine moet minimaal een week vooruit gepland zijn.');
+  assert.ok(plan.every((item) => item.cluster), 'Elke publicatie moet aan een cluster hangen.');
   assert.ok(scheduled.some((item) => item.path === '/blog/website-laten-maken-mkb-paginas'));
   assert.ok(scheduled.some((item) => item.path === '/kennisbank/wat-is-ai-automatisering'));
   assert.ok(scheduled.some((item) => item.path === '/vergelijkingen/maatwerk-software-vs-standaard-software'));
@@ -160,16 +171,35 @@ test('seo content bewaakt unieke slugs, clusters en interne links', () => {
   const items = getSeoContentItems({ now: new Date('2026-06-01T12:00:00.000Z') });
   const paths = items.map((item) => `${item.collection}/${item.slug}`);
   const uniquePaths = new Set(paths);
+  const clusterKeys = new Set(getSeoContentClusters().map((cluster) => cluster.key));
+  const commercialTargets = new Set([
+    '/website-laten-maken',
+    '/ai-automatisering',
+    '/bedrijfssoftware-op-maat',
+    '/crm-systeem-op-maat',
+    '/chatbot-laten-maken',
+    '/ai-telefonist',
+    '/voicesoftware-op-maat',
+    '/diensten',
+  ]);
 
   assert.equal(uniquePaths.size, paths.length);
   assert.ok(getSeoContentPillars().length >= 4);
+  assert.ok(getSeoContentClusters().length >= 6);
 
   for (const item of items) {
+    const cluster = getSeoContentClusterForItem(item);
+
     assert.ok(item.title.length >= 20, item.slug);
     assert.ok(item.description.length >= 80, item.slug);
     assert.ok(item.sections.length >= 3, item.slug);
     assert.ok(item.relatedLinks.length >= 3, item.slug);
     assert.ok(item.relatedLinks.every((link) => String(link.href || '').startsWith('/')), item.slug);
+    assert.ok(clusterKeys.has(cluster.key), item.slug);
+    assert.ok(
+      item.relatedLinks.some((link) => commercialTargets.has(String(link.href || ''))),
+      `${item.slug} moet naar minimaal een money page linken.`
+    );
     if (item.collection === 'branches' || item.collection === 'regio') {
       assert.equal(item.schemaType, 'Service', item.slug);
     }
