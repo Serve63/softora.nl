@@ -16,7 +16,7 @@ const pageSmokeTargets = Object.freeze([
   { path: '/ai-telefonist', marker: 'Laat geen telefoontje meer zonder opvolging' },
   { path: '/voicesoftware-op-maat', marker: 'Voicesoftware op maat' },
   { path: '/chatbot-laten-maken', marker: 'Chatbot op maat' },
-  { path: '/website-laten-maken', marker: 'Premium Websites' },
+  { path: '/website-laten-maken', marker: 'Website laten maken' },
   { path: '/blog', marker: 'Artikelen over websites, software en AI groei' },
   { path: '/kennisbank', marker: 'Heldere uitleg voor betere digitale keuzes' },
   { path: '/premium-personeel-login', marker: 'Softora | Personeel Login' },
