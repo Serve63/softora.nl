@@ -29,6 +29,8 @@ test('website money page is focused on SEO, leads and clean internal links', () 
   assert.match(source, /href="\/kennisbank"/);
   assert.match(source, /href="\/pakketten"/);
   assert.match(source, /href="\/ai-automatisering"/);
+  assert.match(source, /href="\/website-laten-maken-oisterwijk"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
   assert.doesNotMatch(source, /Bedrijfsdashboards|Klantenportalen|Personeelssystemen/);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
@@ -48,8 +50,10 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.match(source, /Interne workflowtools/);
   assert.match(source, /AI automatisering/);
   assert.match(source, /href="\/crm-systeem-op-maat"/);
+  assert.match(source, /href="\/maatwerk-platform"/);
   assert.match(source, /href="\/ai-automatisering"/);
   assert.match(source, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
   assert.doesNotMatch(source, /Website Tool|AI Website Generator/);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
@@ -143,6 +147,7 @@ test('chatbot money page is focused on leads, support and clean follow-up', () =
   assert.match(source, /href="\/ai-automatisering"/);
   assert.match(source, /href="\/ai-telefonist"/);
   assert.match(source, /href="\/blog\/chatbot-laten-maken-wanneer-zinvol"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
   assert.doesNotMatch(
     source,
     /Bedrijfsdashboards|Klantenportalen|Personeelssystemen|Personeel Dashboard|AI Website Generator|Offerte & Factuur Generator/
