@@ -150,6 +150,7 @@ test('seo content renders branche en regio landingspagina’s met service schema
 test('seo content heeft een dagelijkse publicatiebuffer die pas live komt op publicatiedatum', () => {
   const beforeLaunch = new Date('2026-05-19T12:00:00.000Z');
   const afterLaunch = new Date('2026-05-26T12:00:00.000Z');
+  const afterWeekTwo = new Date('2026-06-02T12:00:00.000Z');
 
   const plan = getSeoContentPublicationPlan({ now: beforeLaunch });
   const scheduled = plan.filter((item) => item.status === 'scheduled');
@@ -159,11 +160,30 @@ test('seo content heeft een dagelijkse publicatiebuffer die pas live komt op pub
   assert.ok(scheduled.some((item) => item.path === '/blog/website-laten-maken-mkb-paginas'));
   assert.ok(scheduled.some((item) => item.path === '/kennisbank/wat-is-ai-automatisering'));
   assert.ok(scheduled.some((item) => item.path === '/vergelijkingen/maatwerk-software-vs-standaard-software'));
+  assert.ok(scheduled.some((item) => item.path === '/kennisbank/wat-is-een-crm-systeem'));
+  assert.ok(scheduled.some((item) => item.path === '/blog/ai-automatisering-leadopvolging'));
+  assert.ok(scheduled.some((item) => item.path === '/blog/ai-telefonist-voor-afspraakintake'));
+  assert.ok(scheduled.some((item) => item.path === '/kennisbank/wat-is-interne-linkstructuur'));
 
   assert.ok(!getSeoContentPublicPaths({ now: beforeLaunch }).includes('/vergelijkingen/chatbot-vs-livechat'));
+  assert.ok(!getSeoContentPublicPaths({ now: beforeLaunch }).includes('/kennisbank/wat-is-een-crm-systeem'));
   assert.ok(getSeoContentPublicPaths({ now: afterLaunch }).includes('/vergelijkingen/chatbot-vs-livechat'));
+  assert.ok(getSeoContentPublicPaths({ now: afterWeekTwo }).includes('/kennisbank/wat-is-een-crm-systeem'));
+  assert.ok(getSeoContentPublicPaths({ now: afterWeekTwo }).includes('/blog/ai-automatisering-leadopvolging'));
+  assert.ok(getSeoContentPublicPaths({ now: afterWeekTwo }).includes('/blog/ai-telefonist-voor-afspraakintake'));
+  assert.ok(getSeoContentPublicPaths({ now: afterWeekTwo }).includes('/kennisbank/wat-is-interne-linkstructuur'));
   assert.ok(
     getSeoContentSitemapEntries({ now: afterLaunch }).some((entry) => entry.path === '/vergelijkingen/chatbot-vs-livechat')
+  );
+  assert.ok(
+    getSeoContentSitemapEntries({ now: afterWeekTwo }).some(
+      (entry) => entry.path === '/blog/ai-telefonist-voor-afspraakintake'
+    )
+  );
+  assert.ok(
+    getSeoContentSitemapEntries({ now: afterWeekTwo }).some(
+      (entry) => entry.path === '/kennisbank/wat-is-interne-linkstructuur'
+    )
   );
 });
 
