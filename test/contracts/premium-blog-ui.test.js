@@ -7,9 +7,10 @@ test('premium blog uses delegated actions instead of inline handlers', () => {
   const pagePath = path.join(__dirname, '../../premium-blog.html');
   const source = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(source, /<input class="login-inp" type="password" id="code-inp"[^>]*data-public-lock-input>/);
-  assert.match(source, /<button class="login-btn" type="button" data-public-lock-submit>Doorgaan<\/button>/);
-  assert.match(source, /<script src="assets\/premium-public-lock\.js\?v=20260427a" defer><\/script>/);
+  assert.doesNotMatch(source, /data-public-lock-input/);
+  assert.doesNotMatch(source, /data-public-lock-submit/);
+  assert.doesNotMatch(source, /premium-public-lock\.js/);
+  assert.doesNotMatch(source, /Binnenkort beschikbaar/);
   assert.match(source, /<a class="nav-logo" href="\/" aria-label="Softora homepage">SOFTORA\.NL<\/a>/);
   assert.match(source, /<button class="nav-back" id="nav-back" type="button" data-blog-action="overview">/);
   assert.match(source, /data-blog-filter="Website's"/);

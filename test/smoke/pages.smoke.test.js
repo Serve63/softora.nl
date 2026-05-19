@@ -32,6 +32,26 @@ for (const target of pageSmokeTargets) {
   });
 }
 
+const unlockedPublicSeoPaths = [
+  '/website-laten-maken',
+  '/bedrijfssoftware-op-maat',
+  '/chatbot-laten-maken',
+  '/voicesoftware-op-maat',
+];
+
+for (const pathName of unlockedPublicSeoPaths) {
+  test(`page smoke: ${pathName} toont geen toegangscode-slot`, async () => {
+    const response = await fetch(`${serverRef.baseUrl}${pathName}`, { cache: 'no-store' });
+    const html = await response.text();
+
+    assert.equal(response.status, 200, pathName);
+    assert.doesNotMatch(html, /Binnenkort beschikbaar/, pathName);
+    assert.doesNotMatch(html, /data-public-lock-input/, pathName);
+    assert.doesNotMatch(html, /data-public-lock-submit/, pathName);
+    assert.doesNotMatch(html, /premium-public-lock\.js/, pathName);
+  });
+}
+
 test('page smoke: /premium-website serves the homepage without redirecting back to root', async () => {
   const response = await fetch(`${serverRef.baseUrl}/premium-website`, {
     cache: 'no-store',

@@ -309,19 +309,50 @@ nav {
   text-align: center;
   min-height: 16px;
 }
+@media (max-width: 720px) {
+  body { overflow-x: hidden; }
+  nav { padding: 0.95rem 1.25rem; }
+  .nav-logo { font-size: 1.6rem; }
+  .hero {
+    min-height: 560px;
+    padding: 72px 24px 80px;
+  }
+  .hero-title {
+    font-size: clamp(40px, 11vw, 56px);
+    letter-spacing: 0;
+  }
+  .hero-title .nowrap,
+  .section-title.is-single-line .nowrap {
+    white-space: normal;
+  }
+  .stats-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 24px 20px;
+  }
+  .stat-item {
+    border-bottom: 1px solid rgba(255,255,255,.15);
+    border-right: none;
+    padding: 18px 12px;
+  }
+  .stat-item:nth-child(odd) { border-right: 1px solid rgba(255,255,255,.15); }
+  .stat-item:nth-last-child(-n+2) { border-bottom: none; }
+  .stat-num { font-size: 36px; }
+  .section { padding: 64px 20px; }
+  .diensten-grid,
+  .examples-grid,
+  .why-grid {
+    grid-template-columns: 1fr;
+  }
+  .process-grid {
+    gap: 24px;
+    grid-template-columns: 1fr;
+  }
+  .process-grid::before { display: none; }
+  .cta-block { padding: 64px 20px; }
+}
 </style>
 </head>
 <body>
-<div class="overlay" id="overlay">
-  <div class="overlay-logo">Binnenkort beschikbaar</div>
-  <div class="login-box">
-    <div class="login-label">Toegangscode</div>
-    <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" autocomplete="off" data-public-lock-input>
-    <div class="login-error" id="login-error"></div>
-    <button class="login-btn" type="button" data-public-lock-submit>Doorgaan</button>
-  </div>
-</div>
-
 <!-- NAV -->
 <nav>
   <a class="nav-logo" href="/">SOFTORA.NL</a>
@@ -574,6 +605,5 @@ nav {
 </div>
 
 <!-- FOOTER -->
-<script src="assets/premium-public-lock.js?v=20260427a" defer></script>
 </body>
 </html>
