@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const vm = require('node:vm');
 
 test('premium bevestigingsmails renders the current coldmailing dashboard shell without coldcalling bootstrap', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
@@ -204,8 +205,10 @@ test('premium bevestigingsmails campaign volume uses a fixed mail company label'
 test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuwe Campagne', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const testModePath = path.join(__dirname, '../../assets/premium-campaign-test-mode.js');
+  const sendCopyPath = path.join(__dirname, '../../assets/premium-coldmail-send-copy.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const testModeSource = fs.readFileSync(testModePath, 'utf8');
+  const sendCopySource = fs.readFileSync(sendCopyPath, 'utf8');
 
   assert.match(pageSource, /<div class="campagne-head">[\s\S]*<div class="campagne-title">Nieuwe Campagne<\/div>[\s\S]*id="campaignCompanyCount"/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/softora-dossier-loader\.css\?v=20260424a">/);
@@ -287,7 +290,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /const specialActionSelect = document\.getElementById\('campaignSpecialAction'\), serviceKey = normalizeLowerText\(serviceSelect && serviceSelect\.value\)[\s\S]*specialAction = \(specialActionSelect && specialActionSelect\.value\) \|\| \(!isPremiumAiLeadGeneratorPath\(\) && \(serviceKey === 'websites' \|\| serviceKey === 'website'\) \? 'webdesign' : ''\);/);
   assert.match(pageSource, /specialAction,\s*durationDays: getSelectedCampaignDurationDays\(\),/);
   assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\), testMode: Boolean\(window\.SoftoraCampaignTestMode && window\.SoftoraCampaignTestMode\.isEnabled\(\)\),/);
-  assert.match(pageSource, /if \(sendResult && sendResult\.testMode\) return 'Testmail verstuurd naar servec321@gmail\.com\.';/);
+  assert.match(sendCopySource, /if \(sendResult && sendResult\.testMode\) return 'Testmail verstuurd naar servec321@gmail\.com\.';/);
   assert.match(testModeSource, /const TEST_RECIPIENT_EMAIL = 'servec321@gmail\.com';/);
   assert.match(testModeSource, /button\.addEventListener\('click'/);
   assert.match(testModeSource, /hydrateCampaignCompanyCountFromSupabase/);
@@ -622,10 +625,29 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
   assert.match(pageSource, /function buildSendErrorMessage\(defaultMessage\)/);
   assert.match(pageSource, /payload && Array\.isArray\(payload\.failedItems\) && payload\.failedItems\[0\]/);
   assert.match(pageSource, /if \(!payload\.sent && payload\.failed\) \{/);
-  assert.match(pageSource, /function buildColdmailSendSuccessMessage\(sendResult\)/);
-  assert.match(pageSource, /overgeslagen door daglimiet/);
+  assert.match(pageSource, /assets\/premium-coldmail-send-copy\.js\?v=20260519a/);
+  assert.doesNotMatch(pageSource, /function buildColdmailSendSuccessMessage\(sendResult\)/);
   assert.match(pageSource, /showToast\(buildColdmailSendSuccessMessage\(sendResult\)\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
   assert.match(pageSource, /showScreen\('screen-campaign'\);/);
+});
+
+test('premium bevestigingsmails noemt niet-klare webdesigns overgeslagen in plaats van mislukt', () => {
+  const assetPath = path.join(__dirname, '../../assets/premium-coldmail-send-copy.js');
+  const assetSource = fs.readFileSync(assetPath, 'utf8');
+  const context = { window: {} };
+  vm.createContext(context);
+  vm.runInContext(assetSource, context);
+
+  const message = context.window.SoftoraColdmailSendCopy.buildColdmailSendSuccessMessage({
+    sent: 1,
+    failed: 107,
+    failedItems: Array.from({ length: 107 }, () => ({
+      error: 'Nog geen website-design klaar voor dit bedrijf.',
+    })),
+  });
+
+  assert.equal(message, '✓ 1 mail verstuurd. 107 overgeslagen: website-design nog niet klaar');
+  assert.doesNotMatch(message, /107 mislukt/);
 });
 
 test('premium campaign test mode keeps mail copy and switches to call copy on the lead-generator alias', () => {

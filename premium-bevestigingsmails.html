@@ -1432,7 +1432,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
-<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260513a"></script>
+<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260513a"></script><script src="assets/premium-coldmail-send-copy.js?v=20260519a"></script>
 <script src="assets/premium-campaign-selects.js?v=20260511a"></script>
 <script>
 // ── DATA ──
@@ -2410,26 +2410,6 @@ async function sendColdmailCampaignNow(startConfirmPin) {
     throw error;
   }
   return payload;
-}
-
-function isDailyLimitSkippedItem(item) {
-  return Boolean(item && /Daglimiet/i.test(String(item.error || '')));
-}
-
-function buildColdmailSendSuccessMessage(sendResult) {
-  if (sendResult && sendResult.testMode) return 'Testmail verstuurd naar servec321@gmail.com.';
-  const sent = Number(sendResult && sendResult.sent) || 0;
-  const failed = Number(sendResult && sendResult.failed) || 0;
-  if (!failed) return '✓ ' + sent + ' mails verstuurd';
-  const failedItems = Array.isArray(sendResult && sendResult.failedItems) ? sendResult.failedItems : [];
-  const dailyLimitSkipped = failedItems.filter(isDailyLimitSkippedItem).length;
-  if (dailyLimitSkipped === failed) {
-    return '✓ ' + sent + ' mails verstuurd. ' + failed + ' overgeslagen door daglimiet';
-  }
-  if (dailyLimitSkipped > 0) {
-    return '✓ ' + sent + ' mails verstuurd. ' + dailyLimitSkipped + ' overgeslagen door daglimiet, ' + (failed - dailyLimitSkipped) + ' mislukt';
-  }
-  return '✓ ' + sent + ' mails verstuurd (' + failed + ' mislukt)';
 }
 
 async function startCampagne(verifiedMailSendPin) {
