@@ -465,9 +465,9 @@
         thead th:nth-child(3), tbody td:nth-child(3) { width: 15%; }
         thead th:nth-child(4), tbody td:nth-child(4) { width: 13%; }
         thead th:nth-child(5), tbody td:nth-child(5) { width: 12%; }
-        thead th:nth-child(6), tbody td:nth-child(6) { width: 12%; }
-        thead th:nth-child(7), tbody td:nth-child(7) { width: 9%; }
-        thead th:nth-child(8), tbody td:nth-child(8) { width: 9%; }
+        thead th:nth-child(6), tbody td:nth-child(6) { width: 10%; }
+        thead th:nth-child(7), tbody td:nth-child(7) { width: 8%; }
+        thead th:nth-child(8), tbody td:nth-child(8) { width: 12%; }
         thead th:nth-child(9), tbody td:nth-child(9) {
             width: 7%;
             text-align: center;
@@ -1451,8 +1451,8 @@
                                         <th data-sort-key="dom">Website</th>
                                         <th>Gebruikte kanalen</th>
                                         <th data-sort-key="status">Status</th>
-                                        <th data-sort-key="updatedAt">Laatste actie</th>
-                                        <th>Foto's <span id="photoHeaderCount">(0)</span></th>
+                                        <th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie</th>
+                                        <th id="photoHeader">Foto's <span id="photoHeaderCount">(0)</span></th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody"></tbody>
@@ -2355,14 +2355,14 @@
         }
 
         function renderTable() {
-            const filtered = getSortedCustomers(getFilteredCustomers());
+            const filtered = getSortedCustomers(getFilteredCustomers()), showOutreachActionColumn = state.activeStatus === "benaderd", showPhotoColumn = !showOutreachActionColumn;
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
-            renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return !(state.activeStatus === "benaderd" && outreachController.isWebdesignOutreachCustomer(customer)) && shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
+            document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return showPhotoColumn && shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
 
             if (!filtered.length) {
-                nodes.tbody.innerHTML = "<tr><td colspan=\"9\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
+                nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showPhotoColumn ? 9 : 8) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 return;
             }
 
@@ -2382,10 +2382,10 @@
                         "<td class=\"c-mid\">" + websiteHtml + "</td>",
                         "<td><div class=\"kanalen\">",
                             renderUsedChannelTags(customer),
-                        "</div>" + outreachController.renderActions(customer) + "</td>",
+                        "</div></td>",
                         "<td><div class=\"s-wrap s-" + escapeHtml(customer.status) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(statusLabel) + "</div></div></td>",
-                        "<td class=\"c-light\">" + (outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderReplyInfo(customer) : escapeHtml(formatDisplayDate(customer.updatedAt))) + "</td>",
-                        "<td>" + (!(state.activeStatus === "benaderd" && outreachController.isWebdesignOutreachCustomer(customer)) ? renderWebsitePhotoDrop(customer) : "") + "</td>",
+                        "<td class=\"c-light\">" + (showOutreachActionColumn && outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderActions(customer) : (outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderReplyInfo(customer) : escapeHtml(formatDisplayDate(customer.updatedAt)))) + "</td>",
+                        showPhotoColumn ? "<td>" + renderWebsitePhotoDrop(customer) + "</td>" : "",
                     "</tr>"
                 ].join("");
             }).join("");
