@@ -111,8 +111,8 @@ test('public seo internal links use the existing footer when one is present', ()
 });
 
 test('public seo fallback links stay in normal page flow on fixed-nav templates', () => {
-  const source = fs.readFileSync(path.join(root, 'premium-chatbot.html'), 'utf8');
-  const html = applyPublicSeoHeadDefaults(source, 'premium-chatbot.html', {
+  const source = fs.readFileSync(path.join(root, 'website-laten-maken-oisterwijk.html'), 'utf8');
+  const html = applyPublicSeoHeadDefaults(source, 'website-laten-maken-oisterwijk.html', {
     siteOrigin: 'https://www.softora.nl',
   });
   const ctaStart = html.indexOf('<div class="cta-block');
@@ -122,6 +122,81 @@ test('public seo fallback links stay in normal page flow on fixed-nav templates'
   assert.match(html, /\.softora-seo-footer-links\{position:static;inset:auto;z-index:auto;display:block;width:auto;/);
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });
+
+const CORE_INTERNAL_LINK_EXPECTATIONS = [
+  {
+    fileName: 'diensten.html',
+    canonical: '/diensten',
+    links: [
+      '/website-laten-maken',
+      '/ai-automatisering',
+      '/bedrijfssoftware-op-maat',
+      '/crm-systeem-op-maat',
+      '/chatbot-laten-maken',
+      '/ai-telefonist',
+    ],
+  },
+  {
+    fileName: 'premium-websites.html',
+    canonical: '/website-laten-maken',
+    links: [
+      '/blog/website-laten-maken-kosten-2026',
+      '/website-laten-maken-oisterwijk',
+      '/pakketten',
+      '/kennisbank',
+      '/ai-automatisering',
+    ],
+  },
+  {
+    fileName: 'premium-bedrijfssoftware.html',
+    canonical: '/bedrijfssoftware-op-maat',
+    links: [
+      '/crm-systeem-op-maat',
+      '/maatwerk-platform',
+      '/kennisbank/wat-is-bedrijfssoftware-op-maat',
+      '/ai-automatisering',
+    ],
+  },
+  {
+    fileName: 'premium-chatbot.html',
+    canonical: '/chatbot-laten-maken',
+    links: [
+      '/blog/chatbot-laten-maken-wanneer-zinvol',
+      '/website-laten-maken',
+      '/crm-systeem-op-maat',
+      '/ai-automatisering',
+      '/ai-telefonist',
+    ],
+  },
+  {
+    fileName: 'ai-telefonist.html',
+    canonical: '/ai-telefonist',
+    links: [
+      '/voicesoftware-op-maat',
+      '/chatbot-laten-maken',
+      '/ai-automatisering',
+      '/crm-systeem-op-maat',
+      '/blog/ai-automatisering-mkb-waar-beginnen',
+    ],
+  },
+];
+
+for (const page of CORE_INTERNAL_LINK_EXPECTATIONS) {
+  test(`${page.canonical} owns its service links inside visible content`, () => {
+    const source = fs.readFileSync(path.join(root, page.fileName), 'utf8');
+    const html = applyPublicSeoHeadDefaults(source, page.fileName, {
+      siteOrigin: 'https://www.softora.nl',
+    });
+
+    assert.match(html, new RegExp(`<link rel="canonical" href="https:\\/\\/www\\.softora\\.nl${page.canonical.replace(/\//g, '\\/')}"`));
+    assert.match(html, /data-softora-public-seo="internal-links"/);
+    for (const href of page.links) {
+      assert.match(html, new RegExp(`href="${href.replace(/\//g, '\\/')}"`), `${page.canonical} mist ${href}`);
+    }
+    assert.doesNotMatch(html, /softora-seo-footer-links/);
+    assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
+  });
+}
 
 test('ai automation page owns its internal links inside the page content', () => {
   const source = fs.readFileSync(path.join(root, 'ai-automatisering.html'), 'utf8');
