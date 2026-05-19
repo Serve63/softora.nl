@@ -69,6 +69,67 @@ test('data ops ui-state bridge falls back when structured customer rows are empt
   assert.deepEqual(state, { values: { legacy: 'yes' }, source: 'legacy' });
 });
 
+test('data ops ui-state bridge overlays legacy mailed status onto structured customers', async () => {
+  const bridge = createSoftoraDataOpsUiStateBridge({
+    store: createStore({
+      listCustomers: async () => [
+        {
+          id: 'jaghthuijs',
+          bedrijf: 'Jaghthuijs',
+          naam: 'Jaghthuijs',
+          telefoon: '076 56 56 956',
+          status: 'benaderbaar',
+          databaseStatus: 'benaderbaar',
+        },
+        {
+          id: 'klant-1',
+          bedrijf: 'Klant BV',
+          naam: 'Klant BV',
+          telefoon: '0612345678',
+          status: 'klant',
+          databaseStatus: 'klant',
+        },
+      ],
+    }),
+  });
+  const legacyRows = [
+    {
+      id: 'jaghthuijs',
+      bedrijf: 'Jaghthuijs',
+      naam: 'Jaghthuijs',
+      telefoon: '076 56 56 956',
+      status: 'gemaild',
+      databaseStatus: 'gemaild',
+      lastColdmailSentAt: '2026-05-19T17:02:00.000Z',
+      coldmailSentMessageId: 'message-1',
+      hist: [{ type: 'gemaild', label: 'Mail verstuurd', date: '2026-05-19' }],
+    },
+    {
+      id: 'klant-1',
+      bedrijf: 'Klant BV',
+      naam: 'Klant BV',
+      telefoon: '0612345678',
+      status: 'gemaild',
+      databaseStatus: 'gemaild',
+      lastColdmailSentAt: '2026-05-19T17:02:00.000Z',
+    },
+  ];
+  const state = await bridge.getUiStateValues(SCOPES.customers, {
+    legacyGetUiStateValues: async () => ({
+      values: buildChunkedStatePatch(KEYS.customers, JSON.stringify(legacyRows)),
+      source: 'legacy',
+    }),
+  });
+  const rows = JSON.parse(state.values[KEYS.customers]);
+
+  assert.equal(rows[0].status, 'gemaild');
+  assert.equal(rows[0].databaseStatus, 'gemaild');
+  assert.equal(rows[0].lastColdmailSentAt, '2026-05-19T17:02:00.000Z');
+  assert.equal(rows[0].hist[0].type, 'gemaild');
+  assert.equal(rows[1].status, 'klant');
+  assert.equal(rows[1].databaseStatus, 'klant');
+});
+
 test('data ops ui-state bridge dual-writes customer and active order values', async () => {
   const store = createStore();
   const bridge = createSoftoraDataOpsUiStateBridge({ store });
