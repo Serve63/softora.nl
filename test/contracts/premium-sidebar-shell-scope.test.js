@@ -136,6 +136,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /document\.addEventListener\("pointerdown", function \(event\) \{/);
   assert.match(themeJsSource, /window\.addEventListener\("focus", function \(\) \{\s*schedulePremiumSidebarStability\(\);/s);
   assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords"\]\);/);
+  assert.match(themeJsSource, /PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*"leads"/);
   assert.match(themeJsSource, /PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*"coldcalling"/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
@@ -285,8 +286,8 @@ test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar
     'FLYNOW hoort leeg te starten en daarna de gedeelde premium-sidebar dynamisch te laten vullen'
   );
   assert.match(pageSource, /<main class="main-content flynow-main">/);
-  assert.match(pageSource, /href="\/assets\/personnel-theme\.css\?v=20260519a"/);
-  assert.match(pageSource, /src="\/assets\/personnel-theme\.js\?v=20260519a" defer/);
+  assert.match(pageSource, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
+  assert.match(pageSource, /src="\/assets\/personnel-theme\.js\?v=20260519b" defer/);
   assert.doesNotMatch(pageSource, /data-static-sidebar="1"/);
   assert.match(
     flynowCssSource,
@@ -495,6 +496,7 @@ test('static premium sidebars share the same section order and public labels', (
     assert.equal(linkTargets.social_linkedin, '/premium-socialmedia#linkedin');
     assert.equal(linkTargets.qr_code, '/premium-qr-code');
     for (const lockedKey of [
+      'leads',
       'coldcalling',
       'seo',
       'qr_code',
@@ -515,6 +517,11 @@ test('static premium sidebars share the same section order and public labels', (
       assert.ok(lockedLink, `${relativePath} mist locked sidebar-link ${lockedKey}`);
       assert.match(lockedLink[0], /sidebar-link--coming-soon/);
       assert.match(lockedLink[0], /sidebar-link-lock/);
+      if (lockedKey === 'leads') {
+        assert.match(lockedLink[0], /aria-disabled="true"/);
+        assert.match(lockedLink[0], /tabindex="-1"/);
+        assert.doesNotMatch(lockedLink[0], /data-sidebar-count-key="leads"/);
+      }
     }
     assert.doesNotMatch(pageSource, /Snapchat/);
   }
