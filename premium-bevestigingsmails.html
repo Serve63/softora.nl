@@ -1652,9 +1652,9 @@ function getColdmailRecipientPreviewUrl() {
   if (window.SoftoraCampaignTestMode && typeof window.SoftoraCampaignTestMode.isEnabled === 'function' && window.SoftoraCampaignTestMode.isEnabled()) params.set('testMode', '1');
   params.set('radiusKm', String(getSelectedCampaignRadiusKm()));
   const branchSelect = document.getElementById('branche');
-  const serviceSelect = document.getElementById('service'), specialActionSelect = document.getElementById('campaignSpecialAction');
+  const serviceSelect = document.getElementById('service'), specialActionSelect = document.getElementById('campaignSpecialAction'), serviceKey = normalizeLowerText(serviceSelect && serviceSelect.value).replace(/['’`]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''), specialAction = (specialActionSelect && specialActionSelect.value) || (!isPremiumAiLeadGeneratorPath() && (serviceKey === 'websites' || serviceKey === 'website') ? 'webdesign' : '');
   if (branchSelect && branchSelect.value) params.set('branch', branchSelect.value);
-  if (serviceSelect && serviceSelect.value) params.set('service', serviceSelect.value); if (specialActionSelect && specialActionSelect.value) params.set('specialAction', specialActionSelect.value);
+  if (serviceSelect && serviceSelect.value) params.set('service', serviceSelect.value); if (specialAction) params.set('specialAction', specialAction);
   return '/api/coldmailing/campaigns/recipients?' + params.toString();
 }
 
@@ -2354,7 +2354,7 @@ function getColdmailCampaignPayload(startConfirmPin) {
   const serviceSelect = document.getElementById('service');
   const databaseSelect = document.getElementById('database');
   const senderSelect = document.getElementById('campaignSenderEmail');
-  const specialActionSelect = document.getElementById('campaignSpecialAction');
+  const specialActionSelect = document.getElementById('campaignSpecialAction'), serviceKey = normalizeLowerText(serviceSelect && serviceSelect.value).replace(/['’`]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''), specialAction = (specialActionSelect && specialActionSelect.value) || (!isPremiumAiLeadGeneratorPath() && (serviceKey === 'websites' || serviceKey === 'website') ? 'webdesign' : '');
   const senderProfile = getColdmailingSettingsController()
     ? getColdmailingSettingsController().getCurrentSenderProfile()
     : {};
@@ -2368,7 +2368,7 @@ function getColdmailCampaignPayload(startConfirmPin) {
     service: serviceSelect ? serviceSelect.value : '',
     database: databaseSelect ? databaseSelect.value : '',
     senderEmail: senderSelect ? senderSelect.value : '',
-    specialAction: specialActionSelect ? specialActionSelect.value : '',
+    specialAction,
     durationDays: getSelectedCampaignDurationDays(),
     radiusKm: getSelectedCampaignRadiusKm(), testMode: Boolean(window.SoftoraCampaignTestMode && window.SoftoraCampaignTestMode.isEnabled()), startConfirmPin: String(startConfirmPin || '').trim(),
   };
