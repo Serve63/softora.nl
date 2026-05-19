@@ -416,6 +416,74 @@ nav {
   font-weight: 600;
 }
 
+.content-cta {
+  align-items: center;
+  background: var(--dark);
+  border-radius: 10px;
+  color: #fff;
+  display: grid;
+  gap: 28px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 0 auto 64px;
+  max-width: 920px;
+  padding: 34px 38px;
+}
+
+.content-cta h2 {
+  font-family: Oswald, Inter, sans-serif;
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.05;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.content-cta p {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 14px;
+  line-height: 1.65;
+  max-width: 620px;
+}
+
+.content-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.content-cta-primary,
+.content-cta-secondary {
+  border-radius: 999px;
+  font-family: Oswald, Inter, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 13px 18px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.content-cta-primary {
+  background: var(--crimson);
+  color: #fff;
+}
+
+.content-cta-primary:hover {
+  background: var(--clight);
+}
+
+.content-cta-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.content-cta-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff;
+}
+
 .meer-wrap {
   background: var(--white);
   border-top: 1px solid var(--border);
@@ -541,6 +609,7 @@ nav {
   .blog-grid-wrap,
   .pillar-wrap,
   .meer-wrap,
+  .content-cta,
   .artikel-hero,
   .artikel-body {
     padding-left: 20px;
@@ -568,6 +637,14 @@ nav {
   .pillar-heading-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .content-cta {
+    grid-template-columns: 1fr;
+  }
+
+  .content-cta-actions {
+    justify-content: flex-start;
   }
 
   .hero-banner {

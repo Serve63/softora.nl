@@ -25,6 +25,17 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
     intro:
       'De kennisbank is bedoeld als vaste SEO-basis: korte, duidelijke uitlegpagina’s die intern linken naar diensten en verdiepende artikelen.',
   }),
+  vergelijkingen: Object.freeze({
+    key: 'vergelijkingen',
+    path: '/vergelijkingen',
+    title: 'Softora Vergelijkingen',
+    description:
+      'Vergelijkingspagina’s voor ondernemers die twijfelen tussen website-, software- en AI-oplossingen en een betere keuze willen maken.',
+    eyebrow: 'Vergelijkingen',
+    heading: 'Kiezen tussen digitale oplossingen',
+    intro:
+      'Vergelijkingspagina’s vangen koopintentie af: bezoekers weten al dat ze iets willen verbeteren, maar zoeken nog welke route het beste past.',
+  }),
   branches: Object.freeze({
     key: 'branches',
     path: '/branches',
@@ -414,7 +425,91 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    collection: 'blog',
+    collection: 'vergelijkingen',
+    slug: 'website-laten-maken-vs-zelf-maken',
+    title: 'Website laten maken of zelf maken: wat is slimmer?',
+    description:
+      'Een praktische vergelijking tussen zelf een website bouwen en een website laten maken voor ondernemers die verkeer, vertrouwen en aanvragen willen.',
+    category: 'Websites',
+    intent: 'Vergelijking',
+    publishedAt: '2026-05-19',
+    updatedAt: '2026-05-19',
+    readTime: '7 min',
+    summary:
+      'Zelf bouwen kan snel en goedkoop starten, maar een professionele website wordt sterker wanneer strategie, techniek, SEO en conversie samenkomen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Zelf maken is logisch bij een eenvoudige start',
+        paragraphs: Object.freeze([
+          'Een website zelf maken kan prima zijn als je vooral online aanwezig wilt zijn en nog weinig eisen hebt aan SEO, snelheid, design of aanvragen. Je kunt snel iets publiceren en leert meteen wat je wel en niet belangrijk vindt.',
+          'De grens komt meestal wanneer de site meer moet doen dan bestaan. Zodra je gevonden wilt worden op meerdere diensten, vertrouwen wilt opbouwen en aanvragen wilt meten, wordt structuur belangrijker dan alleen een mooi scherm.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Laten maken is sterker wanneer de site omzet moet dragen',
+        paragraphs: Object.freeze([
+          'Een professionele website wordt gebouwd vanuit zoekintentie, paginaopbouw, techniek, interne links en conversiepunten. Dat is vooral belangrijk wanneer de website een echte bron van leads moet worden.',
+          'Daarbij hoort ook een fundering voor groei: dienstenpagina’s, blog, kennisbank, branchepagina’s, lokale pagina’s, canonicals, sitemap en duidelijke CTA’s. Als dat vanaf het begin klopt, kun je later veel sneller opschalen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'De beste keuze hangt af van risico en groeidoel',
+        paragraphs: Object.freeze([
+          'Als de website nog niet belangrijk is voor omzet, kan zelf starten logisch zijn. Als je site structureel verkeer en aanvragen moet opleveren, is laten maken vaak goedkoper dan maanden verliezen aan een zwakke basis.',
+          'Softora kiest daarom voor een groeibare aanpak: eerst de commerciële basis goed neerzetten, daarna content, tools, lokale SEO en automatisering toevoegen.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Website kosten in 2026', href: '/blog/website-laten-maken-kosten-2026' }),
+      Object.freeze({ label: 'Wat is een conversiegerichte website?', href: '/kennisbank/wat-is-een-conversiegerichte-website' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'vergelijkingen',
+    slug: 'ai-telefonist-vs-receptionist',
+    title: 'AI telefonist vs receptionist: wat past beter?',
+    description:
+      'Een vergelijking tussen een AI telefonist en een receptionist voor bedrijven die bereikbaar willen blijven zonder opvolging te verliezen.',
+    category: 'AI telefonie',
+    intent: 'Vergelijking',
+    publishedAt: '2026-05-19',
+    updatedAt: '2026-05-19',
+    readTime: '6 min',
+    summary:
+      'Een receptionist is persoonlijk en flexibel, terwijl een AI telefonist vooral sterk is in bereikbaarheid, vaste intake en snelle samenvatting.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Een receptionist blijft het sterkst in menselijk contact',
+        paragraphs: Object.freeze([
+          'Voor complexe gesprekken, gevoelige situaties en persoonlijke relatieopbouw blijft een receptionist of medewerker vaak de beste keuze. Mensen kunnen nuance herkennen, doorvragen en vertrouwen opbouwen.',
+          'De beperking zit vooral in beschikbaarheid en schaal. Buiten werktijd, tijdens drukte of bij veel herhalende vragen kan opvolging alsnog blijven liggen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Een AI telefonist is sterk in vaste routes',
+        paragraphs: Object.freeze([
+          'Een AI telefonist kan altijd opnemen, basisvragen stellen, urgentie bepalen en een samenvatting klaarzetten. Dat maakt hem interessant voor intake, terugbelverzoeken, veelgestelde vragen en leadkwalificatie.',
+          'De AI moet wel duidelijke grenzen hebben. Hij moet weten wanneer hij informatie verzamelt en wanneer een mens moet terugbellen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Vaak is combinatie de slimste oplossing',
+        paragraphs: Object.freeze([
+          'De beste oplossing is vaak niet AI of mens, maar een duidelijke verdeling. De AI vangt de eerste laag op en het team neemt over waar persoonlijk contact waarde toevoegt.',
+          'Softora bouwt zulke flows rond het echte proces: gesprek, samenvatting, CRM, agenda, taak en opvolging.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
+      Object.freeze({ label: 'Wat is een AI telefonist?', href: '/kennisbank/wat-is-een-ai-telefonist' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'vergelijkingen',
     slug: 'maatwerk-software-vs-standaard-software',
     title: 'Maatwerk software vs standaard software: wat past beter?',
     description:
@@ -498,7 +593,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    collection: 'blog',
+    collection: 'vergelijkingen',
     slug: 'chatbot-vs-livechat',
     title: 'Chatbot vs livechat: wat past beter bij je bedrijf?',
     description:
@@ -931,7 +1026,7 @@ function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', s
     `<link rel="canonical" href="${escapeHtml(canonicalUrl)}">`,
     '<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">',
     '<link rel="stylesheet" href="/assets/fonts.css?v=20260409a">',
-    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260519b">',
+    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260519c">',
     `<meta property="og:type" content="${escapeHtml(ogType)}">`,
     '<meta property="og:site_name" content="Softora">',
     '<meta property="og:locale" content="nl_NL">',
@@ -996,6 +1091,7 @@ function buildContentShell({ title, description, canonicalUrl, structuredData, b
     '      <a href="/bedrijfssoftware-op-maat">Software</a>',
     '      <a href="/blog">Blog</a>',
     '      <a href="/kennisbank">Kennisbank</a>',
+    '      <a href="/vergelijkingen">Vergelijkingen</a>',
     '      <a href="/branches">Branches</a>',
     '      <a href="/regio">Regio</a>',
     '    </div>',
@@ -1018,6 +1114,41 @@ function renderRelatedLinks(links) {
     ...links.map(
       (link) => `    <a class="blog-card compact-card" href="${escapeHtml(link.href)}"><span>${escapeHtml(link.label)}</span></a>`
     ),
+    '  </div>',
+    '</section>',
+  ].join('\n');
+}
+
+function resolvePrimaryCtaLink(item) {
+  const commercialTargets = new Set([
+    '/website-laten-maken',
+    '/ai-automatisering',
+    '/bedrijfssoftware-op-maat',
+    '/crm-systeem-op-maat',
+    '/chatbot-laten-maken',
+    '/ai-telefonist',
+    '/voicesoftware-op-maat',
+    '/diensten',
+  ]);
+  const relatedLinks = Array.isArray(item && item.relatedLinks) ? item.relatedLinks : [];
+  return relatedLinks.find((link) => commercialTargets.has(String(link.href || ''))) || {
+    label: 'Bekijk wat Softora kan bouwen',
+    href: '/diensten',
+  };
+}
+
+function renderConversionCta(item) {
+  const primary = resolvePrimaryCtaLink(item);
+  return [
+    '<section class="content-cta" data-softora-public-seo="conversion-cta">',
+    '  <div>',
+    '    <div class="meer-label">Volgende stap</div>',
+    '    <h2>Wil je dit toepassen op jouw bedrijf?</h2>',
+    '    <p>Gebruik deze pagina als richting, maar laat de keuze afhangen van je echte proces, doelen en leadflow.</p>',
+    '  </div>',
+    '  <div class="content-cta-actions">',
+    `    <a class="content-cta-primary" href="${escapeHtml(primary.href)}">${escapeHtml(primary.label)}</a>`,
+    '    <a class="content-cta-secondary" href="/#contact">Neem contact op</a>',
     '  </div>',
     '</section>',
   ].join('\n');
@@ -1049,6 +1180,7 @@ function getBackLabelForCollection(collection) {
   if (!collection) return 'overzicht';
   if (collection.key === 'blog') return 'blog';
   if (collection.key === 'kennisbank') return 'kennisbank';
+  if (collection.key === 'vergelijkingen') return 'vergelijkingen';
   if (collection.key === 'branches') return 'branches';
   if (collection.key === 'regio') return 'regio';
   return 'overzicht';
@@ -1171,6 +1303,7 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
     '  <div class="filter-bar" aria-label="Content onderdelen">',
     `    <a class="filter-tab${collection.key === 'blog' ? ' active' : ''}" href="/blog">Blog</a>`,
     `    <a class="filter-tab${collection.key === 'kennisbank' ? ' active' : ''}" href="/kennisbank">Kennisbank</a>`,
+    `    <a class="filter-tab${collection.key === 'vergelijkingen' ? ' active' : ''}" href="/vergelijkingen">Vergelijkingen</a>`,
     `    <a class="filter-tab${collection.key === 'branches' ? ' active' : ''}" href="/branches">Branches</a>`,
     `    <a class="filter-tab${collection.key === 'regio' ? ' active' : ''}" href="/regio">Regio</a>`,
     '    <a class="filter-tab" href="/website-laten-maken">Websites</a>',
@@ -1183,6 +1316,7 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
     renderRelatedLinks([
       { label: 'Website laten maken', href: '/website-laten-maken' },
       { label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' },
+      { label: 'Bekijk vergelijkingen', href: '/vergelijkingen' },
       { label: 'Bekijk branches', href: '/branches' },
       { label: 'Bekijk regio', href: '/regio' },
       { label: collection.key === 'blog' ? 'Bekijk de kennisbank' : 'Bekijk de blog', href: collection.key === 'blog' ? '/kennisbank' : '/blog' },
@@ -1256,6 +1390,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
       ].join('\n')
     ),
     '  </article>',
+    renderConversionCta(item),
     renderRelatedLinks(item.relatedLinks),
     '</main>',
   ].join('\n');
