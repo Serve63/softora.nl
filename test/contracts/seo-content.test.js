@@ -19,23 +19,28 @@ test('seo content exposes blog and kennisbank paths for crawl and sitemap discov
 
   assert.ok(publicPaths.includes('/blog'));
   assert.ok(publicPaths.includes('/kennisbank'));
+  assert.ok(publicPaths.includes('/vergelijkingen'));
   assert.ok(publicPaths.includes('/branches'));
   assert.ok(publicPaths.includes('/regio'));
   assert.ok(publicPaths.includes('/blog/ai-automatisering-mkb-waar-beginnen'));
   assert.ok(publicPaths.includes('/blog/website-laten-maken-kosten-2026'));
   assert.ok(publicPaths.includes('/blog/chatbot-laten-maken-wanneer-zinvol'));
   assert.ok(publicPaths.includes('/kennisbank/wat-is-bedrijfssoftware-op-maat'));
+  assert.ok(publicPaths.includes('/vergelijkingen/website-laten-maken-vs-zelf-maken'));
+  assert.ok(publicPaths.includes('/vergelijkingen/ai-telefonist-vs-receptionist'));
   assert.ok(publicPaths.includes('/branches/installateurs'));
   assert.ok(publicPaths.includes('/branches/makelaars'));
   assert.ok(publicPaths.includes('/regio/oisterwijk'));
   assert.ok(publicPaths.includes('/regio/tilburg'));
   assert.ok(!publicPaths.includes('/blog/website-laten-maken-mkb-paginas'));
   assert.ok(publicPaths.includes('/premium-blog'), 'Legacy blog route moet crawlbaar blijven voor de redirect.');
+  assert.ok(getSeoContentCollectionPaths().includes('/vergelijkingen'));
   assert.ok(getSeoContentCollectionPaths().includes('/branches'));
   assert.ok(getSeoContentCollectionPaths().includes('/regio'));
   assert.ok(sitemapEntries.some((entry) => entry.path === '/blog/ai-automatisering-mkb-waar-beginnen'));
   assert.ok(sitemapEntries.some((entry) => entry.path === '/blog/website-laten-maken-kosten-2026'));
   assert.ok(sitemapEntries.some((entry) => entry.path === '/blog/chatbot-laten-maken-wanneer-zinvol'));
+  assert.ok(sitemapEntries.some((entry) => entry.path === '/vergelijkingen/website-laten-maken-vs-zelf-maken'));
   assert.ok(sitemapEntries.some((entry) => entry.path === '/branches/installateurs'));
   assert.ok(sitemapEntries.some((entry) => entry.path === '/regio/den-bosch'));
   assert.ok(!sitemapEntries.some((entry) => entry.path === '/blog/website-laten-maken-mkb-paginas'));
@@ -63,6 +68,7 @@ test('seo content renders the existing blog visual language with real links', ()
   assert.match(html, /href="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
   assert.match(html, /href="\/blog\/website-laten-maken-kosten-2026"/);
   assert.match(html, /href="\/blog\/chatbot-laten-maken-wanneer-zinvol"/);
+  assert.match(html, /href="\/vergelijkingen">Vergelijkingen<\/a>/);
   assert.doesNotMatch(html, /data-public-lock-input/);
   assert.doesNotMatch(html, /premium-public-lock/);
 });
@@ -81,6 +87,33 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /AI automatisering voor het MKB: waar begin je\?/);
   assert.match(html, /href="\/blog">Terug naar blog<\/a>/);
   assert.match(html, /href="\/ai-telefonist"/);
+  assert.match(html, /data-softora-public-seo="conversion-cta"/);
+  assert.match(html, /href="\/#contact">Neem contact op<\/a>/);
+});
+
+test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
+  const indexHtml = buildSeoContentIndexHtml('vergelijkingen', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const item = getSeoContentItem('vergelijkingen', 'website-laten-maken-vs-zelf-maken');
+  const articleHtml = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.match(indexHtml, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/vergelijkingen">/);
+  assert.match(indexHtml, /Kiezen tussen digitale oplossingen/);
+  assert.match(indexHtml, /href="\/vergelijkingen\/website-laten-maken-vs-zelf-maken"/);
+  assert.match(indexHtml, /href="\/vergelijkingen\/ai-telefonist-vs-receptionist"/);
+  assert.match(indexHtml, /class="filter-tab active" href="\/vergelijkingen">Vergelijkingen/);
+
+  assert.match(
+    articleHtml,
+    /<link rel="canonical" href="https:\/\/www\.softora\.nl\/vergelijkingen\/website-laten-maken-vs-zelf-maken">/
+  );
+  assert.match(articleHtml, /"@type":"Article"/);
+  assert.match(articleHtml, /Terug naar vergelijkingen/);
+  assert.match(articleHtml, /href="\/website-laten-maken">Website laten maken<\/a>/);
+  assert.match(articleHtml, /data-softora-public-seo="conversion-cta"/);
 });
 
 test('seo content renders branche en regio landingspagina’s met service schema', () => {
@@ -114,10 +147,13 @@ test('seo content heeft een dagelijkse publicatiebuffer die pas live komt op pub
   assert.ok(scheduled.length >= 7, 'De contentmachine moet minimaal een week vooruit gepland zijn.');
   assert.ok(scheduled.some((item) => item.path === '/blog/website-laten-maken-mkb-paginas'));
   assert.ok(scheduled.some((item) => item.path === '/kennisbank/wat-is-ai-automatisering'));
+  assert.ok(scheduled.some((item) => item.path === '/vergelijkingen/maatwerk-software-vs-standaard-software'));
 
-  assert.ok(!getSeoContentPublicPaths({ now: beforeLaunch }).includes('/blog/chatbot-vs-livechat'));
-  assert.ok(getSeoContentPublicPaths({ now: afterLaunch }).includes('/blog/chatbot-vs-livechat'));
-  assert.ok(getSeoContentSitemapEntries({ now: afterLaunch }).some((entry) => entry.path === '/blog/chatbot-vs-livechat'));
+  assert.ok(!getSeoContentPublicPaths({ now: beforeLaunch }).includes('/vergelijkingen/chatbot-vs-livechat'));
+  assert.ok(getSeoContentPublicPaths({ now: afterLaunch }).includes('/vergelijkingen/chatbot-vs-livechat'));
+  assert.ok(
+    getSeoContentSitemapEntries({ now: afterLaunch }).some((entry) => entry.path === '/vergelijkingen/chatbot-vs-livechat')
+  );
 });
 
 test('seo content bewaakt unieke slugs, clusters en interne links', () => {

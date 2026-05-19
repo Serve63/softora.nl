@@ -136,6 +136,30 @@ test('page smoke: public kennisbank article is crawlable HTML', async () => {
   assert.match(html, /data-softora-public-seo="structured-data"/);
 });
 
+test('page smoke: public vergelijkingen hub and article are crawlable HTML', async () => {
+  const hubResponse = await fetch(`${serverRef.baseUrl}/vergelijkingen`, {
+    cache: 'no-store',
+  });
+  const hubHtml = await hubResponse.text();
+  const articleResponse = await fetch(`${serverRef.baseUrl}/vergelijkingen/website-laten-maken-vs-zelf-maken`, {
+    cache: 'no-store',
+  });
+  const articleHtml = await articleResponse.text();
+
+  assert.equal(hubResponse.status, 200);
+  assert.match(hubHtml, /Kiezen tussen digitale oplossingen/);
+  assert.match(hubHtml, /href="\/vergelijkingen\/website-laten-maken-vs-zelf-maken"/);
+
+  assert.equal(articleResponse.status, 200);
+  assert.match(articleHtml, /<!DOCTYPE html>/i);
+  assert.match(articleHtml, /Website laten maken of zelf maken: wat is slimmer\?/);
+  assert.match(
+    articleHtml,
+    /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/vergelijkingen\/website-laten-maken-vs-zelf-maken">/
+  );
+  assert.match(articleHtml, /data-softora-public-seo="conversion-cta"/);
+});
+
 test('page smoke: public branche article is crawlable service HTML', async () => {
   const response = await fetch(`${serverRef.baseUrl}/branches/installateurs`, {
     cache: 'no-store',
