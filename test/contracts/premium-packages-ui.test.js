@@ -92,7 +92,7 @@ test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () =
   );
   assert.match(
     routesSection,
-    /Elke database wordt gehost via Softora\.nl\. De kosten voor uitsluitend databasehosting bedragen €15 per maand\./
+    /databaseopslag draait via Softora\.nl\/Supabase; klanten met databasehosting betalen hiervoor €15 per maand aan ons als Supabase-vergoeding, vergelijkbaar met Shopify-platformkosten\./
   );
   assert.ok(route02Start >= 0, 'Route 02 staat in de routes-sectie');
   assert.ok(route03Start > route02Start, 'Route 03 staat na Route 02');
