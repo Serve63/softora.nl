@@ -227,7 +227,7 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
   });
 
   assert.match(violations.join('\n'), /verschillende CSS\/JS personnel-theme versies/i);
-  assert.match(violations.join('\n'), /verwacht 20260513a/i);
+  assert.match(violations.join('\n'), /verwacht 20260519a/i);
 });
 
 test('quality lock remains part of verify critical and the PR checklist', () => {

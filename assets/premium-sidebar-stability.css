@@ -1,4 +1,20 @@
+@view-transition {
+    navigation: auto;
+}
+
 @media (min-width: 901px) {
+    .sidebar[data-static-sidebar="1"] {
+        view-transition-name: softora-premium-sidebar;
+    }
+
+    ::view-transition-group(softora-premium-sidebar),
+    ::view-transition-old(softora-premium-sidebar),
+    ::view-transition-new(softora-premium-sidebar) {
+        animation-duration: 1ms !important;
+        animation-delay: 0ms !important;
+        mix-blend-mode: normal !important;
+    }
+
     ::view-transition-old(root),
     ::view-transition-new(root) {
         animation-duration: 1ms !important;

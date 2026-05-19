@@ -235,7 +235,7 @@ test('agent guardrails prevent oversized frontend files from growing further', (
 test('agent guardrails require targeted tests for protected quality gates and sidebar shell', () => {
   const workflowSource = readRepoFile('.github/workflows/agent-guardrails.yml');
   const qualityLockSource = readRepoFile('scripts/check-quality-lock.js');
-  assert.match(qualityLockSource, /PREMIUM_SIDEBAR_THEME_VERSION = '20260513a'/);
+  assert.match(qualityLockSource, /PREMIUM_SIDEBAR_THEME_VERSION = '20260519a'/);
   assert.equal(isProtectedQualityGatePath('scripts/check-quality-lock.js'), true);
   assert.match(workflowSource, /GUARDRAILS_MAX_BEHAVIOR_DIFF_LINES:\s*2500/);
 

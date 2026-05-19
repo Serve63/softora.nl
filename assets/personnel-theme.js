@@ -1297,18 +1297,15 @@
         return href;
     }
 
-    function openSidebarNavigationTarget(url, event) {
-        const href = normalizeSidebarNavigationTarget(url);
-        if (!href) return;
-        const openInNewTab = Boolean(
-            event &&
-            (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1)
-        );
-        if (openInNewTab) {
-            window.open(href, "_blank", "noopener,noreferrer");
-            return;
+    function isSidebarNavigationCurrentTarget(href) {
+        try {
+            const targetUrl = new URL(normalizeSidebarNavigationTarget(href), window.location.origin);
+            return targetUrl.origin === window.location.origin &&
+                targetUrl.pathname === window.location.pathname &&
+                targetUrl.hash === window.location.hash;
+        } catch (_) {
+            return false;
         }
-        window.location.assign(href);
     }
 
     function canWarmSidebarNavigationTarget(href) {
@@ -1380,13 +1377,14 @@
                 if (!href) return;
                 anchor.dataset.sidebarNavInit = "1";
                 anchor.dataset.sidebarHref = normalizeSidebarNavigationTarget(href);
-                anchor.removeAttribute("href");
-                anchor.setAttribute("role", "link");
-                anchor.setAttribute("tabindex", "0");
+                anchor.setAttribute("href", anchor.dataset.sidebarHref);
+                anchor.removeAttribute("role");
+                anchor.removeAttribute("tabindex");
                 anchor.addEventListener("click", function (event) {
-                    event.preventDefault();
                     warmSidebarNavigationTarget(anchor.dataset.sidebarHref);
-                    openSidebarNavigationTarget(anchor.dataset.sidebarHref, event);
+                    if (isSidebarNavigationCurrentTarget(anchor.dataset.sidebarHref)) {
+                        event.preventDefault();
+                    }
                 });
                 anchor.addEventListener("pointerenter", function () {
                     warmSidebarNavigationTarget(anchor.dataset.sidebarHref);
@@ -1399,13 +1397,7 @@
                 }, { passive: true });
                 anchor.addEventListener("auxclick", function (event) {
                     if (event.button !== 1) return;
-                    event.preventDefault();
-                    openSidebarNavigationTarget(anchor.dataset.sidebarHref, event);
-                });
-                anchor.addEventListener("keydown", function (event) {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.preventDefault();
-                    openSidebarNavigationTarget(anchor.dataset.sidebarHref, event);
+                    warmSidebarNavigationTarget(anchor.dataset.sidebarHref);
                 });
                 initializedCount += 1;
             });

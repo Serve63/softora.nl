@@ -90,7 +90,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   );
   assert.match(themeJsSource, /function neutralizeSidebarAnchors\(\) \{/);
   assert.match(themeJsSource, /anchor\.removeAttribute\("href"\);/);
-  assert.match(themeJsSource, /openSidebarNavigationTarget\(anchor\.dataset\.sidebarHref, event\);/);
+  assert.match(themeJsSource, /function isSidebarNavigationCurrentTarget\(href\) \{/);
+  assert.match(themeJsSource, /anchor\.dataset\.sidebarHref = normalizeSidebarNavigationTarget\(href\);[\s\S]*anchor\.setAttribute\("href", anchor\.dataset\.sidebarHref\);/);
+  assert.doesNotMatch(themeJsSource, /window\.location\.assign\(href\);/);
+  assert.doesNotMatch(themeJsSource, /openSidebarNavigationTarget\(anchor\.dataset\.sidebarHref, event\);/);
   assert.match(themeJsSource, /document\.body\.setAttribute\("data-sidebar-nav-ready", "1"\);/);
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*none;/);
   assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\] \.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*auto;/);
@@ -100,6 +103,9 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /@view-transition\s*\{[\s\S]*navigation:\s*auto;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*view-transition-name:\s*softora-premium-sidebar;/);
   assert.match(themeSource, /::view-transition-old\(softora-premium-sidebar\),[\s\S]*::view-transition-new\(softora-premium-sidebar\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
+  assert.match(stabilitySource, /@view-transition\s*\{[\s\S]*navigation:\s*auto;/);
+  assert.match(stabilitySource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*view-transition-name:\s*softora-premium-sidebar;/);
+  assert.match(stabilitySource, /::view-transition-old\(softora-premium-sidebar\),[\s\S]*::view-transition-new\(softora-premium-sidebar\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
   assert.match(stabilitySource, /::view-transition-old\(root\),[\s\S]*::view-transition-new\(root\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
   assert.match(themeSource, /--premium-sidebar-font-display:\s*'SoftoraSidebarOswald', 'Oswald', sans-serif;/);
   assert.match(themeSource, /\.sidebar-logo\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-display\) !important;[\s\S]*font-synthesis:\s*none !important;/);
@@ -178,6 +184,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /premium-sidebar-stability\.css\?v=/);
   assert.match(htmlPagesSource, /premium-sidebar-stability\.js\?v=/);
   assert.match(htmlPagesSource, /id="softora-premium-sidebar-critical"/);
+  assert.match(htmlPagesSource, /@view-transition\{navigation:auto;\}/);
+  assert.match(htmlPagesSource, /view-transition-name:softora-premium-sidebar !important;/);
   assert.match(htmlPagesSource, /function injectSnippetAfterHeadOpen\(html, snippet, marker\) \{/);
   assert.match(htmlPagesSource, /function hasPremiumStaticSidebar\(html\) \{/);
   assert.match(htmlPagesSource, /margin-left:var\(--premium-sidebar-width,320px\) !important;/);
@@ -277,8 +285,8 @@ test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar
     'FLYNOW hoort leeg te starten en daarna de gedeelde premium-sidebar dynamisch te laten vullen'
   );
   assert.match(pageSource, /<main class="main-content flynow-main">/);
-  assert.match(pageSource, /href="\/assets\/personnel-theme\.css\?v=20260513a"/);
-  assert.match(pageSource, /src="\/assets\/personnel-theme\.js\?v=20260513a" defer/);
+  assert.match(pageSource, /href="\/assets\/personnel-theme\.css\?v=20260519a"/);
+  assert.match(pageSource, /src="\/assets\/personnel-theme\.js\?v=20260519a" defer/);
   assert.doesNotMatch(pageSource, /data-static-sidebar="1"/);
   assert.match(
     flynowCssSource,
