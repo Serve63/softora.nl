@@ -559,7 +559,7 @@ function createSeoCore(deps = {}) {
     const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
     if (!fileName) return '/';
     const slug = fileName.replace(/\.html$/i, '');
-    return slug === 'index' ? '/' : `/${slug}`;
+    return slug === 'index' || slug === 'premium-website' ? '/' : `/${slug}`;
   }
 
   function stripSeoBrandTokens(valueRaw) {
