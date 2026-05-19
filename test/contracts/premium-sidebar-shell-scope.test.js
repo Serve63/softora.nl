@@ -141,6 +141,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(stabilityJsSource, /event\.stopImmediatePropagation\(\);/);
   assert.match(stabilityJsSource, /document\.documentElement\.toggleAttribute\("data-premium-sidebar-route-changing", Boolean\(isChanging\)\);/);
   assert.match(stabilityJsSource, /document\.addEventListener\("click", handleSidebarNavigationStart, true\);/);
+  assert.match(themeSource, /\.dashboard-layout\[data-sidebar-shell="canonical"\] > :is\(\.main-content, main\.main-content, \.main, main\.main\) > \.premium-boot-shell > :is\(\.page-content, \.page-header, \.topbar, \.page-hero, \.register-shell, \.coming-shell, \.screen, \.notepad-shell, \.word-shell\)/);
   assert.match(stabilitySource, /\.softora-premium-content-frame\s*\{[\s\S]*position:\s*fixed;[\s\S]*left:\s*var\(--premium-sidebar-width, 320px\);/);
   assert.match(stabilitySource, /html\[data-premium-sidebar-shell-active\],[\s\S]*body\[data-premium-sidebar-shell-active\]\s*\{[\s\S]*overflow:\s*hidden !important;/);
   assert.match(themeJsSource, /function initPremiumSidebarStabilityGuards\(\) \{/);
@@ -197,6 +198,9 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE/);
   assert.match(htmlPagesSource, /function isPremiumSidebarContentFrameRequest\(req\) \{/);
   assert.match(htmlPagesSource, /function applyPremiumSidebarContentFrameHtml\(html\) \{/);
+  assert.match(htmlPagesSource, /html\[data-softora-sidebar-content-frame="1"\]\{--premium-sidebar-width:0px !important;\}/);
+  assert.match(htmlPagesSource, /html\[data-softora-sidebar-content-frame="1"\] \.dashboard-layout\[data-sidebar-shell="canonical"\] > \.main-content/);
+  assert.match(htmlPagesSource, /html\[data-softora-sidebar-content-frame="1"\] \.premium-boot-loader\{left:0 !important;\}/);
   assert.match(htmlPagesSource, /res\.setHeader\('X-Frame-Options', 'SAMEORIGIN'\);/);
   assert.match(htmlPagesSource, /frame-ancestors 'self'/);
   assert.match(htmlPagesSource, /premium-sidebar-stability\.css\?v=/);

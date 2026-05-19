@@ -20,6 +20,7 @@ const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<script src="/assets/premium-sidebar-stability.js?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}" defer></script>`,
 ].join('\n');
 const PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE = `<style id="softora-premium-sidebar-content-frame">
+html[data-softora-sidebar-content-frame="1"]{--premium-sidebar-width:0px !important;}
 html[data-softora-sidebar-content-frame="1"],html[data-softora-sidebar-content-frame="1"] body{min-height:100vh !important;overflow-x:hidden !important;background:#f8f7f4 !important;}
 html[data-softora-sidebar-content-frame="1"] .sidebar{display:none !important;}
 html[data-softora-sidebar-content-frame="1"] .dashboard-layout{display:block !important;min-height:100vh !important;width:100% !important;margin:0 !important;}
@@ -29,6 +30,13 @@ html[data-softora-sidebar-content-frame="1"] .main-content,
 html[data-softora-sidebar-content-frame="1"] main.main-content,
 html[data-softora-sidebar-content-frame="1"] .page-shell,
 html[data-softora-sidebar-content-frame="1"] main.page-shell{margin-left:0 !important;width:100% !important;max-width:none !important;}
+html[data-softora-sidebar-content-frame="1"] .dashboard-layout[data-sidebar-shell="canonical"] > .main,
+html[data-softora-sidebar-content-frame="1"] .dashboard-layout[data-sidebar-shell="canonical"] > main.main,
+html[data-softora-sidebar-content-frame="1"] .dashboard-layout[data-sidebar-shell="canonical"] > .main-content,
+html[data-softora-sidebar-content-frame="1"] .dashboard-layout[data-sidebar-shell="canonical"] > main.main-content,
+html[data-softora-sidebar-content-frame="1"] .dashboard-layout[data-sidebar-shell="canonical"] > .page-shell,
+html[data-softora-sidebar-content-frame="1"] .dashboard-layout[data-sidebar-shell="canonical"] > main.page-shell{margin-left:0 !important;width:100% !important;max-width:none !important;}
+html[data-softora-sidebar-content-frame="1"] .premium-boot-loader{left:0 !important;}
 </style>`;
 const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
   `<script id="softora-personnel-first-paint">(function(){try{document.documentElement.setAttribute("data-personnel-loading","true");document.documentElement.setAttribute("data-theme-mode","light");document.documentElement.setAttribute("data-theme","light");}catch(_){}})();</script>`,
