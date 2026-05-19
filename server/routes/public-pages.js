@@ -9,6 +9,7 @@ const {
 const {
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
+  getSeoContentCollectionPaths,
   getSeoContentItem,
 } = require('../services/seo-content');
 
@@ -43,6 +44,9 @@ function getStaticAssetCacheControl(assetPath, originalUrl = '') {
 }
 
 function registerPublicPageRoutes(app, deps) {
+  const seoContentCollectionPaths = getSeoContentCollectionPaths();
+  const seoContentArticlePaths = seoContentCollectionPaths.map((collectionPath) => `${collectionPath}/:slug`);
+
   app.get('/robots.txt', (req, res) => {
     const publicBaseUrl = deps.getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -104,7 +108,7 @@ function registerPublicPageRoutes(app, deps) {
     return res.redirect(301, appendOriginalQuery('/blog', req.originalUrl));
   });
 
-  app.get(['/blog', '/kennisbank'], (req, res, next) => {
+  app.get(seoContentCollectionPaths, (req, res, next) => {
     const collection = String(req.path || '').replace(/^\//, '');
     const publicBaseUrl = deps.getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
     const html = buildSeoContentIndexHtml(collection, { siteOrigin: publicBaseUrl });
@@ -114,7 +118,7 @@ function registerPublicPageRoutes(app, deps) {
     return res.status(200).send(html);
   });
 
-  app.get(['/blog/:slug', '/kennisbank/:slug'], (req, res, next) => {
+  app.get(seoContentArticlePaths, (req, res, next) => {
     const collection = String(req.path || '').split('/').filter(Boolean)[0] || '';
     const slug = String(req.params.slug || '').trim();
     if (!/^[a-zA-Z0-9_-]+$/.test(slug)) return next();

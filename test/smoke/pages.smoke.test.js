@@ -136,6 +136,32 @@ test('page smoke: public kennisbank article is crawlable HTML', async () => {
   assert.match(html, /data-softora-public-seo="structured-data"/);
 });
 
+test('page smoke: public branche article is crawlable service HTML', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/branches/installateurs`, {
+    cache: 'no-store',
+  });
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(html, /<!DOCTYPE html>/i);
+  assert.match(html, /Websites en automatisering voor installateurs/);
+  assert.match(html, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/branches\/installateurs">/);
+  assert.match(html, /"@type":"Service"/);
+});
+
+test('page smoke: public regio article is crawlable service HTML', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/regio/tilburg`, {
+    cache: 'no-store',
+  });
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(html, /<!DOCTYPE html>/i);
+  assert.match(html, /Website laten maken en AI automatisering in Tilburg/);
+  assert.match(html, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/regio\/tilburg">/);
+  assert.match(html, /"areaServed":\{"@type":"AdministrativeArea","name":"Tilburg"\}/);
+});
+
 test('page smoke: /favicon.ico serves the Softora favicon', async () => {
   const response = await fetch(`${serverRef.baseUrl}/favicon.ico`, { cache: 'no-store' });
   const bytes = Buffer.from(await response.arrayBuffer());
