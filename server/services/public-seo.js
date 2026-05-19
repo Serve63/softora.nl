@@ -27,12 +27,12 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-websites.html',
     path: '/website-laten-maken',
     legacyPaths: ['/premium-websites'],
-    title: 'Website laten maken door Softora',
+    title: 'Website laten maken voor meer aanvragen',
     description:
-      'Laat een snelle, overtuigende website maken door Softora met sterke uitstraling, heldere structuur en focus op offerteaanvragen.',
+      "Laat een snelle, SEO-vriendelijke website maken door Softora met sterke structuur, duidelijke dienstenpagina's en focus op offerteaanvragen.",
     kind: 'service',
     serviceName: 'Webdesign en website ontwikkeling',
-    relatedLinks: ['/blog/website-laten-maken-kosten-2026', '/ai-automatisering', '/chatbot-laten-maken', '/kennisbank'],
+    relatedLinks: ['/blog/website-laten-maken-kosten-2026', '/website-laten-maken-oisterwijk', '/pakketten', '/kennisbank'],
   },
   {
     fileName: 'website-laten-maken-oisterwijk.html',
@@ -48,9 +48,9 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-bedrijfssoftware.html',
     path: '/bedrijfssoftware-op-maat',
     legacyPaths: ['/premium-bedrijfssoftware'],
-    title: 'Bedrijfssoftware op maat door Softora',
+    title: 'Bedrijfssoftware op maat laten maken',
     description:
-      'Softora bouwt bedrijfssoftware op maat voor dashboards, klantbeheer, processen, automatisering en interne tools die dagelijks werk versnellen.',
+      'Laat bedrijfssoftware op maat maken voor CRM, dashboards, klantbeheer, offertes, planning en AI automatisering die dagelijks werk versnelt.',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
     relatedLinks: ['/crm-systeem-op-maat', '/maatwerk-platform', '/kennisbank/wat-is-bedrijfssoftware-op-maat', '/ai-automatisering'],
