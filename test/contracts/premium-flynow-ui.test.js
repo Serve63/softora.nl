@@ -17,7 +17,7 @@ test('premium flynow gebruikt de deals-layout binnen de premium sidebar', () => 
   assert.match(html, /<main class="main-content flynow-main">/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /src="\/assets\/personnel-theme\.js\?v=20260519b" defer/);
-  assert.match(html, /href="\/assets\/flynow\.css\?v=20260519d"/);
+  assert.match(html, /href="\/assets\/flynow\.css\?v=20260519e"/);
   assert.match(html, /src="\/assets\/flynow\.js\?v=20260519c" defer/);
   assert.match(html, /<span class="deals-logo-text">My Deals<\/span>/);
   assert.match(html, /data-flynow-tab="zon"/);
@@ -64,7 +64,10 @@ test('premium flynow gebruikt de deals-layout binnen de premium sidebar', () => 
   assert.match(css, /\.deals-header\s*\{[\s\S]*position:\s*sticky;/);
   assert.match(css, /\.deals-header\s*\{[\s\S]*background-image:\s*linear-gradient\([\s\S]*url\("\/assets\/flynow\/flynow-zon-photo-8\.jpg"\)/);
   assert.match(css, /\.deals-header\s*\{[\s\S]*background-size:\s*cover/);
-  assert.match(css, /\.deals-tab\.active\s*\{[\s\S]*border-color:\s*var\(--flynow-cream\)/);
+  assert.match(css, /\.deals-tabs\s*\{[\s\S]*gap:\s*10px/);
+  assert.match(css, /\.deals-tab\s*\{[\s\S]*border-radius:\s*999px[\s\S]*box-shadow:/);
+  assert.match(css, /\.deals-tab\.active\s*\{[\s\S]*background:\s*linear-gradient/);
+  assert.match(css, /\.deals-tab-mark\s*\{[\s\S]*width:\s*30px[\s\S]*border-radius:\s*999px/);
   assert.match(css, /body\[data-flynow-page\] \.flynow-main \.hero-deal \.hero-title\s*\{[\s\S]*color:\s*var\(--flynow-white\) !important/);
   assert.match(css, /\.hero-deal--zon\s*\{background-image:\s*url\("\/assets\/flynow\/flynow-zon-photo-1\.jpg"\)/);
   assert.match(css, /\.deal-photo--mallorca\s*\{\s*background-image:\s*url\("\/assets\/flynow\/flynow-zon-photo-5\.jpg"\)/);
