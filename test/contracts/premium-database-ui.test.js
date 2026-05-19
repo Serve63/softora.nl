@@ -30,6 +30,14 @@ function loadDatabaseDeepSearchClient(options = {}) {
   return sandbox.window.SoftoraDatabaseDeepSearch;
 }
 
+function loadDatabaseContactStatusClient() {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-contact-status.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const sandbox = { window: {} };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseContactStatus;
+}
+
 function loadDatabasePhotoStorageClient() {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
@@ -153,6 +161,18 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /sortKey: "manual"/);
 });
 
+test('premium database contact status detects sent coldmail signals', () => {
+  const contactStatusClient = loadDatabaseContactStatusClient();
+
+  assert.equal(contactStatusClient.normalizeOutreachStatusKey('benaderd'), 'benaderd');
+  assert.equal(contactStatusClient.normalizeOutreachStatusKey('sent'), 'benaderd');
+  assert.equal(contactStatusClient.shouldInferMailedStatus('benaderbaar', { outreachStatus: 'benaderd' }), true);
+  assert.equal(contactStatusClient.shouldInferMailedStatus('prospect', { coldmailSentMessageId: 'msg_123' }), true);
+  assert.equal(contactStatusClient.shouldInferMailedStatus('prospect', { hist: [{ label: 'Mail verstuurd' }] }), true);
+  assert.equal(contactStatusClient.shouldInferMailedStatus('klant', { outreachStatus: 'benaderd' }), false);
+  assert.equal(contactStatusClient.getColdmailSentAt({ lastColdmailSentAt: '2026-05-19T17:02:00Z' }), '2026-05-19T17:02:00Z');
+});
+
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const importScriptPath = path.join(__dirname, '../../assets/premium-database-import.js');
@@ -162,6 +182,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   const photoStorageScriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
   const webdesignMockupScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-mockup.js');
   const deepSearchScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
+  const contactStatusScriptPath = path.join(__dirname, '../../assets/premium-database-contact-status.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
   const photoBatchScriptSource = fs.readFileSync(photoBatchScriptPath, 'utf8');
@@ -170,6 +191,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   const photoStorageScriptSource = fs.readFileSync(photoStorageScriptPath, 'utf8');
   const webdesignMockupScriptSource = fs.readFileSync(webdesignMockupScriptPath, 'utf8');
   const deepSearchScriptSource = fs.readFileSync(deepSearchScriptPath, 'utf8');
+  const contactStatusScriptSource = fs.readFileSync(contactStatusScriptPath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
   assert.match(pageSource, /family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700/);
@@ -413,6 +435,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260506a/);
+  assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
@@ -717,8 +740,13 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /function renderUsedChannelTags\(customer\)/);
   assert.match(pageSource, /const COLDMAIL_TEST_COMPANIES = \["mcv e-commerce"\];/);
   assert.match(pageSource, /function isColdmailTestCompany\(customer\)/);
-  assert.match(pageSource, /storedStatus === "gemaild" \? "benaderbaar" : storedStatus/);
+  assert.match(contactStatusScriptSource, /function hasColdmailSentSignal\(raw, helpers\)/);
+  assert.match(contactStatusScriptSource, /function shouldInferMailedStatus\(storedStatus, raw, helpers\)/);
+  assert.match(pageSource, /inferredStatus === "gemaild" \? "benaderbaar" : inferredStatus/);
+  assert.match(pageSource, /const inferredStatus = databaseContactStatus\.shouldInferMailedStatus\(storedStatus, raw, \{ normalizeString, normalizeSearchValue \}\) \? "gemaild" : storedStatus;/);
   assert.match(pageSource, /if \(isColdmailTestCompany\(customer\)\) return false;/);
+  assert.match(contactStatusScriptSource, /normalizeOutreachStatusKey\(raw\.outreachStatus, helpers\) === "benaderd"/);
+  assert.match(contactStatusScriptSource, /raw\.coldmailSentMessageId \|\| raw\.outreachMessageId/);
   assert.match(pageSource, /Cold calling/);
   assert.match(pageSource, /Cold mailing/);
   assert.match(pageSource, /Nog geen acties/);
@@ -1060,6 +1088,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const webdesignActionSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-webdesign-action.js'), 'utf8');
+  const contactStatusScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-contact-status.js'), 'utf8');
 
   assert.match(
     pageSource,
@@ -1071,6 +1100,9 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "reactie_ontvangen"/);
   assert.match(pageSource, /Reactie ontvangen/);
+  assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
+  assert.match(contactStatusScriptSource, /function hasColdmailSentSignal\(raw, helpers\)/);
+  assert.match(contactStatusScriptSource, /function shouldInferMailedStatus\(storedStatus, raw, helpers\)/);
   assert.match(pageSource, /\.sf-btn\.act \{[\s\S]*border-color: rgba\(139, 34, 82, 0\.4\);[\s\S]*background: rgba\(139, 34, 82, 0\.12\);/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn act" data-s="alle" type="button">Alle<\/button>/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="klant"\]\.act/);
@@ -1084,6 +1116,8 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
   assert.match(webdesignActionSource, /Mail bekijken/);
   assert.match(pageSource, /!hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\)/);
+  assert.match(contactStatusScriptSource, /normalizeOutreachStatusKey\(raw\.outreachStatus, helpers\) === "benaderd"/);
+  assert.match(contactStatusScriptSource, /raw\.coldmailSentMessageId \|\| raw\.outreachMessageId/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gebeld" type="button">Gebeld<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gemaild" type="button">Gemaild<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="afspraak" type="button">Afspraak<\/button>/);
