@@ -210,6 +210,9 @@ function loadRuntimeEnv(env = process.env) {
         safeEnv.CONFIRMATION_MAIL_FROM_NAME || safeEnv.MAIL_FROM_NAME || 'Softora'
       ),
       replyTo: normalizeString(safeEnv.CONFIRMATION_MAIL_REPLY_TO || safeEnv.MAIL_REPLY_TO || ''),
+      coldmailAuditBcc: normalizeString(
+        safeEnv.COLDMAIL_AUDIT_BCC || safeEnv.COLDMAIL_BCC || ''
+      ),
       imapHost: normalizeString(
         safeEnv.MAIL_IMAP_HOST ||
           safeEnv.IMAP_HOST ||
