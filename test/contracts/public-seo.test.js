@@ -139,6 +139,22 @@ test('ai automation page owns its internal links inside the page content', () =>
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });
 
+test('crm page owns its internal links inside the page content', () => {
+  const source = fs.readFileSync(path.join(root, 'crm-systeem-op-maat.html'), 'utf8');
+  const html = applyPublicSeoHeadDefaults(source, 'crm-systeem-op-maat.html', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/crm-systeem-op-maat">/);
+  assert.match(html, /data-softora-public-seo="internal-links"/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(html, /href="\/ai-automatisering"/);
+  assert.match(html, /href="\/chatbot-laten-maken"/);
+  assert.match(html, /href="\/voicesoftware-op-maat"/);
+  assert.doesNotMatch(html, /softora-seo-footer-links/);
+  assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
+});
+
 test('voicesoftware page owns its internal links inside the page content', () => {
   const source = fs.readFileSync(path.join(root, 'premium-voicesoftware.html'), 'utf8');
   const html = applyPublicSeoHeadDefaults(source, 'premium-voicesoftware.html', {
