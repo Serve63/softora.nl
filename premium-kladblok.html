@@ -118,6 +118,18 @@
             color: var(--text-tertiary);
         }
 
+        .notepad-status {
+            margin: 0 0 0.85rem;
+            color: var(--text-tertiary);
+            font-size: 0.86rem;
+            min-height: 1.3rem;
+        }
+
+        .notepad-status.is-error {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
         .notepad-editor {
             flex: 1;
             width: 100%;
@@ -244,10 +256,11 @@
                     <div class="editor-toolbar">
                         <h2>Notities</h2>
                     </div>
+                    <p id="notepadStatus" class="notepad-status" role="status" aria-live="polite">Notities laden...</p>
                     <div
                         id="notepadEditor"
                         class="notepad-editor"
-                        contenteditable="true"
+                        contenteditable="false"
                         spellcheck="true"
                         data-placeholder="Typ hier je notities..."
                         aria-label="Kladblok notities"
@@ -259,6 +272,6 @@
     </div>
 
     <script src="assets/premium-ui-state-client.js?v=20260427a"></script>
-    <script src="assets/premium-notepad.js?v=20260427b"></script>
+    <script src="assets/premium-notepad.js?v=20260519a"></script>
 </body>
 </html>

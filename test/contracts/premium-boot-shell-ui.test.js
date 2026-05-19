@@ -70,7 +70,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const pdfBuilderSource = fs.readFileSync(pdfBuilderPath, 'utf8');
         assert.match(pdfBuilderSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else if (file === 'premium-kladblok.html') {
-        assert.match(source, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script>\s*<script src="assets\/premium-notepad\.js\?v=20260427b"><\/script>/, file);
+        assert.match(source, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script>\s*<script src="assets\/premium-notepad\.js\?v=20260519a"><\/script>/, file);
         const notepadPath = path.join(__dirname, '../../assets/premium-notepad.js');
         const notepadSource = fs.readFileSync(notepadPath, 'utf8');
         assert.match(notepadSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
