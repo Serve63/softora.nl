@@ -10,6 +10,12 @@ const {
 
 const KNOWN_FILES = new Set([
   'premium-website.html',
+  'diensten.html',
+  'website-laten-maken.html',
+  'ai-automatisering.html',
+  'bedrijfssoftware-op-maat.html',
+  'crm-systeem-op-maat.html',
+  'chatbot-laten-maken.html',
   'premium-bedrijfssoftware.html',
   'premium-personeel-dashboard.html',
   'premium-seo.html',
@@ -24,6 +30,12 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   });
 
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/diensten<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/website-laten-maken<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-automatisering<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/crm-systeem-op-maat<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/chatbot-laten-maken<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/premium-bedrijfssoftware<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-telefonist<\/loc>/);
   assert.doesNotMatch(sitemap, /premium-personeel-dashboard/);
@@ -46,6 +58,9 @@ test('public seo robots keeps marketing pages crawlable and blocks private surfa
   assert.doesNotMatch(robots, /^Disallow: \/premium-website$/m);
   assert.doesNotMatch(robots, /^Disallow: \/premium-websites$/m);
   assert.doesNotMatch(robots, /^Disallow: \/premium-bedrijfssoftware$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/website-laten-maken$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/ai-automatisering$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/crm-systeem-op-maat$/m);
 });
 
 test('public seo head defaults add canonical metadata and structured data once', () => {

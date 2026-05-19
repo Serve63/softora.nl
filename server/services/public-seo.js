@@ -21,6 +21,32 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     serviceName: 'Webdesign en website ontwikkeling',
   },
   {
+    fileName: 'diensten.html',
+    path: '/diensten',
+    title: 'Softora diensten voor websites, software en AI',
+    description:
+      'Bekijk de Softora diensten voor websites, AI automatisering, bedrijfssoftware, CRM systemen, chatbots en voice software.',
+    kind: 'collection',
+  },
+  {
+    fileName: 'website-laten-maken.html',
+    path: '/website-laten-maken',
+    title: 'Website laten maken door Softora',
+    description:
+      'Website laten maken die snel laadt, professioneel voelt en gericht is op aanvragen. Softora bouwt websites voor ondernemers die willen groeien.',
+    kind: 'service',
+    serviceName: 'Website laten maken',
+  },
+  {
+    fileName: 'ai-automatisering.html',
+    path: '/ai-automatisering',
+    title: 'AI automatisering voor bedrijven door Softora',
+    description:
+      'AI automatisering voor bedrijven die minder handwerk, snellere opvolging en slimmere processen willen. Softora bouwt praktische AI workflows.',
+    kind: 'service',
+    serviceName: 'AI automatisering',
+  },
+  {
     fileName: 'premium-bedrijfssoftware.html',
     path: '/premium-bedrijfssoftware',
     title: 'Bedrijfssoftware op maat door Softora',
@@ -28,6 +54,24 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Softora bouwt bedrijfssoftware op maat voor dashboards, klantbeheer, processen, automatisering en interne tools die dagelijks werk versnellen.',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
+  },
+  {
+    fileName: 'bedrijfssoftware-op-maat.html',
+    path: '/bedrijfssoftware-op-maat',
+    title: 'Bedrijfssoftware op maat laten maken',
+    description:
+      'Bedrijfssoftware op maat laten maken voor dashboards, klantbeheer, interne processen en automatisering. Softora bouwt software die met je bedrijf meewerkt.',
+    kind: 'service',
+    serviceName: 'Bedrijfssoftware op maat',
+  },
+  {
+    fileName: 'crm-systeem-op-maat.html',
+    path: '/crm-systeem-op-maat',
+    title: 'CRM systeem op maat laten maken',
+    description:
+      'CRM systeem op maat laten maken voor leads, klanten, afspraken, opvolging en sales overzicht. Softora bouwt klantbeheer dat past bij jouw bedrijf.',
+    kind: 'service',
+    serviceName: 'CRM systeem op maat',
   },
   {
     fileName: 'maatwerk-platform.html',
@@ -64,6 +108,15 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Softora bouwt chatbots op maat die bezoekers helpen, leads kwalificeren, vragen beantwoorden en jouw bedrijf online sneller laten reageren.',
     kind: 'service',
     serviceName: 'Chatbot op maat',
+  },
+  {
+    fileName: 'chatbot-laten-maken.html',
+    path: '/chatbot-laten-maken',
+    title: 'Chatbot laten maken door Softora',
+    description:
+      'Chatbot laten maken voor je website, klantenservice of leadgeneratie. Softora bouwt AI chatbots die bezoekers helpen en aanvragen beter kwalificeren.',
+    kind: 'service',
+    serviceName: 'Chatbot laten maken',
   },
   {
     fileName: 'premium-pakketten.html',
