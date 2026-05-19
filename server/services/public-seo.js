@@ -60,10 +60,17 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     path: '/crm-systeem-op-maat',
     title: 'CRM systeem op maat laten maken',
     description:
-      'Softora bouwt CRM systemen op maat voor leadopvolging, klantbeheer, offertes, dashboards en automatisering voor MKB-bedrijven.',
+      'Laat een CRM systeem op maat maken door Softora voor leadpipeline, klantbeheer, offertes, dashboards, reminders en AI-opvolging.',
     kind: 'service',
     serviceName: 'CRM systeem op maat',
-    relatedLinks: ['/bedrijfssoftware-op-maat', '/ai-automatisering', '/blog/ai-automatisering-mkb-waar-beginnen', '/kennisbank'],
+    relatedLinks: [
+      '/bedrijfssoftware-op-maat',
+      '/ai-automatisering',
+      '/chatbot-laten-maken',
+      '/voicesoftware-op-maat',
+      '/kennisbank/wat-is-bedrijfssoftware-op-maat',
+      '/blog/ai-automatisering-mkb-waar-beginnen',
+    ],
   },
   {
     fileName: 'ai-automatisering.html',

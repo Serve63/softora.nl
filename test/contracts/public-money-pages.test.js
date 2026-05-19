@@ -59,6 +59,37 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
 });
 
+test('crm money page is focused on pipeline, customers and AI follow-up', () => {
+  const source = readPage('crm-systeem-op-maat.html');
+  const entry = getRegistryEntry('crm-systeem-op-maat.html');
+
+  assert.match(source, /<title>CRM systeem op maat laten maken \| Softora<\/title>/);
+  assert.match(source, /<meta name="description" content="Laat een CRM systeem op maat maken door Softora/);
+  assert.match(source, /<h1>CRM systeem voor leads, klanten en opvolging<\/h1>/);
+  assert.match(source, /Leadpipeline/);
+  assert.match(source, /Klantbeheer/);
+  assert.match(source, /Offerteflow/);
+  assert.match(source, /Reminders en taken/);
+  assert.match(source, /AI-samenvattingen/);
+  assert.match(source, /Dashboards/);
+  assert.match(source, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(source, /href="\/ai-automatisering"/);
+  assert.match(source, /href="\/chatbot-laten-maken"/);
+  assert.match(source, /href="\/voicesoftware-op-maat"/);
+  assert.match(source, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
+  assert.match(source, /href="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
+  assert.doesNotMatch(source, /overlay|login-box|Binnenkort beschikbaar|toegangscode/i);
+  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
+
+  assert.equal(entry.title, 'CRM systeem op maat laten maken');
+  assert.match(entry.description, /leadpipeline, klantbeheer, offertes, dashboards/);
+  assert.ok(entry.relatedLinks.includes('/bedrijfssoftware-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
+  assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
+  assert.ok(entry.relatedLinks.includes('/voicesoftware-op-maat'));
+});
+
 test('ai automation money page is focused on leads, CRM flows and safe handoff', () => {
   const source = readPage('ai-automatisering.html');
   const entry = getRegistryEntry('ai-automatisering.html');
