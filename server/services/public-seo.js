@@ -99,12 +99,18 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-voicesoftware.html',
     path: '/voicesoftware-op-maat',
     legacyPaths: ['/premium-voicesoftware'],
-    title: 'Voicesoftware en AI telefonie op maat door Softora',
+    title: 'AI telefonie en voicesoftware op maat',
     description:
-      'Softora maakt voicesoftware en AI telefonie op maat voor bereikbaarheid, leadkwalificatie, gespreksafhandeling en slimme opvolging.',
+      'Laat voicesoftware en AI telefonie op maat maken door Softora voor bereikbaarheid, leadkwalificatie, afspraakintake, CRM-opvolging en veilige overdracht.',
     kind: 'service',
     serviceName: 'Voicesoftware op maat',
-    relatedLinks: ['/ai-telefonist', '/ai-automatisering', '/chatbot-laten-maken', '/blog/ai-automatisering-mkb-waar-beginnen'],
+    relatedLinks: [
+      '/ai-telefonist',
+      '/crm-systeem-op-maat',
+      '/ai-automatisering',
+      '/chatbot-laten-maken',
+      '/blog/ai-automatisering-mkb-waar-beginnen',
+    ],
   },
   {
     fileName: 'premium-chatbot.html',

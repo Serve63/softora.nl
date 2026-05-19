@@ -87,3 +87,35 @@ test('chatbot money page is focused on leads, support and clean follow-up', () =
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-telefonist'));
 });
+
+test('voicesoftware money page is focused on AI telefonie, intake and CRM follow-up', () => {
+  const source = readPage('premium-voicesoftware.html');
+  const entry = getRegistryEntry('premium-voicesoftware.html');
+
+  assert.match(source, /<title>AI telefonie en voicesoftware op maat \| Softora<\/title>/);
+  assert.match(
+    source,
+    /<meta name="description" content="Laat voicesoftware en AI telefonie op maat maken door Softora/
+  );
+  assert.match(source, /<h1 class="hero-title">Voicesoftware<br><em>die opvolging regelt<\/em><\/h1>/);
+  assert.match(source, /AI telefonist/);
+  assert.match(source, /Leadkwalificatie/);
+  assert.match(source, /Afspraakintake/);
+  assert.match(source, /Gesprekssamenvatting/);
+  assert.match(source, /CRM-overdracht/);
+  assert.match(source, /Veilige AI grenzen/);
+  assert.match(source, /href="\/ai-telefonist"/);
+  assert.match(source, /href="\/chatbot-laten-maken"/);
+  assert.match(source, /href="\/crm-systeem-op-maat"/);
+  assert.match(source, /href="\/ai-automatisering"/);
+  assert.match(source, /href="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
+  assert.doesNotMatch(source, /overlay|login-box|Binnenkort beschikbaar|toegangscode/i);
+  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
+
+  assert.equal(entry.title, 'AI telefonie en voicesoftware op maat');
+  assert.match(entry.description, /leadkwalificatie, afspraakintake, CRM-opvolging/);
+  assert.ok(entry.relatedLinks.includes('/ai-telefonist'));
+  assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
+});
