@@ -209,8 +209,8 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.ok(interPreloadIndex < themeIndex, 'lokale sidebar fonts horen voor de theme css te preloaden');
   assert.match(res.body, /softora-personnel-first-paint/);
   assert.match(res.body, /data-personnel-loading/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260519a/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260519a/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260519c/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260519c/);
   assert.match(res.body, /@view-transition\{navigation:auto;\}/);
   assert.match(res.body, /\.sidebar\[data-static-sidebar="1"\]\{width:var\(--premium-sidebar-width,320px\) !important;display:flex !important;/);
   assert.match(res.body, /view-transition-name:softora-premium-sidebar !important;/);
@@ -221,6 +221,41 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.doesNotMatch(res.body, /font-size:2rem !important/);
   assert.doesNotMatch(res.body, /min-height:2\.35rem !important/);
   assert.doesNotMatch(res.body, /fonts\.googleapis\.com\/css2\?family=Inter/);
+});
+
+test('html page coordinator renders premium content-frame pages without an active sidebar shell', async () => {
+  const { coordinator, pagesDir } = createFixture();
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-personeel-agenda.html'),
+    [
+      '<!DOCTYPE html><html><head>',
+      '<title>Agenda</title>',
+      '<link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">',
+      '</head><body>',
+      '<div class="dashboard-layout">',
+      '<aside class="sidebar" data-static-sidebar="1"><nav class="sidebar-nav"></nav></aside>',
+      '<main class="main-content">Agenda</main>',
+      '</div>',
+      '</body></html>',
+    ].join('')
+  );
+
+  const req = {
+    originalUrl: '/premium-personeel-agenda?softora_sidebar_content=1',
+    query: { softora_sidebar_content: '1' },
+  };
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(req, res, () => {}, 'premium-personeel-agenda.html');
+
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /data-softora-sidebar-content-frame="1"/);
+  assert.match(res.body, /id="softora-premium-sidebar-content-frame"/);
+  assert.match(res.body, /html\[data-softora-sidebar-content-frame="1"\] \.sidebar\{display:none !important;\}/);
+  assert.doesNotMatch(res.body, /\/assets\/premium-sidebar-stability\.js\?v=/);
+  assert.equal(res.headers['X-Frame-Options'], 'SAMEORIGIN');
+  assert.match(res.headers['Content-Security-Policy'], /frame-ancestors 'self'/);
+  assert.match(res.headers['Content-Security-Policy'], /default-src 'self'/);
 });
 
 test('html page coordinator falls back to sendFile when rendering throws', async () => {

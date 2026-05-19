@@ -12,11 +12,23 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   ...LOCAL_FONT_PRELOAD_LINKS,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
-const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260519a';
+const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260519c';
+const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
   `<script src="/assets/premium-sidebar-stability.js?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}" defer></script>`,
 ].join('\n');
+const PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE = `<style id="softora-premium-sidebar-content-frame">
+html[data-softora-sidebar-content-frame="1"],html[data-softora-sidebar-content-frame="1"] body{min-height:100vh !important;overflow-x:hidden !important;background:#f8f7f4 !important;}
+html[data-softora-sidebar-content-frame="1"] .sidebar{display:none !important;}
+html[data-softora-sidebar-content-frame="1"] .dashboard-layout{display:block !important;min-height:100vh !important;width:100% !important;margin:0 !important;}
+html[data-softora-sidebar-content-frame="1"] .main,
+html[data-softora-sidebar-content-frame="1"] main.main,
+html[data-softora-sidebar-content-frame="1"] .main-content,
+html[data-softora-sidebar-content-frame="1"] main.main-content,
+html[data-softora-sidebar-content-frame="1"] .page-shell,
+html[data-softora-sidebar-content-frame="1"] main.page-shell{margin-left:0 !important;width:100% !important;max-width:none !important;}
+</style>`;
 const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
   `<script id="softora-personnel-first-paint">(function(){try{document.documentElement.setAttribute("data-personnel-loading","true");document.documentElement.setAttribute("data-theme-mode","light");document.documentElement.setAttribute("data-theme","light");}catch(_){}})();</script>`,
   ...LOCAL_FONT_PRELOAD_LINKS,
@@ -60,6 +72,20 @@ html,body{min-height:100vh;}
 const HOMEPAGE_HERO_IMAGE_URL = '/assets/home-hero-generated-v2.jpg?v=20260511a';
 const HOMEPAGE_HERO_IMAGE_PRELOAD = `<link rel="preload" as="image" href="${HOMEPAGE_HERO_IMAGE_URL}">`;
 const PREMIUM_SESSION_WATCHDOG_SCRIPT = '<script src="/assets/premium-session-watchdog.js?v=20260516a" defer></script>';
+const PREMIUM_SIDEBAR_CONTENT_FRAME_CSP_BASE = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  "object-src 'none'",
+  "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+  "script-src-attr 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "connect-src 'self' https:",
+  "media-src 'self' data: blob: https:",
+];
 
 function createHtmlPageCoordinator(options = {}) {
   const {
@@ -77,6 +103,7 @@ function createHtmlPageCoordinator(options = {}) {
     applySeoOverridesToHtml = (_fileName, html) => String(html || ''),
     getPageBootstrapData = async () => null,
     publicPageDependencyWaitMs = 1500,
+    isProduction = process.env.NODE_ENV === 'production',
   } = options;
   let premiumSidebarProfilePrefillInlineTag = null;
 
@@ -194,6 +221,38 @@ function createHtmlPageCoordinator(options = {}) {
     return `${snippet}\n${sourceHtml}`;
   }
 
+  function injectHtmlAttribute(html, attribute) {
+    const sourceHtml = String(html || '');
+    const safeAttribute = String(attribute || '').trim();
+    if (!safeAttribute || sourceHtml.includes(safeAttribute)) return sourceHtml;
+    if (/<html\b[^>]*>/i.test(sourceHtml)) {
+      return sourceHtml.replace(/<html\b([^>]*)>/i, (match, attrs) => `<html${attrs || ''} ${safeAttribute}>`);
+    }
+    return sourceHtml;
+  }
+
+  function isPremiumSidebarContentFrameRequest(req) {
+    const query = req && req.query && typeof req.query === 'object' ? req.query : {};
+    const rawValue =
+      query[PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM] ??
+      query.softoraShellContent ??
+      query.__softora_shell_content;
+    return String(rawValue || '').trim() === '1';
+  }
+
+  function getPremiumSidebarContentFrameCsp() {
+    return [
+      ...PREMIUM_SIDEBAR_CONTENT_FRAME_CSP_BASE,
+      ...(isProduction ? ['upgrade-insecure-requests'] : []),
+    ].join('; ');
+  }
+
+  function applyPremiumSidebarContentFrameHtml(html) {
+    let renderedHtml = injectHtmlAttribute(html, 'data-softora-sidebar-content-frame="1"');
+    renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE);
+    return renderedHtml;
+  }
+
   function hasPremiumStaticSidebar(html) {
     const sourceHtml = String(html || '');
     return /<aside[^>]+\bclass=["'][^"']*\bsidebar\b[^"']*["'][^>]*>/i.test(sourceHtml)
@@ -298,11 +357,12 @@ function createHtmlPageCoordinator(options = {}) {
     return injectSnippetBeforeHeadClose(sourceHtml, PREMIUM_SESSION_WATCHDOG_SCRIPT);
   }
 
-  function optimizeHtmlDelivery(html, fileName, authState) {
+  function optimizeHtmlDelivery(html, fileName, authState, options = {}) {
     let renderedHtml = String(html || '')
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.googleapis\.com"[^>]*>\s*/gim, '')
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.gstatic\.com"[^>]*>\s*/gim, '');
 
+    const isSidebarContentFrame = Boolean(options && options.isSidebarContentFrame);
     const hasStaticSidebar = hasPremiumStaticSidebar(renderedHtml);
     if (hasStaticSidebar) {
       renderedHtml = injectSnippetAfterHeadOpen(
@@ -310,11 +370,13 @@ function createHtmlPageCoordinator(options = {}) {
         PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET,
         'id="softora-premium-sidebar-critical"'
       );
-      renderedHtml = injectSnippetAfterHeadOpen(
-        renderedHtml,
-        PREMIUM_SIDEBAR_STABILITY_ASSETS,
-        'premium-sidebar-stability.js'
-      );
+      if (!isSidebarContentFrame) {
+        renderedHtml = injectSnippetAfterHeadOpen(
+          renderedHtml,
+          PREMIUM_SIDEBAR_STABILITY_ASSETS,
+          'premium-sidebar-stability.js'
+        );
+      }
     }
     renderedHtml = optimizeLocalFontDelivery(renderedHtml, { preferHeadStart: hasStaticSidebar });
 
@@ -325,6 +387,9 @@ function createHtmlPageCoordinator(options = {}) {
     renderedHtml = injectPremiumSidebarProfileHtml(renderedHtml, authState);
     renderedHtml = injectPremiumSessionWatchdog(renderedHtml, authState);
     renderedHtml = inlinePremiumSidebarProfilePrefill(renderedHtml);
+    if (isSidebarContentFrame) {
+      renderedHtml = applyPremiumSidebarContentFrameHtml(renderedHtml);
+    }
 
     return renderedHtml;
   }
@@ -419,8 +484,15 @@ function createHtmlPageCoordinator(options = {}) {
       } catch (error) {
         logger.error('[HTML][BootstrapError]', fileName, error?.message || error);
       }
-      rendered = optimizeHtmlDelivery(rendered, fileName, premiumPageAccess?.authState || null);
+      const isSidebarContentFrame = isPremiumSidebarContentFrameRequest(req);
+      rendered = optimizeHtmlDelivery(rendered, fileName, premiumPageAccess?.authState || null, {
+        isSidebarContentFrame,
+      });
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      if (isSidebarContentFrame) {
+        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+        res.setHeader('Content-Security-Policy', getPremiumSidebarContentFrameCsp());
+      }
       res.setHeader(
         'Cache-Control',
         isLoginPage || isProtectedPremiumPage
