@@ -590,9 +590,11 @@ test('mailbox service exposes hidden coldmail opt-out links for clickable mail p
   assert.equal(messages[0].optOutUrl, 'https://www.softora.nl/afmelden?t=test-token');
 });
 
-test('mailbox service recovers sent webdesign images from customer photos without placeholders', async () => {
-  const photoUrl = 'https://example.supabase.co/storage/v1/object/sign/design-photo.png?token=photo';
-  const mockupUrl = 'https://example.supabase.co/storage/v1/object/sign/design-mockup.png?token=mockup';
+test('mailbox service recovers sent webdesign images without treating Softora links as customer designs', async () => {
+  const photoUrl = 'https://example.supabase.co/storage/v1/object/sign/jagthuijs-design-photo.png?token=photo';
+  const mockupUrl = 'https://example.supabase.co/storage/v1/object/sign/jagthuijs-design-mockup.png?token=mockup';
+  const softoraPhotoUrl = 'https://example.supabase.co/storage/v1/object/sign/softora-design-photo.png?token=photo';
+  const softoraMockupUrl = 'https://example.supabase.co/storage/v1/object/sign/softora-design-mockup.png?token=mockup';
   const fetchedUrls = [];
   const oldFetch = global.fetch;
   global.fetch = async (url) => {
@@ -627,7 +629,7 @@ test('mailbox service recovers sent webdesign images from customer photos withou
               text: [
                 'Goedemiddag,',
                 '',
-                'Afgelopen week kwam ik toevallig jullie website (softora.nl) tegen.',
+                'Afgelopen week kwam ik toevallig jullie website (jagthuijs.nl) tegen.',
                 'Vanuit enthousiasme heb ik een nieuw webdesign voor jullie site gemaakt.',
                 '',
                 'Met vriendelijke groet,',
@@ -640,7 +642,7 @@ test('mailbox service recovers sent webdesign images from customer photos withou
               html: '',
               subject: 'Nieuw webdesign gemaakt!',
               from: { value: [{ name: 'Servé Creusen', address: 'serve@softora.nl' }] },
-              to: { value: [{ name: 'Testmodus', address: 'servec321@gmail.com' }] },
+              to: { value: [{ name: 'Jaghthuijs', address: 'info@jagthuijs.nl' }] },
               attachments: [],
             },
           },
@@ -661,13 +663,21 @@ test('mailbox service recovers sent webdesign images from customer photos withou
           return {
             values: {
               softora_database_photos_v1: JSON.stringify({
-                softora_testmodus: {
-                  id: 'softora_testmodus',
-                  identityKey: 'softora testmodus|serve|0629917185',
+                jagthuijs: {
+                  id: 'jagthuijs',
+                  identityKey: 'jaghthuijs|info@jagthuijs.nl',
                   websitePhotoUrl: photoUrl,
                   websiteMockupUrl: mockupUrl,
-                  websitePhotoName: 'Softora Testmodus webdesign.png',
-                  websiteMockupName: 'Softora Testmodus device mockup.png',
+                  websitePhotoName: 'Jaghthuijs webdesign.png',
+                  websiteMockupName: 'Jaghthuijs device mockup.png',
+                },
+                softora_site: {
+                  id: 'softora_site',
+                  identityKey: 'softora|info@softora.nl',
+                  websitePhotoUrl: softoraPhotoUrl,
+                  websiteMockupUrl: softoraMockupUrl,
+                  websitePhotoName: 'Softora webdesign.png',
+                  websiteMockupName: 'Softora device mockup.png',
                 },
               }),
             },
@@ -678,12 +688,20 @@ test('mailbox service recovers sent webdesign images from customer photos withou
             values: {
               softora_customers_premium_v1: JSON.stringify([
                 {
-                  id: 'softora_testmodus',
-                  bedrijf: 'Softora Testmodus',
-                  naam: 'Serve',
+                  id: 'jagthuijs',
+                  bedrijf: 'Jaghthuijs',
+                  naam: 'Jaghthuijs',
+                  tel: '0629917185',
+                  dom: 'jagthuijs.nl',
+                  email: 'info@jagthuijs.nl',
+                },
+                {
+                  id: 'softora_site',
+                  bedrijf: 'Softora',
+                  naam: 'Softora',
                   tel: '0629917185',
                   dom: 'softora.nl',
-                  email: 'testmodus@example.nl',
+                  email: 'info@softora.nl',
                 },
               ]),
             },
@@ -699,19 +717,20 @@ test('mailbox service recovers sent webdesign images from customer photos withou
 
     assert.equal(messages.length, 1);
     const phoneIndex = messages[0].body.indexOf('0629917185');
-    const webdesignIndex = messages[0].body.indexOf('[image: Softora Testmodus webdesign]');
+    const webdesignIndex = messages[0].body.indexOf('[image: Jaghthuijs webdesign]');
     const captionIndex = messages[0].body.indexOf('Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop');
-    const mockupIndex = messages[0].body.indexOf('[image: Softora Testmodus device mockup]');
+    const mockupIndex = messages[0].body.indexOf('[image: Jaghthuijs device mockup]');
     const optOutIndex = messages[0].body.indexOf('Geen webdesign willen ontvangen? Laat het me weten!');
     assert.ok(phoneIndex > 0);
     assert.ok(webdesignIndex > phoneIndex);
     assert.ok(captionIndex > webdesignIndex);
     assert.ok(mockupIndex > captionIndex);
     assert.ok(optOutIndex > mockupIndex);
+    assert.doesNotMatch(messages[0].body, /\[image: Softora webdesign]/);
     assert.equal(messages[0].bodyImages.length, 2);
     assert.deepEqual(
       messages[0].bodyImages.map((image) => image.alt),
-      ['Softora Testmodus webdesign', 'Softora Testmodus device mockup']
+      ['Jaghthuijs webdesign', 'Jaghthuijs device mockup']
     );
     assert.equal(messages[0].bodyImages[0].dataUrl, 'data:image/png;base64,d2ViZGVzaWduLXBob3Rv');
     assert.equal(messages[0].bodyImages[1].dataUrl, 'data:image/png;base64,ZGV2aWNlLW1vY2t1cC1waG90bw==');
