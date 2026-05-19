@@ -60,6 +60,20 @@ for (const pathName of unlockedPublicSeoPaths) {
   });
 }
 
+test('page smoke: / serves the real SEO homepage with a clean canonical', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/`, {
+    cache: 'no-store',
+    redirect: 'manual',
+  });
+  const html = await response.text();
+
+  assert.equal(response.status, 200, '/');
+  assert.equal(response.headers.get('location'), null, '/ mag geen redirect naar een premium URL zijn.');
+  assert.match(html, /Websites die overtuigen/, 'Homepage-marker ontbreekt op /.');
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/">/);
+  assert.doesNotMatch(html, /url=\/premium-website|window\.location\.replace\('\/premium-website'\)/);
+});
+
 test('page smoke: /premium-website serves the homepage without redirecting back to root', async () => {
   const response = await fetch(`${serverRef.baseUrl}/premium-website`, {
     cache: 'no-store',

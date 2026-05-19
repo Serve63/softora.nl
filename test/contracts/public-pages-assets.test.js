@@ -56,6 +56,14 @@ test('html pages use the round Softora favicon asset sitewide', () => {
     );
   });
 
-  assert.ok(pagesWithFavicons.includes('index.html'));
+  assert.ok(pagesWithFavicons.includes('premium-website.html'));
   assert.ok(pagesWithFavicons.length >= 40, 'expected sitewide favicon coverage');
+});
+
+test('root homepage is server-managed instead of a static premium redirect file', () => {
+  assert.equal(
+    fs.existsSync(path.join(REPO_ROOT, 'index.html')),
+    false,
+    'index.html would shadow the server-managed / homepage on Vercel'
+  );
 });
