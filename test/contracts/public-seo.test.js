@@ -28,7 +28,14 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-telefonist<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog\/ai-automatisering-mkb-waar-beginnen<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog\/website-laten-maken-kosten-2026<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog\/chatbot-laten-maken-wanneer-zinvol<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/kennisbank<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/kennisbank\/wat-is-bedrijfssoftware-op-maat<\/loc>/);
   assert.doesNotMatch(sitemap, /premium-bedrijfssoftware/);
+  assert.doesNotMatch(sitemap, /premium-blog/);
   assert.doesNotMatch(sitemap, /premium-personeel-dashboard/);
   assert.doesNotMatch(sitemap, /premium-seo/);
   assert.doesNotMatch(sitemap, /premium-websitegenerator/);
@@ -49,6 +56,9 @@ test('public seo robots keeps marketing pages crawlable and blocks private surfa
   assert.doesNotMatch(robots, /^Disallow: \/premium-website$/m);
   assert.doesNotMatch(robots, /^Disallow: \/bedrijfssoftware-op-maat$/m);
   assert.doesNotMatch(robots, /^Disallow: \/premium-bedrijfssoftware$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/blog$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/kennisbank$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/premium-blog$/m);
 });
 
 test('public seo head defaults add canonical metadata and structured data once', () => {

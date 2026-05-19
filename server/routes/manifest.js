@@ -13,6 +13,8 @@ const pageSmokeTargets = Object.freeze([
   { path: '/voicesoftware-op-maat', marker: 'Voicesoftware op maat' },
   { path: '/chatbot-laten-maken', marker: 'Chatbot op maat' },
   { path: '/website-laten-maken', marker: 'Premium Websites' },
+  { path: '/blog', marker: 'Artikelen over websites, software en AI groei' },
+  { path: '/kennisbank', marker: 'Heldere uitleg voor betere digitale keuzes' },
   { path: '/premium-personeel-login', marker: 'Softora | Personeel Login' },
   { path: '/premium-personeel-agenda', marker: 'Servé Digital | Agenda', allowLoginFallback: true },
   { path: '/premium-leads', marker: 'Softora | Leads Overzicht — Premium', allowLoginFallback: true },
