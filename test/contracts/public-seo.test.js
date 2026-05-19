@@ -191,10 +191,34 @@ test('public seo url mapping exposes clean paths and keeps legacy redirects avai
 test('public packages page is a clean public sales page without premium sidebar links', () => {
   const source = fs.readFileSync(path.join(root, 'pakketten.html'), 'utf8');
 
+  assert.match(source, /<title>Softora pakketten voor websites, software en AI groei<\/title>/);
+  assert.match(source, /<meta name="description" content="Bekijk Softora pakketten voor websites, bedrijfssoftware/);
   assert.match(source, /<h1\b[\s\S]*Pakketten voor bouwen, beheren en groeien[\s\S]*<\/h1>/i);
+  assert.match(source, /Website route/);
+  assert.match(source, /Software en CRM route/);
+  assert.match(source, /AI groei route/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
   assert.doesNotMatch(source, /sidebar-link|premium-sidebar|personnel-theme/i);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
   assert.doesNotMatch(source, /premium-personeel|premium-dashboard|admin-menu|admin-nav/i);
+});
+
+test('packages page owns its internal links inside the page content', () => {
+  const source = fs.readFileSync(path.join(root, 'pakketten.html'), 'utf8');
+  const html = applyPublicSeoHeadDefaults(source, 'pakketten.html', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/pakketten">/);
+  assert.match(html, /data-softora-public-seo="internal-links"/);
+  assert.match(html, /href="\/website-laten-maken"/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(html, /href="\/crm-systeem-op-maat"/);
+  assert.match(html, /href="\/ai-automatisering"/);
+  assert.match(html, /href="\/chatbot-laten-maken"/);
+  assert.match(html, /href="\/voicesoftware-op-maat"/);
+  assert.doesNotMatch(html, /softora-seo-footer-links/);
+  assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });
 
 test('public seo registry points to existing crawlable pages with h1 and link graph', () => {

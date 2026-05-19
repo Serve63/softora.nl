@@ -147,11 +147,18 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'pakketten.html',
     path: '/pakketten',
     legacyPaths: ['/premium-pakketten'],
-    title: 'Softora pakketten en diensten',
+    title: 'Softora pakketten voor websites, software en AI groei',
     description:
-      'Bekijk de Softora pakketten voor websites, software, AI automatisering en digitale groeisystemen voor ondernemers en teams.',
+      'Bekijk Softora pakketten voor websites, bedrijfssoftware, AI automatisering, beheer en doorontwikkeling. Kies de route voor meer verkeer, leads en rust.',
     kind: 'collection',
-    relatedLinks: ['/diensten', '/website-laten-maken', '/bedrijfssoftware-op-maat', '/ai-automatisering'],
+    relatedLinks: [
+      '/website-laten-maken',
+      '/bedrijfssoftware-op-maat',
+      '/crm-systeem-op-maat',
+      '/ai-automatisering',
+      '/chatbot-laten-maken',
+      '/voicesoftware-op-maat',
+    ],
   },
   {
     fileName: 'premium-over-softora.html',
