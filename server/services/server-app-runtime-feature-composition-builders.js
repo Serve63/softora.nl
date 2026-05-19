@@ -220,6 +220,7 @@ function buildServerAppFeatureWiringRuntimeContext({
             mailFromAddress: envConfig.MAIL_FROM_ADDRESS,
             mailFromName: envConfig.MAIL_FROM_NAME,
             mailReplyTo: envConfig.MAIL_REPLY_TO,
+            coldmailAuditBcc: envConfig.COLDMAIL_AUDIT_BCC,
             imapHost: envConfig.MAIL_IMAP_HOST,
             imapPort: envConfig.MAIL_IMAP_PORT,
             imapSecure: envConfig.MAIL_IMAP_SECURE,

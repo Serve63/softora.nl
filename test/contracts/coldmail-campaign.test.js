@@ -42,6 +42,7 @@ function createService(overrides = {}) {
       mailFromAddress: 'info@softora.nl',
       mailFromName: 'Softora',
       mailReplyTo: 'reply@softora.nl',
+      coldmailAuditBcc: overrides.coldmailAuditBcc,
       imapHost: overrides.imapHost || '',
       imapPort: 993,
       imapSecure: true,
@@ -198,6 +199,41 @@ test('coldmail campaign replaces city variable with the recipient database locat
   assert.match(sentMessages[0].text, /📍 Oisterwijk/);
   assert.doesNotMatch(sentMessages[0].text, /\{\{stad\}\}/);
   assert.doesNotMatch(sentMessages[0].text, /Haaren/);
+});
+
+test('coldmail campaign adds audit bcc when configured', async () => {
+  const { service, sentMessages } = createService({
+    coldmailAuditBcc: ' prive@example.nl ',
+  });
+
+  await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'ruben@example.test');
+  assert.equal(sentMessages[0].bcc, 'prive@example.nl');
+  assert.equal(service.getColdmailSafetyLimits().auditBccConfigured, true);
+});
+
+test('coldmail campaign ignores invalid audit bcc configuration', async () => {
+  const { service, sentMessages } = createService({
+    coldmailAuditBcc: 'niet-een-email',
+  });
+
+  await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].bcc, undefined);
+  assert.equal(service.getColdmailSafetyLimits().auditBccConfigured, false);
 });
 
 test('coldmail campaign attaches webdesign photo inline and as attachment', async () => {

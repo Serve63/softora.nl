@@ -122,6 +122,7 @@ function createColdmailCampaignService(deps = {}) {
     mailFromAddress = '',
     mailFromName = 'Softora',
     mailReplyTo = '',
+    coldmailAuditBcc = '',
     imapHost = '',
     imapPort = 993,
     imapSecure = false,
@@ -845,6 +846,11 @@ function createColdmailCampaignService(deps = {}) {
     return name ? `${name} <${address}>` : address;
   }
 
+  function getColdmailAuditBccAddress() {
+    const email = normalizeEmailAddress(coldmailAuditBcc);
+    return isLikelyValidEmail(email) ? email : '';
+  }
+
   function parsePositiveInt(value, fallback, min, max) {
     const parsed = Number.parseInt(String(value || ''), 10);
     const safe = Number.isFinite(parsed) ? parsed : fallback;
@@ -888,6 +894,7 @@ function createColdmailCampaignService(deps = {}) {
       dailySendLimit: getColdmailDailySendLimit(),
       packageDailySendLimit: getColdmailPackageDailySendLimit(),
       blocksPersonalMailboxDomains: shouldBlockPersonalMailboxDomains(),
+      auditBccConfigured: Boolean(getColdmailAuditBccAddress()),
     };
   }
 
@@ -2062,6 +2069,7 @@ function createColdmailCampaignService(deps = {}) {
 
     const transporter = getSmtpTransporter();
     const sent = [];
+    const auditBcc = getColdmailAuditBccAddress();
 
     for (const item of selectedRows) {
       const row = item.row;
@@ -2108,6 +2116,9 @@ function createColdmailCampaignService(deps = {}) {
           html,
           attachments,
         };
+        if (auditBcc && auditBcc !== normalizeEmailAddress(to)) {
+          mail.bcc = auditBcc;
+        }
         const info = await transporter.sendMail(mail);
         const sentCopySaved = await saveSentCopy(senderEmail, mail, info);
         sent.push({
