@@ -110,12 +110,18 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-chatbot.html',
     path: '/chatbot-laten-maken',
     legacyPaths: ['/premium-chatbot'],
-    title: 'Chatbot op maat door Softora',
+    title: 'Chatbot laten maken voor leads en support',
     description:
-      'Softora bouwt chatbots op maat die bezoekers helpen, leads kwalificeren, vragen beantwoorden en jouw bedrijf online sneller laten reageren.',
+      'Laat een chatbot maken die websitebezoekers helpt, leads kwalificeert, veelgestelde vragen opvangt en gesprekken doorstuurt naar je team of CRM.',
     kind: 'service',
-    serviceName: 'Chatbot op maat',
-    relatedLinks: ['/blog/chatbot-laten-maken-wanneer-zinvol', '/ai-automatisering', '/ai-telefonist', '/website-laten-maken'],
+    serviceName: 'Chatbot laten maken',
+    relatedLinks: [
+      '/blog/chatbot-laten-maken-wanneer-zinvol',
+      '/website-laten-maken',
+      '/crm-systeem-op-maat',
+      '/ai-automatisering',
+      '/ai-telefonist',
+    ],
   },
   {
     fileName: 'pakketten.html',
@@ -497,7 +503,7 @@ function addStructuredDataIfMissing(htmlRaw, entry, siteOrigin) {
 
 const PUBLIC_SEO_INTERNAL_LINK_STYLE = [
   '    <style data-softora-public-seo="internal-link-style">',
-  '      .softora-seo-footer-links{background:#fff;border-top:1px solid rgba(26,26,46,.08);padding:26px clamp(20px,6vw,80px);font-family:Inter,system-ui,sans-serif;color:#1a1a2e;}',
+  '      .softora-seo-footer-links{position:static;inset:auto;z-index:auto;display:block;width:auto;background:#fff;border-top:1px solid rgba(26,26,46,.08);border-bottom:0;box-shadow:none;backdrop-filter:none;padding:26px clamp(20px,6vw,80px);font-family:Inter,system-ui,sans-serif;color:#1a1a2e;text-transform:none;letter-spacing:0;}',
   '      .softora-seo-footer-links__inner{max-width:1120px;margin:0 auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap;}',
   '      .softora-seo-footer-links__label{font-family:Oswald,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8b2252;}',
   '      .softora-seo-footer-links a{font-size:13px;font-weight:700;text-decoration:none;color:#5f6270;}',

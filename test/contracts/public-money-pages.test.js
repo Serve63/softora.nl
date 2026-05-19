@@ -58,3 +58,32 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
 });
+
+test('chatbot money page is focused on leads, support and clean follow-up', () => {
+  const source = readPage('premium-chatbot.html');
+  const entry = getRegistryEntry('premium-chatbot.html');
+
+  assert.match(source, /<title>Chatbot laten maken voor leads en support \| Softora<\/title>/);
+  assert.match(source, /<h1 class="hero-title">Chatbot<br><em>die leads opvangt<\/em><\/h1>/);
+  assert.match(source, /Leadkwalificatie/);
+  assert.match(source, /FAQ en support/);
+  assert.match(source, /Offerte-intakebot/);
+  assert.match(source, /AI kennisassistent/);
+  assert.match(source, /Veilige AI grenzen/);
+  assert.match(source, /href="\/website-laten-maken"/);
+  assert.match(source, /href="\/crm-systeem-op-maat"/);
+  assert.match(source, /href="\/ai-automatisering"/);
+  assert.match(source, /href="\/ai-telefonist"/);
+  assert.match(source, /href="\/blog\/chatbot-laten-maken-wanneer-zinvol"/);
+  assert.doesNotMatch(
+    source,
+    /Bedrijfsdashboards|Klantenportalen|Personeelssystemen|Personeel Dashboard|AI Website Generator|Offerte & Factuur Generator/
+  );
+  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
+
+  assert.equal(entry.title, 'Chatbot laten maken voor leads en support');
+  assert.match(entry.description, /leads kwalificeert/);
+  assert.ok(entry.relatedLinks.includes('/website-laten-maken'));
+  assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/ai-telefonist'));
+});

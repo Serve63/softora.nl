@@ -110,6 +110,19 @@ test('public seo internal links use the existing footer when one is present', ()
   assert.doesNotMatch(html, /softora-seo-link-map/);
 });
 
+test('public seo fallback links stay in normal page flow on fixed-nav templates', () => {
+  const source = fs.readFileSync(path.join(root, 'premium-chatbot.html'), 'utf8');
+  const html = applyPublicSeoHeadDefaults(source, 'premium-chatbot.html', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const ctaStart = html.indexOf('<div class="cta-block');
+  const internalLinks = html.indexOf('data-softora-public-seo="internal-links"');
+
+  assert.ok(internalLinks > ctaStart, 'Fallback SEO-links horen onder de pagina-inhoud te staan.');
+  assert.match(html, /\.softora-seo-footer-links\{position:static;inset:auto;z-index:auto;display:block;width:auto;/);
+  assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
+});
+
 test('public seo url mapping exposes clean paths and keeps legacy redirects available', () => {
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-bedrijfssoftware.html'), '/bedrijfssoftware-op-maat');
   assert.equal(getIndexablePublicHtmlFileFromPath('/bedrijfssoftware-op-maat'), 'premium-bedrijfssoftware.html');
