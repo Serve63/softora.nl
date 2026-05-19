@@ -45,6 +45,15 @@ test('page smoke: /premium-website serves the homepage without redirecting back 
   assert.match(html, /Websites die overtuigen/, 'Homepage-marker ontbreekt op /premium-website.');
 });
 
+test('page smoke: /favicon.ico serves the Softora favicon', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/favicon.ico`, { cache: 'no-store' });
+  const bytes = Buffer.from(await response.arrayBuffer());
+
+  assert.equal(response.status, 200, '/favicon.ico');
+  assert.match(response.headers.get('content-type') || '', /^image\/png\b/);
+  assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+});
+
 const repoRoot = path.resolve(__dirname, '..', '..');
 const unifiedPersonnelThemeTargets = [
   'premium-ai-coldmailing.html',
