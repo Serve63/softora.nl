@@ -51,10 +51,33 @@ test('server app runtime composition builders barrel keeps domain builder seams 
   );
 });
 
+test('server app feature wiring writes data-ops scopes through the bridge first', async () => {
+  const calls = [];
+  const setter = featureCompositionBuilders.createDataOpsAwareUiStateSetter({
+    setUiStateValues: async (scope, values, meta) => {
+      calls.push({ target: 'legacy', scope, values, meta });
+      return { source: 'legacy' };
+    },
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_customers',
+      setUiStateValues: async (scope, values, meta) => {
+        calls.push({ target: 'bridge', scope, values, meta });
+        return { source: 'bridge' };
+      },
+    },
+  });
+
+  assert.equal((await setter('premium_customers', { a: 1 }, { source: 'test' })).source, 'bridge');
+  assert.equal((await setter('other_scope', { b: 2 }, { source: 'test' })).source, 'legacy');
+  assert.deepEqual(calls.map((call) => call.target), ['bridge', 'legacy']);
+});
+
 test('server app runtime composition builders preserve feature wiring groups and warmup callbacks', async () => {
   let hydratedAttempts = 0;
   let backfillCalls = 0;
   const bridgeReads = [];
+  const bridgeWrites = [];
+  const legacyWrites = [];
   const isGeneratedAppointmentVisibleForAgenda = () => true;
 
   const context = buildServerAppFeatureWiringRuntimeContext({
@@ -209,7 +232,10 @@ test('server app runtime composition builders preserve feature wiring groups and
     },
     uiSeoRuntime: {
       getUiStateValues: async () => ({}),
-      setUiStateValues: async () => ({}),
+      setUiStateValues: async (...args) => {
+        legacyWrites.push(args);
+        return {};
+      },
       dataOpsUiStateBridge: {
         canHandleScope: (scope) => scope === 'premium_customers' || scope === 'premium_database_photos',
         getUiStateValues: async (scope) => {
@@ -225,6 +251,12 @@ test('server app runtime composition builders preserve feature wiring groups and
                     email: 'servec321@gmail.com',
                     telefoon: '+31000000000',
                     dom: 'softora.nl',
+                    status: 'gemaild',
+                    databaseStatus: 'gemaild',
+                    campaignType: 'webdesign',
+                    coldmailSpecialAction: 'webdesign',
+                    outreachStatus: 'benaderd',
+                    coldmailSentMessageId: 'message-1',
                   },
                 ]),
               },
@@ -246,6 +278,10 @@ test('server app runtime composition builders preserve feature wiring groups and
             };
           }
           return { values: {} };
+        },
+        setUiStateValues: async (scope, values, meta) => {
+          bridgeWrites.push({ scope, values, meta });
+          return { source: 'bridge-write', values };
         },
       },
       websiteLinkCoordinator: {},
@@ -350,6 +386,18 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(testRecipients.selected, 1);
   assert.equal(testRecipients.recipients[0].email, 'servec321@gmail.com');
   assert.deepEqual(bridgeReads, ['premium_customers', 'premium_database_photos']);
+  const outreachUpdate =
+    await context.featureRouteOptions.coldmailing.coldmailCampaignService.updateWebdesignOutreachStatus({
+      customerId: 'softora-test-mode-recipient',
+      status: 'interesse',
+      actor: 'contract-test',
+    });
+  assert.equal(outreachUpdate.databaseStatus, 'interesse');
+  assert.equal(bridgeWrites.length, 1);
+  assert.equal(bridgeWrites[0].scope, 'premium_customers');
+  assert.equal(bridgeWrites[0].meta.source, 'webdesign-outreach-action');
+  assert.equal(JSON.parse(bridgeWrites[0].values.customers_key)[0].databaseStatus, 'interesse');
+  assert.deepEqual(legacyWrites, []);
   assert.equal(
     context.featureRouteOptions.coldmailing.generatedAgendaAppointments,
     context.aiDashboardOptions.generatedAgendaAppointments
