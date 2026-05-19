@@ -2,7 +2,9 @@ const express = require('express');
 const {
   buildPublicSeoRobotsTxt,
   buildPublicSeoSitemapXml,
+  getIndexablePublicHtmlFileFromPath,
   getIndexablePublicPathFromHtmlFile,
+  getLegacyPublicSeoRedirectTargetPath,
 } = require('../services/public-seo');
 
 function appendOriginalQuery(pathname, originalUrl) {
@@ -128,6 +130,17 @@ function registerPublicPageRoutes(app, deps) {
     const legacyTarget = deps.resolveLegacyPrettyPageRedirect(slug);
     if (legacyTarget) {
       return res.redirect(301, appendOriginalQuery(`/${legacyTarget}`, req.originalUrl));
+    }
+
+    const requestPath = `/${slug}`;
+    const publicSeoRedirectTarget = getLegacyPublicSeoRedirectTargetPath(requestPath);
+    if (publicSeoRedirectTarget) {
+      return res.redirect(301, appendOriginalQuery(publicSeoRedirectTarget, req.originalUrl));
+    }
+
+    const publicSeoFileName = getIndexablePublicHtmlFileFromPath(requestPath);
+    if (publicSeoFileName) {
+      return deps.sendSeoManagedHtmlPageResponse(req, res, next, publicSeoFileName);
     }
 
     if (await deps.sendPublishedWebsiteLinkResponse(req, res, slug)) return undefined;

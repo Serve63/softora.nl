@@ -9,10 +9,10 @@ const criticalFlowChecklist = Object.freeze([
 ]);
 
 const pageSmokeTargets = Object.freeze([
-  { path: '/premium-bedrijfssoftware', marker: 'Bedrijfssoftware op maat' },
-  { path: '/premium-voicesoftware', marker: 'Voicesoftware op maat' },
-  { path: '/premium-chatbot', marker: 'Chatbot op maat' },
-  { path: '/premium-websites', marker: 'Premium Websites' },
+  { path: '/bedrijfssoftware-op-maat', marker: 'Bedrijfssoftware op maat' },
+  { path: '/voicesoftware-op-maat', marker: 'Voicesoftware op maat' },
+  { path: '/chatbot-laten-maken', marker: 'Chatbot op maat' },
+  { path: '/website-laten-maken', marker: 'Premium Websites' },
   { path: '/premium-personeel-login', marker: 'Softora | Personeel Login' },
   { path: '/premium-personeel-agenda', marker: 'Servé Digital | Agenda', allowLoginFallback: true },
   { path: '/premium-leads', marker: 'Softora | Leads Overzicht — Premium', allowLoginFallback: true },

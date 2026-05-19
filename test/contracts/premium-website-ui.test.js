@@ -257,7 +257,7 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.match(source, /<footer id="contact" class="footer">/);
   assert.match(
     source,
-    /<div class="footer-col-title">Diensten<\/div>\s*<ul>[\s\S]*<li><a href="\/premium-chatbot">Chatbot<\/a><\/li>[\s\S]*<\/ul>/s
+    /<div class="footer-col-title">Diensten<\/div>\s*<ul>[\s\S]*<li><a href="\/chatbot-laten-maken">Chatbot<\/a><\/li>[\s\S]*<\/ul>/s
   );
   assert.match(source, /Wij bouwen professionele, snelle websites voor bedrijven\. Van ontwerp tot onderhoud - alles onder een dak\./);
   assert.doesNotMatch(source, /Wij bouwen professionele, snelle websites voor het MKB\./);

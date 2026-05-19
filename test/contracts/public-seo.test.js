@@ -5,7 +5,9 @@ const {
   applyPublicSeoHeadDefaults,
   buildPublicSeoRobotsTxt,
   buildPublicSeoSitemapXml,
+  getIndexablePublicHtmlFileFromPath,
   getIndexablePublicPathFromHtmlFile,
+  getLegacyPublicSeoRedirectTargetPath,
 } = require('../../server/services/public-seo');
 
 const KNOWN_FILES = new Set([
@@ -24,8 +26,9 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   });
 
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/premium-bedrijfssoftware<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-telefonist<\/loc>/);
+  assert.doesNotMatch(sitemap, /premium-bedrijfssoftware/);
   assert.doesNotMatch(sitemap, /premium-personeel-dashboard/);
   assert.doesNotMatch(sitemap, /premium-seo/);
   assert.doesNotMatch(sitemap, /premium-websitegenerator/);
@@ -44,7 +47,7 @@ test('public seo robots keeps marketing pages crawlable and blocks private surfa
   assert.match(robots, /^Disallow: \/premium-seo$/m);
   assert.doesNotMatch(robots, /^Disallow: \/premium-$/m);
   assert.doesNotMatch(robots, /^Disallow: \/premium-website$/m);
-  assert.doesNotMatch(robots, /^Disallow: \/premium-websites$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/bedrijfssoftware-op-maat$/m);
   assert.doesNotMatch(robots, /^Disallow: \/premium-bedrijfssoftware$/m);
 });
 
@@ -64,4 +67,12 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.match(first, /type="application\/ld\+json" data-softora-public-seo="structured-data"/);
   assert.equal((second.match(/data-softora-public-seo="structured-data"/g) || []).length, 1);
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-website.html'), '/');
+});
+
+test('public seo url mapping exposes clean paths and keeps legacy redirects available', () => {
+  assert.equal(getIndexablePublicPathFromHtmlFile('premium-bedrijfssoftware.html'), '/bedrijfssoftware-op-maat');
+  assert.equal(getIndexablePublicHtmlFileFromPath('/bedrijfssoftware-op-maat'), 'premium-bedrijfssoftware.html');
+  assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-bedrijfssoftware'), '/bedrijfssoftware-op-maat');
+  assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-chatbot'), '/chatbot-laten-maken');
+  assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-website'), '');
 });

@@ -13,7 +13,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   },
   {
     fileName: 'premium-websites.html',
-    path: '/premium-websites',
+    path: '/website-laten-maken',
+    legacyPaths: ['/premium-websites'],
     title: 'Website laten maken door Softora',
     description:
       'Laat een snelle, overtuigende website maken door Softora met sterke uitstraling, heldere structuur en focus op offerteaanvragen.',
@@ -22,7 +23,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   },
   {
     fileName: 'premium-bedrijfssoftware.html',
-    path: '/premium-bedrijfssoftware',
+    path: '/bedrijfssoftware-op-maat',
+    legacyPaths: ['/premium-bedrijfssoftware'],
     title: 'Bedrijfssoftware op maat door Softora',
     description:
       'Softora bouwt bedrijfssoftware op maat voor dashboards, klantbeheer, processen, automatisering en interne tools die dagelijks werk versnellen.',
@@ -49,7 +51,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   },
   {
     fileName: 'premium-voicesoftware.html',
-    path: '/premium-voicesoftware',
+    path: '/voicesoftware-op-maat',
+    legacyPaths: ['/premium-voicesoftware'],
     title: 'Voicesoftware op maat door Softora',
     description:
       'Softora maakt voicesoftware en AI telefonie op maat voor bereikbaarheid, gespreksafhandeling, opvolging en slimme automatisering.',
@@ -58,7 +61,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   },
   {
     fileName: 'premium-chatbot.html',
-    path: '/premium-chatbot',
+    path: '/chatbot-laten-maken',
+    legacyPaths: ['/premium-chatbot'],
     title: 'Chatbot op maat door Softora',
     description:
       'Softora bouwt chatbots op maat die bezoekers helpen, leads kwalificeren, vragen beantwoorden en jouw bedrijf online sneller laten reageren.',
@@ -67,7 +71,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   },
   {
     fileName: 'premium-pakketten.html',
-    path: '/premium-pakketten',
+    path: '/pakketten',
+    legacyPaths: ['/premium-pakketten'],
     title: 'Softora pakketten en diensten',
     description:
       'Bekijk de Softora pakketten voor websites, software, AI automatisering en digitale groeisystemen voor ondernemers en teams.',
@@ -75,7 +80,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   },
   {
     fileName: 'premium-over-softora.html',
-    path: '/premium-over-softora',
+    path: '/over-softora',
+    legacyPaths: ['/premium-over-softora'],
     title: 'Over Softora',
     description:
       'Lees meer over Softora, de werkwijze en de focus op websites, software en AI oplossingen die ondernemers praktisch verder helpen.',
@@ -83,7 +89,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   },
   {
     fileName: 'premium-algemene-voorwaarden.html',
-    path: '/premium-algemene-voorwaarden',
+    path: '/algemene-voorwaarden',
+    legacyPaths: ['/premium-algemene-voorwaarden'],
     title: 'Algemene voorwaarden van Softora',
     description:
       'Bekijk de algemene voorwaarden van Softora voor afspraken, levering, samenwerking en gebruik van diensten.',
@@ -91,7 +98,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   },
   {
     fileName: 'premium-privacy-policy.html',
-    path: '/premium-privacy-policy',
+    path: '/privacybeleid',
+    legacyPaths: ['/premium-privacy-policy'],
     title: 'Privacybeleid van Softora',
     description:
       'Lees hoe Softora omgaat met persoonsgegevens, privacy, beveiliging en gegevensverwerking binnen de dienstverlening.',
@@ -100,7 +108,24 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
 ]);
 
 const INDEXABLE_PAGE_BY_FILE = new Map(
-  INDEXABLE_PUBLIC_SEO_PAGES.map((entry) => [entry.fileName, Object.freeze({ ...entry })])
+  INDEXABLE_PUBLIC_SEO_PAGES.map((entry) => [
+    entry.fileName,
+    Object.freeze({
+      ...entry,
+      path: normalizePublicPath(entry.path),
+      legacyPaths: Object.freeze((entry.legacyPaths || []).map(normalizePublicPath).filter(Boolean)),
+    }),
+  ])
+);
+
+const INDEXABLE_PAGE_BY_PATH = new Map(
+  Array.from(INDEXABLE_PAGE_BY_FILE.values()).map((entry) => [entry.path, entry])
+);
+
+const LEGACY_PUBLIC_PATH_TO_PAGE = new Map(
+  Array.from(INDEXABLE_PAGE_BY_FILE.values()).flatMap((entry) =>
+    entry.legacyPaths.map((legacyPath) => [legacyPath, entry])
+  )
 );
 
 function normalizeSiteOrigin(valueRaw = DEFAULT_SITE_ORIGIN) {
@@ -112,6 +137,23 @@ function normalizeSiteOrigin(valueRaw = DEFAULT_SITE_ORIGIN) {
   } catch {
     return DEFAULT_SITE_ORIGIN;
   }
+}
+
+function normalizePublicPath(valueRaw) {
+  const raw = String(valueRaw || '').trim();
+  if (!raw) return '';
+
+  let pathName = raw;
+  try {
+    pathName = new URL(raw, DEFAULT_SITE_ORIGIN).pathname;
+  } catch {
+    pathName = raw.split('?')[0].split('#')[0];
+  }
+
+  if (!pathName.startsWith('/')) pathName = `/${pathName}`;
+  pathName = pathName.replace(/\/{2,}/g, '/');
+  if (pathName.length > 1) pathName = pathName.replace(/\/+$/, '');
+  return pathName || '/';
 }
 
 function escapeXml(valueRaw) {
@@ -150,12 +192,26 @@ function getIndexablePublicSeoPage(fileNameRaw) {
   return INDEXABLE_PAGE_BY_FILE.get(String(fileNameRaw || '').trim()) || null;
 }
 
+function getIndexablePublicSeoPageByPath(pathNameRaw) {
+  return INDEXABLE_PAGE_BY_PATH.get(normalizePublicPath(pathNameRaw)) || null;
+}
+
 function isIndexablePublicHtmlFile(fileNameRaw) {
   return Boolean(getIndexablePublicSeoPage(fileNameRaw));
 }
 
 function getIndexablePublicPathFromHtmlFile(fileNameRaw) {
   const entry = getIndexablePublicSeoPage(fileNameRaw);
+  return entry ? entry.path : '';
+}
+
+function getIndexablePublicHtmlFileFromPath(pathNameRaw) {
+  const entry = getIndexablePublicSeoPageByPath(pathNameRaw);
+  return entry ? entry.fileName : '';
+}
+
+function getLegacyPublicSeoRedirectTargetPath(pathNameRaw) {
+  const entry = LEGACY_PUBLIC_PATH_TO_PAGE.get(normalizePublicPath(pathNameRaw));
   return entry ? entry.path : '';
 }
 
@@ -167,7 +223,9 @@ function buildAbsoluteUrl(siteOriginRaw, pathNameRaw) {
 
 function getIndexablePublicSeoPages(knownHtmlPageFiles) {
   const knownFiles = normalizeKnownHtmlPageFiles(knownHtmlPageFiles);
-  return INDEXABLE_PUBLIC_SEO_PAGES.filter((entry) => knownFiles.size === 0 || knownFiles.has(entry.fileName));
+  return Array.from(INDEXABLE_PAGE_BY_FILE.values()).filter(
+    (entry) => knownFiles.size === 0 || knownFiles.has(entry.fileName)
+  );
 }
 
 function buildPublicSeoSitemapXml({ knownHtmlPageFiles, siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
@@ -200,7 +258,9 @@ function toPrettyPathFromFileName(fileNameRaw) {
 }
 
 function buildPublicSeoRobotsTxt({ knownHtmlPageFiles, siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
-  const indexablePaths = new Set(getIndexablePublicSeoPages(knownHtmlPageFiles).map((entry) => entry.path));
+  const indexablePaths = new Set(
+    getIndexablePublicSeoPages(knownHtmlPageFiles).flatMap((entry) => [entry.path, ...entry.legacyPaths])
+  );
   const disallowPaths = new Set([
     '/api/',
     '/premium-personeel-login',
@@ -397,9 +457,13 @@ module.exports = {
   applyPublicSeoHeadDefaults,
   buildPublicSeoRobotsTxt,
   buildPublicSeoSitemapXml,
+  getIndexablePublicHtmlFileFromPath,
   getIndexablePublicPathFromHtmlFile,
   getIndexablePublicSeoPage,
+  getIndexablePublicSeoPageByPath,
   getIndexablePublicSeoPages,
+  getLegacyPublicSeoRedirectTargetPath,
   isIndexablePublicHtmlFile,
+  normalizePublicPath,
   normalizeSiteOrigin,
 };
