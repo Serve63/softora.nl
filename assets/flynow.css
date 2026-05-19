@@ -550,18 +550,20 @@ body[data-flynow-page] .dashboard-layout[data-sidebar-shell="canonical"]>main.fl
 .deals-logo-sub{display: block;margin-top: 3px;color: rgba(255,255,255,0.55);font-size: 10px;letter-spacing: 2px;line-height: 1.2;text-transform: uppercase}
 .deals-header-meta{color: rgba(255,255,255,0.6);font-size: 12px;line-height: 1.45;text-align: right}
 .deals-header-meta strong{display: block;color: rgba(255,255,255,0.9);font-size: 13px}
-.deals-tabs{display: flex;gap: 0;margin-top: 16px}
-.deals-tab{display: inline-flex;align-items: center;gap: 8px;border: 0;border-bottom: 3px solid transparent;padding: 12px 28px 14px;background: transparent;color: rgba(255,255,255,0.5);cursor: pointer;font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 14px;font-weight: 600;letter-spacing: 1.5px;text-transform: uppercase;transition: color 0.2s ease,background 0.2s ease,border-color 0.2s ease}
-.deals-tab.active{border-color: var(--flynow-cream);background: rgba(255,255,255,0.07);color: var(--flynow-white)}
-.deals-tab:hover:not(.active){color: rgba(255,255,255,0.82)}
-.deals-tab-mark{width: 16px;height: 16px;position: relative;display: inline-block;flex: 0 0 auto}
-.deals-tab-mark--sun{border: 2px solid currentColor;border-radius: 50%}
-.deals-tab-mark--sun::before,.deals-tab-mark--sun::after,.deals-tab-mark--snow::before,.deals-tab-mark--snow::after{content: "";position: absolute;left: 50%;top: 50%;width: 20px;height: 2px;border-radius: 999px;background: currentColor}
-.deals-tab-mark--sun::before{transform: translate(-50%,-50%)}
-.deals-tab-mark--sun::after{transform: translate(-50%,-50%) rotate(90deg)}
-.deals-tab-mark--snow{border-left: 2px solid currentColor;transform: rotate(90deg)}
-.deals-tab-mark--snow::before{transform: translate(-50%,-50%) rotate(30deg)}
-.deals-tab-mark--snow::after{transform: translate(-50%,-50%) rotate(-30deg)}
+.deals-tabs{display: flex;gap: 10px;margin-top: 18px;padding: 0 0 12px;overflow-x: auto;scrollbar-width: none}
+.deals-tabs::-webkit-scrollbar{display: none}
+.deals-tab{position: relative;display: inline-flex;align-items: center;justify-content: center;gap: 10px;min-height: 50px;border: 1px solid rgba(255,255,255,0.22);border-radius: 999px;background: rgba(255,255,255,0.1);box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),0 10px 26px rgba(61,15,38,0.18);color: rgba(255,255,255,0.76);cursor: pointer;font-family: "SoftoraOswald","Oswald",sans-serif;font-size: 14px;font-weight: 600;letter-spacing: 1.5px;padding: 9px 22px 9px 10px;text-transform: uppercase;transition: background 0.2s ease,border-color 0.2s ease,box-shadow 0.2s ease,color 0.2s ease,transform 0.2s ease;white-space: nowrap}
+.deals-tab.active{border-color: rgba(255,255,255,0.92);background: linear-gradient(135deg,#fffaf2 0%,#f2e5d6 100%);box-shadow: 0 16px 34px rgba(61,15,38,0.28),inset 0 1px 0 rgba(255,255,255,0.8);color: var(--flynow-brand);transform: translateY(1px)}
+.deals-tab:hover:not(.active){border-color: rgba(255,255,255,0.44);background: rgba(255,255,255,0.16);box-shadow: inset 0 1px 0 rgba(255,255,255,0.16),0 14px 30px rgba(61,15,38,0.24);color: var(--flynow-white);transform: translateY(-1px)}
+.deals-tab-mark{position: relative;display: inline-block;flex: 0 0 auto;width: 30px;height: 30px;border-radius: 999px;background: rgba(255,255,255,0.13);box-shadow: inset 0 0 0 1px rgba(255,255,255,0.26);color: currentColor}
+.deals-tab.active .deals-tab-mark{background: var(--flynow-brand);box-shadow: 0 8px 18px rgba(139,34,82,0.28);color: var(--flynow-cream)}
+.deals-tab-mark--sun::before{content: "";position: absolute;left: 50%;top: 50%;width: 12px;height: 12px;border: 2px solid currentColor;border-radius: 50%;transform: translate(-50%,-50%)}
+.deals-tab-mark--sun::after{content: "";position: absolute;left: 50%;top: 50%;width: 21px;height: 21px;background: linear-gradient(currentColor,currentColor) center/2px 100% no-repeat,linear-gradient(90deg,currentColor,currentColor) center/100% 2px no-repeat;opacity: 0.9;transform: translate(-50%,-50%) rotate(45deg)}
+.deals-tab-mark--snow{background-image: linear-gradient(currentColor,currentColor);background-position: center;background-repeat: no-repeat;background-size: 2px 18px}
+.deals-tab.active .deals-tab-mark--snow{background-image: linear-gradient(var(--flynow-cream),var(--flynow-cream))}
+.deals-tab-mark--snow::before,.deals-tab-mark--snow::after{content: "";position: absolute;left: 50%;top: 50%;width: 18px;height: 2px;border-radius: 999px;background: currentColor}
+.deals-tab-mark--snow::before{transform: translate(-50%,-50%) rotate(28deg)}
+.deals-tab-mark--snow::after{transform: translate(-50%,-50%) rotate(-28deg)}
 .deals-main{width: min(1280px,100%);margin: 0 auto;padding: 32px 24px 60px}
 .deals-panel{display: none}
 .deals-panel.active{display: block}
@@ -656,7 +658,9 @@ body[data-flynow-page] .sidebar{width: var(--premium-sidebar-width,320px) !impor
 @media (max-width: 720px){.deals-header{padding: 0 16px}
 .deals-main{padding: 20px 14px 40px}
 .deals-header-meta{display: none}
-.deals-tab{flex: 1 1 0;justify-content: center;padding: 10px 12px 12px;font-size: 12px}
+.deals-tabs{gap: 8px}
+.deals-tab{flex: 1 1 0;justify-content: center;min-width: 0;min-height: 46px;padding: 8px 12px 8px 8px;font-size: 12px}
+.deals-tab-mark{width: 26px;height: 26px}
 .hero-deal{flex-direction: column;align-items: flex-start}
 .hero-right{text-align: left}
 .hero-price{font-size: 32px}
