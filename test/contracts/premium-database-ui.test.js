@@ -202,7 +202,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /table-layout: fixed;/);
   assert.match(pageSource, /thead th \{[\s\S]*padding: 10px 9px;[\s\S]*letter-spacing: 1\.1px;/);
   assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 14%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 12%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 15%; \}/);
   assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 15%; \}/);
   assert.match(pageSource, /thead th:nth-child\(6\), tbody td:nth-child\(6\) \{ width: 10%; \}/);
   assert.match(pageSource, /thead th:nth-child\(9\), tbody td:nth-child\(9\) \{[\s\S]*width: 7%;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
@@ -280,7 +280,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd", showPhotoColumn = !showOutreachActionColumn/);
   assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn;/);
   assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return showPhotoColumn && shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoSource\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
-  assert.match(pageSource, /colspan=\\"" \+ \(showPhotoColumn \? 9 : 8\) \+ "\\"/);
+  assert.match(pageSource, /colspan=\\"" \+ \(showOutreachActionColumn \? 7 : 9\) \+ "\\"/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";/);
@@ -436,7 +436,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260519a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260519c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
@@ -1118,13 +1118,17 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar<\/button>/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="geengehoor"\]\.act/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"klant_geworden\\"/);
-  assert.match(webdesignActionSource, /data-outreach-status=\\"afgehaakt\\"/);
+  assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\"afgehaakt\\"/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
   assert.match(webdesignActionSource, /Mail bekijken/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(7\), table\.outreach-action-mode tbody td:nth-child\(7\) \{ display: none; \}/);
+  assert.match(pageSource, /document\.getElementById\("databaseTable"\)\.classList\.toggle\("outreach-action-mode", showOutreachActionColumn\); document\.getElementById\("statusHeader"\)\.hidden = showOutreachActionColumn/);
   assert.match(pageSource, /renderUsedChannelTags\(customer\),\s*"\<\/div\>\<\/td\>",\s*"\<td\>\<div class=\\"s-wrap/);
   assert.match(pageSource, /showOutreachActionColumn && outreachController\.isWebdesignOutreachCustomer\(customer\) \? outreachController\.renderActions\(customer\)/);
   assert.match(pageSource, /showPhotoColumn \? "<td>" \+ renderWebsitePhotoDrop\(customer\) \+ "<\/td>" : ""/);
-  assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(78px,1fr\)\)/);
+  assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:420px;min-width:0;margin-top:0/);
+  assert.match(webdesignActionSource, /\.outreach-action\{box-sizing:border-box;min-width:0;min-height:34px/);
+  assert.match(webdesignActionSource, /overflow-wrap:anywhere/);
   assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\\"klant_geworden\\\"\\]\{background:var\(--crimson\)/);
   assert.match(webdesignActionSource, /return replyAt \? "<div class=\\"outreach-reply\\">/);
   assert.doesNotMatch(webdesignActionSource, /Nog geen reactie/);

@@ -466,8 +466,8 @@
         thead th:nth-child(4), tbody td:nth-child(4) { width: 13%; }
         thead th:nth-child(5), tbody td:nth-child(5) { width: 12%; }
         thead th:nth-child(6), tbody td:nth-child(6) { width: 10%; }
-        thead th:nth-child(7), tbody td:nth-child(7) { width: 8%; }
-        thead th:nth-child(8), tbody td:nth-child(8) { width: 12%; }
+        thead th:nth-child(7), tbody td:nth-child(7) { width: 7%; }
+        thead th:nth-child(8), tbody td:nth-child(8) { width: 15%; } table.outreach-action-mode thead th:nth-child(7), table.outreach-action-mode tbody td:nth-child(7) { display: none; } table.outreach-action-mode thead th:nth-child(8), table.outreach-action-mode tbody td:nth-child(8) { width: 25%; }
         thead th:nth-child(9), tbody td:nth-child(9) {
             width: 7%;
             text-align: center;
@@ -1441,7 +1441,7 @@
 
                     <div class="tbl-wrap">
                         <div class="table-card">
-                            <table>
+                            <table id="databaseTable">
                                 <thead>
                                     <tr>
                                         <th data-sort-key="naam">Bedrijf</th>
@@ -1450,7 +1450,7 @@
                                         <th data-sort-key="tel">Telefoonnummer</th>
                                         <th data-sort-key="dom">Website</th>
                                         <th>Gebruikte kanalen</th>
-                                        <th data-sort-key="status">Status</th>
+                                        <th data-sort-key="status" id="statusHeader">Status</th>
                                         <th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie</th>
                                         <th id="photoHeader">Foto's <span id="photoHeaderCount">(0)</span></th>
                                     </tr>
@@ -1577,7 +1577,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260519a"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260519c"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260511a"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260513a"></script>
@@ -2359,10 +2359,10 @@
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
-            document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return showPhotoColumn && shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
+            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return showPhotoColumn && shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
 
             if (!filtered.length) {
-                nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showPhotoColumn ? 9 : 8) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
+                nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 7 : 9) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 return;
             }
 
