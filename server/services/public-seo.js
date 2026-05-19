@@ -11,6 +11,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     description:
       'Softora bouwt snelle websites, bedrijfssoftware en AI automatisering voor ondernemers die meer aanvragen, minder handwerk en slimmere groei willen.',
     kind: 'home',
+    legacyPaths: ['/premium-website'],
     relatedLinks: ['/diensten', '/website-laten-maken', '/blog', '/kennisbank'],
   },
   {
@@ -117,7 +118,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     relatedLinks: ['/blog/chatbot-laten-maken-wanneer-zinvol', '/ai-automatisering', '/ai-telefonist', '/website-laten-maken'],
   },
   {
-    fileName: 'premium-pakketten.html',
+    fileName: 'pakketten.html',
     path: '/pakketten',
     legacyPaths: ['/premium-pakketten'],
     title: 'Softora pakketten en diensten',
