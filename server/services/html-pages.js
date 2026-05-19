@@ -12,7 +12,7 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   ...LOCAL_FONT_PRELOAD_LINKS,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
-const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260512b';
+const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260519a';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
   `<script src="/assets/premium-sidebar-stability.js?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}" defer></script>`,
@@ -24,7 +24,8 @@ const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
 @font-face{font-family:'SoftoraSidebarInter';font-style:normal;font-weight:300 700;font-display:block;src:url('/assets/fonts/inter-latin.woff2?v=${LOCAL_FONT_VERSION}') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
 @font-face{font-family:'SoftoraSidebarOswald';font-style:normal;font-weight:400 700;font-display:block;src:url('/assets/fonts/oswald-latin.woff2?v=${LOCAL_FONT_VERSION}') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
 :root{--premium-sidebar-width:320px;--premium-sidebar-font-sans:'SoftoraSidebarInter','Inter',system-ui,sans-serif;--premium-sidebar-font-display:'SoftoraSidebarOswald','Oswald',sans-serif;}
-.sidebar[data-static-sidebar="1"]{width:var(--premium-sidebar-width,320px) !important;display:flex !important;flex-direction:column !important;background:#fff !important;border-right:1px solid rgba(0,0,0,.08) !important;padding:19px 0 0 !important;opacity:1 !important;visibility:visible !important;transform:none !important;translate:none !important;contain:layout paint style !important;font-family:var(--premium-sidebar-font-sans) !important;font-size:14px !important;line-height:1.2 !important;letter-spacing:0 !important;font-synthesis:none !important;}
+@view-transition{navigation:auto;}
+.sidebar[data-static-sidebar="1"]{width:var(--premium-sidebar-width,320px) !important;display:flex !important;flex-direction:column !important;background:#fff !important;border-right:1px solid rgba(0,0,0,.08) !important;padding:19px 0 0 !important;opacity:1 !important;visibility:visible !important;transform:none !important;translate:none !important;contain:layout paint style !important;font-family:var(--premium-sidebar-font-sans) !important;font-size:14px !important;line-height:1.2 !important;letter-spacing:0 !important;font-synthesis:none !important;view-transition-name:softora-premium-sidebar !important;}
 .sidebar[data-static-sidebar="1"],.sidebar[data-static-sidebar="1"] *,.sidebar[data-static-sidebar="1"] *::before,.sidebar[data-static-sidebar="1"] *::after{box-sizing:border-box !important;transition:none !important;animation-duration:.001ms !important;animation-delay:0ms !important;}
 .sidebar[data-static-sidebar="1"] .sidebar-logo{display:block !important;padding:0 24px !important;margin:0 0 11px !important;font-family:var(--premium-sidebar-font-display) !important;font-size:25px !important;font-weight:700 !important;line-height:1 !important;letter-spacing:.02em !important;color:#8b2252 !important;text-transform:uppercase !important;text-decoration:none !important;white-space:nowrap !important;font-synthesis:none !important;}
 .sidebar[data-static-sidebar="1"] .sidebar-nav{flex:1 1 auto !important;min-height:0 !important;overflow-y:auto !important;overflow-x:hidden !important;scrollbar-gutter:stable !important;overscroll-behavior:contain !important;}
@@ -49,6 +50,7 @@ const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
 .sidebar[data-static-sidebar="1"] .logout-btn svg{width:17px !important;height:17px !important;}
 @media (min-width:901px){
 html,body{min-height:100vh;}
+::view-transition-group(softora-premium-sidebar),::view-transition-old(softora-premium-sidebar),::view-transition-new(softora-premium-sidebar),::view-transition-old(root),::view-transition-new(root){animation-duration:1ms !important;animation-delay:0ms !important;mix-blend-mode:normal !important;}
 .sidebar[data-static-sidebar="1"]{position:fixed !important;inset:0 auto 0 0 !important;height:100vh !important;min-height:100vh !important;max-height:100vh !important;z-index:40 !important;overflow:hidden !important;}
 .main,.page-shell,.main-content,.dashboard-layout[data-sidebar-shell="canonical"]>.main-content{margin-left:var(--premium-sidebar-width,320px) !important;}
 }

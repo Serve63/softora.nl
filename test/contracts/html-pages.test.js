@@ -185,7 +185,7 @@ test('html page coordinator injects critical premium sidebar shell before theme 
     [
       '<!DOCTYPE html><html><head>',
       '<title>Agenda</title>',
-      '<link rel="stylesheet" href="assets/personnel-theme.css?v=20260513a">',
+      '<link rel="stylesheet" href="assets/personnel-theme.css?v=20260519a">',
       '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">',
       '</head><body>',
       '<aside class="sidebar" data-static-sidebar="1"><a class="sidebar-logo">SOFTORA.NL</a><nav class="sidebar-nav"><a class="sidebar-link"><span class="sidebar-link-text">Dashboard</span></a></nav></aside>',
@@ -209,9 +209,11 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.ok(interPreloadIndex < themeIndex, 'lokale sidebar fonts horen voor de theme css te preloaden');
   assert.match(res.body, /softora-personnel-first-paint/);
   assert.match(res.body, /data-personnel-loading/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260512b/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260512b/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260519a/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260519a/);
+  assert.match(res.body, /@view-transition\{navigation:auto;\}/);
   assert.match(res.body, /\.sidebar\[data-static-sidebar="1"\]\{width:var\(--premium-sidebar-width,320px\) !important;display:flex !important;/);
+  assert.match(res.body, /view-transition-name:softora-premium-sidebar !important;/);
   assert.match(res.body, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-logo\{[\s\S]*font-size:25px !important;/);
   assert.match(res.body, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-link\{[\s\S]*min-height:0 !important;[\s\S]*font-size:14px !important;/);
   assert.match(res.body, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-link\.active\{color:#1a1a2e !important;background:rgba\(139,34,82,\.06\) !important;/);

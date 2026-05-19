@@ -15,8 +15,8 @@ test('premium flynow gebruikt de deals-layout binnen de premium sidebar', () => 
   assert.match(html, /<div class="dashboard-layout flynow-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-flynow-sidebar-host="1" aria-label="Premium navigatie"><\/aside>/);
   assert.match(html, /<main class="main-content flynow-main">/);
-  assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260513a"/);
-  assert.match(html, /src="\/assets\/personnel-theme\.js\?v=20260513a" defer/);
+  assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519a"/);
+  assert.match(html, /src="\/assets\/personnel-theme\.js\?v=20260519a" defer/);
   assert.match(html, /href="\/assets\/flynow\.css\?v=20260519c"/);
   assert.match(html, /src="\/assets\/flynow\.js\?v=20260519c" defer/);
   assert.match(html, /<span class="deals-logo-text">My Deals<\/span>/);
