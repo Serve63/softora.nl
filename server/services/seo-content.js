@@ -27,6 +27,33 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   }),
 });
 
+const SEO_CONTENT_PILLARS = Object.freeze([
+  Object.freeze({
+    title: 'Websites die leads opleveren',
+    description: 'Alles rond website laten maken, conversie, SEO-structuur, pagina-opbouw en groeibare content.',
+    href: '/website-laten-maken',
+    category: 'Websites',
+  }),
+  Object.freeze({
+    title: 'AI automatisering voor het MKB',
+    description: 'Praktische AI flows voor intake, opvolging, administratie, klantcontact en interne processen.',
+    href: '/ai-automatisering',
+    category: 'AI automatisering',
+  }),
+  Object.freeze({
+    title: 'Software, CRM en dashboards',
+    description: 'Maatwerk software, CRM-systemen en dashboards die handwerk vervangen en data bruikbaar maken.',
+    href: '/bedrijfssoftware-op-maat',
+    category: 'Software',
+  }),
+  Object.freeze({
+    title: 'AI communicatie',
+    description: 'Chatbots, AI telefonie en slimme klantgesprekken die sneller kwalificeren en beter opvolgen.',
+    href: '/chatbot-laten-maken',
+    category: 'AI contact',
+  }),
+]);
+
 const SEO_CONTENT_ITEMS = Object.freeze([
   Object.freeze({
     collection: 'blog',
@@ -196,6 +223,300 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI automatisering voor het MKB', href: '/blog/ai-automatisering-mkb-waar-beginnen' }),
     ]),
   }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'website-laten-maken-mkb-paginas',
+    title: 'Website laten maken voor het MKB: welke pagina’s heb je echt nodig?',
+    description:
+      'Een praktische indeling voor MKB-websites die gevonden moeten worden, vertrouwen moeten wekken en aanvragen moeten opleveren.',
+    category: 'Websites',
+    intent: 'Koopintentie',
+    publishedAt: '2026-05-20',
+    updatedAt: '2026-05-20',
+    readTime: '7 min',
+    summary:
+      'Een sterke MKB-website begint met een duidelijke basisstructuur: diensten, bewijs, proces, veelgestelde vragen en contactmomenten.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Begin met pagina’s die een keuze makkelijker maken',
+        paragraphs: Object.freeze([
+          'Veel websites starten vanuit wat een bedrijf zelf wil vertellen. Voor SEO en leads werkt het beter om te starten vanuit wat een bezoeker nodig heeft om vertrouwen te krijgen. Denk aan een duidelijke dienstenpagina, voorbeelden van werk, uitleg over het proces en een laagdrempelige manier om contact op te nemen.',
+          'De homepage hoeft niet alles te dragen. Juist aparte pagina’s voor diensten, branches, prijzen, werkwijze en veelgestelde vragen zorgen ervoor dat Google beter begrijpt waar je voor gevonden wilt worden.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Maak iedere belangrijke dienst een eigen landingspagina',
+        paragraphs: Object.freeze([
+          'Als je gevonden wilt worden op “website laten maken”, “bedrijfssoftware op maat” of “AI automatisering”, dan verdienen die onderwerpen een eigen pagina. Zo kan elke pagina scherp inspelen op een zoekvraag, met een eigen titel, H1, interne links en duidelijke CTA.',
+          'Daarna kun je ondersteunende blogs en kennisbankartikelen naar die pagina’s laten wijzen. Dat maakt de dienstpagina sterker zonder dat de tekst onnodig lang of rommelig wordt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Bouw de site alsof er later veel content bij komt',
+        paragraphs: Object.freeze([
+          'Een SEO-site moet kunnen groeien. Daarom is het verstandig om vanaf het begin ruimte te maken voor blogartikelen, kennisbankuitleg, cases, branchepagina’s en tools. Als die onderdelen logisch aan elkaar linken, ontstaat er een netwerk waar Google makkelijk doorheen kan.',
+          'Voor Softora betekent dit dat commerciële pagina’s de hoofdroute blijven, terwijl artikelen en kennisbankstukken helpen om vragen af te vangen en bezoekers richting een aanvraag te sturen.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
+      Object.freeze({ label: 'Website kosten in 2026', href: '/blog/website-laten-maken-kosten-2026' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-ai-automatisering',
+    title: 'Wat is AI automatisering?',
+    description:
+      'Een heldere uitleg van AI automatisering, met voorbeelden van processen die je als bedrijf slimmer kunt laten verlopen.',
+    category: 'AI automatisering',
+    intent: 'Uitleg',
+    publishedAt: '2026-05-21',
+    updatedAt: '2026-05-21',
+    readTime: '5 min',
+    summary:
+      'AI automatisering combineert slimme software met vaste bedrijfsprocessen, zodat terugkerend werk sneller en consistenter verloopt.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele definitie',
+        paragraphs: Object.freeze([
+          'AI automatisering betekent dat kunstmatige intelligentie wordt ingezet om stappen in een proces zelfstandig voor te bereiden, uit te voeren of door te sturen. Denk aan samenvatten, classificeren, antwoorden formuleren, leads beoordelen of taken klaarzetten.',
+          'Het verschil met gewone automatisering is dat AI beter kan omgaan met tekst, gesprekken, context en variatie. Daardoor kun je processen automatiseren die vroeger te rommelig waren voor vaste regels.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Waar bedrijven meestal beginnen',
+        paragraphs: Object.freeze([
+          'Goede startpunten zijn intake, klantvragen, leadopvolging, offertevoorbereiding, planning en interne rapportage. Dat zijn processen met duidelijke input en output, waardoor je snel kunt meten of de automatisering waarde oplevert.',
+          'Een AI workflow hoeft niet meteen alles zelf te beslissen. Vaak is het beter als AI voorbereidt en een medewerker de laatste keuze maakt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Waarom structuur belangrijker is dan hype',
+        paragraphs: Object.freeze([
+          'AI werkt pas goed als de route eromheen klopt. Welke informatie komt binnen? Wanneer is iets urgent? Naar welk systeem moet het resultaat? Wie krijgt een melding? Zonder die proceskeuzes blijft AI een losse tool.',
+          'Daarom begint Softora AI automatisering bij de workflow en pas daarna bij het model of de techniek.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'crm-systeem-op-maat-spreadsheets-vervangen',
+    title: 'CRM systeem op maat: wanneer vervang je spreadsheets?',
+    description:
+      'Signalen dat losse spreadsheets je groei vertragen en wanneer een CRM systeem op maat slimmer wordt.',
+    category: 'CRM',
+    intent: 'Koopintentie',
+    publishedAt: '2026-05-22',
+    updatedAt: '2026-05-22',
+    readTime: '6 min',
+    summary:
+      'Spreadsheets zijn handig om te starten, maar worden kwetsbaar zodra opvolging, status, eigenaarschap en rapportage belangrijk worden.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Spreadsheets zijn prima totdat ze het proces worden',
+        paragraphs: Object.freeze([
+          'Veel bedrijven starten met spreadsheets omdat ze snel en flexibel zijn. Dat is logisch. Het probleem ontstaat wanneer klantstatussen, opvolgmomenten, offertes, taken en rapportages allemaal verspreid raken over losse bestanden.',
+          'Dan is niet meer duidelijk wie wat moet doen, welke lead prioriteit heeft en of de laatste informatie wel klopt. Een CRM systeem op maat brengt die informatie terug naar één duidelijke workflow.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wanneer maatwerk logisch wordt',
+        paragraphs: Object.freeze([
+          'Maatwerk wordt interessant als standaard CRM te veel ruis geeft of belangrijke stappen mist. Bijvoorbeeld wanneer je eigen fases, rollen, berekeningen, klanttypes of automatiseringen nodig hebt.',
+          'Een goed CRM hoeft niet groot te beginnen. De kern is vaak: contactgegevens, status, taken, notities, afspraken, offertefase en rapportage.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Maak opvolging meetbaar',
+        paragraphs: Object.freeze([
+          'De grootste winst zit vaak in opvolging. Welke leads staan open? Welke afspraken zijn gemaakt? Welke offerte wacht op reactie? Welke klant heeft opnieuw aandacht nodig?',
+          'Als die vragen direct zichtbaar zijn, wordt een CRM niet alleen administratie, maar een systeem dat omzetkansen beschermt.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Wat is bedrijfssoftware op maat?', href: '/kennisbank/wat-is-bedrijfssoftware-op-maat' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-een-ai-telefonist',
+    title: 'Wat is een AI telefonist?',
+    description:
+      'Een korte uitleg van AI telefonie, wanneer het nuttig is en hoe je voorkomt dat gesprekken onpersoonlijk worden.',
+    category: 'AI telefonie',
+    intent: 'Uitleg',
+    publishedAt: '2026-05-23',
+    updatedAt: '2026-05-23',
+    readTime: '5 min',
+    summary:
+      'Een AI telefonist neemt gesprekken aan, stelt vaste vragen, vat informatie samen en zet vervolgacties klaar.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Een digitale eerste lijn',
+        paragraphs: Object.freeze([
+          'Een AI telefonist is software die telefoongesprekken kan voeren op basis van vooraf ingerichte doelen. Denk aan opnemen, vragen stellen, informatie verzamelen, een afspraak voorbereiden of een samenvatting naar het team sturen.',
+          'Het doel is niet om persoonlijk contact te vervangen, maar om bereikbaarheid en opvolging betrouwbaarder te maken.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wanneer AI telefonie waarde toevoegt',
+        paragraphs: Object.freeze([
+          'AI telefonie is vooral interessant als je vaak dezelfde vragen krijgt, leads snel wilt kwalificeren of buiten werktijd bereikbaar wilt blijven. Ook voor drukke teams kan het helpen om gesprekken alvast te structureren.',
+          'De beste toepassingen hebben duidelijke grenzen: wanneer mag de AI helpen en wanneer moet een medewerker terugbellen?',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Koppeling met je proces',
+        paragraphs: Object.freeze([
+          'De echte waarde ontstaat na het gesprek. Een goede AI telefonist maakt een samenvatting, herkent vervolgacties en kan informatie doorzetten naar CRM, agenda of mailbox.',
+          'Zonder die opvolging blijft het een los telefoonsysteem. Met goede koppelingen wordt het onderdeel van je commerciële proces.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'maatwerk-software-vs-standaard-software',
+    title: 'Maatwerk software vs standaard software: wat past beter?',
+    description:
+      'Een vergelijking tussen maatwerk en standaard software voor bedrijven die willen groeien zonder onnodige complexiteit.',
+    category: 'Bedrijfssoftware',
+    intent: 'Vergelijking',
+    publishedAt: '2026-05-24',
+    updatedAt: '2026-05-24',
+    readTime: '7 min',
+    summary:
+      'Standaard software is snel en betaalbaar, maar maatwerk wordt sterker zodra je proces uniek, schaalbaar of onderscheidend is.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Standaard software is vaak de beste eerste stap',
+        paragraphs: Object.freeze([
+          'Voor veel bedrijven is standaard software logisch. Je kunt snel starten, de kosten zijn voorspelbaar en je profiteert van functies die al gebouwd zijn.',
+          'Het nadeel is dat je je proces moet aanpassen aan het pakket. Dat is prima zolang de werkwijze eenvoudig blijft, maar kan gaan knellen bij groei.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Maatwerk wordt interessant bij eigen processen',
+        paragraphs: Object.freeze([
+          'Als jouw bedrijf werkt met eigen statussen, rollen, berekeningen, klantstromen of rapportages, kan maatwerk veel rust geven. Het systeem volgt dan de manier waarop je team echt werkt.',
+          'Ook koppelingen zijn vaak een reden. Denk aan CRM, agenda, klantportaal, offertes, AI automatisering en dashboards in één lijn.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'De slimste keuze kan hybride zijn',
+        paragraphs: Object.freeze([
+          'Je hoeft niet altijd alles zelf te bouwen. Vaak is een combinatie verstandig: standaard tools waar ze goed in zijn, met maatwerk voor de processen die jouw bedrijf uniek maken.',
+          'Softora kijkt daarom eerst naar de kernflow en kiest daarna pas welke delen maatwerk verdienen.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-een-conversiegerichte-website',
+    title: 'Wat is een conversiegerichte website?',
+    description:
+      'Een uitleg van conversiegerichte websites: hoe structuur, tekst, bewijs en CTA’s samen meer aanvragen opleveren.',
+    category: 'Websites',
+    intent: 'Uitleg',
+    publishedAt: '2026-05-25',
+    updatedAt: '2026-05-25',
+    readTime: '5 min',
+    summary:
+      'Een conversiegerichte website helpt bezoekers sneller begrijpen, vertrouwen en actie ondernemen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Conversie begint met duidelijkheid',
+        paragraphs: Object.freeze([
+          'Een website converteert beter wanneer bezoekers snel zien wat je doet, voor wie het is en welke volgende stap logisch is. Mooie vormgeving helpt, maar duidelijkheid is de basis.',
+          'Daarom moet een pagina niet alleen informatie tonen, maar twijfels wegnemen. Denk aan bewijs, werkwijze, voorbeelden, veelgestelde vragen en een duidelijke aanvraagroute.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Elke pagina heeft een taak',
+        paragraphs: Object.freeze([
+          'Een homepage oriënteert, een dienstenpagina overtuigt, een kennisbankartikel legt uit en een contactpagina maakt de stap makkelijk. Als iedere pagina zijn taak kent, voelt de site rustiger en presteert hij beter.',
+          'Voor SEO helpt dit ook, omdat Google beter kan begrijpen welke pagina bij welke zoekvraag hoort.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Meten maakt verbeteren mogelijk',
+        paragraphs: Object.freeze([
+          'Een conversiegerichte website is nooit echt af. Je kijkt naar klikken, aanvragen, scrollgedrag, zoekopdrachten en vragen van bezoekers.',
+          'Die signalen gebruik je om titels, CTA’s, interne links en content stap voor stap sterker te maken.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Website laten maken kosten 2026', href: '/blog/website-laten-maken-kosten-2026' }),
+      Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'chatbot-vs-livechat',
+    title: 'Chatbot vs livechat: wat past beter bij je bedrijf?',
+    description:
+      'Een praktische vergelijking tussen chatbots en livechat voor bedrijven die sneller willen reageren op websitebezoekers.',
+    category: 'Chatbots',
+    intent: 'Vergelijking',
+    publishedAt: '2026-05-26',
+    updatedAt: '2026-05-26',
+    readTime: '6 min',
+    summary:
+      'Livechat is sterk voor persoonlijk contact, terwijl een chatbot vooral waarde toevoegt bij herhaalde vragen en gestructureerde intake.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Livechat werkt goed als iemand beschikbaar is',
+        paragraphs: Object.freeze([
+          'Livechat voelt persoonlijk en direct. Het werkt vooral goed wanneer je team snel kan reageren en gesprekken echt maatwerk vragen.',
+          'Het nadeel is beschikbaarheid. Als niemand reageert, verandert livechat snel in frustratie of een gemiste lead.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Een chatbot is sterk in vaste routes',
+        paragraphs: Object.freeze([
+          'Een chatbot kan altijd dezelfde basisvragen stellen, antwoorden geven en bezoekers naar de juiste vervolgroute sturen. Dat is handig voor prijzen, intake, veelgestelde vragen en leadkwalificatie.',
+          'De chatbot moet wel duidelijke grenzen hebben. Voor complexe of gevoelige vragen blijft overdracht naar een mens belangrijk.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'De beste oplossing is vaak combinatie',
+        paragraphs: Object.freeze([
+          'Veel bedrijven hebben baat bij een hybride aanpak. De chatbot vangt de eerste laag op en livechat of terugbelverzoek neemt over wanneer dat nodig is.',
+          'Zo blijft de website bereikbaar zonder dat persoonlijk contact verdwijnt.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
+    ]),
+  }),
 ]);
 
 function normalizeSiteOrigin(valueRaw = DEFAULT_SITE_ORIGIN) {
@@ -248,6 +569,10 @@ function getSeoContentCollection(collectionRaw) {
   return SEO_CONTENT_COLLECTIONS[key] || null;
 }
 
+function getSeoContentPillars() {
+  return SEO_CONTENT_PILLARS;
+}
+
 function getSeoContentItems({ collection, now = new Date() } = {}) {
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   return SEO_CONTENT_ITEMS.filter((item) => {
@@ -287,6 +612,21 @@ function getSeoContentSitemapEntries(options = {}) {
   return [...collectionEntries, ...itemEntries].filter((entry) => entry.path);
 }
 
+function getSeoContentPublicationPlan({ now = new Date() } = {}) {
+  const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  return SEO_CONTENT_ITEMS.map((item) => {
+    const publishedMs = new Date(`${item.publishedAt}T00:00:00.000Z`).getTime();
+    return {
+      collection: item.collection,
+      slug: item.slug,
+      path: getSeoContentPathForItem(item),
+      title: item.title,
+      publishedAt: item.publishedAt,
+      status: Number.isFinite(publishedMs) && publishedMs <= nowMs ? 'live' : 'scheduled',
+    };
+  }).sort((a, b) => String(a.publishedAt).localeCompare(String(b.publishedAt)) || a.slug.localeCompare(b.slug));
+}
+
 function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', structuredData }) {
   const imageUrl = buildAbsoluteUrl(canonicalUrl, DEFAULT_OG_IMAGE_PATH);
   return [
@@ -298,7 +638,7 @@ function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', s
     `<link rel="canonical" href="${escapeHtml(canonicalUrl)}">`,
     '<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">',
     '<link rel="stylesheet" href="/assets/fonts.css?v=20260409a">',
-    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260519a">',
+    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260519b">',
     `<meta property="og:type" content="${escapeHtml(ogType)}">`,
     '<meta property="og:site_name" content="Softora">',
     '<meta property="og:locale" content="nl_NL">',
@@ -382,6 +722,28 @@ function renderRelatedLinks(links) {
     '  <div class="meer-grid">',
     ...links.map(
       (link) => `    <a class="blog-card compact-card" href="${escapeHtml(link.href)}"><span>${escapeHtml(link.label)}</span></a>`
+    ),
+    '  </div>',
+    '</section>',
+  ].join('\n');
+}
+
+function renderPillarCards() {
+  return [
+    '<section class="pillar-wrap" aria-label="SEO groeipijlers">',
+    '  <div class="pillar-heading-row">',
+    '    <div>',
+    '      <div class="meer-label">SEO groeipijlers</div>',
+    '      <h2>De onderwerpen waar Softora autoriteit op bouwt</h2>',
+    '    </div>',
+    '    <a href="/diensten">Alle diensten</a>',
+    '  </div>',
+    '  <div class="pillar-grid">',
+    ...SEO_CONTENT_PILLARS.map(
+      (pillar) =>
+        `    <a class="pillar-card" href="${escapeHtml(pillar.href)}"><span>${escapeHtml(pillar.category)}</span><strong>${escapeHtml(
+          pillar.title
+        )}</strong><em>${escapeHtml(pillar.description)}</em></a>`
     ),
     '  </div>',
     '</section>',
@@ -478,6 +840,7 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
     '  <section class="blog-grid-wrap">',
     `    <div class="blog-grid">${renderArticleCards(items)}</div>`,
     '  </section>',
+    renderPillarCards(),
     renderRelatedLinks([
       { label: 'Website laten maken', href: '/website-laten-maken' },
       { label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' },
@@ -578,12 +941,15 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
 module.exports = {
   SEO_CONTENT_COLLECTIONS,
   SEO_CONTENT_ITEMS,
+  SEO_CONTENT_PILLARS,
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
   getSeoContentCollection,
   getSeoContentItem,
   getSeoContentItems,
   getSeoContentPathForItem,
+  getSeoContentPillars,
+  getSeoContentPublicationPlan,
   getSeoContentPublicPaths,
   getSeoContentSitemapEntries,
 };

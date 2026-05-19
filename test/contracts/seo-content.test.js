@@ -5,13 +5,16 @@ const {
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
   getSeoContentItem,
+  getSeoContentItems,
+  getSeoContentPillars,
+  getSeoContentPublicationPlan,
   getSeoContentPublicPaths,
   getSeoContentSitemapEntries,
 } = require('../../server/services/seo-content');
 
 test('seo content exposes blog and kennisbank paths for crawl and sitemap discovery', () => {
-  const publicPaths = getSeoContentPublicPaths();
-  const sitemapEntries = getSeoContentSitemapEntries();
+  const publicPaths = getSeoContentPublicPaths({ now: new Date('2026-05-19T12:00:00.000Z') });
+  const sitemapEntries = getSeoContentSitemapEntries({ now: new Date('2026-05-19T12:00:00.000Z') });
 
   assert.ok(publicPaths.includes('/blog'));
   assert.ok(publicPaths.includes('/kennisbank'));
@@ -19,10 +22,12 @@ test('seo content exposes blog and kennisbank paths for crawl and sitemap discov
   assert.ok(publicPaths.includes('/blog/website-laten-maken-kosten-2026'));
   assert.ok(publicPaths.includes('/blog/chatbot-laten-maken-wanneer-zinvol'));
   assert.ok(publicPaths.includes('/kennisbank/wat-is-bedrijfssoftware-op-maat'));
+  assert.ok(!publicPaths.includes('/blog/website-laten-maken-mkb-paginas'));
   assert.ok(publicPaths.includes('/premium-blog'), 'Legacy blog route moet crawlbaar blijven voor de redirect.');
   assert.ok(sitemapEntries.some((entry) => entry.path === '/blog/ai-automatisering-mkb-waar-beginnen'));
   assert.ok(sitemapEntries.some((entry) => entry.path === '/blog/website-laten-maken-kosten-2026'));
   assert.ok(sitemapEntries.some((entry) => entry.path === '/blog/chatbot-laten-maken-wanneer-zinvol'));
+  assert.ok(!sitemapEntries.some((entry) => entry.path === '/blog/website-laten-maken-mkb-paginas'));
   assert.ok(sitemapEntries.every((entry) => !String(entry.path).includes('premium-blog')));
 });
 
@@ -37,6 +42,9 @@ test('seo content renders the existing blog visual language with real links', ()
   assert.match(html, /class="hero-banner"/);
   assert.match(html, /class="filter-bar"/);
   assert.match(html, /class="blog-card featured"/);
+  assert.match(html, /SEO groeipijlers/);
+  assert.match(html, /Software, CRM en dashboards/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
   assert.match(html, /href="\/diensten">Diensten<\/a>/);
   assert.match(html, /href="\/ai-automatisering">AI<\/a>/);
   assert.match(html, /href="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
@@ -60,4 +68,37 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /AI automatisering voor het MKB: waar begin je\?/);
   assert.match(html, /href="\/blog">Terug naar blog<\/a>/);
   assert.match(html, /href="\/ai-telefonist"/);
+});
+
+test('seo content heeft een dagelijkse publicatiebuffer die pas live komt op publicatiedatum', () => {
+  const beforeLaunch = new Date('2026-05-19T12:00:00.000Z');
+  const afterLaunch = new Date('2026-05-26T12:00:00.000Z');
+
+  const plan = getSeoContentPublicationPlan({ now: beforeLaunch });
+  const scheduled = plan.filter((item) => item.status === 'scheduled');
+
+  assert.ok(scheduled.length >= 7, 'De contentmachine moet minimaal een week vooruit gepland zijn.');
+  assert.ok(scheduled.some((item) => item.path === '/blog/website-laten-maken-mkb-paginas'));
+  assert.ok(scheduled.some((item) => item.path === '/kennisbank/wat-is-ai-automatisering'));
+
+  assert.ok(!getSeoContentPublicPaths({ now: beforeLaunch }).includes('/blog/chatbot-vs-livechat'));
+  assert.ok(getSeoContentPublicPaths({ now: afterLaunch }).includes('/blog/chatbot-vs-livechat'));
+  assert.ok(getSeoContentSitemapEntries({ now: afterLaunch }).some((entry) => entry.path === '/blog/chatbot-vs-livechat'));
+});
+
+test('seo content bewaakt unieke slugs, clusters en interne links', () => {
+  const items = getSeoContentItems({ now: new Date('2026-06-01T12:00:00.000Z') });
+  const paths = items.map((item) => `${item.collection}/${item.slug}`);
+  const uniquePaths = new Set(paths);
+
+  assert.equal(uniquePaths.size, paths.length);
+  assert.ok(getSeoContentPillars().length >= 4);
+
+  for (const item of items) {
+    assert.ok(item.title.length >= 20, item.slug);
+    assert.ok(item.description.length >= 80, item.slug);
+    assert.ok(item.sections.length >= 3, item.slug);
+    assert.ok(item.relatedLinks.length >= 3, item.slug);
+    assert.ok(item.relatedLinks.every((link) => String(link.href || '').startsWith('/')), item.slug);
+  }
 });
