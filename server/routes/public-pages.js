@@ -133,6 +133,10 @@ function registerPublicPageRoutes(app, deps) {
       return next();
     }
 
+    if (slug === 'premium-website' && fileName === 'premium-website.html') {
+      return deps.sendSeoManagedHtmlPageResponse(req, res, next, fileName);
+    }
+
     const indexablePublicPath = getIndexablePublicPathFromHtmlFile(fileName);
     if (indexablePublicPath && indexablePublicPath !== `/${slug}`) {
       return res.redirect(301, appendOriginalQuery(indexablePublicPath, req.originalUrl));

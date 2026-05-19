@@ -32,6 +32,19 @@ for (const target of pageSmokeTargets) {
   });
 }
 
+test('page smoke: /premium-website serves the homepage without redirecting back to root', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/premium-website`, {
+    cache: 'no-store',
+    redirect: 'manual',
+  });
+  const html = await response.text();
+
+  assert.equal(response.status, 200, '/premium-website');
+  assert.equal(response.headers.get('location'), null, '/premium-website mag geen redirect-loop starten.');
+  assert.match(html, /<!DOCTYPE html>/i, '/premium-website moet HTML serveren.');
+  assert.match(html, /Websites die overtuigen/, 'Homepage-marker ontbreekt op /premium-website.');
+});
+
 const repoRoot = path.resolve(__dirname, '..', '..');
 const unifiedPersonnelThemeTargets = [
   'premium-ai-coldmailing.html',
