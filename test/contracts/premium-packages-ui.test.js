@@ -78,6 +78,9 @@ test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () =
   const sectionStart = pageSource.indexOf('<div id="tab-routes"');
   const sectionEnd = pageSource.indexOf('<div id="tab-bouwen"', sectionStart);
   const routesSection = pageSource.slice(sectionStart, sectionEnd);
+  const route02Start = routesSection.indexOf('<div class="route-card"><div class="card-tier">Route 02');
+  const route03Start = routesSection.indexOf('<div class="route-card featured">');
+  const databaseNoteStart = routesSection.indexOf('<div class="database-hosting-note">');
 
   assert.match(
     routesSection,
@@ -91,6 +94,11 @@ test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () =
     routesSection,
     /Elke database wordt gehost via Softora\.nl\. De kosten voor uitsluitend databasehosting bedragen €15 per maand\./
   );
+  assert.ok(route02Start >= 0, 'Route 02 staat in de routes-sectie');
+  assert.ok(route03Start > route02Start, 'Route 03 staat na Route 02');
+  assert.ok(databaseNoteStart > route03Start, 'De databasehosting-melding staat onder de drie routekaarten');
+  assert.doesNotMatch(routesSection.slice(route02Start, route03Start), /database-hosting-note/);
+  assert.match(pageSource, /\.database-hosting-note \{ grid-column: 1 \/ -1;/);
   assert.match(
     routesSection,
     /Softora ontwikkelt en beheert de website, inclusief monitoring, updates en beveiliging\. Wijzigingen voert Softora op aanvraag uit binnen het onderhoudspakket, zodat de klant technisch volledig wordt ontzorgd\./
