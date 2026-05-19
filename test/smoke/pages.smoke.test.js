@@ -36,6 +36,7 @@ const unlockedPublicSeoPaths = [
   '/diensten',
   '/ai-automatisering',
   '/website-laten-maken',
+  '/website-laten-maken-oisterwijk',
   '/bedrijfssoftware-op-maat',
   '/crm-systeem-op-maat',
   '/ai-telefonist',

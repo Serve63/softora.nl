@@ -34,6 +34,16 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     relatedLinks: ['/blog/website-laten-maken-kosten-2026', '/ai-automatisering', '/chatbot-laten-maken', '/kennisbank'],
   },
   {
+    fileName: 'website-laten-maken-oisterwijk.html',
+    path: '/website-laten-maken-oisterwijk',
+    title: 'Website laten maken Oisterwijk door Softora',
+    description:
+      'Softora bouwt snelle, professionele websites voor ondernemers in Oisterwijk met lokale SEO, duidelijke structuur en focus op aanvragen.',
+    kind: 'service',
+    serviceName: 'Website laten maken Oisterwijk',
+    relatedLinks: ['/website-laten-maken', '/regio/oisterwijk', '/blog/website-laten-maken-kosten-2026', '/diensten'],
+  },
+  {
     fileName: 'premium-bedrijfssoftware.html',
     path: '/bedrijfssoftware-op-maat',
     legacyPaths: ['/premium-bedrijfssoftware'],
@@ -88,9 +98,9 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-voicesoftware.html',
     path: '/voicesoftware-op-maat',
     legacyPaths: ['/premium-voicesoftware'],
-    title: 'Voicesoftware op maat door Softora',
+    title: 'Voicesoftware en AI telefonie op maat door Softora',
     description:
-      'Softora maakt voicesoftware en AI telefonie op maat voor bereikbaarheid, gespreksafhandeling, opvolging en slimme automatisering.',
+      'Softora maakt voicesoftware en AI telefonie op maat voor bereikbaarheid, leadkwalificatie, gespreksafhandeling en slimme opvolging.',
     kind: 'service',
     serviceName: 'Voicesoftware op maat',
     relatedLinks: ['/ai-telefonist', '/ai-automatisering', '/chatbot-laten-maken', '/blog/ai-automatisering-mkb-waar-beginnen'],
@@ -486,15 +496,12 @@ function addStructuredDataIfMissing(htmlRaw, entry, siteOrigin) {
 
 const PUBLIC_SEO_INTERNAL_LINK_STYLE = [
   '    <style data-softora-public-seo="internal-link-style">',
-  '      .softora-seo-link-map{background:#fff;border-top:1px solid rgba(26,26,46,.08);padding:52px clamp(20px,6vw,80px);font-family:Inter,system-ui,sans-serif;color:#1a1a2e;}',
-  '      .softora-seo-link-map__inner{max-width:1120px;margin:0 auto;}',
-  '      .softora-seo-link-map__label{font-family:Oswald,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8b2252;margin-bottom:10px;}',
-  '      .softora-seo-link-map h2{font-family:Oswald,Arial,sans-serif;font-size:clamp(28px,3.8vw,44px);line-height:1.05;text-transform:uppercase;letter-spacing:0;margin:0 0 18px;}',
-  '      .softora-seo-link-map__grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:24px;}',
-  '      .softora-seo-link-map a{display:flex;align-items:center;min-height:72px;padding:16px 18px;border:1px solid rgba(26,26,46,.1);border-radius:8px;text-decoration:none;color:#1a1a2e;background:#f8f7f4;font-weight:700;line-height:1.25;}',
-  '      .softora-seo-link-map a:hover{border-color:rgba(139,34,82,.32);color:#8b2252;background:#fff;}',
-  '      @media (max-width: 860px){.softora-seo-link-map__grid{grid-template-columns:1fr 1fr;}.softora-seo-link-map{padding:40px 20px;}}',
-  '      @media (max-width: 520px){.softora-seo-link-map__grid{grid-template-columns:1fr;}.softora-seo-link-map a{min-height:0;}}',
+  '      .softora-seo-footer-links{background:#fff;border-top:1px solid rgba(26,26,46,.08);padding:26px clamp(20px,6vw,80px);font-family:Inter,system-ui,sans-serif;color:#1a1a2e;}',
+  '      .softora-seo-footer-links__inner{max-width:1120px;margin:0 auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap;}',
+  '      .softora-seo-footer-links__label{font-family:Oswald,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8b2252;}',
+  '      .softora-seo-footer-links a{font-size:13px;font-weight:700;text-decoration:none;color:#5f6270;}',
+  '      .softora-seo-footer-links a:hover{color:#8b2252;}',
+  '      .footer-legal[data-softora-public-seo]{flex-wrap:wrap;}',
   '    </style>',
 ].join('\n');
 
@@ -502,6 +509,7 @@ const PUBLIC_SEO_LINK_LABELS = Object.freeze({
   '/': 'Home',
   '/diensten': 'Alle diensten',
   '/website-laten-maken': 'Website laten maken',
+  '/website-laten-maken-oisterwijk': 'Website laten maken Oisterwijk',
   '/bedrijfssoftware-op-maat': 'Bedrijfssoftware op maat',
   '/crm-systeem-op-maat': 'CRM systeem op maat',
   '/ai-automatisering': 'AI automatisering',
@@ -517,6 +525,7 @@ const PUBLIC_SEO_LINK_LABELS = Object.freeze({
   '/blog/website-laten-maken-kosten-2026': 'Website laten maken kosten 2026',
   '/blog/chatbot-laten-maken-wanneer-zinvol': 'Wanneer is een chatbot slim?',
   '/kennisbank/wat-is-bedrijfssoftware-op-maat': 'Wat is bedrijfssoftware op maat?',
+  '/regio/oisterwijk': 'Softora in Oisterwijk',
 });
 
 function getPublicSeoInternalLinks(entry) {
@@ -550,22 +559,45 @@ function addInternalLinksIfMissing(htmlRaw, entry) {
   }
 
   const linkItems = links
-    .map(
-      (link) =>
-        `        <a href="${escapeHtmlAttribute(link.href)}">${escapeHtmlText(link.label)}</a>`
-    )
+    .map((link) => `        <a href="${escapeHtmlAttribute(link.href)}">${escapeHtmlText(link.label)}</a>`)
     .join('\n');
+
+  if (/<div\b[^>]*class=["'][^"']*\bfooter-legal\b[^"']*["'][^>]*>/i.test(html)) {
+    return html.replace(
+      /<div\b([^>]*class=["'][^"']*\bfooter-legal\b[^"']*["'][^>]*)>([\s\S]*?)<\/div>/i,
+      (match, attrs, content) => {
+        const existingHrefs = new Set(
+          Array.from(String(content || '').matchAll(/href=["']([^"']+)["']/gi)).map((hrefMatch) =>
+            normalizePublicPath(hrefMatch[1])
+          )
+        );
+        const footerLinks = links
+          .filter((link) => !existingHrefs.has(normalizePublicPath(link.href)))
+          .map(
+            (link) =>
+              `                <a href="${escapeHtmlAttribute(link.href)}">${escapeHtmlText(link.label)}</a>`
+          )
+          .join('\n');
+        const nextAttrs = /data-softora-public-seo=/i.test(attrs)
+          ? attrs
+          : `${attrs} data-softora-public-seo="internal-links"`;
+        return `<div${nextAttrs}>${content}${footerLinks ? `\n${footerLinks}` : ''}</div>`;
+      }
+    );
+  }
+
   const snippet = [
-    '  <section class="softora-seo-link-map" data-softora-public-seo="internal-links" aria-label="Verder binnen Softora">',
-    '    <div class="softora-seo-link-map__inner">',
-    '      <div class="softora-seo-link-map__label">Verder bouwen</div>',
-    '      <h2>Logische volgende stap</h2>',
-    '      <div class="softora-seo-link-map__grid">',
+    '  <nav class="softora-seo-footer-links" data-softora-public-seo="internal-links" aria-label="Verder binnen Softora">',
+    '    <div class="softora-seo-footer-links__inner">',
+    '      <span class="softora-seo-footer-links__label">Verder binnen Softora</span>',
     linkItems,
-    '      </div>',
     '    </div>',
-    '  </section>',
+    '  </nav>',
   ].join('\n');
+
+  if (/<\/footer>/i.test(html)) {
+    return html.replace(/<\/footer>/i, `${snippet}\n</footer>`);
+  }
 
   return injectBeforeBodyClose(html, snippet);
 }

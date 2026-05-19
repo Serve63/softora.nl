@@ -31,6 +31,7 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
 
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/diensten<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/website-laten-maken-oisterwijk<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/crm-systeem-op-maat<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-automatisering<\/loc>/);
@@ -93,9 +94,25 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-website.html'), '/');
 });
 
+test('public seo internal links use the existing footer when one is present', () => {
+  const source = fs.readFileSync(path.join(root, 'premium-website.html'), 'utf8');
+  const html = applyPublicSeoHeadDefaults(source, 'premium-website.html', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const footerStart = html.indexOf('<footer');
+  const footerEnd = html.indexOf('</footer>');
+  const internalLinks = html.indexOf('data-softora-public-seo="internal-links"');
+
+  assert.ok(footerStart > -1, 'Homepage mist bestaande footer.');
+  assert.ok(internalLinks > footerStart && internalLinks < footerEnd, 'Interne SEO-links moeten binnen de footer vallen.');
+  assert.doesNotMatch(html, /softora-seo-link-map/);
+});
+
 test('public seo url mapping exposes clean paths and keeps legacy redirects available', () => {
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-bedrijfssoftware.html'), '/bedrijfssoftware-op-maat');
   assert.equal(getIndexablePublicHtmlFileFromPath('/bedrijfssoftware-op-maat'), 'premium-bedrijfssoftware.html');
+  assert.equal(getIndexablePublicPathFromHtmlFile('website-laten-maken-oisterwijk.html'), '/website-laten-maken-oisterwijk');
+  assert.equal(getIndexablePublicHtmlFileFromPath('/website-laten-maken-oisterwijk'), 'website-laten-maken-oisterwijk.html');
   assert.equal(getIndexablePublicPathFromHtmlFile('diensten.html'), '/diensten');
   assert.equal(getIndexablePublicHtmlFileFromPath('/ai-automatisering'), 'ai-automatisering.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/crm-systeem-op-maat'), 'crm-systeem-op-maat.html');
