@@ -251,7 +251,10 @@ test('html page coordinator renders premium content-frame pages without an activ
   assert.equal(res.statusCode, 200);
   assert.match(res.body, /data-softora-sidebar-content-frame="1"/);
   assert.match(res.body, /id="softora-premium-sidebar-content-frame"/);
+  assert.match(res.body, /html\[data-softora-sidebar-content-frame="1"\]\{--premium-sidebar-width:0px !important;\}/);
   assert.match(res.body, /html\[data-softora-sidebar-content-frame="1"\] \.sidebar\{display:none !important;\}/);
+  assert.match(res.body, /html\[data-softora-sidebar-content-frame="1"\] \.dashboard-layout\[data-sidebar-shell="canonical"\] > \.main-content/);
+  assert.match(res.body, /html\[data-softora-sidebar-content-frame="1"\] \.premium-boot-loader\{left:0 !important;\}/);
   assert.doesNotMatch(res.body, /\/assets\/premium-sidebar-stability\.js\?v=/);
   assert.equal(res.headers['X-Frame-Options'], 'SAMEORIGIN');
   assert.match(res.headers['Content-Security-Policy'], /frame-ancestors 'self'/);
