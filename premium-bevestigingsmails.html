@@ -1275,8 +1275,8 @@ Softora.nl | +31 6 43 26 27 92</textarea>
 
         <div class="field">
           <div class="field-label">Straal vanuit Oisterwijk — <span id="km-val">50 km</span></div>
-          <input class="slider" type="range" min="0" max="11" value="4" id="km-slider" oninput="updateKm(this.value)">
-          <div class="slider-row"><span>10 km</span><span>130 km</span><span>250 km</span></div>
+          <input class="slider" type="range" min="0" max="12" value="4" id="km-slider" oninput="updateKm(this.value)">
+          <div class="slider-row"><span>10 km</span><span>250 km</span><span>500 km</span></div>
         </div>
 
         <div class="field">
@@ -1610,7 +1610,7 @@ function getCampaignRequestedCompanyCount() {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-const KM_OPTIES = [10,20,30,40,50,75,100,130,150,175,200,250];
+const KM_OPTIES = [10,20,30,40,50,75,100,130,150,175,200,250,500];
 
 function getSelectedCampaignRadiusKm() {
   const slider = document.getElementById('km-slider');

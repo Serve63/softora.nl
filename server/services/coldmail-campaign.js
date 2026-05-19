@@ -24,6 +24,7 @@ const DEFAULT_COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 30;
 const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 50;
 const DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT = 100;
+const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
@@ -1535,7 +1536,7 @@ function createColdmailCampaignService(deps = {}) {
   function parseRadiusKm(value) {
     const parsed = Number.parseFloat(normalizeString(value).replace(',', '.'));
     if (!Number.isFinite(parsed) || parsed <= 0) return 250;
-    return Math.max(1, Math.min(250, parsed));
+    return Math.max(1, Math.min(MAX_COLDMAIL_RADIUS_KM, parsed));
   }
 
   function hasExplicitRadiusKm(value) {

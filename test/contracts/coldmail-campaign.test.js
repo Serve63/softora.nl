@@ -1689,6 +1689,35 @@ test('coldmail campaign radius includes real customer database places near Oiste
   assert.ok(result.recipients.every((recipient) => recipient.distanceKm <= 40));
 });
 
+test('coldmail campaign recipient preview accepts nationwide 500km radius', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'far-north-1',
+        bedrijf: 'Groningen Studio',
+        email: 'groningen@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        lat: 53.2194,
+        lng: 6.5665,
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    branch: 'Retail & Winkels',
+    radiusKm: 500,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.radiusKm, 500);
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].bedrijf, 'Groningen Studio');
+  assert.ok(result.recipients[0].distanceKm < 500);
+});
+
 test('coldcalling recipient preview selects callable phone rows', async () => {
   const { service } = createService({
     rows: [],
