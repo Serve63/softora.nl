@@ -153,7 +153,7 @@ test('seo core builds audit suggestions for weak pages', () => {
   assert.equal(audit.file, 'premium-website.html');
   assert.equal(audit.health.titleHealthy, false);
   assert.equal(audit.health.canonicalHealthy, false);
-  assert.equal(audit.suggestedPageOverrides.canonical, 'https://www.softora.nl/premium-website');
+  assert.equal(audit.suggestedPageOverrides.canonical, 'https://www.softora.nl');
   assert.ok(audit.suggestedPageOverrides.title.includes('Softora'));
   assert.equal(audit.suggestedImageOverrides['/hero.png'], 'Visual van Kort - Softora');
   assert.ok(audit.score < 80);

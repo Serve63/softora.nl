@@ -1,4 +1,9 @@
 const express = require('express');
+const {
+  buildPublicSeoRobotsTxt,
+  buildPublicSeoSitemapXml,
+  getIndexablePublicPathFromHtmlFile,
+} = require('../services/public-seo');
 
 function appendOriginalQuery(pathname, originalUrl) {
   const basePath = String(pathname || '').trim() || '/';
@@ -31,21 +36,27 @@ function getStaticAssetCacheControl(assetPath, originalUrl = '') {
 }
 
 function registerPublicPageRoutes(app, deps) {
-  app.get('/robots.txt', (_req, res) => {
+  app.get('/robots.txt', (req, res) => {
+    const publicBaseUrl = deps.getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     return res.status(200).send(
-      [
-        'User-agent: *',
-        'Allow: /',
-        'Disallow: /api/',
-        'Disallow: /premium-',
-        'Disallow: /personeel-',
-        'Disallow: /actieve-opdrachten',
-        'Disallow: /ai-coldmailing',
-        'Disallow: /ai-lead-generator',
-        'Disallow: /seo-crm-system',
-        '',
-      ].join('\n')
+      buildPublicSeoRobotsTxt({
+        knownHtmlPageFiles: deps.knownHtmlPageFiles,
+        siteOrigin: publicBaseUrl,
+      })
+    );
+  });
+
+  app.get('/sitemap.xml', (req, res) => {
+    const publicBaseUrl = deps.getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    return res.status(200).send(
+      buildPublicSeoSitemapXml({
+        knownHtmlPageFiles: deps.knownHtmlPageFiles,
+        siteOrigin: publicBaseUrl,
+      })
     );
   });
 
@@ -95,7 +106,7 @@ function registerPublicPageRoutes(app, deps) {
       return next();
     }
 
-    const destination = deps.toPrettyPagePathFromHtmlFile(page);
+    const destination = getIndexablePublicPathFromHtmlFile(page) || deps.toPrettyPagePathFromHtmlFile(page);
     return res.redirect(301, appendOriginalQuery(destination, req.originalUrl));
   });
 
@@ -120,6 +131,11 @@ function registerPublicPageRoutes(app, deps) {
     const fileName = deps.knownPrettyPageSlugToFile.get(slug);
     if (!fileName) {
       return next();
+    }
+
+    const indexablePublicPath = getIndexablePublicPathFromHtmlFile(fileName);
+    if (indexablePublicPath && indexablePublicPath !== `/${slug}`) {
+      return res.redirect(301, appendOriginalQuery(indexablePublicPath, req.originalUrl));
     }
 
     return deps.sendSeoManagedHtmlPageResponse(req, res, next, fileName);

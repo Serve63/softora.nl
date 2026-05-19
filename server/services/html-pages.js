@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { applyPublicSeoHeadDefaults } = require('./public-seo');
 
 const LOCAL_FONT_VERSION = '20260409a';
 const LOCAL_FONT_STYLESHEET_HREF = `/assets/fonts.css?v=${LOCAL_FONT_VERSION}`;
@@ -406,6 +407,9 @@ function createHtmlPageCoordinator(options = {}) {
         rendered = injectPageBootstrapHtml(rendered, bootstrapData);
       } catch (error) {
         logger.error('[HTML][BootstrapError]', fileName, error?.message || error);
+      }
+      if (!isLoginPage && !isProtectedPremiumPage) {
+        rendered = applyPublicSeoHeadDefaults(rendered, fileName);
       }
       rendered = optimizeHtmlDelivery(rendered, fileName, premiumPageAccess?.authState || null);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
