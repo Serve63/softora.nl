@@ -26,6 +26,27 @@ function createDataOpsAwareUiStateGetter(uiSeoRuntime = {}) {
   };
 }
 
+function createDataOpsAwareUiStateSetter(uiSeoRuntime = {}) {
+  const legacySetUiStateValues =
+    typeof uiSeoRuntime.setUiStateValues === 'function'
+      ? (...args) => uiSeoRuntime.setUiStateValues(...args)
+      : async () => null;
+
+  return async (scope, values, meta = {}, ...args) => {
+    const dataOpsBridge = uiSeoRuntime.dataOpsUiStateBridge;
+    if (
+      dataOpsBridge &&
+      typeof dataOpsBridge.canHandleScope === 'function' &&
+      dataOpsBridge.canHandleScope(scope) &&
+      typeof dataOpsBridge.setUiStateValues === 'function'
+    ) {
+      const bridged = await dataOpsBridge.setUiStateValues(scope, values, meta);
+      if (bridged) return bridged;
+    }
+    return legacySetUiStateValues(scope, values, meta, ...args);
+  };
+}
+
 function buildServerAppFeatureWiringRuntimeContext({
   app,
   env,
@@ -50,6 +71,7 @@ function buildServerAppFeatureWiringRuntimeContext({
   shared,
 }) {
   const dataOpsAwareUiStateGetter = createDataOpsAwareUiStateGetter(uiSeoRuntime);
+  const dataOpsAwareUiStateSetter = createDataOpsAwareUiStateSetter(uiSeoRuntime);
 
   return buildServerAppFeatureWiringContext({
     app,
@@ -280,7 +302,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           ),
           coldmailAutoReplyEnabled: /^true$/i.test(shared.normalizeString(env.COLDMAIL_AUTOREPLY_ENABLED || '')),
           getUiStateValues: dataOpsAwareUiStateGetter,
-          setUiStateValues: uiSeoRuntime.setUiStateValues,
+          setUiStateValues: dataOpsAwareUiStateSetter,
           customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
           customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
           leadDbScope: 'coldcalling',
@@ -379,11 +401,13 @@ function buildServerAppFeatureWiringRuntimeContext({
         usdToEurRate: Number(env.SUPABASE_COST_USD_TO_EUR || env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR || 0),
       },
       getUiStateValues: uiSeoRuntime.getUiStateValues,
-      setUiStateValues: uiSeoRuntime.setUiStateValues,
+      setUiStateValues: dataOpsAwareUiStateSetter,
     },
   });
 }
 
 module.exports = {
   buildServerAppFeatureWiringRuntimeContext,
+  createDataOpsAwareUiStateGetter,
+  createDataOpsAwareUiStateSetter,
 };
