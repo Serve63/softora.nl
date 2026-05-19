@@ -17,7 +17,7 @@ test('premium flynow gebruikt de deals-layout binnen de premium sidebar', () => 
   assert.match(html, /<main class="main-content flynow-main">/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /src="\/assets\/personnel-theme\.js\?v=20260519b" defer/);
-  assert.match(html, /href="\/assets\/flynow\.css\?v=20260519c"/);
+  assert.match(html, /href="\/assets\/flynow\.css\?v=20260519d"/);
   assert.match(html, /src="\/assets\/flynow\.js\?v=20260519c" defer/);
   assert.match(html, /<span class="deals-logo-text">My Deals<\/span>/);
   assert.match(html, /data-flynow-tab="zon"/);
@@ -62,6 +62,8 @@ test('premium flynow gebruikt de deals-layout binnen de premium sidebar', () => 
   assert.doesNotMatch(css, /body\[data-flynow-page\]\s+\.sidebar-link\s*\{[\s\S]*font-size:\s*12\.5px !important/);
   assert.doesNotMatch(css, /body\[data-flynow-page\]\s+\.sidebar-footer\s+\.sidebar-user\s+\.sidebar-user-role\s*\{[\s\S]*display:\s*none !important/);
   assert.match(css, /\.deals-header\s*\{[\s\S]*position:\s*sticky;/);
+  assert.match(css, /\.deals-header\s*\{[\s\S]*background-image:\s*linear-gradient\([\s\S]*url\("\/assets\/flynow\/flynow-zon-photo-8\.jpg"\)/);
+  assert.match(css, /\.deals-header\s*\{[\s\S]*background-size:\s*cover/);
   assert.match(css, /\.deals-tab\.active\s*\{[\s\S]*border-color:\s*var\(--flynow-cream\)/);
   assert.match(css, /body\[data-flynow-page\] \.flynow-main \.hero-deal \.hero-title\s*\{[\s\S]*color:\s*var\(--flynow-white\) !important/);
   assert.match(css, /\.hero-deal--zon\s*\{background-image:\s*url\("\/assets\/flynow\/flynow-zon-photo-1\.jpg"\)/);
