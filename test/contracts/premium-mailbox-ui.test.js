@@ -6,6 +6,7 @@ const vm = require('vm');
 
 const pagePath = path.join(__dirname, '../../premium-mailbox.html');
 const scriptPath = path.join(__dirname, '../../assets/premium-mailbox.js');
+const displayScriptPath = path.join(__dirname, '../../assets/premium-mailbox-display.js');
 const outreachScriptPath = path.join(__dirname, '../../assets/premium-mailbox-outreach.js');
 
 function readPage() {
@@ -16,11 +17,15 @@ function readScript() {
   return fs.readFileSync(scriptPath, 'utf8');
 }
 
+function readDisplayScript() {
+  return fs.readFileSync(displayScriptPath, 'utf8');
+}
+
 function readOutreachScript() {
   return fs.readFileSync(outreachScriptPath, 'utf8');
 }
 
-function renderMailboxBodyForTest(body, images, options) {
+function loadMailboxHelpersForTest() {
   const element = {
     innerHTML: '',
     textContent: '',
@@ -66,11 +71,16 @@ function renderMailboxBodyForTest(body, images, options) {
   };
   const source = readScript().replace(
     'bindMailboxActions();',
-    'window.__mailboxTest = { renderMailBody }; bindMailboxActions();'
+    'window.__mailboxTest = { renderMailBody, normalizeMailboxApiMessage, display: window.SoftoraMailboxDisplay }; bindMailboxActions();'
   );
   vm.createContext(context);
+  vm.runInContext(readDisplayScript(), context);
   vm.runInContext(source, context);
-  return context.window.__mailboxTest.renderMailBody(body, images, options);
+  return context.window.__mailboxTest;
+}
+
+function renderMailboxBodyForTest(body, images, options) {
+  return loadMailboxHelpersForTest().renderMailBody(body, images, options);
 }
 
 test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
@@ -84,7 +94,8 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260518f"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260519a"><\/script>/);
+  assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
@@ -108,6 +119,26 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(scriptSource, /mailboxAccountSwitcher\.addEventListener\('click', function\(event\) \{/);
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*applyMailboxAccount\(email\);/);
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*pinMailboxAccount\(email\);/);
+});
+
+test('premium mailbox toont bij verzonden mails de ontvanger als hoofdregel', () => {
+  const helpers = loadMailboxHelpersForTest();
+  const mail = helpers.normalizeMailboxApiMessage({
+    id: 'sent:42',
+    folder: 'sent',
+    from: 'Servé Creusen',
+    email: 'serve@softora.nl',
+    to: 'info@jagthuijs.nl',
+    subject: 'Nieuw webdesign gemaakt!',
+    preview: 'Goedemiddag',
+    date: '2026-05-19T17:02:00.000Z',
+  });
+
+  assert.equal(mail.to, 'info@jagthuijs.nl');
+  assert.equal(helpers.display.getListPrimaryText(mail), 'Aan: info@jagthuijs.nl');
+  assert.equal(helpers.display.getDetailPrimaryText(mail), 'Aan: info@jagthuijs.nl');
+  assert.equal(helpers.display.getDetailSecondaryText(mail), 'Van: serve@softora.nl');
+  assert.equal(helpers.display.getReplyToAddress(mail), 'info@jagthuijs.nl');
 });
 
 test('premium mailbox houdt account-dropdown zichtbaar boven de inbox-layout', () => {

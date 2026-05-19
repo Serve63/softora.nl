@@ -97,6 +97,7 @@ const TRACKING_HOST_PATTERNS = [
   /(^|\.)mailgun\.org$/i,
   /(^|\.)postmarkapp\.com$/i,
 ];
+const OWNED_MAILBOX_DOMAINS = new Set(['softora.nl']);
 
 const IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
 const INLINE_DISPLAY_IMAGE_TYPES = /^image\/(?:png|jpe?g|webp|gif)$/i;
@@ -751,6 +752,12 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  function isOwnedMailboxDomain(domain) {
+    const value = normalizeDomain(domain);
+    if (!value) return false;
+    return OWNED_MAILBOX_DOMAINS.has(value) || Array.from(OWNED_MAILBOX_DOMAINS).some((owned) => value.endsWith(`.${owned}`));
+  }
+
   function getCustomerDomain(row = {}) {
     return normalizeDomain(row.dom || row.domain || row.website || row.websiteUrl || row.website_url || row.url || row.site || row.domein);
   }
@@ -774,7 +781,8 @@ function createMailboxService(deps = {}) {
     const preferred = [];
     const add = (value) => {
       const domain = normalizeDomain(value);
-      if (domain && domain.includes('.') && !preferred.includes(domain)) preferred.push(domain);
+      if (!domain || !domain.includes('.') || isOwnedMailboxDomain(domain) || preferred.includes(domain)) return;
+      preferred.push(domain);
     };
     for (const match of source.matchAll(/(?:website|site|domein)\s*(?:\(|:)?\s*(https?:\/\/)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)/gi)) {
       add(`${match[1] || ''}${match[2] || ''}`);
