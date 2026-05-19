@@ -838,17 +838,87 @@ function createColdmailCampaignService(deps = {}) {
     return phone.replace(/\D/g, '').length >= 8;
   }
 
+  function normalizeIdentityTextPart(value) {
+    if (value === undefined || value === null) return '';
+    const text = normalizeString(value);
+    if (!text || text === 'undefined' || text === 'null') return '';
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function normalizeIdentityPhonePart(value) {
+    return normalizePhoneDigits(value) || normalizeIdentityTextPart(value);
+  }
+
+  function buildNormalizedIdentityKey(company, contact, phone) {
+    const normalizedCompany = normalizeIdentityTextPart(company);
+    const normalizedContact = normalizeIdentityTextPart(contact);
+    const normalizedPhone = normalizeIdentityPhonePart(phone);
+    if (!normalizedCompany && !normalizedContact && !normalizedPhone) return '';
+    return [normalizedCompany, normalizedContact, normalizedPhone].join('|');
+  }
+
+  function buildNormalizedIdentityKeys(company, contact, phone) {
+    const phoneKeys = Array.from(getComparablePhoneKeys(phone));
+    const normalizedFallbackPhone = normalizeIdentityPhonePart(phone);
+    if (!phoneKeys.length && normalizedFallbackPhone) phoneKeys.push(normalizedFallbackPhone);
+    const keys = phoneKeys.length
+      ? phoneKeys.map((phoneKey) => buildNormalizedIdentityKey(company, contact, phoneKey))
+      : [buildNormalizedIdentityKey(company, contact, '')];
+    return new Set(keys.filter(Boolean));
+  }
+
+  function normalizeStoredIdentityKeys(value) {
+    if (value === undefined || value === null) return new Set();
+    const raw = normalizeString(value);
+    if (!raw || raw === 'undefined' || raw === 'null') return new Set();
+    const parts = raw.split('|');
+    if (parts.length >= 3) {
+      return buildNormalizedIdentityKeys(parts[0], parts[1], parts.slice(2).join('|'));
+    }
+    return new Set([normalizeIdentityTextPart(raw)].filter(Boolean));
+  }
+
+  function getExplicitRowContact(row) {
+    return normalizeString(row && (row.naam || row.contact || row.contactName || row.clientName));
+  }
+
+  function buildRowIdentityKeys(row) {
+    const company = getRowCompany(row);
+    const explicitContact = getExplicitRowContact(row);
+    const fallbackContact = getRowContact(row);
+    const phone = getRowPhone(row);
+    const keys = new Set();
+    [
+      [company, fallbackContact, phone],
+      [company, explicitContact, phone],
+      [company, company, phone],
+    ].forEach(([companyPart, contactPart, phonePart]) => {
+      buildNormalizedIdentityKeys(companyPart, contactPart, phonePart).forEach((key) => keys.add(key));
+    });
+    return keys;
+  }
+
   function buildRowIdentityKey(row) {
-    return [getRowCompany(row), getRowContact(row), getRowPhone(row)]
-      .map((value) => normalizeString(value).toLowerCase())
-      .join('|');
+    return Array.from(buildRowIdentityKeys(row))[0] || '';
+  }
+
+  function getPhotoIdentityKeys(photo) {
+    const keys = new Set();
+    normalizeStoredIdentityKeys(photo && photo.identityKey).forEach((key) => keys.add(key));
+    normalizeStoredIdentityKeys(photo && photo.legacyMeta && photo.legacyMeta.identityKey).forEach((key) => keys.add(key));
+    return keys;
   }
 
   function photoRecordMatchesRowIdentity(photo, row) {
-    const photoIdentityKey = normalizeString((photo && photo.identityKey) || '').toLowerCase();
-    if (!photoIdentityKey) return true;
-    const rowIdentityKey = buildRowIdentityKey(row);
-    return Boolean(rowIdentityKey && photoIdentityKey === rowIdentityKey);
+    const photoIdentityKeys = getPhotoIdentityKeys(photo);
+    if (!photoIdentityKeys.size) return true;
+    const rowIdentityKeys = buildRowIdentityKeys(row);
+    return Array.from(rowIdentityKeys).some((key) => photoIdentityKeys.has(key));
   }
 
   function mergeColdcallingRowsWithCustomerRows(leadRows = [], customerRows = []) {
@@ -878,10 +948,13 @@ function createColdmailCampaignService(deps = {}) {
     const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
     const byIdentity = photosByIdentity instanceof Map ? photosByIdentity : new Map();
     const id = getExplicitRowId(row);
-    const identityKey = buildRowIdentityKey(row);
     const directPhoto = id ? photos[id] : null;
     if (directPhoto && photoRecordMatchesRowIdentity(directPhoto, row)) return directPhoto;
-    return byIdentity.get(identityKey) || null;
+    for (const identityKey of buildRowIdentityKeys(row)) {
+      const photo = byIdentity.get(identityKey);
+      if (photo) return photo;
+    }
+    return null;
   }
 
   function preferFreshRowPhotoFields(row, storedPhoto) {
@@ -926,8 +999,9 @@ function createColdmailCampaignService(deps = {}) {
     Object.keys(photos).forEach((key) => {
       const item = photos[key];
       if (!hasReadyWebsitePhotoRecord(item)) return;
-      const identityKey = normalizeString(item && item.identityKey).toLowerCase();
-      if (identityKey) photosByIdentity.set(identityKey, item);
+      getPhotoIdentityKeys(item).forEach((identityKey) => {
+        if (identityKey) photosByIdentity.set(identityKey, item);
+      });
     });
 
     const readyIds = new Set();
@@ -939,9 +1013,8 @@ function createColdmailCampaignService(deps = {}) {
       if (!hasReadyWebsitePhotoRecord(photo)) return;
 
       const rowId = getExplicitRowId(row);
-      const identityKey = buildRowIdentityKey(row);
       if (rowId) readyIds.add(rowId);
-      if (identityKey) readyIdentityKeys.add(identityKey);
+      buildRowIdentityKeys(row).forEach((identityKey) => readyIdentityKeys.add(identityKey));
       getComparablePhoneKeys(getRowPhone(row)).forEach((key) => readyPhoneKeys.add(key));
     });
 
@@ -949,8 +1022,9 @@ function createColdmailCampaignService(deps = {}) {
       hasRow(row, index = 0) {
         const rowId = getExplicitRowId(row);
         if (rowId && readyIds.has(rowId)) return true;
-        const identityKey = buildRowIdentityKey(row);
-        if (identityKey && readyIdentityKeys.has(identityKey)) return true;
+        for (const identityKey of buildRowIdentityKeys(row)) {
+          if (readyIdentityKeys.has(identityKey)) return true;
+        }
         for (const key of getComparablePhoneKeys(getRowPhone(row))) {
           if (readyPhoneKeys.has(key)) return true;
         }

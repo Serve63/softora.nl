@@ -2060,6 +2060,57 @@ test('coldmail preview for webdesign action fills from ready row-level website-d
   assert.equal(result.failedItems[0].id, 'missing-1');
 });
 
+test('coldmail preview matches stored webdesigns with normalized company identities', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'fresh-jaghthuijs-id',
+        bedrijf: "'t Jaghthuijs",
+        naam: "'t Jaghthuijs",
+        telefoon: '076 565 69 56',
+        email: 'info@jaghthuijs.nl',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'fresh-zon-id',
+        bedrijf: 'Bakkerij De Zon',
+        telefoon: '+31 13 555 00 00',
+        email: 'info@bakkerijdezon.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'old-jaghthuijs-id': {
+        id: 'old-jaghthuijs-id',
+        identityKey: 't jaghthuijs|t jaghthuijs|0765656956',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: "'t Jaghthuijs webdesign",
+      },
+      'old-zon-id': {
+        id: 'old-zon-id',
+        identityKey: 'bakkerij de zon||0135550000',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij De Zon webdesign',
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 2,
+    service: "Website's",
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.selected, 2);
+  assert.deepEqual(
+    result.recipients.map((recipient) => recipient.id),
+    ['fresh-jaghthuijs-id', 'fresh-zon-id']
+  );
+  assert.equal(result.failedItems.length, 0);
+});
+
 test('coldmail webdesign action herkent opgeslagen website-design chunks zonder expliciete chunkCount', async () => {
   const { service } = createService({
     rows: [
