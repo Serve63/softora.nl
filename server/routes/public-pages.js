@@ -74,6 +74,15 @@ function registerPublicPageRoutes(app, deps) {
     );
   });
 
+  app.get('/favicon.ico', (req, res, next) => {
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    return res.sendFile('softora-favicon-round.png', { root: deps.assetsDirectory }, (error) => {
+      if (error) return next(error);
+      return undefined;
+    });
+  });
+
   app.use(
     '/assets',
     express.static(deps.assetsDirectory, {
