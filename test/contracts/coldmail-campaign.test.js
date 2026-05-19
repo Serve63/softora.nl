@@ -49,6 +49,7 @@ function createService(overrides = {}) {
       mailReplyTo: 'reply@softora.nl',
       publicBaseUrl: overrides.publicBaseUrl || 'https://www.softora.nl',
       coldmailUnsubscribeSecret: overrides.coldmailUnsubscribeSecret || 'unsubscribe-secret',
+      coldmailAuditBcc: overrides.coldmailAuditBcc,
       imapHost: overrides.imapHost || '',
       imapPort: 993,
       imapSecure: true,
@@ -349,6 +350,41 @@ test('coldmail campaign replaces website variable from database website aliases'
   assert.equal(sentMessages[0].subject, 'Nieuwe website voor bakkerijzon.nl');
   assert.match(sentMessages[0].text, /website bakkerijzon\.nl tegen/);
   assert.doesNotMatch(sentMessages[0].text, /\{\{website\}\}/);
+});
+
+test('coldmail campaign adds audit bcc when configured', async () => {
+  const { service, sentMessages } = createService({
+    coldmailAuditBcc: ' prive@example.nl ',
+  });
+
+  await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'ruben@example.test');
+  assert.equal(sentMessages[0].bcc, 'prive@example.nl');
+  assert.equal(service.getColdmailSafetyLimits().auditBccConfigured, true);
+});
+
+test('coldmail campaign ignores invalid audit bcc configuration', async () => {
+  const { service, sentMessages } = createService({
+    coldmailAuditBcc: 'niet-een-email',
+  });
+
+  await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].bcc, undefined);
+  assert.equal(service.getColdmailSafetyLimits().auditBccConfigured, false);
 });
 
 test('coldmail campaign attaches webdesign photo and device mockup inline and as attachments', async () => {

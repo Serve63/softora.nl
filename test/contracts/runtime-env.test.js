@@ -36,6 +36,7 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
     MAIL_SMTP_PORT: '465',
     MAIL_SMTP_USER: 'team@softora.nl',
     MAIL_SMTP_PASS: 'secret',
+    COLDMAIL_AUDIT_BCC: ' prive@example.nl ',
   });
 
   assert.equal(runtimeEnv.mail.smtpHost, 'smtp.strato.com');
@@ -50,6 +51,7 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 50);
   assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 100);
   assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, false);
+  assert.equal(runtimeEnv.mail.coldmailAuditBcc, 'prive@example.nl');
 });
 
 test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () => {

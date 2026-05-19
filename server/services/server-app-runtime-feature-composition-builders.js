@@ -257,6 +257,7 @@ function buildServerAppFeatureWiringRuntimeContext({
             mailReplyTo: envConfig.MAIL_REPLY_TO,
             publicBaseUrl: envConfig.PUBLIC_BASE_URL,
             coldmailUnsubscribeSecret: envConfig.PREMIUM_SESSION_SECRET || envConfig.MAIL_SMTP_PASS,
+            coldmailAuditBcc: envConfig.COLDMAIL_AUDIT_BCC,
             imapHost: envConfig.MAIL_IMAP_HOST,
             imapPort: envConfig.MAIL_IMAP_PORT,
             imapSecure: envConfig.MAIL_IMAP_SECURE,
