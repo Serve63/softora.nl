@@ -2010,6 +2010,56 @@ test('coldmail preview for webdesign action only counts companies with a ready w
   assert.match(result.failedItems[0].error, /Nog geen website-design klaar/i);
 });
 
+test('coldmail preview for webdesign action fills from ready row-level website-designs', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'missing-1',
+        bedrijf: 'Nog Geen Design BV',
+        email: 'mist@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'stored-ready',
+        bedrijf: 'Opgeslagen Design BV',
+        email: 'stored@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'row-ready',
+        bedrijf: 'Rij Design BV',
+        email: 'row@example.test',
+        status: 'prospect',
+        mail: true,
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Rij Design BV webdesign',
+      },
+    ],
+    photoMap: {
+      'stored-ready': {
+        id: 'stored-ready',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Opgeslagen Design BV webdesign',
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 2,
+    service: "Website's",
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.selected, 2);
+  assert.deepEqual(
+    result.recipients.map((recipient) => recipient.id),
+    ['stored-ready', 'row-ready']
+  );
+  assert.equal(result.failedItems[0].id, 'missing-1');
+});
+
 test('coldmail webdesign action herkent opgeslagen website-design chunks zonder expliciete chunkCount', async () => {
   const { service } = createService({
     rows: [

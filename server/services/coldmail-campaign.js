@@ -889,12 +889,12 @@ function createColdmailCampaignService(deps = {}) {
     const next = { ...base };
     const rowPhotoSource = getWebdesignPhotoSource(row);
     const rowMockupSource = getWebdesignMockupSource(row);
-    if (rowPhotoSource) {
+    if (isResolvableWebsitePhotoValue(rowPhotoSource)) {
       next.websitePhoto = row.websitePhoto || row.websitePhotoUrl || row.signedUrl || (row.storage && row.storage.signedUrl) || rowPhotoSource;
       const rowPhotoName = normalizeString(row.websitePhotoName || row.photoName || row.websiteImageName);
       if (rowPhotoName) next.websitePhotoName = rowPhotoName;
     }
-    if (rowMockupSource) {
+    if (isResolvableWebsitePhotoValue(rowMockupSource)) {
       next.websiteMockup =
         row.websiteMockup ||
         row.websiteMockupUrl ||
@@ -935,7 +935,7 @@ function createColdmailCampaignService(deps = {}) {
     const readyPhoneKeys = new Set();
 
     (Array.isArray(customerRows) ? customerRows : []).forEach((row, index) => {
-      const photo = findStoredPhotoRecordForRow(row, index, photos, photosByIdentity);
+      const photo = preferFreshRowPhotoFields(row, findStoredPhotoRecordForRow(row, index, photos, photosByIdentity));
       if (!hasReadyWebsitePhotoRecord(photo)) return;
 
       const rowId = getExplicitRowId(row);
