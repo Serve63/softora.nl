@@ -25,6 +25,28 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
     intro:
       'De kennisbank is bedoeld als vaste SEO-basis: korte, duidelijke uitlegpagina’s die intern linken naar diensten en verdiepende artikelen.',
   }),
+  branches: Object.freeze({
+    key: 'branches',
+    path: '/branches',
+    title: 'Softora Branchepagina’s',
+    description:
+      'SEO-landingspagina’s per branche voor ondernemers die websites, AI automatisering en bedrijfssoftware slimmer willen inzetten.',
+    eyebrow: 'Branches',
+    heading: 'Digitale groei per branche',
+    intro:
+      'Iedere branche zoekt anders. Daarom bouwen we sectorpagina’s met concrete problemen, oplossingen en interne links naar de juiste Softora-diensten.',
+  }),
+  regio: Object.freeze({
+    key: 'regio',
+    path: '/regio',
+    title: 'Softora Regio',
+    description:
+      'Lokale SEO-pagina’s voor bedrijven in Brabant die meer leads willen uit websites, AI automatisering en maatwerk software.',
+    eyebrow: 'Lokale SEO',
+    heading: 'Softora voor bedrijven in de regio',
+    intro:
+      'Deze lokale pagina’s maken onze dienstverlening vindbaar voor ondernemers in de regio, zonder dunne plaatsnaamcontent of loze claims.',
+  }),
 });
 
 const SEO_CONTENT_PILLARS = Object.freeze([
@@ -517,6 +539,273 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
     ]),
   }),
+  Object.freeze({
+    collection: 'branches',
+    slug: 'installateurs',
+    schemaType: 'Service',
+    serviceType: 'Websites en automatisering voor installateurs',
+    title: 'Websites en automatisering voor installateurs',
+    description:
+      'Een branchepagina voor installatiebedrijven die online beter gevonden willen worden en aanvragen slimmer willen opvolgen.',
+    category: 'Installateurs',
+    intent: 'Branche',
+    publishedAt: '2026-05-19',
+    updatedAt: '2026-05-19',
+    readTime: '6 min',
+    summary:
+      'Installateurs hebben vooral baat bij duidelijke dienstenpagina’s, lokale vindbaarheid, snelle offerteaanvragen en minder handmatige opvolging.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Van vindbaarheid naar aanvraag',
+        paragraphs: Object.freeze([
+          'Veel installatiebedrijven worden gevonden op concrete problemen: storing, onderhoud, verduurzaming, laadpalen, airco, zonnepanelen of elektra. Een goede website maakt die diensten apart vindbaar en stuurt bezoekers snel naar een aanvraag.',
+          'Voor SEO betekent dit dat de site niet alleen een algemene dienstenlijst nodig heeft, maar ook duidelijke pagina’s per dienst en regio. Zo begrijpt Google beter waarvoor het bedrijf relevant is.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Minder handwerk in opvolging',
+        paragraphs: Object.freeze([
+          'Aanvragen komen vaak binnen via telefoon, mail, WhatsApp en formulieren. Zonder systeem raakt opvolging snel verspreid. Een simpele intakeflow kan alvast type klus, locatie, urgentie en foto’s verzamelen.',
+          'Daarna kan AI een samenvatting maken, een prioriteit voorstellen of een taak klaarzetten in een CRM. Dat scheelt tijd en voorkomt dat warme aanvragen blijven liggen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wat Softora hiervoor neerzet',
+        paragraphs: Object.freeze([
+          'De basis is een conversiegerichte website met lokale SEO, duidelijke dienstpagina’s en een contactflow die bij installatiewerk past. Daarna kunnen CRM, planning, AI telefonie of automatisering worden toegevoegd.',
+          'Zo groeit de website van online visitekaartje naar een systeem dat nieuwe aanvragen beter verwerkt.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'branches',
+    slug: 'makelaars',
+    schemaType: 'Service',
+    serviceType: 'Websites en AI automatisering voor makelaars',
+    title: 'Websites en AI automatisering voor makelaars',
+    description:
+      'Een branchepagina voor makelaars die beter zichtbaar willen zijn, leads sneller willen opvolgen en processen willen automatiseren.',
+    category: 'Makelaars',
+    intent: 'Branche',
+    publishedAt: '2026-05-19',
+    updatedAt: '2026-05-19',
+    readTime: '6 min',
+    summary:
+      'Voor makelaars draait digitale groei om vertrouwen, lokale zichtbaarheid, snelle reactie op leads en duidelijke opvolging.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Lokale zichtbaarheid is de basis',
+        paragraphs: Object.freeze([
+          'Makelaars concurreren sterk op plaats, wijk en specialisme. Een website moet daarom niet alleen mooi zijn, maar ook helder uitleggen waar het kantoor actief is en welke dienstverlening het beste past bij kopers, verkopers of verhuurders.',
+          'Sterke pagina’s voor verkoop, aankoop, waardebepaling en lokale werkgebieden helpen bezoekers sneller kiezen en geven Google duidelijke context.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Leads moeten direct vervolg krijgen',
+        paragraphs: Object.freeze([
+          'Een waardebepaling of bezichtigingsaanvraag is vaak tijdgevoelig. Als opvolging te laat komt, is de lead kouder. Automatisering kan aanvragen samenvatten, segmenteren en direct een vervolgstap klaarzetten.',
+          'Een chatbot of AI telefonist kan buiten kantooruren de eerste vragen verzamelen, terwijl het team de menselijke opvolging behoudt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Meer vertrouwen op de pagina zelf',
+        paragraphs: Object.freeze([
+          'Voor makelaars zijn bewijs en helderheid belangrijk. Denk aan cases, lokale kennis, veelgestelde vragen, stappenplannen en duidelijke contactmomenten.',
+          'Softora bouwt zulke pagina’s als onderdeel van een bredere leadflow, zodat SEO-verkeer niet alleen binnenkomt maar ook richting afspraak of aanvraag beweegt.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'branches',
+    slug: 'zakelijke-dienstverleners',
+    schemaType: 'Service',
+    serviceType: 'Websites en software voor zakelijke dienstverleners',
+    title: 'Websites en software voor zakelijke dienstverleners',
+    description:
+      'Een branchepagina voor adviseurs, bureaus en dienstverleners die meer vertrouwen, betere intake en sterkere leadopvolging willen.',
+    category: 'Zakelijke dienstverlening',
+    intent: 'Branche',
+    publishedAt: '2026-05-19',
+    updatedAt: '2026-05-19',
+    readTime: '6 min',
+    summary:
+      'Zakelijke dienstverleners winnen online vooral met expertise, duidelijke positionering, bewijs en een soepel intakeproces.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Expertise moet snel zichtbaar zijn',
+        paragraphs: Object.freeze([
+          'Bij zakelijke dienstverlening koopt een bezoeker vaak geen product, maar vertrouwen. De website moet daarom snel laten zien voor wie je werkt, welk probleem je oplost en waarom jouw aanpak geloofwaardig is.',
+          'Blogs, kennisbankartikelen, cases en duidelijke dienstpagina’s versterken elkaar. Ze helpen Google het onderwerp begrijpen en geven bezoekers meer reden om contact op te nemen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Intake bepaalt de kwaliteit van de lead',
+        paragraphs: Object.freeze([
+          'Niet elke aanvraag is even waardevol. Een goede intake verzamelt daarom budget, behoefte, timing en context zonder de bezoeker af te schrikken.',
+          'AI kan helpen om antwoorden samen te vatten, leads te kwalificeren en taken klaar te zetten. Zo blijft opvolging snel, maar niet onpersoonlijk.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Van website naar werkproces',
+        paragraphs: Object.freeze([
+          'Voor dienstverleners wordt de website sterker wanneer hij aansluit op CRM, planning, offertes of klantportalen. Dan stopt de flow niet bij het formulier.',
+          'Softora bouwt dit stap voor stap: eerst de commerciële basis, daarna automatisering en software waar die echt waarde toevoegt.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'regio',
+    slug: 'oisterwijk',
+    schemaType: 'Service',
+    serviceType: 'Websites, AI automatisering en software in Oisterwijk',
+    areaServed: 'Oisterwijk',
+    title: 'Website laten maken en AI automatisering in Oisterwijk',
+    description:
+      'Softora helpt bedrijven in Oisterwijk met websites, AI automatisering, CRM en bedrijfssoftware die verkeer en leads moeten opleveren.',
+    category: 'Oisterwijk',
+    intent: 'Lokale SEO',
+    publishedAt: '2026-05-19',
+    updatedAt: '2026-05-19',
+    readTime: '6 min',
+    summary:
+      'Voor bedrijven in Oisterwijk draait online groei om lokale vindbaarheid, vertrouwen en snelle opvolging van nieuwe aanvragen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Lokale vindbaarheid zonder standaard plaatsnaampagina',
+        paragraphs: Object.freeze([
+          'Een lokale SEO-pagina moet meer doen dan alleen een plaatsnaam herhalen. Bezoekers uit Oisterwijk willen snel zien welke diensten relevant zijn, hoe contact werkt en waarom Softora de juiste digitale partner kan zijn.',
+          'Daarom combineren we lokale context met concrete diensten: websites, AI automatisering, CRM, chatbots en maatwerk software.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Van aanvraag naar opvolging',
+        paragraphs: Object.freeze([
+          'Lokale ondernemers hebben vaak geen behoefte aan ingewikkelde systemen, maar wel aan duidelijkheid. Wie heeft contact opgenomen, wat is de vraag en welke vervolgstap hoort erbij?',
+          'Met een goede website en slimme automatisering wordt die route korter. Leads komen beter binnen en worden sneller opgevolgd.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Een basis die kan groeien',
+        paragraphs: Object.freeze([
+          'De eerste stap is een sterke lokale dienstpagina en een duidelijke contactflow. Daarna kunnen blogartikelen, cases, branchepagina’s en softwarekoppelingen de autoriteit verder versterken.',
+          'Zo blijft lokale SEO onderdeel van een groter groeisysteem, niet een losse pagina.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Diensten', href: '/diensten' }),
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'regio',
+    slug: 'tilburg',
+    schemaType: 'Service',
+    serviceType: 'Websites, AI automatisering en software in Tilburg',
+    areaServed: 'Tilburg',
+    title: 'Website laten maken en AI automatisering in Tilburg',
+    description:
+      'Softora bouwt websites, AI automatisering en maatwerk software voor bedrijven in Tilburg die meer leads en overzicht willen.',
+    category: 'Tilburg',
+    intent: 'Lokale SEO',
+    publishedAt: '2026-05-19',
+    updatedAt: '2026-05-19',
+    readTime: '6 min',
+    summary:
+      'Tilburgse bedrijven winnen online met een sterke website, duidelijke dienstpagina’s en opvolging die niet afhankelijk is van losse handelingen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Meer dan een mooie website',
+        paragraphs: Object.freeze([
+          'Voor bedrijven in Tilburg is een website pas waardevol wanneer hij aanvragen oplevert. Dat vraagt om goede tekst, snelle laadtijd, duidelijke CTA’s, interne links en pagina’s die aansluiten op echte zoekvragen.',
+          'Een pagina over “website laten maken Tilburg” moet daarom inhoudelijk uitleggen wat er gebouwd wordt en hoe bezoekers richting contact gaan.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Automatisering maakt groei beheersbaar',
+        paragraphs: Object.freeze([
+          'Als er meer aanvragen binnenkomen, groeit ook de opvolging. AI automatisering kan helpen met intake, samenvattingen, leadkwalificatie en taken voor het team.',
+          'Voor lokale bedrijven is dat vaak de stap van losse inboxen naar een betrouwbaar proces.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Tilburg als onderdeel van een regio-aanpak',
+        paragraphs: Object.freeze([
+          'Lokale SEO werkt beter wanneer plaats, dienst en branche logisch aan elkaar gekoppeld zijn. Tilburg kan bijvoorbeeld linken naar websites, CRM, AI telefonie en branchepagina’s voor dienstverleners.',
+          'Zo ontstaat een netwerk van pagina’s dat bezoekers helpt en Google duidelijke context geeft.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Branches', href: '/branches' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'regio',
+    slug: 'den-bosch',
+    schemaType: 'Service',
+    serviceType: 'Websites, CRM en automatisering in Den Bosch',
+    areaServed: 'Den Bosch',
+    title: 'Website, CRM en AI automatisering in Den Bosch',
+    description:
+      'Softora helpt bedrijven in Den Bosch met websites, CRM-systemen en AI automatisering die processen en leadopvolging sterker maken.',
+    category: 'Den Bosch',
+    intent: 'Lokale SEO',
+    publishedAt: '2026-05-19',
+    updatedAt: '2026-05-19',
+    readTime: '6 min',
+    summary:
+      'Voor bedrijven in Den Bosch ligt de kans vaak in betere vindbaarheid én betere opvolging na de eerste aanvraag.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Een lokale pagina met commerciële taak',
+        paragraphs: Object.freeze([
+          'Lokale SEO is pas waardevol als de pagina ook verkoopt. Bezoekers moeten begrijpen welke diensten Softora levert, welke problemen daarmee worden opgelost en hoe ze laagdrempelig contact opnemen.',
+          'Daarom koppelen we Den Bosch niet alleen aan websitebouw, maar ook aan CRM, dashboards en automatisering.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'CRM en software voor meer overzicht',
+        paragraphs: Object.freeze([
+          'Bedrijven die groeien merken vaak dat klantinformatie verspreid raakt. Een CRM of maatwerk dashboard kan leads, afspraken, offertes en opvolging overzichtelijk maken.',
+          'Die software hoeft niet groot te starten. De eerste versie moet vooral het belangrijkste proces betrouwbaar maken.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'SEO-content die verder bouwt',
+        paragraphs: Object.freeze([
+          'De lokale pagina is een startpunt. Daarna versterken kennisbankartikelen, branchepagina’s en blogs de context rond dezelfde diensten.',
+          'Zo groeit Den Bosch mee binnen de bredere Softora-structuur.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Kennisbank', href: '/kennisbank' }),
+    ]),
+  }),
 ]);
 
 function normalizeSiteOrigin(valueRaw = DEFAULT_SITE_ORIGIN) {
@@ -569,6 +858,10 @@ function getSeoContentCollection(collectionRaw) {
   return SEO_CONTENT_COLLECTIONS[key] || null;
 }
 
+function getSeoContentCollectionPaths() {
+  return Object.values(SEO_CONTENT_COLLECTIONS).map((collection) => collection.path);
+}
+
 function getSeoContentPillars() {
   return SEO_CONTENT_PILLARS;
 }
@@ -596,7 +889,7 @@ function getSeoContentPathForItem(item) {
 }
 
 function getSeoContentPublicPaths(options = {}) {
-  const collectionPaths = Object.values(SEO_CONTENT_COLLECTIONS).map((collection) => collection.path);
+  const collectionPaths = getSeoContentCollectionPaths();
   const itemPaths = getSeoContentItems(options).map(getSeoContentPathForItem).filter(Boolean);
   return [...collectionPaths, ...itemPaths, '/premium-blog'];
 }
@@ -703,6 +996,8 @@ function buildContentShell({ title, description, canonicalUrl, structuredData, b
     '      <a href="/bedrijfssoftware-op-maat">Software</a>',
     '      <a href="/blog">Blog</a>',
     '      <a href="/kennisbank">Kennisbank</a>',
+    '      <a href="/branches">Branches</a>',
+    '      <a href="/regio">Regio</a>',
     '    </div>',
     '  </nav>',
     '  <div class="seo-shell">',
@@ -748,6 +1043,48 @@ function renderPillarCards() {
     '  </div>',
     '</section>',
   ].join('\n');
+}
+
+function getBackLabelForCollection(collection) {
+  if (!collection) return 'overzicht';
+  if (collection.key === 'blog') return 'blog';
+  if (collection.key === 'kennisbank') return 'kennisbank';
+  if (collection.key === 'branches') return 'branches';
+  if (collection.key === 'regio') return 'regio';
+  return 'overzicht';
+}
+
+function buildMainEntityForItem(item, site, canonicalUrl) {
+  if (item.schemaType === 'Service') {
+    const entity = {
+      '@type': 'Service',
+      '@id': `${canonicalUrl}#service`,
+      name: item.title,
+      description: item.description,
+      provider: { '@id': `${site}/#organization` },
+      serviceType: item.serviceType || item.category,
+    };
+    if (item.areaServed) {
+      entity.areaServed = {
+        '@type': 'AdministrativeArea',
+        name: item.areaServed,
+      };
+    }
+    return entity;
+  }
+
+  return {
+    '@type': 'Article',
+    '@id': `${canonicalUrl}#article`,
+    headline: item.title,
+    description: item.description,
+    datePublished: item.publishedAt,
+    dateModified: item.updatedAt || item.publishedAt,
+    inLanguage: 'nl-NL',
+    author: { '@id': `${site}/#organization` },
+    publisher: { '@id': `${site}/#organization` },
+    mainEntityOfPage: { '@id': `${canonicalUrl}#webpage` },
+  };
 }
 
 function renderArticleCards(items) {
@@ -834,6 +1171,8 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
     '  <div class="filter-bar" aria-label="Content onderdelen">',
     `    <a class="filter-tab${collection.key === 'blog' ? ' active' : ''}" href="/blog">Blog</a>`,
     `    <a class="filter-tab${collection.key === 'kennisbank' ? ' active' : ''}" href="/kennisbank">Kennisbank</a>`,
+    `    <a class="filter-tab${collection.key === 'branches' ? ' active' : ''}" href="/branches">Branches</a>`,
+    `    <a class="filter-tab${collection.key === 'regio' ? ' active' : ''}" href="/regio">Regio</a>`,
     '    <a class="filter-tab" href="/website-laten-maken">Websites</a>',
     '    <a class="filter-tab" href="/bedrijfssoftware-op-maat">Software</a>',
     '  </div>',
@@ -844,6 +1183,8 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
     renderRelatedLinks([
       { label: 'Website laten maken', href: '/website-laten-maken' },
       { label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' },
+      { label: 'Bekijk branches', href: '/branches' },
+      { label: 'Bekijk regio', href: '/regio' },
       { label: collection.key === 'blog' ? 'Bekijk de kennisbank' : 'Bekijk de blog', href: collection.key === 'blog' ? '/kennisbank' : '/blog' },
     ]),
     '</main>',
@@ -865,22 +1206,12 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
   const site = normalizeSiteOrigin(siteOrigin);
   const pathName = getSeoContentPathForItem(item);
   const canonicalUrl = buildAbsoluteUrl(site, pathName);
+  const mainEntity = buildMainEntityForItem(item, site, canonicalUrl);
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
       ...buildOrganizationGraph(site),
-      {
-        '@type': 'Article',
-        '@id': `${canonicalUrl}#article`,
-        headline: item.title,
-        description: item.description,
-        datePublished: item.publishedAt,
-        dateModified: item.updatedAt || item.publishedAt,
-        inLanguage: 'nl-NL',
-        author: { '@id': `${site}/#organization` },
-        publisher: { '@id': `${site}/#organization` },
-        mainEntityOfPage: { '@id': `${canonicalUrl}#webpage` },
-      },
+      mainEntity,
       {
         '@type': 'WebPage',
         '@id': `${canonicalUrl}#webpage`,
@@ -888,6 +1219,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
         name: item.title,
         description: item.description,
         isPartOf: { '@id': `${site}/#website` },
+        mainEntity: { '@id': mainEntity['@id'] },
       },
       {
         '@type': 'BreadcrumbList',
@@ -903,7 +1235,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
   const body = [
     '<main class="screen active" id="screen-artikel">',
     '  <section class="artikel-hero">',
-    `    <a class="nav-back show inline-back" href="${escapeHtml(collection.path)}">Terug naar ${escapeHtml(collection.key === 'blog' ? 'blog' : 'kennisbank')}</a>`,
+    `    <a class="nav-back show inline-back" href="${escapeHtml(collection.path)}">Terug naar ${escapeHtml(getBackLabelForCollection(collection))}</a>`,
     `    <div class="artikel-cat">${escapeHtml(item.category)}</div>`,
     `    <h1 class="artikel-title">${escapeHtml(item.title)}</h1>`,
     '    <div class="artikel-meta">',
@@ -934,7 +1266,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     canonicalUrl,
     structuredData,
     body,
-    ogType: 'article',
+    ogType: item.schemaType === 'Service' ? 'website' : 'article',
   });
 }
 
@@ -945,6 +1277,7 @@ module.exports = {
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
   getSeoContentCollection,
+  getSeoContentCollectionPaths,
   getSeoContentItem,
   getSeoContentItems,
   getSeoContentPathForItem,
