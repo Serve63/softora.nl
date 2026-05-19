@@ -187,3 +187,35 @@ test('voicesoftware money page is focused on AI telefonie, intake and CRM follow
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
 });
+
+test('packages page is focused on public sales routes and clean internal links', () => {
+  const source = readPage('pakketten.html');
+  const entry = getRegistryEntry('pakketten.html');
+
+  assert.match(source, /<title>Softora pakketten voor websites, software en AI groei<\/title>/);
+  assert.match(source, /<meta name="description" content="Bekijk Softora pakketten voor websites, bedrijfssoftware/);
+  assert.match(source, /<h1>Pakketten voor bouwen, beheren en groeien<\/h1>/);
+  assert.match(source, /Website route/);
+  assert.match(source, /Software en CRM route/);
+  assert.match(source, /AI groei route/);
+  assert.match(source, /Doorontwikkelen/);
+  assert.match(source, /href="\/website-laten-maken"/);
+  assert.match(source, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(source, /href="\/crm-systeem-op-maat"/);
+  assert.match(source, /href="\/ai-automatisering"/);
+  assert.match(source, /href="\/chatbot-laten-maken"/);
+  assert.match(source, /href="\/voicesoftware-op-maat"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
+  assert.doesNotMatch(source, /sidebar-link|premium-sidebar|personnel-theme/i);
+  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
+  assert.doesNotMatch(source, /premium-personeel|premium-dashboard|admin-menu|admin-nav/i);
+
+  assert.equal(entry.title, 'Softora pakketten voor websites, software en AI groei');
+  assert.match(entry.description, /beheer en doorontwikkeling/);
+  assert.ok(entry.relatedLinks.includes('/website-laten-maken'));
+  assert.ok(entry.relatedLinks.includes('/bedrijfssoftware-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
+  assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
+  assert.ok(entry.relatedLinks.includes('/voicesoftware-op-maat'));
+});
