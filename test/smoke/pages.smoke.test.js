@@ -45,6 +45,33 @@ test('page smoke: /premium-website serves the homepage without redirecting back 
   assert.match(html, /Websites die overtuigen/, 'Homepage-marker ontbreekt op /premium-website.');
 });
 
+const publicSeoLegacyRedirectTargets = [
+  { from: '/premium-bedrijfssoftware', to: '/bedrijfssoftware-op-maat' },
+  { from: '/premium-voicesoftware', to: '/voicesoftware-op-maat' },
+  { from: '/premium-chatbot', to: '/chatbot-laten-maken' },
+  { from: '/premium-websites', to: '/website-laten-maken' },
+  { from: '/premium-pakketten', to: '/pakketten' },
+  { from: '/premium-over-softora', to: '/over-softora' },
+  { from: '/premium-algemene-voorwaarden', to: '/algemene-voorwaarden' },
+  { from: '/premium-privacy-policy', to: '/privacybeleid' },
+];
+
+for (const target of publicSeoLegacyRedirectTargets) {
+  test(`page smoke: ${target.from} redirects to clean SEO URL`, async () => {
+    const response = await fetch(`${serverRef.baseUrl}${target.from}`, {
+      cache: 'no-store',
+      redirect: 'manual',
+    });
+    const location = response.headers.get('location') || '';
+
+    assert.equal(response.status, 301, target.from);
+    assert.ok(
+      location === target.to || location === `${serverRef.baseUrl}${target.to}`,
+      `Redirect voor ${target.from} ging naar ${location}`
+    );
+  });
+}
+
 test('page smoke: /favicon.ico serves the Softora favicon', async () => {
   const response = await fetch(`${serverRef.baseUrl}/favicon.ico`, { cache: 'no-store' });
   const bytes = Buffer.from(await response.arrayBuffer());
