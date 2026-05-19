@@ -190,12 +190,15 @@ test('page smoke: premium-actieve-opdrachten.html shows openstaande leads as the
   assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
   assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
   assert.match(html, /assets\/premium-active-order-open-leads\.js\?v=20260518a/, 'Openstaande leads asset ontbreekt.');
-  assert.match(html, /assets\/premium-active-order-manual-open-leads\.js\?v=20260518a/, 'Handmatige openstaande leads asset ontbreekt.');
+  assert.match(html, /assets\/premium-active-order-manual-open-leads\.js\?v=20260519a/, 'Handmatige openstaande leads asset ontbreekt.');
   assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260510a/, 'Opdrachten pagina-asset voor persoonlijke toewijzingen ontbreekt.');
   assert.match(manualLeadsScript, /overlay\.id = 'createChoiceModal';/, 'Keuzemodal voor aanmaken ontbreekt.');
   assert.match(manualLeadsScript, /form\.id = 'createOpenLeadForm';/, 'Handmatige openstaande-lead form ontbreekt.');
   assert.match(html, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/, 'Aanmaken-knop hoort neutraal te zijn.');
   const createButtonHtml = html.match(/<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?<\/button>/)?.[0] || '';
+  assert.doesNotMatch(createButtonHtml, /<svg\b/, 'Aanmaken-knop hoort geen plus-icoon meer te tonen.');
+  assert.doesNotMatch(createButtonHtml, /Aanmaken[\s\S]*Aanmaken/, 'Aanmaken-knop mag het label niet dubbel tonen.');
+  assert.match(manualLeadsScript, /button\.replaceChildren\(document\.createTextNode\('Aanmaken'\)\);/, 'Script moet het label naar één enkele tekst resetten.');
   assert.doesNotMatch(createButtonHtml, /Actieve Opdracht Aanmaken/, 'Topknop mag niet meer alleen actieve opdracht noemen.');
   assert.match(html, />Openstaande leads<\/span>/, 'Primaire tab hoort Openstaande leads te tonen.');
   assert.doesNotMatch(source, /href = '\/premium-leads';/, 'Openstaande leads mag niet naar de leads-pagina linken.');

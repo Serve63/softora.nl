@@ -491,9 +491,7 @@
     }
 
     function setEntryButtonLabel(button) {
-        const node = Array.from(button.childNodes).find((child) => child.nodeType === window.Node.TEXT_NODE);
-        if (node) node.textContent = ' Aanmaken';
-        else button.appendChild(document.createTextNode(' Aanmaken'));
+        button.replaceChildren(document.createTextNode('Aanmaken'));
     }
 
     function bindEntryButton() {
