@@ -686,6 +686,174 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-een-crm-systeem',
+    title: 'Wat is een CRM systeem?',
+    description:
+      'Een heldere uitleg van CRM-systemen, wat je erin bijhoudt en wanneer maatwerk CRM slimmer wordt dan losse lijsten.',
+    category: 'CRM',
+    intent: 'Uitleg',
+    publishedAt: '2026-05-27',
+    updatedAt: '2026-05-27',
+    readTime: '5 min',
+    summary:
+      'Een CRM systeem geeft overzicht over leads, klanten, afspraken, offertes en opvolging, zodat kansen minder snel blijven liggen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele betekenis van CRM',
+        paragraphs: Object.freeze([
+          'CRM staat voor customer relationship management. In gewone taal: een systeem waarin je klantcontact, leads, notities, afspraken, offertes en opvolgmomenten bijhoudt.',
+          'Het doel is niet alleen administratie. Een goed CRM maakt zichtbaar welke kans openstaat, wie eigenaar is van de volgende stap en waar opvolging nodig is.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wat je meestal in een CRM bijhoudt',
+        paragraphs: Object.freeze([
+          'De basis bestaat uit contactgegevens, bedrijfsinformatie, status, notities, taken, afspraken, offertefase en historie. Voor groeiende teams worden dashboards en reminders daarna belangrijk.',
+          'Zonder CRM staat die informatie vaak verspreid over mailboxen, spreadsheets en losse berichten. Dat werkt tot het moment dat er te veel leads of klanten tegelijk lopen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wanneer maatwerk CRM logisch wordt',
+        paragraphs: Object.freeze([
+          'Maatwerk CRM wordt interessant wanneer je eigen stappen, rollen, dashboards, berekeningen of koppelingen nodig hebt. Denk aan offerteflows, intakeformulieren, agenda, AI-samenvattingen of automatische opvolgtaken.',
+          'Softora kijkt dan eerst naar de kernflow: van nieuwe lead naar duidelijke actie. Pas daarna bouwen we extra schermen of automatisering.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'ai-automatisering-leadopvolging',
+    title: 'AI automatisering voor leadopvolging: hoe ziet een goede flow eruit?',
+    description:
+      'Een praktische uitleg van een AI leadopvolging-flow, van intake en kwalificatie tot CRM-taak, samenvatting en menselijke controle.',
+    category: 'AI automatisering',
+    intent: 'Koopintentie',
+    publishedAt: '2026-05-28',
+    updatedAt: '2026-05-28',
+    readTime: '7 min',
+    summary:
+      'AI leadopvolging werkt het beste als de route achter de aanvraag duidelijk is: verzamelen, beoordelen, samenvatten en opvolgen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Begin bij het moment waarop een lead binnenkomt',
+        paragraphs: Object.freeze([
+          'Een lead kan binnenkomen via formulier, chatbot, telefoon, mail of WhatsApp. Als die kanalen los blijven, ontstaat snel ruis. De eerste stap is daarom niet AI, maar één duidelijke route voor nieuwe aanvragen.',
+          'Die route bepaalt welke informatie minimaal nodig is: naam, bedrijf, vraag, urgentie, dienst, budgetindicatie en de gewenste vervolgstap.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Laat AI voorbereiden, niet blind beslissen',
+        paragraphs: Object.freeze([
+          'AI kan een aanvraag samenvatten, de intentie herkennen, ontbrekende informatie signaleren en een voorstel doen voor de volgende taak. Dat scheelt tijd en maakt opvolging consistenter.',
+          'Voor belangrijke commerciële keuzes blijft menselijke controle verstandig. De beste flow laat AI voorbereiden en geeft het team daarna een helder beslismoment.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Koppel de uitkomst aan CRM of agenda',
+        paragraphs: Object.freeze([
+          'Een AI-flow is pas echt nuttig als het resultaat ergens landt. Denk aan een CRM-status, taak voor een medewerker, afspraakvoorstel of mailconcept.',
+          'Softora bouwt dit soort flows rondom het bestaande proces, zodat automatisering niet voelt als extra tool maar als versneller van opvolging.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'ai-telefonist-voor-afspraakintake',
+    title: 'AI telefonist voor afspraakintake: waar moet je op letten?',
+    description:
+      'Waar een AI telefonist sterk in is bij afspraakintake, welke grenzen je moet zetten en hoe opvolging naar CRM of agenda werkt.',
+    category: 'AI telefonie',
+    intent: 'Koopintentie',
+    publishedAt: '2026-05-29',
+    updatedAt: '2026-05-29',
+    readTime: '6 min',
+    summary:
+      'Een AI telefonist kan afspraakintake versnellen, maar alleen als vragen, overdracht en menselijke controle vooraf goed zijn ingericht.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Een goede intake begint met vaste vragen',
+        paragraphs: Object.freeze([
+          'Bij afspraakintake wil je niet dat elk gesprek anders eindigt. De AI telefonist moet weten welke informatie nodig is: naam, contactgegevens, reden van contact, gewenste datum, urgentie en eventuele bijzonderheden.',
+          'Hoe duidelijker die vragen zijn, hoe bruikbaarder de samenvatting wordt voor het team.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Grenzen zijn belangrijker dan stoer klinkende AI',
+        paragraphs: Object.freeze([
+          'Een AI telefonist moet niet doen alsof hij alles kan oplossen. Hij moet weten wanneer hij informatie verzamelt, wanneer hij een terugbelverzoek aanmaakt en wanneer een medewerker nodig is.',
+          'Dat voorkomt frustratie en houdt het gesprek betrouwbaar. Vooral bij commerciële of gevoelige vragen blijft overdracht naar een mens belangrijk.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'De waarde zit na het telefoongesprek',
+        paragraphs: Object.freeze([
+          'Na het gesprek moet de informatie bruikbaar worden. Denk aan een CRM-notitie, agenda-aanvraag, taak of korte samenvatting in de mailbox.',
+          'Softora richt AI telefonie daarom niet los in, maar als onderdeel van bereikbaarheid, leadkwalificatie en opvolging.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
+      Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-interne-linkstructuur',
+    title: 'Wat is een interne linkstructuur?',
+    description:
+      'Een duidelijke uitleg van interne linkstructuur en waarom goede links tussen diensten, blogs en kennisbankpagina’s belangrijk zijn voor SEO.',
+    category: 'Websites',
+    intent: 'Uitleg',
+    publishedAt: '2026-06-01',
+    updatedAt: '2026-06-01',
+    readTime: '5 min',
+    summary:
+      'Interne linkstructuur helpt bezoekers en Google begrijpen welke pagina’s bij elkaar horen en welke pagina’s commercieel belangrijk zijn.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Interne links zijn de routes binnen je website',
+        paragraphs: Object.freeze([
+          'Een interne link is een link van de ene pagina op je website naar een andere pagina op dezelfde website. Denk aan een blog die verwijst naar een dienstpagina of een kennisbankartikel dat doorlinkt naar een passende uitleg.',
+          'Voor bezoekers maakt dat navigeren makkelijker. Voor Google laat het zien welke onderwerpen samenhangen en welke pagina’s belangrijk zijn.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Money pages hebben ondersteunende pagina’s nodig',
+        paragraphs: Object.freeze([
+          'Een dienstpagina zoals website laten maken of AI automatisering hoeft niet elke vraag zelf te beantwoorden. Blogs en kennisbankstukken kunnen die vragen opvangen en daarna teruglinken naar de dienstpagina.',
+          'Zo blijft de commerciële pagina scherp, terwijl de site toch veel nuttige uitleg biedt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Vermijd losse pagina’s zonder route',
+        paragraphs: Object.freeze([
+          'Een pagina die nergens logisch naartoe linkt, voelt voor bezoekers als een dood einde. Ook voor SEO is dat zwakker, omdat de pagina minder duidelijk onderdeel is van een cluster.',
+          'Softora bouwt content daarom rondom clusters: websites, AI automatisering, software, CRM, chatbots, AI telefonie en lokale SEO.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Blog', href: '/blog' }),
+      Object.freeze({ label: 'Diensten', href: '/diensten' }),
+    ]),
+  }),
+  Object.freeze({
     collection: 'branches',
     slug: 'installateurs',
     schemaType: 'Service',
