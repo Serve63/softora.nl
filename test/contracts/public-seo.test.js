@@ -31,6 +31,7 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
 
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/diensten<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/pakketten<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/website-laten-maken-oisterwijk<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/crm-systeem-op-maat<\/loc>/);
@@ -44,6 +45,7 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/kennisbank\/wat-is-bedrijfssoftware-op-maat<\/loc>/);
   assert.doesNotMatch(sitemap, /premium-bedrijfssoftware/);
   assert.doesNotMatch(sitemap, /premium-blog/);
+  assert.doesNotMatch(sitemap, /premium-pakketten/);
   assert.doesNotMatch(sitemap, /premium-personeel-dashboard/);
   assert.doesNotMatch(sitemap, /premium-seo/);
   assert.doesNotMatch(sitemap, /premium-websitegenerator/);
@@ -117,9 +119,21 @@ test('public seo url mapping exposes clean paths and keeps legacy redirects avai
   assert.equal(getIndexablePublicHtmlFileFromPath('/ai-automatisering'), 'ai-automatisering.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/crm-systeem-op-maat'), 'crm-systeem-op-maat.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/ai-telefonist'), 'ai-telefonist.html');
+  assert.equal(getIndexablePublicPathFromHtmlFile('pakketten.html'), '/pakketten');
+  assert.equal(getIndexablePublicHtmlFileFromPath('/pakketten'), 'pakketten.html');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-bedrijfssoftware'), '/bedrijfssoftware-op-maat');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-chatbot'), '/chatbot-laten-maken');
-  assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-website'), '');
+  assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-pakketten'), '/pakketten');
+  assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-website'), '/');
+});
+
+test('public packages page is a clean public sales page without premium sidebar links', () => {
+  const source = fs.readFileSync(path.join(root, 'pakketten.html'), 'utf8');
+
+  assert.match(source, /<h1\b[\s\S]*Pakketten voor bouwen, beheren en groeien[\s\S]*<\/h1>/i);
+  assert.doesNotMatch(source, /sidebar-link|premium-sidebar|personnel-theme/i);
+  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
+  assert.doesNotMatch(source, /premium-personeel|premium-dashboard|admin-menu|admin-nav/i);
 });
 
 test('public seo registry points to existing crawlable pages with h1 and link graph', () => {

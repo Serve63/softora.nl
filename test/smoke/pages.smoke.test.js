@@ -37,6 +37,7 @@ const unlockedPublicSeoPaths = [
   '/ai-automatisering',
   '/website-laten-maken',
   '/website-laten-maken-oisterwijk',
+  '/pakketten',
   '/bedrijfssoftware-op-maat',
   '/crm-systeem-op-maat',
   '/ai-telefonist',
@@ -74,17 +75,18 @@ test('page smoke: / serves the real SEO homepage with a clean canonical', async 
   assert.doesNotMatch(html, /url=\/premium-website|window\.location\.replace\('\/premium-website'\)/);
 });
 
-test('page smoke: /premium-website serves the homepage without redirecting back to root', async () => {
-  const response = await fetch(`${serverRef.baseUrl}/premium-website`, {
+test('page smoke: /premium-website redirects permanently to the clean homepage', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/premium-website?utm_source=test`, {
     cache: 'no-store',
     redirect: 'manual',
   });
-  const html = await response.text();
+  const location = response.headers.get('location') || '';
 
-  assert.equal(response.status, 200, '/premium-website');
-  assert.equal(response.headers.get('location'), null, '/premium-website mag geen redirect-loop starten.');
-  assert.match(html, /<!DOCTYPE html>/i, '/premium-website moet HTML serveren.');
-  assert.match(html, /Websites die overtuigen/, 'Homepage-marker ontbreekt op /premium-website.');
+  assert.equal(response.status, 301, '/premium-website');
+  assert.ok(
+    location === '/?utm_source=test' || location === `${serverRef.baseUrl}/?utm_source=test`,
+    `Redirect voor /premium-website ging naar ${location}`
+  );
 });
 
 const publicSeoLegacyRedirectTargets = [
