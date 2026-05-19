@@ -59,6 +59,43 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
 });
 
+test('ai automation money page is focused on leads, CRM flows and safe handoff', () => {
+  const source = readPage('ai-automatisering.html');
+  const entry = getRegistryEntry('ai-automatisering.html');
+
+  assert.match(source, /<title>AI automatisering laten maken voor MKB \| Softora<\/title>/);
+  assert.match(
+    source,
+    /<meta name="description" content="Laat AI automatisering maken door Softora voor leadopvolging/
+  );
+  assert.match(source, /<h1>AI automatisering voor leads, taken en opvolging<\/h1>/);
+  assert.match(source, /Leadopvolging/);
+  assert.match(source, /Intake en mailbox/);
+  assert.match(source, /CRM-flows/);
+  assert.match(source, /Rapportages/);
+  assert.match(source, /Chatbot-overdracht/);
+  assert.match(source, /voice-overdracht/);
+  assert.match(source, /Menselijke controle/);
+  assert.match(source, /Veilige AI grenzen/);
+  assert.match(source, /href="\/crm-systeem-op-maat"/);
+  assert.match(source, /href="\/chatbot-laten-maken"/);
+  assert.match(source, /href="\/voicesoftware-op-maat"/);
+  assert.match(source, /href="\/ai-telefonist"/);
+  assert.match(source, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(source, /href="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
+  assert.match(source, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
+  assert.doesNotMatch(source, /overlay|login-box|Binnenkort beschikbaar|toegangscode/i);
+  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
+
+  assert.equal(entry.title, 'AI automatisering laten maken voor MKB');
+  assert.match(entry.description, /leadopvolging, intake, mailbox, CRM-flows/);
+  assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
+  assert.ok(entry.relatedLinks.includes('/voicesoftware-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/bedrijfssoftware-op-maat'));
+});
+
 test('chatbot money page is focused on leads, support and clean follow-up', () => {
   const source = readPage('premium-chatbot.html');
   const entry = getRegistryEntry('premium-chatbot.html');
