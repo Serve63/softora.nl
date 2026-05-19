@@ -268,7 +268,9 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function isEligibleCampaignCountRow\(row\) \{\s*return isPremiumAiLeadGeneratorPath\(\)[\s\S]*isEligibleColdcallingCampaignRow\(row\)[\s\S]*isEligibleColdmailCampaignRow\(row\);/);
   assert.match(pageSource, /function isCampaignRowWithinRadius\(row\)/);
   assert.match(pageSource, /params\.set\('radiusKm', String\(getSelectedCampaignRadiusKm\(\)\)\);/);
-  assert.match(pageSource, /<input class="slider" type="range" min="0" max="11" value="4" id="km-slider" oninput="updateKm\(this\.value\)">/);
+  assert.match(pageSource, /<input class="slider" type="range" min="0" max="12" value="4" id="km-slider" oninput="updateKm\(this\.value\)">/);
+  assert.match(pageSource, /<div class="slider-row"><span>10 km<\/span><span>250 km<\/span><span>500 km<\/span><\/div>/);
+  assert.match(pageSource, /const KM_OPTIES = \[10,20,30,40,50,75,100,130,150,175,200,250,500\];/);
   assert.match(pageSource, /const index = Math\.max\(0, Math\.min\(KM_OPTIES\.length - 1,/);
   assert.match(pageSource, /const pct = KM_OPTIES\.length > 1 \? \(index \/ \(KM_OPTIES\.length - 1\)\) \* 100 : 0;/);
   assert.match(pageSource, /function renderCampaignCompanyCount\(countOverride\)/);
