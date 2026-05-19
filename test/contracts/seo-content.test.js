@@ -37,6 +37,8 @@ test('seo content renders the existing blog visual language with real links', ()
   assert.match(html, /class="hero-banner"/);
   assert.match(html, /class="filter-bar"/);
   assert.match(html, /class="blog-card featured"/);
+  assert.match(html, /href="\/diensten">Diensten<\/a>/);
+  assert.match(html, /href="\/ai-automatisering">AI<\/a>/);
   assert.match(html, /href="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
   assert.match(html, /href="\/blog\/website-laten-maken-kosten-2026"/);
   assert.match(html, /href="\/blog\/chatbot-laten-maken-wanneer-zinvol"/);

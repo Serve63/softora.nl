@@ -33,10 +33,15 @@ for (const target of pageSmokeTargets) {
 }
 
 const unlockedPublicSeoPaths = [
+  '/diensten',
+  '/ai-automatisering',
   '/website-laten-maken',
   '/bedrijfssoftware-op-maat',
+  '/crm-systeem-op-maat',
+  '/ai-telefonist',
   '/chatbot-laten-maken',
   '/voicesoftware-op-maat',
+  '/over-softora',
 ];
 
 for (const pathName of unlockedPublicSeoPaths) {
@@ -49,6 +54,8 @@ for (const pathName of unlockedPublicSeoPaths) {
     assert.doesNotMatch(html, /data-public-lock-input/, pathName);
     assert.doesNotMatch(html, /data-public-lock-submit/, pathName);
     assert.doesNotMatch(html, /premium-public-lock\.js/, pathName);
+    assert.match(html, /<h1\b/i, `${pathName} mist een H1`);
+    assert.match(html, /data-softora-public-seo="internal-links"/, `${pathName} mist interne SEO-linkkaart`);
   });
 }
 
