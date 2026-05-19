@@ -5,11 +5,13 @@ const path = require('path');
 
 const root = path.join(__dirname, '../..');
 const publicLockPages = [
+  'premium-over-softora.html',
+];
+const publicSeoUnlockedPages = [
   'premium-bedrijfssoftware.html',
   'premium-chatbot.html',
   'premium-websites.html',
   'premium-voicesoftware.html',
-  'premium-over-softora.html',
   'premium-blog.html',
 ];
 
@@ -42,5 +44,16 @@ test('publieke premium lock-paginas gebruiken gedeelde lock asset zonder inline 
     assert.doesNotMatch(source, /onkeydown=/, file);
     assert.doesNotMatch(source, /function login\(/, file);
     assert.doesNotMatch(source, /sessionStorage/, file);
+  });
+});
+
+test('publieke SEO-landingspagina’s hebben geen toegangscode-slot meer', () => {
+  publicSeoUnlockedPages.forEach((file) => {
+    const source = readRepoFile(file);
+
+    assert.doesNotMatch(source, /Binnenkort beschikbaar/, file);
+    assert.doesNotMatch(source, /data-public-lock-input/, file);
+    assert.doesNotMatch(source, /data-public-lock-submit/, file);
+    assert.doesNotMatch(source, /premium-public-lock\.js/, file);
   });
 });
