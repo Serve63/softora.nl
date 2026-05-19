@@ -7,6 +7,10 @@ const {
   safeParseJsonArray,
   safeParseJsonObject,
 } = require('./data-ops-serialization');
+const {
+  getContactStatusPriority,
+  normalizeContactStatus,
+} = require('./customer-lifecycle');
 const { createSoftoraDataOpsStore } = require('./data-ops-store');
 
 const SCOPES = Object.freeze({
@@ -24,6 +28,38 @@ const KEYS = Object.freeze({
 });
 
 const PHOTO_DATA_PREFIX = 'softora_database_photo_data_v1_';
+const LEGACY_CONTACT_SYNC_FIELDS = Object.freeze([
+  'status',
+  'databaseStatus',
+  'mail',
+  'canMail',
+  'doNotMail',
+  'lastMailSentAt',
+  'lastMailedAt',
+  'lastColdmailSentAt',
+  'lastColdmailSenderEmail',
+  'coldmailCampaignStartedAt',
+  'coldmailCampaignDurationDays',
+  'coldmailCampaignEndsAt',
+  'activeColdmailCampaignUntil',
+  'campaignType',
+  'campaign_type',
+  'outreachCampaignType',
+  'outreach_campaign_type',
+  'coldmailSpecialAction',
+  'outreachStatus',
+  'outreachSentAt',
+  'outreach_sent_at',
+  'coldmailSentMessageId',
+  'outreachMessageId',
+  'sentMessageId',
+  'messageId',
+  'sentFromEmail',
+  'sent_from_email',
+  'outreachSentFromEmail',
+  'statusUpdatedAt',
+  'updatedAt',
+]);
 
 function createSoftoraDataOpsUiStateBridge(deps = {}) {
   const {
@@ -56,10 +92,136 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     };
   }
 
+  function parseLegacyCustomerRows(legacy) {
+    const values = legacy && typeof legacy.values === 'object' ? legacy.values : {};
+    if (!hasKey(values, KEYS.customers)) return [];
+    return safeParseJsonArray(readChunkedStateValue(values, KEYS.customers));
+  }
+
+  function hasUsableCustomerIdentityKey(identityKey) {
+    const parts = normalizeString(identityKey).split('|');
+    const company = normalizeString(parts[0]);
+    const contact = normalizeString(parts[1]);
+    const phone = normalizeString(parts[2]).replace(/[^\d]/g, '');
+    return phone.length >= 7 || Boolean(company && contact);
+  }
+
+  function getCustomerMergeKeys(row) {
+    const payload = row && typeof row === 'object' ? row : {};
+    const identityKey = buildCustomerIdentityKey(payload);
+    return Array.from(new Set([
+      normalizeString(payload.id || payload.customerId || payload.databaseId),
+      hasUsableCustomerIdentityKey(identityKey) ? identityKey : '',
+    ].filter(Boolean)));
+  }
+
+  function parseCustomerContactTimestampMs(row) {
+    const payload = row && typeof row === 'object' ? row : {};
+    return [
+      payload.statusUpdatedAt,
+      payload.updatedAt,
+      payload.lastColdmailSentAt,
+      payload.lastMailSentAt,
+      payload.outreachSentAt,
+      payload.outreach_sent_at,
+      payload.coldmailCampaignStartedAt,
+      payload.datum,
+    ]
+      .map((value) => Date.parse(normalizeString(value)))
+      .filter(Number.isFinite)
+      .reduce((max, value) => Math.max(max, value), 0);
+  }
+
+  function hasLegacyColdmailSignal(row) {
+    const payload = row && typeof row === 'object' ? row : {};
+    if (normalizeString(payload.lastColdmailSentAt || payload.lastMailSentAt || payload.outreachSentAt || payload.outreach_sent_at)) return true;
+    if (normalizeString(payload.coldmailSentMessageId || payload.outreachMessageId || payload.sentMessageId || payload.messageId)) return true;
+    return (Array.isArray(payload.hist) ? payload.hist : []).some((entry) => {
+      const text = normalizeString([
+        entry && entry.type,
+        entry && entry.status,
+        entry && entry.label,
+        entry && entry.source,
+      ].join(' ')).toLowerCase();
+      return /(gemaild|mail verstuurd|coldmail|cold mailing|webdesign-outreach)/.test(text);
+    });
+  }
+
+  function shouldApplyLegacyContactState(current, legacy) {
+    const currentStatus = normalizeContactStatus(current && (current.databaseStatus || current.status), current);
+    const legacyStatus = normalizeContactStatus(legacy && (legacy.databaseStatus || legacy.status), legacy);
+    const currentPriority = getContactStatusPriority(currentStatus);
+    const legacyPriority = getContactStatusPriority(legacyStatus);
+    if (legacyPriority > currentPriority) return true;
+    if (!hasLegacyColdmailSignal(legacy)) return false;
+    if (legacyPriority === currentPriority) {
+      return parseCustomerContactTimestampMs(legacy) > parseCustomerContactTimestampMs(current);
+    }
+    return legacyStatus === 'gemaild' && currentPriority < getContactStatusPriority('gemaild');
+  }
+
+  function mergeHistories(current, legacy) {
+    const combined = [
+      ...(Array.isArray(legacy && legacy.hist) ? legacy.hist : []),
+      ...(Array.isArray(current && current.hist) ? current.hist : []),
+    ].filter(Boolean);
+    const seen = new Set();
+    return combined.filter((entry) => {
+      const key = normalizeString(entry && entry.messageKey) || [
+        normalizeString(entry && entry.type),
+        normalizeString(entry && entry.label),
+        normalizeString(entry && entry.date),
+        normalizeString(entry && entry.actor),
+        normalizeString(entry && entry.source),
+      ].join('|');
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 50);
+  }
+
+  function applyLegacyContactState(current, legacy) {
+    const merged = { ...(current || {}) };
+    LEGACY_CONTACT_SYNC_FIELDS.forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(legacy || {}, field)) {
+        merged[field] = legacy[field];
+      }
+    });
+    merged.hist = mergeHistories(current, legacy);
+    return merged;
+  }
+
+  function mergeLegacyCustomerContactState(customers, legacyRows) {
+    if (!Array.isArray(customers) || !customers.length || !Array.isArray(legacyRows) || !legacyRows.length) {
+      return customers;
+    }
+    const indexByKey = new Map();
+    customers.forEach((customer, index) => {
+      getCustomerMergeKeys(customer).forEach((key) => {
+        if (!indexByKey.has(key)) indexByKey.set(key, index);
+      });
+    });
+    const merged = customers.slice();
+    legacyRows.forEach((legacy) => {
+      const index = getCustomerMergeKeys(legacy)
+        .map((key) => indexByKey.get(key))
+        .find((value) => value !== undefined);
+      if (index === undefined) return;
+      if (shouldApplyLegacyContactState(merged[index], legacy)) {
+        merged[index] = applyLegacyContactState(merged[index], legacy);
+      }
+    });
+    return merged;
+  }
+
   async function getCustomersState(legacyGetUiStateValues) {
-    const customers = await store.listCustomers();
-    if (!customers || customers.length === 0) return readLegacy(legacyGetUiStateValues, SCOPES.customers);
-    return buildState(SCOPES.customers, buildChunkedStatePatch(KEYS.customers, JSON.stringify(customers)));
+    const [customers, legacy] = await Promise.all([
+      store.listCustomers(),
+      readLegacy(legacyGetUiStateValues, SCOPES.customers),
+    ]);
+    if (!customers || customers.length === 0) return legacy;
+    const mergedCustomers = mergeLegacyCustomerContactState(customers, parseLegacyCustomerRows(legacy));
+    return buildState(SCOPES.customers, buildChunkedStatePatch(KEYS.customers, JSON.stringify(mergedCustomers)));
   }
 
   async function getActiveOrdersState(legacyGetUiStateValues) {
