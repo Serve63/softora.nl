@@ -70,6 +70,7 @@ function buildServerAppEnvConfig(runtimeEnv) {
     MAIL_FROM_ADDRESS: runtimeEnv.mail.fromAddress,
     MAIL_FROM_NAME: runtimeEnv.mail.fromName,
     MAIL_REPLY_TO: runtimeEnv.mail.replyTo,
+    COLDMAIL_AUDIT_BCC: runtimeEnv.mail.coldmailAuditBcc,
     MAIL_IMAP_HOST: runtimeEnv.mail.imapHost,
     MAIL_IMAP_PORT: runtimeEnv.mail.imapPort,
     MAIL_IMAP_SECURE: runtimeEnv.mail.imapSecure,

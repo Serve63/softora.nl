@@ -79,6 +79,7 @@ test('server app runtime bootstrap flattens env config without changing values',
       fromAddress: 'noreply@test.invalid',
       fromName: 'Softora',
       replyTo: 'reply@test.invalid',
+      coldmailAuditBcc: 'audit@test.invalid',
       imapHost: 'imap.test',
       imapPort: 993,
       imapSecure: true,
@@ -100,6 +101,7 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.AGENDA_APP_SERVE_EMAIL, 'serve@softora.test');
   assert.equal(envConfig.AGENDA_APP_MARTIJN_EMAIL, 'martijn@softora.test');
   assert.equal(envConfig.AGENDA_APP_SESSION_TTL_DAYS, 3650);
+  assert.equal(envConfig.COLDMAIL_AUDIT_BCC, 'audit@test.invalid');
   assert.equal(envConfig.MAIL_IMAP_MAILBOX, 'INBOX');
   assert.equal(envConfig.SECURITY_CONTACT_EMAIL, 'security@test.invalid');
 });
