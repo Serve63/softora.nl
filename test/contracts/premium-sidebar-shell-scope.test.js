@@ -200,7 +200,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /function applyPremiumSidebarContentFrameHtml\(html\) \{/);
   assert.match(htmlPagesSource, /html\[data-softora-sidebar-content-frame="1"\]\{--premium-sidebar-width:0px !important;\}/);
   assert.match(htmlPagesSource, /html\[data-softora-sidebar-content-frame="1"\] \.dashboard-layout\[data-sidebar-shell="canonical"\] > \.main-content/);
-  assert.match(htmlPagesSource, /html\[data-softora-sidebar-content-frame="1"\] \.premium-boot-loader\{left:0 !important;\}/);
+  assert.match(htmlPagesSource, /html\[data-softora-sidebar-content-frame="1"\] \.premium-boot-loader,\s*html\[data-softora-sidebar-content-frame="1"\] \.monthly-costs-boot-loader\{left:0 !important;\}/);
   assert.match(htmlPagesSource, /res\.setHeader\('X-Frame-Options', 'SAMEORIGIN'\);/);
   assert.match(htmlPagesSource, /frame-ancestors 'self'/);
   assert.match(htmlPagesSource, /premium-sidebar-stability\.css\?v=/);
@@ -275,6 +275,11 @@ test('premium vaste lasten centreert bootloader in het zichtbare hoofdvlak', () 
     pageSource,
     /@media \(max-width: 1100px\) \{[\s\S]*\.monthly-costs-boot-loader\s*\{[\s\S]*left:\s*0;/,
     'op mobiel hoort de loader weer over de volledige breedte te centreren'
+  );
+  assert.match(
+    readRepoFile('server/services/html-pages.js'),
+    /html\[data-softora-sidebar-content-frame="1"\] \.monthly-costs-boot-loader\{left:0 !important;\}/,
+    'binnen de persistente sidebar-frame mag de vaste-lasten-loader geen tweede sidebar-offset optellen'
   );
 });
 
