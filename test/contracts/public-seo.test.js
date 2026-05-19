@@ -123,6 +123,22 @@ test('public seo fallback links stay in normal page flow on fixed-nav templates'
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });
 
+test('ai automation page owns its internal links inside the page content', () => {
+  const source = fs.readFileSync(path.join(root, 'ai-automatisering.html'), 'utf8');
+  const html = applyPublicSeoHeadDefaults(source, 'ai-automatisering.html', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/ai-automatisering">/);
+  assert.match(html, /data-softora-public-seo="internal-links"/);
+  assert.match(html, /href="\/crm-systeem-op-maat"/);
+  assert.match(html, /href="\/chatbot-laten-maken"/);
+  assert.match(html, /href="\/voicesoftware-op-maat"/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
+  assert.doesNotMatch(html, /softora-seo-footer-links/);
+  assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
+});
+
 test('voicesoftware page owns its internal links inside the page content', () => {
   const source = fs.readFileSync(path.join(root, 'premium-voicesoftware.html'), 'utf8');
   const html = applyPublicSeoHeadDefaults(source, 'premium-voicesoftware.html', {

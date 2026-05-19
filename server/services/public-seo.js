@@ -68,12 +68,19 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
     fileName: 'ai-automatisering.html',
     path: '/ai-automatisering',
-    title: 'AI automatisering voor het MKB',
+    title: 'AI automatisering laten maken voor MKB',
     description:
-      'Softora automatiseert terugkerend werk met AI, slimme workflows, CRM-koppelingen, chatbots en AI telefonie voor praktische groei.',
+      'Laat AI automatisering maken door Softora voor leadopvolging, intake, mailbox, CRM-flows, rapportages en veilige menselijke controle.',
     kind: 'service',
     serviceName: 'AI automatisering',
-    relatedLinks: ['/blog/ai-automatisering-mkb-waar-beginnen', '/chatbot-laten-maken', '/ai-telefonist', '/crm-systeem-op-maat'],
+    relatedLinks: [
+      '/crm-systeem-op-maat',
+      '/chatbot-laten-maken',
+      '/voicesoftware-op-maat',
+      '/ai-telefonist',
+      '/bedrijfssoftware-op-maat',
+      '/blog/ai-automatisering-mkb-waar-beginnen',
+    ],
   },
   {
     fileName: 'maatwerk-platform.html',
