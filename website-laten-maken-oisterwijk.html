@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">
 <link rel="apple-touch-icon" href="/assets/softora-favicon-round.png?v=20260513a">
-<title>Voicesoftware en AI telefonie op maat door Softora</title>
+<title>Website laten maken Oisterwijk door Softora</title>
 <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -13,17 +13,16 @@
 :root {
   --bg: #f5f4f1;
   --white: #fff;
-  /* Zelfde accent als premium homepage / bedrijfssoftware */
-  --crimson: #8B2252;
-  --clight: #A62D65;
+  --crimson: #9b2355;
+  --clight: #c4346a;
   --dark: #1a1a2e;
   --mid: #555;
   --light: #999;
   --border: #e8e5e0;
   --nav-accent: #8B2252;
   --nav-accent-hover: #A62D65;
-  --nav-cta: #8B2252;
-  --nav-cta-hover: #A62D65;
+  --nav-cta: var(--crimson);
+  --nav-cta-hover: var(--clight);
 }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); }
 
@@ -94,7 +93,7 @@ nav {
   background: var(--nav-cta-hover);
 }
 
-/* HERO — zelfde opbouw als premium-bedrijfssoftware: foto + paarse wash (geen groene stock-cast) */
+/* HERO — foto full-bleed over volledige breedte, tekst boven overlay */
 .hero {
   margin-top: 78px;
   width: 100%;
@@ -110,7 +109,7 @@ nav {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=2000&q=85') center center / cover no-repeat;
+  background: url('https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?auto=format&fit=crop&w=2000&q=85') 44% center / cover no-repeat;
   pointer-events: none;
   z-index: 0;
 }
@@ -119,8 +118,8 @@ nav {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 92% 20%, rgba(139,34,82,.14) 0%, transparent 50%),
-    radial-gradient(circle at 28% 88%, rgba(139,34,82,.08) 0%, transparent 50%),
+    radial-gradient(circle at 92% 20%, rgba(155,35,85,.14) 0%, transparent 50%),
+    radial-gradient(circle at 28% 88%, rgba(155,35,85,.08) 0%, transparent 50%),
     linear-gradient(90deg, rgba(10,14,25,.94) 0%, rgba(10,14,25,.78) 32%, rgba(10,14,25,.35) 52%, rgba(10,14,25,.08) 78%, rgba(10,14,25,.06) 100%);
   pointer-events: none;
   z-index: 0;
@@ -132,10 +131,15 @@ nav {
     min-height: 0;
   }
   .hero::before {
-    background-position: 66% center;
+    background-position: 70% center;
   }
 }
-.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(139,34,82,.9); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+@media (max-width: 960px) {
+  .nav-start-btn {
+    display: none;
+  }
+}
+.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.9); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
 .hero-eyebrow::before { content: ''; width: 32px; height: 2px; background: var(--crimson); border-radius: 1px; }
 .hero-title { font-family: 'Oswald', sans-serif; font-size: clamp(48px, 5.2vw, 72px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 6px; }
 .hero-title em { color: var(--crimson); font-style: normal; }
@@ -169,8 +173,8 @@ nav {
 .dienst-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 28px 24px; transition: all .2s; overflow: hidden; }
 .dienst-thumb { height: 140px; margin: -28px -24px 18px -24px; overflow: hidden; background: var(--dark); }
 .dienst-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.dienst-card:hover { box-shadow: 0 6px 28px rgba(0,0,0,.08); border-color: rgba(139,34,82,.2); transform: translateY(-2px); }
-.dienst-icon { width: 44px; height: 44px; background: rgba(139,34,82,.08); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+.dienst-card:hover { box-shadow: 0 6px 28px rgba(0,0,0,.08); border-color: rgba(155,35,85,.2); transform: translateY(-2px); }
+.dienst-icon { width: 44px; height: 44px; background: rgba(155,35,85,.08); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
 .dienst-icon svg { width: 20px; height: 20px; color: var(--crimson); }
 .dienst-name { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
 .dienst-desc { font-size: 13px; color: var(--mid); line-height: 1.7; margin-bottom: 16px; }
@@ -202,7 +206,7 @@ nav {
 /* WAAROM SOFTORA */
 .why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px 80px; margin-top: 52px; }
 .why-item { display: flex; gap: 18px; align-items: flex-start; }
-.why-num { font-family: 'Oswald', sans-serif; font-size: 48px; font-weight: 800; color: rgba(139,34,82,.12); line-height: 1; flex-shrink: 0; width: 52px; }
+.why-num { font-family: 'Oswald', sans-serif; font-size: 48px; font-weight: 800; color: rgba(155,35,85,.12); line-height: 1; flex-shrink: 0; width: 52px; }
 .why-title { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
 .why-desc { font-size: 13px; color: var(--mid); line-height: 1.7; }
 
@@ -210,15 +214,15 @@ nav {
 .cta-block {
   background:
     linear-gradient(180deg, rgba(10,14,25,.82) 0%, rgba(10,14,25,.86) 100%),
-    url('https://images.unsplash.com/photo-1552581234-26160f608093?auto=format&fit=crop&w=1800&q=85') center/cover no-repeat;
+    url('https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?auto=format&fit=crop&w=1800&q=85') center/cover no-repeat;
   padding: 80px;
   text-align: center;
   position: relative;
   overflow: hidden;
 }
-.cta-block::before { content: ''; position: absolute; top: -50%; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(139,34,82,.25) 0%, transparent 65%); pointer-events: none; }
+.cta-block::before { content: ''; position: absolute; top: -50%; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(155,35,85,.25) 0%, transparent 65%); pointer-events: none; }
 .cta-block-inner { position: relative; z-index: 1; }
-.cta-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(139,34,82,.9); margin-bottom: 16px; }
+.cta-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.9); margin-bottom: 16px; }
 .cta-title { font-family: 'Oswald', sans-serif; font-size: clamp(36px, 4vw, 56px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; color: #fff; line-height: 1.05; margin-bottom: 16px; }
 .cta-sub { font-size: 15px; color: rgba(255,255,255,.5); line-height: 1.7; margin-bottom: 36px; max-width: 480px; margin-left: auto; margin-right: auto; }
 .cta-contact { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 24px; }
@@ -361,9 +365,9 @@ nav {
 <!-- HERO -->
 <div class="hero">
   <div class="hero-inner">
-    <div class="hero-eyebrow">Voicesoftware op maat</div>
-    <h1 class="hero-title">Voicesoftware<br><em>die opneemt</em> voor jou</h1>
-    <div class="hero-sub">Van AI telefonist tot slimme gespreksflows — Softora.nl bouwt voicesoftware die telefoontjes opvangt, leads kwalificeert, afspraken voorbereidt en opvolging direct doorzet naar je team.</div>
+    <div class="hero-eyebrow">Website laten maken Oisterwijk</div>
+    <h1 class="hero-title">Een website<br><em>in Oisterwijk</em> die leads oplevert</h1>
+    <div class="hero-sub">Softora.nl bouwt snelle, professionele websites voor ondernemers in Oisterwijk die beter gevonden willen worden, vertrouwen willen wekken en meer aanvragen uit Google willen halen.</div>
     <div class="hero-btns">
       <a class="btn-primary" href="mailto:info@softora.nl">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -379,89 +383,89 @@ nav {
 
 <!-- STATS -->
 <div class="stats-strip">
-  <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">Op maat ingericht</div></div>
+  <div class="stat-item"><div class="stat-num">Lokaal</div><div class="stat-label">Focus op Oisterwijk</div></div>
   <div class="stat-item"><div class="stat-num">2–6</div><div class="stat-label">Weken bouwtijd</div></div>
-  <div class="stat-item"><div class="stat-num">CRM</div><div class="stat-label">Koppelingen mogelijk</div></div>
-  <div class="stat-item"><div class="stat-num">24/7</div><div class="stat-label">Bereikbaar blijven</div></div>
+  <div class="stat-item"><div class="stat-num">SEO</div><div class="stat-label">Technische basis</div></div>
+  <div class="stat-item"><div class="stat-num">Leads</div><div class="stat-label">Gericht op aanvragen</div></div>
 </div>
 
 <!-- WAT KAN IK VOOR JE DOEN -->
 <div class="section reveal" id="diensten">
-  <div class="section-eyebrow">Wat wij voor je doen</div>
-  <div class="section-title is-single-line"><span class="nowrap">Telefonie die opvolging versnelt</span></div>
-  <div class="section-sub">Of je nu een AI telefonist, terugbel-flow, afspraakintake of gespreksanalyse nodig hebt — Softora.nl bouwt het rondom jouw klantcontact.</div>
+  <div class="section-eyebrow">Wat wij bouwen</div>
+  <div class="section-title is-single-line"><span class="nowrap">Websites voor bedrijven in Oisterwijk</span></div>
+  <div class="section-sub">Een goede lokale website is geen online visitekaartje, maar een route van zoekopdracht naar vertrouwen en contact.</div>
 
   <div class="diensten-grid">
     <div class="dienst-card">
-      <div class="dienst-thumb"><img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy" decoding="async" width="900" height="560" referrerpolicy="no-referrer"></div>
+      <div class="dienst-thumb"><img src="https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy" decoding="async" width="900" height="560" referrerpolicy="no-referrer"></div>
       <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
-      <div class="dienst-name">AI telefonist</div>
-      <div class="dienst-desc">Een digitale eerste lijn die telefoontjes aanneemt, basisvragen stelt en duidelijke vervolgacties klaarzet voor je team.</div>
+      <div class="dienst-name">Lokale SEO-basis</div>
+      <div class="dienst-desc">Een website met heldere diensten, lokale context en technische SEO zodat Google begrijpt waarvoor je in Oisterwijk relevant bent.</div>
       <ul class="dienst-list">
-        <li>Gesprekken opnemen buiten werktijd</li>
-        <li>Vaste intakevragen per dienst</li>
-        <li>Samenvatting naar mail of CRM</li>
-        <li>Overdracht wanneer menselijk contact nodig is</li>
+        <li>Schone URL's en canonicals</li>
+        <li>Heldere H1's en meta descriptions</li>
+        <li>Interne links naar diensten</li>
+        <li>Sitemap en indexeerbare pagina's</li>
       </ul>
     </div>
     <div class="dienst-card">
-      <div class="dienst-thumb"><img src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy" decoding="async" width="900" height="560" referrerpolicy="no-referrer"></div>
+      <div class="dienst-thumb"><img src="https://images.unsplash.com/photo-1547658719-da2b51169166?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy" decoding="async" width="900" height="560" referrerpolicy="no-referrer"></div>
       <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
-      <div class="dienst-name">Leadkwalificatie</div>
-      <div class="dienst-desc">Laat de voice-agent snel bepalen wie belt, waar de aanvraag over gaat en hoe urgent de opvolging is.</div>
+      <div class="dienst-name">Conversiepagina's</div>
+      <div class="dienst-desc">Pagina's die niet alleen mooi zijn, maar bezoekers helpen kiezen: wat doe je, voor wie, waarom jij en hoe neem ik contact op?</div>
       <ul class="dienst-list">
-        <li>Naam, bedrijf en contactgegevens verzamelen</li>
-        <li>Vraag en timing structureren</li>
-        <li>Urgentie en prioriteit herkennen</li>
-        <li>Warme leads sneller oppakken</li>
+        <li>Sterke homepage en dienstenpagina's</li>
+        <li>Bewijs, werkwijze en veelgestelde vragen</li>
+        <li>Duidelijke offerte- en contactknoppen</li>
+        <li>Tekst die aansluit op zoekintentie</li>
       </ul>
     </div>
     <div class="dienst-card">
-      <div class="dienst-thumb"><img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy" decoding="async" width="900" height="560" referrerpolicy="no-referrer"></div>
+      <div class="dienst-thumb"><img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy" decoding="async" width="900" height="560" referrerpolicy="no-referrer"></div>
       <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
-      <div class="dienst-name">Afspraakintake</div>
-      <div class="dienst-desc">Verzamel alvast de juiste informatie voordat iemand terugbelt of een afspraak bevestigt.</div>
+      <div class="dienst-name">Mobiel & snel</div>
+      <div class="dienst-desc">Veel lokale bezoekers zitten op mobiel. Daarom bouwen we pagina's die snel laden, goed leesbaar zijn en geen onnodige drempels hebben.</div>
       <ul class="dienst-list">
-        <li>Beschikbaarheid en voorkeuren ophalen</li>
-        <li>Situatie en context samenvatten</li>
-        <li>Terugbelverzoeken aanmaken</li>
-        <li>Planning of agenda voorbereiden</li>
+        <li>Responsive design</li>
+        <li>Heldere knoppen op mobiel</li>
+        <li>Snelle laadtijd</li>
+        <li>Geen layoutverschuivingen</li>
       </ul>
     </div>
     <div class="dienst-card">
       <div class="dienst-thumb"><img src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy" decoding="async" width="900" height="560" referrerpolicy="no-referrer"></div>
       <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-      <div class="dienst-name">Gesprekssamenvatting</div>
-      <div class="dienst-desc">Na elk gesprek ontvang je een korte, bruikbare samenvatting met actiepunten en belangrijke klantinformatie.</div>
+      <div class="dienst-name">Aanvraagflow</div>
+      <div class="dienst-desc">Maak de stap naar contact simpel. Van formulier tot mail, WhatsApp of terugbelverzoek: de bezoeker moet makkelijk verder kunnen.</div>
       <ul class="dienst-list">
-        <li>Samenvatting per gesprek</li>
-        <li>Actiepunten voor opvolging</li>
-        <li>Labels per type aanvraag</li>
-        <li>Geen losse notities meer</li>
+        <li>Contactformulier of offerteaanvraag</li>
+        <li>WhatsApp en telefoon duidelijk zichtbaar</li>
+        <li>Meetbare CTA's</li>
+        <li>Leadopvolging als vervolgstap</li>
       </ul>
     </div>
     <div class="dienst-card">
-      <div class="dienst-thumb"><img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy" decoding="async" width="900" height="560" referrerpolicy="no-referrer"></div>
+      <div class="dienst-thumb"><img src="https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy" decoding="async" width="900" height="560" referrerpolicy="no-referrer"></div>
       <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-      <div class="dienst-name">CRM-koppelingen</div>
-      <div class="dienst-desc">Zet gespreksinformatie door naar je CRM, mailbox, agenda of interne dashboard zodat opvolging niet blijft liggen.</div>
+      <div class="dienst-name">Contentstructuur</div>
+      <div class="dienst-desc">De site wordt gebouwd alsof hij later kan groeien met blogs, kennisbankartikelen, branchepagina's en extra lokale pagina's.</div>
       <ul class="dienst-list">
-        <li>Nieuwe lead of taak aanmaken</li>
-        <li>Status en eigenaar instellen</li>
-        <li>Mailnotificatie naar je team</li>
-        <li>Koppeling met bestaande processen</li>
+        <li>Blog en kennisbank als groeimotor</li>
+        <li>Interne links naar commerciële pagina's</li>
+        <li>Onderwerpen per zoekintentie</li>
+        <li>Ruimte voor lokale SEO-uitbreiding</li>
       </ul>
     </div>
     <div class="dienst-card">
       <div class="dienst-thumb"><img src="https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=900&q=80" alt="" loading="lazy" decoding="async" width="900" height="560" referrerpolicy="no-referrer"></div>
       <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div>
-      <div class="dienst-name">Voiceflows op maat</div>
-      <div class="dienst-desc">Heb je een specifieke telefonieroute of brancheproces? Dan richten we de voiceflow in op jouw vragen, tone of voice en vervolgstappen.</div>
+      <div class="dienst-name">Slimme uitbreidingen</div>
+      <div class="dienst-desc">Als de basis staat, kunnen we koppelingen toevoegen zoals CRM, AI automatisering, chatbot of aanvraagbeheer.</div>
       <ul class="dienst-list">
-        <li>Scripts op maat</li>
-        <li>Scenario's per type beller</li>
-        <li>Escalatie naar medewerker</li>
-        <li>Doorlopende optimalisatie</li>
+        <li>CRM-koppeling</li>
+        <li>Chatbot of AI telefonist</li>
+        <li>Dashboards voor leads</li>
+        <li>Doorontwikkeling op basis van data</li>
       </ul>
     </div>
   </div>
@@ -470,29 +474,29 @@ nav {
 <!-- HOE WERKT HET -->
 <div class="section section-alt reveal">
   <div class="section-eyebrow">Werkwijze</div>
-  <div class="section-title is-single-line"><span class="nowrap">Van telefoontje naar opvolging</span></div>
-  <div class="section-sub">Geen vage AI-demo, maar een concrete telefonieroute. Softora.nl richt jouw voice-oplossing stap voor stap in rond echte gesprekken.</div>
+  <div class="section-title is-single-line"><span class="nowrap">Van lokale zoekvraag naar aanvraag</span></div>
+  <div class="section-sub">We bouwen niet zomaar pagina's. We zetten een route neer die bezoekers uit Oisterwijk helpt begrijpen, vertrouwen en contact opnemen.</div>
 
   <div class="process-grid">
     <div class="process-step">
       <div class="step-num">1</div>
-      <div class="step-title">Gespreksflow</div>
-      <div class="step-desc">We bepalen welke telefoontjes binnenkomen, welke vragen gesteld moeten worden en wanneer een medewerker moet overnemen.</div>
+      <div class="step-title">Doel & doelgroep</div>
+      <div class="step-desc">We bepalen welke klanten je wilt aantrekken, welke diensten prioriteit hebben en welke zoekvragen lokaal belangrijk zijn.</div>
     </div>
     <div class="process-step">
       <div class="step-num">2</div>
-      <div class="step-title">Script & koppeling</div>
-      <div class="step-desc">Je krijgt een helder voorstel voor script, tone of voice, data, notificaties en eventuele CRM- of agenda-koppelingen.</div>
+      <div class="step-title">Structuur & copy</div>
+      <div class="step-desc">We maken de paginaopbouw, teksten, interne links en CTA's zodat de site logisch voelt voor bezoeker en zoekmachine.</div>
     </div>
     <div class="process-step">
       <div class="step-num">3</div>
       <div class="step-title">Bouwen & Testen</div>
-      <div class="step-desc">We testen de voice-agent met realistische gesprekken, scherpen antwoorden aan en bewaken dat opvolging logisch binnenkomt.</div>
+      <div class="step-desc">De website wordt gebouwd op snelheid, mobiel gebruik, schone techniek en duidelijke indexeerbare content.</div>
     </div>
     <div class="process-step">
       <div class="step-num">4</div>
-      <div class="step-title">Live & Verbeteren</div>
-      <div class="step-desc">Na livegang blijven we kijken naar gesprekken, gemiste vragen en kansen om de flow slimmer te maken.</div>
+      <div class="step-title">Live & Groeien</div>
+      <div class="step-desc">Na livegang gebruiken we data, content en interne links om stap voor stap meer relevante bezoekers aan te trekken.</div>
     </div>
   </div>
 </div>
@@ -500,48 +504,48 @@ nav {
 <!-- VOORBEELDEN -->
 <div class="section reveal">
   <div class="section-eyebrow">Mogelijkheden</div>
-  <div class="section-title is-single-line"><span class="nowrap">Wat wij voor jou bouwen</span></div>
-  <div class="section-sub">Een greep uit de voice-oplossingen die Softora.nl voor MKB-bedrijven kan inrichten.</div>
+  <div class="section-title is-single-line"><span class="nowrap">Een lokale website die kan groeien</span></div>
+  <div class="section-sub">Voor Oisterwijkse ondernemers bouwen we de basis strak, zodat latere SEO-content en automatisering logisch kunnen aansluiten.</div>
 
   <div class="examples-grid">
     <div class="example-card">
       <div class="example-visual">
-        <img class="example-photo" src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1200&q=85" alt="Professionele medewerker met headset aan het werk" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+        <img class="example-photo" src="https://images.unsplash.com/photo-1547658719-da2b51169166?auto=format&fit=crop&w=1200&q=85" alt="Laptop met moderne bedrijfswebsite op het scherm" loading="lazy" decoding="async" referrerpolicy="no-referrer">
       </div>
       <div class="example-body">
-        <div class="example-tag">AI Telefonie</div>
-        <div class="example-name">AI Telefonist</div>
-        <div class="example-desc">Een voice-agent die opneemt, de reden van het gesprek achterhaalt en direct een duidelijke samenvatting met vervolgstap doorstuurt.</div>
+        <div class="example-tag">Lokale dienstverlener</div>
+        <div class="example-name">Bedrijfswebsite Oisterwijk</div>
+        <div class="example-desc">Een professionele website voor een lokale dienstverlener met diensten, werkwijze, bewijs en een duidelijke route naar contact.</div>
       </div>
     </div>
     <div class="example-card">
       <div class="example-visual">
-        <img class="example-photo" src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1200&q=85" alt="Team in een callcenter met headsets" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+        <img class="example-photo" src="https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=1200&q=85" alt="Online winkelen en e-commerce op mobiel" loading="lazy" decoding="async" referrerpolicy="no-referrer">
       </div>
       <div class="example-body">
-        <div class="example-tag">Lead intake</div>
-        <div class="example-name">Terugbel Flow</div>
-        <div class="example-desc">Bellers laten hun vraag, locatie, urgentie en contactgegevens achter, zodat je team precies weet wie als eerste opvolging nodig heeft.</div>
+        <div class="example-tag">Vindbaarheid</div>
+        <div class="example-name">Lokale SEO-structuur</div>
+        <div class="example-desc">Een paginaopbouw waarin diensten, regio, interne links en content elkaar versterken zonder dat de site rommelig wordt.</div>
       </div>
     </div>
     <div class="example-card">
       <div class="example-visual">
-        <img class="example-photo" src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1200&q=85" alt="Administratie en documenten op een zakelijke werkplek" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+        <img class="example-photo" src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1200&q=85" alt="Zakelijke documenten en laptop voor offertes en facturen" loading="lazy" decoding="async" referrerpolicy="no-referrer">
       </div>
       <div class="example-body">
-        <div class="example-tag">Planning</div>
-        <div class="example-name">Afspraak Intake</div>
-        <div class="example-desc">De voice-agent verzamelt alvast voorkeuren, context en beschikbaarheid, zodat een afspraak sneller bevestigd kan worden.</div>
+        <div class="example-tag">Aanvragen</div>
+        <div class="example-name">Landingspagina & Lead Capture</div>
+        <div class="example-desc">Een gerichte campagnepagina die bezoekers direct omzet in leads. Met contactformulier, bewijs en sterke call-to-action.</div>
       </div>
     </div>
     <div class="example-card">
       <div class="example-visual">
-        <img class="example-photo" src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=85" alt="Ontwikkelaar programmeert een slimme digitale tool" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+        <img class="example-photo" src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=85" alt="Modern kantoor en laptop voor online afspraken" loading="lazy" decoding="async" referrerpolicy="no-referrer">
       </div>
       <div class="example-body">
-        <div class="example-tag">CRM Koppeling</div>
-        <div class="example-name">Gesprek naar Taak</div>
-        <div class="example-desc">Na het gesprek staat de samenvatting als lead, taak of notitie klaar in het systeem waar jouw team al mee werkt.</div>
+        <div class="example-tag">Automatisering</div>
+        <div class="example-name">Website met opvolging</div>
+        <div class="example-desc">Een website die aanvragen niet alleen verzamelt, maar ook kan doorzetten naar CRM, mail, agenda of een slimme intakeflow.</div>
       </div>
     </div>
   </div>
@@ -550,36 +554,36 @@ nav {
 <!-- WAAROM SOFTORA -->
 <div class="section section-alt reveal">
   <div class="section-eyebrow">Waarom Softora.nl</div>
-  <div class="section-title is-single-line"><span class="nowrap">Jouw telefoon, slimme opvolging.</span></div>
-  <div class="section-sub">Softora.nl bouwt voicesoftware op maat voor het MKB. Praktisch, meetbaar en gekoppeld aan de manier waarop jouw team werkt.</div>
+  <div class="section-title is-single-line"><span class="nowrap">Dichtbij, maar gebouwd voor groei.</span></div>
+  <div class="section-sub">Softora.nl werkt vanuit Oisterwijk en bouwt websites voor ondernemers die meer uit hun online zichtbaarheid willen halen.</div>
 
   <div class="why-grid">
     <div class="why-item">
       <div class="why-num">01</div>
       <div class="why-content">
-        <div class="why-title">Proces eerst</div>
-        <div class="why-desc">We starten bij je echte belproces: wie belt, wat moet gevraagd worden en wat moet er na het gesprek gebeuren.</div>
+        <div class="why-title">Lokale context</div>
+        <div class="why-desc">Een pagina voor Oisterwijk moet echt helpen, niet alleen een plaatsnaam herhalen. Daarom koppelen we lokaal zoeken aan concrete diensten.</div>
       </div>
     </div>
     <div class="why-item">
       <div class="why-num">02</div>
       <div class="why-content">
-        <div class="why-title">Heldere grenzen</div>
-        <div class="why-desc">Een goede AI-agent weet wat hij wel en niet mag doen. Complexe of gevoelige situaties gaan terug naar een mens.</div>
+        <div class="why-title">SEO-fundering</div>
+        <div class="why-desc">We letten op technische basis, schone URL, indexeerbare content, interne links, sitemap en duidelijke zoekintentie.</div>
       </div>
     </div>
     <div class="why-item">
       <div class="why-num">03</div>
       <div class="why-content">
-        <div class="why-title">Altijd bereikbaar</div>
-        <div class="why-desc">Je mist minder telefoontjes buiten werktijd, tijdens drukte of wanneer het team tijdelijk niet kan opnemen.</div>
+        <div class="why-title">Conversiegericht</div>
+        <div class="why-desc">Meer verkeer is pas waardevol als bezoekers ook contact opnemen. Daarom krijgt elke pagina een duidelijke vervolgstap.</div>
       </div>
     </div>
     <div class="why-item">
       <div class="why-num">04</div>
       <div class="why-content">
-        <div class="why-title">Meetbaar verbeteren</div>
-        <div class="why-desc">Gesprekken laten zien waar klanten op vastlopen. Die signalen gebruiken we om de flow steeds scherper te maken.</div>
+        <div class="why-title">Groeibaar systeem</div>
+        <div class="why-desc">Deze pagina is een startpunt. Blogs, kennisbank, branches en automatisering kunnen later dezelfde structuur versterken.</div>
       </div>
     </div>
   </div>
@@ -588,9 +592,9 @@ nav {
 <!-- CTA -->
 <div class="cta-block reveal">
   <div class="cta-block-inner">
-    <div class="cta-eyebrow">Klaar om te starten?</div>
-    <div class="cta-title">Laat telefonie<br>voor je werken</div>
-    <div class="cta-sub">Vertel welke telefoontjes nu blijven liggen. Wij komen met een concreet voorstel voor een voice-oplossing die past bij jouw bedrijf.</div>
+    <div class="cta-eyebrow">Klaar om lokaal sterker te worden?</div>
+    <div class="cta-title">Laat je website<br>voor je werken</div>
+    <div class="cta-sub">Vertel wat je verkoopt en wie je wilt bereiken in Oisterwijk. Wij maken een concreet voorstel voor een website die gevonden kan worden en aanvragen kan opleveren.</div>
     <a class="btn-primary" href="mailto:info@softora.nl" style="margin:0 auto;display:inline-flex">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
       Stuur een bericht

@@ -13,6 +13,7 @@ const publicSeoUnlockedPages = [
   'premium-chatbot.html',
   'premium-over-softora.html',
   'premium-websites.html',
+  'website-laten-maken-oisterwijk.html',
   'premium-voicesoftware.html',
   'premium-blog.html',
 ];
@@ -41,5 +42,20 @@ test('publieke SEO-landingspagina’s hebben geen toegangscode-slot meer', () =>
     assert.doesNotMatch(source, /data-public-lock-input/, file);
     assert.doesNotMatch(source, /data-public-lock-submit/, file);
     assert.doesNotMatch(source, /premium-public-lock\.js/, file);
+  });
+});
+
+test('publieke premium landingspagina’s tonen reveal-secties zonder apart animatiescript', () => {
+  [
+    'premium-bedrijfssoftware.html',
+    'premium-chatbot.html',
+    'premium-voicesoftware.html',
+    'premium-websites.html',
+    'website-laten-maken-oisterwijk.html',
+  ].forEach((file) => {
+    const source = readRepoFile(file);
+
+    assert.doesNotMatch(source, /\.reveal\s*\{\s*opacity:\s*0\b/, file);
+    assert.match(source, /\.reveal,\s*\.reveal\.visible\s*\{\s*opacity:\s*1;\s*transform:\s*none;/, file);
   });
 });
