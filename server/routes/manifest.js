@@ -9,7 +9,11 @@ const criticalFlowChecklist = Object.freeze([
 ]);
 
 const pageSmokeTargets = Object.freeze([
+  { path: '/diensten', marker: 'Digitale diensten die verkeer omzetten in leads' },
+  { path: '/ai-automatisering', marker: 'Automatiseer werk dat nu tijd en kansen kost' },
   { path: '/bedrijfssoftware-op-maat', marker: 'Bedrijfssoftware op maat' },
+  { path: '/crm-systeem-op-maat', marker: 'Meer grip op leads, klanten en opvolging' },
+  { path: '/ai-telefonist', marker: 'Laat geen telefoontje meer zonder opvolging' },
   { path: '/voicesoftware-op-maat', marker: 'Voicesoftware op maat' },
   { path: '/chatbot-laten-maken', marker: 'Chatbot op maat' },
   { path: '/website-laten-maken', marker: 'Premium Websites' },

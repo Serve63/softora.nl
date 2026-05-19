@@ -11,6 +11,16 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     description:
       'Softora bouwt snelle websites, bedrijfssoftware en AI automatisering voor ondernemers die meer aanvragen, minder handwerk en slimmere groei willen.',
     kind: 'home',
+    relatedLinks: ['/diensten', '/website-laten-maken', '/blog', '/kennisbank'],
+  },
+  {
+    fileName: 'diensten.html',
+    path: '/diensten',
+    title: 'Softora diensten voor websites, software en AI',
+    description:
+      'Bekijk de Softora diensten voor websites, bedrijfssoftware, CRM, AI automatisering, chatbots en AI telefonie voor groeiende ondernemers.',
+    kind: 'collection',
+    relatedLinks: ['/website-laten-maken', '/ai-automatisering', '/bedrijfssoftware-op-maat', '/crm-systeem-op-maat'],
   },
   {
     fileName: 'premium-websites.html',
@@ -21,6 +31,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Laat een snelle, overtuigende website maken door Softora met sterke uitstraling, heldere structuur en focus op offerteaanvragen.',
     kind: 'service',
     serviceName: 'Webdesign en website ontwikkeling',
+    relatedLinks: ['/blog/website-laten-maken-kosten-2026', '/ai-automatisering', '/chatbot-laten-maken', '/kennisbank'],
   },
   {
     fileName: 'premium-bedrijfssoftware.html',
@@ -31,6 +42,27 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Softora bouwt bedrijfssoftware op maat voor dashboards, klantbeheer, processen, automatisering en interne tools die dagelijks werk versnellen.',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
+    relatedLinks: ['/crm-systeem-op-maat', '/maatwerk-platform', '/kennisbank/wat-is-bedrijfssoftware-op-maat', '/ai-automatisering'],
+  },
+  {
+    fileName: 'crm-systeem-op-maat.html',
+    path: '/crm-systeem-op-maat',
+    title: 'CRM systeem op maat laten maken',
+    description:
+      'Softora bouwt CRM systemen op maat voor leadopvolging, klantbeheer, offertes, dashboards en automatisering voor MKB-bedrijven.',
+    kind: 'service',
+    serviceName: 'CRM systeem op maat',
+    relatedLinks: ['/bedrijfssoftware-op-maat', '/ai-automatisering', '/blog/ai-automatisering-mkb-waar-beginnen', '/kennisbank'],
+  },
+  {
+    fileName: 'ai-automatisering.html',
+    path: '/ai-automatisering',
+    title: 'AI automatisering voor het MKB',
+    description:
+      'Softora automatiseert terugkerend werk met AI, slimme workflows, CRM-koppelingen, chatbots en AI telefonie voor praktische groei.',
+    kind: 'service',
+    serviceName: 'AI automatisering',
+    relatedLinks: ['/blog/ai-automatisering-mkb-waar-beginnen', '/chatbot-laten-maken', '/ai-telefonist', '/crm-systeem-op-maat'],
   },
   {
     fileName: 'maatwerk-platform.html',
@@ -40,6 +72,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Softora ontwikkelt maatwerk platformen, databases en softwareoplossingen voor bedrijven die hun processen professioneel willen digitaliseren.',
     kind: 'service',
     serviceName: 'Maatwerk platform ontwikkeling',
+    relatedLinks: ['/bedrijfssoftware-op-maat', '/crm-systeem-op-maat', '/ai-automatisering', '/kennisbank/wat-is-bedrijfssoftware-op-maat'],
   },
   {
     fileName: 'ai-telefonist.html',
@@ -49,6 +82,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Softora bouwt een AI telefonist die telefoontjes opneemt, klanten kwalificeert, afspraken plant en samenvattingen doorstuurt.',
     kind: 'service',
     serviceName: 'AI telefonist',
+    relatedLinks: ['/voicesoftware-op-maat', '/chatbot-laten-maken', '/ai-automatisering', '/blog/ai-automatisering-mkb-waar-beginnen'],
   },
   {
     fileName: 'premium-voicesoftware.html',
@@ -59,6 +93,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Softora maakt voicesoftware en AI telefonie op maat voor bereikbaarheid, gespreksafhandeling, opvolging en slimme automatisering.',
     kind: 'service',
     serviceName: 'Voicesoftware op maat',
+    relatedLinks: ['/ai-telefonist', '/ai-automatisering', '/chatbot-laten-maken', '/blog/ai-automatisering-mkb-waar-beginnen'],
   },
   {
     fileName: 'premium-chatbot.html',
@@ -69,6 +104,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Softora bouwt chatbots op maat die bezoekers helpen, leads kwalificeren, vragen beantwoorden en jouw bedrijf online sneller laten reageren.',
     kind: 'service',
     serviceName: 'Chatbot op maat',
+    relatedLinks: ['/blog/chatbot-laten-maken-wanneer-zinvol', '/ai-automatisering', '/ai-telefonist', '/website-laten-maken'],
   },
   {
     fileName: 'premium-pakketten.html',
@@ -78,6 +114,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     description:
       'Bekijk de Softora pakketten voor websites, software, AI automatisering en digitale groeisystemen voor ondernemers en teams.',
     kind: 'collection',
+    relatedLinks: ['/diensten', '/website-laten-maken', '/bedrijfssoftware-op-maat', '/ai-automatisering'],
   },
   {
     fileName: 'premium-over-softora.html',
@@ -87,6 +124,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     description:
       'Lees meer over Softora, de werkwijze en de focus op websites, software en AI oplossingen die ondernemers praktisch verder helpen.',
     kind: 'about',
+    relatedLinks: ['/diensten', '/website-laten-maken', '/bedrijfssoftware-op-maat', '/blog'],
   },
   {
     fileName: 'premium-algemene-voorwaarden.html',
@@ -170,6 +208,13 @@ function escapeHtmlAttribute(valueRaw) {
   return String(valueRaw || '')
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeHtmlText(valueRaw) {
+  return String(valueRaw || '')
+    .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
@@ -317,6 +362,15 @@ function injectBeforeHeadClose(htmlRaw, snippet) {
   return `${snippet}\n${html}`;
 }
 
+function injectBeforeBodyClose(htmlRaw, snippet) {
+  const html = String(htmlRaw || '');
+  if (!snippet) return html;
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, `${snippet}\n</body>`);
+  }
+  return `${html}\n${snippet}`;
+}
+
 function upsertCanonical(htmlRaw, canonicalUrl) {
   const html = String(htmlRaw || '');
   const escaped = escapeHtmlAttribute(canonicalUrl);
@@ -430,6 +484,92 @@ function addStructuredDataIfMissing(htmlRaw, entry, siteOrigin) {
   return injectBeforeHeadClose(html, snippet);
 }
 
+const PUBLIC_SEO_INTERNAL_LINK_STYLE = [
+  '    <style data-softora-public-seo="internal-link-style">',
+  '      .softora-seo-link-map{background:#fff;border-top:1px solid rgba(26,26,46,.08);padding:52px clamp(20px,6vw,80px);font-family:Inter,system-ui,sans-serif;color:#1a1a2e;}',
+  '      .softora-seo-link-map__inner{max-width:1120px;margin:0 auto;}',
+  '      .softora-seo-link-map__label{font-family:Oswald,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8b2252;margin-bottom:10px;}',
+  '      .softora-seo-link-map h2{font-family:Oswald,Arial,sans-serif;font-size:clamp(28px,3.8vw,44px);line-height:1.05;text-transform:uppercase;letter-spacing:0;margin:0 0 18px;}',
+  '      .softora-seo-link-map__grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:24px;}',
+  '      .softora-seo-link-map a{display:flex;align-items:center;min-height:72px;padding:16px 18px;border:1px solid rgba(26,26,46,.1);border-radius:8px;text-decoration:none;color:#1a1a2e;background:#f8f7f4;font-weight:700;line-height:1.25;}',
+  '      .softora-seo-link-map a:hover{border-color:rgba(139,34,82,.32);color:#8b2252;background:#fff;}',
+  '      @media (max-width: 860px){.softora-seo-link-map__grid{grid-template-columns:1fr 1fr;}.softora-seo-link-map{padding:40px 20px;}}',
+  '      @media (max-width: 520px){.softora-seo-link-map__grid{grid-template-columns:1fr;}.softora-seo-link-map a{min-height:0;}}',
+  '    </style>',
+].join('\n');
+
+const PUBLIC_SEO_LINK_LABELS = Object.freeze({
+  '/': 'Home',
+  '/diensten': 'Alle diensten',
+  '/website-laten-maken': 'Website laten maken',
+  '/bedrijfssoftware-op-maat': 'Bedrijfssoftware op maat',
+  '/crm-systeem-op-maat': 'CRM systeem op maat',
+  '/ai-automatisering': 'AI automatisering',
+  '/maatwerk-platform': 'Maatwerk platform',
+  '/ai-telefonist': 'AI telefonist',
+  '/voicesoftware-op-maat': 'Voicesoftware op maat',
+  '/chatbot-laten-maken': 'Chatbot laten maken',
+  '/pakketten': 'Pakketten',
+  '/over-softora': 'Over Softora',
+  '/blog': 'Blog',
+  '/kennisbank': 'Kennisbank',
+  '/blog/ai-automatisering-mkb-waar-beginnen': 'AI automatisering voor het MKB',
+  '/blog/website-laten-maken-kosten-2026': 'Website laten maken kosten 2026',
+  '/blog/chatbot-laten-maken-wanneer-zinvol': 'Wanneer is een chatbot slim?',
+  '/kennisbank/wat-is-bedrijfssoftware-op-maat': 'Wat is bedrijfssoftware op maat?',
+});
+
+function getPublicSeoInternalLinks(entry) {
+  if (!entry || entry.kind === 'legal') return [];
+  const fallbackLinks = ['/diensten', '/blog', '/kennisbank', '/pakketten'];
+  const candidates = [...(entry.relatedLinks || []), ...fallbackLinks]
+    .map(normalizePublicPath)
+    .filter((pathName) => pathName && pathName !== entry.path);
+  const seen = new Set();
+  return candidates
+    .filter((pathName) => {
+      if (seen.has(pathName)) return false;
+      seen.add(pathName);
+      return true;
+    })
+    .slice(0, 6)
+    .map((pathName) => ({
+      href: pathName,
+      label: PUBLIC_SEO_LINK_LABELS[pathName] || pathName.replace(/^\//, '').replace(/-/g, ' '),
+    }));
+}
+
+function addInternalLinksIfMissing(htmlRaw, entry) {
+  let html = String(htmlRaw || '');
+  if (/data-softora-public-seo=["']internal-links["']/i.test(html)) return html;
+  const links = getPublicSeoInternalLinks(entry);
+  if (links.length === 0) return html;
+
+  if (!/data-softora-public-seo=["']internal-link-style["']/i.test(html)) {
+    html = injectBeforeHeadClose(html, PUBLIC_SEO_INTERNAL_LINK_STYLE);
+  }
+
+  const linkItems = links
+    .map(
+      (link) =>
+        `        <a href="${escapeHtmlAttribute(link.href)}">${escapeHtmlText(link.label)}</a>`
+    )
+    .join('\n');
+  const snippet = [
+    '  <section class="softora-seo-link-map" data-softora-public-seo="internal-links" aria-label="Verder binnen Softora">',
+    '    <div class="softora-seo-link-map__inner">',
+    '      <div class="softora-seo-link-map__label">Verder bouwen</div>',
+    '      <h2>Logische volgende stap</h2>',
+    '      <div class="softora-seo-link-map__grid">',
+    linkItems,
+    '      </div>',
+    '    </div>',
+    '  </section>',
+  ].join('\n');
+
+  return injectBeforeBodyClose(html, snippet);
+}
+
 function applyPublicSeoHeadDefaults(htmlRaw, fileNameRaw, { siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
   const entry = getIndexablePublicSeoPage(fileNameRaw);
   let html = String(htmlRaw || '');
@@ -454,6 +594,7 @@ function applyPublicSeoHeadDefaults(htmlRaw, fileNameRaw, { siteOrigin = DEFAULT
   html = addMetaIfMissing(html, 'name', 'twitter:description', entry.description);
   html = addMetaIfMissing(html, 'name', 'twitter:image', imageUrl);
   html = addStructuredDataIfMissing(html, entry, siteOrigin);
+  html = addInternalLinksIfMissing(html, entry);
 
   if (!hasTag(html, /<html\b[^>]*lang=["']nl["']/i)) {
     html = html.replace(/<html\b([^>]*)>/i, '<html$1 lang="nl">');
@@ -474,6 +615,7 @@ module.exports = {
   getIndexablePublicSeoPageByPath,
   getIndexablePublicSeoPages,
   getLegacyPublicSeoRedirectTargetPath,
+  getPublicSeoInternalLinks,
   isIndexablePublicHtmlFile,
   normalizePublicPath,
   normalizeSiteOrigin,
