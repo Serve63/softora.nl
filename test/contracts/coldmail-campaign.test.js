@@ -1039,6 +1039,8 @@ test('coldmail campaign test mode infers webdesign assets from the mail content 
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
   assert.match(sentMessages[0].html, /Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop👇/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
+  assert.doesNotMatch(sentMessages[0].html, /border-top\s*:\s*1px\s+dashed/i);
+  assert.doesNotMatch(sentMessages[0].html, /detail-mail-section-signature/);
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-softora-test-mode-recipient@softora');
   assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-softora-test-mode-recipient@softora');
