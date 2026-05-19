@@ -6,6 +6,11 @@ const {
   getIndexablePublicPathFromHtmlFile,
   getLegacyPublicSeoRedirectTargetPath,
 } = require('../services/public-seo');
+const {
+  buildSeoContentArticleHtml,
+  buildSeoContentIndexHtml,
+  getSeoContentItem,
+} = require('../services/seo-content');
 
 function appendOriginalQuery(pathname, originalUrl) {
   const basePath = String(pathname || '').trim() || '/';
@@ -93,6 +98,35 @@ function registerPublicPageRoutes(app, deps) {
 
   app.get('/', async (req, res, next) => {
     return deps.sendSeoManagedHtmlPageResponse(req, res, next, 'premium-website.html');
+  });
+
+  app.get('/premium-blog', (req, res) => {
+    return res.redirect(301, appendOriginalQuery('/blog', req.originalUrl));
+  });
+
+  app.get(['/blog', '/kennisbank'], (req, res, next) => {
+    const collection = String(req.path || '').replace(/^\//, '');
+    const publicBaseUrl = deps.getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
+    const html = buildSeoContentIndexHtml(collection, { siteOrigin: publicBaseUrl });
+    if (!html) return next();
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
+    return res.status(200).send(html);
+  });
+
+  app.get(['/blog/:slug', '/kennisbank/:slug'], (req, res, next) => {
+    const collection = String(req.path || '').split('/').filter(Boolean)[0] || '';
+    const slug = String(req.params.slug || '').trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(slug)) return next();
+
+    const item = getSeoContentItem(collection, slug);
+    if (!item) return next();
+
+    const publicBaseUrl = deps.getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
+    const html = buildSeoContentArticleHtml(item, { siteOrigin: publicBaseUrl });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
+    return res.status(200).send(html);
   });
 
   app.get('/:page', (req, res, next) => {

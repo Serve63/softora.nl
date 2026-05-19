@@ -2,7 +2,7 @@ const { spawn } = require('child_process');
 const { setTimeout: delay } = require('timers/promises');
 
 function randomPort() {
-  return 4100 + Math.floor(Math.random() * 2000);
+  return 4100 + Math.floor(Math.random() * 900);
 }
 
 async function waitFor(url, timeoutMs = 25000) {

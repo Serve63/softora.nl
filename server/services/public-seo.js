@@ -1,6 +1,7 @@
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/home-hero-generated-v2.jpg';
 const DEFAULT_LOGO_PATH = '/assets/61C2BCF5-70E9-4789-AFDE-FA18C862D58A.PNG';
+const { getSeoContentPublicPaths, getSeoContentSitemapEntries } = require('./seo-content');
 
 const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
@@ -229,14 +230,24 @@ function getIndexablePublicSeoPages(knownHtmlPageFiles) {
 }
 
 function buildPublicSeoSitemapXml({ knownHtmlPageFiles, siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
-  const entries = getIndexablePublicSeoPages(knownHtmlPageFiles);
+  const entries = [...getIndexablePublicSeoPages(knownHtmlPageFiles), ...getSeoContentSitemapEntries()];
+  const seenPaths = new Set();
   const urlItems = entries
+    .filter((entry) => {
+      const pathName = normalizePublicPath(entry.path);
+      if (!pathName || seenPaths.has(pathName)) return false;
+      seenPaths.add(pathName);
+      return true;
+    })
     .map((entry) =>
       [
         '  <url>',
         `    <loc>${escapeXml(buildAbsoluteUrl(siteOrigin, entry.path))}</loc>`,
+        entry.lastmod ? `    <lastmod>${escapeXml(entry.lastmod)}</lastmod>` : '',
         '  </url>',
-      ].join('\n')
+      ]
+        .filter(Boolean)
+        .join('\n')
     )
     .join('\n');
 
@@ -261,13 +272,13 @@ function buildPublicSeoRobotsTxt({ knownHtmlPageFiles, siteOrigin = DEFAULT_SITE
   const indexablePaths = new Set(
     getIndexablePublicSeoPages(knownHtmlPageFiles).flatMap((entry) => [entry.path, ...entry.legacyPaths])
   );
+  getSeoContentPublicPaths().forEach((pathName) => indexablePaths.add(pathName));
   const disallowPaths = new Set([
     '/api/',
     '/premium-personeel-login',
     '/premium-seo',
     '/premium-websitegenerator',
     '/premium-bevestigingsmails',
-    '/premium-blog',
     '/actieve-opdrachten',
     '/opdracht-preview',
     '/personeel-dashboard',

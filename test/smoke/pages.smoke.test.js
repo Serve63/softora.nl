@@ -72,6 +72,43 @@ for (const target of publicSeoLegacyRedirectTargets) {
   });
 }
 
+test('page smoke: /premium-blog redirects to the public blog foundation', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/premium-blog`, {
+    cache: 'no-store',
+    redirect: 'manual',
+  });
+  const location = response.headers.get('location') || '';
+
+  assert.equal(response.status, 301, '/premium-blog');
+  assert.ok(location === '/blog' || location === `${serverRef.baseUrl}/blog`, `Redirect ging naar ${location}`);
+});
+
+test('page smoke: public blog article is crawlable HTML', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/blog/ai-automatisering-mkb-waar-beginnen`, {
+    cache: 'no-store',
+  });
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(html, /<!DOCTYPE html>/i);
+  assert.match(html, /AI automatisering voor het MKB: waar begin je\?/);
+  assert.match(html, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/blog\/ai-automatisering-mkb-waar-beginnen">/);
+  assert.match(html, /data-softora-public-seo="structured-data"/);
+});
+
+test('page smoke: public kennisbank article is crawlable HTML', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/kennisbank/wat-is-bedrijfssoftware-op-maat`, {
+    cache: 'no-store',
+  });
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(html, /<!DOCTYPE html>/i);
+  assert.match(html, /Wat is bedrijfssoftware op maat\?/);
+  assert.match(html, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/kennisbank\/wat-is-bedrijfssoftware-op-maat">/);
+  assert.match(html, /data-softora-public-seo="structured-data"/);
+});
+
 test('page smoke: /favicon.ico serves the Softora favicon', async () => {
   const response = await fetch(`${serverRef.baseUrl}/favicon.ico`, { cache: 'no-store' });
   const bytes = Buffer.from(await response.arrayBuffer());
