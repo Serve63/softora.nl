@@ -188,12 +188,17 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(modelsSource, /struct MailboxMessage: Identifiable, Decodable, Hashable/);
   assert.match(apiClientSource, /func fetchMailboxAccounts\(\) async throws -> \[MailboxAccount\]/);
   assert.match(apiClientSource, /\/api\/mailbox\/accounts/);
-  assert.match(apiClientSource, /func fetchMailboxMessages\(account: String, folder: String, limit: Int = 50\) async throws -> \[MailboxMessage\]/);
+  assert.match(apiClientSource, /func fetchMailboxMessages\(account: String, folder: String, limit: Int = 25, summaryOnly: Bool = true\) async throws -> \[MailboxMessage\]/);
   assert.match(apiClientSource, /\/api\/mailbox\/messages\?account=/);
+  assert.match(apiClientSource, /summary=\\\(summaryValue\)/);
+  assert.match(apiClientSource, /func fetchMailboxMessageDetail\(account: String, folder: String, uid: Int\) async throws -> MailboxMessage/);
+  assert.match(apiClientSource, /uid=\\\(uid\)&limit=1/);
   assert.match(apiClientSource, /func sendMailboxMessage\(account: String, to: String, subject: String, body: String\) async throws/);
   assert.match(apiClientSource, /\/api\/mailbox\/send/);
   assert.match(apiClientSource, /func improveMailboxDraft\(account: String, to: String, subject: String, body: String, context: MailboxDraftContextPayload\) async throws -> String/);
   assert.match(apiClientSource, /\/api\/mailbox\/improve-draft/);
+  assert.match(apiClientSource, /configuration\.timeoutIntervalForRequest = 45/);
+  assert.match(apiClientSource, /configuration\.timeoutIntervalForResource = 75/);
   assert.match(modelsSource, /struct MailboxSendResponse: Decodable/);
   assert.match(modelsSource, /struct MailboxImproveDraftResponse: Decodable/);
   assert.match(agendaListSource, /private enum MailboxFolder: String, CaseIterable, Identifiable/);
@@ -209,6 +214,17 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /accessibilityLabel\("Mailadres kiezen"\)/);
   assert.match(agendaListSource, /if isShowingAccountMenu \{[^]*MailboxAccountDropdown\(/);
   assert.match(agendaListSource, /private struct MailboxAccountDropdown: View/);
+  assert.match(agendaListSource, /@State private var isLoadingMessageDetail = false/);
+  assert.match(agendaListSource, /Task \{[^]*await loadMessageDetail\(for: message\)[^]*\}/);
+  assert.match(agendaListSource, /apiClient\.fetchMailboxMessageDetail/);
+  assert.match(agendaListSource, /MailboxDetailLoadingView\(\)/);
+  assert.match(agendaListSource, /@State private var mailboxStatusMessage: String\?/);
+  assert.match(agendaListSource, /Text\("Mailbox niet geladen"\)/);
+  assert.match(agendaListSource, /Text\("Opnieuw proberen"\)/);
+  assert.match(agendaListSource, /private struct MailboxStatusBanner: View/);
+  assert.match(agendaListSource, /mailboxStatusMessage = error\.mailboxDisplayMessage/);
+  assert.match(agendaListSource, /var mailboxDisplayMessage: String/);
+  assert.match(agendaListSource, /return "Mailbox reageert te langzaam\. Probeer het zo opnieuw\."/);
   assert.doesNotMatch(
     agendaListSource,
     /MailboxAccountSelector\(\s*accounts:/,

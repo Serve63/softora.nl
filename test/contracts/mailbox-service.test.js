@@ -340,6 +340,114 @@ test('mailbox service filters belangrijk from flagged inbox messages', async () 
   assert.equal(res.body.messages[0].folder, 'starred');
 });
 
+test('mailbox service can return lightweight mailbox summaries without parsing full mail bodies', async () => {
+  let parseCalls = 0;
+  let fetchQuery = null;
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async () => ({ release() {} }),
+      search: async () => [1],
+      fetch: async function* (_range, query) {
+        fetchQuery = query;
+        yield {
+          uid: 1,
+          flags: [],
+          internalDate: new Date('2026-05-18T10:00:00Z'),
+          envelope: {
+            date: new Date('2026-05-18T10:00:00Z'),
+            from: [{ name: 'Klant', address: 'klant@example.nl' }],
+            to: [{ address: 'serve@softora.nl' }],
+            subject: 'Snelle lijst',
+          },
+        };
+      },
+      logout: async () => {},
+    }),
+    parseMailSource: async () => {
+      parseCalls += 1;
+      throw new Error('Summary mailbox list should not parse full sources.');
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'inbox', limit: '10', summary: '1' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(parseCalls, 0);
+  assert.deepEqual(fetchQuery, { uid: true, flags: true, internalDate: true, envelope: true });
+  assert.equal(res.body.messages[0].from, 'Klant');
+  assert.equal(res.body.messages[0].email, 'klant@example.nl');
+  assert.equal(res.body.messages[0].subject, 'Snelle lijst');
+  assert.equal(res.body.messages[0].body, '');
+  assert.deepEqual(res.body.messages[0].links, []);
+  assert.deepEqual(res.body.messages[0].inlineImages, []);
+});
+
+test('mailbox service can fetch a single full message by uid for the reader', async () => {
+  let fetchedRange = null;
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async () => ({ release() {} }),
+      search: async () => {
+        throw new Error('UID detail fetch should not search the full mailbox.');
+      },
+      fetch: async function* (range) {
+        fetchedRange = range;
+        yield {
+          uid: 42,
+          flags: [],
+          internalDate: new Date('2026-05-18T10:00:00Z'),
+          source: {
+            date: new Date('2026-05-18T10:00:00Z'),
+            from: { value: [{ name: 'Klant', address: 'klant@example.nl' }] },
+            to: { value: [{ address: 'serve@softora.nl' }] },
+            subject: 'Volledige mail',
+            text: 'Dit is de volledige mail.',
+          },
+        };
+      },
+      logout: async () => {},
+    }),
+    parseMailSource: async (source) => source,
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'inbox', uid: '42', limit: '1' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(fetchedRange, { uid: 42 });
+  assert.equal(res.body.messages[0].uid, 42);
+  assert.equal(res.body.messages[0].body, 'Dit is de volledige mail.');
+});
+
 test('mailbox service exposes inline mail images and html links for the iOS mailbox reader', async () => {
   const imageContent = Buffer.from('fake-image-bytes');
   const service = createMailboxService({

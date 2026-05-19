@@ -927,7 +927,9 @@ private struct MailboxView: View {
     @State private var isShowingAccountMenu = false
     @State private var isLoadingAccounts = false
     @State private var isLoadingMessages = false
+    @State private var isLoadingMessageDetail = false
     @State private var alertMessage: String?
+    @State private var mailboxStatusMessage: String?
     @AppStorage("softora.mailbox.accountOrder") private var mailboxAccountOrder = ""
     @AppStorage("softora.mailbox.pinnedAccount") private var pinnedMailboxAccountEmail = ""
     @AppStorage("softora.mailbox.openedMessageKeys") private var openedMailboxMessageKeysRaw = ""
@@ -992,6 +994,7 @@ private struct MailboxView: View {
     private var mailboxBackButton: some View {
         Button {
             selectedMessage = nil
+            isLoadingMessageDetail = false
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "chevron.left")
@@ -1111,8 +1114,47 @@ private struct MailboxView: View {
             MailboxMessageDetail(
                 message: selectedMessage,
                 selectedAccount: selectedAccount,
-                apiClient: apiClient
+                apiClient: apiClient,
+                isLoadingDetail: isLoadingMessageDetail,
+                statusMessage: mailboxStatusMessage
             )
+        } else if let mailboxStatusMessage, messages.isEmpty {
+            VStack(spacing: 12) {
+                Text("Mailbox niet geladen")
+                    .font(.softoraDisplay(20, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(1.0)
+                    .foregroundStyle(Color.softoraInk)
+
+                Text(mailboxStatusMessage.softoraUppercased)
+                    .font(.softoraBody(13, weight: .medium))
+                    .foregroundStyle(Color.softoraMuted)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    Task {
+                        if selectedAccount == nil {
+                            await loadAccounts()
+                        } else {
+                            await loadMessages()
+                        }
+                    }
+                } label: {
+                    Text("Opnieuw proberen")
+                        .font(.softoraDisplay(13, weight: .bold))
+                        .textCase(.uppercase)
+                        .tracking(0.9)
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(Color.softoraCrimson)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
+            }
+            .padding(.horizontal, 28)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if messages.isEmpty {
             VStack(spacing: 8) {
                 Text(emptyTitle)
@@ -1131,6 +1173,10 @@ private struct MailboxView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 8) {
+                    if let mailboxStatusMessage {
+                        MailboxStatusBanner(message: mailboxStatusMessage)
+                    }
+
                     ForEach(messages) { message in
                         MailboxMessageRow(message: message, isUnread: isUnread(message)) {
                             openMessage(message)
@@ -1171,6 +1217,9 @@ private struct MailboxView: View {
 
     private func openMessage(_ message: MailboxMessage) {
         selectedMessage = message
+        Task {
+            await loadMessageDetail(for: message)
+        }
 
         guard message.unread else { return }
         var openedKeys = openedMailboxMessageKeys
@@ -1202,6 +1251,7 @@ private struct MailboxView: View {
         guard !isLoadingAccounts else { return }
         isLoadingAccounts = true
         alertMessage = nil
+        mailboxStatusMessage = nil
         defer { isLoadingAccounts = false }
 
         do {
@@ -1218,7 +1268,7 @@ private struct MailboxView: View {
             await loadMessages()
         } catch {
             guard !error.isMailboxCancellation else { return }
-            alertMessage = error.localizedDescription
+            mailboxStatusMessage = error.mailboxDisplayMessage
         }
     }
 
@@ -1226,28 +1276,60 @@ private struct MailboxView: View {
         guard let account = selectedAccount else {
             messages = []
             selectedMessage = nil
+            isLoadingMessageDetail = false
             return
         }
         guard account.imapConfigured else {
             messages = []
             selectedMessage = nil
+            isLoadingMessageDetail = false
             return
         }
 
         isLoadingMessages = true
         alertMessage = nil
+        mailboxStatusMessage = nil
         defer { isLoadingMessages = false }
 
         do {
             messages = try await apiClient.fetchMailboxMessages(
                 account: account.email,
                 folder: selectedFolder.apiValue,
-                limit: 50
+                limit: 25,
+                summaryOnly: true
             )
             selectedMessage = nil
+            isLoadingMessageDetail = false
         } catch {
             guard !error.isMailboxCancellation else { return }
-            alertMessage = error.localizedDescription
+            mailboxStatusMessage = error.mailboxDisplayMessage
+        }
+    }
+
+    private func loadMessageDetail(for message: MailboxMessage) async {
+        guard let account = selectedAccount, message.uid > 0 else { return }
+        isLoadingMessageDetail = true
+        mailboxStatusMessage = nil
+        defer {
+            if selectedMessage?.id == message.id {
+                isLoadingMessageDetail = false
+            }
+        }
+
+        do {
+            let loadedMessage = try await apiClient.fetchMailboxMessageDetail(
+                account: account.email,
+                folder: message.folder,
+                uid: message.uid
+            )
+            if selectedMessage?.id == message.id {
+                selectedMessage = loadedMessage
+            }
+        } catch {
+            guard !error.isMailboxCancellation else { return }
+            if selectedMessage?.id == message.id {
+                mailboxStatusMessage = error.mailboxDisplayMessage
+            }
         }
     }
 
@@ -1328,6 +1410,28 @@ private extension Error {
 
         let nsError = self as NSError
         return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+    }
+
+    var mailboxDisplayMessage: String {
+        if isMailboxTimeout {
+            return "Mailbox reageert te langzaam. Probeer het zo opnieuw."
+        }
+
+        let message = localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        return message.isEmpty ? "Mailbox laden mislukt. Probeer het zo opnieuw." : message
+    }
+
+    private var isMailboxTimeout: Bool {
+        if let urlError = self as? URLError, urlError.code == .timedOut {
+            return true
+        }
+
+        let nsError = self as NSError
+        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorTimedOut {
+            return true
+        }
+
+        return localizedDescription.lowercased().contains("timed out")
     }
 }
 
@@ -1455,6 +1559,26 @@ private struct MailboxFolderDrawer: View {
     }
 }
 
+private struct MailboxStatusBanner: View {
+    let message: String
+
+    var body: some View {
+        Text(message.softoraUppercased)
+            .font(.softoraBody(12, weight: .semibold))
+            .foregroundStyle(Color.softoraMuted)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.softoraSheetBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.softoraPurpleLight, lineWidth: 1)
+            }
+    }
+}
+
 private struct MailboxMessageRow: View {
     let message: MailboxMessage
     let isUnread: Bool
@@ -1518,6 +1642,8 @@ private struct MailboxMessageDetail: View {
     let message: MailboxMessage
     let selectedAccount: MailboxAccount?
     let apiClient: SoftoraAPIClient
+    let isLoadingDetail: Bool
+    let statusMessage: String?
 
     @State private var isReplying = false
     @State private var replyBody = ""
@@ -1540,7 +1666,17 @@ private struct MailboxMessageDetail: View {
                     MailboxDetailMeta(label: "Datum", value: MailboxDateFormatter.label(message.date))
                 }
 
-                MailboxBodyView(presentation: bodyPresentation)
+                if isLoadingDetail {
+                    MailboxDetailLoadingView()
+                }
+
+                if let statusMessage {
+                    MailboxStatusBanner(message: statusMessage)
+                }
+
+                if shouldShowBody {
+                    MailboxBodyView(presentation: bodyPresentation)
+                }
 
                 replyComposer
             }
@@ -1708,6 +1844,12 @@ private struct MailboxMessageDetail: View {
         )
     }
 
+    private var shouldShowBody: Bool {
+        !isLoadingDetail ||
+            !message.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !message.preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private func improveReply() async {
         let cleanBody = replyBody.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanBody.isEmpty else {
@@ -1804,6 +1946,30 @@ private struct MailboxBodyView: View {
             ForEach(presentation.sections) { section in
                 MailboxBodySectionView(section: section)
             }
+        }
+    }
+}
+
+private struct MailboxDetailLoadingView: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .tint(Color.softoraCrimson)
+
+            Text("Mail laden...")
+                .font(.softoraDisplay(12, weight: .bold))
+                .textCase(.uppercase)
+                .tracking(0.9)
+                .foregroundStyle(Color.softoraMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.softoraSheetBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.softoraPurpleLight, lineWidth: 1)
         }
     }
 }

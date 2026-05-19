@@ -60,16 +60,29 @@ struct SoftoraAPIClient {
         return response.accounts
     }
 
-    func fetchMailboxMessages(account: String, folder: String, limit: Int = 50) async throws -> [MailboxMessage] {
+    func fetchMailboxMessages(account: String, folder: String, limit: Int = 25, summaryOnly: Bool = true) async throws -> [MailboxMessage] {
         let encodedAccount = queryEncoded(account)
         let encodedFolder = queryEncoded(folder)
+        let summaryValue = summaryOnly ? "1" : "0"
         let response: MailboxMessagesResponse = try await get(
-            "/api/mailbox/messages?account=\(encodedAccount)&folder=\(encodedFolder)&limit=\(limit)"
+            "/api/mailbox/messages?account=\(encodedAccount)&folder=\(encodedFolder)&limit=\(limit)&summary=\(summaryValue)"
         )
         guard response.ok else {
             throw SoftoraAPIError.server(response.detail ?? response.error ?? "Mailbox laden mislukt.")
         }
         return response.messages
+    }
+
+    func fetchMailboxMessageDetail(account: String, folder: String, uid: Int) async throws -> MailboxMessage {
+        let encodedAccount = queryEncoded(account)
+        let encodedFolder = queryEncoded(folder)
+        let response: MailboxMessagesResponse = try await get(
+            "/api/mailbox/messages?account=\(encodedAccount)&folder=\(encodedFolder)&uid=\(uid)&limit=1"
+        )
+        guard response.ok, let message = response.messages.first else {
+            throw SoftoraAPIError.server(response.detail ?? response.error ?? "Mail laden mislukt.")
+        }
+        return message
     }
 
     func sendMailboxMessage(account: String, to: String, subject: String, body: String) async throws {
@@ -242,8 +255,8 @@ private extension URLSession {
         configuration.httpCookieAcceptPolicy = .always
         configuration.httpShouldSetCookies = true
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.timeoutIntervalForRequest = 20
-        configuration.timeoutIntervalForResource = 30
+        configuration.timeoutIntervalForRequest = 45
+        configuration.timeoutIntervalForResource = 75
         return URLSession(configuration: configuration)
     }()
 }

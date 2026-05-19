@@ -558,6 +558,11 @@ function createMailboxService(deps = {}) {
     return [...images, ...matchedFallbacks].slice(0, 8);
   }
 
+  function isoDate(value) {
+    const date = value instanceof Date ? value : new Date(value || Date.now());
+    return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+  }
+
   function toClientMessage(parsed, message, folder, account, options = {}) {
     const date = parsed.date || message.internalDate || new Date();
     const html = normalizeString(parsed.html || '');
@@ -577,13 +582,35 @@ function createMailboxService(deps = {}) {
       body: text || preview,
       links: extractHtmlLinks(html),
       inlineImages,
-      date: date.toISOString(),
+      date: isoDate(date),
       unread: !Array.from(message.flags || []).includes('\\Seen'),
       starred: Array.from(message.flags || []).includes('\\Flagged'),
     };
   }
 
-  async function listMessages({ accountEmail, folder = 'inbox', limit = 50 }) {
+  function toClientMessageSummary(message, folder, account) {
+    const envelope = message.envelope || {};
+    const date = envelope.date || message.internalDate || new Date();
+    const fromText = folder === 'sent' ? account.name || account.email : displayName(envelope.from);
+    return {
+      id: `${folder}:${message.uid}`,
+      uid: message.uid,
+      folder,
+      from: fromText,
+      email: folder === 'sent' ? account.email : addressText(envelope.from),
+      to: addressText(envelope.to),
+      subject: normalizeString(envelope.subject || '(Geen onderwerp)'),
+      preview: '',
+      body: '',
+      links: [],
+      inlineImages: [],
+      date: isoDate(date),
+      unread: !Array.from(message.flags || []).includes('\\Seen'),
+      starred: Array.from(message.flags || []).includes('\\Flagged'),
+    };
+  }
+
+  async function listMessages({ accountEmail, folder = 'inbox', limit = 50, summaryOnly = false, uid = 0 }) {
     const requestedFolder = normalizeString(folder || 'inbox').toLowerCase();
     const mailboxFolder = requestedFolder === 'starred' || requestedFolder === 'important' ? 'inbox' : requestedFolder;
     const account = getAccount(accountEmail);
@@ -605,21 +632,42 @@ function createMailboxService(deps = {}) {
       if (!mailboxName) return [];
       const lock = await client.getMailboxLock(mailboxName);
       try {
-        const allUids = await client.search(['ALL']);
-        const uids = (Array.isArray(allUids) ? allUids : []).slice(-Math.max(1, Math.min(100, Number(limit) || 50))).reverse();
-        if (!uids.length) return [];
+        const requestedUid = Number(uid) || 0;
+        let range;
+        if (requestedUid > 0) {
+          range = { uid: requestedUid };
+        } else {
+          const allUids = await client.search(['ALL']);
+          range = (Array.isArray(allUids) ? allUids : [])
+            .slice(-Math.max(1, Math.min(100, Number(limit) || 50)))
+            .reverse();
+        }
+        if (Array.isArray(range) && !range.length) return [];
+
+        const fetchQuery = summaryOnly
+          ? { uid: true, flags: true, internalDate: true, envelope: true }
+          : { uid: true, flags: true, internalDate: true, source: true };
+
         const records = [];
         const imageLabels = [];
-        for await (const message of client.fetch(uids, { uid: true, flags: true, internalDate: true, source: true })) {
+        for await (const message of client.fetch(range, fetchQuery)) {
+          if (summaryOnly) {
+            records.push({ message });
+            continue;
+          }
+
           const parsed = await parseMailSource(message.source);
-          const html = normalizeString(parsed && parsed.html || '');
-          const text = normalizeString(parsed && parsed.text || stripHtmlTags(html));
+          const html = normalizeString((parsed && parsed.html) || '');
+          const text = normalizeString((parsed && parsed.text) || stripHtmlTags(html));
           extractBodyImageLabels(text).forEach((label) => imageLabels.push(label));
           records.push({ message, parsed });
         }
-        const storedImages = await loadStoredImagesForLabels(imageLabels);
+
+        const storedImages = summaryOnly ? [] : await loadStoredImagesForLabels(imageLabels);
         const messages = records.map((record) =>
-          toClientMessage(record.parsed, record.message, requestedFolder, account, { storedImages })
+          summaryOnly
+            ? toClientMessageSummary(record.message, requestedFolder, account)
+            : toClientMessage(record.parsed, record.message, requestedFolder, account, { storedImages })
         );
         const visibleMessages = requestedFolder === 'starred' || requestedFolder === 'important'
           ? messages.filter((item) => item.starred)
@@ -786,6 +834,8 @@ function createMailboxService(deps = {}) {
         accountEmail: req.query?.account,
         folder: normalizeString(req.query?.folder || 'inbox').toLowerCase(),
         limit: Number(req.query?.limit || 50) || 50,
+        summaryOnly: ['1', 'true', 'yes'].includes(normalizeString(req.query?.summary).toLowerCase()),
+        uid: Number(req.query?.uid || 0) || 0,
       });
       return res.status(200).json({ ok: true, messages });
     } catch (error) {
