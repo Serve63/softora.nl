@@ -551,7 +551,7 @@
         const iconHtml = isComingSoon
             ? `<span class="sidebar-link-lock" aria-hidden="true">${COMING_SOON_LOCK_SVG}</span>`
             : link.icon;
-        const hasCountBadge = link.key === "leads";
+        const hasCountBadge = link.key === "leads" && !isComingSoon;
         const countBadgeHtml = hasCountBadge
             ? `<span class="sidebar-notification-badge" data-sidebar-count-key="${link.key}" hidden>0</span>`
             : "";
@@ -588,7 +588,7 @@
 
     /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
-        "coldcalling", "seo", "qr_code",
+        "leads", "coldcalling", "seo", "qr_code",
         "ads_google",
         "ads_facebook",
         "ads_linkedin",
