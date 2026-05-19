@@ -52,6 +52,18 @@ function normalizeMessageKey(value) {
   return raw.replace(/^message:/i, '').replace(/[<>]/g, '').trim();
 }
 
+function shouldSelectFirstMailboxMatch(value) {
+  return ['1', 'true', 'yes', 'first', 'eerste'].includes(normalizeText(value).toLowerCase());
+}
+
+function mailHasEmail(mail, email) {
+  const target = normalizeEmail(email);
+  if (!target) return false;
+  return [mail && mail.email, mail && mail.to, mail && mail.from]
+    .map(normalizeEmail)
+    .some((value) => value === target);
+}
+
 function isWebdesignOutreachCustomer(customer) {
   if (!customer) return false;
   return [
@@ -218,9 +230,10 @@ function readIntent() {
       message: normalizeText(params.get('message') || params.get('mail') || params.get('thread') || ''),
       email: normalizeEmail(params.get('email') || ''),
       query: normalizeText(params.get('q') || params.get('zoek') || params.get('search') || ''),
+      selectFirst: shouldSelectFirstMailboxMatch(params.get('select') || params.get('openFirst') || ''),
     };
   } catch (_) {
-    return { account: '', folder: 'inbox', message: '', email: '', query: '' };
+    return { account: '', folder: 'inbox', message: '', email: '', query: '', selectFirst: false };
   }
 }
 
@@ -240,13 +253,13 @@ function applyIntentAfterLoad(helpers) {
         .filter(Boolean);
       if (keys.includes(messageKey)) return true;
     }
-    return intent.email && normalizeEmail(mail.email) === intent.email;
+    return intent.email && mailHasEmail(mail, intent.email);
   });
   mailboxUrlIntentApplied = true;
   if (helpers && helpers.renderList) helpers.renderList();
   if (match && helpers && helpers.openMail) {
     helpers.openMail(match.id);
-  } else if (searchValue && helpers && helpers.toast) {
+  } else if (searchValue && helpers && helpers.toast && !intent.selectFirst) {
     helpers.toast('Geen exacte thread gevonden, ik zoek op e-mailadres');
   }
 }

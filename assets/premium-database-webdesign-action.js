@@ -569,7 +569,7 @@
             if (!global.document || global.document.getElementById(STYLE_OUTREACH_ID)) return;
             const style = global.document.createElement("style");
             style.id = STYLE_OUTREACH_ID;
-            style.textContent = ".outreach-line{margin-top:4px;color:var(--light);font-size:11px;line-height:1.35;white-space:normal}.outreach-badge{display:inline-flex;align-items:center;width:fit-content;margin-top:6px;padding:3px 8px;border-radius:999px;background:rgba(22,115,60,.1);color:var(--green);font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}.outreach-reply{display:flex;flex-direction:column;gap:3px;color:var(--mid);font-size:12px;line-height:1.35}.outreach-reply strong{color:var(--dark);font-size:12px}.outreach-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.outreach-action{border:1px solid rgba(155,35,85,.18);border-radius:6px;background:rgba(255,255,255,.78);color:var(--crimson);cursor:pointer;font-family:Oswald,sans-serif;font-size:10px;font-weight:700;letter-spacing:.7px;line-height:1;padding:8px 9px;text-transform:uppercase;transition:background .15s ease,border-color .15s ease,color .15s ease}.outreach-action:hover{background:rgba(155,35,85,.08);border-color:rgba(155,35,85,.34)}.outreach-action[data-outreach-status=\"klant_geworden\"]{background:var(--crimson);border-color:var(--crimson);color:#fff}";
+            style.textContent = ".outreach-line{margin-top:4px;color:var(--light);font-size:11px;line-height:1.35;white-space:normal}.outreach-badge{display:inline-flex;align-items:center;width:fit-content;margin-top:6px;padding:3px 8px;border-radius:999px;background:rgba(22,115,60,.1);color:var(--green);font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}.outreach-reply{display:flex;flex-direction:column;gap:3px;color:var(--mid);font-size:12px;line-height:1.35}.outreach-reply strong{color:var(--dark);font-size:12px}.outreach-actions{display:grid;grid-template-columns:repeat(2,minmax(78px,1fr));gap:6px;width:min(188px,100%);margin-top:8px}.outreach-action{min-height:30px;border:1px solid rgba(155,35,85,.18);border-radius:6px;background:rgba(255,255,255,.78);color:var(--crimson);cursor:pointer;font-family:Oswald,sans-serif;font-size:9px;font-weight:700;letter-spacing:.65px;line-height:1.12;padding:7px 8px;text-align:center;text-transform:uppercase;transition:background .15s ease,border-color .15s ease,color .15s ease}.outreach-action:hover{background:rgba(155,35,85,.08);border-color:rgba(155,35,85,.34)}";
             global.document.head.appendChild(style);
         }
 
@@ -708,7 +708,7 @@
         function renderReplyInfo(customer) {
             if (!isWebdesignOutreachCustomer(customer)) return "";
             const replyAt = getReplyAt(customer);
-            return replyAt ? "<div class=\"outreach-reply\"><strong>Reactie ontvangen</strong><span>" + escapeHtml(formatDisplayDate(replyAt)) + "</span></div>" : "<div class=\"outreach-reply\"><strong>Nog geen reactie</strong><span>25 dagen regel actief</span></div>";
+            return replyAt ? "<div class=\"outreach-reply\"><strong>Reactie ontvangen</strong><span>" + escapeHtml(formatDisplayDate(replyAt)) + "</span></div>" : "";
         }
 
         function renderActions(customer) {
@@ -743,12 +743,15 @@
         function openMail(customer) {
             const params = new URLSearchParams();
             const account = normalizeString(customer.replyMailboxAccount || getSentFromEmail(customer));
-            const message = normalizeString(customer.replyMailboxId || customer.replyThreadId || customer.replyMessageId || customer.lastColdmailReplyMessageKey || customer.outreachMessageId || customer.coldmailSentMessageId);
+            const replyMessage = normalizeString(customer.replyMailboxId || customer.replyThreadId || customer.replyMessageId || customer.lastColdmailReplyMessageKey);
+            const sentMessage = normalizeString(customer.outreachMessageId || customer.coldmailSentMessageId);
+            const message = replyMessage || sentMessage;
             if (account) params.set("account", account);
-            params.set("folder", "inbox");
+            params.set("folder", replyMessage ? "inbox" : "sent");
             if (message) params.set("message", message);
             if (customer.email) params.set("email", customer.email);
             params.set("q", customer.email || customer.bedrijf || "");
+            params.set("select", "first");
             global.location.href = "/premium-mailbox?" + params.toString();
         }
 

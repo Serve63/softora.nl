@@ -1577,7 +1577,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260512d"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260519a"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260511a"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260513a"></script>
@@ -2343,7 +2343,7 @@
             });
         }
 
-        function renderPhotoCostLabel(customers) {
+        function renderPhotoCostLabel(customers) { const showPhotoBatchControl = state.activeStatus === "benaderbaar" || state.activeStatus === "alle"; nodes.photoCostLabel.hidden = !showPhotoBatchControl; nodes.generatePhotosButton.hidden = !showPhotoBatchControl;
             const eligibleCount = (customers || []).filter(isWebdesignPhotoEligible).length;
             const totalCost = eligibleCount * WEBSITE_PHOTO_COST_EUR;
             nodes.photoCostLabel.innerHTML = "<strong>" + formatEuroCost(totalCost) + "</strong>";
@@ -2359,7 +2359,7 @@
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
-            renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
+            renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return !(state.activeStatus === "benaderd" && outreachController.isWebdesignOutreachCustomer(customer)) && shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
 
             if (!filtered.length) {
                 nodes.tbody.innerHTML = "<tr><td colspan=\"9\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
@@ -2385,7 +2385,7 @@
                         "</div>" + outreachController.renderActions(customer) + "</td>",
                         "<td><div class=\"s-wrap s-" + escapeHtml(customer.status) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(statusLabel) + "</div></div></td>",
                         "<td class=\"c-light\">" + (outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderReplyInfo(customer) : escapeHtml(formatDisplayDate(customer.updatedAt))) + "</td>",
-                        "<td>" + renderWebsitePhotoDrop(customer) + "</td>",
+                        "<td>" + (!(state.activeStatus === "benaderd" && outreachController.isWebdesignOutreachCustomer(customer)) ? renderWebsitePhotoDrop(customer) : "") + "</td>",
                     "</tr>"
                 ].join("");
             }).join("");
