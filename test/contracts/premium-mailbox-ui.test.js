@@ -94,7 +94,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260516a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260519a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260519a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
@@ -343,7 +343,7 @@ test('premium mailbox toont webdesign outreach acties alleen via databasekoppeli
   const outreachSource = readOutreachScript();
 
   assert.match(pageSource, /\.outreach-quickbar/);
-  assert.match(pageSource, /premium-mailbox-outreach\.js\?v=20260516a/);
+  assert.match(pageSource, /premium-mailbox-outreach\.js\?v=20260519a/);
   assert.match(scriptSource, /SoftoraMailboxOutreach\.hydrate/);
   assert.match(scriptSource, /SoftoraMailboxOutreach\.renderQuickbar/);
   assert.match(scriptSource, /SoftoraMailboxOutreach\.handleAction/);
@@ -354,4 +354,10 @@ test('premium mailbox toont webdesign outreach acties alleen via databasekoppeli
   assert.match(outreachSource, /Geen interesse/);
   assert.match(outreachSource, /mailMatchesOutreachCustomer/);
   assert.match(outreachSource, /collectCustomerMessageKeys/);
+  assert.match(outreachSource, /function shouldSelectFirstMailboxMatch\(value\)/);
+  assert.match(outreachSource, /function mailHasEmail\(mail, email\)/);
+  assert.match(outreachSource, /selectFirst: shouldSelectFirstMailboxMatch\(params\.get\('select'\) \|\| params\.get\('openFirst'\) \|\| ''\)/);
+  assert.match(outreachSource, /intent\.email && mailHasEmail\(mail, intent\.email\)/);
+  assert.match(outreachSource, /helpers\.toast\('Geen exacte thread gevonden, ik zoek op e-mailadres'\);/);
+  assert.match(outreachSource, /helpers && helpers\.toast && !intent\.selectFirst/);
 });

@@ -231,6 +231,9 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);
   assert.match(pageSource, /function formatEuroCost\(value\)/);
   assert.match(pageSource, /function renderPhotoCostLabel\(customers\)/);
+  assert.match(pageSource, /const showPhotoBatchControl = state\.activeStatus === "benaderbaar" \|\| state\.activeStatus === "alle";/);
+  assert.match(pageSource, /nodes\.photoCostLabel\.hidden = !showPhotoBatchControl;/);
+  assert.match(pageSource, /nodes\.generatePhotosButton\.hidden = !showPhotoBatchControl;/);
   assert.match(pageSource, /eligibleCount \* WEBSITE_PHOTO_COST_EUR/);
   assert.match(pageSource, /nodes\.photoCostLabel\.innerHTML = "<strong>" \+ formatEuroCost\(totalCost\) \+ "<\/strong>";/);
   assert.match(pageSource, /URL-scan kost €0,00/);
@@ -273,7 +276,8 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /class=\\"company-edit\\"/);
   assert.match(pageSource, /data-edit-id=\\"/);
   assert.match(pageSource, /<th>Foto's <span id="photoHeaderCount">\(0\)<\/span><\/th>/);
-  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoSource\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
+  assert.match(pageSource, /state\.activeStatus === "benaderd" && outreachController\.isWebdesignOutreachCustomer\(customer\)/);
+  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return !\(state\.activeStatus === "benaderd" && outreachController\.isWebdesignOutreachCustomer\(customer\)\) && shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoSource\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
   assert.match(pageSource, /colspan=\\"9\\"/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
@@ -430,7 +434,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260512d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
@@ -1115,6 +1119,14 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(webdesignActionSource, /data-outreach-status=\\"afgehaakt\\"/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
   assert.match(webdesignActionSource, /Mail bekijken/);
+  assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(78px,1fr\)\)/);
+  assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\\"klant_geworden\\\"\\]\{background:var\(--crimson\)/);
+  assert.match(webdesignActionSource, /return replyAt \? "<div class=\\"outreach-reply\\">/);
+  assert.doesNotMatch(webdesignActionSource, /Nog geen reactie/);
+  assert.match(webdesignActionSource, /const replyMessage = normalizeString\(customer\.replyMailboxId \|\| customer\.replyThreadId \|\| customer\.replyMessageId \|\| customer\.lastColdmailReplyMessageKey\);/);
+  assert.match(webdesignActionSource, /const sentMessage = normalizeString\(customer\.outreachMessageId \|\| customer\.coldmailSentMessageId\);/);
+  assert.match(webdesignActionSource, /params\.set\("folder", replyMessage \? "inbox" : "sent"\);/);
+  assert.match(webdesignActionSource, /params\.set\("select", "first"\);/);
   assert.match(pageSource, /!hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\)/);
   assert.match(contactStatusScriptSource, /normalizeOutreachStatusKey\(raw\.outreachStatus, helpers\) === "benaderd"/);
   assert.match(contactStatusScriptSource, /raw\.coldmailSentMessageId \|\| raw\.outreachMessageId/);
