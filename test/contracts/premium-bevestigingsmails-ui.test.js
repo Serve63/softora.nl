@@ -248,7 +248,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /if \(isPremiumAiLeadGeneratorPath\(\)\) params\.set\('mode', 'call'\);/);
   assert.match(pageSource, /params\.set\('testMode', '1'\);/);
   assert.match(pageSource, /if \(serviceSelect && serviceSelect\.value\) params\.set\('service', serviceSelect\.value\);/);
-  assert.match(pageSource, /if \(specialActionSelect && specialActionSelect\.value\) params\.set\('specialAction', specialActionSelect\.value\);/);
+  assert.match(pageSource, /serviceKey = normalizeLowerText\(serviceSelect && serviceSelect\.value\)[\s\S]*serviceKey === 'websites' \|\| serviceKey === 'website'\) \? 'webdesign' : ''\);/);
+  assert.match(pageSource, /if \(specialAction\) params\.set\('specialAction', specialAction\);/);
   assert.match(pageSource, /recipient\.bedrijf \|\| 'Onbekend bedrijf'/);
   assert.match(pageSource, /const showPhone = isPremiumAiLeadGeneratorPath\(\);/);
   assert.match(pageSource, /function normalizeCampaignRecipientPhone\(value\)/);
@@ -282,6 +283,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data && data\.selected\) \|\| recipients\.length\);/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(Number\(data\.candidates/);
   assert.match(pageSource, /Math\.max\(0, requestedCount\)/);
+  assert.match(pageSource, /const specialActionSelect = document\.getElementById\('campaignSpecialAction'\), serviceKey = normalizeLowerText\(serviceSelect && serviceSelect\.value\)[\s\S]*specialAction = \(specialActionSelect && specialActionSelect\.value\) \|\| \(!isPremiumAiLeadGeneratorPath\(\) && \(serviceKey === 'websites' \|\| serviceKey === 'website'\) \? 'webdesign' : ''\);/);
+  assert.match(pageSource, /specialAction,\s*durationDays: getSelectedCampaignDurationDays\(\),/);
   assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\), testMode: Boolean\(window\.SoftoraCampaignTestMode && window\.SoftoraCampaignTestMode\.isEnabled\(\)\),/);
   assert.match(pageSource, /if \(sendResult && sendResult\.testMode\) return 'Testmail verstuurd naar servec321@gmail\.com\.';/);
   assert.match(testModeSource, /const TEST_RECIPIENT_EMAIL = 'servec321@gmail\.com';/);
