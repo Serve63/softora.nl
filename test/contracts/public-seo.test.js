@@ -123,6 +123,20 @@ test('public seo fallback links stay in normal page flow on fixed-nav templates'
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });
 
+test('voicesoftware page owns its internal links inside the page content', () => {
+  const source = fs.readFileSync(path.join(root, 'premium-voicesoftware.html'), 'utf8');
+  const html = applyPublicSeoHeadDefaults(source, 'premium-voicesoftware.html', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/voicesoftware-op-maat">/);
+  assert.match(html, /data-softora-public-seo="internal-links"/);
+  assert.match(html, /href="\/ai-telefonist"/);
+  assert.match(html, /href="\/crm-systeem-op-maat"/);
+  assert.doesNotMatch(html, /softora-seo-footer-links/);
+  assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
+});
+
 test('public seo url mapping exposes clean paths and keeps legacy redirects available', () => {
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-bedrijfssoftware.html'), '/bedrijfssoftware-op-maat');
   assert.equal(getIndexablePublicHtmlFileFromPath('/bedrijfssoftware-op-maat'), 'premium-bedrijfssoftware.html');
@@ -132,10 +146,12 @@ test('public seo url mapping exposes clean paths and keeps legacy redirects avai
   assert.equal(getIndexablePublicHtmlFileFromPath('/ai-automatisering'), 'ai-automatisering.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/crm-systeem-op-maat'), 'crm-systeem-op-maat.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/ai-telefonist'), 'ai-telefonist.html');
+  assert.equal(getIndexablePublicHtmlFileFromPath('/voicesoftware-op-maat'), 'premium-voicesoftware.html');
   assert.equal(getIndexablePublicPathFromHtmlFile('pakketten.html'), '/pakketten');
   assert.equal(getIndexablePublicHtmlFileFromPath('/pakketten'), 'pakketten.html');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-bedrijfssoftware'), '/bedrijfssoftware-op-maat');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-chatbot'), '/chatbot-laten-maken');
+  assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-voicesoftware'), '/voicesoftware-op-maat');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-pakketten'), '/pakketten');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-website'), '/');
 });
