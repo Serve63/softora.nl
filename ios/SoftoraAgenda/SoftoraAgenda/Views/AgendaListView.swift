@@ -1353,6 +1353,9 @@ private struct MailboxView: View {
             )
             guard selectedAccount?.email == requestAccountEmail && selectedFolder == requestFolder else { return }
             messages = loadedMessages
+            if pinnedMailboxAccountEmail.caseInsensitiveCompare(requestAccountEmail) == .orderedSame {
+                await MailboxPushRegistrar.shared.registerPinnedMailbox(lastKnownUid: loadedMessages.first?.uid ?? 0)
+            }
             if selectedMessage == nil {
                 isLoadingMessageDetail = false
             }
@@ -1439,9 +1442,14 @@ private struct MailboxView: View {
     }
 
     private func togglePinnedMailboxAccount(_ account: MailboxAccount) {
-        pinnedMailboxAccountEmail = pinnedMailboxAccountEmail.caseInsensitiveCompare(account.email) == .orderedSame
+        let nextPinnedAccountEmail = pinnedMailboxAccountEmail.caseInsensitiveCompare(account.email) == .orderedSame
             ? ""
             : account.email
+        pinnedMailboxAccountEmail = nextPinnedAccountEmail
+        let lastKnownUid = nextPinnedAccountEmail.caseInsensitiveCompare(selectedAccount?.email ?? "") == .orderedSame
+            ? messages.first?.uid ?? 0
+            : 0
+        MailboxPushRegistrar.shared.updatePinnedMailbox(nextPinnedAccountEmail, lastKnownUid: lastKnownUid)
     }
 
     private func selectFolder(_ folder: MailboxFolder) {

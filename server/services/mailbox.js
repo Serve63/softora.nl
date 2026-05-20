@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+const http2 = require('http2');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
@@ -14,6 +16,9 @@ const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MAILBOX_DRAFT_MODEL = 'gpt-5.5-pro';
+const DEFAULT_MAILBOX_PUSH_SCOPE = 'mailbox_push_notifications';
+const DEFAULT_MAILBOX_PUSH_KEY = 'softora_mailbox_push_devices_v1';
+const DEFAULT_APNS_BUNDLE_ID = 'nl.softora.agenda';
 const MAX_INLINE_IMAGE_BYTES = 5_000_000;
 const MAILBOX_SUMMARY_CACHE_TTL_MS = 15_000;
 
@@ -46,14 +51,140 @@ async function defaultFetchJsonWithTimeout(url, options = {}, timeoutMs = 65000)
   }
 }
 
+function normalizePushString(value) {
+  return String(value || '').trim();
+}
+
+function normalizeApnsPrivateKey(value) {
+  return normalizePushString(value).replace(/\\n/g, '\n');
+}
+
+function toBase64Url(value) {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function readDefaultApnsConfig() {
+  const env = process.env || {};
+  return {
+    keyId: normalizePushString(env.APPLE_APNS_KEY_ID || env.APNS_KEY_ID),
+    teamId: normalizePushString(env.APPLE_APNS_TEAM_ID || env.APNS_TEAM_ID),
+    bundleId: normalizePushString(env.APPLE_APNS_BUNDLE_ID || env.APNS_TOPIC || DEFAULT_APNS_BUNDLE_ID),
+    privateKey: normalizeApnsPrivateKey(env.APPLE_APNS_PRIVATE_KEY || env.APNS_PRIVATE_KEY),
+    environment: normalizePushString(env.APPLE_APNS_ENV || env.APNS_ENV || 'production').toLowerCase(),
+  };
+}
+
+function isApnsConfigComplete(config) {
+  return Boolean(
+    config &&
+      config.keyId &&
+      config.teamId &&
+      config.bundleId &&
+      config.privateKey &&
+      /BEGIN (EC )?PRIVATE KEY/.test(config.privateKey)
+  );
+}
+
+function createApnsJwt(config) {
+  const header = toBase64Url(JSON.stringify({ alg: 'ES256', kid: config.keyId }));
+  const claims = toBase64Url(JSON.stringify({ iss: config.teamId, iat: Math.floor(Date.now() / 1000) }));
+  const unsignedToken = `${header}.${claims}`;
+  const signature = crypto.sign('sha256', Buffer.from(unsignedToken), {
+    key: config.privateKey,
+    dsaEncoding: 'ieee-p1363',
+  });
+  return `${unsignedToken}.${toBase64Url(signature)}`;
+}
+
+async function defaultSendMailboxPushNotification({ deviceToken, title, body, data = {}, config = readDefaultApnsConfig() }) {
+  if (!isApnsConfigComplete(config)) {
+    return { sent: false, reason: 'APNS_NOT_CONFIGURED' };
+  }
+
+  const token = normalizePushString(deviceToken).replace(/[^a-fA-F0-9]/g, '').toLowerCase();
+  if (!token) return { sent: false, reason: 'DEVICE_TOKEN_MISSING' };
+
+  const host = config.environment === 'sandbox' ? 'https://api.sandbox.push.apple.com' : 'https://api.push.apple.com';
+  const jwt = createApnsJwt(config);
+  const payload = JSON.stringify({
+    aps: {
+      alert: {
+        title: normalizePushString(title) || 'Nieuwe mail',
+        body: normalizePushString(body) || 'Er is een nieuwe mail binnengekomen.',
+      },
+      sound: 'default',
+      badge: 1,
+    },
+    ...data,
+  });
+
+  return new Promise((resolve) => {
+    const client = http2.connect(host);
+    const chunks = [];
+    let statusCode = 0;
+    let settled = false;
+
+    function finish(result) {
+      if (settled) return;
+      settled = true;
+      try {
+        client.close();
+      } catch (_) {}
+      resolve(result);
+    }
+
+    client.on('error', (error) => {
+      finish({ sent: false, reason: 'APNS_CONNECTION_FAILED', detail: normalizePushString(error && error.message) });
+    });
+
+    const request = client.request({
+      [http2.constants.HTTP2_HEADER_METHOD]: 'POST',
+      [http2.constants.HTTP2_HEADER_PATH]: `/3/device/${token}`,
+      authorization: `bearer ${jwt}`,
+      'apns-topic': config.bundleId,
+      'apns-push-type': 'alert',
+      'apns-priority': '10',
+    });
+
+    request.setEncoding('utf8');
+    request.on('response', (headers) => {
+      statusCode = Number(headers[http2.constants.HTTP2_HEADER_STATUS] || 0);
+    });
+    request.on('data', (chunk) => chunks.push(chunk));
+    request.on('error', (error) => {
+      finish({ sent: false, reason: 'APNS_REQUEST_FAILED', detail: normalizePushString(error && error.message) });
+    });
+    request.on('end', () => {
+      if (statusCode === 200) {
+        finish({ sent: true });
+        return;
+      }
+      finish({
+        sent: false,
+        reason: 'APNS_REJECTED',
+        status: statusCode,
+        detail: chunks.join(''),
+      });
+    });
+    request.end(payload);
+  });
+}
+
 function createMailboxService(deps = {}) {
   const {
     logger = console,
     mailConfig = {},
     mailboxAccountsRaw = '',
     getUiStateValues = async () => null,
+    setUiStateValues = async () => null,
     customerPhotoScope = DEFAULT_CUSTOMER_PHOTO_SCOPE,
     customerPhotoKey = DEFAULT_CUSTOMER_PHOTO_KEY,
+    mailboxPushScope = DEFAULT_MAILBOX_PUSH_SCOPE,
+    mailboxPushKey = DEFAULT_MAILBOX_PUSH_KEY,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     createTransport = (config) => nodemailer.createTransport(config),
@@ -64,8 +195,10 @@ function createMailboxService(deps = {}) {
     extractOpenAiTextContent = null,
     openAiApiBaseUrl = process.env.OPENAI_API_BASE_URL || DEFAULT_OPENAI_API_BASE_URL,
     mailboxDraftModel = process.env.MAILBOX_DRAFT_OPENAI_MODEL || process.env.OPENAI_MODEL || DEFAULT_MAILBOX_DRAFT_MODEL,
+    sendMailboxPushNotification = defaultSendMailboxPushNotification,
   } = deps;
   const summaryCache = new Map();
+  const mailboxPushMemoryState = { devices: {} };
 
   const baseAccount = {
     email: normalizeString(mailConfig.mailFromAddress || mailConfig.smtpUser || mailConfig.imapUser).toLowerCase(),
@@ -280,6 +413,206 @@ function createMailboxService(deps = {}) {
 
   function getAccount(email) {
     return getAccounts().find((account) => account.email === normalizeEmail(email)) || null;
+  }
+
+  function normalizeDeviceToken(value) {
+    return normalizeString(value).replace(/[^a-fA-F0-9]/g, '').toLowerCase();
+  }
+
+  function normalizeDeviceId(value, fallbackToken = '') {
+    const cleanValue = normalizeString(value).replace(/[^a-zA-Z0-9._:-]/g, '');
+    if (cleanValue) return truncateText(cleanValue, 120);
+    return `ios-${normalizeDeviceToken(fallbackToken).slice(-32)}`;
+  }
+
+  function normalizePushState(rawState) {
+    const rawDevices = rawState && rawState.devices && typeof rawState.devices === 'object' ? rawState.devices : {};
+    const devices = {};
+    for (const [key, rawDevice] of Object.entries(rawDevices)) {
+      if (!rawDevice || typeof rawDevice !== 'object') continue;
+      const deviceToken = normalizeDeviceToken(rawDevice.deviceToken);
+      const deviceId = normalizeDeviceId(rawDevice.deviceId || key, deviceToken);
+      if (!deviceToken || !deviceId) continue;
+      const pinnedAccount = normalizeEmail(rawDevice.pinnedAccount);
+      const rawLastKnown = rawDevice.lastKnownUidByAccount || {};
+      const lastKnownUidByAccount = {};
+      for (const [accountEmail, uid] of Object.entries(rawLastKnown)) {
+        const normalizedAccount = normalizeEmail(accountEmail);
+        const normalizedUid = Number(uid) || 0;
+        if (normalizedAccount && normalizedUid > 0) {
+          lastKnownUidByAccount[normalizedAccount] = normalizedUid;
+        }
+      }
+      devices[deviceId] = {
+        deviceId,
+        deviceToken,
+        platform: normalizeString(rawDevice.platform || 'ios').toLowerCase(),
+        pinnedAccount,
+        active: rawDevice.active !== false && Boolean(pinnedAccount),
+        lastKnownUidByAccount,
+        updatedAt: isoDate(rawDevice.updatedAt),
+      };
+    }
+    return { devices };
+  }
+
+  async function readMailboxPushState() {
+    try {
+      const state = await getUiStateValues(mailboxPushScope);
+      const values = state && state.values && typeof state.values === 'object' ? state.values : {};
+      const serialized = normalizeString(values[mailboxPushKey]);
+      if (!serialized) return normalizePushState(mailboxPushMemoryState);
+      const parsed = safeParseJsonObject(serialized);
+      const nextState = normalizePushState(parsed);
+      mailboxPushMemoryState.devices = { ...nextState.devices };
+      return nextState;
+    } catch (error) {
+      logger.warn('[Mailbox][Push][Read]', error && error.message ? error.message : error);
+      return normalizePushState(mailboxPushMemoryState);
+    }
+  }
+
+  async function writeMailboxPushState(nextState) {
+    const normalizedState = normalizePushState(nextState);
+    mailboxPushMemoryState.devices = { ...normalizedState.devices };
+    try {
+      await setUiStateValues(
+        mailboxPushScope,
+        { [mailboxPushKey]: JSON.stringify(normalizedState) },
+        { source: 'mailbox-push-notifications' }
+      );
+    } catch (error) {
+      logger.warn('[Mailbox][Push][Write]', error && error.message ? error.message : error);
+    }
+    return normalizedState;
+  }
+
+  function isMailboxPushDeliveryConfigured() {
+    return sendMailboxPushNotification !== defaultSendMailboxPushNotification || isApnsConfigComplete(readDefaultApnsConfig());
+  }
+
+  async function registerMailboxPushDevice({ deviceId, deviceToken, platform = 'ios', pinnedAccount = '', lastKnownUid = 0 }) {
+    const token = normalizeDeviceToken(deviceToken);
+    if (!token) {
+      const error = new Error('Device-token ontbreekt.');
+      error.status = 400;
+      throw error;
+    }
+
+    const accountEmail = normalizeEmail(pinnedAccount);
+    if (accountEmail && !getAccount(accountEmail)) {
+      const error = new Error('Vastgepinde mailbox niet gevonden.');
+      error.status = 404;
+      throw error;
+    }
+
+    const normalizedDeviceId = normalizeDeviceId(deviceId, token);
+    const state = await readMailboxPushState();
+    const existing = state.devices[normalizedDeviceId] || {};
+    const lastKnownUidByAccount = {
+      ...(existing.lastKnownUidByAccount && typeof existing.lastKnownUidByAccount === 'object'
+        ? existing.lastKnownUidByAccount
+        : {}),
+    };
+    const baselineUid = Number(lastKnownUid) || 0;
+    if (accountEmail && baselineUid > 0) {
+      lastKnownUidByAccount[accountEmail] = baselineUid;
+    }
+
+    state.devices[normalizedDeviceId] = {
+      deviceId: normalizedDeviceId,
+      deviceToken: token,
+      platform: normalizeString(platform || 'ios').toLowerCase(),
+      pinnedAccount: accountEmail,
+      active: Boolean(accountEmail),
+      lastKnownUidByAccount,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await writeMailboxPushState(state);
+    return {
+      deviceId: normalizedDeviceId,
+      pinnedAccount: accountEmail,
+      subscribed: Boolean(accountEmail),
+      apnsConfigured: isMailboxPushDeliveryConfigured(),
+    };
+  }
+
+  async function checkMailboxPushNotifications({ limit = 5 } = {}) {
+    const state = await readMailboxPushState();
+    const activeDevices = Object.values(state.devices).filter(
+      (device) => device.active && device.platform === 'ios' && device.deviceToken && device.pinnedAccount
+    );
+    const accountsToCheck = Array.from(new Set(activeDevices.map((device) => device.pinnedAccount).filter(Boolean)));
+    let notificationsSent = 0;
+    let notificationsSkipped = 0;
+    let baselinesCreated = 0;
+    const checkedAccounts = [];
+
+    for (const accountEmail of accountsToCheck) {
+      const messages = await listMessages({
+        accountEmail,
+        folder: 'inbox',
+        limit: Math.max(1, Math.min(10, Number(limit) || 5)),
+        summaryOnly: true,
+        fresh: true,
+      });
+      checkedAccounts.push(accountEmail);
+      const latestUid = Math.max(0, ...messages.map((message) => Number(message.uid) || 0));
+      if (!latestUid) continue;
+
+      for (const device of activeDevices.filter((item) => item.pinnedAccount === accountEmail)) {
+        const lastKnownUidByAccount = {
+          ...(device.lastKnownUidByAccount && typeof device.lastKnownUidByAccount === 'object'
+            ? device.lastKnownUidByAccount
+            : {}),
+        };
+        const lastKnownUid = Number(lastKnownUidByAccount[accountEmail]) || 0;
+        if (lastKnownUid <= 0) {
+          lastKnownUidByAccount[accountEmail] = latestUid;
+          state.devices[device.deviceId] = { ...device, lastKnownUidByAccount, updatedAt: new Date().toISOString() };
+          baselinesCreated += 1;
+          continue;
+        }
+
+        const newMessages = messages
+          .filter((message) => Number(message.uid) > lastKnownUid)
+          .sort((a, b) => Number(a.uid) - Number(b.uid));
+        if (!newMessages.length) {
+          continue;
+        }
+
+        const message = newMessages[newMessages.length - 1];
+        const result = await sendMailboxPushNotification({
+          deviceToken: device.deviceToken,
+          title: 'Nieuwe mail',
+          body: `${message.from || accountEmail}: ${message.subject || 'Geen onderwerp'}`,
+          data: {
+            type: 'mailbox',
+            account: accountEmail,
+            folder: message.folder || 'inbox',
+            uid: String(message.uid || ''),
+          },
+        });
+        if (!result || result.sent !== false) {
+          notificationsSent += 1;
+        } else {
+          notificationsSkipped += 1;
+        }
+        lastKnownUidByAccount[accountEmail] = latestUid;
+        state.devices[device.deviceId] = { ...device, lastKnownUidByAccount, updatedAt: new Date().toISOString() };
+      }
+    }
+
+    await writeMailboxPushState(state);
+    return {
+      checkedAccounts,
+      registeredDevices: activeDevices.length,
+      notificationsSent,
+      notificationsSkipped,
+      baselinesCreated,
+      apnsConfigured: isMailboxPushDeliveryConfigured(),
+    };
   }
 
   function createClient(account) {
@@ -1046,17 +1379,73 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function registerMailboxPushDeviceResponse(req, res) {
+    disableResponseCache(res);
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await registerMailboxPushDevice({
+        deviceId: body.deviceId,
+        deviceToken: body.deviceToken,
+        platform: body.platform || 'ios',
+        pinnedAccount: body.pinnedAccount || body.account || '',
+        lastKnownUid: body.lastKnownUid,
+      });
+      return res.status(200).json({ ok: true, ...result });
+    } catch (error) {
+      logger.error('[Mailbox][Push][Register]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Pushmelding registreren mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
+  function isAuthorizedPushCheck(req) {
+    const expectedSecret = normalizeString(process.env.MAILBOX_PUSH_CRON_SECRET || '');
+    if (!expectedSecret) return true;
+    const authorization = normalizeString(req.headers && req.headers.authorization).replace(/^Bearer\s+/i, '');
+    const querySecret = normalizeString(req.query && req.query.secret);
+    const bodySecret = normalizeString(req.body && req.body.secret);
+    return authorization === expectedSecret || querySecret === expectedSecret || bodySecret === expectedSecret;
+  }
+
+  async function checkMailboxPushNotificationsResponse(req, res) {
+    disableResponseCache(res);
+    if (!isAuthorizedPushCheck(req)) {
+      return res.status(401).json({ ok: false, error: 'Niet toegestaan.' });
+    }
+
+    try {
+      const result = await checkMailboxPushNotifications({
+        limit: Number(req.query?.limit || req.body?.limit || 5) || 5,
+      });
+      return res.status(200).json({ ok: true, ...result });
+    } catch (error) {
+      logger.error('[Mailbox][Push][Check]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Mailbox-push controleren mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
   return {
     accountsResponse,
     listMessagesResponse,
     markMessageReadResponse,
     sendMessageResponse,
     improveDraftResponse,
+    registerMailboxPushDeviceResponse,
+    checkMailboxPushNotificationsResponse,
     getAccounts,
     listMessages,
     markMessageRead,
     sendMessage,
     improveDraft,
+    registerMailboxPushDevice,
+    checkMailboxPushNotifications,
   };
 }
 

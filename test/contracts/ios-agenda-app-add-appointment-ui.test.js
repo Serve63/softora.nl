@@ -235,6 +235,7 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   const modelsSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Models.swift');
   const apiClientSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/SoftoraAPIClient.swift');
   const agendaListSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AgendaListView.swift');
+  const appSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/SoftoraAgendaApp.swift');
   const infoPlistSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Info.plist');
 
   assert.match(modelsSource, /struct MailboxAccount: Identifiable, Decodable, Hashable/);
@@ -253,11 +254,18 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(apiClientSource, /\/api\/mailbox\/send/);
   assert.match(apiClientSource, /func improveMailboxDraft\(account: String, to: String, subject: String, body: String, context: MailboxDraftContextPayload\) async throws -> String/);
   assert.match(apiClientSource, /\/api\/mailbox\/improve-draft/);
+  assert.match(apiClientSource, /func registerMailboxPushDevice\(deviceId: String, deviceToken: String, pinnedAccount: String, lastKnownUid: Int\) async throws -> MailboxPushRegistrationResponse/);
+  assert.match(apiClientSource, /\/api\/mailbox\/push\/register/);
   assert.match(apiClientSource, /configuration\.timeoutIntervalForRequest = 45/);
   assert.match(apiClientSource, /configuration\.timeoutIntervalForResource = 75/);
   assert.match(modelsSource, /struct MailboxSendResponse: Decodable/);
   assert.match(modelsSource, /struct MailboxMarkReadResponse: Decodable/);
   assert.match(modelsSource, /struct MailboxImproveDraftResponse: Decodable/);
+  assert.match(modelsSource, /struct MailboxPushRegistrationResponse: Decodable/);
+  assert.match(appSource, /UNUserNotificationCenter/);
+  assert.match(appSource, /UIApplicationDelegateAdaptor\(SoftoraAgendaAppDelegate\.self\)/);
+  assert.match(appSource, /MailboxPushRegistrar/);
+  assert.match(appSource, /registerForRemoteNotifications/);
   assert.match(agendaListSource, /private enum MailboxFolder: String, CaseIterable, Identifiable/);
   assert.match(agendaListSource, /case important/);
   assert.match(agendaListSource, /case promotions/);
@@ -289,6 +297,9 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /if isShowingAccountMenu \{[^]*MailboxAccountDropdown\(/);
   assert.match(agendaListSource, /private struct MailboxAccountDropdown: View/);
   assert.match(agendaListSource, /@State private var isLoadingMessageDetail = false/);
+  assert.match(agendaListSource, /@AppStorage\("softora\.mailbox\.pinnedAccount"\) private var pinnedMailboxAccountEmail = ""/);
+  assert.match(agendaListSource, /MailboxPushRegistrar\.shared\.updatePinnedMailbox/);
+  assert.match(agendaListSource, /MailboxPushRegistrar\.shared\.registerPinnedMailbox\(lastKnownUid: loadedMessages\.first\?\.uid \?\? 0\)/);
   assert.match(agendaListSource, /Task \{[^]*await loadMessageDetail\(for: message, accountEmail: account\.email, selectionKey: selectionKey\)[^]*\}/);
   assert.match(agendaListSource, /apiClient\.fetchMailboxMessageDetail/);
   assert.doesNotMatch(agendaListSource, /MailboxDetailLoadingView\(\)/);

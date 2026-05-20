@@ -7,6 +7,9 @@ function registerMailboxRoutes(app, deps = {}) {
   app.post('/api/mailbox/messages/read', (req, res) => coordinator.markMessageReadResponse(req, res));
   app.post('/api/mailbox/send', (req, res) => coordinator.sendMessageResponse(req, res));
   app.post('/api/mailbox/improve-draft', (req, res) => coordinator.improveDraftResponse(req, res));
+  app.post('/api/mailbox/push/register', (req, res) => coordinator.registerMailboxPushDeviceResponse(req, res));
+  app.get('/api/mailbox/push/check', (req, res) => coordinator.checkMailboxPushNotificationsResponse(req, res));
+  app.post('/api/mailbox/push/check', (req, res) => coordinator.checkMailboxPushNotificationsResponse(req, res));
 }
 
 module.exports = {

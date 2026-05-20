@@ -794,6 +794,76 @@ test('mailbox service returns empty reclame folder when no matching mailbox exis
   assert.deepEqual(res.body.messages, []);
 });
 
+test('mailbox push notifies devices for new mail on the pinned account', async () => {
+  const sentNotifications = [];
+  const uiStateValues = {};
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    getUiStateValues: async () => ({ values: uiStateValues }),
+    setUiStateValues: async (_scope, values) => {
+      Object.assign(uiStateValues, values);
+      return { values: uiStateValues };
+    },
+    sendMailboxPushNotification: async (payload) => {
+      sentNotifications.push(payload);
+      return { sent: true };
+    },
+    createImapClient: () => ({
+      usable: true,
+      mailbox: { exists: 2, uidNext: 13 },
+      connect: async () => {},
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async () => ({ release() {} }),
+      fetch: async function* () {
+        yield {
+          uid: 11,
+          flags: ['\\Seen'],
+          internalDate: new Date('2026-05-20T09:00:00Z'),
+          envelope: {
+            date: new Date('2026-05-20T09:00:00Z'),
+            from: [{ name: 'Oude klant', address: 'oud@example.nl' }],
+            to: [{ address: 'serve@softora.nl' }],
+            subject: 'Oud bericht',
+          },
+        };
+        yield {
+          uid: 12,
+          flags: [],
+          internalDate: new Date('2026-05-20T10:00:00Z'),
+          envelope: {
+            date: new Date('2026-05-20T10:00:00Z'),
+            from: [{ name: 'Nieuwe klant', address: 'nieuw@example.nl' }],
+            to: [{ address: 'serve@softora.nl' }],
+            subject: 'Nieuwe aanvraag',
+          },
+        };
+      },
+      logout: async () => {},
+    }),
+  });
+
+  await service.registerMailboxPushDevice({
+    deviceId: 'iphone-serve',
+    deviceToken: 'a'.repeat(64),
+    pinnedAccount: 'serve@softora.nl',
+    lastKnownUid: 11,
+  });
+  const result = await service.checkMailboxPushNotifications();
+
+  assert.equal(result.notificationsSent, 1);
+  assert.equal(sentNotifications.length, 1);
+  assert.equal(sentNotifications[0].data.account, 'serve@softora.nl');
+  assert.equal(sentNotifications[0].data.uid, '12');
+  assert.match(sentNotifications[0].body, /Nieuwe aanvraag/);
+});
+
 test('mailbox routes expose accounts, messages and send endpoints', () => {
   const routes = [];
   const app = {
@@ -812,6 +882,8 @@ test('mailbox routes expose accounts, messages and send endpoints', () => {
       markMessageReadResponse() {},
       sendMessageResponse() {},
       improveDraftResponse() {},
+      registerMailboxPushDeviceResponse() {},
+      checkMailboxPushNotificationsResponse() {},
     },
   });
 
@@ -820,4 +892,7 @@ test('mailbox routes expose accounts, messages and send endpoints', () => {
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/read'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/improve-draft'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/push/register'));
+  assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/push/check'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/push/check'));
 });

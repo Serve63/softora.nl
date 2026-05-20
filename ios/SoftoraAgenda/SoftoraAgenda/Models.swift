@@ -70,6 +70,15 @@ struct MailboxImproveDraftResponse: Decodable {
     let detail: String?
 }
 
+struct MailboxPushRegistrationResponse: Decodable {
+    let ok: Bool
+    let subscribed: Bool?
+    let pinnedAccount: String?
+    let apnsConfigured: Bool?
+    let error: String?
+    let detail: String?
+}
+
 struct APIErrorEnvelope: Decodable {
     let ok: Bool?
     let error: String?

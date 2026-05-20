@@ -118,6 +118,23 @@ struct SoftoraAPIClient {
         return draft
     }
 
+    func registerMailboxPushDevice(deviceId: String, deviceToken: String, pinnedAccount: String, lastKnownUid: Int) async throws -> MailboxPushRegistrationResponse {
+        let response: MailboxPushRegistrationResponse = try await post(
+            "/api/mailbox/push/register",
+            body: MailboxPushRegistrationPayload(
+                deviceId: deviceId,
+                deviceToken: deviceToken,
+                platform: "ios",
+                pinnedAccount: pinnedAccount,
+                lastKnownUid: lastKnownUid
+            )
+        )
+        guard response.ok else {
+            throw SoftoraAPIError.server(response.detail ?? response.error ?? "Pushmelding registreren mislukt.")
+        }
+        return response
+    }
+
     func createManualAppointment(_ draft: NewAppointmentDraft) async throws -> AgendaAppointment? {
         let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let location = draft.location.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -259,6 +276,14 @@ private struct MailboxImproveDraftPayload: Encodable {
     let subject: String
     let body: String
     let context: MailboxDraftContextPayload
+}
+
+private struct MailboxPushRegistrationPayload: Encodable {
+    let deviceId: String
+    let deviceToken: String
+    let platform: String
+    let pinnedAccount: String
+    let lastKnownUid: Int
 }
 
 struct MailboxDraftContextPayload: Encodable {
