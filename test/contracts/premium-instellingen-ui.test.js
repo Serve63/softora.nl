@@ -32,6 +32,9 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(source, /grid-template-columns:repeat\(auto-fit,minmax\(260px,1fr\)\)/);
   assert.match(source, /calc\(4 \* 320px \+ 3 \* 24px\)/);
   assert.match(source, /\.tegel \{[\s\S]*font:\s*inherit;[\s\S]*text-align:\s*left;/);
+  assert.match(source, /#settings-screen-pin:not\(\[hidden\]\) \{[^}]*width:\s*100%;[^}]*display:\s*grid !important;[^}]*place-items:\s*center;/);
+  assert.match(source, /\.settings-pin-box \{[^}]*width:\s*min\(400px, 100%\);/);
+  assert.doesNotMatch(source, /#settings-screen-pin:not\(\[hidden\]\) \{[^}]*left:\s*280px;/);
 
   assert.match(source, /function bindSettingsStaticActions\(\)/);
   assert.match(source, /button\.addEventListener\('click', function \(\) \{[\s\S]*settingsPagePinDigit\(button\.dataset\.settingsPinDigit \|\| ''\);/);

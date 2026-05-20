@@ -169,6 +169,15 @@ test('canonical premium pages opt into the shared sidebar shell', () => {
   }
 });
 
+test('premium instellingen PIN blijft gecentreerd binnen de shared main shell', () => {
+  const pageSource = readRepoFile('premium-instellingen.html');
+
+  assert.match(pageSource, /<main class="main is-premium-boot-host">[\s\S]*id="settings-screen-pin"/);
+  assert.match(pageSource, /#settings-screen-pin:not\(\[hidden\]\) \{[^}]*display:\s*grid !important;[^}]*place-items:\s*center;/);
+  assert.doesNotMatch(pageSource, /#settings-screen-pin:not\(\[hidden\]\) \{[^}]*position:\s*fixed;/);
+  assert.doesNotMatch(pageSource, /#settings-screen-pin:not\(\[hidden\]\) \{[^}]*left:\s*280px;/);
+});
+
 test('premium dashboard keeps its first-paint boot overlay in the shell contract', () => {
   const pageSource = readRepoFile('premium-personeel-dashboard.html');
   const coreSource = readRepoFile('assets/premium-dashboard-core.js');
