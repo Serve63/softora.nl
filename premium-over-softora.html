@@ -1,400 +1,323 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">
-<link rel="apple-touch-icon" href="/assets/softora-favicon-round.png?v=20260513a">
-<title>Over Softora | Websites, software en AI voor het MKB</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --bg: #f5f4f1; --white: #fff; --crimson: #9b2355;
-  --dark: #1a1a2e; --mid: #555; --light: #999; --border: #e8e5e0;
-  --nav-cta: #9b2355;
-  --nav-cta-hover: #c4346a;
-}
-body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); line-height: 1.5; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/softora-favicon-round.png?v=20260513a">
+  <title>Over Softora | Websites, software en AI voor het MKB</title>
+  <meta name="description" content="Softora is een digitaal bouwbureau uit Oisterwijk voor websites, bedrijfssoftware, CRM, chatbots en AI automatisering die meer aanvragen en betere opvolging opleveren.">
+  <link rel="canonical" href="https://www.softora.nl/over-softora">
+  <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
+  <link rel="stylesheet" href="/assets/seo-growth-pages.css?v=20260520b">
+  <style>
+    .over-image-card {
+      overflow: hidden;
+      padding: 0;
+    }
 
-nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 1000;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 4rem;
-  background: rgba(248, 247, 244, 0.78);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-.logo {
-  font-family: 'Oswald', sans-serif;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--dark);
-  text-decoration: none;
-  letter-spacing: -0.02em;
-  position: relative;
-  line-height: 1;
-}
-.logo::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 3.2ch;
-  height: 3px;
-  background: var(--nav-cta);
-}
-.nav-links {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.8rem;
-}
-.nav-text-link {
-  color: var(--dark);
-  text-decoration: none;
-  font-family: 'Oswald', sans-serif;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.nav-text-link:hover { color: var(--crimson); }
-.nav-start-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.8rem 1.5rem;
-  background: var(--nav-cta);
-  color: #fff;
-  border: none;
-  border-radius: 5px;
-  font-family: 'Oswald', sans-serif;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  text-decoration: none;
-  transition: background 0.15s;
-}
-.nav-start-btn:hover {
-  background: var(--nav-cta-hover);
-}
-/* INTRO */
-.intro {
-  margin-top: 78px;
-  padding: 112px 80px 84px;
-  max-width: 1240px;
-  margin-left: auto;
-  margin-right: auto;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 42px;
-  align-items: start;
-}
+    .over-image-card img {
+      display: block;
+      width: 100%;
+      height: 230px;
+      object-fit: cover;
+    }
 
-.intro-left { max-width: 1080px; }
-.eyebrow { font-size: 10px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; color: var(--light); margin-bottom: 20px; }
-.big-title {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: clamp(74px, 7.8vw, 118px);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: -3px;
-  line-height: .88;
-  color: var(--dark);
-  max-width: 1080px;
-}
-.big-title span { color: var(--crimson); }
-.title-rule { width: 48px; height: 3px; background: var(--crimson); border-radius: 2px; margin-top: 24px; }
+    .over-image-card-body {
+      padding: 26px;
+    }
 
-.intro-right { max-width: 760px; margin-left: auto; border-left: 1px solid var(--border); padding: 8px 0 8px 40px; }
-.lead { font-size: 19px; font-weight: 300; color: var(--dark); line-height: 1.6; margin-bottom: 28px; }
-.lead strong { font-weight: 600; }
-.body-text { font-size: 15px; color: var(--mid); line-height: 1.9; }
-.body-text p { margin-bottom: 18px; }
-.body-text p:last-child { margin-bottom: 0; }
-.intro-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .over-image-card-body h3 {
+      margin-bottom: 12px;
+    }
 
-/* DIVIDER */
-.divider { border: none; border-top: 1px solid var(--border); margin: 0 auto; max-width: 1240px; width: calc(100% - 160px); }
+    .over-quote {
+      border-left: 4px solid var(--seo-accent);
+    }
 
-/* FEITEN BALK */
-.feiten { padding: 56px 80px; max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
-.feit { padding: 0 32px; border-right: 1px solid var(--border); }
-.feit:first-child { padding-left: 0; }
-.feit:last-child { border-right: none; }
-.feit-num { font-family: 'Barlow Condensed', sans-serif; font-size: 44px; font-weight: 800; color: var(--dark); line-height: 1; margin-bottom: 4px; }
-.feit-num span { color: var(--crimson); }
-.feit-label { font-size: 13px; color: var(--light); line-height: 1.4; }
+    .over-quote-mark {
+      color: var(--seo-accent);
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 56px;
+      font-weight: 800;
+      line-height: .7;
+      margin-bottom: 14px;
+    }
 
-/* SECTIE TEKST */
-.tekst-sectie { padding: 84px 80px; max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 76px; }
-.tekst-sectie-label { font-size: 10px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; color: var(--light); padding-top: 6px; }
-.tekst-sectie-body { max-width: 880px; }
-.tekst-sectie-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(34px, 4vw, 48px); font-weight: 800; text-transform: uppercase; letter-spacing: -.8px; color: var(--dark); line-height: 1.02; margin-bottom: 22px; max-width: 820px; }
-.tekst-sectie-body p { font-size: 15px; color: var(--mid); line-height: 1.9; margin-bottom: 16px; }
-.tekst-sectie-body p:last-child { margin-bottom: 0; }
-.tekst-sectie-body strong { color: var(--dark); font-weight: 600; }
-.service-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
-.service-card { display: flex; flex-direction: column; min-height: 190px; padding: 24px; border: 1px solid var(--border); border-radius: 7px; background: rgba(255,255,255,.72); text-decoration: none; color: var(--dark); }
-.service-card:hover { border-color: rgba(155,35,85,.45); transform: translateY(-1px); }
-.service-card span { font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--crimson); margin-bottom: 14px; }
-.service-card strong { display: block; font-size: 18px; line-height: 1.35; margin-bottom: 10px; }
-.service-card em { display: block; font-style: normal; color: var(--mid); font-size: 14px; line-height: 1.65; margin-top: auto; }
-.principle-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
-.principle { padding: 24px; border-top: 3px solid var(--crimson); background: #fff; }
-.principle strong { display: block; font-size: 16px; margin-bottom: 10px; }
-.principle p { font-size: 14px; line-height: 1.75; color: var(--mid); margin: 0; }
+    .over-quote-person {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 28px;
+    }
 
-/* QUOTE */
-.quote-wrap { background: transparent; padding: 0 80px 84px; margin: 0; }
-.quote-inner {
-  max-width: 1180px;
-  margin: 0 auto;
-  background: var(--dark);
-  border-radius: 8px;
-  padding: 72px 88px;
-}
-.quote-mark { font-family: 'Barlow Condensed', sans-serif; font-size: 80px; font-weight: 800; color: var(--crimson); line-height: .8; margin-bottom: 16px; }
-.quote-body { font-size: clamp(22px, 2.5vw, 32px); font-weight: 300; color: rgba(255,255,255,.88); line-height: 1.45; margin-bottom: 32px; max-width: 840px; }
-.quote-sig { display: flex; align-items: center; gap: 14px; }
-.quote-av { width: 38px; height: 38px; background: var(--crimson); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; color: #fff; flex-shrink: 0; }
-.quote-name { font-size: 14px; font-weight: 500; color: #fff; }
-.quote-role { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 1px; }
+    .over-quote-avatar {
+      align-items: center;
+      background: var(--seo-accent);
+      border-radius: 999px;
+      color: #fff;
+      display: inline-flex;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      height: 42px;
+      justify-content: center;
+      width: 42px;
+    }
 
-/* CONTACT STRIP */
-.contact-strip { padding: 70px 80px; max-width: 1240px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 40px; }
-.contact-strip-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(30px, 4vw, 44px); font-weight: 800; text-transform: uppercase; letter-spacing: -.7px; line-height: 1; margin-bottom: 8px; max-width: 560px; }
-.contact-strip-sub { font-size: 14px; color: var(--light); }
-.contact-strip-right { display: flex; gap: 10px; flex-shrink: 0; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 13px 24px; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all .15s; text-decoration: none; }
-.btn-solid { background: var(--crimson); color: #fff; border: none; }
-.btn-solid:hover { background: #c4346a; }
-.btn-outline { background: #fff; color: var(--dark); border: 1px solid #ded9d0; }
-.btn-outline:hover { border-color: var(--crimson); color: var(--crimson); }
-.footer { border-top: 1px solid var(--border); padding: 36px 80px; background: rgba(255,255,255,.55); }
-.footer-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; }
-.footer-brand { max-width: 360px; }
-.footer-logo { font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 10px; }
-.footer-text { font-size: 13px; line-height: 1.7; color: var(--mid); }
-.footer-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 14px 20px; }
-.footer-links a { color: var(--mid); text-decoration: none; font-size: 13px; font-weight: 600; }
-.footer-links a:hover { color: var(--crimson); }
-.footer-copy { width: 100%; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--light); }
+    .over-quote-name {
+      color: var(--seo-dark);
+      display: block;
+      font-weight: 800;
+    }
 
-@media (max-width: 1100px) {
-  nav { padding: 1rem 2rem; }
-  .intro { grid-template-columns: 1fr; gap: 34px; padding: 88px 48px 64px; align-items: start; }
-  .intro-right { border-left: none; padding: 0; max-width: 760px; margin-left: 0; }
-  .big-title { max-width: 980px; font-size: clamp(68px, 12vw, 112px); }
-  .divider { width: calc(100% - 96px); }
-  .feiten { padding-left: 48px; padding-right: 48px; }
-  .tekst-sectie { grid-template-columns: 180px minmax(0, 1fr); gap: 48px; padding-left: 48px; padding-right: 48px; }
-  .quote-wrap { padding-left: 48px; padding-right: 48px; }
-  .quote-inner { padding: 60px 64px; }
-  .contact-strip { padding-left: 48px; padding-right: 48px; }
-}
+    .over-quote-role {
+      color: var(--seo-muted);
+      display: block;
+      font-size: 14px;
+      margin-top: 2px;
+    }
 
-@media (max-width: 900px) {
-  nav { padding: 1rem 1.25rem; }
-  .nav-text-link { display: none; }
-  .intro { grid-template-columns: 1fr; gap: 36px; padding: 56px 24px 48px; }
-  .intro-right { border-left: none; padding: 0; }
-  .big-title { font-size: clamp(58px, 18vw, 92px); letter-spacing: -2px; max-width: 100%; }
-  .divider { margin: 0 24px; width: auto; }
-  .feiten { grid-template-columns: 1fr 1fr; padding: 40px 24px; gap: 24px 0; }
-  .feit { border-right: none; padding: 0 12px 0 0; }
-  .tekst-sectie { grid-template-columns: 1fr; gap: 20px; padding: 48px 24px; }
-  .service-grid, .principle-grid { grid-template-columns: 1fr; }
-  .quote-wrap { padding: 0 24px 48px; }
-  .quote-inner { padding: 44px 28px; }
-  .contact-strip { flex-direction: column; align-items: flex-start; padding: 48px 24px; }
-  .contact-strip-right { flex-direction: column; width: 100%; }
-  .contact-strip-right .btn { justify-content: center; }
-  .footer { padding: 32px 24px; }
-  .footer-inner { flex-direction: column; }
-  .footer-links { justify-content: flex-start; }
-}
-</style>
+    .over-photo-panel {
+      min-height: 100%;
+      padding: 0;
+    }
+
+    .over-photo-panel img {
+      display: block;
+      height: 100%;
+      min-height: 360px;
+      object-fit: cover;
+      width: 100%;
+    }
+
+    .over-footer-links a {
+      border-color: rgba(255,255,255,.24);
+      color: #fff;
+    }
+
+    .over-footer-note {
+      display: block;
+      margin-top: 28px;
+      color: rgba(255,255,255,.5);
+    }
+
+    @media (max-width: 860px) {
+      .over-photo-panel img {
+        min-height: 240px;
+      }
+    }
+  </style>
 </head>
 <body>
-<nav id="navbar">
-  <a href="/" class="logo">SOFTORA.NL</a>
-  <div class="nav-links">
-    <a href="/diensten" class="nav-text-link">Diensten</a>
-    <a href="/blog" class="nav-text-link">Blog</a>
-    <a href="/#contact" class="nav-start-btn">Start Project</a>
-  </div>
-</nav>
-
-<!-- INTRO -->
-<div class="intro">
-  <div class="intro-left">
-    <div class="eyebrow">Over Softora</div>
-    <h1 class="big-title">Digitale groei zonder ruis<span>.</span></h1>
-    <div class="title-rule"></div>
-  </div>
-  <div class="intro-right">
-    <div class="lead">Softora is een digitaal bouwbureau uit Oisterwijk voor ondernemers die meer willen dan een mooie website: <strong>meer aanvragen, slimmere processen en betere opvolging</strong>.</div>
-    <div class="body-text">
-      <p>We bouwen websites, bedrijfssoftware, CRM-systemen, chatbots en AI telefonie die passen bij de manier waarop een bedrijf echt werkt. Geen losse techniek om de techniek, maar digitale onderdelen die verkeer, leads en werkprocessen met elkaar verbinden.</p>
-      <p>Softora blijft bewust direct en persoonlijk. Je werkt met de mensen die het uitdenken en maken. Daardoor blijven keuzes helder, lijnen kort en het eindresultaat bruikbaar voor de praktijk.</p>
-    </div>
-    <div class="intro-actions">
-      <a class="btn btn-solid" href="/diensten">Bekijk diensten</a>
-      <a class="btn btn-outline" href="/website-laten-maken">Website laten maken</a>
-    </div>
-  </div>
-</div>
-
-<hr class="divider">
-
-<!-- FEITEN -->
-<div class="feiten">
-  <div class="feit">
-    <div class="feit-num">20<span>+</span></div>
-    <div class="feit-label">MKB-projecten<br>en klantvragen</div>
-  </div>
-  <div class="feit">
-    <div class="feit-num">5</div>
-    <div class="feit-label">Focusgebieden:<br>web, software, CRM, chatbot & voice</div>
-  </div>
-  <div class="feit">
-    <div class="feit-num">100<span>%</span></div>
-    <div class="feit-label">Op maat —<br>nooit van de plank</div>
-  </div>
-  <div class="feit">
-    <div class="feit-num">2023</div>
-    <div class="feit-label">Opgericht in<br>Oisterwijk</div>
-  </div>
-</div>
-
-<hr class="divider">
-
-<!-- SECTIE: WAAROM -->
-<div class="tekst-sectie">
-  <div class="tekst-sectie-label">Waarom Softora</div>
-  <div class="tekst-sectie-body">
-    <div class="tekst-sectie-title">Gebouwd voor ondernemers die door willen</div>
-    <p>Veel digitale trajecten worden te groot, te vaag of te technisch. Ondernemers willen vooral weten: wat levert dit op, wat kost het, wanneer staat het live en hoe helpt het mijn bedrijf vooruit?</p>
-    <p>Daarom werkt Softora vanuit <strong>duidelijke doelen, korte lijnen en concrete oplevering</strong>. We leggen uit waarom we iets bouwen, welke keuze verstandig is en wat beter later kan.</p>
-    <p>Een samenwerking mag klein beginnen. Een goede website kan later uitgroeien naar CRM, automatisering, AI klantcontact of een maatwerk platform. De basis moet daarom vanaf dag één logisch zijn.</p>
-  </div>
-</div>
-
-<hr class="divider">
-
-<!-- SECTIE: WAT WE DOEN -->
-<div class="tekst-sectie">
-  <div class="tekst-sectie-label">Wat we bouwen</div>
-  <div class="tekst-sectie-body">
-    <div class="tekst-sectie-title">Van vindbaarheid naar opvolging</div>
-    <p>Softora werkt aan de onderdelen die samen digitale groei vormen: een website die gevonden wordt, pagina’s die vertrouwen opbouwen, systemen die leads bijhouden en automatisering die opvolging niet laat liggen.</p>
-    <p>Daarom kijken we niet alleen naar design. We kijken naar de hele route: zoekvraag, pagina, aanvraag, CRM, taak, afspraak, offerte en vervolgcontact.</p>
-    <div class="service-grid">
-      <a class="service-card" href="/website-laten-maken">
-        <span>Websites</span>
-        <strong>Websites die aanvragen moeten opleveren</strong>
-        <em>Structuur, copy, snelheid, SEO en CTA’s als één geheel.</em>
-      </a>
-      <a class="service-card" href="/bedrijfssoftware-op-maat">
-        <span>Software</span>
-        <strong>Maatwerk software voor echte processen</strong>
-        <em>Dashboards, klantportalen, workflows en interne tools.</em>
-      </a>
-      <a class="service-card" href="/ai-automatisering">
-        <span>AI groei</span>
-        <strong>AI automatisering met menselijke controle</strong>
-        <em>Chatbots, AI telefonie, CRM-overdracht en leadopvolging.</em>
-      </a>
-    </div>
-  </div>
-</div>
-
-<!-- QUOTE -->
-<div class="quote-wrap">
-  <div class="quote-inner">
-    <div class="quote-mark">"</div>
-    <div class="quote-body">Ik wil dat ondernemers precies begrijpen wat we bouwen, waarom het werkt en hoe het bijdraagt aan groei. Een site of systeem moet niet alleen mooi zijn, maar elke week nuttiger worden.</div>
-    <div class="quote-sig">
-      <div class="quote-av">SC</div>
-      <div>
-        <div class="quote-name">Serve Creusen</div>
-        <div class="quote-role">Oprichter — Softora.nl, Oisterwijk</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- SECTIE: HOE WE WERKEN -->
-<div class="tekst-sectie">
-  <div class="tekst-sectie-label">Hoe we werken</div>
-  <div class="tekst-sectie-body">
-    <div class="tekst-sectie-title">Rustig in aanpak, scherp in uitvoering</div>
-    <p>Elke samenwerking begint met begrijpen wat er nu gebeurt: waar bezoekers afhaken, hoe leads binnenkomen, welke systemen gebruikt worden en waar handwerk ontstaat.</p>
-    <p>Daarna maken we een compacte routekaart. Wat moet eerst, wat kan later en welke pagina’s of systemen hebben de meeste waarde? Zo bouwen we snel zonder de basis rommelig te maken.</p>
-    <p>Na oplevering blijven we verbeteren. SEO, content, interne links, conversie en automatisering werken pas echt wanneer ze regelmatig worden gemeten en bijgestuurd.</p>
-    <div class="principle-grid">
-      <div class="principle">
-        <strong>Duidelijke keuzes</strong>
-        <p>Geen vage trajecten. We leggen keuzes uit in gewone taal en koppelen ze aan verkeer, leads of werkdruk.</p>
-      </div>
-      <div class="principle">
-        <strong>Groeibare basis</strong>
-        <p>Wat we bouwen moet later kunnen uitbreiden met content, CRM, AI of maatwerk zonder opnieuw te beginnen.</p>
-      </div>
-      <div class="principle">
-        <strong>Meetbaar verbeteren</strong>
-        <p>We kijken naar data, aanvragen en gebruikerssignalen om pagina’s en flows stap voor stap sterker te maken.</p>
-      </div>
-    </div>
-  </div>
-</div>
-
-<hr class="divider">
-
-<!-- CONTACT STRIP -->
-<div class="contact-strip">
-  <div class="contact-strip-left">
-    <div class="contact-strip-title">Wil je weten welke digitale stap logisch is?</div>
-    <div class="contact-strip-sub">Vertel kort waar je naartoe wilt, dan denken we concreet met je mee.</div>
-  </div>
-  <div class="contact-strip-right">
-    <a class="btn btn-outline" href="tel:+31643262792">+31 6 43 26 27 92</a>
-    <a class="btn btn-solid" href="/#contact">Start gesprek</a>
-  </div>
-</div>
-
-<footer class="footer">
-  <div class="footer-inner">
-    <div class="footer-brand">
-      <div class="footer-logo">SOFTORA.NL</div>
-      <p class="footer-text">Websites, bedrijfssoftware en AI automatisering voor ondernemers die meer verkeer, betere opvolging en minder handwerk willen.</p>
-    </div>
-    <div class="footer-links" data-softora-public-seo="internal-links" aria-label="Footer navigatie">
+  <nav class="seo-growth-nav">
+    <a href="/" class="seo-growth-brand">Softora.nl</a>
+    <div class="seo-growth-nav-links">
       <a href="/diensten">Diensten</a>
-      <a href="/website-laten-maken">Website laten maken</a>
-      <a href="/bedrijfssoftware-op-maat">Bedrijfssoftware</a>
-      <a href="/ai-automatisering">AI automatisering</a>
-      <a href="/crm-systeem-op-maat">CRM systeem</a>
-      <a href="/chatbot-laten-maken">Chatbot laten maken</a>
+      <a href="/website-laten-maken">Websites</a>
+      <a href="/bedrijfssoftware-op-maat">Software</a>
+      <a href="/ai-automatisering">AI</a>
       <a href="/blog">Blog</a>
-      <a href="/kennisbank">Kennisbank</a>
-      <a href="/privacybeleid">Privacybeleid</a>
-      <a href="/algemene-voorwaarden">Algemene voorwaarden</a>
+      <a class="seo-growth-nav-cta" href="/#contact">Start gesprek</a>
     </div>
-  </div>
-  <div class="footer-inner">
-    <div class="footer-copy">© 2026 Softora.nl - Oisterwijk, Nederland</div>
-  </div>
-</footer>
+  </nav>
 
+  <main>
+    <section class="seo-growth-hero">
+      <img class="seo-growth-hero-image" src="/assets/home-over-office-meeting-ai.jpg?v=20260511a" alt="Softora overleg over websites, software en AI automatisering">
+      <div class="seo-growth-hero-content">
+        <p class="seo-growth-eyebrow">Over Softora</p>
+        <h1>Digitale groei zonder ruis</h1>
+        <p>Softora is een digitaal bouwbureau uit Oisterwijk voor ondernemers die meer willen dan een mooie website: meer aanvragen, slimmere processen en betere opvolging.</p>
+        <div class="seo-growth-actions">
+          <a class="seo-growth-button" href="/diensten">Bekijk diensten</a>
+          <a class="seo-growth-button secondary" href="/website-laten-maken">Website laten maken</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="seo-growth-proof" aria-label="Softora in het kort">
+      <div>
+        <strong>20+</strong>
+        <span>MKB-vragen en klanttrajecten</span>
+      </div>
+      <div>
+        <strong>5</strong>
+        <span>Focusgebieden: web, software, CRM, chatbot en voice</span>
+      </div>
+      <div>
+        <strong>100%</strong>
+        <span>Op maat, niet van de plank</span>
+      </div>
+      <div>
+        <strong>2023</strong>
+        <span>Opgericht in Oisterwijk</span>
+      </div>
+    </section>
+
+    <section class="seo-growth-section">
+      <div class="seo-growth-section-inner seo-growth-split">
+        <div>
+          <p class="seo-growth-kicker">Waarom Softora</p>
+          <h2>Gebouwd voor ondernemers die door willen</h2>
+          <p>Veel digitale trajecten worden te groot, te vaag of te technisch. Ondernemers willen vooral weten wat iets oplevert, wat het kost, wanneer het live kan en hoe het helpt om werk slimmer te organiseren.</p>
+          <p>Daarom werkt Softora vanuit duidelijke doelen, korte lijnen en concrete oplevering. We leggen uit waarom we iets bouwen, welke keuze verstandig is en wat beter later kan.</p>
+          <p>Een samenwerking mag klein beginnen. Een goede website kan later uitgroeien naar CRM, automatisering, AI klantcontact of een maatwerk platform. De basis moet daarom vanaf dag één logisch zijn.</p>
+        </div>
+        <div class="seo-growth-panel over-photo-panel" aria-label="Softora werkproces">
+          <img src="/assets/home-service-websites-ai.jpg?v=20260511a" alt="Website strategie en wireframes voor MKB groei">
+        </div>
+      </div>
+    </section>
+
+    <section class="seo-growth-section alt">
+      <div class="seo-growth-section-inner">
+        <div>
+          <p class="seo-growth-kicker">Wat we bouwen</p>
+          <h2>Van vindbaarheid naar opvolging</h2>
+          <p>Softora werkt aan de onderdelen die samen digitale groei vormen: een website die gevonden wordt, pagina's die vertrouwen opbouwen, systemen die leads bijhouden en automatisering die opvolging niet laat liggen.</p>
+          <p>Daarom kijken we niet alleen naar design. We kijken naar de hele route: zoekvraag, pagina, aanvraag, CRM, taak, afspraak, offerte en vervolgcontact.</p>
+        </div>
+        <div class="seo-growth-grid">
+          <a class="seo-growth-card over-image-card" href="/website-laten-maken">
+            <img src="/assets/home-service-websites-ai.jpg?v=20260511a" alt="Website laten maken die aanvragen oplevert">
+            <div class="over-image-card-body">
+              <span>Websites</span>
+              <h3>Websites die aanvragen moeten opleveren</h3>
+              <p>Structuur, copy, snelheid, SEO en CTA's als één geheel.</p>
+            </div>
+          </a>
+          <a class="seo-growth-card over-image-card" href="/bedrijfssoftware-op-maat">
+            <img src="/assets/home-service-software-ai.jpg?v=20260511a" alt="Maatwerk software voor interne processen">
+            <div class="over-image-card-body">
+              <span>Software</span>
+              <h3>Maatwerk software voor echte processen</h3>
+              <p>Dashboards, klantportalen, workflows en interne tools.</p>
+            </div>
+          </a>
+          <a class="seo-growth-card over-image-card" href="/ai-automatisering">
+            <img src="/assets/home-service-chatbot-ai.jpg?v=20260511a" alt="AI automatisering met menselijke controle">
+            <div class="over-image-card-body">
+              <span>AI groei</span>
+              <h3>AI automatisering met menselijke controle</h3>
+              <p>Chatbots, AI telefonie, CRM-overdracht en leadopvolging.</p>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="seo-growth-section">
+      <div class="seo-growth-section-inner seo-growth-split">
+        <div class="seo-growth-panel over-quote">
+          <div class="over-quote-mark">"</div>
+          <p>Ik wil dat ondernemers precies begrijpen wat we bouwen, waarom het werkt en hoe het bijdraagt aan groei. Een site of systeem moet niet alleen mooi zijn, maar elke week nuttiger worden.</p>
+          <div class="over-quote-person">
+            <span class="over-quote-avatar">MV</span>
+            <span>
+              <span class="over-quote-name">Martijn van de Ven</span>
+              <span class="over-quote-role">Digitale groei en projectstrategie bij Softora.nl</span>
+            </span>
+          </div>
+        </div>
+        <div>
+          <p class="seo-growth-kicker">Hoe we werken</p>
+          <h2>Rustig in aanpak, scherp in uitvoering</h2>
+          <p>Elke samenwerking begint met begrijpen wat er nu gebeurt: waar bezoekers afhaken, hoe leads binnenkomen, welke systemen gebruikt worden en waar handwerk ontstaat.</p>
+          <p>Daarna maken we een compacte routekaart. Wat moet eerst, wat kan later en welke pagina's of systemen hebben de meeste waarde? Zo bouwen we snel zonder de basis rommelig te maken.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="seo-growth-section alt">
+      <div class="seo-growth-section-inner">
+        <div>
+          <p class="seo-growth-kicker">Wat belangrijk blijft</p>
+          <h2>Geen losse techniek, maar één groeisysteem</h2>
+          <p>Een goede website, een CRM of AI automatisering werkt pas echt wanneer de onderdelen elkaar versterken. Daarom bouwen we publieke pagina's, interne processen en opvolging in dezelfde richting.</p>
+          <div class="seo-growth-actions">
+            <a class="seo-growth-button" href="/#contact">Start gesprek</a>
+            <a class="seo-growth-button secondary" href="/blog">Bekijk inzichten</a>
+          </div>
+        </div>
+        <div class="seo-growth-grid">
+          <div class="seo-growth-card">
+            <span>Keuzes</span>
+            <h3>Duidelijke keuzes</h3>
+            <p>Geen vage trajecten. We leggen keuzes uit in gewone taal en koppelen ze aan verkeer, leads of werkdruk.</p>
+          </div>
+          <div class="seo-growth-card">
+            <span>Basis</span>
+            <h3>Groeibare basis</h3>
+            <p>Wat we bouwen moet later kunnen uitbreiden met content, CRM, AI of maatwerk zonder opnieuw te beginnen.</p>
+          </div>
+          <div class="seo-growth-card">
+            <span>Meten</span>
+            <h3>Meetbaar verbeteren</h3>
+            <p>We kijken naar data, aanvragen en gebruikssignalen om pagina's en flows stap voor stap sterker te maken.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="seo-growth-section">
+      <div class="seo-growth-section-inner seo-growth-split">
+        <div>
+          <p class="seo-growth-kicker">Verder lezen</p>
+          <h2>Logische volgende stappen</h2>
+          <p>Wil je eerst begrijpen welke digitale stap het meeste oplevert? Begin bij de diensten, bekijk de website-aanpak of lees hoe software, CRM en AI elkaar versterken.</p>
+        </div>
+        <div class="seo-growth-links">
+          <a href="/diensten">Alle diensten</a>
+          <a href="/website-laten-maken">Website laten maken</a>
+          <a href="/bedrijfssoftware-op-maat">Bedrijfssoftware op maat</a>
+          <a href="/crm-systeem-op-maat">CRM systeem op maat</a>
+          <a href="/chatbot-laten-maken">Chatbot laten maken</a>
+          <a href="/kennisbank">Kennisbank</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="seo-growth-cta">
+    <div class="seo-growth-cta-inner">
+      <p class="seo-growth-kicker">Samen bouwen</p>
+      <h2>Wil je weten welke digitale stap logisch is?</h2>
+      <p>Vertel kort waar je naartoe wilt, dan denken we concreet met je mee.</p>
+      <div class="seo-growth-actions">
+        <a class="seo-growth-button" href="/#contact">Start gesprek</a>
+        <a class="seo-growth-button secondary" href="tel:+31643262792">+31 6 43 26 27 92</a>
+      </div>
+      <div class="seo-growth-links over-footer-links" data-softora-public-seo="internal-links" aria-label="Footer navigatie">
+        <a href="/diensten">Diensten</a>
+        <a href="/website-laten-maken">Website laten maken</a>
+        <a href="/bedrijfssoftware-op-maat">Bedrijfssoftware</a>
+        <a href="/ai-automatisering">AI automatisering</a>
+        <a href="/crm-systeem-op-maat">CRM systeem</a>
+        <a href="/chatbot-laten-maken">Chatbot laten maken</a>
+        <a href="/blog">Blog</a>
+        <a href="/kennisbank">Kennisbank</a>
+        <a href="/privacybeleid">Privacybeleid</a>
+        <a href="/algemene-voorwaarden">Algemene voorwaarden</a>
+      </div>
+      <small class="over-footer-note">© 2026 Softora.nl - Oisterwijk, Nederland</small>
+    </div>
+  </footer>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    "name": "Over Softora",
+    "url": "https://www.softora.nl/over-softora",
+    "description": "Softora is een digitaal bouwbureau uit Oisterwijk voor websites, bedrijfssoftware, CRM, chatbots en AI automatisering.",
+    "about": {
+      "@type": "Organization",
+      "name": "Softora",
+      "url": "https://www.softora.nl",
+      "areaServed": "Nederland"
+    }
+  }
+  </script>
 </body>
 </html>

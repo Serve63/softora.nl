@@ -107,44 +107,45 @@ test('over softora page keeps headline, quote and CTA layout polished', () => {
 
   assert.match(
     source,
-    /<h1 class="big-title">Digitale groei zonder ruis<span>\.<\/span><\/h1>/,
-    'Over Softora H1 mag niet opnieuw met harde breaks in vier smalle regels vallen'
+    /\/assets\/seo-growth-pages\.css\?v=20260520b/,
+    'Over Softora moet de gedeelde SEO-growth template blijven gebruiken'
   );
   assert.doesNotMatch(
-    source.match(/<h1 class="big-title">[\s\S]*?<\/h1>/)?.[0] || '',
+    source.match(/<h1>[\s\S]*?<\/h1>/)?.[0] || '',
     /<br>/,
     'Over Softora H1 moet breed kunnen ademen'
   );
   assert.match(
     source,
-    /\.intro\s*\{[\s\S]*max-width:\s*1240px;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*gap:\s*42px;/s,
-    'Over Softora hero moet de titel breed laten ademen'
+    /<section class="seo-growth-hero">[\s\S]*home-over-office-meeting-ai\.jpg/s,
+    'Over Softora moet een echte hero-foto tonen binnen de template'
   );
   assert.match(
     source,
-    /\.big-title\s*\{[\s\S]*max-width:\s*1080px;/s,
-    'Over Softora H1 moet breed genoeg blijven voor krachtige regels'
+    /<a class="seo-growth-card over-image-card" href="\/website-laten-maken">[\s\S]*home-service-websites-ai\.jpg/s,
+    'Websiteblok op Over Softora moet een foto houden'
   );
   assert.match(
     source,
-    /@media \(max-width:\s*1100px\)\s*\{[\s\S]*\.intro\s*\{[\s\S]*grid-template-columns:\s*1fr;[\s\S]*\.big-title\s*\{[\s\S]*max-width:\s*980px;/s,
-    'Over Softora H1 mag op laptopbreedte niet opnieuw in een smalle kolom vallen'
+    /<a class="seo-growth-card over-image-card" href="\/bedrijfssoftware-op-maat">[\s\S]*home-service-software-ai\.jpg/s,
+    'Softwareblok op Over Softora moet een foto houden'
   );
   assert.match(
     source,
-    /\.quote-wrap\s*\{[\s\S]*background:\s*transparent;[\s\S]*padding:\s*0 80px 84px;/s,
-    'Quote mag geen lompe full-width zwarte balk meer zijn'
+    /<a class="seo-growth-card over-image-card" href="\/ai-automatisering">[\s\S]*home-service-chatbot-ai\.jpg/s,
+    'AI-blok op Over Softora moet een foto houden'
   );
   assert.match(
     source,
-    /\.quote-inner\s*\{[\s\S]*max-width:\s*1180px;[\s\S]*background:\s*var\(--dark\);[\s\S]*border-radius:\s*8px;[\s\S]*padding:\s*72px 88px;/s,
-    'Quote moet als nette, ingekaderde sectie blijven renderen'
+    /Martijn van de Ven/,
+    'Over Softora mag niet opnieuw de echte eigenaar publiek als quotepersoon tonen'
   );
-  assert.match(
+  assert.doesNotMatch(
     source,
-    /\.btn-outline\s*\{[\s\S]*background:\s*#fff;[\s\S]*color:\s*var\(--dark\);[\s\S]*border:\s*1px solid #ded9d0;/s,
-    'Secundaire CTA’s moeten zichtbaar blijven op de lichte achtergrond'
+    /Serv[eé]\s+Creusen/i,
+    'Servé mag voorlopig niet aan de voorkant van deze pagina terugkomen'
   );
+  assert.doesNotMatch(source, /class="big-title"|class="intro"|class="quote-wrap"/);
 });
 
 test('design protocol protects the homepage and public templates', () => {
