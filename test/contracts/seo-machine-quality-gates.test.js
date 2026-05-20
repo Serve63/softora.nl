@@ -17,6 +17,8 @@ const {
   getSeoContentPathForItem,
 } = require('../../server/services/seo-content');
 const {
+  DEFAULT_UNSUPPORTED_CLAIM_RULES,
+  auditClaimSafety,
   auditContentQuality,
   auditConversionCtas,
   auditLinkGraph,
@@ -71,6 +73,47 @@ test('seo machine contentkwaliteit blijft sterk genoeg om automatisch door te gr
   });
 
   assert.deepEqual(issues, []);
+});
+
+test('seo machine blokkeert gevaarlijke of onbewezen contentclaims', () => {
+  assert.ok(DEFAULT_UNSUPPORTED_CLAIM_RULES.length >= 6);
+
+  const currentItems = getSeoContentItems({ now: seoMachineNow });
+  assert.deepEqual(auditClaimSafety({ items: currentItems }), []);
+
+  const issues = auditClaimSafety({
+    items: [
+      {
+        collection: 'blog',
+        slug: 'gevaarlijke-claims',
+        title: 'Softora garandeert nummer 1 in Google',
+        description:
+          'Softora is Google Partner, ISO 27001 gecertificeerd en garandeert 100 leads per maand zonder risico.',
+        summary:
+          'Onze AI maakt geen fouten, neemt alle beslissingen, geeft juridisch advies en Servé Creusen staat op de voorkant.',
+        sections: [
+          {
+            heading: '100% veilig en hackvrij',
+            paragraphs: ['Wij worden de grootste speler en hebben meer dan 100 klanten zonder bronvermelding.'],
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    issues.map((issue) => issue.type).sort(),
+    [
+      'absolute-security-or-availability',
+      'frontstage-private-founder-name',
+      'guaranteed-seo-or-business-result',
+      'market-leader-or-number-one-claim',
+      'regulated-advice-claim',
+      'unbounded-ai-claim',
+      'unsupported-certification-or-partner-claim',
+      'unsupported-scale-proof',
+    ].sort()
+  );
 });
 
 test('seo machine houdt money pages ondersteund met interne links', () => {
