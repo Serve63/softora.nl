@@ -145,6 +145,32 @@ test('premium bevestigingsmails includes lead-generator campaign boot overlay be
   );
 });
 
+test('premium bevestigingsmails blokkeert ook de sidebar tijdens coldmail verzending', () => {
+  const root = path.join(__dirname, '../..');
+  const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
+  const freezeSource = fs.readFileSync(path.join(root, 'assets/premium-coldmail-send-freeze.js'), 'utf8');
+
+  assert.match(pageSource, /assets\/premium-coldmail-send-freeze\.js\?v=20260520a/);
+  assert.match(freezeSource, /const overlayId = "coldmail-send-lock-overlay";/);
+  assert.match(
+    freezeSource,
+    /\.coldmail-send-lock-overlay \{[\s\S]*position: fixed;[\s\S]*inset: 0;[\s\S]*z-index: 22000;[\s\S]*pointer-events: auto;/
+  );
+  assert.match(
+    freezeSource,
+    /html\[\$\{lockAttribute\}\] \.sidebar \{[\s\S]*pointer-events: none !important;/
+  );
+  assert.match(freezeSource, /function setColdmailSendLock\(isLocked\)/);
+  assert.match(freezeSource, /sidebar\.setAttribute\("inert", ""\);/);
+  assert.match(freezeSource, /document\.activeElement\.blur\(\);/);
+  assert.match(freezeSource, /function blockColdmailSendLockInteraction\(event\)/);
+  assert.match(freezeSource, /event\.stopImmediatePropagation\(\);/);
+  assert.match(freezeSource, /document\.addEventListener\(eventName, blockColdmailSendLockInteraction, true\);/);
+  assert.match(freezeSource, /function wrapColdmailCampaignSender\(\)/);
+  assert.match(freezeSource, /window\.sendColdmailCampaignNow = async function softoraColdmailSendFreezeWrapped/);
+  assert.match(freezeSource, /setColdmailSendLock\(true\);[\s\S]*originalSender\.apply\(this, arguments\)[\s\S]*setColdmailSendLock\(false\);/);
+});
+
 test('premium bevestigingsmails campaign volume uses a fixed mail company label', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
