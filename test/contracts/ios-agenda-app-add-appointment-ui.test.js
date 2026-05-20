@@ -243,6 +243,16 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /case spam/);
   assert.match(agendaListSource, /\"starred\"/);
   assert.match(agendaListSource, /\"Reclame\"/);
+  const mailboxFolderHeadingStart = agendaListSource.indexOf('Text(selectedFolder.title)');
+  const mailboxFolderHeadingEnd = agendaListSource.indexOf('mailboxContent', mailboxFolderHeadingStart);
+  assert.ok(mailboxFolderHeadingStart >= 0 && mailboxFolderHeadingEnd > mailboxFolderHeadingStart);
+  const mailboxFolderHeadingSource = agendaListSource.slice(mailboxFolderHeadingStart, mailboxFolderHeadingEnd);
+  assert.doesNotMatch(
+    mailboxFolderHeadingSource,
+    /ProgressView\(\)/,
+    'Mailbox loading should only show the centered loader, not a second spinner next to the folder title.'
+  );
+  assert.match(agendaListSource, /if isLoadingMessages && messages\.isEmpty \{[^]*ProgressView\(\)[^]*Text\("MAILS LADEN\.\.\."\)/);
   assert.match(agendaListSource, /MailboxFolderDrawer/);
   assert.match(agendaListSource, /@State private var isShowingAccountMenu = false/);
   assert.match(agendaListSource, /private var mailboxHeader: some View \{[^]*Button \{[^]*isShowingAccountMenu\.toggle\(\)[^]*Text\("Mailbox"\)/);

@@ -979,11 +979,6 @@ private struct MailboxView: View {
                         .foregroundStyle(Color.softoraInk)
 
                     Spacer()
-
-                    if isLoadingMessages {
-                        ProgressView()
-                            .tint(Color.softoraCrimson)
-                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 14)
