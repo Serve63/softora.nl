@@ -2235,7 +2235,7 @@ private enum MailboxBodyFormatter {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !text.isEmpty {
                 if let link = takeLink(matching: text, from: &unusedLinks) {
-                    output.append(.textLink(text, link))
+                    output.append(.textLink(linkDisplayText(from: text, link: link), link))
                 } else {
                     output.append(.text(text))
                 }
@@ -2312,6 +2312,29 @@ private enum MailboxBodyFormatter {
             return nil
         }
         return links.remove(at: index)
+    }
+
+    private static func linkDisplayText(from text: String, link: MailboxLink) -> String {
+        var displayText = text
+        let hrefCandidates = [
+            link.href,
+            link.href.removingPercentEncoding ?? "",
+        ]
+
+        for href in hrefCandidates where !href.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            displayText = displayText.replacingOccurrences(of: href, with: "", options: .caseInsensitive)
+        }
+
+        displayText = displayText
+            .replacingOccurrences(of: #"<?https?://\S+>?"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ":;-")))
+
+        if displayText.isEmpty {
+            let label = link.label.trimmingCharacters(in: .whitespacesAndNewlines)
+            return label.isEmpty ? link.href : label
+        }
+
+        return displayText
     }
 
     private static func normalizedImageText(_ value: String) -> String {

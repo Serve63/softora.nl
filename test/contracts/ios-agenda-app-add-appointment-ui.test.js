@@ -83,6 +83,9 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /\.map\(stripQuotePrefix\)/);
   assert.match(agendaListSource, /imagePlaceholderLabel\(from: trimmed\)/);
   assert.match(agendaListSource, /takeLink\(matching: text, from: &unusedLinks\)/);
+  assert.match(agendaListSource, /linkDisplayText\(from: text, link: link\)/);
+  assert.match(agendaListSource, /private static func linkDisplayText\(from text: String, link: MailboxLink\) -> String/);
+  assert.match(agendaListSource, /replacingOccurrences\(of: #"<\?https\?:\/\/\\S\+>\?"/);
   assert.match(agendaListSource, /uniqueLinks\(links\)/);
   assert.match(agendaListSource, /while output\.trimmingCharacters\(in: \.whitespaces\)\.hasPrefix\(">"\)/);
   assert.doesNotMatch(agendaListSource, /Text\(\(message\.body\.isEmpty \? message\.preview : message\.body\)\.trimmingCharacters/);
