@@ -7,6 +7,10 @@ function createFixture(overrides = {}) {
   const fetchCalls = [];
 
   const service = createAiSummaryService({
+    env: overrides.env || {
+      OPENAI_ORGANIZATION_ID: 'org_softora',
+      OPENAI_PROJECT_ID: 'proj_softora',
+    },
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength),
     parseIntSafe: (value, fallback = 0) => {
@@ -75,6 +79,8 @@ test('ai summary service generates a stable summary payload through OpenAI', asy
 
   assert.equal(fetchCalls.length, 1);
   assert.equal(fetchCalls[0].url, 'https://api.openai.test/v1/chat/completions');
+  assert.equal(fetchCalls[0].options.headers['OpenAI-Organization'], 'org_softora');
+  assert.equal(fetchCalls[0].options.headers['OpenAI-Project'], 'proj_softora');
   assert.match(String(fetchCalls[0].options.body || ''), /gpt-5-mini/);
   assert.equal(result.summary, 'Korte Nederlandse samenvatting.');
   assert.equal(result.style, 'short');

@@ -38,6 +38,7 @@ function createService(overrides = {}) {
     },
   ];
   const service = createColdmailCampaignService({
+    env: overrides.env || {},
     mailConfig: {
       smtpHost: overrides.smtpHost === undefined ? 'smtp.example.test' : overrides.smtpHost,
       smtpPort: 587,
@@ -1221,7 +1222,12 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
     references: '<sent-1@softora>',
   };
   let requestedModel = '';
+  let capturedOpenAiHeaders = null;
   const { service, sentMessages, getReplyState } = createService({
+    env: {
+      OPENAI_ORGANIZATION_ID: 'org_softora',
+      OPENAI_PROJECT_ID: 'proj_softora',
+    },
     imapHost: 'imap.example.test',
     imapUser: 'serve@softora.nl',
     imapPass: 'secret',
@@ -1251,6 +1257,7 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
     parseMailSource: async () => parsedInbound,
     fetchJsonWithTimeout: async (_url, request) => {
       requestedModel = JSON.parse(request.body).model;
+      capturedOpenAiHeaders = request.headers;
       return {
         response: { ok: true, status: 200 },
         data: {
@@ -1266,6 +1273,8 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
 
   assert.equal(result.replied, 1);
   assert.equal(requestedModel, 'gpt-5.5-pro');
+  assert.equal(capturedOpenAiHeaders['OpenAI-Organization'], 'org_softora');
+  assert.equal(capturedOpenAiHeaders['OpenAI-Project'], 'proj_softora');
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');

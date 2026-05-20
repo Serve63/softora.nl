@@ -65,23 +65,31 @@ test('agenda confirmation mail helpers fall back to the template when no OpenAI 
 });
 
 test('agenda confirmation mail helpers use the generated OpenAI draft when the API returns content', async () => {
+  const calls = [];
   const helpers = createAgendaConfirmationMailHelpers({
+    env: {
+      OPENAI_ORGANIZATION_ID: 'org_softora',
+      OPENAI_PROJECT_ID: 'proj_softora',
+    },
     openAiApiBaseUrl: 'https://api.openai.com/v1',
     openAiModel: 'gpt-4o-mini',
     buildConfirmationEmailDraftFallback: () => 'Onderwerp: Template fallback',
     getOpenAiApiKey: () => 'sk-test',
-    fetchJsonWithTimeout: async () => ({
-      response: { ok: true, status: 200 },
-      data: {
-        choices: [
-          {
-            message: {
-              content: ' Onderwerp: AI concept\n\nBeste klant,\n\nTot donderdag. ',
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          choices: [
+            {
+              message: {
+                content: ' Onderwerp: AI concept\n\nBeste klant,\n\nTot donderdag. ',
+              },
             },
-          },
-        ],
-      },
-    }),
+          ],
+        },
+      };
+    },
     extractOpenAiTextContent: (value) => normalizeString(value),
     normalizeString,
     normalizeDateYyyyMmDd,
@@ -105,5 +113,7 @@ test('agenda confirmation mail helpers use the generated OpenAI draft when the A
 
   assert.equal(result.source, 'openai');
   assert.equal(result.model, 'gpt-4o-mini');
+  assert.equal(calls[0].options.headers['OpenAI-Organization'], 'org_softora');
+  assert.equal(calls[0].options.headers['OpenAI-Project'], 'proj_softora');
   assert.match(result.draft, /Onderwerp: AI concept/);
 });

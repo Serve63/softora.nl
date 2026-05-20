@@ -1112,6 +1112,10 @@ test('mailbox service rejects invalid mark-read message references', async () =>
 test('mailbox service rewrites compose draft through OpenAI with reply context', async () => {
   const calls = [];
   const service = createMailboxService({
+    env: {
+      OPENAI_ORGANIZATION_ID: 'org_softora',
+      OPENAI_PROJECT_ID: 'proj_softora',
+    },
     getOpenAiApiKey: () => 'openai-key',
     openAiApiBaseUrl: 'https://api.openai.test/v1',
     openAiModel: 'gpt-test',
@@ -1154,6 +1158,8 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
   assert.equal(result.model, 'gpt-test');
   assert.equal(calls[0].url, 'https://api.openai.test/v1/chat/completions');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer openai-key');
+  assert.equal(calls[0].options.headers['OpenAI-Organization'], 'org_softora');
+  assert.equal(calls[0].options.headers['OpenAI-Project'], 'proj_softora');
   assert.equal(calls[0].timeout, 65000);
   assert.equal(calls[0].payload.model, 'gpt-test');
   assert.match(calls[0].payload.messages[0].content, /Verzin geen feiten/);

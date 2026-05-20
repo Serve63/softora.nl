@@ -60,6 +60,7 @@ function createRuntime(overrides = {}) {
   const updatedCallSummaries = [];
 
   const runtime = createAiCallInsightRuntime({
+    env: overrides.env || {},
     normalizeString,
     truncateText,
     normalizeDateYyyyMmDd,
@@ -155,7 +156,21 @@ test('ai call insight runtime materializes rule-based appointments from transcri
 });
 
 test('ai call insight runtime falls back to rule-based insight when OpenAI analysis fails', async () => {
-  const context = createRuntime({ openAiApiKey: 'sk-test' });
+  const openAiCalls = [];
+  const context = createRuntime({
+    openAiApiKey: 'sk-test',
+    env: {
+      OPENAI_ORGANIZATION_ID: 'org_softora',
+      OPENAI_PROJECT_ID: 'proj_softora',
+    },
+    fetchJsonWithTimeout: async (url, options) => {
+      openAiCalls.push({ url, options });
+      return {
+        response: { ok: false, status: 500 },
+        data: { error: { message: 'test failure' } },
+      };
+    },
+  });
   const callUpdate = {
     callId: 'call_fallback',
     company: 'Softora',
@@ -175,6 +190,8 @@ test('ai call insight runtime falls back to rule-based insight when OpenAI analy
 
   const insight = await context.runtime.maybeAnalyzeCallUpdateWithAi(callUpdate);
 
+  assert.equal(openAiCalls[0].options.headers['OpenAI-Organization'], 'org_softora');
+  assert.equal(openAiCalls[0].options.headers['OpenAI-Project'], 'proj_softora');
   assert.equal(insight?.source, 'rule');
   assert.equal(insight?.appointmentBooked, true);
   assert.equal(context.recentAiCallInsights[0]?.callId, 'call_fallback');

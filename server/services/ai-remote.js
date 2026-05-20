@@ -988,6 +988,7 @@ function createAiRemoteService(deps = {}) {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${apiKey}`,
+            ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
           },
           body,
         },
@@ -1012,6 +1013,7 @@ function createAiRemoteService(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
         },
         body: JSON.stringify(requestBody),
       },
@@ -1363,6 +1365,7 @@ function createAiRemoteService(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
         },
         body: JSON.stringify({
           model: openAiModel,
@@ -1448,6 +1451,7 @@ function createAiRemoteService(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
         },
         body: JSON.stringify({
           model: openAiModel,
@@ -1669,6 +1673,7 @@ function createAiRemoteService(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
         },
         body: JSON.stringify({
           model: openAiModel,
@@ -1788,6 +1793,7 @@ function createAiRemoteService(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
         },
         body: JSON.stringify({
           model,
@@ -1864,6 +1870,7 @@ function createAiRemoteService(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
         },
         body: JSON.stringify({
           model: openAiModel,

@@ -1,5 +1,8 @@
+const { buildOpenAiContextHeaders } = require('./openai-request-context');
+
 function createAgendaConfirmationMailHelpers(deps = {}) {
   const {
+    env = process.env,
     openAiApiBaseUrl = 'https://api.openai.com/v1',
     openAiModel = 'gpt-5.5-pro',
     getGeneratedAgendaAppointments = () => [],
@@ -89,6 +92,7 @@ function createAgendaConfirmationMailHelpers(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
         },
         body: JSON.stringify({
           model: openAiModel,

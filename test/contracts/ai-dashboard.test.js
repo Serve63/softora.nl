@@ -146,6 +146,10 @@ function createFixture(overrides = {}) {
   });
 
   const coordinator = createAiDashboardCoordinator({
+    env: overrides.env || {
+      OPENAI_ORGANIZATION_ID: 'org_softora',
+      OPENAI_PROJECT_ID: 'proj_softora',
+    },
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength),
     parseJsonLoose: (value) => {
@@ -404,6 +408,8 @@ test('ai dashboard coordinator calls OpenAI with normalized question, history an
   const requestBody = JSON.parse(fetchCalls[0].options.body);
   assert.equal(fetchCalls[0].url, 'https://api.openai.test/v1/chat/completions');
   assert.equal(fetchCalls[0].options.headers.Authorization, 'Bearer openai-key');
+  assert.equal(fetchCalls[0].options.headers['OpenAI-Organization'], 'org_softora');
+  assert.equal(fetchCalls[0].options.headers['OpenAI-Project'], 'proj_softora');
   assert.equal(requestBody.model, 'gpt-5.1-mini');
   assert.match(requestBody.messages[0].content, /Ruben Nijhuis/);
   assert.match(requestBody.messages[0].content, /RUBEN_ASSISTANT_CONTEXT_JSON/);

@@ -14,6 +14,7 @@ const {
   safeParseJsonArray,
   safeParseJsonObject,
 } = require('./data-ops-serialization');
+const { buildOpenAiContextHeaders } = require('./openai-request-context');
 
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
@@ -437,6 +438,7 @@ const DEFAULT_SYNC_LIMIT = 50;
 
 function createMailboxService(deps = {}) {
   const {
+    env = process.env,
     logger = console,
     mailConfig = {},
     mailboxAccountsRaw = '',
@@ -1606,6 +1608,7 @@ function createMailboxService(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl: baseUrl }),
         },
         body: JSON.stringify({
           model,
