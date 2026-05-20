@@ -59,6 +59,10 @@ const SENDER_DISPLAY_NAMES = {
   'martijn@softora.nl': 'Martijn van de Ven',
   'ruben@softora.nl': 'Ruben',
 };
+const COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS = new Set([
+  'serve@softora.nl',
+  'martijn@softora.nl',
+]);
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -1382,7 +1386,20 @@ function createColdmailCampaignService(deps = {}) {
     return name ? `${name} <${address}>` : address;
   }
 
-  function getColdmailAuditBccAddress() {
+  function isColdmailPrivateCopyBlockedSender(senderEmail) {
+    return COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS.has(normalizeEmailAddress(senderEmail));
+  }
+
+  function getColdmailReplyToAddress(senderEmail) {
+    const selectedSenderEmail = normalizeEmailAddress(senderEmail);
+    if (isColdmailPrivateCopyBlockedSender(selectedSenderEmail)) {
+      return selectedSenderEmail || mailFromAddress || undefined;
+    }
+    return mailReplyTo || selectedSenderEmail || mailFromAddress || undefined;
+  }
+
+  function getColdmailAuditBccAddress(senderEmail) {
+    if (isColdmailPrivateCopyBlockedSender(senderEmail)) return '';
     const email = normalizeEmailAddress(coldmailAuditBcc);
     return isLikelyValidEmail(email) ? email : '';
   }
@@ -2321,7 +2338,7 @@ function createColdmailCampaignService(deps = {}) {
     const mail = {
       from: formatMailFromHeader(senderEmail, delivery.account),
       to: from.address,
-      replyTo: mailReplyTo || senderEmail || mailFromAddress || undefined,
+      replyTo: getColdmailReplyToAddress(senderEmail),
       subject: buildReplySubject(parsedMail && parsedMail.subject),
       text: replyText,
       inReplyTo: messageId || undefined,
@@ -3035,7 +3052,7 @@ function createColdmailCampaignService(deps = {}) {
     }
     const smtpAccount = delivery.account;
     const sent = [];
-    const auditBcc = getColdmailAuditBccAddress();
+    const auditBcc = getColdmailAuditBccAddress(senderEmail);
 
     for (const item of selectedRows) {
       const row = item.row;
@@ -3089,7 +3106,7 @@ function createColdmailCampaignService(deps = {}) {
         const mail = {
           from: formatMailFromHeader(senderEmail, smtpAccount),
           to,
-          replyTo: mailReplyTo || senderEmail || mailFromAddress || undefined,
+          replyTo: getColdmailReplyToAddress(senderEmail),
           subject,
           text,
           html,

@@ -370,6 +370,27 @@ test('coldmail campaign adds audit bcc when configured', async () => {
   assert.equal(service.getColdmailSafetyLimits().auditBccConfigured, true);
 });
 
+test('coldmail campaign blocks private copies for Serve and Martijn senders', async () => {
+  for (const senderEmail of ['serve@softora.nl', 'martijn@softora.nl']) {
+    const { service, sentMessages } = createService({
+      coldmailAuditBcc: 'servec321@gmail.com',
+      mailReplyTo: 'servec321@gmail.com',
+    });
+
+    await service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Nieuwe website voor {{bedrijf}}',
+      body: 'Goedemorgen {{naam}}',
+      senderEmail,
+    });
+
+    assert.equal(sentMessages.length, 1);
+    assert.equal(sentMessages[0].to, 'ruben@example.test');
+    assert.equal(sentMessages[0].bcc, undefined);
+    assert.equal(sentMessages[0].replyTo, senderEmail);
+  }
+});
+
 test('coldmail campaign ignores invalid audit bcc configuration', async () => {
   const { service, sentMessages } = createService({
     coldmailAuditBcc: 'niet-een-email',
@@ -2543,7 +2564,7 @@ test('coldmail campaign sends through the selected mailbox smtp account when con
   });
 
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
-  assert.equal(sentMessages[0].replyTo, 'reply@softora.nl');
+  assert.equal(sentMessages[0].replyTo, 'serve@softora.nl');
   assert.equal(transportConfigs[0].host, 'smtp.strato.com');
   assert.equal(transportConfigs[0].port, 465);
   assert.equal(transportConfigs[0].secure, true);
