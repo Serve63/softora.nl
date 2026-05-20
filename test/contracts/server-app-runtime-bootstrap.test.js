@@ -80,6 +80,11 @@ test('server app runtime bootstrap flattens env config without changing values',
       fromName: 'Softora',
       replyTo: 'reply@test.invalid',
       coldmailAuditBcc: 'audit@test.invalid',
+      coldmailUnsubscribeSecret: 'unsubscribe-secret',
+      coldmailReplyForwardEnabled: false,
+      coldmailReplyForwardFrom: '',
+      coldmailReplyForwardTo: '',
+      coldmailReplySyncEmail: 'info@test.invalid',
       imapHost: 'imap.test',
       imapPort: 993,
       imapSecure: true,
@@ -88,6 +93,15 @@ test('server app runtime bootstrap flattens env config without changing values',
       imapMailbox: 'INBOX',
       imapExtraMailboxes: ['Sent'],
       imapPollCooldownMs: 1000,
+      coldmailBounceProcessingEnabled: true,
+      coldmailCampaignSendLimit: 30,
+      coldmailDailySendLimit: 50,
+      coldmailPackageDailySendLimit: 100,
+      coldmailSendDelayMs: 90000,
+      coldmailSafetyPauseMs: 21600000,
+      coldmailPersonalMailboxDailyLimit: 10,
+      coldmailPersonalMailboxSendDelayMs: 180000,
+      coldmailBlockPersonalMailboxDomains: false,
     },
     securityContactEmail: 'security@test.invalid',
     demoConfirmationTaskEnabled: true,
@@ -102,6 +116,10 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.AGENDA_APP_MARTIJN_EMAIL, 'martijn@softora.test');
   assert.equal(envConfig.AGENDA_APP_SESSION_TTL_DAYS, 3650);
   assert.equal(envConfig.COLDMAIL_AUDIT_BCC, 'audit@test.invalid');
+  assert.equal(envConfig.COLDMAIL_UNSUBSCRIBE_SECRET, 'unsubscribe-secret');
+  assert.equal(envConfig.COLDMAIL_BOUNCE_PROCESSING_ENABLED, true);
+  assert.equal(envConfig.COLDMAIL_SEND_DELAY_MS, 90000);
+  assert.equal(envConfig.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT, 10);
   assert.equal(envConfig.MAIL_IMAP_MAILBOX, 'INBOX');
   assert.equal(envConfig.SECURITY_CONTACT_EMAIL, 'security@test.invalid');
 });

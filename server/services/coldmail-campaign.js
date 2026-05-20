@@ -25,8 +25,20 @@ const DEFAULT_COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 30;
 const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 50;
 const DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT = 100;
+const DEFAULT_COLDMAIL_SEND_DELAY_MS = 90_000;
+const DEFAULT_COLDMAIL_SAFETY_PAUSE_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT = 10;
+const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS = 180_000;
 const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
+const COLDMAIL_SMTP_SAFETY_STOP_PATTERN =
+  /\b(transmit rate limit|rate limited|too many recipients|too many concurrent|no spam please|b-url|b-text|b-score|b-ex|suspected phishing|mailbox is blocked|mailbox is disabled|not allowed to send|sender not authorized|no authorization to send|dmarc|spf failed|insufficient privacy|tls required)\b/i;
+const COLDMAIL_DELIVERY_FAILURE_PATTERN =
+  /\b(delivery status notification|undeliverable|undelivered mail|mail delivery failed|delivery has failed|failure notice|returned mail|unzustellbar|unzustellbarkeitsmail|niet bezorgd|onbestelbaar|bezorging mislukt|final-recipient|diagnostic-code)\b/i;
+const COLDMAIL_HARD_BOUNCE_PATTERN =
+  /\b(user unknown|unknown user|no such user|mailbox unknown|mailbox not found|recipient unknown|unknown address|invalid recipient|invalid address|no such mailbox|unknown local part|not known to us|recipient address rejected|5\.1\.1|5\.1\.10|5\.0\.0)\b/i;
+const COLDMAIL_SOFT_BOUNCE_PATTERN =
+  /\b(mailbox full|quota exceeded|overquota|temporary failure|try again later|temporarily unavailable|deferred|greylist|greylisted|4\.[0-9]\.[0-9]|resources temporarily unavailable|user has exhausted allowed storage space)\b/i;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
   'gmail.com',
@@ -161,6 +173,7 @@ function createColdmailCampaignService(deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     now = () => new Date(),
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   } = deps;
 
   const {
@@ -183,14 +196,20 @@ function createColdmailCampaignService(deps = {}) {
     imapMailbox = 'INBOX',
     imapExtraMailboxes = [],
     imapPollCooldownMs = 20_000,
+    coldmailBounceProcessingEnabled = true,
     coldmailCampaignSendLimit = DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT,
     coldmailDailySendLimit = DEFAULT_COLDMAIL_DAILY_SEND_LIMIT,
     coldmailPackageDailySendLimit = DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT,
+    coldmailSendDelayMs = DEFAULT_COLDMAIL_SEND_DELAY_MS,
+    coldmailSafetyPauseMs = DEFAULT_COLDMAIL_SAFETY_PAUSE_MS,
+    coldmailPersonalMailboxDailyLimit = DEFAULT_COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT,
+    coldmailPersonalMailboxSendDelayMs = DEFAULT_COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS,
     coldmailBlockPersonalMailboxDomains = false,
   } = mailConfig;
 
   let smtpTransporter = null;
   const senderSmtpTransporters = new Map();
+  let coldmailCampaignSendPromise = null;
   const mailboxAccountService = createMailboxService({
     mailConfig: {
       smtpHost,
@@ -236,15 +255,31 @@ function createColdmailCampaignService(deps = {}) {
     ].filter(Boolean);
   }
 
-  function isSmtpMailConfigured() {
+  function getMissingSenderSmtpEnv(senderEmail) {
+    const email = normalizeEmailAddress(senderEmail);
+    const localKey = envKeyForEmail(email);
+    const fullKey = email.replace(/[^a-z0-9]+/gi, '_').toUpperCase();
+    return [
+      fullKey ? `MAILBOX_${fullKey}_PASS` : null,
+      localKey ? `MAILBOX_${localKey}_PASS` : null,
+      'MAIL_SMTP_PASS',
+    ].filter(Boolean);
+  }
+
+  function isSenderSmtpAccountConfigured(account) {
     return Boolean(
-      smtpHost &&
-        Number.isFinite(Number(smtpPort)) &&
-        Number(smtpPort) > 0 &&
-        smtpUser &&
-        smtpPass &&
-        mailFromAddress
+      account &&
+        account.smtpHost &&
+        Number.isFinite(Number(account.smtpPort)) &&
+        Number(account.smtpPort) > 0 &&
+        account.smtpUser &&
+        account.smtpPass
     );
+  }
+
+  function isSmtpMailConfigured() {
+    if (isSenderSmtpAccountConfigured(buildBaseSmtpAccount())) return true;
+    return getConfiguredMailboxSmtpAccounts().some(isSenderSmtpAccountConfigured);
   }
 
   function getMissingImapMailEnv() {
@@ -290,7 +325,7 @@ function createColdmailCampaignService(deps = {}) {
     const selected = normalizeEmailAddress(senderEmail);
     const fallbackEmail = normalizeEmailAddress(mailFromAddress || smtpUser);
     const email = selected || fallbackEmail;
-    return {
+    const account = {
       email,
       name: normalizeString(SENDER_DISPLAY_NAMES[email] || mailFromName || 'Softora'),
       smtpHost,
@@ -304,6 +339,9 @@ function createColdmailCampaignService(deps = {}) {
       imapUser,
       imapPass,
     };
+    account.smtpConfigured = isSenderSmtpAccountConfigured(account);
+    account.imapConfigured = Boolean(account.imapHost && account.imapUser && account.imapPass);
+    return account;
   }
 
   function resolveSenderSmtpAccount(senderEmail) {
@@ -311,7 +349,7 @@ function createColdmailCampaignService(deps = {}) {
     const account = getConfiguredMailboxSmtpAccounts().find((item) => normalizeEmailAddress(item.email) === selected);
     if (account) {
       const email = normalizeEmailAddress(account.email);
-      return {
+      const resolved = {
         ...account,
         email,
         name: normalizeString(SENDER_DISPLAY_NAMES[email] || account.name),
@@ -321,8 +359,20 @@ function createColdmailCampaignService(deps = {}) {
         smtpUser: account.smtpUser,
         smtpPass: account.smtpPass,
       };
+      resolved.smtpConfigured = isSenderSmtpAccountConfigured(resolved);
+      return resolved;
     }
-    return buildBaseSmtpAccount(selected);
+    const base = buildBaseSmtpAccount(selected);
+    const baseEmails = new Set([
+      normalizeEmailAddress(mailFromAddress),
+      normalizeEmailAddress(smtpUser),
+    ].filter(Boolean));
+    if (!selected || baseEmails.has(selected)) return base;
+    return {
+      ...base,
+      smtpPass: '',
+      smtpConfigured: false,
+    };
   }
 
   function getSenderSmtpTransport(senderEmail) {
@@ -1289,6 +1339,64 @@ function createColdmailCampaignService(deps = {}) {
     return { status: '', intent: 'unclear', label: 'Mailreactie zonder duidelijke lifecycle-status' };
   }
 
+  function buildColdmailDeliveryFailureText(parsedMail, inboundText) {
+    const from = getParsedMailFromEmail(parsedMail);
+    return [
+      normalizeString(parsedMail && parsedMail.subject),
+      normalizeString(from.address),
+      normalizeString(from.name),
+      normalizeString(inboundText),
+      normalizeString(parsedMail && parsedMail.text),
+    ].join('\n');
+  }
+
+  function isColdmailDeliveryFailureMessage(parsedMail, inboundText) {
+    const from = getParsedMailFromEmail(parsedMail);
+    const fromText = normalizeString(`${from.address} ${from.name}`).toLowerCase();
+    const subject = normalizeString(parsedMail && parsedMail.subject);
+    const text = buildColdmailDeliveryFailureText(parsedMail, inboundText);
+    return Boolean(
+      /mailer-daemon|postmaster|mail delivery|no-reply|noreply/i.test(fromText) ||
+        COLDMAIL_DELIVERY_FAILURE_PATTERN.test(subject) ||
+        COLDMAIL_DELIVERY_FAILURE_PATTERN.test(text)
+    );
+  }
+
+  function classifyColdmailDeliveryFailure(parsedMail, inboundText) {
+    if (!isColdmailDeliveryFailureMessage(parsedMail, inboundText)) return null;
+    const text = buildColdmailDeliveryFailureText(parsedMail, inboundText);
+    if (COLDMAIL_HARD_BOUNCE_PATTERN.test(text)) {
+      return {
+        status: 'geblokkeerd',
+        intent: 'hard_bounce',
+        label: 'Hard bounce via mailserver',
+        bounceType: 'hard',
+        disableMail: true,
+      };
+    }
+    if (COLDMAIL_SOFT_BOUNCE_PATTERN.test(text)) {
+      return {
+        status: '',
+        intent: 'soft_bounce',
+        label: 'Zachte bounce via mailserver',
+        bounceType: 'soft',
+        disableMail: false,
+      };
+    }
+    return {
+      status: '',
+      intent: 'unknown_bounce',
+      label: 'Mailservermelding ontvangen',
+      bounceType: 'unknown',
+      disableMail: false,
+    };
+  }
+
+  function extractEmailAddressesFromText(value) {
+    const matches = normalizeString(value).match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/gi);
+    return Array.from(new Set((matches || []).map(normalizeEmailAddress).filter(Boolean)));
+  }
+
   function isOwnMailboxAddress(email) {
     const address = normalizeEmailAddress(email);
     if (!address) return false;
@@ -1333,6 +1441,18 @@ function createColdmailCampaignService(deps = {}) {
     return candidates.length === 1 ? candidates[0] : null;
   }
 
+  function findColdmailRowForDeliveryFailure(parsedMail, inboundText, rows) {
+    const text = buildColdmailDeliveryFailureText(parsedMail, inboundText);
+    const bouncedEmails = extractEmailAddressesFromText(text).filter((email) => !isOwnMailboxAddress(email));
+    if (!bouncedEmails.length) return null;
+    const bouncedSet = new Set(bouncedEmails);
+    const candidates = rows
+      .map((row, index) => ({ row, index, id: getRowId(row, index) }))
+      .filter(({ row }) => bouncedSet.has(getRowEmail(row)))
+      .filter(({ row }) => hasActiveColdmailContext(row));
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+
   function extractOpenAiReplyText(content) {
     if (typeof extractOpenAiTextContent === 'function') {
       return normalizeString(extractOpenAiTextContent(content));
@@ -1367,6 +1487,10 @@ function createColdmailCampaignService(deps = {}) {
           .filter(isLikelyValidEmail)
       )
     );
+  }
+
+  function getConfiguredSenderEmails() {
+    return getAllowedSenderEmails().filter((email) => isSenderSmtpAccountConfigured(resolveSenderSmtpAccount(email)));
   }
 
   function assertSenderAllowed(senderEmail) {
@@ -1444,6 +1568,37 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
+  function getColdmailSendDelayMs() {
+    return parsePositiveInt(coldmailSendDelayMs, DEFAULT_COLDMAIL_SEND_DELAY_MS, 0, 5 * 60 * 1000);
+  }
+
+  function getColdmailSafetyPauseMs() {
+    return parsePositiveInt(
+      coldmailSafetyPauseMs,
+      DEFAULT_COLDMAIL_SAFETY_PAUSE_MS,
+      60 * 1000,
+      24 * 60 * 60 * 1000
+    );
+  }
+
+  function getColdmailPersonalMailboxDailyLimit() {
+    return parsePositiveInt(
+      coldmailPersonalMailboxDailyLimit,
+      DEFAULT_COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT,
+      1,
+      DEFAULT_COLDMAIL_DAILY_SEND_LIMIT
+    );
+  }
+
+  function getColdmailPersonalMailboxSendDelayMs() {
+    return parsePositiveInt(
+      coldmailPersonalMailboxSendDelayMs,
+      DEFAULT_COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS,
+      0,
+      5 * 60 * 1000
+    );
+  }
+
   function shouldBlockPersonalMailboxDomains() {
     return coldmailBlockPersonalMailboxDomains !== false;
   }
@@ -1453,7 +1608,13 @@ function createColdmailCampaignService(deps = {}) {
       campaignSendLimit: getColdmailCampaignSendLimit(),
       dailySendLimit: getColdmailDailySendLimit(),
       packageDailySendLimit: getColdmailPackageDailySendLimit(),
+      sendDelayMs: getColdmailSendDelayMs(),
+      safetyPauseMs: getColdmailSafetyPauseMs(),
+      personalMailboxDailyLimit: getColdmailPersonalMailboxDailyLimit(),
+      personalMailboxSendDelayMs: getColdmailPersonalMailboxSendDelayMs(),
       blocksPersonalMailboxDomains: shouldBlockPersonalMailboxDomains(),
+      bounceProcessingEnabled: coldmailBounceProcessingEnabled !== false,
+      configuredSenderEmails: getConfiguredSenderEmails(),
       auditBccConfigured: Boolean(getColdmailAuditBccAddress()),
     };
   }
@@ -1569,14 +1730,22 @@ function createColdmailCampaignService(deps = {}) {
 
   function pruneColdmailSendGuardEntries(entries) {
     const cutoffMs = now().getTime() - COLDMAIL_SEND_GUARD_WINDOW_MS;
+    const currentMs = now().getTime();
     return (Array.isArray(entries) ? entries : [])
       .filter((entry) => entry && typeof entry === 'object')
       .map((entry) => ({
         at: normalizeString(entry.at),
         senderEmail: normalizeEmailAddress(entry.senderEmail),
         count: Math.max(0, Number(entry.count || 0) || 0),
+        personalCount: Math.max(0, Number(entry.personalCount || 0) || 0),
+        safetyPauseUntil: normalizeString(entry.safetyPauseUntil || entry.until),
+        safetyPauseReason: truncateText(normalizeString(entry.safetyPauseReason || entry.reason), 240),
       }))
-      .filter((entry) => entry.count > 0 && parseTimestampMs(entry.at) >= cutoffMs);
+      .filter((entry) => {
+        const sentRecently = entry.count > 0 && parseTimestampMs(entry.at) >= cutoffMs;
+        const activePause = parseTimestampMs(entry.safetyPauseUntil) > currentMs;
+        return sentRecently || activePause;
+      });
   }
 
   async function loadColdmailSendGuardState() {
@@ -1606,24 +1775,39 @@ function createColdmailCampaignService(deps = {}) {
     const selectedSenderEmail = normalizeEmailAddress(senderEmail);
     const state = await loadColdmailSendGuardState();
     const entries = state.entries;
+    const nowMs = now().getTime();
     const senderSent = entries
       .filter((entry) => entry.senderEmail === selectedSenderEmail)
       .reduce((sum, entry) => sum + entry.count, 0);
     const packageSent = entries.reduce((sum, entry) => sum + entry.count, 0);
+    const personalMailboxSent = entries.reduce((sum, entry) => sum + entry.personalCount, 0);
+    const safetyPause = entries
+      .map((entry) => ({
+        until: normalizeString(entry.safetyPauseUntil),
+        reason: normalizeString(entry.safetyPauseReason),
+        untilMs: parseTimestampMs(entry.safetyPauseUntil),
+      }))
+      .filter((entry) => entry.untilMs > nowMs)
+      .sort((left, right) => right.untilMs - left.untilMs)[0] || null;
     const dailySendLimit = getColdmailDailySendLimit();
     const packageDailySendLimit = getColdmailPackageDailySendLimit();
+    const personalMailboxDailyLimit = getColdmailPersonalMailboxDailyLimit();
     return {
       entries,
       senderSent,
       packageSent,
+      personalMailboxSent,
       dailySendLimit,
       packageDailySendLimit,
+      personalMailboxDailyLimit,
       senderRemaining: Math.max(0, dailySendLimit - senderSent),
       packageRemaining: Math.max(0, packageDailySendLimit - packageSent),
+      personalMailboxRemaining: Math.max(0, personalMailboxDailyLimit - personalMailboxSent),
+      safetyPause,
     };
   }
 
-  async function recordColdmailSendGuardEntry({ senderEmail, count, actor }) {
+  async function recordColdmailSendGuardEntry({ senderEmail, count, personalCount = 0, actor }) {
     const safeCount = Math.max(0, Number(count || 0) || 0);
     if (!safeCount) return false;
     const state = await loadColdmailSendGuardState();
@@ -1631,9 +1815,51 @@ function createColdmailCampaignService(deps = {}) {
       at: now().toISOString(),
       senderEmail: normalizeEmailAddress(senderEmail),
       count: safeCount,
+      personalCount: Math.max(0, Number(personalCount || 0) || 0),
     });
     await saveColdmailSendGuardState(state, actor);
     return true;
+  }
+
+  async function recordColdmailSafetyPause({ senderEmail, reason, error, actor }) {
+    const state = await loadColdmailSendGuardState();
+    const at = now();
+    const until = new Date(at.getTime() + getColdmailSafetyPauseMs()).toISOString();
+    const safetyReason = truncateText(
+      normalizeString(reason || (error && error.message) || error || 'mail_provider_safety_signal'),
+      240
+    );
+    state.entries.push({
+      at: at.toISOString(),
+      senderEmail: normalizeEmailAddress(senderEmail),
+      count: 0,
+      personalCount: 0,
+      safetyPauseUntil: until,
+      safetyPauseReason: safetyReason,
+    });
+    await saveColdmailSendGuardState(state, actor || 'coldmail-safety-pause');
+    return { until, reason: safetyReason };
+  }
+
+  function getSmtpSafetyStopReason(error) {
+    const text = [
+      error && error.code,
+      error && error.command,
+      error && error.responseCode,
+      error && error.response,
+      error && error.message,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    if (!COLDMAIL_SMTP_SAFETY_STOP_PATTERN.test(text)) return '';
+    return truncateText(normalizeString(text), 240) || 'Mailprovider gaf een beschermingssignaal terug.';
+  }
+
+  function buildColdmailSafetyPauseMessage(pause) {
+    const until = normalizeString(pause && pause.until);
+    return until
+      ? `Coldmailing staat tijdelijk op pauze tot ${until}, omdat de mailprovider een veiligheidsmelding gaf.`
+      : 'Coldmailing staat tijdelijk op pauze omdat de mailprovider een veiligheidsmelding gaf.';
   }
 
   function matchesBranch(row, branchFilter) {
@@ -2024,6 +2250,31 @@ function createColdmailCampaignService(deps = {}) {
       'https://www.softora.nl';
     const token = buildColdmailUnsubscribeToken(row, id, reference);
     return `${baseUrl}${COLDMAIL_UNSUBSCRIBE_PATH}?t=${encodeURIComponent(token)}`;
+  }
+
+  function buildColdmailOneClickUnsubscribeUrl(row, id, reference, input = {}) {
+    const baseUrl =
+      normalizePublicBaseUrl(input.publicBaseUrl || mailPublicBaseUrl) ||
+      'https://www.softora.nl';
+    const token = buildColdmailUnsubscribeToken(row, id, reference);
+    return `${baseUrl}/api/coldmailing/unsubscribe?token=${encodeURIComponent(token)}`;
+  }
+
+  function getColdmailListUnsubscribeHeader(senderEmail, row, id, reference, input = {}) {
+    const replyTo = normalizeEmailAddress(getColdmailReplyToAddress(senderEmail));
+    const parts = [];
+    if (isLikelyValidEmail(replyTo)) {
+      parts.push(`<mailto:${replyTo}?subject=${encodeURIComponent('Afmelden')}>`);
+    }
+    const oneClickUrl = buildColdmailOneClickUnsubscribeUrl(row, id, reference, input);
+    if (oneClickUrl) parts.push(`<${oneClickUrl}>`);
+    return parts.join(', ');
+  }
+
+  function getColdmailListUnsubscribePostHeader(row, id, reference, input = {}) {
+    return buildColdmailOneClickUnsubscribeUrl(row, id, reference, input)
+      ? 'List-Unsubscribe=One-Click'
+      : '';
   }
 
   function buildColdmailPreviewImageToken(row, id, reference, type = 'webdesign') {
@@ -2701,6 +2952,112 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function buildColdmailBounceHistoryEntry({
+    classification,
+    parsedMail,
+    inboundText,
+    processedKey,
+    actor,
+  }) {
+    const date = now().toISOString();
+    const hardBounce = classification && classification.bounceType === 'hard';
+    return {
+      type: hardBounce ? 'geblokkeerd' : 'mail_bounce',
+      label: normalizeString(classification && classification.label) || 'Mailservermelding ontvangen',
+      date,
+      actor: normalizeString(actor) || 'Coldmailing',
+      source: 'coldmail-bounce',
+      messageKey: normalizeString(processedKey),
+      subject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+      preview: truncateText(inboundText, 500),
+    };
+  }
+
+  function markRowFromColdmailBounce(row, classification, parsedMail, inboundText, processedKey, actor) {
+    const date = now().toISOString();
+    const currentStatus = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
+    const hardBounce = classification && classification.bounceType === 'hard';
+    const nextStatus =
+      hardBounce && canAdvanceContactStatus(currentStatus, 'geblokkeerd')
+        ? 'geblokkeerd'
+        : currentStatus;
+    const historyEntry = buildColdmailBounceHistoryEntry({
+      classification,
+      parsedMail,
+      inboundText,
+      processedKey,
+      actor,
+    });
+    const mailFields = hardBounce
+      ? {
+          mail: false,
+          canMail: false,
+          doNotMail: true,
+        }
+      : {};
+    return {
+      ...row,
+      ...mailFields,
+      status: nextStatus || row.status,
+      databaseStatus: nextStatus || row.databaseStatus,
+      coldmailReplyIntent: normalizeString(classification && classification.intent),
+      coldmailBounceType: normalizeString(classification && classification.bounceType) || 'unknown',
+      coldmailBounceAt: date,
+      coldmailBounceReason: truncateText(inboundText, 1000),
+      lastColdmailReplyAt: date,
+      lastColdmailReplySubject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+      lastColdmailReplyPreview: truncateText(inboundText, 1000),
+      lastColdmailReplyMessageKey: normalizeString(processedKey),
+      activeColdmailCampaignUntil: hardBounce ? '' : row.activeColdmailCampaignUntil,
+      coldmailCampaignEndsAt: hardBounce ? '' : row.coldmailCampaignEndsAt,
+      updatedAt: date,
+      hist: mergeColdmailReplyHistory(row, historyEntry),
+    };
+  }
+
+  async function persistColdmailBounceLifecycle({
+    values,
+    rows,
+    match,
+    parsedMail,
+    inboundText,
+    processedKey,
+    actor,
+    classification,
+  }) {
+    if (!classification || !match || !Number.isInteger(match.index) || !rows[match.index]) {
+      return {
+        persisted: false,
+        rows,
+        classification,
+        reason: 'missing_bounce_match',
+      };
+    }
+    const nextRows = rows.slice();
+    nextRows[match.index] = markRowFromColdmailBounce(
+      rows[match.index],
+      classification,
+      parsedMail,
+      inboundText,
+      processedKey,
+      actor
+    );
+    await setUiStateValues(
+      customerDbScope,
+      buildCustomerRowsStateValues(values, nextRows),
+      {
+        source: 'coldmail-bounce',
+        actor: normalizeString(actor) || 'coldmail-bounce',
+      }
+    );
+    return {
+      persisted: true,
+      rows: nextRows,
+      classification,
+      reason: 'updated',
+    };
+  }
+
   async function persistColdmailReplyLifecycle({
     values,
     rows,
@@ -2986,6 +3343,19 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function sendColdmailCampaign(input = {}) {
+    if (coldmailCampaignSendPromise) {
+      const error = new Error('Er draait al een coldmailcampagne. Wacht tot die klaar is.');
+      error.code = 'COLDMAIL_SEND_IN_PROGRESS';
+      throw error;
+    }
+    const promise = sendColdmailCampaignUnlocked(input).finally(() => {
+      coldmailCampaignSendPromise = null;
+    });
+    coldmailCampaignSendPromise = promise;
+    return promise;
+  }
+
+  async function sendColdmailCampaignUnlocked(input = {}) {
     if (!isSmtpMailConfigured()) {
       const error = new Error('Mail is nog niet gekoppeld. Vul eerst de SMTP-gegevens op de server in.');
       error.code = 'SMTP_NOT_CONFIGURED';
@@ -2994,6 +3364,15 @@ function createColdmailCampaignService(deps = {}) {
     }
 
     const senderEmail = assertSenderAllowed(input.senderEmail);
+    const senderAccount = resolveSenderSmtpAccount(senderEmail);
+    if (!isSenderSmtpAccountConfigured(senderAccount)) {
+      const error = new Error(
+        `Deze afzender (${senderEmail}) heeft nog geen eigen SMTP-wachtwoord op de server.`
+      );
+      error.code = 'SENDER_SMTP_NOT_CONFIGURED';
+      error.missing = getMissingSenderSmtpEnv(senderEmail);
+      throw error;
+    }
     const subjectTemplate = truncateText(normalizeString(input.subject), 200);
     const bodyTemplate = normalizeString(input.body);
     if (!subjectTemplate || !bodyTemplate) {
@@ -3006,7 +3385,7 @@ function createColdmailCampaignService(deps = {}) {
     const testMode = Boolean(resolvedRecipients.testMode);
     const count = resolvedRecipients.count;
     const values = resolvedRecipients.values;
-    const rows = resolvedRecipients.rows;
+    let rows = resolvedRecipients.rows;
     const candidateRows = resolvedRecipients.candidateRows;
     const failed = resolvedRecipients.failed;
 
@@ -3022,6 +3401,12 @@ function createColdmailCampaignService(deps = {}) {
 
     let selectedRows = resolvedRecipients.selectedRows;
     const quota = await getColdmailSendQuota(senderEmail);
+    if (!testMode && quota.safetyPause) {
+      const error = new Error(buildColdmailSafetyPauseMessage(quota.safetyPause));
+      error.code = 'COLDMAIL_SAFETY_PAUSED';
+      error.quota = quota;
+      throw error;
+    }
     const quotaRemaining = testMode ? selectedRows.length : Math.min(quota.senderRemaining, quota.packageRemaining);
     if (!testMode && quotaRemaining <= 0) {
       const error = new Error(
@@ -3041,6 +3426,22 @@ function createColdmailCampaignService(deps = {}) {
         });
       });
       selectedRows = selectedRows.slice(0, quotaRemaining);
+    }
+    if (!testMode) {
+      let selectedPersonalMailboxCount = 0;
+      selectedRows = selectedRows.filter((item) => {
+        const email = getRowEmail(item.row);
+        if (!isPersonalMailboxDomain(email)) return true;
+        selectedPersonalMailboxCount += 1;
+        if (selectedPersonalMailboxCount <= quota.personalMailboxRemaining) return true;
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row),
+          email,
+          error: `Persoonlijke mailbox-daglimiet beschermt deze ontvanger: nog ${quota.personalMailboxRemaining} Gmail/Outlook/Hotmail verzending(en) beschikbaar vandaag.`,
+        });
+        return false;
+      });
     }
     const customerPhotoMap = shouldIncludeWebdesignPhoto
       ? (resolvedRecipients.customerPhotoMap || await loadCustomerPhotoMap(candidateRows))
@@ -3064,10 +3465,19 @@ function createColdmailCampaignService(deps = {}) {
     const smtpAccount = delivery.account;
     const sent = [];
     const auditBcc = getColdmailAuditBccAddress(senderEmail);
+    const persistedSentRowIds = new Set();
+    let safetyPause = null;
+    const actor = normalizeString(input.actor || 'Coldmailing');
 
-    for (const item of selectedRows) {
+    for (const [index, item] of selectedRows.entries()) {
       const row = item.row;
       const to = getRowEmail(row);
+      if (!testMode && index > 0) {
+        const delayMs = isPersonalMailboxDomain(to)
+          ? Math.max(getColdmailSendDelayMs(), getColdmailPersonalMailboxSendDelayMs())
+          : getColdmailSendDelayMs();
+        if (delayMs > 0) await sleep(delayMs);
+      }
       const reference = buildColdmailReference(row, item.id);
       const baseText = buildMailText(bodyTemplate, row);
       const shouldAppendOptOut = shouldAppendColdmailOptOutText(baseText);
@@ -3123,6 +3533,14 @@ function createColdmailCampaignService(deps = {}) {
           html,
           attachments,
         };
+        const listUnsubscribe = getColdmailListUnsubscribeHeader(senderEmail, row, item.id, reference, input);
+        if (listUnsubscribe) {
+          mail.headers = {
+            'List-Unsubscribe': listUnsubscribe,
+          };
+          const listUnsubscribePost = getColdmailListUnsubscribePostHeader(row, item.id, reference, input);
+          if (listUnsubscribePost) mail.headers['List-Unsubscribe-Post'] = listUnsubscribePost;
+        }
         if (auditBcc && auditBcc !== normalizeEmailAddress(to)) {
           mail.bcc = auditBcc;
         }
@@ -3137,7 +3555,7 @@ function createColdmailCampaignService(deps = {}) {
           throw new Error('SMTP accepteerde de ontvanger niet.');
         }
         const sentCopySaved = await saveSentCopy(senderEmail, mail, info, smtpAccount);
-        sent.push({
+        const sentItem = {
           id: item.id,
           bedrijf: getRowCompany(row),
           email: to,
@@ -3146,7 +3564,35 @@ function createColdmailCampaignService(deps = {}) {
           accepted,
           rejected,
           sentCopySaved,
-        });
+        };
+        sent.push(sentItem);
+        if (!isTestRecipientRow(row, to)) {
+          await recordColdmailSendGuardEntry({
+            senderEmail,
+            count: 1,
+            personalCount: isPersonalMailboxDomain(to) ? 1 : 0,
+            actor,
+          });
+          const updatedRows = rows.map((currentRow, rowIndex) => {
+            const rowId = getRowId(currentRow, rowIndex);
+            if (rowId !== item.id) return currentRow;
+            return markRowAsMailed(currentRow, actor, input.durationDays, {
+              senderEmail,
+              specialAction: input.specialAction,
+              messageId: sentItem.messageId,
+            });
+          });
+          await setUiStateValues(
+            customerDbScope,
+            buildCustomerRowsStateValues(values, updatedRows),
+            {
+              source: 'coldmail-campaign',
+              actor,
+            }
+          );
+          rows = updatedRows;
+          persistedSentRowIds.add(item.id);
+        }
       } catch (error) {
         failed.push({
           id: item.id,
@@ -3154,48 +3600,32 @@ function createColdmailCampaignService(deps = {}) {
           email: to,
           error: truncateText(normalizeString(error && error.message), 500),
         });
+        const safetyReason = getSmtpSafetyStopReason(error);
+        if (safetyReason) {
+          safetyPause = await recordColdmailSafetyPause({
+            senderEmail,
+            reason: safetyReason,
+            error,
+            actor,
+          });
+          failed.push({
+            id: 'coldmail-safety-pause',
+            bedrijf: 'Softora',
+            email: senderEmail,
+            error: buildColdmailSafetyPauseMessage(safetyPause),
+          });
+          break;
+        }
       }
     }
 
     if (!sent.length && failed.length) {
       const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
       const error = new Error(firstFailure ? `Geen mails verzonden: ${firstFailure}` : 'Geen mails verzonden.');
-      error.code = 'SMTP_SEND_FAILED';
+      error.code = safetyPause ? 'COLDMAIL_SAFETY_PAUSED' : 'SMTP_SEND_FAILED';
       error.failedItems = failed;
+      if (safetyPause) error.quota = { ...(quota || {}), safetyPause };
       throw error;
-    }
-
-    const sentPersistableRowIds = new Set(
-      sent
-        .filter((item) => {
-          const selected = selectedRows.find((selectedItem) => selectedItem.id === item.id);
-          return !isTestRecipientRow(selected && selected.row, item.email);
-        })
-        .map((item) => item.id)
-    );
-
-    if (sentPersistableRowIds.size) {
-      const actor = normalizeString(input.actor || 'Coldmailing');
-      await recordColdmailSendGuardEntry({ senderEmail, count: sent.length, actor });
-      const sentByRowId = new Map(sent.map((item) => [item.id, item]));
-      const updatedRows = rows.map((row, index) => {
-        const rowId = getRowId(row, index);
-        if (!sentPersistableRowIds.has(rowId)) return row;
-        const sentItem = sentByRowId.get(rowId) || {};
-        return markRowAsMailed(row, actor, input.durationDays, {
-          senderEmail,
-          specialAction: input.specialAction,
-          messageId: sentItem.messageId,
-        });
-      });
-      await setUiStateValues(
-        customerDbScope,
-        buildCustomerRowsStateValues(values, updatedRows),
-        {
-          source: 'coldmail-campaign',
-          actor,
-        }
-      );
     }
 
     return {
@@ -3204,14 +3634,18 @@ function createColdmailCampaignService(deps = {}) {
       selected: selectedRows.length,
       sent: sent.length,
       failed: failed.length,
-      persisted: sentPersistableRowIds.size,
+      persisted: persistedSentRowIds.size,
       safetyLimits: getColdmailSafetyLimits(),
       dailyQuota: {
         senderSentBefore: quota.senderSent,
         packageSentBefore: quota.packageSent,
+        personalMailboxSentBefore: quota.personalMailboxSent,
         senderRemainingBefore: quota.senderRemaining,
         packageRemainingBefore: quota.packageRemaining,
+        personalMailboxRemainingBefore: quota.personalMailboxRemaining,
+        safetyPausedUntil: safetyPause ? safetyPause.until : undefined,
       },
+      safetyPaused: Boolean(safetyPause),
       senderEmail,
       testMode,
       testRecipientEmail: testMode ? COLDMAIL_TEST_RECIPIENT_EMAIL : undefined,
@@ -3224,11 +3658,12 @@ function createColdmailCampaignService(deps = {}) {
   async function syncInboundColdmailRepliesFromImap(options = {}) {
     const force = Boolean(options.force);
     const maxMessages = Math.max(5, Math.min(100, Number(options.maxMessages || 30) || 30));
-    if (!coldmailAutoReplyEnabled) {
+    const bounceProcessingEnabled = coldmailBounceProcessingEnabled !== false;
+    if (!coldmailAutoReplyEnabled && !bounceProcessingEnabled) {
       return {
         ok: true,
         skipped: true,
-        reason: 'coldmail_autoreply_disabled',
+        reason: 'coldmail_reply_sync_disabled',
       };
     }
     if (!isImapMailConfigured()) {
@@ -3239,7 +3674,7 @@ function createColdmailCampaignService(deps = {}) {
         missingEnv: getMissingImapMailEnv(),
       };
     }
-    if (!isSmtpMailConfigured()) {
+    if (coldmailAutoReplyEnabled && !isSmtpMailConfigured()) {
       return {
         ok: false,
         skipped: true,
@@ -3266,6 +3701,10 @@ function createColdmailCampaignService(deps = {}) {
         markedSeen: 0,
         lifecycleUpdated: 0,
         lifecycleSkipped: 0,
+        hardBounced: 0,
+        softBounced: 0,
+        bounceUpdated: 0,
+        bounceSkipped: 0,
         errors: [],
       };
       const dbState = await getUiStateValues(customerDbScope);
@@ -3323,8 +3762,15 @@ function createColdmailCampaignService(deps = {}) {
               }
 
               const inboundText = getInboundReplyText(parsedMail);
-              const match = findColdmailRowForInboundReply(parsedMail, rows);
-              if (!match || !inboundText) {
+              const deliveryFailure = classifyColdmailDeliveryFailure(parsedMail, inboundText);
+              const match = deliveryFailure
+                ? findColdmailRowForDeliveryFailure(parsedMail, inboundText, rows)
+                : findColdmailRowForInboundReply(parsedMail, rows);
+              if (!match || (!inboundText && !deliveryFailure)) {
+                stats.ignored += 1;
+                continue;
+              }
+              if (deliveryFailure && !bounceProcessingEnabled) {
                 stats.ignored += 1;
                 continue;
               }
@@ -3332,6 +3778,57 @@ function createColdmailCampaignService(deps = {}) {
               stats.matched += 1;
               const from = getParsedMailFromEmail(parsedMail);
               try {
+                if (deliveryFailure && bounceProcessingEnabled) {
+                  try {
+                    const lifecycle = await persistColdmailBounceLifecycle({
+                      values,
+                      rows,
+                      match,
+                      parsedMail,
+                      inboundText: inboundText || truncateText(normalizeString(parsedMail && parsedMail.subject), 500),
+                      processedKey,
+                      actor: 'Coldmailing',
+                      classification: deliveryFailure,
+                    });
+                    rows = lifecycle.rows;
+                    if (lifecycle.persisted) {
+                      stats.bounceUpdated += 1;
+                      if (deliveryFailure.bounceType === 'hard') stats.hardBounced += 1;
+                      else if (deliveryFailure.bounceType === 'soft') stats.softBounced += 1;
+                    } else {
+                      stats.bounceSkipped += 1;
+                    }
+                    replyState.processed[processedKey] = {
+                      at: now().toISOString(),
+                      from: from.address,
+                      company: getRowCompany(match.row),
+                      subject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+                      lifecycleStatus: normalizeString(deliveryFailure.status),
+                      lifecycleIntent: normalizeString(deliveryFailure.intent),
+                      bounceType: normalizeString(deliveryFailure.bounceType),
+                    };
+                    await saveColdmailReplyState(replyState, 'coldmail-bounce');
+                    const flagsSet =
+                      message.flags instanceof Set
+                        ? message.flags
+                        : new Set(Array.isArray(message.flags) ? message.flags : []);
+                    if (!flagsSet.has('\\Seen')) uidsToMarkSeen.push(message.uid);
+                    continue;
+                  } catch (error) {
+                    stats.errors.push(
+                      `${from.address || 'mailserver'} bounce: ${truncateText(
+                        error && error.message ? error.message : String(error),
+                        220
+                      )}`
+                    );
+                  }
+                }
+
+                if (!coldmailAutoReplyEnabled) {
+                  stats.lifecycleSkipped += 1;
+                  continue;
+                }
+
                 try {
                   const lifecycle = await persistColdmailReplyLifecycle({
                     values,
@@ -3436,6 +3933,7 @@ function createColdmailCampaignService(deps = {}) {
 
   return {
     getAllowedSenderEmails,
+    getConfiguredSenderEmails,
     getMissingImapMailEnv,
     getMissingSmtpMailEnv,
     getColdmailSafetyLimits,
