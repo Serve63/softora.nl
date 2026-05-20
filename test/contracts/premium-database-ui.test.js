@@ -1100,19 +1100,20 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar<\/button>\s*<button class="sf-btn" data-s="alle" type="button">Alle<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<button class="sf-btn" data-s="reactie_ontvangen" type="button">Reactie ontvangen<\/button>\s*<button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
+    /<button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar<\/button>\s*<button class="sf-btn" data-s="alle" type="button">Alles<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
   );
   assert.match(pageSource, /activeStatus: "benaderbaar"/);
   assert.match(pageSource, /<option value="benaderbaar">Beschikbaar<\/option>/);
   assert.match(pageSource, /benaderbaar: "Beschikbaar"/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
-  assert.match(pageSource, /state\.activeStatus === "reactie_ontvangen"/);
-  assert.match(pageSource, /Reactie ontvangen/);
+  assert.doesNotMatch(pageSource, /data-s="reactie_ontvangen"/);
+  assert.doesNotMatch(pageSource, /data-s="afgehaakt"/);
+  assert.doesNotMatch(pageSource, /state\.activeStatus === "reactie_ontvangen"/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(contactStatusScriptSource, /function hasColdmailSentSignal\(raw, helpers\)/);
   assert.match(contactStatusScriptSource, /function shouldInferMailedStatus\(storedStatus, raw, helpers\)/);
   assert.match(pageSource, /\.sf-btn\.act \{[\s\S]*border-color: rgba\(139, 34, 82, 0\.4\);[\s\S]*background: rgba\(139, 34, 82, 0\.12\);/);
-  assert.doesNotMatch(pageSource, /<button class="sf-btn act" data-s="alle" type="button">Alle<\/button>/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn act" data-s="alle" type="button">Alles<\/button>/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="klant"\]\.act/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="benaderd"\]\.act/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="afgehaakt"\]\.act/);
@@ -1146,7 +1147,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gemaild" type="button">Gemaild<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="afspraak" type="button">Afspraak<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="interesse" type="button">Interesse<\/button>/);
-  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>/);
+  assert.match(pageSource, /<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>/);
   assert.match(pageSource, /<option value="interesse">Interesse<\/option>/);
   assert.match(pageSource, /<option value="afgehaakt">Afgehaakt<\/option>/);
   assert.match(pageSource, /const DATABASE_STATUS_OPTIONS = \[[^\]]*"interesse"[^\]]*\];/);
