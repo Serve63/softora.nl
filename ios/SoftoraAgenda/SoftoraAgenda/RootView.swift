@@ -21,9 +21,11 @@ struct RootView: View {
 private struct LaunchLoadingView: View {
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "calendar.badge.clock")
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(Color.softoraBlue)
+            Image("SoftoraLaunchLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 68, height: 68)
+                .accessibilityLabel("Softora")
 
             ProgressView()
         }

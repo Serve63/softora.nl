@@ -9,6 +9,18 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
 
+test('ios agenda launch loader uses the Softora logo instead of the calendar symbol', () => {
+  const rootViewSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/RootView.swift');
+
+  assert.match(rootViewSource, /Image\("SoftoraLaunchLogo"\)/);
+  assert.match(rootViewSource, /\.frame\(width: 68, height: 68\)/);
+  assert.doesNotMatch(rootViewSource, /calendar\.badge\.clock/);
+  assert.ok(
+    fs.existsSync(path.join(repoRoot, 'ios/SoftoraAgenda/SoftoraAgenda/Assets.xcassets/SoftoraLaunchLogo.imageset/SoftoraLaunchLogo.png')),
+    'Purple Softora launch logo asset is missing.'
+  );
+});
+
 test('ios agenda add appointment keeps appointment target separate from meeting lead owner', () => {
   const modelsSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Models.swift');
   const addViewSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AddAppointmentView.swift');
