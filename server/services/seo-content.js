@@ -1360,6 +1360,7 @@ function buildContentShell({ title, description, canonicalUrl, structuredData, b
     '    <a class="nav-logo" href="/" aria-label="Softora homepage">SOFTORA.NL</a>',
     '    <div class="nav-links" aria-label="Content navigatie">',
     '      <a href="/diensten">Diensten</a>',
+    '      <a href="/pakketten">Pakketten</a>',
     '      <a href="/website-laten-maken">Websites</a>',
     '      <a href="/ai-automatisering">AI</a>',
     '      <a href="/bedrijfssoftware-op-maat">Software</a>',
@@ -1414,6 +1415,7 @@ function resolvePrimaryCtaLink(item) {
 
 function renderConversionCta(item) {
   const primary = resolvePrimaryCtaLink(item);
+  const contentPath = getSeoContentPathForItem(item);
   return [
     '<section class="content-cta" data-softora-public-seo="conversion-cta">',
     '  <div>',
@@ -1422,8 +1424,8 @@ function renderConversionCta(item) {
     '    <p>Gebruik deze pagina als richting, maar laat de keuze afhangen van je echte proces, doelen en leadflow.</p>',
     '  </div>',
     '  <div class="content-cta-actions">',
-    `    <a class="content-cta-primary" href="${escapeHtml(primary.href)}">${escapeHtml(primary.label)}</a>`,
-    '    <a class="content-cta-secondary" href="/#contact">Neem contact op</a>',
+    `    <a class="content-cta-primary" href="${escapeHtml(primary.href)}" data-softora-conversion="content-primary" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="service">${escapeHtml(primary.label)}</a>`,
+    `    <a class="content-cta-secondary" href="/#contact" data-softora-conversion="content-contact" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="contact">Neem contact op</a>`,
     '  </div>',
     '</section>',
   ].join('\n');
