@@ -213,6 +213,19 @@ function loadRuntimeEnv(env = process.env) {
       coldmailAuditBcc: normalizeString(
         safeEnv.COLDMAIL_AUDIT_BCC || safeEnv.COLDMAIL_BCC || ''
       ),
+      coldmailUnsubscribeSecret: normalizeString(
+        safeEnv.COLDMAIL_UNSUBSCRIBE_SECRET ||
+          safeEnv.PREMIUM_SESSION_SECRET ||
+          safeEnv.CRON_SECRET ||
+          ''
+      ),
+      coldmailReplyForwardEnabled: readNegatedBooleanEnvFlag(
+        safeEnv.COLDMAIL_REPLY_FORWARD_ENABLED,
+        false
+      ),
+      coldmailReplyForwardFrom: normalizeString(safeEnv.COLDMAIL_REPLY_FORWARD_FROM || ''),
+      coldmailReplyForwardTo: normalizeString(safeEnv.COLDMAIL_REPLY_FORWARD_TO || ''),
+      coldmailReplySyncEmail: normalizeString(safeEnv.COLDMAIL_REPLY_SYNC_EMAIL || ''),
       imapHost: normalizeString(
         safeEnv.MAIL_IMAP_HOST ||
           safeEnv.IMAP_HOST ||
@@ -240,6 +253,10 @@ function loadRuntimeEnv(env = process.env) {
         5_000,
         300_000
       ),
+      coldmailBounceProcessingEnabled: readNegatedBooleanEnvFlag(
+        safeEnv.COLDMAIL_BOUNCE_PROCESSING_ENABLED,
+        true
+      ),
       coldmailCampaignSendLimit: readBoundedNumberEnv(
         safeEnv.COLDMAIL_CAMPAIGN_SEND_LIMIT,
         30,
@@ -257,6 +274,30 @@ function loadRuntimeEnv(env = process.env) {
         100,
         1,
         100
+      ),
+      coldmailSendDelayMs: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_SEND_DELAY_MS,
+        90_000,
+        0,
+        5 * 60_000
+      ),
+      coldmailSafetyPauseMs: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_SAFETY_PAUSE_MS,
+        6 * 60 * 60_000,
+        60_000,
+        24 * 60 * 60_000
+      ),
+      coldmailPersonalMailboxDailyLimit: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT,
+        10,
+        1,
+        50
+      ),
+      coldmailPersonalMailboxSendDelayMs: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS,
+        180_000,
+        0,
+        5 * 60_000
       ),
       coldmailBlockPersonalMailboxDomains: readNegatedBooleanEnvFlag(
         safeEnv.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,

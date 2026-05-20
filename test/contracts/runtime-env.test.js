@@ -37,6 +37,7 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
     MAIL_SMTP_USER: 'team@softora.nl',
     MAIL_SMTP_PASS: 'secret',
     COLDMAIL_AUDIT_BCC: ' prive@example.nl ',
+    COLDMAIL_UNSUBSCRIBE_SECRET: ' unsubscribe-secret ',
   });
 
   assert.equal(runtimeEnv.mail.smtpHost, 'smtp.strato.com');
@@ -50,8 +51,14 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.coldmailCampaignSendLimit, 30);
   assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 50);
   assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 100);
+  assert.equal(runtimeEnv.mail.coldmailSendDelayMs, 90_000);
+  assert.equal(runtimeEnv.mail.coldmailSafetyPauseMs, 21_600_000);
+  assert.equal(runtimeEnv.mail.coldmailPersonalMailboxDailyLimit, 10);
+  assert.equal(runtimeEnv.mail.coldmailPersonalMailboxSendDelayMs, 180_000);
+  assert.equal(runtimeEnv.mail.coldmailBounceProcessingEnabled, true);
   assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, false);
   assert.equal(runtimeEnv.mail.coldmailAuditBcc, 'prive@example.nl');
+  assert.equal(runtimeEnv.mail.coldmailUnsubscribeSecret, 'unsubscribe-secret');
 });
 
 test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () => {
@@ -84,12 +91,20 @@ test('loadRuntimeEnv clamps coldmail safety limits for Strato-safe sending', () 
     COLDMAIL_CAMPAIGN_SEND_LIMIT: '500',
     COLDMAIL_DAILY_SEND_LIMIT: '250',
     COLDMAIL_PACKAGE_DAILY_SEND_LIMIT: '1000',
+    COLDMAIL_SEND_DELAY_MS: '9999999',
+    COLDMAIL_SAFETY_PAUSE_MS: '999999999',
+    COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT: '999',
+    COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS: '9999999',
     COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS: 'true',
   });
 
   assert.equal(runtimeEnv.mail.coldmailCampaignSendLimit, 50);
   assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 50);
   assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 100);
+  assert.equal(runtimeEnv.mail.coldmailSendDelayMs, 300_000);
+  assert.equal(runtimeEnv.mail.coldmailSafetyPauseMs, 86_400_000);
+  assert.equal(runtimeEnv.mail.coldmailPersonalMailboxDailyLimit, 50);
+  assert.equal(runtimeEnv.mail.coldmailPersonalMailboxSendDelayMs, 300_000);
   assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, true);
 });
 

@@ -219,6 +219,10 @@ function registerColdmailingRoutes(app, deps = {}) {
   });
 
   app.get('/api/coldmailing/mailbox-options', (_req, res) => {
+    const configuredSenderEmails =
+      typeof coldmailCampaignService.getConfiguredSenderEmails === 'function'
+        ? coldmailCampaignService.getConfiguredSenderEmails()
+        : undefined;
     res.json({
       ok: true,
       configured: coldmailCampaignService.isSmtpMailConfigured(),
@@ -227,7 +231,11 @@ function registerColdmailingRoutes(app, deps = {}) {
         typeof coldmailCampaignService.isImapMailConfigured === 'function'
           ? coldmailCampaignService.isImapMailConfigured()
           : false,
-      senderEmails: coldmailCampaignService.getAllowedSenderEmails(),
+      senderEmails:
+        Array.isArray(configuredSenderEmails) && configuredSenderEmails.length
+          ? configuredSenderEmails
+          : coldmailCampaignService.getAllowedSenderEmails(),
+      configuredSenderEmails,
       safetyLimits:
         typeof coldmailCampaignService.getColdmailSafetyLimits === 'function'
           ? coldmailCampaignService.getColdmailSafetyLimits()
@@ -261,7 +269,37 @@ function registerColdmailingRoutes(app, deps = {}) {
     }
   });
 
-  app.post('/api/coldmailing/campaigns/send', async (req, res) => {
+  app.post('/api/coldmailing/unsubscribe', async (req, res) => {
+    try {
+      if (typeof coldmailCampaignService.unsubscribeColdmailRecipient !== 'function') {
+        res.status(404).json({
+          ok: false,
+          code: 'COLDMAIL_UNSUBSCRIBE_UNAVAILABLE',
+          message: 'Afmelden is niet beschikbaar.',
+        });
+        return;
+      }
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await coldmailCampaignService.unsubscribeColdmailRecipient({
+        email: req.query.email || body.email,
+        token: req.query.token || body.token,
+        actor: 'Coldmail unsubscribe',
+      });
+      res.json(result);
+    } catch (error) {
+      const code = normalizeString(error && error.code) || 'COLDMAIL_UNSUBSCRIBE_FAILED';
+      res.status(code === 'INVALID_UNSUBSCRIBE_TOKEN' ? 403 : 400).json({
+        ok: false,
+        code,
+        message: truncateText(
+          normalizeString(error && error.message) || 'Afmelden kon niet worden verwerkt.',
+          500
+        ),
+      });
+    }
+  });
+
+  app.post('/api/coldmailing/campaigns/send', requirePremiumAdminApiAccess, async (req, res) => {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const pinCheck = validateRiskyActionConfirmPin(body, { expectedPin: COLDMAIL_SEND_CONFIRM_PIN });
@@ -322,9 +360,11 @@ function registerColdmailingRoutes(app, deps = {}) {
       res.json(result);
     } catch (error) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_SEND_FAILED';
-      const status = code === 'SMTP_NOT_CONFIGURED'
+      const status = code === 'SMTP_NOT_CONFIGURED' || code === 'SENDER_SMTP_NOT_CONFIGURED'
         ? 503
-        : code === 'COLDMAIL_DAILY_LIMIT_REACHED'
+        : code === 'COLDMAIL_SEND_IN_PROGRESS'
+          ? 409
+        : code === 'COLDMAIL_DAILY_LIMIT_REACHED' || code === 'COLDMAIL_SAFETY_PAUSED'
           ? 429
         : code === 'NO_RECIPIENTS' || code === 'NO_VALID_RECIPIENT_DOMAINS'
           ? 422
@@ -372,7 +412,7 @@ function registerColdmailingRoutes(app, deps = {}) {
     }
   });
 
-  app.post('/api/coldmailing/replies/sync', async (req, res) => {
+  app.post('/api/coldmailing/replies/sync', requirePremiumAdminApiAccess, async (req, res) => {
     try {
       if (typeof coldmailCampaignService.syncInboundColdmailRepliesFromImap !== 'function') {
         res.status(404).json({
