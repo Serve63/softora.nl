@@ -282,6 +282,9 @@ function createPremiumAuthStateManager(options = {}) {
       if (PREMIUM_PUBLIC_API_PREFIXES.some((prefix) => requestPath.startsWith(prefix))) {
         return true;
       }
+      if (requestPath === '/api/mailbox/sync' && method === 'GET') {
+        return true;
+      }
       if (
         requestPath === '/api/twilio/voice' &&
         (method === 'GET' || method === 'POST')

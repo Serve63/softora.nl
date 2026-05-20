@@ -10,7 +10,12 @@ const TINY_PNG_DATA_URL =
 function createResponseRecorder() {
   return {
     statusCode: null,
+    headers: {},
     body: null,
+    setHeader(name, value) {
+      this.headers[String(name).toLowerCase()] = value;
+      return this;
+    },
     status(code) {
       this.statusCode = code;
       return this;
@@ -1179,6 +1184,106 @@ test('mailbox service refuses rewrite without OpenAI key', async () => {
   assert.equal(res.body.ok, false);
   assert.equal(res.body.error, 'Mailtekst verbeteren mislukt');
   assert.equal(res.body.detail, 'OpenAI API-key ontbreekt.');
+});
+
+test('mailbox list response returns a warming index response without live IMAP when the index is empty', async () => {
+  let imapCalls = 0;
+  const service = createMailboxService({
+    logger: { error() {} },
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      getSyncState: async () => null,
+      isSyncStateStale: () => true,
+    },
+    createImapClient: () => {
+      imapCalls += 1;
+      throw new Error('IMAP mag de mailboxlijst niet blokkeren');
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'inbox', limit: '50' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.messages, []);
+  assert.equal(res.body.sync.source, 'index-empty');
+  assert.equal(res.body.sync.warming, true);
+  assert.equal(res.body.sync.refreshRecommended, true);
+  assert.equal(res.body.sync.indexAvailable, true);
+  assert.equal(typeof res.body.sync.durationMs, 'number');
+  assert.match(String(res.headers['server-timing'] || ''), /^mailbox;dur=/);
+  assert.equal(imapCalls, 0);
+});
+
+test('mailbox list response returns stale indexed messages immediately without live IMAP', async () => {
+  let imapCalls = 0;
+  const service = createMailboxService({
+    logger: { error() {} },
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [
+        {
+          id: 'inbox:42',
+          uid: 42,
+          folder: 'inbox',
+          from: 'Serve',
+          email: 'serve@softora.nl',
+          to: 'klant@example.nl',
+          subject: 'Cached mail',
+          preview: 'Direct zichtbaar',
+          body: '',
+          date: '2026-05-20T12:00:00.000Z',
+          unread: true,
+          indexed: true,
+        },
+      ],
+      getSyncState: async () => ({
+        last_synced_at: '2026-05-20T11:00:00.000Z',
+        status: 'ok',
+      }),
+      isSyncStateStale: () => true,
+    },
+    createImapClient: () => {
+      imapCalls += 1;
+      throw new Error('IMAP mag cached mailboxlijst niet blokkeren');
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'inbox', limit: '50' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.messages.length, 1);
+  assert.equal(res.body.messages[0].subject, 'Cached mail');
+  assert.equal(res.body.sync.source, 'index');
+  assert.equal(res.body.sync.stale, true);
+  assert.equal(res.body.sync.refreshRecommended, true);
+  assert.equal(res.body.sync.warming, false);
+  assert.equal(res.body.sync.indexAvailable, true);
+  assert.equal(imapCalls, 0);
 });
 
 test('mailbox routes expose accounts, messages, send, delete and rewrite endpoints', () => {

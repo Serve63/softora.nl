@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
 
@@ -123,4 +125,20 @@ test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', asy
 
   const third = await store.acquireSyncLock({ accountEmail: 'info@softora.nl', folder: 'inbox' });
   assert.equal(third.ok, true);
+});
+
+test('mailbox index schema declares tables, indexes, RLS and service-role access', () => {
+  const schema = fs.readFileSync(
+    path.resolve(__dirname, '../../supabase/data-ops-schema.sql'),
+    'utf8'
+  );
+
+  assert.match(schema, /create table if not exists public\.softora_mailbox_messages/);
+  assert.match(schema, /create table if not exists public\.softora_mailbox_sync_state/);
+  assert.match(schema, /softora_mailbox_messages_account_folder_date_idx/);
+  assert.match(schema, /softora_mailbox_sync_state_account_folder_idx/);
+  assert.match(schema, /alter table public\.softora_mailbox_messages enable row level security;/);
+  assert.match(schema, /alter table public\.softora_mailbox_sync_state enable row level security;/);
+  assert.match(schema, /grant select, insert, update, delete on public\.softora_mailbox_messages to service_role;/);
+  assert.match(schema, /grant select, insert, update, delete on public\.softora_mailbox_sync_state to service_role;/);
 });

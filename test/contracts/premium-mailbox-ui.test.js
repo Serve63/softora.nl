@@ -116,8 +116,10 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(readOutreachScript(), /\/api\/coldmailing\/outreach\/status/);
   assert.match(scriptSource, /async function loadMailboxAccounts\(\)/);
   assert.match(scriptSource, /async function loadMailboxMessages\(options = \{\}\)/);
+  assert.match(scriptSource, /let mailboxSyncState = null;/);
   assert.match(scriptSource, /void hydrateMailboxOutreachContextsInBackground\(\)\.catch/);
   assert.match(scriptSource, /data\?\.sync\?\.refreshRecommended/);
+  assert.match(scriptSource, /Mailbox wordt bijgewerkt/);
   assert.match(indexSource, /\/api\/mailbox\/sync/);
   assert.match(indexSource, /\/api\/mailbox\/message/);
   assert.match(scriptSource, /async function sendMail\(\)/);
