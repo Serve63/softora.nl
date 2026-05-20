@@ -112,17 +112,32 @@ test('public seo internal links use the existing footer when one is present', ()
   assert.doesNotMatch(html, /softora-seo-link-map/);
 });
 
-test('public seo fallback links stay in normal page flow on fixed-nav templates', () => {
+test('public seo fixed-nav templates own internal links without fallback bars', () => {
   const source = fs.readFileSync(path.join(root, 'website-laten-maken-oisterwijk.html'), 'utf8');
   const html = applyPublicSeoHeadDefaults(source, 'website-laten-maken-oisterwijk.html', {
     siteOrigin: 'https://www.softora.nl',
   });
-  const ctaStart = html.indexOf('<div class="cta-block');
+  const whyStart = html.indexOf('<div class="why-grid" data-softora-public-seo="internal-links"');
   const internalLinks = html.indexOf('data-softora-public-seo="internal-links"');
 
-  assert.ok(internalLinks > ctaStart, 'Fallback SEO-links horen onder de pagina-inhoud te staan.');
-  assert.match(html, /\.softora-seo-footer-links\{position:static;inset:auto;z-index:auto;display:block;width:auto;/);
+  assert.ok(whyStart > -1, 'Oisterwijk-template moet zichtbare contextuele interne links bezitten.');
+  assert.ok(internalLinks >= whyStart, 'Interne SEO-links horen in bestaande content te staan.');
+  assert.doesNotMatch(html, /softora-seo-footer-links/);
+  assert.match(html, /href="\/regio\/oisterwijk"/);
+  assert.match(html, /href="\/kennisbank\/wat-is-een-conversiegerichte-website"/);
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
+});
+
+test('public seo pages do not render fallback internal link bars', () => {
+  for (const entry of INDEXABLE_PUBLIC_SEO_PAGES) {
+    const source = fs.readFileSync(path.join(root, entry.fileName), 'utf8');
+    const html = applyPublicSeoHeadDefaults(source, entry.fileName, {
+      siteOrigin: 'https://www.softora.nl',
+    });
+
+    assert.doesNotMatch(html, /softora-seo-footer-links/, `${entry.path} gebruikt nog fallback SEO-links.`);
+    assert.doesNotMatch(html, /href="\/premium-[^"]*"/i, `${entry.path} linkt nog naar premium routes.`);
+  }
 });
 
 const CORE_INTERNAL_LINK_EXPECTATIONS = [
@@ -143,9 +158,10 @@ const CORE_INTERNAL_LINK_EXPECTATIONS = [
     canonical: '/website-laten-maken',
     links: [
       '/blog/website-laten-maken-kosten-2026',
+      '/blog/website-laten-maken-mkb-paginas',
+      '/kennisbank/wat-is-een-conversiegerichte-website',
       '/website-laten-maken-oisterwijk',
       '/pakketten',
-      '/kennisbank',
       '/ai-automatisering',
     ],
   },
@@ -179,6 +195,7 @@ const CORE_INTERNAL_LINK_EXPECTATIONS = [
       '/ai-automatisering',
       '/crm-systeem-op-maat',
       '/blog/ai-automatisering-mkb-waar-beginnen',
+      '/kennisbank/wat-is-een-ai-telefonist',
     ],
   },
 ];

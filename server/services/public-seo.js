@@ -21,7 +21,14 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     description:
       'Bekijk de Softora diensten voor websites, bedrijfssoftware, CRM, AI automatisering, chatbots en AI telefonie voor groeiende ondernemers.',
     kind: 'collection',
-    relatedLinks: ['/website-laten-maken', '/ai-automatisering', '/bedrijfssoftware-op-maat', '/crm-systeem-op-maat'],
+    relatedLinks: [
+      '/website-laten-maken',
+      '/ai-automatisering',
+      '/bedrijfssoftware-op-maat',
+      '/crm-systeem-op-maat',
+      '/pakketten',
+      '/over-softora',
+    ],
   },
   {
     fileName: 'premium-websites.html',
@@ -32,7 +39,14 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       "Laat een snelle, SEO-vriendelijke website maken door Softora met sterke structuur, duidelijke dienstenpagina's en focus op offerteaanvragen.",
     kind: 'service',
     serviceName: 'Webdesign en website ontwikkeling',
-    relatedLinks: ['/blog/website-laten-maken-kosten-2026', '/website-laten-maken-oisterwijk', '/pakketten', '/kennisbank'],
+    relatedLinks: [
+      '/blog/website-laten-maken-kosten-2026',
+      '/blog/website-laten-maken-mkb-paginas',
+      '/kennisbank/wat-is-een-conversiegerichte-website',
+      '/website-laten-maken-oisterwijk',
+      '/pakketten',
+      '/kennisbank',
+    ],
   },
   {
     fileName: 'website-laten-maken-oisterwijk.html',
@@ -107,7 +121,13 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Softora bouwt een AI telefonist die telefoontjes opneemt, klanten kwalificeert, afspraken plant en samenvattingen doorstuurt.',
     kind: 'service',
     serviceName: 'AI telefonist',
-    relatedLinks: ['/voicesoftware-op-maat', '/chatbot-laten-maken', '/ai-automatisering', '/blog/ai-automatisering-mkb-waar-beginnen'],
+    relatedLinks: [
+      '/voicesoftware-op-maat',
+      '/chatbot-laten-maken',
+      '/ai-automatisering',
+      '/kennisbank/wat-is-een-ai-telefonist',
+      '/blog/ai-automatisering-mkb-waar-beginnen',
+    ],
   },
   {
     fileName: 'premium-voicesoftware.html',
@@ -564,8 +584,11 @@ const PUBLIC_SEO_LINK_LABELS = Object.freeze({
   '/kennisbank': 'Kennisbank',
   '/blog/ai-automatisering-mkb-waar-beginnen': 'AI automatisering voor het MKB',
   '/blog/website-laten-maken-kosten-2026': 'Website laten maken kosten 2026',
+  '/blog/website-laten-maken-mkb-paginas': 'MKB website pagina’s',
   '/blog/chatbot-laten-maken-wanneer-zinvol': 'Wanneer is een chatbot slim?',
   '/kennisbank/wat-is-bedrijfssoftware-op-maat': 'Wat is bedrijfssoftware op maat?',
+  '/kennisbank/wat-is-een-conversiegerichte-website': 'Wat is een conversiegerichte website?',
+  '/kennisbank/wat-is-een-ai-telefonist': 'Wat is een AI telefonist?',
   '/regio/oisterwijk': 'Softora in Oisterwijk',
 });
 
