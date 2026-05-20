@@ -1,7 +1,26 @@
 (function () {
+  var MARTIJN_WHATSAPP_URL = 'https://wa.me/31643262792';
+
   function getValue(id) {
     var element = document.getElementById(id);
     return String((element && element.value) || '').trim();
+  }
+
+  function buildWhatsappUrl(name, email, message) {
+    var lines = [
+      'Hoi Martijn, ik heb een vraag via Softora.nl.',
+      name ? 'Naam: ' + name : '',
+      email ? 'E-mail: ' + email : '',
+      message ? 'Vraag: ' + message : '',
+    ].filter(Boolean);
+    return MARTIJN_WHATSAPP_URL + '?text=' + encodeURIComponent(lines.join('\n'));
+  }
+
+  function openWhatsapp(url) {
+    var openedWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!openedWindow) {
+      window.location.href = url;
+    }
   }
 
   function setStatus(statusElement, message, isError) {
@@ -54,7 +73,8 @@
         return;
       }
 
-      setStatus(statusElement, 'Bericht wordt verstuurd...', false);
+      openWhatsapp(buildWhatsappUrl(name, email, message));
+      setStatus(statusElement, 'WhatsApp wordt geopend. We bewaren je vraag ook veilig.', false);
       setSubmitState(submitButton, true);
 
       try {
