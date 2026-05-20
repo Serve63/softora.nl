@@ -23,6 +23,7 @@ const {
   auditSeoImages,
   buildSeoLinkGraph,
   extractImageEntriesFromHtml,
+  isLeadCtaLabel,
 } = require('../../server/services/seo-machine-quality-gates');
 
 const repoRoot = path.resolve(__dirname, '../..');
@@ -90,7 +91,33 @@ test('publieke SEO-pagina CTAs zijn meetbaar zonder homepage content aan te rake
   assert.deepEqual(issues, []);
   assert.match(diensten.html, /data-softora-conversion="public-cta"/);
   assert.match(diensten.html, /data-softora-conversion-page="\/diensten"/);
+  assert.match(diensten.html, /href="https:\/\/wa\.me\/31643262792"/);
+  assert.match(diensten.html, /data-softora-conversion-target="whatsapp"/);
   assert.doesNotMatch(homepage.html, /data-softora-conversion-page="\/"/);
+});
+
+test('leadknoppen mogen niet meer naar dode contactroutes wijzen', () => {
+  assert.equal(isLeadCtaLabel('Neem contact op'), true);
+  assert.equal(isLeadCtaLabel('Stuur een bericht'), true);
+  assert.equal(isLeadCtaLabel('Bekijk diensten'), false);
+
+  const issues = auditConversionCtas({
+    pages: [
+      {
+        path: '/voorbeeld',
+        html: [
+          '<a href="https://wa.me/31643262792" data-softora-conversion="public-cta">WhatsApp Martijn</a>',
+          '<a href="/#contact">Neem contact op</a>',
+          '<a href="#">Stuur een bericht</a>',
+        ].join('\n'),
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    issues.map((issue) => issue.type).sort(),
+    ['lead-cta-not-whatsapp', 'non-whatsapp-conversion-link', 'untracked-conversion-link']
+  );
 });
 
 test('SEO-content CTAs zijn meetbaar en linken terug naar commerciële pagina’s', () => {
@@ -103,7 +130,8 @@ test('SEO-content CTAs zijn meetbaar en linken terug naar commerciële pagina’
   assert.match(html, /data-softora-conversion="content-contact"/);
   assert.match(html, /data-softora-conversion-page="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
   assert.match(html, /data-softora-conversion-target="service"/);
-  assert.match(html, /data-softora-conversion-target="contact"/);
+  assert.match(html, /data-softora-conversion-target="whatsapp"/);
+  assert.match(html, /href="https:\/\/wa\.me\/31643262792"[^>]*>WhatsApp Martijn<\/a>/);
   assert.match(html, /href="\/pakketten">Pakketten<\/a>/);
 });
 

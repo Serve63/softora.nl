@@ -34,6 +34,7 @@ test('premium telefoonnummer links gebruiken het juiste WhatsApp-nummer', () => 
   const repoRoot = path.resolve(__dirname, '../..');
   for (const file of files) {
     const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');
-    assert.match(source, /\+31643262792/, `${file} heeft geen juiste call-link meer met het WhatsApp-nummer.`);
+    assert.match(source, /https:\/\/wa\.me\/31643262792/, `${file} heeft geen juiste WhatsApp-link meer.`);
+    assert.doesNotMatch(source, /href="tel:/, `${file} mag geen tel-link meer als primaire CTA gebruiken.`);
   }
 });

@@ -416,7 +416,7 @@ test('premium homepage start- en offerteknoppen starten een WhatsApp-chat', () =
   const source = fs.readFileSync(filePath, 'utf8');
 
   const ctaWhatsappCount = (source.match(/href="https:\/\/wa\.me\/31643262792"/g) || []).length;
-  assert.equal(ctaWhatsappCount, 7);
+  assert.equal(ctaWhatsappCount, 8);
 
   const startProjectCount = (source.match(/>Start Project<\/a>/g) || []).length;
   assert.equal(startProjectCount, 2);

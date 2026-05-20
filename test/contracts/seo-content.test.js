@@ -127,7 +127,10 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /href="\/blog">Terug naar blog<\/a>/);
   assert.match(html, /href="\/ai-telefonist"/);
   assert.match(html, /data-softora-public-seo="conversion-cta"/);
-  assert.match(html, /href="\/#contact"[^>]*>Neem contact op<\/a>/);
+  assert.match(
+    html,
+    /href="https:\/\/wa\.me\/31643262792"[^>]*data-softora-conversion-target="whatsapp"[^>]*>WhatsApp Martijn<\/a>/
+  );
 
   const kennisbankHtml = buildSeoContentArticleHtml(getSeoContentItem('kennisbank', 'wat-is-een-ai-telefonist'), {
     siteOrigin: 'https://www.softora.nl',

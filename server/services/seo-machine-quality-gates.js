@@ -199,8 +199,41 @@ function auditLinkGraph({ graph, requiredIncoming = DEFAULT_MONEY_PAGE_INCOMING_
 
 function isConversionHref(hrefRaw) {
   const href = String(hrefRaw || '').trim();
+  if (/^https:\/\/wa\.me\/31643262792(?:[?#].*)?$/i.test(href)) return true;
+  if (/^https:\/\/api\.whatsapp\.com\/send\?phone=31643262792\b/i.test(href)) return true;
   if (/^mailto:/i.test(href)) return true;
+  if (/^tel:/i.test(href)) return true;
   return href === '#contact' || href === '/#contact' || href.endsWith('/#contact');
+}
+
+function isMartijnWhatsappHref(hrefRaw) {
+  const href = String(hrefRaw || '').trim();
+  return (
+    /^https:\/\/wa\.me\/31643262792(?:[?#].*)?$/i.test(href) ||
+    /^https:\/\/api\.whatsapp\.com\/send\?phone=31643262792\b/i.test(href)
+  );
+}
+
+function stripHtmlTags(valueRaw) {
+  return String(valueRaw || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isLeadCtaLabel(labelRaw) {
+  const label = stripHtmlTags(labelRaw).toLowerCase();
+  return /\b(contact|bericht|whatsapp|start gesprek|plan gesprek|plan scan|vraag advies|offerte|bel direct|start project)\b/i.test(label);
+}
+
+function extractAnchorEntries(htmlRaw) {
+  return Array.from(String(htmlRaw || '').matchAll(/<a\b([^>]*\bhref=["']([^"']+)["'][^>]*)>([\s\S]*?)<\/a>/gi)).map(
+    (match) => ({
+      attrs: match[1] || '',
+      href: match[2] || '',
+      label: stripHtmlTags(match[3] || ''),
+    })
+  );
 }
 
 function auditConversionCtas({ pages = [] } = {}) {
@@ -209,14 +242,30 @@ function auditConversionCtas({ pages = [] } = {}) {
   for (const page of Array.isArray(pages) ? pages : []) {
     const pathName = normalizeInternalPath(page.path);
     const html = String(page.html || '');
-    const conversionLinks = Array.from(html.matchAll(/<a\b([^>]*\bhref=["']([^"']+)["'][^>]*)>/gi)).filter((match) =>
-      isConversionHref(match[2])
-    );
-    const annotatedLinks = conversionLinks.filter((match) => /data-softora-conversion=["'][^"']+["']/i.test(match[1]));
+    const anchors = extractAnchorEntries(html);
+    const conversionLinks = anchors.filter((anchor) => isConversionHref(anchor.href));
+    const annotatedLinks = conversionLinks.filter((anchor) => /data-softora-conversion=["'][^"']+["']/i.test(anchor.attrs));
 
     if (conversionLinks.length === 0) {
       issues.push({ type: 'missing-conversion-link', path: pathName, message: `${pathName} heeft geen meetbare CTA-route.` });
       continue;
+    }
+    const nonWhatsappLinks = conversionLinks.filter((anchor) => !isMartijnWhatsappHref(anchor.href));
+    if (nonWhatsappLinks.length > 0) {
+      issues.push({
+        type: 'non-whatsapp-conversion-link',
+        path: pathName,
+        message: `${pathName} heeft een contact-CTA die niet naar Martijns WhatsApp leidt.`,
+      });
+    }
+    const leadCtaLinks = anchors.filter((anchor) => isLeadCtaLabel(anchor.label));
+    const nonWhatsappLeadCtas = leadCtaLinks.filter((anchor) => !isMartijnWhatsappHref(anchor.href));
+    if (nonWhatsappLeadCtas.length > 0) {
+      issues.push({
+        type: 'lead-cta-not-whatsapp',
+        path: pathName,
+        message: `${pathName} heeft een leadknop die niet naar Martijns WhatsApp leidt.`,
+      });
     }
     if (annotatedLinks.length !== conversionLinks.length) {
       issues.push({ type: 'untracked-conversion-link', path: pathName, message: `${pathName} heeft CTA-links zonder meetlabel.` });
@@ -281,6 +330,8 @@ module.exports = {
   auditConversionCtas,
   auditLinkGraph,
   auditSeoImages,
+  isMartijnWhatsappHref,
+  isLeadCtaLabel,
   buildSeoLinkGraph,
   extractImageEntriesFromHtml,
   extractInternalLinksFromHtml,

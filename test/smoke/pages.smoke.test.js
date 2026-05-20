@@ -344,13 +344,12 @@ test('page smoke: premium-website.html keeps mobile werkwijze background white',
   assert.match(html, /#werkwijze \.werkwijze-grid,/ , 'Werkwijze grid wit-regel hoort aanwezig te zijn.');
 });
 
-test('page smoke: premium-website.html routes non-widget CTA buttons to contact form on desktop', () => {
+test('page smoke: premium-website.html keeps all WhatsApp CTA buttons pointing to Martijn', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
-  assert.match(html, /const ctaLinks = Array\.from\(document\.querySelectorAll\('a\[href\^="https:\/\/wa\.me\/"\]/, 'CTA WA-links routing setup ontbreekt.');
-  assert.match(html, /const desktopOnlyContactFormId = "#faq-contact-form";/, 'Desktop contact-form target id ontbreekt.');
-  assert.match(html, /syncCtaLinksForViewport\(\);/, 'Desktop/mobile CTA sync aanroep ontbreekt.');
-  assert.match(html, /window\.addEventListener\("resize", syncCtaLinksForViewport/, 'Resize-resync voor CTA routing ontbreekt.');
-  assert.match(html, /\.filter\(function \(link\) {\s*return !link\.closest\(\"\.whatsapp-widget\"\);/s, 'WhatsApp widget mag niet mee-gewijzigd worden.');
+  assert.match(html, /href="https:\/\/wa\.me\/31643262792"/, 'CTA hoort naar Martijn WhatsApp te wijzen.');
+  assert.doesNotMatch(html, /desktopOnlyContactFormId/, 'CTA links mogen niet meer naar het contactformulier worden omgebogen.');
+  assert.doesNotMatch(html, /syncCtaLinksForViewport/, 'CTA links mogen niet per viewport van bestemming wisselen.');
+  assert.doesNotMatch(html, /data-whatsapp-base-href/, 'WhatsApp CTA links horen stabiel te blijven.');
 });
 
 test('page smoke: premium-personeel-login.html has a password visibility toggle', () => {
