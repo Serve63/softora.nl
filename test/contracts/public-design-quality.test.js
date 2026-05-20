@@ -102,6 +102,51 @@ test('diensten hero keeps the secondary insight CTA in the button system', () =>
   );
 });
 
+test('over softora page keeps headline, quote and CTA layout polished', () => {
+  const source = readFile('premium-over-softora.html');
+
+  assert.match(
+    source,
+    /<h1 class="big-title">Digitale groei zonder ruis<span>\.<\/span><\/h1>/,
+    'Over Softora H1 mag niet opnieuw met harde breaks in vier smalle regels vallen'
+  );
+  assert.doesNotMatch(
+    source.match(/<h1 class="big-title">[\s\S]*?<\/h1>/)?.[0] || '',
+    /<br>/,
+    'Over Softora H1 moet breed kunnen ademen'
+  );
+  assert.match(
+    source,
+    /\.intro\s*\{[\s\S]*max-width:\s*1240px;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*gap:\s*42px;/s,
+    'Over Softora hero moet de titel breed laten ademen'
+  );
+  assert.match(
+    source,
+    /\.big-title\s*\{[\s\S]*max-width:\s*1080px;/s,
+    'Over Softora H1 moet breed genoeg blijven voor krachtige regels'
+  );
+  assert.match(
+    source,
+    /@media \(max-width:\s*1100px\)\s*\{[\s\S]*\.intro\s*\{[\s\S]*grid-template-columns:\s*1fr;[\s\S]*\.big-title\s*\{[\s\S]*max-width:\s*980px;/s,
+    'Over Softora H1 mag op laptopbreedte niet opnieuw in een smalle kolom vallen'
+  );
+  assert.match(
+    source,
+    /\.quote-wrap\s*\{[\s\S]*background:\s*transparent;[\s\S]*padding:\s*0 80px 84px;/s,
+    'Quote mag geen lompe full-width zwarte balk meer zijn'
+  );
+  assert.match(
+    source,
+    /\.quote-inner\s*\{[\s\S]*max-width:\s*1180px;[\s\S]*background:\s*var\(--dark\);[\s\S]*border-radius:\s*8px;[\s\S]*padding:\s*72px 88px;/s,
+    'Quote moet als nette, ingekaderde sectie blijven renderen'
+  );
+  assert.match(
+    source,
+    /\.btn-outline\s*\{[\s\S]*background:\s*#fff;[\s\S]*color:\s*var\(--dark\);[\s\S]*border:\s*1px solid #ded9d0;/s,
+    'Secundaire CTA’s moeten zichtbaar blijven op de lichte achtergrond'
+  );
+});
+
 test('design protocol protects the homepage and public templates', () => {
   const source = readFile('docs/public-design-quality.md');
 
