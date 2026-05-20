@@ -304,6 +304,13 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /<th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie<\/th>/);
   assert.match(pageSource, /<th id="photoHeader">Foto's <span id="photoHeaderCount">\(0\)<\/span><\/th>/);
   assert.match(pageSource, /<th id="daysHeader" hidden>Dagen<\/th>/);
+  assert.match(pageSource, /id="myMailsFilterButton"[^>]*>Enkel mijn mails tonen<\/button>/);
+  assert.match(pageSource, /onlyMyMails: false,/);
+  assert.match(pageSource, /authenticatedEmail: "",/);
+  assert.match(pageSource, /function hydrateDatabaseAuthSession\(\)/);
+  assert.match(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
+  assert.match(pageSource, /state\.onlyMyMails && !customerWasSentFromAuthenticatedEmail\(customer\)/);
+  assert.match(pageSource, /nodes\.myMailsFilterButton\.addEventListener\("click"/);
   assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd", showPhotoColumn = !showOutreachActionColumn/);
   assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn;/);
   assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return showPhotoColumn && shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoSource\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
@@ -464,7 +471,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260520a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260520b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
@@ -1190,7 +1197,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /\.s-afgehaakt \.s-label \{ color: var\(--red\); font-weight: 700; \}/);
 });
 
-test('premium database outreach days column shows sent age and keeps no-reply automation', () => {
+test('premium database outreach days column uses calendar days and keeps no-reply automation', () => {
   const client = loadDatabaseOutreachClient();
   const controller = client.createController({
     state: { klanten: [] },
@@ -1214,15 +1221,22 @@ test('premium database outreach days column shows sent age and keeps no-reply au
     renderPage: () => {},
     setStatusMessage: () => {},
   });
-  const sentAt = new Date(Date.now() - (26 * 86400000)).toISOString();
+  const now = new Date();
+  const yesterdayLate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 30, 0).toISOString();
+  const oldSentAt = new Date(Date.now() - (26 * 86400000)).toISOString();
   const customer = {
     id: 'customer-1',
     campaignType: 'webdesign',
     outreachStatus: 'benaderd',
-    outreachSentAt: sentAt,
+    outreachSentAt: oldSentAt,
   };
 
-  assert.match(controller.renderDaysSinceSent(customer), />26<\/span>/);
+  assert.match(controller.renderDaysSinceSent({
+    id: 'customer-yesterday',
+    campaignType: 'webdesign',
+    outreachStatus: 'benaderd',
+    outreachSentAt: yesterdayLate,
+  }), />1<\/span>/);
   const automated = controller.applyAutomation([customer]);
   assert.equal(automated.changed, true);
   assert.equal(automated.customers[0].status, 'geengehoor');
