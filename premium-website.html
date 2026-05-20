@@ -3133,7 +3133,7 @@
     </div>
 
     <nav id="navbar">
-        <a href="#" class="logo">SOFTORA.NL</a>
+        <a href="/" class="logo">SOFTORA.NL</a>
         <div class="nav-links">
             <a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic nav-start-btn" style="padding: 0.8rem 1.5rem; font-size: 0.85rem;">Start Project</a>
         </div>
@@ -3239,7 +3239,7 @@
                     <li>Strategie, design en development in een compact traject zonder losse schakels.</li>
                     <li>Gebouwd om mooi te ogen, snel te laden en aanvragen op te leveren.</li>
                 </ul>
-                <a href="#contact" class="magnetic-btn magnetic" style="padding: 0.95rem 1.8rem; font-size: 0.92rem; text-transform: none; letter-spacing: 0.02em;">neem contact op | info@softora.nl</a>
+                <a rel="noopener noreferrer" target="_blank" href="https://wa.me/31643262792" class="magnetic-btn magnetic" style="padding: 0.95rem 1.8rem; font-size: 0.92rem; text-transform: none; letter-spacing: 0.02em;">neem contact op | info@softora.nl</a>
             </div>
         </div>
     </section>
@@ -3492,42 +3492,9 @@
                 const tiltCards = document.querySelectorAll("[data-tilt]");
                 const faqListEl = document.getElementById("faq-list");
                 const anchors = document.querySelectorAll('a[href^="#"]');
-                const ctaLinks = Array.from(document.querySelectorAll('a[href^="https://wa.me/"]')).filter(function (link) {
-                    return !link.closest(".whatsapp-widget");
-                });
                 const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
                 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
                 const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
-                const desktopOnlyContactFormId = "#faq-contact-form";
-
-                function isDesktop() {
-                    return window.matchMedia("(min-width: 769px)").matches;
-                }
-
-                function syncCtaLinksForViewport() {
-                    const desktopMode = isDesktop();
-                    ctaLinks.forEach(function (link) {
-                        const baseHref = String(
-                            link.getAttribute("data-whatsapp-base-href") ||
-                            link.getAttribute("href") ||
-                            "https://wa.me/31643262792"
-                        );
-
-                        if (!link.getAttribute("data-whatsapp-base-href")) {
-                            link.setAttribute("data-whatsapp-base-href", baseHref);
-                        }
-
-                        if (desktopMode) {
-                            link.setAttribute("href", desktopOnlyContactFormId);
-                            link.removeAttribute("target");
-                            link.removeAttribute("rel");
-                        } else {
-                            link.setAttribute("href", baseHref);
-                            link.setAttribute("target", "_blank");
-                            link.setAttribute("rel", "noopener noreferrer");
-                        }
-                    });
-                }
 
                 function getCookieValue(name) {
                     const target = name + "=";
@@ -3739,9 +3706,7 @@
                 }
 
                 window.addEventListener("scroll", onScroll, { passive: true });
-                window.addEventListener("resize", syncCtaLinksForViewport, { passive: true });
                 updateScrollUi();
-                syncCtaLinksForViewport();
                 setupCookieConsent();
 
                 document.querySelectorAll(".fade-up").forEach(function (element) {

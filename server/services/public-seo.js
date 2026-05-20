@@ -668,7 +668,10 @@ function addInternalLinksIfMissing(htmlRaw, entry) {
 
 function classifyConversionTarget(hrefRaw) {
   const href = String(hrefRaw || '').trim();
+  if (/^https:\/\/wa\.me\/31643262792(?:[?#].*)?$/i.test(href)) return 'whatsapp';
+  if (/^https:\/\/api\.whatsapp\.com\/send\?phone=31643262792\b/i.test(href)) return 'whatsapp';
   if (/^mailto:/i.test(href)) return 'mailto';
+  if (/^tel:/i.test(href)) return 'phone';
   if (href === '#contact' || href === '/#contact' || href.endsWith('/#contact')) return 'contact';
   return '';
 }
