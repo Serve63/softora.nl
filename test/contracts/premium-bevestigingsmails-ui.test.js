@@ -61,9 +61,11 @@ test('premium bevestigingsmails bevestigt mailverzending met pincode-bolletjes z
   const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
   const pinSource = fs.readFileSync(path.join(root, 'assets/premium-secure-action-pin.js'), 'utf8');
 
-  assert.match(pageSource, /assets\/premium-secure-action-pin\.js\?v=20260518a/);
+  assert.match(pageSource, /assets\/premium-secure-action-pin\.js\?v=20260520a/);
   assert.match(pageSource, /id="start-campaign-btn" onclick="startCampagne\(\)" data-secure-mail-send-pin/);
 
+  assert.match(pinSource, /secure-action-pin-overlay\{[^}]*background:transparent;backdrop-filter:none/);
+  assert.doesNotMatch(pinSource, /rgba\(25,27,39/);
   assert.match(pinSource, /secure-action-pin-card,\.[^"]*box-sizing:border-box/);
   assert.match(pinSource, /secure-action-pin-card\{[^}]*width:min\(400px,100%\)/);
   assert.match(pinSource, /secure-action-pin-card\{[^}]*padding:22px 22px 20px/);

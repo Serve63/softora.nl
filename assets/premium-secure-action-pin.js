@@ -16,7 +16,7 @@
     var style = document.createElement("style");
     style.id = "secure-action-pin-styles";
     style.textContent = [
-      ".secure-action-pin-overlay{position:fixed;inset:0;z-index:12000;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(25,27,39,.52);backdrop-filter:blur(2px)}",
+      ".secure-action-pin-overlay{position:fixed;inset:0;z-index:12000;display:none;align-items:center;justify-content:center;padding:16px;background:transparent;backdrop-filter:none}",
       ".secure-action-pin-overlay.open{display:flex}",
       ".secure-action-pin-card,.secure-action-pin-card *{box-sizing:border-box}",
       ".secure-action-pin-card{position:relative;width:min(400px,100%);border:1px solid rgba(139,34,82,.16);border-radius:18px;background:#fff;color:#191b2f;box-shadow:0 18px 48px rgba(18,18,28,.22);padding:22px 22px 20px;overflow:hidden;text-align:center}",
