@@ -273,6 +273,25 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /configureCampaignVolumeControl\(\);\s*updateSlider\(document\.getElementById\('mail-slider'\)/);
 });
 
+test('premium bevestigingsmails toont geen nep-nulwaarden in verzendscore bij eerste laadmoment', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const scoreSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-coldmail-sender-score.js'), 'utf8');
+
+  assert.match(pageSource, /assets\/premium-coldmail-sender-score\.js\?v=20260520a/);
+  assert.doesNotMatch(pageSource, /data-coldmail-sender-score-count="serve@softora\.nl">0<\/span>/);
+  assert.doesNotMatch(pageSource, /data-coldmail-sender-score-count="martijn@softora\.nl">0<\/span>/);
+  assert.match(scoreSource, /const SENDERS = Object\.freeze\(\[/);
+  assert.match(scoreSource, /count\.textContent = '\.\.\.'/);
+  assert.match(scoreSource, /const hasSnapshot = Object\.prototype\.hasOwnProperty\.call\(values, CUSTOMER_DB_KEY\);/);
+  assert.match(scoreSource, /if \(!result\.hasSnapshot && !\(options && options\.allowEmpty\)\) \{[\s\S]*setLoading\(\);[\s\S]*scheduleRetry\(\);[\s\S]*return;/);
+  assert.match(scoreSource, /function buildStats\(rows\)/);
+  assert.match(scoreSource, /\.sort\(\(left, right\) => \{[\s\S]*right\.count - left\.count[\s\S]*left\.index - right\.index/);
+  assert.match(scoreSource, /window\.SoftoraColdmailSenderScore = \{/);
+  assert.match(pageSource, /function refreshCampaignDatabaseForLatestState\(\) \{[\s\S]*void hydrateCampaignCompanyCountFromSupabase\(\); void window\.SoftoraColdmailSenderScore\?\.hydrate\?\.\(\);/);
+  assert.match(pageSource, /await hydrateCampaignCompanyCountFromSupabase\(\); await window\.SoftoraColdmailSenderScore\?\.hydrate\?\.\(\);/);
+});
+
 test('premium bevestigingsmails toont mailinteresse op coldmailing zonder leads-pagina te mengen', () => {
   const root = path.join(__dirname, '../..');
   const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
@@ -492,6 +511,6 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
   assert.match(pageSource, /if \(!payload\.sent && payload\.failed\) \{/);
   assert.match(pageSource, /function buildColdmailSendSuccessMessage\(sendResult\)/);
   assert.match(pageSource, /overgeslagen door daglimiet/);
-  assert.match(pageSource, /showToast\(buildColdmailSendSuccessMessage\(sendResult\)\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
+  assert.match(pageSource, /showToast\(buildColdmailSendSuccessMessage\(sendResult\)\);\s*await hydrateCampaignCompanyCountFromSupabase\(\); await window\.SoftoraColdmailSenderScore\?\.hydrate\?\.\(\);\s*return;/);
   assert.match(pageSource, /showScreen\('screen-campaign'\);/);
 });
