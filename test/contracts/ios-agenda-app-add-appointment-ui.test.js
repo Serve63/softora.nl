@@ -62,7 +62,7 @@ test('ios agenda add appointment keeps appointment target separate from meeting 
   );
 });
 
-test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => {
+test('ios agenda hides the mail shortcut and keeps the Serve-only gym shortcut', () => {
   const modelsSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Models.swift');
   const agendaListSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AgendaListView.swift');
   const addViewSource = readRepoFile('ios/SoftoraAgenda/SoftoraAgenda/Views/AddAppointmentView.swift');
@@ -70,13 +70,13 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
 
   assert.match(
     agendaListSource,
-    /AgendaShortcutBar\([^]*showGymShortcut: store\.selectedPlanner == \.serve/,
+    /if store\.selectedPlanner == \.serve \{[^]*AgendaShortcutBar\(onOpenGym: openGymShortcut\)/,
     'The gym shortcut should only be visible for the Serve account.'
   );
   assert.match(
     agendaListSource,
     /@State private var isShowingMailbox = false/,
-    'The mail shortcut should open a native mailbox screen inside the app.'
+    'The native mailbox screen should stay in the app for later completion.'
   );
   assert.match(
     agendaListSource,
@@ -216,7 +216,8 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /private var uppercasedExerciseName: Binding<String>/);
   assert.match(agendaListSource, /private var uppercasedNotes: Binding<String>/);
   assert.doesNotMatch(agendaListSource, /premium-mailbox/);
-  assert.match(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
+  assert.doesNotMatch(agendaListSource, /title: "Mail"[^]*systemImage: "envelope\.fill"/);
+  assert.doesNotMatch(agendaListSource, /onOpenMail:/);
   assert.match(agendaListSource, /Text\("Servé's logboek"\)/);
   assert.match(agendaListSource, /title: "Servé's logboek"[^]*systemImage: "dumbbell\.fill"/);
   assert.doesNotMatch(agendaListSource, /Text\("Gym"\)/);

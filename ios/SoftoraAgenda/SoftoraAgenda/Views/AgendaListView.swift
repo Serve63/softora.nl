@@ -55,11 +55,9 @@ struct AgendaListView: View {
                         }
                 )
 
-                AgendaShortcutBar(
-                    showGymShortcut: store.selectedPlanner == .serve,
-                    onOpenMail: openMailbox,
-                    onOpenGym: openGymShortcut
-                )
+                if store.selectedPlanner == .serve {
+                    AgendaShortcutBar(onOpenGym: openGymShortcut)
+                }
             }
             .blur(radius: overlayIsOpen ? 7 : 0)
 
@@ -874,26 +872,14 @@ private struct GymMetricField: View {
 }
 
 private struct AgendaShortcutBar: View {
-    let showGymShortcut: Bool
-    let onOpenMail: () -> Void
     let onOpenGym: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            AgendaShortcutButton(
-                title: "Mail",
-                systemImage: "envelope.fill",
-                action: onOpenMail
-            )
-
-            if showGymShortcut {
-                AgendaShortcutButton(
-                    title: "Servé's logboek",
-                    systemImage: "dumbbell.fill",
-                    action: onOpenGym
-                )
-            }
-        }
+        AgendaShortcutButton(
+            title: "Servé's logboek",
+            systemImage: "dumbbell.fill",
+            action: onOpenGym
+        )
         .padding(.horizontal, 18)
         .padding(.top, 10)
         .padding(.bottom, 10)
