@@ -30,6 +30,52 @@ const DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION = Object.freeze({
   regio: 700,
 });
 
+const DEFAULT_UNSUPPORTED_CLAIM_RULES = Object.freeze([
+  Object.freeze({
+    type: 'guaranteed-seo-or-business-result',
+    pattern:
+      /\b(?:garande(?:er|ert|ren)|gegarandeerd|garantie)\b.{0,90}\b(?:#?1|nummer\s*1|bovenaan|top\s*3|toppositie|ranking|rankings|google|seo|leads?|aanvragen|omzet|conversie|resultaten?)\b/i,
+    message: 'claimt een gegarandeerd SEO-, lead-, omzet- of rankingresultaat.',
+  }),
+  Object.freeze({
+    type: 'absolute-security-or-availability',
+    pattern:
+      /(?:100%|\b(?:volledig|altijd|nooit|permanent)\b).{0,90}\b(?:veilig|hackvrij|foutloos|storingsvrij|waterdicht|privacyproof|datalekvrij|beschikbaar|correct)\b/i,
+    message: 'claimt absolute veiligheid, beschikbaarheid of foutloosheid.',
+  }),
+  Object.freeze({
+    type: 'unsupported-certification-or-partner-claim',
+    pattern: /\b(?:iso\s*27001|nen\s*7510|soc\s*2|google\s+partner|meta\s+partner|microsoft\s+partner|gecertificeerd|certified)\b/i,
+    message: 'claimt een certificering of officieel partnerschap zonder vast bewijs in de SEO-brondata.',
+  }),
+  Object.freeze({
+    type: 'market-leader-or-number-one-claim',
+    pattern:
+      /\b(?:softora\s+(?:is|wordt|blijft)\s+(?:de\s+)?(?:grootste|beste|nummer\s*1|marktleider)|(?:de\s+)?(?:grootste|beste)\s+(?:speler|partij|bureau|webbouwer|websitebouwer)|wij\s+verslaan\s+(?:iedereen|alle\s+concurrenten))\b/i,
+    message: 'positioneert Softora als grootste, beste, nummer 1 of marktleider zonder bewijs.',
+  }),
+  Object.freeze({
+    type: 'unsupported-scale-proof',
+    pattern: /\b(?:meer\s+dan\s+)?\d{2,}\+?\s+(?:klanten|projecten|websites|cases|reviews|bedrijven)\b/i,
+    message: 'gebruikt harde aantallen klanten, projecten, websites, cases of reviews zonder bron.',
+  }),
+  Object.freeze({
+    type: 'regulated-advice-claim',
+    pattern: /\b(?:medisch|juridisch|fiscaal|belasting|beleggings|financieel)\s+advies\b/i,
+    message: 'claimt gereguleerd advies dat niet bij Softora’s dienstverlening hoort.',
+  }),
+  Object.freeze({
+    type: 'unbounded-ai-claim',
+    pattern: /\bAI\b.{0,90}\b(?:neemt\s+alle\s+beslissingen|vervangt\s+alle\s+medewerkers|maakt\s+geen\s+fouten|is\s+altijd\s+correct)\b/i,
+    message: 'doet een te absolute claim over AI zonder menselijke controle of grenzen.',
+  }),
+  Object.freeze({
+    type: 'frontstage-private-founder-name',
+    pattern: /\bServ[eé]\s+Creusen\b/i,
+    message: 'noemt Servé Creusen in publieke SEO-content terwijl de voorkant op Martijn/Softora moet leunen.',
+  }),
+]);
+
 function normalizeInternalPath(valueRaw) {
   const raw = String(valueRaw || '').trim();
   if (!raw || raw.startsWith('#')) return '';
@@ -117,6 +163,81 @@ function getMinimumContentWordCount(item) {
   return DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION[collection] || 650;
 }
 
+function normalizeClaimText(valueRaw) {
+  return stripHtmlTags(valueRaw)
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function collectContentItemClaimText(item) {
+  const parts = [
+    item.title,
+    item.description,
+    item.category,
+    item.intent,
+    item.summary,
+    ...(Array.isArray(item.sections)
+      ? item.sections.flatMap((section) => [
+          section.heading,
+          ...(Array.isArray(section.paragraphs) ? section.paragraphs : []),
+        ])
+      : []),
+    ...(Array.isArray(item.faq)
+      ? item.faq.flatMap((entry) => [entry.question, entry.answer])
+      : []),
+  ];
+  return normalizeClaimText(parts.filter(Boolean).join(' '));
+}
+
+function auditTextClaimSafety({ textRaw, pathName, rules = DEFAULT_UNSUPPORTED_CLAIM_RULES } = {}) {
+  const text = normalizeClaimText(textRaw);
+  const path = normalizeInternalPath(pathName) || String(pathName || '');
+  const issues = [];
+
+  if (!text) return issues;
+
+  for (const rule of rules) {
+    if (rule.pattern.test(text)) {
+      issues.push({
+        type: rule.type,
+        path,
+        message: `${path || 'Deze publicatie'} ${rule.message}`,
+      });
+    }
+  }
+
+  return issues;
+}
+
+function auditClaimSafety({ items = [], pages = [], rules = DEFAULT_UNSUPPORTED_CLAIM_RULES } = {}) {
+  const issues = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const pathName = normalizeInternalPath(`/${item.collection || ''}/${item.slug || ''}`);
+    issues.push(
+      ...auditTextClaimSafety({
+        textRaw: collectContentItemClaimText(item),
+        pathName,
+        rules,
+      })
+    );
+  }
+
+  for (const page of Array.isArray(pages) ? pages : []) {
+    issues.push(
+      ...auditTextClaimSafety({
+        textRaw: page.html || page.text || '',
+        pathName: page.path,
+        rules,
+      })
+    );
+  }
+
+  return issues;
+}
+
 function auditContentQuality({ items = [], clusters = [], commercialTargets = DEFAULT_COMMERCIAL_TARGETS } = {}) {
   const issues = [];
   const seenPaths = new Set();
@@ -172,7 +293,7 @@ function auditContentQuality({ items = [], clusters = [], commercialTargets = DE
     }
   }
 
-  return issues;
+  return [...issues, ...auditClaimSafety({ items })];
 }
 
 function auditLinkGraph({ graph, requiredIncoming = DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS } = {}) {
@@ -326,6 +447,8 @@ module.exports = {
   DEFAULT_COMMERCIAL_TARGETS,
   DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION,
   DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS,
+  DEFAULT_UNSUPPORTED_CLAIM_RULES,
+  auditClaimSafety,
   auditContentQuality,
   auditConversionCtas,
   auditLinkGraph,
