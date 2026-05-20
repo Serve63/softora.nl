@@ -23,14 +23,14 @@
     const SIDEBAR_COUNT_CACHE_TTL_MS = 1000 * 60 * 10;
     const root = document.documentElement;
     const themeButtons = document.querySelectorAll(".theme-switch-btn[data-theme-value]");
-    let premiumSessionSnapshot = null;
-    let premiumSessionPromise = null;
+    let premiumSessionSnapshot = null, premiumSessionPromise = null;
     let premiumInitialSessionFetched = false, premiumSessionSnapshotFromStorage = false;
     let premiumProfileModalRef = null;
     let premiumSidebarProfileResolved = !isPremiumPersonnelContext;
-    let sidebarLeadsRefreshRequestId = 0;
-    let sidebarLeadsZeroSnapshotStreak = 0;
+    let sidebarLeadsRefreshRequestId = 0, sidebarLeadsZeroSnapshotStreak = 0;
     window[sidebarCountCacheKey] = sidebarCountCacheState;
+
+    function isPremiumDashboardPath(path) { const p = String(path || "").toLowerCase().replace(/\/+$/, ""); return p === "/premium-personeel-dashboard" || p === "/premium-personeel-dashboard.html"; } function enforceDashboardAiChatScope() { if (isPremiumDashboardPath(window.location && window.location.pathname)) return; document.querySelectorAll("#dashboardAiChat, .dashboard-ai-chat").forEach(function (element) { if (element && element.parentNode) element.parentNode.removeChild(element); }); } enforceDashboardAiChatScope(); if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", enforceDashboardAiChatScope, { once: true }); } else { (typeof requestAnimationFrame === "function" ? requestAnimationFrame : window.setTimeout)(enforceDashboardAiChatScope); }
 
     try {
         if (isPremiumPersonnelContext) {

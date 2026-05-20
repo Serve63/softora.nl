@@ -95,6 +95,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.doesNotMatch(themeJsSource, /window\.location\.assign\(href\);/);
   assert.doesNotMatch(themeJsSource, /openSidebarNavigationTarget\(anchor\.dataset\.sidebarHref, event\);/);
   assert.match(themeJsSource, /document\.body\.setAttribute\("data-sidebar-nav-ready", "1"\);/);
+  assert.match(themeJsSource, /function enforceDashboardAiChatScope\(\)/);
+  assert.match(themeJsSource, /#dashboardAiChat, \.dashboard-ai-chat/);
+  assert.match(themeJsSource, /\/premium-personeel-dashboard/);
+  assert.match(themeJsSource, /removeChild\(element\)/);
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*none;/);
   assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\] \.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*auto;/);
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*transform:\s*none !important;/);

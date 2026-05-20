@@ -365,6 +365,7 @@
             color: var(--dark);
         }
 
+        .my-mails-toggle { padding: 6px 14px; border: 1px solid rgba(139, 34, 82, 0.22); border-radius: 5px; background: rgba(139, 34, 82, 0.06); color: var(--crimson); font-size: 11px; font-weight: 700; line-height: 1.2; min-height: 31px; cursor: pointer; transition: border-color .15s ease, background .15s ease, color .15s ease, opacity .15s ease; white-space: nowrap; } .my-mails-toggle:hover:not(:disabled), .my-mails-toggle.act { border-color: rgba(139, 34, 82, 0.5); background: rgba(139, 34, 82, 0.14); color: var(--dark); } .my-mails-toggle:disabled { opacity: .55; cursor: wait; }
         .f-count {
             font-size: 12px;
             color: var(--light);
@@ -1425,7 +1426,7 @@
                         </div>
                         <div class="status-filter">
                             <button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar</button><button class="sf-btn" data-s="alle" type="button">Alles</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
-                        </div>
+                        </div><button class="my-mails-toggle" id="myMailsFilterButton" type="button" aria-pressed="false" disabled>Enkel mijn mails tonen</button>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
                                 <strong>€0,00</strong>
@@ -1577,7 +1578,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260520a"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260520b"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260511a"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260513a"></script>
@@ -1619,7 +1620,7 @@
         const state = {
             klanten: [],
             orders: [],
-            query: "",
+            query: "", onlyMyMails: false, authenticatedEmail: "",
             activeStatus: "benaderbaar",
             sortKey: "distance",
             sortAsc: true,
@@ -1639,7 +1640,7 @@
             sortButtons: Array.from(document.querySelectorAll("[data-sort-key]")),
             addActions: document.getElementById("addActions"),
             addActionsMenu: document.getElementById("addActionsMenu"),
-            addButton: document.getElementById("addButton"),
+            addButton: document.getElementById("addButton"), myMailsFilterButton: document.getElementById("myMailsFilterButton"),
             photoCostLabel: document.getElementById("photoCostLabel"),
             generatePhotosButton: document.getElementById("generatePhotosButton"),
             deepSearchButton: document.getElementById("deepSearchButton"), manualAddButton: document.getElementById("manualAddButton"),
@@ -2228,6 +2229,8 @@
             }, 2200);
         }
 
+        function normalizeEmailAddress(value) { return normalizeString(value).toLowerCase(); } function updateMyMailsFilterButton() { if (!nodes.myMailsFilterButton) return; const hasEmail = Boolean(state.authenticatedEmail); nodes.myMailsFilterButton.disabled = !hasEmail; nodes.myMailsFilterButton.classList.toggle("act", Boolean(state.onlyMyMails)); nodes.myMailsFilterButton.setAttribute("aria-pressed", state.onlyMyMails ? "true" : "false"); nodes.myMailsFilterButton.title = hasEmail ? "Toon alleen bedrijven die vanaf " + state.authenticatedEmail + " zijn gemaild" : "Je ingelogde mailadres wordt geladen"; } function customerWasSentFromAuthenticatedEmail(customer) { if (!state.authenticatedEmail) return false; const senderEmail = normalizeEmailAddress(outreachController.getSentFromEmail(customer)); return Boolean(senderEmail && senderEmail === state.authenticatedEmail); } async function hydrateDatabaseAuthSession() { try { const response = await fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } }); const session = await response.json().catch(function () { return {}; }); state.authenticatedEmail = response.ok && session && session.authenticated ? normalizeEmailAddress(session.email) : ""; } catch (error) { state.authenticatedEmail = ""; } if (!state.authenticatedEmail) state.onlyMyMails = false; updateMyMailsFilterButton(); renderPage(); }
+
         function getFilteredCustomers() {
             const query = normalizeSearchValue(state.query);
             return state.klanten.filter(function (customer) {
@@ -2236,6 +2239,7 @@
                 } else if (state.activeStatus !== "alle" && customer.status !== state.activeStatus) {
                     return false;
                 }
+                if (state.onlyMyMails && !customerWasSentFromAuthenticatedEmail(customer)) return false;
                 if (!query) return true;
 
                 const haystack = [
@@ -3074,7 +3078,7 @@
             state.klanten = sortCustomers(outreachController.applyAutomation(initialBootstrapCustomers).customers);
         }
         applyDatabaseUrlIntent();
-        renderPage();
+        renderPage(); updateMyMailsFilterButton(); void hydrateDatabaseAuthSession();
         const databaseBootStartedAt = Date.now(), databaseHadBootstrapCustomers = initialBootstrapCustomers.length > 0, releaseDatabaseBootShell = () => window.SoftoraPremiumBootTiming?.release(databaseBootStartedAt, 1000) || window.SoftoraPremiumBoot?.setShellBooting?.(false);
 
         const databaseImportController = window.SoftoraDatabaseImport.createController({
@@ -3110,17 +3114,11 @@
             renderPage();
         });
 
-        nodes.statusButtons.forEach(function (button) {
-            button.addEventListener("click", function () {
-                setStatus(button.dataset.s || "alle", button);
-            });
-        });
+        nodes.statusButtons.forEach(function (button) { button.addEventListener("click", function () { setStatus(button.dataset.s || "alle", button); }); });
 
-        nodes.sortButtons.forEach(function (button) {
-            button.addEventListener("click", function () {
-                sort(button.dataset.sortKey);
-            });
-        });
+        if (nodes.myMailsFilterButton) { nodes.myMailsFilterButton.addEventListener("click", function () { if (!state.authenticatedEmail) return; state.onlyMyMails = !state.onlyMyMails; updateMyMailsFilterButton(); renderPage(); }); }
+
+        nodes.sortButtons.forEach(function (button) { button.addEventListener("click", function () { sort(button.dataset.sortKey); }); });
 
         nodes.tbody.addEventListener("click", function (event) {
             const outreachButton = event.target.closest(".outreach-action"); if (outreachButton) { event.preventDefault(); event.stopPropagation(); void outreachController.updateStatus(outreachButton.getAttribute("data-outreach-id"), outreachButton.getAttribute("data-outreach-status")); return; }

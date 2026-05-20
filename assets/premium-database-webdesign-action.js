@@ -711,10 +711,19 @@
             return replyAt ? "<div class=\"outreach-reply\"><strong>Reactie ontvangen</strong><span>" + escapeHtml(formatDisplayDate(replyAt)) + "</span></div>" : "";
         }
 
+        function getLocalDateSerial(timestamp) {
+            const date = new Date(timestamp);
+            if (!Number.isFinite(date.getTime())) return null;
+            return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+        }
+
         function getDaysSinceSent(customer) {
             const sentMs = parseDateValue(getSentAt(customer));
             if (!sentMs) return null;
-            return Math.max(0, Math.floor((Date.now() - sentMs) / 86400000));
+            const sentDay = getLocalDateSerial(sentMs);
+            const today = getLocalDateSerial(Date.now());
+            if (sentDay === null || today === null) return null;
+            return Math.max(0, Math.floor((today - sentDay) / 86400000));
         }
 
         function renderDaysSinceSent(customer) {
