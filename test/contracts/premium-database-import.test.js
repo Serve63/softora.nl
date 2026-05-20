@@ -469,11 +469,18 @@ test('premium database deep search uses OpenAI web search and returns complete r
       exclude: ['Bakkerij Oud | oud@voorbeeld.nl | oud.nl'],
     },
     {
-      env: { OPENAI_API_KEY: 'openai-key', OPENAI_MODEL: 'gpt-5.5' },
+      env: {
+        OPENAI_API_KEY: 'openai-key',
+        OPENAI_MODEL: 'gpt-5.5',
+        OPENAI_ORGANIZATION_ID: 'org_softora',
+        OPENAI_PROJECT_ID: 'proj_softora',
+      },
       fetchImpl: async (url, options = {}) => {
         calls.push({ url: String(url), options });
         assert.equal(String(url), 'https://api.openai.com/v1/responses');
         assert.equal(options.headers.Authorization, 'Bearer openai-key');
+        assert.equal(options.headers['OpenAI-Organization'], 'org_softora');
+        assert.equal(options.headers['OpenAI-Project'], 'proj_softora');
         const payload = JSON.parse(options.body);
         assert.equal(payload.model, 'gpt-5.5');
         assert.equal(payload.reasoning.effort, 'low');
