@@ -333,8 +333,10 @@ a {
 
   .seo-growth-nav-links {
     width: 100%;
-    overflow-x: auto;
-    padding-bottom: 2px;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    overflow-x: visible;
+    padding-bottom: 0;
   }
 
   .seo-growth-hero {
