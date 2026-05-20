@@ -95,6 +95,22 @@ test('premium user routes expose server-side admin pin verification without leak
     handler({ body: { actionConfirmCode: 'geheim' } }, okRes);
     assert.equal(okRes.statusCode, 200);
     assert.deepEqual(okRes.body, { ok: true });
+
+    const coldmailRes = {
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload) {
+        this.body = payload;
+        return this;
+      },
+    };
+    handler({ body: { actionConfirmCode: '8080', actionConfirmScope: 'coldmail-send' } }, coldmailRes);
+    assert.equal(coldmailRes.statusCode, 200);
+    assert.deepEqual(coldmailRes.body, { ok: true });
   } finally {
     if (previousPin === undefined) delete process.env.PREMIUM_SETTINGS_CONFIRM_PIN;
     else process.env.PREMIUM_SETTINGS_CONFIRM_PIN = previousPin;

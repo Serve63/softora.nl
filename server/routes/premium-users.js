@@ -1,4 +1,8 @@
 const { validatePremiumAdminActionPin } = require('../security/premium-admin-action-pin');
+const {
+  COLDMAIL_SEND_CONFIRM_PIN,
+  validateRiskyActionConfirmPin,
+} = require('../security/risky-action-confirm-pin');
 
 function registerPremiumUserManagementRoutes(app, deps) {
   app.get('/api/auth/profile', (req, res) => deps.coordinator.getProfileResponse(req, res));
@@ -17,7 +21,11 @@ function registerPremiumUserManagementRoutes(app, deps) {
   });
 
   app.post('/api/premium-users/verify-pin', deps.requirePremiumAdminApiAccess, (req, res) => {
-    const pinCheck = validatePremiumAdminActionPin(req.body);
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const scope = String(body.actionConfirmScope || '').trim().toLowerCase();
+    const pinCheck = scope === 'coldmail-send'
+      ? validateRiskyActionConfirmPin(body, { expectedPin: COLDMAIL_SEND_CONFIRM_PIN })
+      : validatePremiumAdminActionPin(body);
     if (!pinCheck.ok) {
       return res.status(403).json({ ok: false, error: pinCheck.error });
     }
