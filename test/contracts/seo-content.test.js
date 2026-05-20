@@ -8,6 +8,7 @@ const {
   getSeoContentClusters,
   getSeoContentItem,
   getSeoContentItems,
+  getSeoContentPathForItem,
   getSeoContentCollectionPaths,
   getSeoContentPillars,
   getSeoContentPublicationPlan,
@@ -222,6 +223,38 @@ test('seo content bewaakt unieke slugs, clusters en interne links', () => {
     );
     if (item.collection === 'branches' || item.collection === 'regio') {
       assert.equal(item.schemaType, 'Service', item.slug);
+    }
+  }
+});
+
+test('live seo content links only to public or stable pages', () => {
+  const now = new Date('2026-05-20T12:00:00.000Z');
+  const liveContentPaths = new Set(getSeoContentPublicPaths({ now }));
+  const stablePublicPaths = new Set([
+    '/',
+    '/diensten',
+    '/website-laten-maken',
+    '/website-laten-maken-oisterwijk',
+    '/ai-automatisering',
+    '/bedrijfssoftware-op-maat',
+    '/crm-systeem-op-maat',
+    '/maatwerk-platform',
+    '/chatbot-laten-maken',
+    '/ai-telefonist',
+    '/voicesoftware-op-maat',
+    '/pakketten',
+    '/over-softora',
+    '/algemene-voorwaarden',
+    '/privacybeleid',
+  ]);
+  const allowedPaths = new Set([...liveContentPaths, ...stablePublicPaths]);
+
+  for (const item of getSeoContentItems({ now })) {
+    for (const link of item.relatedLinks || []) {
+      assert.ok(
+        allowedPaths.has(link.href),
+        `${getSeoContentPathForItem(item)} linkt naar niet-live content: ${link.href}`
+      );
     }
   }
 });

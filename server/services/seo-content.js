@@ -441,8 +441,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       'Een korte uitleg van AI telefonie, wanneer het nuttig is en hoe je voorkomt dat gesprekken onpersoonlijk worden.',
     category: 'AI telefonie',
     intent: 'Uitleg',
-    publishedAt: '2026-05-23',
-    updatedAt: '2026-05-23',
+    publishedAt: '2026-05-20',
+    updatedAt: '2026-05-20',
     readTime: '5 min',
     summary:
       'Een AI telefonist neemt gesprekken aan, stelt vaste vragen, vat informatie samen en zet vervolgacties klaar.',
@@ -609,8 +609,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       'Een uitleg van conversiegerichte websites: hoe structuur, tekst, bewijs en CTA’s samen meer aanvragen opleveren.',
     category: 'Websites',
     intent: 'Uitleg',
-    publishedAt: '2026-05-25',
-    updatedAt: '2026-05-25',
+    publishedAt: '2026-05-20',
+    updatedAt: '2026-05-20',
     readTime: '5 min',
     summary:
       'Een conversiegerichte website helpt bezoekers sneller begrijpen, vertrouwen en actie ondernemen.',
