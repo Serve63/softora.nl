@@ -551,6 +551,26 @@ test('mailbox service replaces the legacy impactbox mailbox with the softora bus
   }
 });
 
+test('mailbox sync response runs coldmail reply hook after mailbox sync', async () => {
+  let hookCalls = 0;
+  const service = createMailboxService({
+    mailConfig: {},
+    afterSync: async ({ result, folders }) => {
+      hookCalls += 1;
+      assert.equal(result.ok, true);
+      assert.deepEqual(folders, ['inbox', 'sent']);
+      return { ok: true, forwarded: 1 };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.syncMailboxResponse({ body: {}, query: {} }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(hookCalls, 1);
+  assert.deepEqual(res.body.coldmailReplies, { ok: true, forwarded: 1 });
+});
+
 test('mailbox routes expose accounts, messages and send endpoints', () => {
   const routes = [];
   const app = {

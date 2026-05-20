@@ -98,6 +98,10 @@ test('server app runtime composition builders preserve feature wiring groups and
       MAIL_FROM_ADDRESS: 'info@softora.test',
       MAIL_FROM_NAME: 'Softora',
       MAIL_REPLY_TO: 'reply@softora.test',
+      COLDMAIL_REPLY_FORWARD_ENABLED: true,
+      COLDMAIL_REPLY_FORWARD_FROM: 'serve@softora.nl',
+      COLDMAIL_REPLY_FORWARD_TO: 'servec321@gmail.com',
+      COLDMAIL_REPLY_SYNC_EMAIL: 'serve@softora.nl',
     },
     bootstrapState: {
       PREMIUM_ACTIVE_ORDERS_SCOPE: 'premium_active_orders',
@@ -278,6 +282,11 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(context.featureRouteOptions.openAiCostSummary.openAiCostsApiBaseUrl, 'https://api.openai.test');
   assert.equal(context.featureRouteOptions.openAiCostSummary.usdToEurRate, 0.91);
   assert.equal(context.featureRouteOptions.coldmailing.coldmailCampaignService.isSmtpMailConfigured(), true);
+  assert.equal(
+    context.featureRouteOptions.coldmailing.coldmailCampaignService.getColdmailSafetyLimits()
+      .replyForwardConfigured,
+    true
+  );
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
     'info@softora.test',
     'info@softora.nl',

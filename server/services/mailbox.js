@@ -34,6 +34,7 @@ function createMailboxService(deps = {}) {
     createTransport = (config) => nodemailer.createTransport(config),
     createImapClient = (config) => new ImapFlow(config),
     parseMailSource = (source) => simpleParser(source),
+    afterSync = null,
     isSupabaseConfigured = () => false,
     getSupabaseClient = () => null,
     mailboxIndexStore = createMailboxIndexStore({
@@ -717,6 +718,25 @@ function createMailboxService(deps = {}) {
         limit: Number(body.limit || req.query?.limit || DEFAULT_SYNC_LIMIT) || DEFAULT_SYNC_LIMIT,
         force: Boolean(body.force || req.query?.force === '1' || req.query?.force === 'true'),
       });
+      if (typeof afterSync === 'function') {
+        try {
+          result.coldmailReplies = await afterSync({
+            result,
+            req,
+            body,
+            folders,
+          });
+          if (result.coldmailReplies && result.coldmailReplies.ok === false) {
+            result.ok = false;
+          }
+        } catch (error) {
+          result.ok = false;
+          result.coldmailReplies = {
+            ok: false,
+            error: String(error?.message || error || 'Coldmail reply-sync mislukt'),
+          };
+        }
+      }
       return res.status(result.ok ? 200 : 207).json(result);
     } catch (error) {
       logger.error('[Mailbox][SyncResponse]', error?.message || error);

@@ -220,6 +220,21 @@ function loadRuntimeEnv(env = process.env) {
       coldmailAuditBcc: replaceLegacyMailboxEmail(
         safeEnv.COLDMAIL_AUDIT_BCC || safeEnv.COLDMAIL_BCC || ''
       ),
+      coldmailReplyForwardEnabled: readNegatedBooleanEnvFlag(
+        safeEnv.COLDMAIL_REPLY_FORWARD_ENABLED,
+        true
+      ),
+      coldmailReplyForwardFrom: normalizeMailboxAccountEmail(
+        safeEnv.COLDMAIL_REPLY_FORWARD_FROM || 'serve@softora.nl'
+      ),
+      coldmailReplyForwardTo: normalizeMailboxAccountEmail(
+        safeEnv.COLDMAIL_REPLY_FORWARD_TO || 'servec321@gmail.com'
+      ),
+      coldmailReplySyncEmail: normalizeMailboxAccountEmail(
+        safeEnv.COLDMAIL_REPLY_SYNC_EMAIL ||
+          safeEnv.COLDMAIL_REPLY_FORWARD_FROM ||
+          'serve@softora.nl'
+      ),
       imapHost: normalizeString(
         safeEnv.MAIL_IMAP_HOST ||
           safeEnv.IMAP_HOST ||

@@ -127,6 +127,10 @@ function createColdmailCampaignService(deps = {}) {
     mailFromName = 'Softora',
     mailReplyTo: rawMailReplyTo = '',
     coldmailAuditBcc: rawColdmailAuditBcc = '',
+    coldmailReplySyncEmail: rawColdmailReplySyncEmail = '',
+    coldmailReplyForwardEnabled = false,
+    coldmailReplyForwardFrom: rawColdmailReplyForwardFrom = '',
+    coldmailReplyForwardTo: rawColdmailReplyForwardTo = '',
     imapHost = '',
     imapPort = 993,
     imapSecure = false,
@@ -144,6 +148,9 @@ function createColdmailCampaignService(deps = {}) {
   const mailFromAddress = replaceLegacyMailboxEmail(rawMailFromAddress);
   const mailReplyTo = replaceLegacyMailboxEmail(rawMailReplyTo);
   const coldmailAuditBcc = replaceLegacyMailboxEmail(rawColdmailAuditBcc);
+  const coldmailReplySyncEmail = replaceLegacyMailboxEmail(rawColdmailReplySyncEmail);
+  const coldmailReplyForwardFrom = replaceLegacyMailboxEmail(rawColdmailReplyForwardFrom);
+  const coldmailReplyForwardTo = replaceLegacyMailboxEmail(rawColdmailReplyForwardTo);
   const imapUser = replaceLegacyMailboxEmail(rawImapUser);
 
   let smtpTransporter = null;
@@ -186,21 +193,17 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function getMissingImapMailEnv() {
+    const account = resolveColdmailReplySyncAccount();
     return [
-      !imapHost ? 'MAIL_IMAP_HOST' : null,
-      !imapUser ? 'MAIL_IMAP_USER' : null,
-      !imapPass ? 'MAIL_IMAP_PASS' : null,
+      !account.imapHost ? 'MAIL_IMAP_HOST' : null,
+      !account.imapUser ? 'MAIL_IMAP_USER' : null,
+      !account.imapPass ? 'MAIL_IMAP_PASS' : null,
     ].filter(Boolean);
   }
 
   function isImapMailConfigured() {
-    return Boolean(
-      imapHost &&
-        Number.isFinite(Number(imapPort)) &&
-        Number(imapPort) > 0 &&
-        imapUser &&
-        imapPass
-    );
+    const account = resolveColdmailReplySyncAccount();
+    return Boolean(account.imapConfigured);
   }
 
   function getSmtpTransporter() {
@@ -597,8 +600,8 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function resolveSentCopyAccount(senderEmail) {
-    const email = normalizeEmailAddress(senderEmail || mailFromAddress || smtpUser || imapUser);
+  function resolveMailboxImapAccount(emailInput) {
+    const email = normalizeEmailAddress(emailInput || mailFromAddress || smtpUser || imapUser);
     const envAccount = readMailboxEnvForKey(envKeyForEmail(email));
     const envDomain = readMailboxEnvForKey(envKeyForDomain(email));
     const useBaseCredentials =
@@ -631,7 +634,18 @@ function createColdmailCampaignService(deps = {}) {
           (useBaseCredentials ? imapPass : '')
       ),
     };
+    account.imapConfigured = Boolean(account.imapHost && account.imapUser && account.imapPass);
     return account;
+  }
+
+  function resolveSentCopyAccount(senderEmail) {
+    return resolveMailboxImapAccount(senderEmail || mailFromAddress || smtpUser || imapUser);
+  }
+
+  function resolveColdmailReplySyncAccount() {
+    return resolveMailboxImapAccount(
+      coldmailReplySyncEmail || coldmailReplyForwardFrom || imapUser || mailFromAddress || smtpUser
+    );
   }
 
   async function saveSentCopy(senderEmail, mail, info) {
@@ -865,6 +879,24 @@ function createColdmailCampaignService(deps = {}) {
     return isLikelyValidEmail(email) ? email : '';
   }
 
+  function getColdmailReplyForwardFromAddress() {
+    const email = normalizeEmailAddress(coldmailReplyForwardFrom);
+    return isLikelyValidEmail(email) ? email : '';
+  }
+
+  function getColdmailReplyForwardToAddress() {
+    const email = normalizeEmailAddress(coldmailReplyForwardTo);
+    return isLikelyValidEmail(email) ? email : '';
+  }
+
+  function isColdmailReplyForwardConfigured() {
+    return Boolean(
+      coldmailReplyForwardEnabled &&
+        getColdmailReplyForwardFromAddress() &&
+        getColdmailReplyForwardToAddress()
+    );
+  }
+
   function parsePositiveInt(value, fallback, min, max) {
     const parsed = Number.parseInt(String(value || ''), 10);
     const safe = Number.isFinite(parsed) ? parsed : fallback;
@@ -909,6 +941,9 @@ function createColdmailCampaignService(deps = {}) {
       packageDailySendLimit: getColdmailPackageDailySendLimit(),
       blocksPersonalMailboxDomains: shouldBlockPersonalMailboxDomains(),
       auditBccConfigured: Boolean(getColdmailAuditBccAddress()),
+      replyForwardConfigured: isColdmailReplyForwardConfigured(),
+      replyForwardFrom: getColdmailReplyForwardFromAddress() || undefined,
+      replyForwardTo: getColdmailReplyForwardToAddress() || undefined,
     };
   }
 
@@ -1552,6 +1587,84 @@ function createColdmailCampaignService(deps = {}) {
     const info = await transporter.sendMail(mail);
     await saveSentCopy(selectedSenderEmail, mail, info);
     return info;
+  }
+
+  function isInboundReplyAddressedToForwardSource(parsedMail) {
+    const forwardFrom = getColdmailReplyForwardFromAddress();
+    if (!forwardFrom) return false;
+    const recipients = [
+      ...getParsedMailAddressList(parsedMail, 'to'),
+      ...getParsedMailAddressList(parsedMail, 'cc'),
+    ];
+    return recipients.some((entry) => entry.address === forwardFrom);
+  }
+
+  function buildColdmailReplyForwardSubject({ parsedMail, row }) {
+    const company = getRowCompany(row) || getParsedMailFromEmail(parsedMail).address || 'Coldmail reactie';
+    const subject = normalizeString(parsedMail && parsedMail.subject).replace(/^re\s*:\s*/i, '');
+    return truncateText(
+      ['Coldmail reactie', company, subject].filter(Boolean).join(' - '),
+      240
+    );
+  }
+
+  function buildColdmailReplyForwardText({ parsedMail, row, inboundText, mailboxId, forwardFrom }) {
+    const from = getParsedMailFromEmail(parsedMail);
+    const receivedAt =
+      parsedMail && parsedMail.date instanceof Date ? parsedMail.date.toISOString() : now().toISOString();
+    return [
+      'Nieuwe reactie op een Softora coldmailcampagne.',
+      '',
+      `Bedrijf: ${getRowCompany(row) || 'Onbekend'}`,
+      `Contact: ${getRowContact(row) || 'Onbekend'}`,
+      `Afzender klant: ${from.address || 'Onbekend'}`,
+      `Ontvangen op mailbox: ${forwardFrom}`,
+      `Ontvangen om: ${receivedAt}`,
+      `Onderwerp: ${normalizeString(parsedMail && parsedMail.subject) || '(Geen onderwerp)'}`,
+      `Mailboxbericht: ${normalizeString(mailboxId) || 'Onbekend'}`,
+      '',
+      'Reactie:',
+      inboundText,
+    ].join('\n');
+  }
+
+  async function forwardColdmailReplyToPrivateMailbox({ parsedMail, row, inboundText, mailboxId }) {
+    if (!isColdmailReplyForwardConfigured()) {
+      return { forwarded: false, reason: 'forward_not_configured' };
+    }
+    if (!isInboundReplyAddressedToForwardSource(parsedMail)) {
+      return { forwarded: false, reason: 'not_forward_source_recipient' };
+    }
+    const transporter = getSmtpTransporter();
+    if (!transporter) {
+      const error = new Error('SMTP transporter kon niet worden opgebouwd voor coldmail-forward.');
+      error.code = 'SMTP_TRANSPORT_UNAVAILABLE';
+      throw error;
+    }
+    const forwardFrom = getColdmailReplyForwardFromAddress();
+    const forwardTo = getColdmailReplyForwardToAddress();
+    const mail = {
+      from: formatMailFromHeader(forwardFrom),
+      to: forwardTo,
+      replyTo: forwardFrom,
+      subject: buildColdmailReplyForwardSubject({ parsedMail, row }),
+      text: buildColdmailReplyForwardText({
+        parsedMail,
+        row,
+        inboundText,
+        mailboxId,
+        forwardFrom,
+      }),
+    };
+    const info = await transporter.sendMail(mail);
+    const sentCopySaved = await saveSentCopy(forwardFrom, mail, info);
+    return {
+      forwarded: true,
+      from: forwardFrom,
+      to: forwardTo,
+      messageId: normalizeString(info && info.messageId),
+      sentCopySaved,
+    };
   }
 
   function buildCustomerPhotoDataKey(row) {
@@ -2222,11 +2335,12 @@ function createColdmailCampaignService(deps = {}) {
   async function syncInboundColdmailRepliesFromImap(options = {}) {
     const force = Boolean(options.force);
     const maxMessages = Math.max(5, Math.min(100, Number(options.maxMessages || 30) || 30));
-    if (!coldmailAutoReplyEnabled) {
+    const replyForwardConfigured = isColdmailReplyForwardConfigured();
+    if (!coldmailAutoReplyEnabled && !replyForwardConfigured) {
       return {
         ok: true,
         skipped: true,
-        reason: 'coldmail_autoreply_disabled',
+        reason: 'coldmail_reply_processing_disabled',
       };
     }
     if (!isImapMailConfigured()) {
@@ -2264,19 +2378,25 @@ function createColdmailCampaignService(deps = {}) {
         markedSeen: 0,
         lifecycleUpdated: 0,
         lifecycleSkipped: 0,
+        forwarded: 0,
+        forwardSkipped: 0,
+        forwardErrors: 0,
+        autoReplySkipped: 0,
         errors: [],
       };
       const dbState = await getUiStateValues(customerDbScope);
       const values = dbState && typeof dbState.values === 'object' ? dbState.values : {};
       let rows = parseDatabaseRows(values);
       const replyState = await loadColdmailReplyState();
+      const syncAccount = resolveColdmailReplySyncAccount();
+      stats.syncAccount = syncAccount.email;
       const client = createImapClient({
-        host: imapHost,
-        port: Number(imapPort),
-        secure: Boolean(imapSecure),
+        host: syncAccount.imapHost,
+        port: Number(syncAccount.imapPort),
+        secure: Boolean(syncAccount.imapSecure),
         auth: {
-          user: imapUser,
-          pass: imapPass,
+          user: syncAccount.imapUser,
+          pass: syncAccount.imapPass,
         },
         logger: false,
       });
@@ -2315,7 +2435,18 @@ function createColdmailCampaignService(deps = {}) {
               }
 
               const processedKey = getInboundMessageProcessedKey(parsedMail, message);
-              if (replyState.processed[processedKey]) {
+              const processedEntry =
+                replyState.processed[processedKey] && typeof replyState.processed[processedKey] === 'object'
+                  ? replyState.processed[processedKey]
+                  : null;
+              const addressedToForwardSource = isInboundReplyAddressedToForwardSource(parsedMail);
+              const forwardNeeded =
+                replyForwardConfigured && addressedToForwardSource && !(processedEntry && processedEntry.forwardedAt);
+              const autoReplyNeeded =
+                Boolean(coldmailAutoReplyEnabled) && !(processedEntry && processedEntry.messageId);
+              const lifecycleNeeded =
+                !(processedEntry && Object.prototype.hasOwnProperty.call(processedEntry, 'lifecycleIntent'));
+              if (processedEntry && !forwardNeeded && !autoReplyNeeded && !lifecycleNeeded) {
                 stats.skippedProcessed += 1;
                 continue;
               }
@@ -2329,70 +2460,142 @@ function createColdmailCampaignService(deps = {}) {
 
               stats.matched += 1;
               const from = getParsedMailFromEmail(parsedMail);
+              const mailboxId = buildMailboxMessageId(mailboxName, message.uid);
+              const classification = classifyInboundColdmailReplyLifecycle(inboundText);
               try {
-                try {
-                  const lifecycle = await persistColdmailReplyLifecycle({
-                    values,
-                    rows,
-                    match,
-                    parsedMail,
-                    inboundText,
-                    processedKey,
-                    actor: 'Coldmailing',
-                    mailboxId: buildMailboxMessageId(mailboxName, message.uid),
-                    mailboxFolder: mailboxName,
-                    mailboxAccount: resolveInboundMailboxAccount(parsedMail),
-                  });
-                  rows = lifecycle.rows;
-                  if (lifecycle.persisted) {
-                    stats.lifecycleUpdated += 1;
-                  } else {
-                    stats.lifecycleSkipped += 1;
+                if (lifecycleNeeded) {
+                  try {
+                    const lifecycle = await persistColdmailReplyLifecycle({
+                      values,
+                      rows,
+                      match,
+                      parsedMail,
+                      inboundText,
+                      processedKey,
+                      actor: 'Coldmailing',
+                      mailboxId,
+                      mailboxFolder: mailboxName,
+                      mailboxAccount: resolveInboundMailboxAccount(parsedMail),
+                    });
+                    rows = lifecycle.rows;
+                    if (lifecycle.persisted) {
+                      stats.lifecycleUpdated += 1;
+                    } else {
+                      stats.lifecycleSkipped += 1;
+                    }
+                  } catch (error) {
+                    stats.errors.push(
+                      `${from.address || 'onbekende afzender'} lifecycle: ${truncateText(
+                        error && error.message ? error.message : String(error),
+                        220
+                      )}`
+                    );
                   }
-                } catch (error) {
-                  stats.errors.push(
-                    `${from.address || 'onbekende afzender'} lifecycle: ${truncateText(
-                      error && error.message ? error.message : String(error),
-                      220
-                    )}`
-                  );
+                } else {
+                  stats.lifecycleSkipped += 1;
                 }
 
-                const senderEmail = resolveInboundSenderEmail(parsedMail);
-                const aiReply = await generateColdmailAutoReplyWithOpenAi({
-                  row: match.row,
-                  inboundText,
-                  inboundSubject: normalizeString(parsedMail && parsedMail.subject),
-                  fromName: from.name,
-                });
-                const info = await sendColdmailAutoReply({
-                  parsedMail,
-                  row: match.row,
-                  senderEmail,
-                  replyText: aiReply.text,
-                });
-                replyState.processed[processedKey] = {
-                  at: now().toISOString(),
-                  from: from.address,
-                  company: getRowCompany(match.row),
-                  subject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
-                  model: aiReply.model,
-                  messageId: normalizeString(info && info.messageId),
-                  lifecycleStatus: normalizeString(
-                    classifyInboundColdmailReplyLifecycle(inboundText).status
-                  ),
-                  lifecycleIntent: normalizeString(
-                    classifyInboundColdmailReplyLifecycle(inboundText).intent
-                  ),
-                };
-                await saveColdmailReplyState(replyState, 'coldmail-auto-reply');
-                stats.replied += 1;
+                let handled = false;
+                if (forwardNeeded) {
+                  try {
+                    const forwardInfo = await forwardColdmailReplyToPrivateMailbox({
+                      parsedMail,
+                      row: match.row,
+                      inboundText,
+                      mailboxId,
+                    });
+                    if (forwardInfo.forwarded) {
+                      const existing = replyState.processed[processedKey] || {};
+                      replyState.processed[processedKey] = {
+                        ...existing,
+                        at: existing.at || now().toISOString(),
+                        from: existing.from || from.address,
+                        company: existing.company || getRowCompany(match.row),
+                        subject:
+                          existing.subject ||
+                          truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+                        lifecycleStatus: normalizeString(existing.lifecycleStatus || classification.status),
+                        lifecycleIntent: normalizeString(existing.lifecycleIntent || classification.intent),
+                        forwardedAt: now().toISOString(),
+                        forwardFrom: forwardInfo.from,
+                        forwardTo: forwardInfo.to,
+                        forwardMessageId: forwardInfo.messageId,
+                      };
+                      await saveColdmailReplyState(replyState, 'coldmail-reply-forward');
+                      stats.forwarded += 1;
+                      handled = true;
+                    } else {
+                      stats.forwardSkipped += 1;
+                    }
+                  } catch (error) {
+                    stats.forwardErrors += 1;
+                    stats.errors.push(
+                      `${from.address || 'onbekende afzender'} forward: ${truncateText(
+                        error && error.message ? error.message : String(error),
+                        220
+                      )}`
+                    );
+                  }
+                } else if (replyForwardConfigured) {
+                  stats.forwardSkipped += 1;
+                }
+
+                if (autoReplyNeeded) {
+                  const senderEmail = resolveInboundSenderEmail(parsedMail);
+                  const aiReply = await generateColdmailAutoReplyWithOpenAi({
+                    row: match.row,
+                    inboundText,
+                    inboundSubject: normalizeString(parsedMail && parsedMail.subject),
+                    fromName: from.name,
+                  });
+                  const info = await sendColdmailAutoReply({
+                    parsedMail,
+                    row: match.row,
+                    senderEmail,
+                    replyText: aiReply.text,
+                  });
+                  const existing = replyState.processed[processedKey] || {};
+                  replyState.processed[processedKey] = {
+                    ...existing,
+                    at: existing.at || now().toISOString(),
+                    from: existing.from || from.address,
+                    company: existing.company || getRowCompany(match.row),
+                    subject:
+                      existing.subject ||
+                      truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+                    model: aiReply.model,
+                    messageId: normalizeString(info && info.messageId),
+                    lifecycleStatus: normalizeString(existing.lifecycleStatus || classification.status),
+                    lifecycleIntent: normalizeString(existing.lifecycleIntent || classification.intent),
+                  };
+                  await saveColdmailReplyState(replyState, 'coldmail-auto-reply');
+                  stats.replied += 1;
+                  handled = true;
+                } else if (!coldmailAutoReplyEnabled) {
+                  stats.autoReplySkipped += 1;
+                }
+
+                if (!handled && lifecycleNeeded && !forwardNeeded && !autoReplyNeeded) {
+                  const existing = replyState.processed[processedKey] || {};
+                  replyState.processed[processedKey] = {
+                    ...existing,
+                    at: existing.at || now().toISOString(),
+                    from: existing.from || from.address,
+                    company: existing.company || getRowCompany(match.row),
+                    subject:
+                      existing.subject ||
+                      truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+                    lifecycleStatus: normalizeString(existing.lifecycleStatus || classification.status),
+                    lifecycleIntent: normalizeString(existing.lifecycleIntent || classification.intent),
+                  };
+                  await saveColdmailReplyState(replyState, 'coldmail-reply-lifecycle');
+                }
 
                 const flagsSet =
                   message.flags instanceof Set
                     ? message.flags
                     : new Set(Array.isArray(message.flags) ? message.flags : []);
-                if (!flagsSet.has('\\Seen')) uidsToMarkSeen.push(message.uid);
+                if (handled && !flagsSet.has('\\Seen')) uidsToMarkSeen.push(message.uid);
               } catch (error) {
                 stats.errors.push(
                   `${from.address || 'onbekende afzender'}: ${truncateText(error && error.message ? error.message : String(error), 220)}`

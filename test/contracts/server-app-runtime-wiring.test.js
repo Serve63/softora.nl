@@ -7,7 +7,7 @@ const {
   createServerAppOpsWiring,
 } = require('../../server/services/server-app-runtime-wiring');
 
-test('server app runtime wiring composes AI dashboard coordinators into feature routes', () => {
+test('server app runtime wiring composes AI dashboard coordinators into feature routes', async () => {
   const app = { name: 'softora-app' };
   const activeOrdersCoordinator = { scope: 'orders' };
   const aiDashboardCoordinator = { scope: 'dashboard' };
@@ -15,6 +15,7 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
   let capturedAiOptions = null;
   let capturedRouteApp = null;
   let capturedRouteOptions = null;
+  let coldmailSyncOptions = null;
 
   const result = createServerAppFeatureWiring(
     {
@@ -31,6 +32,14 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
         handleRetellWebhook: () => null,
         premiumRouteRuntime: { sessionSecret: 'secret' },
         coldcalling: { openAiModel: 'gpt-test' },
+        coldmailing: {
+          coldmailCampaignService: {
+            syncInboundColdmailRepliesFromImap: async (options) => {
+              coldmailSyncOptions = options;
+              return { ok: true, forwarded: 1 };
+            },
+          },
+        },
         mailbox: { mailConfig: {} },
         websiteLinkCoordinator: { scope: 'website-link' },
         websitePreviewLibraryCoordinator: { scope: 'website-preview-library' },
@@ -82,6 +91,25 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
   );
   assert.ok(capturedRouteOptions.mailboxCoordinator);
   assert.equal(typeof capturedRouteOptions.mailboxCoordinator.accountsResponse, 'function');
+  const mailboxSyncResponse = {
+    statusCode: null,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+  await capturedRouteOptions.mailboxCoordinator.syncMailboxResponse(
+    { body: {}, query: {} },
+    mailboxSyncResponse
+  );
+  assert.equal(mailboxSyncResponse.statusCode, 200);
+  assert.deepEqual(mailboxSyncResponse.body.coldmailReplies, { ok: true, forwarded: 1 });
+  assert.deepEqual(coldmailSyncOptions, { maxMessages: 50 });
   assert.equal(capturedRouteOptions.premiumRouteRuntime.sessionSecret, 'secret');
   assert.equal(capturedRouteOptions.coldcalling.openAiModel, 'gpt-test');
 });

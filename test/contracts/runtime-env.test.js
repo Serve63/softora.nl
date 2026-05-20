@@ -52,6 +52,24 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 100);
   assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, false);
   assert.equal(runtimeEnv.mail.coldmailAuditBcc, 'prive@example.nl');
+  assert.equal(runtimeEnv.mail.coldmailReplyForwardEnabled, true);
+  assert.equal(runtimeEnv.mail.coldmailReplyForwardFrom, 'serve@softora.nl');
+  assert.equal(runtimeEnv.mail.coldmailReplyForwardTo, 'servec321@gmail.com');
+  assert.equal(runtimeEnv.mail.coldmailReplySyncEmail, 'serve@softora.nl');
+});
+
+test('loadRuntimeEnv supports private coldmail reply forward overrides', () => {
+  const runtimeEnv = loadRuntimeEnv({
+    COLDMAIL_REPLY_FORWARD_ENABLED: 'false',
+    COLDMAIL_REPLY_FORWARD_FROM: ' Serve@Softora.NL ',
+    COLDMAIL_REPLY_FORWARD_TO: ' prive@example.nl ',
+    COLDMAIL_REPLY_SYNC_EMAIL: ' reacties@softora.nl ',
+  });
+
+  assert.equal(runtimeEnv.mail.coldmailReplyForwardEnabled, false);
+  assert.equal(runtimeEnv.mail.coldmailReplyForwardFrom, 'serve@softora.nl');
+  assert.equal(runtimeEnv.mail.coldmailReplyForwardTo, 'prive@example.nl');
+  assert.equal(runtimeEnv.mail.coldmailReplySyncEmail, 'reacties@softora.nl');
 });
 
 test('loadRuntimeEnv replaces legacy impactbox account emails with softora business account', () => {

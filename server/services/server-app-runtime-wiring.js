@@ -39,7 +39,19 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     setUiStateValues: featureRouteOptions.setUiStateValues,
     dataOpsStore: featureRouteOptions.dataOpsStore,
   });
-  const mailboxCoordinator = createMailboxService(featureRouteOptions.mailbox || {});
+  const coldmailCampaignService = featureRouteOptions.coldmailing?.coldmailCampaignService;
+  const mailboxCoordinator = createMailboxService({
+    ...(featureRouteOptions.mailbox || {}),
+    afterSync:
+      (featureRouteOptions.mailbox && featureRouteOptions.mailbox.afterSync) ||
+      (coldmailCampaignService &&
+      typeof coldmailCampaignService.syncInboundColdmailRepliesFromImap === 'function'
+        ? () =>
+            coldmailCampaignService.syncInboundColdmailRepliesFromImap({
+              maxMessages: 50,
+            })
+        : null),
+  });
 
   registerFeatureRoutesImpl(
     app,
