@@ -127,6 +127,47 @@ test('openai costs service fetches official OpenAI cost summary and converts USD
   assert.deepEqual(summary.currencies, { usd: 10, eur: 1.25 });
 });
 
+test('openai costs service retries temporary OpenAI Costs API failures', async () => {
+  const calls = [];
+  const summary = await fetchOpenAiCostSummary(
+    {
+      openAiCostsApiKey: 'cost-key',
+      openAiApiBaseUrl: 'https://api.openai.test/v1',
+      openAiCostsFetchRetries: 1,
+      openAiCostsRetryDelayMs: 0,
+      usdToEurRate: 1,
+      logger: { info() {} },
+      fetchJsonWithTimeout: async (url, options) => {
+        calls.push({ url, options });
+        if (calls.length === 1) {
+          return {
+            response: { ok: false, status: 500 },
+            data: { error: { message: 'temporary server error' } },
+          };
+        }
+        return {
+          response: { ok: true, status: 200 },
+          data: {
+            data: [
+              {
+                results: [
+                  { amount: { value: 3.5, currency: 'usd' } },
+                ],
+              },
+            ],
+            has_more: false,
+          },
+        };
+      },
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 3, 29, 9, 0, 0) }
+  );
+
+  assert.equal(calls.length, 2);
+  assert.equal(summary.costUsd, 3.5);
+  assert.equal(summary.costEur, 3.5);
+});
+
 test('openai costs service can convert OpenAI USD costs with a live exchange rate', async () => {
   const calls = [];
   const summary = await fetchOpenAiCostSummary(

@@ -221,6 +221,8 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /window\.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;/);
   assert.match(scriptSource, /const API_COST_NOTE = 'OpenAI API kosten deze maand live';/);
   assert.match(scriptSource, /const API_COST_UNAVAILABLE_NOTE = 'OpenAI kosten konden niet worden opgehaald';/);
+  assert.match(scriptSource, /const API_COST_LOGIN_NOTE = 'Log opnieuw in om OpenAI kosten op te halen';/);
+  assert.match(scriptSource, /const API_COST_ADMIN_NOTE = 'Alleen Full Acces kan OpenAI kosten bekijken';/);
   assert.match(scriptSource, /const SUPABASE_COST_NOTE = 'Supabase kosten live bijgewerkt';/);
   assert.match(scriptSource, /function applyApiCostSnapshot\(snapshot\)/);
   assert.match(scriptSource, /function applyApiCostUnavailable\(error\)/);
@@ -235,6 +237,7 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.doesNotMatch(scriptSource, /OpenAI factuur:/);
   assert.match(scriptSource, /const summary = await fetchApiCostSummary\(\);/);
   assert.match(scriptSource, /const normalized = normalizeOpenAiCostPayload\(summary\);/);
+  assert.match(scriptSource, /error\.status = response\.status;/);
   assert.match(scriptSource, /applyApiCostUnavailable\(error\);/);
   assert.match(scriptSource, /const summary = await fetchSupabaseCostSummary\(\);/);
   assert.match(scriptSource, /applySupabaseCostUnavailable\(error\);/);
