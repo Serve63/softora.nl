@@ -461,12 +461,15 @@ test('premium website contactformulier verstuurt via server-side contact api', (
   );
   assert.match(
     source,
-    /<script src="\/assets\/premium-website-contact-form\.js\?v=20260507a" defer><\/script>/
+    /<script src="\/assets\/premium-website-contact-form\.js\?v=20260520a" defer><\/script>/
   );
   assert.doesNotMatch(source, /mailto:info@softora\.nl/);
+  assert.match(scriptSource, /MARTIJN_WHATSAPP_URL = 'https:\/\/wa\.me\/31643262792'/);
+  assert.match(scriptSource, /function buildWhatsappUrl\(name, email, message\)/);
+  assert.match(scriptSource, /window\.open\(url, '_blank', 'noopener,noreferrer'\)/);
   assert.match(scriptSource, /fetch\('\/api\/public-contact',\s*\{/);
   assert.match(scriptSource, /method:\s*'POST'/);
   assert.match(scriptSource, /headers:\s*\{\s*'Content-Type':\s*'application\/json'\s*\}/);
-  assert.match(scriptSource, /setStatus\(statusElement, 'Bericht wordt verstuurd\.\.\.', false\)/);
+  assert.match(scriptSource, /setStatus\(statusElement, 'WhatsApp wordt geopend\. We bewaren je vraag ook veilig\.', false\)/);
   assert.match(scriptSource, /Bericht verzenden mislukt\. Probeer het later opnieuw\./);
 });
