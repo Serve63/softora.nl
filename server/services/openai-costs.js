@@ -8,6 +8,8 @@ const DEFAULT_OPENAI_COSTS_CACHE_MS = 10 * 60 * 1000;
 const DEFAULT_OPENAI_COSTS_FETCH_RETRIES = 2;
 const DEFAULT_OPENAI_COSTS_RETRY_DELAY_MS = 300;
 const MAX_COST_PAGES = 12;
+const OPENAI_WEB_SEARCH_USD_PER_CALL = 0.01;
+const DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD = 0.165;
 let usdToEurRateCache = null;
 let openAiCostsDashboardCache = null;
 let openAiCostsLastSuccessfulSnapshot = null;
@@ -436,6 +438,124 @@ function addCurrencyAmount(target, currency, amount) {
   target[key] = Math.round(((target[key] || 0) + value) * 100000000) / 100000000;
 }
 
+function addUsageTotals(target, source = {}) {
+  target.requestCount += Math.max(0, Number(source.requestCount || 0) || 0);
+  target.inputTokens += Math.max(0, Number(source.inputTokens || 0) || 0);
+  target.cachedInputTokens += Math.max(0, Number(source.cachedInputTokens || 0) || 0);
+  target.outputTokens += Math.max(0, Number(source.outputTokens || 0) || 0);
+  target.imageCount += Math.max(0, Number(source.imageCount || 0) || 0);
+  target.webSearchCalls += Math.max(0, Number(source.webSearchCalls || 0) || 0);
+}
+
+function getOpenAiTextModelRates(modelRaw) {
+  const key = normalizeString(modelRaw).toLowerCase();
+  if (key.includes('gpt-5.5-pro')) return { input: 30, cachedInput: 0, output: 180 };
+  if (key.includes('gpt-5.5')) return { input: 5, cachedInput: 0.5, output: 30 };
+  if (key.includes('gpt-5.4-mini')) return { input: 0.75, cachedInput: 0.075, output: 4.5 };
+  if (key.includes('gpt-5.4-nano')) return { input: 0.2, cachedInput: 0.02, output: 1.25 };
+  if (key.includes('gpt-5.4-pro')) return { input: 30, cachedInput: 0, output: 180 };
+  if (key.includes('gpt-5.4')) return { input: 2.5, cachedInput: 0.25, output: 15 };
+  if (key.includes('gpt-5-mini')) return { input: 0.25, cachedInput: 0.025, output: 2 };
+  if (key.includes('gpt-5-nano')) return { input: 0.05, cachedInput: 0.005, output: 0.4 };
+  if (key.includes('gpt-5')) return { input: 1.25, cachedInput: 0.125, output: 10 };
+  if (key.includes('gpt-4.1-mini')) return { input: 0.4, cachedInput: 0.1, output: 1.6 };
+  if (key.includes('gpt-4.1-nano')) return { input: 0.1, cachedInput: 0.025, output: 0.4 };
+  if (key.includes('gpt-4.1')) return { input: 2, cachedInput: 0.5, output: 8 };
+  if (key.includes('gpt-4o-mini')) return { input: 0.15, cachedInput: 0.075, output: 0.6 };
+  if (key.includes('gpt-4o')) return { input: 2.5, cachedInput: 1.25, output: 10 };
+  return { input: 1, cachedInput: 0, output: 4 };
+}
+
+function estimateOpenAiTextUsageUsd(result = {}) {
+  const rates = getOpenAiTextModelRates(result.model);
+  const inputTokens = Math.max(0, Number(result.input_tokens || result.prompt_tokens || 0) || 0);
+  const outputTokens = Math.max(0, Number(result.output_tokens || result.completion_tokens || 0) || 0);
+  const cachedInputTokens = Math.min(
+    inputTokens,
+    Math.max(0, Number(result.input_cached_tokens || result.cached_input_tokens || 0) || 0)
+  );
+  const billableInputTokens = Math.max(0, inputTokens - cachedInputTokens);
+  return {
+    usd:
+      (billableInputTokens / 1000000) * rates.input +
+      (cachedInputTokens / 1000000) * rates.cachedInput +
+      (outputTokens / 1000000) * rates.output,
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+    requestCount: Math.max(0, Number(result.num_model_requests || result.num_requests || 0) || 0),
+  };
+}
+
+function getOpenAiImageCostUsdPerImage(modelRaw, sizeRaw, deps = {}) {
+  const env = deps.env || process.env || {};
+  const explicit = Number(deps.openAiImageCostUsdPerImage || env.OPENAI_IMAGE_COST_USD_PER_IMAGE);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+
+  const model = normalizeString(modelRaw).toLowerCase();
+  const size = normalizeString(sizeRaw).toLowerCase();
+  const isPortraitOrLandscape = size === '1024x1536' || size === '1536x1024';
+  const isSquare = size === '1024x1024';
+
+  if (model.includes('gpt-image-2') || model === 'chatgpt-image-latest') {
+    if (isPortraitOrLandscape) return DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD;
+    if (isSquare) return 0.211;
+    return DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD;
+  }
+  if (model.includes('gpt-image-1.5')) return isSquare ? 0.224 : 0.176;
+  if (model.includes('gpt-image-1-mini')) return isSquare ? 0.056 : 0.044;
+  if (model.includes('gpt-image-1')) return isSquare ? 0.167 : 0.25;
+  if (model.includes('dall-e-3')) return isPortraitOrLandscape ? 0.12 : 0.08;
+  if (model.includes('dall-e-2')) return 0.02;
+  return DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD;
+}
+
+function estimateOpenAiImageUsageUsd(result = {}, deps = {}) {
+  const imageCount = Math.max(0, Number(result.images || result.num_images || result.num_model_requests || 0) || 0);
+  if (imageCount <= 0) return { usd: 0, imageCount: 0, requestCount: 0 };
+  const perImageUsd = getOpenAiImageCostUsdPerImage(result.model, result.size, deps);
+  return {
+    usd: imageCount * perImageUsd,
+    imageCount,
+    requestCount: Math.max(0, Number(result.num_model_requests || imageCount) || 0),
+  };
+}
+
+function collectOpenAiUsageEstimate(data, deps = {}, usageType = 'text') {
+  const currencies = {};
+  const totals = {
+    bucketCount: 0,
+    resultCount: 0,
+    requestCount: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    imageCount: 0,
+    webSearchCalls: 0,
+  };
+
+  (Array.isArray(data && data.data) ? data.data : []).forEach((bucket) => {
+    if (!bucket || typeof bucket !== 'object') return;
+    totals.bucketCount += 1;
+    const results = Array.isArray(bucket.results) ? bucket.results : [];
+    results.forEach((result) => {
+      if (!result || typeof result !== 'object') return;
+      totals.resultCount += 1;
+      const estimate =
+        usageType === 'images'
+          ? estimateOpenAiImageUsageUsd(result, deps)
+          : estimateOpenAiTextUsageUsd(result);
+      addCurrencyAmount(currencies, 'usd', estimate.usd);
+      addUsageTotals(totals, estimate);
+    });
+  });
+
+  return {
+    currencies,
+    ...totals,
+  };
+}
+
 function collectOpenAiCostAmounts(data) {
   const currencies = {};
   let bucketCount = 0;
@@ -490,12 +610,32 @@ function pickPrimaryCurrencyAmount(currencies = {}) {
   };
 }
 
-function buildOpenAiCostsUrl({ apiBaseUrl, startTime, endTime, page }) {
+function appendRepeatedSearchParams(url, key, values = []) {
+  (Array.isArray(values) ? values : [values]).forEach((value) => {
+    const normalized = normalizeString(value);
+    if (normalized) url.searchParams.append(key, normalized);
+  });
+}
+
+function buildOpenAiCostsUrl({ apiBaseUrl, startTime, endTime, page, projectId }) {
   const url = new URL(`${apiBaseUrl}/organization/costs`);
   url.searchParams.set('start_time', String(startTime));
   url.searchParams.set('end_time', String(endTime));
   url.searchParams.set('bucket_width', '1d');
   url.searchParams.set('limit', '31');
+  appendRepeatedSearchParams(url, 'project_ids', projectId);
+  if (page) url.searchParams.set('page', page);
+  return url.toString();
+}
+
+function buildOpenAiUsageUrl({ apiBaseUrl, path, startTime, endTime, page, groupBy = [], projectId }) {
+  const url = new URL(`${apiBaseUrl}${path}`);
+  url.searchParams.set('start_time', String(startTime));
+  url.searchParams.set('end_time', String(endTime));
+  url.searchParams.set('bucket_width', '1d');
+  url.searchParams.set('limit', '31');
+  appendRepeatedSearchParams(url, 'group_by', groupBy);
+  appendRepeatedSearchParams(url, 'project_ids', projectId);
   if (page) url.searchParams.set('page', page);
   return url.toString();
 }
@@ -518,6 +658,7 @@ async function fetchOpenAiCostPeriodSummary(deps = {}, period = {}) {
   }
 
   const apiBaseUrl = resolveOpenAiApiBaseUrl(deps);
+  const projectId = resolveOpenAiProjectId(deps);
   const startTime = Math.max(1, Number(period.startTime) || 1);
   const endTime = Math.max(startTime + 1, Number(period.endTime) || startTime + 1);
   const currencies = {};
@@ -529,12 +670,13 @@ async function fetchOpenAiCostPeriodSummary(deps = {}, period = {}) {
   logOpenAiCosts(deps, 'periode ophalen', {
     adminKeyPresent: true,
     period: normalizeString(period.key) || 'custom',
+    projectScoped: Boolean(projectId),
     startTime,
     endTime,
   });
 
   for (let pageIndex = 0; pageIndex < MAX_COST_PAGES; pageIndex += 1) {
-    const url = buildOpenAiCostsUrl({ apiBaseUrl, startTime, endTime, page });
+    const url = buildOpenAiCostsUrl({ apiBaseUrl, startTime, endTime, page, projectId });
     const { response, data } = await fetchOpenAiCostsJsonWithRetry(
       deps,
       url,
@@ -746,6 +888,7 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
 
   const window = buildCostWindow(options.scope, options.nowMs);
   const apiBaseUrl = resolveOpenAiApiBaseUrl(deps);
+  const projectId = resolveOpenAiProjectId(deps);
   const currencies = {};
   let page = '';
   let bucketCount = 0;
@@ -754,7 +897,7 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
   for (let pageIndex = 0; pageIndex < MAX_COST_PAGES; pageIndex += 1) {
     const { response, data } = await fetchOpenAiCostsJsonWithRetry(
       deps,
-      buildOpenAiCostsUrl({ apiBaseUrl, startTime: window.startTime, endTime: window.endTime, page }),
+      buildOpenAiCostsUrl({ apiBaseUrl, startTime: window.startTime, endTime: window.endTime, page, projectId }),
       {
         method: 'GET',
         headers: buildOpenAiCostHeaders(deps, apiKey),
@@ -808,6 +951,179 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
     bucketCount,
     resultCount,
     note: 'OpenAI Costs API; USD-bedragen worden naar EUR omgerekend met een live wisselkoers wanneer er geen vaste koers is ingesteld.',
+  };
+}
+
+async function fetchOpenAiUsageEstimateForEndpoint(deps = {}, window = {}, endpoint = {}) {
+  const apiKey = resolveOpenAiCostsApiKey(deps);
+  if (!apiKey) {
+    throw createServiceError(
+      'OpenAI usage kon niet worden opgehaald',
+      'OPENAI_COSTS_NOT_CONFIGURED',
+      503,
+      'Zet OPENAI_ADMIN_KEY server-side om actuele OpenAI usage te tonen.'
+    );
+  }
+  const fetchJsonWithTimeout = deps.fetchJsonWithTimeout;
+  if (typeof fetchJsonWithTimeout !== 'function') {
+    throw createServiceError('OpenAI usage-helper ontbreekt.', 'OPENAI_USAGE_FETCH_UNAVAILABLE', 503);
+  }
+
+  const apiBaseUrl = resolveOpenAiApiBaseUrl(deps);
+  const projectId = resolveOpenAiProjectId(deps);
+  const currencies = {};
+  const totals = {
+    bucketCount: 0,
+    resultCount: 0,
+    requestCount: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    imageCount: 0,
+    webSearchCalls: 0,
+  };
+  let page = '';
+  let pageCount = 0;
+
+  for (let pageIndex = 0; pageIndex < MAX_COST_PAGES; pageIndex += 1) {
+    const { response, data } = await fetchOpenAiCostsJsonWithRetry(
+      deps,
+      buildOpenAiUsageUrl({
+        apiBaseUrl,
+        path: endpoint.path,
+        startTime: window.startTime,
+        endTime: window.endTime,
+        page,
+        groupBy: endpoint.groupBy,
+        projectId,
+      }),
+      {
+        method: 'GET',
+        headers: buildOpenAiCostHeaders(deps, apiKey),
+      },
+      15000,
+      {
+        scope: window.scope,
+        usageEndpoint: endpoint.key,
+        page: pageIndex + 1,
+      }
+    );
+    pageCount += 1;
+
+    if (!response || !response.ok) {
+      const status = response && response.status ? response.status : 502;
+      const detail = normalizeString(data && (data.error && (data.error.message || data.error.code) || data.detail || data.raw));
+      throw createServiceError('OpenAI usage kon niet worden opgehaald', 'OPENAI_USAGE_FETCH_FAILED', status, detail);
+    }
+
+    const pageAmounts = collectOpenAiUsageEstimate(data, deps, endpoint.usageType);
+    Object.entries(pageAmounts.currencies).forEach(([currency, amount]) => {
+      addCurrencyAmount(currencies, currency, amount);
+    });
+    addUsageTotals(totals, pageAmounts);
+    totals.bucketCount += pageAmounts.bucketCount;
+    totals.resultCount += pageAmounts.resultCount;
+
+    page = normalizeString(data && data.next_page);
+    if (!data || data.has_more !== true || !page) break;
+  }
+
+  return {
+    key: endpoint.key,
+    path: endpoint.path,
+    currencies,
+    ...totals,
+    pageCount,
+  };
+}
+
+async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
+  const window = buildCostWindow(options.scope, options.nowMs);
+  const endpoints = [
+    {
+      key: 'completions',
+      path: '/organization/usage/completions',
+      groupBy: ['model', 'project_id'],
+      usageType: 'text',
+    },
+    {
+      key: 'images',
+      path: '/organization/usage/images',
+      groupBy: ['model', 'size', 'source', 'project_id'],
+      usageType: 'images',
+    },
+  ];
+  const currencies = {};
+  const usage = {
+    bucketCount: 0,
+    resultCount: 0,
+    requestCount: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    imageCount: 0,
+    webSearchCalls: 0,
+  };
+  const endpointSummaries = [];
+
+  for (const endpoint of endpoints) {
+    const summary = await fetchOpenAiUsageEstimateForEndpoint(deps, window, endpoint);
+    endpointSummaries.push(summary);
+    Object.entries(summary.currencies).forEach(([currency, amount]) => {
+      addCurrencyAmount(currencies, currency, amount);
+    });
+    addUsageTotals(usage, summary);
+    usage.bucketCount += summary.bucketCount;
+    usage.resultCount += summary.resultCount;
+  }
+
+  const webSearchUsd = usage.webSearchCalls * OPENAI_WEB_SEARCH_USD_PER_CALL;
+  addCurrencyAmount(currencies, 'usd', webSearchUsd);
+  const costUsd = Number((currencies.usd || 0).toFixed(8));
+  const costEurDirect = Number((currencies.eur || 0).toFixed(8));
+  const usdToEurRateDetails = await resolveUsdToEurRateDetails(deps);
+  const costEur = Number((costEurDirect + costUsd * usdToEurRateDetails.rate).toFixed(2));
+  const fetchedAt = new Date(Math.max(0, Number(options.nowMs) || Date.now())).toISOString();
+
+  return {
+    scope: window.scope,
+    source: 'openai-usage-estimate',
+    exact: false,
+    estimated: true,
+    fetchedAt,
+    lastSuccessfulUpdate: fetchedAt,
+    startTime: window.startTime,
+    endTime: window.endTime,
+    costUsd,
+    costEur,
+    usdToEurRate: usdToEurRateDetails.rate,
+    usdToEurRateSource: usdToEurRateDetails.source,
+    exchangeRateFetchedAtMs: usdToEurRateDetails.fetchedAtMs,
+    currencies,
+    organizationScoped: Boolean(resolveOpenAiOrganizationId(deps)),
+    projectScoped: Boolean(resolveOpenAiProjectId(deps)),
+    bucketCount: usage.bucketCount,
+    resultCount: usage.resultCount,
+    requestCount: usage.requestCount,
+    inputTokens: usage.inputTokens,
+    cachedInputTokens: usage.cachedInputTokens,
+    outputTokens: usage.outputTokens,
+    imageCount: usage.imageCount,
+    webSearchCalls: usage.webSearchCalls,
+    endpoints: endpointSummaries.map((summary) => ({
+      key: summary.key,
+      path: summary.path,
+      currencies: summary.currencies,
+      bucketCount: summary.bucketCount,
+      resultCount: summary.resultCount,
+      requestCount: summary.requestCount,
+      inputTokens: summary.inputTokens,
+      cachedInputTokens: summary.cachedInputTokens,
+      outputTokens: summary.outputTokens,
+      imageCount: summary.imageCount,
+      pageCount: summary.pageCount,
+    })),
+    note: 'OpenAI Usage API schatting; gebruikt totdat de Organization Costs API de nieuwste kosten heeft verwerkt.',
   };
 }
 
@@ -889,16 +1205,52 @@ async function fetchAnthropicCostSummary(deps = {}, options = {}) {
 
 async function fetchCombinedApiCostSummary(deps = {}, options = {}) {
   const openAiSummary = await fetchOpenAiCostSummary(deps, options);
+  let usageEstimate = null;
+  let selectedOpenAiSummary = openAiSummary;
+  const unavailable = [];
+
+  try {
+    usageEstimate = await fetchOpenAiUsageEstimateSummary(deps, options);
+    if (usageEstimate.costUsd > openAiSummary.costUsd + 0.005) {
+      selectedOpenAiSummary = {
+        ...usageEstimate,
+        officialCostUsd: openAiSummary.costUsd,
+        officialCostEur: openAiSummary.costEur,
+        officialSource: openAiSummary.source,
+      };
+    }
+  } catch (error) {
+    unavailable.push({
+      provider: 'OpenAI Usage',
+      source: 'openai-usage-estimate',
+      error: error.code || 'OPENAI_USAGE_ESTIMATE_ERROR',
+      detail: sanitizeOpenAiCostDetail(error.detail || error.message || 'OpenAI usage schatting niet beschikbaar.'),
+    });
+  }
 
   return {
     scope: normalizeScope(options.scope),
     source: 'api-costs',
-    exact: true,
-    costUsd: openAiSummary.costUsd,
-    costEur: openAiSummary.costEur,
-    providers: [openAiSummary],
-    unavailable: [],
-    note: 'OpenAI kosten deze maand via de Organization Costs API.',
+    exact: selectedOpenAiSummary.exact === true,
+    estimated: selectedOpenAiSummary.exact !== true,
+    fetchedAt: selectedOpenAiSummary.fetchedAt,
+    lastSuccessfulUpdate: selectedOpenAiSummary.lastSuccessfulUpdate,
+    startTime: selectedOpenAiSummary.startTime,
+    endTime: selectedOpenAiSummary.endTime,
+    costUsd: selectedOpenAiSummary.costUsd,
+    costEur: selectedOpenAiSummary.costEur,
+    usdToEurRate: selectedOpenAiSummary.usdToEurRate,
+    usdToEurRateSource: selectedOpenAiSummary.usdToEurRateSource,
+    exchangeRateFetchedAtMs: selectedOpenAiSummary.exchangeRateFetchedAtMs,
+    currencies: selectedOpenAiSummary.currencies,
+    providers: [selectedOpenAiSummary],
+    officialProvider: openAiSummary,
+    usageEstimate,
+    unavailable,
+    note:
+      selectedOpenAiSummary.exact === true
+        ? 'OpenAI kosten deze maand via de Organization Costs API.'
+        : 'OpenAI Usage live schatting omdat de Organization Costs API nog achterloopt.',
   };
 }
 
@@ -972,6 +1324,7 @@ module.exports = {
   fetchOpenAiCostsDashboardSnapshot,
   fetchOpenAiCostPeriodSummary,
   fetchOpenAiCostSummary,
+  fetchOpenAiUsageEstimateSummary,
   getOpenAiCostsLastSuccessfulSnapshot,
   parseUsdToEurRateResponse,
   resolveUsdToEurRateDetails,

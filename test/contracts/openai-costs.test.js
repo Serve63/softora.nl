@@ -11,6 +11,7 @@ const {
   fetchCombinedApiCostSummary,
   fetchOpenAiCostsDashboardSnapshot,
   fetchOpenAiCostSummary,
+  fetchOpenAiUsageEstimateSummary,
   parseUsdToEurRateResponse,
   resolveUsdToEurRateDetails,
 } = require('../../server/services/openai-costs');
@@ -91,6 +92,7 @@ test('openai costs service fetches official OpenAI cost summary and converts USD
     {
       openAiCostsApiKey: 'cost-key',
       openAiOrganizationId: 'org-correct',
+      openAiProjectId: 'proj-correct',
       openAiApiBaseUrl: 'https://api.openai.test/v1',
       usdToEurRate: 0.9,
       fetchJsonWithTimeout: async (url, options) => {
@@ -117,8 +119,10 @@ test('openai costs service fetches official OpenAI cost summary and converts USD
   assert.equal(calls.length, 1);
   assert.match(calls[0].url, /^https:\/\/api\.openai\.test\/v1\/organization\/costs\?/);
   assert.match(calls[0].url, /bucket_width=1d/);
+  assert.match(calls[0].url, /project_ids=proj-correct/);
   assert.equal(calls[0].options.headers.Authorization, 'Bearer cost-key');
   assert.equal(calls[0].options.headers['OpenAI-Organization'], 'org-correct');
+  assert.equal(calls[0].options.headers['OpenAI-Project'], 'proj-correct');
   assert.equal(summary.exact, true);
   assert.equal(summary.source, 'openai-costs');
   assert.equal(summary.costUsd, 10);
@@ -272,6 +276,112 @@ test('combined api costs use only OpenAI organization costs', async () => {
   assert.equal(summary.providers.length, 1);
   assert.equal(summary.providers[0].source, 'openai-costs');
   assert.deepEqual(summary.unavailable, []);
+});
+
+test('combined api costs fall back to live usage estimate when official costs lag behind', async () => {
+  const calls = [];
+  const summary = await fetchCombinedApiCostSummary(
+    {
+      openAiCostsApiKey: 'openai-admin-key',
+      openAiProjectId: 'proj-softora',
+      usdToEurRate: 0.9,
+      fetchJsonWithTimeout: async (url) => {
+        calls.push(url);
+        if (url.includes('/organization/costs')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: { data: [{ results: [] }], has_more: false },
+          };
+        }
+        if (url.includes('/organization/usage/images')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              data: [
+                {
+                  results: [
+                    {
+                      images: 2,
+                      num_model_requests: 2,
+                      model: 'gpt-image-2',
+                      size: '1024x1536',
+                      source: 'image.generation',
+                      project_id: 'proj-softora',
+                    },
+                  ],
+                },
+              ],
+              has_more: false,
+            },
+          };
+        }
+        return {
+          response: { ok: true, status: 200 },
+          data: { data: [{ results: [] }], has_more: false },
+        };
+      },
+      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 4, 20, 23, 20, 0) }
+  );
+
+  assert.equal(summary.exact, false);
+  assert.equal(summary.estimated, true);
+  assert.equal(summary.source, 'api-costs');
+  assert.equal(summary.costUsd, 0.33);
+  assert.equal(summary.costEur, 0.3);
+  assert.equal(summary.providers[0].source, 'openai-usage-estimate');
+  assert.equal(summary.providers[0].imageCount, 2);
+  assert.equal(summary.officialProvider.costUsd, 0);
+  assert.match(calls.find((url) => url.includes('/organization/costs')), /project_ids=proj-softora/);
+  assert.match(calls.find((url) => url.includes('/organization/usage/images')), /project_ids=proj-softora/);
+});
+
+test('openai usage estimate can estimate text token usage', async () => {
+  const summary = await fetchOpenAiUsageEstimateSummary(
+    {
+      openAiCostsApiKey: 'openai-admin-key',
+      usdToEurRate: 1,
+      fetchJsonWithTimeout: async (url) => {
+        if (url.includes('/organization/usage/completions')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              data: [
+                {
+                  results: [
+                    {
+                      model: 'gpt-4.1',
+                      input_tokens: 1000,
+                      input_cached_tokens: 250,
+                      output_tokens: 500,
+                      num_model_requests: 1,
+                    },
+                  ],
+                },
+              ],
+              has_more: false,
+            },
+          };
+        }
+        return {
+          response: { ok: true, status: 200 },
+          data: { data: [{ results: [] }], has_more: false },
+        };
+      },
+      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 4, 20, 23, 20, 0) }
+  );
+
+  assert.equal(summary.source, 'openai-usage-estimate');
+  assert.equal(summary.exact, false);
+  assert.equal(summary.costUsd, 0.005625);
+  assert.equal(summary.costEur, 0.01);
+  assert.equal(summary.requestCount, 1);
+  assert.equal(summary.inputTokens, 1000);
+  assert.equal(summary.cachedInputTokens, 250);
+  assert.equal(summary.outputTokens, 500);
 });
 
 test('openai costs service fails closed when no costs key is configured', async () => {
