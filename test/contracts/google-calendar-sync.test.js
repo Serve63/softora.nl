@@ -161,3 +161,22 @@ test('google calendar sync skips shared Serve and Martijn manual appointments', 
   assert.equal(fetchCalls.length, 0);
   assert.equal(setCalls.length, 0);
 });
+
+test('google calendar sync skips manual appointments without an owner instead of assigning Serve', async () => {
+  const { fetchCalls, service, setCalls } = createService();
+
+  const result = await service.createGoogleCalendarEventForAppointment({
+    id: 91,
+    callId: 'manual_91',
+    company: 'Eigenaar ontbreekt',
+    date: '2026-04-29',
+    time: '13:00',
+    summary: 'Eigenaar ontbreekt',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'calendar_owner_missing');
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(setCalls.length, 0);
+});

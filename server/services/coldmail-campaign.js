@@ -1379,11 +1379,16 @@ function createColdmailCampaignService(deps = {}) {
 
   function formatMailFromHeader(senderEmail, smtpAccount = null) {
     const address = normalizeEmailAddress(senderEmail || mailFromAddress);
+    const name = getSenderDisplayName(address, smtpAccount);
+    return name ? `${name} <${address}>` : address;
+  }
+
+  function getSenderDisplayName(senderEmail, smtpAccount = null) {
+    const address = normalizeEmailAddress(senderEmail || mailFromAddress);
     const accountName = smtpAccount && normalizeEmailAddress(smtpAccount.email) === address
       ? normalizeString(smtpAccount.name)
       : '';
-    const name = normalizeString(accountName || SENDER_DISPLAY_NAMES[address] || mailFromName || 'Softora');
-    return name ? `${name} <${address}>` : address;
+    return normalizeString(accountName || SENDER_DISPLAY_NAMES[address] || mailFromName || 'Softora');
   }
 
   function isColdmailPrivateCopyBlockedSender(senderEmail) {
@@ -2243,7 +2248,7 @@ function createColdmailCampaignService(deps = {}) {
       .join('|');
   }
 
-  async function generateColdmailAutoReplyWithOpenAi({ row, inboundText, inboundSubject, fromName }) {
+  async function generateColdmailAutoReplyWithOpenAi({ row, inboundText, inboundSubject, fromName, senderEmail }) {
     const apiKey = getOpenAiApiKey();
     if (!apiKey) {
       const error = new Error('OPENAI_API_KEY ontbreekt');
@@ -2255,8 +2260,10 @@ function createColdmailCampaignService(deps = {}) {
     const company = getRowCompany(row);
     const contact = getRowContact(row);
     const website = getRowDomain(row);
+    const selectedSenderEmail = normalizeEmailAddress(senderEmail || mailFromAddress || smtpUser || imapUser);
+    const senderName = getSenderDisplayName(selectedSenderEmail);
     const system = [
-      'Je bent Servé Creusen van Softora.',
+      `Je bent ${senderName || 'Softora'} van Softora.`,
       'Je reageert automatisch op replies op coldmailcampagnes.',
       'Schrijf in natuurlijk Nederlands, kort, menselijk en professioneel.',
       'Klink niet als een chatbot en gebruik geen markdown.',
@@ -2279,7 +2286,8 @@ function createColdmailCampaignService(deps = {}) {
         text: truncateText(inboundText, 4000),
       },
       sender: {
-        name: 'Servé Creusen',
+        name: senderName || 'Softora',
+        email: selectedSenderEmail,
         company: 'Softora',
       },
     };
@@ -3355,6 +3363,7 @@ function createColdmailCampaignService(deps = {}) {
                   inboundText,
                   inboundSubject: normalizeString(parsedMail && parsedMail.subject),
                   fromName: from.name,
+                  senderEmail,
                 });
                 const info = await sendColdmailAutoReply({
                   parsedMail,

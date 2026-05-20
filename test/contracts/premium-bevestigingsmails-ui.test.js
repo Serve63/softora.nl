@@ -543,6 +543,11 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(senderSettingsSource, /state\.needsMigrationPersist = true;/);
   assert.match(senderSettingsSource, /await persistNow\(state\.activeSenderEmail \|\| getCurrentSenderEmail\(\)\)\.catch\(\(\) => null\);/);
   assert.match(senderSettingsSource, /function switchSenderProfile\(\)/);
+  assert.match(senderSettingsSource, /function getPreferredSenderEmail\(\)/);
+  assert.match(senderSettingsSource, /getPreferredSenderEmail\(\) \|\| state\.settings\.senderEmail/);
+  assert.match(senderSettingsSource, /function resolveAuthenticatedSenderEmail\(session, availableEmails\)/);
+  assert.match(senderSettingsSource, /\/api\/auth\/session/);
+  assert.match(senderSettingsSource, /authenticatedPreferredSenderEmail/);
   assert.match(senderSettingsSource, /state\.settings = buildSettingsSnapshot\(previousSender\);/);
   assert.match(senderSettingsSource, /\["subj1", "body1", "ai-instructies", "ai-tone-style"\]/);
   assert.match(senderSettingsSource, /senderSelect\.addEventListener\("change", \(\) => \{ void switchSenderProfile\(\); \}\);/);

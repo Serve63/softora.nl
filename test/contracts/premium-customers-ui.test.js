@@ -33,7 +33,8 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /<th>Review\?<\/th>\s*<th>Betaaldatum<\/th>/);
   assert.match(pageSource, /<label class="form-label" for="fieldResponsible">Toegewezen aan<\/label>/);
   assert.match(pageSource, /<select class="form-select" id="fieldResponsible" name="verantwoordelijk" required data-custom-select="true">/);
-  assert.match(pageSource, /<option value="Serve" selected>Servé<\/option>/);
+  assert.match(pageSource, /<option value="Team" selected>Team<\/option>/);
+  assert.match(pageSource, /<option value="Serve">Servé<\/option>/);
   assert.match(pageSource, /<option value="Martijn">Martijn<\/option>/);
   assert.match(pageSource, /fieldResponsible: document\.getElementById\("fieldResponsible"\),/);
   assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260428a/);
@@ -41,20 +42,21 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /SoftoraPremiumCustomersCore/);
   assert.match(pageSource, /claimedBy: normalizeString\(item && \(item\.claimedBy \|\| item\.leadOwnerName \|\| item\.leadOwnerFullName\)\),/);
   assert.match(pageSource, /customer\.verantwoordelijk,/);
-  assert.match(pageSource, /if \(nodes\.fieldResponsible\) nodes\.fieldResponsible\.value = "Serve";/);
-  assert.match(pageSource, /if \(nodes\.fieldResponsible\) nodes\.fieldResponsible\.value = customer\.verantwoordelijk \|\| "Serve";/);
-  assert.match(pageSource, /verantwoordelijk: nodes\.fieldResponsible \? nodes\.fieldResponsible\.value : "Serve",/);
+  assert.match(pageSource, /if \(nodes\.fieldResponsible\) nodes\.fieldResponsible\.value = "Team";/);
+  assert.match(pageSource, /if \(nodes\.fieldResponsible\) nodes\.fieldResponsible\.value = customer\.verantwoordelijk \|\| "Team";/);
+  assert.match(pageSource, /verantwoordelijk: nodes\.fieldResponsible \? nodes\.fieldResponsible\.value : "Team",/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
   assert.match(pageSource, /<section class="hero">[\s\S]*<div class="hero-copy">[\s\S]*<div class="hero-side">[\s\S]*<div class="leaderboard-card" id="leaderboardCard">/);
   assert.doesNotMatch(pageSource, /Meeste opdrachten/);
   assert.match(
     pageSource,
-    /<div class="leaderboard-copy">\s*<div class="leaderboard-list" id="leaderboardList">[\s\S]*Servé[\s\S]*0 opdrachten[\s\S]*Martijn[\s\S]*0 opdrachten/
+    /<div class="leaderboard-copy">\s*<div class="leaderboard-list" id="leaderboardList">[\s\S]*Team[\s\S]*0 opdrachten[\s\S]*Servé[\s\S]*0 opdrachten[\s\S]*Martijn[\s\S]*0 opdrachten/
   );
   assert.match(pageSource, /leaderboardCard: document\.getElementById\("leaderboardCard"\),/);
   assert.match(pageSource, /leaderboardList: document\.getElementById\("leaderboardList"\),/);
   assert.match(pageSource, /function updateLeaderboard\(\)/);
   assert.match(pageSource, /const counts = state\.klanten\.reduce\(function \(result, customer\)/);
+  assert.match(pageSource, /displayName: formatResponsibleDisplayName\("Team"\)/);
   assert.match(pageSource, /displayName: formatResponsibleDisplayName\("Serve"\)/);
   assert.match(pageSource, /displayName: formatResponsibleDisplayName\("Martijn"\)/);
   assert.match(pageSource, /<script src="assets\/premium-customers-renderers\.js\?v=20260427a"><\/script>/);
