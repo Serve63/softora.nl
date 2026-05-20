@@ -130,6 +130,20 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /@State private var isChoosingDay = false/);
   assert.match(agendaListSource, /private enum GymWorkoutDay: String, CaseIterable, Identifiable/);
   assert.match(agendaListSource, /private struct GymDayPickerOverlay: View/);
+  const gymDayPickerStart = agendaListSource.indexOf('private struct GymDayPickerOverlay: View');
+  const gymDayPickerEnd = agendaListSource.indexOf('private struct GymRestDayView: View');
+  assert.ok(gymDayPickerStart >= 0 && gymDayPickerEnd > gymDayPickerStart);
+  const gymDayPickerSource = agendaListSource.slice(gymDayPickerStart, gymDayPickerEnd);
+  assert.match(gymDayPickerSource, /Color\.clear/);
+  assert.match(gymDayPickerSource, /\.contentShape\(Rectangle\(\)\)/);
+  assert.doesNotMatch(
+    gymDayPickerSource,
+    /Color\.softoraInk\.opacity/,
+    'The gym day picker should not dim the app behind it.'
+  );
+  assert.match(agendaListSource, /if exercises\.isEmpty \{[^]*GymRestDayView\(day: selectedDay\)/);
+  assert.match(agendaListSource, /private struct GymRestDayView: View/);
+  assert.ok(agendaListSource.includes('Text("\\(day.title) is een rustdag")'));
   assert.match(agendaListSource, /private struct GymDayButton: View/);
   assert.match(agendaListSource, /Text\(selectedDay\.title\)/);
   assert.match(agendaListSource, /case \.today:[^]*"Vandaag"/);

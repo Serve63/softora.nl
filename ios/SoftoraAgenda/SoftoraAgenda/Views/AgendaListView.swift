@@ -302,17 +302,25 @@ private struct GymWorkoutView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         exercisesHeader
 
-                        LazyVStack(spacing: 10) {
-                            ForEach(exercises) { exercise in
-                                GymExerciseSwipeRow(
-                                    day: selectedDay,
-                                    exercise: exercise,
-                                    onDelete: { deleteExercise(exercise) }
-                                )
-                                    .id("\(selectedDay.storageID)-\(exercise.id)")
+                        Group {
+                            if exercises.isEmpty {
+                                GymRestDayView(day: selectedDay)
+                                    .padding(.horizontal, 18)
+                                    .padding(.top, 2)
+                            } else {
+                                LazyVStack(spacing: 10) {
+                                    ForEach(exercises) { exercise in
+                                        GymExerciseSwipeRow(
+                                            day: selectedDay,
+                                            exercise: exercise,
+                                            onDelete: { deleteExercise(exercise) }
+                                        )
+                                            .id("\(selectedDay.storageID)-\(exercise.id)")
+                                    }
+                                }
+                                .padding(.horizontal, 18)
                             }
                         }
-                        .padding(.horizontal, 18)
                         .padding(.bottom, 28)
                     }
                 }
@@ -514,8 +522,9 @@ private struct GymDayPickerOverlay: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color.softoraInk.opacity(0.28)
+            Color.clear
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
                 .onTapGesture(perform: onClose)
 
             VStack(spacing: 16) {
@@ -544,6 +553,18 @@ private struct GymDayPickerOverlay: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
         }
+    }
+}
+
+private struct GymRestDayView: View {
+    let day: GymWorkoutDay
+
+    var body: some View {
+        Text("\(day.title) is een rustdag")
+            .font(.softoraBody(13, weight: .medium))
+            .foregroundStyle(Color.softoraMuted)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 18)
     }
 }
 
