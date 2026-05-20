@@ -6,10 +6,7 @@ const MAILBOX_SENDER_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const MAILBOX_SENDER_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const MAILBOX_PIN_SCOPE = 'premium_mailbox_preferences';
 const MAILBOX_PIN_KEY = 'softora_mailbox_pinned_account_v1';
-let activeMailboxAccount = MAILBOX_ACCOUNT_DEFAULT;
-let pinnedMailboxAccount = '';
-let mailboxAccountPreferenceIdentity = 'anonymous';
-let mailboxPinPreferences = Object.create(null);
+let activeMailboxAccount = MAILBOX_ACCOUNT_DEFAULT, pinnedMailboxAccount = '', mailboxAccountPreferenceIdentity = 'anonymous', mailboxPinPreferences = Object.create(null);
 let mailboxAccounts = [
   { email: 'info@softora.nl', name: 'info@softora.nl', imapConfigured: false, smtpConfigured: false },
 ];
@@ -845,6 +842,7 @@ function toggleStar(id) {
 async function deleteMail(id) {
   const m = findMailById(id);
   if (!m) return;
+  if (!(await requestMailboxDeleteConfirmation(m))) return;
   try {
     const response = await fetch('/api/mailbox/messages/delete', {
       method: 'POST',
@@ -872,6 +870,22 @@ async function deleteMail(id) {
   }
 }
 
+async function requestMailboxDeleteConfirmation(mail) {
+  const folder = String(mail?.folder || activeFolder || '').toLowerCase();
+  const subject = String(mail?.subject || '').trim() || 'deze mail';
+  const permanent = folder === 'trash';
+  const message = `Weet je zeker dat je "${subject}" wilt ${permanent ? 'definitief verwijderen' : 'naar de prullenbak verplaatsen'}?`;
+  const options = {
+    title: permanent ? 'Mail definitief verwijderen' : 'Mail verwijderen',
+    confirmText: permanent ? 'Definitief verwijderen' : 'Verwijderen',
+    cancelText: 'Annuleren',
+  };
+  if (window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function') {
+    return window.SoftoraDialogs.confirm(message, options);
+  }
+  return typeof window.confirm === 'function' ? window.confirm(message) : false;
+}
+
 function getComposeFieldValue(id) {
   const field = document.getElementById(id);
   return field ? field.value : '';
@@ -896,7 +910,6 @@ function setComposeReplyContext(mail) {
 function buildComposeRewriteContext() {
   return composeReplyContext ? { ...composeReplyContext } : null;
 }
-
 function replyMail(mail) {
   if (!mail) return;
   setComposeReplyContext(mail);
@@ -909,7 +922,6 @@ function replyMail(mail) {
   }
   openCompose({ keepContext: true });
 }
-
 function openCompose(options = {}) {
   if (!options.keepContext) setComposeReplyContext(null);
   const overlay = document.getElementById('compose-overlay');
@@ -924,7 +936,6 @@ function closeCompose() {
     if (field) field.value = '';
   });
 }
-
 async function rewriteComposeBody() {
   const bodyField = document.getElementById('c-body');
   const draft = String(bodyField?.value || '').trim();
@@ -974,7 +985,6 @@ async function rewriteComposeBody() {
     if (sendBtn) sendBtn.disabled = false;
   }
 }
-
 async function sendMail() {
   const to = document.getElementById('c-to').value.trim();
   const subject = document.getElementById('c-subject').value.trim();
@@ -1010,7 +1020,6 @@ async function sendMail() {
     if (sendBtn) sendBtn.disabled = false;
   }
 }
-
 function applyMailboxFolderUi(folder) {
   const folderEl = Array.from(document.querySelectorAll('[data-mailbox-folder]')).find(item => item.getAttribute('data-mailbox-folder') === folder);
   document.querySelectorAll('.folder-item').forEach(f => f.classList.toggle('active', f === folderEl));
@@ -1018,7 +1027,6 @@ function applyMailboxFolderUi(folder) {
   const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
   if (folderLabelEl) folderLabelEl.textContent = labels[folder] || folder;
 }
-
 function toast(msg) {
   const t = document.getElementById('toast');
   if (!t) return;
@@ -1027,7 +1035,6 @@ function toast(msg) {
   t.classList.add('show');
   toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
 }
-
 function handleMailboxAction(actionEl) {
   const action = actionEl.getAttribute('data-mailbox-action');
   const id = actionEl.getAttribute('data-mailbox-id');
@@ -1038,7 +1045,6 @@ function handleMailboxAction(actionEl) {
   ) {
     return;
   }
-
   switch (action) {
     case 'open-compose':
       openCompose();
@@ -1071,7 +1077,6 @@ function handleMailboxAction(actionEl) {
       break;
   }
 }
-
 function bindMailboxActions() {
   document.addEventListener('click', (event) => {
     const actionEl = event.target && event.target.closest
@@ -1080,7 +1085,6 @@ function bindMailboxActions() {
     if (!actionEl) return;
     handleMailboxAction(actionEl);
   });
-
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     const actionEl = event.target && event.target.closest
@@ -1090,10 +1094,8 @@ function bindMailboxActions() {
     event.preventDefault();
     handleMailboxAction(actionEl);
   });
-
   const searchInput = document.getElementById('search-input');
   if (searchInput) searchInput.addEventListener('input', filterMails);
-
   const overlay = document.getElementById('compose-overlay');
   if (overlay) {
     overlay.addEventListener('click', event => {
@@ -1101,9 +1103,7 @@ function bindMailboxActions() {
     });
   }
 }
-
 bindMailboxActions();
-
 const mailboxAccountSwitcher = document.getElementById('mailbox-account-switcher');
 const mailboxAccountMenu = document.getElementById('mailbox-account-menu');
 
