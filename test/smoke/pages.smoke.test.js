@@ -153,6 +153,30 @@ test('page smoke: public kennisbank article is crawlable HTML', async () => {
   assert.match(html, /data-softora-public-seo="structured-data"/);
 });
 
+test('page smoke: linked kennisbank articles do not 404', async () => {
+  const linkedArticles = [
+    {
+      path: '/kennisbank/wat-is-een-conversiegerichte-website',
+      title: /Wat is een conversiegerichte website\?/,
+    },
+    {
+      path: '/kennisbank/wat-is-een-ai-telefonist',
+      title: /Wat is een AI telefonist\?/,
+    },
+  ];
+
+  for (const article of linkedArticles) {
+    const response = await fetch(`${serverRef.baseUrl}${article.path}`, {
+      cache: 'no-store',
+    });
+    const html = await response.text();
+
+    assert.equal(response.status, 200, article.path);
+    assert.match(html, article.title);
+    assert.match(html, /data-softora-public-seo="structured-data"/);
+  }
+});
+
 test('page smoke: public vergelijkingen hub and article are crawlable HTML', async () => {
   const hubResponse = await fetch(`${serverRef.baseUrl}/vergelijkingen`, {
     cache: 'no-store',
