@@ -967,22 +967,20 @@ private struct MailboxView: View {
             VStack(spacing: 0) {
                 mailboxHeader
 
-                if selectedMessage != nil {
-                    mailboxBackButton
-                }
+                if selectedMessage == nil {
+                    HStack {
+                        Text(selectedFolder.title)
+                            .font(.softoraDisplay(18, weight: .bold))
+                            .textCase(.uppercase)
+                            .tracking(1.0)
+                            .foregroundStyle(Color.softoraInk)
 
-                HStack {
-                    Text(selectedFolder.title)
-                        .font(.softoraDisplay(18, weight: .bold))
-                        .textCase(.uppercase)
-                        .tracking(1.0)
-                        .foregroundStyle(Color.softoraInk)
-
-                    Spacer()
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                    .padding(.bottom, 8)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 14)
-                .padding(.bottom, 8)
 
                 mailboxContent
             }
@@ -1005,27 +1003,6 @@ private struct MailboxView: View {
         } message: {
             Text((alertMessage ?? "").softoraUppercased)
         }
-    }
-
-    private var mailboxBackButton: some View {
-        Button {
-            selectedMessage = nil
-            isLoadingMessageDetail = false
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "chevron.left")
-                Text("Terug")
-            }
-            .font(.softoraDisplay(13, weight: .bold))
-            .textCase(.uppercase)
-            .tracking(0.8)
-            .foregroundStyle(Color.softoraCrimson)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 2)
     }
 
     private var mailboxHeader: some View {
@@ -1057,11 +1034,16 @@ private struct MailboxView: View {
                 HStack {
                     Button {
                         withAnimation(.smooth(duration: 0.22)) {
-                            isShowingAccountMenu = false
-                            isShowingFolderMenu = true
+                            if selectedMessage == nil {
+                                isShowingAccountMenu = false
+                                isShowingFolderMenu = true
+                            } else {
+                                selectedMessage = nil
+                                isLoadingMessageDetail = false
+                            }
                         }
                     } label: {
-                        Image(systemName: "line.3.horizontal")
+                        Image(systemName: selectedMessage == nil ? "line.3.horizontal" : "chevron.left")
                             .font(.system(size: 19, weight: .bold))
                             .foregroundStyle(Color.softoraInk)
                             .frame(width: 42, height: 42)
@@ -1073,7 +1055,7 @@ private struct MailboxView: View {
                             }
                         }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Mappen")
+                    .accessibilityLabel(selectedMessage == nil ? "Mappen" : "Terug")
 
                     Spacer()
 
@@ -1680,7 +1662,7 @@ private struct MailboxMessageDetail: View {
                 VStack(alignment: .leading, spacing: 8) {
                     MailboxDetailMeta(label: "Van", value: senderAddress)
                     MailboxDetailMeta(label: "Aan", value: message.to)
-                    MailboxDetailMeta(label: "Datum", value: MailboxDateFormatter.label(message.date))
+                    MailboxDetailMeta(label: "Datum", value: MailboxDateFormatter.detailLabel(message.date))
                 }
 
                 if let statusMessage {
@@ -2453,7 +2435,7 @@ private struct MailboxDetailMeta: View {
                 .tracking(1.0)
                 .foregroundStyle(Color.softoraMuted)
 
-            Text(value.isEmpty ? "—" : value.softoraUppercased)
+            Text(value.isEmpty ? "—" : value)
                 .font(.softoraBody(12, weight: .semibold))
                 .foregroundStyle(Color.softoraInk)
         }
@@ -2797,6 +2779,29 @@ private enum MailboxDateFormatter {
             return displayFormatter.string(from: date).uppercased(with: Locale(identifier: "nl_NL"))
         }
         return displayFormatterWithYear.string(from: date).uppercased(with: Locale(identifier: "nl_NL"))
+    }
+
+    static func detailLabel(_ value: String, now: Date = Date(), calendar: Calendar = .current) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let date = parseDate(trimmed) else {
+            return trimmed.isEmpty ? "—" : trimmed
+        }
+
+        if date <= now, now.timeIntervalSince(date) < 300 {
+            return "Zojuist"
+        }
+
+        let time = timeFormatter.string(from: date)
+        if calendar.isDateInToday(date) {
+            return "Vandaag \(time)"
+        }
+        if calendar.isDateInYesterday(date) {
+            return "Gisteren \(time)"
+        }
+        if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
+            return displayFormatter.string(from: date)
+        }
+        return displayFormatterWithYear.string(from: date)
     }
 
     private static func parseDate(_ value: String) -> Date? {

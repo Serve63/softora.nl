@@ -247,6 +247,11 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   const mailboxFolderHeadingEnd = agendaListSource.indexOf('mailboxContent', mailboxFolderHeadingStart);
   assert.ok(mailboxFolderHeadingStart >= 0 && mailboxFolderHeadingEnd > mailboxFolderHeadingStart);
   const mailboxFolderHeadingSource = agendaListSource.slice(mailboxFolderHeadingStart, mailboxFolderHeadingEnd);
+  assert.match(
+    agendaListSource,
+    /if selectedMessage == nil \{\s*HStack \{\s*Text\(selectedFolder\.title\)/,
+    'Mailbox detail view should not repeat the current folder title above the message.'
+  );
   assert.doesNotMatch(
     mailboxFolderHeadingSource,
     /ProgressView\(\)/,
@@ -257,6 +262,8 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /@State private var isShowingAccountMenu = false/);
   assert.match(agendaListSource, /private var mailboxHeader: some View \{[^]*Button \{[^]*isShowingAccountMenu\.toggle\(\)[^]*Text\("Mailbox"\)/);
   assert.match(agendaListSource, /Image\(systemName: isShowingAccountMenu \? "chevron\.up" : "chevron\.down"\)/);
+  assert.match(agendaListSource, /Image\(systemName: selectedMessage == nil \? "line\.3\.horizontal" : "chevron\.left"\)/);
+  assert.doesNotMatch(agendaListSource, /Text\("Terug"\)/);
   assert.match(agendaListSource, /accessibilityLabel\("Mailadres kiezen"\)/);
   assert.match(agendaListSource, /if isShowingAccountMenu \{[^]*MailboxAccountDropdown\(/);
   assert.match(agendaListSource, /private struct MailboxAccountDropdown: View/);
@@ -286,6 +293,10 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /return "ZOJUIST"/);
   assert.ok(agendaListSource.includes('return "VANDAAG \\(time)"'));
   assert.ok(agendaListSource.includes('return "GISTEREN \\(time)"'));
+  assert.match(agendaListSource, /MailboxDetailMeta\(label: "Datum", value: MailboxDateFormatter\.detailLabel\(message\.date\)\)/);
+  assert.doesNotMatch(agendaListSource, /Text\(value\.isEmpty \? "—" : value\.softoraUppercased\)/);
+  assert.ok(agendaListSource.includes('return "Vandaag \\(time)"'));
+  assert.ok(agendaListSource.includes('return "Gisteren \\(time)"'));
   assert.match(agendaListSource, /Image\(systemName: "wand\.and\.stars"\)/);
   assert.match(agendaListSource, /Task \{ await improveReply\(\) \}/);
   assert.match(agendaListSource, /Task \{ await sendReply\(\) \}/);
