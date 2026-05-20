@@ -102,6 +102,9 @@ test('server app runtime composition builders preserve feature wiring groups and
       COLDMAIL_REPLY_FORWARD_FROM: 'serve@softora.nl',
       COLDMAIL_REPLY_FORWARD_TO: 'servec321@gmail.com',
       COLDMAIL_REPLY_SYNC_EMAIL: 'serve@softora.nl',
+      COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT: 7,
+      COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS: 240000,
+      COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS: false,
     },
     bootstrapState: {
       PREMIUM_ACTIVE_ORDERS_SCOPE: 'premium_active_orders',
@@ -285,7 +288,22 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(
     context.featureRouteOptions.coldmailing.coldmailCampaignService.getColdmailSafetyLimits()
       .replyForwardConfigured,
-    true
+    false
+  );
+  assert.equal(
+    context.featureRouteOptions.coldmailing.coldmailCampaignService.getColdmailSafetyLimits()
+      .personalMailboxDailyLimit,
+    7
+  );
+  assert.equal(
+    context.featureRouteOptions.coldmailing.coldmailCampaignService.getColdmailSafetyLimits()
+      .personalMailboxSendDelayMs,
+    240000
+  );
+  assert.equal(
+    context.featureRouteOptions.coldmailing.coldmailCampaignService.getColdmailSafetyLimits()
+      .blocksPersonalMailboxDomains,
+    false
   );
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
     'info@softora.test',

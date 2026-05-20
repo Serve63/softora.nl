@@ -33,6 +33,72 @@ services:
         value: softora_runtime_state
       - key: SUPABASE_STATE_KEY
         value: core
+      - key: MAIL_SMTP_HOST
+        sync: false
+      - key: MAIL_SMTP_PORT
+        value: 587
+      - key: MAIL_SMTP_SECURE
+        value: false
+      - key: MAIL_SMTP_USER
+        sync: false
+      - key: MAIL_SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_IMAP_HOST
+        sync: false
+      - key: MAIL_IMAP_PORT
+        value: 993
+      - key: MAIL_IMAP_SECURE
+        value: true
+      - key: MAIL_IMAP_USER
+        sync: false
+      - key: MAIL_IMAP_PASS
+        sync: false
+      - key: MAILBOX_SERVE_SOFTORA_NL_USER
+        sync: false
+      - key: MAILBOX_SERVE_SOFTORA_NL_PASS
+        sync: false
+      - key: MAILBOX_RUBEN_SOFTORA_NL_USER
+        sync: false
+      - key: MAILBOX_RUBEN_SOFTORA_NL_PASS
+        sync: false
+      - key: MAILBOX_MARTIJN_SOFTORA_NL_USER
+        sync: false
+      - key: MAILBOX_MARTIJN_SOFTORA_NL_PASS
+        sync: false
+      - key: COLDMAIL_REPLY_FORWARD_ENABLED
+        value: false
+      - key: COLDMAIL_REPLY_FORWARD_FROM
+        sync: false
+      - key: COLDMAIL_REPLY_FORWARD_TO
+        sync: false
+      - key: COLDMAIL_REPLY_SYNC_EMAIL
+        sync: false
+      - key: COLDMAIL_UNSUBSCRIBE_SECRET
+        sync: false
+      - key: COLDMAIL_BOUNCE_PROCESSING_ENABLED
+        value: true
+      - key: COLDMAIL_SEND_DELAY_MS
+        value: 90000
+      - key: COLDMAIL_SAFETY_PAUSE_MS
+        value: 21600000
+      - key: COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT
+        value: 10
+      - key: COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS
+        value: 180000
+      - key: COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS
+        value: false
+      - key: GOOGLE_CALENDAR_SYNC_ENABLED
+        value: false
+      - key: GOOGLE_CALENDAR_CLIENT_EMAIL
+        sync: false
+      - key: GOOGLE_CALENDAR_PRIVATE_KEY
+        sync: false
+      - key: GOOGLE_CALENDAR_SERVE_ID
+        sync: false
+      - key: GOOGLE_CALENDAR_MARTIJN_ID
+        sync: false
       - key: TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE
         value: wss://twilio-media-bridge-ln3f.onrender.com/twilio-media
       - key: TWILIO_MEDIA_BRIDGE_TOKEN
