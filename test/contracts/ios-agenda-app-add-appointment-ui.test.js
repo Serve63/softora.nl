@@ -42,8 +42,19 @@ test('ios agenda add appointment keeps appointment target separate from meeting 
   assert.match(addViewSource, /options: orderedPlannerOptions\(Planner\.leadOwnerCases\)/);
   assert.match(addViewSource, /let selectedPlanner = store\.selectedPlanner/);
   assert.match(addViewSource, /return \[selectedPlanner\] \+ options\.filter \{ \$0 != selectedPlanner \}/);
+  assert.match(modelsSource, /var leadOwnerFullName: String \{[^]*case \.serve:[^]*"Servé Creusen"[^]*case \.martijn:[^]*"Martijn van de Ven"/);
+  assert.match(modelsSource, /let leadOwnerKey: String/);
+  assert.match(modelsSource, /let leadOwnerName: String/);
+  assert.match(modelsSource, /let leadOwnerFullName: String/);
+  assert.match(modelsSource, /let leadOwnerEmail: String/);
   assert.match(apiClientSource, /who: draft\.planner\.apiValue/);
-  assert.match(apiClientSource, /manualLeadOwner: isBusinessMeeting \? draft\.leadOwner\.apiValue : ""/);
+  assert.match(apiClientSource, /let leadOwnerKey = isBusinessMeeting \? draft\.leadOwner\.apiValue : ""/);
+  assert.match(apiClientSource, /let leadOwnerName = isBusinessMeeting \? draft\.leadOwner\.leadOwnerFullName : ""/);
+  assert.match(apiClientSource, /manualLeadOwner: leadOwnerKey/);
+  assert.match(apiClientSource, /leadOwnerKey: leadOwnerKey/);
+  assert.match(apiClientSource, /leadOwnerName: leadOwnerName/);
+  assert.match(apiClientSource, /leadOwnerFullName: leadOwnerName/);
+  assert.match(apiClientSource, /leadOwnerEmail: ""/);
   assert.doesNotMatch(
     apiClientSource,
     /who: isBusinessMeeting \? Planner\.both\.apiValue : draft\.planner\.apiValue/,

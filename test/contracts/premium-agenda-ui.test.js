@@ -210,6 +210,31 @@ test('premium agenda handmatige afspraak-modal slaat locatie en opmerkingen op',
   assert.match(pageSource, /notes,/);
 });
 
+test('premium agenda toont leadstand op basis van dezelfde lead-eigenaarvelden als de app', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const counterPath = path.join(__dirname, '../../assets/premium-agenda-lead-counter.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const counterSource = fs.readFileSync(counterPath, 'utf8');
+
+  assert.match(pageSource, /assets\/premium-agenda-lead-counter\.js/);
+  assert.match(pageSource, /window\.SoftoraAgendaLeadCounterSource = \(\) => appointments;/);
+  assert.match(pageSource, /manualLeadOwnerKey: String\(item\.manualLeadOwnerKey \|\| item\.manualLeadOwner \|\| ''\)/);
+  assert.match(pageSource, /leadOwnerKey: String\(item\.leadOwnerKey \|\| ''\)/);
+  assert.match(pageSource, /leadOwnerName: String\(item\.leadOwnerName \|\| ''\)/);
+  assert.match(pageSource, /leadOwnerFullName: String\(item\.leadOwnerFullName \|\| ''\)/);
+  assert.match(pageSource, /document\.dispatchEvent\(new CustomEvent\('softora:agenda-rendered'\)\);/);
+  assert.match(counterSource, /counter\.id = 'agendaLeadCounter'/);
+  assert.match(counterSource, /id="agendaLeadCounterRows"/);
+  assert.match(counterSource, /\.agenda-lead-counter/);
+  assert.match(counterSource, /function normalizeLeadOwnerKey\(value\)/);
+  assert.match(counterSource, /function resolveLeadOwnerKey\(appointment\)/);
+  assert.match(counterSource, /function renderLeadCounter\(appointments = getAppointments\(\)\)/);
+  assert.match(counterSource, /appointments\.reduce\(\(result, appointment\) => \{[\s\S]*resolveLeadOwnerKey\(appointment\)[\s\S]*result\[key\] \+= 1;/);
+  assert.match(counterSource, /label: 'Servé'/);
+  assert.match(counterSource, /label: 'Martijn'/);
+  assert.match(counterSource, /document\.addEventListener\('softora:agenda-rendered'/);
+});
+
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');

@@ -124,6 +124,8 @@ struct SoftoraAPIClient {
         let notes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let time = AgendaDateFormatter.time(from: draft.time)
         let isBusinessMeeting = draft.appointmentType == .business && draft.businessKind == .meeting
+        let leadOwnerKey = isBusinessMeeting ? draft.leadOwner.apiValue : ""
+        let leadOwnerName = isBusinessMeeting ? draft.leadOwner.leadOwnerFullName : ""
         let legendChoice = draft.appointmentType == .business
             ? draft.businessMeetingType.apiValue
             : "manual-overig"
@@ -142,7 +144,11 @@ struct SoftoraAPIClient {
             appointmentType: draft.appointmentType.apiValue,
             appointmentKind: draft.appointmentType == .business ? draft.businessKind.apiValue : "",
             businessMeetingType: draft.businessMeetingType.apiValue,
-            manualLeadOwner: isBusinessMeeting ? draft.leadOwner.apiValue : "",
+            manualLeadOwner: leadOwnerKey,
+            leadOwnerKey: leadOwnerKey,
+            leadOwnerName: leadOwnerName,
+            leadOwnerFullName: leadOwnerName,
+            leadOwnerEmail: "",
             actor: "softora-ios-agenda"
         )
         let response: ManualAppointmentResponse = try await post(

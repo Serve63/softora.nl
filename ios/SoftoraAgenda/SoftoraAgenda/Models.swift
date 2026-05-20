@@ -388,6 +388,17 @@ enum Planner: String, CaseIterable, Codable, Identifiable {
             "Overig"
         }
     }
+
+    var leadOwnerFullName: String {
+        switch self {
+        case .serve:
+            "Servé Creusen"
+        case .martijn:
+            "Martijn van de Ven"
+        case .both, .other:
+            ""
+        }
+    }
 }
 
 struct NewAppointmentDraft {
@@ -555,6 +566,10 @@ struct ManualAppointmentPayload: Encodable {
     let appointmentKind: String
     let businessMeetingType: String
     let manualLeadOwner: String
+    let leadOwnerKey: String
+    let leadOwnerName: String
+    let leadOwnerFullName: String
+    let leadOwnerEmail: String
     let actor: String
 }
 

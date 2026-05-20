@@ -1579,8 +1579,7 @@
         }
     }
 
-    const agendaBootstrapPayload = readAgendaBootstrapPayload();
-    const appointments = [];
+    const agendaBootstrapPayload = readAgendaBootstrapPayload(), appointments = []; window.SoftoraAgendaLeadCounterSource = () => appointments;
 
     // State
     let currentDate = new Date();
@@ -2048,6 +2047,7 @@
             activeOrderAddedAt: String(item.activeOrderAddedAt || ''),
             referenceImages: normalizeReferenceImageList(item.referenceImages || item.attachments || []),
             manualPlannerWho: String(item.manualPlannerWho || ''),
+            manualLeadOwnerKey: String(item.manualLeadOwnerKey || item.manualLeadOwner || ''), manualLeadOwnerName: String(item.manualLeadOwnerName || ''), leadOwnerKey: String(item.leadOwnerKey || ''), leadOwnerName: String(item.leadOwnerName || ''), leadOwnerFullName: String(item.leadOwnerFullName || ''), leadOwnerEmail: String(item.leadOwnerEmail || ''),
             manualAllDayUnavailable: Boolean(item.manualAllDayUnavailable),
             uiFallback: Boolean(item.uiFallback),
         };
@@ -3424,7 +3424,7 @@
             html += '</div>';
         }
 
-        grid.innerHTML = html;
+        grid.innerHTML = html; document.dispatchEvent(new CustomEvent('softora:agenda-rendered'));
 
         // Re-attach magnetic
         document.querySelectorAll('.appointment.magnetic').forEach((elem) => {
@@ -3535,7 +3535,7 @@
         applyWorkspaceMode(false);
     }
 </script>
-<script src="assets/premium-agenda-stability.js?v=20260430a"></script>
+<script src="assets/premium-agenda-lead-counter.js?v=20260520a"></script><script src="assets/premium-agenda-stability.js?v=20260430a"></script>
 <script>
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
