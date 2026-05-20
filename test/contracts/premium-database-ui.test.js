@@ -68,6 +68,28 @@ function loadDatabaseWebdesignActionClient(options = {}) {
   return sandbox.window.SoftoraDatabaseWebdesignAction;
 }
 
+function loadDatabaseOutreachClient(options = {}) {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const document = options.document || {
+    getElementById: () => null,
+    createElement: () => ({ id: '', textContent: '' }),
+    head: { appendChild() {} },
+  };
+  const windowObject = {
+    document,
+    setTimeout: options.setTimeout || setTimeout,
+    clearTimeout: options.clearTimeout || clearTimeout,
+    requestAnimationFrame: options.requestAnimationFrame || ((callback) => callback()),
+    fetch: options.fetch || (async () => ({ ok: true, json: async () => ({ jobs: [] }) })),
+    Image: options.Image || function Image() {},
+    URL,
+  };
+  const sandbox = { window: windowObject, fetch: windowObject.fetch };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseOutreach;
+}
+
 function loadDatabaseDistanceClient() {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-distance.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
@@ -202,10 +224,11 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /table-layout: fixed;/);
   assert.match(pageSource, /thead th \{[\s\S]*padding: 10px 9px;[\s\S]*letter-spacing: 1\.1px;/);
   assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 14%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 15%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 15%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 12%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 14%; \}/);
   assert.match(pageSource, /thead th:nth-child\(6\), tbody td:nth-child\(6\) \{ width: 10%; \}/);
   assert.match(pageSource, /thead th:nth-child\(9\), tbody td:nth-child\(9\) \{[\s\S]*width: 7%;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
+  assert.match(pageSource, /thead th:nth-child\(10\), tbody td:nth-child\(10\) \{[\s\S]*width: 4%;[\s\S]*text-align: center;/);
   assert.match(pageSource, /\.photo-drop \{[\s\S]*width: 34px;[\s\S]*height: 34px;/);
   assert.match(pageSource, /\.photo-remove \{[\s\S]*width: 14px;[\s\S]*height: 14px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
@@ -279,10 +302,11 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /data-edit-id=\\"/);
   assert.match(pageSource, /<th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie<\/th>/);
   assert.match(pageSource, /<th id="photoHeader">Foto's <span id="photoHeaderCount">\(0\)<\/span><\/th>/);
+  assert.match(pageSource, /<th id="daysHeader">Dagen<\/th>/);
   assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd", showPhotoColumn = !showOutreachActionColumn/);
   assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn;/);
   assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return showPhotoColumn && shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoSource\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
-  assert.match(pageSource, /colspan=\\"" \+ \(showOutreachActionColumn \? 7 : 9\) \+ "\\"/);
+  assert.match(pageSource, /colspan=\\"" \+ \(showOutreachActionColumn \? 8 : 10\) \+ "\\"/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";/);
@@ -438,7 +462,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260519c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260520a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
@@ -1125,12 +1149,16 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
   assert.match(webdesignActionSource, /Mail bekijken/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(7\), table\.outreach-action-mode tbody td:nth-child\(7\) \{ display: none; \}/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(9\), table\.outreach-action-mode tbody td:nth-child\(9\) \{ display: none; \}/);
   assert.match(pageSource, /document\.getElementById\("databaseTable"\)\.classList\.toggle\("outreach-action-mode", showOutreachActionColumn\); document\.getElementById\("statusHeader"\)\.hidden = showOutreachActionColumn/);
   assert.match(pageSource, /renderUsedChannelTags\(customer\),\s*"\<\/div\>\<\/td\>",\s*"\<td\>\<div class=\\"s-wrap/);
   assert.match(pageSource, /showOutreachActionColumn && outreachController\.isWebdesignOutreachCustomer\(customer\) \? outreachController\.renderActions\(customer\)/);
-  assert.match(pageSource, /showPhotoColumn \? "<td>" \+ renderWebsitePhotoDrop\(customer\) \+ "<\/td>" : ""/);
+  assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ outreachController\.renderDaysSinceSent\(customer\) \+ "<\/td>"/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 25%; text-align: center; \}/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(10\), table\.outreach-action-mode tbody td:nth-child\(10\) \{ width: 5%; text-align: center; \}/);
   assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:420px;min-width:0;margin:0 auto/);
+  assert.match(webdesignActionSource, /function renderDaysSinceSent\(customer\)/);
+  assert.match(webdesignActionSource, /\.outreach-days\{display:inline-flex;align-items:center;justify-content:center;min-width:24px/);
   assert.match(webdesignActionSource, /\.outreach-action\{box-sizing:border-box;min-width:0;min-height:34px/);
   assert.match(webdesignActionSource, /overflow-wrap:anywhere/);
   assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\\"klant_geworden\\\"\\]\{background:var\(--crimson\)/);
@@ -1158,6 +1186,46 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /afgehaakt: "Afgehaakt"/);
   assert.match(pageSource, /\.s-interesse \.s-label \{ color: var\(--green\); font-weight: 700; \}/);
   assert.match(pageSource, /\.s-afgehaakt \.s-label \{ color: var\(--red\); font-weight: 700; \}/);
+});
+
+test('premium database outreach days column shows sent age and keeps no-reply automation', () => {
+  const client = loadDatabaseOutreachClient();
+  const controller = client.createController({
+    state: { klanten: [] },
+    nodes: {},
+    escapeHtml: (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    })[char]),
+    normalizeSearchValue: (value) => String(value || '').trim().toLowerCase(),
+    normalizeDatabaseStatus: (value) => String(value || '').trim().toLowerCase(),
+    formatDisplayDate: () => '19 mei 2026',
+    parseDateValue: (value) => {
+      const timestamp = Date.parse(String(value || ''));
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    },
+    normalizeCustomer: (value) => value,
+    persistCustomerList: () => {},
+    renderPage: () => {},
+    setStatusMessage: () => {},
+  });
+  const sentAt = new Date(Date.now() - (26 * 86400000)).toISOString();
+  const customer = {
+    id: 'customer-1',
+    campaignType: 'webdesign',
+    outreachStatus: 'benaderd',
+    outreachSentAt: sentAt,
+  };
+
+  assert.match(controller.renderDaysSinceSent(customer), />26<\/span>/);
+  const automated = controller.applyAutomation([customer]);
+  assert.equal(automated.changed, true);
+  assert.equal(automated.customers[0].status, 'geengehoor');
+  assert.equal(automated.customers[0].outreachStatus, 'geen_gehoor');
+  assert.match(automated.customers[0].hist[0].label, /Geen gehoor na 25 dagen/);
 });
 
 test('premium database sync merge updates contact fields and preserves CRM fields', () => {
