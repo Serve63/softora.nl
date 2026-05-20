@@ -337,6 +337,47 @@ function createServiceError(message, code, status = 500, detail = '') {
   return error;
 }
 
+function sanitizeOpenAiCostDetail(value) {
+  const detail = normalizeString(value)
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [verborgen]')
+    .replace(/\bsk-[A-Za-z0-9_-]+/g, '[verborgen]');
+  return detail.length > 180 ? `${detail.slice(0, 177)}...` : detail;
+}
+
+function getOpenAiCostConfigStatus(deps = {}) {
+  return {
+    adminKeyConfigured: Boolean(resolveOpenAiCostsApiKey(deps)),
+    organizationConfigured: Boolean(resolveOpenAiOrganizationId(deps)),
+    projectConfigured: Boolean(resolveOpenAiProjectId(deps)),
+  };
+}
+
+function getOpenAiCostErrorStatus(error) {
+  const status = Number(error && error.status);
+  if (!Number.isFinite(status) || status <= 0) return 500;
+  if ((status === 401 || status === 403) && error && error.code === 'OPENAI_COSTS_FETCH_FAILED') {
+    return 502;
+  }
+  return status;
+}
+
+function buildOpenAiCostErrorPayload(deps = {}, error = {}, fallbackDetail = 'OpenAI kosten konden niet worden opgehaald') {
+  const upstreamStatus =
+    error && error.code === 'OPENAI_COSTS_FETCH_FAILED' && Number.isFinite(Number(error.status))
+      ? Number(error.status)
+      : 0;
+  const payload = {
+    ok: false,
+    error: error.code || 'OPENAI_COSTS_ERROR',
+    detail: sanitizeOpenAiCostDetail(error.detail || error.message || fallbackDetail),
+    config: getOpenAiCostConfigStatus(deps),
+  };
+  if (upstreamStatus > 0) {
+    payload.upstreamStatus = upstreamStatus;
+  }
+  return payload;
+}
+
 function isRetryableOpenAiCostsStatus(status) {
   const numericStatus = Number(status);
   if (!Number.isFinite(numericStatus)) return true;
@@ -874,13 +915,11 @@ function createOpenAiCostSummaryCoordinator(deps = {}) {
         });
       } catch (error) {
         const lastSuccessful = getOpenAiCostsLastSuccessfulSnapshot(deps);
-        return res.status(error.status || 500).json({
-          ok: false,
+        return res.status(getOpenAiCostErrorStatus(error)).json({
+          ...buildOpenAiCostErrorPayload(deps, error),
           status: 'error',
           source: 'openai-organization-costs',
           message: 'OpenAI kosten konden niet worden opgehaald',
-          error: error.code || 'OPENAI_COSTS_ERROR',
-          detail: error.detail || error.message || 'OpenAI kosten konden niet worden opgehaald',
           lastSuccessful,
         });
       }
@@ -896,11 +935,9 @@ function createOpenAiCostSummaryCoordinator(deps = {}) {
           summary,
         });
       } catch (error) {
-        return res.status(error.status || 500).json({
-          ok: false,
-          error: error.code || 'OPENAI_COSTS_ERROR',
-          detail: error.detail || error.message || 'OpenAI kosten konden niet worden opgehaald',
-        });
+        return res
+          .status(getOpenAiCostErrorStatus(error))
+          .json(buildOpenAiCostErrorPayload(deps, error));
       }
     },
     async sendCombinedCostSummaryResponse(req, res) {
@@ -914,11 +951,11 @@ function createOpenAiCostSummaryCoordinator(deps = {}) {
           summary,
         });
       } catch (error) {
-        return res.status(error.status || 500).json({
-          ok: false,
-          error: error.code || 'API_COSTS_ERROR',
-          detail: error.detail || error.message || 'API-factuurkosten konden niet geladen worden.',
-        });
+        const payload = buildOpenAiCostErrorPayload(deps, error, 'API-factuurkosten konden niet geladen worden.');
+        if (!payload.error || payload.error === 'OPENAI_COSTS_ERROR') {
+          payload.error = 'API_COSTS_ERROR';
+        }
+        return res.status(getOpenAiCostErrorStatus(error)).json(payload);
       }
     },
   };

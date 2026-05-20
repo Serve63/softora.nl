@@ -114,7 +114,7 @@ test('premium terugkerende kosten toont dynamische posten bovenaan met paarse st
   assert.match(combinedSource, /window\.softoraMonthlyCostsData = data;/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsRender = render;/);
   assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260518b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260520a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260520b" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(combinedSource, /function createCategoryHeader\(cat, catTotal\) \{/);
   assert.match(combinedSource, /appendCostTextElement\(header, 'div', 'category-title', cat\);/);
@@ -225,6 +225,10 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /const API_COST_ADMIN_NOTE = 'Alleen Full Acces kan OpenAI kosten bekijken';/);
   assert.match(scriptSource, /const SUPABASE_COST_NOTE = 'Supabase kosten live bijgewerkt';/);
   assert.match(scriptSource, /function applyApiCostSnapshot\(snapshot\)/);
+  assert.match(scriptSource, /function buildApiCostUnavailableNote\(error\)/);
+  assert.match(scriptSource, /OpenAI Admin Key ontbreekt op Render/);
+  assert.match(scriptSource, /OpenAI factuur-API fout/);
+  assert.match(scriptSource, /payload\.upstreamStatus \|\| payload\.upstream_status/);
   assert.match(scriptSource, /function applyApiCostUnavailable\(error\)/);
   assert.match(scriptSource, /function applySupabaseCostSnapshot\(payload\)/);
   assert.match(scriptSource, /function applySupabaseCostUnavailable\(error\)/);
