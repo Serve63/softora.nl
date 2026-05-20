@@ -1,3 +1,83 @@
+const {
+  buildSearchConsoleAgentReport: defaultBuildSearchConsoleAgentReport,
+  createSearchConsoleClient: defaultCreateSearchConsoleClient,
+  fetchSearchConsoleSnapshot: defaultFetchSearchConsoleSnapshot,
+  getMissingSearchConsoleConfig: defaultGetMissingSearchConsoleConfig,
+  getSearchConsoleConfigFromEnv: defaultGetSearchConsoleConfigFromEnv,
+  resolveDateWindows: defaultResolveDateWindows,
+} = require('../../scripts/lib/search-console-agent-report');
+
+function toFiniteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function roundNumber(value, decimals = 2) {
+  const factor = 10 ** decimals;
+  return Math.round(toFiniteNumber(value) * factor) / factor;
+}
+
+function normalizeString(value) {
+  return String(value || '').trim();
+}
+
+function resolvePerformanceDays(value) {
+  const raw = normalizeString(value);
+  if (raw === '7' || raw === '28' || raw === '90') return Number(raw);
+  return 90;
+}
+
+function compactSearchConsoleRow(row = {}, labelKey = 'label') {
+  const keys = Array.isArray(row.keys) ? row.keys : [];
+  const label = normalizeString(row[labelKey] || row.query || row.page || keys[0]);
+  return {
+    label,
+    clicks: roundNumber(row.clicks, 2),
+    impressions: roundNumber(row.impressions, 2),
+    ctr: roundNumber(row.ctr, 4),
+    position: roundNumber(row.position, 2),
+    clicksDelta: roundNumber(row.clicksDelta, 2),
+    impressionsDelta: roundNumber(row.impressionsDelta, 2),
+  };
+}
+
+function compactDateRows(rows = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => compactSearchConsoleRow(row))
+    .filter((row) => row.label)
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function buildEmptySearchConsolePerformancePayload(extra = {}) {
+  return {
+    ok: true,
+    connected: false,
+    status: 'needs_connection',
+    generatedAt: new Date().toISOString(),
+    siteUrl: '',
+    dateWindows: null,
+    totals: {
+      current: { clicks: 0, impressions: 0, ctr: 0, position: 0 },
+      previous: { clicks: 0, impressions: 0, ctr: 0, position: 0 },
+      clicksDelta: 0,
+      impressionsDelta: 0,
+      ctrDelta: 0,
+      positionDelta: 0,
+    },
+    rows: {
+      queries: [],
+      pages: [],
+      dates: [],
+      countries: [],
+      devices: [],
+      searchAppearance: [],
+    },
+    sitemaps: [],
+    actionQueue: [],
+    ...extra,
+  };
+}
+
 function createSeoReadCoordinator(deps = {}) {
   const {
     logger = console,
@@ -15,6 +95,12 @@ function createSeoReadCoordinator(deps = {}) {
     buildSeoPageAuditEntry = () => ({}),
     getSeoModelPresetOptions = () => [],
     normalizeSeoAutomationSettings = (value) => value || {},
+    buildSearchConsoleAgentReport = defaultBuildSearchConsoleAgentReport,
+    createSearchConsoleClient = defaultCreateSearchConsoleClient,
+    fetchSearchConsoleSnapshot = defaultFetchSearchConsoleSnapshot,
+    getMissingSearchConsoleConfig = defaultGetMissingSearchConsoleConfig,
+    getSearchConsoleConfigFromEnv = defaultGetSearchConsoleConfigFromEnv,
+    resolveDateWindows = defaultResolveDateWindows,
   } = deps;
 
   async function buildSeoSiteAudit(configRaw = null) {
@@ -239,8 +325,104 @@ function createSeoReadCoordinator(deps = {}) {
     }
   }
 
+  async function getSearchConsolePerformanceResponse(req, res) {
+    const days = resolvePerformanceDays(req.query?.days);
+    const config = getSearchConsoleConfigFromEnv(process.env);
+    const missing = getMissingSearchConsoleConfig(config);
+    const siteUrl = normalizeString(config.siteUrl || 'sc-domain:softora.nl');
+
+    if (missing.length > 0) {
+      return res.status(200).json(
+        buildEmptySearchConsolePerformancePayload({
+          siteUrl,
+          missingSearchConsoleConfig: missing,
+          message: `Search Console-koppeling mist nog: ${missing.join(', ')}.`,
+          actionQueue: [
+            {
+              priority: 'hoog',
+              type: 'connect_gsc',
+              action: 'Rond de Search Console OAuth-koppeling af zodat dit scherm echte klikken, vertoningen, CTR en posities kan tonen.',
+            },
+          ],
+        })
+      );
+    }
+
+    try {
+      const client = createSearchConsoleClient({ config });
+      if (typeof client.resolveAccessToken === 'function') {
+        await client.resolveAccessToken();
+      }
+      const now = new Date();
+      const dateWindows = resolveDateWindows({ days, now });
+      const [snapshot, datesCurrent, countriesCurrent, devicesCurrent, searchAppearanceCurrent] = await Promise.all([
+        fetchSearchConsoleSnapshot({ client, config, siteUrl, days, now }),
+        client.querySearchAnalytics({
+          siteUrl,
+          ...dateWindows.current,
+          dimensions: ['date'],
+          rowLimit: 500,
+        }),
+        client.querySearchAnalytics({
+          siteUrl,
+          ...dateWindows.current,
+          dimensions: ['country'],
+          rowLimit: 100,
+        }),
+        client.querySearchAnalytics({
+          siteUrl,
+          ...dateWindows.current,
+          dimensions: ['device'],
+          rowLimit: 25,
+        }),
+        client.querySearchAnalytics({
+          siteUrl,
+          ...dateWindows.current,
+          dimensions: ['searchAppearance'],
+          rowLimit: 100,
+        }),
+      ]);
+      const report = buildSearchConsoleAgentReport(snapshot);
+
+      return res.status(200).json({
+        ok: true,
+        connected: true,
+        status: 'ready',
+        generatedAt: report.generatedAt || new Date().toISOString(),
+        siteUrl: report.siteUrl || siteUrl,
+        dateWindows: report.dateWindows || dateWindows,
+        totals: report.totals,
+        rows: {
+          queries: (report.queries?.top || []).slice(0, 25).map((row) => compactSearchConsoleRow(row)),
+          pages: (report.pages?.top || []).slice(0, 25).map((row) => compactSearchConsoleRow(row)),
+          dates: compactDateRows(datesCurrent),
+          countries: (countriesCurrent || []).slice(0, 25).map((row) => compactSearchConsoleRow(row)),
+          devices: (devicesCurrent || []).slice(0, 25).map((row) => compactSearchConsoleRow(row)),
+          searchAppearance: (searchAppearanceCurrent || []).slice(0, 25).map((row) =>
+            compactSearchConsoleRow(row)
+          ),
+        },
+        sitemaps: report.sitemaps || [],
+        actionQueue: (report.actionQueue || []).slice(0, 15),
+      });
+    } catch (error) {
+      logger.error('[SEO][SearchConsolePerformanceError]', error?.message || error);
+      return res.status(502).json({
+        ...buildEmptySearchConsolePerformancePayload({
+          connected: true,
+          status: 'error',
+          siteUrl,
+          message: 'Search Console-data kon nu niet worden opgehaald.',
+        }),
+        ok: false,
+        error: 'Kon Search Console-prestaties niet ophalen.',
+      });
+    }
+  }
+
   return {
     buildSeoSiteAudit,
+    getSearchConsolePerformanceResponse,
     getSeoPageResponse,
     getSeoSiteAuditResponse,
     listSeoPagesResponse,
