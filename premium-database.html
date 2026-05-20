@@ -1424,7 +1424,7 @@
                             <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
                         <div class="status-filter">
-                            <button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar</button><button class="sf-btn" data-s="alle" type="button">Alle</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="reactie_ontvangen" type="button">Reactie ontvangen</button><button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
+                            <button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar</button><button class="sf-btn" data-s="alle" type="button">Alles</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
@@ -2233,7 +2233,6 @@
             return state.klanten.filter(function (customer) {
                 if (state.activeStatus === "benaderd") {
                     if (!hasUsedColdCalling(customer) && !hasUsedColdMailing(customer)) return false;
-                } else if (state.activeStatus === "reactie_ontvangen" && !outreachController.isActionRequired(customer)) { return false;
                 } else if (state.activeStatus !== "alle" && customer.status !== state.activeStatus) {
                     return false;
                 }
