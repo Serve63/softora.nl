@@ -270,12 +270,17 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   );
 });
 
-test('premium website footer bevat geen publieke personeel-login link meer', () => {
+test('premium website houdt de personeel-link zichtbaar in de footer', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
-  assert.doesNotMatch(source, /\/premium-personeel-login\?logout=1/);
-  assert.doesNotMatch(source, /\.footer-legal a\[href\*="premium-personeel-login"\]/);
+  assert.match(source, /<a href="\/personeel-login">Personeel<\/a>/);
+  assert.doesNotMatch(source, /href="\/premium-personeel-login\?logout=1"/);
+  assert.doesNotMatch(
+    source,
+    /@media \(max-width: 768px\)\s*\{[\s\S]*\.footer-legal a\[href\*="premium-personeel-login"\]\s*\{\s*display:\s*none;\s*\}/
+  );
+  assert.doesNotMatch(source, /\.footer-legal a\[href\*="premium-personeel-login"\]\s*\{\s*display:\s*none;\s*\}/);
 });
 
 test('premium website houdt footer-links direct klikbaar door footer buiten content-visibility defer te houden', () => {
