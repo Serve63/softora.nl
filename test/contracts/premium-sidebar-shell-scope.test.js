@@ -151,6 +151,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords"\]\);/);
   assert.match(themeJsSource, /PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*"leads"/);
   assert.match(themeJsSource, /PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*"coldcalling"/);
+  const comingSoonSetMatch = themeJsSource.match(/const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[([\s\S]*?)\]\);/);
+  assert.ok(comingSoonSetMatch, 'coming soon set hoort expliciet te blijven bestaan');
+  assert.doesNotMatch(comingSoonSetMatch[1], /"seo"/);
+  assert.match(comingSoonSetMatch[1], /"qr_code"/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
@@ -522,11 +526,19 @@ test('static premium sidebars share the same section order and public labels', (
     assert.equal(linkTargets.ads_google, '/premium-advertenties#google');
     assert.equal(linkTargets.ads_linkedin, '/premium-advertenties#linkedin');
     assert.equal(linkTargets.social_linkedin, '/premium-socialmedia#linkedin');
+    assert.equal(linkTargets.seo, '/premium-seo');
     assert.equal(linkTargets.qr_code, '/premium-qr-code');
+    const seoLink = pageSource.match(
+      new RegExp(`<a [^>]*data-sidebar-key="seo"[^>]*>[\\s\\S]*?<\\/a>`)
+    );
+    assert.ok(seoLink, `${relativePath} mist SEO sidebar-link`);
+    assert.doesNotMatch(seoLink[0], /sidebar-link--coming-soon/);
+    assert.doesNotMatch(seoLink[0], /sidebar-link-lock/);
+    assert.doesNotMatch(seoLink[0], /aria-disabled/);
+    assert.doesNotMatch(seoLink[0], /tabindex="-1"/);
     for (const lockedKey of [
       'leads',
       'coldcalling',
-      'seo',
       'qr_code',
       'ads_trustoo',
       'ads_pinterest',

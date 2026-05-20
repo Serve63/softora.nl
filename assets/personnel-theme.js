@@ -588,7 +588,7 @@
 
     /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
-        "leads", "coldcalling", "seo", "qr_code",
+        "leads", "coldcalling", "qr_code",
         "ads_google",
         "ads_facebook",
         "ads_linkedin",
