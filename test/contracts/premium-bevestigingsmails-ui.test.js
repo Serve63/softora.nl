@@ -171,6 +171,26 @@ test('premium bevestigingsmails blokkeert ook de sidebar tijdens coldmail verzen
   assert.match(freezeSource, /setColdmailSendLock\(true\);[\s\S]*originalSender\.apply\(this, arguments\)[\s\S]*setColdmailSendLock\(false\);/);
 });
 
+test('premium bevestigingsmails kiest automatisch de afzender van de ingelogde persoon', () => {
+  const root = path.join(__dirname, '../..');
+  const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
+  const identitySource = fs.readFileSync(path.join(root, 'assets/premium-coldmail-sender-identity.js'), 'utf8');
+
+  assert.match(pageSource, /assets\/premium-coldmail-sender-identity\.js\?v=20260520a/);
+  assert.match(identitySource, /function resolveColdmailSenderEmailFromSession\(session, availableEmails\)/);
+  assert.match(identitySource, /fetch\("\/api\/auth\/session"/);
+  assert.match(identitySource, /identityText\.indexOf\("martijn"\) !== -1[\s\S]*"martijn@softora\.nl"/);
+  assert.match(
+    identitySource,
+    /identityText\.indexOf\("serve"\) !== -1 \|\|[\s\S]*identityText\.indexOf\("servec"\) !== -1 \|\|[\s\S]*identityText\.indexOf\("creusen"\) !== -1[\s\S]*"serve@softora\.nl"/
+  );
+  assert.match(identitySource, /identityText\.indexOf\("ruben"\) !== -1[\s\S]*"ruben@softora\.nl"/);
+  assert.match(identitySource, /var applyDelaysMs = \[0, 250, 750, 1500, 3000\];/);
+  assert.match(identitySource, /if \(typeof window\.syncCustomSelect === "function"\)/);
+  assert.match(identitySource, /if \(typeof window\.applyColdmailingTemplateForSender === "function"\)/);
+  assert.match(identitySource, /if \(!applyingIdentitySender\) senderTouchedByUser = true;/);
+});
+
 test('premium bevestigingsmails campaign volume uses a fixed mail company label', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
