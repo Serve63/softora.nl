@@ -25,7 +25,7 @@ function readOutreachScript() {
   return fs.readFileSync(outreachScriptPath, 'utf8');
 }
 
-function loadMailboxHelpersForTest() {
+function loadMailboxHelpersForTest(options = {}) {
   const element = {
     innerHTML: '',
     textContent: '',
@@ -52,6 +52,8 @@ function loadMailboxHelpersForTest() {
     SoftoraMailboxOutreach: null,
     SoftoraUiStateClient: null,
     SoftoraCampaignSenderSettings: null,
+    SoftoraDialogs: options.SoftoraDialogs || null,
+    confirm: options.confirm || (() => false),
   };
   const context = {
     URL,
@@ -71,7 +73,7 @@ function loadMailboxHelpersForTest() {
   };
   const source = readScript().replace(
     'bindMailboxActions();',
-    'window.__mailboxTest = { renderMailBody, normalizeMailboxApiMessage, display: window.SoftoraMailboxDisplay }; bindMailboxActions();'
+    'window.__mailboxTest = { renderMailBody, normalizeMailboxApiMessage, requestMailboxDeleteConfirmation, display: window.SoftoraMailboxDisplay }; bindMailboxActions();'
   );
   vm.createContext(context);
   vm.runInContext(readDisplayScript(), context);
@@ -94,7 +96,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260519a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260520a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
@@ -208,15 +210,40 @@ test('premium mailbox bewaart gelezen status via de mailbox API', () => {
   assert.match(scriptSource, /Gelezen status opslaan mislukt/);
 });
 
-test('premium mailbox verwijdert mails pas na een geslaagde mailbox API-call', () => {
+test('premium mailbox vraagt bevestiging en verwijdert pas na een geslaagde mailbox API-call', async () => {
   const scriptSource = readScript();
 
   assert.match(scriptSource, /async function deleteMail\(id\) \{[\s\S]*\/api\/mailbox\/messages\/delete/);
+  assert.match(scriptSource, /if \(!\(await requestMailboxDeleteConfirmation\(m\)\)\) return;/);
+  assert.match(scriptSource, /async function requestMailboxDeleteConfirmation\(mail\)/);
+  assert.match(scriptSource, /SoftoraDialogs\.confirm\(message, options\)/);
+  assert.match(scriptSource, /window\.confirm\(message\)/);
   assert.match(scriptSource, /method:\s*'POST'/);
   assert.match(scriptSource, /body: JSON\.stringify\(\{[\s\S]*account: activeMailboxAccount,[\s\S]*id: m\.id,[\s\S]*uid: m\.uid,[\s\S]*folder: m\.folder \|\| activeFolder,/);
   assert.match(scriptSource, /mails = mails\.filter\(mail => String\(mail\.id\) !== String\(id\)\);/);
   assert.match(scriptSource, /catch \(error\) \{[\s\S]*toast\(String\(error\?\.message \|\| error \|\| 'Mail verwijderen mislukt'\)\);/);
   assert.match(scriptSource, /case 'delete-mail':[\s\S]*void deleteMail\(id\);/);
+
+  const calls = [];
+  const helpers = loadMailboxHelpersForTest({
+    SoftoraDialogs: {
+      confirm: async (message, options) => {
+        calls.push({ message, options });
+        return false;
+      },
+    },
+  });
+  const confirmed = await helpers.requestMailboxDeleteConfirmation({
+    subject: 'Nieuw webdesign gemaakt!',
+    folder: 'trash',
+  });
+
+  assert.equal(confirmed, false);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].message, /Nieuw webdesign gemaakt!/);
+  assert.match(calls[0].message, /definitief verwijderen/);
+  assert.equal(calls[0].options.title, 'Mail definitief verwijderen');
+  assert.equal(calls[0].options.confirmText, 'Definitief verwijderen');
 });
 
 test('premium mailbox ruimt technische mail-links op voor weergave', () => {
