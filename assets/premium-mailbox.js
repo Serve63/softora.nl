@@ -28,6 +28,49 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
+function countCharacter(value, character) {
+  return String(value || '').split(character).length - 1;
+}
+function splitUrlTrailingPunctuation(value) {
+  let url = String(value || '');
+  let suffix = '';
+  while (url) {
+    const last = url.slice(-1);
+    if (!/[.,!?;:)\]]/.test(last)) break;
+    if (last === ')' && countCharacter(url, ')') <= countCharacter(url, '(')) break;
+    if (last === ']' && countCharacter(url, ']') <= countCharacter(url, '[')) break;
+    suffix = last + suffix;
+    url = url.slice(0, -1);
+  }
+  return { url, suffix };
+}
+function isSafeMailBodyUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch (_) {
+    return false;
+  }
+}
+function renderLinkedMailboxText(value) {
+  const text = String(value == null ? '' : value);
+  let html = '';
+  let lastIndex = 0;
+  text.replace(MAIL_BODY_URL_PATTERN, (match, offset) => {
+    const { url, suffix } = splitUrlTrailingPunctuation(match);
+    html += escapeHtml(text.slice(lastIndex, offset));
+    if (url && isSafeMailBodyUrl(url)) {
+      html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>${escapeHtml(suffix)}`;
+    } else {
+      html += escapeHtml(match);
+    }
+    lastIndex = offset + match.length;
+    return match;
+  });
+  html += escapeHtml(text.slice(lastIndex));
+  return html;
+}
 function normalizeMailboxEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -226,7 +269,7 @@ function renderMailboxTextLine(line, options) {
   if (fallbackOptOutUrl && /^Geen webdesign willen ontvangen\? Laat het me weten![:\s]*$/i.test(trimmed)) {
     return renderMailboxOptOutLink(fallbackOptOutUrl);
   }
-  return escapeHtml(value);
+  return renderLinkedMailboxText(value);
 }
 function normalizeMailboxImageLabel(value) {
   return String(value || '')
