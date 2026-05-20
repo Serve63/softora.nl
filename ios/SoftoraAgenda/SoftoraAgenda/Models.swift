@@ -57,6 +57,12 @@ struct MailboxSendResponse: Decodable {
     let detail: String?
 }
 
+struct MailboxMarkReadResponse: Decodable {
+    let ok: Bool
+    let error: String?
+    let detail: String?
+}
+
 struct MailboxImproveDraftResponse: Decodable {
     let ok: Bool
     let draft: String?

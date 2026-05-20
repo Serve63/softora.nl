@@ -529,6 +529,54 @@ test('mailbox service can fetch a single full message by uid for the reader', as
   assert.equal(res.body.messages[0].body, 'Dit is de volledige mail.');
 });
 
+test('mailbox service marks an opened message as seen in IMAP', async () => {
+  let openedMailbox = '';
+  let markedRange = null;
+  let markedFlags = null;
+  let markedOptions = null;
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async (mailboxName) => {
+        openedMailbox = mailboxName;
+        return { release() {} };
+      },
+      messageFlagsAdd: async (range, flags, options) => {
+        markedRange = range;
+        markedFlags = flags;
+        markedOptions = options;
+      },
+      logout: async () => {},
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await service.markMessageReadResponse(
+    { body: { account: 'serve@softora.nl', folder: 'inbox', uid: 42 } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Cache-Control'], 'no-store, max-age=0');
+  assert.equal(openedMailbox, 'INBOX');
+  assert.deepEqual(markedRange, { uid: 42 });
+  assert.deepEqual(markedFlags, ['\\Seen']);
+  assert.deepEqual(markedOptions, { uid: true });
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.uid, 42);
+  assert.equal(res.body.unread, false);
+});
+
 test('mailbox service exposes inline mail images and html links for the iOS mailbox reader', async () => {
   const imageContent = Buffer.from('fake-image-bytes');
   const service = createMailboxService({
@@ -717,6 +765,7 @@ test('mailbox routes expose accounts, messages and send endpoints', () => {
     coordinator: {
       accountsResponse() {},
       listMessagesResponse() {},
+      markMessageReadResponse() {},
       sendMessageResponse() {},
       improveDraftResponse() {},
     },
@@ -724,6 +773,7 @@ test('mailbox routes expose accounts, messages and send endpoints', () => {
 
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/accounts'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/read'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/improve-draft'));
 });

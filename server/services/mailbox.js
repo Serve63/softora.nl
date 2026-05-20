@@ -636,6 +636,13 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  function clearSummaryCacheForAccount(accountEmail) {
+    const prefix = `${normalizeEmail(accountEmail)}|`;
+    for (const key of Array.from(summaryCache.keys())) {
+      if (key.startsWith(prefix)) summaryCache.delete(key);
+    }
+  }
+
   function disableResponseCache(res) {
     const value = 'no-store, max-age=0';
     if (res && typeof res.set === 'function') {
@@ -745,6 +752,56 @@ function createMailboxService(deps = {}) {
           .slice(0, safeLimit);
         if (cacheKey) setSummaryCache(cacheKey, sortedMessages);
         return sortedMessages;
+      } finally {
+        lock.release();
+      }
+    } finally {
+      try {
+        if (client.usable) await client.logout();
+      } catch (_) {}
+    }
+  }
+
+  async function markMessageRead({ accountEmail, folder = 'inbox', uid = 0 }) {
+    const requestedFolder = normalizeString(folder || 'inbox').toLowerCase();
+    const mailboxFolder = requestedFolder === 'starred' || requestedFolder === 'important' ? 'inbox' : requestedFolder;
+    const account = getAccount(accountEmail);
+    if (!account) {
+      const error = new Error('Mailbox-account niet gevonden.');
+      error.status = 404;
+      throw error;
+    }
+    if (!account.imapConfigured) {
+      const error = new Error('IMAP is niet geconfigureerd voor deze mailbox.');
+      error.status = 503;
+      throw error;
+    }
+
+    const requestedUid = Number(uid) || 0;
+    if (requestedUid <= 0) {
+      const error = new Error('Mail uid ontbreekt.');
+      error.status = 400;
+      throw error;
+    }
+
+    const client = createClient(account);
+    try {
+      await client.connect();
+      const mailboxName = await resolveMailboxName(client, mailboxFolder);
+      if (!mailboxName) {
+        const error = new Error('Mailboxmap niet gevonden.');
+        error.status = 404;
+        throw error;
+      }
+
+      const lock = await client.getMailboxLock(mailboxName);
+      try {
+        await client.messageFlagsAdd({ uid: requestedUid }, ['\\Seen'], { uid: true });
+        clearSummaryCacheForAccount(account.email);
+        return {
+          uid: requestedUid,
+          unread: false,
+        };
       } finally {
         lock.release();
       }
@@ -923,6 +980,26 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function markMessageReadResponse(req, res) {
+    disableResponseCache(res);
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await markMessageRead({
+        accountEmail: body.account,
+        folder: body.folder || 'inbox',
+        uid: body.uid,
+      });
+      return res.status(200).json({ ok: true, ...result });
+    } catch (error) {
+      logger.error('[Mailbox][MarkRead]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Mail als gelezen markeren mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
   async function sendMessageResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -967,10 +1044,12 @@ function createMailboxService(deps = {}) {
   return {
     accountsResponse,
     listMessagesResponse,
+    markMessageReadResponse,
     sendMessageResponse,
     improveDraftResponse,
     getAccounts,
     listMessages,
+    markMessageRead,
     sendMessage,
     improveDraft,
   };

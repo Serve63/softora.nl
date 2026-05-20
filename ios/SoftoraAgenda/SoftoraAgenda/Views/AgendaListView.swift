@@ -953,7 +953,6 @@ private struct MailboxView: View {
     @State private var mailboxStatusMessage: String?
     @AppStorage("softora.mailbox.accountOrder") private var mailboxAccountOrder = ""
     @AppStorage("softora.mailbox.pinnedAccount") private var pinnedMailboxAccountEmail = ""
-    @AppStorage("softora.mailbox.openedMessageKeys") private var openedMailboxMessageKeysRaw = ""
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -1205,33 +1204,67 @@ private struct MailboxView: View {
         Self.sortedMailboxAccounts(accounts, order: mailboxAccountOrder, pinnedEmail: pinnedMailboxAccountEmail)
     }
 
-    private var openedMailboxMessageKeys: Set<String> {
-        Set(openedMailboxMessageKeysRaw.split(separator: "\n").map(String.init))
-    }
-
     private func isUnread(_ message: MailboxMessage) -> Bool {
-        message.unread && !openedMailboxMessageKeys.contains(mailboxMessageKey(message))
+        message.unread
     }
 
     private func openMessage(_ message: MailboxMessage) {
         selectedMessage = message
+        if message.unread {
+            markMessageLocallyRead(message)
+        }
         Task {
+            if message.unread {
+                await markMessageReadOnServer(message)
+            }
             await loadMessageDetail(for: message)
         }
-
-        guard message.unread else { return }
-        var openedKeys = openedMailboxMessageKeys
-        openedKeys.insert(mailboxMessageKey(message))
-        openedMailboxMessageKeysRaw = openedKeys.sorted().joined(separator: "\n")
     }
 
-    private func mailboxMessageKey(_ message: MailboxMessage) -> String {
-        [
-            selectedAccount?.email ?? "",
-            message.folder,
-            String(message.uid),
-            message.id
-        ].joined(separator: "|")
+    private func markMessageReadOnServer(_ message: MailboxMessage) async {
+        guard let account = selectedAccount, message.uid > 0 else { return }
+
+        do {
+            try await apiClient.markMailboxMessageRead(
+                account: account.email,
+                folder: message.folder,
+                uid: message.uid
+            )
+        } catch {
+            guard !error.isMailboxCancellation else { return }
+            if selectedMessage?.id == message.id {
+                mailboxStatusMessage = "Gelezen-status kon niet worden opgeslagen."
+            }
+        }
+    }
+
+    private func markMessageLocallyRead(_ message: MailboxMessage) {
+        let readMessage = readVersion(of: message)
+        if selectedMessage?.id == message.id {
+            selectedMessage = readMessage
+        }
+        if let index = messages.firstIndex(where: { $0.id == message.id }) {
+            messages[index] = readMessage
+        }
+    }
+
+    private func readVersion(of message: MailboxMessage) -> MailboxMessage {
+        MailboxMessage(
+            id: message.id,
+            uid: message.uid,
+            folder: message.folder,
+            from: message.from,
+            email: message.email,
+            to: message.to,
+            subject: message.subject,
+            preview: message.preview,
+            body: message.body,
+            links: message.links,
+            inlineImages: message.inlineImages,
+            date: message.date,
+            unread: false,
+            starred: message.starred
+        )
     }
 
     private var alertBinding: Binding<Bool> {

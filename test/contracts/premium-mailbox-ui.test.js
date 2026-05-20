@@ -29,9 +29,11 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
+  assert.match(scriptSource, /\/api\/mailbox\/messages\/read/);
   assert.match(scriptSource, /\/api\/mailbox\/send/);
   assert.match(scriptSource, /async function loadMailboxAccounts\(\)/);
   assert.match(scriptSource, /async function loadMailboxMessages\(\)/);
+  assert.match(scriptSource, /async function markMailRead\(m\) \{/);
   assert.match(scriptSource, /async function sendMail\(\)/);
   assert.match(scriptSource, /function getMailboxAccounts\(\) \{\s*return mailboxAccounts\.map\(\(account\) => account\.email\);\s*\}/);
   assert.match(scriptSource, /function getMailboxAccount\(\) \{\s*return activeMailboxAccount;\s*\}/);
@@ -53,5 +55,9 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(scriptSource, /data-mailbox-action="toggle-star"/);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
+  assert.match(scriptSource, /uid: Number\(message\.uid\) \|\| 0/);
+  assert.match(scriptSource, /const wasUnread = m\.unread;/);
+  assert.match(scriptSource, /void markMailRead\(m\)\.catch/);
+  assert.match(scriptSource, /body: JSON\.stringify\(\{\s*account: activeMailboxAccount,\s*folder: m\.folder \|\| activeFolder,\s*uid: m\.uid,/);
   assert.match(scriptSource, /<div class="detail-body-text">\$\{escapeHtml\(m\.body\)\}<\/div>/);
 });

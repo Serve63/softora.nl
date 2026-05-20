@@ -86,6 +86,16 @@ struct SoftoraAPIClient {
         return message
     }
 
+    func markMailboxMessageRead(account: String, folder: String, uid: Int) async throws {
+        let response: MailboxMarkReadResponse = try await post(
+            "/api/mailbox/messages/read",
+            body: MailboxMarkReadPayload(account: account, folder: folder, uid: uid)
+        )
+        guard response.ok else {
+            throw SoftoraAPIError.server(response.detail ?? response.error ?? "Gelezen-status opslaan mislukt.")
+        }
+    }
+
     func sendMailboxMessage(account: String, to: String, subject: String, body: String) async throws {
         let response: MailboxSendResponse = try await post(
             "/api/mailbox/send",
@@ -223,6 +233,12 @@ private struct AgendaAppLoginPayload: Encodable {
 }
 
 private struct EmptyPayload: Encodable {}
+
+private struct MailboxMarkReadPayload: Encodable {
+    let account: String
+    let folder: String
+    let uid: Int
+}
 
 private struct MailboxSendPayload: Encodable {
     let account: String
