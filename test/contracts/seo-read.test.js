@@ -201,3 +201,103 @@ test('seo read coordinator wraps site audit failures in a stable 500 response', 
   assert.equal(res.body.ok, false);
   assert.equal(res.body.error, 'Kon de volledige SEO-scan niet uitvoeren.');
 });
+
+test('seo read coordinator returns Search Console performance rows for the premium dashboard', async () => {
+  const dateWindows = {
+    current: { startDate: '2026-04-21', endDate: '2026-05-18' },
+    previous: { startDate: '2026-03-24', endDate: '2026-04-20' },
+  };
+  const clientCalls = [];
+  const coordinator = createSeoReadCoordinator({
+    logger: { error: () => {} },
+    getSearchConsoleConfigFromEnv: () => ({
+      siteUrl: 'sc-domain:softora.nl',
+      clientId: 'client',
+      clientSecret: 'secret',
+      refreshToken: 'refresh',
+    }),
+    getMissingSearchConsoleConfig: () => [],
+    resolveDateWindows: (options) => {
+      assert.equal(options.days, 28);
+      return dateWindows;
+    },
+    createSearchConsoleClient: () => ({
+      resolveAccessToken: async () => 'access-token',
+      querySearchAnalytics: async (query) => {
+        clientCalls.push(query.dimensions.join(','));
+        if (query.dimensions.join(',') === 'date') {
+          return [
+            { keys: ['2026-05-17'], clicks: 2, impressions: 80, ctr: 0.025, position: 12 },
+            { keys: ['2026-05-18'], clicks: 4, impressions: 120, ctr: 0.0333, position: 10 },
+          ];
+        }
+        if (query.dimensions.join(',') === 'country') {
+          return [{ keys: ['nld'], clicks: 6, impressions: 200, ctr: 0.03, position: 11 }];
+        }
+        if (query.dimensions.join(',') === 'device') {
+          return [{ keys: ['DESKTOP'], clicks: 5, impressions: 160, ctr: 0.0312, position: 9.5 }];
+        }
+        if (query.dimensions.join(',') === 'searchAppearance') {
+          return [{ keys: ['Web Light results'], clicks: 1, impressions: 40, ctr: 0.025, position: 14 }];
+        }
+        return [];
+      },
+    }),
+    fetchSearchConsoleSnapshot: async (options) => {
+      assert.equal(options.days, 28);
+      return { generatedAt: '2026-05-20T08:00:00.000Z', siteUrl: 'sc-domain:softora.nl', dateWindows };
+    },
+    buildSearchConsoleAgentReport: () => ({
+      generatedAt: '2026-05-20T08:00:00.000Z',
+      siteUrl: 'sc-domain:softora.nl',
+      dateWindows,
+      totals: {
+        current: { clicks: 6, impressions: 200, ctr: 0.03, position: 11 },
+        previous: { clicks: 2, impressions: 100, ctr: 0.02, position: 14 },
+        clicksDelta: 4,
+        impressionsDelta: 100,
+        ctrDelta: 0.01,
+        positionDelta: -3,
+      },
+      queries: {
+        top: [{ keys: ['website laten maken'], clicks: 4, impressions: 120, ctr: 0.0333, position: 10 }],
+      },
+      pages: {
+        top: [{ keys: ['https://www.softora.nl/website-laten-maken'], clicks: 5, impressions: 150, ctr: 0.0333, position: 9 }],
+      },
+      sitemaps: [{ path: 'https://www.softora.nl/sitemap.xml', errors: 0, warnings: 0 }],
+      actionQueue: [{ priority: 'hoog', action: 'Verbeter CTR.' }],
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.getSearchConsolePerformanceResponse({ query: { days: '28' } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.connected, true);
+  assert.equal(res.body.totals.current.clicks, 6);
+  assert.equal(res.body.rows.queries[0].label, 'website laten maken');
+  assert.equal(res.body.rows.pages[0].label, 'https://www.softora.nl/website-laten-maken');
+  assert.equal(res.body.rows.dates[1].label, '2026-05-18');
+  assert.equal(res.body.rows.countries[0].label, 'nld');
+  assert.deepEqual(clientCalls, ['date', 'country', 'device', 'searchAppearance']);
+});
+
+test('seo read coordinator reports a clean setup state when Search Console credentials are missing', async () => {
+  const coordinator = createSeoReadCoordinator({
+    logger: { error: () => {} },
+    getSearchConsoleConfigFromEnv: () => ({ siteUrl: 'sc-domain:softora.nl' }),
+    getMissingSearchConsoleConfig: () => ['GSC_CLIENT_ID', 'GSC_CLIENT_SECRET', 'GSC_REFRESH_TOKEN'],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.getSearchConsolePerformanceResponse({ query: { days: '90' } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.connected, false);
+  assert.equal(res.body.status, 'needs_connection');
+  assert.match(res.body.message, /GSC_CLIENT_ID/);
+  assert.equal(res.body.rows.queries.length, 0);
+});
