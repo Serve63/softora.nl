@@ -122,7 +122,13 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.doesNotMatch(agendaListSource, /body: message\.body\.isEmpty \? message\.preview : message\.body/);
   assert.match(agendaListSource, /rawBody: detailBodyText/);
   assert.match(agendaListSource, /body: detailBodyText/);
-  assert.match(agendaListSource, /private var detailBodyText: String \{[^]*body\.isEmpty \? "" : message\.body/);
+  assert.match(agendaListSource, /private var detailBodyText: String \{[^]*if !body\.isEmpty \{[^]*return message\.body/);
+  assert.match(agendaListSource, /let preview = message\.preview\.trimmingCharacters\(in: \.whitespacesAndNewlines\)[^]*return preview\.isEmpty \? "" : message\.preview/);
+  assert.match(agendaListSource, /selectedMessage = messageWithContentFallback\(loadedMessage, fallback: message\)/);
+  assert.match(agendaListSource, /selectedMessage = messageWithContentFallback\(fallbackMessage, fallback: message\)/);
+  assert.match(agendaListSource, /private func messageWithContentFallback\(_ message: MailboxMessage, fallback: MailboxMessage\) -> MailboxMessage/);
+  assert.match(agendaListSource, /preview: preview\.isEmpty \? fallback\.preview : message\.preview/);
+  assert.match(agendaListSource, /body: body\.isEmpty \? fallback\.body : message\.body/);
   const mailboxMessageRowStart = agendaListSource.indexOf('private struct MailboxMessageRow: View');
   const mailboxMessageRowEnd = agendaListSource.indexOf('private struct MailboxMessageDetail: View');
   assert.ok(mailboxMessageRowStart >= 0 && mailboxMessageRowEnd > mailboxMessageRowStart);
@@ -143,7 +149,7 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /await markMessageReadOnServer\(message, accountEmail: account\.email, selectionKey: selectionKey\)/);
   assert.match(agendaListSource, /try await apiClient\.markMailboxMessageRead/);
   assert.match(agendaListSource, /markMessageLocallyRead\(message, selectionKey: selectionKey\)/);
-  assert.match(agendaListSource, /if isSameMailboxMessage\(loadedMessage, as: message\) \{[^]*selectedMessage = loadedMessage/);
+  assert.match(agendaListSource, /if isSameMailboxMessage\(loadedMessage, as: message\) \{[^]*selectedMessage = messageWithContentFallback\(loadedMessage, fallback: message\)/);
   assert.match(agendaListSource, /matchingMessageDetailFallback\(/);
   assert.match(mailboxMessageRowSource, /let isUnread: Bool/);
   assert.doesNotMatch(mailboxMessageRowSource, /Text\("Nieuw"\)/);

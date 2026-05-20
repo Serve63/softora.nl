@@ -1388,13 +1388,13 @@ private struct MailboxView: View {
             )
             guard selectedMessageKey == selectionKey else { return }
             if isSameMailboxMessage(loadedMessage, as: message) {
-                selectedMessage = loadedMessage
+                selectedMessage = messageWithContentFallback(loadedMessage, fallback: message)
             } else if let fallbackMessage = try await matchingMessageDetailFallback(
                 for: message,
                 accountEmail: accountEmail,
                 selectionKey: selectionKey
             ) {
-                selectedMessage = fallbackMessage
+                selectedMessage = messageWithContentFallback(fallbackMessage, fallback: message)
             } else {
                 mailboxStatusMessage = "Mail kon niet veilig geladen worden. Open de mail opnieuw."
             }
@@ -1421,6 +1421,29 @@ private struct MailboxView: View {
         )
         guard selectedMessageKey == selectionKey else { return nil }
         return fullMessages.first { isSameMailboxMessage($0, as: message) }
+    }
+
+    private func messageWithContentFallback(_ message: MailboxMessage, fallback: MailboxMessage) -> MailboxMessage {
+        let body = message.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let preview = message.preview.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard body.isEmpty || preview.isEmpty else { return message }
+
+        return MailboxMessage(
+            id: message.id,
+            uid: message.uid,
+            folder: message.folder,
+            from: message.from,
+            email: message.email,
+            to: message.to,
+            subject: message.subject,
+            preview: preview.isEmpty ? fallback.preview : message.preview,
+            body: body.isEmpty ? fallback.body : message.body,
+            links: message.links,
+            inlineImages: message.inlineImages,
+            date: message.date,
+            unread: message.unread,
+            starred: message.starred
+        )
     }
 
     private func selectAccount(_ account: MailboxAccount) {
@@ -1946,7 +1969,12 @@ private struct MailboxMessageDetail: View {
 
     private var detailBodyText: String {
         let body = message.body.trimmingCharacters(in: .whitespacesAndNewlines)
-        return body.isEmpty ? "" : message.body
+        if !body.isEmpty {
+            return message.body
+        }
+
+        let preview = message.preview.trimmingCharacters(in: .whitespacesAndNewlines)
+        return preview.isEmpty ? "" : message.preview
     }
 
     private func improveReply() async {
