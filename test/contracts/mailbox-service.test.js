@@ -11,6 +11,15 @@ function createResponseRecorder() {
   return {
     statusCode: null,
     body: null,
+    headers: {},
+    set(name, value) {
+      this.headers[name] = value;
+      return this;
+    },
+    setHeader(name, value) {
+      this.headers[name] = value;
+      return this;
+    },
     status(code) {
       this.statusCode = code;
       return this;
@@ -52,6 +61,7 @@ test('mailbox service exposes configured softora mailbox accounts', async () => 
   await service.accountsResponse({}, res);
 
   assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Cache-Control'], 'no-store, max-age=0');
   assert.equal(res.body.ok, true);
   for (const email of [
     'info@softora.nl',
@@ -404,6 +414,68 @@ test('mailbox service can return lightweight mailbox summaries without parsing f
   assert.equal(res.body.messages[0].body, '');
   assert.deepEqual(res.body.messages[0].links, []);
   assert.deepEqual(res.body.messages[0].inlineImages, []);
+});
+
+test('mailbox service uses fresh UID windows for pull-to-refresh inbox summaries', async () => {
+  let fetchedRange = null;
+  let fetchOptions = null;
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => ({
+      usable: true,
+      mailbox: { exists: 900, uidNext: 1001 },
+      connect: async () => {},
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async () => ({ release() {} }),
+      fetch: async function* (range, _query, options) {
+        fetchedRange = range;
+        fetchOptions = options;
+        yield {
+          uid: 980,
+          flags: [],
+          internalDate: new Date('2026-05-19T10:00:00Z'),
+          envelope: {
+            date: new Date('2026-05-19T10:00:00Z'),
+            from: [{ name: 'Oude klant', address: 'oud@example.nl' }],
+            to: [{ address: 'serve@softora.nl' }],
+            subject: 'Oude mail',
+          },
+        };
+        yield {
+          uid: 1000,
+          flags: [],
+          internalDate: new Date('2026-05-20T00:54:00Z'),
+          envelope: {
+            date: new Date('2026-05-20T00:54:00Z'),
+            from: [{ name: 'Servé test', address: 'servec321@gmail.com' }],
+            to: [{ address: 'serve@softora.nl' }],
+            subject: 'Testmail',
+          },
+        };
+      },
+      logout: async () => {},
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'inbox', limit: '25', summary: '1', fresh: '1' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Cache-Control'], 'no-store, max-age=0');
+  assert.equal(fetchedRange, '901:*');
+  assert.deepEqual(fetchOptions, { uid: true });
+  assert.deepEqual(res.body.messages.map((message) => message.uid), [1000, 980]);
+  assert.equal(res.body.messages[0].email, 'servec321@gmail.com');
 });
 
 test('mailbox service can fetch a single full message by uid for the reader', async () => {

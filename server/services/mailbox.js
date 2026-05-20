@@ -636,11 +636,29 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  function disableResponseCache(res) {
+    const value = 'no-store, max-age=0';
+    if (res && typeof res.set === 'function') {
+      res.set('Cache-Control', value);
+    } else if (res && typeof res.setHeader === 'function') {
+      res.setHeader('Cache-Control', value);
+    }
+  }
+
   function latestSequenceRange(client, limit) {
     const exists = Number(client && client.mailbox && client.mailbox.exists) || 0;
     if (!exists) return '';
     const safeLimit = Math.max(1, Math.min(100, Number(limit) || 50));
     const start = Math.max(1, exists - safeLimit + 1);
+    return `${start}:*`;
+  }
+
+  function latestUidRange(client, limit) {
+    const uidNext = Number(client && client.mailbox && client.mailbox.uidNext) || 0;
+    if (!uidNext || uidNext <= 1) return '';
+    const safeLimit = Math.max(1, Math.min(100, Number(limit) || 50));
+    const uidWindow = Math.max(safeLimit * 4, 100);
+    const start = Math.max(1, uidNext - uidWindow);
     return `${start}:*`;
   }
 
@@ -678,8 +696,12 @@ function createMailboxService(deps = {}) {
         if (requestedUid > 0) {
           range = { uid: requestedUid };
         } else if (summaryOnly) {
-          range = latestSequenceRange(client, limit);
-          fetchOptions = range ? { uid: false } : undefined;
+          range = fresh ? latestUidRange(client, limit) : '';
+          fetchOptions = range ? { uid: true } : undefined;
+          if (!range) {
+            range = latestSequenceRange(client, limit);
+            fetchOptions = range ? { uid: false } : undefined;
+          }
         } else {
           const allUids = await client.search(['ALL']);
           range = (Array.isArray(allUids) ? allUids : [])
@@ -717,7 +739,10 @@ function createMailboxService(deps = {}) {
         const visibleMessages = requestedFolder === 'starred' || requestedFolder === 'important'
           ? messages.filter((item) => item.starred)
           : messages;
-        const sortedMessages = visibleMessages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const safeLimit = Math.max(1, Math.min(100, Number(limit) || 50));
+        const sortedMessages = visibleMessages
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, safeLimit);
         if (cacheKey) setSummaryCache(cacheKey, sortedMessages);
         return sortedMessages;
       } finally {
@@ -864,6 +889,7 @@ function createMailboxService(deps = {}) {
   }
 
   async function accountsResponse(_req, res) {
+    disableResponseCache(res);
     return res.status(200).json({
       ok: true,
       accounts: getAccounts().map((account) => ({
@@ -876,6 +902,7 @@ function createMailboxService(deps = {}) {
   }
 
   async function listMessagesResponse(req, res) {
+    disableResponseCache(res);
     try {
       const messages = await listMessages({
         accountEmail: req.query?.account,

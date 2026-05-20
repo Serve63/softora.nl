@@ -272,7 +272,11 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /apiClient\.fetchMailboxMessageDetail/);
   assert.doesNotMatch(agendaListSource, /MailboxDetailLoadingView\(\)/);
   assert.doesNotMatch(agendaListSource, /Text\("Mail laden\.\.\."\)/);
-  assert.match(agendaListSource, /await loadMessages\(fresh: true\)/);
+  assert.match(agendaListSource, /Task \{ await loadMessages\(fresh: true\) \}/);
+  assert.ok(
+    (agendaListSource.match(/loadMessages\(fresh: true\)/g) || []).length >= 3,
+    'Mailbox open, account switch and folder switch should force a fresh server fetch.'
+  );
   assert.match(agendaListSource, /@State private var mailboxStatusMessage: String\?/);
   assert.match(agendaListSource, /Text\("Mailbox niet geladen"\)/);
   assert.match(agendaListSource, /Text\("Opnieuw proberen"\)/);

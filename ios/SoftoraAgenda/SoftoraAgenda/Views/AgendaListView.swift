@@ -1263,7 +1263,7 @@ private struct MailboxView: View {
                 )
                 selectedAccount = preferredAccounts.first(where: \.imapConfigured) ?? preferredAccounts.first
             }
-            await loadMessages()
+            await loadMessages(fresh: true)
         } catch {
             guard !error.isMailboxCancellation else { return }
             mailboxStatusMessage = error.mailboxDisplayMessage
@@ -1338,7 +1338,7 @@ private struct MailboxView: View {
         }
         guard account.id != selectedAccount?.id else { return }
         selectedAccount = account
-        Task { await loadMessages() }
+        Task { await loadMessages(fresh: true) }
     }
 
     private func moveMailboxAccount(_ account: MailboxAccount, direction: Int) {
@@ -1360,7 +1360,7 @@ private struct MailboxView: View {
         selectedFolder = folder
         isShowingFolderMenu = false
         isShowingAccountMenu = false
-        Task { await loadMessages() }
+        Task { await loadMessages(fresh: true) }
     }
 
     private static func sortedMailboxAccounts(
