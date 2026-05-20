@@ -224,6 +224,27 @@ test('coldmail campaign adds audit bcc when configured', async () => {
   assert.equal(service.getColdmailSafetyLimits().auditBccConfigured, true);
 });
 
+test('coldmail campaign blocks private copies for Serve and Martijn senders', async () => {
+  for (const senderEmail of ['serve@softora.nl', 'martijn@softora.nl']) {
+    const { service, sentMessages } = createService({
+      coldmailAuditBcc: 'servec321@gmail.com',
+      mailReplyTo: 'servec321@gmail.com',
+    });
+
+    await service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Nieuwe website voor {{bedrijf}}',
+      body: 'Goedemorgen {{naam}}',
+      senderEmail,
+    });
+
+    assert.equal(sentMessages.length, 1);
+    assert.equal(sentMessages[0].to, 'ruben@example.test');
+    assert.equal(sentMessages[0].bcc, undefined);
+    assert.equal(sentMessages[0].replyTo, senderEmail);
+  }
+});
+
 test('coldmail campaign ignores invalid audit bcc configuration', async () => {
   const { service, sentMessages } = createService({
     coldmailAuditBcc: 'niet-een-email',
@@ -722,70 +743,28 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
   assert.equal(Object.keys(getReplyState().processed).length, 1);
 });
 
-test('coldmail reply sync forwards Serve campaign replies privately to Gmail', async () => {
-  const parsedInbound = {
-    messageId: '<incoming-forward@example.test>',
-    subject: 'Re: Nieuwe website',
-    text: 'Hoi Servé, klinkt interessant. Kun je meer info sturen?',
-    from: { value: [{ address: 'ruben@example.test', name: 'Ruben' }] },
-    to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
-    cc: { value: [] },
-    references: '<sent-forward@softora>',
-  };
-  const { service, sentMessages, getReplyState } = createService({
-    imapHost: 'imap.example.test',
-    imapUser: 'serve@softora.nl',
-    imapPass: 'secret',
-    coldmailAutoReplyEnabled: false,
-    coldmailReplyForwardEnabled: true,
-    coldmailReplyForwardFrom: 'serve@softora.nl',
-    coldmailReplyForwardTo: 'servec321@gmail.com',
-    rows: [
-      {
-        id: 'prospect-1',
-        bedrijf: 'Bakkerij Zon',
-        naam: 'Ruben',
-        email: 'ruben@example.test',
-        status: 'gemaild',
-        databaseStatus: 'gemaild',
-        lastColdmailSentAt: '2026-04-24T12:00:00.000Z',
-        mail: true,
-        hist: [],
-      },
-    ],
-    createImapClient: () => ({
-      usable: true,
-      connect: async () => {},
-      logout: async () => {},
-      getMailboxLock: async () => ({ release: () => {} }),
-      search: async () => [1],
-      fetch: async function* () {
-        yield { uid: 1, source: 'raw-message', flags: new Set() };
-      },
-      messageFlagsAdd: async () => {},
-    }),
-    parseMailSource: async () => parsedInbound,
-  });
+test('coldmail reply sync blocks private forward for Serve and Martijn senders', async () => {
+  for (const senderEmail of ['serve@softora.nl', 'martijn@softora.nl']) {
+    const { service, sentMessages } = createService({
+      imapHost: 'imap.example.test',
+      imapUser: senderEmail,
+      imapPass: 'secret',
+      coldmailAutoReplyEnabled: false,
+      coldmailReplyForwardEnabled: true,
+      coldmailReplyForwardFrom: senderEmail,
+      coldmailReplyForwardTo: 'servec321@gmail.com',
+    });
 
-  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+    const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
 
-  assert.equal(result.forwarded, 1);
-  assert.equal(result.replied, 0);
-  assert.equal(result.autoReplySkipped, 1);
-  assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
-  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
-  assert.equal(sentMessages[0].replyTo, 'serve@softora.nl');
-  assert.equal(sentMessages[0].cc, undefined);
-  assert.equal(sentMessages[0].bcc, undefined);
-  assert.notEqual(sentMessages[0].to, 'ruben@example.test');
-  assert.match(sentMessages[0].subject, /Coldmail reactie - Bakkerij Zon/);
-  assert.match(sentMessages[0].text, /Afzender klant: ruben@example\.test/);
-
-  const processed = getReplyState().processed['message:incoming-forward@example.test'];
-  assert.equal(processed.forwardFrom, 'serve@softora.nl');
-  assert.equal(processed.forwardTo, 'servec321@gmail.com');
-  assert.equal(processed.forwardMessageId, 'msg-1');
+    assert.deepEqual(result, {
+      ok: true,
+      skipped: true,
+      reason: 'coldmail_reply_processing_disabled',
+    });
+    assert.equal(sentMessages.length, 0);
+    assert.equal(service.getColdmailSafetyLimits().replyForwardConfigured, false);
+  }
 });
 
 test('coldmail auto-reply marks positive inbound replies as interested in the database', async () => {

@@ -53,6 +53,10 @@ const SENDER_DISPLAY_NAMES = {
   'martijn@softora.nl': 'Martijn',
   'ruben@softora.nl': 'Ruben',
 };
+const COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS = new Set([
+  'serve@softora.nl',
+  'martijn@softora.nl',
+]);
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -874,7 +878,20 @@ function createColdmailCampaignService(deps = {}) {
     return name ? `${name} <${address}>` : address;
   }
 
-  function getColdmailAuditBccAddress() {
+  function isColdmailPrivateCopyBlockedSender(senderEmail) {
+    return COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS.has(normalizeEmailAddress(senderEmail));
+  }
+
+  function getColdmailReplyToAddress(senderEmail) {
+    const selectedSenderEmail = normalizeEmailAddress(senderEmail);
+    if (isColdmailPrivateCopyBlockedSender(selectedSenderEmail)) {
+      return selectedSenderEmail || mailFromAddress || undefined;
+    }
+    return mailReplyTo || selectedSenderEmail || mailFromAddress || undefined;
+  }
+
+  function getColdmailAuditBccAddress(senderEmail) {
+    if (isColdmailPrivateCopyBlockedSender(senderEmail)) return '';
     const email = normalizeEmailAddress(coldmailAuditBcc);
     return isLikelyValidEmail(email) ? email : '';
   }
@@ -889,10 +906,17 @@ function createColdmailCampaignService(deps = {}) {
     return isLikelyValidEmail(email) ? email : '';
   }
 
+  function getActiveColdmailReplyForwardFromAddress() {
+    const email = getColdmailReplyForwardFromAddress();
+    if (isColdmailPrivateCopyBlockedSender(email)) return '';
+    return email;
+  }
+
   function isColdmailReplyForwardConfigured() {
+    const forwardFrom = getActiveColdmailReplyForwardFromAddress();
     return Boolean(
       coldmailReplyForwardEnabled &&
-        getColdmailReplyForwardFromAddress() &&
+        forwardFrom &&
         getColdmailReplyForwardToAddress()
     );
   }
@@ -942,7 +966,7 @@ function createColdmailCampaignService(deps = {}) {
       blocksPersonalMailboxDomains: shouldBlockPersonalMailboxDomains(),
       auditBccConfigured: Boolean(getColdmailAuditBccAddress()),
       replyForwardConfigured: isColdmailReplyForwardConfigured(),
-      replyForwardFrom: getColdmailReplyForwardFromAddress() || undefined,
+      replyForwardFrom: getActiveColdmailReplyForwardFromAddress() || undefined,
       replyForwardTo: getColdmailReplyForwardToAddress() || undefined,
     };
   }
@@ -1578,7 +1602,7 @@ function createColdmailCampaignService(deps = {}) {
     const mail = {
       from: formatMailFromHeader(selectedSenderEmail),
       to: from.address,
-      replyTo: mailReplyTo || selectedSenderEmail || mailFromAddress || undefined,
+      replyTo: getColdmailReplyToAddress(selectedSenderEmail),
       subject: buildReplySubject(parsedMail && parsedMail.subject),
       text: replyText,
       inReplyTo: messageId || undefined,
@@ -1590,7 +1614,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function isInboundReplyAddressedToForwardSource(parsedMail) {
-    const forwardFrom = getColdmailReplyForwardFromAddress();
+    const forwardFrom = getActiveColdmailReplyForwardFromAddress();
     if (!forwardFrom) return false;
     const recipients = [
       ...getParsedMailAddressList(parsedMail, 'to'),
@@ -1641,7 +1665,7 @@ function createColdmailCampaignService(deps = {}) {
       error.code = 'SMTP_TRANSPORT_UNAVAILABLE';
       throw error;
     }
-    const forwardFrom = getColdmailReplyForwardFromAddress();
+    const forwardFrom = getActiveColdmailReplyForwardFromAddress();
     const forwardTo = getColdmailReplyForwardToAddress();
     const mail = {
       from: formatMailFromHeader(forwardFrom),
@@ -2205,7 +2229,7 @@ function createColdmailCampaignService(deps = {}) {
 
     const transporter = getSmtpTransporter();
     const sent = [];
-    const auditBcc = getColdmailAuditBccAddress();
+    const auditBcc = getColdmailAuditBccAddress(senderEmail);
 
     for (const item of selectedRows) {
       const row = item.row;
@@ -2246,7 +2270,7 @@ function createColdmailCampaignService(deps = {}) {
         const mail = {
           from: formatMailFromHeader(senderEmail),
           to,
-          replyTo: mailReplyTo || mailFromAddress || undefined,
+          replyTo: getColdmailReplyToAddress(senderEmail),
           subject,
           text,
           html,

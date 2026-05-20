@@ -285,7 +285,7 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(
     context.featureRouteOptions.coldmailing.coldmailCampaignService.getColdmailSafetyLimits()
       .replyForwardConfigured,
-    true
+    false
   );
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
     'info@softora.test',
