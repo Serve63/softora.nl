@@ -29,6 +29,41 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.doesNotMatch(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
 });
 
+test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven', () => {
+  const root = path.join(__dirname, '../..');
+  const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
+  const scoreboardSource = fs.readFileSync(path.join(root, 'assets/premium-coldmail-sender-scoreboard.js'), 'utf8');
+  const context = { window: {} };
+  vm.createContext(context);
+  vm.runInContext(scoreboardSource, context);
+
+  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260520a/);
+  assert.match(scoreboardSource, /id = 'coldmailSenderScoreboard'/);
+  assert.match(scoreboardSource, /data-coldmail-sender'/);
+  assert.match(scoreboardSource, /martijn@softora\.nl/);
+  assert.match(scoreboardSource, /serve@softora\.nl/);
+  assert.match(scoreboardSource, /\.coldmail-sender-scoreboard-entry\.is-leading\{color:var\(--crimson\)\}/);
+  assert.match(scoreboardSource, /querySelector\('#screen-dashboard \.topbar'\)/);
+  assert.match(scoreboardSource, /sendColdmailCampaignNowWithSenderScoreboardRefresh/);
+  assert.match(scoreboardSource, /sentFromEmail/);
+  assert.match(scoreboardSource, /lastColdmailSenderEmail/);
+
+  const entries = context.window.SoftoraColdmailSenderScoreboard.calculateSenderStats([
+    { sentFromEmail: 'serve@softora.nl', lastColdmailSentAt: '2026-05-20T00:00:00.000Z' },
+    { outreachSentFromEmail: 'martijn@softora.nl', outreachSentAt: '2026-05-20T01:00:00.000Z' },
+    { lastColdmailSenderEmail: 'martijn@softora.nl', coldmailCampaignStartedAt: '2026-05-20T02:00:00.000Z' },
+    { sentFromEmail: 'info@softora.nl', lastColdmailSentAt: '2026-05-20T03:00:00.000Z' },
+  ]);
+
+  assert.equal(
+    JSON.stringify(entries.map((entry) => ({ email: entry.email, count: entry.count }))),
+    JSON.stringify([
+      { email: 'martijn@softora.nl', count: 2 },
+      { email: 'serve@softora.nl', count: 1 },
+    ])
+  );
+});
+
 test('risky action pin modal uses a typed input without exposing the pin in frontend assets', () => {
   const pinAssetPath = path.join(__dirname, '../../assets/premium-risky-action-pin.js');
   const pinAssetSource = fs.readFileSync(pinAssetPath, 'utf8');
