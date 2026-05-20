@@ -6,6 +6,9 @@
     { email: 'serve@softora.nl', displayName: 'Servé' },
   ];
   const STYLE_ID = 'softora-coldmail-sender-scoreboard-style';
+  const RETRY_DELAY_MS = 3500;
+
+  let retryTimer = null;
 
   function normalizeString(value) {
     return String(value == null ? '' : value).trim();
@@ -13,6 +16,12 @@
 
   function normalizeEmail(value) {
     return normalizeString(value).toLowerCase();
+  }
+
+  function hasCustomerRowsSnapshot(values) {
+    const stateValues = values && typeof values === 'object' ? values : {};
+    return Object.prototype.hasOwnProperty.call(stateValues, CUSTOMER_DB_KEY) ||
+      Object.prototype.hasOwnProperty.call(stateValues, CUSTOMER_DB_KEY + '_chunks_v1');
   }
 
   function parseCustomerRows(values) {
@@ -97,6 +106,7 @@
       '.coldmail-sender-scoreboard-entry.is-leading{color:var(--crimson)}',
       '.coldmail-sender-scoreboard-name,.coldmail-sender-scoreboard-count{display:inline-flex;align-items:center}',
       '.coldmail-sender-scoreboard-count{min-width:1.45rem;justify-content:flex-end;color:inherit;font-variant-numeric:tabular-nums}',
+      '.coldmail-sender-scoreboard.is-loading .coldmail-sender-scoreboard-count{color:var(--text-tertiary)}',
       'html[data-softora-lead-generator-alias="1"] .coldmail-sender-scoreboard{display:none!important}',
       '@media (max-width:1024px){.coldmail-sender-scoreboard{align-self:flex-start}}',
     ].join('');
@@ -114,7 +124,7 @@
     const count = doc.createElement('span');
     count.className = 'coldmail-sender-scoreboard-count';
     count.setAttribute('data-coldmail-sender-count', '');
-    count.textContent = '0';
+    count.textContent = '...';
     row.appendChild(name);
     row.appendChild(count);
     return row;
@@ -127,6 +137,7 @@
     if (!topbar) return;
     const wrap = doc.createElement('div');
     wrap.className = 'coldmail-sender-scoreboard';
+    wrap.classList.add('is-loading');
     wrap.id = 'coldmailSenderScoreboard';
     wrap.setAttribute('aria-label', 'Coldmail teller per mailadres');
     const list = doc.createElement('div');
@@ -137,10 +148,31 @@
     topbar.appendChild(wrap);
   }
 
+  function setLoadingState() {
+    const doc = global.document;
+    const wrap = doc && doc.getElementById ? doc.getElementById('coldmailSenderScoreboard') : null;
+    const list = doc && doc.getElementById ? doc.getElementById('coldmailSenderScoreboardList') : null;
+    if (wrap) {
+      wrap.classList.add('is-loading');
+      wrap.setAttribute('aria-label', 'Coldmail teller per mailadres wordt geladen');
+    }
+    if (!list) return;
+    Array.from(list.querySelectorAll('[data-coldmail-sender-row]')).forEach((row) => {
+      row.classList.remove('is-leading');
+      const countEl = row.querySelector('[data-coldmail-sender-count]');
+      if (countEl) countEl.textContent = '...';
+    });
+  }
+
   function renderSenderStats(entries) {
     const doc = global.document;
+    const wrap = doc && doc.getElementById ? doc.getElementById('coldmailSenderScoreboard') : null;
     const list = doc && doc.getElementById ? doc.getElementById('coldmailSenderScoreboardList') : null;
     if (!list) return;
+    if (wrap) {
+      wrap.classList.remove('is-loading');
+      wrap.setAttribute('aria-label', 'Coldmail teller per mailadres');
+    }
     const rowsByEmail = new Map();
     Array.from(list.querySelectorAll('[data-coldmail-sender-row]')).forEach((row) => {
       rowsByEmail.set(normalizeEmail(row.getAttribute('data-coldmail-sender')), row);
@@ -169,7 +201,18 @@
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload) throw new Error('Coldmail teller laden mislukt.');
-    return parseCustomerRows(payload.values);
+    return {
+      rows: parseCustomerRows(payload.values),
+      hasSnapshot: hasCustomerRowsSnapshot(payload.values),
+    };
+  }
+
+  function scheduleRetry() {
+    if (typeof global.setTimeout !== 'function') return;
+    if (retryTimer && typeof global.clearTimeout === 'function') global.clearTimeout(retryTimer);
+    retryTimer = global.setTimeout(() => {
+      refresh().catch(() => null);
+    }, RETRY_DELAY_MS);
   }
 
   async function refresh() {
@@ -179,8 +222,17 @@
     }
     injectStyles();
     ensureScoreboard();
-    const rows = await loadCustomerRows();
-    const entries = calculateSenderStats(rows);
+    const snapshot = await loadCustomerRows();
+    if (!snapshot.hasSnapshot) {
+      setLoadingState();
+      scheduleRetry();
+      return [];
+    }
+    if (retryTimer && typeof global.clearTimeout === 'function') {
+      global.clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+    const entries = calculateSenderStats(snapshot.rows);
     renderSenderStats(entries);
     return entries;
   }
@@ -223,9 +275,11 @@
   global.SoftoraColdmailSenderScoreboard = {
     calculateSenderStats,
     ensureScoreboard,
+    hasCustomerRowsSnapshot,
     parseCustomerRows,
     patchSendRefresh,
     renderSenderStats,
+    setLoadingState,
     refresh,
   };
 })(window);
