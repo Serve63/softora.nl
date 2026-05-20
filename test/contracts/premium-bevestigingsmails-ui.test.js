@@ -47,6 +47,14 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.match(scoreboardSource, /sendColdmailCampaignNowWithSenderScoreboardRefresh/);
   assert.match(scoreboardSource, /sentFromEmail/);
   assert.match(scoreboardSource, /lastColdmailSenderEmail/);
+  assert.match(scoreboardSource, /count\.textContent = '\.\.\.'/);
+  assert.doesNotMatch(scoreboardSource, /count\.textContent = '0'/);
+  assert.match(scoreboardSource, /hasCustomerRowsSnapshot/);
+  assert.match(scoreboardSource, /setLoadingState\(\);[\s\S]*scheduleRetry\(\);/);
+  assert.equal(context.window.SoftoraColdmailSenderScoreboard.hasCustomerRowsSnapshot({}), false);
+  assert.equal(context.window.SoftoraColdmailSenderScoreboard.hasCustomerRowsSnapshot({
+    softora_customers_premium_v1: '[]',
+  }), true);
 
   const entries = context.window.SoftoraColdmailSenderScoreboard.calculateSenderStats([
     { sentFromEmail: 'serve@softora.nl', lastColdmailSentAt: '2026-05-20T00:00:00.000Z' },
