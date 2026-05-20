@@ -342,7 +342,9 @@ test('mailbox service filters belangrijk from flagged inbox messages', async () 
 
 test('mailbox service can return lightweight mailbox summaries without parsing full mail bodies', async () => {
   let parseCalls = 0;
+  let fetchedRange = null;
   let fetchQuery = null;
+  let fetchOptions = null;
   const service = createMailboxService({
     mailboxAccountsRaw: JSON.stringify([
       {
@@ -354,12 +356,17 @@ test('mailbox service can return lightweight mailbox summaries without parsing f
     ]),
     createImapClient: () => ({
       usable: true,
+      mailbox: { exists: 20 },
       connect: async () => {},
       list: async () => [{ path: 'INBOX' }],
       getMailboxLock: async () => ({ release() {} }),
-      search: async () => [1],
-      fetch: async function* (_range, query) {
+      search: async () => {
+        throw new Error('Summary mailbox list should not search the whole mailbox.');
+      },
+      fetch: async function* (range, query, options) {
+        fetchedRange = range;
         fetchQuery = query;
+        fetchOptions = options;
         yield {
           uid: 1,
           flags: [],
@@ -388,7 +395,9 @@ test('mailbox service can return lightweight mailbox summaries without parsing f
 
   assert.equal(res.statusCode, 200);
   assert.equal(parseCalls, 0);
+  assert.equal(fetchedRange, '11:*');
   assert.deepEqual(fetchQuery, { uid: true, flags: true, internalDate: true, envelope: true });
+  assert.deepEqual(fetchOptions, { uid: false });
   assert.equal(res.body.messages[0].from, 'Klant');
   assert.equal(res.body.messages[0].email, 'klant@example.nl');
   assert.equal(res.body.messages[0].subject, 'Snelle lijst');

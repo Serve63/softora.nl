@@ -191,9 +191,10 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(modelsSource, /struct MailboxMessage: Identifiable, Decodable, Hashable/);
   assert.match(apiClientSource, /func fetchMailboxAccounts\(\) async throws -> \[MailboxAccount\]/);
   assert.match(apiClientSource, /\/api\/mailbox\/accounts/);
-  assert.match(apiClientSource, /func fetchMailboxMessages\(account: String, folder: String, limit: Int = 25, summaryOnly: Bool = true\) async throws -> \[MailboxMessage\]/);
+  assert.match(apiClientSource, /func fetchMailboxMessages\(account: String, folder: String, limit: Int = 25, summaryOnly: Bool = true, fresh: Bool = false\) async throws -> \[MailboxMessage\]/);
   assert.match(apiClientSource, /\/api\/mailbox\/messages\?account=/);
   assert.match(apiClientSource, /summary=\\\(summaryValue\)/);
+  assert.match(apiClientSource, /fresh=\\\(freshValue\)/);
   assert.match(apiClientSource, /func fetchMailboxMessageDetail\(account: String, folder: String, uid: Int\) async throws -> MailboxMessage/);
   assert.match(apiClientSource, /uid=\\\(uid\)&limit=1/);
   assert.match(apiClientSource, /func sendMailboxMessage\(account: String, to: String, subject: String, body: String\) async throws/);
@@ -221,6 +222,7 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /Task \{[^]*await loadMessageDetail\(for: message\)[^]*\}/);
   assert.match(agendaListSource, /apiClient\.fetchMailboxMessageDetail/);
   assert.match(agendaListSource, /MailboxDetailLoadingView\(\)/);
+  assert.match(agendaListSource, /await loadMessages\(fresh: true\)/);
   assert.match(agendaListSource, /@State private var mailboxStatusMessage: String\?/);
   assert.match(agendaListSource, /Text\("Mailbox niet geladen"\)/);
   assert.match(agendaListSource, /Text\("Opnieuw proberen"\)/);

@@ -60,12 +60,13 @@ struct SoftoraAPIClient {
         return response.accounts
     }
 
-    func fetchMailboxMessages(account: String, folder: String, limit: Int = 25, summaryOnly: Bool = true) async throws -> [MailboxMessage] {
+    func fetchMailboxMessages(account: String, folder: String, limit: Int = 25, summaryOnly: Bool = true, fresh: Bool = false) async throws -> [MailboxMessage] {
         let encodedAccount = queryEncoded(account)
         let encodedFolder = queryEncoded(folder)
         let summaryValue = summaryOnly ? "1" : "0"
+        let freshValue = fresh ? "1" : "0"
         let response: MailboxMessagesResponse = try await get(
-            "/api/mailbox/messages?account=\(encodedAccount)&folder=\(encodedFolder)&limit=\(limit)&summary=\(summaryValue)"
+            "/api/mailbox/messages?account=\(encodedAccount)&folder=\(encodedFolder)&limit=\(limit)&summary=\(summaryValue)&fresh=\(freshValue)"
         )
         guard response.ok else {
             throw SoftoraAPIError.server(response.detail ?? response.error ?? "Mailbox laden mislukt.")

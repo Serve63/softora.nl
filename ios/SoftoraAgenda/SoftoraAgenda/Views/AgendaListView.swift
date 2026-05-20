@@ -1187,7 +1187,7 @@ private struct MailboxView: View {
                 .padding(.bottom, 20)
             }
             .refreshable {
-                await loadMessages()
+                await loadMessages(fresh: true)
             }
             .scrollIndicators(.hidden)
         }
@@ -1272,7 +1272,7 @@ private struct MailboxView: View {
         }
     }
 
-    private func loadMessages() async {
+    private func loadMessages(fresh: Bool = false) async {
         guard let account = selectedAccount else {
             messages = []
             selectedMessage = nil
@@ -1296,7 +1296,8 @@ private struct MailboxView: View {
                 account: account.email,
                 folder: selectedFolder.apiValue,
                 limit: 25,
-                summaryOnly: true
+                summaryOnly: true,
+                fresh: fresh
             )
             selectedMessage = nil
             isLoadingMessageDetail = false

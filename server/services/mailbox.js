@@ -15,6 +15,7 @@ const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MAILBOX_DRAFT_MODEL = 'gpt-5.5-pro';
 const MAX_INLINE_IMAGE_BYTES = 5_000_000;
+const MAILBOX_SUMMARY_CACHE_TTL_MS = 15_000;
 
 const FOLDER_ALIASES = {
   inbox: ['INBOX'],
@@ -64,6 +65,7 @@ function createMailboxService(deps = {}) {
     openAiApiBaseUrl = process.env.OPENAI_API_BASE_URL || DEFAULT_OPENAI_API_BASE_URL,
     mailboxDraftModel = process.env.MAILBOX_DRAFT_OPENAI_MODEL || process.env.OPENAI_MODEL || DEFAULT_MAILBOX_DRAFT_MODEL,
   } = deps;
+  const summaryCache = new Map();
 
   const baseAccount = {
     email: normalizeString(mailConfig.mailFromAddress || mailConfig.smtpUser || mailConfig.imapUser).toLowerCase(),
@@ -610,7 +612,39 @@ function createMailboxService(deps = {}) {
     };
   }
 
-  async function listMessages({ accountEmail, folder = 'inbox', limit = 50, summaryOnly = false, uid = 0 }) {
+  function summaryCacheKey(accountEmail, folder, limit) {
+    return [normalizeEmail(accountEmail), normalizeString(folder).toLowerCase(), Math.max(1, Math.min(100, Number(limit) || 50))].join('|');
+  }
+
+  function getSummaryCache(key) {
+    const cached = summaryCache.get(key);
+    if (!cached || Date.now() - cached.createdAt > MAILBOX_SUMMARY_CACHE_TTL_MS) {
+      summaryCache.delete(key);
+      return null;
+    }
+    return cached.messages;
+  }
+
+  function setSummaryCache(key, messages) {
+    summaryCache.set(key, {
+      createdAt: Date.now(),
+      messages: Array.isArray(messages) ? messages : [],
+    });
+    if (summaryCache.size > 80) {
+      const oldestKey = summaryCache.keys().next().value;
+      if (oldestKey) summaryCache.delete(oldestKey);
+    }
+  }
+
+  function latestSequenceRange(client, limit) {
+    const exists = Number(client && client.mailbox && client.mailbox.exists) || 0;
+    if (!exists) return '';
+    const safeLimit = Math.max(1, Math.min(100, Number(limit) || 50));
+    const start = Math.max(1, exists - safeLimit + 1);
+    return `${start}:*`;
+  }
+
+  async function listMessages({ accountEmail, folder = 'inbox', limit = 50, summaryOnly = false, uid = 0, fresh = false }) {
     const requestedFolder = normalizeString(folder || 'inbox').toLowerCase();
     const mailboxFolder = requestedFolder === 'starred' || requestedFolder === 'important' ? 'inbox' : requestedFolder;
     const account = getAccount(accountEmail);
@@ -625,6 +659,13 @@ function createMailboxService(deps = {}) {
       throw error;
     }
 
+    const requestedUid = Number(uid) || 0;
+    const cacheKey = summaryOnly && requestedUid <= 0 ? summaryCacheKey(account.email, requestedFolder, limit) : '';
+    if (cacheKey && !fresh) {
+      const cachedMessages = getSummaryCache(cacheKey);
+      if (cachedMessages) return cachedMessages;
+    }
+
     const client = createClient(account);
     try {
       await client.connect();
@@ -632,16 +673,20 @@ function createMailboxService(deps = {}) {
       if (!mailboxName) return [];
       const lock = await client.getMailboxLock(mailboxName);
       try {
-        const requestedUid = Number(uid) || 0;
         let range;
+        let fetchOptions;
         if (requestedUid > 0) {
           range = { uid: requestedUid };
+        } else if (summaryOnly) {
+          range = latestSequenceRange(client, limit);
+          fetchOptions = range ? { uid: false } : undefined;
         } else {
           const allUids = await client.search(['ALL']);
           range = (Array.isArray(allUids) ? allUids : [])
             .slice(-Math.max(1, Math.min(100, Number(limit) || 50)))
             .reverse();
         }
+        if (!range) return [];
         if (Array.isArray(range) && !range.length) return [];
 
         const fetchQuery = summaryOnly
@@ -650,7 +695,7 @@ function createMailboxService(deps = {}) {
 
         const records = [];
         const imageLabels = [];
-        for await (const message of client.fetch(range, fetchQuery)) {
+        for await (const message of client.fetch(range, fetchQuery, fetchOptions)) {
           if (summaryOnly) {
             records.push({ message });
             continue;
@@ -672,7 +717,9 @@ function createMailboxService(deps = {}) {
         const visibleMessages = requestedFolder === 'starred' || requestedFolder === 'important'
           ? messages.filter((item) => item.starred)
           : messages;
-        return visibleMessages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const sortedMessages = visibleMessages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        if (cacheKey) setSummaryCache(cacheKey, sortedMessages);
+        return sortedMessages;
       } finally {
         lock.release();
       }
@@ -836,6 +883,7 @@ function createMailboxService(deps = {}) {
         limit: Number(req.query?.limit || 50) || 50,
         summaryOnly: ['1', 'true', 'yes'].includes(normalizeString(req.query?.summary).toLowerCase()),
         uid: Number(req.query?.uid || 0) || 0,
+        fresh: ['1', 'true', 'yes'].includes(normalizeString(req.query?.fresh).toLowerCase()),
       });
       return res.status(200).json({ ok: true, messages });
     } catch (error) {
