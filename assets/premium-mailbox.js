@@ -556,6 +556,7 @@ let mails = [];
 let activeFolder = 'inbox';
 let activeMail = null;
 let inboxUnreadCount = 0;
+let mailboxSyncState = null;
 let composeReplyContext = null;
 function resetDetailEmpty() {
   document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
@@ -660,15 +661,20 @@ async function loadMailboxMessages(options = {}) {
     if (!response.ok || !data?.ok) {
       throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
     }
+    mailboxSyncState = data?.sync && typeof data.sync === 'object' ? data.sync : null;
     mails = Array.isArray(data.messages) ? data.messages.map(normalizeMailboxApiMessage) : [];
     renderList();
     void hydrateMailboxOutreachContextsInBackground().catch(() => {});
+    if (mailboxSyncState?.warming) {
+      window.SoftoraMailboxIndex?.setStatus('Mailbox wordt bijgewerkt…');
+    }
     if (!options.skipBackgroundSync && data?.sync?.refreshRecommended) {
       void syncMailboxInBackground();
     } else if (!window.SoftoraMailboxIndex || !window.SoftoraMailboxIndex.isSyncInFlight()) {
       window.SoftoraMailboxIndex?.setStatus('');
     }
   } catch (error) {
+    mailboxSyncState = null;
     mails = [];
     window.SoftoraMailboxIndex?.setStatus('');
     syncInboxBadgeFromCurrentFolder();
@@ -735,7 +741,11 @@ function renderList() {
   const wrap = document.getElementById('mail-items');
   if (!wrap) return;
   syncInboxBadgeFromCurrentFolder();
-  if (!list.length) { wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Geen e-mails gevonden.</div>`; return; }
+  if (!list.length) {
+    const emptyText = mailboxSyncState?.warming ? 'Mailbox wordt bijgewerkt…' : 'Geen e-mails gevonden.';
+    wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
   wrap.innerHTML = list.map(m => `
     <div class="mail-item ${m.unread ? 'unread' : ''} ${String(activeMail) === String(m.id) ? 'active' : ''}" data-mailbox-action="open-mail" data-mailbox-id="${escapeHtml(m.id)}" role="button" tabindex="0">
       ${m.unread ? '<div class="unread-dot"></div>' : ''}
