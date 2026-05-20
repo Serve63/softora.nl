@@ -6,10 +6,12 @@ const path = require('node:path');
 const {
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
+  countSeoContentWords,
   getSeoContentClusterForItem,
   getSeoContentClusters,
   getSeoContentItem,
   getSeoContentItems,
+  getSeoContentMinimumWordCount,
   getSeoContentImageForItem,
   getSeoContentPathForItem,
   getSeoContentCollectionPaths,
@@ -109,6 +111,13 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /"@type":"Article"/);
   assert.match(html, /"articleSection":"AI automatisering"/);
   assert.match(html, /"image":\["https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"\]/);
+  assert.match(html, /"wordCount":\d{3,}/);
+  assert.match(html, /"author":\{"@type":"Person","name":"Martijn van de Ven"/);
+  assert.match(html, /"reviewedBy":\{"@type":"Person","name":"Martijn van de Ven"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /data-softora-public-seo="eeat"/);
+  assert.match(html, /data-softora-public-seo="faq"/);
+  assert.match(html, />Martijn van de Ven<\/span>/);
   assert.match(html, /<figure class="artikel-img">/);
   assert.match(html, /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
   assert.match(html, /data-content-cluster="ai-automatisering"/);
@@ -133,7 +142,7 @@ test('seo content article template keeps title, image, body and CTA on the same 
   );
   assert.doesNotMatch(extractCssRuleBlock(css, '.artikel-hero'), /max-width:\s*760px/);
   assert.doesNotMatch(extractCssRuleBlock(css, '.artikel-body'), /max-width:\s*680px/);
-  assert.match(html, /<link rel="stylesheet" href="\/assets\/seo-content\.css\?v=20260520b">/);
+  assert.match(html, /<link rel="stylesheet" href="\/assets\/seo-content\.css\?v=20260520c">/);
   assert.match(html, /<section class="artikel-hero">/);
   assert.match(html, /<figure class="artikel-img">/);
   assert.match(html, /<article class="artikel-body">/);
@@ -309,6 +318,11 @@ test('seo content bewaakt unieke slugs, clusters en interne links', () => {
     assert.ok(item.title.length >= 20, item.slug);
     assert.ok(item.description.length >= 80, item.slug);
     assert.ok(item.sections.length >= 3, item.slug);
+    assert.ok(countSeoContentWords(item) >= getSeoContentMinimumWordCount(item), `${item.slug} is te dun voor SEO.`);
+    assert.ok(item.wordCount >= getSeoContentMinimumWordCount(item), `${item.slug} mist berekende woordkwaliteit.`);
+    assert.ok(item.author && item.author.name === 'Martijn van de Ven', `${item.slug} mist auteur.`);
+    assert.ok(item.reviewedBy && item.reviewedBy.name === 'Martijn van de Ven', `${item.slug} mist review-signaal.`);
+    assert.ok(Array.isArray(item.faq) && item.faq.length >= 3, `${item.slug} mist FAQ-verdieping.`);
     assert.ok(item.relatedLinks.length >= 3, item.slug);
     assert.ok(item.relatedLinks.every((link) => String(link.href || '').startsWith('/')), item.slug);
     assert.ok(clusterKeys.has(cluster.key), item.slug);

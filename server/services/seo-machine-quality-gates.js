@@ -22,6 +22,14 @@ const DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS = Object.freeze({
   '/pakketten': 5,
 });
 
+const DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION = Object.freeze({
+  blog: 900,
+  kennisbank: 650,
+  vergelijkingen: 850,
+  branches: 700,
+  regio: 700,
+});
+
 function normalizeInternalPath(valueRaw) {
   const raw = String(valueRaw || '').trim();
   if (!raw || raw.startsWith('#')) return '';
@@ -94,11 +102,19 @@ function countWords(valueRaw) {
 }
 
 function getItemWordCount(item) {
+  if (Number.isFinite(Number(item.wordCount)) && Number(item.wordCount) > 0) {
+    return Number(item.wordCount);
+  }
   return (item.sections || []).reduce((total, section) => {
     const headingWords = countWords(section.heading);
     const paragraphWords = (section.paragraphs || []).reduce((sum, paragraph) => sum + countWords(paragraph), 0);
     return total + headingWords + paragraphWords;
-  }, countWords(item.summary));
+  }, countWords(item.summary)) + (item.faq || []).reduce((total, entry) => total + countWords(entry.question) + countWords(entry.answer), 0);
+}
+
+function getMinimumContentWordCount(item) {
+  const collection = String(item && item.collection ? item.collection : '').trim().toLowerCase();
+  return DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION[collection] || 650;
 }
 
 function auditContentQuality({ items = [], clusters = [], commercialTargets = DEFAULT_COMMERCIAL_TARGETS } = {}) {
@@ -127,8 +143,20 @@ function auditContentQuality({ items = [], clusters = [], commercialTargets = DE
     if ((item.sections || []).length < 3) {
       issues.push({ type: 'thin-sections', path: pathName, message: `${pageLabel} heeft minder dan drie inhoudsblokken.` });
     }
-    if (getItemWordCount(item) < 140) {
-      issues.push({ type: 'thin-body', path: pathName, message: `${pageLabel} heeft te weinig inhoud voor SEO.` });
+    const wordCount = getItemWordCount(item);
+    const minWordCount = getMinimumContentWordCount(item);
+    if (wordCount < minWordCount) {
+      issues.push({
+        type: 'thin-body',
+        path: pathName,
+        message: `${pageLabel} heeft ${wordCount} woorden; minimaal ${minWordCount} verwacht voor deze contentlaag.`,
+      });
+    }
+    if (!item.author || !item.reviewedBy) {
+      issues.push({ type: 'missing-eeat', path: pathName, message: `${pageLabel} mist auteur of inhoudelijke controle.` });
+    }
+    if (!Array.isArray(item.faq) || item.faq.length < 3) {
+      issues.push({ type: 'missing-faq-depth', path: pathName, message: `${pageLabel} mist FAQ-verdieping.` });
     }
     if (relatedLinks.length < 3) {
       issues.push({ type: 'weak-related-links', path: pathName, message: `${pageLabel} heeft te weinig interne links.` });
@@ -247,6 +275,7 @@ function auditSeoImages({ pages = [] } = {}) {
 
 module.exports = {
   DEFAULT_COMMERCIAL_TARGETS,
+  DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION,
   DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS,
   auditContentQuality,
   auditConversionCtas,
