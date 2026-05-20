@@ -115,6 +115,8 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /"author":\{"@type":"Person","name":"Martijn van de Ven"/);
   assert.match(html, /"reviewedBy":\{"@type":"Person","name":"Martijn van de Ven"/);
   assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Wanneer is AI automatisering voor het MKB interessant voor mijn bedrijf\?/);
+  assert.doesNotMatch(html, /Wanneer is AI automatisering voor het MKB: waar begin je\? interessant/);
   assert.match(html, /data-softora-public-seo="eeat"/);
   assert.match(html, /data-softora-public-seo="faq"/);
   assert.match(html, />Martijn van de Ven<\/span>/);
@@ -126,6 +128,12 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /href="\/ai-telefonist"/);
   assert.match(html, /data-softora-public-seo="conversion-cta"/);
   assert.match(html, /href="\/#contact"[^>]*>Neem contact op<\/a>/);
+
+  const kennisbankHtml = buildSeoContentArticleHtml(getSeoContentItem('kennisbank', 'wat-is-een-ai-telefonist'), {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  assert.match(kennisbankHtml, /Wanneer is een AI telefonist interessant voor mijn bedrijf\?/);
+  assert.doesNotMatch(kennisbankHtml, /Wanneer is Wat is een AI telefonist/);
 });
 
 test('seo content article template keeps title, image, body and CTA on the same width', () => {
