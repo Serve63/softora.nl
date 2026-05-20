@@ -4,7 +4,10 @@ Deze poorten bewaken dat de SEO-machine niet alleen publiceert, maar ook netjes 
 
 ## Wat De Poort Bewaakt
 
-- Contentkwaliteit: iedere live publicatie heeft een duidelijke titel, meta description, minimaal drie inhoudsblokken, genoeg tekst, een bekend cluster en interne links naar money pages.
+- Contentkwaliteit: iedere live publicatie heeft een duidelijke titel, meta description, minimaal drie inhoudsblokken, echte verdieping, FAQ, auteur/review-signaal, een bekend cluster en interne links naar money pages.
+- Woorddiepte: blogs en vergelijkingen mogen niet meer als korte 200-woorden stukken live komen. De poort bewaakt nu minimaal 900 woorden voor blogs, 850 voor vergelijkingen, 650 voor kennisbank en 700 voor branche/regio. Voor zware koopintentie-artikelen blijft het richtpunt 1200-1800 woorden wanneer de zoekvraag dat vraagt.
+- E-E-A-T: content toont aan de voorkant wie de uitleg schrijft/controleert en gebruikt structured data met auteur, review, wordCount en FAQ waar passend.
+- Afbeeldingen: iedere SEO-publicatie gebruikt een echte foto uit `/assets/seo-content/` met beschrijvende bestandsnaam en alt-tekst. Geen placeholders of neppe computerachtige visuals.
 - Interne linkgraph: belangrijke commerciële pagina's moeten genoeg interne ingangen krijgen vanuit publieke pagina's en content.
 - CTA-meetbaarheid: publieke commerciële pagina's en SEO-content krijgen meetlabels op contact- en service-CTA's, zodat we later beter kunnen zien welke pagina's leads helpen maken.
 - Schone publieke structuur: content en navigatie gebruiken gewone publieke URL's zoals `/diensten`, `/pakketten`, `/website-laten-maken` en `/ai-automatisering`.
@@ -21,6 +24,7 @@ De standaard blijft gecontroleerd groeien:
 - 3 tot 5 sterke publicaties per week.
 - Eerst money pages en ondersteunende contentclusters.
 - Pas opschalen wanneer de linkstructuur, kwaliteit en meetbaarheid groen blijven.
+- Nieuwe publicaties krijgen pas groen licht als tekst, foto, alt-tekst, interne links, CTA en E-E-A-T samen kloppen.
 
 ## Werkwijze Voor Agents
 

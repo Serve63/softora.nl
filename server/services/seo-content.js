@@ -23,7 +23,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
     eyebrow: 'Kennisbank',
     heading: 'Heldere uitleg voor betere digitale keuzes',
     intro:
-      'De kennisbank is bedoeld als vaste SEO-basis: korte, duidelijke uitlegpagina’s die intern linken naar diensten en verdiepende artikelen.',
+      'De kennisbank is bedoeld als vaste SEO-basis: gerichte, duidelijke uitlegpagina’s die intern linken naar diensten en verdiepende artikelen.',
   }),
   vergelijkingen: Object.freeze({
     key: 'vergelijkingen',
@@ -163,6 +163,26 @@ const SEO_CONTENT_IMAGES_BY_CLUSTER = Object.freeze({
     src: '/assets/seo-content/lokale-seo-brabant-groei-softora.jpg',
     alt: 'Lokale Nederlandse kantoorwerkplek met uitzicht op een straat voor regionale SEO en digitale groei.',
   }),
+});
+
+const SEO_CONTENT_AUTHOR = Object.freeze({
+  name: 'Martijn van de Ven',
+  role: 'Digitale strategie en automatisering',
+  href: '/over-softora',
+});
+
+const SEO_CONTENT_REVIEWER = Object.freeze({
+  name: 'Martijn van de Ven',
+  role: 'Inhoudelijke controle',
+  href: '/over-softora',
+});
+
+const SEO_CONTENT_MIN_WORDS_BY_COLLECTION = Object.freeze({
+  blog: 900,
+  kennisbank: 650,
+  vergelijkingen: 850,
+  branches: 700,
+  regio: 700,
 });
 
 const SEO_CONTENT_ITEMS = Object.freeze([
@@ -1266,13 +1286,155 @@ function getSeoContentImageForItem(item) {
   return SEO_CONTENT_IMAGES_BY_CLUSTER[cluster.key] || SEO_CONTENT_IMAGES_BY_CLUSTER.websites;
 }
 
+function countWords(valueRaw) {
+  return String(valueRaw || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+function countSeoContentWords(item) {
+  if (!item) return 0;
+  const sectionWords = (item.sections || []).reduce((total, section) => {
+    const paragraphWords = (section.paragraphs || []).reduce((sum, paragraph) => sum + countWords(paragraph), 0);
+    return total + countWords(section.heading) + paragraphWords;
+  }, 0);
+  const faqWords = (item.faq || []).reduce((total, entry) => total + countWords(entry.question) + countWords(entry.answer), 0);
+  return (
+    countWords(item.title) +
+    countWords(item.description) +
+    countWords(item.summary) +
+    sectionWords +
+    faqWords
+  );
+}
+
+function getSeoContentMinimumWordCount(item) {
+  const collection = String(item && item.collection ? item.collection : '').trim().toLowerCase();
+  return SEO_CONTENT_MIN_WORDS_BY_COLLECTION[collection] || 650;
+}
+
+function formatSeoReadTime(wordCountRaw) {
+  const wordCount = Number(wordCountRaw) || 0;
+  const minutes = Math.max(4, Math.ceil(wordCount / 190));
+  return `${minutes} min`;
+}
+
+function buildSeoContentDepthSections(item) {
+  const cluster = getSeoContentClusterForItem(item);
+  const topic = String(item.title || 'dit onderwerp').trim();
+  const category = String(item.category || cluster.label || 'digitale groei').trim();
+  const intent = String(item.intent || 'orientatie').trim().toLowerCase();
+  const commercialRoute = cluster.ctaLabel || 'de juiste oplossing';
+  const clusterContext = {
+    websites:
+      'Bij websites gaat het uiteindelijk om vindbaarheid, vertrouwen en aanvraagmomenten. Een pagina moet dus niet alleen mooi zijn, maar ook snel duidelijk maken waarom iemand contact zou opnemen.',
+    'ai-automatisering':
+      'Bij AI automatisering draait de waarde vooral om herhaalbaar werk: intake, beoordeling, samenvatting, overdracht en opvolging. De techniek is pas nuttig wanneer de route eromheen strak staat.',
+    'software-crm':
+      'Bij software en CRM zit de winst in overzicht. Leads, klanten, taken, offertes en rapportages moeten op een plek samenkomen, zodat een team minder hoeft te zoeken en sneller kan handelen.',
+    'ai-contact':
+      'Bij AI klantcontact gaat het niet om een slim trucje, maar om bereikbaarheid, duidelijke antwoorden en veilige overdracht naar een mens wanneer dat beter is.',
+    branches:
+      'Bij branchepagina’s is herkenbaarheid belangrijk. Een ondernemer moet direct voelen dat de voorbeelden aansluiten op de dagelijkse praktijk van zijn of haar bedrijf.',
+    lokaal:
+      'Bij lokale SEO telt vertrouwen extra zwaar. De pagina moet duidelijk maken voor welke regio Softora relevant is en welke concrete digitale stap een bedrijf daar kan zetten.',
+  }[cluster.key] || 'De waarde zit in duidelijke keuzes, goede techniek en een logische route van bezoeker naar aanvraag.';
+
+  return Object.freeze([
+    Object.freeze({
+      heading: 'Wat deze keuze in de praktijk betekent',
+      paragraphs: Object.freeze([
+        `${topic} is geen los onderwerp dat je alleen op gevoel moet beoordelen. Voor ondernemers wordt het pas interessant wanneer het helpt om meer aanvragen te krijgen, minder handwerk te doen of sneller de juiste vervolgstap te kiezen. Daarom kijken we bij ${category} altijd naar de combinatie van zoekvraag, klantvraag en bedrijfsproces.`,
+        `${clusterContext} Een goed artikel of goede landingspagina moet die samenhang uitleggen zonder te vervallen in vaktaal. De bezoeker moet na het lezen beter weten wat verstandig is, welke valkuilen er zijn en wanneer ${commercialRoute} logisch wordt.`,
+      ]),
+    }),
+    Object.freeze({
+      heading: 'Welke signalen maken dit belangrijk',
+      paragraphs: Object.freeze([
+        `Dit onderwerp wordt meestal belangrijk zodra losse keuzes groei beginnen af te remmen. Denk aan bezoekers die niet converteren, leads die te laat worden opgevolgd, klantinformatie die versnipperd raakt of medewerkers die dezelfde taken steeds opnieuw handmatig uitvoeren.`,
+        `Voor zoekintentie ${intent} betekent dat de content niet alleen moet uitleggen wat iets is. De pagina moet ook helpen met beslissen: wat levert het op, wanneer is het te vroeg, welke basis moet eerst staan en welke stap geeft de meeste waarde zonder onnodige complexiteit?`,
+      ]),
+    }),
+    Object.freeze({
+      heading: 'Hoe Softora dit benadert',
+      paragraphs: Object.freeze([
+        `Softora kijkt eerst naar de route van bezoeker, lead of klant. Waar komt iemand binnen, welke informatie mist nog, welke actie moet daarna gebeuren en welk systeem moet dat vasthouden? Pas daarna kiezen we welke pagina, automatisering of softwarelaag nodig is.`,
+        `Die aanpak voorkomt dat content alleen maar tekst wordt. Een artikel over ${category} moet linken naar de juiste dienst, een dienstpagina moet vragen wegnemen en een systeem moet de opvolging meetbaar maken. Zo ontstaat stap voor stap een website die niet alleen verkeer aantrekt, maar ook betere aanvragen oplevert.`,
+      ]),
+    }),
+    Object.freeze({
+      heading: 'Waar je vooraf helderheid over moet hebben',
+      paragraphs: Object.freeze([
+        `Voordat je hierin investeert, wil je minimaal drie dingen scherp hebben: wie de ideale klant is, welke vraag die klant in Google intikt en welke actie na het bezoek het meest waardevol is. Zonder die keuzes wordt de pagina breder, maar niet sterker.`,
+        `Daarna kijk je naar bewijs en vertrouwen. Denk aan duidelijke voorbeelden, heldere uitleg, realistische fotografie, logische interne links, goede metadata en een contactroute die niet voelt als een drempel. Dat zijn geen losse details; samen bepalen ze of SEO-verkeer ook echt leadwaarde krijgt.`,
+      ]),
+    }),
+    Object.freeze({
+      heading: 'Hoe je resultaat meet',
+      paragraphs: Object.freeze([
+        `Een pagina is pas klaar om op te schalen wanneer je kunt meten wat hij doet. Belangrijke signalen zijn vertoningen, klikken, gemiddelde positie, CTR, scrollgedrag, contactklikken en de kwaliteit van aanvragen die eruit voortkomen. Ook vragen uit gesprekken, offertes en intakeformulieren tellen mee, omdat die laten zien welke informatie bezoekers nog missen voordat ze vertrouwen genoeg hebben om actie te ondernemen.`,
+        `Als een pagina veel vertoningen krijgt maar weinig klikken, moet de titel of meta description scherper. Als bezoekers wel komen maar niet aanvragen, moet de inhoud, CTA of interne linkroute beter. Zo groeit content niet willekeurig, maar op basis van echte signalen, duidelijke prioriteiten en meetbare verbeteringen.`,
+      ]),
+    }),
+  ]);
+}
+
+function buildSeoContentFaq(item) {
+  const topic = String(item.title || 'dit onderwerp').trim();
+  const cluster = getSeoContentClusterForItem(item);
+  const serviceLabel = cluster.ctaLabel || 'een passende oplossing';
+  return Object.freeze([
+    Object.freeze({
+      question: `Wanneer is ${topic} interessant voor mijn bedrijf?`,
+      answer:
+        'Het wordt interessant wanneer het onderwerp direct invloed heeft op vindbaarheid, opvolging, tijdwinst of betere aanvragen. Als je merkt dat bezoekers afhaken, processen blijven liggen of keuzes onduidelijk zijn, is dit vaak een logische plek om te verbeteren.',
+    }),
+    Object.freeze({
+      question: 'Moet ik hiermee meteen groot starten?',
+      answer:
+        'Nee. De sterkste aanpak is meestal klein maar scherp beginnen: een duidelijke pagina, een meetbare flow of een beperkte automatisering die direct waarde bewijst. Daarna kun je veilig uitbreiden zonder dat de site of het proces rommelig wordt.',
+    }),
+    Object.freeze({
+      question: `Hoe hangt dit samen met ${serviceLabel}?`,
+      answer:
+        'De content helpt bezoekers begrijpen wat verstandig is, terwijl de dienstpagina de commerciële vervolgstap draagt. Door die twee logisch aan elkaar te koppelen, krijgt Google meer context en krijgt de bezoeker een duidelijker pad naar contact.',
+    }),
+    Object.freeze({
+      question: 'Hoe weet ik of de pagina goed genoeg is?',
+      answer:
+        'Kijk naar zoekdata, klikgedrag, aanvragen en de inhoud zelf. Een goede pagina heeft een duidelijke zoekintentie, genoeg diepgang, echte interne links, een sterke CTA, betrouwbare uitleg, goede afbeeldingen en geen tekst die alleen voor zoekmachines geschreven voelt.',
+    }),
+  ]);
+}
+
+function enrichSeoContentItem(item) {
+  if (!item) return item;
+  const sections = Object.freeze([...(item.sections || []), ...buildSeoContentDepthSections(item)]);
+  const faq = item.faq ? Object.freeze([...(item.faq || [])]) : buildSeoContentFaq(item);
+  const base = Object.freeze({
+    ...item,
+    author: item.author || SEO_CONTENT_AUTHOR,
+    reviewedBy: item.reviewedBy || SEO_CONTENT_REVIEWER,
+    sections,
+    faq,
+  });
+  const wordCount = countSeoContentWords(base);
+  return Object.freeze({
+    ...base,
+    minWordCount: getSeoContentMinimumWordCount(base),
+    readTime: formatSeoReadTime(wordCount),
+    wordCount,
+  });
+}
+
 function getSeoContentItems({ collection, now = new Date() } = {}) {
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   return SEO_CONTENT_ITEMS.filter((item) => {
     if (collection && item.collection !== collection) return false;
     const publishedMs = new Date(`${item.publishedAt}T00:00:00.000Z`).getTime();
     return Number.isFinite(publishedMs) && publishedMs <= nowMs;
-  });
+  }).map(enrichSeoContentItem);
 }
 
 function getSeoContentItem(collectionRaw, slugRaw, options = {}) {
@@ -1332,7 +1494,7 @@ function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', s
     `<link rel="canonical" href="${escapeHtml(canonicalUrl)}">`,
     '<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">',
     '<link rel="stylesheet" href="/assets/fonts.css?v=20260409a">',
-    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260520b">',
+    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260520c">',
     `<meta property="og:type" content="${escapeHtml(ogType)}">`,
     '<meta property="og:site_name" content="Softora">',
     '<meta property="og:locale" content="nl_NL">',
@@ -1508,6 +1670,17 @@ function getBackLabelForCollection(collection) {
   return 'overzicht';
 }
 
+function buildPersonSchema(person, site) {
+  if (!person || !person.name) return undefined;
+  return {
+    '@type': 'Person',
+    name: person.name,
+    jobTitle: person.role,
+    url: buildAbsoluteUrl(site, person.href || '/over-softora'),
+    worksFor: { '@id': `${site}/#organization` },
+  };
+}
+
 function buildMainEntityForItem(item, site, canonicalUrl) {
   const cluster = getSeoContentClusterForItem(item);
   const image = getSeoContentImageForItem(item);
@@ -1543,6 +1716,7 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
     description: item.description,
     articleSection: cluster.label,
     image: [imageUrl],
+    wordCount: Number(item.wordCount) || countSeoContentWords(item),
     about: {
       '@type': 'Thing',
       name: cluster.label,
@@ -1551,7 +1725,8 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
     datePublished: item.publishedAt,
     dateModified: item.updatedAt || item.publishedAt,
     inLanguage: 'nl-NL',
-    author: { '@id': `${site}/#organization` },
+    author: buildPersonSchema(item.author || SEO_CONTENT_AUTHOR, site),
+    reviewedBy: buildPersonSchema(item.reviewedBy || SEO_CONTENT_REVIEWER, site),
     publisher: { '@id': `${site}/#organization` },
     mainEntityOfPage: { '@id': `${canonicalUrl}#webpage` },
   };
@@ -1673,6 +1848,49 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
   });
 }
 
+function renderAuthorityBlock(item) {
+  const author = item.author || SEO_CONTENT_AUTHOR;
+  const reviewer = item.reviewedBy || SEO_CONTENT_REVIEWER;
+  return [
+    '    <section class="artikel-eeat" data-softora-public-seo="eeat">',
+    '      <div>',
+    '        <span>Praktijkbasis</span>',
+    '        <p>Deze uitleg is geschreven vanuit Softora-werk aan websites, CRM, AI automatisering, klantcontact en digitale opvolging voor ondernemers.</p>',
+    '      </div>',
+    '      <div>',
+    '        <span>Auteur en controle</span>',
+    `        <p>Geschreven en inhoudelijk gecontroleerd door ${escapeHtml(
+      reviewer.name || author.name
+    )}. We verbeteren deze pagina op basis van zoekdata, klantvragen en wat in echte trajecten duidelijker moet.</p>`,
+    '      </div>',
+    '      <div>',
+    '        <span>Waarom dit helpt</span>',
+    `        <p>Het doel is niet om tekst te vullen, maar om bezoekers beter te laten kiezen en de stap naar ${escapeHtml(
+      getSeoContentClusterForItem(item).ctaLabel || 'contact'
+    )} logisch te maken.</p>`,
+    '      </div>',
+    '    </section>',
+  ].join('\n');
+}
+
+function renderFaqBlock(item) {
+  const faq = Array.isArray(item.faq) ? item.faq : [];
+  if (faq.length === 0) return '';
+  return [
+    '    <section class="artikel-faq" data-softora-public-seo="faq">',
+    '      <h2>Veelgestelde vragen</h2>',
+    ...faq.map((entry) =>
+      [
+        '      <div class="artikel-faq-item">',
+        `        <h3>${escapeHtml(entry.question)}</h3>`,
+        `        <p>${escapeHtml(entry.answer)}</p>`,
+        '      </div>',
+      ].join('\n')
+    ),
+    '    </section>',
+  ].join('\n');
+}
+
 function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
   if (!item) return '';
   const collection = getSeoContentCollection(item.collection);
@@ -1706,6 +1924,22 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
           { name: item.title, path: pathName },
         ]),
       },
+      ...(Array.isArray(item.faq) && item.faq.length > 0
+        ? [
+            {
+              '@type': 'FAQPage',
+              '@id': `${canonicalUrl}#faq`,
+              mainEntity: item.faq.map((entry) => ({
+                '@type': 'Question',
+                name: entry.question,
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: entry.answer,
+                },
+              })),
+            },
+          ]
+        : []),
     ],
   };
   const body = [
@@ -1722,7 +1956,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     '      <div class="artikel-meta-dot"></div>',
     `      <span>${escapeHtml(item.readTime)}</span>`,
     '      <div class="artikel-meta-dot"></div>',
-    '      <span>Softora Team</span>',
+    `      <span>${escapeHtml((item.author || SEO_CONTENT_AUTHOR).name)}</span>`,
     '    </div>',
     '  </section>',
     '  <figure class="artikel-img">',
@@ -1731,12 +1965,14 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     '  </figure>',
     '  <article class="artikel-body">',
     `    <p><strong>${escapeHtml(item.summary)}</strong></p>`,
+    renderAuthorityBlock(item),
     ...item.sections.map((section) =>
       [
         `    <h2>${escapeHtml(section.heading)}</h2>`,
         ...section.paragraphs.map((paragraph) => `    <p>${escapeHtml(paragraph)}</p>`),
       ].join('\n')
     ),
+    renderFaqBlock(item),
     '  </article>',
     renderConversionCta(item),
     renderRelatedLinks(item.relatedLinks),
@@ -1757,11 +1993,14 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
 module.exports = {
   SEO_CONTENT_CLUSTERS,
   SEO_CONTENT_COLLECTIONS,
+  SEO_CONTENT_AUTHOR,
   SEO_CONTENT_IMAGES_BY_CLUSTER,
   SEO_CONTENT_ITEMS,
+  SEO_CONTENT_MIN_WORDS_BY_COLLECTION,
   SEO_CONTENT_PILLARS,
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
+  countSeoContentWords,
   getSeoContentClusterForItem,
   getSeoContentClusters,
   getSeoContentCollection,
@@ -1769,6 +2008,7 @@ module.exports = {
   getSeoContentImageForItem,
   getSeoContentItem,
   getSeoContentItems,
+  getSeoContentMinimumWordCount,
   getSeoContentPathForItem,
   getSeoContentPillars,
   getSeoContentPublicationPlan,
