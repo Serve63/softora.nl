@@ -1,5 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const repoRoot = path.resolve(__dirname, '../..');
 
 const {
   buildSeoContentArticleHtml,
@@ -8,6 +12,7 @@ const {
   getSeoContentClusters,
   getSeoContentItem,
   getSeoContentItems,
+  getSeoContentImageForItem,
   getSeoContentPathForItem,
   getSeoContentCollectionPaths,
   getSeoContentPillars,
@@ -64,6 +69,9 @@ test('seo content renders the existing blog visual language with real links', ()
   assert.match(html, /SEO groeipijlers/);
   assert.match(html, /data-softora-public-seo="content-clusters"/);
   assert.match(html, /data-content-cluster="websites"/);
+  assert.match(html, /<img src="\/assets\/seo-content\/website-leads-analytics-softora\.jpg"/);
+  assert.match(html, /alt="Ondernemer analyseert websiteverkeer en leads op een laptop"/);
+  assert.doesNotMatch(html, /linear-gradient\(135deg/);
   assert.match(html, /href="\/website-laten-maken">/);
   assert.match(html, /Website groei/);
   assert.match(html, /AI automatisering/);
@@ -94,9 +102,13 @@ test('seo content article pages render Article schema and self canonicals', () =
     /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/ai-automatisering-mkb-waar-beginnen">/
   );
   assert.match(html, /"@type":"Article"/);
+  assert.match(html, /"image":"https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
   assert.match(html, /"articleSection":"AI automatisering"/);
   assert.match(html, /data-content-cluster="ai-automatisering"/);
   assert.match(html, /AI automatisering voor het MKB: waar begin je\?/);
+  assert.match(html, /<figure class="artikel-img">/);
+  assert.match(html, /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
+  assert.match(html, /alt="AI automatisering workflow met procesnotities en digitale taken"/);
   assert.match(html, /href="\/blog">Terug naar blog<\/a>/);
   assert.match(html, /href="\/ai-telefonist"/);
   assert.match(html, /data-softora-public-seo="conversion-cta"/);
@@ -123,6 +135,7 @@ test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
     /<link rel="canonical" href="https:\/\/www\.softora\.nl\/vergelijkingen\/website-laten-maken-vs-zelf-maken">/
   );
   assert.match(articleHtml, /"@type":"Article"/);
+  assert.match(articleHtml, /"image":"https:\/\/www\.softora\.nl\/assets\/seo-content\/website-leads-analytics-softora\.jpg"/);
   assert.match(articleHtml, /Terug naar vergelijkingen/);
   assert.match(articleHtml, /href="\/website-laten-maken"[^>]*>Website laten maken<\/a>/);
   assert.match(articleHtml, /href="\/blog\/website-laten-maken-mkb-paginas"/);
@@ -146,10 +159,28 @@ test('seo content renders branche en regio landingspagina’s met service schema
 
   assert.match(regioHtml, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/regio\/tilburg">/);
   assert.match(regioHtml, /"@type":"Service"/);
+  assert.match(regioHtml, /"image":"https:\/\/www\.softora\.nl\/assets\/seo-content\/lokale-seo-brabant-groei-softora\.jpg"/);
   assert.match(regioHtml, /"areaServed":\{"@type":"AdministrativeArea","name":"Tilburg"\}/);
   assert.match(regioHtml, /Terug naar regio/);
   assert.match(regioHtml, /href="\/crm-systeem-op-maat"/);
   assert.match(regioHtml, /href="\/branches\/zakelijke-dienstverleners"/);
+});
+
+test('seo content gebruikt echte lokale foto-assets met SEO-bestandsnamen en alt-teksten', () => {
+  const items = getSeoContentItems({ now: new Date('2026-06-10T12:00:00.000Z') });
+  const seenImages = new Map();
+
+  for (const item of items) {
+    const image = getSeoContentImageForItem(item);
+    seenImages.set(image.src, image.alt);
+
+    assert.match(image.src, /^\/assets\/seo-content\/[a-z0-9-]+-softora\.jpg$/, item.slug);
+    assert.ok(image.alt.length >= 40, item.slug);
+    assert.ok(!/placeholder|tijdelijk|binnenkort/i.test(image.alt), item.slug);
+    assert.ok(fs.existsSync(path.join(repoRoot, image.src.replace(/^\//, ''))), image.src);
+  }
+
+  assert.ok(seenImages.size >= 6);
 });
 
 test('live seo content keeps weak pages supported by contextual incoming links', () => {

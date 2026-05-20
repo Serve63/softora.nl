@@ -186,13 +186,51 @@ function auditConversionCtas({ pages = [] } = {}) {
   return issues;
 }
 
+function extractImageEntriesFromHtml(htmlRaw) {
+  return Array.from(String(htmlRaw || '').matchAll(/<img\b([^>]*)>/gi)).map((match) => {
+    const attrs = match[1] || '';
+    const src = attrs.match(/\bsrc=["']([^"']+)["']/i)?.[1] || '';
+    const alt = attrs.match(/\balt=["']([^"']*)["']/i)?.[1] || '';
+    return { src, alt, tag: match[0] };
+  });
+}
+
+function auditSeoImages({ pages = [] } = {}) {
+  const issues = [];
+
+  for (const page of Array.isArray(pages) ? pages : []) {
+    const pathName = normalizeInternalPath(page.path);
+    const images = extractImageEntriesFromHtml(page.html);
+
+    if (images.length === 0) {
+      issues.push({ type: 'missing-seo-image', path: pathName, message: `${pathName} heeft geen echte afbeelding.` });
+      continue;
+    }
+
+    for (const image of images) {
+      const src = String(image.src || '').trim();
+      const alt = String(image.alt || '').trim();
+      if (!alt || alt.length < 20 || /placeholder|tijdelijk|binnenkort/i.test(alt)) {
+        issues.push({ type: 'weak-image-alt', path: pathName, message: `${pathName} heeft een afbeelding zonder sterke alt-tekst.` });
+      }
+      if (/^\/assets\/seo-content\//i.test(src) && !/^\/assets\/seo-content\/[a-z0-9-]+-softora\.jpg$/i.test(src)) {
+        issues.push({ type: 'weak-image-filename', path: pathName, message: `${pathName} gebruikt een zwakke SEO-bestandsnaam.` });
+      }
+    }
+  }
+
+  return issues;
+}
+
 module.exports = {
   DEFAULT_COMMERCIAL_TARGETS,
   DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS,
   auditContentQuality,
   auditConversionCtas,
   auditLinkGraph,
+  auditSeoImages,
   buildSeoLinkGraph,
   extractInternalLinksFromHtml,
+  extractImageEntriesFromHtml,
   normalizeInternalPath,
 };

@@ -20,6 +20,7 @@ const {
   auditContentQuality,
   auditConversionCtas,
   auditLinkGraph,
+  auditSeoImages,
   buildSeoLinkGraph,
 } = require('../../server/services/seo-machine-quality-gates');
 
@@ -103,4 +104,14 @@ test('SEO-content CTAs zijn meetbaar en linken terug naar commerciële pagina’
   assert.match(html, /data-softora-conversion-target="service"/);
   assert.match(html, /data-softora-conversion-target="contact"/);
   assert.match(html, /href="\/pakketten">Pakketten<\/a>/);
+});
+
+test('SEO-content pagina’s gebruiken echte afbeeldingen met alt-tekst en sterke bestandsnamen', () => {
+  const pages = renderSeoContentPages();
+  const issues = auditSeoImages({ pages });
+  const article = pages.find((page) => page.path === '/blog/ai-automatisering-mkb-waar-beginnen');
+
+  assert.deepEqual(issues, []);
+  assert.match(article.html, /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
+  assert.doesNotMatch(article.html, /<div class="artikel-img">[^<]+<\/div>/);
 });

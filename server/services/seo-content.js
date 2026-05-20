@@ -138,6 +138,33 @@ const SEO_CONTENT_CLUSTERS = Object.freeze([
   }),
 ]);
 
+const SEO_CONTENT_IMAGES_BY_CLUSTER = Object.freeze({
+  websites: Object.freeze({
+    src: '/assets/seo-content/website-leads-analytics-softora.jpg',
+    alt: 'Ondernemer analyseert websiteverkeer en leads op een laptop',
+  }),
+  'ai-automatisering': Object.freeze({
+    src: '/assets/seo-content/ai-automatisering-workflow-softora.jpg',
+    alt: 'AI automatisering workflow met procesnotities en digitale taken',
+  }),
+  'software-crm': Object.freeze({
+    src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
+    alt: 'Team bespreekt CRM software en dashboards voor bedrijfsprocessen',
+  }),
+  'ai-contact': Object.freeze({
+    src: '/assets/seo-content/ai-klantcontact-chatbot-telefonie-softora.jpg',
+    alt: 'Medewerker gebruikt AI klantcontact voor chatbot en telefonie opvolging',
+  }),
+  branches: Object.freeze({
+    src: '/assets/seo-content/branche-digitalisering-planning-softora.jpg',
+    alt: 'Servicebedrijf digitaliseert planning offertes en klantopvolging',
+  }),
+  lokaal: Object.freeze({
+    src: '/assets/seo-content/lokale-seo-brabant-groei-softora.jpg',
+    alt: 'Ondernemers bespreken lokale SEO en digitale groei in Brabant',
+  }),
+});
+
 const SEO_CONTENT_ITEMS = Object.freeze([
   Object.freeze({
     collection: 'blog',
@@ -1234,6 +1261,11 @@ function getSeoContentClusterForItem(item) {
   return SEO_CONTENT_CLUSTERS.find((cluster) => cluster.key === clusterKey) || SEO_CONTENT_CLUSTERS[0];
 }
 
+function getSeoContentImageForItem(item) {
+  const cluster = getSeoContentClusterForItem(item);
+  return SEO_CONTENT_IMAGES_BY_CLUSTER[cluster.key] || SEO_CONTENT_IMAGES_BY_CLUSTER.websites;
+}
+
 function getSeoContentItems({ collection, now = new Date() } = {}) {
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   return SEO_CONTENT_ITEMS.filter((item) => {
@@ -1478,12 +1510,15 @@ function getBackLabelForCollection(collection) {
 
 function buildMainEntityForItem(item, site, canonicalUrl) {
   const cluster = getSeoContentClusterForItem(item);
+  const image = getSeoContentImageForItem(item);
+  const imageUrl = buildAbsoluteUrl(site, image.src);
   if (item.schemaType === 'Service') {
     const entity = {
       '@type': 'Service',
       '@id': `${canonicalUrl}#service`,
       name: item.title,
       description: item.description,
+      image: imageUrl,
       provider: { '@id': `${site}/#organization` },
       serviceType: item.serviceType || cluster.label || item.category,
       about: {
@@ -1506,6 +1541,7 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
     '@id': `${canonicalUrl}#article`,
     headline: item.title,
     description: item.description,
+    image: imageUrl,
     articleSection: cluster.label,
     about: {
       '@type': 'Thing',
@@ -1522,20 +1558,17 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
 }
 
 function renderArticleCards(items) {
-  const gradients = [
-    'linear-gradient(135deg, #1a1a2e 0%, #9b2355 100%)',
-    'linear-gradient(135deg, #8b2252 0%, #c4346a 100%)',
-    'linear-gradient(135deg, #23233b 0%, #6b1a3f 100%)',
-  ];
   return items
     .map((item, index) => {
       const href = getSeoContentPathForItem(item);
       const featured = index === 0;
       const cluster = getSeoContentClusterForItem(item);
+      const image = getSeoContentImageForItem(item);
       return [
         `<article class="blog-card${featured ? ' featured' : ''}" data-content-cluster="${escapeHtml(cluster.key)}">`,
         `  <a href="${escapeHtml(href)}">`,
-        `    <div class="blog-card-img${featured ? ' featured' : ''}" style="background:${gradients[index % gradients.length]}">`,
+        `    <div class="blog-card-img${featured ? ' featured' : ''}">`,
+        `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}" width="1200" height="1200" loading="${featured ? 'eager' : 'lazy'}" decoding="async" fetchpriority="${featured ? 'high' : 'low'}">`,
         `      <div class="blog-card-img-label">${escapeHtml(item.category)}</div>`,
         '    </div>',
         '    <div class="blog-card-body">',
@@ -1647,6 +1680,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
   const canonicalUrl = buildAbsoluteUrl(site, pathName);
   const mainEntity = buildMainEntityForItem(item, site, canonicalUrl);
   const cluster = getSeoContentClusterForItem(item);
+  const image = getSeoContentImageForItem(item);
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -1689,7 +1723,10 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     '      <span>Softora Team</span>',
     '    </div>',
     '  </section>',
-    `  <div class="artikel-img">${escapeHtml(item.title)}</div>`,
+    '  <figure class="artikel-img">',
+    `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}" width="1200" height="1200" loading="eager" decoding="async" fetchpriority="high">`,
+    `    <figcaption>${escapeHtml(image.alt)}</figcaption>`,
+    '  </figure>',
     '  <article class="artikel-body">',
     `    <p><strong>${escapeHtml(item.summary)}</strong></p>`,
     ...item.sections.map((section) =>
@@ -1727,6 +1764,7 @@ module.exports = {
   getSeoContentCollectionPaths,
   getSeoContentItem,
   getSeoContentItems,
+  getSeoContentImageForItem,
   getSeoContentPathForItem,
   getSeoContentPillars,
   getSeoContentPublicationPlan,
