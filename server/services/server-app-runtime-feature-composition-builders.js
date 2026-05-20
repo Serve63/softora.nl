@@ -261,6 +261,8 @@ function buildServerAppFeatureWiringRuntimeContext({
         normalizeString: shared.normalizeString,
         truncateText: shared.truncateText,
         mailboxAccountsRaw: env.MAILBOX_ACCOUNTS || '',
+        isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
+        getSupabaseClient: platformRuntime.getSupabaseClient,
         mailConfig: {
           smtpHost: envConfig.MAIL_SMTP_HOST,
           smtpPort: envConfig.MAIL_SMTP_PORT,
@@ -276,6 +278,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           imapPass: envConfig.MAIL_IMAP_PASS,
         },
       },
+      mailboxCronSecret: env.CRON_SECRET || '',
       runtimeOpsCoordinator: uiSeoRuntime.runtimeOpsCoordinator,
       runtimeDebugOpsCoordinator: uiSeoRuntime.runtimeDebugOpsCoordinator,
       dataOpsStore: uiSeoRuntime.dataOpsStore,

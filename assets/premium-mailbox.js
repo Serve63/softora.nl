@@ -75,6 +75,7 @@ let activeFolder = 'inbox';
 let activeMail = null;
 let outreachCustomers = [];
 let mailboxUrlIntentApplied = false;
+let mailboxSyncInFlight = false;
 const CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 
@@ -250,7 +251,7 @@ function normalizeMailboxApiMessage(message) {
     email: message.email || '',
     subject: message.subject || '(Geen onderwerp)',
     preview: message.preview || '',
-    body: message.body || message.preview || '',
+    body: message.body || '',
     messageId: message.messageId || '',
     inReplyTo: message.inReplyTo || '',
     references: message.references || '',
@@ -258,8 +259,21 @@ function normalizeMailboxApiMessage(message) {
     date: when.date,
     unread: Boolean(message.unread),
     starred: Boolean(message.starred),
+    hasBody: Boolean(message.hasBody || message.body),
+    bodyLoaded: Boolean(message.body),
+    bodyLoading: false,
+    bodyTruncated: Boolean(message.bodyTruncated),
+    indexed: Boolean(message.indexed),
     tags: [],
   };
+}
+
+function setMailboxSyncStatus(message) {
+  const el = document.getElementById('mail-sync-status');
+  if (!el) return;
+  const text = normalizeText(message);
+  el.hidden = !text;
+  el.textContent = text;
 }
 
 async function loadMailboxAccounts() {
@@ -283,9 +297,41 @@ async function loadMailboxAccounts() {
   }
 }
 
-async function loadMailboxMessages() {
+async function hydrateMailboxOutreachContextsInBackground() {
+  await hydrateMailboxOutreachContexts();
+  renderList();
+  if (activeMail) openMail(activeMail, { skipBodyFetch: true });
+}
+
+async function syncMailboxInBackground() {
+  if (mailboxSyncInFlight) return;
+  mailboxSyncInFlight = true;
+  setMailboxSyncStatus('Mailbox bijwerken…');
+  try {
+    await fetch('/api/mailbox/sync', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        account: activeMailboxAccount,
+        folder: activeFolder,
+        limit: 50,
+      }),
+    });
+    await loadMailboxMessages({ showLoader: false, skipBackgroundSync: true });
+    setMailboxSyncStatus('');
+  } catch (_) {
+    setMailboxSyncStatus('');
+  } finally {
+    mailboxSyncInFlight = false;
+  }
+}
+
+async function loadMailboxMessages(options = {}) {
   const wrap = document.getElementById('mail-items');
-  if (wrap) {
+  const showLoader = options.showLoader !== false;
+  if (wrap && showLoader) {
     wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Mailbox laden…</div>`;
   }
   try {
@@ -299,11 +345,17 @@ async function loadMailboxMessages() {
       throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
     }
     mails = Array.isArray(data.messages) ? data.messages.map(normalizeMailboxApiMessage) : [];
-    await hydrateMailboxOutreachContexts();
     renderList();
     applyMailboxUrlIntentAfterLoad();
+    void hydrateMailboxOutreachContextsInBackground().catch(() => {});
+    if (!options.skipBackgroundSync && data?.sync?.refreshRecommended) {
+      void syncMailboxInBackground();
+    } else if (!mailboxSyncInFlight) {
+      setMailboxSyncStatus('');
+    }
   } catch (error) {
     mails = [];
+    setMailboxSyncStatus('');
     if (wrap) {
       wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${escapeHtml(error?.message || error || 'Mailbox laden mislukt')}</div>`;
     }
@@ -366,7 +418,41 @@ function renderList() {
   badge.style.display = unread ? 'flex' : 'none';
 }
 
-function openMail(id) {
+async function loadMailboxMessageBody(id) {
+  const m = findMailById(id);
+  if (!m || m.bodyLoading) return;
+  m.bodyLoading = true;
+  try {
+    const params = new URLSearchParams({
+      account: activeMailboxAccount,
+      folder: activeFolder,
+      id: String(id),
+    });
+    const response = await fetch(`/api/mailbox/message?${params.toString()}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok || !data.message) {
+      throw new Error(data?.detail || data?.error || 'Bericht laden mislukt');
+    }
+    const body = normalizeText(data.message.body || '');
+    m.body = body || m.preview || '';
+    m.bodyLoaded = true;
+    m.hasBody = Boolean(data.message.hasBody || body);
+    m.bodyTruncated = Boolean(data.message.bodyTruncated);
+    if (String(activeMail) === String(id)) openMail(id, { skipBodyFetch: true });
+  } catch (error) {
+    m.body = String(error?.message || error || 'Bericht laden mislukt');
+    m.bodyLoaded = true;
+    if (String(activeMail) === String(id)) openMail(id, { skipBodyFetch: true });
+  } finally {
+    m.bodyLoading = false;
+  }
+}
+
+function openMail(id, options = {}) {
   const m = findMailById(id);
   if (!m) return;
   activeMail = m.id;
@@ -383,6 +469,10 @@ function openMail(id) {
           <button class="outreach-quickbar-btn" type="button" data-mailbox-action="outreach-status" data-outreach-status="geen_interesse" data-mailbox-id="${escapeHtml(m.id)}">Geen interesse</button>
         </div>
       </div>` : '';
+
+  const detailBody = m.bodyLoaded || m.body
+    ? m.body
+    : 'Bericht laden…';
 
   document.getElementById('mail-detail').innerHTML = `
     <div class="detail-header">
@@ -415,9 +505,13 @@ function openMail(id) {
       </div>
     </div>
     <div class="detail-body">
-      <div class="detail-body-text">${escapeHtml(m.body)}</div>
+      <div class="detail-body-text">${escapeHtml(detailBody)}</div>
       ${outreachQuickbar}
     </div>`;
+
+  if (!options.skipBodyFetch && !m.bodyLoaded) {
+    void loadMailboxMessageBody(m.id);
+  }
 }
 
 function toggleStar(id) {

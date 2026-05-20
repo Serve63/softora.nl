@@ -69,6 +69,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .mail-list-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: var(--tag); }
 .mail-list-title { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-light); }
 .mail-list-count { font-size: 11px; color: var(--text-light); }
+.mail-sync-status { padding: 8px 16px; border-bottom: 1px solid var(--border); background: rgba(155,35,85,.05); color: var(--crimson); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .mail-items { flex: 1; overflow-y: auto; }
 .mail-item { padding: 13px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; position: relative; }
 .mail-item:hover { background: var(--tag); }
@@ -365,6 +366,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   <!-- MAIL LIST -->
   <div class="mail-list">
 
+    <div class="mail-sync-status" id="mail-sync-status" hidden></div>
     <div class="mail-items" id="mail-items"></div>
   </div>
 
@@ -401,6 +403,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   </main>
 </div>
 
-<script src="assets/premium-mailbox.js?v=20260516a"></script>
+<script src="assets/premium-mailbox.js?v=20260520a"></script>
 </body>
 </html>

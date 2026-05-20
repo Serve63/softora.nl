@@ -6,6 +6,7 @@ const {
   publicListErrorMessage,
   resolveMailboxName,
 } = require('./mailbox-sent-copy');
+const { createMailboxIndexStore } = require('./mailbox-index-store');
 
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
@@ -14,6 +15,10 @@ const DEFAULT_MAILBOX_EMAILS = [
   'serve@softora.nl',
   'martijn@softora.nl',
 ];
+
+const INDEX_STALE_MS = 2 * 60 * 1000;
+const DEFAULT_SYNC_FOLDERS = ['inbox', 'sent'];
+const DEFAULT_SYNC_LIMIT = 50;
 
 function createMailboxService(deps = {}) {
   const {
@@ -25,6 +30,16 @@ function createMailboxService(deps = {}) {
     createTransport = (config) => nodemailer.createTransport(config),
     createImapClient = (config) => new ImapFlow(config),
     parseMailSource = (source) => simpleParser(source),
+    isSupabaseConfigured = () => false,
+    getSupabaseClient = () => null,
+    mailboxIndexStore = createMailboxIndexStore({
+      isSupabaseConfigured,
+      getSupabaseClient,
+      logger,
+      normalizeString,
+      truncateText,
+    }),
+    mailboxIndexStaleMs = INDEX_STALE_MS,
   } = deps;
 
   const baseAccount = {
@@ -295,7 +310,15 @@ function createMailboxService(deps = {}) {
     };
   }
 
-  async function listMessages({ accountEmail, folder = 'inbox', limit = 50 }) {
+  function normalizeFolder(value) {
+    return normalizeString(value || 'inbox').toLowerCase() || 'inbox';
+  }
+
+  function getSafeLimit(limit, max = 100) {
+    return Math.max(1, Math.min(max, Number(limit) || DEFAULT_SYNC_LIMIT));
+  }
+
+  function assertReadableAccount(accountEmail) {
     const account = getAccount(accountEmail);
     if (!account) {
       const error = new Error('Mailbox-account niet gevonden.');
@@ -307,21 +330,32 @@ function createMailboxService(deps = {}) {
       error.status = 503;
       throw error;
     }
+    return account;
+  }
+
+  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const safeLimit = getSafeLimit(limit);
 
     const client = createClient(account);
     try {
       await client.connect();
-      const mailboxName = await resolveMailboxName(client, folder);
+      const mailboxName = await resolveMailboxName(client, normalizedFolder);
       if (!mailboxName) return [];
       const lock = await client.getMailboxLock(mailboxName);
       try {
-        const allUids = await client.search(['ALL']);
-        const uids = (Array.isArray(allUids) ? allUids : []).slice(-Math.max(1, Math.min(100, Number(limit) || 50))).reverse();
-        if (!uids.length) return [];
+        let selectedUids = Array.isArray(uids) && uids.length
+          ? uids.map(Number).filter((uid) => Number.isFinite(uid) && uid > 0)
+          : null;
+        if (!selectedUids) {
+          const allUids = await client.search(['ALL']);
+          selectedUids = (Array.isArray(allUids) ? allUids : []).slice(-safeLimit).reverse();
+        }
+        if (!selectedUids.length) return [];
         const messages = [];
-        for await (const message of client.fetch(uids, { uid: true, flags: true, internalDate: true, source: true })) {
+        for await (const message of client.fetch(selectedUids, { uid: true, flags: true, internalDate: true, source: true })) {
           const parsed = await parseMailSource(message.source);
-          messages.push(toClientMessage(parsed, message, folder, account));
+          messages.push(toClientMessage(parsed, message, normalizedFolder, account));
         }
         return messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       } finally {
@@ -332,6 +366,216 @@ function createMailboxService(deps = {}) {
         if (client.usable) await client.logout();
       } catch (_) {}
     }
+  }
+
+  async function fetchMessageFromImapById({ account, folder = 'inbox', id = '' }) {
+    const uid = Number(normalizeString(id).match(/:(\d+)$/)?.[1] || id);
+    if (!Number.isFinite(uid) || uid <= 0) return null;
+    const messages = await fetchMessagesFromImap({ account, folder, uids: [uid], limit: 1 });
+    return messages[0] || null;
+  }
+
+  function canUseMailboxIndex() {
+    return Boolean(
+      mailboxIndexStore &&
+        typeof mailboxIndexStore.listMessages === 'function' &&
+        (typeof mailboxIndexStore.isAvailable !== 'function' || mailboxIndexStore.isAvailable())
+    );
+  }
+
+  async function readIndexedMessages({ account, folder, limit }) {
+    if (!canUseMailboxIndex()) return null;
+    return mailboxIndexStore.listMessages({
+      accountEmail: account.email,
+      folder,
+      limit,
+    });
+  }
+
+  async function getMailboxSyncMeta({ account, folder }) {
+    if (!canUseMailboxIndex() || typeof mailboxIndexStore.getSyncState !== 'function') {
+      return { indexed: false, stale: false, source: 'imap-live' };
+    }
+    const state = await mailboxIndexStore.getSyncState({ accountEmail: account.email, folder });
+    return {
+      indexed: true,
+      stale:
+        !state ||
+        (typeof mailboxIndexStore.isSyncStateStale === 'function' &&
+          mailboxIndexStore.isSyncStateStale(state, mailboxIndexStaleMs)),
+      lastSyncedAt: state?.last_synced_at || null,
+      status: state?.status || null,
+      source: 'index',
+    };
+  }
+
+  async function syncMailboxFolder({ accountEmail, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, force = false } = {}) {
+    const account = assertReadableAccount(accountEmail);
+    const normalizedFolder = normalizeFolder(folder);
+    if (!canUseMailboxIndex()) {
+      return { ok: false, skipped: true, reason: 'mailbox_index_unavailable' };
+    }
+    const lock = await mailboxIndexStore.acquireSyncLock({
+      accountEmail: account.email,
+      folder: normalizedFolder,
+      force,
+    });
+    if (!lock.ok) {
+      return { ok: true, skipped: true, reason: lock.locked ? 'locked' : 'lock_failed' };
+    }
+
+    try {
+      const messages = await fetchMessagesFromImap({
+        account,
+        folder: normalizedFolder,
+        limit: getSafeLimit(limit),
+      });
+      const saved = await mailboxIndexStore.upsertMessages({
+        accountEmail: account.email,
+        folder: normalizedFolder,
+        messages,
+      });
+      if (!saved || saved.ok === false) {
+        throw saved?.error || new Error('Mailbox-index opslaan mislukt');
+      }
+      const lastUid = messages.reduce((max, message) => Math.max(max, Number(message.uid) || 0), 0);
+      await mailboxIndexStore.finishSync({
+        accountEmail: account.email,
+        folder: normalizedFolder,
+        lockToken: lock.lockToken,
+        messageCount: messages.length,
+        lastUid,
+      });
+      return {
+        ok: true,
+        account: account.email,
+        folder: normalizedFolder,
+        synced: messages.length,
+        upserted: saved.upserted || messages.length,
+      };
+    } catch (error) {
+      await mailboxIndexStore.finishSync({
+        accountEmail: account.email,
+        folder: normalizedFolder,
+        lockToken: lock.lockToken,
+        error: error?.message || error,
+      }).catch(() => null);
+      throw error;
+    }
+  }
+
+  async function syncMailbox({ accountEmail = '', folders = DEFAULT_SYNC_FOLDERS, limit = DEFAULT_SYNC_LIMIT, force = false } = {}) {
+    const accounts = accountEmail
+      ? [assertReadableAccount(accountEmail)]
+      : getAccounts().filter((account) => account.imapConfigured);
+    const folderList = Array.from(
+      new Set((Array.isArray(folders) && folders.length ? folders : DEFAULT_SYNC_FOLDERS).map(normalizeFolder))
+    );
+    const results = [];
+    for (const account of accounts) {
+      for (const folder of folderList) {
+        try {
+          results.push(await syncMailboxFolder({ accountEmail: account.email, folder, limit, force }));
+        } catch (error) {
+          logger.error('[Mailbox][Sync]', account.email, folder, error?.message || error);
+          results.push({
+            ok: false,
+            account: account.email,
+            folder,
+            error: String(error?.message || error || 'Mailbox sync mislukt'),
+          });
+        }
+      }
+    }
+    return {
+      ok: results.every((result) => result.ok !== false),
+      results,
+    };
+  }
+
+  async function listMessagesWithMeta({ accountEmail, folder = 'inbox', limit = 50 }) {
+    const account = assertReadableAccount(accountEmail);
+    const normalizedFolder = normalizeFolder(folder);
+    const safeLimit = getSafeLimit(limit);
+    const indexedMessages = await readIndexedMessages({ account, folder: normalizedFolder, limit: safeLimit });
+
+    if (Array.isArray(indexedMessages) && indexedMessages.length) {
+      const sync = await getMailboxSyncMeta({ account, folder: normalizedFolder });
+      return {
+        messages: indexedMessages,
+        sync: {
+          ...sync,
+          stale: Boolean(sync.stale),
+          refreshRecommended: Boolean(sync.stale),
+        },
+      };
+    }
+
+    if (canUseMailboxIndex()) {
+      const seed = await syncMailboxFolder({
+        accountEmail: account.email,
+        folder: normalizedFolder,
+        limit: safeLimit,
+        force: true,
+      }).catch((error) => ({ ok: false, error }));
+      if (seed && seed.ok) {
+        const seededMessages = await readIndexedMessages({ account, folder: normalizedFolder, limit: safeLimit });
+        if (Array.isArray(seededMessages)) {
+          return {
+            messages: seededMessages,
+            sync: {
+              indexed: true,
+              stale: false,
+              source: 'index-seed',
+              refreshRecommended: false,
+            },
+          };
+        }
+      }
+    }
+
+    const messages = await fetchMessagesFromImap({ account, folder: normalizedFolder, limit: safeLimit });
+    return {
+      messages,
+      sync: {
+        indexed: false,
+        stale: false,
+        source: 'imap-live',
+        refreshRecommended: false,
+      },
+    };
+  }
+
+  async function listMessages(options) {
+    const result = await listMessagesWithMeta(options);
+    return result.messages;
+  }
+
+  async function getMessage({ accountEmail, folder = 'inbox', id = '' }) {
+    const account = assertReadableAccount(accountEmail);
+    const normalizedFolder = normalizeFolder(folder);
+    if (canUseMailboxIndex() && typeof mailboxIndexStore.getMessage === 'function') {
+      const indexed = await mailboxIndexStore.getMessage({
+        accountEmail: account.email,
+        folder: normalizedFolder,
+        id,
+      });
+      if (indexed && indexed.hasBody && indexed.body) return indexed;
+    }
+    const live = await fetchMessageFromImapById({ account, folder: normalizedFolder, id });
+    if (!live) {
+      const error = new Error('Mailboxbericht niet gevonden.');
+      error.status = 404;
+      throw error;
+    }
+    if (canUseMailboxIndex() && typeof mailboxIndexStore.upsertMessages === 'function') {
+      await mailboxIndexStore.upsertMessages({
+        accountEmail: account.email,
+        folder: normalizedFolder,
+        messages: [live],
+      }).catch((error) => logger.error('[Mailbox][MessageIndex]', error?.message || error));
+    }
+    return live;
   }
 
   async function sendMessage({ accountEmail, to, subject, text }) {
@@ -400,19 +644,64 @@ function createMailboxService(deps = {}) {
 
   async function listMessagesResponse(req, res) {
     try {
-      const messages = await listMessages({
+      const result = await listMessagesWithMeta({
         accountEmail: req.query?.account,
-        folder: normalizeString(req.query?.folder || 'inbox').toLowerCase(),
+        folder: normalizeFolder(req.query?.folder || 'inbox'),
         limit: Number(req.query?.limit || 50) || 50,
       });
-      return res.status(200).json({ ok: true, messages });
+      return res.status(200).json({ ok: true, messages: result.messages, sync: result.sync });
     } catch (error) {
       logger.error('[Mailbox][List]', error?.message || error);
-      const folder = normalizeString(req.query?.folder || 'inbox').toLowerCase();
+      const folder = normalizeFolder(req.query?.folder || 'inbox');
       return res.status(error.status || 500).json({
         ok: false,
         error: 'Mailbox laden mislukt',
         detail: publicListErrorMessage(error, folder),
+      });
+    }
+  }
+
+  async function getMessageResponse(req, res) {
+    try {
+      const message = await getMessage({
+        accountEmail: req.query?.account,
+        folder: normalizeFolder(req.query?.folder || 'inbox'),
+        id: req.query?.id || req.query?.message || '',
+      });
+      return res.status(200).json({ ok: true, message });
+    } catch (error) {
+      logger.error('[Mailbox][Message]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Mailboxbericht laden mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
+  async function syncMailboxResponse(req, res) {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const folderParam = body.folder || req.query?.folder || '';
+      const folders = folderParam
+        ? String(folderParam)
+            .split(',')
+            .map(normalizeFolder)
+            .filter(Boolean)
+        : DEFAULT_SYNC_FOLDERS;
+      const result = await syncMailbox({
+        accountEmail: body.account || req.query?.account || '',
+        folders,
+        limit: Number(body.limit || req.query?.limit || DEFAULT_SYNC_LIMIT) || DEFAULT_SYNC_LIMIT,
+        force: Boolean(body.force || req.query?.force === '1' || req.query?.force === 'true'),
+      });
+      return res.status(result.ok ? 200 : 207).json(result);
+    } catch (error) {
+      logger.error('[Mailbox][SyncResponse]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Mailbox sync mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
       });
     }
   }
@@ -439,11 +728,17 @@ function createMailboxService(deps = {}) {
 
   return {
     accountsResponse,
+    getMessageResponse,
     listMessagesResponse,
     sendMessageResponse,
+    syncMailboxResponse,
     getAccounts,
+    getMessage,
     listMessages,
+    listMessagesWithMeta,
     sendMessage,
+    syncMailbox,
+    syncMailboxFolder,
   };
 }
 

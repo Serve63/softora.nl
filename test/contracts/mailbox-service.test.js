@@ -237,6 +237,106 @@ test('mailbox service resolves Dutch sent folders without special-use metadata',
   assert.equal(messages[0].subject, 'STRATO verzonden bericht');
 });
 
+test('mailbox service returns indexed mailbox rows before touching IMAP', async () => {
+  let imapTouched = false;
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => {
+      imapTouched = true;
+      return createFakeImapClient({ messagesByMailbox: { INBOX: [] } });
+    },
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [
+        {
+          id: 'inbox:99',
+          uid: 99,
+          folder: 'inbox',
+          from: 'Klant',
+          email: 'klant@example.nl',
+          subject: 'Snelle index',
+          preview: 'Direct uit Supabase',
+          date: '2026-05-20T10:00:00.000Z',
+          unread: true,
+          starred: false,
+          hasBody: true,
+          indexed: true,
+        },
+      ],
+      getSyncState: async () => ({
+        status: 'ok',
+        last_synced_at: '2026-05-20T09:55:00.000Z',
+      }),
+      isSyncStateStale: () => true,
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'inbox', limit: '50' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.messages[0].subject, 'Snelle index');
+  assert.equal(res.body.sync.indexed, true);
+  assert.equal(res.body.sync.refreshRecommended, true);
+  assert.equal(imapTouched, false);
+});
+
+test('mailbox service seeds the index and falls back to live IMAP when the index is unavailable', async () => {
+  const sentDate = new Date('2026-05-12T11:15:00.000Z');
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX' }],
+    messagesByMailbox: {
+      INBOX: [
+        {
+          uid: 9,
+          flags: ['\\Seen'],
+          internalDate: sentDate,
+          source: {
+            date: sentDate,
+            text: 'Live body',
+            subject: 'Live fallback',
+            from: { value: [{ name: 'Klant', address: 'klant@example.nl' }] },
+            to: { value: [{ name: 'Serve', address: 'serve@softora.nl' }] },
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+    mailboxIndexStore: {
+      isAvailable: () => false,
+    },
+  });
+
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'inbox' });
+
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].subject, 'Live fallback');
+  assert.deepEqual(client.lockedMailboxes, ['INBOX']);
+});
+
 test('mailbox service saves app-sent messages into the sent folder', async () => {
   const client = createFakeImapClient({
     boxes: [{ path: 'INBOX' }, { path: 'INBOX/Verstuurd' }],
@@ -423,11 +523,11 @@ test('mailbox service can intentionally expose aliases through the base mailbox 
 test('mailbox routes expose accounts, messages and send endpoints', () => {
   const routes = [];
   const app = {
-    get(path, handler) {
-      routes.push(['GET', path, handler]);
+    get(path, ...handlers) {
+      routes.push(['GET', path, handlers]);
     },
-    post(path, handler) {
-      routes.push(['POST', path, handler]);
+    post(path, ...handlers) {
+      routes.push(['POST', path, handlers]);
     },
   };
 
@@ -441,5 +541,48 @@ test('mailbox routes expose accounts, messages and send endpoints', () => {
 
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/accounts'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
+  assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/message'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/sync'));
+  assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/sync'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
+});
+
+test('mailbox cron sync route requires CRON_SECRET bearer access', () => {
+  let cronCalled = 0;
+  const routes = [];
+  const app = {
+    get(path, ...handlers) {
+      routes.push(['GET', path, handlers]);
+    },
+    post(path, ...handlers) {
+      routes.push(['POST', path, handlers]);
+    },
+  };
+
+  registerMailboxRoutes(app, {
+    cronSecret: 'cron-secret',
+    coordinator: {
+      accountsResponse() {},
+      listMessagesResponse() {},
+      getMessageResponse() {},
+      syncMailboxResponse(_req, res) {
+        cronCalled += 1;
+        res.status(200).json({ ok: true });
+      },
+      sendMessageResponse() {},
+    },
+  });
+
+  const route = routes.find(([method, path]) => method === 'GET' && path === '/api/mailbox/sync');
+  const blocked = createResponseRecorder();
+  route[2][0]({ headers: { authorization: 'Bearer wrong' } }, blocked, () => {});
+  assert.equal(blocked.statusCode, 401);
+  assert.equal(cronCalled, 0);
+
+  const allowed = createResponseRecorder();
+  route[2][0]({ headers: { authorization: 'Bearer cron-secret' } }, allowed, () => {
+    route[2][1]({}, allowed);
+  });
+  assert.equal(allowed.statusCode, 200);
+  assert.equal(cronCalled, 1);
 });
