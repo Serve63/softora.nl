@@ -71,6 +71,7 @@ test('seo content renders the existing blog visual language with real links', ()
   assert.match(html, /Software, CRM en dashboards/);
   assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
   assert.match(html, /href="\/diensten">Diensten<\/a>/);
+  assert.match(html, /href="\/pakketten">Pakketten<\/a>/);
   assert.match(html, /href="\/ai-automatisering">AI<\/a>/);
   assert.match(html, /href="\/branches">Branches<\/a>/);
   assert.match(html, /href="\/regio">Regio<\/a>/);
@@ -99,7 +100,7 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /href="\/blog">Terug naar blog<\/a>/);
   assert.match(html, /href="\/ai-telefonist"/);
   assert.match(html, /data-softora-public-seo="conversion-cta"/);
-  assert.match(html, /href="\/#contact">Neem contact op<\/a>/);
+  assert.match(html, /href="\/#contact"[^>]*>Neem contact op<\/a>/);
 });
 
 test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
@@ -123,7 +124,7 @@ test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
   );
   assert.match(articleHtml, /"@type":"Article"/);
   assert.match(articleHtml, /Terug naar vergelijkingen/);
-  assert.match(articleHtml, /href="\/website-laten-maken">Website laten maken<\/a>/);
+  assert.match(articleHtml, /href="\/website-laten-maken"[^>]*>Website laten maken<\/a>/);
   assert.match(articleHtml, /href="\/blog\/website-laten-maken-mkb-paginas"/);
   assert.match(articleHtml, /href="\/website-laten-maken-oisterwijk"/);
   assert.match(articleHtml, /data-softora-public-seo="conversion-cta"/);

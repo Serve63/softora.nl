@@ -666,6 +666,32 @@ function addInternalLinksIfMissing(htmlRaw, entry) {
   return injectBeforeBodyClose(html, snippet);
 }
 
+function classifyConversionTarget(hrefRaw) {
+  const href = String(hrefRaw || '').trim();
+  if (/^mailto:/i.test(href)) return 'mailto';
+  if (href === '#contact' || href === '/#contact' || href.endsWith('/#contact')) return 'contact';
+  return '';
+}
+
+function addConversionTrackingAttributesIfMissing(htmlRaw, entry) {
+  const html = String(htmlRaw || '');
+  if (!entry || entry.kind === 'home' || entry.kind === 'legal') return html;
+
+  return html.replace(/<a\b([^>]*\bhref=["']([^"']+)["'][^>]*)>/gi, (match, attrs, href) => {
+    if (/data-softora-conversion=/i.test(attrs)) return match;
+
+    const target = classifyConversionTarget(href);
+    if (!target) return match;
+
+    const trackingAttrs = [
+      'data-softora-conversion="public-cta"',
+      `data-softora-conversion-page="${escapeHtmlAttribute(entry.path)}"`,
+      `data-softora-conversion-target="${escapeHtmlAttribute(target)}"`,
+    ].join(' ');
+    return `<a ${trackingAttrs}${attrs}>`;
+  });
+}
+
 function applyPublicSeoHeadDefaults(htmlRaw, fileNameRaw, { siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
   const entry = getIndexablePublicSeoPage(fileNameRaw);
   let html = String(htmlRaw || '');
@@ -691,6 +717,7 @@ function applyPublicSeoHeadDefaults(htmlRaw, fileNameRaw, { siteOrigin = DEFAULT
   html = addMetaIfMissing(html, 'name', 'twitter:image', imageUrl);
   html = addStructuredDataIfMissing(html, entry, siteOrigin);
   html = addInternalLinksIfMissing(html, entry);
+  html = addConversionTrackingAttributesIfMissing(html, entry);
 
   if (!hasTag(html, /<html\b[^>]*lang=["']nl["']/i)) {
     html = html.replace(/<html\b([^>]*)>/i, '<html$1 lang="nl">');
