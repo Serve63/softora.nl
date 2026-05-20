@@ -37,11 +37,12 @@ function createService(overrides = {}) {
       smtpHost: overrides.smtpHost === undefined ? 'smtp.example.test' : overrides.smtpHost,
       smtpPort: 587,
       smtpSecure: false,
-      smtpUser: 'info@softora.nl',
+      smtpUser: overrides.smtpUser === undefined ? 'info@softora.nl' : overrides.smtpUser,
       smtpPass: overrides.smtpPass === undefined ? 'secret' : overrides.smtpPass,
-      mailFromAddress: 'info@softora.nl',
+      mailFromAddress:
+        overrides.mailFromAddress === undefined ? 'info@softora.nl' : overrides.mailFromAddress,
       mailFromName: 'Softora',
-      mailReplyTo: 'reply@softora.nl',
+      mailReplyTo: overrides.mailReplyTo === undefined ? 'reply@softora.nl' : overrides.mailReplyTo,
       coldmailAuditBcc: overrides.coldmailAuditBcc,
       imapHost: overrides.imapHost || '',
       imapPort: 993,
@@ -1083,6 +1084,17 @@ test('coldmail campaign exposes the same sender accounts as mailbox', () => {
     'serve@softora.nl',
     'martijn@softora.nl',
   ]);
+});
+
+test('coldmail campaign replaces legacy impactbox sender identity with softora account', () => {
+  const { service } = createService({
+    smtpUser: 'zakelijk@theimpactbox.co',
+    mailFromAddress: 'zakelijk@theimpactbox.co',
+  });
+  const allowed = service.getAllowedSenderEmails();
+
+  assert.ok(allowed.includes('zakelijk@softora.nl'));
+  assert.ok(!allowed.includes('zakelijk@theimpactbox.co'));
 });
 
 test('coldmail campaign caps preview volume to STRATO-safe campaign limit', async () => {

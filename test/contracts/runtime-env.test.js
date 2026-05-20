@@ -54,6 +54,30 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.coldmailAuditBcc, 'prive@example.nl');
 });
 
+test('loadRuntimeEnv replaces legacy impactbox account emails with softora business account', () => {
+  const runtimeEnv = loadRuntimeEnv({
+    PREMIUM_LOGIN_EMAILS: 'zakelijk@theimpactbox.co, serve@softora.nl',
+    MAIL_SMTP_USER: 'zakelijk@theimpactbox.co',
+    MAIL_SMTP_PASS: 'secret',
+    MAIL_FROM: 'zakelijk@theimpactbox.co',
+    MAIL_REPLY_TO: 'zakelijk@theimpactbox.co',
+    COLDMAIL_AUDIT_BCC: 'zakelijk@theimpactbox.co',
+    MAIL_IMAP_USER: 'zakelijk@theimpactbox.co',
+    SECURITY_CONTACT_EMAIL: 'zakelijk@theimpactbox.co',
+  });
+
+  assert.deepEqual(runtimeEnv.premiumAuth.loginEmails, [
+    'zakelijk@softora.nl',
+    'serve@softora.nl',
+  ]);
+  assert.equal(runtimeEnv.mail.smtpUser, 'zakelijk@softora.nl');
+  assert.equal(runtimeEnv.mail.fromAddress, 'zakelijk@softora.nl');
+  assert.equal(runtimeEnv.mail.replyTo, 'zakelijk@softora.nl');
+  assert.equal(runtimeEnv.mail.coldmailAuditBcc, 'zakelijk@softora.nl');
+  assert.equal(runtimeEnv.mail.imapUser, 'zakelijk@softora.nl');
+  assert.equal(runtimeEnv.securityContactEmail, 'zakelijk@softora.nl');
+});
+
 test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () => {
   const fallbackRuntimeEnv = loadRuntimeEnv({
     PREMIUM_SETTINGS_CONFIRM_PIN: ' 123456 ',

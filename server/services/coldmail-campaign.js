@@ -7,6 +7,10 @@ const {
   normalizeContactStatus,
 } = require('./customer-lifecycle');
 const { appendSentMessage } = require('./mailbox-sent-copy');
+const {
+  normalizeMailboxAccountEmail,
+  replaceLegacyMailboxEmail,
+} = require('../config/mail-identity');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -117,16 +121,16 @@ function createColdmailCampaignService(deps = {}) {
     smtpHost = '',
     smtpPort = 587,
     smtpSecure = false,
-    smtpUser = '',
+    smtpUser: rawSmtpUser = '',
     smtpPass = '',
-    mailFromAddress = '',
+    mailFromAddress: rawMailFromAddress = '',
     mailFromName = 'Softora',
-    mailReplyTo = '',
-    coldmailAuditBcc = '',
+    mailReplyTo: rawMailReplyTo = '',
+    coldmailAuditBcc: rawColdmailAuditBcc = '',
     imapHost = '',
     imapPort = 993,
     imapSecure = false,
-    imapUser = '',
+    imapUser: rawImapUser = '',
     imapPass = '',
     imapMailbox = 'INBOX',
     imapExtraMailboxes = [],
@@ -136,6 +140,11 @@ function createColdmailCampaignService(deps = {}) {
     coldmailPackageDailySendLimit = DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT,
     coldmailBlockPersonalMailboxDomains = false,
   } = mailConfig;
+  const smtpUser = replaceLegacyMailboxEmail(rawSmtpUser);
+  const mailFromAddress = replaceLegacyMailboxEmail(rawMailFromAddress);
+  const mailReplyTo = replaceLegacyMailboxEmail(rawMailReplyTo);
+  const coldmailAuditBcc = replaceLegacyMailboxEmail(rawColdmailAuditBcc);
+  const imapUser = replaceLegacyMailboxEmail(rawImapUser);
 
   let smtpTransporter = null;
 
@@ -144,10 +153,11 @@ function createColdmailCampaignService(deps = {}) {
       .toLowerCase()
       .replace(/[\u200B-\u200D\uFEFF]/g, '');
     const match = raw.match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\.?/i);
-    return (match ? match[0] : raw)
+    const cleaned = (match ? match[0] : raw)
       .replace(/[<>()"[\]]/g, '')
       .replace(/[.,;:!?]+$/g, '')
       .trim();
+    return normalizeMailboxAccountEmail(cleaned);
   }
 
   function isLikelyValidEmail(value) {
@@ -571,13 +581,17 @@ function createColdmailCampaignService(deps = {}) {
 
   function readMailboxEnvForKey(key) {
     const env = process.env || {};
-    const sharedUser = normalizeString(env[`MAILBOX_${key}_USER`] || '');
+    const sharedUser = replaceLegacyMailboxEmail(
+      normalizeString(env[`MAILBOX_${key}_USER`] || '')
+    );
     const sharedPass = normalizeString(env[`MAILBOX_${key}_PASS`] || '');
     return {
       imapHost: normalizeString(env[`MAILBOX_${key}_IMAP_HOST`] || ''),
       imapPort: readPortEnv(env[`MAILBOX_${key}_IMAP_PORT`]),
       imapSecure: readBooleanEnv(env[`MAILBOX_${key}_IMAP_SECURE`]),
-      imapUser: normalizeString(env[`MAILBOX_${key}_IMAP_USER`] || sharedUser),
+      imapUser: replaceLegacyMailboxEmail(
+        normalizeString(env[`MAILBOX_${key}_IMAP_USER`] || sharedUser)
+      ),
       imapPass: normalizeString(env[`MAILBOX_${key}_IMAP_PASS`] || sharedPass),
       useBaseCredentials: readBooleanEnv(env[`MAILBOX_${key}_USE_BASE_CREDENTIALS`]) === true,
     };
@@ -1523,19 +1537,20 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
     const from = getParsedMailFromEmail(parsedMail);
+    const selectedSenderEmail = normalizeEmailAddress(senderEmail);
     const messageId = normalizeString(parsedMail && parsedMail.messageId);
     const references = collectMessageReferenceHeader(parsedMail);
     const mail = {
-      from: formatMailFromHeader(senderEmail),
+      from: formatMailFromHeader(selectedSenderEmail),
       to: from.address,
-      replyTo: mailReplyTo || senderEmail || mailFromAddress || undefined,
+      replyTo: mailReplyTo || selectedSenderEmail || mailFromAddress || undefined,
       subject: buildReplySubject(parsedMail && parsedMail.subject),
       text: replyText,
       inReplyTo: messageId || undefined,
       references: references || undefined,
     };
     const info = await transporter.sendMail(mail);
-    await saveSentCopy(senderEmail, mail, info);
+    await saveSentCopy(selectedSenderEmail, mail, info);
     return info;
   }
 

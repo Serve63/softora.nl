@@ -493,19 +493,19 @@ test('mailbox service supports domain-level softora mailbox provider defaults', 
   }
 });
 
-test('mailbox service can intentionally expose aliases through the base mailbox credentials', async () => {
+test('mailbox service can intentionally expose aliases through the softora base mailbox credentials', async () => {
   const oldEnv = { ...process.env };
   process.env.MAILBOX_SOFTORA_NL_USE_BASE_CREDENTIALS = 'true';
   try {
     const service = createMailboxService({
       mailConfig: {
-        mailFromAddress: 'zakelijk@theimpactbox.co',
-        mailFromName: 'Impactbox',
+        mailFromAddress: 'zakelijk@softora.nl',
+        mailFromName: 'Softora',
         smtpHost: 'smtp.strato.com',
-        smtpUser: 'zakelijk@theimpactbox.co',
+        smtpUser: 'zakelijk@softora.nl',
         smtpPass: 'secret',
         imapHost: 'imap.strato.com',
-        imapUser: 'zakelijk@theimpactbox.co',
+        imapUser: 'zakelijk@softora.nl',
         imapPass: 'secret',
       },
     });
@@ -513,8 +513,39 @@ test('mailbox service can intentionally expose aliases through the base mailbox 
 
     assert.equal(info.smtpConfigured, true);
     assert.equal(info.imapConfigured, true);
-    assert.equal(info.smtpUser, 'zakelijk@theimpactbox.co');
-    assert.equal(info.imapUser, 'zakelijk@theimpactbox.co');
+    assert.equal(info.smtpUser, 'zakelijk@softora.nl');
+    assert.equal(info.imapUser, 'zakelijk@softora.nl');
+  } finally {
+    process.env = oldEnv;
+  }
+});
+
+test('mailbox service replaces the legacy impactbox mailbox with the softora business account', async () => {
+  const oldEnv = { ...process.env };
+  process.env.MAILBOX_SOFTORA_NL_USE_BASE_CREDENTIALS = 'true';
+  try {
+    const service = createMailboxService({
+      mailConfig: {
+        mailFromAddress: 'zakelijk@theimpactbox.co',
+        mailFromName: 'Softora',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'zakelijk@theimpactbox.co',
+        smtpPass: 'secret',
+        imapHost: 'imap.strato.com',
+        imapUser: 'zakelijk@theimpactbox.co',
+        imapPass: 'secret',
+      },
+      mailboxAccountsRaw: JSON.stringify([{ email: 'zakelijk@theimpactbox.co' }]),
+    });
+    const accounts = service.getAccounts();
+    const zakelijk = accounts.find((account) => account.email === 'zakelijk@softora.nl');
+
+    assert.ok(zakelijk);
+    assert.ok(!accounts.some((account) => account.email === 'zakelijk@theimpactbox.co'));
+    assert.equal(zakelijk.smtpConfigured, true);
+    assert.equal(zakelijk.imapConfigured, true);
+    assert.equal(zakelijk.smtpUser, 'zakelijk@softora.nl');
+    assert.equal(zakelijk.imapUser, 'zakelijk@softora.nl');
   } finally {
     process.env = oldEnv;
   }

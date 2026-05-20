@@ -1,9 +1,14 @@
+const {
+  normalizeMailboxAccountEmail,
+  replaceLegacyMailboxEmail,
+} = require('./mail-identity');
+
 function normalizeString(value) {
   return String(value || '').trim();
 }
 
 function normalizeLoginEmailValue(value) {
-  return normalizeString(value).toLowerCase();
+  return normalizeMailboxAccountEmail(value);
 }
 
 function readBooleanEnvFlag(value, defaultValue = false) {
@@ -51,7 +56,7 @@ function loadRuntimeEnv(env = process.env) {
   const mailSmtpPort = Number(
     safeEnv.MAIL_SMTP_PORT || safeEnv.SMTP_PORT || safeEnv.STRATO_SMTP_PORT || 587
   );
-  const mailSmtpUser = normalizeString(
+  const mailSmtpUser = replaceLegacyMailboxEmail(
     safeEnv.MAIL_SMTP_USER || safeEnv.SMTP_USER || safeEnv.STRATO_SMTP_USER || ''
   );
   const mailSmtpPass = normalizeString(
@@ -199,7 +204,7 @@ function loadRuntimeEnv(env = process.env) {
       smtpSecure: readBooleanEnvFlag(
         safeEnv.MAIL_SMTP_SECURE || safeEnv.SMTP_SECURE || (mailSmtpPort === 465 ? 'true' : '')
       ),
-      fromAddress: normalizeString(
+      fromAddress: replaceLegacyMailboxEmail(
         safeEnv.CONFIRMATION_MAIL_FROM ||
           safeEnv.MAIL_FROM ||
           safeEnv.STRATO_SMTP_FROM ||
@@ -209,8 +214,10 @@ function loadRuntimeEnv(env = process.env) {
       fromName: normalizeString(
         safeEnv.CONFIRMATION_MAIL_FROM_NAME || safeEnv.MAIL_FROM_NAME || 'Softora'
       ),
-      replyTo: normalizeString(safeEnv.CONFIRMATION_MAIL_REPLY_TO || safeEnv.MAIL_REPLY_TO || ''),
-      coldmailAuditBcc: normalizeString(
+      replyTo: replaceLegacyMailboxEmail(
+        safeEnv.CONFIRMATION_MAIL_REPLY_TO || safeEnv.MAIL_REPLY_TO || ''
+      ),
+      coldmailAuditBcc: replaceLegacyMailboxEmail(
         safeEnv.COLDMAIL_AUDIT_BCC || safeEnv.COLDMAIL_BCC || ''
       ),
       imapHost: normalizeString(
@@ -223,7 +230,7 @@ function loadRuntimeEnv(env = process.env) {
       imapSecure: readBooleanEnvFlag(
         safeEnv.MAIL_IMAP_SECURE || safeEnv.IMAP_SECURE || (mailImapPort === 993 ? 'true' : '')
       ),
-      imapUser: normalizeString(
+      imapUser: replaceLegacyMailboxEmail(
         safeEnv.MAIL_IMAP_USER || safeEnv.IMAP_USER || safeEnv.STRATO_IMAP_USER || mailSmtpUser || ''
       ),
       imapPass: normalizeString(
@@ -281,7 +288,9 @@ function loadRuntimeEnv(env = process.env) {
         600_000
       ),
     },
-    securityContactEmail: normalizeString(safeEnv.SECURITY_CONTACT_EMAIL || 'info@softora.nl'),
+    securityContactEmail: replaceLegacyMailboxEmail(
+      safeEnv.SECURITY_CONTACT_EMAIL || 'info@softora.nl'
+    ),
     demoConfirmationTaskEnabled: readBooleanEnvFlag(safeEnv.ENABLE_DEMO_CONFIRMATION_TASK),
   };
 }

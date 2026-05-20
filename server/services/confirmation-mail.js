@@ -1,6 +1,10 @@
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const {
+  normalizeMailboxAccountEmail,
+  replaceLegacyMailboxEmail,
+} = require('../config/mail-identity');
 
 function createConfirmationMailService(deps = {}) {
   const {
@@ -25,20 +29,24 @@ function createConfirmationMailService(deps = {}) {
     smtpHost = '',
     smtpPort = 587,
     smtpSecure = false,
-    smtpUser = '',
+    smtpUser: rawSmtpUser = '',
     smtpPass = '',
-    mailFromAddress = '',
+    mailFromAddress: rawMailFromAddress = '',
     mailFromName = '',
-    mailReplyTo = '',
+    mailReplyTo: rawMailReplyTo = '',
     imapHost = '',
     imapPort = 993,
     imapSecure = false,
-    imapUser = '',
+    imapUser: rawImapUser = '',
     imapPass = '',
     imapMailbox = 'INBOX',
     imapExtraMailboxes = [],
     imapPollCooldownMs = 20_000,
   } = mailConfig;
+  const smtpUser = replaceLegacyMailboxEmail(rawSmtpUser);
+  const mailFromAddress = replaceLegacyMailboxEmail(rawMailFromAddress);
+  const mailReplyTo = replaceLegacyMailboxEmail(rawMailReplyTo);
+  const imapUser = replaceLegacyMailboxEmail(rawImapUser);
 
   if (!Object.prototype.hasOwnProperty.call(runtimeState, 'smtpTransporter')) {
     runtimeState.smtpTransporter = null;
@@ -120,7 +128,9 @@ function createConfirmationMailService(deps = {}) {
   }
 
   function normalizeEmailAddress(value) {
-    return normalizeString(String(value || '').trim().toLowerCase());
+    return normalizeMailboxAccountEmail(
+      normalizeString(String(value || '').trim().toLowerCase())
+    );
   }
 
   function normalizeEmailAddressForMatching(value) {

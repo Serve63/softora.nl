@@ -7,6 +7,10 @@ const {
   resolveMailboxName,
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
+const {
+  normalizeMailboxAccountEmail,
+  replaceLegacyMailboxEmail,
+} = require('../config/mail-identity');
 
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
@@ -43,22 +47,24 @@ function createMailboxService(deps = {}) {
   } = deps;
 
   const baseAccount = {
-    email: normalizeString(mailConfig.mailFromAddress || mailConfig.smtpUser || mailConfig.imapUser).toLowerCase(),
+    email: normalizeMailboxAccountEmail(
+      normalizeString(mailConfig.mailFromAddress || mailConfig.smtpUser || mailConfig.imapUser)
+    ),
     name: normalizeString(mailConfig.mailFromName || 'Softora'),
     smtpHost: normalizeString(mailConfig.smtpHost),
     smtpPort: Number(mailConfig.smtpPort) || 587,
     smtpSecure: Boolean(mailConfig.smtpSecure),
-    smtpUser: normalizeString(mailConfig.smtpUser),
+    smtpUser: replaceLegacyMailboxEmail(normalizeString(mailConfig.smtpUser)),
     smtpPass: normalizeString(mailConfig.smtpPass),
     imapHost: normalizeString(mailConfig.imapHost),
     imapPort: Number(mailConfig.imapPort) || 993,
     imapSecure: Boolean(mailConfig.imapSecure),
-    imapUser: normalizeString(mailConfig.imapUser),
+    imapUser: replaceLegacyMailboxEmail(normalizeString(mailConfig.imapUser)),
     imapPass: normalizeString(mailConfig.imapPass),
   };
 
   function normalizeEmail(value) {
-    return normalizeString(value).toLowerCase();
+    return normalizeMailboxAccountEmail(normalizeString(value));
   }
 
   function isValidEmail(value) {
@@ -112,7 +118,9 @@ function createMailboxService(deps = {}) {
   function envAccountForEmail(email) {
     const key = envKeyForEmail(email);
     const env = process.env || {};
-    const sharedUser = normalizeString(env[`MAILBOX_${key}_USER`] || '');
+    const sharedUser = replaceLegacyMailboxEmail(
+      normalizeString(env[`MAILBOX_${key}_USER`] || '')
+    );
     const sharedPass = normalizeString(env[`MAILBOX_${key}_PASS`] || '');
     return {
       email,
@@ -120,12 +128,16 @@ function createMailboxService(deps = {}) {
       smtpHost: normalizeString(env[`MAILBOX_${key}_SMTP_HOST`] || ''),
       smtpPort: readPortEnv(env[`MAILBOX_${key}_SMTP_PORT`]),
       smtpSecure: readBooleanEnv(env[`MAILBOX_${key}_SMTP_SECURE`]),
-      smtpUser: normalizeString(env[`MAILBOX_${key}_SMTP_USER`] || sharedUser),
+      smtpUser: replaceLegacyMailboxEmail(
+        normalizeString(env[`MAILBOX_${key}_SMTP_USER`] || sharedUser)
+      ),
       smtpPass: normalizeString(env[`MAILBOX_${key}_SMTP_PASS`] || sharedPass),
       imapHost: normalizeString(env[`MAILBOX_${key}_IMAP_HOST`] || ''),
       imapPort: readPortEnv(env[`MAILBOX_${key}_IMAP_PORT`]),
       imapSecure: readBooleanEnv(env[`MAILBOX_${key}_IMAP_SECURE`]),
-      imapUser: normalizeString(env[`MAILBOX_${key}_IMAP_USER`] || sharedUser),
+      imapUser: replaceLegacyMailboxEmail(
+        normalizeString(env[`MAILBOX_${key}_IMAP_USER`] || sharedUser)
+      ),
       imapPass: normalizeString(env[`MAILBOX_${key}_IMAP_PASS`] || sharedPass),
       useBaseCredentials: readBooleanEnv(env[`MAILBOX_${key}_USE_BASE_CREDENTIALS`]) === true,
     };
@@ -135,19 +147,25 @@ function createMailboxService(deps = {}) {
     const key = envKeyForDomain(email);
     if (!key) return {};
     const env = process.env || {};
-    const sharedUser = normalizeString(env[`MAILBOX_${key}_USER`] || '');
+    const sharedUser = replaceLegacyMailboxEmail(
+      normalizeString(env[`MAILBOX_${key}_USER`] || '')
+    );
     const sharedPass = normalizeString(env[`MAILBOX_${key}_PASS`] || '');
     return {
       name: normalizeString(env[`MAILBOX_${key}_NAME`] || ''),
       smtpHost: normalizeString(env[`MAILBOX_${key}_SMTP_HOST`] || ''),
       smtpPort: readPortEnv(env[`MAILBOX_${key}_SMTP_PORT`]),
       smtpSecure: readBooleanEnv(env[`MAILBOX_${key}_SMTP_SECURE`]),
-      smtpUser: normalizeString(env[`MAILBOX_${key}_SMTP_USER`] || sharedUser),
+      smtpUser: replaceLegacyMailboxEmail(
+        normalizeString(env[`MAILBOX_${key}_SMTP_USER`] || sharedUser)
+      ),
       smtpPass: normalizeString(env[`MAILBOX_${key}_SMTP_PASS`] || sharedPass),
       imapHost: normalizeString(env[`MAILBOX_${key}_IMAP_HOST`] || ''),
       imapPort: readPortEnv(env[`MAILBOX_${key}_IMAP_PORT`]),
       imapSecure: readBooleanEnv(env[`MAILBOX_${key}_IMAP_SECURE`]),
-      imapUser: normalizeString(env[`MAILBOX_${key}_IMAP_USER`] || sharedUser),
+      imapUser: replaceLegacyMailboxEmail(
+        normalizeString(env[`MAILBOX_${key}_IMAP_USER`] || sharedUser)
+      ),
       imapPass: normalizeString(env[`MAILBOX_${key}_IMAP_PASS`] || sharedPass),
       useBaseCredentials: readBooleanEnv(env[`MAILBOX_${key}_USE_BASE_CREDENTIALS`]) === true,
     };
@@ -180,12 +198,14 @@ function createMailboxService(deps = {}) {
       const smtpHost = normalizeString(
         json.smtpHost || envAccount.smtpHost || envDomain.smtpHost || baseAccount.smtpHost
       );
-      const smtpUser = normalizeString(
-        json.smtpUser ||
-          envAccount.smtpUser ||
-          envDomain.smtpUser ||
-          (useBaseCredentials ? baseAccount.smtpUser : '') ||
-          email
+      const smtpUser = replaceLegacyMailboxEmail(
+        normalizeString(
+          json.smtpUser ||
+            envAccount.smtpUser ||
+            envDomain.smtpUser ||
+            (useBaseCredentials ? baseAccount.smtpUser : '') ||
+            email
+        )
       );
       const smtpPass = normalizeString(
         json.smtpPass ||
@@ -227,13 +247,15 @@ function createMailboxService(deps = {}) {
               : typeof envDomain.imapSecure === 'boolean'
                 ? Boolean(envDomain.imapSecure)
                 : Boolean(baseAccount.imapSecure || imapPort === 993),
-        imapUser: normalizeString(
-          json.imapUser ||
-            envAccount.imapUser ||
-            envDomain.imapUser ||
-            (useBaseCredentials ? baseAccount.imapUser : '') ||
-            smtpUser ||
-            email
+        imapUser: replaceLegacyMailboxEmail(
+          normalizeString(
+            json.imapUser ||
+              envAccount.imapUser ||
+              envDomain.imapUser ||
+              (useBaseCredentials ? baseAccount.imapUser : '') ||
+              smtpUser ||
+              email
+          )
         ),
         imapPass: normalizeString(
           json.imapPass ||

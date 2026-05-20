@@ -7,6 +7,7 @@ function createFixture(overrides = {}) {
   const generatedAgendaAppointments = overrides.generatedAgendaAppointments || [];
   const dashboardActivities = [];
   const transportCalls = [];
+  const transportConfigs = [];
   const markedSeenCalls = [];
   const releaseCalls = [];
   let loggedOut = false;
@@ -98,7 +99,12 @@ function createFixture(overrides = {}) {
       }),
     formatDateTimeLabelNl: (date, time) => `${date} ${time}`.trim(),
     truncateText: (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength),
-    createTransport: overrides.createTransport || (() => transport),
+    createTransport:
+      overrides.createTransport ||
+      ((config) => {
+        transportConfigs.push(config);
+        return transport;
+      }),
     createImapClient: overrides.createImapClient || (() => client),
     parseMailSource:
       overrides.parseMailSource ||
@@ -121,6 +127,7 @@ function createFixture(overrides = {}) {
     runtimeState,
     service,
     transportCalls,
+    transportConfigs,
   };
 }
 
@@ -159,6 +166,26 @@ test('confirmation mail service builds fallback draft and sends SMTP mail with r
   assert.equal(fixture.transportCalls[0].subject, '[CT-42] Intake bevestigd');
   assert.match(fixture.transportCalls[0].text, /Referentie: CT-42/);
   assert.equal(delivery.messageId, '<message-1@example.com>');
+});
+
+test('confirmation mail service replaces legacy impactbox sender identity with softora account', async () => {
+  const fixture = createFixture({
+    smtpUser: 'zakelijk@theimpactbox.co',
+    mailFromAddress: 'zakelijk@theimpactbox.co',
+    mailReplyTo: 'zakelijk@theimpactbox.co',
+    imapUser: 'zakelijk@theimpactbox.co',
+  });
+
+  await fixture.service.sendConfirmationEmailViaSmtp({
+    appointment: { id: 43, company: 'Acme BV' },
+    recipientEmail: 'klant@example.com',
+    draftText: 'Onderwerp: Bevestigd\n\nTot snel.',
+  });
+
+  assert.equal(fixture.service.normalizeEmailAddress('zakelijk@theimpactbox.co'), 'zakelijk@softora.nl');
+  assert.equal(fixture.transportConfigs[0].auth.user, 'zakelijk@softora.nl');
+  assert.equal(fixture.transportCalls[0].from, 'Softora <zakelijk@softora.nl>');
+  assert.equal(fixture.transportCalls[0].replyTo, 'zakelijk@softora.nl');
 });
 
 test('confirmation mail service exposes missing SMTP and IMAP env hints when config is incomplete', () => {
