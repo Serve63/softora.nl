@@ -1816,6 +1816,7 @@ function createMailboxService(deps = {}) {
     getMessage,
     listMessages,
     listMessagesWithMeta,
+    syncMailboxResponse,
     markMessageRead,
     deleteMessage,
     sendMessage,
