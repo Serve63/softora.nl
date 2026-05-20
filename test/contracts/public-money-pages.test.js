@@ -15,6 +15,37 @@ function getRegistryEntry(fileName) {
   return INDEXABLE_PUBLIC_SEO_PAGES.find((entry) => entry.fileName === fileName);
 }
 
+const PUBLIC_ROADMAP_COPY_PATTERNS = [
+  /De contentlaag krijgt straks/i,
+  /Volgende contentblokken/i,
+  /SEO-machine/i,
+  /moeten niet los zweven/i,
+  /pillar pages/i,
+  /Tools en scans/i,
+];
+
+test('public SEO pages do not expose internal roadmap copy', () => {
+  for (const entry of INDEXABLE_PUBLIC_SEO_PAGES) {
+    const source = readPage(entry.fileName);
+    for (const pattern of PUBLIC_ROADMAP_COPY_PATTERNS) {
+      assert.doesNotMatch(source, pattern, `${entry.fileName} bevat interne roadmap-taal`);
+    }
+  }
+});
+
+test('diensten page uses customer-facing service guidance copy', () => {
+  const source = readPage('diensten.html');
+
+  assert.match(source, /<h1>Digitale diensten die verkeer omzetten in leads<\/h1>/);
+  assert.match(source, /<h2>Heldere uitleg helpt bezoekers sneller kiezen<\/h2>/);
+  assert.match(source, /Verder lezen per onderwerp/);
+  assert.match(source, /Kennisbankuitleg over websites, software, CRM en AI/);
+  assert.match(source, /href="\/blog"/);
+  assert.match(source, /href="\/kennisbank"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
+  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
+});
+
 test('website money page is focused on SEO, leads and clean internal links', () => {
   const source = readPage('premium-websites.html');
   const entry = getRegistryEntry('premium-websites.html');
