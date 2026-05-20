@@ -1,6 +1,7 @@
 const { timingSafeEqualStrings } = require('./crypto-utils');
 
 const DEFAULT_RISKY_ACTION_CONFIRM_PIN = '698069';
+const COLDMAIL_SEND_CONFIRM_PIN = '8080';
 
 function resolveExpectedPin(options = {}) {
   if (Object.prototype.hasOwnProperty.call(options, 'expectedPin')) {
@@ -12,6 +13,7 @@ function resolveExpectedPin(options = {}) {
 function resolveProvidedPin(body) {
   const candidates = [
     body?.startConfirmPin,
+    body?.actionConfirmCode,
     body?.actionConfirmPin,
     body?.confirmPin,
   ];
@@ -35,6 +37,7 @@ function validateRiskyActionConfirmPin(body, options = {}) {
 }
 
 module.exports = {
+  COLDMAIL_SEND_CONFIRM_PIN,
   DEFAULT_RISKY_ACTION_CONFIRM_PIN,
   validateRiskyActionConfirmPin,
 };

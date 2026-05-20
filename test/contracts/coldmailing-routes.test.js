@@ -20,7 +20,7 @@ function createRouteHarness(deps) {
   assert.equal(typeof sendHandler, 'function');
 
   return async function callSend(body = {}) {
-    const requestBody = { startConfirmPin: '698069', ...body };
+    const requestBody = { startConfirmPin: '8080', ...body };
     const res = {
       statusCode: 200,
       body: null,
@@ -163,6 +163,43 @@ test('coldmailing campaign send rejects missing confirmation pin before agenda o
   assert.match(String(res.body.message || ''), /Bevestigingspin/);
   assert.equal(sent, 0);
   assert.equal(agendaSynced, false);
+});
+
+test('coldmailing campaign send accepts only the 8080 mail confirmation pin', async () => {
+  let sent = 0;
+  const callSend = createRouteHarness({
+    coldmailCampaignService: {
+      sendColdmailCampaign: async () => {
+        sent += 1;
+        return { ok: true, sent: 1 };
+      },
+    },
+    generatedAgendaAppointments: [],
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+  });
+
+  const badRes = await callSend({
+    startConfirmPin: '698069',
+    count: 1,
+    subject: 'Nieuwe website',
+    body: 'Goedemorgen',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(badRes.statusCode, 403);
+  assert.equal(sent, 0);
+
+  const okRes = await callSend({
+    startConfirmPin: '8080',
+    count: 1,
+    subject: 'Nieuwe website',
+    body: 'Goedemorgen',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(okRes.statusCode, 200);
+  assert.equal(okRes.body.ok, true);
+  assert.equal(sent, 1);
 });
 
 test('coldmailing campaign send blocks before sending when next 10 workdays are full', async () => {

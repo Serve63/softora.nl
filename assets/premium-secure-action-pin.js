@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var PIN_LENGTH = 6;
+  var PIN_LENGTH = 4;
   var VERIFY_URL = "/api/premium-users/verify-pin";
   var state = {
     overlay: null,
@@ -19,28 +19,28 @@
       ".secure-action-pin-overlay{position:fixed;inset:0;z-index:12000;display:none;align-items:center;justify-content:center;padding:16px;background:transparent;backdrop-filter:none}",
       ".secure-action-pin-overlay.open{display:flex}",
       ".secure-action-pin-card,.secure-action-pin-card *{box-sizing:border-box}",
-      ".secure-action-pin-card{position:relative;width:min(400px,100%);border:1px solid rgba(139,34,82,.16);border-radius:18px;background:#fff;color:#191b2f;box-shadow:0 18px 48px rgba(18,18,28,.22);padding:22px 22px 20px;overflow:hidden;text-align:center}",
-      ".secure-action-pin-close{position:absolute;right:14px;top:12px;width:32px;height:32px;border:0;background:transparent;color:#6f7282;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}",
-      ".secure-action-pin-close svg{width:18px;height:18px}",
-      ".secure-action-pin-close:hover{background:rgba(139,34,82,.06);color:#191b2f}",
-      ".secure-action-pin-icon{width:38px;height:38px;margin:0 auto 12px;border:1px solid rgba(139,34,82,.16);border-radius:12px;background:rgba(139,34,82,.055);display:flex;align-items:center;justify-content:center;color:#9b2355}",
-      ".secure-action-pin-icon svg{width:20px;height:20px;stroke-width:1.75}",
-      ".secure-action-pin-kicker{margin:0 0 6px;font-family:Oswald,Inter,system-ui,sans-serif;font-size:.74rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#9b2355}",
-      ".secure-action-pin-title{margin:0;color:#191b2f;font-family:Inter,system-ui,sans-serif;font-size:1.32rem;font-weight:800;line-height:1.15;letter-spacing:0}",
-      ".secure-action-pin-desc{max-width:320px;margin:10px auto 16px;color:#686c7c;font-size:.88rem;line-height:1.45;font-weight:500}",
-      ".secure-action-pin-slots{display:flex;justify-content:center;gap:7px;margin:0 auto 14px;flex-wrap:wrap}",
-      ".secure-action-pin-slot{width:32px;height:32px;border-radius:50%;border:2px solid rgba(155,35,85,.18);background:#fbf8fa;color:#191b2f;display:flex;align-items:center;justify-content:center;font-family:Oswald,Inter,system-ui,sans-serif;font-size:.92rem;font-weight:800;font-variant-numeric:tabular-nums;box-shadow:inset 0 1px 0 rgba(255,255,255,.85);transition:transform .14s ease,border-color .14s ease,background .14s ease,box-shadow .14s ease}",
-      ".secure-action-pin-slot.filled{border-color:#9b2355;background:#fff;box-shadow:0 0 0 3px rgba(155,35,85,.08)}",
+      ".secure-action-pin-card{position:relative;width:min(356px,100%);border:1px solid rgba(139,34,82,.13);border-radius:16px;background:#fff;color:#191b2f;box-shadow:0 18px 56px rgba(25,27,47,.16);padding:24px 24px 22px;overflow:hidden;text-align:center}",
+      ".secure-action-pin-close{position:absolute;right:12px;top:12px;width:30px;height:30px;border:0;background:transparent;color:#727585;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}",
+      ".secure-action-pin-close svg{width:17px;height:17px}",
+      ".secure-action-pin-close:hover{background:rgba(139,34,82,.055);color:#191b2f}",
+      ".secure-action-pin-icon{width:34px;height:34px;margin:0 auto 14px;border:1px solid rgba(139,34,82,.15);border-radius:11px;background:#fbf7f9;display:flex;align-items:center;justify-content:center;color:#9b2355}",
+      ".secure-action-pin-icon svg{width:18px;height:18px;stroke-width:1.8}",
+      ".secure-action-pin-kicker{margin:0 0 7px;font-family:Oswald,Inter,system-ui,sans-serif;font-size:.68rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#9b2355}",
+      ".secure-action-pin-title{margin:0;color:#191b2f;font-family:Inter,system-ui,sans-serif;font-size:1.18rem;font-weight:800;line-height:1.2;letter-spacing:0}",
+      ".secure-action-pin-desc{max-width:280px;margin:9px auto 17px;color:#6f7282;font-size:.84rem;line-height:1.45;font-weight:500}",
+      ".secure-action-pin-slots{display:flex;justify-content:center;gap:10px;margin:0 auto 17px;flex-wrap:wrap}",
+      ".secure-action-pin-slot{width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(155,35,85,.22);background:#fff;color:transparent;display:flex;align-items:center;justify-content:center;font-size:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.88);transition:transform .14s ease,border-color .14s ease,background .14s ease,box-shadow .14s ease}",
+      ".secure-action-pin-slot.filled{border-color:#9b2355;background:#9b2355;box-shadow:0 0 0 4px rgba(155,35,85,.07)}",
       ".secure-action-pin-slot.error{border-color:#c0392b;background:rgba(192,57,43,.08);color:#c0392b;animation:secureActionPinShake .28s ease}",
       "@keyframes secureActionPinShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}",
-      ".secure-action-pin-pad{width:min(228px,100%);margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}",
-      ".secure-action-pin-key{height:38px;border:1px solid rgba(25,27,47,.1);border-radius:9px;background:linear-gradient(180deg,#fff 0%,#fafafa 100%);color:#191b2f;cursor:pointer;font-family:Inter,system-ui,sans-serif;font-size:.98rem;font-weight:800;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.035);transition:transform .08s ease,border-color .14s ease,color .14s ease,box-shadow .14s ease}",
-      ".secure-action-pin-key:hover{border-color:rgba(155,35,85,.28);color:#9b2355;box-shadow:0 6px 16px rgba(25,27,47,.07)}",
+      ".secure-action-pin-pad{width:min(216px,100%);margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}",
+      ".secure-action-pin-key{height:38px;border:1px solid rgba(25,27,47,.09);border-radius:10px;background:#fff;color:#191b2f;cursor:pointer;font-family:Inter,system-ui,sans-serif;font-size:.96rem;font-weight:800;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(25,27,47,.035);transition:transform .08s ease,border-color .14s ease,color .14s ease,box-shadow .14s ease}",
+      ".secure-action-pin-key:hover{border-color:rgba(155,35,85,.24);color:#9b2355;box-shadow:0 6px 16px rgba(25,27,47,.06)}",
       ".secure-action-pin-key:active{transform:scale(.96)}",
       ".secure-action-pin-key svg{width:17px;height:17px}",
       ".secure-action-pin-message{min-height:1.25em;margin-top:10px;color:#c0392b;font-size:.76rem;font-weight:700}",
       ".secure-action-code-capture{position:fixed;left:-1000px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;background:transparent;color:transparent}",
-      "@media(max-width:560px){.secure-action-pin-card{padding:20px 16px 18px}.secure-action-pin-close{right:10px;top:10px}.secure-action-pin-title{font-size:1.22rem}.secure-action-pin-desc{font-size:.86rem}.secure-action-pin-slot{width:30px;height:30px;font-size:.88rem}.secure-action-pin-key{height:38px}}",
+      "@media(max-width:560px){.secure-action-pin-card{padding:22px 18px 20px}.secure-action-pin-close{right:10px;top:10px}.secure-action-pin-title{font-size:1.12rem}.secure-action-pin-desc{font-size:.82rem}.secure-action-pin-key{height:38px}}",
     ].join("");
     document.head.appendChild(style);
   }
@@ -77,7 +77,7 @@
       '  <p class="secure-action-pin-kicker" data-secure-action-pin-kicker>Beveiligde actie</p>',
       '  <h2 class="secure-action-pin-title" id="secure-action-pin-title" data-secure-action-pin-title>Actie bevestigen</h2>',
       '  <p class="secure-action-pin-desc" data-secure-action-pin-desc>Typ de pincode om te voorkomen dat deze actie per ongeluk start.</p>',
-      '  <input class="secure-action-code-capture" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Eenmalige bevestigingscode" tabindex="-1" name="softora_action_code" data-secure-action-code-capture data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other">',
+      '  <input class="secure-action-code-capture" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Eenmalige bevestigingscode" tabindex="-1" name="softora_action_code" data-secure-action-code-capture data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other">',
       '  <div class="secure-action-pin-slots" role="status" aria-live="polite" aria-label="Voortgang pincode" data-secure-action-pin-slots></div>',
       '  <div class="secure-action-pin-pad" data-secure-action-pin-pad></div>',
       '  <div class="secure-action-pin-message" data-secure-action-pin-message></div>',
@@ -157,9 +157,9 @@
   function paintSlots(mode) {
     var slots = state.overlay.querySelectorAll("[data-secure-action-pin-slot]");
     slots.forEach(function (slot, index) {
-      var digit = state.buffer[index] || "";
-      slot.textContent = digit;
-      slot.classList.toggle("filled", Boolean(digit));
+      var filled = Boolean(state.buffer[index]);
+      slot.textContent = "";
+      slot.classList.toggle("filled", filled);
       slot.classList.toggle("error", mode === "error");
     });
   }
@@ -227,7 +227,7 @@
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ actionConfirmCode: pin }),
+      body: JSON.stringify({ actionConfirmCode: pin, actionConfirmScope: "coldmail-send" }),
     });
     var payload = await response.json().catch(function () { return null; });
     if (!response.ok || !payload || payload.ok === false) {
@@ -240,7 +240,7 @@
     if (!state.pending || state.busy) return;
     var pin = String(state.buffer || "").trim();
     if (pin.length !== PIN_LENGTH) {
-      flashError("Vul alle zes cijfers in.");
+      flashError("Vul alle vier cijfers in.");
       return;
     }
     state.busy = true;
@@ -350,9 +350,9 @@
 
   function confirmMailSend() {
     return request({
-      kicker: "Beveiligde actie",
-      title: "Mails versturen bevestigen",
-      description: "Typ de pincode om te voorkomen dat deze actie per ongeluk start.",
+      kicker: "Bevestiging",
+      title: "Mails versturen",
+      description: "Voer je 4-cijferige code in om deze verzending te starten.",
     });
   }
 
