@@ -227,7 +227,8 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /@State private var isLoadingMessageDetail = false/);
   assert.match(agendaListSource, /Task \{[^]*await loadMessageDetail\(for: message\)[^]*\}/);
   assert.match(agendaListSource, /apiClient\.fetchMailboxMessageDetail/);
-  assert.match(agendaListSource, /MailboxDetailLoadingView\(\)/);
+  assert.doesNotMatch(agendaListSource, /MailboxDetailLoadingView\(\)/);
+  assert.doesNotMatch(agendaListSource, /Text\("Mail laden\.\.\."\)/);
   assert.match(agendaListSource, /await loadMessages\(fresh: true\)/);
   assert.match(agendaListSource, /@State private var mailboxStatusMessage: String\?/);
   assert.match(agendaListSource, /Text\("Mailbox niet geladen"\)/);

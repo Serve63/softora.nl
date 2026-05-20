@@ -1667,10 +1667,6 @@ private struct MailboxMessageDetail: View {
                     MailboxDetailMeta(label: "Datum", value: MailboxDateFormatter.label(message.date))
                 }
 
-                if isLoadingDetail {
-                    MailboxDetailLoadingView()
-                }
-
                 if let statusMessage {
                     MailboxStatusBanner(message: statusMessage)
                 }
@@ -1964,30 +1960,6 @@ private struct MailboxBodyView<ReplyComposer: View>: View {
 
     private var replyPlacementIndex: Int? {
         presentation.sections.firstIndex { !$0.isQuoted }
-    }
-}
-
-private struct MailboxDetailLoadingView: View {
-    var body: some View {
-        HStack(spacing: 10) {
-            ProgressView()
-                .tint(Color.softoraCrimson)
-
-            Text("Mail laden...")
-                .font(.softoraDisplay(12, weight: .bold))
-                .textCase(.uppercase)
-                .tracking(0.9)
-                .foregroundStyle(Color.softoraMuted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Color.softoraSheetBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.softoraPurpleLight, lineWidth: 1)
-        }
     }
 }
 
