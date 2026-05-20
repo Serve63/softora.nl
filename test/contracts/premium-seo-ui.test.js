@@ -15,14 +15,16 @@ test('premium seo page shows unlocked prestaties dashboard in premium shell', ()
     'utf8'
   );
 
-  assert.match(source, /assets\/premium-seo-performance\.css\?v=20260520a/);
+  assert.match(source, /assets\/premium-seo-performance\.css\?v=20260520b/);
   assert.match(source, /assets\/premium-seo-performance\.js\?v=20260520a/);
+  assert.ok(
+    source.indexOf('</style>') < source.indexOf('assets/premium-seo-performance.css?v=20260520b'),
+    'dashboard CSS hoort na de legacy SEO-styles te laden zodat de 4-koloms layout wint'
+  );
   assert.match(source, /<main class="main-content seo-performance-main">/);
   assert.match(source, /<span class="topbar-title">Prestaties<\/span>/);
   assert.match(source, /Laatste update: 4 uur geleden/);
   assert.match(source, /<button class="filter-pill active" type="button">3 maanden<\/button>/);
-  assert.match(source, /<button class="filter-pill secondary" type="button">Zoektype: Web<\/button>/);
-  assert.match(source, /<button class="filter-add" type="button">/);
   assert.match(source, /<span class="metric-label">Totaal klikken<\/span>/);
   assert.match(source, /<span class="metric-label">Totaal vertoningen<\/span>/);
   assert.match(source, /<span class="metric-label">Gemiddelde CTR<\/span>/);
@@ -46,6 +48,12 @@ test('premium seo page shows unlocked prestaties dashboard in premium shell', ()
   assert.doesNotMatch(source, /data-seo-lock-submit/);
   assert.doesNotMatch(source, /CONTENT_LOCK_CODE/);
   assert.doesNotMatch(source, /onclick="/);
+  assert.doesNotMatch(source, /class="export-btn"/);
+  assert.doesNotMatch(source, /Exporteren/);
+  assert.doesNotMatch(source, /Zoektype: Web/);
+  assert.doesNotMatch(source, /Filter toevoegen/);
+  assert.doesNotMatch(source, /class="filter-divider"/);
+  assert.doesNotMatch(source, /class="filter-add"/);
 
   const seoLink = source.match(/<a href="\/premium-seo"[^>]*data-sidebar-key="seo"[^>]*>[\s\S]*?<\/a>/);
   assert.ok(seoLink, 'SEO hoort als sidebar-link in de pagina te staan');
