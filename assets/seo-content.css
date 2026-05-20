@@ -15,6 +15,8 @@
   --border: #e8e5e0;
   --nav-cta: var(--crimson);
   --nav-cta-hover: var(--clight);
+  --article-max: 920px;
+  --article-gutter: 80px;
 }
 
 body {
@@ -406,10 +408,16 @@ nav {
   width: 3px;
 }
 
-.artikel-hero {
+.artikel-hero,
+.artikel-img,
+.artikel-body,
+.content-cta {
   margin: 0 auto;
-  max-width: 760px;
-  padding: 60px 80px 0;
+  width: min(var(--article-max), calc(100% - (var(--article-gutter) * 2)));
+}
+
+.artikel-hero {
+  padding: 60px 0 0;
 }
 
 .inline-back {
@@ -468,8 +476,7 @@ nav {
   font-weight: 700;
   justify-content: center;
   letter-spacing: 1px;
-  margin: 0 auto 48px;
-  max-width: 920px;
+  margin-bottom: 48px;
   overflow: hidden;
   padding: 0;
   position: relative;
@@ -498,9 +505,7 @@ nav {
   color: var(--mid);
   font-size: 16px;
   line-height: 1.85;
-  margin: 0 auto;
-  max-width: 680px;
-  padding: 0 80px 80px;
+  padding: 0 0 80px;
 }
 
 .artikel-body h2 {
@@ -530,8 +535,7 @@ nav {
   display: grid;
   gap: 28px;
   grid-template-columns: minmax(0, 1fr) auto;
-  margin: 0 auto 64px;
-  max-width: 920px;
+  margin-bottom: 64px;
   padding: 34px 38px;
 }
 
@@ -710,6 +714,10 @@ nav {
 }
 
 @media (max-width: 980px) {
+  :root {
+    --article-gutter: 20px;
+  }
+
   .hero-banner,
   .filter-bar,
   .cluster-nav,
@@ -771,6 +779,12 @@ nav {
 
   .filter-tab {
     flex: 0 0 auto;
+  }
+
+  .artikel-hero,
+  .artikel-body {
+    padding-left: 0;
+    padding-right: 0;
   }
 }
 

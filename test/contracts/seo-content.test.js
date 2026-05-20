@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   buildSeoContentArticleHtml,
@@ -16,6 +18,14 @@ const {
   getSeoContentPublicPaths,
   getSeoContentSitemapEntries,
 } = require('../../server/services/seo-content');
+
+const repoRoot = path.resolve(__dirname, '../..');
+
+function extractCssRuleBlock(css, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = css.match(new RegExp(`\\n${escapedSelector}\\s*\\{([^}]*)\\}`));
+  return match ? match[1] : '';
+}
 
 test('seo content exposes blog and kennisbank paths for crawl and sitemap discovery', () => {
   const publicPaths = getSeoContentPublicPaths({ now: new Date('2026-05-19T12:00:00.000Z') });
@@ -107,6 +117,27 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /href="\/ai-telefonist"/);
   assert.match(html, /data-softora-public-seo="conversion-cta"/);
   assert.match(html, /href="\/#contact"[^>]*>Neem contact op<\/a>/);
+});
+
+test('seo content article template keeps title, image, body and CTA on the same width', () => {
+  const css = fs.readFileSync(path.join(repoRoot, 'assets/seo-content.css'), 'utf8');
+  const html = buildSeoContentArticleHtml(getSeoContentItem('blog', 'ai-automatisering-mkb-waar-beginnen'), {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.match(css, /--article-max:\s*920px;/);
+  assert.match(css, /--article-gutter:\s*80px;/);
+  assert.match(
+    css,
+    /\.artikel-hero,\s*\.artikel-img,\s*\.artikel-body,\s*\.content-cta\s*\{[\s\S]*?width:\s*min\(var\(--article-max\), calc\(100% - \(var\(--article-gutter\) \* 2\)\)\);/
+  );
+  assert.doesNotMatch(extractCssRuleBlock(css, '.artikel-hero'), /max-width:\s*760px/);
+  assert.doesNotMatch(extractCssRuleBlock(css, '.artikel-body'), /max-width:\s*680px/);
+  assert.match(html, /<link rel="stylesheet" href="\/assets\/seo-content\.css\?v=20260520b">/);
+  assert.match(html, /<section class="artikel-hero">/);
+  assert.match(html, /<figure class="artikel-img">/);
+  assert.match(html, /<article class="artikel-body">/);
+  assert.match(html, /<section class="content-cta" data-softora-public-seo="conversion-cta">/);
 });
 
 test('seo content images zijn per cluster gekoppeld met beschrijvende bestandsnamen en alt-teksten', () => {
