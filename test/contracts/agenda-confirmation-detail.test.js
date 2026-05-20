@@ -108,14 +108,22 @@ test('agenda confirmation detail helpers prefer Twilio media urls when the recor
 
 test('agenda confirmation detail helpers transcribe fetched recordings through OpenAI when an API key is configured', async () => {
   const originalFetch = global.fetch;
-  global.fetch = async () => ({
+  let capturedHeaders = null;
+  global.fetch = async (_url, options = {}) => ({
     ok: true,
     status: 200,
-    text: async () => JSON.stringify({ text: ' Hallo wereld ' }),
+    text: async () => {
+      capturedHeaders = options.headers;
+      return JSON.stringify({ text: ' Hallo wereld ' });
+    },
   });
 
   try {
     const helpers = createAgendaConfirmationDetailHelpers({
+      env: {
+        OPENAI_ORGANIZATION_ID: 'org_softora',
+        OPENAI_PROJECT_ID: 'proj_softora',
+      },
       openAiApiBaseUrl: 'https://api.openai.com/v1',
       normalizeString,
       normalizeEmailAddress,
@@ -149,6 +157,8 @@ test('agenda confirmation detail helpers transcribe fetched recordings through O
     );
 
     assert.equal(transcript, 'Hallo wereld');
+    assert.equal(capturedHeaders['OpenAI-Organization'], 'org_softora');
+    assert.equal(capturedHeaders['OpenAI-Project'], 'proj_softora');
   } finally {
     global.fetch = originalFetch;
   }

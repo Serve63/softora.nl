@@ -44,3 +44,83 @@ test('runtime fetch helpers preserve non-json response bodies as raw text', asyn
   const result = await fetchJsonWithTimeout('https://softora.test/raw', { method: 'GET' }, 50);
   assert.deepEqual(result.data, { raw: 'plain-text-response' });
 });
+
+test('runtime fetch helpers add OpenAI organization and project context headers', async (t) => {
+  const originalFetch = global.fetch;
+  const originalOrganizationId = process.env.OPENAI_ORGANIZATION_ID;
+  const originalProjectId = process.env.OPENAI_PROJECT_ID;
+  t.after(() => {
+    global.fetch = originalFetch;
+    if (originalOrganizationId === undefined) delete process.env.OPENAI_ORGANIZATION_ID;
+    else process.env.OPENAI_ORGANIZATION_ID = originalOrganizationId;
+    if (originalProjectId === undefined) delete process.env.OPENAI_PROJECT_ID;
+    else process.env.OPENAI_PROJECT_ID = originalProjectId;
+  });
+
+  process.env.OPENAI_ORGANIZATION_ID = 'org_softora';
+  process.env.OPENAI_PROJECT_ID = 'proj_softora';
+
+  let capturedHeaders = null;
+  global.fetch = async (_url, options = {}) => {
+    capturedHeaders = options.headers;
+    return {
+      text: async () => '{"ok":true}',
+    };
+  };
+
+  await fetchJsonWithTimeout(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer sk-test',
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    },
+    50
+  );
+
+  assert.equal(capturedHeaders['OpenAI-Organization'], 'org_softora');
+  assert.equal(capturedHeaders['OpenAI-Project'], 'proj_softora');
+  assert.equal(capturedHeaders.Authorization, 'Bearer sk-test');
+});
+
+test('runtime fetch helpers leave existing OpenAI context headers untouched', async (t) => {
+  const originalFetch = global.fetch;
+  const originalOrganizationId = process.env.OPENAI_ORGANIZATION_ID;
+  const originalProjectId = process.env.OPENAI_PROJECT_ID;
+  t.after(() => {
+    global.fetch = originalFetch;
+    if (originalOrganizationId === undefined) delete process.env.OPENAI_ORGANIZATION_ID;
+    else process.env.OPENAI_ORGANIZATION_ID = originalOrganizationId;
+    if (originalProjectId === undefined) delete process.env.OPENAI_PROJECT_ID;
+    else process.env.OPENAI_PROJECT_ID = originalProjectId;
+  });
+
+  process.env.OPENAI_ORGANIZATION_ID = 'org_softora';
+  process.env.OPENAI_PROJECT_ID = 'proj_softora';
+
+  let capturedHeaders = null;
+  global.fetch = async (_url, options = {}) => {
+    capturedHeaders = options.headers;
+    return {
+      text: async () => '{"ok":true}',
+    };
+  };
+
+  await fetchJsonWithTimeout(
+    'https://api.openai.com/v1/organization/costs',
+    {
+      method: 'GET',
+      headers: {
+        Authorization: 'Bearer sk-admin',
+        'OpenAI-Project': 'proj_existing',
+      },
+    },
+    50
+  );
+
+  assert.equal(capturedHeaders['OpenAI-Organization'], 'org_softora');
+  assert.equal(capturedHeaders['OpenAI-Project'], 'proj_existing');
+});

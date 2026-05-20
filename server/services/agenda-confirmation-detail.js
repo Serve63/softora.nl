@@ -1,3 +1,5 @@
+const { buildOpenAiContextHeaders } = require('./openai-request-context');
+
 function createAgendaConfirmationDetailHelpers(deps = {}) {
   const {
     openAiApiBaseUrl = 'https://api.openai.com/v1',
@@ -228,6 +230,7 @@ function createAgendaConfirmationDetailHelpers(deps = {}) {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${apiKey}`,
+              ...buildOpenAiContextHeaders({ ...deps, openAiApiBaseUrl }),
             },
             body: form,
             signal: controller.signal,

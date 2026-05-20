@@ -369,7 +369,11 @@ test('ai remote service accepts chatgpt-image-latest without legacy response for
 test('ai remote service transcribes meeting audio uploads through OpenAI audio API', async () => {
   const calls = [];
   const { service } = createService({
-    env: { OPENAI_AUDIO_TRANSCRIPTION_MODEL: 'gpt-4o-mini-transcribe' },
+    env: {
+      OPENAI_AUDIO_TRANSCRIPTION_MODEL: 'gpt-4o-mini-transcribe',
+      OPENAI_ORGANIZATION_ID: 'org_softora',
+      OPENAI_PROJECT_ID: 'proj_softora',
+    },
     fetchImpl: async (url, options) => {
       calls.push({ url, options });
       return {
@@ -391,6 +395,8 @@ test('ai remote service transcribes meeting audio uploads through OpenAI audio A
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://api.openai.test/v1/audio/transcriptions');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer openai-key');
+  assert.equal(calls[0].options.headers['OpenAI-Organization'], 'org_softora');
+  assert.equal(calls[0].options.headers['OpenAI-Project'], 'proj_softora');
   assert.equal(calls[0].options.body.get('model'), 'gpt-4o-mini-transcribe');
   assert.equal(calls[0].options.body.get('language'), 'nl');
   assert.equal(calls[0].options.body.get('response_format'), 'text');
