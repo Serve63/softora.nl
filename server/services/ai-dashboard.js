@@ -1,5 +1,8 @@
+const { buildOpenAiContextHeaders } = require('./openai-request-context');
+
 function createAiDashboardCoordinator(deps = {}) {
   const {
+    env = process.env,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     parseJsonLoose = () => null,
@@ -488,6 +491,7 @@ function createAiDashboardCoordinator(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
         },
         body: JSON.stringify({
           model,

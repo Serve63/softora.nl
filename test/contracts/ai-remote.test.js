@@ -213,6 +213,10 @@ async function assertPublicPreviewTestUrl(value) {
 test('ai remote service generates website preview image payload from OpenAI image output', async () => {
   const calls = [];
   const { service, state } = createService({
+    env: {
+      OPENAI_ORGANIZATION_ID: 'org_softora',
+      OPENAI_PROJECT_ID: 'proj_softora',
+    },
     fetchJsonWithTimeout: async (url, options, timeoutMs) => {
       calls.push({ url, options, timeoutMs });
       return {
@@ -230,6 +234,8 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.equal(state.fetchJsonCalls.length, 0);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://api.openai.test/v1/images/generations');
+  assert.equal(calls[0].options.headers['OpenAI-Organization'], 'org_softora');
+  assert.equal(calls[0].options.headers['OpenAI-Project'], 'proj_softora');
   assert.match(String(calls[0].options.body || ''), /gpt-image-2/);
   assert.match(String(calls[0].options.body || ''), /"size":"2160x3840"/);
   assert.match(String(calls[0].options.body || ''), /"quality":"high"/);
@@ -246,6 +252,10 @@ test('ai remote service uses OpenAI image edits with fetched website reference i
   const calls = [];
   let capturedPromptScan = null;
   const { service } = createService({
+    env: {
+      OPENAI_ORGANIZATION_ID: 'org_softora',
+      OPENAI_PROJECT_ID: 'proj_softora',
+    },
     buildWebsitePreviewPromptFromScan: (scan) => {
       capturedPromptScan = scan;
       return `Preview met ${scan.referenceImageCount || 0} referentie`;
@@ -281,6 +291,8 @@ test('ai remote service uses OpenAI image edits with fetched website reference i
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://api.openai.test/v1/images/edits');
+  assert.equal(calls[0].options.headers['OpenAI-Organization'], 'org_softora');
+  assert.equal(calls[0].options.headers['OpenAI-Project'], 'proj_softora');
   assert.equal(capturedPromptScan.referenceImageCount, 1);
   assert.equal(result.referenceImageCount, 1);
   assert.equal(calls[0].options.body.get('model'), 'gpt-image-2');

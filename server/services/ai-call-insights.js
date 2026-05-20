@@ -1,3 +1,5 @@
+const { buildOpenAiContextHeaders } = require('./openai-request-context');
+
 function defaultNormalizeString(value, fallback = '') {
   if (value === null || value === undefined) return fallback;
   return String(value).trim();
@@ -11,6 +13,7 @@ function defaultTruncateText(value, maxLength = 500, normalizeString = defaultNo
 
 function createAiCallInsightRuntime(deps = {}) {
   const {
+    env = process.env,
     normalizeString = defaultNormalizeString,
     truncateText = (value, maxLength) => defaultTruncateText(value, maxLength, normalizeString),
     normalizeDateYyyyMmDd = (value) => normalizeString(value),
@@ -697,6 +700,7 @@ function createAiCallInsightRuntime(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
         },
         body: JSON.stringify({
           model: openAiModel,

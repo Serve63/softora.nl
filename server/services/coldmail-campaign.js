@@ -10,6 +10,7 @@ const {
   normalizeContactStatus,
 } = require('./customer-lifecycle');
 const { appendSentMessage } = require('./mailbox-sent-copy');
+const { buildOpenAiContextHeaders } = require('./openai-request-context');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -132,6 +133,7 @@ async function resolveEmailDomainWithDns(domain) {
 
 function createColdmailCampaignService(deps = {}) {
   const {
+    env = process.env,
     mailConfig = {},
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
@@ -2298,6 +2300,7 @@ function createColdmailCampaignService(deps = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
         },
         body: JSON.stringify({
           model,
