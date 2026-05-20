@@ -59,6 +59,10 @@ const SENDER_DISPLAY_NAMES = {
   'martijn@softora.nl': 'Martijn van de Ven',
   'ruben@softora.nl': 'Ruben',
 };
+const SENDER_AUDIT_BCC_ADDRESSES = {
+  'serve@softora.nl': 'servec321@gmail.com',
+  'martijn@softora.nl': 'martijnven123@gmail.com',
+};
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -650,7 +654,9 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeString(value)
       .replace(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b/g, '')
       .replace(/\s*\([A-Z]{2,3}\)\s*$/i, '')
+      .replace(/\s+\b(?:NB|NH|ZH|UT|GE|GLD|OV|FL|FR|GR|DR|LB|LI|ZE)\b$/i, '')
       .replace(/\b(Nederland|The Netherlands)\b/gi, '')
+      .replace(/\s+\b(?:NB|NH|ZH|UT|GE|GLD|OV|FL|FR|GR|DR|LB|LI|ZE)\b$/i, '')
       .replace(/^[\s,.;-]+|[\s,.;-]+$/g, '')
       .replace(/\s+/g, ' ')
       .trim();
@@ -1382,8 +1388,10 @@ function createColdmailCampaignService(deps = {}) {
     return name ? `${name} <${address}>` : address;
   }
 
-  function getColdmailAuditBccAddress() {
-    const email = normalizeEmailAddress(coldmailAuditBcc);
+  function getColdmailAuditBccAddress(senderEmail = '') {
+    const configuredEmail = normalizeEmailAddress(coldmailAuditBcc);
+    if (isLikelyValidEmail(configuredEmail)) return configuredEmail;
+    const email = normalizeEmailAddress(SENDER_AUDIT_BCC_ADDRESSES[normalizeEmailAddress(senderEmail)]);
     return isLikelyValidEmail(email) ? email : '';
   }
 
@@ -1430,7 +1438,7 @@ function createColdmailCampaignService(deps = {}) {
       dailySendLimit: getColdmailDailySendLimit(),
       packageDailySendLimit: getColdmailPackageDailySendLimit(),
       blocksPersonalMailboxDomains: shouldBlockPersonalMailboxDomains(),
-      auditBccConfigured: Boolean(getColdmailAuditBccAddress()),
+      auditBccConfigured: Boolean(getColdmailAuditBccAddress(mailFromAddress || smtpUser)),
     };
   }
 
@@ -3035,7 +3043,7 @@ function createColdmailCampaignService(deps = {}) {
     }
     const smtpAccount = delivery.account;
     const sent = [];
-    const auditBcc = getColdmailAuditBccAddress();
+    const auditBcc = getColdmailAuditBccAddress(senderEmail);
 
     for (const item of selectedRows) {
       const row = item.row;

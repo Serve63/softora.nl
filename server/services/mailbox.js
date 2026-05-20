@@ -36,6 +36,7 @@ const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const FOLDER_ALIASES = {
   inbox: ['INBOX'],
+  starred: ['starred'],
   sent: [
     'Sent',
     'Sent Items',
@@ -83,6 +84,7 @@ const FOLDER_SPECIAL_USES = {
 
 const FOLDER_LABELS = {
   inbox: 'Inbox',
+  starred: 'Gemarkeerd',
   sent: 'Verzonden',
   drafts: 'Concepten',
   spam: 'Spam',
@@ -272,11 +274,13 @@ function isMockupBodyImage(image) {
 function decorateRecoveredWebdesignImagesText(text, images) {
   const bodyImages = (Array.isArray(images) ? images : []).filter((image) => image && image.alt && image.dataUrl);
   if (!bodyImages.length || extractBodyImageLabels(text).length) return text;
+  if (!bodyImages.some((image) => !isMockupBodyImage(image))) return text;
   const lines = String(text || '').split('\n');
   const hasMockupCaption = lines.some((line) => normalizeImageLabel(line) === normalizeImageLabel(COLDMAIL_MOCKUP_CAPTION));
   const imageLines = [];
   let hasMainImage = false;
   bodyImages.forEach((image) => {
+    if (isMockupBodyImage(image) && !hasMainImage) return;
     if (isMockupBodyImage(image) && hasMainImage && !hasMockupCaption) {
       imageLines.push(COLDMAIL_MOCKUP_CAPTION);
     }
@@ -434,6 +438,7 @@ function sanitizeMailboxDisplayText(value) {
 const INDEX_STALE_MS = 2 * 60 * 1000;
 const DEFAULT_SYNC_FOLDERS = ['inbox', 'sent'];
 const DEFAULT_SYNC_LIMIT = 50;
+const STARRED_SOURCE_FOLDERS = ['inbox', 'sent', 'drafts', 'spam', 'trash'];
 
 function createMailboxService(deps = {}) {
   const {
@@ -706,8 +711,15 @@ function createMailboxService(deps = {}) {
     const rawId = normalizeString(input.id || input.messageId);
     let folder = normalizeFolder(input.folder);
     let uid = Number(input.uid || 0);
+    const match = rawId.match(/^([a-z]+):(\d+)$/i);
+    if (match && (folder === 'starred' || !Number.isFinite(uid) || uid <= 0)) {
+      const idFolder = normalizeFolder(match[1]);
+      if (idFolder !== 'starred') {
+        folder = idFolder;
+        if (!Number.isFinite(uid) || uid <= 0) uid = Number(match[2]);
+      }
+    }
     if ((!Number.isFinite(uid) || uid <= 0) && rawId) {
-      const match = rawId.match(/^([a-z]+):(\d+)$/i);
       if (match) {
         folder = normalizeFolder(match[1]);
         uid = Number(match[2]);
@@ -719,6 +731,16 @@ function createMailboxService(deps = {}) {
       throw error;
     }
     return { folder, uid };
+  }
+
+  function resolveMessageLookupFolder(folder, id) {
+    const normalizedFolder = normalizeFolder(folder);
+    const match = normalizeString(id).match(/^([a-z]+):\d+$/i);
+    if (normalizedFolder === 'starred' && match) {
+      const idFolder = normalizeFolder(match[1]);
+      if (idFolder !== 'starred') return idFolder;
+    }
+    return normalizedFolder;
   }
 
   function createClient(account) {
@@ -930,7 +952,8 @@ function createMailboxService(deps = {}) {
       meta,
       normalizeString(meta.websitePhotoName || meta.fileName || fallbackAlt || 'Webdesign')
     );
-    if (mainImage) images.push(mainImage);
+    if (!mainImage) return [];
+    images.push(mainImage);
     const mockupImage = await imageFromPhotoMeta(
       values,
       meta,
@@ -1086,7 +1109,13 @@ function createMailboxService(deps = {}) {
     return account;
   }
 
-  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null }) {
+  async function fetchMessagesFromImap({
+    account,
+    folder = 'inbox',
+    limit = DEFAULT_SYNC_LIMIT,
+    uids = null,
+    searchCriteria = ['ALL'],
+  }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
 
@@ -1101,7 +1130,7 @@ function createMailboxService(deps = {}) {
           ? uids.map(Number).filter((uid) => Number.isFinite(uid) && uid > 0)
           : null;
         if (!selectedUids) {
-          const allUids = await client.search(['ALL']);
+          const allUids = await client.search(searchCriteria);
           selectedUids = (Array.isArray(allUids) ? allUids : []).slice(-safeLimit).reverse();
         }
         if (!selectedUids.length) return [];
@@ -1137,6 +1166,26 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function fetchStarredMessagesFromImap({ account, limit = DEFAULT_SYNC_LIMIT }) {
+    const safeLimit = getSafeLimit(limit);
+    const messages = [];
+    for (const folder of STARRED_SOURCE_FOLDERS) {
+      const folderMessages = await fetchMessagesFromImap({
+        account,
+        folder,
+        limit: safeLimit,
+        searchCriteria: ['FLAGGED'],
+      }).catch((error) => {
+        logger.warn('[Mailbox][Starred]', account.email, folder, error?.message || error);
+        return [];
+      });
+      messages.push(...folderMessages);
+    }
+    return messages
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, safeLimit);
+  }
+
   async function fetchMessageFromImapById({ account, folder = 'inbox', id = '' }) {
     const uid = Number(normalizeString(id).match(/:(\d+)$/)?.[1] || id);
     if (!Number.isFinite(uid) || uid <= 0) return null;
@@ -1159,6 +1208,16 @@ function createMailboxService(deps = {}) {
       folder,
       limit,
     });
+  }
+
+  async function updateIndexedMessageState({ account, folder, uid, patch }) {
+    if (!canUseMailboxIndex() || typeof mailboxIndexStore.updateMessageState !== 'function') return;
+    await mailboxIndexStore.updateMessageState({
+      accountEmail: account.email,
+      folder,
+      uid,
+      patch,
+    }).catch((error) => logger.warn('[Mailbox][IndexState]', error?.message || error));
   }
 
   async function getMailboxSyncMeta({ account, folder }) {
@@ -1266,6 +1325,19 @@ function createMailboxService(deps = {}) {
     const account = assertReadableAccount(accountEmail);
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
+
+    if (normalizedFolder === 'starred') {
+      return {
+        messages: await fetchStarredMessagesFromImap({ account, limit: safeLimit }),
+        sync: {
+          indexed: false,
+          stale: false,
+          source: 'imap-live-starred',
+          refreshRecommended: false,
+        },
+      };
+    }
+
     const indexedMessages = await readIndexedMessages({ account, folder: normalizedFolder, limit: safeLimit });
 
     if (Array.isArray(indexedMessages) && indexedMessages.length) {
@@ -1322,7 +1394,7 @@ function createMailboxService(deps = {}) {
 
   async function getMessage({ accountEmail, folder = 'inbox', id = '' }) {
     const account = assertReadableAccount(accountEmail);
-    const normalizedFolder = normalizeFolder(folder);
+    const normalizedFolder = resolveMessageLookupFolder(folder, id);
     if (canUseMailboxIndex() && typeof mailboxIndexStore.getMessage === 'function') {
       const indexed = await mailboxIndexStore.getMessage({
         accountEmail: account.email,
@@ -1348,17 +1420,7 @@ function createMailboxService(deps = {}) {
   }
 
   async function markMessageRead({ accountEmail, id, folder, uid }) {
-    const account = getAccount(accountEmail);
-    if (!account) {
-      const error = new Error('Mailbox-account niet gevonden.');
-      error.status = 404;
-      throw error;
-    }
-    if (!account.imapConfigured) {
-      const error = new Error('IMAP is niet geconfigureerd voor deze mailbox.');
-      error.status = 503;
-      throw error;
-    }
+    const account = assertReadableAccount(accountEmail);
     const messageRef = parseMessageReference({ id, folder, uid });
     const client = createClient(account);
     try {
@@ -1367,6 +1429,12 @@ function createMailboxService(deps = {}) {
       const lock = await client.getMailboxLock(mailboxName);
       try {
         await client.messageFlagsAdd([messageRef.uid], ['\\Seen'], { uid: true });
+        await updateIndexedMessageState({
+          account,
+          folder: messageRef.folder,
+          uid: messageRef.uid,
+          patch: { unread: false },
+        });
         return {
           account: account.email,
           folder: messageRef.folder,
@@ -1383,18 +1451,54 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function starMessage({ accountEmail, id, folder, uid, starred }) {
+    const account = assertReadableAccount(accountEmail);
+    const messageRef = parseMessageReference({ id, folder, uid });
+    const nextStarred = Boolean(starred);
+    const client = createClient(account);
+    try {
+      await client.connect();
+      const mailboxName = await resolveMailboxName(client, messageRef.folder);
+      if (!mailboxName) {
+        const error = new Error('Mailboxmap niet gevonden.');
+        error.status = 404;
+        throw error;
+      }
+      const lock = await client.getMailboxLock(mailboxName);
+      try {
+        if (nextStarred) {
+          await client.messageFlagsAdd([messageRef.uid], ['\\Flagged'], { uid: true });
+        } else if (typeof client.messageFlagsRemove === 'function') {
+          await client.messageFlagsRemove([messageRef.uid], ['\\Flagged'], { uid: true });
+        } else {
+          const error = new Error('Deze mailbox ondersteunt demarkeren niet.');
+          error.status = 503;
+          throw error;
+        }
+        await updateIndexedMessageState({
+          account,
+          folder: messageRef.folder,
+          uid: messageRef.uid,
+          patch: { starred: nextStarred },
+        });
+        return {
+          account: account.email,
+          folder: messageRef.folder,
+          uid: messageRef.uid,
+          starred: nextStarred,
+        };
+      } finally {
+        lock.release();
+      }
+    } finally {
+      try {
+        if (client.usable) await client.logout();
+      } catch (_) {}
+    }
+  }
+
   async function deleteMessage({ accountEmail, id, folder, uid }) {
-    const account = getAccount(accountEmail);
-    if (!account) {
-      const error = new Error('Mailbox-account niet gevonden.');
-      error.status = 404;
-      throw error;
-    }
-    if (!account.imapConfigured) {
-      const error = new Error('IMAP is niet geconfigureerd voor deze mailbox.');
-      error.status = 503;
-      throw error;
-    }
+    const account = assertReadableAccount(accountEmail);
     const messageRef = parseMessageReference({ id, folder, uid });
     const client = createClient(account);
     try {
@@ -1410,6 +1514,12 @@ function createMailboxService(deps = {}) {
         if (messageRef.folder === 'trash') {
           await client.messageFlagsAdd([messageRef.uid], ['\\Deleted'], { uid: true });
           if (typeof client.mailboxClose === 'function') await client.mailboxClose();
+          await updateIndexedMessageState({
+            account,
+            folder: messageRef.folder,
+            uid: messageRef.uid,
+            patch: { deleted: true },
+          });
           return {
             account: account.email,
             folder: messageRef.folder,
@@ -1431,6 +1541,12 @@ function createMailboxService(deps = {}) {
           throw error;
         }
         await client.messageMove([messageRef.uid], trashMailboxName, { uid: true });
+        await updateIndexedMessageState({
+          account,
+          folder: messageRef.folder,
+          uid: messageRef.uid,
+          patch: { deleted: true },
+        });
         return {
           account: account.email,
           folder: messageRef.folder,
@@ -1731,6 +1847,27 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function starMessageResponse(req, res) {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await starMessage({
+        accountEmail: body.account,
+        id: body.id || body.messageId,
+        folder: body.folder,
+        uid: body.uid,
+        starred: body.starred,
+      });
+      return res.status(200).json({ ok: true, result });
+    } catch (error) {
+      logger.error('[Mailbox][Star]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Markering opslaan mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
   async function deleteMessageResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -1779,6 +1916,7 @@ function createMailboxService(deps = {}) {
     listMessagesResponse,
     sendMessageResponse,
     markMessageReadResponse,
+    starMessageResponse,
     deleteMessageResponse,
     rewriteDraftResponse,
     getAccounts,
@@ -1786,6 +1924,7 @@ function createMailboxService(deps = {}) {
     listMessages,
     listMessagesWithMeta,
     markMessageRead,
+    starMessage,
     deleteMessage,
     sendMessage,
     rewriteDraft,

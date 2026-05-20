@@ -30,6 +30,9 @@ function registerMailboxRoutes(app, deps = {}) {
   app.post('/api/mailbox/messages/read', requireAdmin, (req, res) =>
     coordinator.markMessageReadResponse(req, res)
   );
+  app.post('/api/mailbox/messages/star', requireAdmin, (req, res) =>
+    coordinator.starMessageResponse(req, res)
+  );
   app.post('/api/mailbox/messages/delete', requireAdmin, (req, res) =>
     coordinator.deleteMessageResponse(req, res)
   );

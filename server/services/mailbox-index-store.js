@@ -210,6 +210,26 @@ function createMailboxIndexStore(deps = {}) {
     return { ...result, upserted: rows.length };
   }
 
+  async function updateMessageState({ accountEmail, folder = 'inbox', uid, patch = {} }) {
+    const normalizedUid = Number(uid) || 0;
+    if (!normalizedUid) return { ok: false, skipped: true, error: new Error('Mailbox UID ontbreekt') };
+    const update = { updated_at: isoNow() };
+    if (typeof patch.unread === 'boolean') update.unread = Boolean(patch.unread);
+    if (typeof patch.starred === 'boolean') update.starred = Boolean(patch.starred);
+    if (patch.deleted === true) update.deleted_at = isoNow();
+    if (Object.keys(update).length <= 1) return { ok: true, skipped: true };
+    return run('update-message-state', (client) => {
+      let query = client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .update(update)
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizeFolder(folder))
+        .eq('uid', normalizedUid);
+      if (patch.deleted !== true) query = query.is('deleted_at', null);
+      return query;
+    });
+  }
+
   async function getSyncState({ accountEmail, folder = 'inbox' }) {
     const syncKey = buildSyncKey(accountEmail, folder);
     const result = await run('get-sync-state', (client) =>
@@ -298,6 +318,7 @@ function createMailboxIndexStore(deps = {}) {
     isSyncStateStale,
     listMessages,
     normalizeMessageRow,
+    updateMessageState,
     upsertMessages,
   };
 }

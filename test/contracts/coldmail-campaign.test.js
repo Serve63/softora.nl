@@ -207,6 +207,7 @@ test('coldmail campaign sends Martijn mail with the full sender display name', a
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].from, 'Martijn van de Ven <martijn@softora.nl>');
+  assert.equal(sentMessages[0].bcc, 'martijnven123@gmail.com');
 });
 
 test('coldmail campaign unsubscribe link marks the database row as no interest', async () => {
@@ -320,6 +321,35 @@ test('coldmail campaign keeps city variable to the place name when a place field
   assert.match(sentMessages[0].text, /📍 Haaren/);
   assert.doesNotMatch(sentMessages[0].text, /Reitselaan/);
   assert.doesNotMatch(sentMessages[0].text, /\(NB\)/);
+});
+
+test('coldmail campaign removes province suffixes from city variables', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'De Jong Beton',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        plaats: 'Alphen NB',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}\n\n📍 {{stad}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: '',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].text, /📍 Alphen/);
+  assert.doesNotMatch(sentMessages[0].text, /Alphen NB/);
 });
 
 test('coldmail campaign replaces website variable from database website aliases', async () => {
@@ -2518,6 +2548,7 @@ test('coldmail campaign uses personal sender name for Serve mailbox', async () =
   });
 
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
+  assert.equal(sentMessages[0].bcc, 'servec321@gmail.com');
 });
 
 test('coldmail campaign sends through the selected mailbox smtp account when configured', async () => {

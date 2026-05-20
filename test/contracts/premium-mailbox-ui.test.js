@@ -104,7 +104,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260520a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260520a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260520a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260520b"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
@@ -221,6 +221,18 @@ test('premium mailbox bewaart gelezen status via de mailbox API', () => {
   assert.match(scriptSource, /catch \(error\) \{[\s\S]*mail\.unread = true;[\s\S]*renderList\(\);[\s\S]*toast\(String\(error\?\.message/);
   assert.match(scriptSource, /function openMail\(id, options = \{\}\) \{[\s\S]*const wasUnread = m\.unread;[\s\S]*m\.unread = false;[\s\S]*if \(wasUnread\) void persistMailReadState\(m\);/);
   assert.match(scriptSource, /Gelezen status opslaan mislukt/);
+});
+
+test('premium mailbox bewaart markeringen via de mailbox API', () => {
+  const scriptSource = readScript();
+
+  assert.match(scriptSource, /async function toggleStar\(id\)/);
+  assert.match(scriptSource, /\/api\/mailbox\/messages\/star/);
+  assert.match(scriptSource, /body: JSON\.stringify\(\{[\s\S]*account: activeMailboxAccount,[\s\S]*id: m\.id,[\s\S]*uid: m\.uid,[\s\S]*folder: m\.folder \|\| activeFolder,[\s\S]*starred: next,/);
+  assert.match(scriptSource, /function renderAfterStarToggle\(mail\) \{[\s\S]*activeFolder === 'starred' && mail && !mail\.starred[\s\S]*renderList\(\);/);
+  assert.match(scriptSource, /catch \(error\) \{[\s\S]*m\.starred = previous;[\s\S]*renderAfterStarToggle\(m\);[\s\S]*Markering opslaan mislukt/);
+  assert.match(scriptSource, /case 'toggle-star':[\s\S]*void toggleStar\(id\);/);
+  assert.match(scriptSource, /const mail = findMailById\(id\);[\s\S]*folder: \(mail && mail\.folder\) \|\| activeFolder,/);
 });
 
 test('premium mailbox vraagt bevestiging en verwijdert pas na een geslaagde mailbox API-call', async () => {
@@ -350,6 +362,16 @@ test('premium mailbox behoudt mail-enters en vervangt image placeholders inline'
   assert.match(labelOnlyHtml, /class="detail-mail-optout-link"/);
   assert.match(labelOnlyHtml, /href="https:\/\/www\.softora\.nl\/afmelden\?t=abc"/);
   assert.doesNotMatch(labelOnlyHtml, />https:\/\/www\.softora\.nl\/afmelden/);
+});
+
+test('premium mailbox toont geen mockup als de webdesign-hoofdfoto ontbreekt', () => {
+  const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
+  const html = renderMailboxBodyForTest('[image: De Jong Beton webdesign]', [
+    { alt: 'De Jong Beton device mockup', dataUrl: tinyPng },
+  ]);
+
+  assert.doesNotMatch(html, /<figure class="detail-mail-image">/);
+  assert.doesNotMatch(html, /De Jong Beton device mockup/);
 });
 
 test('premium mailbox voorkomt horizontale overflow door brede e-mails', () => {

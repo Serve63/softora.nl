@@ -26,11 +26,17 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
   let activeMailbox = '';
   const appendedMessages = [];
   const movedMessages = [];
+  const flagMutations = [];
+  function matchingMessages(uids) {
+    const uidSet = new Set((Array.isArray(uids) ? uids : [uids]).map(Number));
+    return (messagesByMailbox[activeMailbox] || []).filter((message) => uidSet.has(Number(message.uid)));
+  }
   return {
     usable: true,
     lockedMailboxes: [],
     appendedMessages,
     movedMessages,
+    flagMutations,
     async connect() {},
     async list() {
       return boxes;
@@ -43,8 +49,15 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
       }
       return { release() {} };
     },
-    async search() {
-      return (messagesByMailbox[activeMailbox] || []).map((message) => message.uid);
+    async search(criteria = ['ALL']) {
+      const flags = (Array.isArray(criteria) ? criteria : [criteria]).map((item) => String(item || '').toUpperCase());
+      const messages = messagesByMailbox[activeMailbox] || [];
+      if (flags.includes('FLAGGED')) {
+        return messages
+          .filter((message) => Array.from(message.flags || []).includes('\\Flagged'))
+          .map((message) => message.uid);
+      }
+      return messages.map((message) => message.uid);
     },
     fetch(uids) {
       const messages = messagesByMailbox[activeMailbox] || [];
@@ -73,6 +86,21 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
       messagesByMailbox[activeMailbox] = sourceMessages.filter((message) => !uidSet.has(message.uid));
       messagesByMailbox[destination].push(...moving);
       return { path: destination };
+    },
+    async messageFlagsAdd(uids, flags, options) {
+      flagMutations.push({ action: 'add', mailboxName: activeMailbox, uids, flags, options });
+      for (const message of matchingMessages(uids)) {
+        const nextFlags = new Set(Array.from(message.flags || []));
+        for (const flag of flags || []) nextFlags.add(flag);
+        message.flags = Array.from(nextFlags);
+      }
+    },
+    async messageFlagsRemove(uids, flags, options) {
+      flagMutations.push({ action: 'remove', mailboxName: activeMailbox, uids, flags, options });
+      for (const message of matchingMessages(uids)) {
+        const removeFlags = new Set(Array.from(flags || []));
+        message.flags = Array.from(message.flags || []).filter((flag) => !removeFlags.has(flag));
+      }
     },
     async logout() {
       this.usable = false;
@@ -755,6 +783,167 @@ test('mailbox service recovers sent webdesign images without treating Softora li
   }
 });
 
+test('mailbox service recovers the De Jong Beton sent webdesign photo and mockup together', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX/Verstuurd' }],
+    messagesByMailbox: {
+      'INBOX/Verstuurd': [
+        {
+          uid: 63,
+          flags: ['\\Seen'],
+          internalDate: new Date('2026-05-20T11:19:00.000Z'),
+          source: {
+            date: new Date('2026-05-20T11:19:00.000Z'),
+            text: [
+              'Goedemiddag,',
+              '',
+              'Afgelopen week kwam ik toevallig jullie website (dejongbeton.nl) tegen.',
+              '',
+              'Met vriendelijke groet,',
+              'Servé Creusen',
+              '📍 Alphen',
+            ].join('\n'),
+            html: '',
+            subject: 'Nieuw webdesign gemaakt!',
+            from: { value: [{ name: 'Servé Creusen', address: 'serve@softora.nl' }] },
+            to: { value: [{ name: 'De Jong Beton B.V.', address: 'info@dejongbeton.nl' }] },
+            attachments: [],
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_database_photos') {
+        return {
+          values: {
+            softora_database_photos_v1: JSON.stringify({
+              dejongbeton: {
+                id: 'dejongbeton',
+                identityKey: 'de jong beton b.v.|info@dejongbeton.nl',
+                websitePhoto: 'data:image/png;base64,ZGVqb25nLXdlYmRlc2lnbg==',
+                websiteMockup: 'data:image/png;base64,ZGVqb25nLW1vY2t1cA==',
+                websitePhotoName: 'De Jong Beton webdesign.png',
+                websiteMockupName: 'De Jong Beton device mockup.png',
+              },
+            }),
+          },
+        };
+      }
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              {
+                id: 'dejongbeton',
+                bedrijf: 'De Jong Beton B.V.',
+                dom: 'dejongbeton.nl',
+                email: 'info@dejongbeton.nl',
+              },
+            ]),
+          },
+        };
+      }
+      return { values: {} };
+    },
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
+
+  assert.equal(messages.length, 1);
+  assert.deepEqual(
+    messages[0].bodyImages.map((image) => image.alt),
+    ['De Jong Beton webdesign', 'De Jong Beton device mockup']
+  );
+  assert.match(messages[0].body, /\[image: De Jong Beton webdesign]/);
+  assert.match(messages[0].body, /\[image: De Jong Beton device mockup]/);
+  assert.equal(messages[0].bodyImages[0].dataUrl, 'data:image/png;base64,ZGVqb25nLXdlYmRlc2lnbg==');
+});
+
+test('mailbox service does not recover a standalone mockup as a sent webdesign photo', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX/Verstuurd' }],
+    messagesByMailbox: {
+      'INBOX/Verstuurd': [
+        {
+          uid: 64,
+          flags: ['\\Seen'],
+          internalDate: new Date('2026-05-20T11:19:00.000Z'),
+          source: {
+            date: new Date('2026-05-20T11:19:00.000Z'),
+            text: 'Afgelopen week kwam ik toevallig jullie website (dejongbeton.nl) tegen.',
+            html: '',
+            subject: 'Nieuw webdesign gemaakt!',
+            from: { value: [{ name: 'Servé Creusen', address: 'serve@softora.nl' }] },
+            to: { value: [{ name: 'De Jong Beton B.V.', address: 'info@dejongbeton.nl' }] },
+            attachments: [],
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_database_photos') {
+        return {
+          values: {
+            softora_database_photos_v1: JSON.stringify({
+              dejongbeton: {
+                id: 'dejongbeton',
+                identityKey: 'de jong beton b.v.|info@dejongbeton.nl',
+                websiteMockup: 'data:image/png;base64,ZGVqb25nLW1vY2t1cA==',
+                websiteMockupName: 'De Jong Beton device mockup.png',
+              },
+            }),
+          },
+        };
+      }
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              {
+                id: 'dejongbeton',
+                bedrijf: 'De Jong Beton B.V.',
+                dom: 'dejongbeton.nl',
+                email: 'info@dejongbeton.nl',
+              },
+            ]),
+          },
+        };
+      }
+      return { values: {} };
+    },
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
+
+  assert.equal(messages.length, 1);
+  assert.deepEqual(messages[0].bodyImages, []);
+  assert.doesNotMatch(messages[0].body, /\[image: De Jong Beton device mockup]/);
+});
+
 test('mailbox service saves app-sent messages into the sent folder', async () => {
   const client = createFakeImapClient({
     boxes: [{ path: 'INBOX' }, { path: 'INBOX/Verstuurd' }],
@@ -994,6 +1183,262 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
   ]);
 });
 
+test('mailbox service persists star state through IMAP flagged uid flags', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX' }],
+    messagesByMailbox: {
+      INBOX: [
+        {
+          uid: 42,
+          flags: ['\\Seen'],
+          internalDate: new Date('2026-05-20T09:00:00.000Z'),
+          source: {
+            date: new Date('2026-05-20T09:00:00.000Z'),
+            text: 'Hallo',
+            subject: 'Te markeren',
+            from: { value: [{ address: 'klant@example.nl' }] },
+            to: { value: [{ address: 'serve@softora.nl' }] },
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+  const res = createResponseRecorder();
+
+  await service.starMessageResponse(
+    {
+      body: {
+        account: 'serve@softora.nl',
+        id: 'inbox:42',
+        starred: true,
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.deepEqual(res.body.result, {
+    account: 'serve@softora.nl',
+    folder: 'inbox',
+    uid: 42,
+    starred: true,
+  });
+  assert.deepEqual(client.flagMutations, [
+    { action: 'add', mailboxName: 'INBOX', uids: [42], flags: ['\\Flagged'], options: { uid: true } },
+  ]);
+});
+
+test('mailbox service removes star state through IMAP flagged uid flags', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX' }],
+    messagesByMailbox: {
+      INBOX: [
+        {
+          uid: 42,
+          flags: ['\\Seen', '\\Flagged'],
+          internalDate: new Date('2026-05-20T09:00:00.000Z'),
+          source: {
+            date: new Date('2026-05-20T09:00:00.000Z'),
+            text: 'Hallo',
+            subject: 'Te demarkeren',
+            from: { value: [{ address: 'klant@example.nl' }] },
+            to: { value: [{ address: 'serve@softora.nl' }] },
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+  const res = createResponseRecorder();
+
+  await service.starMessageResponse(
+    {
+      body: {
+        account: 'serve@softora.nl',
+        id: 'inbox:42',
+        starred: false,
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.deepEqual(res.body.result, {
+    account: 'serve@softora.nl',
+    folder: 'inbox',
+    uid: 42,
+    starred: false,
+  });
+  assert.deepEqual(client.flagMutations, [
+    { action: 'remove', mailboxName: 'INBOX', uids: [42], flags: ['\\Flagged'], options: { uid: true } },
+  ]);
+});
+
+test('mailbox service resolves starred virtual messages back to their real folder when toggling', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX/Verstuurd' }],
+    messagesByMailbox: {
+      'INBOX/Verstuurd': [
+        {
+          uid: 12,
+          flags: ['\\Seen', '\\Flagged'],
+          internalDate: new Date('2026-05-20T09:00:00.000Z'),
+          source: {
+            date: new Date('2026-05-20T09:00:00.000Z'),
+            text: 'Hallo',
+            subject: 'Virtueel gemarkeerd',
+            from: { value: [{ address: 'serve@softora.nl' }] },
+            to: { value: [{ address: 'klant@example.nl' }] },
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+  const res = createResponseRecorder();
+
+  await service.starMessageResponse(
+    {
+      body: {
+        account: 'serve@softora.nl',
+        folder: 'starred',
+        id: 'sent:12',
+        uid: 12,
+        starred: false,
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.result, {
+    account: 'serve@softora.nl',
+    folder: 'sent',
+    uid: 12,
+    starred: false,
+  });
+  assert.deepEqual(client.flagMutations, [
+    { action: 'remove', mailboxName: 'INBOX/Verstuurd', uids: [12], flags: ['\\Flagged'], options: { uid: true } },
+  ]);
+});
+
+test('mailbox service lists starred messages across account mailbox folders', async () => {
+  const client = createFakeImapClient({
+    boxes: [
+      { path: 'INBOX' },
+      { path: 'INBOX/Verstuurd', specialUse: '\\Sent' },
+      { path: 'INBOX/Concepten', specialUse: '\\Drafts' },
+      { path: 'INBOX/Spam', specialUse: '\\Junk' },
+      { path: 'INBOX/Prullenbak', specialUse: '\\Trash' },
+    ],
+    messagesByMailbox: {
+      INBOX: [
+        {
+          uid: 11,
+          flags: ['\\Seen', '\\Flagged'],
+          internalDate: new Date('2026-05-20T09:00:00.000Z'),
+          source: {
+            date: new Date('2026-05-20T09:00:00.000Z'),
+            text: 'Inbox ster',
+            subject: 'Inbox ster',
+            from: { value: [{ address: 'klant@example.nl' }] },
+            to: { value: [{ address: 'serve@softora.nl' }] },
+          },
+        },
+      ],
+      'INBOX/Verstuurd': [
+        {
+          uid: 12,
+          flags: ['\\Seen', '\\Flagged'],
+          internalDate: new Date('2026-05-20T10:00:00.000Z'),
+          source: {
+            date: new Date('2026-05-20T10:00:00.000Z'),
+            text: 'Verzonden ster',
+            subject: 'Verzonden ster',
+            from: { value: [{ address: 'serve@softora.nl' }] },
+            to: { value: [{ address: 'klant@example.nl' }] },
+          },
+        },
+      ],
+      'INBOX/Concepten': [],
+      'INBOX/Spam': [],
+      'INBOX/Prullenbak': [
+        {
+          uid: 13,
+          flags: ['\\Seen'],
+          internalDate: new Date('2026-05-20T08:00:00.000Z'),
+          source: {
+            date: new Date('2026-05-20T08:00:00.000Z'),
+            text: 'Geen ster',
+            subject: 'Geen ster',
+            from: { value: [{ address: 'klant@example.nl' }] },
+            to: { value: [{ address: 'serve@softora.nl' }] },
+          },
+        },
+      ],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'starred', limit: 10 });
+
+  assert.equal(messages.length, 2);
+  assert.deepEqual(
+    messages.map((message) => [message.id, message.folder, message.subject, message.starred]),
+    [
+      ['sent:12', 'sent', 'Verzonden ster', true],
+      ['inbox:11', 'inbox', 'Inbox ster', true],
+    ]
+  );
+});
+
 test('mailbox service moves deleted messages to the resolved trash folder', async () => {
   const client = createFakeImapClient({
     boxes: [
@@ -1181,7 +1626,7 @@ test('mailbox service refuses rewrite without OpenAI key', async () => {
   assert.equal(res.body.detail, 'OpenAI API-key ontbreekt.');
 });
 
-test('mailbox routes expose accounts, messages, send, delete and rewrite endpoints', () => {
+test('mailbox routes expose accounts, messages, star, delete and rewrite endpoints', () => {
   const routes = [];
   const app = {
     get(path, ...handlers) {
@@ -1196,8 +1641,11 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
     coordinator: {
       accountsResponse() {},
       listMessagesResponse() {},
+      getMessageResponse() {},
       markMessageReadResponse() {},
+      starMessageResponse() {},
       deleteMessageResponse() {},
+      syncMailboxResponse() {},
       sendMessageResponse() {},
       rewriteDraftResponse() {},
     },
@@ -1206,6 +1654,7 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/accounts'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/read'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/star'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/delete'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/rewrite'));

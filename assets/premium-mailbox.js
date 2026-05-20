@@ -350,7 +350,6 @@ function renderMailboxParagraphs(lines, options) {
       candidates.find((entry) => entry.label.includes(normalizedAlt) || normalizedAlt.includes(entry.label)) ||
       (isMailboxMockupImageLabel(rawAlt) ? candidates.find((entry) => isMailboxMockupImageLabel(entry.image && entry.image.alt)) : null) ||
       (isMailboxWebdesignImageLabel(rawAlt) ? candidates.find((entry) => !isMailboxMockupImageLabel(entry.image && entry.image.alt)) : null) ||
-      candidates[0] ||
       null;
   }
   lines.forEach((line) => {
@@ -445,7 +444,7 @@ function renderMailBody(value, images, options) {
     }
     renderedSections.push(renderMailboxBodySection(section, imageState));
   });
-  if (!injectedImages) {
+  if (!injectedImages && !hasImagePlaceholders) {
     const imagesHtml = renderUnusedMailboxInlineImages(imageState);
     if (imagesHtml) renderedSections.push(imagesHtml);
   }
@@ -731,11 +730,12 @@ async function persistMailReadState(mail) {
 }
 async function loadMailboxMessageBody(id) {
   if (!window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.loadBody !== 'function') return;
+  const mail = findMailById(id);
   await window.SoftoraMailboxIndex.loadBody({
     id,
     getMail: findMailById,
     account: activeMailboxAccount,
-    folder: activeFolder,
+    folder: (mail && mail.folder) || activeFolder,
     normalizeBodyImages: normalizeMailboxBodyImages,
     normalizeOptOutUrl: normalizeMailboxOptOutUrl,
     openMail,
@@ -797,12 +797,54 @@ function openMail(id, options = {}) {
     void loadMailboxMessageBody(m.id);
   }
 }
-function toggleStar(id) {
+function renderAfterStarToggle(mail) {
+  if (activeFolder === 'starred' && mail && !mail.starred) {
+    if (String(activeMail) === String(mail.id)) {
+      activeMail = null;
+      resetDetailEmpty();
+    }
+    renderList();
+    return;
+  }
+  if (mail && String(activeMail) === String(mail.id)) {
+    openMail(mail.id, { skipBodyFetch: true });
+  } else {
+    renderList();
+  }
+}
+async function toggleStar(id) {
   const m = findMailById(id);
   if (!m) return;
-  m.starred = !m.starred;
-  openMail(id);
-  renderList();
+  const previous = Boolean(m.starred);
+  const next = !previous;
+  m.starred = next;
+  renderAfterStarToggle(m);
+  try {
+    const response = await fetch('/api/mailbox/messages/star', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        account: activeMailboxAccount,
+        id: m.id,
+        uid: m.uid,
+        folder: m.folder || activeFolder,
+        starred: next,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.detail || data?.error || 'Markering opslaan mislukt');
+    }
+    m.starred = Boolean(data?.result?.starred);
+    renderAfterStarToggle(m);
+    toast(m.starred ? '✓ Mail gemarkeerd' : 'Markering verwijderd');
+  } catch (error) {
+    m.starred = previous;
+    renderAfterStarToggle(m);
+    toast(String(error?.message || error || 'Markering opslaan mislukt'));
+  }
 }
 async function deleteMail(id) {
   const m = findMailById(id);
@@ -1026,7 +1068,7 @@ function handleMailboxAction(actionEl) {
       openMail(id);
       break;
     case 'toggle-star':
-      toggleStar(id);
+      void toggleStar(id);
       break;
     case 'reply-mail': {
       const mail = findMailById(id);
