@@ -228,7 +228,8 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 14%; \}/);
   assert.match(pageSource, /thead th:nth-child\(6\), tbody td:nth-child\(6\) \{ width: 10%; \}/);
   assert.match(pageSource, /thead th:nth-child\(9\), tbody td:nth-child\(9\) \{[\s\S]*width: 7%;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
-  assert.match(pageSource, /thead th:nth-child\(10\), tbody td:nth-child\(10\) \{[\s\S]*width: 4%;[\s\S]*text-align: center;/);
+  assert.match(pageSource, /table:not\(\.outreach-action-mode\) thead th:nth-child\(10\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(10\) \{ display: none; \}/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(10\), table\.outreach-action-mode tbody td:nth-child\(10\) \{[\s\S]*width: 5%;[\s\S]*min-width: 56px;[\s\S]*text-align: center;/);
   assert.match(pageSource, /\.photo-drop \{[\s\S]*width: 34px;[\s\S]*height: 34px;/);
   assert.match(pageSource, /\.photo-remove \{[\s\S]*width: 14px;[\s\S]*height: 14px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
@@ -302,11 +303,12 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /data-edit-id=\\"/);
   assert.match(pageSource, /<th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie<\/th>/);
   assert.match(pageSource, /<th id="photoHeader">Foto's <span id="photoHeaderCount">\(0\)<\/span><\/th>/);
-  assert.match(pageSource, /<th id="daysHeader">Dagen<\/th>/);
+  assert.match(pageSource, /<th id="daysHeader" hidden>Dagen<\/th>/);
   assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd", showPhotoColumn = !showOutreachActionColumn/);
-  assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn;/);
+  assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn;/);
   assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return showPhotoColumn && shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoSource\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
-  assert.match(pageSource, /colspan=\\"" \+ \(showOutreachActionColumn \? 8 : 10\) \+ "\\"/);
+  assert.match(pageSource, /colspan=\\"" \+ \(showOutreachActionColumn \? 8 : 9\) \+ "\\"/);
+  assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";/);
@@ -1153,9 +1155,9 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /document\.getElementById\("databaseTable"\)\.classList\.toggle\("outreach-action-mode", showOutreachActionColumn\); document\.getElementById\("statusHeader"\)\.hidden = showOutreachActionColumn/);
   assert.match(pageSource, /renderUsedChannelTags\(customer\),\s*"\<\/div\>\<\/td\>",\s*"\<td\>\<div class=\\"s-wrap/);
   assert.match(pageSource, /showOutreachActionColumn && outreachController\.isWebdesignOutreachCustomer\(customer\) \? outreachController\.renderActions\(customer\)/);
-  assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ outreachController\.renderDaysSinceSent\(customer\) \+ "<\/td>"/);
+  assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 25%; text-align: center; \}/);
-  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(10\), table\.outreach-action-mode tbody td:nth-child\(10\) \{ width: 5%; text-align: center; \}/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(10\), table\.outreach-action-mode tbody td:nth-child\(10\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
   assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:420px;min-width:0;margin:0 auto/);
   assert.match(webdesignActionSource, /function renderDaysSinceSent\(customer\)/);
   assert.match(webdesignActionSource, /\.outreach-days\{display:inline-flex;align-items:center;justify-content:center;min-width:24px/);

@@ -467,7 +467,7 @@
         thead th:nth-child(5), tbody td:nth-child(5) { width: 11%; }
         thead th:nth-child(6), tbody td:nth-child(6) { width: 10%; }
         thead th:nth-child(7), tbody td:nth-child(7) { width: 7%; }
-        thead th:nth-child(8), tbody td:nth-child(8) { width: 12%; } table.outreach-action-mode thead th:nth-child(7), table.outreach-action-mode tbody td:nth-child(7) { display: none; } table.outreach-action-mode thead th:nth-child(9), table.outreach-action-mode tbody td:nth-child(9) { display: none; } table.outreach-action-mode thead th:nth-child(8), table.outreach-action-mode tbody td:nth-child(8) { width: 25%; text-align: center; } table.outreach-action-mode thead th:nth-child(10), table.outreach-action-mode tbody td:nth-child(10) { width: 5%; text-align: center; }
+        thead th:nth-child(8), tbody td:nth-child(8) { width: 12%; } table:not(.outreach-action-mode) thead th:nth-child(10), table:not(.outreach-action-mode) tbody td:nth-child(10) { display: none; } table.outreach-action-mode thead th:nth-child(7), table.outreach-action-mode tbody td:nth-child(7) { display: none; } table.outreach-action-mode thead th:nth-child(9), table.outreach-action-mode tbody td:nth-child(9) { display: none; } table.outreach-action-mode thead th:nth-child(8), table.outreach-action-mode tbody td:nth-child(8) { width: 25%; text-align: center; } table.outreach-action-mode thead th:nth-child(10), table.outreach-action-mode tbody td:nth-child(10) { width: 5%; min-width: 56px; text-align: center; }
         thead th:nth-child(9), tbody td:nth-child(9) {
             width: 7%;
             text-align: center;
@@ -1452,7 +1452,7 @@
                                         <th>Kanaal</th>
                                         <th data-sort-key="status" id="statusHeader">Status</th>
                                         <th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie</th>
-                                        <th id="photoHeader">Foto's <span id="photoHeaderCount">(0)</span></th><th id="daysHeader">Dagen</th>
+                                        <th id="photoHeader">Foto's <span id="photoHeaderCount">(0)</span></th><th id="daysHeader" hidden>Dagen</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody"></tbody>
@@ -2358,10 +2358,10 @@
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
-            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return showPhotoColumn && shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
+            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return showPhotoColumn && shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
 
             if (!filtered.length) {
-                nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 10) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
+                nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 return;
             }
 
@@ -2384,7 +2384,7 @@
                         "</div></td>",
                         "<td><div class=\"s-wrap s-" + escapeHtml(customer.status) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(statusLabel) + "</div></div></td>",
                         "<td class=\"c-light\">" + (showOutreachActionColumn && outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderActions(customer) : (outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderReplyInfo(customer) : escapeHtml(formatDisplayDate(customer.updatedAt)))) + "</td>",
-                        "<td>" + (showPhotoColumn ? renderWebsitePhotoDrop(customer) : "") + "</td><td class=\"c-light days-cell\">" + outreachController.renderDaysSinceSent(customer) + "</td>",
+                        "<td>" + (showPhotoColumn ? renderWebsitePhotoDrop(customer) : "") + "</td><td class=\"c-light days-cell\">" + (showOutreachActionColumn ? outreachController.renderDaysSinceSent(customer) : "") + "</td>",
                     "</tr>"
                 ].join("");
             }).join("");
