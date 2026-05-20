@@ -360,6 +360,10 @@ test('static premium sidebars share the same section order and public labels', (
 test('unified premium sidebar splits ad channels from social media channels', () => {
   const themeJsSource = readRepoFile('assets/personnel-theme.js');
 
+  assert.match(
+    themeJsSource,
+    /const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*"mailbox"[\s\S]*\]\);/
+  );
   assert.match(themeJsSource, /sidebar-section-label\\">ADVERTENTIE'S</);
   assert.match(themeJsSource, /sidebar-section-label">Socialmedia</);
   assert.match(themeJsSource, /href:\s*"\/premium-advertenties#trustoo"[\s\S]*label:\s*"Trustoo"/);
