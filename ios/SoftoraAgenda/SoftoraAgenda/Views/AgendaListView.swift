@@ -1211,16 +1211,17 @@ private struct MailboxView: View {
     private func openMessage(_ message: MailboxMessage) {
         guard let account = selectedAccount else { return }
         let selectionKey = messageKey(accountEmail: account.email, message: message)
+        isLoadingMessageDetail = message.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         selectedMessage = message
         selectedMessageKey = selectionKey
         if message.unread {
             markMessageLocallyRead(message, selectionKey: selectionKey)
         }
         Task {
+            await loadMessageDetail(for: message, accountEmail: account.email, selectionKey: selectionKey)
             if message.unread {
                 await markMessageReadOnServer(message, accountEmail: account.email, selectionKey: selectionKey)
             }
-            await loadMessageDetail(for: message, accountEmail: account.email, selectionKey: selectionKey)
         }
     }
 
@@ -1763,7 +1764,9 @@ private struct MailboxMessageDetail: View {
                     MailboxStatusBanner(message: statusMessage)
                 }
 
-                if shouldShowBody {
+                if isLoadingDetail && !shouldShowBody {
+                    MailboxBodyPendingView()
+                } else if shouldShowBody {
                     MailboxBodyView(presentation: bodyPresentation) {
                         replyComposer
                     }
@@ -1929,16 +1932,21 @@ private struct MailboxMessageDetail: View {
 
     private var bodyPresentation: MailboxBodyPresentation {
         MailboxBodyFormatter.presentation(
-            rawBody: message.body.isEmpty ? message.preview : message.body,
+            rawBody: detailBodyText,
             images: message.inlineImages,
             links: message.links
         )
     }
 
     private var shouldShowBody: Bool {
-        !isLoadingDetail ||
-            !message.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-            !message.preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !detailBodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !message.inlineImages.isEmpty ||
+            !message.links.isEmpty
+    }
+
+    private var detailBodyText: String {
+        let body = message.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        return body.isEmpty ? "" : message.body
     }
 
     private func improveReply() async {
@@ -2011,7 +2019,7 @@ private struct MailboxMessageDetail: View {
             date: message.date,
             subject: message.subject,
             preview: message.preview,
-            body: message.body.isEmpty ? message.preview : message.body
+            body: detailBodyText
         )
     }
 
@@ -2026,6 +2034,25 @@ private struct MailboxMessageDetail: View {
             }
         }
         return ""
+    }
+}
+
+private struct MailboxBodyPendingView: View {
+    var body: some View {
+        Text("VOLLEDIG BERICHT LADEN...")
+            .font(.softoraDisplay(11, weight: .bold))
+            .textCase(.uppercase)
+            .tracking(0.9)
+            .foregroundStyle(Color.softoraMuted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color.softoraSheetBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.softoraPurpleLight, lineWidth: 1)
+            }
     }
 }
 

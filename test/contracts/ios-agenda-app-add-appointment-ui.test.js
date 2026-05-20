@@ -118,6 +118,11 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /uniqueLinks\(links\)/);
   assert.match(agendaListSource, /while output\.trimmingCharacters\(in: \.whitespaces\)\.hasPrefix\(">"\)/);
   assert.doesNotMatch(agendaListSource, /Text\(\(message\.body\.isEmpty \? message\.preview : message\.body\)\.trimmingCharacters/);
+  assert.doesNotMatch(agendaListSource, /rawBody: message\.body\.isEmpty \? message\.preview : message\.body/);
+  assert.doesNotMatch(agendaListSource, /body: message\.body\.isEmpty \? message\.preview : message\.body/);
+  assert.match(agendaListSource, /rawBody: detailBodyText/);
+  assert.match(agendaListSource, /body: detailBodyText/);
+  assert.match(agendaListSource, /private var detailBodyText: String \{[^]*body\.isEmpty \? "" : message\.body/);
   const mailboxMessageRowStart = agendaListSource.indexOf('private struct MailboxMessageRow: View');
   const mailboxMessageRowEnd = agendaListSource.indexOf('private struct MailboxMessageDetail: View');
   assert.ok(mailboxMessageRowStart >= 0 && mailboxMessageRowEnd > mailboxMessageRowStart);
@@ -133,6 +138,8 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /private func openMessage\(_ message: MailboxMessage\)/);
   assert.match(agendaListSource, /@State private var selectedMessageKey: String\?/);
   assert.match(agendaListSource, /let selectionKey = messageKey\(accountEmail: account\.email, message: message\)/);
+  assert.match(agendaListSource, /isLoadingMessageDetail = message\.body\.trimmingCharacters\(in: \.whitespacesAndNewlines\)\.isEmpty/);
+  assert.match(agendaListSource, /await loadMessageDetail\(for: message, accountEmail: account\.email, selectionKey: selectionKey\)[^]*await markMessageReadOnServer\(message, accountEmail: account\.email, selectionKey: selectionKey\)/);
   assert.match(agendaListSource, /await markMessageReadOnServer\(message, accountEmail: account\.email, selectionKey: selectionKey\)/);
   assert.match(agendaListSource, /try await apiClient\.markMailboxMessageRead/);
   assert.match(agendaListSource, /markMessageLocallyRead\(message, selectionKey: selectionKey\)/);
