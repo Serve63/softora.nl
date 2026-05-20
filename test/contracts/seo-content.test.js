@@ -124,6 +124,8 @@ test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
   assert.match(articleHtml, /"@type":"Article"/);
   assert.match(articleHtml, /Terug naar vergelijkingen/);
   assert.match(articleHtml, /href="\/website-laten-maken">Website laten maken<\/a>/);
+  assert.match(articleHtml, /href="\/blog\/website-laten-maken-mkb-paginas"/);
+  assert.match(articleHtml, /href="\/website-laten-maken-oisterwijk"/);
   assert.match(articleHtml, /data-softora-public-seo="conversion-cta"/);
 });
 
@@ -146,6 +148,45 @@ test('seo content renders branche en regio landingspagina’s met service schema
   assert.match(regioHtml, /"areaServed":\{"@type":"AdministrativeArea","name":"Tilburg"\}/);
   assert.match(regioHtml, /Terug naar regio/);
   assert.match(regioHtml, /href="\/crm-systeem-op-maat"/);
+  assert.match(regioHtml, /href="\/branches\/zakelijke-dienstverleners"/);
+});
+
+test('live seo content keeps weak pages supported by contextual incoming links', () => {
+  const now = new Date('2026-05-20T12:00:00.000Z');
+  const collectionPaths = getSeoContentCollectionPaths();
+  const pages = [
+    ...collectionPaths.map((pathName) => {
+      const collection = pathName.replace(/^\//, '');
+      return {
+        path: pathName,
+        html: buildSeoContentIndexHtml(collection, { siteOrigin: 'https://www.softora.nl', now }),
+      };
+    }),
+    ...getSeoContentItems({ now }).map((item) => ({
+      path: getSeoContentPathForItem(item),
+      html: buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' }),
+    })),
+  ];
+  const publicPaths = new Set(pages.map((page) => page.path));
+  const incoming = new Map(pages.map((page) => [page.path, new Set()]));
+
+  for (const page of pages) {
+    const hrefs = Array.from(page.html.matchAll(/href=["']([^"'?#]+)(?:[?#][^"']*)?["']/g))
+      .map((match) => match[1])
+      .filter((href) => href.startsWith('/'))
+      .map((href) => href.replace(/\/$/, '') || '/');
+
+    for (const href of hrefs) {
+      if (href !== page.path && publicPaths.has(href)) {
+        incoming.get(href).add(page.path);
+      }
+    }
+  }
+
+  for (const page of pages) {
+    if (collectionPaths.includes(page.path)) continue;
+    assert.ok(incoming.get(page.path).size >= 2, `${page.path} heeft te weinig contextuele interne ingangen.`);
+  }
 });
 
 test('seo content heeft een dagelijkse publicatiebuffer die pas live komt op publicatiedatum', () => {

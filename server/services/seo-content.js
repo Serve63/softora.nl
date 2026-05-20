@@ -221,6 +221,9 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
       Object.freeze({ label: 'Wat is bedrijfssoftware op maat?', href: '/kennisbank/wat-is-bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Welke MKB-pagina’s heb je nodig?', href: '/blog/website-laten-maken-mkb-paginas' }),
+      Object.freeze({ label: 'Wat is een conversiegerichte website?', href: '/kennisbank/wat-is-een-conversiegerichte-website' }),
+      Object.freeze({ label: 'Website laten maken of zelf maken', href: '/vergelijkingen/website-laten-maken-vs-zelf-maken' }),
     ]),
   }),
   Object.freeze({
@@ -347,6 +350,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
       Object.freeze({ label: 'Website kosten in 2026', href: '/blog/website-laten-maken-kosten-2026' }),
+      Object.freeze({ label: 'Conversiegerichte website', href: '/kennisbank/wat-is-een-conversiegerichte-website' }),
+      Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
     ]),
   }),
   Object.freeze({
@@ -473,6 +478,9 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
       Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({ label: 'AI telefonist vs receptionist', href: '/vergelijkingen/ai-telefonist-vs-receptionist' }),
+      Object.freeze({ label: 'Wanneer is een chatbot zinvol?', href: '/blog/chatbot-laten-maken-wanneer-zinvol' }),
+      Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
     ]),
   }),
   Object.freeze({
@@ -515,6 +523,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'Website kosten in 2026', href: '/blog/website-laten-maken-kosten-2026' }),
       Object.freeze({ label: 'Wat is een conversiegerichte website?', href: '/kennisbank/wat-is-een-conversiegerichte-website' }),
+      Object.freeze({ label: 'MKB website pagina’s', href: '/blog/website-laten-maken-mkb-paginas' }),
+      Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
     ]),
   }),
   Object.freeze({
@@ -557,6 +567,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
       Object.freeze({ label: 'Wat is een AI telefonist?', href: '/kennisbank/wat-is-een-ai-telefonist' }),
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
+      Object.freeze({ label: 'AI automatisering startgids', href: '/blog/ai-automatisering-mkb-waar-beginnen' }),
     ]),
   }),
   Object.freeze({
@@ -641,6 +653,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'Website laten maken kosten 2026', href: '/blog/website-laten-maken-kosten-2026' }),
       Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
+      Object.freeze({ label: 'MKB website pagina’s', href: '/blog/website-laten-maken-mkb-paginas' }),
+      Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
     ]),
   }),
   Object.freeze({
@@ -895,6 +909,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Softora in Oisterwijk', href: '/regio/oisterwijk' }),
+      Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
     ]),
   }),
   Object.freeze({
@@ -939,6 +955,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
       Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
+      Object.freeze({ label: 'Softora in Tilburg', href: '/regio/tilburg' }),
+      Object.freeze({ label: 'Vergelijk AI telefonist en receptionist', href: '/vergelijkingen/ai-telefonist-vs-receptionist' }),
     ]),
   }),
   Object.freeze({
@@ -983,6 +1001,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Softora in Den Bosch', href: '/regio/den-bosch' }),
+      Object.freeze({ label: 'Wat is bedrijfssoftware op maat?', href: '/kennisbank/wat-is-bedrijfssoftware-op-maat' }),
     ]),
   }),
   Object.freeze({
@@ -1028,6 +1048,9 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Diensten', href: '/diensten' }),
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
+      Object.freeze({ label: 'Branches', href: '/branches' }),
+      Object.freeze({ label: 'Installateurs', href: '/branches/installateurs' }),
     ]),
   }),
   Object.freeze({
@@ -1073,6 +1096,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Branches', href: '/branches' }),
+      Object.freeze({ label: 'Zakelijke dienstverleners', href: '/branches/zakelijke-dienstverleners' }),
+      Object.freeze({ label: 'Makelaars', href: '/branches/makelaars' }),
     ]),
   }),
   Object.freeze({
@@ -1118,6 +1143,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Kennisbank', href: '/kennisbank' }),
+      Object.freeze({ label: 'Zakelijke dienstverleners', href: '/branches/zakelijke-dienstverleners' }),
+      Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
     ]),
   }),
 ]);
