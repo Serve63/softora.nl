@@ -22,6 +22,11 @@ const PUBLIC_ROADMAP_COPY_PATTERNS = [
   /moeten niet los zweven/i,
   /pillar pages/i,
   /Tools en scans/i,
+  /Kennis en verdieping/i,
+  /Verder lezen per onderwerp/i,
+  /Kennisbankuitleg/i,
+  /Artikelen over kosten, keuzes/i,
+  /Logische vervolgstappen/i,
 ];
 
 test('public SEO pages do not expose internal roadmap copy', () => {
@@ -37,11 +42,14 @@ test('diensten page uses customer-facing service guidance copy', () => {
   const source = readPage('diensten.html');
 
   assert.match(source, /<h1>Digitale diensten die verkeer omzetten in leads<\/h1>/);
-  assert.match(source, /<h2>Heldere uitleg helpt bezoekers sneller kiezen<\/h2>/);
-  assert.match(source, /Verder lezen per onderwerp/);
-  assert.match(source, /Kennisbankuitleg over websites, software, CRM en AI/);
-  assert.match(source, /href="\/blog"/);
-  assert.match(source, /href="\/kennisbank"/);
+  assert.match(source, /<h2>Snel zien welke digitale stap het meeste oplevert<\/h2>/);
+  assert.match(source, /Waar we samen naar kijken/);
+  assert.match(source, /Welke dienst levert het snelst merkbare waarde op/);
+  assert.match(source, /href="\/website-laten-maken"/);
+  assert.match(source, /href="\/ai-automatisering"/);
+  assert.match(source, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(source, /href="\/crm-systeem-op-maat"/);
+  assert.match(source, /href="\/chatbot-laten-maken"/);
   assert.match(source, /data-softora-public-seo="internal-links"/);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 });

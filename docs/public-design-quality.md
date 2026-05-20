@@ -14,7 +14,8 @@ SEO-truc op de pagina landen.
 - Geen losse SEO-blokken onder of boven de footer. Links horen in echte
   content, navigatie of bestaande footerstructuur, niet in losse linkblokken.
 - Geen interne planningscopy zoals "komt later", "SEO-machine", "contentlaag
-  krijgt straks" of tekst die aan Codex/Serve gericht is.
+  krijgt straks", "volgende contentblokken", "verder lezen per onderwerp" of
+  tekst die aan Codex/Serve gericht is.
 
 ## Beeldkwaliteit
 
