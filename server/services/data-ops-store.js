@@ -18,6 +18,8 @@ const TABLES = Object.freeze({
   orderRuntime: 'softora_order_runtime',
   designPhotos: 'softora_design_photos',
   webdesignJobs: 'softora_webdesign_jobs',
+  mailboxMessages: 'softora_mailbox_messages',
+  mailboxSyncState: 'softora_mailbox_sync_state',
 });
 
 function createSoftoraDataOpsStore(deps = {}) {
@@ -646,12 +648,14 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   async function getDataOpsCounts() {
-    const [customers, activeOrders, orderRuntime, designPhotos, webdesignJobs] = await Promise.all([
+    const [customers, activeOrders, orderRuntime, designPhotos, webdesignJobs, mailboxMessages, mailboxSyncState] = await Promise.all([
       countActiveRows(TABLES.customers),
       countActiveRows(TABLES.activeOrders),
       countActiveRows(TABLES.orderRuntime),
       countActiveRows(TABLES.designPhotos),
       countActiveRows(TABLES.webdesignJobs, ''),
+      countActiveRows(TABLES.mailboxMessages),
+      countActiveRows(TABLES.mailboxSyncState, ''),
     ]);
     return {
       customers,
@@ -659,6 +663,8 @@ function createSoftoraDataOpsStore(deps = {}) {
       orderRuntime,
       designPhotos,
       webdesignJobs,
+      mailboxMessages,
+      mailboxSyncState,
     };
   }
 

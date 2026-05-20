@@ -55,6 +55,12 @@
       "includeFiles": "*.html"
     }
   },
+  "crons": [
+    {
+      "path": "/api/mailbox/sync",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/assets/personnel-theme.js",

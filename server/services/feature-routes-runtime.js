@@ -43,6 +43,7 @@ function registerFeatureRoutes(app, deps = {}) {
     openAiCostSummary = null,
     supabaseCostSummary = null,
     mailboxCoordinator = null,
+    mailboxCronSecret = '',
     publicContactCoordinator = null,
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
@@ -92,6 +93,7 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   registerMailboxRoutes(app, {
     coordinator: mailboxCoordinator,
+    cronSecret: mailboxCronSecret,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerActiveOrderRoutes(app, { coordinator: activeOrdersCoordinator });

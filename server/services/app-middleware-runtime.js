@@ -237,6 +237,7 @@ function applyAppMiddleware(app, deps = {}) {
   app.use(
     [
       '/api/mailbox/send',
+      '/api/mailbox/sync',
       '/api/coldmailing/campaigns/send',
       '/api/coldmailing/outreach/status',
       '/api/coldmailing/replies/sync',

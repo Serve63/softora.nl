@@ -338,6 +338,8 @@ function buildServerAppFeatureWiringRuntimeContext({
         openAiModel: shared.normalizeString(env.MAILBOX_REWRITE_OPENAI_MODEL || env.OPENAI_MODEL || envConfig.OPENAI_MODEL || 'gpt-5.5-pro'),
         fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
         extractOpenAiTextContent: aiHelpers.extractOpenAiTextContent,
+        isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
+        getSupabaseClient: platformRuntime.getSupabaseClient,
         mailConfig: {
           smtpHost: envConfig.MAIL_SMTP_HOST,
           smtpPort: envConfig.MAIL_SMTP_PORT,
@@ -368,6 +370,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           mailFromName: envConfig.MAIL_FROM_NAME,
         },
       },
+      mailboxCronSecret: env.CRON_SECRET || '',
       runtimeOpsCoordinator: uiSeoRuntime.runtimeOpsCoordinator,
       runtimeDebugOpsCoordinator: uiSeoRuntime.runtimeDebugOpsCoordinator,
       dataOpsStore: uiSeoRuntime.dataOpsStore,
