@@ -224,6 +224,39 @@ test('voicesoftware money page is focused on AI telefonie, intake and CRM follow
   assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
 });
 
+test('over softora page is customer-facing and explains the company clearly', () => {
+  const source = readPage('premium-over-softora.html');
+  const entry = getRegistryEntry('premium-over-softora.html');
+
+  assert.match(source, /<title>Over Softora \| Websites, software en AI voor het MKB<\/title>/);
+  assert.match(source, /<h1 class="big-title">Digitale groei<br>zonder ruis<span>\.<\/span><\/h1>/);
+  assert.match(source, /digitaal bouwbureau uit Oisterwijk/);
+  assert.match(source, /meer aanvragen, slimmere processen en betere opvolging/);
+  assert.match(source, /Van vindbaarheid naar opvolging/);
+  assert.match(source, /Websites die aanvragen moeten opleveren/);
+  assert.match(source, /Maatwerk software voor echte processen/);
+  assert.match(source, /AI automatisering met menselijke controle/);
+  assert.match(source, /href="\/diensten"/);
+  assert.match(source, /href="\/website-laten-maken"/);
+  assert.match(source, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(source, /href="\/ai-automatisering"/);
+  assert.match(source, /href="\/crm-systeem-op-maat"/);
+  assert.match(source, /href="\/chatbot-laten-maken"/);
+  assert.match(source, /href="\/blog"/);
+  assert.match(source, /href="\/kennisbank"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
+  assert.doesNotMatch(source, /overlay|login-box|Binnenkort beschikbaar|toegangscode/i);
+  assert.doesNotMatch(source, /De contentlaag krijgt straks|Volgende contentblokken|SEO-machine/i);
+  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
+
+  assert.equal(entry.title, 'Over Softora | Websites, software en AI voor het MKB');
+  assert.match(entry.description, /digitaal bouwbureau uit Oisterwijk/);
+  assert.ok(entry.relatedLinks.includes('/website-laten-maken'));
+  assert.ok(entry.relatedLinks.includes('/bedrijfssoftware-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
+  assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
+});
+
 test('packages page is focused on public sales routes and clean internal links', () => {
   const source = readPage('pakketten.html');
   const entry = getRegistryEntry('pakketten.html');

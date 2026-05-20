@@ -164,11 +164,18 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-over-softora.html',
     path: '/over-softora',
     legacyPaths: ['/premium-over-softora'],
-    title: 'Over Softora',
+    title: 'Over Softora | Websites, software en AI voor het MKB',
     description:
-      'Lees meer over Softora, de werkwijze en de focus op websites, software en AI oplossingen die ondernemers praktisch verder helpen.',
+      'Leer Softora kennen: digitaal bouwbureau uit Oisterwijk voor websites, bedrijfssoftware, CRM, chatbots en AI automatisering die verkeer en leads beter opvolgen.',
     kind: 'about',
-    relatedLinks: ['/diensten', '/website-laten-maken', '/bedrijfssoftware-op-maat', '/blog'],
+    relatedLinks: [
+      '/diensten',
+      '/website-laten-maken',
+      '/bedrijfssoftware-op-maat',
+      '/ai-automatisering',
+      '/crm-systeem-op-maat',
+      '/blog',
+    ],
   },
   {
     fileName: 'premium-algemene-voorwaarden.html',
