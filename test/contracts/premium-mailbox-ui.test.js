@@ -386,7 +386,26 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(scriptSource, /data-mailbox-action="toggle-star"/);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
+  assert.match(scriptSource, /function renderLinkedMailboxText\(value\)/);
+  assert.match(scriptSource, /renderLinkedMailboxText\(value\)/);
   assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl \}\)\}<\/div>/);
+});
+
+test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
+  const scriptSource = readScript();
+  const html = renderMailboxBodyForTest([
+    'Click the following link:',
+    'https://dashboard.render.com/email-reset/confirm?token=fake-token-123.',
+    '<script>alert("xss")</script>',
+  ].join('\n'));
+
+  assert.match(scriptSource, /const MAIL_BODY_URL_PATTERN = \/https\?:\\\/\\\/\[\^\\s<>"'\]\+\/gi;/);
+  assert.match(scriptSource, /function isSafeMailBodyUrl\(value\)/);
+  assert.match(scriptSource, /const parsed = new URL\(value\);/);
+  assert.match(scriptSource, /parsed\.protocol === 'http:' \|\| parsed\.protocol === 'https:';/);
+  assert.match(html, /<a href="https:\/\/dashboard\.render\.com\/email-reset\/confirm\?token=fake-token-123" target="_blank" rel="noopener noreferrer">https:\/\/dashboard\.render\.com\/email-reset\/confirm\?token=fake-token-123<\/a>\./);
+  assert.match(html, /&lt;script&gt;alert\(&quot;xss&quot;\)&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>/);
 });
 
 test('premium mailbox toont webdesign outreach acties alleen via databasekoppeling', () => {
