@@ -99,6 +99,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
+  assert.match(scriptSource, /\/api\/mailbox\/messages\/delete/);
   assert.match(scriptSource, /\/api\/mailbox\/send/);
   assert.match(scriptSource, /\/api\/mailbox\/rewrite/);
   assert.match(readOutreachScript(), /\/api\/coldmailing\/outreach\/status/);
@@ -205,6 +206,17 @@ test('premium mailbox bewaart gelezen status via de mailbox API', () => {
   assert.match(scriptSource, /catch \(error\) \{[\s\S]*mail\.unread = true;[\s\S]*renderList\(\);[\s\S]*toast\(String\(error\?\.message/);
   assert.match(scriptSource, /function openMail\(id\) \{[\s\S]*const wasUnread = m\.unread;[\s\S]*m\.unread = false;[\s\S]*if \(wasUnread\) void persistMailReadState\(m\);/);
   assert.match(scriptSource, /Gelezen status opslaan mislukt/);
+});
+
+test('premium mailbox verwijdert mails pas na een geslaagde mailbox API-call', () => {
+  const scriptSource = readScript();
+
+  assert.match(scriptSource, /async function deleteMail\(id\) \{[\s\S]*\/api\/mailbox\/messages\/delete/);
+  assert.match(scriptSource, /method:\s*'POST'/);
+  assert.match(scriptSource, /body: JSON\.stringify\(\{[\s\S]*account: activeMailboxAccount,[\s\S]*id: m\.id,[\s\S]*uid: m\.uid,[\s\S]*folder: m\.folder \|\| activeFolder,/);
+  assert.match(scriptSource, /mails = mails\.filter\(mail => String\(mail\.id\) !== String\(id\)\);/);
+  assert.match(scriptSource, /catch \(error\) \{[\s\S]*toast\(String\(error\?\.message \|\| error \|\| 'Mail verwijderen mislukt'\)\);/);
+  assert.match(scriptSource, /case 'delete-mail':[\s\S]*void deleteMail\(id\);/);
 });
 
 test('premium mailbox ruimt technische mail-links op voor weergave', () => {

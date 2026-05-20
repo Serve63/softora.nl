@@ -25,10 +25,12 @@ function createResponseRecorder() {
 function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
   let activeMailbox = '';
   const appendedMessages = [];
+  const movedMessages = [];
   return {
     usable: true,
     lockedMailboxes: [],
     appendedMessages,
+    movedMessages,
     async connect() {},
     async list() {
       return boxes;
@@ -59,6 +61,18 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
         throw new Error('Command failed');
       }
       return { path: mailboxName };
+    },
+    async messageMove(uids, destination, options) {
+      movedMessages.push({ mailboxName: activeMailbox, uids, destination, options });
+      const sourceMessages = messagesByMailbox[activeMailbox] || [];
+      if (!Object.prototype.hasOwnProperty.call(messagesByMailbox, destination)) {
+        throw new Error('Command failed');
+      }
+      const uidSet = new Set(Array.isArray(uids) ? uids : [uids]);
+      const moving = sourceMessages.filter((message) => uidSet.has(message.uid));
+      messagesByMailbox[activeMailbox] = sourceMessages.filter((message) => !uidSet.has(message.uid));
+      messagesByMailbox[destination].push(...moving);
+      return { path: destination };
     },
     async logout() {
       this.usable = false;
@@ -980,6 +994,64 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
   ]);
 });
 
+test('mailbox service moves deleted messages to the resolved trash folder', async () => {
+  const client = createFakeImapClient({
+    boxes: [
+      { path: 'INBOX' },
+      { path: 'INBOX/Prullenbak', specialUse: '\\Trash' },
+    ],
+    messagesByMailbox: {
+      INBOX: [
+        {
+          uid: 42,
+          flags: ['\\Seen'],
+          internalDate: new Date('2026-05-20T00:00:00.000Z'),
+          source: {},
+        },
+      ],
+      'INBOX/Prullenbak': [],
+    },
+  });
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+  });
+  const res = createResponseRecorder();
+
+  await service.deleteMessageResponse(
+    {
+      body: {
+        account: 'serve@softora.nl',
+        id: 'inbox:42',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.deepEqual(res.body.result, {
+    account: 'serve@softora.nl',
+    folder: 'inbox',
+    destinationFolder: 'trash',
+    uid: 42,
+    deleted: true,
+    moved: true,
+  });
+  assert.deepEqual(client.movedMessages, [
+    { mailboxName: 'INBOX', uids: [42], destination: 'INBOX/Prullenbak', options: { uid: true } },
+  ]);
+});
+
 test('mailbox service strips tracking and standalone asset urls from display text', () => {
   const clean = sanitizeMailboxDisplayText(`
 [https://cdn.openai.com/API/logo-assets/openai-logo-email-header-1.png]
@@ -1109,7 +1181,7 @@ test('mailbox service refuses rewrite without OpenAI key', async () => {
   assert.equal(res.body.detail, 'OpenAI API-key ontbreekt.');
 });
 
-test('mailbox routes expose accounts, messages, send and rewrite endpoints', () => {
+test('mailbox routes expose accounts, messages, send, delete and rewrite endpoints', () => {
   const routes = [];
   const app = {
     get(path, handler) {
@@ -1125,6 +1197,7 @@ test('mailbox routes expose accounts, messages, send and rewrite endpoints', () 
       accountsResponse() {},
       listMessagesResponse() {},
       markMessageReadResponse() {},
+      deleteMessageResponse() {},
       sendMessageResponse() {},
       rewriteDraftResponse() {},
     },
@@ -1133,6 +1206,7 @@ test('mailbox routes expose accounts, messages, send and rewrite endpoints', () 
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/accounts'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/read'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/delete'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/rewrite'));
 });

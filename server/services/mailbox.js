@@ -1143,6 +1143,72 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function deleteMessage({ accountEmail, id, folder, uid }) {
+    const account = getAccount(accountEmail);
+    if (!account) {
+      const error = new Error('Mailbox-account niet gevonden.');
+      error.status = 404;
+      throw error;
+    }
+    if (!account.imapConfigured) {
+      const error = new Error('IMAP is niet geconfigureerd voor deze mailbox.');
+      error.status = 503;
+      throw error;
+    }
+    const messageRef = parseMessageReference({ id, folder, uid });
+    const client = createClient(account);
+    try {
+      await client.connect();
+      const sourceMailboxName = await resolveMailboxName(client, messageRef.folder);
+      if (!sourceMailboxName) {
+        const error = new Error('Mailboxmap niet gevonden.');
+        error.status = 404;
+        throw error;
+      }
+      const lock = await client.getMailboxLock(sourceMailboxName);
+      try {
+        if (messageRef.folder === 'trash') {
+          await client.messageFlagsAdd([messageRef.uid], ['\\Deleted'], { uid: true });
+          if (typeof client.mailboxClose === 'function') await client.mailboxClose();
+          return {
+            account: account.email,
+            folder: messageRef.folder,
+            uid: messageRef.uid,
+            deleted: true,
+            permanent: true,
+          };
+        }
+
+        const trashMailboxName = await resolveMailboxName(client, 'trash');
+        if (!trashMailboxName) {
+          const error = new Error('Prullenbakmap niet gevonden voor deze mailbox.');
+          error.status = 404;
+          throw error;
+        }
+        if (typeof client.messageMove !== 'function') {
+          const error = new Error('Deze mailbox ondersteunt verplaatsen naar prullenbak niet.');
+          error.status = 503;
+          throw error;
+        }
+        await client.messageMove([messageRef.uid], trashMailboxName, { uid: true });
+        return {
+          account: account.email,
+          folder: messageRef.folder,
+          destinationFolder: 'trash',
+          uid: messageRef.uid,
+          deleted: true,
+          moved: true,
+        };
+      } finally {
+        lock.release();
+      }
+    } finally {
+      try {
+        if (client.usable) await client.logout();
+      } catch (_) {}
+    }
+  }
+
   async function sendMessage({ accountEmail, to, subject, text }) {
     const account = getAccount(accountEmail);
     if (!account) {
@@ -1380,6 +1446,26 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function deleteMessageResponse(req, res) {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await deleteMessage({
+        accountEmail: body.account,
+        id: body.id || body.messageId,
+        folder: body.folder,
+        uid: body.uid,
+      });
+      return res.status(200).json({ ok: true, result });
+    } catch (error) {
+      logger.error('[Mailbox][Delete]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Mail verwijderen mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
   async function rewriteDraftResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -1407,10 +1493,12 @@ function createMailboxService(deps = {}) {
     listMessagesResponse,
     sendMessageResponse,
     markMessageReadResponse,
+    deleteMessageResponse,
     rewriteDraftResponse,
     getAccounts,
     listMessages,
     markMessageRead,
+    deleteMessage,
     sendMessage,
     rewriteDraft,
   };
