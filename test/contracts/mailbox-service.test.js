@@ -1355,3 +1355,15 @@ test('mailbox cron sync route requires CRON_SECRET bearer access', () => {
   assert.equal(allowed.statusCode, 200);
   assert.equal(cronCalled, 1);
 });
+
+test('mailbox service exposes sync response handler for cron and admin routes', async () => {
+  const service = createMailboxService({ mailConfig: {} });
+
+  assert.equal(typeof service.syncMailboxResponse, 'function');
+
+  const response = createResponseRecorder();
+  await service.syncMailboxResponse({ query: {}, body: {} }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, { ok: true, results: [] });
+});
