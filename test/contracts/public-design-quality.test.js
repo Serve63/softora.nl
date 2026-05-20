@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '../..');
-const SEO_GROWTH_CSS_VERSION = '20260520a';
+const SEO_GROWTH_CSS_VERSION = '20260520b';
 
 function readFile(fileName) {
   return fs.readFileSync(path.join(root, fileName), 'utf8');
@@ -80,6 +80,16 @@ test('seo-growth action links are rendered as real buttons', () => {
       }
     }
   }
+});
+
+test('seo-growth mobile navigation keeps the contact CTA in the visible flow', () => {
+  const css = readFile('assets/seo-growth-pages.css');
+
+  assert.match(
+    css,
+    /@media \(max-width:\s*860px\)\s*\{[\s\S]*\.seo-growth-nav-links\s*\{[\s\S]*width:\s*100%;[\s\S]*flex-wrap:\s*wrap;[\s\S]*overflow-x:\s*visible;[\s\S]*padding-bottom:\s*0;/s,
+    'mobiele seo-growth navigatie mag de contact CTA niet buiten beeld duwen'
+  );
 });
 
 test('diensten hero keeps the secondary insight CTA in the button system', () => {
