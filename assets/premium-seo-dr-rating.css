@@ -1,0 +1,95 @@
+.authority-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 32px 24px;
+  padding: 22px 26px;
+  border: 1px solid var(--s-border);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 34px rgba(139, 34, 82, 0.06);
+}
+
+.authority-copy {
+  min-width: 0;
+}
+
+.authority-eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--s-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+.authority-title {
+  margin: 0 0 6px;
+  color: var(--s-purple-dark);
+  font-family: 'Oswald', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.authority-subtext {
+  max-width: 58ch;
+  color: var(--s-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dr-rating-ring {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  flex: 0 0 112px;
+}
+
+.dr-rating-ring svg {
+  display: block;
+  width: 112px;
+  height: 112px;
+  transform: rotate(-90deg);
+}
+
+.dr-ring-track,
+.dr-ring-progress {
+  fill: none;
+  stroke-width: 12;
+  stroke-linecap: round;
+}
+
+.dr-ring-track {
+  stroke: var(--s-beige-mid);
+}
+
+.dr-ring-progress {
+  stroke: var(--s-purple);
+  stroke-dasharray: 50 100;
+  filter: drop-shadow(0 5px 10px rgba(139, 34, 82, 0.18));
+}
+
+.dr-rating-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--s-text);
+  font-family: 'Oswald', sans-serif;
+  font-size: 30px;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .authority-card {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-left: 18px;
+    margin-right: 18px;
+    padding: 20px;
+  }
+}
