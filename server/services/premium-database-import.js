@@ -1,5 +1,6 @@
 const path = require('path');
 const zlib = require('zlib');
+const { buildOpenAiContextHeaders } = require('./openai-request-context');
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 2000;
@@ -1426,6 +1427,7 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
 
   const model = getOpenAiDatabaseSearchModel({ ...deps, env });
   const reasoningEffort = getOpenAiDatabaseSearchReasoningEffort(model, { ...deps, env });
+  const openAiApiBaseUrl = getOpenAiApiBaseUrl({ ...deps, env });
   const { systemPrompt, userPrompt } = buildDeepSearchPrompt({
     target,
     count,
@@ -1439,11 +1441,12 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
     : null;
   let response;
   try {
-    response = await fetchImpl(`${getOpenAiApiBaseUrl({ ...deps, env })}/responses`, {
+    response = await fetchImpl(`${openAiApiBaseUrl}/responses`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
+        ...buildOpenAiContextHeaders({ ...deps, env, openAiApiBaseUrl }),
       },
       signal: controller ? controller.signal : undefined,
       body: JSON.stringify({

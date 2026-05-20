@@ -1,3 +1,5 @@
+const { buildOpenAiContextHeaders } = require('./openai-request-context');
+
 function createAiRemoteService(deps = {}) {
   const {
     env = process.env,
@@ -1549,6 +1551,7 @@ function createAiRemoteService(deps = {}) {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${apiKey}`,
+              ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl }),
             },
             body: form,
             signal: controller.signal,

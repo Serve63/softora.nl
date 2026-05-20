@@ -38,6 +38,7 @@ function createFixture(overrides = {}) {
   const aiAnalyzeCalls = [];
 
   const service = createAgendaLeadDetailService({
+    env: overrides.env || process.env,
     openAiApiBaseUrl: 'https://api.openai.com/v1',
     openAiTranscriptionModel: overrides.openAiTranscriptionModel || '',
     openAiAudioTranscriptionModel: overrides.openAiAudioTranscriptionModel || '',
@@ -413,6 +414,40 @@ test('agenda lead detail service builds stable call-backed detail payloads', asy
   assert.equal(detail.recordingUrlAvailable, true);
   assert.equal(detail.durationSeconds, 187);
   assert.match(detail.summary, /website/i);
+});
+
+test('agenda lead detail service sends OpenAI project context when hydrating recordings', async () => {
+  let capturedHeaders = null;
+  const fixture = createFixture({
+    env: {
+      OPENAI_ORGANIZATION_ID: 'org_softora',
+      OPENAI_PROJECT_ID: 'proj_softora',
+    },
+    openAiApiKey: 'test-key',
+    recentCallUpdates: [
+      {
+        callId: 'call-transcribe',
+        company: 'Softora',
+        provider: 'retell',
+        recordingUrl: 'https://cdn.softora.nl/recordings/call-transcribe.mp3',
+        updatedAt: '2026-04-08T12:00:00.000Z',
+      },
+    ],
+    fetchImpl: async (_url, options = {}) => ({
+      ok: true,
+      status: 200,
+      text: async () => {
+        capturedHeaders = options.headers;
+        return JSON.stringify({ text: 'Lead transcriptie uit OpenAI.' });
+      },
+    }),
+  });
+
+  const detail = await fixture.service.buildCallBackedLeadDetail('call-transcribe');
+
+  assert.match(detail?.transcript || '', /Lead transcriptie uit OpenAI/i);
+  assert.equal(capturedHeaders['OpenAI-Organization'], 'org_softora');
+  assert.equal(capturedHeaders['OpenAI-Project'], 'proj_softora');
 });
 
 test('agenda lead detail service exposes recording filename and transcription model helpers', () => {
