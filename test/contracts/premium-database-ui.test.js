@@ -266,6 +266,8 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /<th data-sort-key="email">Mailadres<\/th>/);
   assert.match(pageSource, /<th data-sort-key="tel">Telefoonnummer<\/th>/);
   assert.match(pageSource, /<th data-sort-key="dom">Website<\/th>/);
+  assert.match(pageSource, /<th>Kanaal<\/th>/);
+  assert.doesNotMatch(pageSource, /<th>Gebruikte kanalen<\/th>/);
   assert.match(pageSource, /const websiteValue = normalizeString\(customer\.website \|\| customer\.dom\) \|\| "—";/);
   assert.match(pageSource, /class=\\"website-link\\"/);
   assert.match(pageSource, /target=\\"_blank\\" rel=\\"noopener\\"/);
@@ -1126,7 +1128,8 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /renderUsedChannelTags\(customer\),\s*"\<\/div\>\<\/td\>",\s*"\<td\>\<div class=\\"s-wrap/);
   assert.match(pageSource, /showOutreachActionColumn && outreachController\.isWebdesignOutreachCustomer\(customer\) \? outreachController\.renderActions\(customer\)/);
   assert.match(pageSource, /showPhotoColumn \? "<td>" \+ renderWebsitePhotoDrop\(customer\) \+ "<\/td>" : ""/);
-  assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:420px;min-width:0;margin-top:0/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 25%; text-align: center; \}/);
+  assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:420px;min-width:0;margin:0 auto/);
   assert.match(webdesignActionSource, /\.outreach-action\{box-sizing:border-box;min-width:0;min-height:34px/);
   assert.match(webdesignActionSource, /overflow-wrap:anywhere/);
   assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\\"klant_geworden\\\"\\]\{background:var\(--crimson\)/);
