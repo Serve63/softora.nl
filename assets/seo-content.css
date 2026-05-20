@@ -271,6 +271,7 @@ nav {
 .blog-card-img {
   align-items: center;
   aspect-ratio: 16 / 9;
+  background: #1a1a2e;
   color: rgba(255, 255, 255, 0.6);
   display: flex;
   flex-shrink: 0;
@@ -282,6 +283,24 @@ nav {
   overflow: hidden;
   position: relative;
   text-transform: uppercase;
+  width: 100%;
+}
+
+.blog-card-img::after {
+  background: linear-gradient(180deg, rgba(20, 20, 34, 0.05) 20%, rgba(20, 20, 34, 0.58) 100%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
+.blog-card-img img {
+  display: block;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
   width: 100%;
 }
 
@@ -302,6 +321,7 @@ nav {
   padding: 3px 10px;
   position: absolute;
   text-transform: uppercase;
+  z-index: 2;
 }
 
 .blog-card-body {
@@ -439,7 +459,7 @@ nav {
 .artikel-img {
   align-items: center;
   aspect-ratio: 16 / 7;
-  background: linear-gradient(135deg, #1a1a2e 0%, #9b2355 100%);
+  background: #1a1a2e;
   border-radius: 10px;
   color: rgba(255, 255, 255, 0.48);
   display: flex;
@@ -451,9 +471,27 @@ nav {
   margin: 0 auto 48px;
   max-width: 920px;
   overflow: hidden;
-  padding: 24px;
+  padding: 0;
+  position: relative;
   text-align: center;
   text-transform: uppercase;
+}
+
+.artikel-img img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.artikel-img figcaption {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 .artikel-body {

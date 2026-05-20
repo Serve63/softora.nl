@@ -138,6 +138,33 @@ const SEO_CONTENT_CLUSTERS = Object.freeze([
   }),
 ]);
 
+const SEO_CONTENT_IMAGES_BY_CLUSTER = Object.freeze({
+  websites: Object.freeze({
+    src: '/assets/seo-content/website-leads-analytics-softora.jpg',
+    alt: 'Realistische werkplek met website analytics en leadflow op een laptop voor ondernemers die meer aanvragen willen.',
+  }),
+  'ai-automatisering': Object.freeze({
+    src: '/assets/seo-content/ai-automatisering-workflow-softora.jpg',
+    alt: 'Praktische kantoorwerkplek met planning, laptop en procesoverzicht voor AI automatisering in het MKB.',
+  }),
+  'software-crm': Object.freeze({
+    src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
+    alt: 'Teamoverleg met CRM-dashboard op een laptop voor maatwerk software, klantbeheer en leadopvolging.',
+  }),
+  'ai-contact': Object.freeze({
+    src: '/assets/seo-content/ai-klantcontact-chatbot-telefonie-softora.jpg',
+    alt: 'Supportdesk met headset, laptop en telefoon voor AI klantcontact, chatbots en telefonieflows.',
+  }),
+  branches: Object.freeze({
+    src: '/assets/seo-content/branche-digitalisering-planning-softora.jpg',
+    alt: 'Werktafel met tablet, laptop en planning voor digitalisering van brancheprocessen bij lokale ondernemers.',
+  }),
+  lokaal: Object.freeze({
+    src: '/assets/seo-content/lokale-seo-brabant-groei-softora.jpg',
+    alt: 'Lokale Nederlandse kantoorwerkplek met uitzicht op een straat voor regionale SEO en digitale groei.',
+  }),
+});
+
 const SEO_CONTENT_ITEMS = Object.freeze([
   Object.freeze({
     collection: 'blog',
@@ -1234,6 +1261,11 @@ function getSeoContentClusterForItem(item) {
   return SEO_CONTENT_CLUSTERS.find((cluster) => cluster.key === clusterKey) || SEO_CONTENT_CLUSTERS[0];
 }
 
+function getSeoContentImageForItem(item) {
+  const cluster = getSeoContentClusterForItem(item);
+  return SEO_CONTENT_IMAGES_BY_CLUSTER[cluster.key] || SEO_CONTENT_IMAGES_BY_CLUSTER.websites;
+}
+
 function getSeoContentItems({ collection, now = new Date() } = {}) {
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   return SEO_CONTENT_ITEMS.filter((item) => {
@@ -1289,8 +1321,8 @@ function getSeoContentPublicationPlan({ now = new Date() } = {}) {
   }).sort((a, b) => String(a.publishedAt).localeCompare(String(b.publishedAt)) || a.slug.localeCompare(b.slug));
 }
 
-function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', structuredData }) {
-  const imageUrl = buildAbsoluteUrl(canonicalUrl, DEFAULT_OG_IMAGE_PATH);
+function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', structuredData, imagePath }) {
+  const imageUrl = buildAbsoluteUrl(canonicalUrl, imagePath || DEFAULT_OG_IMAGE_PATH);
   return [
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
@@ -1300,7 +1332,7 @@ function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', s
     `<link rel="canonical" href="${escapeHtml(canonicalUrl)}">`,
     '<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">',
     '<link rel="stylesheet" href="/assets/fonts.css?v=20260409a">',
-    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260519d">',
+    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260520a">',
     `<meta property="og:type" content="${escapeHtml(ogType)}">`,
     '<meta property="og:site_name" content="Softora">',
     '<meta property="og:locale" content="nl_NL">',
@@ -1348,12 +1380,12 @@ function buildBreadcrumbItems(siteOrigin, entries) {
   }));
 }
 
-function buildContentShell({ title, description, canonicalUrl, structuredData, body, ogType = 'website' }) {
+function buildContentShell({ title, description, canonicalUrl, structuredData, body, ogType = 'website', imagePath }) {
   return [
     '<!DOCTYPE html>',
     '<html lang="nl">',
     '<head>',
-    `    ${buildBaseHead({ title, description, canonicalUrl, structuredData, ogType })}`,
+    `    ${buildBaseHead({ title, description, canonicalUrl, structuredData, ogType, imagePath })}`,
     '</head>',
     '<body>',
     '  <nav>',
@@ -1478,6 +1510,8 @@ function getBackLabelForCollection(collection) {
 
 function buildMainEntityForItem(item, site, canonicalUrl) {
   const cluster = getSeoContentClusterForItem(item);
+  const image = getSeoContentImageForItem(item);
+  const imageUrl = buildAbsoluteUrl(site, image.src);
   if (item.schemaType === 'Service') {
     const entity = {
       '@type': 'Service',
@@ -1486,6 +1520,7 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
       description: item.description,
       provider: { '@id': `${site}/#organization` },
       serviceType: item.serviceType || cluster.label || item.category,
+      image: imageUrl,
       about: {
         '@type': 'Thing',
         name: cluster.label,
@@ -1507,6 +1542,7 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
     headline: item.title,
     description: item.description,
     articleSection: cluster.label,
+    image: [imageUrl],
     about: {
       '@type': 'Thing',
       name: cluster.label,
@@ -1522,20 +1558,19 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
 }
 
 function renderArticleCards(items) {
-  const gradients = [
-    'linear-gradient(135deg, #1a1a2e 0%, #9b2355 100%)',
-    'linear-gradient(135deg, #8b2252 0%, #c4346a 100%)',
-    'linear-gradient(135deg, #23233b 0%, #6b1a3f 100%)',
-  ];
   return items
     .map((item, index) => {
       const href = getSeoContentPathForItem(item);
       const featured = index === 0;
       const cluster = getSeoContentClusterForItem(item);
+      const image = getSeoContentImageForItem(item);
+      const imageLoading = featured ? 'eager' : 'lazy';
+      const imagePriority = featured ? 'high' : 'low';
       return [
         `<article class="blog-card${featured ? ' featured' : ''}" data-content-cluster="${escapeHtml(cluster.key)}">`,
         `  <a href="${escapeHtml(href)}">`,
-        `    <div class="blog-card-img${featured ? ' featured' : ''}" style="background:${gradients[index % gradients.length]}">`,
+        `    <div class="blog-card-img${featured ? ' featured' : ''}">`,
+        `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}" loading="${imageLoading}" fetchpriority="${imagePriority}">`,
         `      <div class="blog-card-img-label">${escapeHtml(item.category)}</div>`,
         '    </div>',
         '    <div class="blog-card-body">',
@@ -1647,6 +1682,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
   const canonicalUrl = buildAbsoluteUrl(site, pathName);
   const mainEntity = buildMainEntityForItem(item, site, canonicalUrl);
   const cluster = getSeoContentClusterForItem(item);
+  const image = getSeoContentImageForItem(item);
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -1689,7 +1725,10 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     '      <span>Softora Team</span>',
     '    </div>',
     '  </section>',
-    `  <div class="artikel-img">${escapeHtml(item.title)}</div>`,
+    '  <figure class="artikel-img">',
+    `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}" loading="eager" fetchpriority="high">`,
+    `    <figcaption>${escapeHtml(item.title)}</figcaption>`,
+    '  </figure>',
     '  <article class="artikel-body">',
     `    <p><strong>${escapeHtml(item.summary)}</strong></p>`,
     ...item.sections.map((section) =>
@@ -1711,12 +1750,14 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     structuredData,
     body,
     ogType: item.schemaType === 'Service' ? 'website' : 'article',
+    imagePath: image.src,
   });
 }
 
 module.exports = {
   SEO_CONTENT_CLUSTERS,
   SEO_CONTENT_COLLECTIONS,
+  SEO_CONTENT_IMAGES_BY_CLUSTER,
   SEO_CONTENT_ITEMS,
   SEO_CONTENT_PILLARS,
   buildSeoContentArticleHtml,
@@ -1725,6 +1766,7 @@ module.exports = {
   getSeoContentClusters,
   getSeoContentCollection,
   getSeoContentCollectionPaths,
+  getSeoContentImageForItem,
   getSeoContentItem,
   getSeoContentItems,
   getSeoContentPathForItem,
