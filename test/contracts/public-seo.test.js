@@ -37,6 +37,7 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/crm-systeem-op-maat<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-automatisering<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-telefonist<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/over-softora<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog\/ai-automatisering-mkb-waar-beginnen<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog\/website-laten-maken-kosten-2026<\/loc>/);
@@ -69,6 +70,7 @@ test('public seo robots keeps marketing pages crawlable and blocks private surfa
   assert.doesNotMatch(robots, /^Disallow: \/crm-systeem-op-maat$/m);
   assert.doesNotMatch(robots, /^Disallow: \/ai-telefonist$/m);
   assert.doesNotMatch(robots, /^Disallow: \/bedrijfssoftware-op-maat$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/over-softora$/m);
   assert.doesNotMatch(robots, /^Disallow: \/premium-bedrijfssoftware$/m);
   assert.doesNotMatch(robots, /^Disallow: \/blog$/m);
   assert.doesNotMatch(robots, /^Disallow: \/kennisbank$/m);
@@ -256,10 +258,13 @@ test('public seo url mapping exposes clean paths and keeps legacy redirects avai
   assert.equal(getIndexablePublicHtmlFileFromPath('/voicesoftware-op-maat'), 'premium-voicesoftware.html');
   assert.equal(getIndexablePublicPathFromHtmlFile('pakketten.html'), '/pakketten');
   assert.equal(getIndexablePublicHtmlFileFromPath('/pakketten'), 'pakketten.html');
+  assert.equal(getIndexablePublicPathFromHtmlFile('premium-over-softora.html'), '/over-softora');
+  assert.equal(getIndexablePublicHtmlFileFromPath('/over-softora'), 'premium-over-softora.html');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-bedrijfssoftware'), '/bedrijfssoftware-op-maat');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-chatbot'), '/chatbot-laten-maken');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-voicesoftware'), '/voicesoftware-op-maat');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-pakketten'), '/pakketten');
+  assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-over-softora'), '/over-softora');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-website'), '/');
 });
 
@@ -292,6 +297,28 @@ test('packages page owns its internal links inside the page content', () => {
   assert.match(html, /href="\/ai-automatisering"/);
   assert.match(html, /href="\/chatbot-laten-maken"/);
   assert.match(html, /href="\/voicesoftware-op-maat"/);
+  assert.doesNotMatch(html, /softora-seo-footer-links/);
+  assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
+});
+
+test('over softora page owns its internal links inside the page footer', () => {
+  const source = fs.readFileSync(path.join(root, 'premium-over-softora.html'), 'utf8');
+  const html = applyPublicSeoHeadDefaults(source, 'premium-over-softora.html', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const footerStart = html.indexOf('<footer');
+  const internalLinks = html.indexOf('data-softora-public-seo="internal-links"');
+
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/over-softora">/);
+  assert.ok(footerStart > -1, 'Over Softora mist een footer.');
+  assert.ok(internalLinks > footerStart, 'Interne links horen in de footer te staan.');
+  assert.match(html, /href="\/diensten"/);
+  assert.match(html, /href="\/website-laten-maken"/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(html, /href="\/ai-automatisering"/);
+  assert.match(html, /href="\/crm-systeem-op-maat"/);
+  assert.match(html, /href="\/blog"/);
+  assert.match(html, /href="\/kennisbank"/);
   assert.doesNotMatch(html, /softora-seo-footer-links/);
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });
