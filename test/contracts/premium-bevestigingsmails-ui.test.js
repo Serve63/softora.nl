@@ -64,6 +64,32 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   );
 });
 
+test('premium bevestigingsmails blokkeert de pagina netjes tijdens coldmail verzending', () => {
+  const root = path.join(__dirname, '../..');
+  const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
+  const freezeSource = fs.readFileSync(path.join(root, 'assets/premium-coldmail-send-freeze.js'), 'utf8');
+  const context = { window: {} };
+  vm.createContext(context);
+  vm.runInContext(freezeSource, context);
+
+  assert.match(pageSource, /assets\/premium-coldmail-send-freeze\.js\?v=20260520a/);
+  assert.match(freezeSource, /OVERLAY_ID = 'coldmailSendFreezeOverlay'/);
+  assert.match(freezeSource, /data-coldmail-send-freeze/);
+  assert.match(freezeSource, /sendColdmailCampaignNowWithFreeze/);
+  assert.match(freezeSource, /global\.sendColdmailCampaignNow = wrapped;/);
+  assert.match(freezeSource, /show\(\);\s*try \{\s*return await original\.apply\(this, arguments\);[\s\S]*hide\(\);/);
+  assert.match(freezeSource, /beforeunload/);
+  assert.match(freezeSource, /event\.returnValue = '';/);
+  assert.match(freezeSource, /pointer-events:auto/);
+  assert.match(freezeSource, /softora-dossier-loader__orbit--outer/);
+  assert.match(freezeSource, /Mails worden verstuurd/);
+  assert.match(freezeSource, /Klikken is geblokkeerd tot de verzending klaar is\./);
+  assert.doesNotMatch(freezeSource, /rgba\(25,27,39/);
+  assert.equal(typeof context.window.SoftoraColdmailSendFreeze.show, 'function');
+  assert.equal(typeof context.window.SoftoraColdmailSendFreeze.hide, 'function');
+  assert.equal(typeof context.window.SoftoraColdmailSendFreeze.patchSendFreeze, 'function');
+});
+
 test('risky action pin modal uses a typed input without exposing the pin in frontend assets', () => {
   const pinAssetPath = path.join(__dirname, '../../assets/premium-risky-action-pin.js');
   const pinAssetSource = fs.readFileSync(pinAssetPath, 'utf8');
