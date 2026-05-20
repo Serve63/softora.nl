@@ -842,14 +842,34 @@ function toggleStar(id) {
   renderList();
 }
 
-function deleteMail(id) {
+async function deleteMail(id) {
   const m = findMailById(id);
   if (!m) return;
-  m.folder = 'trash';
-  activeMail = null;
-  resetDetailEmpty();
-  renderList();
-  toast('Mail verplaatst naar prullenbak');
+  try {
+    const response = await fetch('/api/mailbox/messages/delete', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        account: activeMailboxAccount,
+        id: m.id,
+        uid: m.uid,
+        folder: m.folder || activeFolder,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.detail || data?.error || 'Mail verwijderen mislukt');
+    }
+    mails = mails.filter(mail => String(mail.id) !== String(id));
+    if (String(activeMail) === String(id)) activeMail = null;
+    resetDetailEmpty();
+    renderList();
+    toast((m.folder || activeFolder) === 'trash' ? 'Mail definitief verwijderd' : 'Mail verplaatst naar prullenbak');
+  } catch (error) {
+    toast(String(error?.message || error || 'Mail verwijderen mislukt'));
+  }
 }
 
 function getComposeFieldValue(id) {
@@ -1047,7 +1067,7 @@ function handleMailboxAction(actionEl) {
       break;
     }
     case 'delete-mail':
-      deleteMail(id);
+      void deleteMail(id);
       break;
   }
 }
