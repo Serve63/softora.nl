@@ -2,7 +2,7 @@
   'use strict';
 
   const COST_SUMMARY_ENDPOINT = '/api/coldcalling/cost-summary?scope=month';
-  const API_COST_SUMMARY_ENDPOINT = '/api/openai/cost-summary?scope=month';
+  const API_COST_SUMMARY_ENDPOINT = '/api/api-cost-summary?scope=month';
   const SUPABASE_COST_SUMMARY_ENDPOINT = '/api/supabase/cost-summary';
   const POLL_INTERVAL_MS = 15000;
   const BILLING_POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -298,8 +298,9 @@
       const amountEur = Number(summary.costEur);
       const costUsd = Number(summary.costUsd);
       const fetchedAtLabel = formatDateTime(summary.lastSuccessfulUpdate || summary.fetchedAt);
+      const exact = summary.exact !== false;
       const noteParts = [
-        API_COST_NOTE,
+        exact ? API_COST_NOTE : 'OpenAI Usage live schatting',
         Number.isFinite(costUsd) && costUsd > 0 ? 'USD ' + formatCurrencyAmount(costUsd, 'usd') : '',
         summary.usdToEurRateSource ? 'Koers ' + summary.usdToEurRateSource : '',
         fetchedAtLabel ? 'Bijgewerkt ' + fetchedAtLabel : '',
