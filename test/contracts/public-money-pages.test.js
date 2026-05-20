@@ -232,13 +232,21 @@ test('over softora page is customer-facing and explains the company clearly', ()
   const entry = getRegistryEntry('premium-over-softora.html');
 
   assert.match(source, /<title>Over Softora \| Websites, software en AI voor het MKB<\/title>/);
-  assert.match(source, /<h1 class="big-title">Digitale groei zonder ruis<span>\.<\/span><\/h1>/);
+  assert.match(source, /\/assets\/seo-growth-pages\.css\?v=20260520b/);
+  assert.match(source, /<h1>Digitale groei zonder ruis<\/h1>/);
   assert.match(source, /digitaal bouwbureau uit Oisterwijk/);
   assert.match(source, /meer aanvragen, slimmere processen en betere opvolging/);
   assert.match(source, /Van vindbaarheid naar opvolging/);
   assert.match(source, /Websites die aanvragen moeten opleveren/);
   assert.match(source, /Maatwerk software voor echte processen/);
   assert.match(source, /AI automatisering met menselijke controle/);
+  assert.match(source, /home-over-office-meeting-ai\.jpg/);
+  assert.match(source, /home-service-websites-ai\.jpg/);
+  assert.match(source, /home-service-software-ai\.jpg/);
+  assert.match(source, /home-service-chatbot-ai\.jpg/);
+  assert.match(source, /alt="Softora overleg over websites, software en AI automatisering"/);
+  assert.match(source, /Martijn van de Ven/);
+  assert.doesNotMatch(source, /Serv[eé]\s+Creusen/i);
   assert.match(source, /href="\/diensten"/);
   assert.match(source, /href="\/website-laten-maken"/);
   assert.match(source, /href="\/bedrijfssoftware-op-maat"/);
