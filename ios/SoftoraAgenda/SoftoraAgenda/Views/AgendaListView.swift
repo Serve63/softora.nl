@@ -1634,18 +1634,6 @@ private struct MailboxMessageRow: View {
                             .foregroundStyle(Color.softoraCrimson)
                     }
 
-                    if isUnread {
-                        Text("Nieuw")
-                            .font(.softoraDisplay(9, weight: .bold))
-                            .textCase(.uppercase)
-                            .tracking(0.7)
-                            .foregroundStyle(Color.white)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(Color.softoraCrimson)
-                            .clipShape(Capsule())
-                    }
-
                     Text(MailboxDateFormatter.label(message.date))
                         .font(.softoraBody(10, weight: .semibold))
                         .foregroundStyle(Color.softoraMuted)
@@ -1663,7 +1651,16 @@ private struct MailboxMessageRow: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isUnread ? Color.softoraCrimson : Color.softoraPurpleLight, lineWidth: isUnread ? 1.5 : 1)
+                    .stroke(Color.softoraPurpleLight, lineWidth: 1)
+            }
+            .overlay(alignment: .leading) {
+                if isUnread {
+                    Circle()
+                        .fill(Color.softoraCrimson)
+                        .frame(width: 6, height: 6)
+                        .padding(.leading, 7)
+                        .accessibilityHidden(true)
+                }
             }
         }
         .buttonStyle(.plain)

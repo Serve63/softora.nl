@@ -124,8 +124,9 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /try await apiClient\.markMailboxMessageRead/);
   assert.match(agendaListSource, /markMessageLocallyRead\(message\)/);
   assert.match(mailboxMessageRowSource, /let isUnread: Bool/);
-  assert.match(mailboxMessageRowSource, /Text\("Nieuw"\)/);
-  assert.match(mailboxMessageRowSource, /isUnread \? Color\.softoraCrimson : Color\.softoraPurpleLight/);
+  assert.doesNotMatch(mailboxMessageRowSource, /Text\("Nieuw"\)/);
+  assert.match(mailboxMessageRowSource, /Circle\(\)[^]*\.fill\(Color\.softoraCrimson\)[^]*\.frame\(width: 6, height: 6\)/);
+  assert.match(mailboxMessageRowSource, /\.stroke\(Color\.softoraPurpleLight, lineWidth: 1\)/);
   assert.match(agendaListSource, /GymWorkoutView\(\)/);
   assert.match(agendaListSource, /private struct GymWorkoutView: View/);
   assert.match(agendaListSource, /@State private var selectedDay: GymWorkoutDay = \.today/);
