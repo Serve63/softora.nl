@@ -66,8 +66,10 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(modelsSource, /struct MailboxInlineImage: Identifiable, Decodable, Hashable/);
   assert.match(modelsSource, /let links: \[MailboxLink\]/);
   assert.match(modelsSource, /let inlineImages: \[MailboxInlineImage\]/);
-  assert.match(agendaListSource, /MailboxBodyView\(presentation: bodyPresentation\)/);
-  assert.match(agendaListSource, /private struct MailboxBodyView: View/);
+  assert.match(agendaListSource, /MailboxBodyView\(presentation: bodyPresentation\) \{[^]*replyComposer[^]*\}/);
+  assert.match(agendaListSource, /private struct MailboxBodyView<ReplyComposer: View>: View/);
+  assert.match(agendaListSource, /private var replyPlacementIndex: Int\? \{[^]*presentation\.sections\.firstIndex \{ !\$0\.isQuoted \}/);
+  assert.match(agendaListSource, /if index == replyPlacementIndex \{[^]*replyComposer\(\)/);
   assert.match(agendaListSource, /private struct MailboxBodySectionView: View/);
   assert.match(agendaListSource, /private struct MailboxInlineImageView: View/);
   assert.match(agendaListSource, /Image\(uiImage: uiImage\)/);
@@ -82,10 +84,14 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.match(agendaListSource, /static func readable\(_ rawBody: String\) -> String/);
   assert.match(agendaListSource, /\.map\(stripQuotePrefix\)/);
   assert.match(agendaListSource, /imagePlaceholderLabel\(from: trimmed\)/);
+  assert.match(agendaListSource, /linkFromText\(text\)/);
+  assert.match(agendaListSource, /takeLink\(withHref: textLink\.href, from: &unusedLinks\) \?\? textLink/);
   assert.match(agendaListSource, /takeLink\(matching: text, from: &unusedLinks\)/);
   assert.match(agendaListSource, /linkDisplayText\(from: text, link: link\)/);
   assert.match(agendaListSource, /private static func linkDisplayText\(from text: String, link: MailboxLink\) -> String/);
   assert.match(agendaListSource, /replacingOccurrences\(of: #"<\?https\?:\/\/\\S\+>\?"/);
+  assert.match(agendaListSource, /private static func isUnsubscribeText\(_ normalizedText: String\) -> Bool/);
+  assert.match(agendaListSource, /private static func isUnsubscribeLink\(_ link: MailboxLink\) -> Bool/);
   assert.match(agendaListSource, /uniqueLinks\(links\)/);
   assert.match(agendaListSource, /while output\.trimmingCharacters\(in: \.whitespaces\)\.hasPrefix\(">"\)/);
   assert.doesNotMatch(agendaListSource, /Text\(\(message\.body\.isEmpty \? message\.preview : message\.body\)\.trimmingCharacters/);

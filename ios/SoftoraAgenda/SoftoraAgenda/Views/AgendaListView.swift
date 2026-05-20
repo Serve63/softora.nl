@@ -1676,10 +1676,12 @@ private struct MailboxMessageDetail: View {
                 }
 
                 if shouldShowBody {
-                    MailboxBodyView(presentation: bodyPresentation)
+                    MailboxBodyView(presentation: bodyPresentation) {
+                        replyComposer
+                    }
+                } else {
+                    replyComposer
                 }
-
-                replyComposer
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
@@ -1939,15 +1941,29 @@ private struct MailboxMessageDetail: View {
     }
 }
 
-private struct MailboxBodyView: View {
+private struct MailboxBodyView<ReplyComposer: View>: View {
     let presentation: MailboxBodyPresentation
+    @ViewBuilder let replyComposer: () -> ReplyComposer
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ForEach(presentation.sections) { section in
+            ForEach(presentation.sections.indices, id: \.self) { index in
+                let section = presentation.sections[index]
                 MailboxBodySectionView(section: section)
+
+                if index == replyPlacementIndex {
+                    replyComposer()
+                }
+            }
+
+            if replyPlacementIndex == nil {
+                replyComposer()
             }
         }
+    }
+
+    private var replyPlacementIndex: Int? {
+        presentation.sections.firstIndex { !$0.isQuoted }
     }
 }
 
@@ -2235,7 +2251,10 @@ private enum MailboxBodyFormatter {
                 .joined(separator: "\n")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !text.isEmpty {
-                if let link = takeLink(matching: text, from: &unusedLinks) {
+                if let textLink = linkFromText(text) {
+                    let link = takeLink(withHref: textLink.href, from: &unusedLinks) ?? textLink
+                    output.append(.textLink(linkDisplayText(from: text, link: link), link))
+                } else if let link = takeLink(matching: text, from: &unusedLinks) {
                     output.append(.textLink(linkDisplayText(from: text, link: link), link))
                 } else {
                     output.append(.text(text))
@@ -2308,11 +2327,35 @@ private enum MailboxBodyFormatter {
             let label = normalizedLinkText(link.label)
             let href = normalizedLinkText(link.href)
             return (!label.isEmpty && (normalizedText == label || normalizedText.contains(label) || label.contains(normalizedText))) ||
+                (isUnsubscribeText(normalizedText) && isUnsubscribeLink(link)) ||
                 (!href.isEmpty && normalizedText.contains(href))
         }) else {
             return nil
         }
         return links.remove(at: index)
+    }
+
+    private static func takeLink(withHref href: String, from links: inout [MailboxLink]) -> MailboxLink? {
+        let normalizedHref = href.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard let index = links.firstIndex(where: { $0.href.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedHref }) else {
+            return nil
+        }
+        return links.remove(at: index)
+    }
+
+    private static func linkFromText(_ text: String) -> MailboxLink? {
+        let pattern = #"https?://[^\s<>\)"]+"#
+        guard let range = text.range(of: pattern, options: .regularExpression) else {
+            return nil
+        }
+        var href = String(text[range])
+        while let last = href.last, ".,;:!?]".contains(last) {
+            href.removeLast()
+        }
+        guard !href.isEmpty else {
+            return nil
+        }
+        return MailboxLink(label: linkDisplayText(from: text, link: MailboxLink(label: "", href: href)), href: href)
     }
 
     private static func linkDisplayText(from text: String, link: MailboxLink) -> String {
@@ -2358,6 +2401,24 @@ private enum MailboxBodyFormatter {
             .filter { !$0.isEmpty }
             .joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func isUnsubscribeText(_ normalizedText: String) -> Bool {
+        normalizedText.contains("geen interesse") ||
+            normalizedText.contains("geen webdesign") ||
+            normalizedText.contains("niet ontvangen") ||
+            normalizedText.contains("afmelden") ||
+            normalizedText.contains("uitschrijven")
+    }
+
+    private static func isUnsubscribeLink(_ link: MailboxLink) -> Bool {
+        let normalizedHref = normalizedLinkText(link.href)
+        let normalizedLabel = normalizedLinkText(link.label)
+        return normalizedHref.contains("afmelden") ||
+            normalizedHref.contains("unsubscribe") ||
+            normalizedLabel.contains("afmelden") ||
+            normalizedLabel.contains("unsubscribe") ||
+            normalizedLabel.contains("geen interesse")
     }
 
     private static func uniqueLinks(_ links: [MailboxLink]) -> [MailboxLink] {
