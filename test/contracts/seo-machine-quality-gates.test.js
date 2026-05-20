@@ -20,7 +20,9 @@ const {
   auditContentQuality,
   auditConversionCtas,
   auditLinkGraph,
+  auditSeoImages,
   buildSeoLinkGraph,
+  extractImageEntriesFromHtml,
 } = require('../../server/services/seo-machine-quality-gates');
 
 const repoRoot = path.resolve(__dirname, '../..');
@@ -103,4 +105,24 @@ test('SEO-content CTAs zijn meetbaar en linken terug naar commerciële pagina’
   assert.match(html, /data-softora-conversion-target="service"/);
   assert.match(html, /data-softora-conversion-target="contact"/);
   assert.match(html, /href="\/pakketten">Pakketten<\/a>/);
+});
+
+test('SEO-content gebruikt echte geoptimaliseerde foto’s in plaats van placeholders', () => {
+  const pages = renderSeoContentPages();
+  const issues = auditSeoImages({ pages });
+
+  assert.deepEqual(issues, []);
+
+  for (const page of pages) {
+    const images = extractImageEntriesFromHtml(page.html).filter((image) =>
+      String(image.src || '').startsWith('/assets/seo-content/')
+    );
+    assert.ok(images.length >= 1, `${page.path} mist een SEO-foto.`);
+
+    for (const image of images) {
+      const assetPath = path.join(repoRoot, image.src);
+      assert.ok(fs.existsSync(assetPath), `${image.src} bestaat niet op schijf.`);
+      assert.ok(image.alt.length >= 55, `${image.src} heeft een te korte alt-tekst.`);
+    }
+  }
 });

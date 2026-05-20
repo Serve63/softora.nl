@@ -48,6 +48,18 @@ function extractInternalLinksFromHtml(htmlRaw) {
     .filter(Boolean);
 }
 
+function extractImageEntriesFromHtml(htmlRaw) {
+  return Array.from(String(htmlRaw || '').matchAll(/<img\b([^>]*)>/gi)).map((match) => {
+    const attrs = match[1] || '';
+    const src = attrs.match(/\bsrc=["']([^"']+)["']/i)?.[1] || '';
+    const alt = attrs.match(/\balt=["']([^"']*)["']/i)?.[1] || '';
+    return {
+      src: String(src).trim(),
+      alt: String(alt).trim(),
+    };
+  });
+}
+
 function buildSeoLinkGraph(pagesRaw = []) {
   const pages = Array.isArray(pagesRaw) ? pagesRaw : [];
   const publicPaths = new Set(pages.map((page) => normalizeInternalPath(page.path)).filter(Boolean));
@@ -186,13 +198,62 @@ function auditConversionCtas({ pages = [] } = {}) {
   return issues;
 }
 
+function auditSeoImages({ pages = [] } = {}) {
+  const issues = [];
+
+  for (const page of Array.isArray(pages) ? pages : []) {
+    const pathName = normalizeInternalPath(page.path);
+    const html = String(page.html || '');
+    const images = extractImageEntriesFromHtml(html);
+    const seoImages = images.filter((image) => String(image.src || '').startsWith('/assets/seo-content/'));
+
+    if (/<div\s+class=["']artikel-img["'][^>]*>/i.test(html) || /blog-card-img[^>]+style=["'][^"']*gradient/i.test(html)) {
+      issues.push({
+        type: 'legacy-image-placeholder',
+        path: pathName,
+        message: `${pathName} gebruikt nog een oude tekst- of gradient-placeholder in plaats van een echte foto.`,
+      });
+    }
+
+    if (seoImages.length === 0) {
+      issues.push({ type: 'missing-seo-image', path: pathName, message: `${pathName} heeft geen SEO-foto.` });
+      continue;
+    }
+
+    for (const image of seoImages) {
+      const src = String(image.src || '');
+      const alt = String(image.alt || '');
+      const fileName = src.split('/').pop() || '';
+
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*-softora\.jpg$/.test(fileName)) {
+        issues.push({
+          type: 'weak-image-filename',
+          path: pathName,
+          message: `${pathName} gebruikt geen beschrijvende SEO-bestandsnaam voor ${src}.`,
+        });
+      }
+      if (alt.length < 55 || /placeholder|binnenkort|foto|image|afbeelding/i.test(alt)) {
+        issues.push({
+          type: 'weak-image-alt',
+          path: pathName,
+          message: `${pathName} heeft een te zwakke alt-tekst voor ${src}.`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
 module.exports = {
   DEFAULT_COMMERCIAL_TARGETS,
   DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS,
   auditContentQuality,
   auditConversionCtas,
   auditLinkGraph,
+  auditSeoImages,
   buildSeoLinkGraph,
+  extractImageEntriesFromHtml,
   extractInternalLinksFromHtml,
   normalizeInternalPath,
 };
