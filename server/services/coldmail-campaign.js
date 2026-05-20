@@ -1743,8 +1743,16 @@ function createColdmailCampaignService(deps = {}) {
     const identity = Object.keys(photos)
       .map((key) => photos[key])
       .find((item) => normalizeString(item && item.identityKey) === identityKey);
-    const photo = direct || identity || null;
-    const parsed = parseDataUrlImage(photo && photo.websitePhoto);
+    const inline = {
+      websitePhoto: row && (row.websitePhoto || row.photo || row.websiteImage),
+      websitePhotoName: row && (row.websitePhotoName || row.photoName || row.websiteImageName),
+    };
+    const candidates = [direct, identity, inline].filter(Boolean);
+    const resolved = candidates
+      .map((photo) => ({ photo, parsed: parseDataUrlImage(photo && photo.websitePhoto) }))
+      .find((candidate) => candidate.parsed);
+    if (!resolved) return null;
+    const { photo, parsed } = resolved;
     if (!parsed) return null;
     const baseName = sanitizeFilename(photo.websitePhotoName || `${getRowCompany(row)} webdesign`, 'webdesign');
     const extension = getImageExtension(parsed.contentType);

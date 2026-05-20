@@ -300,6 +300,38 @@ test('coldmail campaign attaches webdesign photo inline and as attachment', asyn
   assert.equal(savedRows[0].actionRequired, false);
 });
 
+test('coldmail campaign accepts inline database webdesign photo when photo storage map misses', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-inline-photo',
+        bedrijf: 'Inline Design BV',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Inline Design webdesign',
+      },
+    ],
+    photoMap: {},
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-inline-photo@softora"/);
+  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments[0].filename, 'Inline-Design-webdesign.png');
+});
+
 test('webdesign outreach reply is marked action required without auto-interest status', async () => {
   const parsedInbound = {
     messageId: '<incoming-webdesign@example.test>',
