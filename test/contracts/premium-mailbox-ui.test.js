@@ -59,7 +59,20 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(scriptSource, /data-mailbox-action="toggle-star"/);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{escapeHtml\(detailBody\)\}<\/div>/);
+  assert.match(scriptSource, /function renderLinkedMailBody\(value\)/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderLinkedMailBody\(detailBody\)\}<\/div>/);
+  assert.doesNotMatch(scriptSource, /<div class="detail-body-text">\$\{escapeHtml\(detailBody\)\}<\/div>/);
+});
+
+test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
+  const scriptSource = readScript();
+
+  assert.match(scriptSource, /const MAIL_BODY_URL_PATTERN = \/https\?:\\\/\\\/\[\^\\s<>"'\]\+\/gi;/);
+  assert.match(scriptSource, /function isSafeMailBodyUrl\(value\)/);
+  assert.match(scriptSource, /const parsed = new URL\(value\);/);
+  assert.match(scriptSource, /parsed\.protocol === 'http:' \|\| parsed\.protocol === 'https:';/);
+  assert.match(scriptSource, /target="_blank" rel="noopener noreferrer"/);
+  assert.match(scriptSource, /\$\{escapeHtml\(url\)\}<\/a>\$\{escapeHtml\(suffix\)\}/);
 });
 
 test('premium mailbox toont webdesign outreach acties alleen via databasekoppeling', () => {
