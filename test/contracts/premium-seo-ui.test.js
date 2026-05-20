@@ -14,8 +14,13 @@ test('premium seo page shows unlocked prestaties dashboard in premium shell', ()
     path.join(__dirname, '../../assets/premium-seo-performance.js'),
     'utf8'
   );
+  const drCssSource = fs.readFileSync(
+    path.join(__dirname, '../../assets/premium-seo-dr-rating.css'),
+    'utf8'
+  );
 
   assert.match(source, /assets\/premium-seo-performance\.css\?v=20260520b/);
+  assert.match(source, /assets\/premium-seo-dr-rating\.css\?v=20260520a/);
   assert.match(source, /assets\/premium-seo-performance\.js\?v=20260520a/);
   assert.ok(
     source.indexOf('</style>') < source.indexOf('assets/premium-seo-performance.css?v=20260520b'),
@@ -29,6 +34,10 @@ test('premium seo page shows unlocked prestaties dashboard in premium shell', ()
   assert.match(source, /<span class="metric-label">Totaal vertoningen<\/span>/);
   assert.match(source, /<span class="metric-label">Gemiddelde CTR<\/span>/);
   assert.match(source, /<span class="metric-label">Gemiddelde positie<\/span>/);
+  assert.match(source, /<div class="authority-card" aria-label="DR backlink rating 50 procent">/);
+  assert.match(source, /<h2 class="authority-title">DR Backlink Rating<\/h2>/);
+  assert.match(source, /<div class="dr-rating-ring" data-rating="50">/);
+  assert.match(source, /<span class="dr-rating-value">50%<\/span>/);
   assert.match(source, /<div class="chart-legend"><span class="legend-dot c1"><\/span>Klikken<\/div>/);
   assert.match(source, /<button class="chart-toggle active" type="button">Dagelijks<\/button>/);
   assert.match(source, /<div class="chart-date-label">18-05-2026<\/div>/);
@@ -43,6 +52,9 @@ test('premium seo page shows unlocked prestaties dashboard in premium shell', ()
   assert.match(jsSource, /document\.querySelectorAll\('\.filter-pill:not\(\.secondary\)'/);
   assert.match(jsSource, /document\.querySelectorAll\('\.chart-toggle'\)/);
   assert.match(jsSource, /document\.querySelectorAll\('\.tab'\)/);
+  assert.match(drCssSource, /\.authority-card/);
+  assert.match(drCssSource, /\.dr-rating-ring/);
+  assert.match(drCssSource, /stroke-dasharray: 50 100;/);
   assert.doesNotMatch(source, /id="contentLockOverlay"/);
   assert.doesNotMatch(source, /data-seo-lock-input/);
   assert.doesNotMatch(source, /data-seo-lock-submit/);
