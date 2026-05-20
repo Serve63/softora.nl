@@ -109,6 +109,63 @@ create index if not exists softora_webdesign_jobs_owner_idx
 create index if not exists softora_webdesign_jobs_customer_status_idx
   on public.softora_webdesign_jobs (owner_key, customer_id, status);
 
+create table if not exists public.softora_mailbox_messages (
+  message_key text primary key,
+  account_email text not null,
+  folder text not null,
+  uid bigint not null,
+  provider_id text not null,
+  message_id text,
+  in_reply_to text,
+  references_text text,
+  sender_name text,
+  sender_email text,
+  recipients_text text,
+  subject text,
+  preview text,
+  body_text text,
+  body_truncated boolean not null default false,
+  has_body boolean not null default false,
+  date timestamptz not null,
+  internal_date timestamptz,
+  unread boolean not null default false,
+  starred boolean not null default false,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  unique (account_email, folder, uid)
+);
+
+create index if not exists softora_mailbox_messages_account_folder_date_idx
+  on public.softora_mailbox_messages (account_email, folder, date desc);
+create index if not exists softora_mailbox_messages_message_id_idx
+  on public.softora_mailbox_messages (account_email, message_id);
+create index if not exists softora_mailbox_messages_deleted_at_idx
+  on public.softora_mailbox_messages (deleted_at);
+
+create table if not exists public.softora_mailbox_sync_state (
+  sync_key text primary key,
+  account_email text not null,
+  folder text not null,
+  status text not null default 'idle'
+    check (status in ('idle', 'syncing', 'ok', 'error')),
+  last_synced_at timestamptz,
+  sync_started_at timestamptz,
+  lock_token text,
+  lock_expires_at timestamptz,
+  last_uid bigint,
+  message_count integer not null default 0,
+  last_error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists softora_mailbox_sync_state_status_idx
+  on public.softora_mailbox_sync_state (status, updated_at desc);
+create index if not exists softora_mailbox_sync_state_account_folder_idx
+  on public.softora_mailbox_sync_state (account_email, folder);
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'softora-design-photos',
@@ -128,3 +185,5 @@ alter table public.softora_active_orders enable row level security;
 alter table public.softora_order_runtime enable row level security;
 alter table public.softora_design_photos enable row level security;
 alter table public.softora_webdesign_jobs enable row level security;
+alter table public.softora_mailbox_messages enable row level security;
+alter table public.softora_mailbox_sync_state enable row level security;

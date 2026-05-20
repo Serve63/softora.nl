@@ -1,6 +1,5 @@
 (function () {
 "use strict";
-
 const MAILBOX_ACCOUNT_DEFAULT = 'info@softora.nl';
 const MAILBOX_SENDER_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const MAILBOX_SENDER_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
@@ -10,7 +9,6 @@ let activeMailboxAccount = MAILBOX_ACCOUNT_DEFAULT, pinnedMailboxAccount = '', m
 let mailboxAccounts = [
   { email: 'info@softora.nl', name: 'info@softora.nl', imapConfigured: false, smtpConfigured: false },
 ];
-
 const avatarColors = ['#9b2355','#1a5f8a','#16733c','#7b3f00','#4a1a6b','#b45a00','#2c6e49'];
 const getColor = str => {
   const value = String(str || '?');
@@ -22,7 +20,6 @@ const initials = name => {
   return value || '?';
 };
 let toastTimer = 0;
-
 function escapeHtml(value) {
   return String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
@@ -31,26 +28,21 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-
 function normalizeMailboxEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
-
 function getMailboxAccountEmails() {
   return mailboxAccounts.map((account) => normalizeMailboxEmail(account.email)).filter(Boolean);
 }
-
 function hasMailboxAccount(email) {
   const normalized = normalizeMailboxEmail(email);
   return Boolean(normalized && getMailboxAccountEmails().includes(normalized));
 }
-
 function resolveMailboxPreferenceIdentity(session) {
   const source = session && typeof session === 'object' ? session : {};
   const value = String(source.userId || source.email || source.displayName || '').trim().toLowerCase();
   return value.replace(/[^a-z0-9@._-]+/g, '_') || 'anonymous';
 }
-
 function parseMailboxJsonObject(value) {
   if (!value) return null;
   if (typeof value === 'object' && !Array.isArray(value)) return value;
@@ -61,7 +53,6 @@ function parseMailboxJsonObject(value) {
     return null;
   }
 }
-
 async function readMailboxPinPreferences() {
   try {
     const client = window.SoftoraUiStateClient;
@@ -79,7 +70,6 @@ async function readMailboxPinPreferences() {
     return mailboxPinPreferences && typeof mailboxPinPreferences === 'object' ? mailboxPinPreferences : Object.create(null);
   }
 }
-
 async function writePinnedMailboxAccount(email) {
   const normalized = normalizeMailboxEmail(email);
   if (normalized) mailboxPinPreferences[mailboxAccountPreferenceIdentity] = normalized;
@@ -97,7 +87,6 @@ async function writePinnedMailboxAccount(email) {
     return false;
   }
 }
-
 async function initializeMailboxAccountPreference() {
   try {
     const response = await fetch('/api/auth/session', {
@@ -114,7 +103,6 @@ async function initializeMailboxAccountPreference() {
   mailboxPinPreferences = await readMailboxPinPreferences();
   pinnedMailboxAccount = normalizeMailboxEmail(mailboxPinPreferences[mailboxAccountPreferenceIdentity] || '');
 }
-
 const MAILBOX_TRACKING_HOST_PATTERNS = [
   /(^|\.)sendgrid\.net$/i,
   /(^|\.)ct\.sendgrid\.net$/i,
@@ -143,7 +131,6 @@ const MAILBOX_SIGNATURE_START_PATTERNS = [
   /^cheers[,!]*$/i,
   /^--$/,
 ];
-
 function parseMailboxUrl(value) {
   const raw = String(value || '')
     .trim()
@@ -157,7 +144,6 @@ function parseMailboxUrl(value) {
     return null;
   }
 }
-
 function isMailboxTrackingUrl(value) {
   const parsed = parseMailboxUrl(value);
   if (!parsed) return false;
@@ -166,7 +152,6 @@ function isMailboxTrackingUrl(value) {
   return MAILBOX_TRACKING_HOST_PATTERNS.some((pattern) => pattern.test(host)) ||
     /\/(?:wf\/open|open|click|ls\/click|track|tracking)\b/i.test(path);
 }
-
 function isMailboxStandaloneAssetUrl(value) {
   const parsed = parseMailboxUrl(value);
   if (!parsed) return false;
@@ -175,12 +160,10 @@ function isMailboxStandaloneAssetUrl(value) {
   return MAILBOX_IMAGE_ASSET_EXTENSIONS.test(path) ||
     (host === 'cdn.openai.com' && /(?:logo|asset|image|header)/i.test(path));
 }
-
 function isMailboxTechnicalUrl(value, options) {
   if (isMailboxTrackingUrl(value)) return true;
   return Boolean(options && options.standalone && isMailboxStandaloneAssetUrl(value));
 }
-
 function cleanMailboxText(value) {
   return String(value || '')
     .replace(/\r\n?/g, '\n')
@@ -204,37 +187,30 @@ function cleanMailboxText(value) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
-
 function isMailboxReplyHeaderLine(line) {
   const value = String(line || '').trim();
   return MAILBOX_REPLY_HEADER_PATTERNS.some((pattern) => pattern.test(value));
 }
-
 function isMailboxSignatureStartLine(line) {
   const value = String(line || '').trim();
   return MAILBOX_SIGNATURE_START_PATTERNS.some((pattern) => pattern.test(value));
 }
-
 function stripMailboxQuotePrefix(line) {
   return String(line || '').replace(/^\s*(?:>\s*)+/, '').trimEnd();
 }
-
 function isMailboxSafeOptOutUrl(value) {
   const parsed = parseMailboxUrl(value);
   if (!parsed) return false;
   const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
   return host === 'softora.nl' && parsed.pathname.replace(/\/+$/, '') === '/afmelden';
 }
-
 function normalizeMailboxOptOutUrl(value) {
   const parsed = parseMailboxUrl(value);
   return parsed && isMailboxSafeOptOutUrl(parsed.href) ? parsed.href : '';
 }
-
 function renderMailboxOptOutLink(url) {
   return `<a class="detail-mail-optout-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(MAILBOX_COLDMAIL_OPT_OUT_LABEL)}</a>`;
 }
-
 function renderMailboxTextLine(line, options) {
   const value = String(line || '');
   const trimmed = value.trim();
@@ -252,7 +228,6 @@ function renderMailboxTextLine(line, options) {
   }
   return escapeHtml(value);
 }
-
 function normalizeMailboxImageLabel(value) {
   return String(value || '')
     .trim()
@@ -263,19 +238,15 @@ function normalizeMailboxImageLabel(value) {
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
-
 function isMailboxMockupImageLabel(value) {
   return /\b(?:device|mockup|laptop|ipad|iphone|tablet|mobiel)\b/i.test(String(value || ''));
 }
-
 function isMailboxWebdesignImageLabel(value) {
   return /\b(?:webdesign|website|site|foto|screenshot)\b/i.test(String(value || ''));
 }
-
 function sectionHasMailboxImagePlaceholder(section) {
   return Boolean(section && Array.isArray(section.lines) && section.lines.some((line) => /^\s*\[image:\s*[^\]]+\]\s*$/i.test(String(line || ''))));
 }
-
 function buildMailboxBodySections(value) {
   const text = cleanMailboxText(value);
   if (!text) {
@@ -287,7 +258,6 @@ function buildMailboxBodySections(value) {
   let currentLines = [];
   let signatureStarted = false;
   let quotedThreadStarted = false;
-
   function pushSection() {
     if (!currentLines.length) return;
     if (!currentLines.some((line) => String(line || '').trim())) {
@@ -297,13 +267,11 @@ function buildMailboxBodySections(value) {
     sections.push({ type: currentType, lines: currentLines.slice() });
     currentLines = [];
   }
-
   lines.forEach((line) => {
     const rawLine = String(line || '');
     const trimmed = rawLine.trim();
     const isReplyHeader = isMailboxReplyHeaderLine(trimmed);
     const isQuoteLine = /^\s*>/.test(rawLine);
-
     if (isReplyHeader) {
       quotedThreadStarted = true;
       signatureStarted = false;
@@ -314,7 +282,6 @@ function buildMailboxBodySections(value) {
       currentLines.push(trimmed);
       return;
     }
-
     if (isQuoteLine) {
       quotedThreadStarted = true;
       signatureStarted = false;
@@ -325,7 +292,6 @@ function buildMailboxBodySections(value) {
       currentLines.push(stripMailboxQuotePrefix(rawLine));
       return;
     }
-
     if (quotedThreadStarted) {
       if (currentType !== 'quote') {
         pushSection();
@@ -334,7 +300,6 @@ function buildMailboxBodySections(value) {
       currentLines.push(rawLine);
       return;
     }
-
     if (!signatureStarted && isMailboxSignatureStartLine(trimmed)) {
       signatureStarted = true;
       if (currentType !== 'signature') {
@@ -344,7 +309,6 @@ function buildMailboxBodySections(value) {
       currentLines.push(rawLine);
       return;
     }
-
     if (signatureStarted) {
       if (currentType !== 'signature') {
         pushSection();
@@ -353,24 +317,20 @@ function buildMailboxBodySections(value) {
       currentLines.push(rawLine);
       return;
     }
-
     if (currentType !== 'body') {
       pushSection();
       currentType = 'body';
     }
     currentLines.push(rawLine);
   });
-
   pushSection();
   return sections.length ? sections : [{ type: 'body', lines: ['Geen inhoud.'] }];
 }
-
 function renderMailboxParagraphs(lines, options) {
   const renderedLines = [];
   const quoteBody = Boolean(options && options.quoteBody);
   const images = Array.isArray(options && options.images) ? options.images : [];
   const usedImages = options && options.usedImages instanceof Set ? options.usedImages : new Set();
-
   function pushTextLine(line) {
     const value = String(line || '');
     if (!value.trim()) {
@@ -379,7 +339,6 @@ function renderMailboxParagraphs(lines, options) {
     }
     renderedLines.push(`<div class="detail-mail-line">${renderMailboxTextLine(value, options)}</div>`);
   }
-
   function findImageByAlt(alt) {
     const rawAlt = String(alt || '').trim();
     const normalizedAlt = normalizeMailboxImageLabel(rawAlt);
@@ -394,7 +353,6 @@ function renderMailboxParagraphs(lines, options) {
       candidates[0] ||
       null;
   }
-
   lines.forEach((line) => {
     const value = String(line || '');
     const cleaned = quoteBody ? stripMailboxQuotePrefix(value) : value.trimEnd();
@@ -410,19 +368,16 @@ function renderMailboxParagraphs(lines, options) {
     }
     pushTextLine(cleaned);
   });
-
   return renderedLines.length
     ? `<div class="detail-mail-lines">${renderedLines.join('')}</div>`
     : '<div class="detail-mail-lines"><div class="detail-mail-line">Geen inhoud.</div></div>';
 }
-
 function renderMailboxInlineImage(image) {
   const dataUrl = String(image && image.dataUrl || '').trim();
   if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(dataUrl)) return '';
   const alt = String(image && image.alt || 'Afbeelding').trim() || 'Afbeelding';
   return `<figure class="detail-mail-image"><img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async"></figure>`;
 }
-
 function renderMailboxBodySection(section, imageState) {
   if (!section || !Array.isArray(section.lines)) {
     return '<section class="detail-mail-section"><p>Geen inhoud.</p></section>';
@@ -450,7 +405,6 @@ function renderMailboxBodySection(section, imageState) {
       ${renderMailboxParagraphs(section.lines, imageState)}
     </section>`;
 }
-
 function renderUnusedMailboxInlineImages(imageState) {
   if (!imageState || !Array.isArray(imageState.images) || !(imageState.usedImages instanceof Set)) return '';
   const unusedImages = imageState.images
@@ -465,7 +419,6 @@ function renderUnusedMailboxInlineImages(imageState) {
   if (!renderedImages) return '';
   return `<section class="detail-mail-section detail-mail-section-images">${renderedImages}</section>`;
 }
-
 function normalizeMailboxBodyImages(images) {
   return (Array.isArray(images) ? images : [])
     .map((image) => ({
@@ -474,7 +427,6 @@ function normalizeMailboxBodyImages(images) {
     }))
     .filter((image) => image.alt && /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(image.dataUrl));
 }
-
 function renderMailBody(value, images, options) {
   const imageState = {
     images: normalizeMailboxBodyImages(images),
@@ -499,20 +451,16 @@ function renderMailBody(value, images, options) {
   }
   return renderedSections.join('');
 }
-
 function findMailById(id) {
   const key = String(id);
   return mails.find(mail => String(mail.id) === key);
 }
-
 function getMailboxAccounts() {
   return getMailboxAccountEmails();
 }
-
 function getMailboxAccount() {
   return activeMailboxAccount;
 }
-
 async function loadMailboxSenderProfile() {
   if (!window.SoftoraCampaignSenderSettings || typeof window.SoftoraCampaignSenderSettings.loadProfileForSender !== 'function') return null;
   try {
@@ -524,14 +472,12 @@ async function loadMailboxSenderProfile() {
     return null;
   }
 }
-
 function closeMailboxAccountMenu() {
   const switcher = document.getElementById('mailbox-account-switcher');
   const menu = document.getElementById('mailbox-account-menu');
   if (switcher) switcher.setAttribute('aria-expanded', 'false');
   if (menu) menu.classList.remove('open');
 }
-
 function renderMailboxAccountMenu() {
   const menu = document.getElementById('mailbox-account-menu');
   if (!menu) return;
@@ -558,24 +504,19 @@ function renderMailboxAccountMenu() {
   `;
   }).join('');
 }
-
 function setMailboxAccountUi(email) {
   const top = document.getElementById('topbar-mailbox-account');
   if (top) top.textContent = email;
   renderMailboxAccountMenu();
 }
-
 let mails = [];
-
 let activeFolder = 'inbox';
 let activeMail = null;
 let inboxUnreadCount = 0;
 let composeReplyContext = null;
-
 function resetDetailEmpty() {
   document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
 }
-
 function formatMailDate(value) {
   const date = value ? new Date(value) : new Date();
   if (!Number.isFinite(date.getTime())) return { date: '', time: '' };
@@ -586,14 +527,13 @@ function formatMailDate(value) {
     time: date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
   };
 }
-
 function normalizeMailboxApiMessage(message) {
   const when = formatMailDate(message.date);
   const body = cleanMailboxText(message.body || message.preview || '');
   const preview = cleanMailboxText(message.preview || body).replace(/\s+/g, ' ').slice(0, 160);
   const bodyImages = normalizeMailboxBodyImages(message.bodyImages);
   const optOutUrl = normalizeMailboxOptOutUrl(message.optOutUrl);
-  return {
+  const mail = {
     id: message.id,
     folder: message.folder || activeFolder,
     from: message.from || 'Onbekend',
@@ -614,8 +554,10 @@ function normalizeMailboxApiMessage(message) {
     starred: Boolean(message.starred),
     tags: [],
   };
+  return window.SoftoraMailboxIndex && typeof window.SoftoraMailboxIndex.decorateMessage === 'function'
+    ? window.SoftoraMailboxIndex.decorateMessage(mail, message)
+    : mail;
 }
-
 async function loadMailboxAccounts() {
   try {
     const response = await fetch('/api/mailbox/accounts', {
@@ -640,10 +582,29 @@ async function loadMailboxAccounts() {
     toast('Mailboxaccounts laden mislukt');
   }
 }
-
-async function loadMailboxMessages() {
+async function hydrateMailboxOutreachContextsInBackground() {
+  if (!window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.hydrateOutreachContexts !== 'function') return;
+  await window.SoftoraMailboxIndex.hydrateOutreachContexts({
+    getMails: () => mails,
+    setMails: (nextMails) => { mails = Array.isArray(nextMails) ? nextMails : []; },
+    renderList,
+    getActiveMail: () => activeMail,
+    openMail,
+    toast,
+  });
+}
+async function syncMailboxInBackground() {
+  if (!window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.syncInBackground !== 'function') return;
+  await window.SoftoraMailboxIndex.syncInBackground({
+    account: activeMailboxAccount,
+    folder: activeFolder,
+    loadMessages: loadMailboxMessages,
+  });
+}
+async function loadMailboxMessages(options = {}) {
   const wrap = document.getElementById('mail-items');
-  if (wrap) {
+  const showLoader = options.showLoader !== false;
+  if (wrap && showLoader) {
     wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Mailbox laden…</div>`;
   }
   try {
@@ -657,15 +618,16 @@ async function loadMailboxMessages() {
       throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
     }
     mails = Array.isArray(data.messages) ? data.messages.map(normalizeMailboxApiMessage) : [];
-    if (window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.hydrate === 'function') {
-      mails = await window.SoftoraMailboxOutreach.hydrate(mails);
-    }
     renderList();
-    if (window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.applyIntentAfterLoad === 'function') {
-      window.SoftoraMailboxOutreach.applyIntentAfterLoad({ getMails: () => mails, openMail, renderList, toast });
+    void hydrateMailboxOutreachContextsInBackground().catch(() => {});
+    if (!options.skipBackgroundSync && data?.sync?.refreshRecommended) {
+      void syncMailboxInBackground();
+    } else if (!window.SoftoraMailboxIndex || !window.SoftoraMailboxIndex.isSyncInFlight()) {
+      window.SoftoraMailboxIndex?.setStatus('');
     }
   } catch (error) {
     mails = [];
+    window.SoftoraMailboxIndex?.setStatus('');
     syncInboxBadgeFromCurrentFolder();
     if (wrap) {
       wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${escapeHtml(error?.message || error || 'Mailbox laden mislukt')}</div>`;
@@ -673,7 +635,6 @@ async function loadMailboxMessages() {
     toast(String(error?.message || error || 'Mailbox laden mislukt'));
   }
 }
-
 async function applyMailboxAccount(email, options = {}) {
   const normalizedEmail = normalizeMailboxEmail(email);
   activeMailboxAccount = hasMailboxAccount(normalizedEmail) ? normalizedEmail : (mailboxAccounts[0]?.email || MAILBOX_ACCOUNT_DEFAULT);
@@ -686,7 +647,6 @@ async function applyMailboxAccount(email, options = {}) {
   resetDetailEmpty();
   await loadMailboxMessages();
 }
-
 async function pinMailboxAccount(email) {
   const normalizedEmail = normalizeMailboxEmail(email);
   if (!hasMailboxAccount(normalizedEmail)) return;
@@ -696,7 +656,6 @@ async function pinMailboxAccount(email) {
   await applyMailboxAccount(normalizedEmail);
   toast(saved ? `Mailbox vastgepind: ${normalizedEmail}` : `Mailbox gekozen: ${normalizedEmail}. Vastpinnen opslaan mislukt.`);
 }
-
 function setFolder(folder, el) {
   activeFolder = folder;
   activeMail = null;
@@ -705,15 +664,12 @@ function setFolder(folder, el) {
   resetDetailEmpty();
   void loadMailboxMessages();
 }
-
 function getMailsForFolder(folder) {
   if (['offerte','factuur','klant'].includes(folder)) return mails.filter(m => m.tags.includes(folder));
   if (folder === 'starred') return mails.filter(m => m.starred);
   return mails;
 }
-
 function filterMails() { renderList(); }
-
 function renderInboxBadge() {
   const badge = document.getElementById('badge-inbox');
   if (!badge) return;
@@ -721,14 +677,12 @@ function renderInboxBadge() {
   badge.textContent = String(count);
   badge.hidden = count === 0;
 }
-
 function syncInboxBadgeFromCurrentFolder() {
   if (activeFolder === 'inbox') {
     inboxUnreadCount = mails.filter(m => m.folder === 'inbox' && m.unread).length;
   }
   renderInboxBadge();
 }
-
 function renderList() {
   const searchInput = document.getElementById('search-input');
   const q = ((searchInput && searchInput.value) || '').toLowerCase();
@@ -739,7 +693,6 @@ function renderList() {
   if (!wrap) return;
   syncInboxBadgeFromCurrentFolder();
   if (!list.length) { wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Geen e-mails gevonden.</div>`; return; }
-
   wrap.innerHTML = list.map(m => `
     <div class="mail-item ${m.unread ? 'unread' : ''} ${String(activeMail) === String(m.id) ? 'active' : ''}" data-mailbox-action="open-mail" data-mailbox-id="${escapeHtml(m.id)}" role="button" tabindex="0">
       ${m.unread ? '<div class="unread-dot"></div>' : ''}
@@ -750,9 +703,7 @@ function renderList() {
       <div class="mail-subject">${escapeHtml(m.subject)}</div>
       <div class="mail-preview">${escapeHtml(m.preview)}</div>
     </div>`).join('');
-
 }
-
 async function persistMailReadState(mail) {
   if (!mail) return;
   try {
@@ -778,8 +729,19 @@ async function persistMailReadState(mail) {
     toast(String(error?.message || error || 'Gelezen status opslaan mislukt'));
   }
 }
-
-function openMail(id) {
+async function loadMailboxMessageBody(id) {
+  if (!window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.loadBody !== 'function') return;
+  await window.SoftoraMailboxIndex.loadBody({
+    id,
+    getMail: findMailById,
+    account: activeMailboxAccount,
+    folder: activeFolder,
+    normalizeBodyImages: normalizeMailboxBodyImages,
+    normalizeOptOutUrl: normalizeMailboxOptOutUrl,
+    openMail,
+  });
+}
+function openMail(id, options = {}) {
   const m = findMailById(id);
   if (!m) return;
   const wasUnread = m.unread;
@@ -794,7 +756,9 @@ function openMail(id) {
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
   const detailSecondary = window.SoftoraMailboxDisplay.getDetailSecondaryText(m, displayOptions);
-
+  const detailBody = m.bodyLoaded || m.body
+    ? m.body
+    : 'Bericht laden…';
   document.getElementById('mail-detail').innerHTML = `
     <div class="detail-header">
       <div class="detail-subject">${escapeHtml(m.subject)}</div>
@@ -826,11 +790,13 @@ function openMail(id) {
       </div>
     </div>
     <div class="detail-body">
-      <div class="detail-body-text">${renderMailBody(m.body, m.bodyImages, { optOutUrl: m.optOutUrl })}</div>
+      <div class="detail-body-text">${renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl })}</div>
       ${outreachQuickbar}
     </div>`;
+  if (!options.skipBodyFetch && !m.bodyLoaded) {
+    void loadMailboxMessageBody(m.id);
+  }
 }
-
 function toggleStar(id) {
   const m = findMailById(id);
   if (!m) return;
@@ -838,7 +804,6 @@ function toggleStar(id) {
   openMail(id);
   renderList();
 }
-
 async function deleteMail(id) {
   const m = findMailById(id);
   if (!m) return;
@@ -869,7 +834,6 @@ async function deleteMail(id) {
     toast(String(error?.message || error || 'Mail verwijderen mislukt'));
   }
 }
-
 async function requestMailboxDeleteConfirmation(mail) {
   const folder = String(mail?.folder || activeFolder || '').toLowerCase();
   const subject = String(mail?.subject || '').trim() || 'deze mail';
@@ -885,12 +849,10 @@ async function requestMailboxDeleteConfirmation(mail) {
   }
   return typeof window.confirm === 'function' ? window.confirm(message) : false;
 }
-
 function getComposeFieldValue(id) {
   const field = document.getElementById(id);
   return field ? field.value : '';
 }
-
 function setComposeReplyContext(mail) {
   composeReplyContext = mail
     ? {
@@ -906,7 +868,6 @@ function setComposeReplyContext(mail) {
       }
     : null;
 }
-
 function buildComposeRewriteContext() {
   return composeReplyContext ? { ...composeReplyContext } : null;
 }
@@ -1106,7 +1067,6 @@ function bindMailboxActions() {
 bindMailboxActions();
 const mailboxAccountSwitcher = document.getElementById('mailbox-account-switcher');
 const mailboxAccountMenu = document.getElementById('mailbox-account-menu');
-
 if (mailboxAccountSwitcher) {
   mailboxAccountSwitcher.addEventListener('click', function(event) {
     event.stopPropagation();
@@ -1119,7 +1079,6 @@ if (mailboxAccountSwitcher) {
     mailboxAccountSwitcher.setAttribute('aria-expanded', 'true');
   });
 }
-
 if (mailboxAccountMenu) {
   mailboxAccountMenu.addEventListener('click', function(event) {
     const pinButton = event.target.closest('[data-mailbox-pin-email]');
@@ -1137,18 +1096,15 @@ if (mailboxAccountMenu) {
     applyMailboxAccount(email);
   });
 }
-
 document.addEventListener('click', (event) => {
   if (!mailboxAccountMenu || !mailboxAccountSwitcher) return;
   if (mailboxAccountMenu.contains(event.target) || mailboxAccountSwitcher.contains(event.target)) return;
   closeMailboxAccountMenu();
 });
-
 window.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
   closeMailboxAccountMenu();
 });
-
 (async function initMailboxAccount() {
   await initializeMailboxAccountPreference();
   const intent = window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.readIntent === 'function'
@@ -1164,7 +1120,6 @@ window.addEventListener('keydown', (event) => {
     keepSearch: true,
   });
 })();
-
 function finishPremiumShellBoot() {
   if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
     window.SoftoraPremiumBoot.setShellBooting(false);

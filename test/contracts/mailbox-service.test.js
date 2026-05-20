@@ -1184,11 +1184,11 @@ test('mailbox service refuses rewrite without OpenAI key', async () => {
 test('mailbox routes expose accounts, messages, send, delete and rewrite endpoints', () => {
   const routes = [];
   const app = {
-    get(path, handler) {
-      routes.push(['GET', path, handler]);
+    get(path, ...handlers) {
+      routes.push(['GET', path, handlers]);
     },
-    post(path, handler) {
-      routes.push(['POST', path, handler]);
+    post(path, ...handlers) {
+      routes.push(['POST', path, handlers]);
     },
   };
 
@@ -1209,4 +1209,44 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/delete'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/rewrite'));
+});
+
+test('mailbox cron sync route requires CRON_SECRET bearer access', () => {
+  let cronCalled = 0;
+  const routes = [];
+  const app = {
+    get(path, ...handlers) {
+      routes.push(['GET', path, handlers]);
+    },
+    post(path, ...handlers) {
+      routes.push(['POST', path, handlers]);
+    },
+  };
+
+  registerMailboxRoutes(app, {
+    cronSecret: 'cron-secret',
+    coordinator: {
+      accountsResponse() {},
+      listMessagesResponse() {},
+      getMessageResponse() {},
+      syncMailboxResponse(_req, res) {
+        cronCalled += 1;
+        res.status(200).json({ ok: true });
+      },
+      sendMessageResponse() {},
+    },
+  });
+
+  const route = routes.find(([method, path]) => method === 'GET' && path === '/api/mailbox/sync');
+  const blocked = createResponseRecorder();
+  route[2][0]({ headers: { authorization: 'Bearer wrong' } }, blocked, () => {});
+  assert.equal(blocked.statusCode, 401);
+  assert.equal(cronCalled, 0);
+
+  const allowed = createResponseRecorder();
+  route[2][0]({ headers: { authorization: 'Bearer cron-secret' } }, allowed, () => {
+    route[2][1]({}, allowed);
+  });
+  assert.equal(allowed.statusCode, 200);
+  assert.equal(cronCalled, 1);
 });
