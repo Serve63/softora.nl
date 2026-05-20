@@ -23,6 +23,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const CHUNK_SIZE = 180000;
   const MAX_STORAGE_CHUNKS = 80;
   const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
+  const ADMIN_TEAM_OWNER_KEY = 'softora-admin-team';
   let processing = false;
 
   function pruneJobs() {
@@ -45,9 +46,16 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   function ownerKeyFromReq(req) {
+    if (hasAdminTeamAccess(req)) return ADMIN_TEAM_OWNER_KEY;
     const email = normalizeString(req?.premiumAuth?.email || '').toLowerCase();
     const uid = normalizeString(req?.premiumAuth?.userId || '');
     return email || uid ? `${email}::${uid}` : '';
+  }
+
+  function hasAdminTeamAccess(req) {
+    const auth = req?.premiumAuth || {};
+    const role = normalizeString(auth.role || auth.rol || '').toLowerCase();
+    return Boolean(auth.authenticated && (auth.isAdmin || role === 'admin'));
   }
 
   function normalizeJobId(value) {
@@ -148,26 +156,34 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
   }
 
-  async function findRunningJobForCustomer(ownerKey, customerId) {
+  async function findRunningJobForCustomer(ownerKey, customerId, options = {}) {
+    const adminTeamAccess = Boolean(options.adminTeamAccess);
     if (dataOpsStore && typeof dataOpsStore.findRunningWebdesignJob === 'function') {
-      const persistent = await dataOpsStore.findRunningWebdesignJob(ownerKey, customerId);
+      const persistent =
+        adminTeamAccess && typeof dataOpsStore.findRunningWebdesignJobForAdmin === 'function'
+          ? await dataOpsStore.findRunningWebdesignJobForAdmin(customerId)
+          : await dataOpsStore.findRunningWebdesignJob(ownerKey, customerId);
       if (persistent) {
         jobs.set(persistent.id, persistent);
         return persistent;
       }
     }
     for (const job of jobs.values()) {
-      if (job.ownerKey !== ownerKey) continue;
+      if (!adminTeamAccess && job.ownerKey !== ownerKey) continue;
       if (job.customer.id !== customerId) continue;
       if (job.status === 'queued' || job.status === 'running') return job;
     }
     return null;
   }
 
-  async function getVisibleJobsForOwner(ownerKey) {
+  async function getVisibleJobsForOwner(ownerKey, options = {}) {
+    const adminTeamAccess = Boolean(options.adminTeamAccess);
     const byId = new Map();
     if (dataOpsStore && typeof dataOpsStore.listVisibleWebdesignJobs === 'function') {
-      const persistentJobs = await dataOpsStore.listVisibleWebdesignJobs(ownerKey);
+      const persistentJobs =
+        adminTeamAccess && typeof dataOpsStore.listVisibleWebdesignJobsForAdmin === 'function'
+          ? await dataOpsStore.listVisibleWebdesignJobsForAdmin()
+          : await dataOpsStore.listVisibleWebdesignJobs(ownerKey);
       (Array.isArray(persistentJobs) ? persistentJobs : []).forEach((job) => {
         if (job && job.id) {
           jobs.set(job.id, job);
@@ -176,10 +192,16 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       });
     }
     Array.from(jobs.values())
-      .filter((job) => job.ownerKey === ownerKey)
+      .filter((job) => adminTeamAccess || job.ownerKey === ownerKey)
       .filter((job) => job.status === 'queued' || job.status === 'running')
       .forEach((job) => byId.set(job.id, job));
     return Array.from(byId.values()).sort((left, right) => left.createdAt - right.createdAt);
+  }
+
+  function canAccessJob(req, job, ownerKey) {
+    if (!job) return false;
+    if (hasAdminTeamAccess(req)) return true;
+    return job.ownerKey === ownerKey;
   }
 
   async function persistGeneratedPhoto(job, image) {
@@ -342,6 +364,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   async function startJobResponse(req, res) {
     pruneJobs();
     const ownerKey = ownerKeyFromReq(req);
+    const adminTeamAccess = hasAdminTeamAccess(req);
     if (!ownerKey) {
       return res.status(401).json({
         ok: false,
@@ -361,7 +384,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       });
     }
 
-    const existing = await findRunningJobForCustomer(ownerKey, customer.id);
+    const existing = await findRunningJobForCustomer(ownerKey, customer.id, { adminTeamAccess });
     if (existing) {
       return res.status(202).json({
         ok: true,
@@ -374,7 +397,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const existingById = jobs.get(jobId) || await loadPersistentJob(jobId);
     if (existingById) {
       jobs.set(existingById.id, existingById);
-      if (existingById.ownerKey !== ownerKey) {
+      if (!canAccessJob(req, existingById, ownerKey)) {
         return res.status(403).json({
           ok: false,
           error: 'Geen toegang',
@@ -437,7 +460,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         error: 'Job niet gevonden',
       });
     }
-    if (job.ownerKey !== ownerKey) {
+    if (!canAccessJob(req, job, ownerKey)) {
       return res.status(403).json({
         ok: false,
         error: 'Geen toegang',
@@ -455,6 +478,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   async function listJobsResponse(req, res) {
     pruneJobs();
     const ownerKey = ownerKeyFromReq(req);
+    const adminTeamAccess = hasAdminTeamAccess(req);
     if (!ownerKey) {
       return res.status(401).json({
         ok: false,
@@ -465,7 +489,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
     return res.status(200).json({
       ok: true,
-      jobs: (await getVisibleJobsForOwner(ownerKey)).map(serializeJob),
+      jobs: (await getVisibleJobsForOwner(ownerKey, { adminTeamAccess })).map(serializeJob),
     });
   }
 

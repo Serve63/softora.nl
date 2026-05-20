@@ -28,6 +28,116 @@ function buildConfirmationTaskDedupeKey(task, normalizeString) {
   ].join('|');
 }
 
+const BUSINESS_LEGEND_CHOICES = new Set([
+  'website',
+  'websites',
+  'business',
+  'bedrijfssoftware',
+  'voice',
+  'voicesoftware',
+  'chatbot',
+  'chatbots',
+]);
+
+function normalizeIdentityToken(value, normalizeString) {
+  return normalizeString(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function resolvePlannerIdentity(value, normalizeString) {
+  const normalized = normalizeIdentityToken(value, normalizeString);
+  if (!normalized) return '';
+  if (['both', 'allebei', 'beide', 'serve-martijn'].includes(normalized)) return 'both';
+  const tokens = normalized.split(/[^a-z0-9]+/).filter(Boolean);
+  if (tokens.includes('serve') && tokens.includes('martijn')) return 'both';
+  if (tokens.includes('martijn') || normalized === 'martijn') return 'martijn';
+  if (tokens.includes('serve') || tokens.includes('serv') || normalized === 'serve') return 'serve';
+  return '';
+}
+
+function resolveViewerPlanner(viewer, normalizeString) {
+  if (!viewer) return '';
+  if (typeof viewer === 'string') return resolvePlannerIdentity(viewer, normalizeString);
+  return (
+    resolvePlannerIdentity(viewer.who, normalizeString) ||
+    resolvePlannerIdentity(viewer.identity, normalizeString) ||
+    resolvePlannerIdentity(viewer.email, normalizeString) ||
+    resolvePlannerIdentity(viewer.firstName, normalizeString) ||
+    resolvePlannerIdentity(viewer.displayName, normalizeString)
+  );
+}
+
+function resolveAppointmentPlanner(appointment, normalizeString) {
+  return (
+    resolvePlannerIdentity(appointment?.manualPlannerWho, normalizeString) ||
+    resolvePlannerIdentity(appointment?.googleCalendarOwner, normalizeString) ||
+    resolvePlannerIdentity(appointment?.manualWho, normalizeString) ||
+    resolvePlannerIdentity(appointment?.who, normalizeString)
+  );
+}
+
+function isBusinessAppointment(appointment, normalizeString) {
+  const appointmentType = normalizeIdentityToken(appointment?.appointmentType, normalizeString);
+  if (['business', 'zakelijk', 'meeting'].includes(appointmentType)) return true;
+  const legendChoice = normalizeIdentityToken(
+    appointment?.manualLegendChoice || appointment?.legendChoice || appointment?.businessMeetingType,
+    normalizeString
+  );
+  return BUSINESS_LEGEND_CHOICES.has(legendChoice);
+}
+
+function isPrivateAppointment(appointment, normalizeString) {
+  if (!appointment || isBusinessAppointment(appointment, normalizeString)) return false;
+  const appointmentType = normalizeIdentityToken(appointment.appointmentType, normalizeString);
+  if (['private', 'personal', 'prive', 'privee'].includes(appointmentType)) return true;
+  const legendChoice = normalizeIdentityToken(
+    appointment.manualLegendChoice || appointment.legendChoice,
+    normalizeString
+  );
+  if (legendChoice.startsWith('manual-')) return true;
+  const provider = normalizeIdentityToken(appointment.provider || appointment.source, normalizeString);
+  return provider === 'google-calendar' || provider === 'google calendar';
+}
+
+function hasSharedAgendaVisibility(viewer, normalizeString) {
+  if (!viewer || typeof viewer !== 'object') return false;
+  const role = normalizeIdentityToken(viewer.role || viewer.rol, normalizeString);
+  return Boolean(viewer.authenticated && (viewer.isAdmin || viewer.canManageUsers || role === 'admin'));
+}
+
+function maskPrivateAppointmentForViewer(appointment, viewerPlanner, normalizeString) {
+  const owner = resolveAppointmentPlanner(appointment, normalizeString);
+  if (!viewerPlanner || !owner || owner === viewerPlanner || owner === 'both') return appointment;
+  if (!isPrivateAppointment(appointment, normalizeString)) return appointment;
+
+  return {
+    ...appointment,
+    privacyMasked: true,
+    title: 'Bezet',
+    company: 'Bezet',
+    activity: 'Bezet',
+    name: 'Bezet',
+    contact: '—',
+    phone: '',
+    location: '',
+    appointmentLocation: '',
+    summary: '',
+    manualNotes: '',
+    notes: '',
+    googleCalendarHtmlLink: '',
+  };
+}
+
+function isPrivateAppointmentBlockedForViewer(appointment, viewer, normalizeString) {
+  const viewerPlanner = resolveViewerPlanner(viewer, normalizeString);
+  const owner = resolveAppointmentPlanner(appointment, normalizeString);
+  if (!viewerPlanner || !owner || owner === viewerPlanner || owner === 'both') return false;
+  return isPrivateAppointment(appointment, normalizeString);
+}
+
 function createAgendaReadCoordinator(deps) {
   function getSafePreparationTimeoutMs() {
     return Math.max(0, Math.min(10000, Number(deps.readPreparationTimeoutMs) || 1500));
@@ -155,9 +265,15 @@ function createAgendaReadCoordinator(deps) {
   async function listAppointments(options = {}) {
     const limit = Math.max(1, Math.min(1000, Number(options.limit) || 200));
     await prepareAppointmentsOverview({ freshSharedState: Boolean(options.freshSharedState) });
+    const viewerPlanner = hasSharedAgendaVisibility(options.viewer, deps.normalizeString)
+      ? ''
+      : resolveViewerPlanner(options.viewer, deps.normalizeString);
     const sorted = deps
       .getGeneratedAgendaAppointments()
       .filter(deps.isGeneratedAppointmentVisibleForAgenda)
+      .map((appointment) =>
+        maskPrivateAppointmentForViewer(appointment, viewerPlanner, deps.normalizeString)
+      )
       .slice()
       .sort(deps.compareAgendaAppointments);
 
@@ -244,4 +360,5 @@ function createAgendaReadCoordinator(deps) {
 
 module.exports = {
   createAgendaReadCoordinator,
+  isPrivateAppointmentBlockedForViewer,
 };

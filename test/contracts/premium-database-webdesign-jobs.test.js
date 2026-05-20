@@ -128,6 +128,76 @@ test('premium database webdesign jobs keep status access scoped to the logged in
   assert.equal(statusRes.body.ok, false);
 });
 
+test('premium database webdesign jobs share status access between admin personeel accounts', async () => {
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        await wait(50);
+        return { image: { dataUrl: 'data:image/png;base64,AAAA', fileName: 'preview.png' } };
+      },
+    },
+    getUiStateValues: async () => ({ values: {} }),
+    setUiStateValues: async () => ({ values: {} }),
+  });
+
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: {
+        authenticated: true,
+        email: 'serve@softora.nl',
+        userId: 'usr_serve',
+        role: 'admin',
+        isAdmin: true,
+      },
+      body: {
+        jobId: 'job_adminshared123',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-admin-share', bedrijf: 'Softora' },
+      },
+    },
+    createResponseRecorder()
+  );
+
+  const getRes = createResponseRecorder();
+  await coordinator.getJobResponse(
+    {
+      premiumAuth: {
+        authenticated: true,
+        email: 'martijn@softora.nl',
+        userId: 'usr_martijn',
+        role: 'admin',
+        isAdmin: true,
+      },
+      params: { jobId: 'job_adminshared123' },
+    },
+    getRes
+  );
+
+  assert.equal(getRes.statusCode, 200);
+  assert.equal(getRes.body.ok, true);
+  assert.equal(getRes.body.job.customerId, 'customer-admin-share');
+
+  const listRes = createResponseRecorder();
+  await coordinator.listJobsResponse(
+    {
+      premiumAuth: {
+        authenticated: true,
+        email: 'martijn@softora.nl',
+        userId: 'usr_martijn',
+        role: 'admin',
+        isAdmin: true,
+      },
+    },
+    listRes
+  );
+
+  assert.equal(listRes.statusCode, 200);
+  assert.equal(listRes.body.jobs.some((job) => job.customerId === 'customer-admin-share'), true);
+});
+
 test('premium database webdesign jobs persist status and generated photos through data ops storage', async () => {
   const persistedJobs = [];
   const uploadedPhotos = [];

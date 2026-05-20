@@ -652,6 +652,21 @@ function createSoftoraDataOpsStore(deps = {}) {
     return normalizeWebdesignJobRow(result.data);
   }
 
+  async function findRunningWebdesignJobForAdmin(customerId) {
+    const result = await run('find-running-webdesign-job-admin', (client) =>
+      client
+        .from(TABLES.webdesignJobs)
+        .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
+        .eq('customer_id', normalizeString(customerId))
+        .in('status', ['queued', 'running'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    );
+    if (!result.ok || !result.data) return null;
+    return normalizeWebdesignJobRow(result.data);
+  }
+
   async function listVisibleWebdesignJobs(ownerKey) {
     const result = await run('list-webdesign-jobs', (client) =>
       client
@@ -666,7 +681,21 @@ function createSoftoraDataOpsStore(deps = {}) {
     return (result.data || []).map(normalizeWebdesignJobRow);
   }
 
+  async function listVisibleWebdesignJobsForAdmin() {
+    const result = await run('list-webdesign-jobs-admin', (client) =>
+      client
+        .from(TABLES.webdesignJobs)
+        .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
+        .in('status', ['queued', 'running'])
+        .order('created_at', { ascending: true })
+        .limit(100)
+    );
+    if (!result.ok) return null;
+    return (result.data || []).map(normalizeWebdesignJobRow);
+  }
+
   return {
+    findRunningWebdesignJobForAdmin,
     findRunningWebdesignJob,
     getDataOpsCounts,
     getWebdesignJob,
@@ -674,6 +703,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     listActiveOrders,
     listCustomers,
     listDesignPhotosWithDataUrls,
+    listVisibleWebdesignJobsForAdmin,
     listVisibleWebdesignJobs,
     listOrderRuntime,
     replaceActiveOrders,
