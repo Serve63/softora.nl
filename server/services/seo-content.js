@@ -330,7 +330,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       'Bedrijfssoftware op maat is software die precies aansluit op je processen, rollen en data in plaats van andersom.',
     sections: Object.freeze([
       Object.freeze({
-        heading: 'De korte uitleg',
+        heading: 'De heldere uitleg',
         paragraphs: Object.freeze([
           'Bedrijfssoftware op maat is een digitaal systeem dat wordt gebouwd rondom de manier waarop jouw bedrijf werkt. Het kan gaan om een dashboard, CRM, planningstool, klantportaal, database, offertemodule of een combinatie daarvan.',
           'Het verschil met standaard software is dat je niet hoeft te werken volgens vaste schermen en beperkingen van een pakket. De software volgt je proces, mits dat proces duidelijk genoeg is om te vertalen naar logica, schermen en gegevens.',
@@ -490,7 +490,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     slug: 'wat-is-een-ai-telefonist',
     title: 'Wat is een AI telefonist?',
     description:
-      'Een korte uitleg van AI telefonie, wanneer het nuttig is en hoe je voorkomt dat gesprekken onpersoonlijk worden.',
+      'Heldere uitleg van AI telefonie, wanneer het nuttig is en hoe je voorkomt dat gesprekken onpersoonlijk worden.',
     category: 'AI telefonie',
     intent: 'Uitleg',
     publishedAt: '2026-05-20',
@@ -1380,8 +1380,22 @@ function buildSeoContentDepthSections(item) {
   ]);
 }
 
+function buildSeoContentFaqTopic(item) {
+  const title = String(item && item.title ? item.title : '').trim();
+  if (!title) return 'dit onderwerp';
+  return title
+    .replace(/[?!]+$/g, '')
+    .replace(/^Wat is\s+/i, '')
+    .replace(/^Wat zijn\s+/i, '')
+    .replace(/:\s*waar begin je$/i, '')
+    .replace(/:\s*waar let je op$/i, '')
+    .replace(/:\s*wat kies je$/i, '')
+    .replace(/:\s*wanneer is het slimmer$/i, '')
+    .trim() || 'dit onderwerp';
+}
+
 function buildSeoContentFaq(item) {
-  const topic = String(item.title || 'dit onderwerp').trim();
+  const topic = buildSeoContentFaqTopic(item);
   const cluster = getSeoContentClusterForItem(item);
   const serviceLabel = cluster.ctaLabel || 'een passende oplossing';
   return Object.freeze([
