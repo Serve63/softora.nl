@@ -35,6 +35,28 @@ function loadDatabasePhotoStorageClient() {
   return sandbox.window.SoftoraDatabasePhotoStorage;
 }
 
+function loadDatabaseOutreachClient(options = {}) {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const document = options.document || {
+    getElementById: () => null,
+    createElement: () => ({ id: '', textContent: '' }),
+    head: { appendChild() {} },
+  };
+  const windowObject = {
+    document,
+    setTimeout: options.setTimeout || setTimeout,
+    clearTimeout: options.clearTimeout || clearTimeout,
+    requestAnimationFrame: options.requestAnimationFrame || ((callback) => callback()),
+    fetch: options.fetch || (async () => ({ ok: true, json: async () => ({ jobs: [] }) })),
+    Image: options.Image || function Image() {},
+    URL,
+  };
+  const sandbox = { window: windowObject, fetch: windowObject.fetch };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseOutreach;
+}
+
 function readDefaultDeepSearchTargetLines(source) {
   const match = source.match(/const DEFAULT_TARGET_TEXT_BASE64 = \[([\s\S]*?)\]\.join\(""\);/);
   assert.ok(match, 'DEFAULT_TARGET_TEXT_BASE64 should be present');
@@ -149,6 +171,9 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 14%; \}/);
   assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 9%; \}/);
   assert.match(pageSource, /thead th:nth-child\(9\), tbody td:nth-child\(9\) \{[\s\S]*width: 5%;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
+  assert.match(pageSource, /table:not\(\.outreach-action-mode\) thead th:nth-child\(10\),/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(7\),/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(10\),/);
   assert.match(pageSource, /\.photo-drop \{[\s\S]*width: 34px;[\s\S]*height: 34px;/);
   assert.match(pageSource, /\.photo-remove \{[\s\S]*width: 14px;[\s\S]*height: 14px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
@@ -206,6 +231,9 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(pageSource, /<th data-sort-key="email">Mailadres<\/th>/);
   assert.match(pageSource, /<th data-sort-key="tel">Telefoonnummer<\/th>/);
   assert.match(pageSource, /<th data-sort-key="dom">Website<\/th>/);
+  assert.match(pageSource, /<th>Kanaal<\/th>/);
+  assert.match(pageSource, /<th data-sort-key="status" id="statusHeader">Status<\/th>/);
+  assert.match(pageSource, /<th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie<\/th>/);
   assert.match(pageSource, /const websiteValue = normalizeString\(customer\.website \|\| customer\.dom\) \|\| "—";/);
   assert.match(pageSource, /class=\\"website-link\\"/);
   assert.match(pageSource, /target=\\"_blank\\" rel=\\"noopener\\"/);
@@ -214,9 +242,24 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(pageSource, /formatPhoneNumber\(raw && \(raw\.tel \|\| raw\.telefoon \|\| raw\.contactPhone\)\)/);
   assert.match(pageSource, /class=\\"company-edit\\"/);
   assert.match(pageSource, /data-edit-id=\\"/);
-  assert.match(pageSource, /<th>Foto <span id="photoHeaderCount">\(0\)<\/span><\/th>/);
-  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoDataUrl\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
-  assert.match(pageSource, /colspan=\\"9\\"/);
+  assert.match(pageSource, /<th id="photoHeader">Foto <span id="photoHeaderCount">\(0\)<\/span><\/th>/);
+  assert.match(pageSource, /<th id="daysHeader" hidden>Dagen<\/th>/);
+  assert.match(pageSource, /id="myMailsFilterButton"[^>]*>Enkel mijn mails tonen<\/button>/);
+  assert.match(pageSource, /onlyMyMails: false,/);
+  assert.match(pageSource, /authenticatedEmail: "",/);
+  assert.match(pageSource, /function hydrateDatabaseAuthSession\(\)/);
+  assert.match(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
+  assert.match(pageSource, /state\.onlyMyMails && !customerWasSentFromAuthenticatedEmail\(customer\)/);
+  assert.match(pageSource, /nodes\.myMailsFilterButton\.addEventListener\("click"/);
+  assert.match(pageSource, /const showOutreachActionColumn = state\.activeStatus === "benaderd";/);
+  assert.match(pageSource, /const showPhotoColumn = !showOutreachActionColumn;/);
+  assert.match(pageSource, /databaseTable\.classList\.toggle\("outreach-action-mode", showOutreachActionColumn\)/);
+  assert.match(pageSource, /statusHeader\.hidden = showOutreachActionColumn;/);
+  assert.match(pageSource, /latestActionHeader\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie";/);
+  assert.match(pageSource, /photoHeader\.hidden = !showPhotoColumn;/);
+  assert.match(pageSource, /daysHeader\.hidden = !showOutreachActionColumn;/);
+  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return showPhotoColumn && shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoDataUrl\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
+  assert.match(pageSource, /colspan=\\"" \+ \(showOutreachActionColumn \? 8 : 9\) \+ "\\"/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";/);
@@ -315,7 +358,7 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260505a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260520b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429c/);
@@ -611,10 +654,16 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "reactie_ontvangen"/);
   assert.match(pageSource, /Reactie ontvangen/);
+  assert.match(pageSource, /showOutreachActionColumn && outreachController\.isWebdesignOutreachCustomer\(customer\) \? outreachController\.renderActions\(customer\)/);
+  assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"klant_geworden\\"/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"afgehaakt\\"/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
   assert.match(webdesignActionSource, /Mail bekijken/);
+  assert.match(webdesignActionSource, /function renderDaysSinceSent\(customer\)/);
+  assert.match(webdesignActionSource, /\.outreach-days/);
+  assert.match(webdesignActionSource, /params\.set\("folder", replyMessage \? "inbox" : "sent"\);/);
+  assert.match(webdesignActionSource, /params\.set\("select", "first"\);/);
   assert.match(pageSource, /!hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\)/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gebeld" type="button">Gebeld<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gemaild" type="button">Gemaild<\/button>/);
@@ -631,6 +680,46 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /afgehaakt: "Afgehaakt"/);
   assert.match(pageSource, /\.s-interesse \.s-label \{ color: var\(--green\); font-weight: 700; \}/);
   assert.match(pageSource, /\.s-afgehaakt \.s-label \{ color: var\(--red\); font-weight: 700; \}/);
+});
+
+test('premium database outreach days column uses calendar days', () => {
+  const outreachClient = loadDatabaseOutreachClient();
+  const controller = outreachClient.createController({
+    state: { klanten: [] },
+    nodes: {},
+    escapeHtml: (value) => String(value || ''),
+    normalizeSearchValue: (value) => String(value || '').toLowerCase(),
+    normalizeDatabaseStatus: (value) => String(value || ''),
+    formatDisplayDate: (value) => String(value || ''),
+    parseDateValue: (value) => new Date(value).getTime(),
+    normalizeCustomer: (value) => value,
+    persistCustomerList: async () => ({ ok: true }),
+    renderPage: () => {},
+    setStatusMessage: () => {},
+  });
+  const now = new Date();
+  const yesterdayLate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 30, 0).toISOString();
+  const oldSentAt = new Date(Date.now() - (26 * 86400000)).toISOString();
+
+  assert.match(
+    controller.renderDaysSinceSent({
+      id: 'customer-1',
+      campaignType: 'webdesign',
+      outreachStatus: 'benaderd',
+      outreachSentAt: yesterdayLate,
+    }),
+    />1<\/span>/
+  );
+
+  const automated = controller.applyAutomation([{
+    id: 'customer-2',
+    campaignType: 'webdesign',
+    outreachStatus: 'benaderd',
+    outreachSentAt: oldSentAt,
+  }]);
+
+  assert.equal(automated.changed, true);
+  assert.equal(automated.customers[0].outreachStatus, 'geen_gehoor');
 });
 
 test('premium database sync merge updates contact fields and preserves CRM fields', () => {

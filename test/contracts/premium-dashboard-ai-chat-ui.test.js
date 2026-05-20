@@ -7,6 +7,7 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
+  assert.match(pageSource, /id="dashboardAiChat"/);
   assert.match(pageSource, /<span>Ruben Nijhuis<\/span>/);
   assert.match(pageSource, /<strong>Ruben Nijhuis<\/strong>/);
   assert.doesNotMatch(pageSource, /Je Softora-collega voor context, keuzes en overzicht in de software\./);
@@ -45,6 +46,22 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
     pageSource,
     /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.kpi-grid \{[\s\S]*order:\s*3;/s
   );
+});
+
+test('premium dashboard chat blijft beperkt tot het personeel dashboard', () => {
+  const dashboardPath = path.join(__dirname, '../../premium-personeel-dashboard.html');
+  const databasePath = path.join(__dirname, '../../premium-database.html');
+  const themePath = path.join(__dirname, '../../assets/personnel-theme.js');
+  const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
+  const databaseSource = fs.readFileSync(databasePath, 'utf8');
+  const themeSource = fs.readFileSync(themePath, 'utf8');
+
+  assert.match(dashboardSource, /id="dashboardAiChat"/);
+  assert.doesNotMatch(databaseSource, /id="dashboardAiChat"/);
+  assert.match(themeSource, /function enforceDashboardAiChatScope\(\)/);
+  assert.match(themeSource, /#dashboardAiChat, \.dashboard-ai-chat/);
+  assert.match(themeSource, /\/premium-personeel-dashboard/);
+  assert.match(themeSource, /removeChild\(element\)/);
 });
 
 test('premium dashboard verbergt de personeel beheer selector boven de datumfilters', () => {

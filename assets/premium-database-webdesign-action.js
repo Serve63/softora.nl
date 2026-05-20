@@ -376,7 +376,7 @@
             if (!global.document || global.document.getElementById(STYLE_OUTREACH_ID)) return;
             const style = global.document.createElement("style");
             style.id = STYLE_OUTREACH_ID;
-            style.textContent = ".outreach-line{margin-top:4px;color:var(--light);font-size:11px;line-height:1.35;white-space:normal}.outreach-badge{display:inline-flex;align-items:center;width:fit-content;margin-top:6px;padding:3px 8px;border-radius:999px;background:rgba(22,115,60,.1);color:var(--green);font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}.outreach-reply{display:flex;flex-direction:column;gap:3px;color:var(--mid);font-size:12px;line-height:1.35}.outreach-reply strong{color:var(--dark);font-size:12px}.outreach-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.outreach-action{border:1px solid rgba(155,35,85,.18);border-radius:6px;background:rgba(255,255,255,.78);color:var(--crimson);cursor:pointer;font-family:Oswald,sans-serif;font-size:10px;font-weight:700;letter-spacing:.7px;line-height:1;padding:8px 9px;text-transform:uppercase;transition:background .15s ease,border-color .15s ease,color .15s ease}.outreach-action:hover{background:rgba(155,35,85,.08);border-color:rgba(155,35,85,.34)}.outreach-action[data-outreach-status=\"klant_geworden\"]{background:var(--crimson);border-color:var(--crimson);color:#fff}";
+            style.textContent = ".outreach-line{margin-top:4px;color:var(--light);font-size:11px;line-height:1.35;white-space:normal}.outreach-badge{display:inline-flex;align-items:center;width:fit-content;margin-top:6px;padding:3px 8px;border-radius:999px;background:rgba(22,115,60,.1);color:var(--green);font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}.outreach-reply{display:flex;flex-direction:column;gap:3px;color:var(--mid);font-size:12px;line-height:1.35}.outreach-reply strong{color:var(--dark);font-size:12px}.outreach-days{display:inline-flex;align-items:center;justify-content:center;min-width:24px;color:var(--crimson);font-weight:800;line-height:1}.outreach-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.outreach-action{border:1px solid rgba(155,35,85,.18);border-radius:6px;background:rgba(255,255,255,.78);color:var(--crimson);cursor:pointer;font-family:Oswald,sans-serif;font-size:10px;font-weight:700;letter-spacing:.7px;line-height:1;padding:8px 9px;text-transform:uppercase;transition:background .15s ease,border-color .15s ease,color .15s ease}.outreach-action:hover{background:rgba(155,35,85,.08);border-color:rgba(155,35,85,.34)}.outreach-action[data-outreach-status=\"klant_geworden\"]{background:var(--crimson);border-color:var(--crimson);color:#fff}";
             global.document.head.appendChild(style);
         }
 
@@ -518,6 +518,29 @@
             return replyAt ? "<div class=\"outreach-reply\"><strong>Reactie ontvangen</strong><span>" + escapeHtml(formatDisplayDate(replyAt)) + "</span></div>" : "<div class=\"outreach-reply\"><strong>Nog geen reactie</strong><span>25 dagen regel actief</span></div>";
         }
 
+        function getLocalDateSerial(timestamp) {
+            const date = new Date(timestamp);
+            if (!Number.isFinite(date.getTime())) return null;
+            return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+        }
+
+        function getDaysSinceSent(customer) {
+            const sentMs = parseDateValue(getSentAt(customer));
+            if (!sentMs) return null;
+            const sentDay = getLocalDateSerial(sentMs);
+            const today = getLocalDateSerial(Date.now());
+            if (sentDay === null || today === null) return null;
+            return Math.max(0, Math.floor((today - sentDay) / 86400000));
+        }
+
+        function renderDaysSinceSent(customer) {
+            if (!isWebdesignOutreachCustomer(customer)) return "";
+            const days = getDaysSinceSent(customer);
+            if (days === null) return "";
+            const label = days === 1 ? "1 dag geleden" : days + " dagen geleden";
+            return "<span class=\"outreach-days\" title=\"" + escapeHtml(label) + "\">" + escapeHtml(String(days)) + "</span>";
+        }
+
         function renderActions(customer) {
             if (!isWebdesignOutreachCustomer(customer)) return "";
             const id = escapeHtml(customer.id);
@@ -550,12 +573,15 @@
         function openMail(customer) {
             const params = new URLSearchParams();
             const account = normalizeString(customer.replyMailboxAccount || getSentFromEmail(customer));
-            const message = normalizeString(customer.replyMailboxId || customer.replyThreadId || customer.replyMessageId || customer.lastColdmailReplyMessageKey || customer.outreachMessageId || customer.coldmailSentMessageId);
+            const replyMessage = normalizeString(customer.replyMailboxId || customer.replyThreadId || customer.replyMessageId || customer.lastColdmailReplyMessageKey);
+            const sentMessage = normalizeString(customer.outreachMessageId || customer.coldmailSentMessageId);
+            const message = replyMessage || sentMessage;
             if (account) params.set("account", account);
-            params.set("folder", "inbox");
+            params.set("folder", replyMessage ? "inbox" : "sent");
             if (message) params.set("message", message);
             if (customer.email) params.set("email", customer.email);
             params.set("q", customer.email || customer.bedrijf || "");
+            params.set("select", "first");
             global.location.href = "/premium-mailbox?" + params.toString();
         }
 
@@ -578,7 +604,7 @@
         }
 
         ensureOutreachStyles();
-        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, isActionRequired: isActionRequired, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, updateStatus: updateStatus };
+        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, isActionRequired: isActionRequired, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderDaysSinceSent: renderDaysSinceSent, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, updateStatus: updateStatus };
     }
 
     global.SoftoraDatabaseOutreach = {

@@ -34,6 +34,25 @@
     const PREMIUM_BOOT_MIN_VISIBLE_MS = 1000;
     window[sidebarCountCacheKey] = sidebarCountCacheState;
 
+    function isPremiumDashboardPath(path) {
+        const p = String(path || "").toLowerCase().replace(/\/+$/, "");
+        return p === "/premium-personeel-dashboard" || p === "/premium-personeel-dashboard.html";
+    }
+
+    function enforceDashboardAiChatScope() {
+        if (isPremiumDashboardPath(window.location && window.location.pathname)) return;
+        document.querySelectorAll("#dashboardAiChat, .dashboard-ai-chat").forEach(function (element) {
+            if (element && element.parentNode) element.parentNode.removeChild(element);
+        });
+    }
+
+    enforceDashboardAiChatScope();
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", enforceDashboardAiChatScope, { once: true });
+    } else {
+        (typeof requestAnimationFrame === "function" ? requestAnimationFrame : window.setTimeout)(enforceDashboardAiChatScope);
+    }
+
     try {
         if (isPremiumPersonnelContext) {
             const raw = sessionStorage.getItem(PREMIUM_SIDEBAR_SESSION_STORAGE_KEY);

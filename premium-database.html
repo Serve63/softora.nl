@@ -372,6 +372,33 @@
         .sf-btn[data-s="benaderbaar"].act { border-color: var(--green); background: rgba(22,115,60,.1); color: var(--green); }
         .sf-btn[data-s="geengehoor"].act { border-color: rgba(180,90,0,.45); background: rgba(180,90,0,.08); color: var(--orange); }
 
+        .my-mails-toggle {
+            padding: 6px 14px;
+            border: 1px solid rgba(139, 34, 82, 0.22);
+            border-radius: 5px;
+            background: rgba(139, 34, 82, 0.06);
+            color: var(--crimson);
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.2;
+            min-height: 31px;
+            cursor: pointer;
+            transition: border-color .15s ease, background .15s ease, color .15s ease, opacity .15s ease;
+            white-space: nowrap;
+        }
+
+        .my-mails-toggle:hover:not(:disabled),
+        .my-mails-toggle.act {
+            border-color: rgba(139, 34, 82, 0.5);
+            background: rgba(139, 34, 82, 0.14);
+            color: var(--dark);
+        }
+
+        .my-mails-toggle:disabled {
+            opacity: .55;
+            cursor: wait;
+        }
+
         .f-count {
             font-size: 12px;
             color: var(--light);
@@ -481,6 +508,17 @@
             padding-left: 7px;
             padding-right: 7px;
         }
+        thead th:nth-child(10), tbody td:nth-child(10) { width: 5%; text-align: center; }
+        table:not(.outreach-action-mode) thead th:nth-child(10),
+        table:not(.outreach-action-mode) tbody td:nth-child(10) { display: none; }
+        table.outreach-action-mode thead th:nth-child(7),
+        table.outreach-action-mode tbody td:nth-child(7),
+        table.outreach-action-mode thead th:nth-child(9),
+        table.outreach-action-mode tbody td:nth-child(9) { display: none; }
+        table.outreach-action-mode thead th:nth-child(8),
+        table.outreach-action-mode tbody td:nth-child(8) { width: 25%; text-align: center; }
+        table.outreach-action-mode thead th:nth-child(10),
+        table.outreach-action-mode tbody td:nth-child(10) { width: 5%; min-width: 56px; text-align: center; }
 
         thead th:hover {
             color: var(--dark);
@@ -1434,6 +1472,7 @@
                         <div class="status-filter">
                             <button class="sf-btn act" data-s="alle" type="button">Alle</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="reactie_ontvangen" type="button">Reactie ontvangen</button><button class="sf-btn" data-s="afgehaakt" type="button">Afgehaakt</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
+                        <button class="my-mails-toggle" id="myMailsFilterButton" type="button" aria-pressed="false" disabled>Enkel mijn mails tonen</button>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
                                 <strong>€0,00</strong>
@@ -1449,7 +1488,7 @@
 
                     <div class="tbl-wrap">
                         <div class="table-card">
-                            <table>
+                            <table id="databaseTable">
                                 <thead>
                                     <tr>
                                         <th data-sort-key="naam">Bedrijf</th>
@@ -1457,10 +1496,11 @@
                                         <th data-sort-key="email">Mailadres</th>
                                         <th data-sort-key="tel">Telefoonnummer</th>
                                         <th data-sort-key="dom">Website</th>
-                                        <th>Gebruikte kanalen</th>
-                                        <th data-sort-key="status">Status</th>
-                                        <th data-sort-key="updatedAt">Laatste actie</th>
-                                        <th>Foto <span id="photoHeaderCount">(0)</span></th>
+                                        <th>Kanaal</th>
+                                        <th data-sort-key="status" id="statusHeader">Status</th>
+                                        <th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie</th>
+                                        <th id="photoHeader">Foto <span id="photoHeaderCount">(0)</span></th>
+                                        <th id="daysHeader" hidden>Dagen</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody"></tbody>
@@ -1585,7 +1625,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260505a"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260520b"></script>
     <script src="assets/premium-database-import.js?v=20260427c"></script>
     <script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260505a"></script>
@@ -1629,6 +1669,8 @@
             klanten: [],
             orders: [],
             query: "",
+            onlyMyMails: false,
+            authenticatedEmail: "",
             activeStatus: "alle",
             sortKey: "manual",
             sortAsc: true,
@@ -1652,6 +1694,7 @@
             addActions: document.getElementById("addActions"),
             addActionsMenu: document.getElementById("addActionsMenu"),
             addButton: document.getElementById("addButton"),
+            myMailsFilterButton: document.getElementById("myMailsFilterButton"),
             photoCostLabel: document.getElementById("photoCostLabel"),
             generatePhotosButton: document.getElementById("generatePhotosButton"),
             deepSearchButton: document.getElementById("deepSearchButton"),
@@ -2282,6 +2325,48 @@
             }, 2200);
         }
 
+        function normalizeEmailAddress(value) {
+            return normalizeString(value).toLowerCase();
+        }
+
+        function updateMyMailsFilterButton() {
+            if (!nodes.myMailsFilterButton) return;
+            const hasEmail = Boolean(state.authenticatedEmail);
+            nodes.myMailsFilterButton.disabled = !hasEmail;
+            nodes.myMailsFilterButton.classList.toggle("act", Boolean(state.onlyMyMails));
+            nodes.myMailsFilterButton.setAttribute("aria-pressed", state.onlyMyMails ? "true" : "false");
+            nodes.myMailsFilterButton.title = hasEmail
+                ? "Toon alleen bedrijven die vanaf " + state.authenticatedEmail + " zijn gemaild"
+                : "Je ingelogde mailadres wordt geladen";
+        }
+
+        function customerWasSentFromAuthenticatedEmail(customer) {
+            if (!state.authenticatedEmail) return false;
+            const senderEmail = normalizeEmailAddress(outreachController.getSentFromEmail(customer));
+            return Boolean(senderEmail && senderEmail === state.authenticatedEmail);
+        }
+
+        async function hydrateDatabaseAuthSession() {
+            try {
+                const response = await fetch("/api/auth/session", {
+                    credentials: "same-origin",
+                    cache: "no-store",
+                    headers: { Accept: "application/json" }
+                });
+                const session = await response.json().catch(function () {
+                    return {};
+                });
+                state.authenticatedEmail = response.ok && session && session.authenticated
+                    ? normalizeEmailAddress(session.email)
+                    : "";
+            } catch (error) {
+                state.authenticatedEmail = "";
+            }
+            if (!state.authenticatedEmail) state.onlyMyMails = false;
+            updateMyMailsFilterButton();
+            renderPage();
+        }
+
         function getFilteredCustomers() {
             const query = normalizeSearchValue(state.query);
             return state.klanten.filter(function (customer) {
@@ -2292,6 +2377,7 @@
                 } else if (state.activeStatus !== "alle" && customer.status !== state.activeStatus) {
                     return false;
                 }
+                if (state.onlyMyMails && !customerWasSentFromAuthenticatedEmail(customer)) return false;
                 if (!query) return true;
 
                 const haystack = [
@@ -2435,13 +2521,25 @@
 
         function renderTable() {
             const filtered = getSortedCustomers(getFilteredCustomers());
+            const showOutreachActionColumn = state.activeStatus === "benaderd";
+            const showPhotoColumn = !showOutreachActionColumn;
+            const databaseTable = document.getElementById("databaseTable");
+            const statusHeader = document.getElementById("statusHeader");
+            const latestActionHeader = document.getElementById("latestActionHeader");
+            const photoHeader = document.getElementById("photoHeader");
+            const daysHeader = document.getElementById("daysHeader");
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
-            renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return shouldShowWebsitePhoto(customer) && isValidWebsitePhotoDataUrl(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
+            if (databaseTable) databaseTable.classList.toggle("outreach-action-mode", showOutreachActionColumn);
+            if (statusHeader) statusHeader.hidden = showOutreachActionColumn;
+            if (latestActionHeader) latestActionHeader.textContent = showOutreachActionColumn ? "Acties" : "Laatste actie";
+            if (photoHeader) photoHeader.hidden = !showPhotoColumn;
+            if (daysHeader) daysHeader.hidden = !showOutreachActionColumn;
+            renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return showPhotoColumn && shouldShowWebsitePhoto(customer) && isValidWebsitePhotoDataUrl(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
 
             if (!filtered.length) {
-                nodes.tbody.innerHTML = "<tr><td colspan=\"9\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
+                nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 return;
             }
 
@@ -2461,10 +2559,11 @@
                         "<td class=\"c-mid\">" + websiteHtml + "</td>",
                         "<td><div class=\"kanalen\">",
                             renderUsedChannelTags(customer),
-                        "</div>" + outreachController.renderActions(customer) + "</td>",
+                        "</div></td>",
                         "<td><div class=\"s-wrap s-" + escapeHtml(customer.status) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(statusLabel) + "</div></div></td>",
-                        "<td class=\"c-light\">" + (outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderReplyInfo(customer) : escapeHtml(formatDisplayDate(customer.updatedAt))) + "</td>",
-                        "<td>" + renderWebsitePhotoDrop(customer) + "</td>",
+                        "<td class=\"c-light\">" + (showOutreachActionColumn && outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderActions(customer) : (outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderReplyInfo(customer) : escapeHtml(formatDisplayDate(customer.updatedAt)))) + "</td>",
+                        "<td>" + (showPhotoColumn ? renderWebsitePhotoDrop(customer) : "") + "</td>",
+                        "<td class=\"c-light days-cell\">" + (showOutreachActionColumn ? outreachController.renderDaysSinceSent(customer) : "") + "</td>",
                     "</tr>"
                 ].join("");
             }).join("");
@@ -3259,7 +3358,8 @@
 
         const initialBootstrapCustomers = resolveBootstrapCustomers();
         if (initialBootstrapCustomers.length) state.klanten = outreachController.applyAutomation(initialBootstrapCustomers).customers;
-        applyDatabaseUrlIntent(); renderPage();
+        applyDatabaseUrlIntent(); renderPage(); updateMyMailsFilterButton();
+        void hydrateDatabaseAuthSession();
 
         const databaseImportController = window.SoftoraDatabaseImport.createController({
             input: nodes.importFileInput,
@@ -3299,6 +3399,15 @@
                 setStatus(button.dataset.s || "alle", button);
             });
         });
+
+        if (nodes.myMailsFilterButton) {
+            nodes.myMailsFilterButton.addEventListener("click", function () {
+                if (!state.authenticatedEmail) return;
+                state.onlyMyMails = !state.onlyMyMails;
+                updateMyMailsFilterButton();
+                renderPage();
+            });
+        }
 
         nodes.sortButtons.forEach(function (button) {
             button.addEventListener("click", function () {
