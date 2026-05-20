@@ -6,6 +6,8 @@
   const SUPABASE_COST_SUMMARY_ENDPOINT = '/api/supabase/cost-summary';
   const POLL_INTERVAL_MS = 15000;
   const BILLING_POLL_INTERVAL_MS = 5 * 60 * 1000;
+  const BILLING_RETRY_INTERVAL_MS = 10000;
+  const BILLING_RETRY_MAX_ATTEMPTS = 18;
   const COLDCALLING_COST_NOTE = 'Retell AI kosten deze maand';
   const COLDCALLING_PARTIAL_NOTE = 'Retell AI deels exact, deels geschat';
   const API_COST_NOTE = 'OpenAI API kosten deze maand live';
@@ -23,6 +25,8 @@
   let supabaseCostRefreshPromise = null;
   let pollTimer = null;
   let billingPollTimer = null;
+  let apiCostRetryTimer = null;
+  let apiCostRetryAttempts = 0;
   let syncListenersBound = false;
 
   function normalizeString(value) {
@@ -467,6 +471,32 @@
     return API_COST_UNAVAILABLE_NOTE;
   }
 
+  function isRetryableApiCostError(error) {
+    const payload = error && error.payload && typeof error.payload === 'object' ? error.payload : {};
+    const statusCode = Number(error && error.status);
+    if (isPremiumAuthCostError(statusCode, payload)) return false;
+    return true;
+  }
+
+  function clearApiCostRetry() {
+    if (apiCostRetryTimer) {
+      window.clearTimeout(apiCostRetryTimer);
+      apiCostRetryTimer = null;
+    }
+    apiCostRetryAttempts = 0;
+  }
+
+  function scheduleApiCostRetry(error) {
+    if (!isRetryableApiCostError(error)) return;
+    if (apiCostRetryTimer || apiCostRetryAttempts >= BILLING_RETRY_MAX_ATTEMPTS) return;
+
+    apiCostRetryAttempts += 1;
+    apiCostRetryTimer = window.setTimeout(function () {
+      apiCostRetryTimer = null;
+      void refreshMonthlyApiCosts();
+    }, BILLING_RETRY_INTERVAL_MS);
+  }
+
   function applyApiCostUnavailable(error) {
     const item = resolveApiCostItem();
     const render = getMonthlyCostsRender();
@@ -583,6 +613,7 @@
       try {
         const summary = await fetchApiCostSummary();
         const normalized = normalizeOpenAiCostPayload(summary);
+        clearApiCostRetry();
         return {
           ok: true,
           updated: applyApiCostSnapshot(summary),
@@ -592,6 +623,7 @@
         };
       } catch (error) {
         applyApiCostUnavailable(error);
+        scheduleApiCostRetry(error);
         return {
           ok: false,
           error: normalizeString(error && error.message) || 'API-kosten konden niet geladen worden.',
