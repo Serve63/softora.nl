@@ -44,9 +44,9 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /\.sheet\{width:100%;max-width:430px;background:linear-gradient\(180deg,#fff 0%,#fbf6f9 100%\);/);
   assert.match(pageSource, /\.sheet-title\{font-family:'Oswald',sans-serif;/);
   assert.match(pageSource, /\.form-input:focus,\.form-textarea:focus\{border-color:var\(--purple-dim\);/);
-  assert.match(pageSource, /class="planner-choice selected" type="button" data-who="serve">Servé/);
+  assert.match(pageSource, /class="planner-choice" type="button" data-who="serve">Servé/);
   assert.match(pageSource, /class="planner-choice" type="button" data-who="martijn">Martijn/);
-  assert.match(pageSource, /class="planner-choice" type="button" data-who="both">Allebei/);
+  assert.match(pageSource, /class="planner-choice selected" type="button" data-who="both">Allebei/);
   assert.match(pageSource, /placeholder="Titel van de afspraak"/);
   assert.match(pageSource, /placeholder="--:--"/);
   assert.match(pageSource, /id="repeat-row"/);
@@ -58,7 +58,10 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /id="agendaAppWho"/);
   assert.match(pageSource, /<option value="serve">Servé<\/option>/);
   assert.match(pageSource, /<option value="martijn">Martijn<\/option>/);
-  assert.match(pageSource, /<option value="both">Allebei<\/option>/);
+  assert.match(pageSource, /<option value="both" selected>Allebei<\/option>/);
+  assert.match(pageSource, /\/api\/auth\/session/);
+  assert.match(pageSource, /function resolveAgendaAppWhoFromSession/);
+  assert.match(pageSource, /function hydrateAgendaAppWhoDefault/);
   assert.match(pageSource, /actor: 'agendaapp'/);
   assert.match(pageSource, /legendChoice:appointmentType==='business'\?businessMeetingType:'manual-overig'/);
   assert.match(pageSource, /businessMeetingType='website'/);
@@ -66,7 +69,9 @@ test('agenda app page is available as pretty page and uses shared agenda endpoin
   assert.match(pageSource, /recurrence:repeatChoice/);
   assert.match(pageSource, /quarterly:'Per kwartaal'/);
   assert.match(pageSource, /Herhalen: \$\{repeatText\}/);
-  assert.match(pageSource, /selectedWho='serve'/);
+  assert.match(pageSource, /selectedWho='both'/);
+  assert.match(pageSource, /agendaAppPreferredWho='both'/);
+  assert.match(pageSource, /function setPlannerWho\(who\)/);
   assert.match(pageSource, /who:selectedWho/);
   assert.match(pageSource, /renderMobileAgendaApp/);
   assert.match(pageSource, /const appShellTemplate = document\.createElement\('template'\);/);

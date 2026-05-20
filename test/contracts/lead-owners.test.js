@@ -131,3 +131,23 @@ test('lead owner service preserves explicit owner values and supports lookup wit
   assert.equal(explicit.leadOwnerEmail, 'serve@softora.nl');
   assert.equal(missing, null);
 });
+
+test('lead owner service does not coerce unknown explicit owners to Serve', () => {
+  const { service, persistReasons } = createFixture();
+
+  const explicitUnknown = service.buildLeadOwnerFields('call-unknown', {
+    key: 'team',
+    displayName: 'Team Softora',
+    fullName: 'Team Softora',
+    email: 'team@softora.nl',
+  });
+
+  assert.deepEqual(explicitUnknown, {
+    leadOwnerKey: '',
+    leadOwnerName: '',
+    leadOwnerFullName: '',
+    leadOwnerUserId: '',
+    leadOwnerEmail: '',
+  });
+  assert.deepEqual(persistReasons, []);
+});

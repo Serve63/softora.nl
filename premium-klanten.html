@@ -1126,14 +1126,9 @@
                         <div class="leaderboard-card" id="leaderboardCard">
                             <div class="leaderboard-copy">
                                 <div class="leaderboard-list" id="leaderboardList">
-                                    <div class="leaderboard-entry is-leading">
-                                        <span class="leaderboard-entry-name">Servé</span>
-                                        <span class="leaderboard-entry-count">0 opdrachten</span>
-                                    </div>
-                                    <div class="leaderboard-entry">
-                                        <span class="leaderboard-entry-name">Martijn</span>
-                                        <span class="leaderboard-entry-count">0 opdrachten</span>
-                                    </div>
+                                    <div class="leaderboard-entry is-leading"><span class="leaderboard-entry-name">Team</span><span class="leaderboard-entry-count">0 opdrachten</span></div>
+                                    <div class="leaderboard-entry"><span class="leaderboard-entry-name">Servé</span><span class="leaderboard-entry-count">0 opdrachten</span></div>
+                                    <div class="leaderboard-entry"><span class="leaderboard-entry-name">Martijn</span><span class="leaderboard-entry-count">0 opdrachten</span></div>
                                 </div>
                             </div>
                         </div>
@@ -1271,7 +1266,8 @@
                     <div class="form-group">
                         <label class="form-label" for="fieldResponsible">Toegewezen aan</label>
                         <select class="form-select" id="fieldResponsible" name="verantwoordelijk" required data-custom-select="true">
-                            <option value="Serve" selected>Servé</option>
+                            <option value="Team" selected>Team</option>
+                            <option value="Serve">Servé</option>
                             <option value="Martijn">Martijn</option>
                         </select>
                     </div>
@@ -1898,13 +1894,14 @@
 
             const counts = state.klanten.reduce(function (result, customer) {
                 const responsible = normalizeResponsibleValue(customer && customer.verantwoordelijk);
-                if (responsible === "Serve" || responsible === "Martijn") {
+                if (responsible === "Team" || responsible === "Serve" || responsible === "Martijn") {
                     result[responsible] = (result[responsible] || 0) + 1;
                 }
                 return result;
-            }, { Serve: 0, Martijn: 0 });
+            }, { Team: 0, Serve: 0, Martijn: 0 });
 
             const entries = [
+                { name: "Team", displayName: formatResponsibleDisplayName("Team"), count: Number(counts.Team || 0) },
                 { name: "Serve", displayName: formatResponsibleDisplayName("Serve"), count: Number(counts.Serve || 0) },
                 { name: "Martijn", displayName: formatResponsibleDisplayName("Martijn"), count: Number(counts.Martijn || 0) }
             ].sort(function (a, b) {
@@ -1953,7 +1950,7 @@
             nodes.fieldStatus.value = "Betaald";
             if (nodes.fieldActive) nodes.fieldActive.value = "Ja";
             if (nodes.fieldReview) nodes.fieldReview.value = "Nee";
-            if (nodes.fieldResponsible) nodes.fieldResponsible.value = "Serve";
+            if (nodes.fieldResponsible) nodes.fieldResponsible.value = "Team";
             nodes.fieldDate.value = "";
             if (nodes.fieldWebsiteAmount) nodes.fieldWebsiteAmount.value = "";
             if (nodes.fieldMaintenanceEnabled) nodes.fieldMaintenanceEnabled.value = "Nee";
@@ -1997,7 +1994,7 @@
                 nodes.fieldStatus.value = customer.status;
                 if (nodes.fieldActive) nodes.fieldActive.value = customer.actief || "Ja";
                 if (nodes.fieldReview) nodes.fieldReview.value = customer.review || "Nee";
-                if (nodes.fieldResponsible) nodes.fieldResponsible.value = customer.verantwoordelijk || "Serve";
+                if (nodes.fieldResponsible) nodes.fieldResponsible.value = customer.verantwoordelijk || "Team";
                 nodes.fieldDate.value = customer.datum || "";
                 updateAmountFieldVisibility();
             } else {
@@ -2086,7 +2083,7 @@
                 status: nodes.fieldStatus.value,
                 actief: nodes.fieldActive ? nodes.fieldActive.value : "Ja",
                 review: nodes.fieldReview ? nodes.fieldReview.value : "Nee",
-                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : "Serve",
+                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : "Team",
                 datum: nodes.fieldDate.value
             });
         }

@@ -38,6 +38,13 @@ function normalizeManualLegendChoice(body, normalizeString) {
   return raw ? '' : 'manual-serve';
 }
 
+function getDefaultManualLegendChoiceForPlanner(whoKey) {
+  if (whoKey === 'martijn') return 'manual-martijn';
+  if (whoKey === 'both') return 'manual-both';
+  if (whoKey === 'overig') return 'manual-overig';
+  return 'manual-serve';
+}
+
 function isManualAppointmentRecord(appointment, normalizeString) {
   if (!appointment || typeof appointment !== 'object') return false;
   const callId = normalizeString(appointment.callId || '').toLowerCase();
@@ -217,7 +224,10 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       activity = 'Gehele dag niet beschikbaar';
       phone = '';
       notes = '';
-      legendChoice = normalizeManualLegendChoice(body, normalizeString) || 'manual-serve';
+      const requestedLegendChoice = normalizeString(body?.legendChoice || body?.manualLegendChoice || '');
+      legendChoice = requestedLegendChoice
+        ? normalizeManualLegendChoice(body, normalizeString)
+        : getDefaultManualLegendChoiceForPlanner(whoKey);
     } else {
       appointmentTime = normalizeTimeHhMm(body.time || '');
       activityTime = normalizeTimeHhMm(body.activityTime || body.activity_time || body.time || '');
@@ -310,7 +320,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       providerLabel: 'Handmatig',
       coldcallingStack: 'manual',
       manualPlannerWho:
-        whoKey || 'serve',
+        whoKey || 'both',
       appointmentKind,
       manualLegendChoice: legendChoice,
       manualActivityTime: activityTime,

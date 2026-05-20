@@ -295,6 +295,27 @@ test('agenda manual business appointment stores as customer appointment without 
   assert.match(res.body.appointment.summary, /Legenda: manual-both/);
 });
 
+test('agenda all-day unavailable defaults legend to the selected planner instead of Serve', async () => {
+  const { coordinator } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        who: 'both',
+        allDayUnavailable: true,
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.appointment.manualPlannerWho, 'both');
+  assert.equal(res.body.appointment.manualLegendChoice, 'manual-both');
+});
+
 test('agenda manual appointment does not block on initial shared-state hydration', async () => {
   let hydrateCalls = 0;
   let syncCalls = 0;

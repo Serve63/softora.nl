@@ -141,7 +141,7 @@ function createGoogleCalendarSyncService(deps = {}) {
     const raw = normalizeString(value).toLowerCase();
     if (raw === 'martijn') return 'martijn';
     if (raw === 'serve' || raw === 'servé') return 'serve';
-    return 'serve';
+    return '';
   }
 
   function mapGoogleEventToAppointment(event, owner, calendarId) {
@@ -275,6 +275,7 @@ function createGoogleCalendarSyncService(deps = {}) {
       return { ok: true, skipped: true, reason: 'calendar_owner_is_both', owner: 'both' };
     }
     const owner = resolveOwner(appointment.manualPlannerWho || appointment.googleCalendarOwner || '');
+    if (!owner) return { ok: true, skipped: true, reason: 'calendar_owner_missing', owner: '' };
     const calendarId = calendarByOwner[owner];
     if (!calendarId) return { ok: false, skipped: true, reason: 'calendar_missing_for_owner', owner };
     if (normalizeString(appointment.googleCalendarEventId || '')) {

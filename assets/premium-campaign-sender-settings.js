@@ -10,6 +10,7 @@
     "serve@softora.nl": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServe Creusen\nSoftora.nl | +31 6 43 26 27 92",
     "martijn@softora.nl": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\nSoftora.nl",
   };
+  const AUTHENTICATED_SENDER_EMAILS = Object.freeze(["serve@softora.nl", "martijn@softora.nl"]);
 
   function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -89,6 +90,50 @@
   function getSelectValue(id) {
     const field = getUiField(id);
     return field ? field.value : "";
+  }
+
+  function normalizeIdentityText(value) {
+    return normalizeEmail(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9@.]+/g, " ");
+  }
+
+  function getAvailableSenderEmails() {
+    const select = getUiField("campaignSenderEmail");
+    const emails = Array.from(select?.options || [])
+      .map((option) => normalizeEmail(option.value))
+      .filter(Boolean);
+    return emails.length ? emails : AUTHENTICATED_SENDER_EMAILS.slice();
+  }
+
+  function resolveAuthenticatedSenderEmail(session, availableEmails) {
+    const allowed = new Set((Array.isArray(availableEmails) ? availableEmails : []).map(normalizeEmail).filter(Boolean));
+    const email = normalizeEmail(session && session.email);
+    if (allowed.has(email)) return email;
+    const identityText = [
+      session && session.email,
+      session && session.displayName,
+      session && session.firstName,
+      session && session.lastName,
+    ].map(normalizeIdentityText).filter(Boolean).join(" ");
+    if (identityText.includes("martijn") && allowed.has("martijn@softora.nl")) return "martijn@softora.nl";
+    if ((identityText.includes("serve") || identityText.includes("servec") || identityText.includes("creusen")) && allowed.has("serve@softora.nl")) return "serve@softora.nl";
+    return "";
+  }
+
+  async function fetchAuthenticatedPreferredSenderEmail() {
+    try {
+      const response = await fetch("/api/auth/session", {
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      const session = await response.json().catch(() => null);
+      return resolveAuthenticatedSenderEmail(session, getAvailableSenderEmails());
+    } catch (_) {
+      return "";
+    }
   }
 
   function setSelectValue(select, value, syncCustomSelect) {
@@ -180,6 +225,7 @@
       defaults: null,
       initialized: false,
       needsMigrationPersist: false,
+      authenticatedPreferredSenderEmail: "",
     };
 
     function getScope() {
@@ -188,6 +234,10 @@
 
     function getKey() {
       return typeof config.getKey === "function" ? config.getKey() : DEFAULT_KEY;
+    }
+
+    function getPreferredSenderEmail() {
+      return normalizeEmail(typeof config.getPreferredSenderEmail === "function" ? config.getPreferredSenderEmail() : "") || state.authenticatedPreferredSenderEmail;
     }
 
     function readDocumentDefaults() {
@@ -251,7 +301,7 @@
       const rawSettings = settings && typeof settings === "object" ? settings : {};
       state.settings = normalizeSettings(settings || {}, config);
       const senderSelect = getUiField("campaignSenderEmail");
-      const preferredSender = state.settings.senderEmail || (senderSelect ? senderSelect.value : "");
+      const preferredSender = getPreferredSenderEmail() || state.settings.senderEmail || (senderSelect ? senderSelect.value : "");
       if (senderSelect && preferredSender) setSelectValue(senderSelect, preferredSender, global.syncCustomSelect);
       const activeSender = getCurrentSenderEmail();
       state.activeSenderEmail = activeSender;
@@ -298,6 +348,7 @@
       const data = await fetchUiState(getScope());
       state.loadedValues = data && data.values && typeof data.values === "object" ? data.values : {};
       const rawSettings = safeJsonParse(state.loadedValues[getKey()] || "{}", {});
+      state.authenticatedPreferredSenderEmail = await fetchAuthenticatedPreferredSenderEmail();
       applySettings(rawSettings);
       if (state.needsMigrationPersist) {
         state.needsMigrationPersist = false;

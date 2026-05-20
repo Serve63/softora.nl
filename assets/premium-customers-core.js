@@ -51,16 +51,25 @@
             .trim();
         if (normalized.includes("martijn")) return "Martijn";
         if (normalized.includes("serve")) return "Serve";
+        if (
+            normalized.includes("team")
+            || normalized.includes("softora")
+            || normalized.includes("algemeen")
+            || normalized.includes("beide")
+            || normalized.includes("allebei")
+        ) return "Team";
         return "";
     }
 
     function normalizeResponsibleValue(value) {
-        return parseResponsibleValue(value) || "Serve";
+        return parseResponsibleValue(value) || "Team";
     }
 
     function formatResponsibleDisplayName(value) {
         const normalized = parseResponsibleValue(value);
-        return normalized === "Martijn" ? "Martijn" : "Serv\u00e9";
+        if (normalized === "Martijn") return "Martijn";
+        if (normalized === "Serve") return "Serv\u00e9";
+        return "Team";
     }
 
     function getResponsibleSourceValue(raw) {

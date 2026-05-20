@@ -1275,6 +1275,71 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
   assert.equal(Object.keys(getReplyState().processed).length, 1);
 });
 
+test('coldmail auto-reply uses the mailbox owner identity for Martijn replies', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-martijn@example.test>',
+    subject: 'Re: Nieuwe website',
+    text: 'Hoi Martijn, klinkt interessant. Kun je meer sturen?',
+    from: { value: [{ address: 'ruben@example.test', name: 'Ruben' }] },
+    to: { value: [{ address: 'martijn@softora.nl', name: 'Martijn van de Ven' }] },
+    cc: { value: [] },
+    references: '<sent-martijn@softora>',
+  };
+  let requestPayload = null;
+  const { service, sentMessages } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'martijn@softora.nl',
+    imapPass: 'secret',
+    openAiApiKey: 'openai-secret',
+    coldmailAutoReplyEnabled: true,
+    rows: [
+      {
+        id: 'prospect-martijn',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        lastColdmailSentAt: '2026-04-24T10:00:00.000Z',
+        lastColdmailSenderEmail: 'martijn@softora.nl',
+        mail: true,
+      },
+    ],
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [1],
+      fetch: async function* () {
+        yield { uid: 1, source: 'raw-message', flags: new Set() };
+      },
+      messageFlagsAdd: async () => {},
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async (_url, request) => {
+      requestPayload = JSON.parse(request.body);
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          model: requestPayload.model,
+          choices: [{ message: { content: 'Hoi, ik stuur je graag wat meer informatie.' } }],
+          usage: { input_tokens: 10, output_tokens: 12 },
+        },
+      };
+    },
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+  const userPayload = JSON.parse(requestPayload.messages[1].content);
+
+  assert.equal(result.replied, 1);
+  assert.match(requestPayload.messages[0].content, /Je bent Martijn van de Ven van Softora/);
+  assert.equal(userPayload.sender.name, 'Martijn van de Ven');
+  assert.equal(userPayload.sender.email, 'martijn@softora.nl');
+  assert.equal(sentMessages[0].from, 'Martijn van de Ven <martijn@softora.nl>');
+});
+
 test('coldmail auto-reply marks positive inbound replies as interested in the database', async () => {
   const parsedInbound = {
     messageId: '<incoming-interest@example.test>',
