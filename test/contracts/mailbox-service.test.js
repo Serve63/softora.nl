@@ -529,6 +529,50 @@ test('mailbox service can fetch a single full message by uid for the reader', as
   assert.equal(res.body.messages[0].body, 'Dit is de volledige mail.');
 });
 
+test('mailbox service never returns a different message for a requested uid', async () => {
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async () => ({ release() {} }),
+      fetch: async function* () {
+        yield {
+          uid: 99,
+          flags: [],
+          internalDate: new Date('2026-05-20T10:00:00Z'),
+          source: {
+            date: new Date('2026-05-20T10:00:00Z'),
+            from: { value: [{ name: 'Tester', address: 'tester@example.nl' }] },
+            to: { value: [{ address: 'serve@softora.nl' }] },
+            subject: 'Verkeerde testmail',
+            text: 'Deze mail mag niet getoond worden voor uid 42.',
+          },
+        };
+      },
+      logout: async () => {},
+    }),
+    parseMailSource: async (source) => source,
+  });
+  const res = createResponseRecorder();
+
+  await service.listMessagesResponse(
+    { query: { account: 'serve@softora.nl', folder: 'inbox', uid: '42', limit: '1' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.messages, []);
+});
+
 test('mailbox service marks an opened message as seen in IMAP', async () => {
   let openedMailbox = '';
   let markedRange = null;

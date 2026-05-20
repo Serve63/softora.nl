@@ -746,10 +746,15 @@ function createMailboxService(deps = {}) {
         const visibleMessages = requestedFolder === 'starred' || requestedFolder === 'important'
           ? messages.filter((item) => item.starred)
           : messages;
+        const scopedMessages = requestedUid > 0
+          ? visibleMessages.filter((item) => Number(item.uid) === requestedUid)
+          : visibleMessages;
         const safeLimit = Math.max(1, Math.min(100, Number(limit) || 50));
-        const sortedMessages = visibleMessages
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-          .slice(0, safeLimit);
+        const sortedMessages = requestedUid > 0
+          ? scopedMessages.slice(0, 1)
+          : scopedMessages
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .slice(0, safeLimit);
         if (cacheKey) setSummaryCache(cacheKey, sortedMessages);
         return sortedMessages;
       } finally {

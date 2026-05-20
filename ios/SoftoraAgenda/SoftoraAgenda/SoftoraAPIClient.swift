@@ -78,7 +78,7 @@ struct SoftoraAPIClient {
         let encodedAccount = queryEncoded(account)
         let encodedFolder = queryEncoded(folder)
         let response: MailboxMessagesResponse = try await get(
-            "/api/mailbox/messages?account=\(encodedAccount)&folder=\(encodedFolder)&uid=\(uid)&limit=1"
+            "/api/mailbox/messages?account=\(encodedAccount)&folder=\(encodedFolder)&uid=\(uid)&limit=1&summary=0&fresh=1"
         )
         guard response.ok, let message = response.messages.first else {
             throw SoftoraAPIError.server(response.detail ?? response.error ?? "Mail laden mislukt.")

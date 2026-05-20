@@ -944,6 +944,7 @@ private struct MailboxView: View {
     @State private var selectedFolder: MailboxFolder = .inbox
     @State private var messages: [MailboxMessage] = []
     @State private var selectedMessage: MailboxMessage?
+    @State private var selectedMessageKey: String?
     @State private var isShowingFolderMenu = false
     @State private var isShowingAccountMenu = false
     @State private var isLoadingAccounts = false
@@ -1037,8 +1038,7 @@ private struct MailboxView: View {
                                 isShowingAccountMenu = false
                                 isShowingFolderMenu = true
                             } else {
-                                selectedMessage = nil
-                                isLoadingMessageDetail = false
+                                clearSelectedMessage()
                             }
                         }
                     } label: {
@@ -1209,43 +1209,64 @@ private struct MailboxView: View {
     }
 
     private func openMessage(_ message: MailboxMessage) {
+        guard let account = selectedAccount else { return }
+        let selectionKey = messageKey(accountEmail: account.email, message: message)
         selectedMessage = message
+        selectedMessageKey = selectionKey
         if message.unread {
-            markMessageLocallyRead(message)
+            markMessageLocallyRead(message, selectionKey: selectionKey)
         }
         Task {
             if message.unread {
-                await markMessageReadOnServer(message)
+                await markMessageReadOnServer(message, accountEmail: account.email, selectionKey: selectionKey)
             }
-            await loadMessageDetail(for: message)
+            await loadMessageDetail(for: message, accountEmail: account.email, selectionKey: selectionKey)
         }
     }
 
-    private func markMessageReadOnServer(_ message: MailboxMessage) async {
-        guard let account = selectedAccount, message.uid > 0 else { return }
+    private func markMessageReadOnServer(
+        _ message: MailboxMessage,
+        accountEmail: String,
+        selectionKey: String
+    ) async {
+        guard message.uid > 0 else { return }
 
         do {
             try await apiClient.markMailboxMessageRead(
-                account: account.email,
+                account: accountEmail,
                 folder: message.folder,
                 uid: message.uid
             )
         } catch {
             guard !error.isMailboxCancellation else { return }
-            if selectedMessage?.id == message.id {
+            if selectedMessageKey == selectionKey {
                 mailboxStatusMessage = "Gelezen-status kon niet worden opgeslagen."
             }
         }
     }
 
-    private func markMessageLocallyRead(_ message: MailboxMessage) {
+    private func markMessageLocallyRead(_ message: MailboxMessage, selectionKey: String) {
         let readMessage = readVersion(of: message)
-        if selectedMessage?.id == message.id {
+        if selectedMessageKey == selectionKey {
             selectedMessage = readMessage
         }
-        if let index = messages.firstIndex(where: { $0.id == message.id }) {
+        if let index = messages.firstIndex(where: { isSameMailboxMessage($0, as: message) }) {
             messages[index] = readMessage
         }
+    }
+
+    private func clearSelectedMessage() {
+        selectedMessage = nil
+        selectedMessageKey = nil
+        isLoadingMessageDetail = false
+    }
+
+    private func messageKey(accountEmail: String, message: MailboxMessage) -> String {
+        "\(accountEmail.lowercased())|\(message.folder.lowercased())|\(message.uid)"
+    }
+
+    private func isSameMailboxMessage(_ left: MailboxMessage, as right: MailboxMessage) -> Bool {
+        left.uid == right.uid && left.folder.caseInsensitiveCompare(right.folder) == .orderedSame
     }
 
     private func readVersion(of message: MailboxMessage) -> MailboxMessage {
@@ -1306,63 +1327,96 @@ private struct MailboxView: View {
     private func loadMessages(fresh: Bool = false) async {
         guard let account = selectedAccount else {
             messages = []
-            selectedMessage = nil
-            isLoadingMessageDetail = false
+            clearSelectedMessage()
             return
         }
         guard account.imapConfigured else {
             messages = []
-            selectedMessage = nil
-            isLoadingMessageDetail = false
+            clearSelectedMessage()
             return
         }
 
+        let requestAccountEmail = account.email
+        let requestFolder = selectedFolder
         isLoadingMessages = true
         alertMessage = nil
         mailboxStatusMessage = nil
         defer { isLoadingMessages = false }
 
         do {
-            messages = try await apiClient.fetchMailboxMessages(
-                account: account.email,
-                folder: selectedFolder.apiValue,
+            let loadedMessages = try await apiClient.fetchMailboxMessages(
+                account: requestAccountEmail,
+                folder: requestFolder.apiValue,
                 limit: 25,
                 summaryOnly: true,
                 fresh: fresh
             )
-            selectedMessage = nil
-            isLoadingMessageDetail = false
+            guard selectedAccount?.email == requestAccountEmail && selectedFolder == requestFolder else { return }
+            messages = loadedMessages
+            if selectedMessage == nil {
+                isLoadingMessageDetail = false
+            }
         } catch {
             guard !error.isMailboxCancellation else { return }
             mailboxStatusMessage = error.mailboxDisplayMessage
         }
     }
 
-    private func loadMessageDetail(for message: MailboxMessage) async {
-        guard let account = selectedAccount, message.uid > 0 else { return }
+    private func loadMessageDetail(
+        for message: MailboxMessage,
+        accountEmail: String,
+        selectionKey: String
+    ) async {
+        guard message.uid > 0 else { return }
         isLoadingMessageDetail = true
         mailboxStatusMessage = nil
         defer {
-            if selectedMessage?.id == message.id {
+            if selectedMessageKey == selectionKey {
                 isLoadingMessageDetail = false
             }
         }
 
         do {
             let loadedMessage = try await apiClient.fetchMailboxMessageDetail(
-                account: account.email,
+                account: accountEmail,
                 folder: message.folder,
                 uid: message.uid
             )
-            if selectedMessage?.id == message.id {
+            guard selectedMessageKey == selectionKey else { return }
+            if isSameMailboxMessage(loadedMessage, as: message) {
                 selectedMessage = loadedMessage
+            } else if let fallbackMessage = try await matchingMessageDetailFallback(
+                for: message,
+                accountEmail: accountEmail,
+                selectionKey: selectionKey
+            ) {
+                selectedMessage = fallbackMessage
+            } else {
+                mailboxStatusMessage = "Mail kon niet veilig geladen worden. Open de mail opnieuw."
             }
         } catch {
             guard !error.isMailboxCancellation else { return }
-            if selectedMessage?.id == message.id {
+            if selectedMessageKey == selectionKey {
                 mailboxStatusMessage = error.mailboxDisplayMessage
             }
         }
+    }
+
+    private func matchingMessageDetailFallback(
+        for message: MailboxMessage,
+        accountEmail: String,
+        selectionKey: String
+    ) async throws -> MailboxMessage? {
+        guard selectedMessageKey == selectionKey else { return nil }
+        let fullMessages = try await apiClient.fetchMailboxMessages(
+            account: accountEmail,
+            folder: message.folder,
+            limit: 25,
+            summaryOnly: false,
+            fresh: true
+        )
+        guard selectedMessageKey == selectionKey else { return nil }
+        return fullMessages.first { isSameMailboxMessage($0, as: message) }
     }
 
     private func selectAccount(_ account: MailboxAccount) {
@@ -1370,6 +1424,7 @@ private struct MailboxView: View {
             isShowingAccountMenu = false
         }
         guard account.id != selectedAccount?.id else { return }
+        clearSelectedMessage()
         selectedAccount = account
         Task { await loadMessages(fresh: true) }
     }
@@ -1390,6 +1445,7 @@ private struct MailboxView: View {
     }
 
     private func selectFolder(_ folder: MailboxFolder) {
+        clearSelectedMessage()
         selectedFolder = folder
         isShowingFolderMenu = false
         isShowingAccountMenu = false

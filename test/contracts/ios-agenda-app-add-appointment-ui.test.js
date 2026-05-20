@@ -120,9 +120,13 @@ test('ios agenda shows bottom mail shortcut and Serve-only gym shortcut', () => 
   assert.doesNotMatch(agendaListSource, /@AppStorage\("softora\.mailbox\.openedMessageKeys"\)/);
   assert.match(agendaListSource, /private func isUnread\(_ message: MailboxMessage\) -> Bool \{[^]*message\.unread/);
   assert.match(agendaListSource, /private func openMessage\(_ message: MailboxMessage\)/);
-  assert.match(agendaListSource, /await markMessageReadOnServer\(message\)/);
+  assert.match(agendaListSource, /@State private var selectedMessageKey: String\?/);
+  assert.match(agendaListSource, /let selectionKey = messageKey\(accountEmail: account\.email, message: message\)/);
+  assert.match(agendaListSource, /await markMessageReadOnServer\(message, accountEmail: account\.email, selectionKey: selectionKey\)/);
   assert.match(agendaListSource, /try await apiClient\.markMailboxMessageRead/);
-  assert.match(agendaListSource, /markMessageLocallyRead\(message\)/);
+  assert.match(agendaListSource, /markMessageLocallyRead\(message, selectionKey: selectionKey\)/);
+  assert.match(agendaListSource, /if isSameMailboxMessage\(loadedMessage, as: message\) \{[^]*selectedMessage = loadedMessage/);
+  assert.match(agendaListSource, /matchingMessageDetailFallback\(/);
   assert.match(mailboxMessageRowSource, /let isUnread: Bool/);
   assert.doesNotMatch(mailboxMessageRowSource, /Text\("Nieuw"\)/);
   assert.match(mailboxMessageRowSource, /Circle\(\)[^]*\.fill\(Color\.softoraCrimson\)[^]*\.frame\(width: 6, height: 6\)/);
@@ -231,7 +235,7 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(apiClientSource, /summary=\\\(summaryValue\)/);
   assert.match(apiClientSource, /fresh=\\\(freshValue\)/);
   assert.match(apiClientSource, /func fetchMailboxMessageDetail\(account: String, folder: String, uid: Int\) async throws -> MailboxMessage/);
-  assert.match(apiClientSource, /uid=\\\(uid\)&limit=1/);
+  assert.match(apiClientSource, /uid=\\\(uid\)&limit=1&summary=0&fresh=1/);
   assert.match(apiClientSource, /func markMailboxMessageRead\(account: String, folder: String, uid: Int\) async throws/);
   assert.match(apiClientSource, /\/api\/mailbox\/messages\/read/);
   assert.match(apiClientSource, /func sendMailboxMessage\(account: String, to: String, subject: String, body: String\) async throws/);
@@ -274,7 +278,7 @@ test('ios agenda native mailbox has folders, account selector and mailbox api ca
   assert.match(agendaListSource, /if isShowingAccountMenu \{[^]*MailboxAccountDropdown\(/);
   assert.match(agendaListSource, /private struct MailboxAccountDropdown: View/);
   assert.match(agendaListSource, /@State private var isLoadingMessageDetail = false/);
-  assert.match(agendaListSource, /Task \{[^]*await loadMessageDetail\(for: message\)[^]*\}/);
+  assert.match(agendaListSource, /Task \{[^]*await loadMessageDetail\(for: message, accountEmail: account\.email, selectionKey: selectionKey\)[^]*\}/);
   assert.match(agendaListSource, /apiClient\.fetchMailboxMessageDetail/);
   assert.doesNotMatch(agendaListSource, /MailboxDetailLoadingView\(\)/);
   assert.doesNotMatch(agendaListSource, /Text\("Mail laden\.\.\."\)/);
