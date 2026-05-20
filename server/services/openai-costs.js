@@ -5,6 +5,8 @@ const DEFAULT_USD_TO_EUR_RATE = 0.92;
 const DEFAULT_EXCHANGE_RATE_API_URL = 'https://api.frankfurter.app/latest?from=USD&to=EUR';
 const DEFAULT_EXCHANGE_RATE_CACHE_MS = 30 * 60 * 1000;
 const DEFAULT_OPENAI_COSTS_CACHE_MS = 10 * 60 * 1000;
+const DEFAULT_OPENAI_COSTS_FETCH_RETRIES = 2;
+const DEFAULT_OPENAI_COSTS_RETRY_DELAY_MS = 300;
 const MAX_COST_PAGES = 12;
 let usdToEurRateCache = null;
 let openAiCostsDashboardCache = null;
@@ -33,6 +35,20 @@ function getOpenAiCostsCacheMs(deps = {}) {
   const parsed = Number(deps.openAiCostsCacheMs || env.OPENAI_COSTS_CACHE_MS);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_OPENAI_COSTS_CACHE_MS;
   return Math.min(Math.max(Math.round(parsed), 60 * 1000), 15 * 60 * 1000);
+}
+
+function getOpenAiCostsFetchRetries(deps = {}) {
+  const env = deps.env || process.env || {};
+  const parsed = Number(deps.openAiCostsFetchRetries ?? env.OPENAI_COSTS_FETCH_RETRIES);
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_OPENAI_COSTS_FETCH_RETRIES;
+  return Math.min(Math.round(parsed), 3);
+}
+
+function getOpenAiCostsRetryDelayMs(deps = {}) {
+  const env = deps.env || process.env || {};
+  const parsed = Number(deps.openAiCostsRetryDelayMs ?? env.OPENAI_COSTS_RETRY_DELAY_MS);
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_OPENAI_COSTS_RETRY_DELAY_MS;
+  return Math.min(Math.round(parsed), 2000);
 }
 
 function getOpenAiCostsCacheStore(deps = {}) {
@@ -321,6 +337,57 @@ function createServiceError(message, code, status = 500, detail = '') {
   return error;
 }
 
+function isRetryableOpenAiCostsStatus(status) {
+  const numericStatus = Number(status);
+  if (!Number.isFinite(numericStatus)) return true;
+  return numericStatus === 408 || numericStatus === 429 || numericStatus >= 500;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
+async function fetchOpenAiCostsJsonWithRetry(deps = {}, url, options, timeoutMs, meta = {}) {
+  const fetchJsonWithTimeout = deps.fetchJsonWithTimeout;
+  const maxAttempts = 1 + getOpenAiCostsFetchRetries(deps);
+  const retryDelayMs = getOpenAiCostsRetryDelayMs(deps);
+  let lastResult = null;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const result = await fetchJsonWithTimeout(url, options, timeoutMs);
+      const status = Number(result?.response?.status || 0);
+      if (result?.response?.ok || !isRetryableOpenAiCostsStatus(status) || attempt >= maxAttempts) {
+        return result;
+      }
+      lastResult = result;
+      logOpenAiCosts(deps, 'tijdelijke openai status opnieuw proberen', {
+        ...meta,
+        statusCode: status,
+        attempt,
+        maxAttempts,
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt >= maxAttempts) throw error;
+      logOpenAiCosts(deps, 'tijdelijke openai fout opnieuw proberen', {
+        ...meta,
+        error: normalizeString(error?.message || 'fetch failed'),
+        attempt,
+        maxAttempts,
+      });
+    }
+
+    if (retryDelayMs > 0) {
+      await wait(retryDelayMs * attempt);
+    }
+  }
+
+  if (lastResult) return lastResult;
+  throw lastError || createServiceError('OpenAI kosten konden niet worden opgehaald', 'OPENAI_COSTS_FETCH_FAILED', 502);
+}
+
 function addCurrencyAmount(target, currency, amount) {
   const key = normalizeString(currency || 'usd').toLowerCase() || 'usd';
   const value = Number(amount);
@@ -427,13 +494,18 @@ async function fetchOpenAiCostPeriodSummary(deps = {}, period = {}) {
 
   for (let pageIndex = 0; pageIndex < MAX_COST_PAGES; pageIndex += 1) {
     const url = buildOpenAiCostsUrl({ apiBaseUrl, startTime, endTime, page });
-    const { response, data } = await fetchJsonWithTimeout(
+    const { response, data } = await fetchOpenAiCostsJsonWithRetry(
+      deps,
       url,
       {
         method: 'GET',
         headers: buildOpenAiCostHeaders(deps, apiKey),
       },
-      15000
+      15000,
+      {
+        period: normalizeString(period.key) || 'custom',
+        page: pageIndex + 1,
+      }
     );
     pageCount += 1;
 
@@ -639,13 +711,18 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
   let resultCount = 0;
 
   for (let pageIndex = 0; pageIndex < MAX_COST_PAGES; pageIndex += 1) {
-    const { response, data } = await fetchJsonWithTimeout(
+    const { response, data } = await fetchOpenAiCostsJsonWithRetry(
+      deps,
       buildOpenAiCostsUrl({ apiBaseUrl, startTime: window.startTime, endTime: window.endTime, page }),
       {
         method: 'GET',
         headers: buildOpenAiCostHeaders(deps, apiKey),
       },
-      15000
+      15000,
+      {
+        scope: window.scope,
+        page: pageIndex + 1,
+      }
     );
 
     if (!response || !response.ok) {

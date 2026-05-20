@@ -10,6 +10,8 @@
   const COLDCALLING_PARTIAL_NOTE = 'Retell AI deels exact, deels geschat';
   const API_COST_NOTE = 'OpenAI API kosten deze maand live';
   const API_COST_UNAVAILABLE_NOTE = 'OpenAI kosten konden niet worden opgehaald';
+  const API_COST_LOGIN_NOTE = 'Log opnieuw in om OpenAI kosten op te halen';
+  const API_COST_ADMIN_NOTE = 'Alleen Full Acces kan OpenAI kosten bekijken';
   const SUPABASE_COST_NOTE = 'Supabase kosten live bijgewerkt';
   const SUPABASE_COST_PARTIAL_NOTE = 'Supabase live-kosten gedeeltelijk gekoppeld';
   const SUPABASE_COST_UNAVAILABLE_NOTE = 'Supabase live-kosten niet gekoppeld';
@@ -438,7 +440,14 @@
       ? formatCurrencyAmount(lastMonth.amount || 0, lastMonth.currency || lastSuccessful.currency || 'usd')
       : '';
     const lastUpdateLabel = formatDateTime(lastSuccessful && (lastSuccessful.lastSuccessfulUpdate || lastSuccessful.fetchedAt));
-    const noteParts = [API_COST_UNAVAILABLE_NOTE];
+    const statusCode = Number(error && error.status);
+    const baseNote =
+      statusCode === 401
+        ? API_COST_LOGIN_NOTE
+        : statusCode === 403
+          ? API_COST_ADMIN_NOTE
+          : API_COST_UNAVAILABLE_NOTE;
+    const noteParts = [baseNote];
     if (lastAmountLabel && lastUpdateLabel) {
       noteParts.push('Laatst succesvol ' + lastUpdateLabel + ': ' + lastAmountLabel);
     }
@@ -486,6 +495,7 @@
     });
     if (!response.ok || !data || data.ok !== true || (!data.summary && data.status !== 'success')) {
       const error = new Error(String((data && (data.message || data.detail || data.error)) || API_COST_UNAVAILABLE_NOTE));
+      error.status = response.status;
       error.payload = data || {};
       throw error;
     }
