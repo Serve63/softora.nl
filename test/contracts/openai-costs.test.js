@@ -408,3 +408,47 @@ test('openai costs dashboard returns a safe error payload with last success', as
   assert.equal(payload.lastSuccessful.currentMonth.amount, 11.22);
   assert.doesNotMatch(JSON.stringify(payload), /€0|0,00/);
 });
+
+test('openai cost summary exposes safe upstream diagnostics without leaking keys', async () => {
+  const coordinator = createOpenAiCostSummaryCoordinator({
+    env: {
+      OPENAI_ADMIN_API_KEY: 'admin-key',
+      OPENAI_ORGANIZATION_ID: 'org-softora',
+      OPENAI_PROJECT_ID: 'proj-softora',
+    },
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: false, status: 401 },
+      data: {
+        error: {
+          message: 'Incorrect API key provided: sk-secret123',
+        },
+      },
+    }),
+  });
+
+  let statusCode = 0;
+  let payload = null;
+  await coordinator.sendCostSummaryResponse(
+    { query: { scope: 'month' } },
+    {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(body) {
+        payload = body;
+        return body;
+      },
+    }
+  );
+
+  assert.equal(statusCode, 502);
+  assert.equal(payload.ok, false);
+  assert.equal(payload.error, 'OPENAI_COSTS_FETCH_FAILED');
+  assert.equal(payload.upstreamStatus, 401);
+  assert.equal(payload.config.adminKeyConfigured, true);
+  assert.equal(payload.config.organizationConfigured, true);
+  assert.equal(payload.config.projectConfigured, true);
+  assert.match(payload.detail, /Incorrect API key provided/);
+  assert.doesNotMatch(payload.detail, /sk-secret123/);
+});

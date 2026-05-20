@@ -428,6 +428,45 @@
     return true;
   }
 
+  function truncateCostNote(value) {
+    const note = normalizeString(value);
+    return note.length > 180 ? note.slice(0, 177) + '...' : note;
+  }
+
+  function isPremiumAuthCostError(statusCode, payload) {
+    const message = normalizeString((payload && (payload.error || payload.message || payload.detail)) || '').toLowerCase();
+    if (statusCode === 401) return message.indexOf('niet ingelogd') !== -1;
+    if (statusCode === 403) return message.indexOf('full acces') !== -1 || message.indexOf('adminstatus') !== -1;
+    return false;
+  }
+
+  function buildApiCostUnavailableNote(error) {
+    const payload = error && error.payload && typeof error.payload === 'object' ? error.payload : {};
+    const statusCode = Number(error && error.status);
+    const errorCode = normalizeString(payload.error || payload.code);
+    const detail = normalizeString(payload.detail || payload.message || (error && error.message));
+    const upstreamStatus = Number(payload.upstreamStatus || payload.upstream_status || 0);
+
+    if (isPremiumAuthCostError(statusCode, payload)) {
+      return statusCode === 401 ? API_COST_LOGIN_NOTE : API_COST_ADMIN_NOTE;
+    }
+    if (errorCode === 'OPENAI_ADMIN_KEY_MISSING' || errorCode === 'OPENAI_COSTS_NOT_CONFIGURED') {
+      return 'OpenAI Admin Key ontbreekt op Render';
+    }
+    if (errorCode === 'OPENAI_COSTS_FETCH_UNAVAILABLE') {
+      return 'OpenAI kosten-helper ontbreekt op server';
+    }
+    if (upstreamStatus > 0) {
+      return truncateCostNote(
+        'OpenAI factuur-API fout ' + upstreamStatus + (detail && detail !== API_COST_UNAVAILABLE_NOTE ? ': ' + detail : '')
+      );
+    }
+    if (detail && detail !== API_COST_UNAVAILABLE_NOTE) {
+      return truncateCostNote(API_COST_UNAVAILABLE_NOTE + ': ' + detail);
+    }
+    return API_COST_UNAVAILABLE_NOTE;
+  }
+
   function applyApiCostUnavailable(error) {
     const item = resolveApiCostItem();
     const render = getMonthlyCostsRender();
@@ -440,13 +479,7 @@
       ? formatCurrencyAmount(lastMonth.amount || 0, lastMonth.currency || lastSuccessful.currency || 'usd')
       : '';
     const lastUpdateLabel = formatDateTime(lastSuccessful && (lastSuccessful.lastSuccessfulUpdate || lastSuccessful.fetchedAt));
-    const statusCode = Number(error && error.status);
-    const baseNote =
-      statusCode === 401
-        ? API_COST_LOGIN_NOTE
-        : statusCode === 403
-          ? API_COST_ADMIN_NOTE
-          : API_COST_UNAVAILABLE_NOTE;
+    const baseNote = buildApiCostUnavailableNote(error);
     const noteParts = [baseNote];
     if (lastAmountLabel && lastUpdateLabel) {
       noteParts.push('Laatst succesvol ' + lastUpdateLabel + ': ' + lastAmountLabel);
