@@ -8,6 +8,7 @@ const {
   getSeoContentClusters,
   getSeoContentItem,
   getSeoContentItems,
+  getSeoContentImageForItem,
   getSeoContentPathForItem,
   getSeoContentCollectionPaths,
   getSeoContentPillars,
@@ -61,6 +62,8 @@ test('seo content renders the existing blog visual language with real links', ()
   assert.match(html, /class="hero-banner"/);
   assert.match(html, /class="filter-bar"/);
   assert.match(html, /class="blog-card featured"/);
+  assert.match(html, /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
+  assert.match(html, /alt="Praktische kantoorwerkplek met planning, laptop en procesoverzicht/);
   assert.match(html, /SEO groeipijlers/);
   assert.match(html, /data-softora-public-seo="content-clusters"/);
   assert.match(html, /data-content-cluster="websites"/);
@@ -95,12 +98,31 @@ test('seo content article pages render Article schema and self canonicals', () =
   );
   assert.match(html, /"@type":"Article"/);
   assert.match(html, /"articleSection":"AI automatisering"/);
+  assert.match(html, /"image":\["https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"\]/);
+  assert.match(html, /<figure class="artikel-img">/);
+  assert.match(html, /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
   assert.match(html, /data-content-cluster="ai-automatisering"/);
   assert.match(html, /AI automatisering voor het MKB: waar begin je\?/);
   assert.match(html, /href="\/blog">Terug naar blog<\/a>/);
   assert.match(html, /href="\/ai-telefonist"/);
   assert.match(html, /data-softora-public-seo="conversion-cta"/);
   assert.match(html, /href="\/#contact"[^>]*>Neem contact op<\/a>/);
+});
+
+test('seo content images zijn per cluster gekoppeld met beschrijvende bestandsnamen en alt-teksten', () => {
+  const items = getSeoContentItems({ now: new Date('2026-06-10T12:00:00.000Z') });
+  const seenImages = new Set();
+
+  for (const item of items) {
+    const image = getSeoContentImageForItem(item);
+
+    assert.match(image.src, /^\/assets\/seo-content\/[a-z0-9-]+-softora\.jpg$/);
+    assert.ok(image.alt.length >= 55, item.slug);
+    assert.doesNotMatch(image.alt, /placeholder|binnenkort|foto moet|later/i);
+    seenImages.add(image.src);
+  }
+
+  assert.ok(seenImages.size >= 6, 'Elke SEO-cluster moet een eigen herkenbare foto hebben.');
 });
 
 test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
