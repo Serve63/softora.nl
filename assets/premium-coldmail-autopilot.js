@@ -27,6 +27,8 @@
   let state = null;
   let busy = false;
   let freezeActive = false;
+  let statusLoaded = false;
+  let statusUnavailable = false;
 
   function byId(id) {
     return document.getElementById(id);
@@ -121,8 +123,10 @@
       ".coldmail-autopilot-toggle:hover{border-color:rgba(155,35,85,.44);box-shadow:0 0 0 4px rgba(155,35,85,.08)}",
       ".coldmail-autopilot-toggle[aria-pressed=true]{background:var(--green,#16733c);border-color:var(--green,#16733c);color:#fff;box-shadow:0 10px 24px rgba(22,115,60,.18)}",
       ".coldmail-autopilot-toggle:disabled{opacity:.66;cursor:wait}",
+      ".coldmail-autopilot-toggle.is-loading,.coldmail-autopilot-toggle.is-unavailable{background:rgba(155,35,85,.06);border-color:rgba(155,35,85,.18);color:var(--mid,#8d8d9a);box-shadow:none}",
       ".coldmail-autopilot-dot{width:9px;height:9px;border-radius:999px;background:var(--crimson,#9b2355);box-shadow:0 0 0 4px rgba(155,35,85,.12);flex:0 0 auto}",
       ".coldmail-autopilot-toggle[aria-pressed=true] .coldmail-autopilot-dot{background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.22)}",
+      ".coldmail-autopilot-toggle.is-loading .coldmail-autopilot-dot{background:var(--mid,#8d8d9a);box-shadow:0 0 0 4px rgba(141,141,154,.14)}",
       "html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable{position:relative}",
       "html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable .mf-row,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable .field{opacity:.54;filter:grayscale(.18)}",
       "html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable input:disabled,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable textarea:disabled,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable select:disabled,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable button:disabled{cursor:not-allowed!important}",
@@ -143,9 +147,9 @@
     row.className = "coldmail-autopilot-row";
     row.innerHTML = [
       '<div class="coldmail-autopilot-card" id="coldmailAutopilotCard">',
-      '<button type="button" class="coldmail-autopilot-toggle" id="coldmailAutopilotToggle" aria-pressed="false" data-autopilot-scope="team">',
+      '<button type="button" class="coldmail-autopilot-toggle is-loading" id="coldmailAutopilotToggle" aria-pressed="false" aria-busy="true" data-autopilot-scope="team" disabled>',
       '<span class="coldmail-autopilot-dot" aria-hidden="true"></span>',
-      '<span id="coldmailAutopilotToggleLabel">Team autopilot uit</span>',
+      '<span id="coldmailAutopilotToggleLabel">Team autopilot controleren</span>',
       "</button>",
       "</div>",
     ].join("");
@@ -202,9 +206,17 @@
     }
   }
 
-  function render(payload) {
-    state = payload && payload.autopilot ? payload.autopilot : payload || state || {};
-    const enabled = Boolean(state.enabled);
+  function applyStatusPayload(payload) {
+    state = payload && payload.autopilot ? payload.autopilot : payload || {};
+    statusLoaded = true;
+    statusUnavailable = false;
+    render();
+  }
+
+  function render() {
+    const loading = !statusLoaded && !statusUnavailable;
+    const unavailable = statusUnavailable && !statusLoaded;
+    const enabled = statusLoaded && Boolean(state && state.enabled);
     const card = byId("coldmailAutopilotCard");
     const button = byId("coldmailAutopilotToggle");
     const label = byId("coldmailAutopilotToggleLabel");
@@ -214,15 +226,31 @@
       card.classList.toggle("is-busy", busy);
     }
     if (button) {
-      button.disabled = busy;
+      const buttonTitle = loading
+        ? "Team-autopilotstatus wordt geladen"
+        : unavailable
+          ? "Team-autopilotstatus kon niet worden geladen"
+          : enabled
+            ? "Team-autopilot uitschakelen voor iedereen van Softora"
+            : "Team-autopilot inschakelen voor iedereen van Softora";
+      button.disabled = busy || loading || unavailable;
+      button.classList.toggle("is-loading", loading);
+      button.classList.toggle("is-unavailable", unavailable);
       button.setAttribute("aria-pressed", enabled ? "true" : "false");
-      button.title = enabled
-        ? "Team-autopilot uitschakelen voor iedereen van Softora"
-        : "Team-autopilot inschakelen voor iedereen van Softora";
+      button.setAttribute("aria-busy", loading ? "true" : "false");
+      button.title = buttonTitle;
     }
-    if (label) label.textContent = enabled ? "Team autopilot aan" : "Team autopilot uit";
+    if (label) {
+      label.textContent = loading
+        ? "Team autopilot controleren"
+        : unavailable
+          ? "Team autopilot status onbekend"
+          : enabled
+            ? "Team autopilot aan"
+            : "Team autopilot uit";
+    }
     setAutopilotFreeze(enabled);
-    notifyAutopilotStatus(state);
+    if (statusLoaded) notifyAutopilotStatus(state);
   }
 
   async function json(url, options) {
@@ -240,8 +268,10 @@
 
   async function refresh() {
     try {
-      render(await json(STATUS_URL));
+      applyStatusPayload(await json(STATUS_URL));
     } catch (_) {
+      statusUnavailable = !statusLoaded;
+      render();
       const status = byId("coldmailAutopilotStatus");
       if (status) status.innerHTML = "<strong>Status onbekend</strong><span>Autopilotstatus kon niet worden geladen.</span>";
       if (!freezeActive) setAutopilotFreeze(false);
@@ -249,12 +279,12 @@
   }
 
   async function toggle() {
-    if (busy) return;
+    if (busy || !statusLoaded || statusUnavailable) return;
     busy = true;
-    render(state);
+    render();
     const enabled = !(state && state.enabled);
     try {
-      render(await json(SETTINGS_URL, {
+      applyStatusPayload(await json(SETTINGS_URL, {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -281,12 +311,13 @@
       }
     } finally {
       busy = false;
-      render(state);
+      render();
     }
   }
 
   function init() {
     if (isLeadGenerator() || !injectUi()) return;
+    render();
     void refresh();
     global.setInterval(refresh, 60000);
     global.addEventListener("focus", refresh);

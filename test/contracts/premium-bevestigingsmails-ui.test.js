@@ -740,12 +740,23 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const autopilotSource = fs.readFileSync(autopilotPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260521g/);
+  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260521h/);
   assert.match(autopilotSource, /const BATCH_SIZE = 3;/);
   assert.match(autopilotSource, /"campaignSenderEmail"/);
   assert.match(autopilotSource, /"start-campaign-btn"/);
   assert.match(autopilotSource, /data-coldmail-autopilot-enabled/);
   assert.match(autopilotSource, /startButton\.insertAdjacentElement\("afterend", row\)/);
+  assert.match(autopilotSource, /let statusLoaded = false;/);
+  assert.match(autopilotSource, /let statusUnavailable = false;/);
+  assert.match(autopilotSource, /coldmail-autopilot-toggle is-loading/);
+  assert.match(autopilotSource, /aria-busy="true" data-autopilot-scope="team" disabled/);
+  assert.match(autopilotSource, /Team autopilot controleren/);
+  assert.match(autopilotSource, /const loading = !statusLoaded && !statusUnavailable;/);
+  assert.match(autopilotSource, /if \(statusLoaded\) notifyAutopilotStatus\(state\)/);
+  assert.match(autopilotSource, /statusUnavailable = !statusLoaded;/);
+  assert.match(autopilotSource, /if \(busy \|\| !statusLoaded \|\| statusUnavailable\) return;/);
+  assert.match(autopilotSource, /render\(\);\s*void refresh\(\);/);
+  assert.doesNotMatch(autopilotSource, /coldmailAutopilotToggleLabel">Team autopilot uit/);
   assert.match(autopilotSource, /Team-autopilot staat aan voor iedereen van Softora\. Instellingen zijn bevroren\./);
   assert.match(autopilotSource, /Team autopilot aan/);
   assert.match(autopilotSource, /data-coldmail-autopilot-scope/);
