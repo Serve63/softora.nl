@@ -669,7 +669,6 @@ function addInternalLinksIfMissing(htmlRaw, entry) {
 function classifyConversionTarget(hrefRaw) {
   const href = String(hrefRaw || '').trim();
   if (/^https:\/\/wa\.me\/31643262792(?:[?#].*)?$/i.test(href)) return 'whatsapp';
-  if (/^https:\/\/api\.whatsapp\.com\/send\?phone=31643262792\b/i.test(href)) return 'whatsapp';
   if (/^mailto:/i.test(href)) return 'mailto';
   if (/^tel:/i.test(href)) return 'phone';
   if (href === '#contact' || href === '/#contact' || href.endsWith('/#contact')) return 'contact';
@@ -678,7 +677,7 @@ function classifyConversionTarget(hrefRaw) {
 
 function addConversionTrackingAttributesIfMissing(htmlRaw, entry) {
   const html = String(htmlRaw || '');
-  if (!entry || entry.kind === 'home' || entry.kind === 'legal') return html;
+  if (!entry || entry.kind === 'legal') return html;
 
   return html.replace(/<a\b([^>]*\bhref=["']([^"']+)["'][^>]*)>/gi, (match, attrs, href) => {
     if (/data-softora-conversion=/i.test(attrs)) return match;
