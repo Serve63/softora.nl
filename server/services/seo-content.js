@@ -141,27 +141,39 @@ const SEO_CONTENT_CLUSTERS = Object.freeze([
 const SEO_CONTENT_IMAGES_BY_CLUSTER = Object.freeze({
   websites: Object.freeze({
     src: '/assets/seo-content/website-leads-analytics-softora.jpg',
-    alt: 'Realistische werkplek met website analytics en leadflow op een laptop voor ondernemers die meer aanvragen willen.',
+    alt: 'Laptop met website analytics en meetbare leadgroei voor ondernemers die meer aanvragen willen.',
+    width: 1600,
+    height: 1000,
   }),
   'ai-automatisering': Object.freeze({
     src: '/assets/seo-content/ai-automatisering-workflow-softora.jpg',
-    alt: 'Praktische kantoorwerkplek met planning, laptop en procesoverzicht voor AI automatisering in het MKB.',
+    alt: 'Overleg aan tafel over workflow, planning en procesautomatisering voor het MKB.',
+    width: 1600,
+    height: 1000,
   }),
   'software-crm': Object.freeze({
     src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
-    alt: 'Teamoverleg met CRM-dashboard op een laptop voor maatwerk software, klantbeheer en leadopvolging.',
+    alt: 'Dashboard met klantdata en prestatiegrafieken voor CRM, maatwerk software en leadopvolging.',
+    width: 1600,
+    height: 1000,
   }),
   'ai-contact': Object.freeze({
     src: '/assets/seo-content/ai-klantcontact-chatbot-telefonie-softora.jpg',
-    alt: 'Supportdesk met headset, laptop en telefoon voor AI klantcontact, chatbots en telefonieflows.',
+    alt: 'Team werkt samen met laptops en headset aan klantcontact, chatbots en telefonieflows.',
+    width: 1600,
+    height: 1000,
   }),
   branches: Object.freeze({
     src: '/assets/seo-content/branche-digitalisering-planning-softora.jpg',
-    alt: 'Werktafel met tablet, laptop en planning voor digitalisering van brancheprocessen bij lokale ondernemers.',
+    alt: 'Team aan een werktafel met laptops voor digitalisering van brancheprocessen.',
+    width: 1600,
+    height: 1000,
   }),
   lokaal: Object.freeze({
     src: '/assets/seo-content/lokale-seo-brabant-groei-softora.jpg',
-    alt: 'Lokale Nederlandse kantoorwerkplek met uitzicht op een straat voor regionale SEO en digitale groei.',
+    alt: 'Modern kantoorinterieur voor lokale SEO, regionale vindbaarheid en digitale groei.',
+    width: 1600,
+    height: 1000,
   }),
 });
 
@@ -1755,11 +1767,15 @@ function renderArticleCards(items) {
       const image = getSeoContentImageForItem(item);
       const imageLoading = featured ? 'eager' : 'lazy';
       const imagePriority = featured ? 'high' : 'low';
+      const imageDimensions =
+        Number(image.width) > 0 && Number(image.height) > 0
+          ? ` width="${Number(image.width)}" height="${Number(image.height)}"`
+          : '';
       return [
         `<article class="blog-card${featured ? ' featured' : ''}" data-content-cluster="${escapeHtml(cluster.key)}">`,
         `  <a href="${escapeHtml(href)}">`,
         `    <div class="blog-card-img${featured ? ' featured' : ''}">`,
-        `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}" loading="${imageLoading}" fetchpriority="${imagePriority}">`,
+        `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="${imageLoading}" fetchpriority="${imagePriority}">`,
         `      <div class="blog-card-img-label">${escapeHtml(item.category)}</div>`,
         '    </div>',
         '    <div class="blog-card-body">',
@@ -1915,6 +1931,10 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
   const mainEntity = buildMainEntityForItem(item, site, canonicalUrl);
   const cluster = getSeoContentClusterForItem(item);
   const image = getSeoContentImageForItem(item);
+  const imageDimensions =
+    Number(image.width) > 0 && Number(image.height) > 0
+      ? ` width="${Number(image.width)}" height="${Number(image.height)}"`
+      : '';
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -1974,7 +1994,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     '    </div>',
     '  </section>',
     '  <figure class="artikel-img">',
-    `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}" loading="eager" fetchpriority="high">`,
+    `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="eager" fetchpriority="high">`,
     `    <figcaption>${escapeHtml(item.title)}</figcaption>`,
     '  </figure>',
     '  <article class="artikel-body">',
