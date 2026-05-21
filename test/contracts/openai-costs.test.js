@@ -513,7 +513,8 @@ test('openai usage estimate falls back to the configured OpenAI model when usage
   const summary = await fetchOpenAiUsageEstimateSummary(
     {
       openAiCostsApiKey: 'openai-admin-key',
-      openAiModel: 'gpt-5.5',
+      openAiUsageEstimateModel: 'gpt-5.5',
+      openAiModel: 'gpt-5.5-pro',
       usdToEurRate: 0.9,
       fetchJsonWithTimeout: async (url) => {
         if (url.includes('/organization/usage/completions')) {
@@ -524,6 +525,7 @@ test('openai usage estimate falls back to the configured OpenAI model when usage
                 {
                   results: [
                     {
+                      model: 'unknown_model_bucket',
                       input_tokens: 11695,
                       output_tokens: 43904,
                       num_model_requests: 8,

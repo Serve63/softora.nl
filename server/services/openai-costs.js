@@ -484,18 +484,41 @@ function addUsageTotals(target, source = {}) {
   target.audioSeconds += Math.max(0, Number(source.audioSeconds || 0) || 0);
 }
 
+function isKnownOpenAiTextPricingModel(modelRaw) {
+  const key = normalizeString(modelRaw).toLowerCase();
+  return [
+    'gpt-5.5-pro',
+    'gpt-5.5',
+    'gpt-5.4-mini',
+    'gpt-5.4-nano',
+    'gpt-5.4-pro',
+    'gpt-5.4',
+    'gpt-5.2-pro',
+    'gpt-5.2',
+    'gpt-5.1',
+    'gpt-5-pro',
+    'gpt-5-mini',
+    'gpt-5-nano',
+    'gpt-5',
+    'gpt-4.1-mini',
+    'gpt-4.1-nano',
+    'gpt-4.1',
+    'gpt-4o-mini',
+    'gpt-4o',
+  ].some((name) => key.includes(name));
+}
+
 function resolveOpenAiUsageModel(result = {}, deps = {}) {
+  const reportedModel = normalizeString(
+    result.model || result.model_id || result.model_name || result.snapshot_id || result.response_model
+  );
+  if (isKnownOpenAiTextPricingModel(reportedModel)) return reportedModel;
   return (
     normalizeString(
-      result.model ||
-        result.model_id ||
-        result.model_name ||
-        result.snapshot_id ||
-        result.response_model ||
-        deps.openAiUsageEstimateModel ||
-        deps.openAiModel ||
+      deps.openAiUsageEstimateModel ||
         deps.env?.OPENAI_USAGE_ESTIMATE_MODEL ||
         deps.env?.OPENAI_MODEL ||
+        deps.openAiModel ||
         'gpt-5.5'
     ) || 'gpt-5.5'
   );
