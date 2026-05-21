@@ -221,6 +221,11 @@ test('ios agenda hides the mail shortcut and keeps the Serve-only gym shortcut',
   assert.match(agendaListSource, /Text\("Servé's logboek"\)/);
   assert.match(agendaListSource, /title: "Servé's logboek"[^]*systemImage: "dumbbell\.fill"/);
   assert.doesNotMatch(agendaListSource, /Text\("Gym"\)/);
+  assert.match(
+    agendaListSource,
+    /private var isClientWorkDay: Bool \{[^]*return weekday == 4 \|\| weekday == 6/,
+    'The app should mark Wednesday and Friday as klantwerk days.'
+  );
   assert.match(agendaStoreSource, /guard !isRecoverableSupabaseHydrationIssue\(error\) else \{ return \}/);
   assert.doesNotMatch(
     agendaStoreSource,

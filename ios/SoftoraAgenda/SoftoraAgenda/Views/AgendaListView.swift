@@ -3068,7 +3068,7 @@ private struct DayCellView: View {
 
     private var isClientWorkDay: Bool {
         let weekday = Calendar.current.component(.weekday, from: date)
-        return weekday == 4 || weekday == 7
+        return weekday == 4 || weekday == 6
     }
 }
 
