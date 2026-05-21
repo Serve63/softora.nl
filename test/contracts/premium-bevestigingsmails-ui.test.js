@@ -283,6 +283,11 @@ test('premium bevestigingsmails toont geen nep-nulwaarden in verzendscore bij ee
   assert.doesNotMatch(pageSource, /data-coldmail-sender-score-count="martijn@softora\.nl">0<\/span>/);
   assert.match(scoreSource, /const SENDERS = Object\.freeze\(\[/);
   assert.match(scoreSource, /count\.textContent = '\.\.\.'/);
+  assert.match(scoreSource, /function appendTotalRow\(root, value\)/);
+  assert.match(scoreSource, /coldmail-sender-score-total-count\{[\s\S]*border-top:2px solid currentColor/);
+  assert.match(scoreSource, /const total = \(Array\.isArray\(stats\) \? stats : \[\]\)\.reduce\(\(sum, item\) => sum \+ Math\.max\(0, Number\(item\.count\) \|\| 0\), 0\);/);
+  assert.match(scoreSource, /appendTotalRow\(root, total\);/);
+  assert.match(scoreSource, /root\.querySelector\('\[data-coldmail-sender-score-total-count\]'\)/);
   assert.match(scoreSource, /const hasSnapshot = Object\.prototype\.hasOwnProperty\.call\(values, CUSTOMER_DB_KEY\);/);
   assert.match(scoreSource, /if \(!result\.hasSnapshot && !\(options && options\.allowEmpty\)\) \{[\s\S]*setLoading\(\);[\s\S]*scheduleRetry\(\);[\s\S]*return;/);
   assert.match(scoreSource, /function buildStats\(rows\)/);

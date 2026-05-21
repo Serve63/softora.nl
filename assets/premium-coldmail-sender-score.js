@@ -33,11 +33,37 @@
       '.coldmail-sender-score[hidden]{display:none!important}',
       '.coldmail-sender-score-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;column-gap:28px}',
       '.coldmail-sender-score-row.is-leading{color:var(--crimson)}',
-      '.coldmail-sender-score-count{min-width:18px;text-align:right;font-variant-numeric:tabular-nums}',
+      '.coldmail-sender-score-count{min-width:24px;text-align:right;font-variant-numeric:tabular-nums}',
+      '.coldmail-sender-score-total{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;column-gap:28px;margin-top:3px}',
+      '.coldmail-sender-score-total-count{min-width:24px;padding-top:5px;border-top:2px solid currentColor;text-align:right;font-variant-numeric:tabular-nums;justify-self:end}',
       '.coldmail-sender-score[data-coldmail-sender-score-state=\"loading\"] .coldmail-sender-score-count{color:var(--text-tertiary)}',
+      '.coldmail-sender-score[data-coldmail-sender-score-state=\"loading\"] .coldmail-sender-score-total-count{color:var(--text-tertiary)}',
       '@media (max-width:1024px){.topbar-right{width:100%;justify-content:flex-start}}',
     ].join('');
     document.head.appendChild(style);
+  }
+
+  function appendTotalRow(root, value) {
+    if (!root) return;
+    const hasValue = value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+    const safeValue = hasValue ? String(Math.max(0, Number(value) || 0)) : '...';
+    const row = document.createElement('div');
+    row.className = 'coldmail-sender-score-total';
+    row.setAttribute('data-coldmail-sender-score-total', '');
+    row.setAttribute('aria-label', safeValue === '...' ? 'Totaal wordt geladen' : 'Totaal verzonden coldmails: ' + safeValue);
+
+    const spacer = document.createElement('span');
+    spacer.className = 'coldmail-sender-score-total-spacer';
+    spacer.setAttribute('aria-hidden', 'true');
+
+    const count = document.createElement('span');
+    count.className = 'coldmail-sender-score-total-count';
+    count.setAttribute('data-coldmail-sender-score-total-count', '');
+    count.textContent = safeValue;
+
+    row.appendChild(spacer);
+    row.appendChild(count);
+    root.appendChild(row);
   }
 
   function ensureRoot() {
@@ -75,6 +101,7 @@
       row.appendChild(count);
       root.appendChild(row);
     });
+    appendTotalRow(root, null);
 
     wrapper.appendChild(root);
     topbar.appendChild(wrapper);
@@ -163,6 +190,14 @@
       if (row) row.classList.remove('is-leading');
       if (count) count.textContent = '...';
     });
+    const totalCount = root.querySelector('[data-coldmail-sender-score-total-count]');
+    if (totalCount) {
+      totalCount.textContent = '...';
+      const totalRow = totalCount.closest('[data-coldmail-sender-score-total]');
+      if (totalRow) totalRow.setAttribute('aria-label', 'Totaal wordt geladen');
+    } else {
+      appendTotalRow(root, null);
+    }
   }
 
   function render(stats) {
@@ -176,6 +211,7 @@
     root.innerHTML = '';
     root.setAttribute('data-coldmail-sender-score-state', 'ready');
     root.setAttribute('aria-label', 'Verzonden coldmails per afzender');
+    const total = (Array.isArray(stats) ? stats : []).reduce((sum, item) => sum + Math.max(0, Number(item.count) || 0), 0);
     (Array.isArray(stats) ? stats : []).forEach((item, index) => {
       const row = document.createElement('div');
       row.className = 'coldmail-sender-score-row' + (index === 0 && item.count > 0 ? ' is-leading' : '');
@@ -194,6 +230,7 @@
       row.appendChild(count);
       root.appendChild(row);
     });
+    appendTotalRow(root, total);
   }
 
   function scheduleRetry() {
