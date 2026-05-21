@@ -37,7 +37,7 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   vm.createContext(context);
   vm.runInContext(scoreboardSource, context);
 
-  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260520a/);
+  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260521a/);
   assert.match(scoreboardSource, /id = 'coldmailSenderScoreboard'/);
   assert.match(scoreboardSource, /data-coldmail-sender'/);
   assert.match(scoreboardSource, /martijn@softora\.nl/);
@@ -51,10 +51,26 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.doesNotMatch(scoreboardSource, /count\.textContent = '0'/);
   assert.match(scoreboardSource, /hasCustomerRowsSnapshot/);
   assert.match(scoreboardSource, /setLoadingState\(\);[\s\S]*scheduleRetry\(\);/);
+  assert.match(scoreboardSource, /AUTO_REFRESH_INTERVAL_MS = 60000/);
+  assert.match(scoreboardSource, /softora:coldmail-autopilot-status/);
+  assert.match(scoreboardSource, /global\.addEventListener\(AUTOPILOT_STATUS_EVENT, handleAutopilotStatus\)/);
+  assert.match(scoreboardSource, /startAutoRefresh\(\);[\s\S]*refresh\(\)\.catch/);
   assert.equal(context.window.SoftoraColdmailSenderScoreboard.hasCustomerRowsSnapshot({}), false);
   assert.equal(context.window.SoftoraColdmailSenderScoreboard.hasCustomerRowsSnapshot({
     softora_customers_premium_v1: '[]',
   }), true);
+  assert.notEqual(
+    context.window.SoftoraColdmailSenderScoreboard.buildAutopilotStatusKey({
+      enabled: true,
+      lastRunAt: '2026-05-21T12:00:00.000Z',
+      lastResult: { senderEmail: 'serve@softora.nl', sent: 3, reason: 'sent' },
+    }),
+    context.window.SoftoraColdmailSenderScoreboard.buildAutopilotStatusKey({
+      enabled: true,
+      lastRunAt: '2026-05-21T12:15:00.000Z',
+      lastResult: { senderEmail: 'martijn@softora.nl', sent: 3, reason: 'sent' },
+    })
+  );
 
   const entries = context.window.SoftoraColdmailSenderScoreboard.calculateSenderStats([
     { sentFromEmail: 'serve@softora.nl', lastColdmailSentAt: '2026-05-20T00:00:00.000Z' },
@@ -720,7 +736,7 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const autopilotSource = fs.readFileSync(autopilotPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260521e/);
+  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260521f/);
   assert.match(autopilotSource, /const BATCH_SIZE = 3;/);
   assert.match(autopilotSource, /"campaignSenderEmail"/);
   assert.match(autopilotSource, /"start-campaign-btn"/);
@@ -730,13 +746,15 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   assert.match(autopilotSource, /Team autopilot aan/);
   assert.match(autopilotSource, /data-coldmail-autopilot-scope/);
   assert.match(autopilotSource, /global\.addEventListener\("focus", refresh\)/);
+  assert.match(autopilotSource, /softora:coldmail-autopilot-status/);
+  assert.match(autopilotSource, /dispatchEvent\(new CustomEvent\(AUTOPILOT_STATUS_EVENT/);
+  assert.match(autopilotSource, /notifyAutopilotStatus\(state\)/);
   assert.match(autopilotSource, /\/api\/coldmailing\/autopilot\/status/);
   assert.match(autopilotSource, /\/api\/coldmailing\/autopilot\/settings/);
   assert.match(autopilotSource, /senderEmails: getSenderEmails\(\)/);
   assert.match(autopilotSource, /startHour: 9/);
   assert.match(autopilotSource, /endHour: 17/);
   assert.match(autopilotSource, /minIntervalMinutes: 12/);
-  assert.doesNotMatch(autopilotSource, /coldmail-autopilot-status/);
   assert.doesNotMatch(autopilotSource, /Handmatige modus/);
   assert.doesNotMatch(autopilotSource, /Geen automatische verzending/);
   assert.doesNotMatch(autopilotSource, /parentNode\.insertBefore\(row, startButton\)/);
