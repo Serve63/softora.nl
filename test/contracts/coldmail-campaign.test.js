@@ -1487,6 +1487,49 @@ test('coldmail campaign test mode uses the ready Gmail design row when the dedic
   assert.deepEqual(getSavedStates(), []);
 });
 
+test('coldmail campaign test mode can look up a ready design row with the common Gmail typo', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'serve-ready-design-typo',
+        bedrijf: 'Softora Testmodus',
+        naam: 'Servé',
+        email: 'servec321@gail.com',
+        website: 'softora.nl',
+        dom: 'softora.nl',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'serve-ready-design-typo': {
+        id: 'serve-ready-design-typo',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Softora typo lookup webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Softora typo lookup device mockup',
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuw webdesign gemaakt!',
+    body: 'Hoi {{naam}}, ik heb een nieuw webdesign gemaakt voor {{website}}.',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+    testMode: true,
+  });
+
+  assert.equal(result.testMode, true);
+  assert.equal(result.sent, 1);
+  assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-serve-ready-design-typo@softora"/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-serve-ready-design-typo@softora"/);
+});
+
 test('coldmail campaign keeps the dedicated Softora test row out of normal campaigns', async () => {
   const { service } = createService({
     rows: [
