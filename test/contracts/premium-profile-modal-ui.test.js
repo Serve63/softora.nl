@@ -39,4 +39,10 @@ test('premium profielmodal heeft een werkende annuleerknop en subtielere stijl',
   assert.match(jsSource, /function shouldKeepServerRenderedProfile\(sidebar, nextRenderKey\) \{/);
   assert.match(jsSource, /const serverKey = sidebar[\s\S]*premiumSessionSnapshotFromStorage[\s\S]*!premiumInitialSessionFetched/s);
   assert.match(jsSource, /if \(shouldKeepServerRenderedProfile\(sidebar, renderKey\)\) \{[\s\S]*markPremiumSidebarProfileResolved\(\);[\s\S]*return;/s);
+  assert.match(jsSource, /avatarMutation: "unchanged"/);
+  assert.match(jsSource, /premiumProfileModalRef\.avatarMutation = "replace"/);
+  assert.match(jsSource, /premiumProfileModalRef\.avatarMutation = "remove"/);
+  assert.match(jsSource, /if \(premiumProfileModalRef\.avatarMutation === "replace"\) profilePayload\.avatarDataUrl = premiumProfileModalRef\.pendingAvatarDataUrl \|\| "";/);
+  assert.match(jsSource, /if \(premiumProfileModalRef\.avatarMutation === "remove"\) profilePayload\.removeAvatar = true;/);
+  assert.doesNotMatch(jsSource, /removeAvatar:\s*premiumProfileModalRef\.pendingAvatarDataUrl \? false : true/);
 });

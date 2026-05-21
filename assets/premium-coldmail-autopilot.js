@@ -102,9 +102,9 @@
     row.className = "coldmail-autopilot-row";
     row.innerHTML = [
       '<div class="coldmail-autopilot-card" id="coldmailAutopilotCard">',
-      '<button type="button" class="coldmail-autopilot-toggle" id="coldmailAutopilotToggle" aria-pressed="false">',
+      '<button type="button" class="coldmail-autopilot-toggle" id="coldmailAutopilotToggle" aria-pressed="false" data-autopilot-scope="team">',
       '<span class="coldmail-autopilot-dot" aria-hidden="true"></span>',
-      '<span id="coldmailAutopilotToggleLabel">Autopilot uit</span>',
+      '<span id="coldmailAutopilotToggleLabel">Team autopilot uit</span>',
       "</button>",
       "</div>",
     ].join("");
@@ -140,6 +140,7 @@
     const active = Boolean(enabled);
     freezeActive = active;
     document.documentElement.setAttribute("data-coldmail-autopilot-enabled", active ? "true" : "false");
+    document.documentElement.setAttribute("data-coldmail-autopilot-scope", "team");
     getFreezeElements().forEach((element) => {
       if (!previousDisabledState.has(element)) previousDisabledState.set(element, Boolean(element.disabled));
       element.disabled = active ? true : Boolean(previousDisabledState.get(element));
@@ -164,10 +165,10 @@
       button.disabled = busy;
       button.setAttribute("aria-pressed", enabled ? "true" : "false");
       button.title = enabled
-        ? "Autopilot uitschakelen en instellingen weer vrijgeven"
-        : "Autopilot inschakelen met de huidige instellingen";
+        ? "Team-autopilot uitschakelen voor iedereen van Softora"
+        : "Team-autopilot inschakelen voor iedereen van Softora";
     }
-    if (label) label.textContent = enabled ? "Autopilot aan" : "Autopilot uit";
+    if (label) label.textContent = enabled ? "Team autopilot aan" : "Team autopilot uit";
     setAutopilotFreeze(enabled);
   }
 
@@ -219,7 +220,7 @@
         }),
       }));
       if (typeof global.showToast === "function") {
-        global.showToast(enabled ? "Autopilot staat aan. Instellingen zijn bevroren." : "Autopilot staat uit. Instellingen zijn vrijgegeven.");
+        global.showToast(enabled ? "Team-autopilot staat aan voor iedereen van Softora. Instellingen zijn bevroren." : "Team-autopilot staat uit. Instellingen zijn vrijgegeven.");
       }
     } catch (error) {
       if (typeof global.showToast === "function") {
@@ -235,6 +236,10 @@
     if (isLeadGenerator() || !injectUi()) return;
     void refresh();
     global.setInterval(refresh, 60000);
+    global.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) void refresh();
+    });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

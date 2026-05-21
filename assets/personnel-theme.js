@@ -1655,7 +1655,7 @@
     function populatePremiumProfileModal(session) {
         if (!premiumProfileModalRef) return;
         const currentSession = session || premiumSessionSnapshot || null;
-        premiumProfileModalRef.pendingAvatarDataUrl = (currentSession && currentSession.avatarDataUrl) || "";
+        premiumProfileModalRef.pendingAvatarDataUrl = (currentSession && currentSession.avatarDataUrl) || ""; premiumProfileModalRef.avatarMutation = "unchanged";
         premiumProfileModalRef.nameInput.value = String((currentSession && currentSession.displayName) || "").trim();
         premiumProfileModalRef.emailText.textContent = String((currentSession && currentSession.email) || "");
         premiumProfileModalRef.fileInput.value = "";
@@ -1716,7 +1716,7 @@
             preview: rootEl.querySelector("[data-profile-avatar-preview]"),
             feedback: rootEl.querySelector("[data-profile-feedback]"),
             form: rootEl.querySelector(".premium-profile-form"),
-            pendingAvatarDataUrl: "",
+            pendingAvatarDataUrl: "", avatarMutation: "unchanged",
         };
 
         rootEl.addEventListener("click", function (event) {
@@ -1742,7 +1742,7 @@
         });
 
         premiumProfileModalRef.removeBtn.addEventListener("click", function () {
-            premiumProfileModalRef.pendingAvatarDataUrl = "";
+            premiumProfileModalRef.pendingAvatarDataUrl = ""; premiumProfileModalRef.avatarMutation = "remove";
             premiumProfileModalRef.fileInput.value = "";
             paintPremiumProfilePreview(premiumSessionSnapshot);
         });
@@ -1752,7 +1752,7 @@
             if (!file) return;
             setPremiumProfileFeedback("", "");
             try {
-                premiumProfileModalRef.pendingAvatarDataUrl = await buildResizedAvatarDataUrl(file);
+                premiumProfileModalRef.pendingAvatarDataUrl = await buildResizedAvatarDataUrl(file); premiumProfileModalRef.avatarMutation = "replace";
                 paintPremiumProfilePreview(premiumSessionSnapshot);
             } catch (error) {
                 premiumProfileModalRef.fileInput.value = "";
@@ -1776,13 +1776,12 @@
             setPremiumProfileFeedback("", "");
 
             try {
+                const profilePayload = { displayName: nameValue };
+                if (premiumProfileModalRef.avatarMutation === "replace") profilePayload.avatarDataUrl = premiumProfileModalRef.pendingAvatarDataUrl || "";
+                if (premiumProfileModalRef.avatarMutation === "remove") profilePayload.removeAvatar = true;
                 const payload = await requestJson("/api/auth/profile", {
                     method: "PATCH",
-                    body: JSON.stringify({
-                        displayName: nameValue,
-                        avatarDataUrl: premiumProfileModalRef.pendingAvatarDataUrl || "",
-                        removeAvatar: premiumProfileModalRef.pendingAvatarDataUrl ? false : true,
-                    }),
+                    body: JSON.stringify(profilePayload),
                 });
                 premiumSessionSnapshot = payload && payload.session ? payload.session : premiumSessionSnapshot; premiumSessionSnapshotFromStorage = false;
                 persistPremiumSidebarSessionSnapshot(premiumSessionSnapshot);
