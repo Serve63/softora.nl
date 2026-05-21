@@ -6,6 +6,7 @@ const path = require('node:path');
 const {
   createPremiumDatabaseImportCoordinator,
   detectDelimitedSeparator,
+  estimateDeepSearchBusinessRunCost,
   fetchDeepSearchBusinessRows,
   fetchRealBusinessRows,
   fetchSpreadsheetRowsFromSourceUrl,
@@ -483,7 +484,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
         assert.equal(options.headers['OpenAI-Project'], 'proj_softora');
         const payload = JSON.parse(options.body);
         assert.equal(payload.model, 'gpt-5.5');
-        assert.equal(payload.reasoning.effort, 'low');
+        assert.equal(payload.reasoning.effort, 'high');
         assert.equal(payload.tools[0].type, 'web_search');
         assert.equal(payload.tools[0].external_web_access, true);
         assert.deepEqual(payload.include, ['web_search_call.action.sources']);
@@ -562,7 +563,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
   assert.equal(result.found, 1);
   assert.equal(result.rejected, 2);
   assert.equal(result.model, 'gpt-5.5');
-  assert.equal(result.reasoningEffort, 'low');
+  assert.equal(result.reasoningEffort, 'high');
   assert.equal(result.placeComplete, false);
   assert.equal(result.cost.currency, 'USD');
   assert.equal(result.cost.inputTokens, 1000);
@@ -577,6 +578,139 @@ test('premium database deep search uses OpenAI web search and returns complete r
     'bakkerijzon.nl',
   ]);
   assert.equal(result.sources[0].url, 'https://bakkerijzon.nl/contact');
+});
+
+test('premium database deep search hard-filters businesses already in the exclude list', async () => {
+  const result = await fetchDeepSearchBusinessRows(
+    {
+      target: 'Nederland | Noord-Brabant | Breda | Bavel',
+      count: 100,
+      exclude: [
+        'domain:growingbyknowing.nl',
+        'email:info@linszorgt.nl',
+        'Tuin Idee | contact@tuin-idee.com | www.tuin-idee.com | Bavel',
+      ],
+    },
+    {
+      env: { OPENAI_API_KEY: 'openai-key' },
+      fetchImpl: async () => ({
+        ok: true,
+        async json() {
+          return {
+            output_text: JSON.stringify({
+              target: 'Bavel',
+              businesses: [
+                {
+                  bedrijfsnaam: 'Growing By Knowing',
+                  adres: 'Dorpsstraat 1, 4854 AA Bavel',
+                  email: 'hello@growingbyknowing.nl',
+                  telefoonnummer: '06 111 111 11',
+                  website: 'https://www.growingbyknowing.nl',
+                  bronnen: ['https://www.growingbyknowing.nl/contact'],
+                },
+                {
+                  bedrijfsnaam: 'Lins Zorgt',
+                  adres: 'Kerkstraat 2, 4854 BB Bavel',
+                  email: 'info@linszorgt.nl',
+                  telefoonnummer: '06 222 222 22',
+                  website: 'https://linszorgt.nl',
+                  bronnen: ['https://linszorgt.nl/contact'],
+                },
+                {
+                  bedrijfsnaam: 'Tuin Idee',
+                  adres: 'Brigidastraat 3, 4854 CT Bavel',
+                  email: 'contact@tuin-idee.com',
+                  telefoonnummer: '06 333 333 33',
+                  website: 'https://tuin-idee.com',
+                  bronnen: ['https://tuin-idee.com/contact'],
+                },
+                {
+                  bedrijfsnaam: 'Bavel Nieuw BV',
+                  adres: 'Bavelseparklaan 4, 4854 HR Bavel',
+                  email: 'info@bavelnieuw.nl',
+                  telefoonnummer: '076 444 44 44',
+                  website: 'https://bavelnieuw.nl',
+                  bronnen: ['https://bavelnieuw.nl/contact'],
+                },
+              ],
+              placeComplete: false,
+              completionReason: '',
+              notes: '',
+            }),
+            output: [],
+            usage: {
+              input_tokens: 100,
+              output_tokens: 80,
+            },
+          };
+        },
+      }),
+    }
+  );
+
+  assert.equal(result.found, 1);
+  assert.equal(result.rejected, 3);
+  assert.deepEqual(result.businesses.map((business) => business.website), ['bavelnieuw.nl']);
+});
+
+test('premium database deep search keeps a compact prompt but hard-filters the full exclude list', async () => {
+  const exclude = Array.from({ length: 650 }, (_item, index) => `domain:bestaand-${index}.nl`);
+  let promptText = '';
+  const result = await fetchDeepSearchBusinessRows(
+    {
+      target: 'Nederland | Noord-Brabant | Breda | Bavel',
+      count: 100,
+      exclude,
+    },
+    {
+      env: { OPENAI_API_KEY: 'openai-key' },
+      fetchImpl: async (_url, options = {}) => {
+        const payload = JSON.parse(options.body);
+        promptText = payload.input[1].content;
+        return {
+          ok: true,
+          async json() {
+            return {
+              output_text: JSON.stringify({
+                target: 'Bavel',
+                businesses: [
+                  {
+                    bedrijfsnaam: 'Bestaand 649',
+                    adres: 'Kerkstraat 649, 4854 BB Bavel',
+                    email: 'info@bestaand-649.nl',
+                    telefoonnummer: '06 649 649 64',
+                    website: 'https://bestaand-649.nl',
+                    bronnen: ['https://bestaand-649.nl/contact'],
+                  },
+                  {
+                    bedrijfsnaam: 'Nieuw Zeker BV',
+                    adres: 'Dorpsstraat 5, 4854 AA Bavel',
+                    email: 'info@nieuwzeker.nl',
+                    telefoonnummer: '076 555 55 55',
+                    website: 'https://nieuwzeker.nl',
+                    bronnen: ['https://nieuwzeker.nl/contact'],
+                  },
+                ],
+                placeComplete: false,
+                completionReason: '',
+                notes: '',
+              }),
+              output: [],
+              usage: {
+                input_tokens: 100,
+                output_tokens: 80,
+              },
+            };
+          },
+        };
+      },
+    }
+  );
+
+  assert.match(promptText, /domain:bestaand-0\.nl/);
+  assert.doesNotMatch(promptText, /domain:bestaand-649\.nl/);
+  assert.equal(result.found, 1);
+  assert.deepEqual(result.businesses.map((business) => business.website), ['nieuwzeker.nl']);
 });
 
 test('premium database deep search keeps productive batches open for follow-up', async () => {
@@ -657,7 +791,7 @@ test('premium database deep search route reports missing OpenAI key', async () =
   assert.equal(response.body.code, 'OPENAI_NOT_CONFIGURED');
 });
 
-test('premium database deep search defaults to gpt-5.5-pro with high reasoning', async () => {
+test('premium database deep search defaults to gpt-5.4 with high reasoning', async () => {
   const result = await fetchDeepSearchBusinessRows(
     {
       target: 'Nederland | Noord-Brabant | Altena | Almkerk',
@@ -667,7 +801,7 @@ test('premium database deep search defaults to gpt-5.5-pro with high reasoning',
       env: { OPENAI_API_KEY: 'openai-key' },
       fetchImpl: async (_url, options = {}) => {
         const payload = JSON.parse(options.body);
-        assert.equal(payload.model, 'gpt-5.5-pro');
+        assert.equal(payload.model, 'gpt-5.4');
         assert.equal(payload.reasoning.effort, 'high');
         return {
           ok: true,
@@ -692,11 +826,89 @@ test('premium database deep search defaults to gpt-5.5-pro with high reasoning',
     }
   );
 
-  assert.equal(result.model, 'gpt-5.5-pro');
+  assert.equal(result.model, 'gpt-5.4');
   assert.equal(result.reasoningEffort, 'high');
   assert.equal(result.placeComplete, true);
   assert.equal(result.completionReason, 'Geen extra complete bedrijven gevonden.');
-  assert.equal(result.cost.estimatedUsd, 0.0066);
+  assert.equal(result.cost.estimatedUsd, 0.00055);
+});
+
+test('premium database deep search estimate uses active model pricing without calling OpenAI', () => {
+  const cases = [
+    { count: 25, expectedUsd: 0.3675, expectedBatches: 1 },
+    { count: 250, expectedUsd: 3.5525, expectedBatches: 3 },
+    { count: 500, expectedUsd: 7.0875, expectedBatches: 5 },
+  ];
+
+  cases.forEach(({ count, expectedUsd, expectedBatches }) => {
+    const result = estimateDeepSearchBusinessRunCost(
+      { count },
+      {
+        env: {
+          OPENAI_DATABASE_SEARCH_MODEL: 'gpt-5.1',
+        },
+      }
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(result.estimateOnly, true);
+    assert.equal(result.requested, count);
+    assert.equal(result.batchSize, 100);
+    assert.equal(result.estimatedBatches, expectedBatches);
+    assert.equal(result.model, 'gpt-5.1');
+    assert.equal(result.cost.inputTokens, expectedBatches * 6000);
+    assert.equal(result.cost.outputTokens, count * 1400);
+    assert.equal(result.cost.webSearchCalls, expectedBatches);
+    assert.equal(result.cost.estimatedUsd, expectedUsd);
+    assert.equal(result.cost.pricing.outputUsdPerMillion, 10);
+  });
+});
+
+test('premium database deep search estimate defaults to gpt-5.4 high reasoning', () => {
+  const result = estimateDeepSearchBusinessRunCost(
+    { count: 250 },
+    {
+      env: {},
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.model, 'gpt-5.4');
+  assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.cost.estimatedUsd, 5.325);
+  assert.equal(result.cost.pricing.outputUsdPerMillion, 15);
+});
+
+test('premium database deep search estimate route returns model-aware costs', () => {
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    env: {
+      OPENAI_DATABASE_SEARCH_MODEL: 'gpt-5.1',
+    },
+  });
+  const response = {
+    statusCode: 200,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  coordinator.sendDeepSearchEstimateResponse(
+    { query: { count: '250' } },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.requested, 250);
+  assert.equal(response.body.model, 'gpt-5.1');
+  assert.equal(response.body.cost.estimatedUsd, 3.5525);
+  assert.equal(response.body.cost.pricing.outputUsdPerMillion, 10);
 });
 
 test('premium database deep search route accepts an automatically completed empty place', async () => {
@@ -758,5 +970,13 @@ test('premium database import route is registered behind the premium api surface
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/import-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/sync-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/add-real-businesses'/);
+  assert.match(routeSource, /app\.get\('\/api\/premium-database\/deep-search-estimate'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/deep-search-businesses'/);
+});
+
+test('premium database Render config pins deep search to gpt-5.4 high reasoning', () => {
+  const renderSource = fs.readFileSync(path.join(__dirname, '../../render.yaml'), 'utf8');
+
+  assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_MODEL\s+value: gpt-5\.4/);
+  assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_REASONING_EFFORT\s+value: high/);
 });
