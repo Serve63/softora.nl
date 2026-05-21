@@ -486,7 +486,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521c/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
@@ -594,7 +594,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260521b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260521a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260521a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -652,18 +652,19 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT/);
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT_BASE64/);
   assert.match(deepSearchScriptSource, /function decodeBase64Utf8\(value\)/);
-  assert.match(deepSearchScriptSource, /TARGET_ORDER_VERSION = "distance-oisterwijk-v3"/);
-  assert.match(deepSearchScriptSource, /PREVIOUS_TARGET_ORDER_VERSION = "distance-oisterwijk-v2"/);
+  assert.match(deepSearchScriptSource, /TARGET_ORDER_VERSION = "distance-oisterwijk-v4"/);
+  assert.match(deepSearchScriptSource, /PREVIOUS_TARGET_ORDER_VERSION = "distance-oisterwijk-v3"/);
+  assert.match(deepSearchScriptSource, /LEGACY_TARGET_ORDER_VERSION_V2 = "distance-oisterwijk-v2"/);
   assert.match(deepSearchScriptSource, /function getRawDefaultTargetLabels\(\)/);
   assert.match(deepSearchScriptSource, /function getDefaultTargetLabels\(\)/);
   const rawTargetLines = readDefaultDeepSearchTargetLines(deepSearchScriptSource);
   const defaultTargetLines = loadDatabaseDeepSearchClient().getDefaultTargetLabels();
   const distanceClient = loadDatabaseDistanceClient();
-  assert.equal(rawTargetLines.length, 2499);
-  assert.equal(defaultTargetLines.length, 2499);
-  assert.equal(defaultTargetLines[0], 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk');
-  assert.equal(defaultTargetLines.includes('Nederland | Noord-Brabant | Oisterwijk | Haaren'), false);
-  assert.equal(defaultTargetLines.includes('Nederland | Noord-Brabant | Tilburg | Tilburg'), false);
+  assert.equal(rawTargetLines.length, 2493);
+  assert.equal(defaultTargetLines.length, 2493);
+  assert.equal(defaultTargetLines[0], 'Nederland | Noord-Brabant | Vught | Helvoirt');
+  assert.equal(defaultTargetLines.some((label) => label.startsWith('Nederland | Noord-Brabant | Oisterwijk | ')), false);
+  assert.equal(defaultTargetLines.some((label) => label.startsWith('Nederland | Noord-Brabant | Tilburg | ')), false);
   let previousTargetDistance = -Infinity;
   for (const label of defaultTargetLines) {
     const targetDistance = distanceClient.getTargetDistanceKm(label);
@@ -674,7 +675,7 @@ test('premium database contact status detects sent coldmail signals', () => {
     );
     previousTargetDistance = targetDistance;
   }
-  assert.ok(defaultTargetLines.indexOf('Nederland | Noord-Brabant | Oisterwijk | Moergestel') < defaultTargetLines.indexOf('Nederland | Noord-Brabant | Altena | Almkerk'));
+  assert.ok(defaultTargetLines.indexOf('Nederland | Noord-Brabant | Vught | Helvoirt') < defaultTargetLines.indexOf('Nederland | Noord-Brabant | Altena | Almkerk'));
   assert.ok(defaultTargetLines.indexOf('Nederland | Noord-Brabant | Altena | Almkerk') < defaultTargetLines.indexOf('Nederland | Groningen | Groningen | Groningen'));
   assert.ok(defaultTargetLines.includes('Nederland | Noord-Brabant | Altena | Woudrichem'));
   assert.ok(defaultTargetLines.includes('Nederland | Zuid-Holland | Zwijndrecht | Zwijndrecht'));
@@ -1392,7 +1393,7 @@ test('premium database deep search keeps old index-only progress on the original
   controller.open();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.match(listNode.innerHTML, /^<button class="deep-search-target is-active is-active"[\s\S]*1\. Nederland \| Noord-Brabant \| Oisterwijk \| Oisterwijk/);
+  assert.match(listNode.innerHTML, /^<button class="deep-search-target is-active is-active"[\s\S]*1\. Nederland \| Noord-Brabant \| Vught \| Helvoirt/);
   assert.match(listNode.innerHTML, /class="deep-search-target is-done"[\s\S]*Nederland \| Noord-Brabant \| Altena \| Almkerk/);
 });
 
@@ -1621,21 +1622,21 @@ test('premium database deep search continues to the next location until the requ
   const persisted = [];
   const rows = [
     ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
-    ['Oisterwijk Test BV', 'Kerkstraat 1, Oisterwijk', 'info@oisterwijktest.nl', '013 123 4567', 'oisterwijktest.nl'],
+    ['Helvoirt Test BV', 'Kerkstraat 1, Helvoirt', 'info@helvoirttest.nl', '073 123 4567', 'helvoirttest.nl'],
   ];
-  const heukelomRows = [
+  const boxtelRows = [
     rows[0],
-    ['Heukelom Test BV', 'Kerkstraat 2, Heukelom', 'info@heukelomtest.nl', '013 765 4321', 'heukelomtest.nl'],
+    ['Boxtel Test BV', 'Kerkstraat 2, Boxtel', 'info@boxteltest.nl', '0411 765 432', 'boxteltest.nl'],
   ];
   const responses = [
     {
       ok: true,
       rows,
-      businesses: [{ bedrijfsnaam: 'Oisterwijk Test BV', email: 'info@oisterwijktest.nl', website: 'oisterwijktest.nl' }],
+      businesses: [{ bedrijfsnaam: 'Helvoirt Test BV', email: 'info@helvoirttest.nl', website: 'helvoirttest.nl' }],
       found: 1,
       placeComplete: true,
       cost: { estimatedUsd: 0.12 },
-      sources: [{ url: 'https://oisterwijktest.nl/contact', title: 'Contact' }],
+      sources: [{ url: 'https://helvoirttest.nl/contact', title: 'Contact' }],
     },
     {
       ok: true,
@@ -1644,16 +1645,16 @@ test('premium database deep search continues to the next location until the requ
       found: 0,
       placeComplete: true,
       cost: { estimatedUsd: 0.08 },
-      sources: [{ url: 'https://oisterwijktest.nl/over-ons', title: 'Over ons' }],
+      sources: [{ url: 'https://helvoirttest.nl/over-ons', title: 'Over ons' }],
     },
     {
       ok: true,
-      rows: heukelomRows,
-      businesses: [{ bedrijfsnaam: 'Heukelom Test BV', email: 'info@heukelomtest.nl', website: 'heukelomtest.nl' }],
+      rows: boxtelRows,
+      businesses: [{ bedrijfsnaam: 'Boxtel Test BV', email: 'info@boxteltest.nl', website: 'boxteltest.nl' }],
       found: 1,
       placeComplete: false,
       cost: { estimatedUsd: 0.11 },
-      sources: [{ url: 'https://heukelomtest.nl/contact', title: 'Contact' }],
+      sources: [{ url: 'https://boxteltest.nl/contact', title: 'Contact' }],
     },
   ];
   const controller = deepSearchClient.createController({
@@ -1677,7 +1678,7 @@ test('premium database deep search continues to the next location until the requ
         assert.ok(persisted.length >= 1);
         const savedBeforeFollowUp = JSON.parse(persisted[persisted.length - 1].patch.deep_search_state);
         assert.deepEqual(getStoredTargetProgress(savedBeforeFollowUp).foundWebsites, [
-          'oisterwijktest.nl',
+          'helvoirttest.nl',
         ]);
       }
       calls.push(payload);
@@ -1696,13 +1697,13 @@ test('premium database deep search continues to the next location until the requ
 
   assert.equal(result, true);
   assert.equal(calls.length, 3);
-  assert.equal(calls[0].target, 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk');
+  assert.equal(calls[0].target, 'Nederland | Noord-Brabant | Vught | Helvoirt');
   assert.equal(calls[0].count, 2);
   assert.equal(calls[0].batchNumber, 1);
   assert.equal(calls[1].target, calls[0].target);
   assert.equal(calls[1].count, 1);
   assert.equal(calls[1].batchNumber, 2);
-  assert.equal(calls[2].target, 'Nederland | Noord-Brabant | Oisterwijk | Heukelom');
+  assert.equal(calls[2].target, 'Nederland | Noord-Brabant | Boxtel | Boxtel');
   assert.equal(calls[2].count, 1);
   assert.equal(calls[2].batchNumber, 1);
   assert.equal(customers.length, 2);
@@ -1713,14 +1714,14 @@ test('premium database deep search continues to the next location until the requ
   const finalStatePatch = persisted[persisted.length - 1].patch.deep_search_state;
   const finalState = JSON.parse(finalStatePatch);
   assert.equal(finalState.targets, undefined);
-  assert.equal(finalState.targetOrderVersion, 'distance-oisterwijk-v3');
+  assert.equal(finalState.targetOrderVersion, 'distance-oisterwijk-v4');
   assert.ok(finalStatePatch.length < 200000);
   assert.deepEqual(getStoredTargetProgress(finalState).foundWebsites, [
-    'oisterwijktest.nl',
+    'helvoirttest.nl',
   ]);
   assert.equal(getStoredTargetProgress(finalState).status, 'done');
   assert.deepEqual(getStoredTargetProgress(finalState, 1).foundWebsites, [
-    'heukelomtest.nl',
+    'boxteltest.nl',
   ]);
 });
 
@@ -1818,7 +1819,7 @@ test('premium database deep search turns the start button into a disabled comple
   const customers = [];
   const rows = [
     ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
-    ['Schutte Groen & Grond', 'Kerkstraat 1, Oisterwijk', 'info@schuttegroenengrond.nl', '013 123 4567', 'schuttegroenengrond.nl'],
+    ['Schutte Groen & Grond', 'Kerkstraat 1, Helvoirt', 'info@schuttegroenengrond.nl', '073 123 4567', 'schuttegroenengrond.nl'],
   ];
   const controller = deepSearchClient.createController({
     nodes: {
@@ -1854,7 +1855,7 @@ test('premium database deep search turns the start button into a disabled comple
   assert.equal(await controller.runCurrentSearch(), true);
 
   assert.equal(calls.length, 1);
-  assert.equal(startButton.textContent, '1 bedrijf toegevoegd in Oisterwijk');
+  assert.equal(startButton.textContent, '1 bedrijf toegevoegd in Helvoirt');
   assert.equal(startButton.disabled, true);
   assert.equal(startButton.getAttribute('aria-disabled'), 'true');
   assert.equal(startButton.classList.contains('is-session-complete'), true);
