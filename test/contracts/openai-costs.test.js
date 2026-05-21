@@ -438,6 +438,14 @@ test('combined api costs choose live usage estimate when Costs API is behind das
     {
       openAiCostsApiKey: 'openai-admin-key',
       openAiProjectId: 'proj-softora',
+      apiCostLedgerEvents: [
+        {
+          occurredAt: '2026-05-21T01:20:00.000Z',
+          source: 'premium-database-deep-search',
+          label: 'Ledger estimate that should not double-count OpenAI Usage',
+          amountUsd: 3.54,
+        },
+      ],
       usdToEurRate: 0.9,
       fetchJsonWithTimeout: async (url, options) => {
         calls.push({ url, options });
@@ -493,11 +501,55 @@ test('combined api costs choose live usage estimate when Costs API is behind das
   assert.equal(summary.costUsd, 1.38);
   assert.equal(summary.costEur, 1.24);
   assert.equal(summary.selectedProviderKind, 'usage_organization');
+  assert.equal(summary.softoraLedger.costUsd, 3.54);
   assert.equal(summary.organizationUsageEstimate.webSearchCalls, 138);
   assert.equal(summary.organizationOfficialProvider.costUsd, 0.34);
   assert.match(summary.note, /OpenAI loopt nog achter/);
   assert.ok(organizationWebSearchCall, 'verwacht organisatiebrede web-search usage zonder projectfilter');
   assert.equal(organizationWebSearchCall.options.headers['OpenAI-Project'], undefined);
+});
+
+test('openai usage estimate falls back to the configured OpenAI model when usage buckets omit model', async () => {
+  const summary = await fetchOpenAiUsageEstimateSummary(
+    {
+      openAiCostsApiKey: 'openai-admin-key',
+      openAiModel: 'gpt-5.5',
+      usdToEurRate: 0.9,
+      fetchJsonWithTimeout: async (url) => {
+        if (url.includes('/organization/usage/completions')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              data: [
+                {
+                  results: [
+                    {
+                      input_tokens: 11695,
+                      output_tokens: 43904,
+                      num_model_requests: 8,
+                    },
+                  ],
+                },
+              ],
+              has_more: false,
+            },
+          };
+        }
+        return {
+          response: { ok: true, status: 200 },
+          data: { data: [{ results: [] }], has_more: false },
+        };
+      },
+      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 4, 21, 1, 55, 0) }
+  );
+
+  assert.equal(summary.costUsd, 1.375595);
+  assert.equal(summary.costEur, 1.24);
+  assert.equal(summary.requestCount, 8);
+  assert.equal(summary.inputTokens, 11695);
+  assert.equal(summary.outputTokens, 43904);
 });
 
 test('openai usage estimate can estimate text token usage', async () => {
