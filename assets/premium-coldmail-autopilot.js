@@ -43,6 +43,44 @@
     return emails.length ? emails : [normEmail(select && select.value)].filter(Boolean);
   }
 
+  function buildSenderProfileFromPayload(payload) {
+    return {
+      subject: String(payload && payload.subject || ""),
+      body: String(payload && payload.body || ""),
+      aiInstructions: String(payload && payload.aiInstructions || ""),
+      toneStyle: String(payload && payload.toneStyle || ""),
+    };
+  }
+
+  function buildSenderProfiles(payload, senderEmails) {
+    const emails = Array.isArray(senderEmails) ? senderEmails.map(normEmail).filter(Boolean) : [];
+    const profiles = {};
+    let settings = null;
+    const controller = global.softoraColdmailingSenderSettingsController;
+    if (controller && typeof controller.collectSettings === "function") {
+      try {
+        settings = controller.collectSettings();
+      } catch (_) {
+        settings = null;
+      }
+    }
+    const senders = settings && settings.senders && typeof settings.senders === "object" ? settings.senders : {};
+    emails.forEach((email) => {
+      const stored = senders[email] && typeof senders[email] === "object" ? senders[email] : null;
+      if (stored && stored.subject && stored.body) profiles[email] = {
+        subject: String(stored.subject || ""),
+        body: String(stored.body || ""),
+        aiInstructions: String(stored.aiInstructions || ""),
+        toneStyle: String(stored.toneStyle || ""),
+      };
+    });
+    const currentSenderEmail = normEmail(payload && payload.senderEmail);
+    if (currentSenderEmail && emails.includes(currentSenderEmail)) {
+      profiles[currentSenderEmail] = buildSenderProfileFromPayload(payload);
+    }
+    return profiles;
+  }
+
   function isLeadGenerator() {
     return /premium-ai-coldmailing/.test(String(location.pathname || "")) ||
       document.documentElement.getAttribute("data-softora-lead-generator-alias") === "1";
@@ -52,10 +90,12 @@
     const payload = typeof global.getColdmailCampaignPayload === "function"
       ? global.getColdmailCampaignPayload("")
       : {};
+    const senderEmails = getSenderEmails();
     return {
       count: BATCH_SIZE,
       senderEmail: normEmail(payload.senderEmail),
-      senderEmails: getSenderEmails(),
+      senderEmails,
+      senderProfiles: buildSenderProfiles(payload, senderEmails),
       subject: String(payload.subject || ""),
       body: String(payload.body || ""),
       aiInstructions: String(payload.aiInstructions || ""),

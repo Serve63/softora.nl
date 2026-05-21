@@ -314,6 +314,14 @@ test('coldmail autopilot sends a small safe batch through the existing campaign 
       config: {
         count: 2,
         senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+            aiInstructions: 'Houd het kort.',
+            toneStyle: 'Vriendelijk & professioneel',
+          },
+        },
         branch: 'Horeca & Restaurants',
         service: "Website's",
         specialAction: '',
@@ -404,6 +412,12 @@ test('coldmail autopilot only uses explicitly configured sender emails', async (
       config: {
         count: 1,
         senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
         branch: 'Horeca & Restaurants',
         service: "Website's",
         specialAction: '',
@@ -428,6 +442,144 @@ test('coldmail autopilot only uses explicitly configured sender emails', async (
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
   assert.equal(sentMessages[0].subject, 'Korte vraag voor Bakkerij Zon');
+});
+
+test('coldmail autopilot refuses non-team sender emails even when SMTP exists', async () => {
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'info@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'info@softora.nl',
+        smtpPass: 'info-secret',
+      },
+      {
+        email: 'zakelijk@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'zakelijk@softora.nl',
+        smtpPass: 'zakelijk-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['info@softora.nl', 'zakelijk@softora.nl'],
+        senderProfiles: {
+          'info@softora.nl': {
+            subject: 'Foute info-afzender {{bedrijf}}',
+            body: 'Deze tekst mag nooit door autopilot heen.',
+          },
+          'zakelijk@softora.nl': {
+            subject: 'Foute zakelijk-afzender {{bedrijf}}',
+            body: 'Deze tekst mag ook nooit door autopilot heen.',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        service: "Website's",
+        specialAction: '',
+        radiusKm: 250,
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_sender_capacity');
+  assert.equal(sentMessages.length, 0);
+  assert.deepEqual(getAutopilotState().config.senderEmails, []);
+});
+
+test('coldmail autopilot uses the saved dashboard profile and requires the webdesign mockup', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Bakkerij Zon device mockup',
+      },
+    },
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'martijn@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'martijn@softora.nl',
+        smtpPass: 'martijn-secret',
+      },
+    ]),
+    coldmailingSettings: {
+      senderEmail: 'martijn@softora.nl',
+      senders: {
+        'martijn@softora.nl': {
+          subject: 'Oude opgeslagen tekst {{bedrijf}}',
+          body: 'Deze oudere tekst mag autopilot niet gebruiken.',
+        },
+      },
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['martijn@softora.nl'],
+        senderProfiles: {
+          'martijn@softora.nl': {
+            subject: 'Nieuw webdesign gemaakt voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}},\n\nDit is de actuele dashboardtekst.\n\nMet vriendelijke groet,\nMartijn van de Ven',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        service: "Website's",
+        specialAction: 'webdesign',
+        radiusKm: 250,
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.senderEmail, 'martijn@softora.nl');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].from, 'Martijn van de Ven <martijn@softora.nl>');
+  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt voor Bakkerij Zon');
+  assert.match(sentMessages[0].text, /Dit is de actuele dashboardtekst/);
+  assert.doesNotMatch(sentMessages[0].text, /oudere tekst/);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-prospect-1@softora');
 });
 
 test('coldmail autopilot keeps an emergency disabled state when a running batch finishes', async () => {
@@ -466,6 +618,12 @@ test('coldmail autopilot keeps an emergency disabled state when a running batch 
       config: {
         count: 1,
         senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
         branch: 'Horeca & Restaurants',
         service: "Website's",
         specialAction: '',
@@ -539,6 +697,12 @@ test('coldmail autopilot does not treat a full agenda as a mail safety stop', as
       config: {
         count: 1,
         senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}',
+          },
+        },
       },
     },
   });
@@ -891,6 +1055,44 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
   assert.equal(savedRows[0].actionRequired, false);
 });
 
+test('coldmail campaign refuses webdesign outreach when the device mockup is missing', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+      },
+    },
+  });
+
+  await assert.rejects(
+    service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Nieuwe website voor {{bedrijf}}',
+      body: 'Goedemorgen {{naam}}',
+      senderEmail: 'info@softora.nl',
+      specialAction: 'webdesign',
+    }),
+    (error) => {
+      assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
+      assert.match(error.failedItems[0].error, /Geen device-mockup gevonden/);
+      return true;
+    }
+  );
+  assert.equal(sentMessages.length, 0);
+});
+
 test('coldmail campaign keeps the closing signature before webdesign photos', async () => {
   const { service, sentMessages } = createService({
     rows: [
@@ -1236,6 +1438,7 @@ test('coldmail campaign send rejects legacy row-index chunks without a stable cu
 
 test('coldmail campaign uses chunked webdesign photo when websitePhoto is stale', async () => {
   const photoKey = 'photo-prospect-1';
+  const mockupPhotoKey = 'mockup-prospect-1';
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -1252,6 +1455,8 @@ test('coldmail campaign uses chunked webdesign photo when websitePhoto is stale'
         id: 'prospect-1',
         photoKey,
         chunkCount: 1,
+        mockupPhotoKey,
+        mockupChunkCount: 1,
         websitePhoto: TINY_PNG_DATA_URL,
       },
     },
@@ -1261,10 +1466,13 @@ test('coldmail campaign uses chunked webdesign photo when websitePhoto is stale'
           id: 'prospect-1',
           photoKey,
           chunkCount: 1,
+          mockupPhotoKey,
+          mockupChunkCount: 1,
           websitePhoto: TINY_PNG_DATA_URL,
         },
       }),
       [`${photoKey}_0`]: CHUNKED_PNG_DATA_URL,
+      [`${mockupPhotoKey}_0`]: CHUNKED_PNG_DATA_URL,
     },
   });
 
@@ -1278,12 +1486,14 @@ test('coldmail campaign uses chunked webdesign photo when websitePhoto is stale'
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].content.toString('base64'), 'TQ==');
+  assert.equal(sentMessages[0].attachments[1].content.toString('base64'), 'TQ==');
 });
 
 test('coldmail campaign uses recovered webdesign chunks over stale inline photo', async () => {
   const photoKey = 'softora_database_photo_data_v1_prospect-1';
+  const mockupPhotoKey = 'softora_database_photo_data_v1_prospect-1_mockup';
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -1301,9 +1511,12 @@ test('coldmail campaign uses recovered webdesign chunks over stale inline photo'
           id: 'prospect-1',
           websitePhoto: TINY_PNG_DATA_URL,
           websitePhotoName: 'Oude webdesign mockup',
+          mockupPhotoKey,
+          mockupChunkCount: 1,
         },
       }),
       [`${photoKey}_0`]: CHUNKED_PNG_DATA_URL,
+      [`${mockupPhotoKey}_0`]: CHUNKED_PNG_DATA_URL,
     },
   });
 
@@ -1317,8 +1530,9 @@ test('coldmail campaign uses recovered webdesign chunks over stale inline photo'
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].content.toString('base64'), 'TQ==');
+  assert.equal(sentMessages[0].attachments[1].content.toString('base64'), 'TQ==');
 });
 
 test('coldmail campaign prefers fresh row mockup data over stale stored photo map data', async () => {
