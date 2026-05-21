@@ -348,6 +348,88 @@ test('coldmail autopilot sends a small safe batch through the existing campaign 
   assert.equal(getSendGuardState().entries.length, 2);
 });
 
+test('coldmail autopilot only uses explicitly configured sender emails', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+      {
+        email: 'zakelijk@theimpactbox.co',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'zakelijk@theimpactbox.co',
+        smtpPass: 'impact-secret',
+      },
+    ]),
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-04-24T09:00:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 9,
+          personalCount: 0,
+        },
+      ],
+    },
+    coldmailingSettings: {
+      senderEmail: 'zakelijk@theimpactbox.co',
+      senders: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+        'zakelijk@theimpactbox.co': {
+          subject: 'Impact vraag voor {{bedrijf}}',
+          body: 'Impact body',
+        },
+      },
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        branch: 'Horeca & Restaurants',
+        service: "Website's",
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 9,
+        endHour: 17,
+        minIntervalMinutes: 12,
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.senderEmail, 'serve@softora.nl');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
+  assert.equal(sentMessages[0].subject, 'Korte vraag voor Bakkerij Zon');
+});
+
 test('coldmail autopilot keeps an emergency disabled state when a running batch finishes', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [
