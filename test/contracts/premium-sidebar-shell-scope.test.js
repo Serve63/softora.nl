@@ -342,6 +342,7 @@ test('static premium sidebars share the same section order and public labels', (
     assert.equal(linkTargets.social_linkedin, '/premium-socialmedia#linkedin');
     assert.equal(linkTargets.qr_code, '/premium-qr-code');
     for (const lockedKey of [
+      'mailbox',
       'seo',
       'qr_code',
       'ads_trustoo',
