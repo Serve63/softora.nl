@@ -95,6 +95,10 @@ const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
 const TEST_RECIPIENT_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL]);
 const TEST_RECIPIENT_LOOKUP_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL, 'servec321@gail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce', 'softora testmodus']);
+const COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS = new Set([
+  'serve@softora.nl',
+  'martijn@softora.nl',
+]);
 const SENDER_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
   'martijn@softora.nl': 'Martijn van de Ven',
@@ -1914,6 +1918,23 @@ function createColdmailCampaignService(deps = {}) {
       .slice(0, 5);
   }
 
+  function isColdmailAutopilotAllowedSenderEmail(value) {
+    return COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS.has(normalizeEmailAddress(value));
+  }
+
+  function normalizeColdmailAutopilotSenderProfiles(value = {}) {
+    const raw = value && typeof value === 'object' ? value : {};
+    const profiles = {};
+    Object.keys(raw).forEach((email) => {
+      const normalizedEmail = normalizeEmailAddress(email);
+      if (!isColdmailAutopilotAllowedSenderEmail(normalizedEmail)) return;
+      const profile = normalizeColdmailingSenderProfile(raw[email]);
+      if (!profile.subject || !profile.body) return;
+      profiles[normalizedEmail] = profile;
+    });
+    return profiles;
+  }
+
   function normalizeColdmailAutopilotRadiusKm(value) {
     if (normalizeString(value) === '') return 50;
     return parseRadiusKm(value);
@@ -1925,8 +1946,11 @@ function createColdmailCampaignService(deps = {}) {
       Object.prototype.hasOwnProperty.call(raw, 'senderEmails')
         ? raw.senderEmails
         : raw.senderEmail
-    );
-    const senderEmail = normalizeEmailAddress(raw.senderEmail) || senderEmails[0] || '';
+    ).filter(isColdmailAutopilotAllowedSenderEmail);
+    const rawSenderEmail = normalizeEmailAddress(raw.senderEmail);
+    const senderEmail = isColdmailAutopilotAllowedSenderEmail(rawSenderEmail)
+      ? rawSenderEmail
+      : senderEmails[0] || '';
     if (senderEmail && !senderEmails.includes(senderEmail)) senderEmails.unshift(senderEmail);
     return {
       count: parsePositiveInt(
@@ -1937,6 +1961,7 @@ function createColdmailCampaignService(deps = {}) {
       ),
       senderEmail: senderEmail || senderEmails[0] || '',
       senderEmails,
+      senderProfiles: normalizeColdmailAutopilotSenderProfiles(raw.senderProfiles || raw.senders),
       subject: truncateText(normalizeString(raw.subject), 200),
       body: normalizeString(raw.body),
       aiInstructions: normalizeString(raw.aiInstructions),
@@ -2099,6 +2124,7 @@ function createColdmailCampaignService(deps = {}) {
       count: normalized.count,
       senderEmail: normalized.senderEmail,
       senderEmails: normalized.senderEmails,
+      senderProfilesConfigured: Object.keys(normalized.senderProfiles || {}),
       branch: normalized.branch,
       service: normalized.service,
       database: normalized.database,
@@ -2217,40 +2243,39 @@ function createColdmailCampaignService(deps = {}) {
   function resolveColdmailAutopilotSenderProfile(settings, config, senderEmail) {
     const email = normalizeEmailAddress(senderEmail);
     const fallback = DEFAULT_COLDMAIL_SENDER_PROFILES[email] || DEFAULT_COLDMAIL_SENDER_PROFILES['serve@softora.nl'];
-    const stored = settings && settings.senders && settings.senders[email] ? settings.senders[email] : null;
-    const selectedSettingsProfile =
-      settings && normalizeEmailAddress(settings.senderEmail) === email
-        ? settings
-        : {};
-    const base = normalizeColdmailingSenderProfile(stored || selectedSettingsProfile, fallback);
+    const snapshots = config && config.senderProfiles && typeof config.senderProfiles === 'object'
+      ? config.senderProfiles
+      : {};
+    const snapshot = snapshots[email] && typeof snapshots[email] === 'object'
+      ? snapshots[email]
+      : null;
+    if (snapshot && snapshot.subject && snapshot.body) {
+      return normalizeColdmailingSenderProfile(snapshot, fallback);
+    }
     const configBelongsToSender = normalizeEmailAddress(config && config.senderEmail) === email;
-    return normalizeColdmailingSenderProfile(
-      configBelongsToSender
-        ? {
-            subject: config.subject || base.subject,
-            body: config.body || base.body,
-            aiInstructions: config.aiInstructions || base.aiInstructions,
-            toneStyle: config.toneStyle || base.toneStyle,
-          }
-        : base,
-      fallback
-    );
+    if (configBelongsToSender && config && config.subject && config.body) {
+      return normalizeColdmailingSenderProfile({
+        subject: config.subject,
+        body: config.body,
+        aiInstructions: config.aiInstructions,
+        toneStyle: config.toneStyle,
+      }, fallback);
+    }
+    return {
+      subject: '',
+      body: '',
+      aiInstructions: '',
+      toneStyle: normalizeString(config && config.toneStyle) || fallback.toneStyle || 'Vriendelijk & professioneel',
+    };
   }
 
   function getColdmailAutopilotSenderCandidates(state, settings) {
     const explicit = normalizeColdmailAutopilotSenderEmails([
       ...(state.config.senderEmails || []),
       state.config.senderEmail,
-    ]);
+    ]).filter(isColdmailAutopilotAllowedSenderEmail);
     if (explicit.length) return explicit;
-    const configured = getConfiguredSenderEmails();
-    const allowed = getAllowedSenderEmails();
-    const selected = normalizeColdmailAutopilotSenderEmails([
-      settings && settings.senderEmail,
-      ...configured,
-      ...allowed,
-    ]);
-    return selected.length ? selected : allowed;
+    return [];
   }
 
   async function chooseColdmailAutopilotSender(candidates) {
@@ -3473,8 +3498,9 @@ function createColdmailCampaignService(deps = {}) {
       const existing = parsed[id] && typeof parsed[id] === 'object' ? parsed[id] : null;
       if (existing && normalizeString(existing.photoKey) && parseDataUrlImage(existing.websitePhoto)) return;
       parsed[id] = {
+        ...(existing || {}),
         id,
-        identityKey: buildRowIdentityKey(row),
+        identityKey: normalizeString(existing && existing.identityKey) || buildRowIdentityKey(row),
         photoKey,
         chunkCount: chunked.chunkCount,
         websitePhoto: chunked.dataUrl,
@@ -4312,6 +4338,15 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
+      if (shouldIncludeWebdesignPhoto && !webdesignPhoto.mockup) {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(row),
+          email: to,
+          error: `Geen device-mockup gevonden voor ${getRowCompany(row) || to}.`,
+        });
+        continue;
+      }
       const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(baseText), reference);
       const html = webdesignPhoto
         ? appendWebdesignImageHtml(htmlBase, webdesignPhoto, {
@@ -4437,8 +4472,15 @@ function createColdmailCampaignService(deps = {}) {
 
     if (!sent.length && failed.length) {
       const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
+      const webdesignAssetFailure = shouldIncludeWebdesignPhoto && failed.every((item) =>
+        /^Geen (?:webdesign-foto|device-mockup) gevonden voor /i.test(normalizeString(item && item.error))
+      );
       const error = new Error(firstFailure ? `Geen mails verzonden: ${firstFailure}` : 'Geen mails verzonden.');
-      error.code = safetyPause ? 'COLDMAIL_SAFETY_PAUSED' : 'SMTP_SEND_FAILED';
+      error.code = safetyPause
+        ? 'COLDMAIL_SAFETY_PAUSED'
+        : webdesignAssetFailure
+          ? 'NO_WEBDESIGN_PHOTOS'
+          : 'SMTP_SEND_FAILED';
       error.failedItems = failed;
       if (safetyPause) error.quota = { ...(quota || {}), safetyPause };
       throw error;

@@ -736,7 +736,7 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const autopilotSource = fs.readFileSync(autopilotPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260521f/);
+  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260521g/);
   assert.match(autopilotSource, /const BATCH_SIZE = 3;/);
   assert.match(autopilotSource, /"campaignSenderEmail"/);
   assert.match(autopilotSource, /"start-campaign-btn"/);
@@ -751,7 +751,8 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   assert.match(autopilotSource, /notifyAutopilotStatus\(state\)/);
   assert.match(autopilotSource, /\/api\/coldmailing\/autopilot\/status/);
   assert.match(autopilotSource, /\/api\/coldmailing\/autopilot\/settings/);
-  assert.match(autopilotSource, /senderEmails: getSenderEmails\(\)/);
+  assert.match(autopilotSource, /const senderEmails = getSenderEmails\(\)/);
+  assert.match(autopilotSource, /senderProfiles: buildSenderProfiles\(payload, senderEmails\)/);
   assert.match(autopilotSource, /startHour: 9/);
   assert.match(autopilotSource, /endHour: 17/);
   assert.match(autopilotSource, /minIntervalMinutes: 12/);
