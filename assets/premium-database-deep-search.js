@@ -8,6 +8,7 @@
         inputTokensPerBatch: 6000,
         outputTokensPerCompany: 1400,
         webSearchCallsPerBatch: 1,
+        practicalMultiplier: 2.2,
         batchSize: 100,
         inputUsdPerMillion: 2.5,
         outputUsdPerMillion: 15,
@@ -153,13 +154,18 @@
         const count = Math.max(1, Math.min(MAX_DESIRED_COMPANY_COUNT, Number(companyCount || DEFAULT_DESIRED_COMPANY_COUNT) || DEFAULT_DESIRED_COMPANY_COUNT));
         const batchSize = Math.max(1, Number(ESTIMATED_BATCH_PRICING.batchSize) || DEEP_SEARCH_BATCH_SIZE);
         const estimatedBatches = Math.max(1, Math.ceil(count / batchSize));
-        const inputTokens = estimatedBatches * ESTIMATED_BATCH_PRICING.inputTokensPerBatch;
-        const outputTokens = count * ESTIMATED_BATCH_PRICING.outputTokensPerCompany;
-        const webSearchCalls = estimatedBatches * ESTIMATED_BATCH_PRICING.webSearchCallsPerBatch;
+        const practicalMultiplier = Math.max(1, Number(ESTIMATED_BATCH_PRICING.practicalMultiplier) || 1);
+        const inputTokens = scaleEstimateAmount(estimatedBatches * ESTIMATED_BATCH_PRICING.inputTokensPerBatch, practicalMultiplier);
+        const outputTokens = scaleEstimateAmount(count * ESTIMATED_BATCH_PRICING.outputTokensPerCompany, practicalMultiplier);
+        const webSearchCalls = Math.max(1, scaleEstimateAmount(estimatedBatches * ESTIMATED_BATCH_PRICING.webSearchCallsPerBatch, practicalMultiplier));
         const inputUsd = (inputTokens / 1000000) * ESTIMATED_BATCH_PRICING.inputUsdPerMillion;
         const outputUsd = (outputTokens / 1000000) * ESTIMATED_BATCH_PRICING.outputUsdPerMillion;
         const webSearchUsd = webSearchCalls * ESTIMATED_BATCH_PRICING.webSearchUsdPerCall;
         return Number((inputUsd + outputUsd + webSearchUsd).toFixed(6));
+    }
+
+    function scaleEstimateAmount(value, multiplier) {
+        return Math.ceil(Number((Math.max(0, Number(value) || 0) * multiplier).toFixed(6)));
     }
 
     function usdToEur(value) {

@@ -1029,12 +1029,40 @@ test('premium database deep search defaults to gpt-5.4 with high reasoning', asy
 
 test('premium database deep search estimate uses active model pricing without calling OpenAI', () => {
   const cases = [
-    { count: 25, expectedUsd: 0.3675, expectedBatches: 1 },
-    { count: 250, expectedUsd: 3.5525, expectedBatches: 3 },
-    { count: 500, expectedUsd: 7.0875, expectedBatches: 5 },
+    {
+      count: 25,
+      expectedUsd: 0.8165,
+      expectedBatches: 1,
+      expectedInputTokens: 13200,
+      expectedOutputTokens: 77000,
+      expectedWebSearchCalls: 3,
+    },
+    {
+      count: 250,
+      expectedUsd: 7.8195,
+      expectedBatches: 3,
+      expectedInputTokens: 39600,
+      expectedOutputTokens: 770000,
+      expectedWebSearchCalls: 7,
+    },
+    {
+      count: 500,
+      expectedUsd: 15.5925,
+      expectedBatches: 5,
+      expectedInputTokens: 66000,
+      expectedOutputTokens: 1540000,
+      expectedWebSearchCalls: 11,
+    },
   ];
 
-  cases.forEach(({ count, expectedUsd, expectedBatches }) => {
+  cases.forEach(({
+    count,
+    expectedUsd,
+    expectedBatches,
+    expectedInputTokens,
+    expectedOutputTokens,
+    expectedWebSearchCalls,
+  }) => {
     const result = estimateDeepSearchBusinessRunCost(
       { count },
       {
@@ -1049,10 +1077,12 @@ test('premium database deep search estimate uses active model pricing without ca
     assert.equal(result.requested, count);
     assert.equal(result.batchSize, 100);
     assert.equal(result.estimatedBatches, expectedBatches);
+    assert.equal(result.estimateMultiplier, 2.2);
     assert.equal(result.model, 'gpt-5.1');
-    assert.equal(result.cost.inputTokens, expectedBatches * 6000);
-    assert.equal(result.cost.outputTokens, count * 1400);
-    assert.equal(result.cost.webSearchCalls, expectedBatches);
+    assert.equal(result.cost.estimateMultiplier, 2.2);
+    assert.equal(result.cost.inputTokens, expectedInputTokens);
+    assert.equal(result.cost.outputTokens, expectedOutputTokens);
+    assert.equal(result.cost.webSearchCalls, expectedWebSearchCalls);
     assert.equal(result.cost.estimatedUsd, expectedUsd);
     assert.equal(result.cost.pricing.outputUsdPerMillion, 10);
   });
@@ -1069,7 +1099,8 @@ test('premium database deep search estimate defaults to gpt-5.4 high reasoning',
   assert.equal(result.ok, true);
   assert.equal(result.model, 'gpt-5.4');
   assert.equal(result.reasoningEffort, 'high');
-  assert.equal(result.cost.estimatedUsd, 5.325);
+  assert.equal(result.estimateMultiplier, 2.2);
+  assert.equal(result.cost.estimatedUsd, 11.719);
   assert.equal(result.cost.pricing.outputUsdPerMillion, 15);
 });
 
@@ -1086,8 +1117,25 @@ test('premium database deep search ignores the generic OPENAI_MODEL fallback', (
   assert.equal(result.ok, true);
   assert.equal(result.model, 'gpt-5.4');
   assert.equal(result.reasoningEffort, 'high');
-  assert.equal(result.cost.estimatedUsd, 0.55);
+  assert.equal(result.cost.estimatedUsd, 1.218);
   assert.equal(result.cost.pricing.outputUsdPerMillion, 15);
+});
+
+test('premium database deep search estimate multiplier can be calibrated safely', () => {
+  const result = estimateDeepSearchBusinessRunCost(
+    { count: 25 },
+    {
+      env: {
+        OPENAI_DATABASE_SEARCH_MODEL: 'gpt-5.4',
+        OPENAI_DATABASE_SEARCH_ESTIMATE_MULTIPLIER: '1',
+      },
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.model, 'gpt-5.4');
+  assert.equal(result.estimateMultiplier, 1);
+  assert.equal(result.cost.estimatedUsd, 0.55);
 });
 
 test('premium database deep search estimate route returns model-aware costs', () => {
@@ -1118,7 +1166,8 @@ test('premium database deep search estimate route returns model-aware costs', ()
   assert.equal(response.body.ok, true);
   assert.equal(response.body.requested, 250);
   assert.equal(response.body.model, 'gpt-5.1');
-  assert.equal(response.body.cost.estimatedUsd, 3.5525);
+  assert.equal(response.body.estimateMultiplier, 2.2);
+  assert.equal(response.body.cost.estimatedUsd, 7.8195);
   assert.equal(response.body.cost.pricing.outputUsdPerMillion, 10);
 });
 
@@ -1134,9 +1183,10 @@ test('premium database deep search estimate route returns model-aware costs with
   assert.equal(estimate.model, 'gpt-5.5');
   assert.equal(estimate.reasoningEffort, 'high');
   assert.equal(estimate.cost.currency, 'USD');
-  assert.equal(estimate.cost.inputTokens, 6000);
-  assert.equal(estimate.cost.outputTokens, 35000);
-  assert.equal(estimate.cost.webSearchCalls, 1);
+  assert.equal(estimate.estimateMultiplier, 2.2);
+  assert.equal(estimate.cost.inputTokens, 13200);
+  assert.equal(estimate.cost.outputTokens, 77000);
+  assert.equal(estimate.cost.webSearchCalls, 3);
 });
 
 test('premium database deep search estimate route is wired through the coordinator', () => {
