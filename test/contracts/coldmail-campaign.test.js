@@ -1530,6 +1530,51 @@ test('coldmail campaign test mode can look up a ready design row with the common
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-serve-ready-design-typo@softora"/);
 });
 
+test('coldmail campaign test mode keeps the dedicated test design when identity metadata changed', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'softora-test-mode-recipient',
+        bedrijf: 'Softora Testmodus',
+        naam: 'Servé',
+        email: 'servec321@gmail.com',
+        telefoon: '06 29 91 71 85',
+        website: 'softora.nl',
+        dom: 'softora.nl',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'softora-test-mode-recipient': {
+        id: 'softora-test-mode-recipient',
+        identityKey: 'softora testmodus|serve|31 00 000 00 00',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Softora test webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Softora test device mockup',
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuw webdesign gemaakt!',
+    body: 'Hoi {{naam}}, ik heb een nieuw webdesign gemaakt voor {{website}}.',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+    testMode: true,
+  });
+
+  assert.equal(result.testMode, true);
+  assert.equal(result.sent, 1);
+  assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
+});
+
 test('coldmail campaign keeps the dedicated Softora test row out of normal campaigns', async () => {
   const { service } = createService({
     rows: [

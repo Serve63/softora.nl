@@ -1070,7 +1070,9 @@ function createColdmailCampaignService(deps = {}) {
     const byIdentity = photosByIdentity instanceof Map ? photosByIdentity : new Map();
     const id = getExplicitRowId(row);
     const directPhoto = id ? photos[id] : null;
-    if (directPhoto && photoRecordMatchesRowIdentity(directPhoto, row)) return directPhoto;
+    if (directPhoto && (photoRecordMatchesRowIdentity(directPhoto, row) || isDedicatedTestModeRow(row))) {
+      return directPhoto;
+    }
     for (const identityKey of buildRowIdentityKeys(row)) {
       const photo = byIdentity.get(identityKey);
       if (photo) return photo;
