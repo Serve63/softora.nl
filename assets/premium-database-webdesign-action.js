@@ -515,7 +515,7 @@
         function renderReplyInfo(customer) {
             if (!isWebdesignOutreachCustomer(customer)) return "";
             const replyAt = getReplyAt(customer);
-            return replyAt ? "<div class=\"outreach-reply\"><strong>Reactie ontvangen</strong><span>" + escapeHtml(formatDisplayDate(replyAt)) + "</span></div>" : "<div class=\"outreach-reply\"><strong>Nog geen reactie</strong><span>25 dagen regel actief</span></div>";
+            return replyAt ? "<div class=\"outreach-reply\"><strong>Reactie ontvangen</strong><span>" + escapeHtml(formatDisplayDate(replyAt)) + "</span></div>" : "<div class=\"outreach-reply\"><strong>Nog geen reactie</strong><span>Blijft in Benaderd</span></div>";
         }
 
         function getLocalDateSerial(timestamp) {
@@ -544,24 +544,55 @@
         function renderActions(customer) {
             if (!isWebdesignOutreachCustomer(customer)) return "";
             const id = escapeHtml(customer.id);
-            return "<div class=\"outreach-actions\"><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"klant_geworden\" data-outreach-id=\"" + id + "\">Is klant geworden</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"afgehaakt\" data-outreach-id=\"" + id + "\">Afgehaakt</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"geen_interesse\" data-outreach-id=\"" + id + "\">Geen interesse</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"mail\" data-outreach-id=\"" + id + "\">Mail bekijken</button></div>";
+            return "<div class=\"outreach-actions\"><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"klant_geworden\" data-outreach-id=\"" + id + "\">Is klant geworden</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"mail\" data-outreach-id=\"" + id + "\">Mail bekijken</button></div>";
         }
 
-        function shouldAutoMarkNoReply(customer) {
-            const sentMs = parseDateValue(getSentAt(customer));
-            return isWebdesignOutreachCustomer(customer) && getEffectiveStatus(customer) === "benaderd" && !getReplyAt(customer) && sentMs && Math.floor((Date.now() - sentMs) / 86400000) >= 25;
+        function hasAutomatedNoReplyHistory(customer) {
+            const history = Array.isArray(customer && customer.hist) ? customer.hist : [];
+            return history.some(function (item) {
+                const source = normalizeOutreachValue(item && item.source);
+                const label = normalizeOutreachValue(item && (item.label || item.message || item.title));
+                return source === "webdesign_outreach_automation" || label === "geen_gehoor_na_25_dagen";
+            });
+        }
+
+        function shouldRestoreAutomatedNoReply(customer) {
+            if (!isWebdesignOutreachCustomer(customer) || !hasAutomatedNoReplyHistory(customer)) return false;
+            return normalizeOutreachStatus(customer && customer.outreachStatus) === "geen_gehoor" || mapDatabaseStatus(customer) === "geen_gehoor";
+        }
+
+        function restoreAutomatedNoReply(customer, nowIso) {
+            return {
+                ...customer,
+                status: "gemaild",
+                databaseStatus: "gemaild",
+                outreachStatus: "benaderd",
+                actionRequired: false,
+                outreachActionRequired: false,
+                statusUpdatedAt: nowIso,
+                updatedAt: nowIso,
+                hist: [{
+                    type: "gemaild",
+                    label: "Automatische geen gehoor-regel teruggedraaid",
+                    date: nowIso,
+                    actor: "Premium database",
+                    source: "webdesign-outreach-automation-rollback"
+                }].concat(Array.isArray(customer.hist) ? customer.hist : []).slice(0, 50)
+            };
         }
 
         function applyAutomation(customers) {
             let changed = false;
             const nowIso = new Date().toISOString();
+            const list = Array.isArray(customers) ? customers : [];
+            const nextCustomers = list.map(function (customer) {
+                if (!shouldRestoreAutomatedNoReply(customer)) return customer;
+                changed = true;
+                return restoreAutomatedNoReply(customer, nowIso);
+            });
             return {
-                changed: (customers || []).some(shouldAutoMarkNoReply),
-                customers: (customers || []).map(function (customer) {
-                    if (!shouldAutoMarkNoReply(customer)) return customer;
-                    changed = true;
-                    return { ...customer, status: "geengehoor", databaseStatus: "geengehoor", outreachStatus: "geen_gehoor", actionRequired: false, outreachActionRequired: false, statusUpdatedAt: nowIso, updatedAt: nowIso, hist: [{ type: "geengehoor", label: "Geen gehoor na 25 dagen", date: nowIso, actor: "Premium database", source: "webdesign-outreach-automation" }].concat(Array.isArray(customer.hist) ? customer.hist : []).slice(0, 50) };
-                })
+                changed: changed,
+                customers: nextCustomers
             };
         }
 
