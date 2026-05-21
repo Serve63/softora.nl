@@ -560,11 +560,28 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function findColdmailTestRecipientRow(customerRows = []) {
-    return (Array.isArray(customerRows) ? customerRows : []).find((row) => {
+    const rows = (Array.isArray(customerRows) ? customerRows : []).filter((row) => row && typeof row === 'object');
+    const dedicatedRow = rows.find((row) => {
       if (!row || typeof row !== 'object') return false;
       const id = normalizeString(row.id || row.customerId || row.databaseId).toLowerCase();
       return id === COLDMAIL_TEST_RECIPIENT_ID;
-    }) || null;
+    });
+    if (dedicatedRow) return dedicatedRow;
+    return (
+      rows.find(
+        (row) =>
+          getRowEmail(row) === COLDMAIL_TEST_RECIPIENT_EMAIL &&
+          isResolvableWebsitePhotoValue(getWebdesignPhotoSource(row))
+      ) ||
+      rows.find((row) => getRowEmail(row) === COLDMAIL_TEST_RECIPIENT_EMAIL) ||
+      rows.find(
+        (row) =>
+          TEST_RECIPIENT_COMPANIES.has(getRowCompany(row).toLowerCase()) &&
+          isResolvableWebsitePhotoValue(getWebdesignPhotoSource(row))
+      ) ||
+      rows.find((row) => TEST_RECIPIENT_COMPANIES.has(getRowCompany(row).toLowerCase())) ||
+      null
+    );
   }
 
   function buildColdmailTestRecipientRow(mode = 'mail', databaseRow = null) {

@@ -1417,6 +1417,76 @@ test('coldmail campaign test mode can send Softora webdesign attachment safely',
   assert.deepEqual(getSavedStates(), []);
 });
 
+test('coldmail campaign test mode uses the ready Gmail design row when the dedicated id is missing', async () => {
+  const { service, sentMessages, getSavedState, getSavedStates } = createService({
+    rows: [
+      {
+        id: 'serve-ready-design',
+        bedrijf: 'Softora Testmodus',
+        naam: 'Servé',
+        email: 'servec321@gmail.com',
+        website: 'softora.nl',
+        dom: 'softora.nl',
+        status: 'benaderbaar',
+        mail: true,
+      },
+      {
+        id: 'real-prospect',
+        bedrijf: 'Echte Klant BV',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'serve-ready-design': {
+        id: 'serve-ready-design',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Softora Gmail test webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Softora Gmail test device mockup',
+      },
+    },
+  });
+
+  const preview = await service.getColdmailCampaignRecipients({
+    count: 10,
+    testMode: true,
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(preview.testMode, true);
+  assert.equal(preview.selected, 1);
+  assert.equal(preview.failedItems.length, 0);
+  assert.equal(preview.recipients[0].id, 'serve-ready-design');
+  assert.equal(preview.recipients[0].email, 'servec321@gmail.com');
+
+  const result = await service.sendColdmailCampaign({
+    count: 10,
+    subject: 'Nieuw webdesign gemaakt!',
+    body: 'Hoi {{naam}}, ik heb een nieuw webdesign gemaakt voor {{website}}.',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+    testMode: true,
+  });
+
+  assert.equal(result.testMode, true);
+  assert.equal(result.sent, 1);
+  assert.equal(result.persisted, 0);
+  assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
+  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt!');
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-serve-ready-design@softora"/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-serve-ready-design@softora"/);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-serve-ready-design@softora');
+  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-serve-ready-design@softora');
+  assert.equal(getSavedState(), null);
+  assert.deepEqual(getSavedStates(), []);
+});
+
 test('coldmail campaign keeps the dedicated Softora test row out of normal campaigns', async () => {
   const { service } = createService({
     rows: [
