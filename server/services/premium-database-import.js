@@ -34,6 +34,8 @@ const GOOGLE_PLACES_FIELD_MASK = [
 const DEFAULT_REAL_BUSINESS_QUERY = 'bedrijven in Noord-Brabant';
 const DEFAULT_OPENAI_DATABASE_SEARCH_MODEL = 'gpt-5.4';
 const DEFAULT_OPENAI_DATABASE_SEARCH_REASONING_EFFORT = 'high';
+const DEFAULT_OPENAI_DATABASE_SEARCH_TIMEOUT_MS = 720000;
+const MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS = 760000;
 const ESTIMATED_DEEP_SEARCH_INPUT_TOKENS_PER_BATCH = 6000;
 const ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY = 1400;
 const ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH = 1;
@@ -979,7 +981,7 @@ function getOpenAiApiBaseUrl(deps = {}) {
 function getOpenAiDatabaseSearchModel(deps = {}) {
   const env = deps.env || process.env || {};
   return normalizeString(
-    deps.openAiModel || env.OPENAI_DATABASE_SEARCH_MODEL || env.OPENAI_MODEL || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL
+    env.OPENAI_DATABASE_SEARCH_MODEL || deps.openAiDatabaseSearchModel || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL
   );
 }
 
@@ -988,6 +990,39 @@ function getOpenAiDatabaseSearchReasoningEffort(model, deps = {}) {
   const explicit = normalizeString(deps.openAiReasoningEffort || env.OPENAI_DATABASE_SEARCH_REASONING_EFFORT);
   if (['none', 'low', 'medium', 'high', 'xhigh'].includes(explicit)) return explicit;
   return DEFAULT_OPENAI_DATABASE_SEARCH_REASONING_EFFORT;
+}
+
+function getOpenAiDatabaseSearchTimeoutMs(deps = {}) {
+  const env = deps.env || process.env || {};
+  const explicitDepsTimeout = Number(deps.openAiTimeoutMs);
+  if (Number.isFinite(explicitDepsTimeout) && explicitDepsTimeout > 0) {
+    return Math.min(explicitDepsTimeout, MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS);
+  }
+  const explicitEnvTimeout = Number(env.OPENAI_DATABASE_SEARCH_TIMEOUT_MS);
+  if (Number.isFinite(explicitEnvTimeout) && explicitEnvTimeout > 0) {
+    return Math.max(30000, Math.min(explicitEnvTimeout, MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS));
+  }
+  return DEFAULT_OPENAI_DATABASE_SEARCH_TIMEOUT_MS;
+}
+
+function isAbortError(error) {
+  const text = [
+    error && error.name,
+    error && error.code,
+    error && error.message,
+  ]
+    .map(normalizeString)
+    .join(' ')
+    .toLowerCase();
+  return /\babort|aborted|aborterror/.test(text);
+}
+
+function createOpenAiDeepSearchTimeoutError() {
+  return createServiceError(
+    'AI zoeken duurde te lang en is veilig gestopt. Probeer opnieuw of kies tijdelijk minder bedrijven.',
+    'OPENAI_DEEP_SEARCH_TIMEOUT',
+    504
+  );
 }
 
 function getOpenAiDatabaseSearchPricing(model) {
@@ -1618,7 +1653,7 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
 
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   const timeout = controller
-    ? setTimeout(() => controller.abort(), Math.max(10000, deps.openAiTimeoutMs || 180000))
+    ? setTimeout(() => controller.abort(), getOpenAiDatabaseSearchTimeoutMs({ ...deps, env }))
     : null;
   let response;
   try {
@@ -1659,6 +1694,11 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
         },
       }),
     });
+  } catch (error) {
+    if (isAbortError(error) || (controller && controller.signal && controller.signal.aborted)) {
+      throw createOpenAiDeepSearchTimeoutError();
+    }
+    throw error;
   } finally {
     if (timeout) clearTimeout(timeout);
   }

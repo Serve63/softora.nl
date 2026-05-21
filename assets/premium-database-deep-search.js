@@ -207,9 +207,9 @@
         const style = doc.createElement("style");
         style.id = DEEP_SEARCH_BUSY_STYLE_ID;
         style.textContent = [
-            ".deep-search-close.is-loading, .modal-bg.is-running .deep-search-close { width: 58px; height: 58px; cursor: wait; color: var(--crimson); background: rgba(139, 34, 82, 0.06); pointer-events: none; }",
+            ".deep-search-close.is-loading, .modal-bg.is-running .deep-search-close { width: 30px; height: 30px; cursor: wait; color: var(--crimson); background: rgba(139, 34, 82, 0.06); pointer-events: none; }",
             ".deep-search-close.is-loading svg, .modal-bg.is-running .deep-search-close svg { display: none; }",
-            ".deep-search-close-spinner { display: block; width: 58px; height: 58px; border: 2px solid rgba(139, 34, 82, 0.18); border-top-color: var(--crimson); border-radius: 50%; animation: deepSearchSpin .8s linear infinite; }",
+            ".deep-search-close-spinner { display: block; width: 18px; height: 18px; box-sizing: border-box; border: 2px solid rgba(139, 34, 82, 0.18); border-top-color: var(--crimson); border-radius: 50%; animation: deepSearchSpin .8s linear infinite; }",
             "#deepSearchStartButton.is-session-complete:disabled { background: rgba(65, 150, 92, 0.12); color: #3f8f5a; box-shadow: inset 0 0 0 1px rgba(63, 143, 90, 0.34); opacity: 1; cursor: not-allowed; }",
             "@keyframes deepSearchSpin { to { transform: rotate(360deg); } }"
         ].join("\n");

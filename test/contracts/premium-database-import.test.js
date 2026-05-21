@@ -472,6 +472,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
     {
       env: {
         OPENAI_API_KEY: 'openai-key',
+        OPENAI_DATABASE_SEARCH_MODEL: 'gpt-5.5',
         OPENAI_MODEL: 'gpt-5.5',
         OPENAI_ORGANIZATION_ID: 'org_softora',
         OPENAI_PROJECT_ID: 'proj_softora',
@@ -578,6 +579,36 @@ test('premium database deep search uses OpenAI web search and returns complete r
     'bakkerijzon.nl',
   ]);
   assert.equal(result.sources[0].url, 'https://bakkerijzon.nl/contact');
+});
+
+test('premium database deep search reports OpenAI aborts as a clean timeout', async () => {
+  await assert.rejects(
+    fetchDeepSearchBusinessRows(
+      {
+        target: 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk',
+        count: 25,
+      },
+      {
+        env: { OPENAI_API_KEY: 'openai-key' },
+        openAiTimeoutMs: 5,
+        fetchImpl: async (_url, options = {}) =>
+          new Promise((_resolve, reject) => {
+            assert.ok(options.signal, 'OpenAI request should receive an abort signal');
+            options.signal.addEventListener(
+              'abort',
+              () => reject(new Error('This operation was aborted')),
+              { once: true }
+            );
+          }),
+      }
+    ),
+    (error) => {
+      assert.equal(error.code, 'OPENAI_DEEP_SEARCH_TIMEOUT');
+      assert.equal(error.statusCode, 504);
+      assert.match(error.message, /AI zoeken duurde te lang/);
+      return true;
+    }
+  );
 });
 
 test('premium database deep search hard-filters businesses already in the exclude list', async () => {
@@ -936,6 +967,23 @@ test('premium database deep search estimate defaults to gpt-5.4 high reasoning',
   assert.equal(result.model, 'gpt-5.4');
   assert.equal(result.reasoningEffort, 'high');
   assert.equal(result.cost.estimatedUsd, 5.325);
+  assert.equal(result.cost.pricing.outputUsdPerMillion, 15);
+});
+
+test('premium database deep search ignores the generic OPENAI_MODEL fallback', () => {
+  const result = estimateDeepSearchBusinessRunCost(
+    { count: 25 },
+    {
+      env: {
+        OPENAI_MODEL: 'gpt-5.1',
+      },
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.model, 'gpt-5.4');
+  assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.cost.estimatedUsd, 0.55);
   assert.equal(result.cost.pricing.outputUsdPerMillion, 15);
 });
 
