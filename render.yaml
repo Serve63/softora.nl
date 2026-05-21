@@ -91,6 +91,10 @@ services:
         sync: false
       - key: COLDMAIL_BOUNCE_PROCESSING_ENABLED
         value: true
+      - key: COLDMAIL_DAILY_SEND_LIMIT
+        value: 30
+      - key: COLDMAIL_PACKAGE_DAILY_SEND_LIMIT
+        value: 60
       - key: COLDMAIL_SEND_DELAY_MS
         value: 90000
       - key: COLDMAIL_SAFETY_PAUSE_MS

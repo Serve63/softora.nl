@@ -2671,6 +2671,9 @@ test('coldmail campaign caps preview volume to STRATO-safe campaign limit', asyn
 
   assert.equal(result.selected, 30);
   assert.equal(result.safetyLimits.campaignSendLimit, 30);
+  assert.equal(result.safetyLimits.dailySendLimit, 30);
+  assert.equal(result.safetyLimits.packageDailySendLimit, 60);
+  assert.equal(result.safetyLimits.personalMailboxDailyLimit, 10);
 });
 
 test('coldmail campaign enforces daily sender guard across campaigns', async () => {
@@ -2731,13 +2734,13 @@ test('coldmail campaign does not mark daily-limit skipped rows as mailed', async
   const { service, sentMessages, getSavedState } = createService({
     rows,
     coldmailCampaignSendLimit: 10,
-    coldmailDailySendLimit: 50,
+    coldmailDailySendLimit: 30,
     sendGuardState: {
       entries: [
         {
           at: '2026-04-24T11:00:00.000Z',
           senderEmail: 'info@softora.nl',
-          count: 48,
+          count: 28,
         },
       ],
     },

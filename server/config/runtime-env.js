@@ -261,19 +261,19 @@ function loadRuntimeEnv(env = process.env) {
         safeEnv.COLDMAIL_CAMPAIGN_SEND_LIMIT,
         30,
         1,
-        50
+        30
       ),
       coldmailDailySendLimit: readBoundedNumberEnv(
         safeEnv.COLDMAIL_DAILY_SEND_LIMIT,
-        50,
+        30,
         1,
-        50
+        30
       ),
       coldmailPackageDailySendLimit: readBoundedNumberEnv(
         safeEnv.COLDMAIL_PACKAGE_DAILY_SEND_LIMIT,
-        100,
+        60,
         1,
-        100
+        60
       ),
       coldmailSendDelayMs: readBoundedNumberEnv(
         safeEnv.COLDMAIL_SEND_DELAY_MS,
@@ -291,7 +291,7 @@ function loadRuntimeEnv(env = process.env) {
         safeEnv.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT,
         10,
         1,
-        50
+        10
       ),
       coldmailPersonalMailboxSendDelayMs: readBoundedNumberEnv(
         safeEnv.COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS,
