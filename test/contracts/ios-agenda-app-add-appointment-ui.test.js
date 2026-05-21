@@ -31,7 +31,11 @@ test('ios agenda add appointment removes the meeting lead-owner step', () => {
     /static let appointmentTargetCases: \[Planner\] = \[\.serve, \.martijn, \.both\]/,
     'Appointment target choices must include Serve, Martijn and both.'
   );
-  assert.match(addViewSource, /FormLabel\("Voor wie\?"\)[^]*appointmentTargetChoices/);
+  assert.match(addViewSource, /if showsAppointmentTargetChoices \{[^]*FormLabel\("Voor wie\?"\)[^]*appointmentTargetChoices[^]*\}/);
+  assert.match(addViewSource, /private var showsAppointmentTargetChoices: Bool \{[^]*draft\.appointmentType != \.personal[^]*\}/);
+  assert.match(addViewSource, /\.onAppear \{[^]*syncPrivateAppointmentPlanner\(\)[^]*\}/);
+  assert.match(addViewSource, /private func syncPrivateAppointmentPlanner\(\) \{[^]*guard draft\.appointmentType == \.personal else \{ return \}[^]*draft\.planner = store\.selectedPlanner[^]*\}/);
+  assert.match(addViewSource, /private func save\(\) \{[^]*syncPrivateAppointmentPlanner\(\)/);
   assert.match(addViewSource, /options: orderedPlannerOptions\(Planner\.appointmentTargetCases\)/);
   assert.match(addViewSource, /let selectedPlanner = store\.selectedPlanner/);
   assert.match(addViewSource, /return \[selectedPlanner\] \+ options\.filter \{ \$0 != selectedPlanner \}/);

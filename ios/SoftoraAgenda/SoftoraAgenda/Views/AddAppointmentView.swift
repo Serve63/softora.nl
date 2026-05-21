@@ -48,8 +48,10 @@ struct AddAppointmentView: View {
                     sheetHeader
 
                     VStack(alignment: .leading, spacing: 11) {
-                        FormLabel("Voor wie?")
-                        appointmentTargetChoices
+                        if showsAppointmentTargetChoices {
+                            FormLabel("Voor wie?")
+                            appointmentTargetChoices
+                        }
 
                         FormLabel("Titel")
                         SoftoraTextField(
@@ -117,6 +119,9 @@ struct AddAppointmentView: View {
         } message: {
             Text((store.alertMessage ?? "").softoraUppercased)
         }
+        .onAppear {
+            syncPrivateAppointmentPlanner()
+        }
     }
 
     private var sheetHeader: some View {
@@ -173,6 +178,10 @@ struct AddAppointmentView: View {
         )
     }
 
+    private var showsAppointmentTargetChoices: Bool {
+        draft.appointmentType != .personal
+    }
+
     private func plannerChoiceRow(options: [Planner], selection: Binding<Planner>) -> some View {
         HStack(spacing: 10) {
             ForEach(options) { planner in
@@ -204,6 +213,11 @@ struct AddAppointmentView: View {
         let selectedPlanner = store.selectedPlanner
         guard options.contains(selectedPlanner) else { return options }
         return [selectedPlanner] + options.filter { $0 != selectedPlanner }
+    }
+
+    private func syncPrivateAppointmentPlanner() {
+        guard draft.appointmentType == .personal else { return }
+        draft.planner = store.selectedPlanner
     }
 
     private var repeatRow: some View {
@@ -285,6 +299,8 @@ struct AddAppointmentView: View {
     }
 
     private func save() {
+        syncPrivateAppointmentPlanner()
+
         let trimmedTime = timeText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedTime.count == 5, trimmedTime.contains(":") else {
             store.alertMessage = "Vul een tijdstip in als HH:MM."
