@@ -6,6 +6,7 @@ const DEFAULT_MONTHLY_HOURS = 730;
 const SUPABASE_MANAGEMENT_ADDONS_DOC_URL =
   'https://supabase.com/docs/reference/api/management#list-billing-addons-and-compute-instance-selections';
 const SUPABASE_BILLING_DOC_URL = 'https://supabase.com/docs/guides/platform/billing-on-supabase';
+const SUPABASE_USAGE_DOC_URL = 'https://supabase.com/docs/guides/platform/manage-your-usage';
 let supabaseCostsCache = null;
 
 function normalizeString(value) {
@@ -243,14 +244,16 @@ function convertCurrenciesToEur(currencies = {}, rateDetails = {}) {
 }
 
 function buildSupabaseCostSelection(summary = {}) {
-  const complete = Boolean(summary && summary.complete);
+  const hasConfiguredBase = Boolean(summary && summary.hasConfiguredBase);
   return {
-    selectionStrategy: 'management_addons_plus_configured_base_without_double_counting',
-    selectedProviderKind: complete ? 'management_addons_with_configured_base' : 'management_addons_only',
-    selectedProviderLabel: complete
-      ? 'Live schatting via Supabase Management API + basisbedrag'
-      : 'Gedeeltelijke live schatting via Supabase Management API',
-    selectedProviderConfidence: complete ? 'complete_estimate' : 'partial_estimate',
+    selectionStrategy: 'management_addons_plus_configured_base_as_known_lower_bound',
+    selectedProviderKind: hasConfiguredBase
+      ? 'management_addons_with_configured_base_partial'
+      : 'management_addons_only_partial',
+    selectedProviderLabel: hasConfiguredBase
+      ? 'Live ondergrens via Supabase Management API + basisbedrag'
+      : 'Live gedeeltelijk via Supabase Management API',
+    selectedProviderConfidence: 'partial_estimate',
   };
 }
 
@@ -345,14 +348,22 @@ async function fetchSupabaseCostSummary(deps = {}, options = {}) {
   const baseConverted = convertCurrenciesToEur(baseCurrencies, rateDetails);
   const converted = convertCurrenciesToEur(currencies, rateDetails);
   const fetchedAt = new Date(nowMs).toISOString();
-  const complete = Boolean(baseCost.configured && converted.unsupportedCurrencies.length === 0);
-  const selection = buildSupabaseCostSelection({ complete });
+  const selection = buildSupabaseCostSelection({ hasConfiguredBase: baseCost.configured });
+  const excludedCostCategories = [
+    'organization_usage_overages',
+    'invoice_adjustments',
+    'taxes',
+    'credits',
+    'subscription_changes_after_config',
+  ];
   const summary = {
-    status: complete ? 'success' : 'partial',
+    status: 'partial',
     source: 'supabase-management-addons',
     endpoint: '/v1/projects/{ref}/billing/addons',
-    exact: complete,
-    complete,
+    exact: false,
+    complete: false,
+    officialBillingTotalAvailable: false,
+    costCoverage: 'known_lower_bound',
     selectionStrategy: selection.selectionStrategy,
     selectedProviderKind: selection.selectedProviderKind,
     selectedProviderLabel: selection.selectedProviderLabel,
@@ -362,6 +373,8 @@ async function fetchSupabaseCostSummary(deps = {}, options = {}) {
     scope: 'month',
     projectRef: addonsResult.projectRef,
     costEur: converted.costEur,
+    knownCostEur: converted.costEur,
+    minimumCostEur: converted.costEur,
     currency: 'eur',
     currencies,
     addonCurrencies: addonCosts.currencies,
@@ -376,9 +389,11 @@ async function fetchSupabaseCostSummary(deps = {}, options = {}) {
     usdToEurRateSource: rateDetails.source,
     pricingSource: SUPABASE_BILLING_DOC_URL,
     managementApiSource: SUPABASE_MANAGEMENT_ADDONS_DOC_URL,
-    note: complete
-      ? 'Supabase kosten via Management API add-ons plus geconfigureerd basisbedrag.'
-      : 'Supabase Management API geeft project-add-ons; zet SUPABASE_MONTHLY_BASE_COST_EUR of USD voor een volledige maandinschatting.',
+    usageSource: SUPABASE_USAGE_DOC_URL,
+    excludedCostCategories,
+    note: baseCost.configured
+      ? 'Supabase Management API geeft project-add-ons, maar geen volledige organization usage of factuurregels; dit is een live ondergrens plus geconfigureerd basisbedrag.'
+      : 'Supabase Management API geeft project-add-ons, maar geen basisplan, organization usage of factuurregels; zet SUPABASE_MONTHLY_BASE_COST_EUR of USD voor een betere ondergrens.',
   };
 
   cache.summary = summary;
@@ -417,8 +432,12 @@ async function fetchSupabaseCostDiagnostics(deps = {}, options = {}) {
         selectedProviderLabel: summary.selectedProviderLabel,
         selectedProviderConfidence: summary.selectedProviderConfidence,
         costEur: summary.costEur,
+        knownCostEur: summary.knownCostEur,
+        minimumCostEur: summary.minimumCostEur,
         exact: summary.exact,
         complete: summary.complete,
+        officialBillingTotalAvailable: summary.officialBillingTotalAvailable,
+        costCoverage: summary.costCoverage,
         note: summary.note,
       }
     : null;
@@ -439,6 +458,8 @@ async function fetchSupabaseCostDiagnostics(deps = {}, options = {}) {
           addonCurrencies: summary.addonCurrencies,
           addons: summary.addons,
           status: summary.status,
+          officialBillingTotalAvailable: summary.officialBillingTotalAvailable,
+          excludedCostCategories: summary.excludedCostCategories,
         }
       : null,
     configuredBase: {
@@ -450,7 +471,7 @@ async function fetchSupabaseCostDiagnostics(deps = {}, options = {}) {
     },
     selected,
     comparison: {
-      strategy: 'management_addons_plus_configured_base_without_double_counting',
+      strategy: 'management_addons_plus_configured_base_as_known_lower_bound',
       selectedProviderKind: selected ? selected.selectedProviderKind : null,
       selectedProviderLabel: selected ? selected.selectedProviderLabel : null,
       selectedCostEur: selected ? selected.costEur : 0,
@@ -460,13 +481,13 @@ async function fetchSupabaseCostDiagnostics(deps = {}, options = {}) {
               kind: 'configured_base',
               label: 'Geconfigureerd Supabase basisbedrag',
               costEur: summary.baseCostEur,
-              complete: Boolean(summary.baseCost && summary.baseCost.configured),
+              complete: false,
             },
             {
               kind: 'management_addons',
               label: 'Supabase Management API add-ons',
               costEur: summary.addonCostEur,
-              complete: true,
+              complete: false,
             },
             {
               kind: summary.selectedProviderKind,
@@ -481,6 +502,7 @@ async function fetchSupabaseCostDiagnostics(deps = {}, options = {}) {
     docs: {
       managementAddons: SUPABASE_MANAGEMENT_ADDONS_DOC_URL,
       billing: SUPABASE_BILLING_DOC_URL,
+      usage: SUPABASE_USAGE_DOC_URL,
     },
   };
 }

@@ -53,7 +53,7 @@ test('supabase costs collects selected add-on prices as monthly amounts', () => 
   assert.equal(amounts.lineItems[1].amount, 3.5);
 });
 
-test('supabase costs fetches Management API add-ons and combines configured base cost', async () => {
+test('supabase costs fetches Management API add-ons and reports a known lower bound', async () => {
   const calls = [];
   const summary = await fetchSupabaseCostSummary(
     {
@@ -88,19 +88,26 @@ test('supabase costs fetches Management API add-ons and combines configured base
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://api.supabase.test/v1/projects/project-ref/billing/addons');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer supabase-token');
-  assert.equal(summary.status, 'success');
-  assert.equal(summary.exact, true);
+  assert.equal(summary.status, 'partial');
+  assert.equal(summary.exact, false);
+  assert.equal(summary.complete, false);
+  assert.equal(summary.officialBillingTotalAvailable, false);
+  assert.equal(summary.costCoverage, 'known_lower_bound');
   assert.equal(summary.costEur, 34);
+  assert.equal(summary.knownCostEur, 34);
+  assert.equal(summary.minimumCostEur, 34);
   assert.equal(summary.addonCostEur, 9);
   assert.equal(summary.baseCostEur, 25);
-  assert.equal(summary.selectedProviderKind, 'management_addons_with_configured_base');
-  assert.match(summary.selectedProviderLabel, /Management API/);
+  assert.equal(summary.selectedProviderKind, 'management_addons_with_configured_base_partial');
+  assert.match(summary.selectedProviderLabel, /ondergrens/);
   assert.equal(summary.currency, 'eur');
   assert.equal(summary.baseCost.source, 'configured-eur');
   assert.deepEqual(summary.currencies, { usd: 10, eur: 25 });
   assert.deepEqual(summary.addonCurrencies, { usd: 10 });
   assert.deepEqual(summary.baseCurrencies, { eur: 25 });
   assert.equal(summary.addons.length, 1);
+  assert.match(summary.note, /geen volledige organization usage/);
+  assert.ok(summary.excludedCostCategories.includes('organization_usage_overages'));
 });
 
 test('supabase costs stays partial without configured base plan cost', async () => {
@@ -131,7 +138,7 @@ test('supabase costs stays partial without configured base plan cost', async () 
 
   assert.equal(summary.status, 'partial');
   assert.equal(summary.exact, false);
-  assert.equal(summary.selectedProviderKind, 'management_addons_only');
+  assert.equal(summary.selectedProviderKind, 'management_addons_only_partial');
   assert.equal(summary.costEur, 9);
   assert.match(summary.note, /SUPABASE_MONTHLY_BASE_COST/);
 });
@@ -185,10 +192,15 @@ test('supabase cost diagnostics compares configured base and Management API add-
   assert.equal(diagnostics.managementApi.addonCostEur, 9);
   assert.equal(diagnostics.configuredBase.costEur, 25);
   assert.equal(diagnostics.selected.costEur, 34);
-  assert.equal(diagnostics.selected.selectedProviderKind, 'management_addons_with_configured_base');
+  assert.equal(diagnostics.selected.selectedProviderKind, 'management_addons_with_configured_base_partial');
+  assert.equal(diagnostics.selected.exact, false);
+  assert.equal(diagnostics.selected.officialBillingTotalAvailable, false);
+  assert.equal(diagnostics.selected.costCoverage, 'known_lower_bound');
   assert.equal(diagnostics.comparison.candidates[0].kind, 'configured_base');
   assert.equal(diagnostics.comparison.candidates[1].kind, 'management_addons');
+  assert.equal(diagnostics.comparison.candidates[2].complete, false);
   assert.equal(diagnostics.unavailable.length, 0);
+  assert.match(diagnostics.docs.usage, /manage-your-usage/);
 });
 
 test('supabase cost diagnostics reports missing token without throwing', async () => {
