@@ -15,8 +15,9 @@
   const API_COST_UNAVAILABLE_NOTE = 'OpenAI kosten konden niet worden opgehaald';
   const API_COST_LOGIN_NOTE = 'Log opnieuw in om OpenAI kosten op te halen';
   const API_COST_ADMIN_NOTE = 'Alleen Full Acces kan OpenAI kosten bekijken';
-  const SUPABASE_COST_NOTE = 'Live schatting · Supabase Management API';
-  const SUPABASE_COST_PARTIAL_NOTE = 'Live gedeeltelijk · Supabase Management API';
+  const SUPABASE_COST_NOTE = 'Live ondergrens · Supabase Management API';
+  const SUPABASE_COST_PARTIAL_NOTE = 'Live ondergrens · Supabase Management API';
+  const SUPABASE_COST_LIMITATION_NOTE = 'Extra verbruik niet via API';
   const SUPABASE_COST_UNAVAILABLE_NOTE = 'Supabase live-kosten niet gekoppeld';
   const SUPABASE_COST_TOKEN_NOTE = 'Supabase Management token ontbreekt op Vercel';
   const SUPABASE_COST_PROJECT_NOTE = 'Supabase project-ref ontbreekt op Vercel';
@@ -390,6 +391,12 @@
     const addonCount = Number(summary && summary.selectedAddonCount);
     const usdToEurRateSource = normalizeString(summary && summary.usdToEurRateSource);
     const hasUsdCosts = Boolean(summary && summary.currencies && Number(summary.currencies.usd) > 0);
+    const addonLabel = Number.isFinite(addonCount)
+      ? addonCount > 0
+        ? addonCount + ' add-on(s)'
+        : 'Geen add-ons'
+      : '';
+    const officialBillingTotalAvailable = Boolean(summary && summary.officialBillingTotalAvailable === true);
     const rateLabel = hasUsdCosts
       ? usdToEurRateSource === 'configured'
         ? 'Koers ingesteld'
@@ -399,8 +406,9 @@
       : '';
     return [
       summary && summary.exact ? SUPABASE_COST_NOTE : SUPABASE_COST_PARTIAL_NOTE,
-      Number.isFinite(addonCount) ? addonCount + ' add-on(s)' : '',
+      addonLabel,
       summary && summary.baseCost && summary.baseCost.configured ? 'Basisbedrag gekoppeld' : 'Basisbedrag ontbreekt',
+      officialBillingTotalAvailable ? '' : SUPABASE_COST_LIMITATION_NOTE,
       rateLabel,
       fetchedAtLabel ? 'Bijgewerkt ' + fetchedAtLabel : '',
     ].filter(Boolean).join(' · ');
@@ -413,8 +421,8 @@
 
     const summary = payload && payload.summary && typeof payload.summary === 'object' ? payload.summary : payload;
     const nextNote = buildSupabaseCostNote(summary || {});
-    const canReplaceAmount = Boolean(summary && summary.exact === true);
     const amountEur = Number(summary && summary.costEur);
+    const canReplaceAmount = Boolean(summary && Number.isFinite(amountEur) && amountEur >= 0);
 
     if (!canReplaceAmount || !Number.isFinite(amountEur) || amountEur < 0) {
       if (normalizeString(item.note) === nextNote || !nextNote) return false;
@@ -425,13 +433,17 @@
     }
 
     const nextAmount = Math.round(amountEur * 100) / 100;
-    const nextAmountLabel = formatCurrencyAmount(nextAmount, 'eur');
+    const nextAmountLabel =
+      summary && summary.exact === true
+        ? formatCurrencyAmount(nextAmount, 'eur')
+        : 'Vanaf ' + formatCurrencyAmount(nextAmount, 'eur');
+    const nextStatus = summary && summary.exact === true ? 'success' : 'partial';
     const changed =
       Number(item.bedrag) !== nextAmount ||
       normalizeString(item.currency) !== 'eur' ||
       normalizeString(item.amountLabel) !== nextAmountLabel ||
       normalizeString(item.note) !== nextNote ||
-      normalizeString(item.status) !== 'success';
+      normalizeString(item.status) !== nextStatus;
 
     if (!changed) return false;
 
@@ -439,7 +451,7 @@
     item.currency = 'eur';
     item.amountLabel = nextAmountLabel;
     item.note = nextNote;
-    item.status = 'success';
+    item.status = nextStatus;
     render();
     return true;
   }

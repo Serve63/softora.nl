@@ -231,7 +231,9 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /const BILLING_RETRY_MAX_ATTEMPTS = 18;/);
   assert.match(scriptSource, /function scheduleApiCostRetry\(error\)/);
   assert.match(scriptSource, /if \(isPremiumAuthCostError\(statusCode, payload\)\) return false;/);
-  assert.match(scriptSource, /const SUPABASE_COST_NOTE = 'Live schatting · Supabase Management API';/);
+  assert.match(scriptSource, /const SUPABASE_COST_NOTE = 'Live ondergrens · Supabase Management API';/);
+  assert.match(scriptSource, /const SUPABASE_COST_LIMITATION_NOTE = 'Extra verbruik niet via API';/);
+  assert.match(scriptSource, /'Vanaf ' \+ formatCurrencyAmount\(nextAmount, 'eur'\)/);
   assert.match(scriptSource, /const SUPABASE_COST_TOKEN_NOTE = 'Supabase Management token ontbreekt op Vercel';/);
   assert.match(scriptSource, /function applyApiCostSnapshot\(snapshot\)/);
   assert.match(scriptSource, /function buildApiCostUnavailableNote\(error\)/);
