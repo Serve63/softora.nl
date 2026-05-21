@@ -485,7 +485,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
         assert.equal(options.headers['OpenAI-Project'], 'proj_softora');
         const payload = JSON.parse(options.body);
         assert.equal(payload.model, 'gpt-5.5');
-        assert.equal(payload.reasoning.effort, 'high');
+        assert.equal(payload.reasoning.effort, 'medium');
         assert.equal(payload.service_tier, 'flex');
         assert.equal(payload.prompt_cache_key, 'softora-premium-database-deep-search-v1');
         assert.equal(payload.prompt_cache_retention, '24h');
@@ -568,7 +568,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
   assert.equal(result.found, 1);
   assert.equal(result.rejected, 2);
   assert.equal(result.model, 'gpt-5.5');
-  assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.reasoningEffort, 'medium');
   assert.equal(result.serviceTier, 'flex');
   assert.equal(result.promptVersion, 'v1');
   assert.equal(result.placeComplete, false);
@@ -1034,7 +1034,7 @@ test('premium database deep search route reports missing OpenAI key', async () =
   assert.equal(response.body.code, 'OPENAI_NOT_CONFIGURED');
 });
 
-test('premium database deep search defaults to gpt-5.4 with high reasoning', async () => {
+test('premium database deep search defaults to gpt-5.4 with medium reasoning', async () => {
   const result = await fetchDeepSearchBusinessRows(
     {
       target: 'Nederland | Noord-Brabant | Altena | Almkerk',
@@ -1045,7 +1045,7 @@ test('premium database deep search defaults to gpt-5.4 with high reasoning', asy
       fetchImpl: async (_url, options = {}) => {
         const payload = JSON.parse(options.body);
         assert.equal(payload.model, 'gpt-5.4');
-        assert.equal(payload.reasoning.effort, 'high');
+        assert.equal(payload.reasoning.effort, 'medium');
         return {
           ok: true,
           async json() {
@@ -1070,7 +1070,7 @@ test('premium database deep search defaults to gpt-5.4 with high reasoning', asy
   );
 
   assert.equal(result.model, 'gpt-5.4');
-  assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.reasoningEffort, 'medium');
   assert.equal(result.placeComplete, true);
   assert.equal(result.completionReason, 'Geen extra complete bedrijven gevonden.');
   assert.equal(result.serviceTier, 'flex');
@@ -1140,7 +1140,7 @@ test('premium database deep search estimate uses active model pricing without ca
   });
 });
 
-test('premium database deep search estimate defaults to gpt-5.4 high reasoning', () => {
+test('premium database deep search estimate defaults to gpt-5.4 medium reasoning', () => {
   const result = estimateDeepSearchBusinessRunCost(
     { count: 250 },
     {
@@ -1150,7 +1150,7 @@ test('premium database deep search estimate defaults to gpt-5.4 high reasoning',
 
   assert.equal(result.ok, true);
   assert.equal(result.model, 'gpt-5.4');
-  assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.reasoningEffort, 'medium');
   assert.equal(result.serviceTier, 'flex');
   assert.equal(result.estimateMultiplier, 2.2);
   assert.equal(result.cost.estimatedUsd, 5.8945);
@@ -1170,7 +1170,7 @@ test('premium database deep search ignores the generic OPENAI_MODEL fallback', (
 
   assert.equal(result.ok, true);
   assert.equal(result.model, 'gpt-5.4');
-  assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.reasoningEffort, 'medium');
   assert.equal(result.serviceTier, 'flex');
   assert.equal(result.cost.estimatedUsd, 0.624);
   assert.equal(result.cost.upperEstimatedUsd, 1.248);
@@ -1336,11 +1336,11 @@ test('premium database import route is registered behind the premium api surface
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/deep-search-businesses'/);
 });
 
-test('premium database Render config pins deep search to gpt-5.4 high reasoning on flex', () => {
+test('premium database Render config pins deep search to gpt-5.4 medium reasoning on flex', () => {
   const renderSource = fs.readFileSync(path.join(__dirname, '../../render.yaml'), 'utf8');
 
   assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_MODEL\s+value: gpt-5\.4/);
-  assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_REASONING_EFFORT\s+value: high/);
+  assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_REASONING_EFFORT\s+value: medium/);
   assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_SERVICE_TIER\s+value: flex/);
   assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_PROMPT_VERSION\s+value: v1/);
   assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_ESTIMATE_MULTIPLIER\s+value: "2\.2"/);
