@@ -4,6 +4,7 @@
   const STATUS_URL = "/api/coldmailing/autopilot/status";
   const SETTINGS_URL = "/api/coldmailing/autopilot/settings";
   const BATCH_SIZE = 3;
+  const AUTOPILOT_STATUS_EVENT = "softora:coldmail-autopilot-status";
   const FREEZE_IDS = [
     "subj1",
     "body1",
@@ -150,6 +151,17 @@
     });
   }
 
+  function notifyAutopilotStatus(autopilot) {
+    if (typeof global.dispatchEvent !== "function") return;
+    try {
+      global.dispatchEvent(new CustomEvent(AUTOPILOT_STATUS_EVENT, {
+        detail: { autopilot: autopilot && typeof autopilot === "object" ? autopilot : {} },
+      }));
+    } catch (_) {
+      /* ignore older browser event issues */
+    }
+  }
+
   function render(payload) {
     state = payload && payload.autopilot ? payload.autopilot : payload || state || {};
     const enabled = Boolean(state.enabled);
@@ -170,6 +182,7 @@
     }
     if (label) label.textContent = enabled ? "Team autopilot aan" : "Team autopilot uit";
     setAutopilotFreeze(enabled);
+    notifyAutopilotStatus(state);
   }
 
   async function json(url, options) {

@@ -7,8 +7,12 @@
   ];
   const STYLE_ID = 'softora-coldmail-sender-scoreboard-style';
   const RETRY_DELAY_MS = 3500;
+  const AUTO_REFRESH_INTERVAL_MS = 60000;
+  const AUTOPILOT_STATUS_EVENT = 'softora:coldmail-autopilot-status';
 
   let retryTimer = null;
+  let autoRefreshTimer = null;
+  let lastAutopilotStatusKey = '';
 
   function normalizeString(value) {
     return String(value == null ? '' : value).trim();
@@ -237,6 +241,38 @@
     return entries;
   }
 
+  function startAutoRefresh() {
+    if (autoRefreshTimer || typeof global.setInterval !== 'function') return false;
+    autoRefreshTimer = global.setInterval(() => {
+      refresh().catch(() => null);
+    }, AUTO_REFRESH_INTERVAL_MS);
+    return true;
+  }
+
+  function buildAutopilotStatusKey(autopilot) {
+    const state = autopilot && typeof autopilot === 'object' ? autopilot : {};
+    const lastResult = state.lastResult && typeof state.lastResult === 'object' ? state.lastResult : {};
+    return [
+      state.enabled ? '1' : '0',
+      normalizeString(state.lastRunAt),
+      normalizeString(state.lastStartedAt),
+      normalizeString(state.updatedAt),
+      normalizeString(lastResult.senderEmail),
+      normalizeString(lastResult.sent),
+      normalizeString(lastResult.reason),
+    ].join('|');
+  }
+
+  function handleAutopilotStatus(event) {
+    const autopilot = event && event.detail && event.detail.autopilot ? event.detail.autopilot : null;
+    const statusKey = buildAutopilotStatusKey(autopilot);
+    if (!statusKey || statusKey === lastAutopilotStatusKey) return;
+    lastAutopilotStatusKey = statusKey;
+    global.setTimeout(() => {
+      refresh().catch(() => null);
+    }, 0);
+  }
+
   function patchSendRefresh() {
     const original = global.sendColdmailCampaignNow;
     if (typeof original !== 'function' || original.__coldmailSenderScoreboardPatched) return false;
@@ -258,6 +294,7 @@
     if (!patchSendRefresh() && typeof global.setTimeout === 'function') {
       global.setTimeout(patchSendRefresh, 0);
     }
+    startAutoRefresh();
     refresh().catch(() => null);
   }
 
@@ -270,16 +307,20 @@
     global.addEventListener('load', patchSendRefresh);
     global.addEventListener('focus', () => refresh().catch(() => null));
     global.addEventListener('pageshow', () => refresh().catch(() => null));
+    global.addEventListener(AUTOPILOT_STATUS_EVENT, handleAutopilotStatus);
   }
 
   global.SoftoraColdmailSenderScoreboard = {
     calculateSenderStats,
+    buildAutopilotStatusKey,
     ensureScoreboard,
+    handleAutopilotStatus,
     hasCustomerRowsSnapshot,
     parseCustomerRows,
     patchSendRefresh,
     renderSenderStats,
     setLoadingState,
     refresh,
+    startAutoRefresh,
   };
 })(window);
