@@ -753,7 +753,8 @@ test('premium database import route is registered behind the premium api surface
   const routeSource = fs.readFileSync(routePath, 'utf8');
 
   assert.match(featureRoutesSource, /registerPremiumDatabaseImportRoutes\(app/);
-  assert.match(featureRoutesSource, /createPremiumDatabaseImportCoordinator\(\)/);
+  assert.match(featureRoutesSource, /createPremiumDatabaseImportCoordinator\(\{[\s\S]*getUiStateValues: deps\.getUiStateValues/);
+  assert.match(featureRoutesSource, /setUiStateValues: deps\.setUiStateValues/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/import-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/sync-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/add-real-businesses'/);

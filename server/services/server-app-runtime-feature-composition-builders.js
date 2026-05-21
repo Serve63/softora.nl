@@ -397,6 +397,8 @@ function buildServerAppFeatureWiringRuntimeContext({
         openAiOrganizationId: env.OPENAI_ORGANIZATION_ID || env.OPENAI_ORG_ID || env.OPENAI_ORGANIZATION || '',
         openAiProjectId: env.OPENAI_PROJECT_ID || env.OPENAI_PROJECT || '',
         fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
+        getUiStateValues: dataOpsAwareUiStateGetter,
+        setUiStateValues: dataOpsAwareUiStateSetter,
         usdToEurRate: Number(env.OPENAI_COST_USD_TO_EUR || env.AI_COST_USD_TO_EUR || 0),
       },
       supabaseCostSummary: {

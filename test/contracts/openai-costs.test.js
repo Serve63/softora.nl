@@ -9,6 +9,7 @@ const {
   createOpenAiCostSummaryCoordinator,
   fetchAnthropicCostSummary,
   fetchCombinedApiCostSummary,
+  fetchOpenAiCostDiagnostics,
   fetchOpenAiCostsDashboardSnapshot,
   fetchOpenAiCostSummary,
   fetchOpenAiUsageEstimateSummary,
@@ -431,6 +432,74 @@ test('combined api costs prefer organization-wide usage when project filter miss
   assert.equal(organizationImageCall.options.headers['OpenAI-Project'], undefined);
 });
 
+test('combined api costs choose live usage estimate when Costs API is behind dashboard usage', async () => {
+  const calls = [];
+  const summary = await fetchCombinedApiCostSummary(
+    {
+      openAiCostsApiKey: 'openai-admin-key',
+      openAiProjectId: 'proj-softora',
+      usdToEurRate: 0.9,
+      fetchJsonWithTimeout: async (url, options) => {
+        calls.push({ url, options });
+        const parsed = new URL(url);
+        const isProjectFiltered = parsed.searchParams.getAll('project_ids').includes('proj-softora');
+
+        if (url.includes('/organization/costs')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: { data: [{ results: [{ amount: { value: 0.34, currency: 'usd' } }] }], has_more: false },
+          };
+        }
+
+        if (url.includes('/organization/usage/web_search_calls')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              data: [
+                {
+                  results: isProjectFiltered
+                    ? []
+                    : [
+                        {
+                          model: 'gpt-5',
+                          context_level: 'medium',
+                          num_model_requests: 8,
+                          num_requests: 138,
+                        },
+                      ],
+                },
+              ],
+              has_more: false,
+            },
+          };
+        }
+
+        return {
+          response: { ok: true, status: 200 },
+          data: { data: [{ results: [] }], has_more: false },
+        };
+      },
+      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 4, 21, 1, 38, 0) }
+  );
+
+  const organizationWebSearchCall = calls.find(
+    (call) => call.url.includes('/organization/usage/web_search_calls') && !call.url.includes('project_ids=')
+  );
+
+  assert.equal(summary.exact, false);
+  assert.equal(summary.estimated, true);
+  assert.equal(summary.costUsd, 1.38);
+  assert.equal(summary.costEur, 1.24);
+  assert.equal(summary.selectedProviderKind, 'usage_organization');
+  assert.equal(summary.organizationUsageEstimate.webSearchCalls, 138);
+  assert.equal(summary.organizationOfficialProvider.costUsd, 0.34);
+  assert.match(summary.note, /OpenAI loopt nog achter/);
+  assert.ok(organizationWebSearchCall, 'verwacht organisatiebrede web-search usage zonder projectfilter');
+  assert.equal(organizationWebSearchCall.options.headers['OpenAI-Project'], undefined);
+});
+
 test('openai usage estimate can estimate text token usage', async () => {
   const summary = await fetchOpenAiUsageEstimateSummary(
     {
@@ -497,7 +566,8 @@ test('openai usage estimate includes web search tool calls', async () => {
                     {
                       model: 'gpt-5',
                       context_level: 'medium',
-                      num_model_requests: 12,
+                      num_model_requests: 1,
+                      num_requests: 12,
                       project_id: 'proj-softora',
                     },
                   ],
@@ -754,4 +824,63 @@ test('openai cost summary exposes safe upstream diagnostics without leaking keys
   assert.equal(payload.config.projectConfigured, true);
   assert.match(payload.detail, /Incorrect API key provided/);
   assert.doesNotMatch(payload.detail, /sk-secret123/);
+});
+
+test('openai cost diagnostics compares official, usage and ledger without failing on one usage endpoint', async () => {
+  const diagnostics = await fetchOpenAiCostDiagnostics(
+    {
+      openAiCostsApiKey: 'openai-admin-key',
+      usdToEurRate: 1,
+      apiCostLedgerEvents: [
+        {
+          occurredAt: '2026-05-21T01:10:00.000Z',
+          source: 'premium-database-deep-search',
+          label: 'Deep search',
+          amountUsd: 0.2,
+        },
+      ],
+      fetchJsonWithTimeout: async (url) => {
+        if (url.includes('/organization/costs')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: { data: [{ results: [{ amount: { value: 0.34, currency: 'usd' } }] }], has_more: false },
+          };
+        }
+        if (url.includes('/organization/usage/images')) {
+          return {
+            response: { ok: false, status: 500 },
+            data: { error: { message: 'temporary images outage' } },
+          };
+        }
+        if (url.includes('/organization/usage/web_search_calls')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              data: [{ results: [{ model: 'gpt-5', num_requests: 138, num_model_requests: 8 }] }],
+              has_more: false,
+            },
+          };
+        }
+        return {
+          response: { ok: true, status: 200 },
+          data: { data: [{ results: [] }], has_more: false },
+        };
+      },
+      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 4, 21, 1, 45, 0) }
+  );
+
+  assert.equal(diagnostics.ok, true);
+  assert.equal(diagnostics.official.project.costUsd, 0.34);
+  assert.equal(diagnostics.usage.project.costUsd, 1.38);
+  assert.equal(diagnostics.ledger.costUsd, 0.2);
+  assert.equal(diagnostics.selected.selectedProviderKind, 'usage_project');
+  assert.equal(diagnostics.selected.costUsd, 1.38);
+  assert.equal(diagnostics.usage.project.endpointsUnavailable[0].key, 'images');
+  assert.deepEqual(diagnostics.comparison.candidates.map((candidate) => candidate.kind), [
+    'official_project',
+    'usage_project',
+    'softora_ledger',
+  ]);
 });
