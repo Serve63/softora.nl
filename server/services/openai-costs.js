@@ -484,8 +484,26 @@ function addUsageTotals(target, source = {}) {
   target.audioSeconds += Math.max(0, Number(source.audioSeconds || 0) || 0);
 }
 
-function estimateOpenAiTextUsageUsd(result = {}) {
-  const rates = getOpenAiTextModelRates(result.model);
+function resolveOpenAiUsageModel(result = {}, deps = {}) {
+  return (
+    normalizeString(
+      result.model ||
+        result.model_id ||
+        result.model_name ||
+        result.snapshot_id ||
+        result.response_model ||
+        deps.openAiUsageEstimateModel ||
+        deps.openAiModel ||
+        deps.env?.OPENAI_USAGE_ESTIMATE_MODEL ||
+        deps.env?.OPENAI_MODEL ||
+        'gpt-5.5'
+    ) || 'gpt-5.5'
+  );
+}
+
+function estimateOpenAiTextUsageUsd(result = {}, deps = {}) {
+  const model = resolveOpenAiUsageModel(result, deps);
+  const rates = getOpenAiTextModelRates(model);
   const inputTokens = Math.max(0, Number(result.input_tokens || result.prompt_tokens || 0) || 0);
   const outputTokens = Math.max(0, Number(result.output_tokens || result.completion_tokens || 0) || 0);
   const cachedInputTokens = Math.min(
@@ -502,6 +520,7 @@ function estimateOpenAiTextUsageUsd(result = {}) {
     cachedInputTokens,
     outputTokens,
     requestCount: Math.max(0, Number(result.num_model_requests || result.num_requests || 0) || 0),
+    pricingFallbackModel: model,
   };
 }
 
@@ -658,7 +677,7 @@ function collectOpenAiUsageEstimate(data, deps = {}, usageType = 'text') {
                   ? estimateOpenAiCodeInterpreterUsageUsd(result)
                   : usageType === 'audio_transcriptions' || usageType === 'audio_speeches'
                     ? estimateOpenAiAudioUsageUsd(result, usageType)
-                    : estimateOpenAiTextUsageUsd(result);
+                    : estimateOpenAiTextUsageUsd(result, deps);
       addCurrencyAmount(currencies, 'usd', estimate.usd);
       addUsageTotals(totals, estimate);
     });
@@ -1423,13 +1442,30 @@ function summarizeCostCandidate(summary = {}, kind = '', label = '') {
   };
 }
 
-function selectHighestReliableCostCandidate(candidates = []) {
+function pickHighestCostCandidate(candidates = []) {
   const usable = candidates.filter(Boolean);
   if (usable.length === 0) return null;
   return usable.reduce((selected, candidate) => {
     if (!selected) return candidate;
     return candidate.costUsd > selected.costUsd + 0.005 ? candidate : selected;
   }, null);
+}
+
+function selectHighestReliableCostCandidate(candidates = [], options = {}) {
+  const openAiCandidates = candidates.filter(
+    (candidate) => candidate && candidate.kind !== 'softora_ledger'
+  );
+  const bestOpenAi = pickHighestCostCandidate(openAiCandidates);
+  const bestLedger = pickHighestCostCandidate(
+    candidates.filter((candidate) => candidate && candidate.kind === 'softora_ledger')
+  );
+
+  if (!bestOpenAi) return bestLedger || null;
+  if (!bestLedger) return bestOpenAi;
+  if (options.ledgerCanOverrideOpenAi === true) {
+    return bestLedger.costUsd > bestOpenAi.costUsd + 0.005 ? bestLedger : bestOpenAi;
+  }
+  return bestOpenAi;
 }
 
 function buildOpenAiCostSelectionNote(selectedCandidate = {}) {
@@ -1539,7 +1575,11 @@ async function fetchCombinedApiCostSummary(deps = {}, options = {}) {
     candidates.push(summarizeCostCandidate(ledgerSummary, 'softora_ledger', 'Softora API-kostenledger'));
   }
 
-  const selectedCandidate = selectHighestReliableCostCandidate(candidates);
+  const selectedCandidate = selectHighestReliableCostCandidate(candidates, {
+    ledgerCanOverrideOpenAi:
+      deps.openAiCostLedgerCanOverrideOpenAi === true ||
+      deps.env?.OPENAI_COST_LEDGER_CAN_OVERRIDE_OPENAI === 'true',
+  });
   if (!selectedCandidate) {
     const firstUnavailable = unavailable[0] || {};
     throw createServiceError(
