@@ -569,7 +569,7 @@
             if (!global.document || global.document.getElementById(STYLE_OUTREACH_ID)) return;
             const style = global.document.createElement("style");
             style.id = STYLE_OUTREACH_ID;
-            style.textContent = ".outreach-line{margin-top:4px;color:var(--light);font-size:11px;line-height:1.35;white-space:normal}.outreach-badge{display:inline-flex;align-items:center;width:fit-content;margin-top:6px;padding:3px 8px;border-radius:999px;background:rgba(22,115,60,.1);color:var(--green);font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}.outreach-reply{display:flex;flex-direction:column;gap:3px;color:var(--mid);font-size:12px;line-height:1.35}.outreach-reply strong{color:var(--dark);font-size:12px}.outreach-days{display:inline-flex;align-items:center;justify-content:center;min-width:24px;color:var(--crimson);font-weight:800;line-height:1}.outreach-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;max-width:420px;min-width:0;margin:0 auto}.outreach-action{box-sizing:border-box;min-width:0;min-height:34px;border:1px solid rgba(155,35,85,.18);border-radius:6px;background:rgba(255,255,255,.78);color:var(--crimson);cursor:pointer;font-family:Oswald,sans-serif;font-size:9px;font-weight:700;letter-spacing:.35px;line-height:1.08;overflow-wrap:anywhere;padding:6px 5px;text-align:center;text-transform:uppercase;transition:background .15s ease,border-color .15s ease,color .15s ease}.outreach-action:hover{background:rgba(155,35,85,.08);border-color:rgba(155,35,85,.34)}";
+            style.textContent = ".outreach-line{margin-top:4px;color:var(--light);font-size:11px;line-height:1.35;white-space:normal}.outreach-badge{display:inline-flex;align-items:center;width:fit-content;margin-top:6px;padding:3px 8px;border-radius:999px;background:rgba(22,115,60,.1);color:var(--green);font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}.outreach-reply{display:flex;flex-direction:column;gap:3px;color:var(--mid);font-size:12px;line-height:1.35}.outreach-reply strong{color:var(--dark);font-size:12px}.outreach-days{display:inline-flex;align-items:center;justify-content:center;min-width:24px;color:var(--crimson);font-weight:800;line-height:1}.outreach-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto}.outreach-action{box-sizing:border-box;min-width:0;min-height:34px;border:1px solid rgba(155,35,85,.18);border-radius:6px;background:rgba(255,255,255,.78);color:var(--crimson);cursor:pointer;font-family:Oswald,sans-serif;font-size:9px;font-weight:700;letter-spacing:.35px;line-height:1.08;overflow-wrap:anywhere;padding:6px 5px;text-align:center;text-transform:uppercase;transition:background .15s ease,border-color .15s ease,color .15s ease}.outreach-action:hover{background:rgba(155,35,85,.08);border-color:rgba(155,35,85,.34)}";
             global.document.head.appendChild(style);
         }
 
@@ -708,7 +708,7 @@
         function renderReplyInfo(customer) {
             if (!isWebdesignOutreachCustomer(customer)) return "";
             const replyAt = getReplyAt(customer);
-            return replyAt ? "<div class=\"outreach-reply\"><strong>Reactie ontvangen</strong><span>" + escapeHtml(formatDisplayDate(replyAt)) + "</span></div>" : "";
+            return replyAt ? "<div class=\"outreach-reply\"><strong>Reactie ontvangen</strong><span>" + escapeHtml(formatDisplayDate(replyAt)) + "</span></div>" : "<div class=\"outreach-reply\"><strong>Nog geen reactie</strong><span>Blijft in Benaderd</span></div>";
         }
 
         function getLocalDateSerial(timestamp) {
@@ -737,24 +737,55 @@
         function renderActions(customer) {
             if (!isWebdesignOutreachCustomer(customer)) return "";
             const id = escapeHtml(customer.id);
-            return "<div class=\"outreach-actions\"><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"klant_geworden\" data-outreach-id=\"" + id + "\">Is klant geworden</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"geen_interesse\" data-outreach-id=\"" + id + "\">Geen interesse</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"mail\" data-outreach-id=\"" + id + "\">Mail bekijken</button></div>";
+            return "<div class=\"outreach-actions\"><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"klant_geworden\" data-outreach-id=\"" + id + "\">Is klant geworden</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"mail\" data-outreach-id=\"" + id + "\">Mail bekijken</button></div>";
         }
 
-        function shouldAutoMarkNoReply(customer) {
-            const sentMs = parseDateValue(getSentAt(customer));
-            return isWebdesignOutreachCustomer(customer) && getEffectiveStatus(customer) === "benaderd" && !getReplyAt(customer) && sentMs && Math.floor((Date.now() - sentMs) / 86400000) >= 25;
+        function hasAutomatedNoReplyHistory(customer) {
+            const history = Array.isArray(customer && customer.hist) ? customer.hist : [];
+            return history.some(function (item) {
+                const source = normalizeOutreachValue(item && item.source);
+                const label = normalizeOutreachValue(item && (item.label || item.message || item.title));
+                return source === "webdesign_outreach_automation" || label === "geen_gehoor_na_25_dagen";
+            });
+        }
+
+        function shouldRestoreAutomatedNoReply(customer) {
+            if (!isWebdesignOutreachCustomer(customer) || !hasAutomatedNoReplyHistory(customer)) return false;
+            return normalizeOutreachStatus(customer && customer.outreachStatus) === "geen_gehoor" || mapDatabaseStatus(customer) === "geen_gehoor";
+        }
+
+        function restoreAutomatedNoReply(customer, nowIso) {
+            return {
+                ...customer,
+                status: "gemaild",
+                databaseStatus: "gemaild",
+                outreachStatus: "benaderd",
+                actionRequired: false,
+                outreachActionRequired: false,
+                statusUpdatedAt: nowIso,
+                updatedAt: nowIso,
+                hist: [{
+                    type: "gemaild",
+                    label: "Automatische geen gehoor-regel teruggedraaid",
+                    date: nowIso,
+                    actor: "Premium database",
+                    source: "webdesign-outreach-automation-rollback"
+                }].concat(Array.isArray(customer.hist) ? customer.hist : []).slice(0, 50)
+            };
         }
 
         function applyAutomation(customers) {
             let changed = false;
             const nowIso = new Date().toISOString();
+            const list = Array.isArray(customers) ? customers : [];
+            const nextCustomers = list.map(function (customer) {
+                if (!shouldRestoreAutomatedNoReply(customer)) return customer;
+                changed = true;
+                return restoreAutomatedNoReply(customer, nowIso);
+            });
             return {
-                changed: (customers || []).some(shouldAutoMarkNoReply),
-                customers: (customers || []).map(function (customer) {
-                    if (!shouldAutoMarkNoReply(customer)) return customer;
-                    changed = true;
-                    return { ...customer, status: "geengehoor", databaseStatus: "geengehoor", outreachStatus: "geen_gehoor", actionRequired: false, outreachActionRequired: false, statusUpdatedAt: nowIso, updatedAt: nowIso, hist: [{ type: "geengehoor", label: "Geen gehoor na 25 dagen", date: nowIso, actor: "Premium database", source: "webdesign-outreach-automation" }].concat(Array.isArray(customer.hist) ? customer.hist : []).slice(0, 50) };
-                })
+                changed: changed,
+                customers: nextCustomers
             };
         }
 

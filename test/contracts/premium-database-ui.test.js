@@ -471,7 +471,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260520b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260521a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
@@ -1155,7 +1155,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="geengehoor"\]\.act/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"klant_geworden\\"/);
   assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\"afgehaakt\\"/);
-  assert.match(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
+  assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
   assert.match(webdesignActionSource, /Mail bekijken/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(7\), table\.outreach-action-mode tbody td:nth-child\(7\) \{ display: none; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(9\), table\.outreach-action-mode tbody td:nth-child\(9\) \{ display: none; \}/);
@@ -1165,14 +1165,14 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 25%; text-align: center; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(10\), table\.outreach-action-mode tbody td:nth-child\(10\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
-  assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:420px;min-width:0;margin:0 auto/);
+  assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto/);
   assert.match(webdesignActionSource, /function renderDaysSinceSent\(customer\)/);
   assert.match(webdesignActionSource, /\.outreach-days\{display:inline-flex;align-items:center;justify-content:center;min-width:24px/);
   assert.match(webdesignActionSource, /\.outreach-action\{box-sizing:border-box;min-width:0;min-height:34px/);
   assert.match(webdesignActionSource, /overflow-wrap:anywhere/);
   assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\\"klant_geworden\\\"\\]\{background:var\(--crimson\)/);
-  assert.match(webdesignActionSource, /return replyAt \? "<div class=\\"outreach-reply\\">/);
-  assert.doesNotMatch(webdesignActionSource, /Nog geen reactie/);
+  assert.match(webdesignActionSource, /Blijft in Benaderd/);
+  assert.doesNotMatch(webdesignActionSource, /25 dagen regel actief/);
   assert.match(webdesignActionSource, /const replyMessage = normalizeString\(customer\.replyMailboxId \|\| customer\.replyThreadId \|\| customer\.replyMessageId \|\| customer\.lastColdmailReplyMessageKey\);/);
   assert.match(webdesignActionSource, /const sentMessage = normalizeString\(customer\.outreachMessageId \|\| customer\.coldmailSentMessageId\);/);
   assert.match(webdesignActionSource, /params\.set\("folder", replyMessage \? "inbox" : "sent"\);/);
@@ -1197,9 +1197,9 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /\.s-afgehaakt \.s-label \{ color: var\(--red\); font-weight: 700; \}/);
 });
 
-test('premium database outreach days column uses calendar days and keeps no-reply automation', () => {
-  const client = loadDatabaseOutreachClient();
-  const controller = client.createController({
+test('premium database outreach days column keeps benaderd rows after 25 days', () => {
+  const outreachClient = loadDatabaseOutreachClient();
+  const controller = outreachClient.createController({
     state: { klanten: [] },
     nodes: {},
     escapeHtml: (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -1228,6 +1228,7 @@ test('premium database outreach days column uses calendar days and keeps no-repl
     id: 'customer-1',
     campaignType: 'webdesign',
     outreachStatus: 'benaderd',
+    status: 'gemaild',
     outreachSentAt: oldSentAt,
   };
 
@@ -1238,10 +1239,23 @@ test('premium database outreach days column uses calendar days and keeps no-repl
     outreachSentAt: yesterdayLate,
   }), />1<\/span>/);
   const automated = controller.applyAutomation([customer]);
-  assert.equal(automated.changed, true);
-  assert.equal(automated.customers[0].status, 'geengehoor');
-  assert.equal(automated.customers[0].outreachStatus, 'geen_gehoor');
-  assert.match(automated.customers[0].hist[0].label, /Geen gehoor na 25 dagen/);
+  assert.equal(automated.changed, false);
+  assert.equal(automated.customers[0].outreachStatus, 'benaderd');
+  assert.equal(automated.customers[0].status, 'gemaild');
+
+  const rollback = controller.applyAutomation([{
+    id: 'customer-3',
+    campaignType: 'webdesign',
+    status: 'geengehoor',
+    outreachStatus: 'geen_gehoor',
+    outreachSentAt: oldSentAt,
+    hist: [{ type: 'geengehoor', label: 'Geen gehoor na 25 dagen', source: 'webdesign-outreach-automation' }],
+  }]);
+
+  assert.equal(rollback.changed, true);
+  assert.equal(rollback.customers[0].status, 'gemaild');
+  assert.equal(rollback.customers[0].outreachStatus, 'benaderd');
+  assert.equal(rollback.customers[0].hist[0].label, 'Automatische geen gehoor-regel teruggedraaid');
 });
 
 test('premium database sync merge updates contact fields and preserves CRM fields', () => {
