@@ -3156,6 +3156,55 @@ test('coldmail campaign records a safety pause when the provider rate-limits sen
   );
 });
 
+test('coldmail reply sync safety-pauses on generic Strato provider warnings', async () => {
+  const parsedInbound = {
+    messageId: '<strato-warning@example.test>',
+    subject: 'STRATO waarschuwing: mailverzending tijdelijk geblokkeerd',
+    text:
+      'Uw mailbox is blocked because we detected suspected phishing. ' +
+      'De mailversand is gesperrt en SPF failed controles zijn gezien.',
+    from: { value: [{ address: 'no-reply@strato.nl', name: 'STRATO Mailserver' }] },
+    to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
+    cc: { value: [] },
+  };
+  const markedSeen = [];
+  const { service, sentMessages, getReplyState, getSendGuardState } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    coldmailSafetyPauseMs: 60_000,
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [12],
+      fetch: async function* () {
+        yield { uid: 12, source: 'raw-provider-warning', flags: new Set() };
+      },
+      messageFlagsAdd: async (uids) => {
+        markedSeen.push(...uids);
+      },
+    }),
+    parseMailSource: async () => parsedInbound,
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+
+  assert.equal(result.providerWarnings, 1);
+  assert.equal(result.safetyPausedUntil, '2026-04-24T12:01:00.000Z');
+  assert.equal(result.matched, 0);
+  assert.equal(result.ignored, 0);
+  assert.deepEqual(markedSeen, [12]);
+  assert.equal(sentMessages.length, 0);
+  assert.equal(getSendGuardState().entries[0].senderEmail, 'serve@softora.nl');
+  assert.equal(getSendGuardState().entries[0].safetyPauseUntil, '2026-04-24T12:01:00.000Z');
+  assert.match(getSendGuardState().entries[0].safetyPauseReason, /suspected phishing/i);
+  const processed = getReplyState().processed['message:strato-warning@example.test'];
+  assert.equal(processed.lifecycleIntent, 'provider_warning');
+  assert.equal(processed.safetyPauseUntil, '2026-04-24T12:01:00.000Z');
+});
+
 test('coldmail campaign skips recipients whose domain does not receive mail', async () => {
   const { service, sentMessages, getSavedState } = createService({
     rows: [
