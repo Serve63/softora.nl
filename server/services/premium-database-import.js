@@ -7,7 +7,10 @@ const MAX_IMPORT_ROWS = 2000;
 const MAX_IMPORT_COLS = 50;
 const MAX_REAL_BUSINESS_ROWS = 100;
 const MAX_DEEP_SEARCH_ROWS = 100;
-const MAX_DEEP_SEARCH_EXCLUDE_ITEMS = 180;
+const DEFAULT_DEEP_SEARCH_ESTIMATE_ROWS = 25;
+const MAX_DEEP_SEARCH_ESTIMATE_ROWS = 500;
+const MAX_DEEP_SEARCH_EXCLUDE_ITEMS = 5000;
+const MAX_DEEP_SEARCH_PROMPT_EXCLUDE_ITEMS = 500;
 const GOOGLE_PLACES_TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
 const GOOGLE_PLACES_FIELD_MASK = [
   'places.id',
@@ -21,8 +24,71 @@ const GOOGLE_PLACES_FIELD_MASK = [
   'nextPageToken',
 ].join(',');
 const DEFAULT_REAL_BUSINESS_QUERY = 'bedrijven in Noord-Brabant';
-const DEFAULT_OPENAI_MODEL = 'gpt-5.5-pro';
+const DEFAULT_OPENAI_DATABASE_SEARCH_MODEL = 'gpt-5.4';
+const DEFAULT_OPENAI_DATABASE_SEARCH_REASONING_EFFORT = 'high';
+const DEFAULT_OPENAI_DATABASE_SEARCH_SERVICE_TIER = 'flex';
+const DEFAULT_OPENAI_DATABASE_SEARCH_PROMPT_VERSION = 'v1';
+const DEFAULT_OPENAI_DATABASE_SEARCH_COST_MULTIPLIER = 2.2;
+const DEFAULT_OPENAI_DATABASE_SEARCH_MAX_ATTEMPTS = 3;
+const OPENAI_DATABASE_SEARCH_PROMPT_CACHE_RETENTION = '24h';
+const OPENAI_DATABASE_SEARCH_PROMPT_CACHE_PREFIX = 'softora-premium-database-deep-search';
+const DEFAULT_OPENAI_DATABASE_SEARCH_PRICING_KEY = 'gpt-5.4';
 const OPENAI_DATABASE_SEARCH_PRICING = {
+  'gpt-5': {
+    inputUsdPerMillion: 1.25,
+    outputUsdPerMillion: 10,
+    cachedInputUsdPerMillion: 0.125,
+    flex: {
+      inputUsdPerMillion: 0.625,
+      outputUsdPerMillion: 5,
+      cachedInputUsdPerMillion: 0.0625,
+    },
+  },
+  'gpt-5.1': {
+    inputUsdPerMillion: 1.25,
+    outputUsdPerMillion: 10,
+    cachedInputUsdPerMillion: 0.125,
+    flex: {
+      inputUsdPerMillion: 0.625,
+      outputUsdPerMillion: 5,
+      cachedInputUsdPerMillion: 0.0625,
+    },
+  },
+  'gpt-5.4': {
+    inputUsdPerMillion: 2.5,
+    outputUsdPerMillion: 15,
+    cachedInputUsdPerMillion: 0.25,
+    flex: {
+      inputUsdPerMillion: 1.25,
+      outputUsdPerMillion: 7.5,
+      cachedInputUsdPerMillion: 0.13,
+    },
+  },
+  'gpt-5.4-mini': {
+    inputUsdPerMillion: 0.75,
+    outputUsdPerMillion: 4.5,
+    cachedInputUsdPerMillion: 0.075,
+    flex: {
+      inputUsdPerMillion: 0.375,
+      outputUsdPerMillion: 2.25,
+      cachedInputUsdPerMillion: 0.0375,
+    },
+  },
+  'gpt-5.4-nano': {
+    inputUsdPerMillion: 0.2,
+    outputUsdPerMillion: 1.25,
+    cachedInputUsdPerMillion: 0.02,
+    flex: {
+      inputUsdPerMillion: 0.1,
+      outputUsdPerMillion: 0.625,
+      cachedInputUsdPerMillion: 0.01,
+    },
+  },
+  'gpt-5.4-pro': {
+    inputUsdPerMillion: 30,
+    outputUsdPerMillion: 180,
+    cachedInputUsdPerMillion: null,
+  },
   'gpt-5.5-pro': {
     inputUsdPerMillion: 30,
     outputUsdPerMillion: 180,
@@ -35,6 +101,9 @@ const OPENAI_DATABASE_SEARCH_PRICING = {
   },
 };
 const OPENAI_WEB_SEARCH_USD_PER_CALL = 0.01;
+const ESTIMATED_DEEP_SEARCH_INPUT_TOKENS_PER_BATCH = 6000;
+const ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY = 1400;
+const ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH = 1;
 const REAL_BUSINESS_CATEGORY_PREFIXES = [
   'bedrijven',
   'winkels',
@@ -686,6 +755,36 @@ async function readJsonResponse(response) {
   return {};
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
+function shouldRetryOpenAiDeepSearchResponse(response, data) {
+  const status = Number(response && response.status) || 0;
+  if (![408, 409, 425, 429, 500, 502, 503, 504].includes(status)) return false;
+  const message = normalizeString(data && data.error && data.error.message).toLowerCase();
+  const type = normalizeString(data && data.error && data.error.type).toLowerCase();
+  const code = normalizeString(data && data.error && data.error.code).toLowerCase();
+  return status !== 400 && !code.includes('invalid') && !type.includes('invalid') && !message.includes('invalid');
+}
+
+function getResponseHeader(response, name) {
+  if (!response || !response.headers) return '';
+  if (typeof response.headers.get === 'function') return normalizeString(response.headers.get(name));
+  const direct = response.headers[name] || response.headers[name.toLowerCase()];
+  return normalizeString(direct);
+}
+
+function getOpenAiRetryDelayMs(response, data, attempt) {
+  const retryAfter = Number(getResponseHeader(response, 'retry-after'));
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.min(30000, retryAfter * 1000);
+  const message = normalizeString(data && data.error && data.error.message);
+  const secondsMatch = message.match(/try again in\s+([0-9.]+)s/i);
+  const seconds = secondsMatch ? Number(secondsMatch[1]) : NaN;
+  if (Number.isFinite(seconds) && seconds > 0) return Math.min(30000, seconds * 1000);
+  return Math.min(30000, 1500 * Math.pow(2, Math.max(0, Number(attempt) - 1)));
+}
+
 function normalizeWebsiteDomain(value) {
   const raw = normalizeString(value);
   if (!raw) return '';
@@ -977,7 +1076,7 @@ function getOpenAiApiBaseUrl(deps = {}) {
 function getOpenAiDatabaseSearchModel(deps = {}) {
   const env = deps.env || process.env || {};
   return normalizeString(
-    deps.openAiModel || env.OPENAI_DATABASE_SEARCH_MODEL || env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL
+    deps.openAiModel || env.OPENAI_DATABASE_SEARCH_MODEL || env.OPENAI_MODEL || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL
   );
 }
 
@@ -985,12 +1084,65 @@ function getOpenAiDatabaseSearchReasoningEffort(model, deps = {}) {
   const env = deps.env || process.env || {};
   const explicit = normalizeString(deps.openAiReasoningEffort || env.OPENAI_DATABASE_SEARCH_REASONING_EFFORT);
   if (['none', 'low', 'medium', 'high', 'xhigh'].includes(explicit)) return explicit;
-  return normalizeString(model).toLowerCase().includes('pro') ? 'high' : 'low';
+  return DEFAULT_OPENAI_DATABASE_SEARCH_REASONING_EFFORT;
+}
+
+function getOpenAiDatabaseSearchServiceTier(deps = {}) {
+  const env = deps.env || process.env || {};
+  const explicit = normalizeString(deps.openAiServiceTier || env.OPENAI_DATABASE_SEARCH_SERVICE_TIER).toLowerCase();
+  if (['flex', 'standard', 'default', 'auto'].includes(explicit)) return explicit;
+  return DEFAULT_OPENAI_DATABASE_SEARCH_SERVICE_TIER;
+}
+
+function getOpenAiDatabaseSearchPromptVersion(deps = {}) {
+  const env = deps.env || process.env || {};
+  const explicit = normalizeString(deps.openAiPromptVersion || env.OPENAI_DATABASE_SEARCH_PROMPT_VERSION).toLowerCase();
+  return explicit === 'v2' ? 'v2' : DEFAULT_OPENAI_DATABASE_SEARCH_PROMPT_VERSION;
+}
+
+function getOpenAiDatabaseSearchCostMultiplier(deps = {}) {
+  const env = deps.env || process.env || {};
+  const parsed = Number(deps.openAiCostMultiplier || env.OPENAI_DATABASE_SEARCH_COST_MULTIPLIER);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return DEFAULT_OPENAI_DATABASE_SEARCH_COST_MULTIPLIER;
+}
+
+function getOpenAiDatabaseSearchMaxAttempts(deps = {}) {
+  const env = deps.env || process.env || {};
+  const parsed = Number.parseInt(String(deps.openAiMaxAttempts || env.OPENAI_DATABASE_SEARCH_MAX_ATTEMPTS || ''), 10);
+  if (Number.isFinite(parsed)) return Math.max(1, Math.min(6, parsed));
+  return DEFAULT_OPENAI_DATABASE_SEARCH_MAX_ATTEMPTS;
 }
 
 function getOpenAiDatabaseSearchPricing(model) {
   const normalized = normalizeString(model).toLowerCase();
-  return OPENAI_DATABASE_SEARCH_PRICING[normalized] || OPENAI_DATABASE_SEARCH_PRICING[DEFAULT_OPENAI_MODEL];
+  if (OPENAI_DATABASE_SEARCH_PRICING[normalized]) return OPENAI_DATABASE_SEARCH_PRICING[normalized];
+  if (/^gpt-5\.5-pro\b/.test(normalized)) return OPENAI_DATABASE_SEARCH_PRICING['gpt-5.5-pro'];
+  if (/^gpt-5\.5\b/.test(normalized)) return OPENAI_DATABASE_SEARCH_PRICING['gpt-5.5'];
+  if (/^gpt-5\.4-mini\b/.test(normalized)) return OPENAI_DATABASE_SEARCH_PRICING['gpt-5.4-mini'];
+  if (/^gpt-5\.4-nano\b/.test(normalized)) return OPENAI_DATABASE_SEARCH_PRICING['gpt-5.4-nano'];
+  if (/^gpt-5\.4-pro\b/.test(normalized)) return OPENAI_DATABASE_SEARCH_PRICING['gpt-5.4-pro'];
+  if (/^gpt-5\.4\b/.test(normalized)) return OPENAI_DATABASE_SEARCH_PRICING['gpt-5.4'];
+  if (/^gpt-5\.1\b/.test(normalized)) return OPENAI_DATABASE_SEARCH_PRICING['gpt-5.1'];
+  if (/^gpt-5\b/.test(normalized)) return OPENAI_DATABASE_SEARCH_PRICING['gpt-5'];
+  return OPENAI_DATABASE_SEARCH_PRICING[DEFAULT_OPENAI_DATABASE_SEARCH_PRICING_KEY];
+}
+
+function resolveOpenAiDatabaseSearchPricing(model, serviceTier) {
+  const pricing = getOpenAiDatabaseSearchPricing(model);
+  const requestedServiceTier = normalizeString(serviceTier).toLowerCase();
+  if (requestedServiceTier === 'flex' && pricing.flex) {
+    return {
+      serviceTier: 'flex',
+      pricing: pricing.flex,
+      standardPricing: pricing,
+    };
+  }
+  return {
+    serviceTier: 'standard',
+    pricing,
+    standardPricing: pricing,
+  };
 }
 
 function extractOpenAiUsage(data) {
@@ -1000,11 +1152,16 @@ function extractOpenAiUsage(data) {
   const inputDetails = usage.input_tokens_details && typeof usage.input_tokens_details === 'object'
     ? usage.input_tokens_details
     : {};
+  const outputDetails = usage.output_tokens_details && typeof usage.output_tokens_details === 'object'
+    ? usage.output_tokens_details
+    : {};
   const cachedInputTokens = Math.max(0, Number(inputDetails.cached_tokens || 0) || 0);
+  const reasoningTokens = Math.max(0, Number(outputDetails.reasoning_tokens || 0) || 0);
   return {
     inputTokens,
     outputTokens,
     cachedInputTokens: Math.min(inputTokens, cachedInputTokens),
+    reasoningTokens: Math.min(outputTokens, reasoningTokens),
   };
 }
 
@@ -1013,11 +1170,13 @@ function countOpenAiWebSearchCalls(data) {
   return output.filter((item) => normalizeString(item && item.type) === 'web_search_call').length;
 }
 
-function estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls }) {
-  const pricing = getOpenAiDatabaseSearchPricing(model);
+function estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls, serviceTier, costMultiplier }) {
+  const resolvedPricing = resolveOpenAiDatabaseSearchPricing(model, serviceTier);
+  const pricing = resolvedPricing.pricing;
   const safeUsage = usage || {};
   const inputTokens = Math.max(0, Number(safeUsage.inputTokens || 0) || 0);
   const outputTokens = Math.max(0, Number(safeUsage.outputTokens || 0) || 0);
+  const reasoningTokens = Math.min(outputTokens, Math.max(0, Number(safeUsage.reasoningTokens || 0) || 0));
   const cachedInputTokens = Math.min(inputTokens, Math.max(0, Number(safeUsage.cachedInputTokens || 0) || 0));
   const billableInputTokens = Math.max(0, inputTokens - cachedInputTokens);
   const cachedRate = Number.isFinite(pricing.cachedInputUsdPerMillion)
@@ -1027,24 +1186,90 @@ function estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls }) {
   const cachedInputUsd = (cachedInputTokens / 1000000) * cachedRate;
   const outputUsd = (outputTokens / 1000000) * pricing.outputUsdPerMillion;
   const webSearchUsd = Math.max(0, Number(webSearchCalls || 0) || 0) * OPENAI_WEB_SEARCH_USD_PER_CALL;
-  const totalUsd = inputUsd + cachedInputUsd + outputUsd + webSearchUsd;
+  const rawTotalUsd = inputUsd + cachedInputUsd + outputUsd + webSearchUsd;
+  const billingCalibrationMultiplier = getOpenAiDatabaseSearchCostMultiplier({ openAiCostMultiplier: costMultiplier });
+  const totalUsd = rawTotalUsd * billingCalibrationMultiplier;
 
   return {
     currency: 'USD',
+    model: normalizeString(model),
     estimatedUsd: Number(totalUsd.toFixed(6)),
-    inputUsd: Number((inputUsd + cachedInputUsd).toFixed(6)),
-    outputUsd: Number(outputUsd.toFixed(6)),
-    webSearchUsd: Number(webSearchUsd.toFixed(6)),
+    rawEstimatedUsd: Number(rawTotalUsd.toFixed(6)),
+    inputUsd: Number(((inputUsd + cachedInputUsd) * billingCalibrationMultiplier).toFixed(6)),
+    outputUsd: Number((outputUsd * billingCalibrationMultiplier).toFixed(6)),
+    webSearchUsd: Number((webSearchUsd * billingCalibrationMultiplier).toFixed(6)),
     inputTokens,
     outputTokens,
+    reasoningTokens,
     cachedInputTokens,
     webSearchCalls: Math.max(0, Number(webSearchCalls || 0) || 0),
+    serviceTier: resolvedPricing.serviceTier,
+    billingCalibrationMultiplier,
     pricing: {
       inputUsdPerMillion: pricing.inputUsdPerMillion,
       outputUsdPerMillion: pricing.outputUsdPerMillion,
+      cachedInputUsdPerMillion: cachedRate,
       webSearchUsdPerCall: OPENAI_WEB_SEARCH_USD_PER_CALL,
+      serviceTier: resolvedPricing.serviceTier,
     },
-    note: 'Schatting op basis van OpenAI tokengebruik en web-search calls; exclusief eventuele regionale toeslagen.',
+    note: 'Schatting op basis van OpenAI tokengebruik, web-search calls en Softora-kalibratie op recente dashboardkosten.',
+  };
+}
+
+function getDeepSearchEstimateRangeMultiplier(requested) {
+  const count = Math.max(0, Number(requested) || 0);
+  if (count >= 500) return 2;
+  if (count >= 250) return 1.6;
+  if (count >= 100) return 1.35;
+  return 1.25;
+}
+
+function estimateDeepSearchBusinessRunCost(input = {}, deps = {}) {
+  const env = deps.env || process.env || {};
+  const requested = parsePositiveInt(
+    input.count,
+    DEFAULT_DEEP_SEARCH_ESTIMATE_ROWS,
+    1,
+    MAX_DEEP_SEARCH_ESTIMATE_ROWS
+  );
+  const model = getOpenAiDatabaseSearchModel({ ...deps, env });
+  const reasoningEffort = getOpenAiDatabaseSearchReasoningEffort(model, { ...deps, env });
+  const requestedServiceTier = getOpenAiDatabaseSearchServiceTier({ ...deps, env });
+  const serviceTier = resolveOpenAiDatabaseSearchPricing(model, requestedServiceTier).serviceTier;
+  const promptVersion = getOpenAiDatabaseSearchPromptVersion({ ...deps, env });
+  const costMultiplier = getOpenAiDatabaseSearchCostMultiplier({ ...deps, env });
+  const batchSize = MAX_DEEP_SEARCH_ROWS;
+  const estimatedBatches = Math.max(1, Math.ceil(requested / batchSize));
+  const usage = {
+    inputTokens: estimatedBatches * ESTIMATED_DEEP_SEARCH_INPUT_TOKENS_PER_BATCH,
+    outputTokens: requested * ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY,
+    reasoningTokens: requested * ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY,
+    cachedInputTokens: 0,
+  };
+  const webSearchCalls = estimatedBatches * ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH;
+  const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls, serviceTier, costMultiplier });
+  const rangeMultiplier = getDeepSearchEstimateRangeMultiplier(requested);
+  const upperEstimatedUsd = Number((cost.estimatedUsd * rangeMultiplier).toFixed(6));
+
+  return {
+    ok: true,
+    source: 'openai-web-search-estimate',
+    requested,
+    maxRequested: MAX_DEEP_SEARCH_ESTIMATE_ROWS,
+    batchSize,
+    estimatedBatches,
+    model,
+    reasoningEffort,
+    serviceTier,
+    promptVersion,
+    estimateOnly: true,
+    cost: {
+      ...cost,
+      upperEstimatedUsd,
+      rangeMultiplier,
+      note:
+        'Voorcalculatie op basis van het actieve deep-search model; er is geen OpenAI-call uitgevoerd. Grote runs kunnen hoger uitvallen als veel locaties leeg of dubbel blijken.',
+    },
   };
 }
 
@@ -1117,10 +1342,11 @@ function deepSearchBusinessMatchesTarget(business, targetParts) {
   );
 }
 
-function normalizeDeepSearchExcludeItems(items) {
+function normalizeDeepSearchExcludeItems(items, maxItems = MAX_DEEP_SEARCH_EXCLUDE_ITEMS) {
   const values = Array.isArray(items) ? items : [];
   const seen = new Set();
   const result = [];
+  const limit = Math.max(1, Math.min(10000, Number(maxItems) || MAX_DEEP_SEARCH_EXCLUDE_ITEMS));
   values.forEach((item) => {
     const normalized = truncateText(item, 160);
     const key = normalizeImportKey(normalized);
@@ -1128,7 +1354,88 @@ function normalizeDeepSearchExcludeItems(items) {
     seen.add(key);
     result.push(normalized);
   });
-  return result.slice(0, MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
+  return result.slice(0, limit);
+}
+
+function collectDeepSearchExcludeItems(input = {}) {
+  const rawItems = [];
+  function add(value) {
+    if (Array.isArray(value)) {
+      value.forEach(add);
+      return;
+    }
+    const normalized = normalizeString(value);
+    if (normalized) rawItems.push(normalized);
+  }
+
+  add(input.exclude);
+  add(input.excludeItems);
+  add(input.excludeKeys);
+  add(input.seen);
+  return normalizeDeepSearchExcludeItems(rawItems, MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
+}
+
+function addDeepSearchExcludeKey(keys, key) {
+  const normalized = normalizeString(key);
+  if (normalized) keys.add(normalized);
+}
+
+function addDeepSearchExcludeEmail(keys, value) {
+  const email = normalizeDeepSearchEmail(value);
+  if (email) addDeepSearchExcludeKey(keys, `email:${email}`);
+}
+
+function addDeepSearchExcludeDomain(keys, value) {
+  const domain = normalizeWebsiteDomain(value);
+  if (domain) addDeepSearchExcludeKey(keys, `domain:${domain}`);
+}
+
+function addDeepSearchExcludeCompanyAddress(keys, company, address) {
+  const companyKey = normalizeImportKey(company);
+  const addressKey = normalizeImportKey(address);
+  if (companyKey && addressKey) {
+    addDeepSearchExcludeKey(keys, `company-address:${companyKey}|${addressKey}`);
+  }
+}
+
+function addDeepSearchExcludeItemKeys(keys, item) {
+  const raw = normalizeString(item);
+  if (!raw) return;
+
+  const prefixed = raw.match(/^(email|domain|company-address)\s*:\s*(.+)$/i);
+  if (prefixed) {
+    const type = prefixed[1].toLowerCase();
+    const value = normalizeString(prefixed[2]);
+    if (type === 'email') addDeepSearchExcludeEmail(keys, value);
+    if (type === 'domain') addDeepSearchExcludeDomain(keys, value);
+    if (type === 'company-address') {
+      const parts = value.split('|').map((part) => normalizeString(part)).filter(Boolean);
+      if (parts.length >= 2) addDeepSearchExcludeCompanyAddress(keys, parts[0], parts.slice(1).join(' '));
+    }
+    return;
+  }
+
+  const emailMatches = raw.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
+  emailMatches.forEach((email) => addDeepSearchExcludeEmail(keys, email));
+
+  raw
+    .split(/[\s|,;<>()[\]{}"']+/)
+    .map((part) => normalizeString(part))
+    .filter((part) => part && part.includes('.') && !part.includes('@'))
+    .forEach((part) => addDeepSearchExcludeDomain(keys, part));
+
+  const parts = raw.split('|').map((part) => normalizeString(part)).filter(Boolean);
+  if (parts.length >= 2) {
+    addDeepSearchExcludeCompanyAddress(keys, parts[0], parts[parts.length - 1]);
+  }
+}
+
+function buildDeepSearchExcludeKeySet(items) {
+  const keys = new Set();
+  normalizeDeepSearchExcludeItems(items).forEach((item) => {
+    addDeepSearchExcludeItemKeys(keys, item);
+  });
+  return keys;
 }
 
 function buildDeepSearchJsonSchema() {
@@ -1164,8 +1471,8 @@ function buildDeepSearchJsonSchema() {
   };
 }
 
-function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
-  const exclusions = normalizeDeepSearchExcludeItems(excludeItems);
+function buildDeepSearchPromptV1({ target, count, excludeItems, batchNumber }) {
+  const exclusions = normalizeDeepSearchExcludeItems(excludeItems, MAX_DEEP_SEARCH_PROMPT_EXCLUDE_ITEMS);
   const targetParts = parseDeepSearchTargetParts(target);
   const exclusionText = exclusions.length
     ? exclusions.map((item, index) => `${index + 1}. ${item}`).join('\n')
@@ -1212,6 +1519,61 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
   ].join('\n');
 
   return { systemPrompt, userPrompt };
+}
+
+function buildDeepSearchPromptV2({ target, count, excludeItems, batchNumber }) {
+  const exclusions = normalizeDeepSearchExcludeItems(excludeItems, MAX_DEEP_SEARCH_PROMPT_EXCLUDE_ITEMS);
+  const targetParts = parseDeepSearchTargetParts(target);
+  const exclusionText = exclusions.length
+    ? exclusions.map((item, index) => `${index + 1}. ${item}`).join('\n')
+    : 'Geen eerdere resultaten meegegeven.';
+  const strictLocationRule = targetParts.place
+    ? `Harde regioregel: lever alleen bedrijven met een fysiek adres in plaats "${targetParts.place}", gemeente "${targetParts.municipality}", provincie "${targetParts.province}", ${targetParts.country || 'Nederland'}. Bedrijven uit omliggende plaatsen, alleen servicegebieden of alleen dezelfde gemeente tellen niet mee.`
+    : 'Harde regioregel: lever alleen bedrijven met een fysiek adres binnen het opgegeven zoekgebied.';
+
+  const systemPrompt = [
+    'Je bent een nauwkeurige Nederlandse B2B-researchassistent voor Softora.',
+    'Gebruik live web search en lever alleen bedrijven aan waarvan bedrijfsnaam, adres, e-mail, telefoonnummer en website online verifieerbaar zijn.',
+    'Werk zuinig: elke zoekactie moet gericht zijn op nieuwe complete bedrijven, niet op eindeloos breed rondkijken.',
+    'Zoekroute: begin met combinaties van plaats + branche/bedrijf/contact, gebruik lokale bedrijvengidsen alleen als ontdekbron, open daarna bij voorkeur de officiele bedrijfswebsite of contactpagina voor bewijs.',
+    'Verifieer per bedrijf naam, fysiek adres, e-mail, telefoonnummer en website. Als een veld ontbreekt, lever het bedrijf niet aan.',
+    'Neem alleen actieve bedrijven of bedrijven die duidelijk operationeel lijken mee.',
+    'Neem geen verenigingen, scholen, overheidsinstanties of stichtingen mee, tenzij ze commercieel interessant zijn.',
+    'Vermijd dubbele bedrijven, handelsnamen met dezelfde website en eerder gevonden resultaten.',
+    'Wanneer je vooral uitgesloten/dubbele resultaten terugvindt en geen nieuwe complete bedrijven, stop dan voor deze plaats en zet placeComplete op true.',
+    'Wanneer je bedrijven aanlevert, zet placeComplete altijd op false.',
+    'Gebruik geen placeholders zoals onbekend, niet gevonden, n.v.t. of lege waarden.',
+    'Geef compacte JSON terug volgens het schema; maximaal twee bron-URLs per bedrijf is genoeg.',
+  ].join('\n');
+
+  const userPrompt = [
+    `Vind maximaal ${count} nieuwe actieve bedrijven in: ${target}.`,
+    `Dit is batch ${Math.max(1, Number(batchNumber) || 1)} voor deze plek.`,
+    '',
+    'Locatieregel:',
+    `- ${strictLocationRule}`,
+    '- Het adres moet de gevraagde plaats tonen. Een bedrijf in een andere plaats binnen dezelfde gemeente of provincie mag niet mee.',
+    '',
+    'Velden per bedrijf:',
+    'Bedrijfsnaam | Adres | E-mail | Telefoonnummer | Website',
+    '',
+    'Stopregels:',
+    '- Als je nieuwe complete bedrijven vindt, lever die aan en zet placeComplete op false.',
+    '- Als je nul nieuwe complete bedrijven vindt na gerichte live search, zet placeComplete op true en leg kort uit waarom in completionReason.',
+    '- Als alle zichtbare kandidaten dubbel, uitgesloten, onvolledig of buiten de plaats zijn, zet placeComplete op true.',
+    '',
+    'Eerder gevonden of al bestaande resultaten die je moet vermijden:',
+    exclusionText,
+  ].join('\n');
+
+  return { systemPrompt, userPrompt };
+}
+
+function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber, promptVersion }) {
+  if (promptVersion === 'v2') {
+    return buildDeepSearchPromptV2({ target, count, excludeItems, batchNumber });
+  }
+  return buildDeepSearchPromptV1({ target, count, excludeItems, batchNumber });
 }
 
 function extractOpenAiResponsesText(data) {
@@ -1333,23 +1695,60 @@ function normalizeDeepSearchBusiness(record) {
   };
 }
 
-function dedupeDeepSearchBusinesses(businesses, targetParts = {}) {
+function getDeepSearchBusinessKeys(business) {
+  const keys = [
+    `email:${business.email.toLowerCase()}`,
+    `domain:${business.website.toLowerCase()}`,
+    `company-address:${normalizeImportKey(business.bedrijfsnaam)}|${normalizeImportKey(business.adres)}`,
+  ];
+  return keys.filter((key) => !key.endsWith(':') && !key.endsWith('|'));
+}
+
+function dedupeDeepSearchBusinesses(businesses, targetParts = {}, excludeItems = []) {
+  return filterDeepSearchBusinesses(businesses, targetParts, excludeItems).businesses;
+}
+
+function filterDeepSearchBusinesses(businesses, targetParts = {}, excludeItems = []) {
   const seen = new Set();
+  const excluded = buildDeepSearchExcludeKeySet(excludeItems);
   const result = [];
+  const stats = {
+    raw: 0,
+    incomplete: 0,
+    wrongLocation: 0,
+    duplicate: 0,
+  };
   (businesses || []).forEach((business) => {
+    stats.raw += 1;
     const normalized = normalizeDeepSearchBusiness(business);
-    if (!normalized) return;
-    if (!deepSearchBusinessMatchesTarget(normalized, targetParts)) return;
-    const keys = [
-      `email:${normalized.email.toLowerCase()}`,
-      `domain:${normalized.website.toLowerCase()}`,
-      `company-address:${normalizeImportKey(normalized.bedrijfsnaam)}|${normalizeImportKey(normalized.adres)}`,
-    ];
-    if (keys.some((key) => seen.has(key))) return;
+    if (!normalized) {
+      stats.incomplete += 1;
+      return;
+    }
+    if (!deepSearchBusinessMatchesTarget(normalized, targetParts)) {
+      stats.wrongLocation += 1;
+      return;
+    }
+    const keys = getDeepSearchBusinessKeys(normalized);
+    if (keys.some((key) => excluded.has(key))) {
+      stats.duplicate += 1;
+      return;
+    }
+    if (keys.some((key) => seen.has(key))) {
+      stats.duplicate += 1;
+      return;
+    }
     keys.forEach((key) => seen.add(key));
     result.push(normalized);
   });
-  return result;
+  return {
+    businesses: result,
+    rejected: Math.max(0, stats.raw - result.length),
+    rejectedIncomplete: stats.incomplete,
+    rejectedWrongLocation: stats.wrongLocation,
+    rejectedDuplicates: stats.duplicate,
+    rawCount: stats.raw,
+  };
 }
 
 function mapDeepSearchBusinessesToRows(businesses) {
@@ -1413,7 +1812,7 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const target = normalizeDeepSearchTarget(input.target || input.location || input.query);
   const count = parsePositiveInt(input.count, MAX_DEEP_SEARCH_ROWS, 1, MAX_DEEP_SEARCH_ROWS);
   const batchNumber = parsePositiveInt(input.batchNumber, 1, 1, 999);
-  const excludeItems = normalizeDeepSearchExcludeItems(input.exclude || input.excludeItems || input.seen);
+  const excludeItems = collectDeepSearchExcludeItems(input);
 
   if (typeof fetchImpl !== 'function') {
     throw createServiceError('AI zoeken is niet beschikbaar op deze server.', 'FETCH_UNAVAILABLE', 503);
@@ -1427,61 +1826,79 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
 
   const model = getOpenAiDatabaseSearchModel({ ...deps, env });
   const reasoningEffort = getOpenAiDatabaseSearchReasoningEffort(model, { ...deps, env });
+  const requestedServiceTier = getOpenAiDatabaseSearchServiceTier({ ...deps, env });
+  const serviceTier = resolveOpenAiDatabaseSearchPricing(model, requestedServiceTier).serviceTier;
+  const promptVersion = getOpenAiDatabaseSearchPromptVersion({ ...deps, env });
+  const costMultiplier = getOpenAiDatabaseSearchCostMultiplier({ ...deps, env });
+  const maxAttempts = getOpenAiDatabaseSearchMaxAttempts({ ...deps, env });
   const openAiApiBaseUrl = getOpenAiApiBaseUrl({ ...deps, env });
   const { systemPrompt, userPrompt } = buildDeepSearchPrompt({
     target,
     count,
     excludeItems,
     batchNumber,
+    promptVersion,
   });
 
-  const controller = typeof AbortController === 'function' ? new AbortController() : null;
-  const timeout = controller
-    ? setTimeout(() => controller.abort(), Math.max(10000, deps.openAiTimeoutMs || 180000))
-    : null;
-  let response;
-  try {
-    response = await fetchImpl(`${openAiApiBaseUrl}/responses`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        ...buildOpenAiContextHeaders({ ...deps, env, openAiApiBaseUrl }),
-      },
-      signal: controller ? controller.signal : undefined,
-      body: JSON.stringify({
-        model,
-        reasoning: { effort: reasoningEffort },
-        tools: [
-          {
-            type: 'web_search',
-            external_web_access: true,
-            user_location: {
-              type: 'approximate',
-              country: 'NL',
-            },
-          },
-        ],
-        tool_choice: 'auto',
-        include: ['web_search_call.action.sources'],
-        input: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'softora_business_search_batch',
-            strict: true,
-            schema: buildDeepSearchJsonSchema(),
-          },
+  const requestBody = {
+    model,
+    reasoning: { effort: reasoningEffort },
+    tools: [
+      {
+        type: 'web_search',
+        external_web_access: true,
+        user_location: {
+          type: 'approximate',
+          country: 'NL',
         },
-      }),
-    });
-  } finally {
-    if (timeout) clearTimeout(timeout);
+      },
+    ],
+    tool_choice: 'auto',
+    include: ['web_search_call.action.sources'],
+    prompt_cache_key: `${OPENAI_DATABASE_SEARCH_PROMPT_CACHE_PREFIX}-${promptVersion}`,
+    input: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'softora_business_search_batch',
+        strict: true,
+        schema: buildDeepSearchJsonSchema(),
+      },
+    },
+  };
+  if (serviceTier === 'flex') requestBody.service_tier = 'flex';
+  if (/^gpt-5\.4\b/i.test(model)) requestBody.prompt_cache_retention = OPENAI_DATABASE_SEARCH_PROMPT_CACHE_RETENTION;
+
+  let response;
+  let data;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = controller
+      ? setTimeout(() => controller.abort(), Math.max(10000, deps.openAiTimeoutMs || 240000))
+      : null;
+    try {
+      response = await fetchImpl(`${openAiApiBaseUrl}/responses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          ...buildOpenAiContextHeaders({ ...deps, env, openAiApiBaseUrl }),
+        },
+        signal: controller ? controller.signal : undefined,
+        body: JSON.stringify(requestBody),
+      });
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+
+    data = await readJsonResponse(response);
+    if (response && response.ok) break;
+    if (attempt >= maxAttempts || !shouldRetryOpenAiDeepSearchResponse(response, data)) break;
+    await wait(getOpenAiRetryDelayMs(response, data, attempt));
   }
-  const data = await readJsonResponse(response);
   if (!response || !response.ok) {
     const message =
       normalizeString(data && data.error && data.error.message) || 'OpenAI kon geen bedrijven ophalen.';
@@ -1492,14 +1909,17 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const parsed = parseJsonObjectFromText(text);
   const rawBusinesses = Array.isArray(parsed && parsed.businesses) ? parsed.businesses : [];
   const targetParts = parseDeepSearchTargetParts(target);
-  const businesses = dedupeDeepSearchBusinesses(rawBusinesses, targetParts).slice(0, count);
+  const filtered = filterDeepSearchBusinesses(rawBusinesses, targetParts, excludeItems);
+  const businesses = filtered.businesses.slice(0, count);
   const rows = mapDeepSearchBusinessesToRows(businesses);
   const usage = extractOpenAiUsage(data);
   const webSearchCalls = countOpenAiWebSearchCalls(data);
-  const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls });
-  const placeComplete = businesses.length > 0 ? false : Boolean(parsed && parsed.placeComplete);
+  const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls, serviceTier, costMultiplier });
+  const duplicateOnlyBatch = filtered.rawCount > 0 && filtered.rejectedDuplicates === filtered.rawCount;
+  const placeComplete = businesses.length > 0 ? false : Boolean((parsed && parsed.placeComplete) || duplicateOnlyBatch);
   const completionReason = truncateText(
     (parsed && (parsed.completionReason || parsed.notes)) ||
+      (duplicateOnlyBatch ? 'Alle gevonden kandidaten waren al bekend of uitgesloten.' : '') ||
       (placeComplete ? 'Geen extra complete en verifieerbare bedrijven gevonden.' : ''),
     300
   );
@@ -1511,12 +1931,19 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
     target,
     model,
     reasoningEffort,
+    serviceTier,
+    promptVersion,
     requested: count,
     found: businesses.length,
-    rejected: Math.max(0, rawBusinesses.length - businesses.length),
+    rejected: filtered.rejected,
+    rejectedDuplicates: filtered.rejectedDuplicates,
+    rejectedWrongLocation: filtered.rejectedWrongLocation,
+    rejectedIncomplete: filtered.rejectedIncomplete,
     placeComplete,
     completionReason,
     cost,
+    usage,
+    webSearchCalls,
     businesses,
     sources: collectDeepSearchSources(data, businesses),
     rows,
@@ -1591,6 +2018,28 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     }
   }
 
+  function sendDeepSearchEstimateResponse(req, res) {
+    try {
+      const query = req && req.query && typeof req.query === 'object' ? req.query : {};
+      const result = estimateDeepSearchBusinessRunCost(
+        {
+          count: query.count,
+        },
+        {
+          env,
+        }
+      );
+      return res.status(200).json(result);
+    } catch (error) {
+      const code = normalizeString(error && error.code) || 'DEEP_SEARCH_ESTIMATE_FAILED';
+      return res.status(error && error.statusCode ? error.statusCode : 400).json({
+        ok: false,
+        code,
+        error: truncateText(normalizeString(error && error.message) || 'Kosteninschatting mislukt.', 500),
+      });
+    }
+  }
+
   async function sendDeepSearchBusinessesResponse(req, res) {
     try {
       const result = await fetchDeepSearchBusinessRows(req.body || {}, {
@@ -1620,6 +2069,7 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     sendSyncResponse,
     sendImportResponse,
     sendRealBusinessesResponse,
+    sendDeepSearchEstimateResponse,
     sendDeepSearchBusinessesResponse,
   };
 }
@@ -1628,6 +2078,7 @@ module.exports = {
   buildGooglePlacesSearchQueries,
   createPremiumDatabaseImportCoordinator,
   detectDelimitedSeparator,
+  estimateDeepSearchBusinessRunCost,
   fetchDeepSearchBusinessRows,
   fetchRealBusinessRows,
   fetchSpreadsheetRowsFromSourceUrl,

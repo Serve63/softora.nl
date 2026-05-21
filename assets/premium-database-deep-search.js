@@ -7,13 +7,15 @@
         outputTokensPerCompany: 1400,
         webSearchCallsPerBatch: 1,
         batchSize: 100,
-        inputUsdPerMillion: 30,
-        outputUsdPerMillion: 180,
-        webSearchUsdPerCall: 0.01
+        inputUsdPerMillion: 1.25,
+        outputUsdPerMillion: 7.5,
+        webSearchUsdPerCall: 0.01,
+        billingCalibrationMultiplier: 2.2
     };
     const DEEP_SEARCH_BATCH_SIZE = 100;
     const DEFAULT_DESIRED_COMPANY_COUNT = 25;
     const MAX_DESIRED_COMPANY_COUNT = 500;
+    const MAX_DEEP_SEARCH_EXCLUDE_ITEMS = 5000;
     const AUTO_CONTINUE_DELAY_MS = 750;
     const REQUIRED_EMPTY_COMPLETION_ROUNDS = 1;
     const DEEP_SEARCH_BUSY_STYLE_ID = "softora-deep-search-busy-style";
@@ -133,7 +135,14 @@
         const inputUsd = (inputTokens / 1000000) * ESTIMATED_BATCH_PRICING.inputUsdPerMillion;
         const outputUsd = (outputTokens / 1000000) * ESTIMATED_BATCH_PRICING.outputUsdPerMillion;
         const webSearchUsd = webSearchCalls * ESTIMATED_BATCH_PRICING.webSearchUsdPerCall;
-        return inputUsd + outputUsd + webSearchUsd;
+        return (inputUsd + outputUsd + webSearchUsd) * ESTIMATED_BATCH_PRICING.billingCalibrationMultiplier;
+    }
+
+    function estimateRunUpperUsd(companyCount) {
+        const count = normalizeDesiredCompanyCount(companyCount);
+        const base = estimateRunUsd(count);
+        const multiplier = count >= 500 ? 2 : (count >= 250 ? 1.6 : (count >= 100 ? 1.35 : 1.25));
+        return base * multiplier;
     }
 
     function usdToEur(value) {
@@ -233,6 +242,49 @@
         return (Array.isArray(customers) ? customers : []).map(function (customer) {
             return customer && (customer.website || customer.dom || customer.url || customer.site);
         });
+    }
+
+    function normalizeExistingWebsiteDomain(value) {
+        const raw = normalizeString(value)
+            .toLowerCase()
+            .replace(/^https?:\/\//, "")
+            .replace(/^www\./, "")
+            .replace(/\/.*$/, "")
+            .trim();
+        return /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(raw) ? raw : "";
+    }
+
+    function collectCustomerMatchKeys(customer) {
+        const keys = [];
+        const email = normalizeString(customer && customer.email).toLowerCase();
+        const domain = normalizeExistingWebsiteDomain(customer && (customer.website || customer.dom || customer.url || customer.site));
+        const company = normalizeKey(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam));
+        const address = normalizeKey(customer && (customer.stad || customer.adres || customer.address || customer.location));
+
+        if (email && email !== "—") keys.push("email:" + email);
+        if (domain && domain !== "onbekend.nl") keys.push("domain:" + domain);
+        if (company && address && address !== "onbekend") keys.push("company-address:" + company + "|" + address);
+        return keys;
+    }
+
+    function collectNewCustomersAfterImport(beforeCustomers, afterCustomers, limit) {
+        const beforeKeys = new Set();
+        (Array.isArray(beforeCustomers) ? beforeCustomers : []).forEach(function (customer) {
+            collectCustomerMatchKeys(customer).forEach(function (key) {
+                beforeKeys.add(key);
+            });
+        });
+
+        const maxItems = Math.max(0, Number(limit) || 0);
+        if (maxItems <= 0) return [];
+        const result = [];
+        (Array.isArray(afterCustomers) ? afterCustomers : []).forEach(function (customer) {
+            if (maxItems && result.length >= maxItems) return;
+            const keys = collectCustomerMatchKeys(customer);
+            if (!keys.length || keys.some(function (key) { return beforeKeys.has(key); })) return;
+            result.push(customer);
+        });
+        return result;
     }
 
     function createTarget(label, index) {
@@ -409,6 +461,19 @@
         });
     }
 
+    function readDeepSearchEstimate(companyCount) {
+        const count = normalizeDesiredCompanyCount(companyCount);
+        return fetch("/api/premium-database/deep-search-estimate?count=" + encodeURIComponent(String(count)), {
+            method: "GET",
+            headers: { "Accept": "application/json" }
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (body) {
+                if (!response.ok || !body.ok || !body.cost) throw new Error(body.error || "Kosteninschatting mislukt.");
+                return body;
+            });
+        });
+    }
+
     function createController(options) {
         ensureBusyStyles();
         const nodes = options.nodes || {};
@@ -418,6 +483,7 @@
         const stateKey = normalizeString(options.stateKey);
         const importRows = options.importRows;
         const fetchDeepSearchRows = options.readDeepSearchRows || readDeepSearchRows;
+        const fetchDeepSearchEstimate = options.readDeepSearchEstimate || readDeepSearchEstimate;
         const autoContinueDelayMs = options.autoContinueDelayMs === 0
             ? 0
             : Math.max(0, Number(options.autoContinueDelayMs) || AUTO_CONTINUE_DELAY_MS);
@@ -432,6 +498,13 @@
         let bound = false;
         const visibleSourceTargetIds = new Set();
         const sessionFoundWebsitesByTargetId = new Map();
+        let estimateState = {
+            count: 0,
+            body: null,
+            pending: false,
+            failed: false,
+            requestId: 0
+        };
 
         function getCurrentTarget() {
             return state.targets[state.activeIndex] || null;
@@ -566,6 +639,73 @@
             target.updatedAt = new Date().toISOString();
         }
 
+        function getEstimateCostUsdForCount(desiredCount) {
+            if (estimateState.count !== desiredCount || !estimateState.body || !estimateState.body.cost) return null;
+            const amount = Number(estimateState.body.cost.estimatedUsd);
+            return Number.isFinite(amount) && amount >= 0 ? amount : null;
+        }
+
+        function getEstimateUpperCostUsdForCount(desiredCount) {
+            if (estimateState.count !== desiredCount || !estimateState.body || !estimateState.body.cost) return null;
+            const amount = Number(estimateState.body.cost.upperEstimatedUsd);
+            return Number.isFinite(amount) && amount > 0 ? amount : null;
+        }
+
+        function formatDeepSearchEstimateLabel(desiredCount) {
+            const backendEstimateUsd = getEstimateCostUsdForCount(desiredCount);
+            const estimateUsd = backendEstimateUsd === null ? estimateRunUsd(desiredCount) : backendEstimateUsd;
+            const backendUpperEstimateUsd = getEstimateUpperCostUsdForCount(desiredCount);
+            const upperEstimateUsd = backendEstimateUsd === null ? estimateRunUpperUsd(desiredCount) : backendUpperEstimateUsd;
+            const estimate = formatUsdAsEuro(estimateUsd);
+            const rangeSuffix = upperEstimateUsd && upperEstimateUsd > estimateUsd * 1.1
+                ? " tot " + formatUsdAsEuro(upperEstimateUsd)
+                : "";
+            const model = estimateState.count === desiredCount ? normalizeString(estimateState.body && estimateState.body.model) : "";
+            const serviceTier = estimateState.count === desiredCount ? normalizeString(estimateState.body && estimateState.body.serviceTier) : "";
+            const tierSuffix = serviceTier && serviceTier !== "standard" ? " " + serviceTier : "";
+            const modelSuffix = model ? " via " + model + tierSuffix : "";
+            return "Richtprijs voor maximaal " + desiredCount + " bedrijven: " + estimate + rangeSuffix + modelSuffix + " (dashboard kan afwijken)";
+        }
+
+        function requestDeepSearchEstimate(desiredCount) {
+            if (typeof fetchDeepSearchEstimate !== "function") return;
+            const count = normalizeDesiredCompanyCount(desiredCount);
+            if (
+                estimateState.count === count
+                && (estimateState.pending || estimateState.body || estimateState.failed)
+            ) {
+                return;
+            }
+            const requestId = estimateState.requestId + 1;
+            estimateState = {
+                count: count,
+                body: null,
+                pending: true,
+                failed: false,
+                requestId: requestId
+            };
+            Promise.resolve(fetchDeepSearchEstimate(count)).then(function (body) {
+                if (estimateState.requestId !== requestId) return;
+                estimateState = {
+                    count: count,
+                    body: body,
+                    pending: false,
+                    failed: false,
+                    requestId: requestId
+                };
+                render();
+            }).catch(function () {
+                if (estimateState.requestId !== requestId) return;
+                estimateState = {
+                    count: count,
+                    body: null,
+                    pending: false,
+                    failed: true,
+                    requestId: requestId
+                };
+            });
+        }
+
         function render() {
             const target = getCurrentTarget();
             const canSearchTarget = target && target.status !== "done";
@@ -577,8 +717,8 @@
             }
             if (nodes.deepSearchCost) {
                 const desiredCount = getDesiredCompanyCount();
-                const estimate = formatUsdAsEuro(estimateRunUsd(desiredCount));
-                nodes.deepSearchCost.textContent = "Geschatte API-kosten voor " + desiredCount + " bedrijven: ± " + estimate + " (max ± €2 afwijking)";
+                nodes.deepSearchCost.textContent = formatDeepSearchEstimateLabel(desiredCount);
+                requestDeepSearchEstimate(desiredCount);
             }
             if (nodes.deepSearchList) {
                 nodes.deepSearchList.innerHTML = state.targets.length
@@ -597,14 +737,27 @@
 
         function collectExistingKeys() {
             const customers = Array.isArray(getCustomers()) ? getCustomers() : [];
-            return customers.map(function (customer) {
-                return [
-                    customer && customer.bedrijf,
-                    customer && customer.email,
-                    customer && (customer.website || customer.dom),
-                    customer && customer.stad
-                ].map(normalizeString).filter(Boolean).join(" | ");
-            }).filter(Boolean).slice(-120);
+            const priorityKeys = [];
+            const secondaryKeys = [];
+            const seen = new Set();
+
+            function addKey(list, key) {
+                const normalized = normalizeString(key);
+                if (!normalized || seen.has(normalized)) return;
+                seen.add(normalized);
+                list.push(normalized);
+            }
+
+            customers.forEach(function (customer) {
+                collectCustomerMatchKeys(customer).forEach(function (key) {
+                    if (key.indexOf("company-address:") === 0) {
+                        addKey(secondaryKeys, key);
+                    } else {
+                        addKey(priorityKeys, key);
+                    }
+                });
+            });
+            return priorityKeys.concat(secondaryKeys).slice(0, MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
         }
 
         function updateTargetAfterSearch(target, body, addedCount, addedWebsites) {
@@ -658,13 +811,14 @@
         }
 
         function runTargetBatch(target, requestedCount) {
-            const beforeCount = Array.isArray(getCustomers()) ? getCustomers().length : 0;
+            const beforeCustomers = Array.isArray(getCustomers()) ? getCustomers().slice() : [];
+            const beforeCount = beforeCustomers.length;
             const requestCount = Math.max(1, Math.min(DEEP_SEARCH_BATCH_SIZE, normalizeDesiredCompanyCount(requestedCount || DEEP_SEARCH_BATCH_SIZE)));
             return fetchDeepSearchRows({
                 target: target.label,
                 count: requestCount,
                 batchNumber: target.batches + 1,
-                exclude: uniqueStrings(target.seen.concat(collectExistingKeys()), 180)
+                exclude: uniqueStrings(target.seen.concat(collectExistingKeys()), MAX_DEEP_SEARCH_EXCLUDE_ITEMS)
             }).then(function (body) {
                 const rows = Array.isArray(body.rows) ? body.rows : [];
                 target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
@@ -674,9 +828,10 @@
                     const afterCustomers = Array.isArray(getCustomers()) ? getCustomers() : [];
                     const afterCount = afterCustomers.length;
                     const addedCount = Math.max(0, afterCount - beforeCount);
+                    const addedCustomers = collectNewCustomersAfterImport(beforeCustomers, afterCustomers, addedCount);
                     const addedWebsites = importResult === false
                         ? []
-                        : collectWebsitesFromCustomers(afterCustomers.slice(beforeCount, beforeCount + addedCount));
+                        : collectWebsitesFromCustomers(addedCustomers);
                     updateTargetAfterSearch(target, body, addedCount, addedWebsites);
                     const completed = Boolean(body && body.placeComplete);
                     const customerPersisted = !(rows.length > 1 && addedCount > 0 && importResult === false);
@@ -691,12 +846,22 @@
                         source: "premium-database-deep-search",
                         label: target.label,
                         amountUsd: result.costUsd,
-                        model: body && body.cost && body.cost.model,
+                        model: normalizeString(body && (body.model || (body.cost && body.cost.model))),
                         meta: {
                             target: target.label,
                             batchNumber: target.batches,
                             found: result.found,
-                            added: result.addedCount
+                            added: result.addedCount,
+                            model: normalizeString(body && body.model),
+                            reasoningEffort: normalizeString(body && body.reasoningEffort),
+                            serviceTier: normalizeString(body && body.serviceTier),
+                            promptVersion: normalizeString(body && body.promptVersion),
+                            rejected: Math.max(0, Number(body && body.rejected) || 0),
+                            rejectedDuplicates: Math.max(0, Number(body && body.rejectedDuplicates) || 0),
+                            rejectedWrongLocation: Math.max(0, Number(body && body.rejectedWrongLocation) || 0),
+                            rejectedIncomplete: Math.max(0, Number(body && body.rejectedIncomplete) || 0),
+                            usage: body && body.usage ? body.usage : null,
+                            cost: body && body.cost ? body.cost : null
                         }
                     }).catch(function (error) {
                         console.error("API-kosten opslaan mislukt:", error);
