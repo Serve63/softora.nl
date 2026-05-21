@@ -13,8 +13,10 @@ function loadDatabaseImportClient() {
 }
 
 function loadDatabaseDeepSearchClient(options = {}) {
+  const helperScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search-helpers.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const distanceScriptPath = path.join(__dirname, '../../assets/premium-database-distance.js');
+  const helperSource = fs.readFileSync(helperScriptPath, 'utf8');
   const source = fs.readFileSync(scriptPath, 'utf8');
   const distanceSource = fs.readFileSync(distanceScriptPath, 'utf8');
   const sandbox = {
@@ -26,6 +28,7 @@ function loadDatabaseDeepSearchClient(options = {}) {
   if (options.document) sandbox.window.document = options.document;
   sandbox.window.confirm = () => true;
   vm.runInNewContext(distanceSource, sandbox);
+  vm.runInNewContext(helperSource, sandbox);
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseDeepSearch;
 }
@@ -476,7 +479,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260506a/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521b/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
@@ -583,8 +586,8 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260427c"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search\.js\?v=20260506a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260521b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521b"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -1823,12 +1826,175 @@ test('premium database deep search turns the start button into a disabled comple
   assert.equal(await controller.runCurrentSearch(), true);
 
   assert.equal(calls.length, 1);
-  assert.equal(startButton.textContent, '1 bedrijf gevonden in Oisterwijk');
+  assert.equal(startButton.textContent, '1 bedrijf toegevoegd in Oisterwijk');
   assert.equal(startButton.disabled, true);
   assert.equal(startButton.getAttribute('aria-disabled'), 'true');
   assert.equal(startButton.classList.contains('is-session-complete'), true);
   assert.equal(await controller.runCurrentSearch(), false);
   assert.equal(calls.length, 1);
+});
+
+test('premium database deep search sends compact duplicate exclusions for the full customer list', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const customers = Array.from({ length: 150 }, (_item, index) => ({
+    bedrijf: `Bestaand ${index}`,
+    email: `info${index}@bestaand-${index}.nl`,
+    website: `https://www.bestaand-${index}.nl`,
+    stad: `Kerkstraat ${index}, Oisterwijk`,
+  }));
+  customers.push({
+    bedrijf: 'Growingbyknowing.nl',
+    email: 'hello@growingbyknowing.nl',
+    website: 'https://www.growingbyknowing.nl',
+    stad: 'Dorpsstraat 1, Bavel',
+  });
+  let capturedPayload = null;
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '1' },
+      deepSearchList: {},
+      deepSearchSources: {},
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    autoContinueDelayMs: 0,
+    getCustomers: () => customers,
+    importRows: async (receivedRows) => {
+      customers.push(...receivedRows.slice(1).map((row) => ({
+        bedrijf: row[0],
+        stad: row[1],
+        email: row[2],
+        website: row[4],
+      })));
+      return true;
+    },
+    readDeepSearchRows: async (payload) => {
+      capturedPayload = payload;
+      return {
+        ok: true,
+        rows: [
+          ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+          ['Nieuw Oisterwijk BV', 'Kerkstraat 1, Oisterwijk', 'info@nieuwoisterwijk.nl', '013 111 111', 'nieuwoisterwijk.nl'],
+        ],
+        businesses: [{ bedrijfsnaam: 'Nieuw Oisterwijk BV', email: 'info@nieuwoisterwijk.nl', website: 'nieuwoisterwijk.nl' }],
+        found: 1,
+        placeComplete: false,
+        cost: { estimatedUsd: 0.01 },
+        sources: [],
+      };
+    },
+    setUiState: async () => ({ ok: true }),
+  });
+
+  await controller.runCurrentSearch();
+
+  assert.ok(capturedPayload);
+  assert.ok(capturedPayload.exclude.includes('domain:bestaand-0.nl'));
+  assert.ok(capturedPayload.exclude.includes('domain:bestaand-149.nl'));
+  assert.ok(capturedPayload.exclude.includes('domain:growingbyknowing.nl'));
+  assert.ok(capturedPayload.exclude.includes('email:hello@growingbyknowing.nl'));
+  assert.notEqual(capturedPayload.exclude.length, 120);
+});
+
+test('premium database deep search lists websites from newly added customers after import sorting', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const sourcesPanel = { innerHTML: '' };
+  const customers = [
+    { bedrijf: 'Oude A', email: 'info@oudea.nl', website: 'oudea.nl', stad: 'Kerkstraat 1, Oisterwijk' },
+    { bedrijf: 'Oude B', email: 'info@oudeb.nl', website: 'oudeb.nl', stad: 'Kerkstraat 2, Oisterwijk' },
+  ];
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '1' },
+      deepSearchList: {},
+      deepSearchSources: sourcesPanel,
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    autoContinueDelayMs: 0,
+    getCustomers: () => customers,
+    importRows: async (receivedRows) => {
+      customers.unshift(...receivedRows.slice(1).map((row) => ({
+        bedrijf: row[0],
+        stad: row[1],
+        email: row[2],
+        website: row[4],
+      })));
+      return true;
+    },
+    readDeepSearchRows: async () => ({
+      ok: true,
+      rows: [
+        ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+        ['Nieuw Voorop BV', 'Kerkstraat 3, Oisterwijk', 'info@nieuwvoorop.nl', '013 333 333', 'nieuwvoorop.nl'],
+      ],
+      businesses: [{ bedrijfsnaam: 'Nieuw Voorop BV', email: 'info@nieuwvoorop.nl', website: 'nieuwvoorop.nl' }],
+      found: 1,
+      placeComplete: false,
+      cost: { estimatedUsd: 0.01 },
+      sources: [],
+    }),
+    setUiState: async () => ({ ok: true }),
+  });
+
+  await controller.runCurrentSearch();
+
+  assert.match(sourcesPanel.innerHTML, /nieuwvoorop\.nl/);
+  assert.doesNotMatch(sourcesPanel.innerHTML, /oudea\.nl/);
+  assert.doesNotMatch(sourcesPanel.innerHTML, /oudeb\.nl/);
+});
+
+test('premium database deep search stops duplicate-only batches to protect API costs', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const messages = [];
+  const calls = [];
+  const customers = [
+    { bedrijf: 'Lins Zorgt', email: 'info@linszorgt.nl', website: 'linszorgt.nl', stad: 'Kerkstraat 1, Oisterwijk' },
+  ];
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '1' },
+      deepSearchList: {},
+      deepSearchSources: {},
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    autoContinueDelayMs: 0,
+    getCustomers: () => customers,
+    importRows: async () => false,
+    readDeepSearchRows: async (payload) => {
+      calls.push(payload);
+      return {
+        ok: true,
+        rows: [
+          ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+          ['Lins Zorgt', 'Kerkstraat 1, Oisterwijk', 'info@linszorgt.nl', '013 111 111', 'linszorgt.nl'],
+        ],
+        businesses: [{ bedrijfsnaam: 'Lins Zorgt', email: 'info@linszorgt.nl', website: 'linszorgt.nl' }],
+        found: 1,
+        placeComplete: false,
+        cost: { estimatedUsd: 0.02 },
+        sources: [],
+      };
+    },
+    setStatusMessage: (message) => messages.push(message),
+    setUiState: async () => ({ ok: true }),
+  });
+
+  const result = await controller.runCurrentSearch();
+
+  assert.equal(result, false);
+  assert.equal(calls.length, 1);
+  assert.match(messages.join('\n'), /geen enkel nieuw bedrijf is toegevoegd/);
 });
 
 test('premium database deep search stops when new companies could not be saved', async () => {

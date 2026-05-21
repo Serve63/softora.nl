@@ -21,6 +21,7 @@
     const REQUIRED_EMPTY_COMPLETION_ROUNDS = 1;
     const DEEP_SEARCH_BUSY_STYLE_ID = "softora-deep-search-busy-style";
     const TARGET_ORDER_VERSION = "distance-oisterwijk-v1";
+    const helpers = global.SoftoraDatabaseDeepSearchHelpers;
     // Generated from the supplied work order, extended with CBS 2025 woonplaatsen.
     const DEFAULT_TARGET_TEXT_BASE64 = [
         "TmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFsbWtlcmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IEFuZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBCYWJ5bG9uacOrbmJyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBEcm9uZ2VsZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IER1c3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgRWV0aGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBHZW5kZXJlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgR2llc3NlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgSGFuawpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTWVldXdlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgTmlldXdlbmRpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFJpanN3aWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBTbGVldXdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFVpdHdpamsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFZlZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdhYXJkaHVpemVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBbHRlbmEgfCBXZXJrZW5kYW0KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEFsdGVuYSB8IFdpamsgZW4gQWFsYnVyZwpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQWx0ZW5hIHwgV291ZHJpY2hlbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBBc3RlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQXN0ZW4gfCBIZXVzZGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBBc3RlbiB8IE9tbWVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCYWFybGUtTmFzc2F1IHwgQmFhcmxlLU5hc3NhdQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IENhc3RlbHLDqQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmFhcmxlLU5hc3NhdSB8IFVsaWNvdGVuCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEJlcmdlaWprCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IEx1eWtzZ2VzdGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJnZWlqayB8IFJpZXRob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VpamsgfCBXZXN0ZXJob3ZlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBCZXJnZW4gb3AgWm9vbQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVyZ2VuIG9wIFpvb20gfCBIYWxzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcmdlbiBvcCBab29tIHwgTGVwZWxzdHJhYXQKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgSGVlc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IEhlZXN3aWprLURpbnRoZXIKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgTG9vc2Jyb2VrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IE5pc3RlbHJvZGUKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJlcm5oZXplIHwgVmlua2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCZXJuaGV6ZSB8IFZvcnN0ZW5ib3NjaApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmVzdCB8IEJlc3QKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEJsYWRlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgQ2FzdGVyZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJsYWRlbCB8IEhhcGVydApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQmxhZGVsIHwgSG9vZ2Vsb29uCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCbGFkZWwgfCBOZXRlcnNlbApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm9la2VsIHwgQm9la2VsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb2VrZWwgfCBWZW5ob3JzdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQm94dGVsIHwgQm94dGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBFc2NoCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCb3h0ZWwgfCBMaWVtcGRlCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJhdmVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IEJyZWRhCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFByaW5zZW5iZWVrCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBCcmVkYSB8IFRldGVyaW5nZW4KTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IEJyZWRhIHwgVWx2ZW5ob3V0Ck5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLURvcnBsZWluCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IEJ1ZGVsLVNjaG9vdApOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgQ3JhbmVuZG9uY2sgfCBHYXN0ZWwKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IENyYW5lbmRvbmNrIHwgTWFhcmhlZXplCk5lZGVybGFuZCB8IE5vb3JkLUJyYWJhbnQgfCBDcmFuZW5kb25jayB8IFNvZXJlbmRvbmsKTmVkZXJsYW5kIHwgTm9vcmQtQnJhYmFudCB8IERldXJuZSB8IERldXJuZQpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwgSGVsZW5hdmVlbgpOZWRlcmxhbmQgfCBOb29yZC1CcmFiYW50IHwgRGV1cm5lIHwg",
@@ -176,7 +177,7 @@
     }
 
     function buildCompletedSessionButtonLabel(summary) {
-        return formatCompanyCountLabel(summary && summary.addedCount) + " gevonden in " + getTargetLocationName(summary && summary.targetLabel);
+        return formatCompanyCountLabel(summary && summary.addedCount) + " toegevoegd in " + getTargetLocationName(summary && summary.targetLabel);
     }
 
     function formatEuro(value) {
@@ -262,29 +263,6 @@
         return result.slice(0, maxItems || 200);
     }
 
-    function normalizeExistingWebsiteDomain(value) {
-        const raw = normalizeString(value)
-            .toLowerCase()
-            .replace(/^https?:\/\//, "")
-            .replace(/^www\./, "")
-            .replace(/\/.*$/, "")
-            .trim();
-        return /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(raw) ? raw : "";
-    }
-
-    function collectCustomerMatchKeys(customer) {
-        const keys = [];
-        const email = normalizeString(customer && customer.email).toLowerCase();
-        const domain = normalizeExistingWebsiteDomain(customer && (customer.website || customer.dom || customer.url || customer.site));
-        const company = normalizeKey(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam));
-        const address = normalizeKey(customer && (customer.stad || customer.adres || customer.address || customer.location));
-
-        if (email && email !== "—") keys.push("email:" + email);
-        if (domain && domain !== "onbekend.nl") keys.push("domain:" + domain);
-        if (company && address && address !== "onbekend") keys.push("company-address:" + company + "|" + address);
-        return keys;
-    }
-
     function normalizeDesiredCompanyCount(value) {
         const cleaned = String(value || "").replace(/[^\d]/g, "");
         const parsed = Number(cleaned);
@@ -334,7 +312,7 @@
             placeComplete: Boolean(raw && raw.placeComplete),
             completionReason: normalizeString(raw && raw.completionReason),
             completionChecks: Math.max(0, Number(raw && raw.completionChecks) || 0),
-            seen: uniqueStrings(raw && raw.seen, 180),
+            seen: uniqueStrings(raw && raw.seen, MAX_DEEP_SEARCH_EXCLUDE_ITEMS),
             foundWebsites: uniqueWebsiteValues((raw && (raw.foundWebsites || raw.websites)) || raw && raw.lastSources, 200),
             lastSources: Array.isArray(raw && raw.lastSources) ? raw.lastSources.slice(0, 40) : [],
             updatedAt: normalizeString(raw && raw.updatedAt)
@@ -371,7 +349,7 @@
             progress[key] = value;
             changed = true;
         });
-        const seen = uniqueStrings(target && target.seen, 180);
+        const seen = uniqueStrings(target && target.seen, MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
         if (seen.length) {
             progress.seen = seen;
             changed = true;
@@ -519,8 +497,6 @@
         let state = normalizeState({});
         let busy = false;
         let bound = false;
-        const visibleSourceTargetIds = new Set();
-        const sessionFoundWebsitesByTargetId = new Map();
         let estimateState = {
             count: 0,
             body: null,
@@ -528,6 +504,8 @@
             failed: false,
             requestId: 0
         };
+        const visibleSourceTargetIds = new Set();
+        const sessionFoundWebsitesByTargetId = new Map();
 
         function getCurrentTarget() {
             return state.targets[state.activeIndex] || null;
@@ -799,7 +777,7 @@
             }
 
             customers.forEach(function (customer) {
-                collectCustomerMatchKeys(customer).forEach(function (key) {
+                helpers.collectCustomerMatchKeys(customer).forEach(function (key) {
                     if (key.indexOf("company-address:") === 0) {
                         addKey(secondaryKeys, key);
                     } else {
@@ -824,13 +802,13 @@
             target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
             target.foundWebsites = uniqueWebsiteValues((target.foundWebsites || []).concat(addedWebsites || []), 200);
             setSessionFoundWebsites(target.id, getSessionFoundWebsites(target.id).concat(addedWebsites || []));
-            target.seen = uniqueStrings(target.seen.concat(businesses.map(function (business) {
-                return [
-                    business && business.bedrijfsnaam,
-                    business && business.email,
-                    business && business.website
-                ].map(normalizeString).filter(Boolean).join(" | ");
-            })), 180);
+            const businessKeys = [];
+            businesses.forEach(function (business) {
+                helpers.collectCustomerMatchKeys(business).forEach(function (key) {
+                    businessKeys.push(key);
+                });
+            });
+            target.seen = uniqueStrings(target.seen.concat(businessKeys), MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
         }
 
         function advanceCompletedTarget(target) {
@@ -861,7 +839,8 @@
         }
 
         function runTargetBatch(target, requestedCount) {
-            const beforeCount = Array.isArray(getCustomers()) ? getCustomers().length : 0;
+            const beforeCustomers = Array.isArray(getCustomers()) ? getCustomers().slice() : [];
+            const beforeCount = beforeCustomers.length;
             const requestCount = Math.max(1, Math.min(DEEP_SEARCH_BATCH_SIZE, normalizeDesiredCompanyCount(requestedCount || DEEP_SEARCH_BATCH_SIZE)));
             return fetchDeepSearchRows({
                 target: target.label,
@@ -876,17 +855,25 @@
                 return importPromise.then(function (importResult) {
                     const afterCustomers = Array.isArray(getCustomers()) ? getCustomers() : [];
                     const afterCount = afterCustomers.length;
-                    const addedCount = Math.max(0, afterCount - beforeCount);
+                    const importDetails = importResult && typeof importResult === "object" ? importResult : null;
+                    const addedCount = importDetails
+                        ? Math.max(0, Number(importDetails.addedCount) || 0)
+                        : Math.max(0, afterCount - beforeCount);
+                    const addedCustomers = importDetails && Array.isArray(importDetails.addedCustomers)
+                        ? importDetails.addedCustomers.slice(0, addedCount || importDetails.addedCustomers.length)
+                        : helpers.collectNewCustomersAfterImport(beforeCustomers, afterCustomers, addedCount);
                     const addedWebsites = importResult === false
                         ? []
-                        : collectWebsitesFromCustomers(afterCustomers.slice(beforeCount, beforeCount + addedCount));
+                        : collectWebsitesFromCustomers(addedCustomers);
                     updateTargetAfterSearch(target, body, addedCount, addedWebsites);
                     const completed = Boolean(body && body.placeComplete);
                     const customerPersisted = !(rows.length > 1 && addedCount > 0 && importResult === false);
+                    const duplicateOnlyBatch = rows.length > 1 && Math.max(0, Number(body.found) || 0) > 0 && addedCount === 0;
                     const result = {
                         addedCount: addedCount,
                         completed: completed,
                         customerPersisted: customerPersisted,
+                        duplicateOnlyBatch: duplicateOnlyBatch,
                         costUsd: Math.max(0, Number(body && body.cost && body.cost.estimatedUsd) || 0),
                         found: Math.max(0, Number(body.found) || 0)
                     };
@@ -939,9 +926,13 @@
                     if (result.addedCount) toast("+" + result.addedCount + " bedrijven");
                     const storageNote = result.persisted ? "" : " Let op: voortgang opslaan lukte niet.";
                     const progressMessage = runSession.addedCount + " van " + runSession.desiredCount + " gewenste bedrijven toegevoegd. ";
-                    const baseMessage = "AI vond " + result.found + " complete bedrijven voor " + startedLabel + ". " + result.addedCount + " nieuw toegevoegd. " + progressMessage + "API-kosten: " + formatUsdAsEuro(result.costUsd) + "." + storageNote;
+                    const baseMessage = "AI leverde " + result.found + " bruikbare bedrijven voor " + startedLabel + ". " + result.addedCount + " echt nieuw toegevoegd aan de database. " + progressMessage + "API-kosten: " + formatUsdAsEuro(result.costUsd) + "." + storageNote;
                     if (result.customerPersisted === false) {
                         setStatusMessage(baseMessage + " Opslaan in Supabase lukte niet, dus deze batch is gestopt zodat er niets stilletjes verloren gaat.", "error", true);
+                        return { stopped: true };
+                    }
+                    if (result.duplicateOnlyBatch) {
+                        setStatusMessage(baseMessage + " De batch is gestopt omdat er geen enkel nieuw bedrijf is toegevoegd. Zo voorkomen we dat dezelfde bestaande bedrijven API-kosten blijven maken.", "info", true);
                         return { stopped: true };
                     }
                     if (runSession.addedCount >= runSession.desiredCount) {
@@ -1135,6 +1126,7 @@
             getDefaultTargetLabels: getDefaultTargetLabels,
             getRawDefaultTargetLabels: getRawDefaultTargetLabels,
             parseTargetLines: parseTargetLines,
+            readDeepSearchEstimate: readDeepSearchEstimate,
             readDeepSearchRows: readDeepSearchRows,
             runCurrentSearch: runCurrentSearch
         };
@@ -1145,6 +1137,7 @@
         getDefaultTargetLabels: getDefaultTargetLabels,
         getRawDefaultTargetLabels: getRawDefaultTargetLabels,
         parseTargetLines: parseTargetLines,
+        readDeepSearchEstimate: readDeepSearchEstimate,
         readDeepSearchRows: readDeepSearchRows
     };
 })(window);
