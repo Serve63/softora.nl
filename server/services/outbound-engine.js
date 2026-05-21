@@ -234,6 +234,7 @@ function isLeadEligible(lead, suppressionSet = new Set(), seenLeadKeys = new Set
   const website = normaliseDomainName(lead.website || lead.domain);
   const leadKey = email || website || String(lead.id || '');
 
+  if (!email) reasons.push('lead_email_missing');
   if (!hasText(lead.companyName)) reasons.push('company_name_missing');
   if (!hasText(lead.website) && !hasText(lead.source)) reasons.push('lead_source_missing');
   if (!hasText(lead.relevanceReason)) reasons.push('relevance_reason_missing');
