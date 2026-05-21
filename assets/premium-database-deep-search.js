@@ -20,7 +20,7 @@
     const AUTO_CONTINUE_DELAY_MS = 750;
     const REQUIRED_EMPTY_COMPLETION_ROUNDS = 1;
     const DEEP_SEARCH_BUSY_STYLE_ID = "softora-deep-search-busy-style";
-    const TARGET_ORDER_VERSION = "distance-oisterwijk-v1";
+    const TARGET_ORDER_VERSION = "distance-oisterwijk-v2";
     const helpers = global.SoftoraDatabaseDeepSearchHelpers;
     // Generated from the supplied work order, extended with CBS 2025 woonplaatsen.
     const DEFAULT_TARGET_TEXT_BASE64 = [
