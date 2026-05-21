@@ -37,6 +37,10 @@ services:
         sync: false
       - key: OPENAI_PROJECT_ID
         sync: false
+      - key: OPENAI_DATABASE_SEARCH_MODEL
+        value: gpt-5.4
+      - key: OPENAI_DATABASE_SEARCH_REASONING_EFFORT
+        value: high
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY

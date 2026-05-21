@@ -13,6 +13,10 @@ function registerPremiumDatabaseImportRoutes(app, deps = {}) {
     coordinator.sendRealBusinessesResponse(req, res)
   );
 
+  app.get('/api/premium-database/deep-search-estimate', (req, res) =>
+    coordinator.sendDeepSearchEstimateResponse(req, res)
+  );
+
   app.post('/api/premium-database/deep-search-businesses', (req, res) =>
     coordinator.sendDeepSearchBusinessesResponse(req, res)
   );

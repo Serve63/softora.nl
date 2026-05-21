@@ -15,7 +15,10 @@ const MAX_IMPORT_ROWS = 2000;
 const MAX_IMPORT_COLS = 50;
 const MAX_REAL_BUSINESS_ROWS = 100;
 const MAX_DEEP_SEARCH_ROWS = 100;
-const MAX_DEEP_SEARCH_EXCLUDE_ITEMS = 180;
+const DEFAULT_DEEP_SEARCH_ESTIMATE_ROWS = 25;
+const MAX_DEEP_SEARCH_ESTIMATE_ROWS = 500;
+const MAX_DEEP_SEARCH_EXCLUDE_ITEMS = 5000;
+const MAX_DEEP_SEARCH_PROMPT_EXCLUDE_ITEMS = 500;
 const GOOGLE_PLACES_TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
 const GOOGLE_PLACES_FIELD_MASK = [
   'places.id',
@@ -29,7 +32,11 @@ const GOOGLE_PLACES_FIELD_MASK = [
   'nextPageToken',
 ].join(',');
 const DEFAULT_REAL_BUSINESS_QUERY = 'bedrijven in Noord-Brabant';
-const DEFAULT_OPENAI_MODEL = 'gpt-5.5-pro';
+const DEFAULT_OPENAI_DATABASE_SEARCH_MODEL = 'gpt-5.4';
+const DEFAULT_OPENAI_DATABASE_SEARCH_REASONING_EFFORT = 'high';
+const ESTIMATED_DEEP_SEARCH_INPUT_TOKENS_PER_BATCH = 6000;
+const ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY = 1400;
+const ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH = 1;
 const REAL_BUSINESS_CATEGORY_PREFIXES = [
   'bedrijven',
   'winkels',
@@ -972,7 +979,7 @@ function getOpenAiApiBaseUrl(deps = {}) {
 function getOpenAiDatabaseSearchModel(deps = {}) {
   const env = deps.env || process.env || {};
   return normalizeString(
-    deps.openAiModel || env.OPENAI_DATABASE_SEARCH_MODEL || env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL
+    deps.openAiModel || env.OPENAI_DATABASE_SEARCH_MODEL || env.OPENAI_MODEL || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL
   );
 }
 
@@ -980,11 +987,11 @@ function getOpenAiDatabaseSearchReasoningEffort(model, deps = {}) {
   const env = deps.env || process.env || {};
   const explicit = normalizeString(deps.openAiReasoningEffort || env.OPENAI_DATABASE_SEARCH_REASONING_EFFORT);
   if (['none', 'low', 'medium', 'high', 'xhigh'].includes(explicit)) return explicit;
-  return normalizeString(model).toLowerCase().includes('pro') ? 'high' : 'low';
+  return DEFAULT_OPENAI_DATABASE_SEARCH_REASONING_EFFORT;
 }
 
 function getOpenAiDatabaseSearchPricing(model) {
-  const rates = getOpenAiTextModelRates(model || DEFAULT_OPENAI_MODEL);
+  const rates = getOpenAiTextModelRates(model || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL);
   return {
     inputUsdPerMillion: rates.input,
     outputUsdPerMillion: rates.output,
@@ -1046,6 +1053,44 @@ function estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls }) {
       source: OPENAI_PRICING_SOURCE_URL,
     },
     note: 'Schatting op basis van OpenAI tokengebruik en web-search calls; exclusief eventuele regionale toeslagen.',
+  };
+}
+
+function estimateDeepSearchBusinessRunCost(input = {}, deps = {}) {
+  const env = deps.env || process.env || {};
+  const requested = parsePositiveInt(
+    input.count,
+    DEFAULT_DEEP_SEARCH_ESTIMATE_ROWS,
+    1,
+    MAX_DEEP_SEARCH_ESTIMATE_ROWS
+  );
+  const model = getOpenAiDatabaseSearchModel({ ...deps, env });
+  const reasoningEffort = getOpenAiDatabaseSearchReasoningEffort(model, { ...deps, env });
+  const batchSize = MAX_DEEP_SEARCH_ROWS;
+  const estimatedBatches = Math.max(1, Math.ceil(requested / batchSize));
+  const usage = {
+    inputTokens: estimatedBatches * ESTIMATED_DEEP_SEARCH_INPUT_TOKENS_PER_BATCH,
+    outputTokens: requested * ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY,
+    cachedInputTokens: 0,
+  };
+  const webSearchCalls = estimatedBatches * ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH;
+  const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls });
+
+  return {
+    ok: true,
+    source: 'openai-web-search-estimate',
+    requested,
+    maxRequested: MAX_DEEP_SEARCH_ESTIMATE_ROWS,
+    batchSize,
+    estimatedBatches,
+    model,
+    reasoningEffort,
+    estimateOnly: true,
+    cost: {
+      ...cost,
+      note:
+        'Voorcalculatie op basis van het actieve deep-search model; er is geen OpenAI-call uitgevoerd.',
+    },
   };
 }
 
@@ -1118,10 +1163,11 @@ function deepSearchBusinessMatchesTarget(business, targetParts) {
   );
 }
 
-function normalizeDeepSearchExcludeItems(items) {
+function normalizeDeepSearchExcludeItems(items, maxItems = MAX_DEEP_SEARCH_EXCLUDE_ITEMS) {
   const values = Array.isArray(items) ? items : [];
   const seen = new Set();
   const result = [];
+  const limit = Math.max(1, Math.min(10000, Number(maxItems) || MAX_DEEP_SEARCH_EXCLUDE_ITEMS));
   values.forEach((item) => {
     const normalized = truncateText(item, 160);
     const key = normalizeImportKey(normalized);
@@ -1129,7 +1175,88 @@ function normalizeDeepSearchExcludeItems(items) {
     seen.add(key);
     result.push(normalized);
   });
-  return result.slice(0, MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
+  return result.slice(0, limit);
+}
+
+function collectDeepSearchExcludeItems(input = {}) {
+  const rawItems = [];
+  function add(value) {
+    if (Array.isArray(value)) {
+      value.forEach(add);
+      return;
+    }
+    const normalized = normalizeString(value);
+    if (normalized) rawItems.push(normalized);
+  }
+
+  add(input.exclude);
+  add(input.excludeItems);
+  add(input.excludeKeys);
+  add(input.seen);
+  return normalizeDeepSearchExcludeItems(rawItems, MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
+}
+
+function addDeepSearchExcludeKey(keys, key) {
+  const normalized = normalizeString(key);
+  if (normalized) keys.add(normalized);
+}
+
+function addDeepSearchExcludeEmail(keys, value) {
+  const email = normalizeDeepSearchEmail(value);
+  if (email) addDeepSearchExcludeKey(keys, `email:${email}`);
+}
+
+function addDeepSearchExcludeDomain(keys, value) {
+  const domain = normalizeWebsiteDomain(value);
+  if (domain) addDeepSearchExcludeKey(keys, `domain:${domain}`);
+}
+
+function addDeepSearchExcludeCompanyAddress(keys, company, address) {
+  const companyKey = normalizeImportKey(company);
+  const addressKey = normalizeImportKey(address);
+  if (companyKey && addressKey) {
+    addDeepSearchExcludeKey(keys, `company-address:${companyKey}|${addressKey}`);
+  }
+}
+
+function addDeepSearchExcludeItemKeys(keys, item) {
+  const raw = normalizeString(item);
+  if (!raw) return;
+
+  const prefixed = raw.match(/^(email|domain|company-address)\s*:\s*(.+)$/i);
+  if (prefixed) {
+    const type = prefixed[1].toLowerCase();
+    const value = normalizeString(prefixed[2]);
+    if (type === 'email') addDeepSearchExcludeEmail(keys, value);
+    if (type === 'domain') addDeepSearchExcludeDomain(keys, value);
+    if (type === 'company-address') {
+      const parts = value.split('|').map((part) => normalizeString(part)).filter(Boolean);
+      if (parts.length >= 2) addDeepSearchExcludeCompanyAddress(keys, parts[0], parts.slice(1).join(' '));
+    }
+    return;
+  }
+
+  const emailMatches = raw.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
+  emailMatches.forEach((email) => addDeepSearchExcludeEmail(keys, email));
+
+  raw
+    .split(/[\s|,;<>()[\]{}"']+/)
+    .map((part) => normalizeString(part))
+    .filter((part) => part && part.includes('.') && !part.includes('@'))
+    .forEach((part) => addDeepSearchExcludeDomain(keys, part));
+
+  const parts = raw.split('|').map((part) => normalizeString(part)).filter(Boolean);
+  if (parts.length >= 2) {
+    addDeepSearchExcludeCompanyAddress(keys, parts[0], parts[parts.length - 1]);
+  }
+}
+
+function buildDeepSearchExcludeKeySet(items) {
+  const keys = new Set();
+  normalizeDeepSearchExcludeItems(items).forEach((item) => {
+    addDeepSearchExcludeItemKeys(keys, item);
+  });
+  return keys;
 }
 
 function buildDeepSearchJsonSchema() {
@@ -1166,7 +1293,7 @@ function buildDeepSearchJsonSchema() {
 }
 
 function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
-  const exclusions = normalizeDeepSearchExcludeItems(excludeItems);
+  const exclusions = normalizeDeepSearchExcludeItems(excludeItems, MAX_DEEP_SEARCH_PROMPT_EXCLUDE_ITEMS);
   const targetParts = parseDeepSearchTargetParts(target);
   const exclusionText = exclusions.length
     ? exclusions.map((item, index) => `${index + 1}. ${item}`).join('\n')
@@ -1334,18 +1461,25 @@ function normalizeDeepSearchBusiness(record) {
   };
 }
 
-function dedupeDeepSearchBusinesses(businesses, targetParts = {}) {
+function getDeepSearchBusinessKeys(business) {
+  const keys = [
+    `email:${business.email.toLowerCase()}`,
+    `domain:${business.website.toLowerCase()}`,
+    `company-address:${normalizeImportKey(business.bedrijfsnaam)}|${normalizeImportKey(business.adres)}`,
+  ];
+  return keys.filter((key) => !key.endsWith(':') && !key.endsWith('|'));
+}
+
+function dedupeDeepSearchBusinesses(businesses, targetParts = {}, excludeItems = []) {
   const seen = new Set();
+  const excluded = buildDeepSearchExcludeKeySet(excludeItems);
   const result = [];
   (businesses || []).forEach((business) => {
     const normalized = normalizeDeepSearchBusiness(business);
     if (!normalized) return;
     if (!deepSearchBusinessMatchesTarget(normalized, targetParts)) return;
-    const keys = [
-      `email:${normalized.email.toLowerCase()}`,
-      `domain:${normalized.website.toLowerCase()}`,
-      `company-address:${normalizeImportKey(normalized.bedrijfsnaam)}|${normalizeImportKey(normalized.adres)}`,
-    ];
+    const keys = getDeepSearchBusinessKeys(normalized);
+    if (keys.some((key) => excluded.has(key))) return;
     if (keys.some((key) => seen.has(key))) return;
     keys.forEach((key) => seen.add(key));
     result.push(normalized);
@@ -1414,7 +1548,7 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const target = normalizeDeepSearchTarget(input.target || input.location || input.query);
   const count = parsePositiveInt(input.count, MAX_DEEP_SEARCH_ROWS, 1, MAX_DEEP_SEARCH_ROWS);
   const batchNumber = parsePositiveInt(input.batchNumber, 1, 1, 999);
-  const excludeItems = normalizeDeepSearchExcludeItems(input.exclude || input.excludeItems || input.seen);
+  const excludeItems = collectDeepSearchExcludeItems(input);
 
   if (typeof fetchImpl !== 'function') {
     throw createServiceError('AI zoeken is niet beschikbaar op deze server.', 'FETCH_UNAVAILABLE', 503);
@@ -1493,7 +1627,7 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const parsed = parseJsonObjectFromText(text);
   const rawBusinesses = Array.isArray(parsed && parsed.businesses) ? parsed.businesses : [];
   const targetParts = parseDeepSearchTargetParts(target);
-  const businesses = dedupeDeepSearchBusinesses(rawBusinesses, targetParts).slice(0, count);
+  const businesses = dedupeDeepSearchBusinesses(rawBusinesses, targetParts, excludeItems).slice(0, count);
   const rows = mapDeepSearchBusinessesToRows(businesses);
   const usage = extractOpenAiUsage(data);
   const webSearchCalls = countOpenAiWebSearchCalls(data);
@@ -1619,6 +1753,28 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     }
   }
 
+  function sendDeepSearchEstimateResponse(req, res) {
+    try {
+      const query = req && req.query && typeof req.query === 'object' ? req.query : {};
+      const result = estimateDeepSearchBusinessRunCost(
+        {
+          count: query.count,
+        },
+        {
+          env,
+        }
+      );
+      return res.status(200).json(result);
+    } catch (error) {
+      const code = normalizeString(error && error.code) || 'DEEP_SEARCH_ESTIMATE_FAILED';
+      return res.status(error && error.statusCode ? error.statusCode : 400).json({
+        ok: false,
+        code,
+        error: truncateText(normalizeString(error && error.message) || 'Kosteninschatting mislukt.', 500),
+      });
+    }
+  }
+
   async function sendDeepSearchBusinessesResponse(req, res) {
     try {
       const result = await fetchDeepSearchBusinessRows(req.body || {}, {
@@ -1650,6 +1806,7 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     sendSyncResponse,
     sendImportResponse,
     sendRealBusinessesResponse,
+    sendDeepSearchEstimateResponse,
     sendDeepSearchBusinessesResponse,
   };
 }
@@ -1658,6 +1815,7 @@ module.exports = {
   buildGooglePlacesSearchQueries,
   createPremiumDatabaseImportCoordinator,
   detectDelimitedSeparator,
+  estimateDeepSearchBusinessRunCost,
   fetchDeepSearchBusinessRows,
   fetchRealBusinessRows,
   fetchSpreadsheetRowsFromSourceUrl,

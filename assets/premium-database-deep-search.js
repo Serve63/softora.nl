@@ -2,20 +2,21 @@
     "use strict";
 
     const USD_TO_EUR_RATE = 0.93;
-    const ESTIMATED_DEEP_SEARCH_MODEL = "gpt-5.5-pro";
+    const ESTIMATED_DEEP_SEARCH_MODEL = "gpt-5.4";
     const ESTIMATED_BATCH_PRICING = {
         model: ESTIMATED_DEEP_SEARCH_MODEL,
         inputTokensPerBatch: 6000,
         outputTokensPerCompany: 1400,
         webSearchCallsPerBatch: 1,
         batchSize: 100,
-        inputUsdPerMillion: 30,
-        outputUsdPerMillion: 180,
+        inputUsdPerMillion: 2.5,
+        outputUsdPerMillion: 15,
         webSearchUsdPerCall: 0.01
     };
     const DEEP_SEARCH_BATCH_SIZE = 100;
     const DEFAULT_DESIRED_COMPANY_COUNT = 25;
     const MAX_DESIRED_COMPANY_COUNT = 500;
+    const MAX_DEEP_SEARCH_EXCLUDE_ITEMS = 5000;
     const AUTO_CONTINUE_DELAY_MS = 750;
     const REQUIRED_EMPTY_COMPLETION_ROUNDS = 1;
     const DEEP_SEARCH_BUSY_STYLE_ID = "softora-deep-search-busy-style";
@@ -261,6 +262,29 @@
         return result.slice(0, maxItems || 200);
     }
 
+    function normalizeExistingWebsiteDomain(value) {
+        const raw = normalizeString(value)
+            .toLowerCase()
+            .replace(/^https?:\/\//, "")
+            .replace(/^www\./, "")
+            .replace(/\/.*$/, "")
+            .trim();
+        return /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(raw) ? raw : "";
+    }
+
+    function collectCustomerMatchKeys(customer) {
+        const keys = [];
+        const email = normalizeString(customer && customer.email).toLowerCase();
+        const domain = normalizeExistingWebsiteDomain(customer && (customer.website || customer.dom || customer.url || customer.site));
+        const company = normalizeKey(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam));
+        const address = normalizeKey(customer && (customer.stad || customer.adres || customer.address || customer.location));
+
+        if (email && email !== "—") keys.push("email:" + email);
+        if (domain && domain !== "onbekend.nl") keys.push("domain:" + domain);
+        if (company && address && address !== "onbekend") keys.push("company-address:" + company + "|" + address);
+        return keys;
+    }
+
     function normalizeDesiredCompanyCount(value) {
         const cleaned = String(value || "").replace(/[^\d]/g, "");
         const parsed = Number(cleaned);
@@ -460,6 +484,19 @@
         });
     }
 
+    function readDeepSearchEstimate(companyCount) {
+        const count = normalizeDesiredCompanyCount(companyCount);
+        return fetch("/api/premium-database/deep-search-estimate?count=" + encodeURIComponent(String(count)), {
+            method: "GET",
+            headers: { "Accept": "application/json" }
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (body) {
+                if (!response.ok || !body.ok || !body.cost) throw new Error(body.error || "Kosteninschatting mislukt.");
+                return body;
+            });
+        });
+    }
+
     function createController(options) {
         ensureBusyStyles();
         const nodes = options.nodes || {};
@@ -469,6 +506,7 @@
         const stateKey = normalizeString(options.stateKey);
         const importRows = options.importRows;
         const fetchDeepSearchRows = options.readDeepSearchRows || readDeepSearchRows;
+        const fetchDeepSearchEstimate = options.readDeepSearchEstimate || readDeepSearchEstimate;
         const autoContinueDelayMs = options.autoContinueDelayMs === 0
             ? 0
             : Math.max(0, Number(options.autoContinueDelayMs) || AUTO_CONTINUE_DELAY_MS);
@@ -483,6 +521,13 @@
         let bound = false;
         const visibleSourceTargetIds = new Set();
         const sessionFoundWebsitesByTargetId = new Map();
+        let estimateState = {
+            count: 0,
+            body: null,
+            pending: false,
+            failed: false,
+            requestId: 0
+        };
 
         function getCurrentTarget() {
             return state.targets[state.activeIndex] || null;
@@ -642,6 +687,61 @@
             target.updatedAt = new Date().toISOString();
         }
 
+        function getEstimateCostUsdForCount(desiredCount) {
+            if (estimateState.count !== desiredCount || !estimateState.body || !estimateState.body.cost) return null;
+            const amount = Number(estimateState.body.cost.estimatedUsd);
+            return Number.isFinite(amount) && amount >= 0 ? amount : null;
+        }
+
+        function formatDeepSearchEstimateLabel(desiredCount) {
+            const backendEstimateUsd = getEstimateCostUsdForCount(desiredCount);
+            const estimate = formatUsdAsEuro(
+                backendEstimateUsd === null ? estimateRunUsd(desiredCount) : backendEstimateUsd
+            );
+            const model = estimateState.count === desiredCount ? normalizeString(estimateState.body && estimateState.body.model) : "";
+            const modelSuffix = model ? " via " + model : "";
+            return "Geschatte API-kosten voor " + desiredCount + " bedrijven: ± " + estimate + modelSuffix;
+        }
+
+        function requestDeepSearchEstimate(desiredCount) {
+            if (typeof fetchDeepSearchEstimate !== "function") return;
+            const count = normalizeDesiredCompanyCount(desiredCount);
+            if (
+                estimateState.count === count
+                && (estimateState.pending || estimateState.body || estimateState.failed)
+            ) {
+                return;
+            }
+            const requestId = estimateState.requestId + 1;
+            estimateState = {
+                count: count,
+                body: null,
+                pending: true,
+                failed: false,
+                requestId: requestId
+            };
+            Promise.resolve(fetchDeepSearchEstimate(count)).then(function (body) {
+                if (estimateState.requestId !== requestId) return;
+                estimateState = {
+                    count: count,
+                    body: body,
+                    pending: false,
+                    failed: false,
+                    requestId: requestId
+                };
+                render();
+            }).catch(function () {
+                if (estimateState.requestId !== requestId) return;
+                estimateState = {
+                    count: count,
+                    body: null,
+                    pending: false,
+                    failed: true,
+                    requestId: requestId
+                };
+            });
+        }
+
         function render() {
             const target = getCurrentTarget();
             renderDesiredCompanyCountControl();
@@ -655,8 +755,8 @@
             }
             if (nodes.deepSearchCost) {
                 const desiredCount = getDesiredCompanyCount();
-                const estimate = formatUsdAsEuro(estimateRunUsd(desiredCount));
-                nodes.deepSearchCost.textContent = "Geschatte API-kosten voor " + desiredCount + " bedrijven: ± " + estimate;
+                nodes.deepSearchCost.textContent = formatDeepSearchEstimateLabel(desiredCount);
+                requestDeepSearchEstimate(desiredCount);
             }
             if (nodes.deepSearchList) {
                 nodes.deepSearchList.innerHTML = state.targets.length
@@ -687,14 +787,27 @@
 
         function collectExistingKeys() {
             const customers = Array.isArray(getCustomers()) ? getCustomers() : [];
-            return customers.map(function (customer) {
-                return [
-                    customer && customer.bedrijf,
-                    customer && customer.email,
-                    customer && (customer.website || customer.dom),
-                    customer && customer.stad
-                ].map(normalizeString).filter(Boolean).join(" | ");
-            }).filter(Boolean).slice(-120);
+            const priorityKeys = [];
+            const secondaryKeys = [];
+            const seen = new Set();
+
+            function addKey(list, key) {
+                const normalized = normalizeString(key);
+                if (!normalized || seen.has(normalized)) return;
+                seen.add(normalized);
+                list.push(normalized);
+            }
+
+            customers.forEach(function (customer) {
+                collectCustomerMatchKeys(customer).forEach(function (key) {
+                    if (key.indexOf("company-address:") === 0) {
+                        addKey(secondaryKeys, key);
+                    } else {
+                        addKey(priorityKeys, key);
+                    }
+                });
+            });
+            return priorityKeys.concat(secondaryKeys).slice(0, MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
         }
 
         function updateTargetAfterSearch(target, body, addedCount, addedWebsites) {
@@ -754,7 +867,7 @@
                 target: target.label,
                 count: requestCount,
                 batchNumber: target.batches + 1,
-                exclude: uniqueStrings(target.seen.concat(collectExistingKeys()), 180)
+                exclude: uniqueStrings(target.seen.concat(collectExistingKeys()), MAX_DEEP_SEARCH_EXCLUDE_ITEMS)
             }).then(function (body) {
                 const rows = Array.isArray(body.rows) ? body.rows : [];
                 target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];

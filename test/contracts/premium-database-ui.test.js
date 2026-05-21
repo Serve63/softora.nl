@@ -685,17 +685,18 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.doesNotMatch(deepSearchScriptSource, /item\.batches \+ "x/);
   assert.doesNotMatch(deepSearchScriptSource, /item\.added \+ " nieuw/);
   assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
-  assert.match(
-    deepSearchScriptSource,
-    /"Geschatte API-kosten voor " \+ desiredCount \+ " bedrijven: ± " \+ estimate/
-  );
+  assert.match(deepSearchScriptSource, /fetch\("\/api\/premium-database\/deep-search-estimate\?count="/);
+  assert.match(deepSearchScriptSource, /function readDeepSearchEstimate\(companyCount\)/);
+  assert.match(deepSearchScriptSource, /function formatDeepSearchEstimateLabel\(desiredCount\)/);
+  assert.match(deepSearchScriptSource, /formatDeepSearchEstimateLabel\(desiredCount\)/);
+  assert.match(deepSearchScriptSource, /" via " \+ model/);
   assert.doesNotMatch(deepSearchScriptSource, /max ± €2 afwijking/);
   assert.match(deepSearchScriptSource, /function estimateRunUsd\(companyCount\)/);
   assert.match(deepSearchScriptSource, /outputTokensPerCompany/);
-  assert.match(deepSearchScriptSource, /ESTIMATED_DEEP_SEARCH_MODEL = "gpt-5\.5-pro"/);
+  assert.match(deepSearchScriptSource, /ESTIMATED_DEEP_SEARCH_MODEL = "gpt-5\.4"/);
   assert.match(deepSearchScriptSource, /inputTokensPerBatch: 6000/);
-  assert.match(deepSearchScriptSource, /inputUsdPerMillion: 30/);
-  assert.match(deepSearchScriptSource, /outputUsdPerMillion: 180/);
+  assert.match(deepSearchScriptSource, /inputUsdPerMillion: 2\.5/);
+  assert.match(deepSearchScriptSource, /outputUsdPerMillion: 15/);
   assert.match(deepSearchScriptSource, /webSearchUsdPerCall: 0\.01/);
   assert.match(deepSearchScriptSource, /Number\(\(inputUsd \+ outputUsd \+ webSearchUsd\)\.toFixed\(6\)\)/);
   assert.doesNotMatch(deepSearchScriptSource, /"Geschatte API-kosten: ± " \+ batchCost/);
@@ -1367,6 +1368,66 @@ test('premium database deep search keeps old index-only progress on the original
   assert.match(listNode.innerHTML, /class="deep-search-target is-done"[\s\S]*Nederland \| Noord-Brabant \| Altena \| Almkerk/);
 });
 
+test('premium database deep search modal shows backend cost estimate when available', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const costNode = { textContent: '' };
+  const estimateCalls = [];
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: costNode,
+      deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '250' },
+      deepSearchList: {},
+      deepSearchModal: createClassListNode(),
+      deepSearchSources: {},
+      deepSearchStartButton: {},
+    },
+    importRows: async () => true,
+    readDeepSearchEstimate: async (count) => {
+      estimateCalls.push(count);
+      return {
+        ok: true,
+        model: 'gpt-5.4',
+        cost: { estimatedUsd: 5.325 },
+      };
+    },
+  });
+
+  controller.open();
+  assert.match(costNode.textContent, /250 bedrijven: ± €4,95/);
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(estimateCalls, [250]);
+  assert.match(costNode.textContent, /250 bedrijven: ± €4,95 via gpt-5\.4/);
+});
+
+test('premium database deep search modal falls back when backend estimate fails', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const costNode = { textContent: '' };
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: costNode,
+      deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '250' },
+      deepSearchList: {},
+      deepSearchModal: createClassListNode(),
+      deepSearchSources: {},
+      deepSearchStartButton: {},
+    },
+    importRows: async () => true,
+    readDeepSearchEstimate: async () => {
+      throw new Error('estimate offline');
+    },
+  });
+
+  controller.open();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.match(costNode.textContent, /250 bedrijven: ± €4,95/);
+  assert.doesNotMatch(costNode.textContent, /via gpt-/);
+});
+
 test('premium database photo storage clears removed photo chunks so refresh cannot restore them', async () => {
   const photoStorageClient = loadDatabasePhotoStorageClient();
   const patches = [];
@@ -1634,6 +1695,71 @@ test('premium database deep search continues to the next location until the requ
   ]);
 });
 
+test('premium database deep search sends compact duplicate exclusions for the full customer list', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const customers = Array.from({ length: 150 }, (_item, index) => ({
+    bedrijf: `Bestaand ${index}`,
+    email: `info${index}@bestaand-${index}.nl`,
+    website: `https://www.bestaand-${index}.nl`,
+    stad: `Kerkstraat ${index}, Almkerk`,
+  }));
+  customers.push({
+    bedrijf: 'Growingbyknowing.nl',
+    email: 'hello@growingbyknowing.nl',
+    website: 'https://www.growingbyknowing.nl',
+    stad: 'Dorpsstraat 1, Bavel',
+  });
+  let capturedPayload = null;
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: {},
+      deepSearchDesiredCount: { value: '1' },
+      deepSearchList: {},
+      deepSearchSources: {},
+      deepSearchStartButton: {},
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    autoContinueDelayMs: 0,
+    getCustomers: () => customers,
+    importRows: async (receivedRows) => {
+      customers.push(...receivedRows.slice(1).map((row) => ({
+        bedrijf: row[0],
+        stad: row[1],
+        email: row[2],
+        website: row[4],
+      })));
+      return true;
+    },
+    readDeepSearchRows: async (payload) => {
+      capturedPayload = payload;
+      return {
+        ok: true,
+        rows: [
+          ['Bedrijfsnaam', 'Adres', 'E-mail', 'Telefoonnummer', 'Website'],
+          ['Nieuw Almkerk BV', 'Kerkstraat 1, Almkerk', 'info@nieuwalmkerk.nl', '0183 111 111', 'nieuwalmkerk.nl'],
+        ],
+        businesses: [{ bedrijfsnaam: 'Nieuw Almkerk BV', email: 'info@nieuwalmkerk.nl', website: 'nieuwalmkerk.nl' }],
+        found: 1,
+        placeComplete: false,
+        cost: { estimatedUsd: 0.01 },
+        sources: [],
+      };
+    },
+    setUiState: async () => ({ ok: true }),
+  });
+
+  await controller.runCurrentSearch();
+
+  assert.ok(capturedPayload);
+  assert.ok(capturedPayload.exclude.includes('domain:bestaand-0.nl'));
+  assert.ok(capturedPayload.exclude.includes('domain:bestaand-149.nl'));
+  assert.ok(capturedPayload.exclude.includes('domain:growingbyknowing.nl'));
+  assert.ok(capturedPayload.exclude.includes('email:hello@growingbyknowing.nl'));
+  assert.notEqual(capturedPayload.exclude.length, 120);
+});
+
 test('premium database deep search shows the precise estimate without deviation copy', () => {
   const deepSearchClient = loadDatabaseDeepSearchClient();
   const nodes = {
@@ -1649,7 +1775,7 @@ test('premium database deep search shows the precise estimate without deviation 
 
   controller.open();
 
-  assert.equal(nodes.deepSearchCost.textContent, 'Geschatte API-kosten voor 25 bedrijven: ± €6,04');
+  assert.equal(nodes.deepSearchCost.textContent, 'Geschatte API-kosten voor 25 bedrijven: ± €0,51');
   assert.doesNotMatch(nodes.deepSearchCost.textContent, /max ± €2 afwijking/);
 });
 
