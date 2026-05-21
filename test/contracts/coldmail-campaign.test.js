@@ -507,6 +507,55 @@ test('coldmail autopilot refuses non-team sender emails even when SMTP exists', 
   assert.deepEqual(getAutopilotState().config.senderEmails, []);
 });
 
+test('coldmail autopilot refuses legacy config without saved sender profiles', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmail: 'serve@softora.nl',
+        senderEmails: ['serve@softora.nl'],
+        subject: 'Legacy onderwerp {{bedrijf}}',
+        body: 'Legacy tekst die niet meer genoeg is.',
+        branch: 'Horeca & Restaurants',
+        service: "Website's",
+        specialAction: '',
+        radiusKm: 250,
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'empty_mail_content');
+  assert.equal(sentMessages.length, 0);
+});
+
 test('coldmail autopilot uses the saved dashboard profile and requires the webdesign mockup', async () => {
   const { service, sentMessages } = createService({
     rows: [
