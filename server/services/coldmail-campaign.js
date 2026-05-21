@@ -93,6 +93,7 @@ const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
 const COLDMAIL_TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
 const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
 const TEST_RECIPIENT_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL]);
+const TEST_RECIPIENT_LOOKUP_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL, 'servec321@gail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce', 'softora testmodus']);
 const SENDER_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
@@ -561,6 +562,7 @@ function createColdmailCampaignService(deps = {}) {
 
   function findColdmailTestRecipientRow(customerRows = []) {
     const rows = (Array.isArray(customerRows) ? customerRows : []).filter((row) => row && typeof row === 'object');
+    const isLookupEmailRow = (row) => TEST_RECIPIENT_LOOKUP_EMAILS.has(getRowEmail(row));
     const dedicatedRow = rows.find((row) => {
       if (!row || typeof row !== 'object') return false;
       const id = normalizeString(row.id || row.customerId || row.databaseId).toLowerCase();
@@ -570,10 +572,10 @@ function createColdmailCampaignService(deps = {}) {
     return (
       rows.find(
         (row) =>
-          getRowEmail(row) === COLDMAIL_TEST_RECIPIENT_EMAIL &&
+          isLookupEmailRow(row) &&
           isResolvableWebsitePhotoValue(getWebdesignPhotoSource(row))
       ) ||
-      rows.find((row) => getRowEmail(row) === COLDMAIL_TEST_RECIPIENT_EMAIL) ||
+      rows.find(isLookupEmailRow) ||
       rows.find(
         (row) =>
           TEST_RECIPIENT_COMPANIES.has(getRowCompany(row).toLowerCase()) &&
