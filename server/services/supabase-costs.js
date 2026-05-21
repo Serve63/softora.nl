@@ -3,6 +3,9 @@ const { resolveUsdToEurRateDetails } = require('./openai-costs');
 const DEFAULT_SUPABASE_MANAGEMENT_API_BASE_URL = 'https://api.supabase.com/v1';
 const DEFAULT_SUPABASE_COSTS_CACHE_MS = 10 * 60 * 1000;
 const DEFAULT_MONTHLY_HOURS = 730;
+const SUPABASE_MANAGEMENT_ADDONS_DOC_URL =
+  'https://supabase.com/docs/reference/api/management#list-billing-addons-and-compute-instance-selections';
+const SUPABASE_BILLING_DOC_URL = 'https://supabase.com/docs/guides/platform/billing-on-supabase';
 let supabaseCostsCache = null;
 
 function normalizeString(value) {
@@ -33,6 +36,15 @@ function createServiceError(message, code, status = 500, detail = '') {
   error.status = status;
   error.detail = detail;
   return error;
+}
+
+function sanitizeSupabaseCostDetail(value) {
+  const detail = normalizeString(value);
+  if (!detail) return '';
+  return detail
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [redacted]')
+    .replace(/sbp_[A-Za-z0-9._-]+/g, 'sbp_[redacted]')
+    .slice(0, 500);
 }
 
 function resolveSupabaseManagementToken(deps = {}) {
@@ -124,6 +136,27 @@ function resolveConfiguredBaseCost(deps = {}) {
   };
 }
 
+function redactProjectRef(projectRef) {
+  const value = normalizeString(projectRef);
+  if (!value) return '';
+  if (value.length <= 8) return `${value.slice(0, 2)}...`;
+  return `${value.slice(0, 4)}...${value.slice(-4)}`;
+}
+
+function getSupabaseCostConfigStatus(deps = {}) {
+  const projectRef = resolveSupabaseProjectRef(deps);
+  const baseCost = resolveConfiguredBaseCost(deps);
+  return {
+    managementTokenConfigured: Boolean(resolveSupabaseManagementToken(deps)),
+    projectRefConfigured: Boolean(projectRef),
+    projectRef: redactProjectRef(projectRef),
+    baseCostConfigured: Boolean(baseCost.configured),
+    baseCostCurrency: baseCost.currency || '',
+    baseCostSource: baseCost.source || '',
+    managementApiBaseUrl: resolveSupabaseManagementApiBaseUrl(deps),
+  };
+}
+
 function buildSupabaseAddonsUrl(deps = {}, projectRef = '') {
   const apiBaseUrl = resolveSupabaseManagementApiBaseUrl(deps);
   return `${apiBaseUrl}/projects/${encodeURIComponent(projectRef)}/billing/addons`;
@@ -209,6 +242,30 @@ function convertCurrenciesToEur(currencies = {}, rateDetails = {}) {
   };
 }
 
+function buildSupabaseCostSelection(summary = {}) {
+  const complete = Boolean(summary && summary.complete);
+  return {
+    selectionStrategy: 'management_addons_plus_configured_base_without_double_counting',
+    selectedProviderKind: complete ? 'management_addons_with_configured_base' : 'management_addons_only',
+    selectedProviderLabel: complete
+      ? 'Live schatting via Supabase Management API + basisbedrag'
+      : 'Gedeeltelijke live schatting via Supabase Management API',
+    selectedProviderConfidence: complete ? 'complete_estimate' : 'partial_estimate',
+  };
+}
+
+function buildSupabaseCostUnavailable(error, provider = 'Supabase Management API') {
+  return {
+    provider,
+    source: 'supabase-costs',
+    error: error && error.code ? error.code : 'SUPABASE_COSTS_ERROR',
+    status: Number(error && error.status) || 500,
+    detail: sanitizeSupabaseCostDetail(
+      (error && (error.detail || error.message)) || 'Supabase kosten konden niet worden opgehaald.'
+    ),
+  };
+}
+
 async function fetchSupabaseProjectAddons(deps = {}) {
   const apiToken = resolveSupabaseManagementToken(deps);
   if (!apiToken) {
@@ -276,19 +333,30 @@ async function fetchSupabaseCostSummary(deps = {}, options = {}) {
   const addonsResult = await fetchSupabaseProjectAddons(deps);
   const addonCosts = collectSupabaseAddonCosts(addonsResult.data, deps);
   const baseCost = resolveConfiguredBaseCost(deps);
+  const baseCurrencies = {};
   const currencies = { ...addonCosts.currencies };
-  if (baseCost.configured) addCurrencyAmount(currencies, baseCost.currency, baseCost.amount);
+  if (baseCost.configured) {
+    addCurrencyAmount(baseCurrencies, baseCost.currency, baseCost.amount);
+    addCurrencyAmount(currencies, baseCost.currency, baseCost.amount);
+  }
 
   const rateDetails = await resolveUsdToEurRateDetails(deps);
+  const addonConverted = convertCurrenciesToEur(addonCosts.currencies, rateDetails);
+  const baseConverted = convertCurrenciesToEur(baseCurrencies, rateDetails);
   const converted = convertCurrenciesToEur(currencies, rateDetails);
   const fetchedAt = new Date(nowMs).toISOString();
   const complete = Boolean(baseCost.configured && converted.unsupportedCurrencies.length === 0);
+  const selection = buildSupabaseCostSelection({ complete });
   const summary = {
     status: complete ? 'success' : 'partial',
     source: 'supabase-management-addons',
     endpoint: '/v1/projects/{ref}/billing/addons',
     exact: complete,
     complete,
+    selectionStrategy: selection.selectionStrategy,
+    selectedProviderKind: selection.selectedProviderKind,
+    selectedProviderLabel: selection.selectedProviderLabel,
+    selectedProviderConfidence: selection.selectedProviderConfidence,
     fetchedAt,
     lastSuccessfulUpdate: fetchedAt,
     scope: 'month',
@@ -296,12 +364,18 @@ async function fetchSupabaseCostSummary(deps = {}, options = {}) {
     costEur: converted.costEur,
     currency: 'eur',
     currencies,
+    addonCurrencies: addonCosts.currencies,
+    baseCurrencies,
+    addonCostEur: addonConverted.costEur,
+    baseCostEur: baseConverted.costEur,
     baseCost,
     addons: addonCosts.lineItems,
     selectedAddonCount: addonCosts.selectedAddonCount,
     unsupportedCurrencies: converted.unsupportedCurrencies,
     usdToEurRate: rateDetails.rate,
     usdToEurRateSource: rateDetails.source,
+    pricingSource: SUPABASE_BILLING_DOC_URL,
+    managementApiSource: SUPABASE_MANAGEMENT_ADDONS_DOC_URL,
     note: complete
       ? 'Supabase kosten via Management API add-ons plus geconfigureerd basisbedrag.'
       : 'Supabase Management API geeft project-add-ons; zet SUPABASE_MONTHLY_BASE_COST_EUR of USD voor een volledige maandinschatting.',
@@ -315,6 +389,98 @@ async function fetchSupabaseCostSummary(deps = {}, options = {}) {
     cache: {
       hit: false,
       ttlMs: cacheMs,
+    },
+  };
+}
+
+async function fetchSupabaseCostDiagnostics(deps = {}, options = {}) {
+  const scope = normalizeString(options.scope || 'month') || 'month';
+  const fetchedAt = new Date(Math.max(0, Number(options.nowMs) || Date.now())).toISOString();
+  const config = getSupabaseCostConfigStatus(deps);
+  const configuredBase = resolveConfiguredBaseCost(deps);
+  const unavailable = [];
+  let summary = null;
+
+  try {
+    summary = await fetchSupabaseCostSummary(deps, {
+      ...options,
+      forceRefresh: true,
+    });
+  } catch (error) {
+    unavailable.push(buildSupabaseCostUnavailable(error));
+  }
+
+  const selected = summary
+    ? {
+        status: summary.status,
+        selectedProviderKind: summary.selectedProviderKind,
+        selectedProviderLabel: summary.selectedProviderLabel,
+        selectedProviderConfidence: summary.selectedProviderConfidence,
+        costEur: summary.costEur,
+        exact: summary.exact,
+        complete: summary.complete,
+        note: summary.note,
+      }
+    : null;
+
+  return {
+    scope,
+    source: 'supabase-cost-diagnostics',
+    ok: Boolean(summary),
+    fetchedAt,
+    config,
+    managementApi: summary
+      ? {
+          source: summary.source,
+          endpoint: summary.endpoint,
+          projectRef: redactProjectRef(summary.projectRef),
+          selectedAddonCount: summary.selectedAddonCount,
+          addonCostEur: summary.addonCostEur,
+          addonCurrencies: summary.addonCurrencies,
+          addons: summary.addons,
+          status: summary.status,
+        }
+      : null,
+    configuredBase: {
+      configured: Boolean(configuredBase.configured),
+      source: configuredBase.source,
+      currency: configuredBase.currency,
+      amount: configuredBase.amount,
+      costEur: summary ? summary.baseCostEur : 0,
+    },
+    selected,
+    comparison: {
+      strategy: 'management_addons_plus_configured_base_without_double_counting',
+      selectedProviderKind: selected ? selected.selectedProviderKind : null,
+      selectedProviderLabel: selected ? selected.selectedProviderLabel : null,
+      selectedCostEur: selected ? selected.costEur : 0,
+      candidates: summary
+        ? [
+            {
+              kind: 'configured_base',
+              label: 'Geconfigureerd Supabase basisbedrag',
+              costEur: summary.baseCostEur,
+              complete: Boolean(summary.baseCost && summary.baseCost.configured),
+            },
+            {
+              kind: 'management_addons',
+              label: 'Supabase Management API add-ons',
+              costEur: summary.addonCostEur,
+              complete: true,
+            },
+            {
+              kind: summary.selectedProviderKind,
+              label: summary.selectedProviderLabel,
+              costEur: summary.costEur,
+              complete: summary.complete,
+            },
+          ]
+        : [],
+    },
+    unavailable,
+    docs: {
+      managementAddons: SUPABASE_MANAGEMENT_ADDONS_DOC_URL,
+      billing: SUPABASE_BILLING_DOC_URL,
     },
   };
 }
@@ -336,9 +502,21 @@ function createSupabaseCostSummaryCoordinator(deps = {}) {
           ok: false,
           source: 'supabase-costs',
           error: error.code || 'SUPABASE_COSTS_ERROR',
-          detail: error.detail || error.message || 'Supabase kosten konden niet worden opgehaald',
+          detail: sanitizeSupabaseCostDetail(error.detail || error.message || 'Supabase kosten konden niet worden opgehaald'),
+          config: getSupabaseCostConfigStatus(deps),
         });
       }
+    },
+    async sendSupabaseCostDiagnosticsResponse(req, res) {
+      const diagnostics = await fetchSupabaseCostDiagnostics(deps, {
+        scope: req && req.query ? req.query.scope : 'month',
+        nowMs: req && req.query && req.query.nowMs,
+      });
+      return res.status(200).json({
+        ok: true,
+        source: 'supabase-cost-diagnostics',
+        diagnostics,
+      });
     },
   };
 }
@@ -346,7 +524,9 @@ function createSupabaseCostSummaryCoordinator(deps = {}) {
 module.exports = {
   collectSupabaseAddonCosts,
   createSupabaseCostSummaryCoordinator,
+  fetchSupabaseCostDiagnostics,
   fetchSupabaseCostSummary,
   fetchSupabaseProjectAddons,
+  getSupabaseCostConfigStatus,
   resolveSupabaseProjectRef,
 };

@@ -231,7 +231,8 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /const BILLING_RETRY_MAX_ATTEMPTS = 18;/);
   assert.match(scriptSource, /function scheduleApiCostRetry\(error\)/);
   assert.match(scriptSource, /if \(isPremiumAuthCostError\(statusCode, payload\)\) return false;/);
-  assert.match(scriptSource, /const SUPABASE_COST_NOTE = 'Supabase kosten live bijgewerkt';/);
+  assert.match(scriptSource, /const SUPABASE_COST_NOTE = 'Live schatting · Supabase Management API';/);
+  assert.match(scriptSource, /const SUPABASE_COST_TOKEN_NOTE = 'Supabase Management token ontbreekt op Vercel';/);
   assert.match(scriptSource, /function applyApiCostSnapshot\(snapshot\)/);
   assert.match(scriptSource, /function buildApiCostUnavailableNote\(error\)/);
   assert.match(scriptSource, /OpenAI Admin Key ontbreekt op Render/);
@@ -239,6 +240,7 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /payload\.upstreamStatus \|\| payload\.upstream_status/);
   assert.match(scriptSource, /function applyApiCostUnavailable\(error\)/);
   assert.match(scriptSource, /function applySupabaseCostSnapshot\(payload\)/);
+  assert.match(scriptSource, /function buildSupabaseCostUnavailableNote\(error\)/);
   assert.match(scriptSource, /function applySupabaseCostUnavailable\(error\)/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'api kosten'/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'supabase'/);
@@ -252,6 +254,7 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /error\.status = response\.status;/);
   assert.match(scriptSource, /applyApiCostUnavailable\(error\);/);
   assert.match(scriptSource, /const summary = await fetchSupabaseCostSummary\(\);/);
+  assert.match(scriptSource, /error\.payload = data \|\| \{\};/);
   assert.match(scriptSource, /applySupabaseCostUnavailable\(error\);/);
   assert.match(scriptSource, /window\.refreshMonthlyApiCosts = refreshMonthlyApiCosts;/);
   assert.match(scriptSource, /window\.refreshMonthlySupabaseCosts = refreshMonthlySupabaseCosts;/);

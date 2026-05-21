@@ -15,9 +15,11 @@
   const API_COST_UNAVAILABLE_NOTE = 'OpenAI kosten konden niet worden opgehaald';
   const API_COST_LOGIN_NOTE = 'Log opnieuw in om OpenAI kosten op te halen';
   const API_COST_ADMIN_NOTE = 'Alleen Full Acces kan OpenAI kosten bekijken';
-  const SUPABASE_COST_NOTE = 'Supabase kosten live bijgewerkt';
-  const SUPABASE_COST_PARTIAL_NOTE = 'Supabase live-kosten gedeeltelijk gekoppeld';
+  const SUPABASE_COST_NOTE = 'Live schatting · Supabase Management API';
+  const SUPABASE_COST_PARTIAL_NOTE = 'Live gedeeltelijk · Supabase Management API';
   const SUPABASE_COST_UNAVAILABLE_NOTE = 'Supabase live-kosten niet gekoppeld';
+  const SUPABASE_COST_TOKEN_NOTE = 'Supabase Management token ontbreekt op Vercel';
+  const SUPABASE_COST_PROJECT_NOTE = 'Supabase project-ref ontbreekt op Vercel';
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
 
@@ -386,10 +388,20 @@
   function buildSupabaseCostNote(summary) {
     const fetchedAtLabel = formatDateTime(summary && (summary.lastSuccessfulUpdate || summary.fetchedAt));
     const addonCount = Number(summary && summary.selectedAddonCount);
+    const usdToEurRateSource = normalizeString(summary && summary.usdToEurRateSource);
+    const hasUsdCosts = Boolean(summary && summary.currencies && Number(summary.currencies.usd) > 0);
+    const rateLabel = hasUsdCosts
+      ? usdToEurRateSource === 'configured'
+        ? 'Koers ingesteld'
+        : usdToEurRateSource === 'fallback'
+          ? 'Koers fallback'
+          : 'Koers live'
+      : '';
     return [
       summary && summary.exact ? SUPABASE_COST_NOTE : SUPABASE_COST_PARTIAL_NOTE,
       Number.isFinite(addonCount) ? addonCount + ' add-on(s)' : '',
       summary && summary.baseCost && summary.baseCost.configured ? 'Basisbedrag gekoppeld' : 'Basisbedrag ontbreekt',
+      rateLabel,
       fetchedAtLabel ? 'Bijgewerkt ' + fetchedAtLabel : '',
     ].filter(Boolean).join(' · ');
   }
@@ -438,13 +450,34 @@
     if (!item || !render) return false;
 
     const currentNote = normalizeString(item.note);
-    const errorText = normalizeString(error && error.message);
-    const nextNote = [SUPABASE_COST_UNAVAILABLE_NOTE, errorText].filter(Boolean).join(' · ');
+    const nextNote = buildSupabaseCostUnavailableNote(error);
     if (currentNote === nextNote) return false;
     item.note = nextNote;
     item.status = 'error';
     render();
     return true;
+  }
+
+  function buildSupabaseCostUnavailableNote(error) {
+    const payload = error && error.payload && typeof error.payload === 'object' ? error.payload : {};
+    const statusCode = Number(error && error.status);
+    const errorCode = normalizeString(payload.error || payload.code);
+    const detail = normalizeString(payload.detail || payload.message || (error && error.message));
+
+    if (isPremiumAuthCostError(statusCode, payload)) {
+      return statusCode === 401 ? 'Log opnieuw in om Supabase kosten op te halen' : 'Alleen Full Acces kan Supabase kosten bekijken';
+    }
+    if (errorCode === 'SUPABASE_ACCESS_TOKEN_MISSING') {
+      return SUPABASE_COST_UNAVAILABLE_NOTE + ' · ' + SUPABASE_COST_TOKEN_NOTE;
+    }
+    if (errorCode === 'SUPABASE_PROJECT_REF_MISSING') {
+      return SUPABASE_COST_UNAVAILABLE_NOTE + ' · ' + SUPABASE_COST_PROJECT_NOTE;
+    }
+    if (errorCode === 'SUPABASE_COSTS_FETCH_FAILED' && (statusCode === 401 || statusCode === 403)) {
+      return SUPABASE_COST_UNAVAILABLE_NOTE + ' · Supabase token mist Management API rechten';
+    }
+
+    return [SUPABASE_COST_UNAVAILABLE_NOTE, detail].filter(Boolean).join(' · ');
   }
 
   function truncateCostNote(value) {
@@ -583,7 +616,9 @@
   }
 
   async function fetchSupabaseCostSummary() {
-    const response = await fetch(SUPABASE_COST_SUMMARY_ENDPOINT, {
+    const url = new URL(SUPABASE_COST_SUMMARY_ENDPOINT, window.location.origin);
+    url.searchParams.set('_', String(Date.now()));
+    const response = await fetch(url.toString(), {
       method: 'GET',
       cache: 'no-store',
     });
@@ -591,7 +626,10 @@
       return {};
     });
     if (!response.ok || !data || data.ok !== true || !data.summary || typeof data.summary !== 'object') {
-      throw new Error(String((data && (data.detail || data.error)) || SUPABASE_COST_UNAVAILABLE_NOTE));
+      const error = new Error(String((data && (data.detail || data.error)) || SUPABASE_COST_UNAVAILABLE_NOTE));
+      error.status = response.status;
+      error.payload = data || {};
+      throw error;
     }
     return data;
   }

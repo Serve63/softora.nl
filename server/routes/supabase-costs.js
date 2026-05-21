@@ -13,6 +13,11 @@ function registerSupabaseCostRoutes(app, deps = {}) {
       coordinator.sendSupabaseCostSummaryResponse(req, res)
     );
   }
+  if (typeof coordinator.sendSupabaseCostDiagnosticsResponse === 'function') {
+    app.get('/api/supabase/cost-diagnostics', requireAdmin, (req, res) =>
+      coordinator.sendSupabaseCostDiagnosticsResponse(req, res)
+    );
+  }
 }
 
 module.exports = {
