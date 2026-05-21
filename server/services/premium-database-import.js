@@ -34,6 +34,10 @@ const GOOGLE_PLACES_FIELD_MASK = [
 const DEFAULT_REAL_BUSINESS_QUERY = 'bedrijven in Noord-Brabant';
 const DEFAULT_OPENAI_DATABASE_SEARCH_MODEL = 'gpt-5.4';
 const DEFAULT_OPENAI_DATABASE_SEARCH_REASONING_EFFORT = 'high';
+const DEFAULT_OPENAI_DATABASE_SEARCH_SERVICE_TIER = 'flex';
+const DEFAULT_OPENAI_DATABASE_SEARCH_PROMPT_VERSION = 'v1';
+const OPENAI_DATABASE_SEARCH_PROMPT_CACHE_PREFIX = 'softora-premium-database-deep-search';
+const OPENAI_DATABASE_SEARCH_PROMPT_CACHE_RETENTION = '24h';
 const DEFAULT_OPENAI_DATABASE_SEARCH_TIMEOUT_MS = 720000;
 const MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS = 760000;
 const DEFAULT_OPENAI_DATABASE_SEARCH_RATE_LIMIT_RETRIES = 2;
@@ -999,8 +1003,25 @@ function getOpenAiDatabaseSearchModel(deps = {}) {
 function getOpenAiDatabaseSearchReasoningEffort(model, deps = {}) {
   const env = deps.env || process.env || {};
   const explicit = normalizeString(deps.openAiReasoningEffort || env.OPENAI_DATABASE_SEARCH_REASONING_EFFORT);
-  if (['none', 'low', 'medium', 'high', 'xhigh'].includes(explicit)) return explicit;
+  if (['none', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(explicit)) return explicit;
   return DEFAULT_OPENAI_DATABASE_SEARCH_REASONING_EFFORT;
+}
+
+function getOpenAiDatabaseSearchServiceTier(deps = {}) {
+  const env = deps.env || process.env || {};
+  const explicit = normalizeString(
+    deps.openAiDatabaseSearchServiceTier || env.OPENAI_DATABASE_SEARCH_SERVICE_TIER
+  ).toLowerCase();
+  if (['auto', 'default', 'flex', 'priority'].includes(explicit)) return explicit;
+  return DEFAULT_OPENAI_DATABASE_SEARCH_SERVICE_TIER;
+}
+
+function getOpenAiDatabaseSearchPromptVersion(deps = {}) {
+  const env = deps.env || process.env || {};
+  return normalizeString(deps.openAiDatabaseSearchPromptVersion || env.OPENAI_DATABASE_SEARCH_PROMPT_VERSION)
+    .toLowerCase() === 'v2'
+    ? 'v2'
+    : DEFAULT_OPENAI_DATABASE_SEARCH_PROMPT_VERSION;
 }
 
 function getOpenAiDatabaseSearchTimeoutMs(deps = {}) {
@@ -1107,12 +1128,53 @@ function createOpenAiDeepSearchRateLimitError() {
   );
 }
 
-function getOpenAiDatabaseSearchPricing(model) {
-  const rates = getOpenAiTextModelRates(model || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL);
+function getOpenAiFlexTextModelRates(modelRaw) {
+  const key = normalizeString(modelRaw).toLowerCase();
+  const match = [
+    ['gpt-5.5-pro', 15, 0, 90],
+    ['gpt-5.5', 2.5, 0.25, 15],
+    ['gpt-5.4-mini', 0.375, 0.0375, 2.25],
+    ['gpt-5.4-nano', 0.1, 0.01, 0.625],
+    ['gpt-5.4-pro', 15, 0, 90],
+    ['gpt-5.4', 1.25, 0.13, 7.5],
+    ['gpt-5.2-pro', 10.5, 0, 84],
+    ['gpt-5.2', 0.875, 0.0875, 7],
+    ['gpt-5.1', 0.625, 0.0625, 5],
+    ['gpt-5-pro', 7.5, 0, 60],
+    ['gpt-5-mini', 0.125, 0.0125, 1],
+    ['gpt-5-nano', 0.025, 0.0025, 0.2],
+    ['gpt-5', 0.625, 0.0625, 5],
+  ].find(([name]) => key.includes(name));
+  if (!match) return null;
+  const [model, input, cachedInput, output] = match;
+  return { model, input, cachedInput, output, source: OPENAI_PRICING_SOURCE_URL };
+}
+
+function getOpenAiPriorityTextModelRates(modelRaw) {
+  const key = normalizeString(modelRaw).toLowerCase();
+  const match = [
+    ['gpt-5.5', 12.5, 1.25, 75],
+    ['gpt-5.4-mini', 1.5, 0.15, 9],
+    ['gpt-5.4', 5, 0.5, 30],
+  ].find(([name]) => key.includes(name));
+  if (!match) return null;
+  const [model, input, cachedInput, output] = match;
+  return { model, input, cachedInput, output, source: OPENAI_PRICING_SOURCE_URL };
+}
+
+function getOpenAiDatabaseSearchPricing(model, serviceTier = 'default') {
+  const normalizedServiceTier = normalizeString(serviceTier).toLowerCase();
+  const rates =
+    normalizedServiceTier === 'flex'
+      ? getOpenAiFlexTextModelRates(model) || getOpenAiTextModelRates(model || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL)
+      : normalizedServiceTier === 'priority'
+        ? getOpenAiPriorityTextModelRates(model) || getOpenAiTextModelRates(model || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL)
+        : getOpenAiTextModelRates(model || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL);
   return {
     inputUsdPerMillion: rates.input,
     outputUsdPerMillion: rates.output,
     cachedInputUsdPerMillion: rates.cachedInput,
+    serviceTier: normalizedServiceTier || 'default',
   };
 }
 
@@ -1123,11 +1185,16 @@ function extractOpenAiUsage(data) {
   const inputDetails = usage.input_tokens_details && typeof usage.input_tokens_details === 'object'
     ? usage.input_tokens_details
     : {};
+  const outputDetails = usage.output_tokens_details && typeof usage.output_tokens_details === 'object'
+    ? usage.output_tokens_details
+    : {};
   const cachedInputTokens = Math.max(0, Number(inputDetails.cached_tokens || 0) || 0);
+  const reasoningTokens = Math.max(0, Number(outputDetails.reasoning_tokens || 0) || 0);
   return {
     inputTokens,
     outputTokens,
     cachedInputTokens: Math.min(inputTokens, cachedInputTokens),
+    reasoningTokens: Math.min(outputTokens, reasoningTokens),
   };
 }
 
@@ -1136,11 +1203,12 @@ function countOpenAiWebSearchCalls(data) {
   return output.filter((item) => normalizeString(item && item.type) === 'web_search_call').length;
 }
 
-function estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls }) {
-  const pricing = getOpenAiDatabaseSearchPricing(model);
+function estimateOpenAiDatabaseSearchCost({ model, serviceTier, usage, webSearchCalls }) {
+  const pricing = getOpenAiDatabaseSearchPricing(model, serviceTier);
   const safeUsage = usage || {};
   const inputTokens = Math.max(0, Number(safeUsage.inputTokens || 0) || 0);
   const outputTokens = Math.max(0, Number(safeUsage.outputTokens || 0) || 0);
+  const reasoningTokens = Math.min(outputTokens, Math.max(0, Number(safeUsage.reasoningTokens || 0) || 0));
   const cachedInputTokens = Math.min(inputTokens, Math.max(0, Number(safeUsage.cachedInputTokens || 0) || 0));
   const billableInputTokens = Math.max(0, inputTokens - cachedInputTokens);
   const cachedRate = Number.isFinite(pricing.cachedInputUsdPerMillion)
@@ -1161,11 +1229,16 @@ function estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls }) {
     webSearchUsd: Number(webSearchUsd.toFixed(6)),
     inputTokens,
     outputTokens,
+    reasoningTokens,
     cachedInputTokens,
     webSearchCalls: Math.max(0, Number(webSearchCalls || 0) || 0),
+    model: model || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL,
+    serviceTier: pricing.serviceTier,
     pricing: {
       inputUsdPerMillion: pricing.inputUsdPerMillion,
       outputUsdPerMillion: pricing.outputUsdPerMillion,
+      cachedInputUsdPerMillion: pricing.cachedInputUsdPerMillion,
+      serviceTier: pricing.serviceTier,
       webSearchUsdPerCall,
       source: OPENAI_PRICING_SOURCE_URL,
     },
@@ -1187,6 +1260,10 @@ function scaleDeepSearchEstimateAmount(value, multiplier) {
   return Math.ceil(Number((Math.max(0, Number(value) || 0) * multiplier).toFixed(6)));
 }
 
+function getDeepSearchEstimateUpperMultiplier(_requested) {
+  return 2;
+}
+
 function estimateDeepSearchBusinessRunCost(input = {}, deps = {}) {
   const env = deps.env || process.env || {};
   const requested = parsePositiveInt(
@@ -1197,6 +1274,8 @@ function estimateDeepSearchBusinessRunCost(input = {}, deps = {}) {
   );
   const model = getOpenAiDatabaseSearchModel({ ...deps, env });
   const reasoningEffort = getOpenAiDatabaseSearchReasoningEffort(model, { ...deps, env });
+  const serviceTier = getOpenAiDatabaseSearchServiceTier({ ...deps, env });
+  const promptVersion = getOpenAiDatabaseSearchPromptVersion({ ...deps, env });
   const batchSize = MAX_DEEP_SEARCH_ROWS;
   const estimatedBatches = Math.max(1, Math.ceil(requested / batchSize));
   const estimateMultiplier = getDeepSearchPracticalEstimateMultiplier({ ...deps, env });
@@ -1215,7 +1294,9 @@ function estimateDeepSearchBusinessRunCost(input = {}, deps = {}) {
     1,
     scaleDeepSearchEstimateAmount(estimatedBatches * ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH, estimateMultiplier)
   );
-  const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls });
+  const cost = estimateOpenAiDatabaseSearchCost({ model, serviceTier, usage, webSearchCalls });
+  const estimateUpperMultiplier = getDeepSearchEstimateUpperMultiplier(requested);
+  const upperEstimatedUsd = Number((cost.estimatedUsd * estimateUpperMultiplier).toFixed(6));
 
   return {
     ok: true,
@@ -1227,10 +1308,14 @@ function estimateDeepSearchBusinessRunCost(input = {}, deps = {}) {
     estimateMultiplier,
     model,
     reasoningEffort,
+    serviceTier,
+    promptVersion,
     estimateOnly: true,
     cost: {
       ...cost,
       estimateMultiplier,
+      estimateUpperMultiplier,
+      upperEstimatedUsd,
       note: 'Praktijkschatting op basis van het actieve deep-search model, inclusief marge voor vervolgzoekacties en filtering; er is geen OpenAI-call uitgevoerd.',
     },
   };
@@ -1470,8 +1555,9 @@ function buildDeepSearchJsonSchema() {
   };
 }
 
-function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
+function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber, promptVersion }) {
   const exclusions = normalizeDeepSearchExcludeItems(excludeItems, MAX_DEEP_SEARCH_PROMPT_EXCLUDE_ITEMS);
+  const version = normalizeString(promptVersion).toLowerCase() === 'v2' ? 'v2' : DEFAULT_OPENAI_DATABASE_SEARCH_PROMPT_VERSION;
   const targetParts = parseDeepSearchTargetParts(target);
   const exclusionText = exclusions.length
     ? exclusions.map((item, index) => `${index + 1}. ${item}`).join('\n')
@@ -1516,9 +1602,18 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
     '',
     'Eerder gevonden of al bestaande resultaten die je moet vermijden:',
     exclusionText,
+    ...(version === 'v2'
+      ? [
+          '',
+          'Zoekstrategie v2:',
+          '- Begin bij lokale bedrijfswebsites, bedrijvengidsen en branchepagina’s rond de exacte plaats.',
+          '- Gebruik alleen bredere zoektermen wanneer de exacte plaats weinig oplevert.',
+          '- Stop niet na de eerste bekende resultaten; zoek door totdat je zeker bent dat er geen nieuwe complete bedrijven meer zijn.',
+        ]
+      : []),
   ].join('\n');
 
-  return { systemPrompt, userPrompt };
+  return { systemPrompt, userPrompt, promptVersion: version };
 }
 
 function extractOpenAiResponsesText(data) {
@@ -1751,12 +1846,15 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
 
   const model = getOpenAiDatabaseSearchModel({ ...deps, env });
   const reasoningEffort = getOpenAiDatabaseSearchReasoningEffort(model, { ...deps, env });
+  const serviceTier = getOpenAiDatabaseSearchServiceTier({ ...deps, env });
+  const promptVersion = getOpenAiDatabaseSearchPromptVersion({ ...deps, env });
   const openAiApiBaseUrl = getOpenAiApiBaseUrl({ ...deps, env });
   const { systemPrompt, userPrompt } = buildDeepSearchPrompt({
     target,
     count,
     excludeItems,
     batchNumber,
+    promptVersion,
   });
 
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
@@ -1769,9 +1867,11 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
     Authorization: `Bearer ${apiKey}`,
     ...buildOpenAiContextHeaders({ ...deps, env, openAiApiBaseUrl }),
   };
-  const requestBody = JSON.stringify({
+  const requestPayload = {
     model,
     reasoning: { effort: reasoningEffort },
+    prompt_cache_key: `${OPENAI_DATABASE_SEARCH_PROMPT_CACHE_PREFIX}-${promptVersion}`,
+    prompt_cache_retention: OPENAI_DATABASE_SEARCH_PROMPT_CACHE_RETENTION,
     tools: [
       {
         type: 'web_search',
@@ -1796,7 +1896,11 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
         schema: buildDeepSearchJsonSchema(),
       },
     },
-  });
+  };
+  if (serviceTier && serviceTier !== 'auto') {
+    requestPayload.service_tier = serviceTier;
+  }
+  const requestBody = JSON.stringify(requestPayload);
   const maxRateLimitRetries = getOpenAiDatabaseSearchRateLimitRetries({ ...deps, env });
   let response;
   let data = {};
@@ -1837,7 +1941,8 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const rows = mapDeepSearchBusinessesToRows(businesses);
   const usage = extractOpenAiUsage(data);
   const webSearchCalls = countOpenAiWebSearchCalls(data);
-  const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls });
+  const actualServiceTier = normalizeString(data && data.service_tier) || serviceTier;
+  const cost = estimateOpenAiDatabaseSearchCost({ model, serviceTier: actualServiceTier, usage, webSearchCalls });
   await recordSoftoraApiCostEvent(
     {
       ...deps,
@@ -1853,8 +1958,11 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
         target,
         requested: count,
         batchNumber,
+        serviceTier: cost.serviceTier,
+        promptVersion,
         inputTokens: cost.inputTokens,
         outputTokens: cost.outputTokens,
+        reasoningTokens: cost.reasoningTokens,
         cachedInputTokens: cost.cachedInputTokens,
         webSearchCalls: cost.webSearchCalls,
       },
@@ -1874,6 +1982,8 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
     target,
     model,
     reasoningEffort,
+    serviceTier: cost.serviceTier,
+    promptVersion,
     requested: count,
     found: businesses.length,
     rejected: Math.max(0, rawBusinesses.length - businesses.length),

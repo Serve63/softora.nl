@@ -5,13 +5,14 @@
     const ESTIMATED_DEEP_SEARCH_MODEL = "gpt-5.4";
     const ESTIMATED_BATCH_PRICING = {
         model: ESTIMATED_DEEP_SEARCH_MODEL,
+        serviceTier: "flex",
         inputTokensPerBatch: 6000,
         outputTokensPerCompany: 1400,
         webSearchCallsPerBatch: 1,
         practicalMultiplier: 2.2,
         batchSize: 100,
-        inputUsdPerMillion: 2.5,
-        outputUsdPerMillion: 15,
+        inputUsdPerMillion: 1.25,
+        outputUsdPerMillion: 7.5,
         webSearchUsdPerCall: 0.01
     };
     const DEEP_SEARCH_BATCH_SIZE = 100;
@@ -162,6 +163,14 @@
         const outputUsd = (outputTokens / 1000000) * ESTIMATED_BATCH_PRICING.outputUsdPerMillion;
         const webSearchUsd = webSearchCalls * ESTIMATED_BATCH_PRICING.webSearchUsdPerCall;
         return Number((inputUsd + outputUsd + webSearchUsd).toFixed(6));
+    }
+
+    function getEstimateUpperMultiplier(_companyCount) {
+        return 2;
+    }
+
+    function estimateRunUpperUsd(companyCount) {
+        return Number((estimateRunUsd(companyCount) * getEstimateUpperMultiplier(companyCount)).toFixed(6));
     }
 
     function scaleEstimateAmount(value, multiplier) {
@@ -677,14 +686,33 @@
             return Number.isFinite(amount) && amount >= 0 ? amount : null;
         }
 
+        function getEstimateUpperCostUsdForCount(desiredCount) {
+            if (estimateState.count !== desiredCount || !estimateState.body || !estimateState.body.cost) return null;
+            const amount = Number(estimateState.body.cost.upperEstimatedUsd);
+            return Number.isFinite(amount) && amount >= 0 ? amount : null;
+        }
+
+        function getEstimateModelLabel(desiredCount) {
+            const body = estimateState.count === desiredCount ? (estimateState.body || {}) : {};
+            const cost = body.cost || {};
+            const model = normalizeString(body.model || cost.model || ESTIMATED_BATCH_PRICING.model);
+            const serviceTier = normalizeString(body.serviceTier || cost.serviceTier || ESTIMATED_BATCH_PRICING.serviceTier);
+            return model + (serviceTier && serviceTier !== "default" && serviceTier !== "auto" ? " " + serviceTier : "");
+        }
+
         function formatDeepSearchEstimateLabel(desiredCount) {
             const backendEstimateUsd = getEstimateCostUsdForCount(desiredCount);
+            const backendUpperEstimateUsd = getEstimateUpperCostUsdForCount(desiredCount);
+            const estimateUsd = backendEstimateUsd === null ? estimateRunUsd(desiredCount) : backendEstimateUsd;
+            const upperEstimateUsd = backendUpperEstimateUsd === null ? estimateRunUpperUsd(desiredCount) : backendUpperEstimateUsd;
             const estimate = formatUsdAsEuro(
-                backendEstimateUsd === null ? estimateRunUsd(desiredCount) : backendEstimateUsd
+                estimateUsd
             );
-            const model = estimateState.count === desiredCount ? normalizeString(estimateState.body && estimateState.body.model) : "";
+            const upperEstimate = formatUsdAsEuro(Math.max(estimateUsd, upperEstimateUsd));
+            const rangeSuffix = upperEstimate !== estimate ? " tot " + upperEstimate : "";
+            const model = getEstimateModelLabel(desiredCount);
             const modelSuffix = model ? " via " + model : "";
-            return "Geschatte API-kosten voor " + desiredCount + " bedrijven: ± " + estimate + modelSuffix;
+            return "Richtprijs voor maximaal " + desiredCount + " bedrijven: " + estimate + rangeSuffix + modelSuffix + " (dashboard kan afwijken)";
         }
 
         function requestDeepSearchEstimate(desiredCount) {
@@ -891,8 +919,17 @@
                         meta: {
                             target: target.label,
                             batchNumber: target.batches,
+                            model: body && body.model,
+                            reasoningEffort: body && body.reasoningEffort,
+                            serviceTier: body && (body.serviceTier || body.cost && body.cost.serviceTier),
+                            promptVersion: body && body.promptVersion,
                             found: result.found,
-                            added: result.addedCount
+                            added: result.addedCount,
+                            inputTokens: body && body.cost && body.cost.inputTokens,
+                            outputTokens: body && body.cost && body.cost.outputTokens,
+                            reasoningTokens: body && body.cost && body.cost.reasoningTokens,
+                            cachedInputTokens: body && body.cost && body.cost.cachedInputTokens,
+                            webSearchCalls: body && body.cost && body.cost.webSearchCalls
                         }
                     }).catch(function (error) {
                         console.error("API-kosten opslaan mislukt:", error);

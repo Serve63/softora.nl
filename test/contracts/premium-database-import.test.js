@@ -486,6 +486,9 @@ test('premium database deep search uses OpenAI web search and returns complete r
         const payload = JSON.parse(options.body);
         assert.equal(payload.model, 'gpt-5.5');
         assert.equal(payload.reasoning.effort, 'high');
+        assert.equal(payload.service_tier, 'flex');
+        assert.equal(payload.prompt_cache_key, 'softora-premium-database-deep-search-v1');
+        assert.equal(payload.prompt_cache_retention, '24h');
         assert.equal(payload.tools[0].type, 'web_search');
         assert.equal(payload.tools[0].external_web_access, true);
         assert.deepEqual(payload.include, ['web_search_call.action.sources']);
@@ -500,6 +503,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
         assert.match(payload.input[1].content, /Almkerk/);
         assert.match(payload.input[1].content, /Bakkerij Oud/);
         assert.match(payload.input[1].content, /placeComplete/);
+        assert.doesNotMatch(payload.input[1].content, /Zoekstrategie v2/);
         assert.match(payload.input[0].content, /Harde regioregel/);
         assert.match(payload.input[1].content, /Het adres moet de gevraagde plaats tonen/);
         assert.match(payload.input[1].content, /Als je bedrijven teruggeeft, zet placeComplete op false/);
@@ -565,12 +569,15 @@ test('premium database deep search uses OpenAI web search and returns complete r
   assert.equal(result.rejected, 2);
   assert.equal(result.model, 'gpt-5.5');
   assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.serviceTier, 'flex');
+  assert.equal(result.promptVersion, 'v1');
   assert.equal(result.placeComplete, false);
   assert.equal(result.cost.currency, 'USD');
   assert.equal(result.cost.inputTokens, 1000);
   assert.equal(result.cost.outputTokens, 500);
   assert.equal(result.cost.webSearchCalls, 1);
-  assert.equal(result.cost.estimatedUsd, 0.0291);
+  assert.equal(result.cost.serviceTier, 'flex');
+  assert.equal(result.cost.estimatedUsd, 0.01955);
   assert.deepEqual(result.rows[1].slice(0, 5), [
     'Bakkerij Zon',
     'Dorpsstraat 1, 4286 AA Almkerk',
@@ -579,6 +586,48 @@ test('premium database deep search uses OpenAI web search and returns complete r
     'bakkerijzon.nl',
   ]);
   assert.equal(result.sources[0].url, 'https://bakkerijzon.nl/contact');
+});
+
+test('premium database deep search prompt v2 stays behind an explicit flag', async () => {
+  let capturedPayload = null;
+  const result = await fetchDeepSearchBusinessRows(
+    {
+      target: 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk',
+      count: 25,
+    },
+    {
+      env: {
+        OPENAI_API_KEY: 'openai-key',
+        OPENAI_DATABASE_SEARCH_PROMPT_VERSION: 'v2',
+      },
+      fetchImpl: async (_url, options = {}) => {
+        capturedPayload = JSON.parse(options.body);
+        return {
+          ok: true,
+          async json() {
+            return {
+              output_text: JSON.stringify({
+                target: 'Oisterwijk',
+                businesses: [],
+                placeComplete: true,
+                completionReason: 'Geen extra complete bedrijven gevonden.',
+                notes: '',
+              }),
+              output: [],
+              usage: {
+                input_tokens: 100,
+                output_tokens: 20,
+              },
+            };
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(result.promptVersion, 'v2');
+  assert.equal(capturedPayload.prompt_cache_key, 'softora-premium-database-deep-search-v2');
+  assert.match(capturedPayload.input[1].content, /Zoekstrategie v2/);
 });
 
 test('premium database deep search retries temporary OpenAI rate limits', async () => {
@@ -1024,14 +1073,15 @@ test('premium database deep search defaults to gpt-5.4 with high reasoning', asy
   assert.equal(result.reasoningEffort, 'high');
   assert.equal(result.placeComplete, true);
   assert.equal(result.completionReason, 'Geen extra complete bedrijven gevonden.');
-  assert.equal(result.cost.estimatedUsd, 0.00055);
+  assert.equal(result.serviceTier, 'flex');
+  assert.equal(result.cost.estimatedUsd, 0.000275);
 });
 
 test('premium database deep search estimate uses active model pricing without calling OpenAI', () => {
   const cases = [
     {
       count: 25,
-      expectedUsd: 0.8165,
+      expectedUsd: 0.42325,
       expectedBatches: 1,
       expectedInputTokens: 13200,
       expectedOutputTokens: 77000,
@@ -1039,7 +1089,7 @@ test('premium database deep search estimate uses active model pricing without ca
     },
     {
       count: 250,
-      expectedUsd: 7.8195,
+      expectedUsd: 3.94475,
       expectedBatches: 3,
       expectedInputTokens: 39600,
       expectedOutputTokens: 770000,
@@ -1047,7 +1097,7 @@ test('premium database deep search estimate uses active model pricing without ca
     },
     {
       count: 500,
-      expectedUsd: 15.5925,
+      expectedUsd: 7.85125,
       expectedBatches: 5,
       expectedInputTokens: 66000,
       expectedOutputTokens: 1540000,
@@ -1079,12 +1129,14 @@ test('premium database deep search estimate uses active model pricing without ca
     assert.equal(result.estimatedBatches, expectedBatches);
     assert.equal(result.estimateMultiplier, 2.2);
     assert.equal(result.model, 'gpt-5.1');
+    assert.equal(result.serviceTier, 'flex');
     assert.equal(result.cost.estimateMultiplier, 2.2);
+    assert.equal(result.cost.upperEstimatedUsd, Number((expectedUsd * 2).toFixed(6)));
     assert.equal(result.cost.inputTokens, expectedInputTokens);
     assert.equal(result.cost.outputTokens, expectedOutputTokens);
     assert.equal(result.cost.webSearchCalls, expectedWebSearchCalls);
     assert.equal(result.cost.estimatedUsd, expectedUsd);
-    assert.equal(result.cost.pricing.outputUsdPerMillion, 10);
+    assert.equal(result.cost.pricing.outputUsdPerMillion, 5);
   });
 });
 
@@ -1099,9 +1151,11 @@ test('premium database deep search estimate defaults to gpt-5.4 high reasoning',
   assert.equal(result.ok, true);
   assert.equal(result.model, 'gpt-5.4');
   assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.serviceTier, 'flex');
   assert.equal(result.estimateMultiplier, 2.2);
-  assert.equal(result.cost.estimatedUsd, 11.719);
-  assert.equal(result.cost.pricing.outputUsdPerMillion, 15);
+  assert.equal(result.cost.estimatedUsd, 5.8945);
+  assert.equal(result.cost.upperEstimatedUsd, 11.789);
+  assert.equal(result.cost.pricing.outputUsdPerMillion, 7.5);
 });
 
 test('premium database deep search ignores the generic OPENAI_MODEL fallback', () => {
@@ -1117,8 +1171,10 @@ test('premium database deep search ignores the generic OPENAI_MODEL fallback', (
   assert.equal(result.ok, true);
   assert.equal(result.model, 'gpt-5.4');
   assert.equal(result.reasoningEffort, 'high');
-  assert.equal(result.cost.estimatedUsd, 1.218);
-  assert.equal(result.cost.pricing.outputUsdPerMillion, 15);
+  assert.equal(result.serviceTier, 'flex');
+  assert.equal(result.cost.estimatedUsd, 0.624);
+  assert.equal(result.cost.upperEstimatedUsd, 1.248);
+  assert.equal(result.cost.pricing.outputUsdPerMillion, 7.5);
 });
 
 test('premium database deep search estimate multiplier can be calibrated safely', () => {
@@ -1135,7 +1191,8 @@ test('premium database deep search estimate multiplier can be calibrated safely'
   assert.equal(result.ok, true);
   assert.equal(result.model, 'gpt-5.4');
   assert.equal(result.estimateMultiplier, 1);
-  assert.equal(result.cost.estimatedUsd, 0.55);
+  assert.equal(result.serviceTier, 'flex');
+  assert.equal(result.cost.estimatedUsd, 0.28);
 });
 
 test('premium database deep search estimate route returns model-aware costs', () => {
@@ -1166,9 +1223,11 @@ test('premium database deep search estimate route returns model-aware costs', ()
   assert.equal(response.body.ok, true);
   assert.equal(response.body.requested, 250);
   assert.equal(response.body.model, 'gpt-5.1');
+  assert.equal(response.body.serviceTier, 'flex');
   assert.equal(response.body.estimateMultiplier, 2.2);
-  assert.equal(response.body.cost.estimatedUsd, 7.8195);
-  assert.equal(response.body.cost.pricing.outputUsdPerMillion, 10);
+  assert.equal(response.body.cost.estimatedUsd, 3.94475);
+  assert.equal(response.body.cost.upperEstimatedUsd, 7.8895);
+  assert.equal(response.body.cost.pricing.outputUsdPerMillion, 5);
 });
 
 test('premium database deep search estimate route returns model-aware costs without calling OpenAI', () => {
@@ -1277,9 +1336,12 @@ test('premium database import route is registered behind the premium api surface
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/deep-search-businesses'/);
 });
 
-test('premium database Render config pins deep search to gpt-5.4 high reasoning', () => {
+test('premium database Render config pins deep search to gpt-5.4 high reasoning on flex', () => {
   const renderSource = fs.readFileSync(path.join(__dirname, '../../render.yaml'), 'utf8');
 
   assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_MODEL\s+value: gpt-5\.4/);
   assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_REASONING_EFFORT\s+value: high/);
+  assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_SERVICE_TIER\s+value: flex/);
+  assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_PROMPT_VERSION\s+value: v1/);
+  assert.match(renderSource, /key: OPENAI_DATABASE_SEARCH_ESTIMATE_MULTIPLIER\s+value: "2\.2"/);
 });

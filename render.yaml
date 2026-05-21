@@ -41,6 +41,12 @@ services:
         value: gpt-5.4
       - key: OPENAI_DATABASE_SEARCH_REASONING_EFFORT
         value: high
+      - key: OPENAI_DATABASE_SEARCH_SERVICE_TIER
+        value: flex
+      - key: OPENAI_DATABASE_SEARCH_PROMPT_VERSION
+        value: v1
+      - key: OPENAI_DATABASE_SEARCH_ESTIMATE_MULTIPLIER
+        value: "2.2"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
