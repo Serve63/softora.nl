@@ -285,6 +285,9 @@ function createPremiumAuthStateManager(options = {}) {
       if (requestPath === '/api/mailbox/sync' && method === 'GET') {
         return true;
       }
+      if (requestPath === '/api/coldmailing/autopilot/run' && method === 'GET') {
+        return true;
+      }
       if (
         requestPath === '/api/twilio/voice' &&
         (method === 'GET' || method === 'POST')

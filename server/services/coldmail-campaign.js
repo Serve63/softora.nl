@@ -22,6 +22,10 @@ const DEFAULT_COLDMAIL_REPLY_SCOPE = 'premium_coldmail_auto_replies';
 const DEFAULT_COLDMAIL_REPLY_KEY = 'softora_coldmail_auto_replies_v1';
 const DEFAULT_COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
 const DEFAULT_COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
+const DEFAULT_COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
+const DEFAULT_COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
+const DEFAULT_COLDMAIL_AUTOPILOT_SCOPE = 'premium_coldmail_autopilot';
+const DEFAULT_COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
 const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 30;
 const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 50;
 const DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT = 100;
@@ -29,8 +33,27 @@ const DEFAULT_COLDMAIL_SEND_DELAY_MS = 90_000;
 const DEFAULT_COLDMAIL_SAFETY_PAUSE_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT = 10;
 const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS = 180_000;
+const DEFAULT_COLDMAIL_AUTOPILOT_BATCH_SIZE = 3;
+const DEFAULT_COLDMAIL_AUTOPILOT_LOCK_MS = 12 * 60 * 1000;
+const DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE = 'Europe/Amsterdam';
+const DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR = 9;
+const DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR = 17;
+const DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES = 12;
 const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
+const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
+  'COLDMAIL_DAILY_LIMIT_REACHED',
+  'COLDMAIL_SAFETY_PAUSED',
+  'COLDMAIL_SEND_IN_PROGRESS',
+  'EMPTY_MAIL_CONTENT',
+  'NO_RECIPIENTS',
+  'NO_SENDER_CAPACITY',
+  'NO_VALID_RECIPIENT_DOMAINS',
+  'NO_WEBDESIGN_PHOTOS',
+  'SENDER_SMTP_NOT_CONFIGURED',
+  'SMTP_NOT_CONFIGURED',
+  'SMTP_TRANSPORT_UNAVAILABLE',
+]);
 const COLDMAIL_SMTP_SAFETY_STOP_PATTERN =
   /\b(transmit rate limit|rate limited|too many recipients|too many concurrent|no spam please|b-url|b-text|b-score|b-ex|suspected phishing|mailbox is blocked|mailbox is disabled|not allowed to send|sender not authorized|no authorization to send|dmarc|spf failed|insufficient privacy|tls required)\b/i;
 const COLDMAIL_DELIVERY_FAILURE_PATTERN =
@@ -71,6 +94,20 @@ const SENDER_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
   'martijn@softora.nl': 'Martijn van de Ven',
   'ruben@softora.nl': 'Ruben',
+};
+const DEFAULT_COLDMAIL_SENDER_PROFILES = {
+  'serve@softora.nl': {
+    subject: 'Korte vraag over uw website - Softora.nl',
+    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\nSoftora.nl | +31 6 43 26 27 92",
+    aiInstructions: "Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.",
+    toneStyle: 'Vriendelijk & professioneel',
+  },
+  'martijn@softora.nl': {
+    subject: 'Korte vraag over uw website - Softora.nl',
+    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\nSoftora.nl",
+    aiInstructions: "Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.",
+    toneStyle: 'Vriendelijk & professioneel',
+  },
 };
 const COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS = new Set([
   'serve@softora.nl',
@@ -159,6 +196,10 @@ function createColdmailCampaignService(deps = {}) {
     coldmailReplyKey = DEFAULT_COLDMAIL_REPLY_KEY,
     coldmailSendGuardScope = DEFAULT_COLDMAIL_SEND_GUARD_SCOPE,
     coldmailSendGuardKey = DEFAULT_COLDMAIL_SEND_GUARD_KEY,
+    coldmailingSettingsScope = DEFAULT_COLDMAILING_SETTINGS_SCOPE,
+    coldmailingSettingsKey = DEFAULT_COLDMAILING_SETTINGS_KEY,
+    coldmailAutopilotScope = DEFAULT_COLDMAIL_AUTOPILOT_SCOPE,
+    coldmailAutopilotKey = DEFAULT_COLDMAIL_AUTOPILOT_KEY,
     mailboxAccountsRaw = '',
     createTransport = (config) => nodemailer.createTransport(config),
     createImapClient = (config) => new ImapFlow(config),
@@ -1805,6 +1846,696 @@ function createColdmailCampaignService(deps = {}) {
       personalMailboxRemaining: Math.max(0, personalMailboxDailyLimit - personalMailboxSent),
       safetyPause,
     };
+  }
+
+  function normalizeBooleanFlag(value, fallback = false) {
+    if (typeof value === 'boolean') return value;
+    const text = normalizeString(value).toLowerCase();
+    if (['1', 'true', 'yes', 'ja', 'aan', 'on'].includes(text)) return true;
+    if (['0', 'false', 'no', 'nee', 'uit', 'off'].includes(text)) return false;
+    return Boolean(fallback);
+  }
+
+  function normalizeColdmailAutopilotSenderEmails(value) {
+    const raw = Array.isArray(value)
+      ? value
+      : normalizeString(value)
+        ? normalizeString(value).split(/[\s,;]+/g)
+        : [];
+    const seen = new Set();
+    return raw
+      .map(normalizeEmailAddress)
+      .filter((email) => {
+        if (!isLikelyValidEmail(email) || seen.has(email)) return false;
+        seen.add(email);
+        return true;
+      })
+      .slice(0, 5);
+  }
+
+  function normalizeColdmailAutopilotRadiusKm(value) {
+    if (normalizeString(value) === '') return 50;
+    return parseRadiusKm(value);
+  }
+
+  function normalizeColdmailAutopilotConfig(value = {}) {
+    const raw = value && typeof value === 'object' ? value : {};
+    const senderEmails = normalizeColdmailAutopilotSenderEmails(
+      Object.prototype.hasOwnProperty.call(raw, 'senderEmails')
+        ? raw.senderEmails
+        : raw.senderEmail
+    );
+    const senderEmail = normalizeEmailAddress(raw.senderEmail) || senderEmails[0] || '';
+    if (senderEmail && !senderEmails.includes(senderEmail)) senderEmails.unshift(senderEmail);
+    return {
+      count: parsePositiveInt(
+        raw.count || raw.batchSize || raw.batch,
+        DEFAULT_COLDMAIL_AUTOPILOT_BATCH_SIZE,
+        1,
+        Math.min(10, getColdmailCampaignSendLimit())
+      ),
+      senderEmail: senderEmail || senderEmails[0] || '',
+      senderEmails,
+      subject: truncateText(normalizeString(raw.subject), 200),
+      body: normalizeString(raw.body),
+      aiInstructions: normalizeString(raw.aiInstructions),
+      toneStyle: normalizeString(raw.toneStyle) || 'Vriendelijk & professioneel',
+      branch: normalizeString(raw.branch || raw.branche),
+      service: normalizeString(raw.service),
+      database: normalizeString(raw.database),
+      specialAction: normalizeString(raw.specialAction),
+      durationDays: parsePositiveInt(raw.durationDays, 14, 1, 90),
+      radiusKm: normalizeColdmailAutopilotRadiusKm(raw.radiusKm),
+    };
+  }
+
+  function normalizeColdmailAutopilotSchedule(value = {}) {
+    const raw = value && typeof value === 'object' ? value : {};
+    const startHour = parsePositiveInt(
+      raw.startHour ?? raw.safeStartHour,
+      DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR,
+      0,
+      23
+    );
+    const endHour = parsePositiveInt(
+      raw.endHour ?? raw.safeEndHour,
+      DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR,
+      1,
+      24
+    );
+    return {
+      timezone: normalizeString(raw.timezone || raw.timeZone) || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+      weekdaysOnly: normalizeBooleanFlag(
+        Object.prototype.hasOwnProperty.call(raw, 'weekdaysOnly') ? raw.weekdaysOnly : true,
+        true
+      ),
+      startHour,
+      endHour: Math.max(startHour + 1, endHour),
+      minIntervalMinutes: parsePositiveInt(
+        raw.minIntervalMinutes,
+        DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES,
+        5,
+        240
+      ),
+    };
+  }
+
+  function getEnvColdmailAutopilotConfig() {
+    return normalizeColdmailAutopilotConfig({
+      count: env.COLDMAIL_AUTOPILOT_BATCH_SIZE || env.COLDMAIL_AUTOPILOT_COUNT,
+      senderEmails: env.COLDMAIL_AUTOPILOT_SENDER_EMAILS || env.COLDMAIL_AUTOPILOT_SENDER_EMAIL,
+      senderEmail: env.COLDMAIL_AUTOPILOT_SENDER_EMAIL,
+      subject: env.COLDMAIL_AUTOPILOT_SUBJECT,
+      body: env.COLDMAIL_AUTOPILOT_BODY,
+      aiInstructions: env.COLDMAIL_AUTOPILOT_AI_INSTRUCTIONS,
+      toneStyle: env.COLDMAIL_AUTOPILOT_TONE_STYLE,
+      branch: env.COLDMAIL_AUTOPILOT_BRANCH,
+      service: env.COLDMAIL_AUTOPILOT_SERVICE,
+      database: env.COLDMAIL_AUTOPILOT_DATABASE,
+      specialAction: env.COLDMAIL_AUTOPILOT_SPECIAL_ACTION,
+      durationDays: env.COLDMAIL_AUTOPILOT_DURATION_DAYS,
+      radiusKm: env.COLDMAIL_AUTOPILOT_RADIUS_KM,
+    });
+  }
+
+  function getDefaultColdmailAutopilotState() {
+    return {
+      version: 1,
+      enabled: normalizeBooleanFlag(env.COLDMAIL_AUTOPILOT_ENABLED, false),
+      config: getEnvColdmailAutopilotConfig(),
+      schedule: normalizeColdmailAutopilotSchedule({
+        timezone: env.COLDMAIL_AUTOPILOT_TIMEZONE,
+        weekdaysOnly: env.COLDMAIL_AUTOPILOT_WEEKDAYS_ONLY,
+        startHour: env.COLDMAIL_AUTOPILOT_START_HOUR,
+        endHour: env.COLDMAIL_AUTOPILOT_END_HOUR,
+        minIntervalMinutes: env.COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES,
+      }),
+      lastRunAt: '',
+      lastStartedAt: '',
+      lastResult: null,
+      lock: null,
+      log: [],
+      updatedAt: '',
+      updatedBy: '',
+    };
+  }
+
+  function normalizeColdmailAutopilotLog(entries) {
+    return (Array.isArray(entries) ? entries : [])
+      .filter((entry) => entry && typeof entry === 'object')
+      .map((entry) => ({
+        at: normalizeString(entry.at),
+        ok: entry.ok !== false,
+        skipped: Boolean(entry.skipped),
+        reason: truncateText(normalizeString(entry.reason), 120),
+        message: truncateText(normalizeString(entry.message), 240),
+        sent: Math.max(0, Number(entry.sent || 0) || 0),
+        senderEmail: normalizeEmailAddress(entry.senderEmail),
+      }))
+      .filter((entry) => entry.at)
+      .slice(-30);
+  }
+
+  function normalizeColdmailAutopilotState(value) {
+    const defaults = getDefaultColdmailAutopilotState();
+    const raw = value && typeof value === 'object' ? value : {};
+    const rawConfig = raw.config && typeof raw.config === 'object' ? raw.config : {};
+    const rawSchedule = raw.schedule && typeof raw.schedule === 'object' ? raw.schedule : {};
+    return {
+      version: 1,
+      enabled: normalizeBooleanFlag(
+        Object.prototype.hasOwnProperty.call(raw, 'enabled') ? raw.enabled : defaults.enabled,
+        defaults.enabled
+      ),
+      config: normalizeColdmailAutopilotConfig({ ...defaults.config, ...rawConfig }),
+      schedule: normalizeColdmailAutopilotSchedule({ ...defaults.schedule, ...rawSchedule }),
+      lastRunAt: normalizeString(raw.lastRunAt),
+      lastStartedAt: normalizeString(raw.lastStartedAt),
+      lastResult: raw.lastResult && typeof raw.lastResult === 'object' ? raw.lastResult : null,
+      lock: raw.lock && typeof raw.lock === 'object'
+        ? {
+            startedAt: normalizeString(raw.lock.startedAt),
+            expiresAt: normalizeString(raw.lock.expiresAt),
+            actor: truncateText(normalizeString(raw.lock.actor), 120),
+          }
+        : null,
+      log: normalizeColdmailAutopilotLog(raw.log),
+      updatedAt: normalizeString(raw.updatedAt),
+      updatedBy: truncateText(normalizeString(raw.updatedBy), 120),
+    };
+  }
+
+  async function loadColdmailAutopilotState() {
+    const state = await getUiStateValues(coldmailAutopilotScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    return normalizeColdmailAutopilotState(
+      safeJsonParse(values[coldmailAutopilotKey] || '{}', {})
+    );
+  }
+
+  async function saveColdmailAutopilotState(state, actor = 'coldmail-autopilot') {
+    const normalized = normalizeColdmailAutopilotState(state);
+    await setUiStateValues(
+      coldmailAutopilotScope,
+      {
+        [coldmailAutopilotKey]: JSON.stringify(normalized),
+      },
+      {
+        source: 'coldmail-autopilot',
+        actor,
+      }
+    );
+    return normalized;
+  }
+
+  function summarizeColdmailAutopilotConfig(config) {
+    const normalized = normalizeColdmailAutopilotConfig(config);
+    return {
+      count: normalized.count,
+      senderEmail: normalized.senderEmail,
+      senderEmails: normalized.senderEmails,
+      branch: normalized.branch,
+      service: normalized.service,
+      database: normalized.database,
+      specialAction: normalized.specialAction,
+      durationDays: normalized.durationDays,
+      radiusKm: normalized.radiusKm,
+      subjectConfigured: Boolean(normalized.subject),
+      bodyConfigured: Boolean(normalized.body),
+    };
+  }
+
+  function summarizeColdmailAutopilotState(state) {
+    const normalized = normalizeColdmailAutopilotState(state);
+    return {
+      version: normalized.version,
+      enabled: normalized.enabled,
+      config: summarizeColdmailAutopilotConfig(normalized.config),
+      schedule: normalized.schedule,
+      lastRunAt: normalized.lastRunAt,
+      lastStartedAt: normalized.lastStartedAt,
+      lastResult: normalized.lastResult,
+      lock: normalized.lock,
+      log: normalized.log,
+      updatedAt: normalized.updatedAt,
+      updatedBy: normalized.updatedBy,
+      safetyLimits: getColdmailSafetyLimits(),
+    };
+  }
+
+  async function getColdmailAutopilotStatus() {
+    const state = await loadColdmailAutopilotState();
+    return {
+      ok: true,
+      autopilot: summarizeColdmailAutopilotState(state),
+    };
+  }
+
+  async function updateColdmailAutopilotSettings(input = {}, actor = 'Coldmail Autopilot') {
+    const state = await loadColdmailAutopilotState();
+    const rawConfig = input && input.config && typeof input.config === 'object' ? input.config : {};
+    const nextSenderEmails = Object.prototype.hasOwnProperty.call(rawConfig, 'senderEmails')
+      ? rawConfig.senderEmails
+      : Object.prototype.hasOwnProperty.call(rawConfig, 'senderEmail')
+        ? rawConfig.senderEmail
+        : state.config.senderEmails;
+    const nextState = {
+      ...state,
+      enabled: Object.prototype.hasOwnProperty.call(input, 'enabled')
+        ? normalizeBooleanFlag(input.enabled, state.enabled)
+        : state.enabled,
+      config: normalizeColdmailAutopilotConfig({
+        ...state.config,
+        ...rawConfig,
+        senderEmails: nextSenderEmails,
+      }),
+      schedule: normalizeColdmailAutopilotSchedule({
+        ...state.schedule,
+        ...(input && input.schedule && typeof input.schedule === 'object' ? input.schedule : {}),
+      }),
+      updatedAt: now().toISOString(),
+      updatedBy: truncateText(normalizeString(actor), 120),
+    };
+    if (!nextState.enabled) {
+      nextState.lock = null;
+      nextState.lastResult = {
+        ok: true,
+        skipped: true,
+        reason: 'disabled',
+        message: 'Coldmail autopilot staat uit.',
+        at: now().toISOString(),
+      };
+    }
+    const saved = await saveColdmailAutopilotState(nextState, actor);
+    return {
+      ok: true,
+      autopilot: summarizeColdmailAutopilotState(saved),
+    };
+  }
+
+  function normalizeColdmailingSenderProfile(value, fallback = {}) {
+    const raw = value && typeof value === 'object' ? value : {};
+    const base = fallback && typeof fallback === 'object' ? fallback : {};
+    return {
+      subject: truncateText(normalizeString(raw.subject || base.subject), 200),
+      body: normalizeString(raw.body || base.body),
+      aiInstructions: normalizeString(raw.aiInstructions || base.aiInstructions),
+      toneStyle: normalizeString(raw.toneStyle || base.toneStyle || 'Vriendelijk & professioneel'),
+    };
+  }
+
+  async function loadColdmailingSenderSettings() {
+    const state = await getUiStateValues(coldmailingSettingsScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const parsed = safeJsonParse(values[coldmailingSettingsKey] || '{}', {});
+    const raw = parsed && typeof parsed === 'object' ? parsed : {};
+    const senders = {};
+    Object.keys(raw.senders && typeof raw.senders === 'object' ? raw.senders : {}).forEach((email) => {
+      const normalizedEmail = normalizeEmailAddress(email);
+      if (!normalizedEmail) return;
+      senders[normalizedEmail] = normalizeColdmailingSenderProfile(raw.senders[email]);
+    });
+    const senderEmail = normalizeEmailAddress(raw.senderEmail);
+    if (!Object.keys(senders).length && senderEmail && (raw.subject || raw.body)) {
+      senders[senderEmail] = normalizeColdmailingSenderProfile(raw);
+    }
+    return {
+      senderEmail,
+      subject: truncateText(normalizeString(raw.subject), 200),
+      body: normalizeString(raw.body),
+      aiInstructions: normalizeString(raw.aiInstructions),
+      toneStyle: normalizeString(raw.toneStyle) || 'Vriendelijk & professioneel',
+      senders,
+    };
+  }
+
+  function resolveColdmailAutopilotSenderProfile(settings, config, senderEmail) {
+    const email = normalizeEmailAddress(senderEmail);
+    const fallback = DEFAULT_COLDMAIL_SENDER_PROFILES[email] || DEFAULT_COLDMAIL_SENDER_PROFILES['serve@softora.nl'];
+    const stored = settings && settings.senders && settings.senders[email] ? settings.senders[email] : null;
+    const selectedSettingsProfile =
+      settings && normalizeEmailAddress(settings.senderEmail) === email
+        ? settings
+        : {};
+    const base = normalizeColdmailingSenderProfile(stored || selectedSettingsProfile, fallback);
+    const configBelongsToSender = normalizeEmailAddress(config && config.senderEmail) === email;
+    return normalizeColdmailingSenderProfile(
+      configBelongsToSender
+        ? {
+            subject: config.subject || base.subject,
+            body: config.body || base.body,
+            aiInstructions: config.aiInstructions || base.aiInstructions,
+            toneStyle: config.toneStyle || base.toneStyle,
+          }
+        : base,
+      fallback
+    );
+  }
+
+  function getColdmailAutopilotSenderCandidates(state, settings) {
+    const configured = getConfiguredSenderEmails();
+    const allowed = getAllowedSenderEmails();
+    const selected = normalizeColdmailAutopilotSenderEmails([
+      ...(state.config.senderEmails || []),
+      state.config.senderEmail,
+      settings && settings.senderEmail,
+      ...configured,
+      ...allowed,
+    ]);
+    return selected.length ? selected : allowed;
+  }
+
+  async function chooseColdmailAutopilotSender(candidates) {
+    const options = [];
+    const skipped = [];
+    for (const [index, candidate] of candidates.entries()) {
+      try {
+        const senderEmail = assertSenderAllowed(candidate);
+        const senderAccount = resolveSenderSmtpAccount(senderEmail);
+        if (!isSenderSmtpAccountConfigured(senderAccount)) {
+          skipped.push({ senderEmail, reason: 'sender_smtp_not_configured' });
+          continue;
+        }
+        const quota = await getColdmailSendQuota(senderEmail);
+        const remaining = Math.min(quota.senderRemaining, quota.packageRemaining);
+        if (quota.safetyPause) {
+          skipped.push({ senderEmail, reason: 'coldmail_safety_paused', safetyPause: quota.safetyPause });
+          continue;
+        }
+        if (remaining <= 0) {
+          skipped.push({ senderEmail, reason: 'coldmail_daily_limit_reached', quota });
+          continue;
+        }
+        options.push({ senderEmail, quota, remaining, index });
+      } catch (error) {
+        skipped.push({
+          senderEmail: normalizeEmailAddress(candidate),
+          reason: normalizeString(error && error.code) || 'sender_not_allowed',
+        });
+      }
+    }
+    options.sort((left, right) => {
+      const sentDiff = (left.quota.senderSent || 0) - (right.quota.senderSent || 0);
+      if (sentDiff !== 0) return sentDiff;
+      return left.index - right.index;
+    });
+    return {
+      selected: options[0] || null,
+      skipped,
+    };
+  }
+
+  function getZonedColdmailAutopilotParts(date, timezone) {
+    let parts;
+    try {
+      parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).formatToParts(date);
+    } catch (_) {
+      parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).formatToParts(date);
+    }
+    const getPart = (type) => {
+      const part = parts.find((item) => item.type === type);
+      return part ? part.value : '';
+    };
+    const rawHour = Number(getPart('hour'));
+    return {
+      weekday: getPart('weekday'),
+      hour: rawHour === 24 ? 0 : rawHour,
+      minute: Number(getPart('minute')) || 0,
+    };
+  }
+
+  function isColdmailAutopilotInSchedule(schedule, date = now()) {
+    const normalized = normalizeColdmailAutopilotSchedule(schedule);
+    const parts = getZonedColdmailAutopilotParts(date, normalized.timezone);
+    if (normalized.weekdaysOnly && ['Sat', 'Sun'].includes(parts.weekday)) {
+      return {
+        ok: false,
+        reason: 'outside_weekday_window',
+        message: 'Autopilot wacht tot de volgende werkdag.',
+      };
+    }
+    if (parts.hour < normalized.startHour || parts.hour >= normalized.endHour) {
+      return {
+        ok: false,
+        reason: 'outside_safe_hours',
+        message: `Autopilot mailt alleen tussen ${String(normalized.startHour).padStart(2, '0')}:00 en ${String(normalized.endHour).padStart(2, '0')}:00.`,
+      };
+    }
+    return { ok: true };
+  }
+
+  function isColdmailAutopilotLockActive(state) {
+    const expiresAtMs = parseTimestampMs(state && state.lock && state.lock.expiresAt);
+    return expiresAtMs > now().getTime();
+  }
+
+  function isColdmailAutopilotIntervalReady(state) {
+    const schedule = normalizeColdmailAutopilotSchedule(state.schedule);
+    const lastStartedAtMs = parseTimestampMs(state.lastStartedAt);
+    if (!lastStartedAtMs) return { ok: true };
+    const minIntervalMs = schedule.minIntervalMinutes * 60 * 1000;
+    const readyAtMs = lastStartedAtMs + minIntervalMs;
+    if (readyAtMs <= now().getTime()) return { ok: true };
+    return {
+      ok: false,
+      reason: 'cooldown',
+      message: `Autopilot wacht nog tot ${new Date(readyAtMs).toISOString()}.`,
+    };
+  }
+
+  function compactColdmailAutopilotResult(result = {}) {
+    return {
+      ok: result.ok !== false,
+      skipped: Boolean(result.skipped),
+      reason: truncateText(normalizeString(result.reason || result.code), 120),
+      message: truncateText(normalizeString(result.message), 500),
+      at: normalizeString(result.at) || now().toISOString(),
+      sent: Math.max(0, Number(result.sent || 0) || 0),
+      failed: Math.max(0, Number(result.failed || 0) || 0),
+      senderEmail: normalizeEmailAddress(result.senderEmail),
+      selected: Math.max(0, Number(result.selected || 0) || 0),
+      requested: Math.max(0, Number(result.requested || 0) || 0),
+      dailyQuota: result.dailyQuota && typeof result.dailyQuota === 'object' ? result.dailyQuota : undefined,
+      agendaBlocked: Boolean(result.agendaBlocked),
+    };
+  }
+
+  async function finishColdmailAutopilotRun(state, result, actor, options = {}) {
+    const compactResult = compactColdmailAutopilotResult(result);
+    const nextState = {
+      ...state,
+      lock: options.preserveLock ? state.lock : null,
+      lastRunAt: compactResult.at,
+      lastResult: compactResult,
+      log: normalizeColdmailAutopilotLog([
+        ...(state.log || []),
+        compactResult,
+      ]),
+    };
+    const saved = await saveColdmailAutopilotState(nextState, actor || 'Coldmail Autopilot');
+    return {
+      ...compactResult,
+      autopilot: summarizeColdmailAutopilotState(saved),
+    };
+  }
+
+  function buildColdmailAutopilotSkipResult(reason, message, extra = {}) {
+    return {
+      ok: true,
+      skipped: true,
+      reason,
+      message,
+      at: now().toISOString(),
+      ...extra,
+    };
+  }
+
+  async function runColdmailAutopilot(input = {}) {
+    const actor = truncateText(normalizeString(input.actor), 120) || 'Coldmail Autopilot';
+    let state = await loadColdmailAutopilotState();
+
+    if (!state.enabled) {
+      return finishColdmailAutopilotRun(
+        state,
+        buildColdmailAutopilotSkipResult('disabled', 'Coldmail autopilot staat uit.'),
+        actor
+      );
+    }
+    if (isColdmailAutopilotLockActive(state)) {
+      return finishColdmailAutopilotRun(
+        state,
+        buildColdmailAutopilotSkipResult('already_running', 'Er draait al een autopilot-run.'),
+        actor,
+        { preserveLock: true }
+      );
+    }
+    if (!input.force) {
+      const scheduleCheck = isColdmailAutopilotInSchedule(state.schedule, now());
+      if (!scheduleCheck.ok) {
+        return finishColdmailAutopilotRun(
+          state,
+          buildColdmailAutopilotSkipResult(scheduleCheck.reason, scheduleCheck.message),
+          actor
+        );
+      }
+      const intervalCheck = isColdmailAutopilotIntervalReady(state);
+      if (!intervalCheck.ok) {
+        return finishColdmailAutopilotRun(
+          state,
+          buildColdmailAutopilotSkipResult(intervalCheck.reason, intervalCheck.message),
+          actor
+        );
+      }
+    }
+
+    const startedAt = now().toISOString();
+    state = await saveColdmailAutopilotState(
+      {
+        ...state,
+        lastStartedAt: startedAt,
+        lock: {
+          startedAt,
+          expiresAt: new Date(now().getTime() + DEFAULT_COLDMAIL_AUTOPILOT_LOCK_MS).toISOString(),
+          actor,
+        },
+      },
+      actor
+    );
+
+    try {
+      let replySync = null;
+      try {
+        replySync = await syncInboundColdmailRepliesFromImap({ force: false, maxMessages: 30 });
+      } catch (error) {
+        replySync = {
+          ok: false,
+          skipped: true,
+          reason: 'reply_sync_failed',
+          message: truncateText(normalizeString(error && error.message), 240),
+        };
+      }
+
+      const settings = await loadColdmailingSenderSettings();
+      const candidates = getColdmailAutopilotSenderCandidates(state, settings);
+      const senderChoice = await chooseColdmailAutopilotSender(candidates);
+      if (!senderChoice.selected) {
+        return finishColdmailAutopilotRun(
+          state,
+          buildColdmailAutopilotSkipResult(
+            'no_sender_capacity',
+            'Geen afzender heeft nu veilige verzendruimte of geldige SMTP-configuratie.',
+            { senderSkips: senderChoice.skipped }
+          ),
+          actor
+        );
+      }
+
+      const senderEmail = senderChoice.selected.senderEmail;
+      const profile = resolveColdmailAutopilotSenderProfile(settings, state.config, senderEmail);
+      if (!profile.subject || !profile.body) {
+        return finishColdmailAutopilotRun(
+          state,
+          buildColdmailAutopilotSkipResult(
+            'empty_mail_content',
+            'Autopilot mist een onderwerp of mailtekst en heeft niets verzonden.',
+            { senderEmail }
+          ),
+          actor
+        );
+      }
+
+      const sendCount = Math.max(
+        0,
+        Math.min(
+          state.config.count,
+          senderChoice.selected.remaining,
+          getColdmailCampaignSendLimit()
+        )
+      );
+      if (sendCount <= 0) {
+        return finishColdmailAutopilotRun(
+          state,
+          buildColdmailAutopilotSkipResult(
+            'coldmail_daily_limit_reached',
+            'Daglimiet bereikt. Autopilot heeft niets verzonden.',
+            { senderEmail, dailyQuota: senderChoice.selected.quota }
+          ),
+          actor
+        );
+      }
+
+      const sendResult = await sendColdmailCampaign({
+        count: sendCount,
+        subject: profile.subject,
+        body: profile.body,
+        aiInstructions: profile.aiInstructions,
+        toneStyle: profile.toneStyle,
+        branch: state.config.branch,
+        service: state.config.service,
+        database: state.config.database,
+        senderEmail,
+        specialAction: state.config.specialAction,
+        durationDays: state.config.durationDays,
+        radiusKm: state.config.radiusKm,
+        mode: 'mail',
+        testMode: false,
+        publicBaseUrl: input.publicBaseUrl,
+        actor,
+      });
+      return finishColdmailAutopilotRun(
+        state,
+        {
+          ok: true,
+          skipped: false,
+          reason: 'sent',
+          message: `${sendResult.sent || 0} coldmail(s) veilig verzonden.`,
+          at: now().toISOString(),
+          requested: sendResult.requested,
+          selected: sendResult.selected,
+          sent: sendResult.sent,
+          failed: sendResult.failed,
+          senderEmail,
+          dailyQuota: sendResult.dailyQuota,
+          replySync: replySync ? {
+            ok: replySync.ok !== false,
+            skipped: Boolean(replySync.skipped),
+            reason: normalizeString(replySync.reason),
+          } : undefined,
+        },
+        actor
+      );
+    } catch (error) {
+      const code = normalizeString(error && error.code) || 'COLDMAIL_AUTOPILOT_FAILED';
+      const knownSkip = COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES.has(code);
+      return finishColdmailAutopilotRun(
+        state,
+        {
+          ok: knownSkip,
+          skipped: knownSkip,
+          reason: code.toLowerCase(),
+          message: truncateText(
+            normalizeString(error && error.message) || 'Coldmail autopilot kon niet veilig draaien.',
+            500
+          ),
+          at: now().toISOString(),
+          failedItems: Array.isArray(error && error.failedItems) ? error.failedItems : undefined,
+          dailyQuota: error && error.quota && typeof error.quota === 'object' ? error.quota : undefined,
+        },
+        actor
+      );
+    }
   }
 
   async function recordColdmailSendGuardEntry({ senderEmail, count, personalCount = 0, actor }) {
@@ -3942,11 +4673,14 @@ function createColdmailCampaignService(deps = {}) {
     isLikelyValidEmail,
     getColdmailCampaignRecipients,
     getColdmailPreviewImage,
+    getColdmailAutopilotStatus,
     getColdmailUnsubscribePreview,
     listColdmailReplyFollowUps,
+    runColdmailAutopilot,
     sendColdmailCampaign,
     syncInboundColdmailRepliesFromImap,
     unsubscribeColdmailRecipient,
+    updateColdmailAutopilotSettings,
     updateWebdesignOutreachStatus,
   };
 }
