@@ -270,11 +270,13 @@ test('server app runtime composition builders preserve feature wiring groups and
                   'softora-test-mode-recipient': {
                     id: 'softora-test-mode-recipient',
                     photoKey: 'photo_softora_test',
+                    mockupPhotoKey: 'mockup_softora_test',
                     chunkCount: 1,
                     websitePhotoName: 'softora-test.png',
                   },
                 }),
                 photo_softora_test_0: 'data:image/png;base64,AAAA',
+                mockup_softora_test_0: 'data:image/png;base64,AAAA',
               },
             };
           }

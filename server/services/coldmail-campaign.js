@@ -1120,12 +1120,17 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
+  function hasReadyWebdesignAssetRecord(photo) {
+    if (!hasReadyWebsitePhotoRecord(photo)) return false;
+    return isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo));
+  }
+
   function createReadyWebdesignMatcher(customerRows = [], photoMap = {}) {
     const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
     const photosByIdentity = new Map();
     Object.keys(photos).forEach((key) => {
       const item = photos[key];
-      if (!hasReadyWebsitePhotoRecord(item)) return;
+      if (!hasReadyWebdesignAssetRecord(item)) return;
       getPhotoIdentityKeys(item).forEach((identityKey) => {
         if (identityKey) photosByIdentity.set(identityKey, item);
       });
@@ -1137,7 +1142,7 @@ function createColdmailCampaignService(deps = {}) {
 
     (Array.isArray(customerRows) ? customerRows : []).forEach((row, index) => {
       const photo = preferFreshRowPhotoFields(row, findStoredPhotoRecordForRow(row, index, photos, photosByIdentity));
-      if (!hasReadyWebsitePhotoRecord(photo)) return;
+      if (!hasReadyWebdesignAssetRecord(photo)) return;
 
       const rowId = getExplicitRowId(row);
       if (rowId) readyIds.add(rowId);

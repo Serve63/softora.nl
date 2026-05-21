@@ -1135,7 +1135,7 @@ test('coldmail campaign refuses webdesign outreach when the device mockup is mis
     }),
     (error) => {
       assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
-      assert.match(error.failedItems[0].error, /Geen device-mockup gevonden/);
+      assert.match(error.failedItems[0].error, /Nog geen website-design klaar/);
       return true;
     }
   );
@@ -1380,6 +1380,7 @@ test('coldmail campaign preview only lists webdesign recipients with a generated
       'with-photo': {
         id: 'with-photo',
         websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
         websitePhotoName: 'Met Design webdesign',
       },
     },
@@ -1423,6 +1424,7 @@ test('coldmail campaign does not treat stale row-index photos as ready webdesign
         identityKey:
           'autobedrijf den breejen almkerk b.v.|autobedrijf den breejen almkerk b.v.|+31 18 340 25 21',
         websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
         websitePhotoName: 'Autobedrijf Den Breejen webdesign',
       },
       'row-1': {
@@ -2933,6 +2935,7 @@ test('coldmail preview for webdesign action only counts companies with a ready w
       'ready-1': {
         id: 'ready-1',
         websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
         websitePhotoName: 'Klaar Design BV webdesign',
       },
     },
@@ -2984,6 +2987,7 @@ test('coldmail preview for webdesign action fills from ready row-level website-d
         status: 'prospect',
         mail: true,
         websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
         websitePhotoName: 'Rij Design BV webdesign',
       },
     ],
@@ -2991,6 +2995,7 @@ test('coldmail preview for webdesign action fills from ready row-level website-d
       'stored-ready': {
         id: 'stored-ready',
         websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
         websitePhotoName: 'Opgeslagen Design BV webdesign',
       },
     },
@@ -3036,12 +3041,14 @@ test('coldmail preview matches stored webdesigns with normalized company identit
         id: 'old-jaghthuijs-id',
         identityKey: 't jaghthuijs|t jaghthuijs|0765656956',
         websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
         websitePhotoName: "'t Jaghthuijs webdesign",
       },
       'old-zon-id': {
         id: 'old-zon-id',
         identityKey: 'bakkerij de zon||0135550000',
         websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
         websitePhotoName: 'Bakkerij De Zon webdesign',
       },
     },
@@ -3078,10 +3085,12 @@ test('coldmail webdesign action herkent opgeslagen website-design chunks zonder 
         'chunked-ready-1': {
           id: 'chunked-ready-1',
           photoKey: 'softora_photo_chunked_ready_1',
+          mockupPhotoKey: 'softora_photo_chunked_ready_1_mockup',
           websitePhotoName: 'Chunked Design BV webdesign',
         },
       }),
       softora_photo_chunked_ready_1_0: TINY_PNG_DATA_URL,
+      softora_photo_chunked_ready_1_mockup_0: TINY_PNG_DATA_URL,
     },
   });
 
@@ -3145,6 +3154,7 @@ test('coldcalling preview for webdesign action only includes leads with a ready 
       'ready-customer': {
         id: 'ready-customer',
         websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
         websitePhotoName: 'Klaar Belbedrijf webdesign',
       },
     },
