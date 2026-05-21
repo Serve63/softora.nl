@@ -2252,15 +2252,6 @@ function createColdmailCampaignService(deps = {}) {
     if (snapshot && snapshot.subject && snapshot.body) {
       return normalizeColdmailingSenderProfile(snapshot, fallback);
     }
-    const configBelongsToSender = normalizeEmailAddress(config && config.senderEmail) === email;
-    if (configBelongsToSender && config && config.subject && config.body) {
-      return normalizeColdmailingSenderProfile({
-        subject: config.subject,
-        body: config.body,
-        aiInstructions: config.aiInstructions,
-        toneStyle: config.toneStyle,
-      }, fallback);
-    }
     return {
       subject: '',
       body: '',
