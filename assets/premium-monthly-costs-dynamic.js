@@ -299,8 +299,16 @@
       const costUsd = Number(summary.costUsd);
       const fetchedAtLabel = formatDateTime(summary.lastSuccessfulUpdate || summary.fetchedAt);
       const exact = summary.exact !== false;
+      const primaryProvider = Array.isArray(summary.providers) ? summary.providers[0] : null;
+      const organizationWide = summary.organizationWide === true || (primaryProvider && primaryProvider.organizationWide === true);
       const noteParts = [
-        exact ? API_COST_NOTE : 'OpenAI Usage live schatting',
+        exact
+          ? organizationWide
+            ? 'OpenAI API kosten organisatiebreed live'
+            : API_COST_NOTE
+          : organizationWide
+            ? 'OpenAI Usage live schatting organisatiebreed'
+            : 'OpenAI Usage live schatting',
         Number.isFinite(costUsd) && costUsd > 0 ? 'USD ' + formatCurrencyAmount(costUsd, 'usd') : '',
         summary.usdToEurRateSource ? 'Koers ' + summary.usdToEurRateSource : '',
         fetchedAtLabel ? 'Bijgewerkt ' + fetchedAtLabel : '',

@@ -183,20 +183,43 @@ function resolveOpenAiOrganizationId(deps = {}) {
 
 function resolveOpenAiProjectId(deps = {}) {
   const env = deps.env || process.env || {};
+  if (Object.prototype.hasOwnProperty.call(deps, 'openAiProjectId')) {
+    return normalizeString(deps.openAiProjectId);
+  }
   return normalizeString(
-    deps.openAiProjectId ||
-      env.OPENAI_PROJECT_ID ||
+    env.OPENAI_PROJECT_ID ||
       env.OPENAI_PROJECT
   );
 }
 
-function buildOpenAiCostHeaders(deps = {}, apiKey = '') {
+function resolveOpenAiProjectFilterId(deps = {}, options = {}) {
+  if (options && options.projectScope === false) return '';
+  if (options && Object.prototype.hasOwnProperty.call(options, 'projectId')) {
+    return normalizeString(options.projectId);
+  }
+  return resolveOpenAiProjectId(deps);
+}
+
+function withoutOpenAiProjectFilter(deps = {}) {
+  const envSource = deps.env || process.env || {};
+  return {
+    ...deps,
+    openAiProjectId: '',
+    env: {
+      ...envSource,
+      OPENAI_PROJECT_ID: '',
+      OPENAI_PROJECT: '',
+    },
+  };
+}
+
+function buildOpenAiCostHeaders(deps = {}, apiKey = '', options = {}) {
   const headers = {
     Authorization: `Bearer ${apiKey}`,
     Accept: 'application/json',
   };
   const organizationId = resolveOpenAiOrganizationId(deps);
-  const projectId = resolveOpenAiProjectId(deps);
+  const projectId = resolveOpenAiProjectFilterId(deps, options);
   if (organizationId) headers['OpenAI-Organization'] = organizationId;
   if (projectId) headers['OpenAI-Project'] = projectId;
   return headers;
@@ -888,7 +911,7 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
 
   const window = buildCostWindow(options.scope, options.nowMs);
   const apiBaseUrl = resolveOpenAiApiBaseUrl(deps);
-  const projectId = resolveOpenAiProjectId(deps);
+  const projectId = resolveOpenAiProjectFilterId(deps, options);
   const currencies = {};
   let page = '';
   let bucketCount = 0;
@@ -900,7 +923,7 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
       buildOpenAiCostsUrl({ apiBaseUrl, startTime: window.startTime, endTime: window.endTime, page, projectId }),
       {
         method: 'GET',
-        headers: buildOpenAiCostHeaders(deps, apiKey),
+        headers: buildOpenAiCostHeaders(deps, apiKey, { projectId }),
       },
       15000,
       {
@@ -948,6 +971,8 @@ async function fetchOpenAiCostSummary(deps = {}, options = {}) {
     currencies,
     organizationScoped: Boolean(resolveOpenAiOrganizationId(deps)),
     projectScoped: Boolean(resolveOpenAiProjectId(deps)),
+    projectFilterApplied: Boolean(projectId),
+    organizationWide: !projectId,
     bucketCount,
     resultCount,
     note: 'OpenAI Costs API; USD-bedragen worden naar EUR omgerekend met een live wisselkoers wanneer er geen vaste koers is ingesteld.',
@@ -970,7 +995,7 @@ async function fetchOpenAiUsageEstimateForEndpoint(deps = {}, window = {}, endpo
   }
 
   const apiBaseUrl = resolveOpenAiApiBaseUrl(deps);
-  const projectId = resolveOpenAiProjectId(deps);
+  const projectId = resolveOpenAiProjectFilterId(deps, window);
   const currencies = {};
   const totals = {
     bucketCount: 0,
@@ -999,7 +1024,7 @@ async function fetchOpenAiUsageEstimateForEndpoint(deps = {}, window = {}, endpo
       }),
       {
         method: 'GET',
-        headers: buildOpenAiCostHeaders(deps, apiKey),
+        headers: buildOpenAiCostHeaders(deps, apiKey, { projectId }),
       },
       15000,
       {
@@ -1038,7 +1063,10 @@ async function fetchOpenAiUsageEstimateForEndpoint(deps = {}, window = {}, endpo
 }
 
 async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
-  const window = buildCostWindow(options.scope, options.nowMs);
+  const window = {
+    ...buildCostWindow(options.scope, options.nowMs),
+    projectId: resolveOpenAiProjectFilterId(deps, options),
+  };
   const endpoints = [
     {
       key: 'completions',
@@ -1102,6 +1130,8 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
     currencies,
     organizationScoped: Boolean(resolveOpenAiOrganizationId(deps)),
     projectScoped: Boolean(resolveOpenAiProjectId(deps)),
+    projectFilterApplied: Boolean(window.projectId),
+    organizationWide: !window.projectId,
     bucketCount: usage.bucketCount,
     resultCount: usage.resultCount,
     requestCount: usage.requestCount,
@@ -1204,14 +1234,36 @@ async function fetchAnthropicCostSummary(deps = {}, options = {}) {
 }
 
 async function fetchCombinedApiCostSummary(deps = {}, options = {}) {
+  const configuredProjectId = resolveOpenAiProjectId(deps);
   const openAiSummary = await fetchOpenAiCostSummary(deps, options);
+  let organizationOpenAiSummary = null;
   let usageEstimate = null;
+  let organizationUsageEstimate = null;
   let selectedOpenAiSummary = openAiSummary;
   const unavailable = [];
 
+  if (configuredProjectId) {
+    try {
+      organizationOpenAiSummary = await fetchOpenAiCostSummary(withoutOpenAiProjectFilter(deps), {
+        ...options,
+        projectScope: false,
+      });
+      if (organizationOpenAiSummary.costUsd > selectedOpenAiSummary.costUsd + 0.005) {
+        selectedOpenAiSummary = organizationOpenAiSummary;
+      }
+    } catch (error) {
+      unavailable.push({
+        provider: 'OpenAI Costs organisatiebreed',
+        source: 'openai-costs',
+        error: error.code || 'OPENAI_ORGANIZATION_COSTS_ERROR',
+        detail: sanitizeOpenAiCostDetail(error.detail || error.message || 'OpenAI organisatiekosten niet beschikbaar.'),
+      });
+    }
+  }
+
   try {
     usageEstimate = await fetchOpenAiUsageEstimateSummary(deps, options);
-    if (usageEstimate.costUsd > openAiSummary.costUsd + 0.005) {
+    if (usageEstimate.costUsd > selectedOpenAiSummary.costUsd + 0.005) {
       selectedOpenAiSummary = {
         ...usageEstimate,
         officialCostUsd: openAiSummary.costUsd,
@@ -1221,11 +1273,35 @@ async function fetchCombinedApiCostSummary(deps = {}, options = {}) {
     }
   } catch (error) {
     unavailable.push({
-      provider: 'OpenAI Usage',
+      provider: 'OpenAI Usage project',
       source: 'openai-usage-estimate',
       error: error.code || 'OPENAI_USAGE_ESTIMATE_ERROR',
       detail: sanitizeOpenAiCostDetail(error.detail || error.message || 'OpenAI usage schatting niet beschikbaar.'),
     });
+  }
+
+  if (configuredProjectId) {
+    try {
+      organizationUsageEstimate = await fetchOpenAiUsageEstimateSummary(withoutOpenAiProjectFilter(deps), {
+        ...options,
+        projectScope: false,
+      });
+      if (organizationUsageEstimate.costUsd > selectedOpenAiSummary.costUsd + 0.005) {
+        selectedOpenAiSummary = {
+          ...organizationUsageEstimate,
+          officialCostUsd: (organizationOpenAiSummary || openAiSummary).costUsd,
+          officialCostEur: (organizationOpenAiSummary || openAiSummary).costEur,
+          officialSource: (organizationOpenAiSummary || openAiSummary).source,
+        };
+      }
+    } catch (error) {
+      unavailable.push({
+        provider: 'OpenAI Usage organisatiebreed',
+        source: 'openai-usage-estimate',
+        error: error.code || 'OPENAI_ORGANIZATION_USAGE_ESTIMATE_ERROR',
+        detail: sanitizeOpenAiCostDetail(error.detail || error.message || 'OpenAI organisatie-usage schatting niet beschikbaar.'),
+      });
+    }
   }
 
   return {
@@ -1245,12 +1321,18 @@ async function fetchCombinedApiCostSummary(deps = {}, options = {}) {
     currencies: selectedOpenAiSummary.currencies,
     providers: [selectedOpenAiSummary],
     officialProvider: openAiSummary,
+    organizationOfficialProvider: organizationOpenAiSummary,
     usageEstimate,
+    organizationUsageEstimate,
     unavailable,
     note:
-      selectedOpenAiSummary.exact === true
-        ? 'OpenAI kosten deze maand via de Organization Costs API.'
-        : 'OpenAI Usage live schatting omdat de Organization Costs API nog achterloopt.',
+      selectedOpenAiSummary.exact === true && selectedOpenAiSummary.organizationWide
+        ? 'OpenAI kosten deze maand organisatiebreed via de Organization Costs API.'
+        : selectedOpenAiSummary.exact === true
+          ? 'OpenAI kosten deze maand via de Organization Costs API.'
+          : selectedOpenAiSummary.organizationWide
+            ? 'OpenAI Usage live schatting organisatiebreed omdat de Organization Costs API nog achterloopt.'
+            : 'OpenAI Usage live schatting omdat de Organization Costs API nog achterloopt.',
   };
 }
 

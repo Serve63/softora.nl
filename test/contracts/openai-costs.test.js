@@ -337,6 +337,100 @@ test('combined api costs fall back to live usage estimate when official costs la
   assert.match(calls.find((url) => url.includes('/organization/usage/images')), /project_ids=proj-softora/);
 });
 
+test('combined api costs prefer organization-wide usage when project filter misses all-project dashboard spend', async () => {
+  const calls = [];
+  const summary = await fetchCombinedApiCostSummary(
+    {
+      openAiCostsApiKey: 'openai-admin-key',
+      openAiProjectId: 'proj-softora',
+      usdToEurRate: 0.9,
+      fetchJsonWithTimeout: async (url, options) => {
+        calls.push({ url, options });
+        const parsed = new URL(url);
+        const isProjectFiltered = parsed.searchParams.getAll('project_ids').includes('proj-softora');
+
+        if (url.includes('/organization/costs')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: { data: [{ results: [] }], has_more: false },
+          };
+        }
+
+        if (url.includes('/organization/usage/completions')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              data: [
+                {
+                  results: isProjectFiltered
+                    ? [
+                        {
+                          model: 'gpt-5',
+                          input_tokens: 0,
+                          output_tokens: 5000,
+                          num_model_requests: 1,
+                          project_id: 'proj-softora',
+                        },
+                      ]
+                    : [],
+                },
+              ],
+              has_more: false,
+            },
+          };
+        }
+
+        if (url.includes('/organization/usage/images')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              data: [
+                {
+                  results: isProjectFiltered
+                    ? []
+                    : [
+                        {
+                          images: 2,
+                          num_model_requests: 2,
+                          model: 'gpt-image-2',
+                          size: '1024x1536',
+                          source: 'image.generation',
+                        },
+                      ],
+                },
+              ],
+              has_more: false,
+            },
+          };
+        }
+
+        return {
+          response: { ok: true, status: 200 },
+          data: { data: [{ results: [] }], has_more: false },
+        };
+      },
+      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 4, 20, 23, 20, 0) }
+  );
+
+  const organizationImageCall = calls.find(
+    (call) => call.url.includes('/organization/usage/images') && !call.url.includes('project_ids=')
+  );
+
+  assert.equal(summary.exact, false);
+  assert.equal(summary.estimated, true);
+  assert.equal(summary.costUsd, 0.33);
+  assert.equal(summary.costEur, 0.3);
+  assert.equal(summary.providers[0].source, 'openai-usage-estimate');
+  assert.equal(summary.providers[0].organizationWide, true);
+  assert.equal(summary.providers[0].projectFilterApplied, false);
+  assert.equal(summary.usageEstimate.costUsd, 0.05);
+  assert.equal(summary.organizationUsageEstimate.costUsd, 0.33);
+  assert.ok(organizationImageCall, 'verwacht een organisatiebrede images usage-call zonder project filter');
+  assert.equal(organizationImageCall.options.headers['OpenAI-Project'], undefined);
+});
+
 test('openai usage estimate can estimate text token usage', async () => {
   const summary = await fetchOpenAiUsageEstimateSummary(
     {
