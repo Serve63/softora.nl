@@ -145,6 +145,20 @@ function createService(overrides = {}) {
         sendMail: async (message) => {
           if (overrides.sendMailError) throw new Error(overrides.sendMailError);
           sentMessages.push(message);
+          if (typeof overrides.onSendMail === 'function') {
+            await overrides.onSendMail({
+              message,
+              sentMessages,
+              getAutopilotState: () => autopilotState,
+              setAutopilotState: (nextState) => {
+                autopilotState = nextState;
+              },
+              getSendGuardState: () => sendGuardState,
+              setSendGuardState: (nextState) => {
+                sendGuardState = nextState;
+              },
+            });
+          }
           return { messageId: `msg-${sentMessages.length}`, response: '250 ok' };
         },
       };
@@ -332,6 +346,79 @@ test('coldmail autopilot sends a small safe batch through the existing campaign 
   assert.equal(getAutopilotState().lastResult.reason, 'sent');
   assert.equal(getAutopilotState().lock, null);
   assert.equal(getSendGuardState().entries.length, 2);
+});
+
+test('coldmail autopilot keeps an emergency disabled state when a running batch finishes', async () => {
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    coldmailingSettings: {
+      senderEmail: 'serve@softora.nl',
+      senders: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        branch: 'Horeca & Restaurants',
+        service: "Website's",
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 9,
+        endHour: 17,
+        minIntervalMinutes: 12,
+      },
+    },
+    onSendMail: ({ getAutopilotState, setAutopilotState }) => {
+      setAutopilotState({
+        ...getAutopilotState(),
+        enabled: false,
+        lock: null,
+        emergencyStoppedAt: '2026-04-24T12:00:00.000Z',
+        emergencyStopReason: 'Noodstop tijdens actieve run.',
+      });
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(getAutopilotState().enabled, false);
+  assert.equal(getAutopilotState().lock, null);
+  assert.equal(getAutopilotState().lastResult.reason, 'sent');
+  assert.equal(getAutopilotState().emergencyStopReason, 'Noodstop tijdens actieve run.');
 });
 
 test('coldmail autopilot does not treat a full agenda as a mail safety stop', async () => {
@@ -3315,6 +3402,58 @@ test('coldmail campaign records a safety pause when the provider rate-limits sen
       return true;
     }
   );
+});
+
+test('coldmail campaign stops the next message when a safety pause appears during a batch', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        mail: true,
+      },
+      {
+        id: 'prospect-2',
+        bedrijf: 'Kapsalon Luna',
+        naam: 'Luna',
+        email: 'luna@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        mail: true,
+      },
+    ],
+    onSendMail: ({ sentMessages, setSendGuardState }) => {
+      if (sentMessages.length !== 1) return;
+      setSendGuardState({
+        entries: [
+          {
+            at: '2026-04-24T12:00:00.000Z',
+            senderEmail: '',
+            count: 0,
+            personalCount: 0,
+            safetyPauseUntil: '2026-04-24T13:00:00.000Z',
+            safetyPauseReason: 'Noodstop tijdens actieve batch.',
+          },
+        ],
+      });
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 2,
+    subject: 'Test',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.safetyPaused, true);
+  assert.equal(sentMessages.length, 1);
+  assert.match(result.failedItems[0].error, /tijdelijk op pauze/);
 });
 
 test('coldmail reply sync safety-pauses on generic Strato provider warnings', async () => {
