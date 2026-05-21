@@ -329,10 +329,7 @@ function isConversionHref(hrefRaw) {
 
 function isMartijnWhatsappHref(hrefRaw) {
   const href = String(hrefRaw || '').trim();
-  return (
-    /^https:\/\/wa\.me\/31643262792(?:[?#].*)?$/i.test(href) ||
-    /^https:\/\/api\.whatsapp\.com\/send\?phone=31643262792\b/i.test(href)
-  );
+  return /^https:\/\/wa\.me\/31643262792(?:[?#].*)?$/i.test(href);
 }
 
 function stripHtmlTags(valueRaw) {
@@ -344,7 +341,7 @@ function stripHtmlTags(valueRaw) {
 
 function isLeadCtaLabel(labelRaw) {
   const label = stripHtmlTags(labelRaw).toLowerCase();
-  return /\b(contact|bericht|whatsapp|start gesprek|plan gesprek|plan scan|vraag advies|offerte|bel direct|start project)\b/i.test(label);
+  return /\b(neem contact op|contact opnemen|contact|stuur (?:een )?bericht|verstuur(?: bericht)?|whatsapp|start gesprek|plan gesprek|plan scan|vraag advies|offerte(?: aanvragen)?|bel direct|start project|pakket aanvragen|meer informatie|bespreken)\b/i.test(label);
 }
 
 function extractAnchorEntries(htmlRaw) {
@@ -357,6 +354,33 @@ function extractAnchorEntries(htmlRaw) {
   );
 }
 
+function extractButtonEntries(htmlRaw) {
+  return Array.from(String(htmlRaw || '').matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/gi)).map((match) => {
+    const attrs = match[1] || '';
+    const ariaLabel = attrs.match(/\baria-label=["']([^"']+)["']/i)?.[1] || '';
+    const title = attrs.match(/\btitle=["']([^"']+)["']/i)?.[1] || '';
+    return {
+      attrs,
+      label: stripHtmlTags(match[2] || '') || stripHtmlTags(ariaLabel || title),
+    };
+  });
+}
+
+function hasSafeBlankTarget(attrsRaw) {
+  const attrs = String(attrsRaw || '');
+  const target = attrs.match(/(?:^|\s)target=["']([^"']+)["']/i)?.[1] || '';
+  const rel = attrs.match(/(?:^|\s)rel=["']([^"']+)["']/i)?.[1] || '';
+  return target.toLowerCase() === '_blank' && /\bnoopener\b/i.test(rel) && /\bnoreferrer\b/i.test(rel);
+}
+
+function isTrackedWhatsappButton(button) {
+  const attrs = String(button?.attrs || '');
+  return (
+    /data-softora-conversion=["'][^"']+["']/i.test(attrs) &&
+    /data-softora-conversion-target=["']whatsapp["']/i.test(attrs)
+  );
+}
+
 function auditConversionCtas({ pages = [] } = {}) {
   const issues = [];
 
@@ -364,12 +388,14 @@ function auditConversionCtas({ pages = [] } = {}) {
     const pathName = normalizeInternalPath(page.path);
     const html = String(page.html || '');
     const anchors = extractAnchorEntries(html);
+    const buttons = extractButtonEntries(html);
     const conversionLinks = anchors.filter((anchor) => isConversionHref(anchor.href));
     const annotatedLinks = conversionLinks.filter((anchor) => /data-softora-conversion=["'][^"']+["']/i.test(anchor.attrs));
+    const leadCtaButtons = buttons.filter((button) => isLeadCtaLabel(button.label));
+    const trackedWhatsappButtons = leadCtaButtons.filter(isTrackedWhatsappButton);
 
-    if (conversionLinks.length === 0) {
+    if (conversionLinks.length === 0 && trackedWhatsappButtons.length === 0) {
       issues.push({ type: 'missing-conversion-link', path: pathName, message: `${pathName} heeft geen meetbare CTA-route.` });
-      continue;
     }
     const nonWhatsappLinks = conversionLinks.filter((anchor) => !isMartijnWhatsappHref(anchor.href));
     if (nonWhatsappLinks.length > 0) {
@@ -379,6 +405,16 @@ function auditConversionCtas({ pages = [] } = {}) {
         message: `${pathName} heeft een contact-CTA die niet naar Martijns WhatsApp leidt.`,
       });
     }
+    const unsafeWhatsappLinks = conversionLinks.filter(
+      (anchor) => isMartijnWhatsappHref(anchor.href) && !hasSafeBlankTarget(anchor.attrs)
+    );
+    if (unsafeWhatsappLinks.length > 0) {
+      issues.push({
+        type: 'whatsapp-link-missing-new-tab-safety',
+        path: pathName,
+        message: `${pathName} heeft een WhatsApp-link zonder target="_blank" en veilige rel-attributen.`,
+      });
+    }
     const leadCtaLinks = anchors.filter((anchor) => isLeadCtaLabel(anchor.label));
     const nonWhatsappLeadCtas = leadCtaLinks.filter((anchor) => !isMartijnWhatsappHref(anchor.href));
     if (nonWhatsappLeadCtas.length > 0) {
@@ -386,6 +422,14 @@ function auditConversionCtas({ pages = [] } = {}) {
         type: 'lead-cta-not-whatsapp',
         path: pathName,
         message: `${pathName} heeft een leadknop die niet naar Martijns WhatsApp leidt.`,
+      });
+    }
+    const nonWhatsappLeadButtons = leadCtaButtons.filter((button) => !isTrackedWhatsappButton(button));
+    if (nonWhatsappLeadButtons.length > 0) {
+      issues.push({
+        type: 'lead-button-not-whatsapp',
+        path: pathName,
+        message: `${pathName} heeft een zichtbare leadknop zonder meetbare WhatsApp-route naar Martijn.`,
       });
     }
     if (annotatedLinks.length !== conversionLinks.length) {
@@ -456,6 +500,7 @@ module.exports = {
   isMartijnWhatsappHref,
   isLeadCtaLabel,
   buildSeoLinkGraph,
+  extractButtonEntries,
   extractImageEntriesFromHtml,
   extractInternalLinksFromHtml,
   normalizeInternalPath,

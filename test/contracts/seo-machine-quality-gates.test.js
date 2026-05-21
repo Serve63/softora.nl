@@ -24,6 +24,7 @@ const {
   auditLinkGraph,
   auditSeoImages,
   buildSeoLinkGraph,
+  extractButtonEntries,
   extractImageEntriesFromHtml,
   isLeadCtaLabel,
 } = require('../../server/services/seo-machine-quality-gates');
@@ -124,9 +125,9 @@ test('seo machine houdt money pages ondersteund met interne links', () => {
   assert.deepEqual(issues, []);
 });
 
-test('publieke SEO-pagina CTAs zijn meetbaar zonder homepage content aan te raken', () => {
+test('publieke SEO-pagina CTAs zijn meetbaar van landing tot leadactie', () => {
   const pages = renderStaticPublicPages();
-  const conversionPages = pages.filter((page) => !['home', 'legal'].includes(page.kind));
+  const conversionPages = pages.filter((page) => page.kind !== 'legal');
   const issues = auditConversionCtas({ pages: conversionPages });
   const diensten = pages.find((page) => page.path === '/diensten');
   const homepage = pages.find((page) => page.path === '/');
@@ -136,12 +137,15 @@ test('publieke SEO-pagina CTAs zijn meetbaar zonder homepage content aan te rake
   assert.match(diensten.html, /data-softora-conversion-page="\/diensten"/);
   assert.match(diensten.html, /href="https:\/\/wa\.me\/31643262792"/);
   assert.match(diensten.html, /data-softora-conversion-target="whatsapp"/);
-  assert.doesNotMatch(homepage.html, /data-softora-conversion-page="\/"/);
+  assert.match(homepage.html, /data-softora-conversion-page="\/"/);
+  assert.match(homepage.html, /data-softora-conversion="public-form-submit"/);
+  assert.match(homepage.html, /data-softora-whatsapp-action="submit"/);
 });
 
-test('leadknoppen mogen niet meer naar dode contactroutes wijzen', () => {
+test('leadknoppen mogen niet meer naar dode contactroutes of niet-veilige WhatsApp-routes wijzen', () => {
   assert.equal(isLeadCtaLabel('Neem contact op'), true);
   assert.equal(isLeadCtaLabel('Stuur een bericht'), true);
+  assert.equal(isLeadCtaLabel('Verstuur bericht'), true);
   assert.equal(isLeadCtaLabel('Bekijk diensten'), false);
 
   const issues = auditConversionCtas({
@@ -149,7 +153,7 @@ test('leadknoppen mogen niet meer naar dode contactroutes wijzen', () => {
       {
         path: '/voorbeeld',
         html: [
-          '<a href="https://wa.me/31643262792" data-softora-conversion="public-cta">WhatsApp Martijn</a>',
+          '<a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" data-softora-conversion="public-cta">WhatsApp Martijn</a>',
           '<a href="/#contact">Neem contact op</a>',
           '<a href="#">Stuur een bericht</a>',
         ].join('\n'),
@@ -160,6 +164,55 @@ test('leadknoppen mogen niet meer naar dode contactroutes wijzen', () => {
   assert.deepEqual(
     issues.map((issue) => issue.type).sort(),
     ['lead-cta-not-whatsapp', 'non-whatsapp-conversion-link', 'untracked-conversion-link']
+  );
+
+  const strictWhatsappIssues = auditConversionCtas({
+    pages: [
+      {
+        path: '/api-whatsapp',
+        html:
+          '<a href="https://api.whatsapp.com/send?phone=31643262792" target="_blank" rel="noopener noreferrer" data-softora-conversion="public-cta">WhatsApp</a>',
+      },
+      {
+        path: '/unsafe-whatsapp',
+        html: '<a href="https://wa.me/31643262792" data-softora-conversion="public-cta">WhatsApp</a>',
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    strictWhatsappIssues.map((issue) => issue.type).sort(),
+    ['lead-cta-not-whatsapp', 'non-whatsapp-conversion-link', 'whatsapp-link-missing-new-tab-safety'].sort()
+  );
+});
+
+test('zichtbare contactform-buttons moeten expliciet als WhatsApp-conversie gemarkeerd zijn', () => {
+  const buttons = extractButtonEntries(
+    '<button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-target="whatsapp">Verstuur bericht</button>'
+  );
+  assert.equal(buttons.length, 1);
+  assert.equal(buttons[0].label, 'Verstuur bericht');
+
+  const issues = auditConversionCtas({
+    pages: [
+      {
+        path: '/formulier-zonder-whatsapp',
+        html: '<form><button type="submit">Verstuur bericht</button></form>',
+      },
+      {
+        path: '/formulier-met-whatsapp',
+        html:
+          '<form><button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-target="whatsapp">Verstuur bericht</button></form>',
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    issues.map((issue) => `${issue.path}:${issue.type}`).sort(),
+    [
+      '/formulier-zonder-whatsapp:lead-button-not-whatsapp',
+      '/formulier-zonder-whatsapp:missing-conversion-link',
+    ].sort()
   );
 });
 
