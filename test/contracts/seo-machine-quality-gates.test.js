@@ -117,6 +117,29 @@ test('seo machine blokkeert gevaarlijke of onbewezen contentclaims', () => {
   );
 });
 
+test('seo machine scant ook publieke SEO-pagina’s op onbewezen claims', () => {
+  const pages = [...renderStaticPublicPages(), ...renderSeoContentPages()];
+
+  assert.deepEqual(auditClaimSafety({ pages }), []);
+});
+
+test('seo machine ziet juridische ontkenningen niet als commerciële garantieclaims', () => {
+  const issues = auditClaimSafety({
+    pages: [
+      {
+        path: '/juridische-disclaimer',
+        html: [
+          'Softora garandeert niet dat websites altijd foutloos, ononderbroken of zonder beperkingen werken.',
+          'Softora garandeert geen volledige beveiliging, hackvrij systeem of permanente beschikbaarheid.',
+          'Geen enkel digitaal systeem is volledig veilig.',
+        ].join(' '),
+      },
+    ],
+  });
+
+  assert.deepEqual(issues, []);
+});
+
 test('seo machine houdt money pages ondersteund met interne links', () => {
   const pages = [...renderStaticPublicPages(), ...renderSeoContentPages()];
   const graph = buildSeoLinkGraph(pages);

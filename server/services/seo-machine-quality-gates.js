@@ -199,7 +199,7 @@ function auditTextClaimSafety({ textRaw, pathName, rules = DEFAULT_UNSUPPORTED_C
   if (!text) return issues;
 
   for (const rule of rules) {
-    if (rule.pattern.test(text)) {
+    if (hasUnsupportedClaimMatch(text, rule.pattern)) {
       issues.push({
         type: rule.type,
         path,
@@ -209,6 +209,34 @@ function auditTextClaimSafety({ textRaw, pathName, rules = DEFAULT_UNSUPPORTED_C
   }
 
   return issues;
+}
+
+function toGlobalPattern(pattern) {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  return new RegExp(pattern.source, flags);
+}
+
+function isNegatedUnsupportedClaimContext(text, matchIndex, matchText) {
+  const contextStart = Math.max(0, matchIndex - 140);
+  const contextEnd = Math.min(text.length, matchIndex + String(matchText || '').length + 50);
+  const context = text.slice(contextStart, contextEnd).toLowerCase();
+
+  return (
+    /\bgarande(?:er|ert|ren)\s+(?:niet|geen)\b/i.test(context) ||
+    /\bgeen\s+(?:enkel|garantie|volledige|permanente)\b/i.test(context) ||
+    /\bniet\s+(?:altijd|volledig|permanent|foutloos|veilig|correct|beschikbaar|zonder)\b/i.test(context) ||
+    /\bzonder\s+garantie\b/i.test(context)
+  );
+}
+
+function hasUnsupportedClaimMatch(text, pattern) {
+  const matcher = toGlobalPattern(pattern);
+  for (const match of text.matchAll(matcher)) {
+    if (!isNegatedUnsupportedClaimContext(text, match.index || 0, match[0])) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function auditClaimSafety({ items = [], pages = [], rules = DEFAULT_UNSUPPORTED_CLAIM_RULES } = {}) {
