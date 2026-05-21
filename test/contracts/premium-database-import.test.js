@@ -581,6 +581,36 @@ test('premium database deep search uses OpenAI web search and returns complete r
   assert.equal(result.sources[0].url, 'https://bakkerijzon.nl/contact');
 });
 
+test('premium database deep search reports OpenAI aborts as a clean timeout', async () => {
+  await assert.rejects(
+    fetchDeepSearchBusinessRows(
+      {
+        target: 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk',
+        count: 25,
+      },
+      {
+        env: { OPENAI_API_KEY: 'openai-key' },
+        openAiTimeoutMs: 5,
+        fetchImpl: async (_url, options = {}) =>
+          new Promise((_resolve, reject) => {
+            assert.ok(options.signal, 'OpenAI request should receive an abort signal');
+            options.signal.addEventListener(
+              'abort',
+              () => reject(new Error('This operation was aborted')),
+              { once: true }
+            );
+          }),
+      }
+    ),
+    (error) => {
+      assert.equal(error.code, 'OPENAI_DEEP_SEARCH_TIMEOUT');
+      assert.equal(error.statusCode, 504);
+      assert.match(error.message, /AI zoeken duurde te lang/);
+      return true;
+    }
+  );
+});
+
 test('premium database deep search hard-filters businesses already in the exclude list', async () => {
   const result = await fetchDeepSearchBusinessRows(
     {

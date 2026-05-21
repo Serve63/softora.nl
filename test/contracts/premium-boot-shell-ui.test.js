@@ -110,6 +110,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
 test('premium laadiconen blijven overal 58px', () => {
   const compactInlineLoaderExceptions = new Map([
     ['assets/premium-database-webdesign-action.js:.photo-generate-spinner', '18px'],
+    ['assets/premium-database-deep-search.js:.deep-search-close-spinner', '18px'],
   ]);
 
   const filesToScan = [
