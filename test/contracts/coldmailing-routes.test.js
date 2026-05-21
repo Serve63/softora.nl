@@ -610,15 +610,11 @@ test('coldmailing maps overlapping campaign sends to conflict status', () => {
   assert.match(routeSource, /\?\s*409/);
 });
 
-test('coldmailing autopilot is wired as a protected Vercel cron', () => {
+test('coldmailing autopilot route stays protected while the emergency Vercel cron is disabled', () => {
   const routeSource = fs.readFileSync(path.join(__dirname, '../../server/routes/coldmailing.js'), 'utf8');
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../../vercel.json'), 'utf8'));
 
   assert.match(routeSource, /app\.get\('\/api\/coldmailing\/autopilot\/run', requireColdmailingCronAccess/);
   assert.match(routeSource, /runColdmailAutopilot/);
-  assert.ok(
-    vercelConfig.crons.some(
-      (cron) => cron.path === '/api/coldmailing/autopilot/run' && cron.schedule === '*/15 * * * *'
-    )
-  );
+  assert.ok(!vercelConfig.crons.some((cron) => cron.path === '/api/coldmailing/autopilot/run'));
 });

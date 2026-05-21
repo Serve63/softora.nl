@@ -2018,6 +2018,8 @@ function createColdmailCampaignService(deps = {}) {
       log: [],
       updatedAt: '',
       updatedBy: '',
+      emergencyStoppedAt: '',
+      emergencyStopReason: '',
     };
   }
 
@@ -2063,6 +2065,8 @@ function createColdmailCampaignService(deps = {}) {
       log: normalizeColdmailAutopilotLog(raw.log),
       updatedAt: normalizeString(raw.updatedAt),
       updatedBy: truncateText(normalizeString(raw.updatedBy), 120),
+      emergencyStoppedAt: normalizeString(raw.emergencyStoppedAt),
+      emergencyStopReason: truncateText(normalizeString(raw.emergencyStopReason), 240),
     };
   }
 
@@ -2375,13 +2379,34 @@ function createColdmailCampaignService(deps = {}) {
 
   async function finishColdmailAutopilotRun(state, result, actor, options = {}) {
     const compactResult = compactColdmailAutopilotResult(result);
+    const latestState = await loadColdmailAutopilotState().catch(() => null);
+    const preserveDisabledState =
+      latestState &&
+      latestState.enabled === false &&
+      state &&
+      state.enabled !== false;
+    const baseState = preserveDisabledState
+      ? {
+          ...state,
+          enabled: false,
+          config: latestState.config || state.config,
+          schedule: latestState.schedule || state.schedule,
+          updatedAt: latestState.updatedAt || state.updatedAt,
+          updatedBy: latestState.updatedBy || state.updatedBy,
+          emergencyStoppedAt: latestState.emergencyStoppedAt || state.emergencyStoppedAt,
+          emergencyStopReason: latestState.emergencyStopReason || state.emergencyStopReason,
+        }
+      : state;
+    const logSource = preserveDisabledState && Array.isArray(latestState.log)
+      ? latestState.log
+      : baseState.log;
     const nextState = {
-      ...state,
-      lock: options.preserveLock ? state.lock : null,
+      ...baseState,
+      lock: options.preserveLock && !preserveDisabledState ? baseState.lock : null,
       lastRunAt: compactResult.at,
       lastResult: compactResult,
       log: normalizeColdmailAutopilotLog([
-        ...(state.log || []),
+        ...(logSource || []),
         compactResult,
       ]),
     };
@@ -4249,6 +4274,22 @@ function createColdmailCampaignService(deps = {}) {
           ? Math.max(getColdmailSendDelayMs(), getColdmailPersonalMailboxSendDelayMs())
           : getColdmailSendDelayMs();
         if (delayMs > 0) await sleep(delayMs);
+      }
+      if (!testMode) {
+        const liveQuota = await getColdmailSendQuota(senderEmail);
+        if (liveQuota.safetyPause) {
+          safetyPause = {
+            until: liveQuota.safetyPause.until,
+            reason: liveQuota.safetyPause.reason,
+          };
+          failed.push({
+            id: 'coldmail-safety-pause',
+            bedrijf: 'Softora',
+            email: senderEmail,
+            error: buildColdmailSafetyPauseMessage(safetyPause),
+          });
+          break;
+        }
       }
       const reference = buildColdmailReference(row, item.id);
       const baseText = buildMailText(bodyTemplate, row);
