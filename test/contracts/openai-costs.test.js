@@ -552,6 +552,53 @@ test('openai usage estimate falls back to the configured OpenAI model when usage
   assert.equal(summary.requestCount, 8);
   assert.equal(summary.inputTokens, 11695);
   assert.equal(summary.outputTokens, 43904);
+  assert.equal(summary.modelBreakdown[0].pricingModel, 'gpt-5.5');
+  assert.equal(summary.modelBreakdown[0].reportedModel, 'unknown_model_bucket');
+  assert.equal(summary.modelBreakdown[0].pricingInputUsdPerMillion, 5);
+  assert.equal(summary.modelBreakdown[0].pricingOutputUsdPerMillion, 30);
+});
+
+test('openai usage estimate uses conservative default pricing when usage buckets omit a known model', async () => {
+  const summary = await fetchOpenAiUsageEstimateSummary(
+    {
+      openAiCostsApiKey: 'openai-admin-key',
+      env: { OPENAI_MODEL: 'gpt-5' },
+      usdToEurRate: 0.9,
+      fetchJsonWithTimeout: async (url) => {
+        if (url.includes('/organization/usage/completions')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              data: [
+                {
+                  results: [
+                    {
+                      model: null,
+                      input_tokens: 11695,
+                      output_tokens: 43904,
+                      num_model_requests: 8,
+                    },
+                  ],
+                },
+              ],
+              has_more: false,
+            },
+          };
+        }
+        return {
+          response: { ok: true, status: 200 },
+          data: { data: [{ results: [] }], has_more: false },
+        };
+      },
+      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 4, 21, 2, 55, 0) }
+  );
+
+  assert.equal(summary.costUsd, 1.375595);
+  assert.equal(summary.costEur, 1.24);
+  assert.equal(summary.modelBreakdown[0].pricingModel, 'gpt-5.5');
+  assert.equal(summary.modelBreakdown[0].reportedModel, '');
 });
 
 test('openai usage estimate can estimate text token usage', async () => {

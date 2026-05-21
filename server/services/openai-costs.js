@@ -484,6 +484,25 @@ function addUsageTotals(target, source = {}) {
   target.audioSeconds += Math.max(0, Number(source.audioSeconds || 0) || 0);
 }
 
+function createEmptyUsageTotals() {
+  return {
+    bucketCount: 0,
+    resultCount: 0,
+    requestCount: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    imageCount: 0,
+    webSearchCalls: 0,
+    embeddingTokens: 0,
+    fileSearchCalls: 0,
+    codeInterpreterSessions: 0,
+    audioInputTokens: 0,
+    audioOutputTokens: 0,
+    audioSeconds: 0,
+  };
+}
+
 function isKnownOpenAiTextPricingModel(modelRaw) {
   const key = normalizeString(modelRaw).toLowerCase();
   return [
@@ -517,8 +536,6 @@ function resolveOpenAiUsageModel(result = {}, deps = {}) {
     normalizeString(
       deps.openAiUsageEstimateModel ||
         deps.env?.OPENAI_USAGE_ESTIMATE_MODEL ||
-        deps.env?.OPENAI_MODEL ||
-        deps.openAiModel ||
         'gpt-5.5'
     ) || 'gpt-5.5'
   );
@@ -543,7 +560,13 @@ function estimateOpenAiTextUsageUsd(result = {}, deps = {}) {
     cachedInputTokens,
     outputTokens,
     requestCount: Math.max(0, Number(result.num_model_requests || result.num_requests || 0) || 0),
-    pricingFallbackModel: model,
+    reportedModel: normalizeString(
+      result.model || result.model_id || result.model_name || result.snapshot_id || result.response_model
+    ),
+    pricingModel: rates.model || model,
+    pricingInputUsdPerMillion: rates.input,
+    pricingCachedInputUsdPerMillion: rates.cachedInput,
+    pricingOutputUsdPerMillion: rates.output,
   };
 }
 
@@ -555,6 +578,9 @@ function estimateOpenAiImageUsageUsd(result = {}, deps = {}) {
     usd: imageCount * perImageUsd,
     imageCount,
     requestCount: Math.max(0, Number(result.num_model_requests || imageCount) || 0),
+    reportedModel: normalizeString(result.model),
+    pricingModel: normalizeString(result.model) || 'image-default',
+    unitUsd: perImageUsd,
   };
 }
 
@@ -576,6 +602,9 @@ function estimateOpenAiWebSearchUsageUsd(result = {}, deps = {}) {
     usd: callCount * getOpenAiWebSearchUsdPerCall(deps),
     webSearchCalls: callCount,
     requestCount: callCount,
+    reportedModel: normalizeString(result.model),
+    pricingModel: normalizeString(result.model) || 'web-search',
+    unitUsd: getOpenAiWebSearchUsdPerCall(deps),
   };
 }
 
@@ -604,6 +633,9 @@ function estimateOpenAiEmbeddingUsageUsd(result = {}) {
     usd: (inputTokens / 1000000) * rates.input,
     embeddingTokens: inputTokens,
     requestCount: Math.max(0, Number(result.num_model_requests || result.num_requests || 0) || 0),
+    reportedModel: normalizeString(result.model),
+    pricingModel: normalizeString(result.model) || 'embedding-default',
+    pricingInputUsdPerMillion: rates.input,
   };
 }
 
@@ -658,27 +690,74 @@ function estimateOpenAiAudioUsageUsd(result = {}, usageType = 'audio') {
     audioOutputTokens: outputTokens,
     audioSeconds: seconds,
     requestCount: Math.max(0, Number(result.num_model_requests || result.num_requests || 0) || 0),
+    reportedModel: normalizeString(result.model),
+    pricingModel: model || usageType,
   };
+}
+
+function buildUsageBreakdownKey(usageType = '', result = {}, estimate = {}) {
+  return [
+    usageType || 'unknown',
+    estimate.pricingModel || estimate.reportedModel || result.model || 'unknown-model',
+    result.project_id || 'all-projects',
+    result.size || '',
+    result.source || '',
+    result.context_level || '',
+  ].map((value) => normalizeString(value).toLowerCase()).join('|');
+}
+
+function addUsageBreakdown(target = {}, usageType = '', result = {}, estimate = {}) {
+  const activityCount =
+    Number(estimate.usd || 0) ||
+    Number(estimate.requestCount || 0) ||
+    Number(estimate.inputTokens || 0) ||
+    Number(estimate.outputTokens || 0) ||
+    Number(estimate.imageCount || 0) ||
+    Number(estimate.webSearchCalls || 0) ||
+    Number(estimate.embeddingTokens || 0) ||
+    Number(estimate.fileSearchCalls || 0) ||
+    Number(estimate.codeInterpreterSessions || 0) ||
+    Number(estimate.audioInputTokens || 0) ||
+    Number(estimate.audioOutputTokens || 0) ||
+    Number(estimate.audioSeconds || 0);
+  if (!activityCount) return;
+
+  const key = buildUsageBreakdownKey(usageType, result, estimate);
+  if (!target[key]) {
+    target[key] = {
+      key,
+      usageType,
+      reportedModel: estimate.reportedModel || normalizeString(result.model),
+      pricingModel: estimate.pricingModel || estimate.reportedModel || normalizeString(result.model) || 'unknown',
+      projectId: normalizeString(result.project_id),
+      size: normalizeString(result.size),
+      source: normalizeString(result.source),
+      contextLevel: normalizeString(result.context_level),
+      currencies: {},
+      ...createEmptyUsageTotals(),
+    };
+  }
+
+  addCurrencyAmount(target[key].currencies, 'usd', estimate.usd);
+  addUsageTotals(target[key], estimate);
+  if (Number.isFinite(Number(estimate.pricingInputUsdPerMillion))) {
+    target[key].pricingInputUsdPerMillion = Number(estimate.pricingInputUsdPerMillion);
+  }
+  if (Number.isFinite(Number(estimate.pricingCachedInputUsdPerMillion))) {
+    target[key].pricingCachedInputUsdPerMillion = Number(estimate.pricingCachedInputUsdPerMillion);
+  }
+  if (Number.isFinite(Number(estimate.pricingOutputUsdPerMillion))) {
+    target[key].pricingOutputUsdPerMillion = Number(estimate.pricingOutputUsdPerMillion);
+  }
+  if (Number.isFinite(Number(estimate.unitUsd))) {
+    target[key].unitUsd = Number(estimate.unitUsd);
+  }
 }
 
 function collectOpenAiUsageEstimate(data, deps = {}, usageType = 'text') {
   const currencies = {};
-  const totals = {
-    bucketCount: 0,
-    resultCount: 0,
-    requestCount: 0,
-    inputTokens: 0,
-    cachedInputTokens: 0,
-    outputTokens: 0,
-    imageCount: 0,
-    webSearchCalls: 0,
-    embeddingTokens: 0,
-    fileSearchCalls: 0,
-    codeInterpreterSessions: 0,
-    audioInputTokens: 0,
-    audioOutputTokens: 0,
-    audioSeconds: 0,
-  };
+  const totals = createEmptyUsageTotals();
+  const breakdown = {};
 
   (Array.isArray(data && data.data) ? data.data : []).forEach((bucket) => {
     if (!bucket || typeof bucket !== 'object') return;
@@ -703,12 +782,17 @@ function collectOpenAiUsageEstimate(data, deps = {}, usageType = 'text') {
                     : estimateOpenAiTextUsageUsd(result, deps);
       addCurrencyAmount(currencies, 'usd', estimate.usd);
       addUsageTotals(totals, estimate);
+      addUsageBreakdown(breakdown, usageType, result, estimate);
     });
   });
 
   return {
     currencies,
     ...totals,
+    modelBreakdown: Object.values(breakdown).map((item) => ({
+      ...item,
+      costUsd: Number((item.currencies.usd || 0).toFixed(8)),
+    })),
   };
 }
 
@@ -1130,22 +1214,8 @@ async function fetchOpenAiUsageEstimateForEndpoint(deps = {}, window = {}, endpo
   const apiBaseUrl = resolveOpenAiApiBaseUrl(deps);
   const projectId = resolveOpenAiProjectFilterId(deps, window);
   const currencies = {};
-  const totals = {
-    bucketCount: 0,
-    resultCount: 0,
-    requestCount: 0,
-    inputTokens: 0,
-    cachedInputTokens: 0,
-    outputTokens: 0,
-    imageCount: 0,
-    webSearchCalls: 0,
-    embeddingTokens: 0,
-    fileSearchCalls: 0,
-    codeInterpreterSessions: 0,
-    audioInputTokens: 0,
-    audioOutputTokens: 0,
-    audioSeconds: 0,
-  };
+  const totals = createEmptyUsageTotals();
+  const modelBreakdown = [];
   let page = '';
   let pageCount = 0;
 
@@ -1187,6 +1257,7 @@ async function fetchOpenAiUsageEstimateForEndpoint(deps = {}, window = {}, endpo
     addUsageTotals(totals, pageAmounts);
     totals.bucketCount += pageAmounts.bucketCount;
     totals.resultCount += pageAmounts.resultCount;
+    modelBreakdown.push(...(pageAmounts.modelBreakdown || []));
 
     page = normalizeString(data && data.next_page);
     if (!data || data.has_more !== true || !page) break;
@@ -1197,6 +1268,7 @@ async function fetchOpenAiUsageEstimateForEndpoint(deps = {}, window = {}, endpo
     path: endpoint.path,
     currencies,
     ...totals,
+    modelBreakdown,
     pageCount,
   };
 }
@@ -1257,22 +1329,7 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
     },
   ];
   const currencies = {};
-  const usage = {
-    bucketCount: 0,
-    resultCount: 0,
-    requestCount: 0,
-    inputTokens: 0,
-    cachedInputTokens: 0,
-    outputTokens: 0,
-    imageCount: 0,
-    webSearchCalls: 0,
-    embeddingTokens: 0,
-    fileSearchCalls: 0,
-    codeInterpreterSessions: 0,
-    audioInputTokens: 0,
-    audioOutputTokens: 0,
-    audioSeconds: 0,
-  };
+  const usage = createEmptyUsageTotals();
   const endpointSummaries = [];
   const endpointsUnavailable = [];
 
@@ -1366,7 +1423,14 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
       audioOutputTokens: summary.audioOutputTokens,
       audioSeconds: summary.audioSeconds,
       pageCount: summary.pageCount,
+      modelBreakdown: summary.modelBreakdown || [],
     })),
+    modelBreakdown: endpointSummaries.flatMap((summary) =>
+      (summary.modelBreakdown || []).map((item) => ({
+        endpointKey: summary.key,
+        ...item,
+      }))
+    ),
     endpointsUnavailable,
     pricingSource: OPENAI_PRICING_SOURCE_URL,
     note: 'OpenAI Usage API schatting; gebruikt totdat de Organization Costs API de nieuwste kosten heeft verwerkt.',
