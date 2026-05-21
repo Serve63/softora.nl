@@ -15,6 +15,15 @@ test('ios agenda launch loader uses the Softora logo instead of the calendar sym
   assert.match(rootViewSource, /Image\("SoftoraLaunchLogo"\)/);
   assert.match(rootViewSource, /\.frame\(width: 68, height: 68\)/);
   assert.doesNotMatch(rootViewSource, /calendar\.badge\.clock/);
+  const launchViewStart = rootViewSource.indexOf('private struct LaunchLoadingView: View');
+  const launchViewEnd = rootViewSource.indexOf('struct RootView_Previews', launchViewStart);
+  assert.ok(launchViewStart >= 0 && launchViewEnd > launchViewStart);
+  const launchViewSource = rootViewSource.slice(launchViewStart, launchViewEnd);
+  assert.doesNotMatch(
+    launchViewSource,
+    /ProgressView\(\)/,
+    'The app launch screen should not show a loading spinner.'
+  );
   assert.ok(
     fs.existsSync(path.join(repoRoot, 'ios/SoftoraAgenda/SoftoraAgenda/Assets.xcassets/SoftoraLaunchLogo.imageset/SoftoraLaunchLogo.png')),
     'Purple Softora launch logo asset is missing.'

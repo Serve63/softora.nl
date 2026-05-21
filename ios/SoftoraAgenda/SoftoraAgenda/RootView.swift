@@ -20,14 +20,12 @@ struct RootView: View {
 
 private struct LaunchLoadingView: View {
     var body: some View {
-        VStack(spacing: 16) {
+        VStack {
             Image("SoftoraLaunchLogo")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 68, height: 68)
                 .accessibilityLabel("Softora")
-
-            ProgressView()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.softoraBackground)
