@@ -48,6 +48,9 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.match(scoreboardSource, /sentFromEmail/);
   assert.match(scoreboardSource, /lastColdmailSenderEmail/);
   assert.match(scoreboardSource, /count\.textContent = '\.\.\.'/);
+  assert.match(scoreboardSource, /function calculateSenderTotal\(entries\)/);
+  assert.match(scoreboardSource, /coldmail-sender-scoreboard-total-count\{[\s\S]*border-top:2px solid currentColor/);
+  assert.match(scoreboardSource, /data-coldmail-sender-total-count/);
   assert.doesNotMatch(scoreboardSource, /count\.textContent = '0'/);
   assert.match(scoreboardSource, /hasCustomerRowsSnapshot/);
   assert.match(scoreboardSource, /setLoadingState\(\);[\s\S]*scheduleRetry\(\);/);
@@ -86,6 +89,7 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
       { email: 'serve@softora.nl', count: 1 },
     ])
   );
+  assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateSenderTotal(entries), 3);
 });
 
 test('premium bevestigingsmails blokkeert de pagina netjes tijdens coldmail verzending', () => {

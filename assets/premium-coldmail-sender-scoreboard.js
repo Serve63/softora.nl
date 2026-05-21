@@ -98,6 +98,12 @@
       });
   }
 
+  function calculateSenderTotal(entries) {
+    return (Array.isArray(entries) ? entries : []).reduce((total, entry) => {
+      return total + Math.max(0, Number(entry && entry.count) || 0);
+    }, 0);
+  }
+
   function injectStyles() {
     const doc = global.document;
     if (!doc || doc.getElementById(STYLE_ID)) return;
@@ -110,7 +116,10 @@
       '.coldmail-sender-scoreboard-entry.is-leading{color:var(--crimson)}',
       '.coldmail-sender-scoreboard-name,.coldmail-sender-scoreboard-count{display:inline-flex;align-items:center}',
       '.coldmail-sender-scoreboard-count{min-width:1.45rem;justify-content:flex-end;color:inherit;font-variant-numeric:tabular-nums}',
+      '.coldmail-sender-scoreboard-total{display:flex;justify-content:flex-end;margin-top:.1rem}',
+      '.coldmail-sender-scoreboard-total-count{min-width:1.45rem;padding-top:.32rem;border-top:2px solid currentColor;display:inline-flex;justify-content:flex-end;color:inherit;font-variant-numeric:tabular-nums}',
       '.coldmail-sender-scoreboard.is-loading .coldmail-sender-scoreboard-count{color:var(--text-tertiary)}',
+      '.coldmail-sender-scoreboard.is-loading .coldmail-sender-scoreboard-total-count{color:var(--text-tertiary)}',
       'html[data-softora-lead-generator-alias="1"] .coldmail-sender-scoreboard{display:none!important}',
       '@media (max-width:1024px){.coldmail-sender-scoreboard{align-self:flex-start}}',
     ].join('');
@@ -134,6 +143,23 @@
     return row;
   }
 
+  function ensureTotalRow(doc, wrap) {
+    if (!doc || !wrap) return null;
+    let row = wrap.querySelector('[data-coldmail-sender-total]');
+    if (row) return row;
+    row = doc.createElement('div');
+    row.className = 'coldmail-sender-scoreboard-total';
+    row.setAttribute('data-coldmail-sender-total', '');
+    row.setAttribute('aria-label', 'Totaal wordt geladen');
+    const count = doc.createElement('span');
+    count.className = 'coldmail-sender-scoreboard-total-count';
+    count.setAttribute('data-coldmail-sender-total-count', '');
+    count.textContent = '...';
+    row.appendChild(count);
+    wrap.appendChild(row);
+    return row;
+  }
+
   function ensureScoreboard() {
     const doc = global.document;
     if (!doc || doc.getElementById('coldmailSenderScoreboard')) return;
@@ -149,6 +175,7 @@
     list.id = 'coldmailSenderScoreboardList';
     SENDER_ROWS.forEach((sender) => list.appendChild(createSenderRow(doc, sender)));
     wrap.appendChild(list);
+    ensureTotalRow(doc, wrap);
     topbar.appendChild(wrap);
   }
 
@@ -166,6 +193,10 @@
       const countEl = row.querySelector('[data-coldmail-sender-count]');
       if (countEl) countEl.textContent = '...';
     });
+    const totalRow = ensureTotalRow(doc, wrap);
+    const totalCountEl = totalRow && totalRow.querySelector('[data-coldmail-sender-total-count]');
+    if (totalCountEl) totalCountEl.textContent = '...';
+    if (totalRow) totalRow.setAttribute('aria-label', 'Totaal wordt geladen');
   }
 
   function renderSenderStats(entries) {
@@ -194,6 +225,11 @@
       row.setAttribute('aria-label', entry.displayName + ' ' + count + ' coldmails');
       list.appendChild(row);
     });
+    const total = calculateSenderTotal(entries);
+    const totalRow = ensureTotalRow(doc, wrap);
+    const totalCountEl = totalRow && totalRow.querySelector('[data-coldmail-sender-total-count]');
+    if (totalCountEl) totalCountEl.textContent = String(total);
+    if (totalRow) totalRow.setAttribute('aria-label', 'Totaal ' + total + ' coldmails');
   }
 
   async function loadCustomerRows() {
@@ -312,6 +348,7 @@
 
   global.SoftoraColdmailSenderScoreboard = {
     calculateSenderStats,
+    calculateSenderTotal,
     buildAutopilotStatusKey,
     ensureScoreboard,
     handleAutopilotStatus,
