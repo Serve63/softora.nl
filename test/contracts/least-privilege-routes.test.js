@@ -24,6 +24,7 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
   assert.match(openAiCostRoutes, /app\.get\('\/api\/api-cost-summary', requireAdmin,/);
   assert.match(openAiCostRoutes, /app\.get\('\/api\/api-cost-diagnostics', requireAdmin,/);
   assert.match(supabaseCostRoutes, /app\.get\('\/api\/supabase\/cost-summary', requireAdmin,/);
+  assert.match(supabaseCostRoutes, /app\.get\('\/api\/supabase\/cost-diagnostics', requireAdmin,/);
   assert.match(coldmailingRoutes, /app\.post\('\/api\/coldmailing\/outreach\/status', requirePremiumAdminApiAccess,/);
   assert.match(coldcallingRoutes, /app\.get\('\/api\/coldcalling\/recording-proxy', requireAdmin,/);
   assert.match(coldcallingRoutes, /app\.get\('\/api\/coldcalling\/cost-summary', requireAdmin,/);
