@@ -486,7 +486,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521b/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521c/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
@@ -594,7 +594,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260521b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260521a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260521a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521c"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -652,15 +652,18 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT/);
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT_BASE64/);
   assert.match(deepSearchScriptSource, /function decodeBase64Utf8\(value\)/);
-  assert.match(deepSearchScriptSource, /TARGET_ORDER_VERSION = "distance-oisterwijk-v2"/);
+  assert.match(deepSearchScriptSource, /TARGET_ORDER_VERSION = "distance-oisterwijk-v3"/);
+  assert.match(deepSearchScriptSource, /PREVIOUS_TARGET_ORDER_VERSION = "distance-oisterwijk-v2"/);
   assert.match(deepSearchScriptSource, /function getRawDefaultTargetLabels\(\)/);
   assert.match(deepSearchScriptSource, /function getDefaultTargetLabels\(\)/);
   const rawTargetLines = readDefaultDeepSearchTargetLines(deepSearchScriptSource);
   const defaultTargetLines = loadDatabaseDeepSearchClient().getDefaultTargetLabels();
   const distanceClient = loadDatabaseDistanceClient();
-  assert.equal(rawTargetLines.length, 2501);
-  assert.equal(defaultTargetLines.length, 2501);
+  assert.equal(rawTargetLines.length, 2499);
+  assert.equal(defaultTargetLines.length, 2499);
   assert.equal(defaultTargetLines[0], 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk');
+  assert.equal(defaultTargetLines.includes('Nederland | Noord-Brabant | Oisterwijk | Haaren'), false);
+  assert.equal(defaultTargetLines.includes('Nederland | Noord-Brabant | Tilburg | Tilburg'), false);
   let previousTargetDistance = -Infinity;
   for (const label of defaultTargetLines) {
     const targetDistance = distanceClient.getTargetDistanceKm(label);
@@ -1710,7 +1713,7 @@ test('premium database deep search continues to the next location until the requ
   const finalStatePatch = persisted[persisted.length - 1].patch.deep_search_state;
   const finalState = JSON.parse(finalStatePatch);
   assert.equal(finalState.targets, undefined);
-  assert.equal(finalState.targetOrderVersion, 'distance-oisterwijk-v2');
+  assert.equal(finalState.targetOrderVersion, 'distance-oisterwijk-v3');
   assert.ok(finalStatePatch.length < 200000);
   assert.deepEqual(getStoredTargetProgress(finalState).foundWebsites, [
     'oisterwijktest.nl',
