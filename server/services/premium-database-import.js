@@ -42,6 +42,8 @@ const MAX_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS = 30000;
 const ESTIMATED_DEEP_SEARCH_INPUT_TOKENS_PER_BATCH = 6000;
 const ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY = 1400;
 const ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH = 1;
+const DEFAULT_DEEP_SEARCH_PRACTICAL_ESTIMATE_MULTIPLIER = 2.2;
+const MAX_DEEP_SEARCH_PRACTICAL_ESTIMATE_MULTIPLIER = 5;
 const REAL_BUSINESS_CATEGORY_PREFIXES = [
   'bedrijven',
   'winkels',
@@ -67,6 +69,12 @@ function truncateText(value, maxLength = 500) {
 
 function parsePositiveInt(value, fallback, min, max) {
   const parsed = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function parsePositiveNumber(value, fallback, min, max) {
+  const parsed = Number.parseFloat(String(value || '').replace(',', '.'));
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
 }
@@ -1165,6 +1173,20 @@ function estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls }) {
   };
 }
 
+function getDeepSearchPracticalEstimateMultiplier(deps = {}) {
+  const env = deps.env || process.env || {};
+  return parsePositiveNumber(
+    deps.deepSearchPracticalEstimateMultiplier ?? env.OPENAI_DATABASE_SEARCH_ESTIMATE_MULTIPLIER,
+    DEFAULT_DEEP_SEARCH_PRACTICAL_ESTIMATE_MULTIPLIER,
+    1,
+    MAX_DEEP_SEARCH_PRACTICAL_ESTIMATE_MULTIPLIER
+  );
+}
+
+function scaleDeepSearchEstimateAmount(value, multiplier) {
+  return Math.ceil(Number((Math.max(0, Number(value) || 0) * multiplier).toFixed(6)));
+}
+
 function estimateDeepSearchBusinessRunCost(input = {}, deps = {}) {
   const env = deps.env || process.env || {};
   const requested = parsePositiveInt(
@@ -1177,12 +1199,22 @@ function estimateDeepSearchBusinessRunCost(input = {}, deps = {}) {
   const reasoningEffort = getOpenAiDatabaseSearchReasoningEffort(model, { ...deps, env });
   const batchSize = MAX_DEEP_SEARCH_ROWS;
   const estimatedBatches = Math.max(1, Math.ceil(requested / batchSize));
+  const estimateMultiplier = getDeepSearchPracticalEstimateMultiplier({ ...deps, env });
   const usage = {
-    inputTokens: estimatedBatches * ESTIMATED_DEEP_SEARCH_INPUT_TOKENS_PER_BATCH,
-    outputTokens: requested * ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY,
+    inputTokens: scaleDeepSearchEstimateAmount(
+      estimatedBatches * ESTIMATED_DEEP_SEARCH_INPUT_TOKENS_PER_BATCH,
+      estimateMultiplier
+    ),
+    outputTokens: scaleDeepSearchEstimateAmount(
+      requested * ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY,
+      estimateMultiplier
+    ),
     cachedInputTokens: 0,
   };
-  const webSearchCalls = estimatedBatches * ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH;
+  const webSearchCalls = Math.max(
+    1,
+    scaleDeepSearchEstimateAmount(estimatedBatches * ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH, estimateMultiplier)
+  );
   const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls });
 
   return {
@@ -1192,12 +1224,14 @@ function estimateDeepSearchBusinessRunCost(input = {}, deps = {}) {
     maxRequested: MAX_DEEP_SEARCH_ESTIMATE_ROWS,
     batchSize,
     estimatedBatches,
+    estimateMultiplier,
     model,
     reasoningEffort,
     estimateOnly: true,
     cost: {
       ...cost,
-      note: 'Voorcalculatie op basis van het actieve deep-search model; er is geen OpenAI-call uitgevoerd.',
+      estimateMultiplier,
+      note: 'Praktijkschatting op basis van het actieve deep-search model, inclusief marge voor vervolgzoekacties en filtering; er is geen OpenAI-call uitgevoerd.',
     },
   };
 }

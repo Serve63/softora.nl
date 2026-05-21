@@ -717,6 +717,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(deepSearchScriptSource, /outputTokensPerCompany/);
   assert.match(deepSearchScriptSource, /ESTIMATED_DEEP_SEARCH_MODEL = "gpt-5\.4"/);
   assert.match(deepSearchScriptSource, /inputTokensPerBatch: 6000/);
+  assert.match(deepSearchScriptSource, /practicalMultiplier: 2\.2/);
   assert.match(deepSearchScriptSource, /inputUsdPerMillion: 2\.5/);
   assert.match(deepSearchScriptSource, /outputUsdPerMillion: 15/);
   assert.match(deepSearchScriptSource, /webSearchUsdPerCall: 0\.01/);
@@ -1410,18 +1411,18 @@ test('premium database deep search modal shows backend cost estimate when availa
       return {
         ok: true,
         model: 'gpt-5.4',
-        cost: { estimatedUsd: 5.325 },
+        cost: { estimatedUsd: 11.719 },
       };
     },
   });
 
   controller.open();
-  assert.match(costNode.textContent, /250 bedrijven: ± €4,95/);
+  assert.match(costNode.textContent, /250 bedrijven: ± €10,90/);
 
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.deepEqual(estimateCalls, [250]);
-  assert.match(costNode.textContent, /250 bedrijven: ± €4,95 via gpt-5\.4/);
+  assert.match(costNode.textContent, /250 bedrijven: ± €10,90 via gpt-5\.4/);
 });
 
 test('premium database deep search modal falls back when backend estimate fails', async () => {
@@ -1446,7 +1447,7 @@ test('premium database deep search modal falls back when backend estimate fails'
   controller.open();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.match(costNode.textContent, /250 bedrijven: ± €4,95/);
+  assert.match(costNode.textContent, /250 bedrijven: ± €10,90/);
   assert.doesNotMatch(costNode.textContent, /via gpt-/);
 });
 
@@ -1797,7 +1798,7 @@ test('premium database deep search shows the precise estimate without deviation 
 
   controller.open();
 
-  assert.equal(nodes.deepSearchCost.textContent, 'Geschatte API-kosten voor 25 bedrijven: ± €0,51');
+  assert.equal(nodes.deepSearchCost.textContent, 'Geschatte API-kosten voor 25 bedrijven: ± €1,13');
   assert.doesNotMatch(nodes.deepSearchCost.textContent, /max ± €2 afwijking/);
 });
 
