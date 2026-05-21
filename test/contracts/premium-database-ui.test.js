@@ -14,9 +14,11 @@ function loadDatabaseImportClient() {
 
 function loadDatabaseDeepSearchClient(options = {}) {
   const helperScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search-helpers.js');
+  const targetCoordsScriptPath = path.join(__dirname, '../../assets/premium-database-target-coords.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const distanceScriptPath = path.join(__dirname, '../../assets/premium-database-distance.js');
   const helperSource = fs.readFileSync(helperScriptPath, 'utf8');
+  const targetCoordsSource = fs.readFileSync(targetCoordsScriptPath, 'utf8');
   const source = fs.readFileSync(scriptPath, 'utf8');
   const distanceSource = fs.readFileSync(distanceScriptPath, 'utf8');
   const sandbox = {
@@ -27,6 +29,7 @@ function loadDatabaseDeepSearchClient(options = {}) {
   };
   if (options.document) sandbox.window.document = options.document;
   sandbox.window.confirm = () => true;
+  vm.runInNewContext(targetCoordsSource, sandbox);
   vm.runInNewContext(distanceSource, sandbox);
   vm.runInNewContext(helperSource, sandbox);
   vm.runInNewContext(source, sandbox);
@@ -94,9 +97,12 @@ function loadDatabaseOutreachClient(options = {}) {
 }
 
 function loadDatabaseDistanceClient() {
+  const targetCoordsScriptPath = path.join(__dirname, '../../assets/premium-database-target-coords.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-database-distance.js');
+  const targetCoordsSource = fs.readFileSync(targetCoordsScriptPath, 'utf8');
   const source = fs.readFileSync(scriptPath, 'utf8');
-  const sandbox = { window: {} };
+  const sandbox = { window: {}, Buffer };
+  vm.runInNewContext(targetCoordsSource, sandbox);
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraPremiumDatabaseDistance;
 }
@@ -176,7 +182,8 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
     sorted.map((customer) => customer.bedrijf),
     ['Oisterwijk Winkel', 'Alphen Service', 'Chaam Garage', 'Roosendaal Zaak', 'Onbekend Ver Weg']
   );
-  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260506a/);
+  assert.match(pageSource, /assets\/premium-database-target-coords\.js\?v=20260521a/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260521a/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);/);
@@ -587,7 +594,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260521b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260521a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521b"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -645,14 +652,25 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT/);
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT_BASE64/);
   assert.match(deepSearchScriptSource, /function decodeBase64Utf8\(value\)/);
-  assert.match(deepSearchScriptSource, /TARGET_ORDER_VERSION = "distance-oisterwijk-v1"/);
+  assert.match(deepSearchScriptSource, /TARGET_ORDER_VERSION = "distance-oisterwijk-v2"/);
   assert.match(deepSearchScriptSource, /function getRawDefaultTargetLabels\(\)/);
   assert.match(deepSearchScriptSource, /function getDefaultTargetLabels\(\)/);
   const rawTargetLines = readDefaultDeepSearchTargetLines(deepSearchScriptSource);
   const defaultTargetLines = loadDatabaseDeepSearchClient().getDefaultTargetLabels();
+  const distanceClient = loadDatabaseDistanceClient();
   assert.equal(rawTargetLines.length, 2501);
   assert.equal(defaultTargetLines.length, 2501);
   assert.equal(defaultTargetLines[0], 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk');
+  let previousTargetDistance = -Infinity;
+  for (const label of defaultTargetLines) {
+    const targetDistance = distanceClient.getTargetDistanceKm(label);
+    assert.ok(Number.isFinite(targetDistance), `${label} should have target coordinates`);
+    assert.ok(
+      targetDistance + 1e-9 >= previousTargetDistance,
+      `${label} should not be closer than the previous planned target`
+    );
+    previousTargetDistance = targetDistance;
+  }
   assert.ok(defaultTargetLines.indexOf('Nederland | Noord-Brabant | Oisterwijk | Moergestel') < defaultTargetLines.indexOf('Nederland | Noord-Brabant | Altena | Almkerk'));
   assert.ok(defaultTargetLines.indexOf('Nederland | Noord-Brabant | Altena | Almkerk') < defaultTargetLines.indexOf('Nederland | Groningen | Groningen | Groningen'));
   assert.ok(defaultTargetLines.includes('Nederland | Noord-Brabant | Altena | Woudrichem'));
@@ -1688,7 +1706,7 @@ test('premium database deep search continues to the next location until the requ
   const finalStatePatch = persisted[persisted.length - 1].patch.deep_search_state;
   const finalState = JSON.parse(finalStatePatch);
   assert.equal(finalState.targets, undefined);
-  assert.equal(finalState.targetOrderVersion, 'distance-oisterwijk-v1');
+  assert.equal(finalState.targetOrderVersion, 'distance-oisterwijk-v2');
   assert.ok(finalStatePatch.length < 200000);
   assert.deepEqual(getStoredTargetProgress(finalState).foundWebsites, [
     'oisterwijktest.nl',
@@ -2437,7 +2455,8 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const sorterSource = fs.readFileSync(sorterPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260506a/);
+  assert.match(pageSource, /assets\/premium-database-target-coords\.js\?v=20260521a/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260521a/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);/);
@@ -2447,6 +2466,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(sorterSource, /function compareCustomersByDistance\(left, right\)/);
   assert.match(sorterSource, /function compareTargetLabelsByDistance\(left, right\)/);
   assert.match(sorterSource, /function sortTargetLabelsByDistance\(labels\)/);
+  assert.match(sorterSource, /function resolveExternalTargetCoords\(parts\)/);
   assert.match(sorterSource, /return \(Array\.isArray\(customers\) \? customers : \[\]\)\.slice\(\)\.sort\(compareCustomersByDistance\);/);
   assert.match(sorterSource, /"4281": \{ lat: 51\.7835, lng: 5\.0585 \}/);
   assert.match(sorterSource, /"4286": \{ lat: 51\.7714, lng: 4\.9597 \}/);
@@ -2468,4 +2488,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
     'Nederland | Noord-Brabant | Altena | Almkerk',
     'Nederland | Groningen | Groningen | Groningen',
   ]);
+  assert.ok(Number.isFinite(sorter.getTargetDistanceKm('Nederland | Friesland | Ameland | Buren')));
+  assert.ok(Number.isFinite(sorter.getTargetDistanceKm('Nederland | Noord-Brabant | Land van Cuijk | Beers')));
+  assert.ok(Number.isFinite(sorter.getTargetDistanceKm('Nederland | Noord-Holland | Velsen | Driehuis')));
 });

@@ -234,8 +234,29 @@
       .filter(Boolean);
   }
 
+  function getTargetCoordSource() {
+    const root = typeof window !== "undefined" ? window : globalThis;
+    return root && root.SoftoraPremiumDatabaseTargetCoords &&
+      typeof root.SoftoraPremiumDatabaseTargetCoords.getTargetCoords === "function"
+      ? root.SoftoraPremiumDatabaseTargetCoords
+      : null;
+  }
+
+  function resolveExternalTargetCoords(parts) {
+    const source = getTargetCoordSource();
+    if (!source) return null;
+    return source.getTargetCoords({
+      country: parts[0] || "",
+      province: parts[1] || "",
+      municipality: parts.length > 3 ? parts[2] : "",
+      place: parts.length ? parts[parts.length - 1] : "",
+    });
+  }
+
   function resolveTargetCoords(label) {
     const parts = getTargetParts(label);
+    const externalCoords = resolveExternalTargetCoords(parts);
+    if (externalCoords) return externalCoords;
     const place = parts.length ? parts[parts.length - 1] : "";
     const municipality = parts.length > 2 ? parts[parts.length - 2] : "";
     return resolvePlaceCoords(place) || resolvePlaceCoords(municipality) || resolvePlaceCoords(label);
