@@ -176,6 +176,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /profileSessionHelper\.enrichSession\(payload, fetchJsonNoStore\)/);
   assert.match(themeJsSource, /buildSidebarProfileRenderKey/);
   assert.match(themeJsSource, /sidebar\.dataset\.sidebarProfileRenderKey === renderKey/);
+  assert.match(themeJsSource, /avatarMutation: "unchanged"/);
+  assert.match(themeJsSource, /if \(premiumProfileModalRef\.avatarMutation === "replace"\) profilePayload\.avatarDataUrl/);
+  assert.match(themeJsSource, /if \(premiumProfileModalRef\.avatarMutation === "remove"\) profilePayload\.removeAvatar = true;/);
+  assert.doesNotMatch(themeJsSource, /removeAvatar:\s*premiumProfileModalRef\.pendingAvatarDataUrl \? false : true/);
   assert.match(themeJsSource, /document\.querySelector\("\[data-sidebar-profile-trigger\]"\) \|\| document\.querySelector\("\.sidebar-user \.sidebar-user-trigger"\);/);
   assert.match(themeJsSource, /if \(!document\.querySelector\("\[data-sidebar-user-name\]"\)\) \{[\s\S]*markPremiumSidebarProfileResolved\(\);[\s\S]*return;[\s\S]*\}/);
   assert.match(themeJsSource, /loadPremiumSession\(\);/);

@@ -39,6 +39,32 @@ function createPremiumUserManagementCoordinator(deps = {}) {
     return { hydrated, users };
   }
 
+  async function resolveStoredUserForAuthState(authState) {
+    const { users } = await loadPremiumUsers({ force: true });
+    return (
+      premiumUsersStore.findUserById(users, authState.userId) ||
+      premiumUsersStore.findUserByEmail(users, authState.email) ||
+      authState.user ||
+      null
+    );
+  }
+
+  function buildRefreshedAuthState(authState, user) {
+    if (!user) return authState;
+    return {
+      ...authState,
+      user,
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      isAdmin: premiumUsersStore.isAdminRole(user.role),
+      firstName: normalizeString(user.firstName || ''),
+      lastName: normalizeString(user.lastName || ''),
+      displayName: premiumUsersStore.buildUserDisplayName(user),
+      avatarDataUrl: premiumUsersStore.sanitizeAvatarDataUrl(user.avatarDataUrl || ''),
+    };
+  }
+
   function sanitizeUsersForClient(users) {
     return users.map((user) => premiumUsersStore.sanitizeUserForClient(user));
   }
@@ -69,11 +95,13 @@ function createPremiumUserManagementCoordinator(deps = {}) {
   async function getProfileResponse(req, res) {
     const authState = requireAuthenticatedPremiumAuthState(req, res);
     if (!authState) return res;
+    const resolvedUser = await resolveStoredUserForAuthState(authState);
+    const refreshedAuthState = buildRefreshedAuthState(authState, resolvedUser);
 
     return res.status(200).json({
       ok: true,
-      user: premiumUsersStore.sanitizeUserForClient(authState.user),
-      session: buildPremiumAuthSessionPayload(authState),
+      user: premiumUsersStore.sanitizeUserForClient(resolvedUser),
+      session: buildPremiumAuthSessionPayload(refreshedAuthState),
     });
   }
 
@@ -162,14 +190,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
       'security_premium_profile_updated'
     );
 
-    const refreshedAuthState = {
-      ...authState,
-      user: updatedUser,
-      firstName: normalizeString(updatedUser?.firstName || ''),
-      lastName: normalizeString(updatedUser?.lastName || ''),
-      displayName: premiumUsersStore.buildUserDisplayName(updatedUser),
-      avatarDataUrl: premiumUsersStore.sanitizeAvatarDataUrl(updatedUser?.avatarDataUrl || ''),
-    };
+    const refreshedAuthState = buildRefreshedAuthState(authState, updatedUser);
 
     return res.status(200).json({
       ok: true,

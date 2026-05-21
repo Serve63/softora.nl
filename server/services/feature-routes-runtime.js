@@ -76,6 +76,7 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   registerColdmailingRoutes(app, {
     ...coldmailing,
+    requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerAiDashboardRoutes(app, { coordinator: aiDashboardCoordinator });

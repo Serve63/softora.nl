@@ -75,7 +75,7 @@ function createFixture(overrides = {}) {
   });
 }
 
-test('premium users store falls back to bootstrap users when Supabase hydration is unavailable', async () => {
+test('premium users store does not overwrite users with bootstrap data when Supabase hydration fails', async () => {
   const store = createFixture();
   const originalConsoleError = console.error;
   console.error = () => {};
@@ -83,13 +83,89 @@ test('premium users store falls back to bootstrap users when Supabase hydration 
   try {
     const hydrated = await store.ensureUsersHydrated();
 
-    assert.equal(hydrated.source, 'bootstrap_env');
-    assert.equal(hydrated.users.length, 1);
-    assert.equal(hydrated.users[0].email, 'servec321@gmail.com');
-    assert.equal(store.getCachedUsers()[0].email, 'servec321@gmail.com');
+    assert.equal(hydrated.source, 'unavailable');
+    assert.equal(hydrated.users.length, 0);
+    assert.equal(store.getCachedUsers().length, 0);
   } finally {
     console.error = originalConsoleError;
   }
+});
+
+test('premium users store bootstraps only after Supabase confirms the users row is missing', async () => {
+  let upsertedRow = null;
+  const store = createFixture({
+    client: {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  async maybeSingle() {
+                    return {
+                      data: null,
+                      error: null,
+                    };
+                  },
+                };
+              },
+            };
+          },
+          async upsert(row) {
+            upsertedRow = row;
+            return { error: null };
+          },
+        };
+      },
+    },
+  });
+
+  const hydrated = await store.ensureUsersHydrated();
+
+  assert.equal(hydrated.source, 'supabase');
+  assert.equal(hydrated.users.length, 1);
+  assert.equal(hydrated.users[0].email, 'servec321@gmail.com');
+  assert.equal(upsertedRow.state_key, 'premium_auth_users');
+  assert.equal(upsertedRow.meta.source, 'bootstrap_env');
+});
+
+test('premium users store treats an existing empty users row as authoritative', async () => {
+  let upsertCalls = 0;
+  const store = createFixture({
+    client: {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  async maybeSingle() {
+                    return {
+                      data: {
+                        payload: { version: 1, users: [] },
+                        updated_at: '2026-05-21T00:00:00.000Z',
+                      },
+                      error: null,
+                    };
+                  },
+                };
+              },
+            };
+          },
+          async upsert() {
+            upsertCalls += 1;
+            return { error: null };
+          },
+        };
+      },
+    },
+  });
+
+  const hydrated = await store.ensureUsersHydrated();
+
+  assert.equal(hydrated.source, 'unavailable');
+  assert.equal(hydrated.users.length, 0);
+  assert.equal(upsertCalls, 0);
 });
 
 test('premium users store can bootstrap users even when Supabase is not configured', async () => {

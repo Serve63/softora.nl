@@ -194,8 +194,9 @@ function createAutopilotRouteHarness(deps) {
       body,
       premiumAuth: { displayName: 'Servé' },
     }),
-    status: () => callHandlers(statusHandlers, {
+    status: (req = {}) => callHandlers(statusHandlers, {
       premiumAuth: { displayName: 'Servé' },
+      ...req,
     }),
     settings: (body = {}) => callHandlers(settingsHandlers, {
       body,
@@ -428,6 +429,37 @@ test('coldmailing autopilot run uses mail safety only and does not require the s
   assert.equal(received.publicBaseUrl, 'https://www.softora.nl');
   assert.equal(Object.prototype.hasOwnProperty.call(received, 'agendaCapacity'), false);
   assert.equal(agendaTouched, false);
+});
+
+test('coldmailing autopilot status route is visible to authenticated staff without admin access', async () => {
+  let premiumAccessCalls = 0;
+  let adminAccessCalls = 0;
+  const autopilot = createAutopilotRouteHarness({
+    requirePremiumApiAccess: (req, _res, next) => {
+      premiumAccessCalls += 1;
+      req.premiumAuth = { displayName: 'Martijn', role: 'medewerker' };
+      next();
+    },
+    requirePremiumAdminApiAccess: (_req, res) => {
+      adminAccessCalls += 1;
+      res.status(403).json({ ok: false, error: 'Alleen Full Acces-accounts hebben toegang.' });
+    },
+    coldmailCampaignService: {
+      runColdmailAutopilot: async () => ({ ok: true }),
+      getColdmailAutopilotStatus: async () => ({ ok: true, autopilot: { enabled: true } }),
+      updateColdmailAutopilotSettings: async () => ({ ok: true, autopilot: { enabled: true } }),
+    },
+    normalizeString: (value) => String(value || '').trim(),
+  });
+
+  const res = await autopilot.status({
+    premiumAuth: { displayName: 'Martijn', role: 'medewerker' },
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.autopilot.enabled, true);
+  assert.equal(premiumAccessCalls, 1);
+  assert.equal(adminAccessCalls, 0);
 });
 
 test('coldmailing autopilot settings route stores dashboard configuration through admin access', async () => {

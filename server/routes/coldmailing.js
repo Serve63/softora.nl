@@ -111,6 +111,7 @@ function registerColdmailingRoutes(app, deps = {}) {
     getEffectivePublicBaseUrl = () => '',
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    requirePremiumApiAccess = (_req, _res, next) => next(),
     requirePremiumAdminApiAccess = (_req, _res, next) => next(),
     cronSecret = process.env.CRON_SECRET || '',
   } = deps;
@@ -302,7 +303,7 @@ function registerColdmailingRoutes(app, deps = {}) {
     });
   });
 
-  app.get('/api/coldmailing/autopilot/status', requirePremiumAdminApiAccess, async (_req, res) => {
+  app.get('/api/coldmailing/autopilot/status', requirePremiumApiAccess, async (_req, res) => {
     try {
       if (typeof coldmailCampaignService.getColdmailAutopilotStatus !== 'function') {
         res.status(404).json({

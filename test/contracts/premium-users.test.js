@@ -217,6 +217,41 @@ test('premium user coordinator returns profile payload for authenticated users',
   assert.equal(res.body.session.authenticated, true);
 });
 
+test('premium user coordinator refreshes profile payload from stored user when session is thin', async () => {
+  const { coordinator } = createCoordinatorFixture([
+    {
+      id: 'usr_admin',
+      email: 'admin@softora.nl',
+      firstName: 'Servé',
+      lastName: 'Creusen',
+      role: 'admin',
+      status: 'active',
+      avatarDataUrl: 'data:image/png;base64,abcd',
+    },
+  ]);
+
+  const req = createRequest({
+    originalUrl: '/api/auth/profile',
+    premiumAuth: {
+      authenticated: true,
+      email: 'admin@softora.nl',
+      userId: 'usr_admin',
+      role: 'admin',
+      user: null,
+      displayName: '',
+      avatarDataUrl: '',
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.getProfileResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.user.email, 'admin@softora.nl');
+  assert.equal(res.body.session.displayName, 'Servé Creusen');
+  assert.equal(res.body.session.avatarDataUrl, 'data:image/png;base64,abcd');
+});
+
 test('premium user coordinator rejects invalid avatar updates on profile edits', async () => {
   const { coordinator } = createCoordinatorFixture([
     {
@@ -247,6 +282,42 @@ test('premium user coordinator rejects invalid avatar updates on profile edits',
 
   assert.equal(res.statusCode, 400);
   assert.equal(res.body.error, 'Profielfoto moet een geldige PNG, JPG, WEBP of GIF data-url zijn.');
+});
+
+test('premium user coordinator preserves existing avatar on name-only profile edits', async () => {
+  const { coordinator, premiumUsersStore } = createCoordinatorFixture([
+    {
+      id: 'usr_admin',
+      email: 'admin@softora.nl',
+      firstName: 'Servé',
+      lastName: 'Creusen',
+      role: 'admin',
+      status: 'active',
+      avatarDataUrl: 'data:image/png;base64,abcd',
+    },
+  ]);
+
+  const req = createRequest({
+    originalUrl: '/api/auth/profile',
+    body: {
+      displayName: 'Servé Creusen',
+    },
+    premiumAuth: {
+      authenticated: true,
+      email: 'admin@softora.nl',
+      userId: 'usr_admin',
+      user: { id: 'usr_admin', email: 'admin@softora.nl' },
+      displayName: 'Servé Creusen',
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.updateProfileResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.user.avatarDataUrl, 'data:image/png;base64,abcd');
+  assert.equal(res.body.session.avatarDataUrl, 'data:image/png;base64,abcd');
+  assert.equal(premiumUsersStore.state.users[0].avatarDataUrl, 'data:image/png;base64,abcd');
 });
 
 test('premium user coordinator persists profile updates and refreshes session payload', async () => {

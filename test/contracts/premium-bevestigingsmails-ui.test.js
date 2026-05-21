@@ -720,13 +720,16 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const autopilotSource = fs.readFileSync(autopilotPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260521d/);
+  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260521e/);
   assert.match(autopilotSource, /const BATCH_SIZE = 3;/);
   assert.match(autopilotSource, /"campaignSenderEmail"/);
   assert.match(autopilotSource, /"start-campaign-btn"/);
   assert.match(autopilotSource, /data-coldmail-autopilot-enabled/);
   assert.match(autopilotSource, /startButton\.insertAdjacentElement\("afterend", row\)/);
-  assert.match(autopilotSource, /Autopilot staat aan\. Instellingen zijn bevroren\./);
+  assert.match(autopilotSource, /Team-autopilot staat aan voor iedereen van Softora\. Instellingen zijn bevroren\./);
+  assert.match(autopilotSource, /Team autopilot aan/);
+  assert.match(autopilotSource, /data-coldmail-autopilot-scope/);
+  assert.match(autopilotSource, /global\.addEventListener\("focus", refresh\)/);
   assert.match(autopilotSource, /\/api\/coldmailing\/autopilot\/status/);
   assert.match(autopilotSource, /\/api\/coldmailing\/autopilot\/settings/);
   assert.match(autopilotSource, /senderEmails: getSenderEmails\(\)/);
