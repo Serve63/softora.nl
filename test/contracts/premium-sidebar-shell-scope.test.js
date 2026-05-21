@@ -547,6 +547,7 @@ test('static premium sidebars share the same section order and public labels', (
     for (const lockedKey of [
       'leads',
       'coldcalling',
+      'mailbox',
       'qr_code',
       'ads_trustoo',
       'ads_pinterest',
