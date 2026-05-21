@@ -706,20 +706,22 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.doesNotMatch(deepSearchScriptSource, /STATUS_LABELS/);
   assert.doesNotMatch(deepSearchScriptSource, /item\.batches \+ "x/);
   assert.doesNotMatch(deepSearchScriptSource, /item\.added \+ " nieuw/);
-  assert.match(deepSearchScriptSource, /Geschatte API-kosten/);
+  assert.match(deepSearchScriptSource, /Richtprijs voor maximaal/);
   assert.match(deepSearchScriptSource, /fetch\("\/api\/premium-database\/deep-search-estimate\?count="/);
   assert.match(deepSearchScriptSource, /function readDeepSearchEstimate\(companyCount\)/);
   assert.match(deepSearchScriptSource, /function formatDeepSearchEstimateLabel\(desiredCount\)/);
   assert.match(deepSearchScriptSource, /formatDeepSearchEstimateLabel\(desiredCount\)/);
   assert.match(deepSearchScriptSource, /" via " \+ model/);
-  assert.doesNotMatch(deepSearchScriptSource, /max ± €2 afwijking/);
+  assert.match(deepSearchScriptSource, /dashboard kan afwijken/);
   assert.match(deepSearchScriptSource, /function estimateRunUsd\(companyCount\)/);
+  assert.match(deepSearchScriptSource, /function estimateRunUpperUsd\(companyCount\)/);
   assert.match(deepSearchScriptSource, /outputTokensPerCompany/);
   assert.match(deepSearchScriptSource, /ESTIMATED_DEEP_SEARCH_MODEL = "gpt-5\.4"/);
+  assert.match(deepSearchScriptSource, /serviceTier: "flex"/);
   assert.match(deepSearchScriptSource, /inputTokensPerBatch: 6000/);
   assert.match(deepSearchScriptSource, /practicalMultiplier: 2\.2/);
-  assert.match(deepSearchScriptSource, /inputUsdPerMillion: 2\.5/);
-  assert.match(deepSearchScriptSource, /outputUsdPerMillion: 15/);
+  assert.match(deepSearchScriptSource, /inputUsdPerMillion: 1\.25/);
+  assert.match(deepSearchScriptSource, /outputUsdPerMillion: 7\.5/);
   assert.match(deepSearchScriptSource, /webSearchUsdPerCall: 0\.01/);
   assert.match(deepSearchScriptSource, /Number\(\(inputUsd \+ outputUsd \+ webSearchUsd\)\.toFixed\(6\)\)/);
   assert.doesNotMatch(deepSearchScriptSource, /"Geschatte API-kosten: ± " \+ batchCost/);
@@ -1411,18 +1413,19 @@ test('premium database deep search modal shows backend cost estimate when availa
       return {
         ok: true,
         model: 'gpt-5.4',
-        cost: { estimatedUsd: 11.719 },
+        serviceTier: 'flex',
+        cost: { estimatedUsd: 5.8945, upperEstimatedUsd: 11.789, serviceTier: 'flex' },
       };
     },
   });
 
   controller.open();
-  assert.match(costNode.textContent, /250 bedrijven: ± €10,90/);
+  assert.match(costNode.textContent, /maximaal 250 bedrijven: €5,48 tot €10,96 via gpt-5\.4 flex/);
 
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.deepEqual(estimateCalls, [250]);
-  assert.match(costNode.textContent, /250 bedrijven: ± €10,90 via gpt-5\.4/);
+  assert.match(costNode.textContent, /maximaal 250 bedrijven: €5,48 tot €10,96 via gpt-5\.4 flex/);
 });
 
 test('premium database deep search modal falls back when backend estimate fails', async () => {
@@ -1447,8 +1450,8 @@ test('premium database deep search modal falls back when backend estimate fails'
   controller.open();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.match(costNode.textContent, /250 bedrijven: ± €10,90/);
-  assert.doesNotMatch(costNode.textContent, /via gpt-/);
+  assert.match(costNode.textContent, /maximaal 250 bedrijven: €5,48 tot €10,96 via gpt-5\.4 flex/);
+  assert.match(costNode.textContent, /dashboard kan afwijken/);
 });
 
 test('premium database photo storage clears removed photo chunks so refresh cannot restore them', async () => {
@@ -1783,7 +1786,7 @@ test('premium database deep search sends compact duplicate exclusions for the fu
   assert.notEqual(capturedPayload.exclude.length, 120);
 });
 
-test('premium database deep search shows the precise estimate without deviation copy', () => {
+test('premium database deep search shows a calibrated flex range estimate', () => {
   const deepSearchClient = loadDatabaseDeepSearchClient();
   const nodes = {
     deepSearchModal: createClassListNode(),
@@ -1798,8 +1801,11 @@ test('premium database deep search shows the precise estimate without deviation 
 
   controller.open();
 
-  assert.equal(nodes.deepSearchCost.textContent, 'Geschatte API-kosten voor 25 bedrijven: ± €1,13');
-  assert.doesNotMatch(nodes.deepSearchCost.textContent, /max ± €2 afwijking/);
+  assert.equal(
+    nodes.deepSearchCost.textContent,
+    'Richtprijs voor maximaal 25 bedrijven: €0,58 tot €1,16 via gpt-5.4 flex (dashboard kan afwijken)'
+  );
+  assert.match(nodes.deepSearchCost.textContent, /dashboard kan afwijken/);
 });
 
 test('premium database deep search turns the start button into a disabled completed-session summary', async () => {
