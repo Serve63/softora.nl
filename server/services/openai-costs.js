@@ -1,3 +1,13 @@
+const {
+  OPENAI_PRICING_SOURCE_URL,
+  getOpenAiImageCostUsdPerImage,
+  getOpenAiTextModelRates,
+  getOpenAiWebSearchUsdPerCall,
+} = require('./openai-pricing');
+const {
+  readSoftoraApiCostLedgerSummary,
+} = require('./softora-api-cost-ledger');
+
 const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_ANTHROPIC_API_BASE_URL = 'https://api.anthropic.com/v1';
 const ANTHROPIC_API_VERSION = '2023-06-01';
@@ -8,8 +18,6 @@ const DEFAULT_OPENAI_COSTS_CACHE_MS = 10 * 60 * 1000;
 const DEFAULT_OPENAI_COSTS_FETCH_RETRIES = 2;
 const DEFAULT_OPENAI_COSTS_RETRY_DELAY_MS = 300;
 const MAX_COST_PAGES = 12;
-const OPENAI_WEB_SEARCH_USD_PER_CALL = 0.01;
-const DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD = 0.165;
 let usdToEurRateCache = null;
 let openAiCostsDashboardCache = null;
 let openAiCostsLastSuccessfulSnapshot = null;
@@ -468,25 +476,12 @@ function addUsageTotals(target, source = {}) {
   target.outputTokens += Math.max(0, Number(source.outputTokens || 0) || 0);
   target.imageCount += Math.max(0, Number(source.imageCount || 0) || 0);
   target.webSearchCalls += Math.max(0, Number(source.webSearchCalls || 0) || 0);
-}
-
-function getOpenAiTextModelRates(modelRaw) {
-  const key = normalizeString(modelRaw).toLowerCase();
-  if (key.includes('gpt-5.5-pro')) return { input: 30, cachedInput: 0, output: 180 };
-  if (key.includes('gpt-5.5')) return { input: 5, cachedInput: 0.5, output: 30 };
-  if (key.includes('gpt-5.4-mini')) return { input: 0.75, cachedInput: 0.075, output: 4.5 };
-  if (key.includes('gpt-5.4-nano')) return { input: 0.2, cachedInput: 0.02, output: 1.25 };
-  if (key.includes('gpt-5.4-pro')) return { input: 30, cachedInput: 0, output: 180 };
-  if (key.includes('gpt-5.4')) return { input: 2.5, cachedInput: 0.25, output: 15 };
-  if (key.includes('gpt-5-mini')) return { input: 0.25, cachedInput: 0.025, output: 2 };
-  if (key.includes('gpt-5-nano')) return { input: 0.05, cachedInput: 0.005, output: 0.4 };
-  if (key.includes('gpt-5')) return { input: 1.25, cachedInput: 0.125, output: 10 };
-  if (key.includes('gpt-4.1-mini')) return { input: 0.4, cachedInput: 0.1, output: 1.6 };
-  if (key.includes('gpt-4.1-nano')) return { input: 0.1, cachedInput: 0.025, output: 0.4 };
-  if (key.includes('gpt-4.1')) return { input: 2, cachedInput: 0.5, output: 8 };
-  if (key.includes('gpt-4o-mini')) return { input: 0.15, cachedInput: 0.075, output: 0.6 };
-  if (key.includes('gpt-4o')) return { input: 2.5, cachedInput: 1.25, output: 10 };
-  return { input: 1, cachedInput: 0, output: 4 };
+  target.embeddingTokens += Math.max(0, Number(source.embeddingTokens || 0) || 0);
+  target.fileSearchCalls += Math.max(0, Number(source.fileSearchCalls || 0) || 0);
+  target.codeInterpreterSessions += Math.max(0, Number(source.codeInterpreterSessions || 0) || 0);
+  target.audioInputTokens += Math.max(0, Number(source.audioInputTokens || 0) || 0);
+  target.audioOutputTokens += Math.max(0, Number(source.audioOutputTokens || 0) || 0);
+  target.audioSeconds += Math.max(0, Number(source.audioSeconds || 0) || 0);
 }
 
 function estimateOpenAiTextUsageUsd(result = {}) {
@@ -510,29 +505,6 @@ function estimateOpenAiTextUsageUsd(result = {}) {
   };
 }
 
-function getOpenAiImageCostUsdPerImage(modelRaw, sizeRaw, deps = {}) {
-  const env = deps.env || process.env || {};
-  const explicit = Number(deps.openAiImageCostUsdPerImage || env.OPENAI_IMAGE_COST_USD_PER_IMAGE);
-  if (Number.isFinite(explicit) && explicit > 0) return explicit;
-
-  const model = normalizeString(modelRaw).toLowerCase();
-  const size = normalizeString(sizeRaw).toLowerCase();
-  const isPortraitOrLandscape = size === '1024x1536' || size === '1536x1024';
-  const isSquare = size === '1024x1024';
-
-  if (model.includes('gpt-image-2') || model === 'chatgpt-image-latest') {
-    if (isPortraitOrLandscape) return DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD;
-    if (isSquare) return 0.211;
-    return DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD;
-  }
-  if (model.includes('gpt-image-1.5')) return isSquare ? 0.224 : 0.176;
-  if (model.includes('gpt-image-1-mini')) return isSquare ? 0.056 : 0.044;
-  if (model.includes('gpt-image-1')) return isSquare ? 0.167 : 0.25;
-  if (model.includes('dall-e-3')) return isPortraitOrLandscape ? 0.12 : 0.08;
-  if (model.includes('dall-e-2')) return 0.02;
-  return DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD;
-}
-
 function estimateOpenAiImageUsageUsd(result = {}, deps = {}) {
   const imageCount = Math.max(0, Number(result.images || result.num_images || result.num_model_requests || 0) || 0);
   if (imageCount <= 0) return { usd: 0, imageCount: 0, requestCount: 0 };
@@ -544,23 +516,16 @@ function estimateOpenAiImageUsageUsd(result = {}, deps = {}) {
   };
 }
 
-function getOpenAiWebSearchUsdPerCall(deps = {}) {
-  const env = deps.env || process.env || {};
-  const explicit = Number(deps.openAiWebSearchUsdPerCall || env.OPENAI_WEB_SEARCH_USD_PER_CALL);
-  if (Number.isFinite(explicit) && explicit >= 0) return explicit;
-  return OPENAI_WEB_SEARCH_USD_PER_CALL;
-}
-
 function estimateOpenAiWebSearchUsageUsd(result = {}, deps = {}) {
   const callCount = Math.max(
     0,
     Number(
-      result.num_model_requests ??
-        result.num_web_search_calls ??
+      result.num_requests ??
         result.web_search_calls ??
-        result.num_requests ??
+        result.num_web_search_calls ??
         result.requests ??
         result.count ??
+        result.num_model_requests ??
         0
     ) || 0
   );
@@ -569,6 +534,88 @@ function estimateOpenAiWebSearchUsageUsd(result = {}, deps = {}) {
     usd: callCount * getOpenAiWebSearchUsdPerCall(deps),
     webSearchCalls: callCount,
     requestCount: callCount,
+  };
+}
+
+function getOpenAiEmbeddingModelRates(modelRaw) {
+  const key = normalizeString(modelRaw).toLowerCase();
+  if (key.includes('text-embedding-3-small')) return { input: 0.02 };
+  if (key.includes('text-embedding-3-large')) return { input: 0.13 };
+  if (key.includes('text-embedding-ada-002')) return { input: 0.1 };
+  return { input: 0.1 };
+}
+
+function estimateOpenAiEmbeddingUsageUsd(result = {}) {
+  const inputTokens = Math.max(
+    0,
+    Number(
+      result.input_tokens ??
+        result.inputTokens ??
+        result.prompt_tokens ??
+        result.usage_tokens ??
+        result.num_tokens ??
+        0
+    ) || 0
+  );
+  const rates = getOpenAiEmbeddingModelRates(result.model);
+  return {
+    usd: (inputTokens / 1000000) * rates.input,
+    embeddingTokens: inputTokens,
+    requestCount: Math.max(0, Number(result.num_model_requests || result.num_requests || 0) || 0),
+  };
+}
+
+function estimateOpenAiFileSearchUsageUsd(result = {}) {
+  const callCount = Math.max(
+    0,
+    Number(result.num_requests ?? result.num_tool_calls ?? result.file_search_calls ?? result.count ?? 0) || 0
+  );
+  return {
+    usd: (callCount / 1000) * 2.5,
+    fileSearchCalls: callCount,
+    requestCount: callCount,
+  };
+}
+
+function estimateOpenAiCodeInterpreterUsageUsd(result = {}) {
+  const sessionCount = Math.max(
+    0,
+    Number(result.num_sessions ?? result.sessions ?? result.num_requests ?? result.count ?? 0) || 0
+  );
+  return {
+    usd: sessionCount * 0.03,
+    codeInterpreterSessions: sessionCount,
+    requestCount: sessionCount,
+  };
+}
+
+function estimateOpenAiAudioUsageUsd(result = {}, usageType = 'audio') {
+  const inputTokens = Math.max(0, Number(result.input_tokens || result.prompt_tokens || 0) || 0);
+  const outputTokens = Math.max(0, Number(result.output_tokens || result.completion_tokens || 0) || 0);
+  const seconds = Math.max(0, Number(result.seconds || result.duration_seconds || result.audio_seconds || 0) || 0);
+  const model = normalizeString(result.model).toLowerCase();
+  const isSpeech = usageType === 'audio_speeches';
+  let usd = 0;
+
+  if (inputTokens > 0 || outputTokens > 0) {
+    const inputRate = model.includes('mini') ? 10 : 32;
+    const outputRate = model.includes('mini') ? 20 : 64;
+    usd = (inputTokens / 1000000) * inputRate + (outputTokens / 1000000) * outputRate;
+  } else if (seconds > 0) {
+    const perMinute = isSpeech
+      ? 0.015
+      : model.includes('mini')
+        ? 0.003
+        : 0.006;
+    usd = (seconds / 60) * perMinute;
+  }
+
+  return {
+    usd,
+    audioInputTokens: inputTokens,
+    audioOutputTokens: outputTokens,
+    audioSeconds: seconds,
+    requestCount: Math.max(0, Number(result.num_model_requests || result.num_requests || 0) || 0),
   };
 }
 
@@ -583,6 +630,12 @@ function collectOpenAiUsageEstimate(data, deps = {}, usageType = 'text') {
     outputTokens: 0,
     imageCount: 0,
     webSearchCalls: 0,
+    embeddingTokens: 0,
+    fileSearchCalls: 0,
+    codeInterpreterSessions: 0,
+    audioInputTokens: 0,
+    audioOutputTokens: 0,
+    audioSeconds: 0,
   };
 
   (Array.isArray(data && data.data) ? data.data : []).forEach((bucket) => {
@@ -597,7 +650,15 @@ function collectOpenAiUsageEstimate(data, deps = {}, usageType = 'text') {
           ? estimateOpenAiImageUsageUsd(result, deps)
           : usageType === 'web_search_calls'
             ? estimateOpenAiWebSearchUsageUsd(result, deps)
-            : estimateOpenAiTextUsageUsd(result);
+            : usageType === 'embeddings'
+              ? estimateOpenAiEmbeddingUsageUsd(result)
+              : usageType === 'file_search_calls'
+                ? estimateOpenAiFileSearchUsageUsd(result)
+                : usageType === 'code_interpreter_sessions'
+                  ? estimateOpenAiCodeInterpreterUsageUsd(result)
+                  : usageType === 'audio_transcriptions' || usageType === 'audio_speeches'
+                    ? estimateOpenAiAudioUsageUsd(result, usageType)
+                    : estimateOpenAiTextUsageUsd(result);
       addCurrencyAmount(currencies, 'usd', estimate.usd);
       addUsageTotals(totals, estimate);
     });
@@ -1036,6 +1097,12 @@ async function fetchOpenAiUsageEstimateForEndpoint(deps = {}, window = {}, endpo
     outputTokens: 0,
     imageCount: 0,
     webSearchCalls: 0,
+    embeddingTokens: 0,
+    fileSearchCalls: 0,
+    codeInterpreterSessions: 0,
+    audioInputTokens: 0,
+    audioOutputTokens: 0,
+    audioSeconds: 0,
   };
   let page = '';
   let pageCount = 0;
@@ -1116,6 +1183,36 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
       groupBy: ['model', 'context_level', 'project_id'],
       usageType: 'web_search_calls',
     },
+    {
+      key: 'embeddings',
+      path: '/organization/usage/embeddings',
+      groupBy: ['model', 'project_id'],
+      usageType: 'embeddings',
+    },
+    {
+      key: 'file_search_calls',
+      path: '/organization/usage/file_search_calls',
+      groupBy: ['project_id'],
+      usageType: 'file_search_calls',
+    },
+    {
+      key: 'code_interpreter_sessions',
+      path: '/organization/usage/code_interpreter_sessions',
+      groupBy: ['project_id'],
+      usageType: 'code_interpreter_sessions',
+    },
+    {
+      key: 'audio_transcriptions',
+      path: '/organization/usage/audio_transcriptions',
+      groupBy: ['model', 'project_id'],
+      usageType: 'audio_transcriptions',
+    },
+    {
+      key: 'audio_speeches',
+      path: '/organization/usage/audio_speeches',
+      groupBy: ['model', 'project_id'],
+      usageType: 'audio_speeches',
+    },
   ];
   const currencies = {};
   const usage = {
@@ -1127,6 +1224,12 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
     outputTokens: 0,
     imageCount: 0,
     webSearchCalls: 0,
+    embeddingTokens: 0,
+    fileSearchCalls: 0,
+    codeInterpreterSessions: 0,
+    audioInputTokens: 0,
+    audioOutputTokens: 0,
+    audioSeconds: 0,
   };
   const endpointSummaries = [];
   const endpointsUnavailable = [];
@@ -1196,6 +1299,12 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
     outputTokens: usage.outputTokens,
     imageCount: usage.imageCount,
     webSearchCalls: usage.webSearchCalls,
+    embeddingTokens: usage.embeddingTokens,
+    fileSearchCalls: usage.fileSearchCalls,
+    codeInterpreterSessions: usage.codeInterpreterSessions,
+    audioInputTokens: usage.audioInputTokens,
+    audioOutputTokens: usage.audioOutputTokens,
+    audioSeconds: usage.audioSeconds,
     endpoints: endpointSummaries.map((summary) => ({
       key: summary.key,
       path: summary.path,
@@ -1208,9 +1317,16 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
       outputTokens: summary.outputTokens,
       imageCount: summary.imageCount,
       webSearchCalls: summary.webSearchCalls,
+      embeddingTokens: summary.embeddingTokens,
+      fileSearchCalls: summary.fileSearchCalls,
+      codeInterpreterSessions: summary.codeInterpreterSessions,
+      audioInputTokens: summary.audioInputTokens,
+      audioOutputTokens: summary.audioOutputTokens,
+      audioSeconds: summary.audioSeconds,
       pageCount: summary.pageCount,
     })),
     endpointsUnavailable,
+    pricingSource: OPENAI_PRICING_SOURCE_URL,
     note: 'OpenAI Usage API schatting; gebruikt totdat de Organization Costs API de nieuwste kosten heeft verwerkt.',
   };
 }
@@ -1291,107 +1407,273 @@ async function fetchAnthropicCostSummary(deps = {}, options = {}) {
   };
 }
 
-async function fetchCombinedApiCostSummary(deps = {}, options = {}) {
-  const configuredProjectId = resolveOpenAiProjectId(deps);
-  const openAiSummary = await fetchOpenAiCostSummary(deps, options);
-  let organizationOpenAiSummary = null;
-  let usageEstimate = null;
-  let organizationUsageEstimate = null;
-  let selectedOpenAiSummary = openAiSummary;
-  const unavailable = [];
+function summarizeCostCandidate(summary = {}, kind = '', label = '') {
+  if (!summary || typeof summary !== 'object') return null;
+  const costUsd = Number(summary.costUsd);
+  const costEur = Number(summary.costEur);
+  if (!Number.isFinite(costUsd) || costUsd < 0) return null;
+  return {
+    kind,
+    label,
+    costUsd,
+    costEur: Number.isFinite(costEur) && costEur >= 0 ? costEur : 0,
+    exact: summary.exact === true,
+    organizationWide: summary.organizationWide === true,
+    summary,
+  };
+}
 
-  if (configuredProjectId) {
-    try {
-      organizationOpenAiSummary = await fetchOpenAiCostSummary(withoutOpenAiProjectFilter(deps), {
-        ...options,
-        projectScope: false,
-      });
-      if (organizationOpenAiSummary.costUsd > selectedOpenAiSummary.costUsd + 0.005) {
-        selectedOpenAiSummary = organizationOpenAiSummary;
-      }
-    } catch (error) {
-      unavailable.push({
-        provider: 'OpenAI Costs organisatiebreed',
-        source: 'openai-costs',
-        error: error.code || 'OPENAI_ORGANIZATION_COSTS_ERROR',
-        detail: sanitizeOpenAiCostDetail(error.detail || error.message || 'OpenAI organisatiekosten niet beschikbaar.'),
-      });
-    }
+function selectHighestReliableCostCandidate(candidates = []) {
+  const usable = candidates.filter(Boolean);
+  if (usable.length === 0) return null;
+  return usable.reduce((selected, candidate) => {
+    if (!selected) return candidate;
+    return candidate.costUsd > selected.costUsd + 0.005 ? candidate : selected;
+  }, null);
+}
+
+function buildOpenAiCostSelectionNote(selectedCandidate = {}) {
+  const selected = selectedCandidate.summary || {};
+  if (selectedCandidate.kind === 'official_organization') {
+    return 'Officieel: OpenAI kosten deze maand organisatiebreed via de Organization Costs API.';
   }
+  if (selectedCandidate.kind === 'official_project') {
+    return 'Officieel: OpenAI kosten deze maand via de Organization Costs API.';
+  }
+  if (selectedCandidate.kind === 'usage_organization') {
+    return 'Live schatting: OpenAI Usage organisatiebreed is hoger dan Costs, dus OpenAI loopt nog achter.';
+  }
+  if (selectedCandidate.kind === 'usage_project') {
+    return 'Live schatting: OpenAI Usage is hoger dan Costs, dus OpenAI loopt nog achter.';
+  }
+  if (selectedCandidate.kind === 'softora_ledger') {
+    return 'Live schatting: Softora API-kostenledger is hoger dan OpenAI Costs/Usage, dus OpenAI loopt nog achter.';
+  }
+  return selected.note || 'OpenAI API-kosten deze maand.';
+}
 
+async function loadOpenAiCostProvider(unavailable, provider, source, loader) {
   try {
-    usageEstimate = await fetchOpenAiUsageEstimateSummary(deps, options);
-    if (usageEstimate.costUsd > selectedOpenAiSummary.costUsd + 0.005) {
-      selectedOpenAiSummary = {
-        ...usageEstimate,
-        officialCostUsd: openAiSummary.costUsd,
-        officialCostEur: openAiSummary.costEur,
-        officialSource: openAiSummary.source,
-      };
-    }
+    return await loader();
   } catch (error) {
     unavailable.push({
-      provider: 'OpenAI Usage project',
-      source: 'openai-usage-estimate',
-      error: error.code || 'OPENAI_USAGE_ESTIMATE_ERROR',
-      detail: sanitizeOpenAiCostDetail(error.detail || error.message || 'OpenAI usage schatting niet beschikbaar.'),
+      provider,
+      source,
+      error: error.code || `${source.toUpperCase()}_ERROR`,
+      detail: sanitizeOpenAiCostDetail(error.detail || error.message || `${provider} niet beschikbaar.`),
     });
+    return null;
   }
+}
 
+async function fetchCombinedApiCostSummary(deps = {}, options = {}) {
+  const configuredProjectId = resolveOpenAiProjectId(deps);
+  const scope = normalizeScope(options.scope);
+  const costWindow = buildCostWindow(scope, options.nowMs);
+  const unavailable = [];
+  const candidates = [];
+
+  const openAiSummary = await loadOpenAiCostProvider(
+    unavailable,
+    'OpenAI Costs project',
+    'openai-costs',
+    () => fetchOpenAiCostSummary(deps, options)
+  );
+  if (openAiSummary) candidates.push(summarizeCostCandidate(openAiSummary, 'official_project', 'OpenAI Costs project'));
+
+  let organizationOpenAiSummary = null;
   if (configuredProjectId) {
-    try {
-      organizationUsageEstimate = await fetchOpenAiUsageEstimateSummary(withoutOpenAiProjectFilter(deps), {
+    organizationOpenAiSummary = await loadOpenAiCostProvider(
+      unavailable,
+      'OpenAI Costs organisatiebreed',
+      'openai-costs',
+      () => fetchOpenAiCostSummary(withoutOpenAiProjectFilter(deps), {
         ...options,
         projectScope: false,
-      });
-      if (organizationUsageEstimate.costUsd > selectedOpenAiSummary.costUsd + 0.005) {
-        selectedOpenAiSummary = {
-          ...organizationUsageEstimate,
-          officialCostUsd: (organizationOpenAiSummary || openAiSummary).costUsd,
-          officialCostEur: (organizationOpenAiSummary || openAiSummary).costEur,
-          officialSource: (organizationOpenAiSummary || openAiSummary).source,
-        };
-      }
-    } catch (error) {
-      unavailable.push({
-        provider: 'OpenAI Usage organisatiebreed',
-        source: 'openai-usage-estimate',
-        error: error.code || 'OPENAI_ORGANIZATION_USAGE_ESTIMATE_ERROR',
-        detail: sanitizeOpenAiCostDetail(error.detail || error.message || 'OpenAI organisatie-usage schatting niet beschikbaar.'),
-      });
+      })
+    );
+    if (organizationOpenAiSummary) {
+      candidates.push(summarizeCostCandidate(organizationOpenAiSummary, 'official_organization', 'OpenAI Costs organisatiebreed'));
     }
   }
 
+  const usageEstimate = await loadOpenAiCostProvider(
+    unavailable,
+    'OpenAI Usage project',
+    'openai-usage-estimate',
+    () => fetchOpenAiUsageEstimateSummary(deps, options)
+  );
+  if (usageEstimate) {
+    candidates.push(summarizeCostCandidate(usageEstimate, 'usage_project', 'OpenAI Usage project'));
+  }
+
+  let organizationUsageEstimate = null;
+  if (configuredProjectId) {
+    organizationUsageEstimate = await loadOpenAiCostProvider(
+      unavailable,
+      'OpenAI Usage organisatiebreed',
+      'openai-usage-estimate',
+      () => fetchOpenAiUsageEstimateSummary(withoutOpenAiProjectFilter(deps), {
+        ...options,
+        projectScope: false,
+      })
+    );
+    if (organizationUsageEstimate) {
+      candidates.push(
+        summarizeCostCandidate(organizationUsageEstimate, 'usage_organization', 'OpenAI Usage organisatiebreed')
+      );
+    }
+  }
+
+  const ledgerSummary = await loadOpenAiCostProvider(
+    unavailable,
+    'Softora API-kostenledger',
+    'softora-api-ledger',
+    () => readSoftoraApiCostLedgerSummary(deps, {
+      ...options,
+      scope,
+      window: costWindow,
+    })
+  );
+  if (ledgerSummary && ledgerSummary.available !== false && ledgerSummary.costUsd > 0) {
+    candidates.push(summarizeCostCandidate(ledgerSummary, 'softora_ledger', 'Softora API-kostenledger'));
+  }
+
+  const selectedCandidate = selectHighestReliableCostCandidate(candidates);
+  if (!selectedCandidate) {
+    const firstUnavailable = unavailable[0] || {};
+    throw createServiceError(
+      'API-factuurkosten konden niet geladen worden.',
+      firstUnavailable.error || 'API_COSTS_UNAVAILABLE',
+      503,
+      firstUnavailable.detail || 'Geen OpenAI Costs, Usage of Softora ledger kon worden opgehaald.'
+    );
+  }
+
+  const selectedSummary = selectedCandidate.summary;
+  const officialBaseline = organizationOpenAiSummary || openAiSummary || null;
+  const selectedProvider = {
+    ...selectedSummary,
+    selectedKind: selectedCandidate.kind,
+    selectedLabel: selectedCandidate.label,
+    officialCostUsd: selectedSummary.exact === true ? undefined : officialBaseline && officialBaseline.costUsd,
+    officialCostEur: selectedSummary.exact === true ? undefined : officialBaseline && officialBaseline.costEur,
+    officialSource: selectedSummary.exact === true ? undefined : officialBaseline && officialBaseline.source,
+  };
+  const fetchedAt = selectedProvider.fetchedAt || new Date(Math.max(0, Number(options.nowMs) || Date.now())).toISOString();
+  const costUsd = Number((selectedProvider.costUsd || 0).toFixed(8));
+  const costEur = Number((selectedProvider.costEur || 0).toFixed(2));
+
   return {
-    scope: normalizeScope(options.scope),
+    scope,
     source: 'api-costs',
-    exact: selectedOpenAiSummary.exact === true,
-    estimated: selectedOpenAiSummary.exact !== true,
-    fetchedAt: selectedOpenAiSummary.fetchedAt,
-    lastSuccessfulUpdate: selectedOpenAiSummary.lastSuccessfulUpdate,
-    startTime: selectedOpenAiSummary.startTime,
-    endTime: selectedOpenAiSummary.endTime,
-    costUsd: selectedOpenAiSummary.costUsd,
-    costEur: selectedOpenAiSummary.costEur,
-    usdToEurRate: selectedOpenAiSummary.usdToEurRate,
-    usdToEurRateSource: selectedOpenAiSummary.usdToEurRateSource,
-    exchangeRateFetchedAtMs: selectedOpenAiSummary.exchangeRateFetchedAtMs,
-    currencies: selectedOpenAiSummary.currencies,
-    providers: [selectedOpenAiSummary],
+    exact: selectedProvider.exact === true,
+    estimated: selectedProvider.exact !== true,
+    fetchedAt,
+    lastSuccessfulUpdate: selectedProvider.lastSuccessfulUpdate || fetchedAt,
+    startTime: selectedProvider.startTime || costWindow.startTime,
+    endTime: selectedProvider.endTime || costWindow.endTime,
+    costUsd,
+    costEur,
+    usdToEurRate: selectedProvider.usdToEurRate,
+    usdToEurRateSource: selectedProvider.usdToEurRateSource,
+    exchangeRateFetchedAtMs: selectedProvider.exchangeRateFetchedAtMs,
+    currencies: selectedProvider.currencies || { usd: costUsd },
+    selectedProviderKind: selectedCandidate.kind,
+    selectedProviderLabel: selectedCandidate.label,
+    selectionStrategy: 'highest_without_double_counting',
+    selectionReason: buildOpenAiCostSelectionNote(selectedCandidate),
+    providers: [selectedProvider],
+    candidates: candidates.map((candidate) => ({
+      kind: candidate.kind,
+      label: candidate.label,
+      source: candidate.summary.source,
+      exact: candidate.summary.exact === true,
+      estimated: candidate.summary.exact !== true,
+      organizationWide: candidate.summary.organizationWide === true,
+      costUsd: candidate.costUsd,
+      costEur: candidate.costEur,
+    })),
     officialProvider: openAiSummary,
     organizationOfficialProvider: organizationOpenAiSummary,
     usageEstimate,
     organizationUsageEstimate,
+    softoraLedger: ledgerSummary,
     unavailable,
-    note:
-      selectedOpenAiSummary.exact === true && selectedOpenAiSummary.organizationWide
-        ? 'OpenAI kosten deze maand organisatiebreed via de Organization Costs API.'
-        : selectedOpenAiSummary.exact === true
-          ? 'OpenAI kosten deze maand via de Organization Costs API.'
-          : selectedOpenAiSummary.organizationWide
-            ? 'OpenAI Usage live schatting organisatiebreed omdat de Organization Costs API nog achterloopt.'
-            : 'OpenAI Usage live schatting omdat de Organization Costs API nog achterloopt.',
+    pricingSource: OPENAI_PRICING_SOURCE_URL,
+    note: buildOpenAiCostSelectionNote(selectedCandidate),
   };
+}
+
+async function fetchOpenAiCostDiagnostics(deps = {}, options = {}) {
+  const scope = normalizeScope(options.scope);
+  const fetchedAt = new Date(Math.max(0, Number(options.nowMs) || Date.now())).toISOString();
+  try {
+    const selected = await fetchCombinedApiCostSummary(deps, {
+      ...options,
+      scope,
+    });
+    return {
+      scope,
+      source: 'api-cost-diagnostics',
+      ok: true,
+      fetchedAt,
+      config: getOpenAiCostConfigStatus(deps),
+      official: {
+        project: selected.officialProvider || null,
+        organization: selected.organizationOfficialProvider || null,
+      },
+      usage: {
+        project: selected.usageEstimate || null,
+        organization: selected.organizationUsageEstimate || null,
+      },
+      ledger: selected.softoraLedger || null,
+      selected,
+      comparison: {
+        strategy: selected.selectionStrategy,
+        selectedProviderKind: selected.selectedProviderKind,
+        selectedProviderLabel: selected.selectedProviderLabel,
+        selectedCostUsd: selected.costUsd,
+        selectedCostEur: selected.costEur,
+        candidates: selected.candidates || [],
+      },
+      unavailable: selected.unavailable || [],
+    };
+  } catch (error) {
+    return {
+      scope,
+      source: 'api-cost-diagnostics',
+      ok: false,
+      fetchedAt,
+      config: getOpenAiCostConfigStatus(deps),
+      official: {
+        project: null,
+        organization: null,
+      },
+      usage: {
+        project: null,
+        organization: null,
+      },
+      ledger: null,
+      selected: null,
+      comparison: {
+        strategy: 'highest_without_double_counting',
+        selectedProviderKind: null,
+        selectedProviderLabel: null,
+        selectedCostUsd: 0,
+        selectedCostEur: 0,
+        candidates: [],
+      },
+      unavailable: [
+        {
+          provider: 'API kosten diagnose',
+          source: 'api-costs',
+          error: error.code || 'API_COSTS_DIAGNOSTICS_ERROR',
+          detail: sanitizeOpenAiCostDetail(error.detail || error.message || 'Diagnose kon niet worden opgebouwd.'),
+        },
+      ],
+    };
+  }
 }
 
 function createOpenAiCostSummaryCoordinator(deps = {}) {
@@ -1450,6 +1732,16 @@ function createOpenAiCostSummaryCoordinator(deps = {}) {
         return res.status(getOpenAiCostErrorStatus(error)).json(payload);
       }
     },
+    async sendCostDiagnosticsResponse(req, res) {
+      const diagnostics = await fetchOpenAiCostDiagnostics(deps, {
+        scope: req && req.query ? req.query.scope : 'month',
+      });
+      return res.status(200).json({
+        ok: true,
+        source: 'api-cost-diagnostics',
+        diagnostics,
+      });
+    },
   };
 }
 
@@ -1461,6 +1753,7 @@ module.exports = {
   createOpenAiCostSummaryCoordinator,
   fetchAnthropicCostSummary,
   fetchCombinedApiCostSummary,
+  fetchOpenAiCostDiagnostics,
   fetchOpenAiCostsDashboardSnapshot,
   fetchOpenAiCostPeriodSummary,
   fetchOpenAiCostSummary,

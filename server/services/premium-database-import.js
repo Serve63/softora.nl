@@ -1,6 +1,14 @@
 const path = require('path');
 const zlib = require('zlib');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
+const {
+  OPENAI_PRICING_SOURCE_URL,
+  getOpenAiTextModelRates,
+  getOpenAiWebSearchUsdPerCall,
+} = require('./openai-pricing');
+const {
+  recordSoftoraApiCostEvent,
+} = require('./softora-api-cost-ledger');
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 2000;
@@ -22,19 +30,6 @@ const GOOGLE_PLACES_FIELD_MASK = [
 ].join(',');
 const DEFAULT_REAL_BUSINESS_QUERY = 'bedrijven in Noord-Brabant';
 const DEFAULT_OPENAI_MODEL = 'gpt-5.5-pro';
-const OPENAI_DATABASE_SEARCH_PRICING = {
-  'gpt-5.5-pro': {
-    inputUsdPerMillion: 30,
-    outputUsdPerMillion: 180,
-    cachedInputUsdPerMillion: null,
-  },
-  'gpt-5.5': {
-    inputUsdPerMillion: 5,
-    outputUsdPerMillion: 30,
-    cachedInputUsdPerMillion: 0.5,
-  },
-};
-const OPENAI_WEB_SEARCH_USD_PER_CALL = 0.01;
 const REAL_BUSINESS_CATEGORY_PREFIXES = [
   'bedrijven',
   'winkels',
@@ -989,8 +984,12 @@ function getOpenAiDatabaseSearchReasoningEffort(model, deps = {}) {
 }
 
 function getOpenAiDatabaseSearchPricing(model) {
-  const normalized = normalizeString(model).toLowerCase();
-  return OPENAI_DATABASE_SEARCH_PRICING[normalized] || OPENAI_DATABASE_SEARCH_PRICING[DEFAULT_OPENAI_MODEL];
+  const rates = getOpenAiTextModelRates(model || DEFAULT_OPENAI_MODEL);
+  return {
+    inputUsdPerMillion: rates.input,
+    outputUsdPerMillion: rates.output,
+    cachedInputUsdPerMillion: rates.cachedInput,
+  };
 }
 
 function extractOpenAiUsage(data) {
@@ -1026,7 +1025,8 @@ function estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls }) {
   const inputUsd = (billableInputTokens / 1000000) * pricing.inputUsdPerMillion;
   const cachedInputUsd = (cachedInputTokens / 1000000) * cachedRate;
   const outputUsd = (outputTokens / 1000000) * pricing.outputUsdPerMillion;
-  const webSearchUsd = Math.max(0, Number(webSearchCalls || 0) || 0) * OPENAI_WEB_SEARCH_USD_PER_CALL;
+  const webSearchUsdPerCall = getOpenAiWebSearchUsdPerCall();
+  const webSearchUsd = Math.max(0, Number(webSearchCalls || 0) || 0) * webSearchUsdPerCall;
   const totalUsd = inputUsd + cachedInputUsd + outputUsd + webSearchUsd;
 
   return {
@@ -1042,7 +1042,8 @@ function estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls }) {
     pricing: {
       inputUsdPerMillion: pricing.inputUsdPerMillion,
       outputUsdPerMillion: pricing.outputUsdPerMillion,
-      webSearchUsdPerCall: OPENAI_WEB_SEARCH_USD_PER_CALL,
+      webSearchUsdPerCall,
+      source: OPENAI_PRICING_SOURCE_URL,
     },
     note: 'Schatting op basis van OpenAI tokengebruik en web-search calls; exclusief eventuele regionale toeslagen.',
   };
@@ -1497,6 +1498,28 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const usage = extractOpenAiUsage(data);
   const webSearchCalls = countOpenAiWebSearchCalls(data);
   const cost = estimateOpenAiDatabaseSearchCost({ model, usage, webSearchCalls });
+  await recordSoftoraApiCostEvent(
+    {
+      ...deps,
+      env,
+    },
+    {
+      source: 'premium-database-deep-search',
+      label: `Database deep search: ${target}`,
+      model,
+      amountUsd: cost.estimatedUsd,
+      estimated: true,
+      meta: {
+        target,
+        requested: count,
+        batchNumber,
+        inputTokens: cost.inputTokens,
+        outputTokens: cost.outputTokens,
+        cachedInputTokens: cost.cachedInputTokens,
+        webSearchCalls: cost.webSearchCalls,
+      },
+    }
+  ).catch(() => null);
   const placeComplete = businesses.length > 0 ? false : Boolean(parsed && parsed.placeComplete);
   const completionReason = truncateText(
     (parsed && (parsed.completionReason || parsed.notes)) ||
@@ -1524,7 +1547,12 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
 }
 
 function createPremiumDatabaseImportCoordinator(deps = {}) {
-  const { fetchImpl = global.fetch, env = process.env } = deps;
+  const {
+    fetchImpl = global.fetch,
+    env = process.env,
+    getUiStateValues,
+    setUiStateValues,
+  } = deps;
 
   function sendImportResponse(req, res) {
     try {
@@ -1596,6 +1624,8 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
       const result = await fetchDeepSearchBusinessRows(req.body || {}, {
         fetchImpl,
         env,
+        getUiStateValues,
+        setUiStateValues,
       });
       if ((!Array.isArray(result.rows) || result.rows.length < 2) && !result.placeComplete) {
         return res.status(422).json({

@@ -221,8 +221,9 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /const amountEur = Number\(summary\.costEur \|\| 0\) \|\| 0;/);
   assert.match(scriptSource, /window\.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;/);
   assert.match(scriptSource, /const API_COST_NOTE = 'OpenAI API kosten deze maand live';/);
-  assert.match(scriptSource, /OpenAI Usage live schatting/);
-  assert.match(scriptSource, /OpenAI Usage live schatting organisatiebreed/);
+  assert.match(scriptSource, /Live schatting · OpenAI loopt achter/);
+  assert.match(scriptSource, /Live schatting organisatiebreed · OpenAI loopt achter/);
+  assert.match(scriptSource, /Softora ledger live schatting/);
   assert.match(scriptSource, /const API_COST_UNAVAILABLE_NOTE = 'OpenAI kosten konden niet worden opgehaald';/);
   assert.match(scriptSource, /const API_COST_LOGIN_NOTE = 'Log opnieuw in om OpenAI kosten op te halen';/);
   assert.match(scriptSource, /const API_COST_ADMIN_NOTE = 'Alleen Full Acces kan OpenAI kosten bekijken';/);

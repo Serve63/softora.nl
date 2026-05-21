@@ -23,6 +23,11 @@ function registerOpenAiCostRoutes(app, deps = {}) {
       coordinator.sendCombinedCostSummaryResponse(req, res)
     );
   }
+  if (typeof coordinator.sendCostDiagnosticsResponse === 'function') {
+    app.get('/api/api-cost-diagnostics', requireAdmin, (req, res) =>
+      coordinator.sendCostDiagnosticsResponse(req, res)
+    );
+  }
 }
 
 module.exports = {

@@ -52,7 +52,10 @@ function registerFeatureRoutes(app, deps = {}) {
     seoReadCoordinator,
     seoWriteCoordinator,
   } = deps;
-  const premiumDatabaseImportCoordinator = createPremiumDatabaseImportCoordinator();
+  const premiumDatabaseImportCoordinator = createPremiumDatabaseImportCoordinator({
+    getUiStateValues: deps.getUiStateValues,
+    setUiStateValues: deps.setUiStateValues,
+  });
 
   registerColdcallingWebhookRoutes(app, {
     handleTwilioInboundVoice,
