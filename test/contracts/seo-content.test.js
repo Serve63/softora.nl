@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {
+  SEO_CONTENT_IMAGES_BY_CLUSTER,
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
   countSeoContentWords,
@@ -27,6 +28,28 @@ function extractCssRuleBlock(css, selector) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = css.match(new RegExp(`\\n${escapedSelector}\\s*\\{([^}]*)\\}`));
   return match ? match[1] : '';
+}
+
+function readJpegDimensions(filePath) {
+  const buffer = fs.readFileSync(filePath);
+  let offset = 2;
+
+  while (offset < buffer.length) {
+    if (buffer[offset] !== 0xff) break;
+    const marker = buffer[offset + 1];
+    const length = buffer.readUInt16BE(offset + 2);
+
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      return {
+        height: buffer.readUInt16BE(offset + 5),
+        width: buffer.readUInt16BE(offset + 7),
+      };
+    }
+
+    offset += 2 + length;
+  }
+
+  throw new Error(`Geen JPEG-dimensies gevonden voor ${filePath}`);
 }
 
 test('seo content exposes blog and kennisbank paths for crawl and sitemap discovery', () => {
@@ -74,8 +97,10 @@ test('seo content renders the existing blog visual language with real links', ()
   assert.match(html, /class="hero-banner"/);
   assert.match(html, /class="filter-bar"/);
   assert.match(html, /class="blog-card featured"/);
-  assert.match(html, /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
-  assert.match(html, /alt="Praktische kantoorwerkplek met planning, laptop en procesoverzicht/);
+  assert.match(
+    html,
+    /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg" alt="Overleg aan tafel over workflow, planning en procesautomatisering voor het MKB\." width="1600" height="1000"/
+  );
   assert.match(html, /SEO groeipijlers/);
   assert.match(html, /data-softora-public-seo="content-clusters"/);
   assert.match(html, /data-content-cluster="websites"/);
@@ -121,7 +146,10 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /data-softora-public-seo="faq"/);
   assert.match(html, />Martijn van de Ven<\/span>/);
   assert.match(html, /<figure class="artikel-img">/);
-  assert.match(html, /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
+  assert.match(
+    html,
+    /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg" alt="Overleg aan tafel over workflow, planning en procesautomatisering voor het MKB\." width="1600" height="1000"/
+  );
   assert.match(html, /data-content-cluster="ai-automatisering"/);
   assert.match(html, /AI automatisering voor het MKB: waar begin je\?/);
   assert.match(html, /href="\/blog">Terug naar blog<\/a>/);
@@ -160,7 +188,7 @@ test('seo content article template keeps title, image, body and CTA on the same 
   assert.match(html, /<section class="content-cta" data-softora-public-seo="conversion-cta">/);
 });
 
-test('seo content images zijn per cluster gekoppeld met beschrijvende bestandsnamen en alt-teksten', () => {
+test('seo content images zijn per cluster realistisch vastgezet met metadata', () => {
   const items = getSeoContentItems({ now: new Date('2026-06-10T12:00:00.000Z') });
   const seenImages = new Set();
 
@@ -169,11 +197,20 @@ test('seo content images zijn per cluster gekoppeld met beschrijvende bestandsna
 
     assert.match(image.src, /^\/assets\/seo-content\/[a-z0-9-]+-softora\.jpg$/);
     assert.ok(image.alt.length >= 55, item.slug);
+    assert.equal(image.width, 1600, `${item.slug} mist vaste afbeeldingsbreedte`);
+    assert.equal(image.height, 1000, `${item.slug} mist vaste afbeeldingshoogte`);
     assert.doesNotMatch(image.alt, /placeholder|binnenkort|foto moet|later/i);
     seenImages.add(image.src);
   }
 
   assert.ok(seenImages.size >= 6, 'Elke SEO-cluster moet een eigen herkenbare foto hebben.');
+
+  for (const image of Object.values(SEO_CONTENT_IMAGES_BY_CLUSTER)) {
+    assert.doesNotMatch(image.src, /generated|placeholder/i);
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    const dimensions = readJpegDimensions(imagePath);
+    assert.deepEqual(dimensions, { width: image.width, height: image.height }, image.src);
+  }
 });
 
 test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
