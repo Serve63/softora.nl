@@ -40,7 +40,7 @@ services:
       - key: OPENAI_DATABASE_SEARCH_MODEL
         value: gpt-5.4
       - key: OPENAI_DATABASE_SEARCH_REASONING_EFFORT
-        value: high
+        value: medium
       - key: OPENAI_DATABASE_SEARCH_SERVICE_TIER
         value: flex
       - key: OPENAI_DATABASE_SEARCH_PROMPT_VERSION
