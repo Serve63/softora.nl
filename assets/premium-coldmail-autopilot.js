@@ -73,27 +73,21 @@
     const style = document.createElement("style");
     style.id = "coldmailAutopilotStyles";
     style.textContent = [
-      ".coldmail-autopilot-row{margin-top:12px;display:grid;gap:8px}",
-      ".coldmail-autopilot-card{display:grid;grid-template-columns:1fr;gap:8px;align-items:stretch;border:1px solid rgba(155,35,85,.18);border-radius:8px;background:#fff;padding:8px;box-shadow:0 10px 26px rgba(26,26,46,.06);transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}",
-      ".coldmail-autopilot-card.is-on{border-color:rgba(22,115,60,.34);background:rgba(22,115,60,.045);box-shadow:0 12px 30px rgba(22,115,60,.12)}",
+      ".coldmail-autopilot-row{margin-top:12px;display:grid}",
+      ".coldmail-autopilot-card{display:grid;align-items:stretch}",
       ".coldmail-autopilot-card.is-busy{opacity:.72}",
-      ".coldmail-autopilot-toggle{min-height:46px;border:1px solid rgba(155,35,85,.26);border-radius:6px;background:#fff;color:var(--crimson,#9b2355);cursor:pointer;font-family:Oswald,sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;padding:9px 12px;display:flex;align-items:center;justify-content:center;gap:9px;transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease}",
+      ".coldmail-autopilot-toggle{min-height:58px;width:100%;border:1px solid rgba(155,35,85,.26);border-radius:8px;background:#fff;color:var(--crimson,#9b2355);cursor:pointer;font-family:Oswald,sans-serif;font-size:14px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;padding:11px 14px;display:flex;align-items:center;justify-content:center;gap:10px;transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease}",
       ".coldmail-autopilot-toggle:hover{border-color:rgba(155,35,85,.44);box-shadow:0 0 0 4px rgba(155,35,85,.08)}",
       ".coldmail-autopilot-toggle[aria-pressed=true]{background:var(--green,#16733c);border-color:var(--green,#16733c);color:#fff;box-shadow:0 10px 24px rgba(22,115,60,.18)}",
       ".coldmail-autopilot-toggle:disabled{opacity:.66;cursor:wait}",
       ".coldmail-autopilot-dot{width:9px;height:9px;border-radius:999px;background:var(--crimson,#9b2355);box-shadow:0 0 0 4px rgba(155,35,85,.12);flex:0 0 auto}",
       ".coldmail-autopilot-toggle[aria-pressed=true] .coldmail-autopilot-dot{background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.22)}",
-      ".coldmail-autopilot-status{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:3px;color:var(--mid,#555);font-size:11px;line-height:1.35;overflow-wrap:anywhere;padding:2px 4px}",
-      ".coldmail-autopilot-status strong{font-family:Oswald,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;line-height:1.1;text-transform:uppercase;color:var(--dark,#1a1a2e)}",
-      ".coldmail-autopilot-card.is-on .coldmail-autopilot-status strong{color:var(--green,#16733c)}",
-      ".coldmail-autopilot-freeze-note{display:none;align-items:center;gap:8px;border:1px solid rgba(22,115,60,.22);border-radius:6px;background:rgba(22,115,60,.07);color:var(--green,#16733c);font-size:11px;font-weight:700;line-height:1.35;padding:9px 11px}",
-      "html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freeze-note{display:flex}",
       "html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable{position:relative}",
       "html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable .mf-row,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable .field{opacity:.54;filter:grayscale(.18)}",
       "html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable input:disabled,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable textarea:disabled,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable select:disabled,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable button:disabled{cursor:not-allowed!important}",
       "html[data-coldmail-autopilot-enabled=true] #start-campaign-btn{opacity:.48;filter:grayscale(.2);box-shadow:none}",
       "html[data-coldmail-autopilot-enabled=true] .site-select.is-disabled .site-select-trigger{cursor:not-allowed!important;opacity:.64}",
-      "@media (max-width:760px){.coldmail-autopilot-card{grid-template-columns:1fr}.coldmail-autopilot-toggle{width:100%}}",
+      "@media (max-width:760px){.coldmail-autopilot-toggle{width:100%}}",
     ].join("");
     document.head.appendChild(style);
   }
@@ -108,13 +102,11 @@
     row.className = "coldmail-autopilot-row";
     row.innerHTML = [
       '<div class="coldmail-autopilot-card" id="coldmailAutopilotCard">',
-      '<button type="button" class="coldmail-autopilot-toggle" id="coldmailAutopilotToggle" aria-pressed="false" aria-describedby="coldmailAutopilotStatus">',
+      '<button type="button" class="coldmail-autopilot-toggle" id="coldmailAutopilotToggle" aria-pressed="false">',
       '<span class="coldmail-autopilot-dot" aria-hidden="true"></span>',
       '<span id="coldmailAutopilotToggleLabel">Autopilot uit</span>',
       "</button>",
-      '<div class="coldmail-autopilot-status" id="coldmailAutopilotStatus"><strong>Handmatige modus</strong><span>Status laden...</span></div>',
       "</div>",
-      '<div class="coldmail-autopilot-freeze-note" id="coldmailAutopilotFreezeNote">Instellingen bevroren zolang autopilot aan staat.</div>',
     ].join("");
     startButton.insertAdjacentElement("afterend", row);
     byId("coldmailAutopilotToggle").addEventListener("click", toggle);
@@ -157,30 +149,12 @@
     });
   }
 
-  function reasonLabel(reason) {
-    const labels = {
-      sent: "laatste check heeft verzonden",
-      outside_safe_hours: "wacht op veilig tijdslot",
-      outside_weekday_window: "wacht op werkdag",
-      cooldown: "wacht op volgende check",
-      coldmail_daily_limit_reached: "dagruimte op",
-      no_sender_capacity: "dagruimte op",
-      coldmail_safety_paused: "veiligheidspauze actief",
-      empty_mail_content: "mist mailtekst",
-      disabled: "staat gepauzeerd",
-    };
-    return labels[String(reason || "").toLowerCase()] || String(reason || "geen recente check");
-  }
-
   function render(payload) {
     state = payload && payload.autopilot ? payload.autopilot : payload || state || {};
     const enabled = Boolean(state.enabled);
-    const result = state.lastResult || {};
-    const batch = (state.config && state.config.count) || BATCH_SIZE;
     const card = byId("coldmailAutopilotCard");
     const button = byId("coldmailAutopilotToggle");
     const label = byId("coldmailAutopilotToggleLabel");
-    const status = byId("coldmailAutopilotStatus");
 
     if (card) {
       card.classList.toggle("is-on", enabled);
@@ -194,15 +168,6 @@
         : "Autopilot inschakelen met de huidige instellingen";
     }
     if (label) label.textContent = enabled ? "Autopilot aan" : "Autopilot uit";
-    if (status) {
-      const title = enabled ? "Automatisch actief" : "Handmatige modus";
-      const copy = !enabled
-        ? "Geen automatische verzending. Gebruik Mails Versturen voor handmatig sturen."
-        : Number(result.sent || 0) > 0
-          ? String(result.sent) + " verzonden bij laatste check. Batch " + batch + "."
-          : reasonLabel(result.reason) + ". Batch " + batch + ".";
-      status.innerHTML = "<strong>" + title + "</strong><span>" + copy + "</span>";
-    }
     setAutopilotFreeze(enabled);
   }
 
