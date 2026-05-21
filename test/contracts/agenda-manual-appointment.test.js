@@ -170,7 +170,7 @@ test('agenda manual meeting stores the selected lead owner separately from plann
   assert.match(res.body.appointment.summary, /Lead geregeld door: Martijn van de Ven/);
 });
 
-test('agenda manual meeting requires a lead owner only for the new meeting wizard flow', async () => {
+test('agenda manual meeting no longer requires a lead owner in the meeting wizard flow', async () => {
   const { coordinator } = createFixture();
   const res = createResponseRecorder();
 
@@ -189,9 +189,13 @@ test('agenda manual meeting requires a lead owner only for the new meeting wizar
     res
   );
 
-  assert.equal(res.statusCode, 400);
-  assert.equal(res.body.ok, false);
-  assert.match(res.body.error, /Kies wie deze lead heeft geregeld/);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.appointment.manualPlannerWho, 'both');
+  assert.equal(res.body.appointment.manualLeadOwnerKey, '');
+  assert.equal(res.body.appointment.leadOwnerKey, '');
+  assert.match(res.body.appointment.summary, /Wie: Servé en Martijn/);
+  assert.doesNotMatch(res.body.appointment.summary, /Lead geregeld door/);
 });
 
 test('agenda manual appointment does not block on initial shared-state hydration', async () => {

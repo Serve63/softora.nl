@@ -1579,7 +1579,7 @@
         }
     }
 
-    const agendaBootstrapPayload = readAgendaBootstrapPayload(), appointments = []; window.SoftoraAgendaLeadCounterSource = () => appointments;
+    const agendaBootstrapPayload = readAgendaBootstrapPayload(), appointments = [];
 
     // State
     let currentDate = new Date();
@@ -2046,7 +2046,6 @@
             activeOrderAddedAt: String(item.activeOrderAddedAt || ''),
             referenceImages: normalizeReferenceImageList(item.referenceImages || item.attachments || []),
             manualPlannerWho: String(item.manualPlannerWho || ''),
-            manualLeadOwnerKey: String(item.manualLeadOwnerKey || item.manualLeadOwner || ''), manualLeadOwnerName: String(item.manualLeadOwnerName || ''), leadOwnerKey: String(item.leadOwnerKey || ''), leadOwnerName: String(item.leadOwnerName || ''), leadOwnerFullName: String(item.leadOwnerFullName || ''), leadOwnerEmail: String(item.leadOwnerEmail || ''),
             manualAllDayUnavailable: Boolean(item.manualAllDayUnavailable),
             uiFallback: Boolean(item.uiFallback),
         };
@@ -2353,7 +2352,7 @@
         return normalizeManualLegendChoice(manualAppointmentMeetingType);
     }
 
-    function syncManualAppointmentDetailsMode() { const isMeeting = manualAppointmentKind === 'meeting', whoLabel = document.getElementById('manualAppointmentWhoLabel'), whoChoices = document.getElementById('manualAppointmentWhoChoices'), bothChoice = document.querySelector('[data-manual-who="both"]'); if (whoLabel) whoLabel.textContent = isMeeting ? 'Wie heeft deze lead geregeld?' : 'Voor wie?'; if (whoChoices) whoChoices.setAttribute('aria-label', isMeeting ? 'Wie heeft deze lead geregeld?' : 'Voor wie is deze afspraak?'); if (bothChoice) bothChoice.hidden = isMeeting; if (isMeeting && manualAppointmentWho === 'both') manualAppointmentWho = ''; }
+    function syncManualAppointmentDetailsMode() { const whoLabel = document.getElementById('manualAppointmentWhoLabel'), whoChoices = document.getElementById('manualAppointmentWhoChoices'), bothChoice = document.querySelector('[data-manual-who="both"]'); if (whoLabel) whoLabel.textContent = 'Voor wie?'; if (whoChoices) whoChoices.setAttribute('aria-label', 'Voor wie is deze afspraak?'); if (bothChoice) bothChoice.hidden = false; }
 
     function setManualAppointmentStep(step) {
         manualAppointmentStep = step || 'kind';
@@ -2480,7 +2479,7 @@
         const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
         const location = manualAppointmentLocationEl ? String(manualAppointmentLocationEl.value || '').trim() : '';
         const notes = manualAppointmentNotesEl ? String(manualAppointmentNotesEl.value || '').trim() : '';
-        const isMeeting = manualAppointmentKind === 'meeting', who = isMeeting ? 'both' : String(manualAppointmentWho || '').trim(), leadOwnerKey = isMeeting && (manualAppointmentWho === 'serve' || manualAppointmentWho === 'martijn') ? manualAppointmentWho : '';
+        const who = String(manualAppointmentWho || '').trim();
 
         if (manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
             setManualAppointmentStatus('Kies eerst wat je wilt inplannen.', 'error');
@@ -2490,8 +2489,7 @@
             setManualAppointmentStatus('Kies welke meeting je wilt inplannen.', 'error');
             return;
         }
-        if (isMeeting && !leadOwnerKey) { setManualAppointmentStatus('Kies wie deze lead heeft geregeld.', 'error'); return; }
-        if (!isMeeting && who !== 'serve' && who !== 'martijn' && who !== 'both') {
+        if (who !== 'serve' && who !== 'martijn' && who !== 'both') {
             setManualAppointmentStatus('Kies voor wie deze afspraak is.', 'error');
             return;
         }
@@ -2519,7 +2517,7 @@
                 title: activity,
                 time: timeVal,
                 activityTime: timeVal,
-                legendChoice, appointmentKind: manualAppointmentKind, manualLeadOwner: leadOwnerKey, leadOwnerKey,
+                legendChoice, appointmentKind: manualAppointmentKind,
                 activity,
                 location,
                 notes,
@@ -3522,7 +3520,7 @@
         applyWorkspaceMode(false);
     }
 </script>
-<script src="assets/premium-agenda-lead-counter.js?v=20260520a"></script><script src="assets/premium-agenda-stability.js?v=20260430a"></script>
+<script src="assets/premium-agenda-stability.js?v=20260430a"></script>
 <script>
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });

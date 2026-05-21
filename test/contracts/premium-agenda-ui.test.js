@@ -132,17 +132,16 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /id="manualAppointmentActivity"/);
   assert.match(pageSource, /id="manualAppointmentWhoLabel"/);
   assert.match(pageSource, /Voor wie\?/);
-  assert.match(pageSource, /Wie heeft deze lead geregeld\?/);
   assert.match(pageSource, /function syncManualAppointmentDetailsMode\(\)/);
-  assert.match(pageSource, /whoLabel\.textContent = isMeeting \? 'Wie heeft deze lead geregeld\?' : 'Voor wie\?';/);
-  assert.match(pageSource, /whoChoices\.setAttribute\('aria-label', isMeeting \? 'Wie heeft deze lead geregeld\?' : 'Voor wie is deze afspraak\?'\);/);
+  assert.match(pageSource, /whoLabel\.textContent = 'Voor wie\?';/);
+  assert.match(pageSource, /whoChoices\.setAttribute\('aria-label', 'Voor wie is deze afspraak\?'\);/);
   assert.match(pageSource, /id="manualAppointmentWhoChoices"/);
   assert.match(pageSource, /\.manual-appointment-choice-grid--who \{[\s\S]*display: flex;[\s\S]*flex-wrap: nowrap;/);
   assert.match(pageSource, /data-manual-who="serve"/);
   assert.match(pageSource, /data-manual-who="martijn"/);
   assert.match(pageSource, /data-manual-who="both"/);
-  assert.match(pageSource, /if \(bothChoice\) bothChoice\.hidden = isMeeting;/);
-  assert.match(pageSource, /if \(isMeeting && manualAppointmentWho === 'both'\) manualAppointmentWho = '';/);
+  assert.match(pageSource, /if \(bothChoice\) bothChoice\.hidden = false;/);
+  assert.doesNotMatch(pageSource, /Wie heeft deze lead geregeld\?/);
   assert.match(pageSource, /Titel/);
   assert.match(pageSource, /id="manualAppointmentTime"/);
   assert.match(pageSource, /Tijdstip/);
@@ -185,13 +184,13 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /\.legend-dot\.manual-overig \{ background: #ec4899; \}/);
   assert.match(pageSource, /\.appointment\.manual-overig \{[\s\S]*border-left: 3px solid #ec4899;/);
   assert.match(pageSource, /activityTime: timeVal/);
-  assert.match(pageSource, /const isMeeting = manualAppointmentKind === 'meeting', who = isMeeting \? 'both' : String\(manualAppointmentWho \|\| ''\)\.trim\(\), leadOwnerKey = isMeeting && \(manualAppointmentWho === 'serve' \|\| manualAppointmentWho === 'martijn'\) \? manualAppointmentWho : '';/);
-  assert.match(pageSource, /Kies wie deze lead heeft geregeld\./);
+  assert.match(pageSource, /const who = String\(manualAppointmentWho \|\| ''\)\.trim\(\);/);
+  assert.doesNotMatch(pageSource, /Kies wie deze lead heeft geregeld\./);
   assert.match(pageSource, /Kies voor wie deze afspraak is\./);
   assert.match(pageSource, /legendChoice,/);
   assert.match(pageSource, /appointmentKind: manualAppointmentKind,/);
-  assert.match(pageSource, /manualLeadOwner: leadOwnerKey,/);
-  assert.match(pageSource, /leadOwnerKey,/);
+  assert.doesNotMatch(pageSource, /manualLeadOwner:/);
+  assert.doesNotMatch(pageSource, /leadOwnerKey,/);
   assert.match(pageSource, /who,/);
   assert.match(pageSource, /notes,/);
   assert.match(pageSource, /if \(manualLegendChoice === 'business'\) return 'appointment meeting magnetic meeting--business';/);
@@ -210,29 +209,18 @@ test('premium agenda handmatige afspraak-modal slaat locatie en opmerkingen op',
   assert.match(pageSource, /notes,/);
 });
 
-test('premium agenda toont leadstand op basis van dezelfde lead-eigenaarvelden als de app', () => {
+test('premium agenda verwijdert leadstand en lead-eigenaarvelden uit de handmatige agenda', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
-  const counterPath = path.join(__dirname, '../../assets/premium-agenda-lead-counter.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
-  const counterSource = fs.readFileSync(counterPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-agenda-lead-counter\.js/);
-  assert.match(pageSource, /window\.SoftoraAgendaLeadCounterSource = \(\) => appointments;/);
-  assert.match(pageSource, /manualLeadOwnerKey: String\(item\.manualLeadOwnerKey \|\| item\.manualLeadOwner \|\| ''\)/);
-  assert.match(pageSource, /leadOwnerKey: String\(item\.leadOwnerKey \|\| ''\)/);
-  assert.match(pageSource, /leadOwnerName: String\(item\.leadOwnerName \|\| ''\)/);
-  assert.match(pageSource, /leadOwnerFullName: String\(item\.leadOwnerFullName \|\| ''\)/);
+  assert.doesNotMatch(pageSource, /assets\/premium-agenda-lead-counter\.js/);
+  assert.doesNotMatch(pageSource, /window\.SoftoraAgendaLeadCounterSource/);
+  assert.doesNotMatch(pageSource, /manualLeadOwnerKey/);
+  assert.doesNotMatch(pageSource, /leadOwnerKey/);
+  assert.doesNotMatch(pageSource, /leadOwnerName/);
+  assert.doesNotMatch(pageSource, /leadOwnerFullName/);
   assert.match(pageSource, /document\.dispatchEvent\(new CustomEvent\('softora:agenda-rendered'\)\);/);
-  assert.match(counterSource, /counter\.id = 'agendaLeadCounter'/);
-  assert.match(counterSource, /id="agendaLeadCounterRows"/);
-  assert.match(counterSource, /\.agenda-lead-counter/);
-  assert.match(counterSource, /function normalizeLeadOwnerKey\(value\)/);
-  assert.match(counterSource, /function resolveLeadOwnerKey\(appointment\)/);
-  assert.match(counterSource, /function renderLeadCounter\(appointments = getAppointments\(\)\)/);
-  assert.match(counterSource, /appointments\.reduce\(\(result, appointment\) => \{[\s\S]*resolveLeadOwnerKey\(appointment\)[\s\S]*result\[key\] \+= 1;/);
-  assert.match(counterSource, /label: 'Servé'/);
-  assert.match(counterSource, /label: 'Martijn'/);
-  assert.match(counterSource, /document\.addEventListener\('softora:agenda-rendered'/);
+  assert.equal(fs.existsSync(path.join(__dirname, '../../assets/premium-agenda-lead-counter.js')), false);
 });
 
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {

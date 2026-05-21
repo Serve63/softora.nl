@@ -48,11 +48,6 @@ struct AddAppointmentView: View {
                     sheetHeader
 
                     VStack(alignment: .leading, spacing: 11) {
-                        if showsLeadOwnerChoices {
-                            FormLabel("Wie heeft deze lead geregeld?")
-                            leadOwnerChoices
-                        }
-
                         FormLabel("Voor wie?")
                         appointmentTargetChoices
 
@@ -178,16 +173,6 @@ struct AddAppointmentView: View {
         )
     }
 
-    private var leadOwnerChoices: some View {
-        plannerChoiceRow(
-            options: orderedPlannerOptions(Planner.leadOwnerCases),
-            selection: Binding(
-                get: { draft.leadOwner },
-                set: { draft.leadOwner = $0 }
-            )
-        )
-    }
-
     private func plannerChoiceRow(options: [Planner], selection: Binding<Planner>) -> some View {
         HStack(spacing: 10) {
             ForEach(options) { planner in
@@ -219,10 +204,6 @@ struct AddAppointmentView: View {
         let selectedPlanner = store.selectedPlanner
         guard options.contains(selectedPlanner) else { return options }
         return [selectedPlanner] + options.filter { $0 != selectedPlanner }
-    }
-
-    private var showsLeadOwnerChoices: Bool {
-        draft.appointmentType == .business && draft.businessKind == .meeting
     }
 
     private var repeatRow: some View {

@@ -48,10 +48,6 @@ function resolveManualLeadOwner(body, normalizeString) {
   return null;
 }
 
-function isMeetingLegendChoice(value) {
-  return ['website', 'business', 'voice', 'chatbot'].includes(String(value || '').trim().toLowerCase());
-}
-
 function isTruthyAllDayUnavailable(body) {
   const v = body?.allDayUnavailable ?? body?.geheleDagNietBeschikbaar;
   if (v === true || v === 1) return true;
@@ -182,8 +178,6 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       legendChoice = normalizeManualLegendChoice(body, normalizeString);
     }
     const manualLeadOwner = resolveManualLeadOwner(body, normalizeString);
-    const requiresManualLeadOwner =
-      !allDayUnavailable && appointmentKind === 'meeting' && isMeetingLegendChoice(legendChoice);
 
     if (!appointmentDate) {
       return res.status(400).json({ ok: false, error: 'Vul een geldige datum in (YYYY-MM-DD).' });
@@ -211,12 +205,6 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
         return res.status(400).json({
           ok: false,
           error: 'Kies een geldige legenda keuze.',
-        });
-      }
-      if (requiresManualLeadOwner && !manualLeadOwner) {
-        return res.status(400).json({
-          ok: false,
-          error: 'Kies wie deze lead heeft geregeld.',
         });
       }
     }
