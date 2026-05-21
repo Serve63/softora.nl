@@ -36,6 +36,9 @@ const DEFAULT_OPENAI_DATABASE_SEARCH_MODEL = 'gpt-5.4';
 const DEFAULT_OPENAI_DATABASE_SEARCH_REASONING_EFFORT = 'high';
 const DEFAULT_OPENAI_DATABASE_SEARCH_TIMEOUT_MS = 720000;
 const MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS = 760000;
+const DEFAULT_OPENAI_DATABASE_SEARCH_RATE_LIMIT_RETRIES = 2;
+const DEFAULT_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS = 8000;
+const MAX_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS = 30000;
 const ESTIMATED_DEEP_SEARCH_INPUT_TOKENS_PER_BATCH = 6000;
 const ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY = 1400;
 const ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH = 1;
@@ -1025,6 +1028,77 @@ function createOpenAiDeepSearchTimeoutError() {
   );
 }
 
+function getOpenAiDatabaseSearchRateLimitRetries(deps = {}) {
+  const env = deps.env || process.env || {};
+  const explicitDepsRetries = Number(deps.openAiRateLimitRetries);
+  if (Number.isFinite(explicitDepsRetries) && explicitDepsRetries >= 0) {
+    return Math.min(4, Math.floor(explicitDepsRetries));
+  }
+  const explicitEnvRetries = Number(env.OPENAI_DATABASE_SEARCH_RATE_LIMIT_RETRIES);
+  if (Number.isFinite(explicitEnvRetries) && explicitEnvRetries >= 0) {
+    return Math.min(4, Math.floor(explicitEnvRetries));
+  }
+  return DEFAULT_OPENAI_DATABASE_SEARCH_RATE_LIMIT_RETRIES;
+}
+
+function getHeaderValue(headers, name) {
+  return headers && typeof headers.get === 'function' ? normalizeString(headers.get(name)) : '';
+}
+
+function clampOpenAiRateLimitWaitMs(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS;
+  return Math.max(250, Math.min(Math.ceil(parsed), MAX_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS));
+}
+
+function parseRetryAfterMs(value, nowMs = Date.now()) {
+  const raw = normalizeString(value);
+  if (!raw) return 0;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const dateMs = Date.parse(raw);
+  return Number.isFinite(dateMs) ? Math.max(0, dateMs - nowMs) : 0;
+}
+
+function getOpenAiRateLimitRetryDelayMs(response, data, deps = {}) {
+  const explicitDelay = Number(deps.openAiRateLimitRetryDelayMs);
+  if (Number.isFinite(explicitDelay) && explicitDelay >= 0) {
+    return Math.min(Math.ceil(explicitDelay), MAX_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS);
+  }
+
+  const retryAfterMsHeader = Number(getHeaderValue(response && response.headers, 'retry-after-ms'));
+  if (Number.isFinite(retryAfterMsHeader) && retryAfterMsHeader > 0) {
+    return clampOpenAiRateLimitWaitMs(retryAfterMsHeader);
+  }
+
+  const retryAfterHeaderMs = parseRetryAfterMs(getHeaderValue(response && response.headers, 'retry-after'));
+  if (retryAfterHeaderMs > 0) return clampOpenAiRateLimitWaitMs(retryAfterHeaderMs);
+
+  const message = normalizeString(data && data.error && data.error.message);
+  const messageDelay = message.match(/try again in\s+([0-9.]+)\s*s/i);
+  if (messageDelay) return clampOpenAiRateLimitWaitMs(Number(messageDelay[1]) * 1000);
+
+  return DEFAULT_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS;
+}
+
+function isOpenAiRateLimitResponse(response, data) {
+  if (response && Number(response.status) === 429) return true;
+  const code = normalizeString(data && data.error && data.error.code).toLowerCase();
+  return code === 'rate_limit_exceeded';
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
+function createOpenAiDeepSearchRateLimitError() {
+  return createServiceError(
+    'OpenAI-snelheidslimiet geraakt. We hebben automatisch opnieuw geprobeerd; probeer over enkele seconden nogmaals.',
+    'OPENAI_DEEP_SEARCH_RATE_LIMIT',
+    429
+  );
+}
+
 function getOpenAiDatabaseSearchPricing(model) {
   const rates = getOpenAiTextModelRates(model || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL);
   return {
@@ -1655,45 +1729,55 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const timeout = controller
     ? setTimeout(() => controller.abort(), getOpenAiDatabaseSearchTimeoutMs({ ...deps, env }))
     : null;
-  let response;
-  try {
-    response = await fetchImpl(`${openAiApiBaseUrl}/responses`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        ...buildOpenAiContextHeaders({ ...deps, env, openAiApiBaseUrl }),
-      },
-      signal: controller ? controller.signal : undefined,
-      body: JSON.stringify({
-        model,
-        reasoning: { effort: reasoningEffort },
-        tools: [
-          {
-            type: 'web_search',
-            external_web_access: true,
-            user_location: {
-              type: 'approximate',
-              country: 'NL',
-            },
-          },
-        ],
-        tool_choice: 'auto',
-        include: ['web_search_call.action.sources'],
-        input: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'softora_business_search_batch',
-            strict: true,
-            schema: buildDeepSearchJsonSchema(),
-          },
+  const requestUrl = `${openAiApiBaseUrl}/responses`;
+  const requestHeaders = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+    ...buildOpenAiContextHeaders({ ...deps, env, openAiApiBaseUrl }),
+  };
+  const requestBody = JSON.stringify({
+    model,
+    reasoning: { effort: reasoningEffort },
+    tools: [
+      {
+        type: 'web_search',
+        external_web_access: true,
+        user_location: {
+          type: 'approximate',
+          country: 'NL',
         },
-      }),
-    });
+      },
+    ],
+    tool_choice: 'auto',
+    include: ['web_search_call.action.sources'],
+    input: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'softora_business_search_batch',
+        strict: true,
+        schema: buildDeepSearchJsonSchema(),
+      },
+    },
+  });
+  const maxRateLimitRetries = getOpenAiDatabaseSearchRateLimitRetries({ ...deps, env });
+  let response;
+  let data = {};
+  try {
+    for (let attempt = 0; attempt <= maxRateLimitRetries; attempt += 1) {
+      response = await fetchImpl(requestUrl, {
+        method: 'POST',
+        headers: requestHeaders,
+        signal: controller ? controller.signal : undefined,
+        body: requestBody,
+      });
+      data = await readJsonResponse(response);
+      if (!isOpenAiRateLimitResponse(response, data) || attempt >= maxRateLimitRetries) break;
+      await wait(getOpenAiRateLimitRetryDelayMs(response, data, { ...deps, env }));
+    }
   } catch (error) {
     if (isAbortError(error) || (controller && controller.signal && controller.signal.aborted)) {
       throw createOpenAiDeepSearchTimeoutError();
@@ -1702,8 +1786,10 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   } finally {
     if (timeout) clearTimeout(timeout);
   }
-  const data = await readJsonResponse(response);
   if (!response || !response.ok) {
+    if (isOpenAiRateLimitResponse(response, data)) {
+      throw createOpenAiDeepSearchRateLimitError();
+    }
     const message =
       normalizeString(data && data.error && data.error.message) || 'OpenAI kon geen bedrijven ophalen.';
     throw createServiceError(message, 'OPENAI_DEEP_SEARCH_FAILED', response && response.status ? response.status : 400);
