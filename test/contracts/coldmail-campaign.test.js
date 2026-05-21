@@ -19,6 +19,8 @@ function createService(overrides = {}) {
   const savedStates = [];
   let replyState = overrides.replyState || { processed: {} };
   let sendGuardState = overrides.sendGuardState || { entries: [] };
+  let autopilotState = overrides.autopilotState || {};
+  let coldmailingSettings = overrides.coldmailingSettings || {};
   const rows = overrides.rows || [
     {
       id: 'prospect-1',
@@ -100,6 +102,20 @@ function createService(overrides = {}) {
           },
         };
       }
+      if (scope === 'premium_coldmail_autopilot') {
+        return {
+          values: {
+            softora_coldmail_autopilot_v1: JSON.stringify(autopilotState),
+          },
+        };
+      }
+      if (scope === 'premium_coldmailing_settings') {
+        return {
+          values: {
+            softora_coldmailing_settings_v1: JSON.stringify(coldmailingSettings),
+          },
+        };
+      }
       return {
         values: overrides.customerValues || {
           softora_customers_premium_v1: JSON.stringify(rows),
@@ -114,6 +130,12 @@ function createService(overrides = {}) {
       }
       if (scope === 'premium_coldmail_send_guard') {
         sendGuardState = JSON.parse(values.softora_coldmail_send_guard_v1);
+      }
+      if (scope === 'premium_coldmail_autopilot') {
+        autopilotState = JSON.parse(values.softora_coldmail_autopilot_v1);
+      }
+      if (scope === 'premium_coldmailing_settings') {
+        coldmailingSettings = JSON.parse(values.softora_coldmailing_settings_v1);
       }
       return { ok: true };
     },
@@ -167,6 +189,7 @@ function createService(overrides = {}) {
     getSavedStates: () => savedStates,
     getReplyState: () => replyState,
     getSendGuardState: () => sendGuardState,
+    getAutopilotState: () => autopilotState,
   };
 }
 
@@ -212,6 +235,155 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[0].coldmailCampaignDurationDays, 14);
   assert.equal(savedRows[0].activeColdmailCampaignUntil, '2026-05-08T12:00:00.000Z');
   assert.equal(savedRows[1].status, 'klant');
+});
+
+test('coldmail autopilot stays idle until it is explicitly enabled', async () => {
+  const { service, sentMessages, getAutopilotState } = createService();
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'contract-test',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'disabled');
+  assert.equal(sentMessages.length, 0);
+  assert.equal(getAutopilotState().lastResult.reason, 'disabled');
+});
+
+test('coldmail autopilot sends a small safe batch through the existing campaign service', async () => {
+  const { service, sentMessages, getAutopilotState, getSendGuardState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+      {
+        id: 'prospect-2',
+        bedrijf: 'Kapsalon Luna',
+        naam: 'Luna',
+        email: 'luna@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    coldmailingSettings: {
+      senderEmail: 'serve@softora.nl',
+      senders: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          aiInstructions: 'Houd het kort.',
+          toneStyle: 'Vriendelijk & professioneel',
+        },
+      },
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 2,
+        senderEmails: ['serve@softora.nl'],
+        branch: 'Horeca & Restaurants',
+        service: "Website's",
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 9,
+        endHour: 17,
+        minIntervalMinutes: 12,
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, false);
+  assert.equal(result.reason, 'sent');
+  assert.equal(result.sent, 2);
+  assert.equal(result.senderEmail, 'serve@softora.nl');
+  assert.equal(sentMessages.length, 2);
+  assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
+  assert.equal(sentMessages[0].subject, 'Korte vraag voor Bakkerij Zon');
+  assert.equal(sentMessages[1].subject, 'Korte vraag voor Kapsalon Luna');
+  assert.equal(getAutopilotState().lastResult.reason, 'sent');
+  assert.equal(getAutopilotState().lock, null);
+  assert.equal(getSendGuardState().entries.length, 2);
+});
+
+test('coldmail autopilot does not treat a full agenda as a mail safety stop', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    coldmailingSettings: {
+      senderEmail: 'serve@softora.nl',
+      senders: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}',
+        },
+      },
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+    agendaCapacity: { full: true, availableSlots: 0 },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'sent');
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
 });
 
 test('coldmail campaign sends Martijn mail with the full sender display name', async () => {

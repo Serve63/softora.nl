@@ -91,6 +91,7 @@ test('server app runtime composition builders preserve feature wiring groups and
       SUPABASE_MANAGEMENT_ACCESS_TOKEN: 'supabase-management-token',
       SUPABASE_PROJECT_REF: 'softora-ref',
       SUPABASE_MONTHLY_BASE_COST_EUR: '25',
+      CRON_SECRET: 'cron-secret',
     },
     envConfig: {
       ACTIVE_ORDER_AUTOMATION_ENABLED: true,
@@ -369,6 +370,7 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(context.featureRouteOptions.supabaseCostSummary.supabaseProjectRef, 'softora-ref');
   assert.equal(context.featureRouteOptions.supabaseCostSummary.supabaseMonthlyBaseCostEur, 25);
   assert.equal(context.featureRouteOptions.coldmailing.coldmailCampaignService.isSmtpMailConfigured(), true);
+  assert.equal(context.featureRouteOptions.coldmailing.cronSecret, 'cron-secret');
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
     'info@softora.test',
     'info@softora.nl',

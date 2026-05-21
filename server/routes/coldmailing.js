@@ -112,9 +112,68 @@ function registerColdmailingRoutes(app, deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     requirePremiumAdminApiAccess = (_req, _res, next) => next(),
+    cronSecret = process.env.CRON_SECRET || '',
   } = deps;
+  const coldmailingCronSecret = normalizeString(cronSecret || process.env.CRON_SECRET || '');
 
   if (!coldmailCampaignService) return;
+
+  function requireColdmailingCronAccess(req, res, next) {
+    if (!coldmailingCronSecret) {
+      res.status(503).json({
+        ok: false,
+        code: 'COLDMAIL_AUTOPILOT_CRON_NOT_CONFIGURED',
+        message: 'Coldmail autopilot cron is niet geconfigureerd.',
+      });
+      return;
+    }
+    const authorization = normalizeString(req.headers && req.headers.authorization);
+    if (authorization !== `Bearer ${coldmailingCronSecret}`) {
+      res.status(401).json({
+        ok: false,
+        code: 'COLDMAIL_AUTOPILOT_CRON_UNAUTHORIZED',
+        message: 'Coldmail autopilot cron geweigerd.',
+      });
+      return;
+    }
+    next();
+  }
+
+  function getColdmailingActor(req, fallback = 'Coldmailing') {
+    return (
+      normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
+      fallback
+    );
+  }
+
+  async function runColdmailAutopilotFromRoute(req, res, options = {}) {
+    if (typeof coldmailCampaignService.runColdmailAutopilot !== 'function') {
+      res.status(404).json({
+        ok: false,
+        code: 'COLDMAIL_AUTOPILOT_UNAVAILABLE',
+        message: 'Coldmail autopilot is niet beschikbaar.',
+      });
+      return;
+    }
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    try {
+      const result = await coldmailCampaignService.runColdmailAutopilot({
+        actor: options.actor || getColdmailingActor(req, 'Coldmail Autopilot'),
+        force: Boolean(options.force || body.force),
+        publicBaseUrl: getEffectivePublicBaseUrl(req),
+      });
+      res.status(result && result.ok === false ? 500 : 200).json(result);
+    } catch (error) {
+      res.status(500).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'COLDMAIL_AUTOPILOT_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Coldmail autopilot kon niet veilig draaien.',
+          500
+        ),
+      });
+    }
+  }
 
   app.get('/coldmailing/webdesign-foto', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -240,6 +299,70 @@ function registerColdmailingRoutes(app, deps = {}) {
         typeof coldmailCampaignService.getColdmailSafetyLimits === 'function'
           ? coldmailCampaignService.getColdmailSafetyLimits()
           : undefined,
+    });
+  });
+
+  app.get('/api/coldmailing/autopilot/status', requirePremiumAdminApiAccess, async (_req, res) => {
+    try {
+      if (typeof coldmailCampaignService.getColdmailAutopilotStatus !== 'function') {
+        res.status(404).json({
+          ok: false,
+          code: 'COLDMAIL_AUTOPILOT_UNAVAILABLE',
+          message: 'Coldmail autopilot is niet beschikbaar.',
+        });
+        return;
+      }
+      res.json(await coldmailCampaignService.getColdmailAutopilotStatus());
+    } catch (error) {
+      res.status(500).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'COLDMAIL_AUTOPILOT_STATUS_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Coldmail autopilot status kon niet worden geladen.',
+          500
+        ),
+      });
+    }
+  });
+
+  app.post('/api/coldmailing/autopilot/settings', requirePremiumAdminApiAccess, async (req, res) => {
+    try {
+      if (typeof coldmailCampaignService.updateColdmailAutopilotSettings !== 'function') {
+        res.status(404).json({
+          ok: false,
+          code: 'COLDMAIL_AUTOPILOT_UNAVAILABLE',
+          message: 'Coldmail autopilot is niet beschikbaar.',
+        });
+        return;
+      }
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      res.json(await coldmailCampaignService.updateColdmailAutopilotSettings(
+        body,
+        getColdmailingActor(req, 'Coldmail Autopilot')
+      ));
+    } catch (error) {
+      res.status(400).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'COLDMAIL_AUTOPILOT_SETTINGS_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Coldmail autopilot instellingen konden niet worden opgeslagen.',
+          500
+        ),
+      });
+    }
+  });
+
+  app.post('/api/coldmailing/autopilot/run', requirePremiumAdminApiAccess, async (req, res) => {
+    await runColdmailAutopilotFromRoute(req, res, {
+      actor: getColdmailingActor(req, 'Coldmail Autopilot'),
+      force: Boolean(req.body && req.body.force),
+    });
+  });
+
+  app.get('/api/coldmailing/autopilot/run', requireColdmailingCronAccess, async (req, res) => {
+    await runColdmailAutopilotFromRoute(req, res, {
+      actor: 'Coldmail Autopilot Cron',
+      force: false,
     });
   });
 

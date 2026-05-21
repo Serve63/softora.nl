@@ -334,6 +334,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           agendaSupportRuntime.isGeneratedAppointmentVisibleForAgenda,
         backfillInsightsAndAppointmentsFromRecentCallUpdates:
           agendaSupportRuntime.backfillInsightsAndAppointmentsFromRecentCallUpdates,
+        cronSecret: env.CRON_SECRET || '',
         normalizeString: shared.normalizeString,
         truncateText: shared.truncateText,
       },

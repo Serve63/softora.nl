@@ -131,6 +131,79 @@ function createPreviewImageRouteHarness(deps) {
   };
 }
 
+function createAutopilotRouteHarness(deps) {
+  let cronRunHandlers = null;
+  let adminRunHandlers = null;
+  let statusHandlers = null;
+  let settingsHandlers = null;
+  const app = {
+    get(routePath, ...handlers) {
+      if (routePath === '/api/coldmailing/autopilot/run') cronRunHandlers = handlers;
+      if (routePath === '/api/coldmailing/autopilot/status') statusHandlers = handlers;
+    },
+    post(routePath, ...handlers) {
+      if (routePath === '/api/coldmailing/autopilot/run') adminRunHandlers = handlers;
+      if (routePath === '/api/coldmailing/autopilot/settings') settingsHandlers = handlers;
+    },
+  };
+
+  registerColdmailingRoutes(app, deps);
+  assert.ok(Array.isArray(cronRunHandlers));
+  assert.ok(Array.isArray(adminRunHandlers));
+  assert.ok(Array.isArray(statusHandlers));
+  assert.ok(Array.isArray(settingsHandlers));
+
+  async function callHandlers(handlers, req = {}) {
+    const res = {
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload) {
+        this.body = payload;
+        return payload;
+      },
+    };
+    let index = 0;
+    const next = async () => {
+      const handler = handlers[index];
+      index += 1;
+      if (!handler) return undefined;
+      let nextPromise = null;
+      const runNext = () => {
+        nextPromise = next();
+        return nextPromise;
+      };
+      await Promise.resolve(handler(req, res, runNext));
+      if (nextPromise) await nextPromise;
+      return undefined;
+    };
+    await next();
+    return res;
+  }
+
+  return {
+    cronRun: (req = {}) => callHandlers(cronRunHandlers, {
+      headers: {},
+      body: {},
+      ...req,
+    }),
+    adminRun: (body = {}) => callHandlers(adminRunHandlers, {
+      body,
+      premiumAuth: { displayName: 'Servé' },
+    }),
+    status: () => callHandlers(statusHandlers, {
+      premiumAuth: { displayName: 'Servé' },
+    }),
+    settings: (body = {}) => callHandlers(settingsHandlers, {
+      body,
+      premiumAuth: { displayName: 'Servé' },
+    }),
+  };
+}
+
 test('coldmailing campaign send rejects missing confirmation pin before agenda or mail dispatch', async () => {
   let sent = 0;
   let agendaSynced = false;
@@ -289,6 +362,102 @@ test('coldmailing campaign send forwards sender AI instructions to the service',
   assert.equal(received.senderEmail, 'serve@softora.nl');
 });
 
+test('coldmailing autopilot cron route requires CRON_SECRET bearer access', async () => {
+  let runs = 0;
+  const autopilot = createAutopilotRouteHarness({
+    cronSecret: 'cron-secret',
+    coldmailCampaignService: {
+      runColdmailAutopilot: async () => {
+        runs += 1;
+        return { ok: true, skipped: true, reason: 'disabled' };
+      },
+      getColdmailAutopilotStatus: async () => ({ ok: true, autopilot: { enabled: false } }),
+      updateColdmailAutopilotSettings: async () => ({ ok: true, autopilot: { enabled: true } }),
+    },
+    getEffectivePublicBaseUrl: () => 'https://www.softora.nl',
+    normalizeString: (value) => String(value || '').trim(),
+  });
+
+  const denied = await autopilot.cronRun({
+    headers: { authorization: 'Bearer wrong' },
+  });
+
+  assert.equal(denied.statusCode, 401);
+  assert.equal(denied.body.code, 'COLDMAIL_AUTOPILOT_CRON_UNAUTHORIZED');
+  assert.equal(runs, 0);
+
+  const allowed = await autopilot.cronRun({
+    headers: { authorization: 'Bearer cron-secret' },
+  });
+
+  assert.equal(allowed.statusCode, 200);
+  assert.equal(allowed.body.reason, 'disabled');
+  assert.equal(runs, 1);
+});
+
+test('coldmailing autopilot run uses mail safety only and does not require the send pin or agenda capacity', async () => {
+  let received = null;
+  let agendaTouched = false;
+  const autopilot = createAutopilotRouteHarness({
+    cronSecret: 'cron-secret',
+    coldmailCampaignService: {
+      runColdmailAutopilot: async (payload) => {
+        received = payload;
+        return { ok: true, skipped: false, reason: 'sent', sent: 3 };
+      },
+      getColdmailAutopilotStatus: async () => ({ ok: true, autopilot: { enabled: true } }),
+      updateColdmailAutopilotSettings: async () => ({ ok: true, autopilot: { enabled: true } }),
+    },
+    getEffectivePublicBaseUrl: () => 'https://www.softora.nl',
+    normalizeString: (value) => String(value || '').trim(),
+    backfillInsightsAndAppointmentsFromRecentCallUpdates: () => {
+      agendaTouched = true;
+    },
+    generatedAgendaAppointments: [{ date: '2026-05-21', time: '09:00', manualAllDayUnavailable: true }],
+  });
+
+  const res = await autopilot.cronRun({
+    headers: { authorization: 'Bearer cron-secret' },
+    body: { startConfirmPin: '' },
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.sent, 3);
+  assert.equal(received.actor, 'Coldmail Autopilot Cron');
+  assert.equal(received.force, false);
+  assert.equal(received.publicBaseUrl, 'https://www.softora.nl');
+  assert.equal(Object.prototype.hasOwnProperty.call(received, 'agendaCapacity'), false);
+  assert.equal(agendaTouched, false);
+});
+
+test('coldmailing autopilot settings route stores dashboard configuration through admin access', async () => {
+  let received = null;
+  const autopilot = createAutopilotRouteHarness({
+    coldmailCampaignService: {
+      runColdmailAutopilot: async () => ({ ok: true }),
+      getColdmailAutopilotStatus: async () => ({ ok: true, autopilot: { enabled: false } }),
+      updateColdmailAutopilotSettings: async (payload, actor) => {
+        received = { payload, actor };
+        return { ok: true, autopilot: { enabled: payload.enabled } };
+      },
+    },
+    normalizeString: (value) => String(value || '').trim(),
+  });
+
+  const res = await autopilot.settings({
+    enabled: true,
+    config: {
+      count: 3,
+      senderEmails: ['serve@softora.nl', 'martijn@softora.nl'],
+    },
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.autopilot.enabled, true);
+  assert.equal(received.actor, 'Servé');
+  assert.deepEqual(received.payload.config.senderEmails, ['serve@softora.nl', 'martijn@softora.nl']);
+});
+
 test('coldmailing unsubscribe page asks for confirmation before updating the recipient', async () => {
   let previewReceived = null;
   let unsubscribeCalls = 0;
@@ -407,4 +576,17 @@ test('coldmailing maps overlapping campaign sends to conflict status', () => {
 
   assert.match(routeSource, /COLDMAIL_SEND_IN_PROGRESS/);
   assert.match(routeSource, /\?\s*409/);
+});
+
+test('coldmailing autopilot is wired as a protected Vercel cron', () => {
+  const routeSource = fs.readFileSync(path.join(__dirname, '../../server/routes/coldmailing.js'), 'utf8');
+  const vercelConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../../vercel.json'), 'utf8'));
+
+  assert.match(routeSource, /app\.get\('\/api\/coldmailing\/autopilot\/run', requireColdmailingCronAccess/);
+  assert.match(routeSource, /runColdmailAutopilot/);
+  assert.ok(
+    vercelConfig.crons.some(
+      (cron) => cron.path === '/api/coldmailing/autopilot/run' && cron.schedule === '*/15 * * * *'
+    )
+  );
 });
