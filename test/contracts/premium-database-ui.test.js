@@ -260,7 +260,8 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /nodes\.generatePhotosButton\.hidden = !showPhotoBatchControl;/);
   assert.match(pageSource, /eligibleCount \* WEBSITE_PHOTO_COST_EUR/);
   assert.match(pageSource, /nodes\.photoCostLabel\.innerHTML = "<strong>" \+ formatEuroCost\(totalCost\) \+ "<\/strong>";/);
-  assert.match(pageSource, /URL-scan kost €0,00/);
+  assert.match(pageSource, /AI-foto kost " \+ formatEuroCost\(WEBSITE_PHOTO_COST_EUR\) \+ " per stuk/);
+  assert.doesNotMatch(pageSource, /URL-scan kost €0,00/);
   assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="result-count-icon"/);
   assert.match(pageSource, /<div class="page-title">Database<\/div>/);

@@ -2350,7 +2350,7 @@
             const eligibleCount = (customers || []).filter(isWebdesignPhotoEligible).length;
             const totalCost = eligibleCount * WEBSITE_PHOTO_COST_EUR;
             nodes.photoCostLabel.innerHTML = "<strong>" + formatEuroCost(totalCost) + "</strong>";
-            nodes.photoCostLabel.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. URL-scan kost €0,00.";
+            nodes.photoCostLabel.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. AI-foto kost " + formatEuroCost(WEBSITE_PHOTO_COST_EUR) + " per stuk.";
         }
 
         function renderWebsitePhotoDrop(customer) {
