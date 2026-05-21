@@ -979,7 +979,7 @@ function getOpenAiApiBaseUrl(deps = {}) {
 function getOpenAiDatabaseSearchModel(deps = {}) {
   const env = deps.env || process.env || {};
   return normalizeString(
-    deps.openAiModel || env.OPENAI_DATABASE_SEARCH_MODEL || env.OPENAI_MODEL || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL
+    env.OPENAI_DATABASE_SEARCH_MODEL || deps.openAiDatabaseSearchModel || DEFAULT_OPENAI_DATABASE_SEARCH_MODEL
   );
 }
 

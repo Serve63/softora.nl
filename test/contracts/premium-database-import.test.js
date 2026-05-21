@@ -472,6 +472,7 @@ test('premium database deep search uses OpenAI web search and returns complete r
     {
       env: {
         OPENAI_API_KEY: 'openai-key',
+        OPENAI_DATABASE_SEARCH_MODEL: 'gpt-5.5',
         OPENAI_MODEL: 'gpt-5.5',
         OPENAI_ORGANIZATION_ID: 'org_softora',
         OPENAI_PROJECT_ID: 'proj_softora',
@@ -936,6 +937,23 @@ test('premium database deep search estimate defaults to gpt-5.4 high reasoning',
   assert.equal(result.model, 'gpt-5.4');
   assert.equal(result.reasoningEffort, 'high');
   assert.equal(result.cost.estimatedUsd, 5.325);
+  assert.equal(result.cost.pricing.outputUsdPerMillion, 15);
+});
+
+test('premium database deep search ignores the generic OPENAI_MODEL fallback', () => {
+  const result = estimateDeepSearchBusinessRunCost(
+    { count: 25 },
+    {
+      env: {
+        OPENAI_MODEL: 'gpt-5.1',
+      },
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.model, 'gpt-5.4');
+  assert.equal(result.reasoningEffort, 'high');
+  assert.equal(result.cost.estimatedUsd, 0.55);
   assert.equal(result.cost.pricing.outputUsdPerMillion, 15);
 });
 
