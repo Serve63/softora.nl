@@ -59,10 +59,6 @@
     {
       "path": "/api/mailbox/sync",
       "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/coldmailing/autopilot/run",
-      "schedule": "*/15 * * * *"
     }
   ],
   "headers": [
