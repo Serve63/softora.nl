@@ -20,8 +20,8 @@ function getOpenAiTextModelRates(modelRaw) {
     ['gpt-4.1-nano', 0.1, 0.025, 0.4], ['gpt-4.1', 2, 0.5, 8],
     ['gpt-4o-mini', 0.15, 0.075, 0.6], ['gpt-4o', 2.5, 1.25, 10],
   ].find(([name]) => key.includes(name));
-  const [, input, cachedInput, output] = match || ['default', 1, 0, 4];
-  return { input, cachedInput, output, source: OPENAI_PRICING_SOURCE_URL };
+  const [model, input, cachedInput, output] = match || ['default', 1, 0, 4];
+  return { model, input, cachedInput, output, source: OPENAI_PRICING_SOURCE_URL };
 }
 
 function getOpenAiImageCostUsdPerImage(modelRaw, sizeRaw, deps = {}) {
