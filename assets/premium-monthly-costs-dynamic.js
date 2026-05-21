@@ -5,6 +5,7 @@
   const API_COST_SUMMARY_ENDPOINT = '/api/api-cost-summary?scope=month';
   const SUPABASE_COST_SUMMARY_ENDPOINT = '/api/supabase/cost-summary';
   const POLL_INTERVAL_MS = 15000;
+  const API_COST_POLL_INTERVAL_MS = 60 * 1000;
   const BILLING_POLL_INTERVAL_MS = 5 * 60 * 1000;
   const BILLING_RETRY_INTERVAL_MS = 10000;
   const BILLING_RETRY_MAX_ATTEMPTS = 18;
@@ -24,6 +25,7 @@
   let apiCostRefreshPromise = null;
   let supabaseCostRefreshPromise = null;
   let pollTimer = null;
+  let apiCostPollTimer = null;
   let billingPollTimer = null;
   let apiCostRetryTimer = null;
   let apiCostRetryAttempts = 0;
@@ -558,7 +560,9 @@
   }
 
   async function fetchApiCostSummary() {
-    const response = await fetch(API_COST_SUMMARY_ENDPOINT, {
+    const url = new URL(API_COST_SUMMARY_ENDPOINT, window.location.origin);
+    url.searchParams.set('_', String(Date.now()));
+    const response = await fetch(url.toString(), {
       method: 'GET',
       cache: 'no-store',
     });
@@ -689,9 +693,14 @@
       }, POLL_INTERVAL_MS);
     }
 
-    if ((hasApiCostItem || hasSupabaseCostItem) && !billingPollTimer) {
-      billingPollTimer = window.setInterval(function () {
+    if (hasApiCostItem && !apiCostPollTimer) {
+      apiCostPollTimer = window.setInterval(function () {
         void refreshMonthlyApiCosts();
+      }, API_COST_POLL_INTERVAL_MS);
+    }
+
+    if (hasSupabaseCostItem && !billingPollTimer) {
+      billingPollTimer = window.setInterval(function () {
         void refreshMonthlySupabaseCosts();
       }, BILLING_POLL_INTERVAL_MS);
     }

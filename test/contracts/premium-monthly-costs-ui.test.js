@@ -114,7 +114,7 @@ test('premium terugkerende kosten toont dynamische posten bovenaan met paarse st
   assert.match(combinedSource, /window\.softoraMonthlyCostsData = data;/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsRender = render;/);
   assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260518b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260521c" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260521d" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(combinedSource, /function createCategoryHeader\(cat, catTotal\) \{/);
   assert.match(combinedSource, /appendCostTextElement\(header, 'div', 'category-title', cat\);/);
@@ -209,6 +209,7 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /const COST_SUMMARY_ENDPOINT = '\/api\/coldcalling\/cost-summary\?scope=month';/);
   assert.match(scriptSource, /const API_COST_SUMMARY_ENDPOINT = '\/api\/api-cost-summary\?scope=month';/);
   assert.match(scriptSource, /const SUPABASE_COST_SUMMARY_ENDPOINT = '\/api\/supabase\/cost-summary';/);
+  assert.match(scriptSource, /const API_COST_POLL_INTERVAL_MS = 60 \* 1000;/);
   assert.match(scriptSource, /const BILLING_POLL_INTERVAL_MS = 5 \* 60 \* 1000;/);
   assert.match(scriptSource, /async function fetchMonthlyCostSummary\(\)/);
   assert.match(scriptSource, /async function fetchApiCostSummary\(\)/);
@@ -256,6 +257,7 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /let coldcallingRefreshPromise = null;/);
   assert.match(scriptSource, /let apiCostRefreshPromise = null;/);
   assert.match(scriptSource, /let supabaseCostRefreshPromise = null;/);
+  assert.match(scriptSource, /let apiCostPollTimer = null;/);
   assert.match(scriptSource, /let billingPollTimer = null;/);
   assert.match(scriptSource, /const hasApiCostItem = Boolean\(resolveApiCostItem\(\)\);/);
   assert.match(scriptSource, /const hasSupabaseCostItem = Boolean\(resolveSupabaseCostItem\(\)\);/);
@@ -265,6 +267,11 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   );
   assert.match(
     scriptSource,
-    /billingPollTimer = window\.setInterval\(function \(\) \{\s*void refreshMonthlyApiCosts\(\);\s*void refreshMonthlySupabaseCosts\(\);\s*\}, BILLING_POLL_INTERVAL_MS\);/
+    /apiCostPollTimer = window\.setInterval\(function \(\) \{\s*void refreshMonthlyApiCosts\(\);\s*\}, API_COST_POLL_INTERVAL_MS\);/
   );
+  assert.match(
+    scriptSource,
+    /billingPollTimer = window\.setInterval\(function \(\) \{\s*void refreshMonthlySupabaseCosts\(\);\s*\}, BILLING_POLL_INTERVAL_MS\);/
+  );
+  assert.match(scriptSource, /url\.searchParams\.set\('_', String\(Date\.now\(\)\)\);/);
 });
