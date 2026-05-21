@@ -581,6 +581,109 @@ test('premium database deep search uses OpenAI web search and returns complete r
   assert.equal(result.sources[0].url, 'https://bakkerijzon.nl/contact');
 });
 
+test('premium database deep search retries temporary OpenAI rate limits', async () => {
+  const calls = [];
+  const result = await fetchDeepSearchBusinessRows(
+    {
+      target: 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk',
+      count: 25,
+    },
+    {
+      env: { OPENAI_API_KEY: 'openai-key' },
+      openAiRateLimitRetryDelayMs: 0,
+      fetchImpl: async (url, options = {}) => {
+        calls.push({ url: String(url), options });
+        if (calls.length === 1) {
+          return {
+            ok: false,
+            status: 429,
+            headers: {
+              get(name) {
+                return name.toLowerCase() === 'retry-after' ? '0.001' : '';
+              },
+            },
+            async json() {
+              return {
+                error: {
+                  code: 'rate_limit_exceeded',
+                  message: 'Rate limit reached. Please try again in 0.001s.',
+                },
+              };
+            },
+          };
+        }
+        return {
+          ok: true,
+          async json() {
+            return {
+              output_text: JSON.stringify({
+                target: 'Oisterwijk',
+                businesses: [
+                  {
+                    bedrijfsnaam: 'Oisterwijk Zeker BV',
+                    adres: 'Dorpsstraat 10, 5061 HJ Oisterwijk',
+                    email: 'info@oisterwijkzeker.nl',
+                    telefoonnummer: '013 123 4567',
+                    website: 'https://oisterwijkzeker.nl',
+                    bronnen: ['https://oisterwijkzeker.nl/contact'],
+                  },
+                ],
+                placeComplete: false,
+                completionReason: '',
+                notes: '',
+              }),
+              output: [],
+              usage: {
+                input_tokens: 100,
+                output_tokens: 50,
+              },
+            };
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(calls.length, 2);
+  assert.equal(result.ok, true);
+  assert.equal(result.found, 1);
+  assert.equal(result.businesses[0].bedrijfsnaam, 'Oisterwijk Zeker BV');
+});
+
+test('premium database deep search hides raw OpenAI rate limit text after retries', async () => {
+  await assert.rejects(
+    fetchDeepSearchBusinessRows(
+      {
+        target: 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk',
+        count: 25,
+      },
+      {
+        env: { OPENAI_API_KEY: 'openai-key' },
+        openAiRateLimitRetries: 0,
+        fetchImpl: async () => ({
+          ok: false,
+          status: 429,
+          async json() {
+            return {
+              error: {
+                code: 'rate_limit_exceeded',
+                message: 'Rate limit reached for gpt-5.4 in organization org-example.',
+              },
+            };
+          },
+        }),
+      }
+    ),
+    (error) => {
+      assert.equal(error.code, 'OPENAI_DEEP_SEARCH_RATE_LIMIT');
+      assert.equal(error.statusCode, 429);
+      assert.match(error.message, /OpenAI-snelheidslimiet geraakt/);
+      assert.doesNotMatch(error.message, /org-example/);
+      return true;
+    }
+  );
+});
+
 test('premium database deep search reports OpenAI aborts as a clean timeout', async () => {
   await assert.rejects(
     fetchDeepSearchBusinessRows(
