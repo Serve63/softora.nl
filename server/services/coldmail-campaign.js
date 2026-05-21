@@ -2238,11 +2238,14 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function getColdmailAutopilotSenderCandidates(state, settings) {
+    const explicit = normalizeColdmailAutopilotSenderEmails([
+      ...(state.config.senderEmails || []),
+      state.config.senderEmail,
+    ]);
+    if (explicit.length) return explicit;
     const configured = getConfiguredSenderEmails();
     const allowed = getAllowedSenderEmails();
     const selected = normalizeColdmailAutopilotSenderEmails([
-      ...(state.config.senderEmails || []),
-      state.config.senderEmail,
       settings && settings.senderEmail,
       ...configured,
       ...allowed,
