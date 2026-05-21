@@ -544,6 +544,34 @@ function estimateOpenAiImageUsageUsd(result = {}, deps = {}) {
   };
 }
 
+function getOpenAiWebSearchUsdPerCall(deps = {}) {
+  const env = deps.env || process.env || {};
+  const explicit = Number(deps.openAiWebSearchUsdPerCall || env.OPENAI_WEB_SEARCH_USD_PER_CALL);
+  if (Number.isFinite(explicit) && explicit >= 0) return explicit;
+  return OPENAI_WEB_SEARCH_USD_PER_CALL;
+}
+
+function estimateOpenAiWebSearchUsageUsd(result = {}, deps = {}) {
+  const callCount = Math.max(
+    0,
+    Number(
+      result.num_model_requests ??
+        result.num_web_search_calls ??
+        result.web_search_calls ??
+        result.num_requests ??
+        result.requests ??
+        result.count ??
+        0
+    ) || 0
+  );
+  if (callCount <= 0) return { usd: 0, webSearchCalls: 0, requestCount: 0 };
+  return {
+    usd: callCount * getOpenAiWebSearchUsdPerCall(deps),
+    webSearchCalls: callCount,
+    requestCount: callCount,
+  };
+}
+
 function collectOpenAiUsageEstimate(data, deps = {}, usageType = 'text') {
   const currencies = {};
   const totals = {
@@ -567,7 +595,9 @@ function collectOpenAiUsageEstimate(data, deps = {}, usageType = 'text') {
       const estimate =
         usageType === 'images'
           ? estimateOpenAiImageUsageUsd(result, deps)
-          : estimateOpenAiTextUsageUsd(result);
+          : usageType === 'web_search_calls'
+            ? estimateOpenAiWebSearchUsageUsd(result, deps)
+            : estimateOpenAiTextUsageUsd(result);
       addCurrencyAmount(currencies, 'usd', estimate.usd);
       addUsageTotals(totals, estimate);
     });
@@ -1080,6 +1110,12 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
       groupBy: ['model', 'size', 'source', 'project_id'],
       usageType: 'images',
     },
+    {
+      key: 'web_search_calls',
+      path: '/organization/usage/web_search_calls',
+      groupBy: ['model', 'context_level', 'project_id'],
+      usageType: 'web_search_calls',
+    },
   ];
   const currencies = {};
   const usage = {
@@ -1093,9 +1129,21 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
     webSearchCalls: 0,
   };
   const endpointSummaries = [];
+  const endpointsUnavailable = [];
 
   for (const endpoint of endpoints) {
-    const summary = await fetchOpenAiUsageEstimateForEndpoint(deps, window, endpoint);
+    let summary;
+    try {
+      summary = await fetchOpenAiUsageEstimateForEndpoint(deps, window, endpoint);
+    } catch (error) {
+      endpointsUnavailable.push({
+        key: endpoint.key,
+        path: endpoint.path,
+        error: error.code || 'OPENAI_USAGE_ENDPOINT_FAILED',
+        detail: sanitizeOpenAiCostDetail(error.detail || error.message || 'OpenAI usage endpoint niet beschikbaar.'),
+      });
+      continue;
+    }
     endpointSummaries.push(summary);
     Object.entries(summary.currencies).forEach(([currency, amount]) => {
       addCurrencyAmount(currencies, currency, amount);
@@ -1105,8 +1153,16 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
     usage.resultCount += summary.resultCount;
   }
 
-  const webSearchUsd = usage.webSearchCalls * OPENAI_WEB_SEARCH_USD_PER_CALL;
-  addCurrencyAmount(currencies, 'usd', webSearchUsd);
+  if (endpointSummaries.length === 0 && endpointsUnavailable.length > 0) {
+    const first = endpointsUnavailable[0];
+    throw createServiceError(
+      'OpenAI usage kon niet worden opgehaald',
+      first.error || 'OPENAI_USAGE_FETCH_FAILED',
+      502,
+      first.detail || 'Geen enkele OpenAI usage endpoint was beschikbaar.'
+    );
+  }
+
   const costUsd = Number((currencies.usd || 0).toFixed(8));
   const costEurDirect = Number((currencies.eur || 0).toFixed(8));
   const usdToEurRateDetails = await resolveUsdToEurRateDetails(deps);
@@ -1151,8 +1207,10 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
       cachedInputTokens: summary.cachedInputTokens,
       outputTokens: summary.outputTokens,
       imageCount: summary.imageCount,
+      webSearchCalls: summary.webSearchCalls,
       pageCount: summary.pageCount,
     })),
+    endpointsUnavailable,
     note: 'OpenAI Usage API schatting; gebruikt totdat de Organization Costs API de nieuwste kosten heeft verwerkt.',
   };
 }

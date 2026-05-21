@@ -478,6 +478,105 @@ test('openai usage estimate can estimate text token usage', async () => {
   assert.equal(summary.outputTokens, 500);
 });
 
+test('openai usage estimate includes web search tool calls', async () => {
+  const calls = [];
+  const summary = await fetchOpenAiUsageEstimateSummary(
+    {
+      openAiCostsApiKey: 'openai-admin-key',
+      openAiProjectId: 'proj-softora',
+      usdToEurRate: 1,
+      fetchJsonWithTimeout: async (url) => {
+        calls.push(url);
+        if (url.includes('/organization/usage/web_search_calls')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              data: [
+                {
+                  results: [
+                    {
+                      model: 'gpt-5',
+                      context_level: 'medium',
+                      num_model_requests: 12,
+                      project_id: 'proj-softora',
+                    },
+                  ],
+                },
+              ],
+              has_more: false,
+            },
+          };
+        }
+        return {
+          response: { ok: true, status: 200 },
+          data: { data: [{ results: [] }], has_more: false },
+        };
+      },
+      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 4, 21, 0, 35, 0) }
+  );
+
+  const webSearchEndpoint = summary.endpoints.find((endpoint) => endpoint.key === 'web_search_calls');
+  const webSearchCall = calls.find((url) => url.includes('/organization/usage/web_search_calls'));
+
+  assert.equal(summary.costUsd, 0.12);
+  assert.equal(summary.costEur, 0.12);
+  assert.equal(summary.webSearchCalls, 12);
+  assert.equal(webSearchEndpoint.webSearchCalls, 12);
+  assert.match(webSearchCall, /project_ids=proj-softora/);
+  assert.match(webSearchCall, /group_by=context_level/);
+});
+
+test('openai usage estimate keeps other usage when one usage endpoint fails', async () => {
+  const summary = await fetchOpenAiUsageEstimateSummary(
+    {
+      openAiCostsApiKey: 'openai-admin-key',
+      usdToEurRate: 1,
+      fetchJsonWithTimeout: async (url) => {
+        if (url.includes('/organization/usage/completions')) {
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              data: [
+                {
+                  results: [
+                    {
+                      model: 'gpt-4.1',
+                      input_tokens: 1000,
+                      input_cached_tokens: 250,
+                      output_tokens: 500,
+                      num_model_requests: 1,
+                    },
+                  ],
+                },
+              ],
+              has_more: false,
+            },
+          };
+        }
+        if (url.includes('/organization/usage/web_search_calls')) {
+          return {
+            response: { ok: false, status: 400 },
+            data: { error: { message: 'unsupported usage endpoint' } },
+          };
+        }
+        return {
+          response: { ok: true, status: 200 },
+          data: { data: [{ results: [] }], has_more: false },
+        };
+      },
+      openAiCostsApiBaseUrl: 'https://api.openai.test/v1',
+    },
+    { scope: 'month', nowMs: Date.UTC(2026, 4, 21, 0, 35, 0) }
+  );
+
+  assert.equal(summary.costUsd, 0.005625);
+  assert.equal(summary.requestCount, 1);
+  assert.equal(summary.endpointsUnavailable.length, 1);
+  assert.equal(summary.endpointsUnavailable[0].key, 'web_search_calls');
+});
+
 test('openai costs service fails closed when no costs key is configured', async () => {
   await assert.rejects(
     () =>
