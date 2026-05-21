@@ -55,7 +55,11 @@ const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'SMTP_TRANSPORT_UNAVAILABLE',
 ]);
 const COLDMAIL_SMTP_SAFETY_STOP_PATTERN =
-  /\b(transmit rate limit|rate limited|too many recipients|too many concurrent|no spam please|b-url|b-text|b-score|b-ex|suspected phishing|mailbox is blocked|mailbox is disabled|not allowed to send|sender not authorized|no authorization to send|dmarc|spf failed|insufficient privacy|tls required)\b/i;
+  /\b(transmit rate limit|rate limited|too many recipients|too many messages|too many concurrent|no spam please|b-url|b-text|b-score|b-ex|suspected phishing|spam detected|spamverdacht|spam complaint|mailbox is blocked|mailbox is disabled|mailbox restricted|account restricted|account suspended|not allowed to send|sender not authorized|no authorization to send|mailversand gesperrt|versand gesperrt|versandlimit|sperrung|verzendlimiet|verzendblokkade|geblokkeerd|blokkade|dmarc|spf failed|spf|insufficient privacy|tls required)\b/i;
+const COLDMAIL_PROVIDER_WARNING_SENDER_PATTERN =
+  /\b(strato|mailer-daemon|postmaster|mail delivery|delivery subsystem|abuse|security|noreply|no-reply|support|kundenservice|customer service)\b/i;
+const COLDMAIL_PROVIDER_WARNING_SUBJECT_PATTERN =
+  /\b(strato|smtp|mailbox|mailserver|mail server|e-mail|email|account|delivery|bezorging|mail delivery|sending|verzenden|blocked|geblokkeerd|warning|waarschuwing|spam|phishing|dmarc|spf|rate limit|limiet|sperrung|versandlimit)\b/i;
 const COLDMAIL_DELIVERY_FAILURE_PATTERN =
   /\b(delivery status notification|undeliverable|undelivered mail|mail delivery failed|delivery has failed|failure notice|returned mail|unzustellbar|unzustellbarkeitsmail|niet bezorgd|onbestelbaar|bezorging mislukt|final-recipient|diagnostic-code)\b/i;
 const COLDMAIL_HARD_BOUNCE_PATTERN =
@@ -1388,6 +1392,8 @@ function createColdmailCampaignService(deps = {}) {
       normalizeString(from.name),
       normalizeString(inboundText),
       normalizeString(parsedMail && parsedMail.text),
+      normalizeString(parsedMail && parsedMail.textAsHtml),
+      normalizeString(parsedMail && parsedMail.html),
     ].join('\n');
   }
 
@@ -1431,6 +1437,20 @@ function createColdmailCampaignService(deps = {}) {
       bounceType: 'unknown',
       disableMail: false,
     };
+  }
+
+  function getColdmailProviderWarningSafetyReason(parsedMail, inboundText) {
+    const text = buildColdmailDeliveryFailureText(parsedMail, inboundText);
+    const safetyReason = getSmtpSafetyStopReason({ message: text });
+    if (!safetyReason) return '';
+    const from = getParsedMailFromEmail(parsedMail);
+    const fromText = normalizeString(`${from.address} ${from.name}`);
+    const subject = normalizeString(parsedMail && parsedMail.subject);
+    const providerLike =
+      COLDMAIL_PROVIDER_WARNING_SENDER_PATTERN.test(fromText) ||
+      COLDMAIL_PROVIDER_WARNING_SUBJECT_PATTERN.test(subject) ||
+      isColdmailDeliveryFailureMessage(parsedMail, inboundText);
+    return providerLike ? safetyReason : '';
   }
 
   function extractEmailAddressesFromText(value) {
@@ -4436,6 +4456,7 @@ function createColdmailCampaignService(deps = {}) {
         softBounced: 0,
         bounceUpdated: 0,
         bounceSkipped: 0,
+        providerWarnings: 0,
         errors: [],
       };
       const dbState = await getUiStateValues(customerDbScope);
@@ -4494,10 +4515,40 @@ function createColdmailCampaignService(deps = {}) {
 
               const inboundText = getInboundReplyText(parsedMail);
               const deliveryFailure = classifyColdmailDeliveryFailure(parsedMail, inboundText);
+              const providerWarningSafetyReason = getColdmailProviderWarningSafetyReason(parsedMail, inboundText);
+              let providerWarningPause = null;
+              const from = getParsedMailFromEmail(parsedMail);
+              if (providerWarningSafetyReason) {
+                providerWarningPause = await recordColdmailSafetyPause({
+                  senderEmail: resolveInboundMailboxAccount(parsedMail),
+                  reason: providerWarningSafetyReason,
+                  error: providerWarningSafetyReason,
+                  actor: 'coldmail-provider-warning',
+                });
+                stats.providerWarnings += 1;
+                stats.safetyPausedUntil = providerWarningPause.until;
+                replyState.processed[processedKey] = {
+                  at: now().toISOString(),
+                  from: from.address,
+                  subject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+                  lifecycleIntent: 'provider_warning',
+                  safetyPauseUntil: providerWarningPause.until,
+                  safetyPauseReason: providerWarningPause.reason,
+                };
+                await saveColdmailReplyState(replyState, 'coldmail-provider-warning');
+              }
               const match = deliveryFailure
                 ? findColdmailRowForDeliveryFailure(parsedMail, inboundText, rows)
                 : findColdmailRowForInboundReply(parsedMail, rows);
               if (!match || (!inboundText && !deliveryFailure)) {
+                if (providerWarningPause) {
+                  const flagsSet =
+                    message.flags instanceof Set
+                      ? message.flags
+                      : new Set(Array.isArray(message.flags) ? message.flags : []);
+                  if (!flagsSet.has('\\Seen')) uidsToMarkSeen.push(message.uid);
+                  continue;
+                }
                 stats.ignored += 1;
                 continue;
               }
@@ -4507,7 +4558,6 @@ function createColdmailCampaignService(deps = {}) {
               }
 
               stats.matched += 1;
-              const from = getParsedMailFromEmail(parsedMail);
               try {
                 if (deliveryFailure && bounceProcessingEnabled) {
                   try {
