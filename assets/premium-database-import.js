@@ -310,6 +310,8 @@
         const updateExisting = Boolean(options && options.updateExisting);
         const mergedCustomers = (existingCustomers || []).slice();
         const keyIndex = indexCustomersBySyncKeys(mergedCustomers);
+        const addedCustomers = [];
+        const updatedCustomers = [];
         let addedCount = 0;
         let updatedCount = 0;
 
@@ -319,6 +321,7 @@
                 const newIndex = mergedCustomers.length;
                 mergedCustomers.push(customer);
                 addCustomerSyncKeysToIndex(keyIndex, customer, newIndex);
+                addedCustomers.push(customer);
                 addedCount += 1;
                 return;
             }
@@ -328,6 +331,7 @@
             if (updated !== mergedCustomers[existingIndex]) {
                 mergedCustomers[existingIndex] = updated;
                 addCustomerSyncKeysToIndex(keyIndex, updated, existingIndex);
+                updatedCustomers.push(updated);
                 updatedCount += 1;
             }
         });
@@ -335,7 +339,9 @@
         return {
             customers: mergedCustomers,
             addedCount: addedCount,
-            updatedCount: updatedCount
+            updatedCount: updatedCount,
+            addedCustomers: addedCustomers,
+            updatedCustomers: updatedCustomers
         };
     }
 

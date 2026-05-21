@@ -1088,8 +1088,7 @@ function estimateDeepSearchBusinessRunCost(input = {}, deps = {}) {
     estimateOnly: true,
     cost: {
       ...cost,
-      note:
-        'Voorcalculatie op basis van het actieve deep-search model; er is geen OpenAI-call uitgevoerd.',
+      note: 'Voorcalculatie op basis van het actieve deep-search model; er is geen OpenAI-call uitgevoerd.',
     },
   };
 }
@@ -1155,11 +1154,51 @@ function normalizedTextIncludesPhrase(text, phrase) {
   return normalizedText.includes(` ${normalizedPhrase} `);
 }
 
+function splitDeepSearchAddressSegments(address) {
+  return normalizeString(address)
+    .split(/[,;\n|]+/)
+    .map((part) => normalizeString(part))
+    .filter(Boolean);
+}
+
+function hasDutchPostcode(value) {
+  return /\b[1-9][0-9]{3}\s?[a-z]{2}\b/i.test(normalizeString(value));
+}
+
+function hasStreetNumberSignal(value) {
+  const raw = normalizeString(value);
+  return /[a-z]/i.test(raw) && /\b\d{1,5}\s?[a-z]?\b/i.test(raw);
+}
+
+function isServiceAreaText(value) {
+  const normalized = normalizeDeepSearchLocationText(value);
+  return /\b(?:werkgebied|servicegebied|actief|werkzaam|bedient|regio|omgeving|bezorgt|levering)\b/.test(
+    normalized
+  );
+}
+
+function addressHasPhysicalPlaceAlias(address, alias) {
+  const segments = splitDeepSearchAddressSegments(address);
+  if (!segments.length) return false;
+  return segments.some((segment, index) => {
+    if (!normalizedTextIncludesPhrase(segment, alias)) return false;
+    const previous = segments[index - 1] || '';
+    const next = segments[index + 1] || '';
+    const localContext = [previous, segment, next].filter(Boolean).join(', ');
+    const hasPhysicalSignal =
+      hasDutchPostcode(segment) ||
+      hasDutchPostcode(localContext) ||
+      hasStreetNumberSignal(segment) ||
+      (hasStreetNumberSignal(previous) && !isServiceAreaText(segment));
+    return hasPhysicalSignal && !isServiceAreaText(segment);
+  });
+}
+
 function deepSearchBusinessMatchesTarget(business, targetParts) {
   const place = normalizeString(targetParts && targetParts.place);
   if (!place) return true;
   return buildDeepSearchPlaceAliases(place).some((alias) =>
-    normalizedTextIncludesPhrase(business && business.adres, alias)
+    addressHasPhysicalPlaceAlias(business && business.adres, alias)
   );
 }
 
@@ -1214,9 +1253,7 @@ function addDeepSearchExcludeDomain(keys, value) {
 function addDeepSearchExcludeCompanyAddress(keys, company, address) {
   const companyKey = normalizeImportKey(company);
   const addressKey = normalizeImportKey(address);
-  if (companyKey && addressKey) {
-    addDeepSearchExcludeKey(keys, `company-address:${companyKey}|${addressKey}`);
-  }
+  if (companyKey && addressKey) addDeepSearchExcludeKey(keys, `company-address:${companyKey}|${addressKey}`);
 }
 
 function addDeepSearchExcludeItemKeys(keys, item) {
@@ -1246,9 +1283,7 @@ function addDeepSearchExcludeItemKeys(keys, item) {
     .forEach((part) => addDeepSearchExcludeDomain(keys, part));
 
   const parts = raw.split('|').map((part) => normalizeString(part)).filter(Boolean);
-  if (parts.length >= 2) {
-    addDeepSearchExcludeCompanyAddress(keys, parts[0], parts[parts.length - 1]);
-  }
+  if (parts.length >= 2) addDeepSearchExcludeCompanyAddress(keys, parts[0], parts[parts.length - 1]);
 }
 
 function buildDeepSearchExcludeKeySet(items) {
@@ -1329,6 +1364,7 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber }) {
     '- Als een van deze velden ontbreekt, lever het bedrijf niet aan.',
     '- Gebruik bij voorkeur de officiele bedrijfswebsite als bron voor e-mail en telefoon.',
     '- Website mag een domein of volledige URL zijn, maar moet echt bij het bedrijf horen.',
+    '- Minimaal één bron per bedrijf moet op hetzelfde domein staan als de opgegeven website.',
     '- Vermijd dubbele bedrijven, handelsnamen met dezelfde website en eerder gevonden resultaten.',
     '- Gebruik bronnen als URL-lijst per bedrijf, zodat de controle zichtbaar blijft.',
     '- Als je bedrijven teruggeeft, zet placeComplete op false, ook als je denkt dat dit misschien de laatste lading is.',
@@ -1470,6 +1506,15 @@ function getDeepSearchBusinessKeys(business) {
   return keys.filter((key) => !key.endsWith(':') && !key.endsWith('|'));
 }
 
+function deepSearchBusinessHasOfficialWebsiteSource(business) {
+  const websiteDomain = normalizeWebsiteDomain(business && business.website);
+  if (!websiteDomain) return false;
+  return (business && Array.isArray(business.bronnen) ? business.bronnen : []).some((source) => {
+    const sourceDomain = normalizeWebsiteDomain(source);
+    return sourceDomain === websiteDomain || sourceDomain.endsWith(`.${websiteDomain}`);
+  });
+}
+
 function dedupeDeepSearchBusinesses(businesses, targetParts = {}, excludeItems = []) {
   const seen = new Set();
   const excluded = buildDeepSearchExcludeKeySet(excludeItems);
@@ -1478,6 +1523,7 @@ function dedupeDeepSearchBusinesses(businesses, targetParts = {}, excludeItems =
     const normalized = normalizeDeepSearchBusiness(business);
     if (!normalized) return;
     if (!deepSearchBusinessMatchesTarget(normalized, targetParts)) return;
+    if (!deepSearchBusinessHasOfficialWebsiteSource(normalized)) return;
     const keys = getDeepSearchBusinessKeys(normalized);
     if (keys.some((key) => excluded.has(key))) return;
     if (keys.some((key) => seen.has(key))) return;

@@ -713,6 +713,66 @@ test('premium database deep search keeps a compact prompt but hard-filters the f
   assert.deepEqual(result.businesses.map((business) => business.website), ['nieuwzeker.nl']);
 });
 
+test('premium database deep search rejects service-area addresses and source mismatches', async () => {
+  const result = await fetchDeepSearchBusinessRows(
+    {
+      target: 'Nederland | Noord-Brabant | Etten-Leur | Etten-Leur',
+      count: 100,
+    },
+    {
+      env: { OPENAI_API_KEY: 'openai-key' },
+      fetchImpl: async () => ({
+        ok: true,
+        async json() {
+          return {
+            output_text: JSON.stringify({
+              target: 'Etten-Leur',
+              businesses: [
+                {
+                  bedrijfsnaam: 'Servicegebied BV',
+                  adres: 'Werkgebied Etten-Leur, kantoor Rotterdam',
+                  email: 'info@servicegebied.nl',
+                  telefoonnummer: '010 111 1111',
+                  website: 'https://servicegebied.nl',
+                  bronnen: ['https://servicegebied.nl/contact'],
+                },
+                {
+                  bedrijfsnaam: 'Bron Mismatch BV',
+                  adres: 'Markt 1, 4871 AA Etten-Leur',
+                  email: 'info@bronmismatch.nl',
+                  telefoonnummer: '076 222 2222',
+                  website: 'https://bronmismatch.nl',
+                  bronnen: ['https://bedrijvenplatform.example/contact'],
+                },
+                {
+                  bedrijfsnaam: 'Etten Zeker BV',
+                  adres: 'Markt 2, 4871 BB Etten-Leur',
+                  email: 'info@ettenzeker.nl',
+                  telefoonnummer: '076 333 3333',
+                  website: 'https://ettenzeker.nl',
+                  bronnen: ['https://ettenzeker.nl/contact'],
+                },
+              ],
+              placeComplete: false,
+              completionReason: '',
+              notes: '',
+            }),
+            output: [],
+            usage: {
+              input_tokens: 100,
+              output_tokens: 80,
+            },
+          };
+        },
+      }),
+    }
+  );
+
+  assert.equal(result.found, 1);
+  assert.equal(result.rejected, 2);
+  assert.deepEqual(result.businesses.map((business) => business.website), ['ettenzeker.nl']);
+});
+
 test('premium database deep search keeps productive batches open for follow-up', async () => {
   const result = await fetchDeepSearchBusinessRows(
     {
@@ -909,6 +969,48 @@ test('premium database deep search estimate route returns model-aware costs', ()
   assert.equal(response.body.model, 'gpt-5.1');
   assert.equal(response.body.cost.estimatedUsd, 3.5525);
   assert.equal(response.body.cost.pricing.outputUsdPerMillion, 10);
+});
+
+test('premium database deep search estimate route returns model-aware costs without calling OpenAI', () => {
+  const estimate = estimateDeepSearchBusinessRunCost(
+    { count: 25 },
+    { env: { OPENAI_DATABASE_SEARCH_MODEL: 'gpt-5.5', OPENAI_DATABASE_SEARCH_REASONING_EFFORT: 'high' } }
+  );
+
+  assert.equal(estimate.ok, true);
+  assert.equal(estimate.source, 'openai-web-search-estimate');
+  assert.equal(estimate.requested, 25);
+  assert.equal(estimate.model, 'gpt-5.5');
+  assert.equal(estimate.reasoningEffort, 'high');
+  assert.equal(estimate.cost.currency, 'USD');
+  assert.equal(estimate.cost.inputTokens, 6000);
+  assert.equal(estimate.cost.outputTokens, 35000);
+  assert.equal(estimate.cost.webSearchCalls, 1);
+});
+
+test('premium database deep search estimate route is wired through the coordinator', () => {
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    env: { OPENAI_DATABASE_SEARCH_MODEL: 'gpt-5.5' },
+  });
+  const response = {
+    statusCode: 0,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  coordinator.sendDeepSearchEstimateResponse({ query: { count: '25' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.requested, 25);
+  assert.equal(response.body.model, 'gpt-5.5');
 });
 
 test('premium database deep search route accepts an automatically completed empty place', async () => {
