@@ -29,12 +29,6 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
-const MAILBOX_SENDER_CTA_LINKS = Object.freeze({
-  'martijn@softora.nl': {
-    text: '💼 Mijn LinkedIn 👈',
-    url: 'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios',
-  },
-});
 function countCharacter(value, character) {
   return String(value || '').split(character).length - 1;
 }
@@ -59,19 +53,6 @@ function isSafeMailBodyUrl(value) {
     return false;
   }
 }
-function getMailboxSenderCtaLink(options) {
-  const mail = options && options.mail;
-  const candidates = [
-    options && options.senderEmail,
-    mail && mail.email,
-    activeMailboxAccount,
-  ];
-  for (const candidate of candidates) {
-    const email = normalizeMailboxEmail(candidate);
-    if (MAILBOX_SENDER_CTA_LINKS[email]) return MAILBOX_SENDER_CTA_LINKS[email];
-  }
-  return null;
-}
 function renderLinkedMailboxText(value, options) {
   const text = String(value == null ? '' : value);
   let html = '';
@@ -88,13 +69,7 @@ function renderLinkedMailboxText(value, options) {
     return match;
   });
   html += escapeHtml(text.slice(lastIndex));
-  const cta = getMailboxSenderCtaLink(options);
-  if (cta && text.includes(cta.text) && isSafeMailBodyUrl(cta.url)) {
-    const label = escapeHtml(cta.text);
-    const link = `<a href="${escapeHtml(cta.url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
-    html = html.split(label).join(link);
-  }
-  return html;
+  return window.SoftoraMailboxDisplay.applySenderCtaLinks(html, text, options, { escapeHtml, isSafeUrl: isSafeMailBodyUrl });
 }
 function normalizeMailboxEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -498,8 +473,7 @@ function normalizeMailboxBodyImages(images) {
 function renderMailBody(value, images, options) {
   const imageState = {
     images: normalizeMailboxBodyImages(images),
-    optOutUrl: normalizeMailboxOptOutUrl(options && options.optOutUrl),
-    senderEmail: normalizeMailboxEmail((options && options.senderEmail) || (options && options.mail && options.mail.email) || activeMailboxAccount),
+    optOutUrl: normalizeMailboxOptOutUrl(options && options.optOutUrl), senderEmail: normalizeMailboxEmail((options && options.senderEmail) || (options && options.mail && options.mail.email) || activeMailboxAccount),
     usedImages: new Set()
   };
   const sections = buildMailboxBodySections(value);

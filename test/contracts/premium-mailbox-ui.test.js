@@ -104,7 +104,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260520a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260522a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260520a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260522a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
@@ -402,9 +402,9 @@ test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
   ].join('\n'));
 
   assert.match(scriptSource, /const MAIL_BODY_URL_PATTERN = \/https\?:\\\/\\\/\[\^\\s<>"'\]\+\/gi;/);
-  assert.match(scriptSource, /const MAILBOX_SENDER_CTA_LINKS = Object\.freeze/);
-  assert.match(scriptSource, /'martijn@softora\.nl': \{\s*text: '💼 Mijn LinkedIn 👈',\s*url: 'https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&utm_content=profile&utm_medium=member_ios'/);
-  assert.match(scriptSource, /function getMailboxSenderCtaLink\(options\)/);
+  assert.match(readDisplayScript(), /const SENDER_CTA_LINKS = Object\.freeze/);
+  assert.match(readDisplayScript(), /'martijn@softora\.nl': \{\s*text: '💼 Mijn LinkedIn 👈',\s*url: 'https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&utm_content=profile&utm_medium=member_ios'/);
+  assert.match(readDisplayScript(), /function getSenderCtaLink\(options\)/);
   assert.match(scriptSource, /function isSafeMailBodyUrl\(value\)/);
   assert.match(scriptSource, /const parsed = new URL\(value\);/);
   assert.match(scriptSource, /parsed\.protocol === 'http:' \|\| parsed\.protocol === 'https:';/);

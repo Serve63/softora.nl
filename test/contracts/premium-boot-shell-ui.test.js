@@ -85,7 +85,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const bookkeepingSource = fs.readFileSync(bookkeepingPath, 'utf8');
         assert.match(bookkeepingSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else if (file === 'premium-mailbox.html') {
-        assert.match(source, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260520a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260522a"><\/script>/, file);
+        assert.match(source, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260520a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260522a"><\/script>/, file);
         const mailboxPath = path.join(__dirname, '../../assets/premium-mailbox.js');
         const mailboxSource = fs.readFileSync(mailboxPath, 'utf8');
         assert.match(mailboxSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
