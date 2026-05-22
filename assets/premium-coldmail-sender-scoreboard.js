@@ -80,8 +80,18 @@
       row.coldmailOpened ||
       normalizeString(row.coldmailOpenedAt) ||
       normalizeString(row.coldmailFirstOpenedAt) ||
-      normalizeString(row.outreachOpenedAt)
+      normalizeString(row.outreachOpenedAt) ||
+      Number(row.coldmailOpenCount || row.outreachOpenCount || 0) > 0
     );
+  }
+
+  function hasColdmailOpenTrackingSignal(row) {
+    if (!row || typeof row !== 'object') return false;
+    return Boolean(normalizeString(row.coldmailTrackingId || row.coldmailOpenTrackingId));
+  }
+
+  function hasMeasurableColdmailOpenSignal(row) {
+    return hasColdmailOpenTrackingSignal(row) || hasColdmailOpenSignal(row);
   }
 
   function calculateSenderStats(rows) {
@@ -93,6 +103,7 @@
       const senderEmail = resolveSenderEmail(row);
       if (!Object.prototype.hasOwnProperty.call(counts, senderEmail)) return;
       if (!hasColdmailSendSignal(row)) return;
+      if (!hasMeasurableColdmailOpenSignal(row)) return;
       counts[senderEmail].sent += 1;
       if (hasColdmailOpenSignal(row)) counts[senderEmail].opened += 1;
     });
@@ -265,7 +276,7 @@
       if (nameEl) nameEl.textContent = entry.displayName;
       if (countEl) countEl.textContent = String(count);
       row.classList.toggle('is-leading', index === 0 && highestCount > 0);
-      row.setAttribute('aria-label', entry.displayName + ' ' + count + ' coldmails');
+      row.setAttribute('aria-label', entry.displayName + ' ' + count + ' meetbare coldmails');
       list.appendChild(row);
     });
     const total = calculateSenderTotal(entries);
@@ -276,7 +287,7 @@
     const totalMetaEl = totalRow && totalRow.querySelector('[data-coldmail-sender-total-meta]');
     if (totalCountEl) totalCountEl.textContent = String(total);
     if (totalMetaEl) totalMetaEl.textContent = 'OPEN RATE ' + totalOpenRate + '%';
-    if (totalRow) totalRow.setAttribute('aria-label', 'Totaal ' + total + ' coldmails, ' + openedTotal + ' geopend, open-rate ' + totalOpenRate + '%');
+    if (totalRow) totalRow.setAttribute('aria-label', 'Totaal ' + total + ' meetbare coldmails, ' + openedTotal + ' geopend, open-rate ' + totalOpenRate + '%');
   }
 
   async function loadCustomerRows() {
@@ -401,7 +412,10 @@
     buildAutopilotStatusKey,
     ensureScoreboard,
     handleAutopilotStatus,
+    hasColdmailOpenSignal,
+    hasColdmailOpenTrackingSignal,
     hasCustomerRowsSnapshot,
+    hasMeasurableColdmailOpenSignal,
     parseCustomerRows,
     patchSendRefresh,
     renderSenderStats,
