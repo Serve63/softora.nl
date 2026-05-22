@@ -59,6 +59,7 @@
     const exact = Object.create(null);
     const byProvincePlace = Object.create(null);
     const byPlace = Object.create(null);
+    const placeEntries = [];
     decodeBase64(DATA_BASE64).split("\n").forEach(function (line) {
       const parts = line.split("|");
       if (parts.length !== 5) return;
@@ -70,9 +71,25 @@
       exact[province + "|" + municipality + "|" + place] = coords;
       addUnique(byProvincePlace, province + "|" + place, coords);
       addUnique(byPlace, place, coords);
+      placeEntries.push({ province: province, municipality: municipality, place: place, coords: coords });
     });
-    cache = { exact: exact, byProvincePlace: byProvincePlace, byPlace: byPlace };
+    placeEntries.sort(function (left, right) {
+      return right.place.length - left.place.length;
+    });
+    cache = { exact: exact, byProvincePlace: byProvincePlace, byPlace: byPlace, placeEntries: placeEntries };
     return cache;
+  }
+
+  function escapeRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function hasNormalizedPhrase(text, phrase) {
+    const normalizedText = normalizeText(text);
+    const normalizedPhrase = normalizeText(phrase);
+    if (!normalizedText || !normalizedPhrase) return false;
+    const pattern = new RegExp("(^|\\s)" + escapeRegExp(normalizedPhrase).replace(/\s+/g, "\\s+") + "(\\s|$)");
+    return pattern.test(normalizedText);
   }
 
   function getTargetCoords(target) {
@@ -88,8 +105,43 @@
       null;
   }
 
+  function resolveTextCoords(value, hints) {
+    const text = normalizeText(value);
+    if (!text) return null;
+    const maps = getCache();
+    const province = normalizeText(hints && hints.province);
+    const municipality = normalizeText(hints && hints.municipality);
+
+    for (let index = 0; index < maps.placeEntries.length; index += 1) {
+      const entry = maps.placeEntries[index];
+      if (!hasNormalizedPhrase(text, entry.place)) continue;
+      if (province && entry.province !== province) continue;
+      if (municipality && entry.municipality !== municipality) continue;
+      if (province || municipality) return entry.coords;
+    }
+
+    for (let index = 0; index < maps.placeEntries.length; index += 1) {
+      const entry = maps.placeEntries[index];
+      if (!hasNormalizedPhrase(text, entry.place)) continue;
+      if (hasNormalizedPhrase(text, entry.province) || hasNormalizedPhrase(text, entry.municipality)) {
+        return entry.coords;
+      }
+    }
+
+    for (let index = 0; index < maps.placeEntries.length; index += 1) {
+      const entry = maps.placeEntries[index];
+      if (!hasNormalizedPhrase(text, entry.place)) continue;
+      const uniqueCoords = maps.byPlace[entry.place];
+      if (uniqueCoords) return uniqueCoords;
+    }
+
+    return null;
+  }
+
   return Object.freeze({
     getTargetCoords: getTargetCoords,
-    normalizeText: normalizeText
+    hasNormalizedPhrase: hasNormalizedPhrase,
+    normalizeText: normalizeText,
+    resolveTextCoords: resolveTextCoords
   });
 });
