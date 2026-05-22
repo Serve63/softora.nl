@@ -289,7 +289,7 @@ test('premium bevestigingsmails houdt het handmatige coldmailing scherm zichtbaa
   assert.match(pageSource, /AI is momenteel hier niet mee bezig\./);
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-dashboard,/);
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-ai-management \{ display: block !important; \}/);
-  assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260522a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260522b"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-management\.js\?v=20260423a" defer><\/script>/);
   assert.match(managementSource, /AI is momenteel hier niet mee bezig\./);
   assert.match(managementSource, /AI is hier actief bezig met coldmailing\./);
@@ -827,7 +827,7 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const autopilotSource = fs.readFileSync(autopilotPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260522a/);
+  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260522b/);
   assert.match(autopilotSource, /const BATCH_SIZE = 1;/);
   assert.match(autopilotSource, /"campaignSenderEmail"/);
   assert.match(autopilotSource, /"start-campaign-btn"/);
@@ -860,6 +860,8 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   assert.match(autopilotSource, /minIntervalMinutes: 5/);
   assert.match(autopilotSource, /senderMinIntervalMinutes: 14/);
   assert.match(autopilotSource, /senderMaxIntervalMinutes: 18/);
+  assert.match(autopilotSource, /sendJitterMinSeconds: 5/);
+  assert.match(autopilotSource, /sendJitterMaxSeconds: 45/);
   assert.doesNotMatch(autopilotSource, /Handmatige modus/);
   assert.doesNotMatch(autopilotSource, /Geen automatische verzending/);
   assert.doesNotMatch(autopilotSource, /parentNode\.insertBefore\(row, startButton\)/);

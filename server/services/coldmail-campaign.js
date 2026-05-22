@@ -2035,6 +2035,18 @@ function createColdmailCampaignService(deps = {}) {
       senderMinIntervalMinutes,
       240
     );
+    const sendJitterMinSeconds = parsePositiveInt(
+      raw.sendJitterMinSeconds ?? raw.preSendJitterMinSeconds,
+      0,
+      0,
+      300
+    );
+    const sendJitterMaxSeconds = parsePositiveInt(
+      raw.sendJitterMaxSeconds ?? raw.preSendJitterMaxSeconds,
+      sendJitterMinSeconds,
+      sendJitterMinSeconds,
+      300
+    );
     return {
       timezone: normalizeString(raw.timezone || raw.timeZone) || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
       weekdaysOnly: normalizeBooleanFlag(
@@ -2051,6 +2063,8 @@ function createColdmailCampaignService(deps = {}) {
       ),
       senderMinIntervalMinutes,
       senderMaxIntervalMinutes,
+      sendJitterMinSeconds,
+      sendJitterMaxSeconds,
     };
   }
 
@@ -2089,6 +2103,12 @@ function createColdmailCampaignService(deps = {}) {
         senderMaxIntervalMinutes:
           env.COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES ||
           env.COLDMAIL_AUTOPILOT_SENDER_COOLDOWN_MAX_MINUTES,
+        sendJitterMinSeconds:
+          env.COLDMAIL_AUTOPILOT_SEND_JITTER_MIN_SECONDS ||
+          env.COLDMAIL_AUTOPILOT_PRE_SEND_JITTER_MIN_SECONDS,
+        sendJitterMaxSeconds:
+          env.COLDMAIL_AUTOPILOT_SEND_JITTER_MAX_SECONDS ||
+          env.COLDMAIL_AUTOPILOT_PRE_SEND_JITTER_MAX_SECONDS,
       }),
       lastRunAt: '',
       lastStartedAt: '',
@@ -2357,6 +2377,19 @@ function createColdmailCampaignService(deps = {}) {
     return min + (seed % range);
   }
 
+  function getColdmailAutopilotSendJitterSeconds(schedule, senderEmail, startedAt) {
+    const min = Math.max(0, Number(schedule && schedule.sendJitterMinSeconds) || 0);
+    const max = Math.max(min, Number(schedule && schedule.sendJitterMaxSeconds) || min);
+    if (!min || max <= min) return min;
+    const range = max - min + 1;
+    const seed = crypto
+      .createHash('sha256')
+      .update(`${normalizeEmailAddress(senderEmail)}:${normalizeString(startedAt)}:autopilot-send-jitter`)
+      .digest()
+      .readUInt32BE(0);
+    return min + (seed % range);
+  }
+
   async function chooseColdmailAutopilotSender(candidates, selectionOptions = {}) {
     const schedule = normalizeColdmailAutopilotSchedule(selectionOptions.schedule);
     const currentMs = now().getTime();
@@ -2506,6 +2539,7 @@ function createColdmailCampaignService(deps = {}) {
       senderEmail: normalizeEmailAddress(result.senderEmail),
       selected: Math.max(0, Number(result.selected || 0) || 0),
       requested: Math.max(0, Number(result.requested || 0) || 0),
+      sendJitterSeconds: Math.max(0, Number(result.sendJitterSeconds || 0) || 0) || undefined,
       dailyQuota: result.dailyQuota && typeof result.dailyQuota === 'object' ? result.dailyQuota : undefined,
       senderSkips: Array.isArray(result.senderSkips)
         ? result.senderSkips.slice(0, 10).map((item) => ({
@@ -2702,6 +2736,13 @@ function createColdmailCampaignService(deps = {}) {
         );
       }
 
+      const sendJitterSeconds = input.force
+        ? 0
+        : getColdmailAutopilotSendJitterSeconds(state.schedule, senderEmail, state.lastStartedAt);
+      if (sendJitterSeconds > 0) {
+        await sleep(sendJitterSeconds * 1000);
+      }
+
       const sendResult = await sendColdmailCampaign({
         count: sendCount,
         subject: profile.subject,
@@ -2735,6 +2776,7 @@ function createColdmailCampaignService(deps = {}) {
           sent: sendResult.sent,
           failed: sendResult.failed,
           senderEmail,
+          sendJitterSeconds,
           dailyQuota: sendResult.dailyQuota,
           replySync: replySync ? {
             ok: replySync.ok !== false,

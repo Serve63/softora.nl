@@ -301,6 +301,8 @@
             minIntervalMinutes: 5,
             senderMinIntervalMinutes: 14,
             senderMaxIntervalMinutes: 18,
+            sendJitterMinSeconds: 5,
+            sendJitterMaxSeconds: 45,
           },
         }),
       }));
