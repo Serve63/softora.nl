@@ -190,7 +190,7 @@ function createService(overrides = {}) {
       if (overrides.invalidDomains && overrides.invalidDomains.includes(domain)) return false;
       return true;
     },
-    now: () => new Date('2026-04-24T12:00:00.000Z'),
+    now: overrides.now || (() => new Date('2026-04-24T12:00:00.000Z')),
     sleep: async (ms) => {
       sleeps.push(ms);
       if (typeof overrides.sleep === 'function') return overrides.sleep(ms);
@@ -348,6 +348,48 @@ test('coldmail open tracking ignores invalid tokens without changing rows', asyn
 
   assert.equal(result.ok, false);
   assert.equal(result.updated, 0);
+  const savedRows = JSON.parse(readChunkedStateValue(getSavedState().values, 'softora_customers_premium_v1'));
+  assert.equal(savedRows[0].coldmailOpened, false);
+  assert.equal(savedRows[0].coldmailOpenCount, 0);
+});
+
+test('coldmail open tracking ignores tokens from before a metrics reset', async () => {
+  const { service, sentMessages, getSavedState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        telefoon: '+31 6 12345678',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        mail: true,
+        coldmailOpenTrackingResetAt: '2026-04-24T12:01:00.000Z',
+      },
+    ],
+  });
+
+  await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}},\n\nZou u openstaan voor webdesign?',
+    senderEmail: 'info@softora.nl',
+    branch: 'Horeca & Restaurants',
+    actor: 'Servé',
+  });
+
+  const trackingUrl = sentMessages[0].html.match(/src="(https:\/\/www\.softora\.nl\/api\/coldmailing\/open\.gif[^"]+)"/)[1].replace(/&amp;/g, '&');
+  const trackingParams = new URL(trackingUrl).searchParams;
+  const result = await service.recordColdmailOpen({
+    token: trackingParams.get('token'),
+    trackingId: trackingParams.get('tid'),
+    actor: 'contract-test',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.updated, 0);
+  assert.equal(result.reason, 'tracking_token_before_reset');
   const savedRows = JSON.parse(readChunkedStateValue(getSavedState().values, 'softora_customers_premium_v1'));
   assert.equal(savedRows[0].coldmailOpened, false);
   assert.equal(savedRows[0].coldmailOpenCount, 0);

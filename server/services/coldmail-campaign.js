@@ -3799,6 +3799,18 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
+  function parseColdmailOpenTimestampMs(value) {
+    const timestamp = Date.parse(normalizeString(value));
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function isColdmailOpenTokenBeforeReset(row, payload) {
+    const resetAtMs = parseColdmailOpenTimestampMs(row && row.coldmailOpenTrackingResetAt);
+    if (!resetAtMs) return false;
+    const tokenAtMs = parseColdmailOpenTimestampMs(payload && payload.ts);
+    return !tokenAtMs || tokenAtMs <= resetAtMs;
+  }
+
   function buildColdmailOpenHistoryEntry(payload, actor) {
     const date = now().toISOString();
     return {
@@ -3849,6 +3861,16 @@ function createColdmailCampaignService(deps = {}) {
         ok: true,
         updated: 0,
         reason: 'target_not_found',
+      };
+    }
+    if (isColdmailOpenTokenBeforeReset(rows[match.index], payload)) {
+      return {
+        ok: true,
+        updated: 0,
+        reason: 'tracking_token_before_reset',
+        id: match.id,
+        email: match.email,
+        trackingId: payload.trackingId,
       };
     }
 
