@@ -203,6 +203,30 @@
     return null;
   }
 
+  function firstCustomerValue(customer, keys) {
+    if (!customer) return "";
+    for (let index = 0; index < keys.length; index += 1) {
+      const value = customer[keys[index]];
+      if (value !== undefined && value !== null && String(value).trim()) return value;
+    }
+    return "";
+  }
+
+  function resolveExternalCustomerCoords(customer, text) {
+    const source = getTargetCoordSource();
+    if (!source) return null;
+    const province = firstCustomerValue(customer, ["provincie", "province", "regio", "region"]);
+    const municipality = firstCustomerValue(customer, ["gemeente", "municipality"]);
+    const place = firstCustomerValue(customer, ["plaats", "woonplaats", "city", "stad"]);
+    const structuredCoords = place && typeof source.getTargetCoords === "function"
+      ? source.getTargetCoords({ province: province, municipality: municipality, place: place })
+      : null;
+    if (structuredCoords) return structuredCoords;
+    return typeof source.resolveTextCoords === "function"
+      ? source.resolveTextCoords(text, { province: province, municipality: municipality })
+      : null;
+  }
+
   function resolveCustomerCoords(customer) {
     const explicitCoords = resolveExplicitCoords(customer);
     if (explicitCoords) return explicitCoords;
@@ -215,7 +239,7 @@
       customer && customer.address,
       customer && customer.location,
     ].filter(Boolean).join(" ");
-    return resolvePlaceCoords(text) || resolvePostalCoords(text);
+    return resolvePostalCoords(text) || resolvePlaceCoords(text) || resolveExternalCustomerCoords(customer, text);
   }
 
   function getDistanceKm(customer) {
@@ -235,8 +259,29 @@
     return getCompanyName(left).localeCompare(getCompanyName(right), "nl");
   }
 
+  function compareCustomerSortEntries(left, right) {
+    if (Number.isFinite(left.distanceKm) && !Number.isFinite(right.distanceKm)) return -1;
+    if (!Number.isFinite(left.distanceKm) && Number.isFinite(right.distanceKm)) return 1;
+    if (left.distanceKm < right.distanceKm) return -1;
+    if (left.distanceKm > right.distanceKm) return 1;
+    const nameComparison = left.companyName.localeCompare(right.companyName, "nl");
+    return nameComparison || left.index - right.index;
+  }
+
   function sortCustomersByDistance(customers) {
-    return (Array.isArray(customers) ? customers : []).slice().sort(compareCustomersByDistance);
+    return (Array.isArray(customers) ? customers : [])
+      .map(function (customer, index) {
+        return {
+          customer: customer,
+          index: index,
+          distanceKm: getDistanceKm(customer),
+          companyName: getCompanyName(customer),
+        };
+      })
+      .sort(compareCustomerSortEntries)
+      .map(function (entry) {
+        return entry.customer;
+      });
   }
 
   function getTargetParts(label) {
