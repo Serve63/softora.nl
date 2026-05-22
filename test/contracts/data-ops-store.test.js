@@ -93,6 +93,59 @@ test('data ops store merges duplicate customer identities before structured upse
   assert.deepEqual(recorder.deletedIds, ['lead-1']);
 });
 
+test('data ops store paginates customer reads beyond Supabase default page size', async () => {
+  const rows = Array.from({ length: 1250 }, (_item, index) => ({
+    customer_id: `lead-${index + 1}`,
+    payload: {
+      id: `lead-${index + 1}`,
+      bedrijf: `Bedrijf ${index + 1}`,
+    },
+    updated_at: '2026-05-22T10:00:00.000Z',
+  }));
+  const ranges = [];
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    range(from, to) {
+                      ranges.push([from, to]);
+                      return Promise.resolve({
+                        data: rows.slice(from, to + 1),
+                        error: null,
+                      });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error: () => {} },
+  });
+
+  const customers = await store.listCustomers();
+
+  assert.equal(customers.length, 1250);
+  assert.equal(customers[0].id, 'lead-1');
+  assert.equal(customers[1249].bedrijf, 'Bedrijf 1250');
+  assert.deepEqual(ranges, [
+    [0, 999],
+    [1000, 1999],
+  ]);
+});
+
 test('data ops store saves webdesign and device mockup as one photo record', async () => {
   const uploads = [];
   const upserts = [];
