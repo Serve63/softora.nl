@@ -1951,6 +1951,24 @@ function createColdmailCampaignService(deps = {}) {
     return profiles;
   }
 
+  function normalizeColdmailTemplateVariants(value, fallback = '', maxLength = 6000) {
+    const rawList = Array.isArray(value)
+      ? value
+      : String(value || '')
+          .split(/\n-{3,}\n/g)
+          .filter(Boolean);
+    const normalized = [];
+    const seen = new Set();
+    [fallback, ...rawList].forEach((item) => {
+      const text = truncateText(normalizeString(item), maxLength);
+      const key = text.replace(/\s+/g, ' ').toLowerCase();
+      if (!text || seen.has(key)) return;
+      seen.add(key);
+      normalized.push(text);
+    });
+    return normalized.slice(0, 12);
+  }
+
   function normalizeColdmailAutopilotRadiusKm(value) {
     if (normalizeString(value) === '') return 50;
     return parseRadiusKm(value);
@@ -2243,9 +2261,21 @@ function createColdmailCampaignService(deps = {}) {
   function normalizeColdmailingSenderProfile(value, fallback = {}) {
     const raw = value && typeof value === 'object' ? value : {};
     const base = fallback && typeof fallback === 'object' ? fallback : {};
+    const subject = truncateText(normalizeString(raw.subject || base.subject), 200);
+    const body = normalizeString(raw.body || base.body);
     return {
-      subject: truncateText(normalizeString(raw.subject || base.subject), 200),
-      body: normalizeString(raw.body || base.body),
+      subject,
+      body,
+      subjectVariants: normalizeColdmailTemplateVariants(
+        raw.subjectVariants || raw.subjects || base.subjectVariants || base.subjects,
+        subject,
+        200
+      ),
+      bodyVariants: normalizeColdmailTemplateVariants(
+        raw.bodyVariants || raw.bodies || raw.textVariants || base.bodyVariants || base.bodies,
+        body,
+        12000
+      ),
       aiInstructions: normalizeString(raw.aiInstructions || base.aiInstructions),
       toneStyle: normalizeString(raw.toneStyle || base.toneStyle || 'Vriendelijk & professioneel'),
     };
@@ -2675,7 +2705,9 @@ function createColdmailCampaignService(deps = {}) {
       const sendResult = await sendColdmailCampaign({
         count: sendCount,
         subject: profile.subject,
+        subjectVariants: profile.subjectVariants,
         body: profile.body,
+        bodyVariants: profile.bodyVariants,
         aiInstructions: profile.aiInstructions,
         toneStyle: profile.toneStyle,
         branch: state.config.branch,
@@ -3075,6 +3107,23 @@ function createColdmailCampaignService(deps = {}) {
       .replace(/\r\n?/g, '\n')
       .replace(/[ \t]+\n/g, '\n')
       .trim();
+  }
+
+  function selectColdmailTemplateVariant(variants, row, item, senderEmail, reference, kind) {
+    const list = normalizeColdmailTemplateVariants(variants);
+    if (!list.length) return '';
+    if (list.length === 1) return list[0];
+    const seed = [
+      kind,
+      normalizeEmailAddress(senderEmail),
+      normalizeString(item && item.id),
+      normalizeString(getRowEmail(row)),
+      normalizeString(getRowCompany(row)),
+      normalizeString(reference),
+    ].join('|');
+    const hash = crypto.createHash('sha256').update(seed).digest().readUInt32BE(0);
+    const rowOffset = Math.max(0, Number(item && item.index) || 0);
+    return list[(hash + rowOffset) % list.length];
   }
 
   function appendColdmailOptOutText(text, unsubscribeUrl = '') {
@@ -4552,8 +4601,14 @@ function createColdmailCampaignService(deps = {}) {
       error.missing = getMissingSenderSmtpEnv(senderEmail);
       throw error;
     }
-    const subjectTemplate = truncateText(normalizeString(input.subject), 200);
-    const bodyTemplate = normalizeString(input.body);
+    const subjectVariants = normalizeColdmailTemplateVariants(input.subjectVariants || input.subjects, input.subject, 200);
+    const bodyVariants = normalizeColdmailTemplateVariants(
+      input.bodyVariants || input.bodies || input.textVariants,
+      input.body,
+      12000
+    );
+    const subjectTemplate = subjectVariants[0] || '';
+    const bodyTemplate = bodyVariants[0] || '';
     if (!subjectTemplate || !bodyTemplate) {
       const error = new Error('Vul eerst een onderwerp en mailtekst in.');
       error.code = 'EMPTY_MAIL_CONTENT';
@@ -4676,13 +4731,29 @@ function createColdmailCampaignService(deps = {}) {
       const reference = buildColdmailReference(row, item.id);
       const trackingId = createColdmailTrackingId();
       const trackingUrl = buildColdmailOpenTrackingUrl(row, item.id, reference, trackingId, input);
-      const baseText = buildMailText(bodyTemplate, row);
+      const selectedBodyTemplate = selectColdmailTemplateVariant(
+        bodyVariants,
+        row,
+        item,
+        senderEmail,
+        reference,
+        'body'
+      ) || bodyTemplate;
+      const selectedSubjectTemplate = selectColdmailTemplateVariant(
+        subjectVariants,
+        row,
+        item,
+        senderEmail,
+        reference,
+        'subject'
+      ) || subjectTemplate;
+      const baseText = buildMailText(selectedBodyTemplate, row);
       const shouldAppendOptOut = shouldAppendColdmailOptOutText(baseText);
       const unsubscribeUrl = shouldAppendOptOut
         ? buildColdmailUnsubscribeUrl(row, item.id, reference, input)
         : '';
       const text = shouldAppendOptOut ? appendColdmailOptOutText(baseText, unsubscribeUrl) : baseText;
-      const subject = personalizeTemplate(subjectTemplate, row);
+      const subject = personalizeTemplate(selectedSubjectTemplate, row);
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? await resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
         failed.push({
