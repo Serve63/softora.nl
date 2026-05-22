@@ -205,7 +205,7 @@
     const count = doc.createElement('span');
     count.className = 'coldmail-sender-scoreboard-count';
     count.setAttribute('data-coldmail-sender-count', '');
-    count.textContent = '...';
+    count.textContent = isMobileStatsOnlyMode() ? '0' : '...';
     const metrics = doc.createElement('span');
     metrics.className = 'coldmail-sender-scoreboard-metrics';
     metrics.appendChild(count);
@@ -230,7 +230,7 @@
     const count = doc.createElement('span');
     count.className = 'coldmail-sender-scoreboard-total-count';
     count.setAttribute('data-coldmail-sender-total-count', '');
-    count.textContent = '...';
+    count.textContent = isMobileStatsOnlyMode() ? '0' : '...';
     totalLine.appendChild(totalLabel);
     totalLine.appendChild(count);
     const openedLine = doc.createElement('span');
@@ -241,7 +241,7 @@
     const opened = doc.createElement('span');
     opened.className = 'coldmail-sender-scoreboard-total-opened';
     opened.setAttribute('data-coldmail-sender-total-opened', '');
-    opened.textContent = '...';
+    opened.textContent = isMobileStatsOnlyMode() ? '0' : '...';
     openedLine.appendChild(openedLabel);
     openedLine.appendChild(opened);
     const metrics = doc.createElement('span');
@@ -331,6 +331,12 @@
     if (totalRow) totalRow.setAttribute('aria-label', 'Totaal ' + total + ' meetbare coldmails, ' + openedTotal + ' geopend');
   }
 
+  function renderMobileZeroState() {
+    if (!isMobileStatsOnlyMode()) return false;
+    renderSenderStats(calculateSenderStats([]));
+    return true;
+  }
+
   async function loadCustomerRows() {
     const response = await global.fetch('/api/ui-state-get?scope=' + encodeURIComponent(CUSTOMER_DB_SCOPE), {
       method: 'GET',
@@ -362,9 +368,16 @@
     injectStyles();
     ensureScoreboard();
     syncScoreboardPlacement();
-    const snapshot = await loadCustomerRows();
+    let snapshot = null;
+    try {
+      snapshot = await loadCustomerRows();
+    } catch (_) {
+      if (!renderMobileZeroState()) setLoadingState();
+      scheduleRetry();
+      return [];
+    }
     if (!snapshot.hasSnapshot) {
-      setLoadingState();
+      if (!renderMobileZeroState()) setLoadingState();
       scheduleRetry();
       return [];
     }
@@ -428,6 +441,7 @@
     injectStyles();
     ensureScoreboard();
     syncScoreboardPlacement();
+    renderMobileZeroState();
     if (!patchSendRefresh() && typeof global.setTimeout === 'function') {
       global.setTimeout(patchSendRefresh, 0);
     }
@@ -463,6 +477,7 @@
     parseCustomerRows,
     patchSendRefresh,
     renderSenderStats,
+    renderMobileZeroState,
     setLoadingState,
     refresh,
     syncScoreboardPlacement,
