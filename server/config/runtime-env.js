@@ -219,6 +219,13 @@ function loadRuntimeEnv(env = process.env) {
           safeEnv.CRON_SECRET ||
           ''
       ),
+      coldmailTrackingSecret: normalizeString(
+        safeEnv.COLDMAIL_TRACKING_SECRET ||
+          safeEnv.COLDMAIL_UNSUBSCRIBE_SECRET ||
+          safeEnv.PREMIUM_SESSION_SECRET ||
+          safeEnv.CRON_SECRET ||
+          ''
+      ),
       coldmailReplyForwardEnabled: readNegatedBooleanEnvFlag(
         safeEnv.COLDMAIL_REPLY_FORWARD_ENABLED,
         false

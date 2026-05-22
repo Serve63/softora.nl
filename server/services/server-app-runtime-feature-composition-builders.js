@@ -282,6 +282,11 @@ function buildServerAppFeatureWiringRuntimeContext({
               envConfig.COLDMAIL_UNSUBSCRIBE_SECRET ||
               envConfig.PREMIUM_SESSION_SECRET ||
               envConfig.MAIL_SMTP_PASS,
+            coldmailTrackingSecret:
+              envConfig.COLDMAIL_TRACKING_SECRET ||
+              envConfig.COLDMAIL_UNSUBSCRIBE_SECRET ||
+              envConfig.PREMIUM_SESSION_SECRET ||
+              envConfig.MAIL_SMTP_PASS,
             coldmailAuditBcc: envConfig.COLDMAIL_AUDIT_BCC,
             coldmailReplyForwardEnabled: envConfig.COLDMAIL_REPLY_FORWARD_ENABLED,
             coldmailReplyForwardFrom: envConfig.COLDMAIL_REPLY_FORWARD_FROM,

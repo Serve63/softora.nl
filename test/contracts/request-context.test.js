@@ -138,6 +138,11 @@ test('request security context exempts safe methods and webhook paths', () => {
     method: 'POST',
     originalUrl: '/api/retell/functions/agenda/availability',
   });
+  const coldmailUnsubscribeReq = createRequest({
+    method: 'POST',
+    originalUrl: '/api/coldmailing/unsubscribe',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+  });
   const mountedRetellAvailabilityReq = createRequest({
     method: 'POST',
     originalUrl: '/retell/functions/agenda/availability/',
@@ -150,6 +155,7 @@ test('request security context exempts safe methods and webhook paths', () => {
   assert.equal(context.isSameOriginApiRequest(getReq), true);
   assert.equal(context.isSameOriginApiRequest(webhookReq), true);
   assert.equal(context.isSameOriginApiRequest(retellFunctionReq), true);
+  assert.equal(context.isSameOriginApiRequest(coldmailUnsubscribeReq), true);
   assert.equal(context.isSameOriginApiRequest(mountedRetellAvailabilityReq), true);
   assert.equal(context.isSameOriginApiRequest(namespacedRetellAvailabilityReq), true);
 });

@@ -81,6 +81,7 @@ test('server app runtime bootstrap flattens env config without changing values',
       replyTo: 'reply@test.invalid',
       coldmailAuditBcc: 'audit@test.invalid',
       coldmailUnsubscribeSecret: 'unsubscribe-secret',
+      coldmailTrackingSecret: 'tracking-secret',
       coldmailReplyForwardEnabled: false,
       coldmailReplyForwardFrom: '',
       coldmailReplyForwardTo: '',
@@ -117,6 +118,7 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.AGENDA_APP_SESSION_TTL_DAYS, 3650);
   assert.equal(envConfig.COLDMAIL_AUDIT_BCC, 'audit@test.invalid');
   assert.equal(envConfig.COLDMAIL_UNSUBSCRIBE_SECRET, 'unsubscribe-secret');
+  assert.equal(envConfig.COLDMAIL_TRACKING_SECRET, 'tracking-secret');
   assert.equal(envConfig.COLDMAIL_BOUNCE_PROCESSING_ENABLED, true);
   assert.equal(envConfig.COLDMAIL_SEND_DELAY_MS, 90000);
   assert.equal(envConfig.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT, 10);

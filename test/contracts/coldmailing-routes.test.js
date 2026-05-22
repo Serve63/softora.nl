@@ -603,6 +603,16 @@ test('coldmailing exposes token-protected one-click unsubscribe without admin au
   assert.match(routeSource, /INVALID_UNSUBSCRIBE_TOKEN/);
 });
 
+test('coldmailing exposes token-protected open tracking pixel without admin auth', () => {
+  const routeSource = fs.readFileSync(path.join(__dirname, '../../server/routes/coldmailing.js'), 'utf8');
+
+  assert.match(routeSource, /app\.get\('\/api\/coldmailing\/open\.gif'/);
+  assert.match(routeSource, /recordColdmailOpen/);
+  assert.doesNotMatch(routeSource, /app\.get\('\/api\/coldmailing\/open\.gif', requirePremiumAdminApiAccess/);
+  assert.match(routeSource, /Content-Type': 'image\/gif'/);
+  assert.match(routeSource, /Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'/);
+});
+
 test('coldmailing maps overlapping campaign sends to conflict status', () => {
   const routeSource = fs.readFileSync(path.join(__dirname, '../../server/routes/coldmailing.js'), 'utf8');
 

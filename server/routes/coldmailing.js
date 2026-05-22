@@ -393,6 +393,27 @@ function registerColdmailingRoutes(app, deps = {}) {
     }
   });
 
+  app.get('/api/coldmailing/open.gif', async (req, res) => {
+    try {
+      if (typeof coldmailCampaignService.recordColdmailOpen === 'function') {
+        await coldmailCampaignService.recordColdmailOpen({
+          token: req.query.token || req.query.t,
+          trackingId: req.query.trackingId || req.query.tid,
+          actor: 'Coldmail open tracking',
+        });
+      }
+    } catch (_) {
+      // Tracking pixels should never break the recipient's mail client.
+    }
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+      'Content-Type': 'image/gif',
+    });
+    res.send(Buffer.from('R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==', 'base64'));
+  });
+
   app.post('/api/coldmailing/unsubscribe', async (req, res) => {
     try {
       if (typeof coldmailCampaignService.unsubscribeColdmailRecipient !== 'function') {

@@ -72,6 +72,7 @@ function buildServerAppEnvConfig(runtimeEnv) {
     MAIL_REPLY_TO: runtimeEnv.mail.replyTo,
     COLDMAIL_AUDIT_BCC: runtimeEnv.mail.coldmailAuditBcc,
     COLDMAIL_UNSUBSCRIBE_SECRET: runtimeEnv.mail.coldmailUnsubscribeSecret,
+    COLDMAIL_TRACKING_SECRET: runtimeEnv.mail.coldmailTrackingSecret,
     COLDMAIL_REPLY_FORWARD_ENABLED: runtimeEnv.mail.coldmailReplyForwardEnabled,
     COLDMAIL_REPLY_FORWARD_FROM: runtimeEnv.mail.coldmailReplyForwardFrom,
     COLDMAIL_REPLY_FORWARD_TO: runtimeEnv.mail.coldmailReplyForwardTo,
