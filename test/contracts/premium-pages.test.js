@@ -52,6 +52,7 @@ test('marketing premium landing pages are not auth-gated', () => {
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-websites.html'), false);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-blog.html'), false);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-websitegenerator.html'), false);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-bevestigingsmails.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-personeel-dashboard.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-wachtwoordenregister.html'), true);
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-instellingen.html'), true);
@@ -132,6 +133,31 @@ test('protected premium pages redirect to setup when auth is not configured', as
     res.redirectLocation,
     '/premium-personeel-login?setup=1&next=%2Fpremium-personeel-agenda'
   );
+});
+
+test('premium bevestigingsmails requires login for anonymous visitors', async () => {
+  const controller = createPremiumHtmlPageAccessController({
+    premiumPublicHtmlFiles: createPremiumPublicHtmlFilesSet(),
+    noindexHeaderValue: 'noindex',
+    getResolvedPremiumAuthState: async () => ({ configured: true, authenticated: false }),
+    getSafePremiumRedirectPath: (value, fallback = '/premium-personeel-dashboard') =>
+      String(value || '').trim() || fallback,
+  });
+
+  const req = createRequest({
+    originalUrl: '/premium-bevestigingsmails',
+    path: '/premium-bevestigingsmails',
+  });
+  const res = createResponseRecorder();
+
+  const result = await controller.resolvePremiumHtmlPageAccess(req, res, 'premium-bevestigingsmails.html');
+
+  assert.equal(result.handled, true);
+  assert.equal(result.isProtectedPremiumPage, true);
+  assert.equal(res.redirectCode, 302);
+  assert.equal(res.redirectLocation, '/premium-personeel-login?next=%2Fpremium-bevestigingsmails');
+  assert.equal(res.headers['Cache-Control'], 'no-store, private');
+  assert.equal(res.headers['X-Robots-Tag'], 'noindex');
 });
 
 test('protected premium pages clear expired sessions and redirect to login', async () => {
