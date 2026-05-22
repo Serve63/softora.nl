@@ -1131,8 +1131,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function hasReadyWebdesignAssetRecord(photo) {
-    if (!hasReadyWebsitePhotoRecord(photo)) return false;
-    return isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo));
+    return hasReadyWebsitePhotoRecord(photo);
   }
 
   function createReadyWebdesignMatcher(customerRows = [], photoMap = {}) {
@@ -4583,15 +4582,6 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
-      if (shouldIncludeWebdesignPhoto && !webdesignPhoto.mockup) {
-        failed.push({
-          id: item.id,
-          bedrijf: getRowCompany(row),
-          email: to,
-          error: `Geen device-mockup gevonden voor ${getRowCompany(row) || to}.`,
-        });
-        continue;
-      }
       const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(baseText, { senderEmail }), reference);
       const htmlWithContent = webdesignPhoto
         ? appendWebdesignImageHtml(htmlBase, webdesignPhoto, {
@@ -4727,7 +4717,7 @@ function createColdmailCampaignService(deps = {}) {
     if (!sent.length && failed.length) {
       const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
       const webdesignAssetFailure = shouldIncludeWebdesignPhoto && failed.every((item) =>
-        /^Geen (?:webdesign-foto|device-mockup) gevonden voor /i.test(normalizeString(item && item.error))
+        /^Geen webdesign-foto gevonden voor /i.test(normalizeString(item && item.error))
       );
       const error = new Error(firstFailure ? `Geen mails verzonden: ${firstFailure}` : 'Geen mails verzonden.');
       error.code = safetyPause
