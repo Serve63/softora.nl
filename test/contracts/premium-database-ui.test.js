@@ -183,7 +183,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
     ['Oisterwijk Winkel', 'Alphen Service', 'Chaam Garage', 'Roosendaal Zaak', 'Onbekend Ver Weg']
   );
   assert.match(pageSource, /assets\/premium-database-target-coords\.js\?v=20260521a/);
-  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260521a/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260522a/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);/);
@@ -2467,7 +2467,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   const sorterSource = fs.readFileSync(sorterPath, 'utf8');
 
   assert.match(pageSource, /assets\/premium-database-target-coords\.js\?v=20260521a/);
-  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260521a/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260522a/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);/);
@@ -2485,8 +2485,16 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(sorterSource, /"4858": \{ lat: 51\.5486, lng: 4\.7967 \}/);
   assert.match(sorterSource, /"4859": \{ lat: 51\.5653, lng: 4\.8307 \}/);
   assert.match(sorterSource, /"4861": \{ lat: 51\.5069, lng: 4\.8616 \}/);
+  assert.match(sorterSource, /"5085": \{ lat: 51\.4619, lng: 5\.1372 \}/);
+  assert.match(sorterSource, /"5268": \{ lat: 51\.6336, lng: 5\.2291 \}/);
+  assert.match(sorterSource, /"5281": \{ lat: 51\.5891, lng: 5\.3158 \}/);
+  assert.match(sorterSource, /"5296": \{ lat: 51\.6118, lng: 5\.2915 \}/);
+  assert.match(sorterSource, /"5298": \{ lat: 51\.5705, lng: 5\.3713 \}/);
   assert.match(sorterSource, /"5131": \{ lat: 51\.4817, lng: 4\.9583 \}/);
   const sorter = loadDatabaseDistanceClient();
+  assert.ok(Number.isFinite(sorter.getDistanceKm({ bedrijf: 'Esbeek bedrijf', stad: 'Prins Hendriklaan 4, 5085 NJ Esbeek' })));
+  assert.ok(Number.isFinite(sorter.getDistanceKm({ bedrijf: 'Helvoirt bedrijf', stad: 'Lindelaan 20, 5268 CC Helvoirt' })));
+  assert.ok(Number.isFinite(sorter.getDistanceKm({ bedrijf: 'Liempde bedrijf', stad: 'Parkstraat 11, 5298 CE Liempde' })));
   const sortedTargets = sorter.sortTargetLabelsByDistance([
     'Nederland | Noord-Brabant | Altena | Almkerk',
     'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk',
