@@ -37,7 +37,7 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   vm.createContext(context);
   vm.runInContext(scoreboardSource, context);
 
-  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522i/);
+  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522j/);
   assert.match(scoreboardSource, /id = 'coldmailSenderScoreboard'/);
   assert.match(scoreboardSource, /data-coldmail-sender'/);
   assert.match(scoreboardSource, /martijn@softora\.nl/);
@@ -47,7 +47,8 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.match(scoreboardSource, /sendColdmailCampaignNowWithSenderScoreboardRefresh/);
   assert.match(scoreboardSource, /sentFromEmail/);
   assert.match(scoreboardSource, /lastColdmailSenderEmail/);
-  assert.match(scoreboardSource, /count\.textContent = '\.\.\.'/);
+  assert.match(scoreboardSource, /count\.textContent = isMobileStatsOnlyMode\(\) \? '0' : '\.\.\.'/);
+  assert.match(scoreboardSource, /opened\.textContent = isMobileStatsOnlyMode\(\) \? '0' : '\.\.\.'/);
   assert.match(scoreboardSource, /function calculateSenderTotal\(entries\)/);
   assert.match(scoreboardSource, /function calculateOpenedTotal\(entries\)/);
   assert.match(scoreboardSource, /function calculateOpenRate\(sent, opened\)/);
@@ -63,6 +64,7 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.match(scoreboardSource, /\.coldmail-sender-scoreboard\{position:fixed;top:50%;left:16px;right:16px;z-index:14001;/);
   assert.match(scoreboardSource, /transform:translateY\(-50%\)/);
   assert.match(scoreboardSource, /function syncScoreboardPlacement\(\)/);
+  assert.match(scoreboardSource, /function renderMobileZeroState\(\)/);
   assert.match(scoreboardSource, /doc\.body\.appendChild\(wrap\)/);
   assert.match(scoreboardSource, /global\.addEventListener\('resize', syncScoreboardPlacement\)/);
   assert.match(scoreboardSource, /\.coldmail-sender-scoreboard-list\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);/);
@@ -76,7 +78,8 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.match(scoreboardSource, /function hasColdmailOpenTrackingSignal\(row\)/);
   assert.match(scoreboardSource, /function hasMeasurableColdmailOpenSignal\(row\)/);
   assert.match(scoreboardSource, /if \(!hasMeasurableColdmailOpenSignal\(row\)\) return;/);
-  assert.match(scoreboardSource, /setLoadingState\(\);[\s\S]*scheduleRetry\(\);/);
+  assert.match(scoreboardSource, /if \(!renderMobileZeroState\(\)\) setLoadingState\(\);[\s\S]*scheduleRetry\(\);/);
+  assert.match(scoreboardSource, /renderMobileZeroState\(\);[\s\S]*if \(!patchSendRefresh\(\)/);
   assert.match(scoreboardSource, /AUTO_REFRESH_INTERVAL_MS = 60000/);
   assert.match(scoreboardSource, /softora:coldmail-autopilot-status/);
   assert.match(scoreboardSource, /global\.addEventListener\(AUTOPILOT_STATUS_EVENT, handleAutopilotStatus\)/);
@@ -85,6 +88,7 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.equal(context.window.SoftoraColdmailSenderScoreboard.hasCustomerRowsSnapshot({
     softora_customers_premium_v1: '[]',
   }), true);
+  assert.equal(context.window.SoftoraColdmailSenderScoreboard.renderMobileZeroState(), false);
   assert.notEqual(
     context.window.SoftoraColdmailSenderScoreboard.buildAutopilotStatusKey({
       enabled: true,
