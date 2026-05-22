@@ -124,6 +124,19 @@ test('seo machine scant ook publieke SEO-pagina’s op onbewezen claims', () => 
   assert.deepEqual(auditClaimSafety({ pages }), []);
 });
 
+test('seo machine blokkeert harde uptimegaranties in publieke paginacopy', () => {
+  const issues = auditClaimSafety({
+    pages: [
+      {
+        path: '/maatwerk-platform',
+        html: '<span>99.9%</span><span>Uptime Garantie</span>',
+      },
+    ],
+  });
+
+  assert.deepEqual(issues.map((issue) => issue.type), ['absolute-security-or-availability']);
+});
+
 test('seo machine ziet juridische ontkenningen niet als commerciële garantieclaims', () => {
   const issues = auditClaimSafety({
     pages: [

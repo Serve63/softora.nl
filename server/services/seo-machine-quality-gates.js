@@ -40,7 +40,7 @@ const DEFAULT_UNSUPPORTED_CLAIM_RULES = Object.freeze([
   Object.freeze({
     type: 'absolute-security-or-availability',
     pattern:
-      /(?:100%|\b(?:volledig|altijd|nooit|permanent)\b).{0,90}\b(?:veilig|hackvrij|foutloos|storingsvrij|waterdicht|privacyproof|datalekvrij|beschikbaar|correct)\b/i,
+      /(?:\buptime\s+garantie\b|\b\d{2}(?:[.,]\d+)?%\s+uptime\b|(?:100%|\b(?:volledig|altijd|nooit|permanent)\b).{0,90}\b(?:veilig|hackvrij|foutloos|storingsvrij|waterdicht|privacyproof|datalekvrij|beschikbaar|correct)\b)/i,
     message: 'claimt absolute veiligheid, beschikbaarheid of foutloosheid.',
   }),
   Object.freeze({
