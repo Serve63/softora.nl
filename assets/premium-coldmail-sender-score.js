@@ -7,6 +7,7 @@
   const SENDERS = Object.freeze([
     { email: 'serve@softora.nl', label: 'Servé' },
     { email: 'martijn@softora.nl', label: 'Martijn' },
+    { email: 'ruben@softora.nl', label: 'Ruben' },
   ]);
 
   let retryTimer = null;
@@ -28,14 +29,17 @@
     const style = document.createElement('style');
     style.id = 'coldmailSenderScoreStyles';
     style.textContent = [
-      '.topbar-right{display:flex;align-items:flex-start;justify-content:flex-end;min-width:150px}',
-      '.coldmail-sender-score{min-width:122px;display:flex;flex-direction:column;gap:2px;font-family:\"Oswald\",sans-serif;font-size:15px;font-weight:700;letter-spacing:.08em;line-height:1.05;text-transform:uppercase;color:var(--dark)}',
+      '.topbar-right{display:flex;align-items:flex-start;justify-content:flex-end;min-width:190px}',
+      '.coldmail-sender-score{min-width:176px;display:flex;flex-direction:column;gap:5px;font-family:\"Oswald\",sans-serif;font-size:15px;font-weight:700;letter-spacing:.08em;line-height:1.05;text-transform:uppercase;color:var(--dark)}',
       '.coldmail-sender-score[hidden]{display:none!important}',
-      '.coldmail-sender-score-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;column-gap:28px}',
+      '.coldmail-sender-score-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:18px}',
       '.coldmail-sender-score-row.is-leading{color:var(--crimson)}',
       '.coldmail-sender-score-count{min-width:24px;text-align:right;font-variant-numeric:tabular-nums}',
-      '.coldmail-sender-score-total{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;column-gap:28px;margin-top:3px}',
+      '.coldmail-sender-score-metrics{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:74px}',
+      '.coldmail-sender-score-open-rate{font-size:10px;font-weight:700;letter-spacing:.05em;line-height:1.1;color:var(--crimson);white-space:nowrap}',
+      '.coldmail-sender-score-total{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:18px;margin-top:3px}',
       '.coldmail-sender-score-total-count{min-width:24px;padding-top:5px;border-top:2px solid currentColor;text-align:right;font-variant-numeric:tabular-nums;justify-self:end}',
+      '.coldmail-sender-score-total-meta{font-size:11px;font-weight:800;letter-spacing:.06em;line-height:1.1;color:var(--crimson);white-space:nowrap;text-align:right}',
       '.coldmail-sender-score[data-coldmail-sender-score-state=\"loading\"] .coldmail-sender-score-count{color:var(--text-tertiary)}',
       '.coldmail-sender-score[data-coldmail-sender-score-state=\"loading\"] .coldmail-sender-score-total-count{color:var(--text-tertiary)}',
       '@media (max-width:1024px){.topbar-right{width:100%;justify-content:flex-start}}',
@@ -45,12 +49,20 @@
 
   function appendTotalRow(root, value) {
     if (!root) return;
-    const hasValue = value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
-    const safeValue = hasValue ? String(Math.max(0, Number(value) || 0)) : '...';
+    const summary = value && typeof value === 'object'
+      ? value
+      : { count: value, opened: null, openRate: null };
+    const hasValue = summary.count !== null && summary.count !== undefined && summary.count !== '' && Number.isFinite(Number(summary.count));
+    const safeValue = hasValue ? String(Math.max(0, Number(summary.count) || 0)) : '...';
+    const hasOpened = summary.opened !== null && summary.opened !== undefined && Number.isFinite(Number(summary.opened));
+    const opened = hasOpened ? Math.max(0, Number(summary.opened) || 0) : null;
+    const openRate = hasValue && Number(summary.count) > 0
+      ? Math.round((Math.max(0, Number(summary.opened) || 0) / Math.max(1, Number(summary.count) || 0)) * 100)
+      : 0;
     const row = document.createElement('div');
     row.className = 'coldmail-sender-score-total';
     row.setAttribute('data-coldmail-sender-score-total', '');
-    row.setAttribute('aria-label', safeValue === '...' ? 'Totaal wordt geladen' : 'Totaal verzonden coldmails: ' + safeValue);
+    row.setAttribute('aria-label', safeValue === '...' ? 'Totaal wordt geladen' : 'Totaal meetbaar verzonden coldmails: ' + safeValue + ', geopend: ' + (opened || 0) + ', open-rate: ' + openRate + '%');
 
     const spacer = document.createElement('span');
     spacer.className = 'coldmail-sender-score-total-spacer';
@@ -61,8 +73,17 @@
     count.setAttribute('data-coldmail-sender-score-total-count', '');
     count.textContent = safeValue;
 
+    const meta = document.createElement('span');
+    meta.className = 'coldmail-sender-score-total-meta';
+    meta.setAttribute('data-coldmail-sender-score-total-meta', '');
+    meta.textContent = safeValue === '...' ? 'OPEN RATE ...' : 'OPEN RATE ' + openRate + '%';
+
     row.appendChild(spacer);
-    row.appendChild(count);
+    const metrics = document.createElement('span');
+    metrics.className = 'coldmail-sender-score-metrics';
+    metrics.appendChild(count);
+    metrics.appendChild(meta);
+    row.appendChild(metrics);
     root.appendChild(row);
   }
 
@@ -81,7 +102,7 @@
     root.id = 'coldmailSenderScore';
     root.setAttribute('data-coldmail-sender-score-state', 'loading');
     root.setAttribute('aria-live', 'polite');
-    root.setAttribute('aria-label', 'Verzonden coldmails per afzender');
+    root.setAttribute('aria-label', 'Meetbaar verzonden, geopend en open-rate per afzender');
 
     SENDERS.forEach((sender) => {
       const row = document.createElement('div');
@@ -97,8 +118,18 @@
       count.setAttribute('data-coldmail-sender-score-count', sender.email);
       count.textContent = '...';
 
+      const openRate = document.createElement('span');
+      openRate.className = 'coldmail-sender-score-open-rate';
+      openRate.setAttribute('data-coldmail-sender-score-open-rate', sender.email);
+      openRate.textContent = '...';
+
+      const metrics = document.createElement('span');
+      metrics.className = 'coldmail-sender-score-metrics';
+      metrics.appendChild(count);
+      metrics.appendChild(openRate);
+
       row.appendChild(name);
-      row.appendChild(count);
+      row.appendChild(metrics);
       root.appendChild(row);
     });
     appendTotalRow(root, null);
@@ -155,25 +186,50 @@
     );
   }
 
+  function hasColdmailOpen(row) {
+    return Boolean(row && (
+      row.coldmailOpened ||
+      row.coldmailOpenedAt ||
+      row.coldmailFirstOpenedAt ||
+      row.outreachOpenedAt ||
+      Number(row.coldmailOpenCount || row.outreachOpenCount || 0) > 0
+    ));
+  }
+
+  function hasColdmailOpenTracking(row) {
+    return Boolean(row && normalizeLowerText(row.coldmailTrackingId || row.coldmailOpenTrackingId));
+  }
+
+  function isColdmailOpenMeasurable(row) {
+    return hasColdmailOpenTracking(row) || hasColdmailOpen(row);
+  }
+
   function buildStats(rows) {
     const counts = {};
     SENDERS.forEach((sender) => {
-      counts[sender.email] = 0;
+      counts[sender.email] = { count: 0, opened: 0 };
     });
     (Array.isArray(rows) ? rows : []).forEach((row) => {
       const email = getSenderEmail(row);
       if (!Object.prototype.hasOwnProperty.call(counts, email)) return;
-      counts[email] += 1;
+      if (!isColdmailOpenMeasurable(row)) return;
+      counts[email].count += 1;
+      if (hasColdmailOpen(row)) counts[email].opened += 1;
     });
     return SENDERS
       .map((sender, index) => ({
         email: sender.email,
         label: sender.label,
-        count: Number(counts[sender.email] || 0),
+        count: Number((counts[sender.email] && counts[sender.email].count) || 0),
+        opened: Number((counts[sender.email] && counts[sender.email].opened) || 0),
+        openRate: counts[sender.email] && counts[sender.email].count
+          ? Math.round((counts[sender.email].opened / counts[sender.email].count) * 100)
+          : 0,
         index,
       }))
       .sort((left, right) => {
         if (right.count !== left.count) return right.count - left.count;
+        if (right.opened !== left.opened) return right.opened - left.opened;
         return left.index - right.index;
       });
   }
@@ -183,12 +239,14 @@
     if (!root) return;
     root.hidden = isLeadGeneratorAlias();
     root.setAttribute('data-coldmail-sender-score-state', 'loading');
-    root.setAttribute('aria-label', 'Verzonden coldmails per afzender worden geladen');
+    root.setAttribute('aria-label', 'Meetbaar verzonden, geopend en open-rate per afzender worden geladen');
     SENDERS.forEach((sender) => {
       const row = root.querySelector('[data-coldmail-sender-score-row="' + sender.email + '"]');
       const count = root.querySelector('[data-coldmail-sender-score-count="' + sender.email + '"]');
+      const openRate = root.querySelector('[data-coldmail-sender-score-open-rate="' + sender.email + '"]');
       if (row) row.classList.remove('is-leading');
       if (count) count.textContent = '...';
+      if (openRate) openRate.textContent = '...';
     });
     const totalCount = root.querySelector('[data-coldmail-sender-score-total-count]');
     if (totalCount) {
@@ -198,6 +256,8 @@
     } else {
       appendTotalRow(root, null);
     }
+    const totalMeta = root.querySelector('[data-coldmail-sender-score-total-meta]');
+    if (totalMeta) totalMeta.textContent = 'OPEN RATE ...';
   }
 
   function render(stats) {
@@ -210,12 +270,17 @@
     root.hidden = false;
     root.innerHTML = '';
     root.setAttribute('data-coldmail-sender-score-state', 'ready');
-    root.setAttribute('aria-label', 'Verzonden coldmails per afzender');
+    root.setAttribute('aria-label', 'Meetbaar verzonden, geopend en open-rate per afzender');
     const total = (Array.isArray(stats) ? stats : []).reduce((sum, item) => sum + Math.max(0, Number(item.count) || 0), 0);
+    const openedTotal = (Array.isArray(stats) ? stats : []).reduce((sum, item) => sum + Math.max(0, Number(item.opened) || 0), 0);
     (Array.isArray(stats) ? stats : []).forEach((item, index) => {
+      const countValue = Math.max(0, Number(item.count) || 0);
+      const openedValue = Math.max(0, Number(item.opened) || 0);
+      const openRateValue = countValue > 0 ? Math.round((openedValue / countValue) * 100) : 0;
       const row = document.createElement('div');
-      row.className = 'coldmail-sender-score-row' + (index === 0 && item.count > 0 ? ' is-leading' : '');
+      row.className = 'coldmail-sender-score-row' + (index === 0 && countValue > 0 ? ' is-leading' : '');
       row.setAttribute('data-coldmail-sender-score-row', item.email);
+      row.setAttribute('aria-label', item.label + ': ' + countValue + ' meetbaar verzonden, ' + openedValue + ' geopend, open-rate ' + openRateValue + '%');
 
       const name = document.createElement('span');
       name.className = 'coldmail-sender-score-name';
@@ -224,13 +289,23 @@
       const count = document.createElement('span');
       count.className = 'coldmail-sender-score-count';
       count.setAttribute('data-coldmail-sender-score-count', item.email);
-      count.textContent = String(Math.max(0, Number(item.count) || 0));
+      count.textContent = String(countValue);
+
+      const openRate = document.createElement('span');
+      openRate.className = 'coldmail-sender-score-open-rate';
+      openRate.setAttribute('data-coldmail-sender-score-open-rate', item.email);
+      openRate.textContent = 'OPEN ' + openRateValue + '%';
+
+      const metrics = document.createElement('span');
+      metrics.className = 'coldmail-sender-score-metrics';
+      metrics.appendChild(count);
+      metrics.appendChild(openRate);
 
       row.appendChild(name);
-      row.appendChild(count);
+      row.appendChild(metrics);
       root.appendChild(row);
     });
-    appendTotalRow(root, total);
+    appendTotalRow(root, { count: total, opened: openedTotal });
   }
 
   function scheduleRetry() {

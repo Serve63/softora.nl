@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 test('premium bevestigingsmails renders the current coldmailing dashboard shell without coldcalling bootstrap', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
@@ -278,16 +279,23 @@ test('premium bevestigingsmails toont geen nep-nulwaarden in verzendscore bij ee
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const scoreSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-coldmail-sender-score.js'), 'utf8');
 
-  assert.match(pageSource, /assets\/premium-coldmail-sender-score\.js\?v=20260520a/);
+  assert.match(pageSource, /assets\/premium-coldmail-sender-score\.js\?v=20260522b/);
   assert.doesNotMatch(pageSource, /data-coldmail-sender-score-count="serve@softora\.nl">0<\/span>/);
   assert.doesNotMatch(pageSource, /data-coldmail-sender-score-count="martijn@softora\.nl">0<\/span>/);
   assert.match(scoreSource, /const SENDERS = Object\.freeze\(\[/);
   assert.match(scoreSource, /count\.textContent = '\.\.\.'/);
   assert.match(scoreSource, /function appendTotalRow\(root, value\)/);
   assert.match(scoreSource, /coldmail-sender-score-total-count\{[\s\S]*border-top:2px solid currentColor/);
-  assert.match(scoreSource, /const total = \(Array\.isArray\(stats\) \? stats : \[\]\)\.reduce\(\(sum, item\) => sum \+ Math\.max\(0, Number\(item\.count\) \|\| 0\), 0\);/);
-  assert.match(scoreSource, /appendTotalRow\(root, total\);/);
+  assert.match(scoreSource, /function hasColdmailOpen\(row\)/);
+  assert.match(scoreSource, /function hasColdmailOpenTracking\(row\)/);
+  assert.match(scoreSource, /function isColdmailOpenMeasurable\(row\)/);
+  assert.match(scoreSource, /if \(!isColdmailOpenMeasurable\(row\)\) return;/);
+  assert.match(scoreSource, /openRate: counts\[sender\.email\] && counts\[sender\.email\]\.count/);
+  assert.match(scoreSource, /const openedTotal = \(Array\.isArray\(stats\) \? stats : \[\]\)\.reduce\(\(sum, item\) => sum \+ Math\.max\(0, Number\(item\.opened\) \|\| 0\), 0\);/);
+  assert.match(scoreSource, /appendTotalRow\(root, \{ count: total, opened: openedTotal \}\);/);
   assert.match(scoreSource, /root\.querySelector\('\[data-coldmail-sender-score-total-count\]'\)/);
+  assert.match(scoreSource, /data-coldmail-sender-score-open-rate/);
+  assert.match(scoreSource, /OPEN RATE /);
   assert.match(scoreSource, /const hasSnapshot = Object\.prototype\.hasOwnProperty\.call\(values, CUSTOMER_DB_KEY\);/);
   assert.match(scoreSource, /if \(!result\.hasSnapshot && !\(options && options\.allowEmpty\)\) \{[\s\S]*setLoading\(\);[\s\S]*scheduleRetry\(\);[\s\S]*return;/);
   assert.match(scoreSource, /function buildStats\(rows\)/);
@@ -295,6 +303,51 @@ test('premium bevestigingsmails toont geen nep-nulwaarden in verzendscore bij ee
   assert.match(scoreSource, /window\.SoftoraColdmailSenderScore = \{/);
   assert.match(pageSource, /function refreshCampaignDatabaseForLatestState\(\) \{[\s\S]*void hydrateCampaignCompanyCountFromSupabase\(\); void window\.SoftoraColdmailSenderScore\?\.hydrate\?\.\(\);/);
   assert.match(pageSource, /await hydrateCampaignCompanyCountFromSupabase\(\); await window\.SoftoraColdmailSenderScore\?\.hydrate\?\.\(\);/);
+});
+
+test('premium bevestigingsmails open-rate telt alleen meetbare coldmails mee', () => {
+  const scoreSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-coldmail-sender-score.js'), 'utf8');
+  const context = {
+    document: {
+      readyState: 'loading',
+      addEventListener() {},
+      documentElement: { getAttribute: () => '' },
+    },
+    window: {},
+  };
+
+  vm.runInNewContext(scoreSource, context);
+
+  const stats = context.window.SoftoraColdmailSenderScore.buildStats([
+    {
+      lastColdmailSenderEmail: 'serve@softora.nl',
+      lastColdmailSentAt: '2026-05-01T08:00:00.000Z',
+    },
+    {
+      lastColdmailSenderEmail: 'serve@softora.nl',
+      coldmailTrackingId: 'track-serve-unopened',
+      coldmailOpened: false,
+    },
+    {
+      lastColdmailSenderEmail: 'serve@softora.nl',
+      coldmailOpenTrackingId: 'track-serve-opened',
+      coldmailFirstOpenedAt: '2026-05-02T08:00:00.000Z',
+    },
+    {
+      lastColdmailSenderEmail: 'martijn@softora.nl',
+      coldmailOpenedAt: '2026-05-03T08:00:00.000Z',
+    },
+  ]);
+
+  const serve = stats.find((item) => item.email === 'serve@softora.nl');
+  const martijn = stats.find((item) => item.email === 'martijn@softora.nl');
+
+  assert.equal(serve.count, 2);
+  assert.equal(serve.opened, 1);
+  assert.equal(serve.openRate, 50);
+  assert.equal(martijn.count, 1);
+  assert.equal(martijn.opened, 1);
+  assert.equal(martijn.openRate, 100);
 });
 
 test('premium bevestigingsmails toont mailinteresse op coldmailing zonder leads-pagina te mengen', () => {
