@@ -2019,6 +2019,12 @@ function createColdmailCampaignService(deps = {}) {
         5,
         240
       ),
+      senderMinIntervalMinutes: parsePositiveInt(
+        raw.senderMinIntervalMinutes ?? raw.senderCooldownMinutes ?? raw.mailboxIntervalMinutes,
+        0,
+        0,
+        240
+      ),
     };
   }
 
@@ -2051,6 +2057,9 @@ function createColdmailCampaignService(deps = {}) {
         startHour: env.COLDMAIL_AUTOPILOT_START_HOUR,
         endHour: env.COLDMAIL_AUTOPILOT_END_HOUR,
         minIntervalMinutes: env.COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES,
+        senderMinIntervalMinutes:
+          env.COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES ||
+          env.COLDMAIL_AUTOPILOT_SENDER_COOLDOWN_MINUTES,
       }),
       lastRunAt: '',
       lastStartedAt: '',
@@ -2285,8 +2294,20 @@ function createColdmailCampaignService(deps = {}) {
     return [];
   }
 
-  async function chooseColdmailAutopilotSender(candidates) {
-    const options = [];
+  function getLastColdmailSendAtMsForSender(quota, senderEmail) {
+    const selectedSenderEmail = normalizeEmailAddress(senderEmail);
+    return (Array.isArray(quota && quota.entries) ? quota.entries : [])
+      .filter((entry) => entry.senderEmail === selectedSenderEmail && entry.count > 0)
+      .map((entry) => parseTimestampMs(entry.at))
+      .filter(Boolean)
+      .reduce((latest, timestamp) => Math.max(latest, timestamp), 0);
+  }
+
+  async function chooseColdmailAutopilotSender(candidates, selectionOptions = {}) {
+    const schedule = normalizeColdmailAutopilotSchedule(selectionOptions.schedule);
+    const senderMinIntervalMs = schedule.senderMinIntervalMinutes * 60 * 1000;
+    const currentMs = now().getTime();
+    const senderOptions = [];
     const skipped = [];
     for (const [index, candidate] of candidates.entries()) {
       try {
@@ -2306,7 +2327,19 @@ function createColdmailCampaignService(deps = {}) {
           skipped.push({ senderEmail, reason: 'coldmail_daily_limit_reached', quota });
           continue;
         }
-        options.push({ senderEmail, quota, remaining, index });
+        if (senderMinIntervalMs > 0) {
+          const lastSentAtMs = getLastColdmailSendAtMsForSender(quota, senderEmail);
+          const readyAtMs = lastSentAtMs + senderMinIntervalMs;
+          if (lastSentAtMs && readyAtMs > currentMs) {
+            skipped.push({
+              senderEmail,
+              reason: 'sender_cooldown',
+              readyAt: new Date(readyAtMs).toISOString(),
+            });
+            continue;
+          }
+        }
+        senderOptions.push({ senderEmail, quota, remaining, index });
       } catch (error) {
         skipped.push({
           senderEmail: normalizeEmailAddress(candidate),
@@ -2314,15 +2347,26 @@ function createColdmailCampaignService(deps = {}) {
         });
       }
     }
-    options.sort((left, right) => {
+    senderOptions.sort((left, right) => {
       const sentDiff = (left.quota.senderSent || 0) - (right.quota.senderSent || 0);
       if (sentDiff !== 0) return sentDiff;
       return left.index - right.index;
     });
     return {
-      selected: options[0] || null,
+      selected: senderOptions[0] || null,
       skipped,
     };
+  }
+
+  function isOnlySenderCooldownSkips(skipped) {
+    return Array.isArray(skipped) && skipped.length > 0 && skipped.every((item) => item && item.reason === 'sender_cooldown');
+  }
+
+  function getNextSenderCooldownReadyAt(skipped) {
+    return (Array.isArray(skipped) ? skipped : [])
+      .map((item) => parseTimestampMs(item && item.readyAt))
+      .filter(Boolean)
+      .sort((left, right) => left - right)[0] || 0;
   }
 
   function getZonedColdmailAutopilotParts(date, timezone) {
@@ -2408,6 +2452,13 @@ function createColdmailCampaignService(deps = {}) {
       selected: Math.max(0, Number(result.selected || 0) || 0),
       requested: Math.max(0, Number(result.requested || 0) || 0),
       dailyQuota: result.dailyQuota && typeof result.dailyQuota === 'object' ? result.dailyQuota : undefined,
+      senderSkips: Array.isArray(result.senderSkips)
+        ? result.senderSkips.slice(0, 10).map((item) => ({
+            senderEmail: normalizeEmailAddress(item && item.senderEmail),
+            reason: truncateText(normalizeString(item && item.reason), 120),
+            readyAt: normalizeString(item && item.readyAt),
+          }))
+        : undefined,
       agendaBlocked: Boolean(result.agendaBlocked),
     };
   }
@@ -2501,6 +2552,7 @@ function createColdmailCampaignService(deps = {}) {
       }
     }
 
+    const previousLastStartedAt = state.lastStartedAt;
     const startedAt = now().toISOString();
     state = await saveColdmailAutopilotState(
       {
@@ -2530,8 +2582,25 @@ function createColdmailCampaignService(deps = {}) {
 
       const settings = await loadColdmailingSenderSettings();
       const candidates = getColdmailAutopilotSenderCandidates(state, settings);
-      const senderChoice = await chooseColdmailAutopilotSender(candidates);
+      const senderChoice = await chooseColdmailAutopilotSender(candidates, { schedule: state.schedule });
       if (!senderChoice.selected) {
+        if (isOnlySenderCooldownSkips(senderChoice.skipped)) {
+          const nextReadyAtMs = getNextSenderCooldownReadyAt(senderChoice.skipped);
+          return finishColdmailAutopilotRun(
+            {
+              ...state,
+              lastStartedAt: previousLastStartedAt,
+            },
+            buildColdmailAutopilotSkipResult(
+              'sender_cooldown',
+              nextReadyAtMs
+                ? `Autopilot spreidt per mailbox en wacht tot ${new Date(nextReadyAtMs).toISOString()}.`
+                : 'Autopilot spreidt per mailbox en wacht nog even.',
+              { senderSkips: senderChoice.skipped }
+            ),
+            actor
+          );
+        }
         return finishColdmailAutopilotRun(
           state,
           buildColdmailAutopilotSkipResult(
