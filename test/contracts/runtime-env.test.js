@@ -59,6 +59,17 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, false);
   assert.equal(runtimeEnv.mail.coldmailAuditBcc, 'prive@example.nl');
   assert.equal(runtimeEnv.mail.coldmailUnsubscribeSecret, 'unsubscribe-secret');
+  assert.equal(runtimeEnv.mail.coldmailTrackingSecret, 'unsubscribe-secret');
+});
+
+test('loadRuntimeEnv supports a separate coldmail tracking secret', () => {
+  const runtimeEnv = loadRuntimeEnv({
+    COLDMAIL_UNSUBSCRIBE_SECRET: 'unsubscribe-secret',
+    COLDMAIL_TRACKING_SECRET: ' tracking-secret ',
+  });
+
+  assert.equal(runtimeEnv.mail.coldmailUnsubscribeSecret, 'unsubscribe-secret');
+  assert.equal(runtimeEnv.mail.coldmailTrackingSecret, 'tracking-secret');
 });
 
 test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () => {

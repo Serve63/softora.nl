@@ -21,7 +21,7 @@ function createService(overrides = {}) {
   let sendGuardState = overrides.sendGuardState || { entries: [] };
   let autopilotState = overrides.autopilotState || {};
   let coldmailingSettings = overrides.coldmailingSettings || {};
-  const rows = overrides.rows || [
+  let rows = overrides.rows || [
     {
       id: 'prospect-1',
       bedrijf: 'Bakkerij Zon',
@@ -53,6 +53,7 @@ function createService(overrides = {}) {
       mailReplyTo: 'reply@softora.nl',
       publicBaseUrl: overrides.publicBaseUrl || 'https://www.softora.nl',
       coldmailUnsubscribeSecret: overrides.coldmailUnsubscribeSecret || 'unsubscribe-secret',
+      coldmailTrackingSecret: overrides.coldmailTrackingSecret || 'tracking-secret',
       coldmailAuditBcc: overrides.coldmailAuditBcc,
       imapHost: overrides.imapHost || '',
       imapPort: 993,
@@ -136,6 +137,10 @@ function createService(overrides = {}) {
       }
       if (scope === 'premium_coldmailing_settings') {
         coldmailingSettings = JSON.parse(values.softora_coldmailing_settings_v1);
+      }
+      if (scope === 'premium_customers_database') {
+        const rawRows = readChunkedStateValue(values, 'softora_customers_premium_v1');
+        rows = JSON.parse(rawRows || '[]');
       }
       return { ok: true };
     },
@@ -235,6 +240,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.doesNotMatch(sentMessages[0].text, /Referentie: SF-/);
   assert.match(sentMessages[0].html, /font-family:Arial,sans-serif/);
   assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
+  assert.match(sentMessages[0].html, /https:\/\/www\.softora\.nl\/api\/coldmailing\/open\.gif\?/);
   assert.match(
     sentMessages[0].html,
     /<a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Geen webdesign willen ontvangen\? Laat het me weten!<\/a>/
@@ -248,7 +254,65 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[0].lastColdmailSentAt, '2026-04-24T12:00:00.000Z');
   assert.equal(savedRows[0].coldmailCampaignDurationDays, 14);
   assert.equal(savedRows[0].activeColdmailCampaignUntil, '2026-05-08T12:00:00.000Z');
+  assert.equal(savedRows[0].coldmailOpened, false);
+  assert.equal(savedRows[0].coldmailOpenCount, 0);
+  assert.ok(savedRows[0].coldmailTrackingId);
   assert.equal(savedRows[1].status, 'klant');
+});
+
+test('coldmail campaign tracks opens with a tokenized tracking pixel', async () => {
+  const { service, sentMessages, getSavedState } = createService();
+
+  await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}},\n\nZou u openstaan voor webdesign?',
+    senderEmail: 'info@softora.nl',
+    branch: 'Horeca & Restaurants',
+    actor: 'Servé',
+  });
+
+  const trackingUrl = sentMessages[0].html.match(/src="(https:\/\/www\.softora\.nl\/api\/coldmailing\/open\.gif[^"]+)"/)[1].replace(/&amp;/g, '&');
+  const trackingParams = new URL(trackingUrl).searchParams;
+  const result = await service.recordColdmailOpen({
+    token: trackingParams.get('token'),
+    trackingId: trackingParams.get('tid'),
+    actor: 'contract-test',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.updated, 1);
+  const savedRows = JSON.parse(readChunkedStateValue(getSavedState().values, 'softora_customers_premium_v1'));
+  assert.equal(savedRows[0].coldmailOpened, true);
+  assert.equal(savedRows[0].coldmailFirstOpenedAt, '2026-04-24T12:00:00.000Z');
+  assert.equal(savedRows[0].coldmailLastOpenedAt, '2026-04-24T12:00:00.000Z');
+  assert.equal(savedRows[0].coldmailOpenCount, 1);
+  assert.equal(savedRows[0].hist[0].source, 'coldmail-open-tracking');
+});
+
+test('coldmail open tracking ignores invalid tokens without changing rows', async () => {
+  const { service, sentMessages, getSavedState } = createService();
+
+  await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}},\n\nZou u openstaan voor webdesign?',
+    senderEmail: 'info@softora.nl',
+    branch: 'Horeca & Restaurants',
+    actor: 'Servé',
+  });
+
+  const result = await service.recordColdmailOpen({
+    token: 'bad-token',
+    trackingId: 'bad',
+    actor: 'contract-test',
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.updated, 0);
+  const savedRows = JSON.parse(readChunkedStateValue(getSavedState().values, 'softora_customers_premium_v1'));
+  assert.equal(savedRows[0].coldmailOpened, false);
+  assert.equal(savedRows[0].coldmailOpenCount, 0);
 });
 
 test('coldmail autopilot stays idle until it is explicitly enabled', async () => {

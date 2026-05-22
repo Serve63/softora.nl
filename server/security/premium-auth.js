@@ -9,6 +9,8 @@ const PREMIUM_PUBLIC_API_EXACT_MATCHES = new Set([
   '/api/agenda-app/login',
   '/api/twilio/voice',
   '/api/twilio/status',
+  '/api/coldmailing/open.gif',
+  '/api/coldmailing/unsubscribe',
   '/api/retell/webhook',
   '/api/retell/functions/agenda/availability',
   '/retell/webhook',

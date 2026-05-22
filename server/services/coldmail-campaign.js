@@ -237,6 +237,7 @@ function createColdmailCampaignService(deps = {}) {
     mailReplyTo = '',
     publicBaseUrl: mailPublicBaseUrl = '',
     coldmailUnsubscribeSecret = '',
+    coldmailTrackingSecret = '',
     coldmailAuditBcc = '',
     imapHost = '',
     imapPort = 993,
@@ -1705,6 +1706,7 @@ function createColdmailCampaignService(deps = {}) {
       personalMailboxSendDelayMs: getColdmailPersonalMailboxSendDelayMs(),
       blocksPersonalMailboxDomains: shouldBlockPersonalMailboxDomains(),
       bounceProcessingEnabled: coldmailBounceProcessingEnabled !== false,
+      openTrackingConfigured: isColdmailOpenTrackingConfigured(),
       configuredSenderEmails: getConfiguredSenderEmails(),
       auditBccConfigured: Boolean(getColdmailAuditBccAddress()),
     };
@@ -3000,9 +3002,23 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeString(coldmailUnsubscribeSecret || smtpPass || imapPass || mailFromAddress || 'softora-coldmail');
   }
 
+  function getColdmailTrackingSecret() {
+    return normalizeString(coldmailTrackingSecret || coldmailUnsubscribeSecret || smtpPass || imapPass || mailFromAddress || 'softora-coldmail-open');
+  }
+
   function signColdmailUnsubscribePayload(encodedPayload) {
     return crypto
       .createHmac('sha256', getColdmailUnsubscribeSecret())
+      .update(normalizeString(encodedPayload))
+      .digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  }
+
+  function signColdmailOpenTrackingPayload(encodedPayload) {
+    return crypto
+      .createHmac('sha256', getColdmailTrackingSecret())
       .update(normalizeString(encodedPayload))
       .digest('base64')
       .replace(/\+/g, '-')
@@ -3020,6 +3036,24 @@ function createColdmailCampaignService(deps = {}) {
     };
     const encodedPayload = encodeBase64Url(JSON.stringify(payload));
     return `${encodedPayload}.${signColdmailUnsubscribePayload(encodedPayload)}`;
+  }
+
+  function createColdmailTrackingId() {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return crypto.randomBytes(16).toString('hex');
+  }
+
+  function buildColdmailOpenTrackingToken(row, id, reference, trackingId) {
+    const payload = {
+      v: 1,
+      id: normalizeString(id || getRowId(row, 0)),
+      email: getRowEmail(row),
+      ref: normalizeString(reference),
+      tid: normalizeString(trackingId),
+      ts: now().toISOString(),
+    };
+    const encodedPayload = encodeBase64Url(JSON.stringify(payload));
+    return `${encodedPayload}.${signColdmailOpenTrackingPayload(encodedPayload)}`;
   }
 
   function verifyColdmailUnsubscribeToken(token) {
@@ -3054,6 +3088,40 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function verifyColdmailOpenTrackingToken(token) {
+    const cleanToken = normalizeString(token);
+    const parts = cleanToken.split('.');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      const error = new Error('Deze open-trackinglink is ongeldig.');
+      error.code = 'INVALID_OPEN_TRACKING_TOKEN';
+      throw error;
+    }
+    const expected = signColdmailOpenTrackingPayload(parts[0]);
+    const expectedBuffer = Buffer.from(expected);
+    const actualBuffer = Buffer.from(parts[1]);
+    if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
+      const error = new Error('Deze open-trackinglink is ongeldig.');
+      error.code = 'INVALID_OPEN_TRACKING_TOKEN';
+      throw error;
+    }
+    const payload = safeJsonParse(decodeBase64Url(parts[0]), {});
+    const email = normalizeEmailAddress(payload && payload.email);
+    const trackingId = normalizeString(payload && payload.tid);
+    if (!payload || typeof payload !== 'object' || !email || !trackingId) {
+      const error = new Error('Deze open-trackinglink is ongeldig.');
+      error.code = 'INVALID_OPEN_TRACKING_TOKEN';
+      throw error;
+    }
+    return {
+      v: Number(payload.v || 1),
+      id: normalizeString(payload.id),
+      email,
+      ref: normalizeString(payload.ref),
+      trackingId,
+      ts: normalizeString(payload.ts),
+    };
+  }
+
   function normalizePublicBaseUrl(value) {
     const raw = normalizeString(value).replace(/\/+$/g, '');
     if (!/^https?:\/\//i.test(raw)) return '';
@@ -3079,6 +3147,23 @@ function createColdmailCampaignService(deps = {}) {
       'https://www.softora.nl';
     const token = buildColdmailUnsubscribeToken(row, id, reference);
     return `${baseUrl}/api/coldmailing/unsubscribe?token=${encodeURIComponent(token)}`;
+  }
+
+  function buildColdmailOpenTrackingUrl(row, id, reference, trackingId, input = {}) {
+    const cleanTrackingId = normalizeString(trackingId);
+    if (!cleanTrackingId) return '';
+    const baseUrl =
+      normalizePublicBaseUrl(input.publicBaseUrl || mailPublicBaseUrl) ||
+      'https://www.softora.nl';
+    const token = buildColdmailOpenTrackingToken(row, id, reference, cleanTrackingId);
+    const params = new URLSearchParams();
+    params.set('tid', cleanTrackingId);
+    params.set('token', token);
+    return `${baseUrl}/api/coldmailing/open.gif?${params.toString()}`;
+  }
+
+  function isColdmailOpenTrackingConfigured() {
+    return Boolean(getColdmailTrackingSecret());
   }
 
   function getColdmailListUnsubscribeHeader(senderEmail, row, id, reference, input = {}) {
@@ -3148,6 +3233,12 @@ function createColdmailCampaignService(deps = {}) {
     return `${html}\n<p style="margin:18px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="${escapeHtml(
       cleanUrl
     )}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(COLDMAIL_OPT_OUT_LABEL)}</a></p>`;
+  }
+
+  function appendColdmailOpenTrackingPixelHtml(html, trackingUrl = '') {
+    const cleanUrl = normalizeString(trackingUrl);
+    if (!cleanUrl) return html;
+    return `${html}\n<img src="${escapeHtml(cleanUrl)}" alt="" width="1" height="1" style="display:none!important;width:1px!important;height:1px!important;opacity:0!important;overflow:hidden!important;border:0!important;" />`;
   }
 
   function escapeHtml(value) {
@@ -3565,7 +3656,21 @@ function createColdmailCampaignService(deps = {}) {
     const existingHistory = Array.isArray(row.hist) ? row.hist : [];
     const senderEmail = normalizeEmailAddress(context.senderEmail);
     const messageId = normalizeString(context.messageId);
+    const trackingId = normalizeString(context.trackingId);
     const isWebdesignOutreach = isWebdesignSpecialAction(context.specialAction);
+    const trackingFields = trackingId
+      ? {
+          coldmailTrackingId: trackingId,
+          coldmailOpenTrackingId: trackingId,
+          coldmailOpened: false,
+          coldmailOpenedAt: '',
+          coldmailFirstOpenedAt: '',
+          coldmailLastOpenedAt: '',
+          coldmailOpenCount: 0,
+          outreachOpenedAt: '',
+          outreachOpenCount: 0,
+        }
+      : {};
     const outreachFields = isWebdesignOutreach
       ? {
           campaignType: 'webdesign',
@@ -3596,6 +3701,7 @@ function createColdmailCampaignService(deps = {}) {
     return {
       ...row,
       ...outreachFields,
+      ...trackingFields,
       status: 'gemaild',
       databaseStatus: 'gemaild',
       mail: true,
@@ -3646,6 +3752,101 @@ function createColdmailCampaignService(deps = {}) {
       ? existingHistory.some((item) => normalizeString(item && item.messageKey) === messageKey)
       : false;
     return (alreadyTracked ? existingHistory : [entry, ...existingHistory]).slice(0, 50);
+  }
+
+  function findColdmailOpenTrackingRow(payload, rows = []) {
+    const targetId = normalizeString(payload && payload.id);
+    const targetEmail = normalizeEmailAddress(payload && payload.email);
+    const targetTrackingId = normalizeString(payload && payload.trackingId);
+    const items = (Array.isArray(rows) ? rows : []).map((row, index) => ({
+      row,
+      index,
+      id: getRowId(row, index),
+      email: getRowEmail(row),
+      trackingId: normalizeString(
+        row && (row.coldmailTrackingId || row.coldmailOpenTrackingId || row.openTrackingId)
+      ),
+    }));
+    return (
+      items.find((item) => targetTrackingId && item.trackingId === targetTrackingId) ||
+      items.find((item) => targetId && item.id === targetId && (!targetEmail || item.email === targetEmail)) ||
+      items.find((item) => targetEmail && item.email === targetEmail) ||
+      null
+    );
+  }
+
+  function buildColdmailOpenHistoryEntry(payload, actor) {
+    const date = now().toISOString();
+    return {
+      type: 'mail_geopend',
+      label: 'Mail geopend',
+      date,
+      actor: normalizeString(actor) || 'Coldmail open tracking',
+      source: 'coldmail-open-tracking',
+      messageKey: `open-${normalizeString(payload && payload.trackingId)}`,
+      preview: 'Ontvanger heeft de coldmail geopend.',
+    };
+  }
+
+  function markRowAsOpened(row, payload, actor) {
+    const date = now().toISOString();
+    const openCount = Math.max(0, Number(row && row.coldmailOpenCount) || 0) + 1;
+    const historyEntry = buildColdmailOpenHistoryEntry(payload, actor);
+    return {
+      ...row,
+      coldmailOpened: true,
+      coldmailOpenedAt: row && row.coldmailOpenedAt ? row.coldmailOpenedAt : date,
+      coldmailFirstOpenedAt: row && row.coldmailFirstOpenedAt ? row.coldmailFirstOpenedAt : date,
+      coldmailLastOpenedAt: date,
+      coldmailOpenCount: openCount,
+      outreachOpenedAt: row && row.outreachOpenedAt ? row.outreachOpenedAt : date,
+      outreachOpenCount: Math.max(0, Number(row && row.outreachOpenCount) || 0) + 1,
+      hist: mergeColdmailReplyHistory(row, historyEntry),
+    };
+  }
+
+  async function recordColdmailOpen(input = {}) {
+    let payload;
+    try {
+      payload = verifyColdmailOpenTrackingToken(input.token || input.t);
+    } catch (error) {
+      return {
+        ok: false,
+        updated: 0,
+        code: normalizeString(error && error.code) || 'INVALID_OPEN_TRACKING_TOKEN',
+      };
+    }
+    const state = await getUiStateValues(customerDbScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const rows = parseDatabaseRows(values);
+    const match = findColdmailOpenTrackingRow(payload, rows);
+    if (!match || !Number.isInteger(match.index) || !rows[match.index]) {
+      return {
+        ok: true,
+        updated: 0,
+        reason: 'target_not_found',
+      };
+    }
+
+    const nextRows = rows.slice();
+    const actor = normalizeString(input.actor || 'Coldmail open tracking');
+    nextRows[match.index] = markRowAsOpened(rows[match.index], payload, actor);
+    await setUiStateValues(
+      customerDbScope,
+      buildCustomerRowsStateValues(values, nextRows),
+      {
+        source: 'coldmail-open-tracking',
+        actor,
+      }
+    );
+
+    return {
+      ok: true,
+      updated: 1,
+      id: match.id,
+      email: match.email,
+      trackingId: payload.trackingId,
+    };
   }
 
   function findColdmailUnsubscribeRow(payload, rows = []) {
@@ -4317,6 +4518,8 @@ function createColdmailCampaignService(deps = {}) {
         }
       }
       const reference = buildColdmailReference(row, item.id);
+      const trackingId = createColdmailTrackingId();
+      const trackingUrl = buildColdmailOpenTrackingUrl(row, item.id, reference, trackingId, input);
       const baseText = buildMailText(bodyTemplate, row);
       const shouldAppendOptOut = shouldAppendColdmailOptOutText(baseText);
       const unsubscribeUrl = shouldAppendOptOut
@@ -4344,12 +4547,13 @@ function createColdmailCampaignService(deps = {}) {
         continue;
       }
       const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(baseText), reference);
-      const html = webdesignPhoto
+      const htmlWithContent = webdesignPhoto
         ? appendWebdesignImageHtml(htmlBase, webdesignPhoto, {
             optOutText: shouldAppendOptOut ? COLDMAIL_OPT_OUT_LABEL : '',
             optOutUrl: unsubscribeUrl,
           })
         : appendColdmailOptOutHtml(htmlBase, unsubscribeUrl);
+      const html = appendColdmailOpenTrackingPixelHtml(htmlWithContent, trackingUrl);
       const attachments = webdesignPhoto
         ? [
             {
@@ -4407,6 +4611,7 @@ function createColdmailCampaignService(deps = {}) {
           bedrijf: getRowCompany(row),
           email: to,
           messageId: normalizeString(info && info.messageId),
+          trackingId: trackingUrl ? trackingId : '',
           response: truncateText(normalizeString(info && info.response), 500),
           accepted,
           rejected,
@@ -4427,6 +4632,7 @@ function createColdmailCampaignService(deps = {}) {
               senderEmail,
               specialAction: input.specialAction,
               messageId: sentItem.messageId,
+              trackingId: sentItem.trackingId,
             });
           });
           await setUiStateValues(
@@ -4829,6 +5035,7 @@ function createColdmailCampaignService(deps = {}) {
     getColdmailAutopilotStatus,
     getColdmailUnsubscribePreview,
     listColdmailReplyFollowUps,
+    recordColdmailOpen,
     runColdmailAutopilot,
     sendColdmailCampaign,
     syncInboundColdmailRepliesFromImap,
