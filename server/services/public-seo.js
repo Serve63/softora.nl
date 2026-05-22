@@ -393,6 +393,7 @@ function buildPublicSeoRobotsTxt({ knownHtmlPageFiles, siteOrigin = DEFAULT_SITE
   const disallowPaths = new Set([
     '/api/',
     '/premium-personeel-login',
+    '/premium-pakketten',
     '/premium-seo',
     '/premium-websitegenerator',
     '/premium-bevestigingsmails',

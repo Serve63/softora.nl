@@ -61,6 +61,7 @@ test('public seo robots keeps marketing pages crawlable and blocks private surfa
   assert.match(robots, /^Allow: \/$/m);
   assert.match(robots, /^Sitemap: https:\/\/www\.softora\.nl\/sitemap\.xml$/m);
   assert.match(robots, /^Disallow: \/api\/$/m);
+  assert.match(robots, /^Disallow: \/premium-pakketten$/m);
   assert.match(robots, /^Disallow: \/premium-personeel-dashboard$/m);
   assert.match(robots, /^Disallow: \/premium-seo$/m);
   assert.doesNotMatch(robots, /^Disallow: \/premium-$/m);
