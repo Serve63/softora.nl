@@ -166,10 +166,32 @@
       '.coldmail-sender-scoreboard.is-loading .coldmail-sender-scoreboard-total-count{color:var(--text-tertiary)}',
       'html[data-softora-lead-generator-alias="1"] .coldmail-sender-scoreboard{display:none!important}',
       '@media (max-width:1024px){.coldmail-sender-scoreboard{align-self:flex-start}}',
-      '@media (max-width:760px){.coldmail-sender-scoreboard{position:fixed;top:92px;left:12px;right:12px;z-index:45;width:auto;min-width:0;margin-top:0;padding:.72rem;border:1px solid rgba(25,27,39,.12);border-radius:8px;background:rgba(255,255,255,.9);box-shadow:0 10px 24px rgba(25,27,39,.08);box-sizing:border-box;font-size:.8rem;line-height:1.05}.coldmail-sender-scoreboard-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:.48rem}.coldmail-sender-scoreboard-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.42rem;align-items:center;min-width:0;padding:.52rem .56rem;border:1px solid rgba(25,27,39,.1);border-radius:8px;background:rgba(255,255,255,.72)}.coldmail-sender-scoreboard-name{min-width:0;overflow:hidden;text-overflow:ellipsis}.coldmail-sender-scoreboard-metrics{min-width:0}.coldmail-sender-scoreboard-count{min-width:1.2rem}.coldmail-sender-scoreboard-total{display:block;margin-top:.1rem}.coldmail-sender-scoreboard-total-stack{width:100%;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:.48rem;justify-items:stretch}.coldmail-sender-scoreboard-total-line{grid-template-columns:minmax(0,1fr) auto;justify-content:stretch;column-gap:.42rem;min-width:0;padding:.52rem .56rem;border:1px solid rgba(25,27,39,.1);border-radius:8px;background:rgba(255,255,255,.72);box-sizing:border-box}.coldmail-sender-scoreboard-total-line--primary{padding-top:.52rem;border-top:1px solid rgba(25,27,39,.1)}.coldmail-sender-scoreboard-total-label{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:.64rem}.coldmail-sender-scoreboard-total-count,.coldmail-sender-scoreboard-total-opened{min-width:1.2rem}}',
+      '@media (max-width:760px){html.softora-coldmail-mobile-stats-only body{background:#fff!important;color:#1a1a2e!important;min-height:100vh!important;overflow:hidden!important}html.softora-coldmail-mobile-stats-only body>:not(#coldmailSenderScoreboard){display:none!important}.coldmail-sender-scoreboard{position:fixed;top:50%;left:16px;right:16px;z-index:14001;display:grid!important;width:auto;min-width:0;margin-top:0;padding:.84rem;border:1px solid rgba(25,27,39,.12);border-radius:8px;background:#fff;box-shadow:0 10px 24px rgba(25,27,39,.08);box-sizing:border-box;font-size:.8rem;line-height:1.05;transform:translateY(-50%)}.coldmail-sender-scoreboard-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:.48rem}.coldmail-sender-scoreboard-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.42rem;align-items:center;min-width:0;padding:.52rem .56rem;border:1px solid rgba(25,27,39,.1);border-radius:8px;background:#fff}.coldmail-sender-scoreboard-name{min-width:0;overflow:hidden;text-overflow:ellipsis}.coldmail-sender-scoreboard-metrics{min-width:0}.coldmail-sender-scoreboard-count{min-width:1.2rem}.coldmail-sender-scoreboard-total{display:block;margin-top:.1rem}.coldmail-sender-scoreboard-total-stack{width:100%;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:.48rem;justify-items:stretch}.coldmail-sender-scoreboard-total-line{grid-template-columns:minmax(0,1fr) auto;justify-content:stretch;column-gap:.42rem;min-width:0;padding:.52rem .56rem;border:1px solid rgba(25,27,39,.1);border-radius:8px;background:#fff;box-sizing:border-box}.coldmail-sender-scoreboard-total-line--primary{padding-top:.52rem;border-top:1px solid rgba(25,27,39,.1)}.coldmail-sender-scoreboard-total-label{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:.64rem}.coldmail-sender-scoreboard-total-count,.coldmail-sender-scoreboard-total-opened{min-width:1.2rem}}',
       '@media (max-width:390px){.coldmail-sender-scoreboard{font-size:.74rem;padding:.62rem}.coldmail-sender-scoreboard-list,.coldmail-sender-scoreboard-total-stack{gap:.4rem}.coldmail-sender-scoreboard-entry,.coldmail-sender-scoreboard-total-line{padding:.48rem .46rem}.coldmail-sender-scoreboard-total-label{font-size:.6rem}}',
     ].join('');
     (doc.head || doc.documentElement).appendChild(style);
+  }
+
+  function isMobileStatsOnlyMode() {
+    return Boolean(
+      global.matchMedia &&
+      global.matchMedia('(max-width: 760px)').matches
+    );
+  }
+
+  function syncScoreboardPlacement() {
+    const doc = global.document;
+    if (!doc || !doc.documentElement) return;
+    const wrap = doc.getElementById('coldmailSenderScoreboard');
+    const topbar = doc.querySelector('#screen-dashboard .topbar');
+    const mobile = isMobileStatsOnlyMode();
+    doc.documentElement.classList.toggle('softora-coldmail-mobile-stats-only', mobile);
+    if (!wrap) return;
+    if (mobile && doc.body && wrap.parentNode !== doc.body) {
+      doc.body.appendChild(wrap);
+    } else if (!mobile && topbar && wrap.parentNode !== topbar) {
+      topbar.appendChild(wrap);
+    }
   }
 
   function createSenderRow(doc, sender) {
@@ -248,6 +270,7 @@
     wrap.appendChild(list);
     ensureTotalRow(doc, wrap);
     topbar.appendChild(wrap);
+    syncScoreboardPlacement();
   }
 
   function setLoadingState() {
@@ -338,6 +361,7 @@
     }
     injectStyles();
     ensureScoreboard();
+    syncScoreboardPlacement();
     const snapshot = await loadCustomerRows();
     if (!snapshot.hasSnapshot) {
       setLoadingState();
@@ -403,6 +427,7 @@
   function init() {
     injectStyles();
     ensureScoreboard();
+    syncScoreboardPlacement();
     if (!patchSendRefresh() && typeof global.setTimeout === 'function') {
       global.setTimeout(patchSendRefresh, 0);
     }
@@ -419,6 +444,7 @@
     global.addEventListener('load', patchSendRefresh);
     global.addEventListener('focus', () => refresh().catch(() => null));
     global.addEventListener('pageshow', () => refresh().catch(() => null));
+    global.addEventListener('resize', syncScoreboardPlacement);
     global.addEventListener(AUTOPILOT_STATUS_EVENT, handleAutopilotStatus);
   }
 
@@ -439,6 +465,7 @@
     renderSenderStats,
     setLoadingState,
     refresh,
+    syncScoreboardPlacement,
     startAutoRefresh,
   };
 })(window);
