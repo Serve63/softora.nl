@@ -254,10 +254,10 @@ test('over softora page is customer-facing and explains the company clearly', ()
   assert.match(source, /Websites die aanvragen moeten opleveren/);
   assert.match(source, /Maatwerk software voor echte processen/);
   assert.match(source, /AI automatisering met menselijke controle/);
-  assert.match(source, /home-over-office-meeting-ai\.jpg/);
-  assert.match(source, /home-service-websites-ai\.jpg/);
-  assert.match(source, /home-service-software-ai\.jpg/);
-  assert.match(source, /home-service-chatbot-ai\.jpg/);
+  assert.match(source, /softora-strategy-meeting\.jpg/);
+  assert.match(source, /softora-website-wireframes\.jpg/);
+  assert.match(source, /softora-crm-workflow\.jpg/);
+  assert.match(source, /softora-chatbot-klantcontact\.jpg/);
   assert.match(source, /alt="Softora overleg over websites, software en AI automatisering"/);
   assert.match(source, /Martijn van de Ven/);
   assert.doesNotMatch(source, /Serv[eé]\s+Creusen/i);

@@ -1,5 +1,5 @@
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
-const DEFAULT_OG_IMAGE_PATH = '/assets/home-hero-generated-v2.jpg';
+const DEFAULT_OG_IMAGE_PATH = '/assets/softora-office-digital-growth.jpg';
 const DEFAULT_LOGO_PATH = '/assets/61C2BCF5-70E9-4789-AFDE-FA18C862D58A.PNG';
 const { getSeoContentPublicPaths, getSeoContentSitemapEntries } = require('./seo-content');
 

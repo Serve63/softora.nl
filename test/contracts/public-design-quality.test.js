@@ -17,6 +17,10 @@ function getSeoGrowthPages() {
     .filter((fileName) => readFile(fileName).includes('/assets/seo-growth-pages.css'));
 }
 
+function getImgTags(source) {
+  return Array.from(source.matchAll(/<img\b[^>]*>/gi), (match) => match[0]);
+}
+
 test('seo-growth pages use the current shared design stylesheet', () => {
   const pages = getSeoGrowthPages();
 
@@ -82,6 +86,28 @@ test('seo-growth action links are rendered as real buttons', () => {
   }
 });
 
+test('seo-growth template images use trustworthy filenames and stable dimensions', () => {
+  const pages = getSeoGrowthPages();
+
+  for (const fileName of pages) {
+    const source = readFile(fileName);
+    const imgTags = getImgTags(source);
+
+    assert.ok(imgTags.length > 0, `${fileName} moet echte publieke beelden tonen`);
+
+    for (const tag of imgTags) {
+      assert.doesNotMatch(
+        tag,
+        /home-hero-generated-v2|home-over-office-meeting-ai|home-service-[^"']*-ai/i,
+        `${fileName} gebruikt een zwakke AI/generated publieke beeldnaam: ${tag}`
+      );
+      assert.match(tag, /\balt="[^"]{18,}"/, `${fileName} mist betekenisvolle alt-tekst: ${tag}`);
+      assert.match(tag, /\bwidth="\d+"/, `${fileName} mist vaste image width: ${tag}`);
+      assert.match(tag, /\bheight="\d+"/, `${fileName} mist vaste image height: ${tag}`);
+    }
+  }
+});
+
 test('seo-growth mobile navigation keeps the contact CTA in the visible flow', () => {
   const css = readFile('assets/seo-growth-pages.css');
 
@@ -117,22 +143,22 @@ test('over softora page keeps headline, quote and CTA layout polished', () => {
   );
   assert.match(
     source,
-    /<section class="seo-growth-hero">[\s\S]*home-over-office-meeting-ai\.jpg/s,
+    /<section class="seo-growth-hero">[\s\S]*softora-strategy-meeting\.jpg[\s\S]*width="1536" height="1024"/s,
     'Over Softora moet een echte hero-foto tonen binnen de template'
   );
   assert.match(
     source,
-    /<a class="seo-growth-card over-image-card" href="\/website-laten-maken">[\s\S]*home-service-websites-ai\.jpg/s,
+    /<a class="seo-growth-card over-image-card" href="\/website-laten-maken">[\s\S]*softora-website-wireframes\.jpg[\s\S]*width="1122" height="1402"/s,
     'Websiteblok op Over Softora moet een foto houden'
   );
   assert.match(
     source,
-    /<a class="seo-growth-card over-image-card" href="\/bedrijfssoftware-op-maat">[\s\S]*home-service-software-ai\.jpg/s,
+    /<a class="seo-growth-card over-image-card" href="\/bedrijfssoftware-op-maat">[\s\S]*softora-crm-workflow\.jpg[\s\S]*width="1122" height="1402"/s,
     'Softwareblok op Over Softora moet een foto houden'
   );
   assert.match(
     source,
-    /<a class="seo-growth-card over-image-card" href="\/ai-automatisering">[\s\S]*home-service-chatbot-ai\.jpg/s,
+    /<a class="seo-growth-card over-image-card" href="\/ai-automatisering">[\s\S]*softora-chatbot-klantcontact\.jpg[\s\S]*width="1122" height="1402"/s,
     'AI-blok op Over Softora moet een foto houden'
   );
   assert.match(
