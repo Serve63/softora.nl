@@ -3,7 +3,7 @@
 
   const STATUS_URL = "/api/coldmailing/autopilot/status";
   const SETTINGS_URL = "/api/coldmailing/autopilot/settings";
-  const BATCH_SIZE = 3;
+  const BATCH_SIZE = 1;
   const AUTOPILOT_STATUS_EVENT = "softora:coldmail-autopilot-status";
   const FREEZE_IDS = [
     "subj1",
@@ -296,9 +296,11 @@
           schedule: {
             timezone: "Europe/Amsterdam",
             weekdaysOnly: true,
-            startHour: 9,
+            startHour: 8,
             endHour: 17,
-            minIntervalMinutes: 12,
+            minIntervalMinutes: 5,
+            senderMinIntervalMinutes: 14,
+            senderMaxIntervalMinutes: 18,
           },
         }),
       }));

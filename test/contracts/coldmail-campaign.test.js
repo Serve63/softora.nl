@@ -298,6 +298,87 @@ test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async
   );
 });
 
+test('coldmail campaign uses deterministic subject and body variants per recipient', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'variant-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        website: 'bakkerijzon.nl',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        mail: true,
+      },
+      {
+        id: 'variant-2',
+        bedrijf: 'Lunchroom Maan',
+        naam: 'Luna',
+        email: 'luna@example.test',
+        website: 'lunchroommaan.nl',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        mail: true,
+      },
+      {
+        id: 'variant-3',
+        bedrijf: 'Café Nova',
+        naam: 'Nora',
+        email: 'nora@example.test',
+        website: 'cafenova.nl',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'variant-1': {
+        id: 'variant-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+      'variant-2': {
+        id: 'variant-2',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+      'variant-3': {
+        id: 'variant-3',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 3,
+    subject: 'Nieuw webdesign gemaakt voor {{bedrijf}}',
+    subjectVariants: [
+      'Nieuw webdesign gemaakt voor {{bedrijf}}',
+      'Ik maakte een webdesign voor {{bedrijf}}',
+      'Korte vraag over {{website}}',
+    ],
+    body: 'Ik kwam {{website}} tegen en heb een nieuw webdesign gemaakt.',
+    bodyVariants: [
+      'Ik kwam {{website}} tegen en heb een nieuw webdesign gemaakt.',
+      'Deze week zag ik {{website}} voorbij komen. Ik heb daar een nieuw webdesign voor gemaakt.',
+      'Vanuit enthousiasme heb ik een alternatief design gemaakt voor {{website}}.',
+    ],
+    senderEmail: 'info@softora.nl',
+    branch: 'Horeca & Restaurants',
+    actor: 'Servé',
+  });
+
+  assert.equal(result.sent, 3);
+  assert.equal(sentMessages.length, 3);
+  assert.ok(new Set(sentMessages.map((message) => message.subject)).size > 1);
+  assert.ok(new Set(sentMessages.map((message) => message.text.split('\n')[0])).size > 1);
+  assert.match(sentMessages[0].text, /bakkerijzon\.nl/);
+  assert.match(sentMessages[1].text, /lunchroommaan\.nl/);
+  assert.match(sentMessages[2].text, /cafenova\.nl/);
+});
+
 test('coldmail campaign tracks opens with a tokenized tracking pixel', async () => {
   const { service, sentMessages, getSavedState } = createService();
 
@@ -966,7 +1047,7 @@ test('coldmail autopilot refuses legacy config without saved sender profiles', a
 });
 
 test('coldmail autopilot uses the saved dashboard profile and includes the webdesign mockup when available', async () => {
-  const { service, sentMessages } = createService({
+  const { service, sentMessages, getAutopilotState } = createService({
     rows: [
       {
         id: 'prospect-1',
@@ -1013,7 +1094,15 @@ test('coldmail autopilot uses the saved dashboard profile and includes the webde
         senderProfiles: {
           'martijn@softora.nl': {
             subject: 'Nieuw webdesign gemaakt voor {{bedrijf}}',
+            subjectVariants: [
+              'Nieuw webdesign gemaakt voor {{bedrijf}}',
+              'Ik maakte een webdesign voor {{bedrijf}}',
+            ],
             body: 'Goedemorgen {{naam}},\n\nDit is de actuele dashboardtekst.\n\nMet vriendelijke groet,\nMartijn van de Ven',
+            bodyVariants: [
+              'Goedemorgen {{naam}},\n\nDit is de actuele dashboardtekst.\n\nMet vriendelijke groet,\nMartijn van de Ven',
+              'Goedemorgen {{naam}},\n\nIk stuur je de actuele variant vanuit het dashboard.\n\nMet vriendelijke groet,\nMartijn van de Ven',
+            ],
           },
         },
         branch: 'Horeca & Restaurants',
@@ -1033,11 +1122,15 @@ test('coldmail autopilot uses the saved dashboard profile and includes the webde
   assert.equal(result.senderEmail, 'martijn@softora.nl');
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].from, 'Martijn van de Ven <martijn@softora.nl>');
-  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt voor Bakkerij Zon');
-  assert.match(sentMessages[0].text, /Dit is de actuele dashboardtekst/);
+  assert.ok([
+    'Nieuw webdesign gemaakt voor Bakkerij Zon',
+    'Ik maakte een webdesign voor Bakkerij Zon',
+  ].includes(sentMessages[0].subject));
+  assert.match(sentMessages[0].text, /actuele (dashboardtekst|variant)/);
   assert.doesNotMatch(sentMessages[0].text, /oudere tekst/);
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-prospect-1@softora');
+  assert.equal(getAutopilotState().config.senderProfiles['martijn@softora.nl'].bodyVariants.length, 2);
 });
 
 test('coldmail autopilot skips leads without a complete webdesign mockup', async () => {
