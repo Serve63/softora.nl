@@ -85,6 +85,13 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/premium-:slug.html",
+      "destination": "/premium-:slug",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/agenda/confirmation-tasks/:taskId",
