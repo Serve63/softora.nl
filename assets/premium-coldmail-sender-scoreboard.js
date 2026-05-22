@@ -22,6 +22,24 @@
     return normalizeString(value).toLowerCase();
   }
 
+  function parseTimestampMs(value) {
+    const timestamp = Date.parse(normalizeString(value));
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function getColdmailScoreResetAtMs(rows) {
+    return (Array.isArray(rows) ? rows : []).reduce((latest, row) => {
+      return Math.max(
+        latest,
+        parseTimestampMs(row && (
+          row.coldmailScoreboardResetAt ||
+          row.coldmailMetricsResetAt ||
+          row.coldmailOpenTrackingResetAt
+        ))
+      );
+    }, 0);
+  }
+
   function hasCustomerRowsSnapshot(values) {
     const stateValues = values && typeof values === 'object' ? values : {};
     return Object.prototype.hasOwnProperty.call(stateValues, CUSTOMER_DB_KEY) ||
@@ -65,22 +83,39 @@
   function hasColdmailSendSignal(row) {
     if (!row || typeof row !== 'object') return false;
     return Boolean(
-      normalizeString(row.outreachSentAt) ||
-      normalizeString(row.outreach_sent_at) ||
-      normalizeString(row.lastColdmailSentAt) ||
-      normalizeString(row.lastMailSentAt) ||
-      normalizeString(row.coldmailCampaignStartedAt) ||
+      getColdmailSendTimestampMs(row) ||
       resolveSenderEmail(row)
     );
   }
 
-  function hasColdmailOpenSignal(row) {
+  function getColdmailSendTimestampMs(row) {
+    if (!row || typeof row !== 'object') return 0;
+    return Math.max(
+      parseTimestampMs(row.outreachSentAt),
+      parseTimestampMs(row.outreach_sent_at),
+      parseTimestampMs(row.lastColdmailSentAt),
+      parseTimestampMs(row.lastMailSentAt),
+      parseTimestampMs(row.coldmailCampaignStartedAt)
+    );
+  }
+
+  function getColdmailOpenTimestampMs(row) {
+    if (!row || typeof row !== 'object') return 0;
+    return Math.max(
+      parseTimestampMs(row.coldmailOpenedAt),
+      parseTimestampMs(row.coldmailFirstOpenedAt),
+      parseTimestampMs(row.coldmailLastOpenedAt),
+      parseTimestampMs(row.outreachOpenedAt)
+    );
+  }
+
+  function hasColdmailOpenSignal(row, resetAtMs = 0) {
     if (!row || typeof row !== 'object') return false;
+    const openedAtMs = getColdmailOpenTimestampMs(row);
+    if (resetAtMs) return openedAtMs > resetAtMs;
     return Boolean(
       row.coldmailOpened ||
-      normalizeString(row.coldmailOpenedAt) ||
-      normalizeString(row.coldmailFirstOpenedAt) ||
-      normalizeString(row.outreachOpenedAt) ||
+      openedAtMs ||
       Number(row.coldmailOpenCount || row.outreachOpenCount || 0) > 0
     );
   }
@@ -95,6 +130,7 @@
   }
 
   function calculateSenderStats(rows) {
+    const resetAtMs = getColdmailScoreResetAtMs(rows);
     const counts = SENDER_ROWS.reduce((result, sender) => {
       result[sender.email] = { sent: 0, opened: 0 };
       return result;
@@ -103,8 +139,10 @@
       const senderEmail = resolveSenderEmail(row);
       if (!Object.prototype.hasOwnProperty.call(counts, senderEmail)) return;
       if (!hasColdmailSendSignal(row)) return;
+      const sentAtMs = getColdmailSendTimestampMs(row);
+      if (resetAtMs && (!sentAtMs || sentAtMs <= resetAtMs)) return;
       counts[senderEmail].sent += 1;
-      if (hasColdmailOpenSignal(row)) counts[senderEmail].opened += 1;
+      if (hasColdmailOpenSignal(row, resetAtMs)) counts[senderEmail].opened += 1;
     });
     return SENDER_ROWS
       .map((sender, index) => ({
@@ -468,6 +506,7 @@
     calculateOpenRate,
     buildAutopilotStatusKey,
     ensureScoreboard,
+    getColdmailScoreResetAtMs,
     handleAutopilotStatus,
     hasColdmailOpenSignal,
     hasColdmailOpenTrackingSignal,

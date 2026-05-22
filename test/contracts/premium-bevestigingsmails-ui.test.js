@@ -37,7 +37,7 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   vm.createContext(context);
   vm.runInContext(scoreboardSource, context);
 
-  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522k/);
+  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522l/);
   assert.match(scoreboardSource, /id = 'coldmailSenderScoreboard'/);
   assert.match(scoreboardSource, /data-coldmail-sender'/);
   assert.match(scoreboardSource, /martijn@softora\.nl/);
@@ -75,6 +75,8 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.doesNotMatch(scoreboardSource, /count\.textContent = '0'/);
   assert.doesNotMatch(scoreboardSource, /OPEN RATE /);
   assert.match(scoreboardSource, /hasCustomerRowsSnapshot/);
+  assert.match(scoreboardSource, /function getColdmailScoreResetAtMs\(rows\)/);
+  assert.match(scoreboardSource, /coldmailOpenTrackingResetAt/);
   assert.match(scoreboardSource, /function hasColdmailOpenTrackingSignal\(row\)/);
   assert.match(scoreboardSource, /function hasMeasurableColdmailOpenSignal\(row\)/);
   assert.doesNotMatch(scoreboardSource, /if \(!hasMeasurableColdmailOpenSignal\(row\)\) return;/);
@@ -120,6 +122,56 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateSenderTotal(entries), 4);
   assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateOpenedTotal(entries), 2);
   assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateOpenRate(3, 2), 67);
+});
+
+test('premium bevestigingsmails coldmail teller start na de reset-baseline', () => {
+  const root = path.join(__dirname, '../..');
+  const scoreboardSource = fs.readFileSync(path.join(root, 'assets/premium-coldmail-sender-scoreboard.js'), 'utf8');
+  const context = { window: {} };
+  vm.createContext(context);
+  vm.runInContext(scoreboardSource, context);
+
+  const entries = context.window.SoftoraColdmailSenderScoreboard.calculateSenderStats([
+    {
+      sentFromEmail: 'serve@softora.nl',
+      lastColdmailSentAt: '2026-05-22T09:55:00.000Z',
+      coldmailOpened: true,
+      coldmailLastOpenedAt: '2026-05-22T10:00:00.000Z',
+    },
+    {
+      outreachSentFromEmail: 'martijn@softora.nl',
+      outreachSentAt: '2026-05-22T08:19:34.861Z',
+      coldmailOpenTrackingResetAt: '2026-05-22T10:06:28.510Z',
+      coldmailOpened: true,
+      coldmailLastOpenedAt: '2026-05-22T10:01:00.000Z',
+    },
+    {
+      outreachSentFromEmail: 'martijn@softora.nl',
+      outreachSentAt: '2026-05-22T10:45:51.388Z',
+      coldmailTrackingId: 'tracking-after-reset',
+    },
+    {
+      sentFromEmail: 'serve@softora.nl',
+      lastColdmailSentAt: '2026-05-22T10:47:31.628Z',
+      coldmailFirstOpenedAt: '2026-05-22T10:52:00.000Z',
+    },
+    {
+      sentFromEmail: 'serve@softora.nl',
+      lastColdmailSentAt: '2026-05-22T10:49:11.321Z',
+      coldmailOpened: true,
+      coldmailLastOpenedAt: '2026-05-22T10:02:00.000Z',
+    },
+  ]);
+
+  assert.equal(
+    JSON.stringify(entries.map((entry) => ({ email: entry.email, count: entry.count, opened: entry.opened, openRate: entry.openRate }))),
+    JSON.stringify([
+      { email: 'serve@softora.nl', count: 2, opened: 1, openRate: 50 },
+      { email: 'martijn@softora.nl', count: 1, opened: 0, openRate: 0 },
+    ])
+  );
+  assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateSenderTotal(entries), 3);
+  assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateOpenedTotal(entries), 1);
 });
 
 test('premium bevestigingsmails blokkeert de pagina netjes tijdens coldmail verzending', () => {
