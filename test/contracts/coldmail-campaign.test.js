@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { simpleParser } = require('mailparser');
 
 const { createColdmailCampaignService } = require('../../server/services/coldmail-campaign');
 const {
@@ -1502,7 +1503,7 @@ test('coldmail campaign preview only lists webdesign recipients with a generated
 });
 
 test('coldmail campaign does not treat stale row-index photos as ready webdesign', async () => {
-  const { service } = createService({
+  const { service, sentMessages } = createService({
     rows: [
       {
         bedrijf: 'Autobedrijf Den Breejen Almkerk B.V.',
@@ -3684,7 +3685,7 @@ test('coldmail campaign saves sent copies into the selected sender sent folder',
       this.usable = false;
     },
   };
-  const { service } = createService({
+  const { service, sentMessages } = createService({
     imapHost: 'imap.example.test',
     imapUser: 'serve@softora.nl',
     imapPass: 'secret',
@@ -3702,6 +3703,9 @@ test('coldmail campaign saves sent copies into the selected sender sent folder',
   assert.equal(result.sentItems[0].sentCopySaved, true);
   assert.equal(appendedMessages.length, 1);
   assert.equal(appendedMessages[0].mailboxName, 'INBOX/Verstuurd');
+  const parsedSentCopy = await simpleParser(appendedMessages[0].raw);
+  assert.match(sentMessages[0].html, /\/api\/coldmailing\/open\.gif\?/);
+  assert.doesNotMatch(String(parsedSentCopy.html || ''), /\/api\/coldmailing\/open\.gif\?/);
   assert.match(String(appendedMessages[0].raw), /Subject: Nieuwe website voor Bakkerij Zon/);
 });
 

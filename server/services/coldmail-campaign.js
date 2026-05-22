@@ -4629,7 +4629,13 @@ function createColdmailCampaignService(deps = {}) {
         if (rejected.includes(normalizeEmailAddress(to)) || (Array.isArray(info && info.accepted) && !accepted.length)) {
           throw new Error('SMTP accepteerde de ontvanger niet.');
         }
-        const sentCopySaved = await saveSentCopy(senderEmail, mail, info, smtpAccount);
+        const sentCopyMail = trackingUrl
+          ? {
+              ...mail,
+              html: htmlWithContent,
+            }
+          : mail;
+        const sentCopySaved = await saveSentCopy(senderEmail, sentCopyMail, info, smtpAccount);
         const sentItem = {
           id: item.id,
           bedrijf: getRowCompany(row),
