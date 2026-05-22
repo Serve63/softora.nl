@@ -103,7 +103,6 @@
       const senderEmail = resolveSenderEmail(row);
       if (!Object.prototype.hasOwnProperty.call(counts, senderEmail)) return;
       if (!hasColdmailSendSignal(row)) return;
-      if (!hasMeasurableColdmailOpenSignal(row)) return;
       counts[senderEmail].sent += 1;
       if (hasColdmailOpenSignal(row)) counts[senderEmail].opened += 1;
     });

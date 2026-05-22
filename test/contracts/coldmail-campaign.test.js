@@ -775,7 +775,7 @@ test('coldmail autopilot uses the saved dashboard profile and includes the webde
   assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-prospect-1@softora');
 });
 
-test('coldmail autopilot skips leads without a webdesign and sends photo-only ready designs', async () => {
+test('coldmail autopilot skips leads without a complete webdesign mockup', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -798,12 +798,29 @@ test('coldmail autopilot skips leads without a webdesign and sends photo-only re
         stad: 'Oisterwijk',
         mail: true,
       },
+      {
+        id: 'mockup-ready',
+        bedrijf: 'Mockup Klaar BV',
+        naam: 'Ruben',
+        email: 'mockup@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
     ],
     photoMap: {
       'photo-ready': {
         id: 'photo-ready',
         websitePhoto: TINY_PNG_DATA_URL,
         websitePhotoName: 'Foto Klaar BV webdesign',
+      },
+      'mockup-ready': {
+        id: 'mockup-ready',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Mockup Klaar BV webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Mockup Klaar BV device mockup',
       },
     },
     mailboxAccountsRaw: JSON.stringify([
@@ -850,11 +867,11 @@ test('coldmail autopilot skips leads without a webdesign and sends photo-only re
   assert.equal(result.sent, 1);
   assert.equal(result.skipped, false);
   assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].to, 'klaar@example.test');
-  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt voor Foto Klaar BV');
-  assert.equal(sentMessages[0].attachments.length, 1);
-  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-photo-ready@softora');
-  assert.doesNotMatch(sentMessages[0].html, /webdesign-mockup-photo-ready@softora/);
+  assert.equal(sentMessages[0].to, 'mockup@example.test');
+  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt voor Mockup Klaar BV');
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-mockup-ready@softora');
+  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-mockup-ready@softora');
 });
 
 test('coldmail autopilot keeps an emergency disabled state when a running batch finishes', async () => {
@@ -1330,7 +1347,7 @@ test('coldmail campaign attaches webdesign photo and device mockup inline and as
   assert.equal(savedRows[0].actionRequired, false);
 });
 
-test('coldmail campaign sends webdesign outreach when the device mockup is missing', async () => {
+test('coldmail campaign refuses webdesign outreach when the device mockup is missing', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -1351,20 +1368,24 @@ test('coldmail campaign sends webdesign outreach when the device mockup is missi
     },
   });
 
-  const result = await service.sendColdmailCampaign({
-    count: 1,
-    subject: 'Nieuwe website voor {{bedrijf}}',
-    body: 'Goedemorgen {{naam}}',
-    senderEmail: 'info@softora.nl',
-    specialAction: 'webdesign',
-  });
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Nieuwe website voor {{bedrijf}}',
+        body: 'Goedemorgen {{naam}}',
+        senderEmail: 'info@softora.nl',
+        specialAction: 'webdesign',
+      }),
+    (error) => {
+      assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
+      assert.match(error.message, /Nog geen website-design klaar voor Bakkerij Zon/);
+      assert.equal(error.failedItems[0].email, 'ruben@example.test');
+      return true;
+    }
+  );
 
-  assert.equal(result.sent, 1);
-  assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].attachments.length, 1);
-  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-prospect-1@softora');
-  assert.doesNotMatch(sentMessages[0].html, /webdesign-mockup-prospect-1@softora/);
-  assert.doesNotMatch(sentMessages[0].html, /Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop/);
+  assert.equal(sentMessages.length, 0);
 });
 
 test('coldmail campaign keeps the closing signature before webdesign photos', async () => {
