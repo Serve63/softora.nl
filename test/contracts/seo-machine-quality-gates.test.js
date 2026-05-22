@@ -24,6 +24,7 @@ const {
   auditLinkGraph,
   auditSeoImages,
   buildSeoLinkGraph,
+  extractButtonLikeControlEntries,
   extractButtonEntries,
   extractImageEntriesFromHtml,
   isLeadCtaLabel,
@@ -237,6 +238,39 @@ test('zichtbare contactform-buttons moeten expliciet als WhatsApp-conversie gema
       '/formulier-zonder-whatsapp:missing-conversion-link',
     ].sort()
   );
+});
+
+test('button-like lead controls zonder WhatsApp-route worden geblokkeerd', () => {
+  const controls = extractButtonLikeControlEntries(
+    [
+      '<input type="submit" value="Plan scan">',
+      '<a class="seo-growth-button">Vraag advies</a>',
+      '<div role="button" class="hero-cta">Start project</div>',
+      '<span onclick="openContact()" aria-label="WhatsApp"></span>',
+    ].join('\n')
+  );
+
+  assert.deepEqual(
+    controls.map((control) => control.label),
+    ['Plan scan', 'Vraag advies', 'Start project', 'WhatsApp']
+  );
+
+  const issues = auditConversionCtas({
+    pages: [
+      {
+        path: '/button-like-controls',
+        html: [
+          '<input type="submit" value="Plan scan">',
+          '<a class="seo-growth-button">Vraag advies</a>',
+          '<div role="button" class="hero-cta">Start project</div>',
+          '<span onclick="openContact()" aria-label="WhatsApp"></span>',
+          '<button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-target="whatsapp">Verstuur bericht</button>',
+        ].join('\n'),
+      },
+    ],
+  });
+
+  assert.deepEqual(issues.map((issue) => issue.type), ['lead-button-not-whatsapp']);
 });
 
 test('SEO-content CTAs zijn meetbaar en linken terug naar commerciële pagina’s', () => {
