@@ -1,8 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { createPremiumPublicHtmlFilesSet } = require('../../server/config/premium-public-html-files');
 const { createPremiumHtmlPageAccessController } = require('../../server/security/premium-pages');
+
+const repoRoot = path.resolve(__dirname, '../..');
 
 function createResponseRecorder() {
   return {
@@ -175,6 +179,17 @@ test('internal premium tool pages require login for anonymous visitors', async (
     assert.equal(res.headers['Cache-Control'], 'no-store, private', fileName);
     assert.equal(res.headers['X-Robots-Tag'], 'noindex', fileName);
   }
+});
+
+test('vercel redirects direct premium html files so static serving cannot bypass auth', () => {
+  const vercelConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, 'vercel.json'), 'utf8'));
+  const premiumHtmlRedirect = (vercelConfig.redirects || []).find(
+    (redirect) => redirect && redirect.source === '/premium-:slug.html'
+  );
+
+  assert.ok(premiumHtmlRedirect, 'Vercel must redirect direct premium .html URLs before filesystem routes.');
+  assert.equal(premiumHtmlRedirect.destination, '/premium-:slug');
+  assert.equal(premiumHtmlRedirect.permanent, false);
 });
 
 test('protected premium pages clear expired sessions and redirect to login', async () => {
