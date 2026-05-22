@@ -51,7 +51,10 @@ test('marketing premium landing pages are not auth-gated', () => {
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-chatbot.html'), false);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-websites.html'), false);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-blog.html'), false);
-  assert.equal(controller.isPremiumProtectedHtmlFile('premium-websitegenerator.html'), false);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-pakketten.html'), true);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-seo.html'), true);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-websitegenerator.html'), true);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-bevestigingsmails.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-personeel-dashboard.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-flynow.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-wachtwoordenregister.html'), true);
@@ -134,6 +137,44 @@ test('protected premium pages redirect to setup when auth is not configured', as
     res.redirectLocation,
     '/premium-personeel-login?setup=1&next=%2Fpremium-personeel-agenda'
   );
+});
+
+test('internal premium tool pages require login for anonymous visitors', async () => {
+  const controller = createPremiumHtmlPageAccessController({
+    premiumPublicHtmlFiles: createPremiumPublicHtmlFilesSet(),
+    noindexHeaderValue: 'noindex',
+    getResolvedPremiumAuthState: async () => ({ configured: true, authenticated: false }),
+    getSafePremiumRedirectPath: (value, fallback = '/premium-personeel-dashboard') =>
+      String(value || '').trim() || fallback,
+  });
+
+  const protectedToolPages = [
+    ['premium-bevestigingsmails.html', '/premium-bevestigingsmails'],
+    ['premium-pakketten.html', '/premium-pakketten'],
+    ['premium-seo.html', '/premium-seo'],
+    ['premium-websitegenerator.html', '/premium-websitegenerator'],
+  ];
+
+  for (const [fileName, requestPath] of protectedToolPages) {
+    const req = createRequest({
+      originalUrl: requestPath,
+      path: requestPath,
+    });
+    const res = createResponseRecorder();
+
+    const result = await controller.resolvePremiumHtmlPageAccess(req, res, fileName);
+
+    assert.equal(result.handled, true, fileName);
+    assert.equal(result.isProtectedPremiumPage, true, fileName);
+    assert.equal(res.redirectCode, 302, fileName);
+    assert.equal(
+      res.redirectLocation,
+      `/premium-personeel-login?next=${encodeURIComponent(requestPath)}`,
+      fileName
+    );
+    assert.equal(res.headers['Cache-Control'], 'no-store, private', fileName);
+    assert.equal(res.headers['X-Robots-Tag'], 'noindex', fileName);
+  }
 });
 
 test('protected premium pages clear expired sessions and redirect to login', async () => {
