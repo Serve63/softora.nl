@@ -162,7 +162,6 @@
       '.coldmail-sender-scoreboard-total-line--primary{padding-top:.32rem;border-top:2px solid currentColor}',
       '.coldmail-sender-scoreboard-total-label{font-size:.68rem;font-weight:800;letter-spacing:.05em;color:inherit}',
       '.coldmail-sender-scoreboard-total-count,.coldmail-sender-scoreboard-total-opened{display:inline-flex;justify-content:flex-end;color:inherit;font-variant-numeric:tabular-nums}',
-      '.coldmail-sender-scoreboard-total-meta{font-size:.72rem;font-weight:800;letter-spacing:.06em;line-height:1;color:var(--crimson)}',
       '.coldmail-sender-scoreboard.is-loading .coldmail-sender-scoreboard-count{color:var(--text-tertiary)}',
       '.coldmail-sender-scoreboard.is-loading .coldmail-sender-scoreboard-total-count{color:var(--text-tertiary)}',
       'html[data-softora-lead-generator-alias="1"] .coldmail-sender-scoreboard{display:none!important}',
@@ -221,15 +220,10 @@
     opened.textContent = '...';
     openedLine.appendChild(openedLabel);
     openedLine.appendChild(opened);
-    const meta = doc.createElement('span');
-    meta.className = 'coldmail-sender-scoreboard-total-meta';
-    meta.setAttribute('data-coldmail-sender-total-meta', '');
-    meta.textContent = '...';
     const metrics = doc.createElement('span');
     metrics.className = 'coldmail-sender-scoreboard-total-stack';
     metrics.appendChild(totalLine);
     metrics.appendChild(openedLine);
-    metrics.appendChild(meta);
     row.appendChild(metrics);
     wrap.appendChild(row);
     return row;
@@ -271,10 +265,8 @@
     const totalRow = ensureTotalRow(doc, wrap);
     const totalCountEl = totalRow && totalRow.querySelector('[data-coldmail-sender-total-count]');
     const totalOpenedEl = totalRow && totalRow.querySelector('[data-coldmail-sender-total-opened]');
-    const totalMetaEl = totalRow && totalRow.querySelector('[data-coldmail-sender-total-meta]');
     if (totalCountEl) totalCountEl.textContent = '...';
     if (totalOpenedEl) totalOpenedEl.textContent = '...';
-    if (totalMetaEl) totalMetaEl.textContent = '...';
     if (totalRow) totalRow.setAttribute('aria-label', 'Totaal wordt geladen');
   }
 
@@ -306,15 +298,12 @@
     });
     const total = calculateSenderTotal(entries);
     const openedTotal = calculateOpenedTotal(entries);
-    const totalOpenRate = calculateOpenRate(total, openedTotal);
     const totalRow = ensureTotalRow(doc, wrap);
     const totalCountEl = totalRow && totalRow.querySelector('[data-coldmail-sender-total-count]');
     const totalOpenedEl = totalRow && totalRow.querySelector('[data-coldmail-sender-total-opened]');
-    const totalMetaEl = totalRow && totalRow.querySelector('[data-coldmail-sender-total-meta]');
     if (totalCountEl) totalCountEl.textContent = String(total);
     if (totalOpenedEl) totalOpenedEl.textContent = String(openedTotal);
-    if (totalMetaEl) totalMetaEl.textContent = totalOpenRate + '%';
-    if (totalRow) totalRow.setAttribute('aria-label', 'Totaal ' + total + ' meetbare coldmails, ' + openedTotal + ' geopend, open-rate ' + totalOpenRate + '%');
+    if (totalRow) totalRow.setAttribute('aria-label', 'Totaal ' + total + ' meetbare coldmails, ' + openedTotal + ' geopend');
   }
 
   async function loadCustomerRows() {
