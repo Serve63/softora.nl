@@ -29,6 +29,12 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
+const MAILBOX_SENDER_CTA_LINKS = Object.freeze({
+  'martijn@softora.nl': {
+    text: '💼 Mijn LinkedIn 👈',
+    url: 'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios',
+  },
+});
 function countCharacter(value, character) {
   return String(value || '').split(character).length - 1;
 }
@@ -53,7 +59,20 @@ function isSafeMailBodyUrl(value) {
     return false;
   }
 }
-function renderLinkedMailboxText(value) {
+function getMailboxSenderCtaLink(options) {
+  const mail = options && options.mail;
+  const candidates = [
+    options && options.senderEmail,
+    mail && mail.email,
+    activeMailboxAccount,
+  ];
+  for (const candidate of candidates) {
+    const email = normalizeMailboxEmail(candidate);
+    if (MAILBOX_SENDER_CTA_LINKS[email]) return MAILBOX_SENDER_CTA_LINKS[email];
+  }
+  return null;
+}
+function renderLinkedMailboxText(value, options) {
   const text = String(value == null ? '' : value);
   let html = '';
   let lastIndex = 0;
@@ -69,6 +88,12 @@ function renderLinkedMailboxText(value) {
     return match;
   });
   html += escapeHtml(text.slice(lastIndex));
+  const cta = getMailboxSenderCtaLink(options);
+  if (cta && text.includes(cta.text) && isSafeMailBodyUrl(cta.url)) {
+    const label = escapeHtml(cta.text);
+    const link = `<a href="${escapeHtml(cta.url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    html = html.split(label).join(link);
+  }
   return html;
 }
 function normalizeMailboxEmail(value) {
@@ -269,7 +294,7 @@ function renderMailboxTextLine(line, options) {
   if (fallbackOptOutUrl && /^Geen webdesign willen ontvangen\? Laat het me weten![:\s]*$/i.test(trimmed)) {
     return renderMailboxOptOutLink(fallbackOptOutUrl);
   }
-  return renderLinkedMailboxText(value);
+  return renderLinkedMailboxText(value, options);
 }
 function normalizeMailboxImageLabel(value) {
   return String(value || '')
@@ -434,7 +459,7 @@ function renderMailboxBodySection(section, imageState) {
       <section class="detail-mail-section detail-mail-section-quote">
         <div class="detail-mail-section-label">Eerdere mail</div>
         ${quoteMeta}
-        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: imageState.images, optOutUrl: imageState.optOutUrl, usedImages: imageState.usedImages })}</div>
+        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: imageState.images, optOutUrl: imageState.optOutUrl, senderEmail: imageState.senderEmail, usedImages: imageState.usedImages })}</div>
       </section>`;
   }
   if (section.type === 'signature') {
@@ -474,6 +499,7 @@ function renderMailBody(value, images, options) {
   const imageState = {
     images: normalizeMailboxBodyImages(images),
     optOutUrl: normalizeMailboxOptOutUrl(options && options.optOutUrl),
+    senderEmail: normalizeMailboxEmail((options && options.senderEmail) || (options && options.mail && options.mail.email) || activeMailboxAccount),
     usedImages: new Set()
   };
   const sections = buildMailboxBodySections(value);
@@ -843,7 +869,7 @@ function openMail(id, options = {}) {
       </div>
     </div>
     <div class="detail-body">
-      <div class="detail-body-text">${renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl })}</div>
+      <div class="detail-body-text">${renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl, mail: m })}</div>
       ${outreachQuickbar}
     </div>`;
   if (!options.skipBodyFetch && !m.bodyLoaded) {

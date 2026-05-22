@@ -104,7 +104,7 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260520a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260520a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260513a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260520a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260522a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
@@ -297,7 +297,7 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /const bodyImages = normalizeMailboxBodyImages\(message\.bodyImages\);/);
   assert.match(scriptSource, /const optOutUrl = normalizeMailboxOptOutUrl\(message\.optOutUrl\);/);
   assert.match(scriptSource, /cleanMailboxText\(message\.body \|\| message\.preview \|\| ''\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl \}\)\}<\/div>/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl, mail: m \}\)\}<\/div>/);
   assert.match(scriptSource, /imageAlt = cleaned\.trim\(\)\.match\(\/\^\\\[image:\\s\*\(\[\^\\\]\]\+\)\\\]\$\/i\)/);
 });
 
@@ -388,9 +388,9 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(scriptSource, /data-mailbox-action="toggle-star"/);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
-  assert.match(scriptSource, /function renderLinkedMailboxText\(value\)/);
-  assert.match(scriptSource, /renderLinkedMailboxText\(value\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl \}\)\}<\/div>/);
+  assert.match(scriptSource, /function renderLinkedMailboxText\(value, options\)/);
+  assert.match(scriptSource, /renderLinkedMailboxText\(value, options\)/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl, mail: m \}\)\}<\/div>/);
 });
 
 test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
@@ -402,12 +402,20 @@ test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
   ].join('\n'));
 
   assert.match(scriptSource, /const MAIL_BODY_URL_PATTERN = \/https\?:\\\/\\\/\[\^\\s<>"'\]\+\/gi;/);
+  assert.match(scriptSource, /const MAILBOX_SENDER_CTA_LINKS = Object\.freeze/);
+  assert.match(scriptSource, /'martijn@softora\.nl': \{\s*text: '💼 Mijn LinkedIn 👈',\s*url: 'https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&utm_content=profile&utm_medium=member_ios'/);
+  assert.match(scriptSource, /function getMailboxSenderCtaLink\(options\)/);
   assert.match(scriptSource, /function isSafeMailBodyUrl\(value\)/);
   assert.match(scriptSource, /const parsed = new URL\(value\);/);
   assert.match(scriptSource, /parsed\.protocol === 'http:' \|\| parsed\.protocol === 'https:';/);
   assert.match(html, /<a href="https:\/\/dashboard\.render\.com\/email-reset\/confirm\?token=fake-token-123" target="_blank" rel="noopener noreferrer">https:\/\/dashboard\.render\.com\/email-reset\/confirm\?token=fake-token-123<\/a>\./);
   assert.match(html, /&lt;script&gt;alert\(&quot;xss&quot;\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script>/);
+  const linkedCtaHtml = renderMailboxBodyForTest('💼 Mijn LinkedIn 👈', [], { senderEmail: 'martijn@softora.nl' });
+  assert.match(
+    linkedCtaHtml,
+    /<a href="https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios" target="_blank" rel="noopener noreferrer">💼 Mijn LinkedIn 👈<\/a>/
+  );
 });
 
 test('premium mailbox toont webdesign outreach acties alleen via databasekoppeling', () => {

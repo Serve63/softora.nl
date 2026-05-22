@@ -95,6 +95,9 @@ const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
 const TEST_RECIPIENT_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL]);
 const TEST_RECIPIENT_LOOKUP_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL, 'servec321@gail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce', 'softora testmodus']);
+const MARTIJN_LINKEDIN_CTA_TEXT = '💼 Mijn LinkedIn 👈';
+const MARTIJN_LINKEDIN_URL =
+  'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios';
 const COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS = new Set([
   'serve@softora.nl',
   'martijn@softora.nl',
@@ -104,6 +107,12 @@ const SENDER_DISPLAY_NAMES = {
   'martijn@softora.nl': 'Martijn van de Ven',
   'ruben@softora.nl': 'Ruben',
 };
+const COLDMAIL_LINKEDIN_CTA_BY_SENDER = Object.freeze({
+  'martijn@softora.nl': {
+    text: MARTIJN_LINKEDIN_CTA_TEXT,
+    url: MARTIJN_LINKEDIN_URL,
+  },
+});
 const DEFAULT_COLDMAIL_SENDER_PROFILES = {
   'serve@softora.nl': {
     subject: 'Korte vraag over uw website - Softora.nl',
@@ -3249,6 +3258,10 @@ function createColdmailCampaignService(deps = {}) {
       .replace(/"/g, '&quot;');
   }
 
+  function escapeHtmlAttribute(value) {
+    return escapeHtml(value).replace(/'/g, '&#39;');
+  }
+
   function parseDataUrlImage(value) {
     const match = normalizeString(value).match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-z0-9+/=\s]+)$/i);
     if (!match) return null;
@@ -3301,18 +3314,29 @@ function createColdmailCampaignService(deps = {}) {
     return normalized || fallback;
   }
 
-  function toHtml(text) {
+  function renderColdmailHtmlLine(line, options = {}) {
+    const cleanLine = normalizeString(line);
+    const senderEmail = normalizeEmailAddress(options.senderEmail || '');
+    const cta = COLDMAIL_LINKEDIN_CTA_BY_SENDER[senderEmail];
+    if (!cta || !cleanLine.includes(cta.text)) return escapeHtml(cleanLine);
+    const link = `<a href="${escapeHtmlAttribute(
+      cta.url
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">${escapeHtml(
+      cta.text
+    )}</a>`;
+    return cleanLine
+      .split(cta.text)
+      .map((part) => escapeHtml(part))
+      .join(link);
+  }
+
+  function toHtml(text, options = {}) {
     const body = normalizeString(text)
       .split(/\n{2,}/)
       .map((paragraph) =>
         `<p>${paragraph
           .split('\n')
-          .map((line) =>
-            normalizeString(line)
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-          )
+          .map((line) => renderColdmailHtmlLine(line, options))
           .join('<br>')}</p>`
       )
       .join('\n');
@@ -4546,7 +4570,7 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
-      const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(baseText), reference);
+      const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(baseText, { senderEmail }), reference);
       const htmlWithContent = webdesignPhoto
         ? appendWebdesignImageHtml(htmlBase, webdesignPhoto, {
             optOutText: shouldAppendOptOut ? COLDMAIL_OPT_OUT_LABEL : '',
