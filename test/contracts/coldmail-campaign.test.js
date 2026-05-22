@@ -260,6 +260,43 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[1].status, 'klant');
 });
 
+test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async () => {
+  const { service, sentMessages } = createService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'martijn@softora.nl',
+        name: 'Martijn van de Ven',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'martijn@softora.nl',
+        smtpPass: 'martijn-secret',
+      },
+    ]),
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: [
+      'Goedemorgen {{naam}},',
+      '',
+      'Zou u openstaan voor webdesign?',
+      '',
+      'Met vriendelijke groet,',
+      'Martijn',
+      '💼 Mijn LinkedIn 👈',
+      'Softora.nl',
+    ].join('\n'),
+    senderEmail: 'martijn@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.match(sentMessages[0].text, /💼 Mijn LinkedIn 👈/);
+  assert.match(
+    sentMessages[0].html,
+    /<a href="https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">💼 Mijn LinkedIn 👈<\/a>/
+  );
+});
+
 test('coldmail campaign tracks opens with a tokenized tracking pixel', async () => {
   const { service, sentMessages, getSavedState } = createService();
 

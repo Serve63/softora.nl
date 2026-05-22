@@ -1,4 +1,15 @@
 (function (global) {
+  const SENDER_CTA_LINKS = Object.freeze({
+    'martijn@softora.nl': {
+      text: '💼 Mijn LinkedIn 👈',
+      url: 'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios',
+    },
+  });
+
+  function normalizeEmail(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
   function isSentMessage(mail, options) {
     return String(mail && (mail.folder || (options && options.activeFolder)) || '').toLowerCase() === 'sent';
   }
@@ -46,7 +57,34 @@
     ].join(' ').toLowerCase();
   }
 
+  function getSenderCtaLink(options) {
+    const mail = options && options.mail;
+    const candidates = [
+      options && options.senderEmail,
+      mail && mail.email,
+      options && options.account,
+    ];
+    for (const candidate of candidates) {
+      const email = normalizeEmail(candidate);
+      if (SENDER_CTA_LINKS[email]) return SENDER_CTA_LINKS[email];
+    }
+    return null;
+  }
+
+  function applySenderCtaLinks(html, text, options, helpers) {
+    const cta = getSenderCtaLink(options);
+    const escapeHtml = helpers && helpers.escapeHtml;
+    const isSafeUrl = helpers && helpers.isSafeUrl;
+    if (!cta || !String(text || '').includes(cta.text) || typeof escapeHtml !== 'function' || !isSafeUrl(cta.url)) {
+      return html;
+    }
+    const label = escapeHtml(cta.text);
+    const link = `<a href="${escapeHtml(cta.url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    return String(html || '').split(label).join(link);
+  }
+
   global.SoftoraMailboxDisplay = {
+    applySenderCtaLinks,
     isSentMessage,
     getListPrimaryText,
     getDetailPrimaryText,
