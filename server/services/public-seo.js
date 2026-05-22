@@ -44,6 +44,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/blog/website-laten-maken-mkb-paginas',
       '/kennisbank/wat-is-een-conversiegerichte-website',
       '/website-laten-maken-oisterwijk',
+      '/crm-systeem-op-maat',
       '/pakketten',
       '/kennisbank',
     ],
