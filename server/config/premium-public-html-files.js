@@ -13,9 +13,6 @@ const PREMIUM_PUBLIC_HTML_FILE_NAMES = Object.freeze([
   'premium-algemene-voorwaarden.html',
   'premium-privacy-policy.html',
   'premium-over-softora.html',
-  'premium-pakketten.html',
-  'premium-seo.html',
-  'premium-websitegenerator.html',
 ]);
 
 function createPremiumPublicHtmlFilesSet() {

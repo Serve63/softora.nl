@@ -119,14 +119,6 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     serviceName: 'Chatbot laten maken',
   },
   {
-    fileName: 'premium-pakketten.html',
-    path: '/premium-pakketten',
-    title: 'Softora pakketten en diensten',
-    description:
-      'Bekijk de Softora pakketten voor websites, software, AI automatisering en digitale groeisystemen voor ondernemers en teams.',
-    kind: 'collection',
-  },
-  {
     fileName: 'premium-over-softora.html',
     path: '/premium-over-softora',
     title: 'Over Softora',
@@ -257,6 +249,7 @@ function buildPublicSeoRobotsTxt({ knownHtmlPageFiles, siteOrigin = DEFAULT_SITE
   const disallowPaths = new Set([
     '/api/',
     '/premium-personeel-login',
+    '/premium-pakketten',
     '/premium-seo',
     '/premium-websitegenerator',
     '/premium-bevestigingsmails',

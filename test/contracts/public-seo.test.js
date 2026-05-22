@@ -17,6 +17,7 @@ const KNOWN_FILES = new Set([
   'crm-systeem-op-maat.html',
   'chatbot-laten-maken.html',
   'premium-bedrijfssoftware.html',
+  'premium-pakketten.html',
   'premium-personeel-dashboard.html',
   'premium-seo.html',
   'premium-websitegenerator.html',
@@ -38,6 +39,7 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/chatbot-laten-maken<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/premium-bedrijfssoftware<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-telefonist<\/loc>/);
+  assert.doesNotMatch(sitemap, /premium-pakketten/);
   assert.doesNotMatch(sitemap, /premium-personeel-dashboard/);
   assert.doesNotMatch(sitemap, /premium-seo/);
   assert.doesNotMatch(sitemap, /premium-websitegenerator/);
@@ -52,6 +54,7 @@ test('public seo robots keeps marketing pages crawlable and blocks private surfa
   assert.match(robots, /^Allow: \/$/m);
   assert.match(robots, /^Sitemap: https:\/\/www\.softora\.nl\/sitemap\.xml$/m);
   assert.match(robots, /^Disallow: \/api\/$/m);
+  assert.match(robots, /^Disallow: \/premium-pakketten$/m);
   assert.match(robots, /^Disallow: \/premium-personeel-dashboard$/m);
   assert.match(robots, /^Disallow: \/premium-seo$/m);
   assert.doesNotMatch(robots, /^Disallow: \/premium-$/m);
