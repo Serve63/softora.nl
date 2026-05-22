@@ -669,6 +669,68 @@ test('coldmail autopilot respects a per-sender cooldown without extending the gl
   assert.equal(getAutopilotState().lastResult.senderSkips.length, 2);
 });
 
+test('coldmail autopilot waits a configured send jitter before sending', async () => {
+  const { service, sentMessages, sleeps, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 9,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        sendJitterMinSeconds: 37,
+        sendJitterMaxSeconds: 37,
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.sendJitterSeconds, 37);
+  assert.deepEqual(sleeps, [37000]);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(getAutopilotState().schedule.sendJitterMinSeconds, 37);
+  assert.equal(getAutopilotState().lastResult.sendJitterSeconds, 37);
+});
+
 test('coldmail autopilot supports a deterministic random per-sender cooldown range', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [
