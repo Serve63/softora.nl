@@ -196,7 +196,7 @@ test('premium bevestigingsmails bevestigt mailverzending met pincode-bolletjes z
   assert.doesNotMatch(pinSource, /autocomplete=["']current-password["']/);
 });
 
-test('premium bevestigingsmails toont een aparte AI beheer pagina wanneer de modus op software staat', () => {
+test('premium bevestigingsmails houdt het handmatige coldmailing scherm zichtbaar in softwaremodus', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const managementPath = path.join(__dirname, '../../assets/premium-bevestigingsmails-management.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -207,8 +207,9 @@ test('premium bevestigingsmails toont een aparte AI beheer pagina wanneer de mod
   assert.match(pageSource, /id="screen-ai-management"/);
   assert.match(pageSource, /AI bepaalt zelf of coldmailing nu nodig is/);
   assert.match(pageSource, /AI is momenteel hier niet mee bezig\./);
-  assert.match(pageSource, /html\[data-ai-management-mode="software"\] #screen-dashboard,/);
-  assert.match(pageSource, /html\[data-ai-management-mode="software"\] #screen-ai-management \{ display: block !important; \}/);
+  assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-dashboard,/);
+  assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-ai-management \{ display: block !important; \}/);
+  assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260521h"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-management\.js\?v=20260423a" defer><\/script>/);
   assert.match(managementSource, /AI is momenteel hier niet mee bezig\./);
   assert.match(managementSource, /AI is hier actief bezig met coldmailing\./);
