@@ -394,10 +394,81 @@ function extractButtonEntries(htmlRaw) {
   });
 }
 
+function getAttrValue(attrsRaw, attrName) {
+  const attrs = String(attrsRaw || '');
+  const escapedName = String(attrName || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = attrs.match(new RegExp(`(?:^|\\s)${escapedName}=["']([^"']*)["']`, 'i'));
+  return match ? match[1] || '' : '';
+}
+
+function hasAttr(attrsRaw, attrName) {
+  const attrs = String(attrsRaw || '');
+  const escapedName = String(attrName || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|\\s)${escapedName}(?:\\s*=|\\s|$)`, 'i').test(attrs);
+}
+
+function getControlLabel(attrsRaw, innerHtmlRaw = '') {
+  return (
+    stripHtmlTags(innerHtmlRaw) ||
+    stripHtmlTags(getAttrValue(attrsRaw, 'value')) ||
+    stripHtmlTags(getAttrValue(attrsRaw, 'aria-label')) ||
+    stripHtmlTags(getAttrValue(attrsRaw, 'title'))
+  );
+}
+
+function isButtonLikeControlAttrs(attrsRaw) {
+  const attrs = String(attrsRaw || '');
+  if (/\brole=["']button["']/i.test(attrs)) return true;
+  if (/\bonclick\s*=/i.test(attrs)) return true;
+  if (/\bdata-softora-conversion=["'][^"']+["']/i.test(attrs)) return true;
+  return false;
+}
+
+function extractButtonLikeControlEntries(htmlRaw) {
+  const html = String(htmlRaw || '');
+  const entries = extractButtonEntries(html).map((entry) => ({
+    ...entry,
+    tag: 'button',
+  }));
+
+  for (const match of html.matchAll(/<input\b([^>]*)>/gi)) {
+    const attrs = match[1] || '';
+    const type = getAttrValue(attrs, 'type').toLowerCase();
+    if (!['submit', 'button'].includes(type)) continue;
+    entries.push({
+      attrs,
+      label: getControlLabel(attrs),
+      tag: 'input',
+    });
+  }
+
+  for (const match of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const attrs = match[1] || '';
+    if (hasAttr(attrs, 'href')) continue;
+    entries.push({
+      attrs,
+      label: getControlLabel(attrs, match[2] || ''),
+      tag: 'a',
+    });
+  }
+
+  for (const match of html.matchAll(/<(div|span)\b([^>]*)>([\s\S]*?)<\/\1>/gi)) {
+    const attrs = match[2] || '';
+    if (!isButtonLikeControlAttrs(attrs)) continue;
+    entries.push({
+      attrs,
+      label: getControlLabel(attrs, match[3] || ''),
+      tag: match[1].toLowerCase(),
+    });
+  }
+
+  return entries;
+}
+
 function hasSafeBlankTarget(attrsRaw) {
   const attrs = String(attrsRaw || '');
-  const target = attrs.match(/(?:^|\s)target=["']([^"']+)["']/i)?.[1] || '';
-  const rel = attrs.match(/(?:^|\s)rel=["']([^"']+)["']/i)?.[1] || '';
+  const target = getAttrValue(attrs, 'target');
+  const rel = getAttrValue(attrs, 'rel');
   return target.toLowerCase() === '_blank' && /\bnoopener\b/i.test(rel) && /\bnoreferrer\b/i.test(rel);
 }
 
@@ -416,7 +487,7 @@ function auditConversionCtas({ pages = [] } = {}) {
     const pathName = normalizeInternalPath(page.path);
     const html = String(page.html || '');
     const anchors = extractAnchorEntries(html);
-    const buttons = extractButtonEntries(html);
+    const buttons = extractButtonLikeControlEntries(html);
     const conversionLinks = anchors.filter((anchor) => isConversionHref(anchor.href));
     const annotatedLinks = conversionLinks.filter((anchor) => /data-softora-conversion=["'][^"']+["']/i.test(anchor.attrs));
     const leadCtaButtons = buttons.filter((button) => isLeadCtaLabel(button.label));
@@ -528,6 +599,7 @@ module.exports = {
   isMartijnWhatsappHref,
   isLeadCtaLabel,
   buildSeoLinkGraph,
+  extractButtonLikeControlEntries,
   extractButtonEntries,
   extractImageEntriesFromHtml,
   extractInternalLinksFromHtml,
