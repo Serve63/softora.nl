@@ -161,6 +161,7 @@ const CORE_INTERNAL_LINK_EXPECTATIONS = [
       '/blog/website-laten-maken-mkb-paginas',
       '/kennisbank/wat-is-een-conversiegerichte-website',
       '/website-laten-maken-oisterwijk',
+      '/crm-systeem-op-maat',
       '/pakketten',
       '/ai-automatisering',
     ],

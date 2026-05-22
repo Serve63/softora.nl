@@ -64,9 +64,14 @@ test('website money page is focused on SEO, leads and clean internal links', () 
   assert.match(source, /Conversiegerichte landingspagina's/);
   assert.match(source, /Contentstructuur/);
   assert.match(source, /Google Search Console/);
+  assert.match(source, /Waar let je op bij een website laten maken\?/);
+  assert.match(source, /Wat kost een website laten maken\?/);
+  assert.match(source, /Welke pagina's heb je nodig\?/);
+  assert.match(source, /Wat gebeurt er met nieuwe leads\?/);
   assert.match(source, /href="\/blog\/website-laten-maken-kosten-2026"/);
   assert.match(source, /href="\/blog\/website-laten-maken-mkb-paginas"/);
   assert.match(source, /href="\/kennisbank\/wat-is-een-conversiegerichte-website"/);
+  assert.match(source, /href="\/crm-systeem-op-maat"/);
   assert.match(source, /href="\/pakketten"/);
   assert.match(source, /href="\/ai-automatisering"/);
   assert.match(source, /href="\/website-laten-maken-oisterwijk"/);
@@ -79,6 +84,7 @@ test('website money page is focused on SEO, leads and clean internal links', () 
   assert.ok(entry.relatedLinks.includes('/website-laten-maken-oisterwijk'));
   assert.ok(entry.relatedLinks.includes('/blog/website-laten-maken-mkb-paginas'));
   assert.ok(entry.relatedLinks.includes('/kennisbank/wat-is-een-conversiegerichte-website'));
+  assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/pakketten'));
 });
 
