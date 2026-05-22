@@ -2005,6 +2005,18 @@ function createColdmailCampaignService(deps = {}) {
       1,
       24
     );
+    const senderMinIntervalMinutes = parsePositiveInt(
+      raw.senderMinIntervalMinutes ?? raw.senderCooldownMinutes ?? raw.mailboxIntervalMinutes,
+      0,
+      0,
+      240
+    );
+    const senderMaxIntervalMinutes = parsePositiveInt(
+      raw.senderMaxIntervalMinutes ?? raw.senderCooldownMaxMinutes ?? raw.mailboxMaxIntervalMinutes,
+      senderMinIntervalMinutes,
+      senderMinIntervalMinutes,
+      240
+    );
     return {
       timezone: normalizeString(raw.timezone || raw.timeZone) || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
       weekdaysOnly: normalizeBooleanFlag(
@@ -2019,12 +2031,8 @@ function createColdmailCampaignService(deps = {}) {
         5,
         240
       ),
-      senderMinIntervalMinutes: parsePositiveInt(
-        raw.senderMinIntervalMinutes ?? raw.senderCooldownMinutes ?? raw.mailboxIntervalMinutes,
-        0,
-        0,
-        240
-      ),
+      senderMinIntervalMinutes,
+      senderMaxIntervalMinutes,
     };
   }
 
@@ -2060,6 +2068,9 @@ function createColdmailCampaignService(deps = {}) {
         senderMinIntervalMinutes:
           env.COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES ||
           env.COLDMAIL_AUTOPILOT_SENDER_COOLDOWN_MINUTES,
+        senderMaxIntervalMinutes:
+          env.COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES ||
+          env.COLDMAIL_AUTOPILOT_SENDER_COOLDOWN_MAX_MINUTES,
       }),
       lastRunAt: '',
       lastStartedAt: '',
@@ -2303,9 +2314,21 @@ function createColdmailCampaignService(deps = {}) {
       .reduce((latest, timestamp) => Math.max(latest, timestamp), 0);
   }
 
+  function getSenderCooldownMinutes(schedule, senderEmail, lastSentAtMs) {
+    const min = Math.max(0, Number(schedule && schedule.senderMinIntervalMinutes) || 0);
+    const max = Math.max(min, Number(schedule && schedule.senderMaxIntervalMinutes) || min);
+    if (!min || max <= min) return min;
+    const range = max - min + 1;
+    const seed = crypto
+      .createHash('sha256')
+      .update(`${normalizeEmailAddress(senderEmail)}:${lastSentAtMs}`)
+      .digest()
+      .readUInt32BE(0);
+    return min + (seed % range);
+  }
+
   async function chooseColdmailAutopilotSender(candidates, selectionOptions = {}) {
     const schedule = normalizeColdmailAutopilotSchedule(selectionOptions.schedule);
-    const senderMinIntervalMs = schedule.senderMinIntervalMinutes * 60 * 1000;
     const currentMs = now().getTime();
     const senderOptions = [];
     const skipped = [];
@@ -2327,14 +2350,16 @@ function createColdmailCampaignService(deps = {}) {
           skipped.push({ senderEmail, reason: 'coldmail_daily_limit_reached', quota });
           continue;
         }
-        if (senderMinIntervalMs > 0) {
+        if (schedule.senderMinIntervalMinutes > 0) {
           const lastSentAtMs = getLastColdmailSendAtMsForSender(quota, senderEmail);
-          const readyAtMs = lastSentAtMs + senderMinIntervalMs;
+          const cooldownMinutes = getSenderCooldownMinutes(schedule, senderEmail, lastSentAtMs);
+          const readyAtMs = lastSentAtMs + cooldownMinutes * 60 * 1000;
           if (lastSentAtMs && readyAtMs > currentMs) {
             skipped.push({
               senderEmail,
               reason: 'sender_cooldown',
               readyAt: new Date(readyAtMs).toISOString(),
+              cooldownMinutes,
             });
             continue;
           }
@@ -2454,10 +2479,11 @@ function createColdmailCampaignService(deps = {}) {
       dailyQuota: result.dailyQuota && typeof result.dailyQuota === 'object' ? result.dailyQuota : undefined,
       senderSkips: Array.isArray(result.senderSkips)
         ? result.senderSkips.slice(0, 10).map((item) => ({
-            senderEmail: normalizeEmailAddress(item && item.senderEmail),
-            reason: truncateText(normalizeString(item && item.reason), 120),
-            readyAt: normalizeString(item && item.readyAt),
-          }))
+          senderEmail: normalizeEmailAddress(item && item.senderEmail),
+          reason: truncateText(normalizeString(item && item.reason), 120),
+          readyAt: normalizeString(item && item.readyAt),
+          cooldownMinutes: Math.max(0, Number(item && item.cooldownMinutes) || 0) || undefined,
+        }))
         : undefined,
       agendaBlocked: Boolean(result.agendaBlocked),
     };
