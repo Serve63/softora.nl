@@ -37,7 +37,7 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   vm.createContext(context);
   vm.runInContext(scoreboardSource, context);
 
-  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522g/);
+  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522i/);
   assert.match(scoreboardSource, /id = 'coldmailSenderScoreboard'/);
   assert.match(scoreboardSource, /data-coldmail-sender'/);
   assert.match(scoreboardSource, /martijn@softora\.nl/);
@@ -58,7 +58,13 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.doesNotMatch(scoreboardSource, /totalOpenRate \+ '%'/);
   assert.doesNotMatch(scoreboardSource, /open-rate /);
   assert.match(scoreboardSource, /coldmail-sender-scoreboard-total-line--primary\{[\s\S]*border-top:2px solid currentColor/);
-  assert.match(scoreboardSource, /@media \(max-width:760px\)\{\.coldmail-sender-scoreboard\{position:fixed;top:92px;left:12px;right:12px;/);
+  assert.match(scoreboardSource, /@media \(max-width:760px\)\{html\.softora-coldmail-mobile-stats-only body\{background:#fff!important;color:#1a1a2e!important;min-height:100vh!important;overflow:hidden!important\}/);
+  assert.match(scoreboardSource, /html\.softora-coldmail-mobile-stats-only body>:not\(#coldmailSenderScoreboard\)\{display:none!important\}/);
+  assert.match(scoreboardSource, /\.coldmail-sender-scoreboard\{position:fixed;top:50%;left:16px;right:16px;z-index:14001;/);
+  assert.match(scoreboardSource, /transform:translateY\(-50%\)/);
+  assert.match(scoreboardSource, /function syncScoreboardPlacement\(\)/);
+  assert.match(scoreboardSource, /doc\.body\.appendChild\(wrap\)/);
+  assert.match(scoreboardSource, /global\.addEventListener\('resize', syncScoreboardPlacement\)/);
   assert.match(scoreboardSource, /\.coldmail-sender-scoreboard-list\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);/);
   assert.match(scoreboardSource, /\.coldmail-sender-scoreboard-total-stack\{width:100%;min-width:0;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);/);
   assert.match(scoreboardSource, /@media \(max-width:390px\)\{/);
