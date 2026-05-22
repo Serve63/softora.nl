@@ -1,6 +1,8 @@
 (function setupColdmailSenderScoreboard(global) {
   const CUSTOMER_DB_SCOPE = 'premium_customers_database';
   const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
+  const SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
+  const SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
   const SENDER_ROWS = [
     { email: 'martijn@softora.nl', displayName: 'Martijn' },
     { email: 'serve@softora.nl', displayName: 'Servé' },
@@ -70,6 +72,18 @@
     }
   }
 
+  function parseSendGuardEntries(values) {
+    const stateValues = values && typeof values === 'object' ? values : {};
+    let parsed = null;
+    try {
+      parsed = JSON.parse(String(stateValues[SEND_GUARD_KEY] || '{}'));
+    } catch (_) {
+      parsed = null;
+    }
+    const entries = parsed && Array.isArray(parsed.entries) ? parsed.entries : [];
+    return entries.filter((item) => item && typeof item === 'object');
+  }
+
   function resolveSenderEmail(row) {
     if (!row || typeof row !== 'object') return '';
     return normalizeEmail(
@@ -129,8 +143,24 @@
     return hasColdmailOpenTrackingSignal(row) || hasColdmailOpenSignal(row);
   }
 
-  function calculateSenderStats(rows) {
+  function calculateSendGuardCounts(entries, resetAtMs = 0) {
+    const counts = SENDER_ROWS.reduce((result, sender) => {
+      result[sender.email] = 0;
+      return result;
+    }, {});
+    (Array.isArray(entries) ? entries : []).forEach((entry) => {
+      const senderEmail = normalizeEmail(entry && entry.senderEmail);
+      if (!Object.prototype.hasOwnProperty.call(counts, senderEmail)) return;
+      const sentAtMs = parseTimestampMs(entry && entry.at);
+      if (resetAtMs && (!sentAtMs || sentAtMs <= resetAtMs)) return;
+      counts[senderEmail] += Math.max(0, Number(entry && entry.count) || 0);
+    });
+    return counts;
+  }
+
+  function calculateSenderStats(rows, options = {}) {
     const resetAtMs = getColdmailScoreResetAtMs(rows);
+    const sendGuardCounts = calculateSendGuardCounts(options.sendGuardEntries, resetAtMs);
     const counts = SENDER_ROWS.reduce((result, sender) => {
       result[sender.email] = { sent: 0, opened: 0 };
       return result;
@@ -143,6 +173,12 @@
       if (resetAtMs && (!sentAtMs || sentAtMs <= resetAtMs)) return;
       counts[senderEmail].sent += 1;
       if (hasColdmailOpenSignal(row, resetAtMs)) counts[senderEmail].opened += 1;
+    });
+    SENDER_ROWS.forEach((sender) => {
+      counts[sender.email].sent = Math.max(
+        counts[sender.email].sent,
+        Math.max(0, Number(sendGuardCounts[sender.email]) || 0)
+      );
     });
     return SENDER_ROWS
       .map((sender, index) => ({
@@ -374,8 +410,8 @@
     return true;
   }
 
-  async function loadCustomerRows() {
-    const response = await global.fetch('/api/ui-state-get?scope=' + encodeURIComponent(CUSTOMER_DB_SCOPE), {
+  async function loadUiStateValues(scope) {
+    const response = await global.fetch('/api/ui-state-get?scope=' + encodeURIComponent(scope), {
       method: 'GET',
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
@@ -383,9 +419,21 @@
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload) throw new Error('Coldmail teller laden mislukt.');
+    return payload.values && typeof payload.values === 'object' ? payload.values : {};
+  }
+
+  async function loadScoreboardSnapshot() {
+    const customerValues = await loadUiStateValues(CUSTOMER_DB_SCOPE);
+    let sendGuardEntries = [];
+    try {
+      sendGuardEntries = parseSendGuardEntries(await loadUiStateValues(SEND_GUARD_SCOPE));
+    } catch (_) {
+      sendGuardEntries = [];
+    }
     return {
-      rows: parseCustomerRows(payload.values),
-      hasSnapshot: hasCustomerRowsSnapshot(payload.values),
+      rows: parseCustomerRows(customerValues),
+      sendGuardEntries,
+      hasSnapshot: hasCustomerRowsSnapshot(customerValues),
     };
   }
 
@@ -407,7 +455,7 @@
     syncScoreboardPlacement();
     let snapshot = null;
     try {
-      snapshot = await loadCustomerRows();
+      snapshot = await loadScoreboardSnapshot();
     } catch (_) {
       if (!renderMobileZeroState()) setLoadingState();
       scheduleRetry();
@@ -422,7 +470,7 @@
       global.clearTimeout(retryTimer);
       retryTimer = null;
     }
-    const entries = calculateSenderStats(snapshot.rows);
+    const entries = calculateSenderStats(snapshot.rows, { sendGuardEntries: snapshot.sendGuardEntries });
     renderSenderStats(entries);
     return entries;
   }
@@ -512,6 +560,7 @@
     hasColdmailOpenTrackingSignal,
     hasCustomerRowsSnapshot,
     hasMeasurableColdmailOpenSignal,
+    parseSendGuardEntries,
     parseCustomerRows,
     patchSendRefresh,
     renderSenderStats,
