@@ -37,7 +37,7 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   vm.createContext(context);
   vm.runInContext(scoreboardSource, context);
 
-  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522c/);
+  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522d/);
   assert.match(scoreboardSource, /id = 'coldmailSenderScoreboard'/);
   assert.match(scoreboardSource, /data-coldmail-sender'/);
   assert.match(scoreboardSource, /martijn@softora\.nl/);
@@ -51,11 +51,14 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.match(scoreboardSource, /function calculateSenderTotal\(entries\)/);
   assert.match(scoreboardSource, /function calculateOpenedTotal\(entries\)/);
   assert.match(scoreboardSource, /function calculateOpenRate\(sent, opened\)/);
-  assert.match(scoreboardSource, /OPEN RATE /);
-  assert.match(scoreboardSource, /coldmail-sender-scoreboard-total-count\{[\s\S]*border-top:2px solid currentColor/);
+  assert.match(scoreboardSource, /totalLabel\.textContent = 'Totaal:';/);
+  assert.match(scoreboardSource, /openedLabel\.textContent = 'Geopend:';/);
+  assert.match(scoreboardSource, /data-coldmail-sender-total-opened/);
+  assert.match(scoreboardSource, /coldmail-sender-scoreboard-total-line--primary\{[\s\S]*border-top:2px solid currentColor/);
   assert.doesNotMatch(scoreboardSource, /data-coldmail-sender-open-rate/);
   assert.match(scoreboardSource, /data-coldmail-sender-total-count/);
   assert.doesNotMatch(scoreboardSource, /count\.textContent = '0'/);
+  assert.doesNotMatch(scoreboardSource, /OPEN RATE /);
   assert.match(scoreboardSource, /hasCustomerRowsSnapshot/);
   assert.match(scoreboardSource, /function hasColdmailOpenTrackingSignal\(row\)/);
   assert.match(scoreboardSource, /function hasMeasurableColdmailOpenSignal\(row\)/);
