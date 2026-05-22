@@ -1131,7 +1131,8 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function hasReadyWebdesignAssetRecord(photo) {
-    return hasReadyWebsitePhotoRecord(photo);
+    if (!hasReadyWebsitePhotoRecord(photo)) return false;
+    return isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo));
   }
 
   function createReadyWebdesignMatcher(customerRows = [], photoMap = {}) {
@@ -2740,6 +2741,21 @@ function createColdmailCampaignService(deps = {}) {
   function isPersonalMailboxDomain(email) {
     const domain = getEmailDomain(email);
     return Boolean(domain && PERSONAL_MAILBOX_DOMAINS.has(domain));
+  }
+
+  function pickFailureMessage(failedItems = [], candidateItems = []) {
+    const failures = Array.isArray(failedItems) ? failedItems : [];
+    const candidateIds = new Set(
+      (Array.isArray(candidateItems) ? candidateItems : [])
+        .map((item) => normalizeString(item && item.id))
+        .filter(Boolean)
+    );
+    const candidateFailure = failures.find((item) =>
+      candidateIds.has(normalizeString(item && item.id)) && normalizeString(item && item.error)
+    );
+    if (candidateFailure) return normalizeString(candidateFailure.error);
+    const firstFailure = failures.find((item) => normalizeString(item && item.error));
+    return firstFailure ? normalizeString(firstFailure.error) : '';
   }
 
   async function resolveColdmailRecipients(input = {}) {
@@ -4460,7 +4476,7 @@ function createColdmailCampaignService(deps = {}) {
     const shouldIncludeWebdesignPhoto = shouldUseWebdesignAssets(input, 'mail');
 
     if (!candidateRows.length) {
-      const firstFailure = resolvedRecipients.failed[0] && resolvedRecipients.failed[0].error ? resolvedRecipients.failed[0].error : '';
+      const firstFailure = pickFailureMessage(resolvedRecipients.failed);
       const error = new Error(firstFailure || 'Geen geschikte e-mailadressen gevonden in de database.');
       error.code = shouldIncludeWebdesignPhoto && firstFailure ? 'NO_WEBDESIGN_PHOTOS' : 'NO_RECIPIENTS';
       error.failedItems = resolvedRecipients.failed;
@@ -4516,7 +4532,7 @@ function createColdmailCampaignService(deps = {}) {
       : {};
 
     if (!selectedRows.length) {
-      const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
+      const firstFailure = pickFailureMessage(failed, candidateRows);
       const error = new Error(firstFailure || 'Geen geldige e-maildomeinen gevonden in de database.');
       error.code = 'NO_VALID_RECIPIENT_DOMAINS';
       error.failedItems = failed;
@@ -4579,6 +4595,15 @@ function createColdmailCampaignService(deps = {}) {
           bedrijf: getRowCompany(row),
           email: to,
           error: `Geen webdesign-foto gevonden voor ${getRowCompany(row) || to}.`,
+        });
+        continue;
+      }
+      if (shouldIncludeWebdesignPhoto && !webdesignPhoto.mockup) {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(row),
+          email: to,
+          error: `Geen device-mockup gevonden voor ${getRowCompany(row) || to}.`,
         });
         continue;
       }
@@ -4715,9 +4740,9 @@ function createColdmailCampaignService(deps = {}) {
     }
 
     if (!sent.length && failed.length) {
-      const firstFailure = failed[0] && failed[0].error ? failed[0].error : '';
+      const firstFailure = pickFailureMessage(failed, selectedRows);
       const webdesignAssetFailure = shouldIncludeWebdesignPhoto && failed.every((item) =>
-        /^Geen webdesign-foto gevonden voor /i.test(normalizeString(item && item.error))
+        /^Geen (?:webdesign-foto|device-mockup) gevonden voor /i.test(normalizeString(item && item.error))
       );
       const error = new Error(firstFailure ? `Geen mails verzonden: ${firstFailure}` : 'Geen mails verzonden.');
       error.code = safetyPause

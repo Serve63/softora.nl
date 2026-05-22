@@ -37,7 +37,7 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   vm.createContext(context);
   vm.runInContext(scoreboardSource, context);
 
-  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522j/);
+  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522k/);
   assert.match(scoreboardSource, /id = 'coldmailSenderScoreboard'/);
   assert.match(scoreboardSource, /data-coldmail-sender'/);
   assert.match(scoreboardSource, /martijn@softora\.nl/);
@@ -77,7 +77,7 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.match(scoreboardSource, /hasCustomerRowsSnapshot/);
   assert.match(scoreboardSource, /function hasColdmailOpenTrackingSignal\(row\)/);
   assert.match(scoreboardSource, /function hasMeasurableColdmailOpenSignal\(row\)/);
-  assert.match(scoreboardSource, /if \(!hasMeasurableColdmailOpenSignal\(row\)\) return;/);
+  assert.doesNotMatch(scoreboardSource, /if \(!hasMeasurableColdmailOpenSignal\(row\)\) return;/);
   assert.match(scoreboardSource, /if \(!renderMobileZeroState\(\)\) setLoadingState\(\);[\s\S]*scheduleRetry\(\);/);
   assert.match(scoreboardSource, /renderMobileZeroState\(\);[\s\S]*if \(!patchSendRefresh\(\)/);
   assert.match(scoreboardSource, /AUTO_REFRESH_INTERVAL_MS = 60000/);
@@ -113,11 +113,11 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   assert.equal(
     JSON.stringify(entries.map((entry) => ({ email: entry.email, count: entry.count, opened: entry.opened, openRate: entry.openRate }))),
     JSON.stringify([
-      { email: 'martijn@softora.nl', count: 2, opened: 1, openRate: 50 },
+      { email: 'martijn@softora.nl', count: 3, opened: 1, openRate: 33 },
       { email: 'serve@softora.nl', count: 1, opened: 1, openRate: 100 },
     ])
   );
-  assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateSenderTotal(entries), 3);
+  assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateSenderTotal(entries), 4);
   assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateOpenedTotal(entries), 2);
   assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateOpenRate(3, 2), 67);
 });
