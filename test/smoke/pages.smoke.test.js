@@ -48,8 +48,14 @@ test('page smoke: /cinematic-office-demo serves the isolated cinematic prototype
   assert.equal(response.status, 200);
   assert.match(html, /Softora Cinematic Office Demo/);
   assert.match(html, /assets\/cinematic-office-command-center\.png/);
-  assert.match(html, /assets\/cinematic-office-demo\.css/);
-  assert.match(html, /assets\/cinematic-office-demo\.js/);
+  assert.match(html, /assets\/cinematic-office-demo\.css\?v=20260524e/);
+  assert.match(html, /assets\/cinematic-office-demo\.js\?v=20260524e/);
+  assert.match(html, /class="scene-photo scene-photo-back"/);
+  assert.match(html, /class="scene-photo scene-photo-main"/);
+  assert.match(html, /class="scene-photo scene-photo-detail"/);
+  assert.match(html, /class="light-sweep"/);
+  assert.match(html, /class="focus-frame"/);
+  assert.match(html, /class="letterbox letterbox-top"/);
   assert.match(html, /Los gebouwd\. Niks aan bestaande pagina's vast\./);
 });
 

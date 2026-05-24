@@ -7,7 +7,7 @@
   <title>Softora Cinematic Office Demo</title>
   <link rel="preload" href="/assets/cinematic-office-command-center.png" as="image" />
   <link rel="stylesheet" href="/assets/fonts.css" />
-  <link rel="stylesheet" href="/assets/cinematic-office-demo.css?v=20260524d" />
+  <link rel="stylesheet" href="/assets/cinematic-office-demo.css?v=20260524e" />
 </head>
 <body>
   <main class="cinematic-page">
@@ -15,12 +15,36 @@
       <div class="scene-pin">
         <div class="scene-photo-shell" aria-hidden="true">
           <img
-            id="officePhoto"
-            class="scene-photo"
+            id="officePhotoBack"
+            class="scene-photo scene-photo-back"
+            src="/assets/cinematic-office-command-center.png"
+            alt=""
+          />
+          <img
+            id="officePhotoMain"
+            class="scene-photo scene-photo-main"
+            src="/assets/cinematic-office-command-center.png"
+            alt=""
+          />
+          <img
+            id="officePhotoDetail"
+            class="scene-photo scene-photo-detail"
             src="/assets/cinematic-office-command-center.png"
             alt=""
           />
         </div>
+        <div class="depth-rail depth-rail-left" aria-hidden="true"></div>
+        <div class="depth-rail depth-rail-right" aria-hidden="true"></div>
+        <div class="light-sweep" aria-hidden="true"></div>
+        <div class="lens-glow" aria-hidden="true"></div>
+        <div class="focus-frame" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="letterbox letterbox-top" aria-hidden="true"></div>
+        <div class="letterbox letterbox-bottom" aria-hidden="true"></div>
         <div class="film-grain" aria-hidden="true"></div>
         <div class="scene-vignette" aria-hidden="true"></div>
 
@@ -71,6 +95,6 @@
     </section>
   </main>
 
-  <script src="/assets/cinematic-office-demo.js?v=20260524d" defer></script>
+  <script src="/assets/cinematic-office-demo.js?v=20260524e" defer></script>
 </body>
 </html>

@@ -1,12 +1,14 @@
 (function () {
   const stage = document.getElementById("cinematicStage");
-  const photo = document.getElementById("officePhoto");
+  const photoBack = document.getElementById("officePhotoBack");
+  const photoMain = document.getElementById("officePhotoMain");
+  const photoDetail = document.getElementById("officePhotoDetail");
   const progressBar = document.getElementById("sceneProgress");
   const percentLabel = document.getElementById("scenePercent");
   const statusLabel = document.getElementById("sceneStatus");
   const panels = Array.from(document.querySelectorAll("[data-story-panel]"));
 
-  if (!stage || !photo || !progressBar || !percentLabel || !statusLabel) {
+  if (!stage || !photoBack || !photoMain || !photoDetail || !progressBar || !percentLabel || !statusLabel) {
     return;
   }
 
@@ -28,12 +30,12 @@
   }
 
   function updateScrollProgress() {
-    const rect = stage.getBoundingClientRect();
-    const travel = Math.max(1, rect.height - window.innerHeight);
-    scrollProgress = clamp(Math.abs(rect.top) / travel, 0, 1);
+    const stageTop = stage.offsetTop;
+    const travel = Math.max(1, stage.offsetHeight - window.innerHeight);
+    scrollProgress = clamp((window.scrollY - stageTop) / travel, 0, 1);
   }
 
-  function getShotState(progress) {
+  function getShotStates(progress) {
     const eased = easeInOut(progress);
     const mobile = window.innerWidth < 760;
     const firstHalf = clamp(eased / 0.52, 0, 1);
@@ -41,16 +43,16 @@
 
     if (mobile) {
       return {
-        scale: lerp(1.12, 1.78, eased),
-        x: lerp(-18, -32, secondHalf),
-        y: lerp(0, 4, firstHalf) + lerp(0, -4, secondHalf),
+        back: { scale: lerp(1.04, 1.22, eased), x: lerp(-9, -17, secondHalf), y: lerp(0, -2, eased) },
+        main: { scale: lerp(1.18, 1.98, eased), x: lerp(-15, -39, secondHalf), y: lerp(1, 7, firstHalf) + lerp(0, -8, secondHalf) },
+        detail: { scale: lerp(1.28, 2.28, eased), x: lerp(-12, -46, secondHalf), y: lerp(0, -8, eased), opacity: clamp((progress - 0.2) / 0.58, 0, 0.54) },
       };
     }
 
     return {
-      scale: lerp(1.04, 1.42, eased),
-      x: lerp(0, -7, secondHalf),
-      y: lerp(0, 2, firstHalf) + lerp(0, -3, secondHalf),
+      back: { scale: lerp(1.01, 1.18, eased), x: lerp(0, -2.8, secondHalf), y: lerp(0, -1.5, eased) },
+      main: { scale: lerp(1.06, 1.58, eased), x: lerp(0, -11.5, secondHalf), y: lerp(0, 2.4, firstHalf) + lerp(0, -5.4, secondHalf) },
+      detail: { scale: lerp(1.14, 1.92, eased), x: lerp(1.5, -17, secondHalf), y: lerp(0, -4.5, eased), opacity: clamp((progress - 0.26) / 0.5, 0, 0.48) },
     };
   }
 
@@ -65,19 +67,33 @@
   }
 
   function paint(progress) {
-    const shot = getShotState(progress);
-    photo.style.transform = "translate3d(" + shot.x.toFixed(3) + "%, " + shot.y.toFixed(3) + "%, 0) scale(" + shot.scale.toFixed(4) + ")";
+    const shot = getShotStates(progress);
+    const focusOpacity = clamp((progress - 0.48) / 0.42, 0, 1);
+    const railDrift = easeInOut(progress);
+
+    photoBack.style.transform = transformShot(shot.back);
+    photoMain.style.transform = transformShot(shot.main);
+    photoDetail.style.transform = transformShot(shot.detail);
+    photoDetail.style.opacity = String(shot.detail.opacity.toFixed(3));
+    document.documentElement.style.setProperty("--focus-opacity", focusOpacity.toFixed(3));
+    document.documentElement.style.setProperty("--light-x", lerp(-34, 34, railDrift).toFixed(3) + "%");
+    document.documentElement.style.setProperty("--rail-left-x", lerp(-22, 24, railDrift).toFixed(3) + "%");
+    document.documentElement.style.setProperty("--rail-right-x", lerp(18, -22, railDrift).toFixed(3) + "%");
     updateCopy(progress);
     frameCount += 1;
     document.body.dataset.cinematicFrameCount = String(frameCount);
-    document.body.dataset.cinematicPixelWidth = String(photo.naturalWidth || 0);
-    document.body.dataset.cinematicPixelHeight = String(photo.naturalHeight || 0);
+    document.body.dataset.cinematicPixelWidth = String(photoMain.naturalWidth || 0);
+    document.body.dataset.cinematicPixelHeight = String(photoMain.naturalHeight || 0);
     document.body.dataset.cinematicProgress = progress.toFixed(3);
+  }
+
+  function transformShot(shot) {
+    return "translate3d(" + shot.x.toFixed(3) + "%, " + shot.y.toFixed(3) + "%, 0) scale(" + shot.scale.toFixed(4) + ")";
   }
 
   function tick() {
     const target = prefersReducedMotion ? 0.78 : scrollProgress;
-    smoothProgress += (target - smoothProgress) * (prefersReducedMotion ? 1 : 0.09);
+    smoothProgress += (target - smoothProgress) * (prefersReducedMotion ? 1 : 0.16);
     paint(smoothProgress);
     if (!prefersReducedMotion) {
       updateScrollProgress();
@@ -91,10 +107,10 @@
   }
 
   updateScrollProgress();
-  if (photo.complete) {
+  if (photoMain.complete) {
     markReady();
   } else {
-    photo.addEventListener("load", markReady, { once: true });
+    photoMain.addEventListener("load", markReady, { once: true });
   }
   window.addEventListener("resize", updateScrollProgress, { passive: true });
   window.addEventListener("scroll", updateScrollProgress, { passive: true });

@@ -7,6 +7,10 @@
   --gold: #d7a85c;
   --teal: #68d4c5;
   --line: rgba(255, 255, 255, 0.16);
+  --focus-opacity: 0;
+  --light-x: -34%;
+  --rail-left-x: -14%;
+  --rail-right-x: 12%;
 }
 
 * {
@@ -44,7 +48,7 @@ a {
 }
 
 .cinematic-stage {
-  min-height: 460vh;
+  min-height: 540vh;
   position: relative;
 }
 
@@ -60,21 +64,30 @@ a {
 
 .scene-photo-shell,
 .scene-photo,
+.depth-rail,
+.light-sweep,
+.lens-glow,
+.focus-frame,
+.letterbox,
 .film-grain,
 .scene-vignette {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
 }
 
 .scene-photo-shell {
+  inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 1;
   overflow: hidden;
   background: #070707;
+  perspective: 1100px;
 }
 
 .scene-photo {
+  inset: -6vh -6vw;
+  width: calc(100% + 12vw);
+  height: calc(100% + 12vh);
   object-fit: cover;
   object-position: 53% 50%;
   filter: saturate(0.9) contrast(1.08) brightness(0.76);
@@ -85,11 +98,153 @@ a {
   will-change: transform;
 }
 
-body[data-cinematic-ready="true"] .scene-photo {
+.scene-photo-back {
+  z-index: 1;
+  filter: saturate(0.75) contrast(1.12) brightness(0.44) blur(6px);
+}
+
+.scene-photo-main {
+  z-index: 2;
+}
+
+.scene-photo-detail {
+  z-index: 3;
+  opacity: 0;
+  filter: saturate(1.05) contrast(1.18) brightness(1.04);
+  mask-image: radial-gradient(circle at 72% 39%, #000 0 20%, rgba(0, 0, 0, 0.72) 34%, transparent 64%);
+  mix-blend-mode: screen;
+  transform-origin: 72% 39%;
+}
+
+body[data-cinematic-ready="true"] .scene-photo-back,
+body[data-cinematic-ready="true"] .scene-photo-main {
   opacity: 1;
 }
 
+.depth-rail {
+  top: -12vh;
+  bottom: -12vh;
+  z-index: 3;
+  width: clamp(86px, 12vw, 190px);
+  opacity: 0.42;
+  pointer-events: none;
+  filter: blur(7px);
+  will-change: transform, opacity;
+}
+
+.depth-rail-left {
+  left: -6vw;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.72), rgba(255, 229, 178, 0.18), rgba(255, 255, 255, 0.03), transparent);
+  transform: translate3d(var(--rail-left-x), 0, 0) rotate(7deg);
+}
+
+.depth-rail-right {
+  right: -7vw;
+  background:
+    linear-gradient(270deg, rgba(0, 0, 0, 0.68), rgba(215, 168, 92, 0.17), rgba(255, 255, 255, 0.02), transparent);
+  transform: translate3d(var(--rail-right-x), 0, 0) rotate(-5deg);
+}
+
+.light-sweep {
+  inset: -28vh -34vw;
+  z-index: 4;
+  opacity: 0.32;
+  pointer-events: none;
+  background:
+    linear-gradient(112deg, transparent 0%, transparent 36%, rgba(255, 232, 184, 0.28) 47%, rgba(104, 212, 197, 0.13) 52%, transparent 64%, transparent 100%);
+  mix-blend-mode: screen;
+  transform: translate3d(var(--light-x), 0, 0) rotate(2deg);
+  will-change: transform;
+}
+
+.lens-glow {
+  z-index: 4;
+  right: 3vw;
+  top: 4vh;
+  width: clamp(180px, 26vw, 420px);
+  height: clamp(180px, 26vw, 420px);
+  border-radius: 50%;
+  opacity: calc(0.16 + (var(--focus-opacity) * 0.2));
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(215, 168, 92, 0.4) 0%, rgba(139, 34, 82, 0.16) 32%, transparent 68%);
+  filter: blur(18px);
+  mix-blend-mode: screen;
+}
+
+.focus-frame {
+  z-index: 6;
+  left: 58vw;
+  top: 23vh;
+  width: min(30vw, 420px);
+  height: min(27vh, 250px);
+  opacity: var(--focus-opacity);
+  pointer-events: none;
+  transform: translate3d(-50%, -50%, 0) scale(calc(1.06 - (var(--focus-opacity) * 0.04)));
+  transition: opacity 160ms linear;
+}
+
+.focus-frame span {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  border-color: rgba(215, 168, 92, 0.86);
+  filter: drop-shadow(0 0 12px rgba(215, 168, 92, 0.42));
+}
+
+.focus-frame span:nth-child(1) {
+  top: 0;
+  left: 0;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+
+.focus-frame span:nth-child(2) {
+  top: 0;
+  right: 0;
+  border-top: 1px solid;
+  border-right: 1px solid;
+}
+
+.focus-frame span:nth-child(3) {
+  bottom: 0;
+  right: 0;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+}
+
+.focus-frame span:nth-child(4) {
+  bottom: 0;
+  left: 0;
+  border-bottom: 1px solid;
+  border-left: 1px solid;
+}
+
+.letterbox {
+  left: 0;
+  right: 0;
+  z-index: 9;
+  height: clamp(28px, 5vh, 62px);
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.92);
+  transform: scaleY(calc(0.55 + (var(--focus-opacity) * 0.45)));
+  will-change: transform;
+}
+
+.letterbox-top {
+  top: 0;
+  transform-origin: top;
+}
+
+.letterbox-bottom {
+  bottom: 0;
+  transform-origin: bottom;
+}
+
 .film-grain {
+  inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 5;
   opacity: 0.12;
   pointer-events: none;
@@ -100,6 +255,9 @@ body[data-cinematic-ready="true"] .scene-photo {
 }
 
 .scene-vignette {
+  inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 4;
   pointer-events: none;
   background:
@@ -299,7 +457,7 @@ h2 {
 
 @media (max-width: 760px) {
   .cinematic-stage {
-    min-height: 420vh;
+    min-height: 500vh;
   }
 
   .scene-topbar {
@@ -309,6 +467,26 @@ h2 {
   .scene-status {
     gap: 9px;
     font-size: 10px;
+  }
+
+  .scene-photo {
+    object-position: 58% 50%;
+  }
+
+  .scene-photo-detail {
+    mask-image: radial-gradient(circle at 70% 44%, #000 0 18%, rgba(0, 0, 0, 0.7) 35%, transparent 64%);
+  }
+
+  .depth-rail {
+    width: 110px;
+    opacity: 0.28;
+  }
+
+  .focus-frame {
+    left: 56vw;
+    top: 28vh;
+    width: 58vw;
+    height: 21vh;
   }
 
   .story-copy {
@@ -350,6 +528,9 @@ h2 {
   }
 
   .scene-photo,
+  .depth-rail,
+  .light-sweep,
+  .letterbox,
   .story-copy {
     transition: none;
   }
