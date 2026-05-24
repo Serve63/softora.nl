@@ -334,6 +334,17 @@ test('SEO-content gebruikt echte geoptimaliseerde foto’s in plaats van placeho
   }
 });
 
+test('publieke SEO-pagina’s gebruiken lokale afbeeldingen met alt, dimensies en laadstrategie', () => {
+  const pages = renderStaticPublicPages().filter((page) => page.kind !== 'legal');
+  const issues = auditSeoImages({
+    pages,
+    checkAllImages: true,
+    requireLocalImages: true,
+  });
+
+  assert.deepEqual(issues, []);
+});
+
 test('SEO-image gate blokkeert foto’s zonder prestatie-attributen', () => {
   const issues = auditSeoImages({
     pages: [
@@ -348,5 +359,29 @@ test('SEO-image gate blokkeert foto’s zonder prestatie-attributen', () => {
   assert.deepEqual(
     issues.map((issue) => issue.type).sort(),
     ['missing-image-dimensions', 'missing-image-fetch-priority', 'missing-image-loading-strategy'].sort()
+  );
+});
+
+test('publieke SEO-image gate blokkeert externe of zwakke servicepagina-afbeeldingen', () => {
+  const issues = auditSeoImages({
+    pages: [
+      {
+        path: '/website-laten-maken',
+        html:
+          '<img src="https://images.unsplash.com/photo-123?auto=format" alt="Website" width="900" height="560" loading="lazy" fetchpriority="low">',
+      },
+      {
+        path: '/crm-systeem-op-maat',
+        html:
+          '<img src="/assets/random.jpg" alt="CRM systeem op maat voor ondernemers met klantbeheer en opvolging." width="900" height="560" loading="lazy" fetchpriority="low">',
+      },
+    ],
+    checkAllImages: true,
+    requireLocalImages: true,
+  });
+
+  assert.deepEqual(
+    issues.map((issue) => issue.type).sort(),
+    ['external-seo-image', 'weak-image-alt', 'weak-image-filename'].sort()
   );
 });
