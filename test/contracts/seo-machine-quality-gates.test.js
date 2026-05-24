@@ -17,6 +17,7 @@ const {
   getSeoContentPathForItem,
 } = require('../../server/services/seo-content');
 const {
+  DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION,
   DEFAULT_UNSUPPORTED_CLAIM_RULES,
   auditClaimSafety,
   auditContentQuality,
@@ -65,6 +66,14 @@ function renderSeoContentPages() {
 }
 
 test('seo machine contentkwaliteit blijft sterk genoeg om automatisch door te groeien', () => {
+  assert.deepEqual(DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION, {
+    blog: 1500,
+    kennisbank: 850,
+    vergelijkingen: 1200,
+    branches: 1100,
+    regio: 1100,
+  });
+
   const items = getSeoContentItems({ now: seoMachineNow }).map((item) => ({
     ...item,
     cluster: getSeoContentClusterForItem(item).key,
@@ -317,6 +326,27 @@ test('SEO-content gebruikt echte geoptimaliseerde foto’s in plaats van placeho
       const assetPath = path.join(repoRoot, image.src);
       assert.ok(fs.existsSync(assetPath), `${image.src} bestaat niet op schijf.`);
       assert.ok(image.alt.length >= 55, `${image.src} heeft een te korte alt-tekst.`);
+      assert.equal(image.width, '1600', `${image.src} mist vaste breedte.`);
+      assert.equal(image.height, '1000', `${image.src} mist vaste hoogte.`);
+      assert.match(image.loading, /^(eager|lazy)$/);
+      assert.match(image.fetchpriority, /^(high|low)$/);
     }
   }
+});
+
+test('SEO-image gate blokkeert foto’s zonder prestatie-attributen', () => {
+  const issues = auditSeoImages({
+    pages: [
+      {
+        path: '/blog/slappe-foto',
+        html:
+          '<img src="/assets/seo-content/slappe-foto-softora.jpg" alt="Realistische werksessie rond Softora workflow met duidelijke context voor ondernemers.">',
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    issues.map((issue) => issue.type).sort(),
+    ['missing-image-dimensions', 'missing-image-fetch-priority', 'missing-image-loading-strategy'].sort()
+  );
 });

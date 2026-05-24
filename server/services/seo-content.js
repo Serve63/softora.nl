@@ -190,11 +190,11 @@ const SEO_CONTENT_REVIEWER = Object.freeze({
 });
 
 const SEO_CONTENT_MIN_WORDS_BY_COLLECTION = Object.freeze({
-  blog: 900,
-  kennisbank: 650,
-  vergelijkingen: 850,
-  branches: 700,
-  regio: 700,
+  blog: 1500,
+  kennisbank: 850,
+  vergelijkingen: 1200,
+  branches: 1100,
+  regio: 1100,
 });
 
 const SEO_CONTENT_ITEMS = Object.freeze([
@@ -1392,6 +1392,79 @@ function buildSeoContentDepthSections(item) {
   ]);
 }
 
+function buildSeoContentPerformanceSections(item) {
+  const cluster = getSeoContentClusterForItem(item);
+  const topic = String(item.title || 'dit onderwerp').trim();
+  const collection = String(item.collection || '').trim().toLowerCase();
+  const serviceLabel = cluster.ctaLabel || 'de juiste vervolgstap';
+  const serviceHref = cluster.ctaHref || cluster.href || '/diensten';
+  const commercialContext = {
+    blog:
+      'Een goed blogartikel moet meer doen dan uitleg geven. Het moet een vraag afvangen, vertrouwen opbouwen en daarna natuurlijk doorverwijzen naar een dienstpagina waar de bezoeker verder kan.',
+    kennisbank:
+      'Een kennisbankpagina mag korter en praktischer zijn dan een blog, maar moet nog steeds genoeg context geven om een ondernemer te helpen beslissen of het onderwerp relevant is.',
+    vergelijkingen:
+      'Een vergelijkingspagina heeft extra koopintentie. De bezoeker twijfelt vaak tussen twee routes en wil vooral weten welke keuze in zijn situatie verstandiger is.',
+    branches:
+      'Een branchepagina moet concreet voelen. Algemene SEO-tekst is niet genoeg; de voorbeelden moeten aansluiten op de manier waarop die ondernemers leads, klanten en opvolging organiseren.',
+    regio:
+      'Een regiopagina moet lokale relevantie combineren met echte dienstwaarde. Alleen een plaatsnaam toevoegen is dun; de pagina moet uitleggen welke digitale stap voor bedrijven in die regio logisch is.',
+  }[collection] || 'Een sterke pagina moet zoekintentie, vertrouwen en vervolgstap in balans brengen.';
+  const serviceContext = {
+    websites:
+      'Voor websitegroei betekent dit dat structuur, copy, snelheid, interne links en aanvraagmomenten samen moeten werken. Een mooie pagina zonder duidelijke route naar contact blijft onder zijn waarde.',
+    'ai-automatisering':
+      'Voor AI automatisering betekent dit dat de flow vooraf helder moet zijn: welke input komt binnen, welke samenvatting of kwalificatie mag AI maken en waar blijft menselijke controle nodig?',
+    'software-crm':
+      'Voor software en CRM betekent dit dat de pagina moet laten zien welke informatie vastgelegd wordt, wie ermee werkt en hoe taken, offertes of klantmomenten daarna minder versnipperd worden.',
+    'ai-contact':
+      'Voor AI klantcontact betekent dit dat bereikbaarheid, antwoordkwaliteit en overdracht naar WhatsApp, CRM of een mens duidelijk moeten zijn. Juist die grenzen maken de oplossing betrouwbaar.',
+    branches:
+      'Voor branchepagina’s betekent dit dat voorbeelden herkenbaar moeten zijn: aanvragen, planning, offertes, klantvragen en opvolging verschillen per sector en verdienen dus concrete taal.',
+    lokaal:
+      'Voor lokale SEO betekent dit dat de pagina niet alleen “in de buurt” moet zeggen, maar ook moet laten zien welke website-, software- of AI-route voor ondernemers in die regio waardevol is.',
+  }[cluster.key] || 'Voor digitale groei betekent dit dat de pagina moet helpen kiezen, vertrouwen wekken en doorsturen naar een logische actie.';
+
+  return Object.freeze([
+    Object.freeze({
+      heading: 'Welke fouten je beter voorkomt',
+      paragraphs: Object.freeze([
+        `Bij ${topic} gaat het vaak mis wanneer een pagina alleen vanuit de aanbieder is geschreven. Dan staat er veel over functies, techniek of algemene voordelen, maar weinig over de vraag van de bezoeker. Voor SEO is dat zwak, omdat Google en bezoekers willen begrijpen welk probleem wordt opgelost en welke vervolgstap logisch is.`,
+        `Een tweede fout is te snel naar tools of losse oplossingen springen. ${serviceContext} Daarom moet de uitleg steeds terug naar het proces: wat gebeurt er voor de aanvraag, wat gebeurt er erna en wie moet welke informatie kunnen gebruiken?`,
+      ]),
+    }),
+    Object.freeze({
+      heading: 'Welke content en interne links erbij horen',
+      paragraphs: Object.freeze([
+        `${commercialContext} Daarom hoort deze pagina niet los te zweven. Hij moet linken naar ondersteunende uitleg, vergelijkingen of voorbeelden, maar ook terug naar ${serviceLabel} wanneer de bezoeker klaar is om concreter te worden.`,
+        `Andersom moet de commerciële pagina op ${serviceHref} dit onderwerp ook ondersteunen. Die combinatie maakt de site sterker: informatieve content vangt vragen af, money pages dragen de aanvraag en interne links laten Google zien welke pagina’s binnen Softora het belangrijkst zijn.`,
+      ]),
+    }),
+    Object.freeze({
+      heading: 'Welke informatie een bezoeker nodig heeft',
+      paragraphs: Object.freeze([
+        `Een bezoeker wil meestal vier dingen weten: wat betekent dit precies, wanneer is het relevant, wat zijn de risico’s of beperkingen en welke stap is verstandig als hij verder wil. Als een artikel die vragen niet beantwoordt, voelt het snel als dunne SEO-content.`,
+        `Daarom moet ${topic} altijd praktisch blijven. Gebruik duidelijke taal, concrete situaties, realistische verwachtingen en een contactroute die logisch voelt. Geen garanties, geen loze claims en geen tekst die alleen voor zoekmachines geschreven is.`,
+      ]),
+    }),
+    Object.freeze({
+      heading: 'Hoe je dit blijft verbeteren na publicatie',
+      paragraphs: Object.freeze([
+        `Publiceren is pas het begin. Na indexatie kijk je naar vertoningen, zoekopdrachten, CTR, positie en het gedrag op de pagina. Als Google de pagina toont maar mensen niet klikken, moeten titel en meta description scherper. Als mensen wel klikken maar niet doorgaan, moet de inhoud, interne link of CTA beter.`,
+        `Die verbeterloop is belangrijker dan in één keer perfect willen zijn. Softora kan pagina’s blijven aanscherpen op basis van echte GSC-data, klantvragen en leadkwaliteit. Zo groeit de contentlaag niet als losse stapel artikelen, maar als een systeem dat steeds beter verkeer en aanvragen ondersteunt.`,
+      ]),
+    }),
+    Object.freeze({
+      heading: 'Welke eerste stap meestal het meeste oplevert',
+      paragraphs: Object.freeze([
+        `De beste eerste stap is meestal niet de grootste stap, maar de stap die het snelst duidelijkheid geeft. Bij ${topic} betekent dat: kies één concrete route, maak de informatie volledig genoeg om vertrouwen te winnen en koppel de pagina aan een meetbare actie. Zo kun je zien of bezoekers begrijpen wat je aanbiedt en of ze doorklikken naar de juiste vervolgstap.`,
+        `Daarna wordt opschalen veel veiliger. Je kunt extra artikelen, kennisbankvragen, vergelijkingen of lokale pagina’s toevoegen zonder dat de site rommelig wordt. Elke nieuwe publicatie moet dan een duidelijke taak hebben: een vraag beantwoorden, een bezwaar wegnemen, een money page versterken of een betere lead naar WhatsApp of een intakeflow brengen.`,
+        `Als die taak niet scherp is, publiceren we liever niet. Dat klinkt streng, maar het houdt de SEO-machine gezond: minder losse pagina’s, meer inhoud die echt helpt, en meer kans dat nieuwe vertoningen uiteindelijk verkeer en betere aanvragen voor Softora worden in de praktijk.`,
+      ]),
+    }),
+  ]);
+}
+
 function buildSeoContentFaqTopic(item) {
   const title = String(item && item.title ? item.title : '').trim();
   if (!title) return 'dit onderwerp';
@@ -1436,7 +1509,11 @@ function buildSeoContentFaq(item) {
 
 function enrichSeoContentItem(item) {
   if (!item) return item;
-  const sections = Object.freeze([...(item.sections || []), ...buildSeoContentDepthSections(item)]);
+  const sections = Object.freeze([
+    ...(item.sections || []),
+    ...buildSeoContentDepthSections(item),
+    ...buildSeoContentPerformanceSections(item),
+  ]);
   const faq = item.faq ? Object.freeze([...(item.faq || [])]) : buildSeoContentFaq(item);
   const base = Object.freeze({
     ...item,

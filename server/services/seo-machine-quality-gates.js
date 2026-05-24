@@ -23,11 +23,11 @@ const DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS = Object.freeze({
 });
 
 const DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION = Object.freeze({
-  blog: 900,
-  kennisbank: 650,
-  vergelijkingen: 850,
-  branches: 700,
-  regio: 700,
+  blog: 1500,
+  kennisbank: 850,
+  vergelijkingen: 1200,
+  branches: 1100,
+  regio: 1100,
 });
 
 const DEFAULT_UNSUPPORTED_CLAIM_RULES = Object.freeze([
@@ -108,8 +108,13 @@ function extractImageEntriesFromHtml(htmlRaw) {
     const src = attrs.match(/\bsrc=["']([^"']+)["']/i)?.[1] || '';
     const alt = attrs.match(/\balt=["']([^"']*)["']/i)?.[1] || '';
     return {
+      attrs,
       src: String(src).trim(),
       alt: String(alt).trim(),
+      width: getAttrValue(attrs, 'width'),
+      height: getAttrValue(attrs, 'height'),
+      loading: getAttrValue(attrs, 'loading'),
+      fetchpriority: getAttrValue(attrs, 'fetchpriority'),
     };
   });
 }
@@ -578,6 +583,27 @@ function auditSeoImages({ pages = [] } = {}) {
           type: 'weak-image-alt',
           path: pathName,
           message: `${pathName} heeft een te zwakke alt-tekst voor ${src}.`,
+        });
+      }
+      if (!(Number(image.width) > 0) || !(Number(image.height) > 0)) {
+        issues.push({
+          type: 'missing-image-dimensions',
+          path: pathName,
+          message: `${pathName} mist vaste afbeeldingsdimensies voor ${src}.`,
+        });
+      }
+      if (!/^(eager|lazy)$/i.test(String(image.loading || ''))) {
+        issues.push({
+          type: 'missing-image-loading-strategy',
+          path: pathName,
+          message: `${pathName} mist een expliciete loading-strategie voor ${src}.`,
+        });
+      }
+      if (!/^(high|low|auto)$/i.test(String(image.fetchpriority || ''))) {
+        issues.push({
+          type: 'missing-image-fetch-priority',
+          path: pathName,
+          message: `${pathName} mist fetchpriority voor ${src}.`,
         });
       }
     }
