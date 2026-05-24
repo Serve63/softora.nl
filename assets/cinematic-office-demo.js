@@ -14,8 +14,14 @@
 
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let scrollProgress = 0;
+  let targetScrollY = window.scrollY;
+  let easedScrollY = window.scrollY;
   let smoothProgress = 0;
+  let progressVelocity = 0;
   let frameCount = 0;
+  let lastFrameTime = performance.now();
+  let ignoreNativeScrollUntil = 0;
+  let wheelSmoothingActive = false;
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -25,34 +31,94 @@
     return start + (end - start) * amount;
   }
 
-  function easeInOut(value) {
-    return value < 0.5 ? 4 * value * value * value : 1 - Math.pow(-2 * value + 2, 3) / 2;
+  function easeCinematic(value) {
+    return 0.5 - Math.cos(clamp(value, 0, 1) * Math.PI) / 2;
   }
 
-  function updateScrollProgress() {
+  function easeSegment(value) {
+    const clamped = clamp(value, 0, 1);
+    return clamped * clamped * (3 - 2 * clamped);
+  }
+
+  function getMaxScrollY() {
+    return Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+  }
+
+  function getWheelDelta(event) {
+    const multiplier = event.deltaMode === 1 ? 18 : event.deltaMode === 2 ? window.innerHeight : 1;
+    return event.deltaY * multiplier;
+  }
+
+  function updateScrollProgress(scrollY) {
     const stageTop = stage.offsetTop;
     const travel = Math.max(1, stage.offsetHeight - window.innerHeight);
-    scrollProgress = clamp((window.scrollY - stageTop) / travel, 0, 1);
+    scrollProgress = clamp((scrollY - stageTop) / travel, 0, 1);
+  }
+
+  function syncNativeScroll() {
+    if (performance.now() < ignoreNativeScrollUntil) {
+      return;
+    }
+    targetScrollY = window.scrollY;
+    easedScrollY = window.scrollY;
+    wheelSmoothingActive = false;
+    updateScrollProgress(easedScrollY);
+  }
+
+  function smoothWheelScroll(deltaSeconds) {
+    if (prefersReducedMotion || !wheelSmoothingActive) {
+      updateScrollProgress(window.scrollY);
+      return;
+    }
+
+    const follow = 1 - Math.exp(-deltaSeconds * 8.5);
+    easedScrollY += (targetScrollY - easedScrollY) * follow;
+
+    if (Math.abs(targetScrollY - easedScrollY) < 0.45) {
+      easedScrollY = targetScrollY;
+      wheelSmoothingActive = false;
+    }
+
+    if (Math.abs(window.scrollY - easedScrollY) > 0.2) {
+      ignoreNativeScrollUntil = performance.now() + 120;
+      window.scrollTo(0, easedScrollY);
+    }
+
+    updateScrollProgress(easedScrollY);
+  }
+
+  function smoothCameraProgress(target, deltaSeconds) {
+    const diff = target - smoothProgress;
+    const stiffness = 112;
+    const damping = 19;
+    progressVelocity += (diff * stiffness - progressVelocity * damping) * deltaSeconds;
+    progressVelocity = clamp(progressVelocity, -3.2, 3.2);
+    smoothProgress = clamp(smoothProgress + progressVelocity * deltaSeconds, 0, 1);
+
+    if (Math.abs(target - smoothProgress) < 0.0005 && Math.abs(progressVelocity) < 0.004) {
+      smoothProgress = target;
+      progressVelocity = 0;
+    }
   }
 
   function getShotStates(progress) {
-    const eased = easeInOut(progress);
+    const eased = easeCinematic(progress);
     const mobile = window.innerWidth < 760;
-    const firstHalf = clamp(eased / 0.52, 0, 1);
-    const secondHalf = clamp((eased - 0.52) / 0.48, 0, 1);
+    const firstHalf = easeSegment(eased / 0.54);
+    const secondHalf = easeSegment((eased - 0.46) / 0.54);
 
     if (mobile) {
       return {
         back: { scale: lerp(1.04, 1.22, eased), x: lerp(-9, -17, secondHalf), y: lerp(0, -2, eased) },
         main: { scale: lerp(1.18, 1.98, eased), x: lerp(-15, -39, secondHalf), y: lerp(1, 7, firstHalf) + lerp(0, -8, secondHalf) },
-        detail: { scale: lerp(1.28, 2.28, eased), x: lerp(-12, -46, secondHalf), y: lerp(0, -8, eased), opacity: clamp((progress - 0.2) / 0.58, 0, 0.54) },
+        detail: { scale: lerp(1.28, 2.28, eased), x: lerp(-12, -46, secondHalf), y: lerp(0, -8, eased), opacity: easeSegment((progress - 0.2) / 0.58) * 0.54 },
       };
     }
 
     return {
       back: { scale: lerp(1.01, 1.18, eased), x: lerp(0, -2.8, secondHalf), y: lerp(0, -1.5, eased) },
       main: { scale: lerp(1.06, 1.58, eased), x: lerp(0, -11.5, secondHalf), y: lerp(0, 2.4, firstHalf) + lerp(0, -5.4, secondHalf) },
-      detail: { scale: lerp(1.14, 1.92, eased), x: lerp(1.5, -17, secondHalf), y: lerp(0, -4.5, eased), opacity: clamp((progress - 0.26) / 0.5, 0, 0.48) },
+      detail: { scale: lerp(1.14, 1.92, eased), x: lerp(1.5, -17, secondHalf), y: lerp(0, -4.5, eased), opacity: easeSegment((progress - 0.26) / 0.5) * 0.48 },
     };
   }
 
@@ -68,8 +134,8 @@
 
   function paint(progress) {
     const shot = getShotStates(progress);
-    const focusOpacity = clamp((progress - 0.48) / 0.42, 0, 1);
-    const railDrift = easeInOut(progress);
+    const focusOpacity = easeSegment((progress - 0.48) / 0.42);
+    const railDrift = easeCinematic(progress);
 
     photoBack.style.transform = transformShot(shot.back);
     photoMain.style.transform = transformShot(shot.main);
@@ -85,20 +151,50 @@
     document.body.dataset.cinematicPixelWidth = String(photoMain.naturalWidth || 0);
     document.body.dataset.cinematicPixelHeight = String(photoMain.naturalHeight || 0);
     document.body.dataset.cinematicProgress = progress.toFixed(3);
+    document.body.dataset.cinematicTargetProgress = scrollProgress.toFixed(3);
+    document.body.dataset.cinematicVelocity = progressVelocity.toFixed(4);
   }
 
   function transformShot(shot) {
     return "translate3d(" + shot.x.toFixed(3) + "%, " + shot.y.toFixed(3) + "%, 0) scale(" + shot.scale.toFixed(4) + ")";
   }
 
-  function tick() {
-    const target = prefersReducedMotion ? 0.78 : scrollProgress;
-    smoothProgress += (target - smoothProgress) * (prefersReducedMotion ? 1 : 0.16);
-    paint(smoothProgress);
+  function tick(now) {
+    const deltaSeconds = clamp((now - lastFrameTime) / 1000, 0.001, 0.05);
+    lastFrameTime = now;
+
     if (!prefersReducedMotion) {
-      updateScrollProgress();
+      smoothWheelScroll(deltaSeconds);
+      smoothCameraProgress(scrollProgress, deltaSeconds);
+    } else {
+      smoothProgress = 0.78;
+      progressVelocity = 0;
     }
+
+    paint(smoothProgress);
     requestAnimationFrame(tick);
+  }
+
+  function handleWheel(event) {
+    if (prefersReducedMotion || event.ctrlKey) {
+      return;
+    }
+
+    const delta = getWheelDelta(event);
+    if (Math.abs(delta) < 0.1) {
+      return;
+    }
+
+    event.preventDefault();
+    targetScrollY = clamp(targetScrollY + delta, 0, getMaxScrollY());
+    wheelSmoothingActive = true;
+    document.body.dataset.cinematicScrollSmoothing = "wheel";
+  }
+
+  function handleResize() {
+    targetScrollY = clamp(targetScrollY, 0, getMaxScrollY());
+    easedScrollY = clamp(easedScrollY, 0, getMaxScrollY());
+    updateScrollProgress(wheelSmoothingActive ? easedScrollY : window.scrollY);
   }
 
   function markReady() {
@@ -106,13 +202,14 @@
     paint(0);
   }
 
-  updateScrollProgress();
+  updateScrollProgress(window.scrollY);
   if (photoMain.complete) {
     markReady();
   } else {
     photoMain.addEventListener("load", markReady, { once: true });
   }
-  window.addEventListener("resize", updateScrollProgress, { passive: true });
-  window.addEventListener("scroll", updateScrollProgress, { passive: true });
+  window.addEventListener("resize", handleResize, { passive: true });
+  window.addEventListener("scroll", syncNativeScroll, { passive: true });
+  window.addEventListener("wheel", handleWheel, { passive: false });
   requestAnimationFrame(tick);
 })();

@@ -19,7 +19,7 @@
 
 html {
   background: var(--dark);
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 body {
@@ -29,6 +29,7 @@ body {
   background: var(--dark);
   font-family: "Inter", Arial, sans-serif;
   overflow-x: hidden;
+  overscroll-behavior-y: none;
 }
 
 body::selection {
@@ -60,6 +61,7 @@ a {
   background:
     radial-gradient(circle at 72% 22%, rgba(215, 168, 92, 0.2), transparent 28%),
     linear-gradient(135deg, #0a0908, #16100f 52%, #060707);
+  transform: translateZ(0);
 }
 
 .scene-photo-shell,
@@ -95,6 +97,7 @@ a {
   transform: translate3d(0, 0, 0) scale(1.04);
   transform-origin: 62% 48%;
   transition: opacity 520ms ease;
+  backface-visibility: hidden;
   will-change: transform;
 }
 
@@ -322,8 +325,9 @@ body[data-cinematic-ready="true"] .scene-photo-main {
   opacity: 0;
   transform: translate3d(0, 28px, 0);
   transition:
-    opacity 420ms ease,
-    transform 520ms ease;
+    opacity 680ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 780ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
 }
 
 .story-copy.is-active {
@@ -436,6 +440,7 @@ h2 {
   background: linear-gradient(90deg, var(--gold), var(--teal), #ffffff);
   transform: scaleX(0);
   transform-origin: left center;
+  will-change: transform;
 }
 
 .closing-panel {
