@@ -199,6 +199,7 @@
 
   function markReady() {
     document.body.dataset.cinematicReady = "true";
+    document.body.dataset.cinematicLayerMode = "single-panorama";
     paint(0);
   }
 
