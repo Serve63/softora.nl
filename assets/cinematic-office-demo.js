@@ -5,6 +5,7 @@
   const percentLabel = document.getElementById("scenePercent");
   const statusLabel = document.getElementById("sceneStatus");
   const panels = Array.from(document.querySelectorAll("[data-story-panel]"));
+  const revealElements = Array.from(document.querySelectorAll("[data-reveal]"));
   const motion = window.Motion;
 
   if (!stage || !photoMain || !progressBar || !percentLabel || !statusLabel || !motion) {
@@ -12,7 +13,8 @@
   }
 
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let motionCleanups = [];
+  let scrollCleanups = [];
+  let revealCleanups = [];
   let frameCount = 0;
 
   function clamp(value, min, max) {
@@ -90,13 +92,18 @@
     document.body.dataset.cinematicVelocity = String(Math.round((info?.y?.velocity || 0) * 100) / 100);
   }
 
-  function clearMotionBindings() {
-    motionCleanups.forEach((cleanup) => cleanup());
-    motionCleanups = [];
+  function clearScrollBindings() {
+    scrollCleanups.forEach((cleanup) => cleanup());
+    scrollCleanups = [];
+  }
+
+  function clearRevealBindings() {
+    revealCleanups.forEach((cleanup) => cleanup());
+    revealCleanups = [];
   }
 
   function bindMotionScroll() {
-    clearMotionBindings();
+    clearScrollBindings();
 
     if (prefersReducedMotion) {
       const reducedProgress = 0.78;
@@ -124,16 +131,62 @@
       { duration: 1, ease: "linear" }
     );
 
-    motionCleanups.push(motion.scroll(panoramaAnimation, scrollOptions));
-    motionCleanups.push(motion.scroll(progressAnimation, scrollOptions));
-    motionCleanups.push(motion.scroll(paintMeta, scrollOptions));
+    scrollCleanups.push(motion.scroll(panoramaAnimation, scrollOptions));
+    scrollCleanups.push(motion.scroll(progressAnimation, scrollOptions));
+    scrollCleanups.push(motion.scroll(paintMeta, scrollOptions));
     document.body.dataset.cinematicMotionEngine = "motion-scroll";
+  }
+
+  function bindSectionReveals() {
+    clearRevealBindings();
+
+    if (!revealElements.length) {
+      return;
+    }
+
+    if (prefersReducedMotion || !motion.inView) {
+      revealElements.forEach((element) => {
+        element.style.opacity = "1";
+        element.style.transform = "translateY(0px)";
+      });
+      document.body.dataset.cinematicSiteMotion = "reduced";
+      return;
+    }
+
+    revealElements.forEach((element, index) => {
+      element.style.opacity = "0";
+      element.style.transform = "translateY(28px)";
+      element.style.willChange = "opacity, transform";
+
+      const cleanup = motion.inView(
+        element,
+        (target) => {
+          motion.animate(
+            target,
+            { opacity: 1, transform: "translateY(0px)" },
+            {
+              duration: 0.78,
+              delay: Math.min((index % 4) * 0.045, 0.16),
+              ease: [0.22, 1, 0.36, 1],
+            }
+          );
+
+          return () => {};
+        },
+        { margin: "0px 0px -16% 0px" }
+      );
+
+      revealCleanups.push(cleanup);
+    });
+
+    document.body.dataset.cinematicSiteMotion = "motion-reveal";
   }
 
   function markReady() {
     document.body.dataset.cinematicReady = "true";
     document.body.dataset.cinematicLayerMode = "single-panorama";
     bindMotionScroll();
+    bindSectionReveals();
     paintMeta(0);
   }
 

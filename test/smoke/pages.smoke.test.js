@@ -48,16 +48,19 @@ test('page smoke: /cinematic-office-demo serves the isolated cinematic prototype
   assert.equal(response.status, 200);
   assert.match(html, /Softora Cinematic Office Demo/);
   assert.match(html, /assets\/cinematic-office-panorama-360\.png/);
-  assert.match(html, /assets\/cinematic-office-demo\.css\?v=20260525e/);
+  assert.match(html, /assets\/cinematic-office-command-center\.png/);
+  assert.match(html, /assets\/cinematic-office-demo\.css\?v=20260525f/);
   assert.match(html, /assets\/vendor\/motion-12\.39\.0\.js\?v=12\.39\.0/);
-  assert.match(html, /assets\/cinematic-office-demo\.js\?v=20260525e/);
+  assert.match(html, /assets\/cinematic-office-demo\.js\?v=20260525f/);
   assert.match(html, /class="scene-photo scene-photo-back"/);
   assert.match(html, /class="scene-photo scene-photo-main"/);
   assert.match(html, /class="scene-photo scene-photo-detail"/);
   assert.match(html, /class="light-sweep"/);
   assert.match(html, /class="focus-frame"/);
   assert.match(html, /class="letterbox letterbox-top"/);
-  assert.match(html, /Los gebouwd\. Niks aan bestaande pagina's vast\./);
+  assert.match(html, /Een website die voelt als je beste salesgesprek\./);
+  assert.match(html, /Growth command center/);
+  assert.match(html, /Plan strategiegesprek/);
 });
 
 const repoRoot = path.resolve(__dirname, '..', '..');
