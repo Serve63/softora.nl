@@ -11,6 +11,18 @@ function readPage(fileName) {
   return fs.readFileSync(path.join(root, fileName), 'utf8');
 }
 
+function countVisibleWords(htmlRaw) {
+  return String(htmlRaw || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-z0-9#]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
 function getRegistryEntry(fileName) {
   return INDEXABLE_PUBLIC_SEO_PAGES.find((entry) => entry.fileName === fileName);
 }
@@ -160,6 +172,12 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.match(source, /voice-overdracht/);
   assert.match(source, /Menselijke controle/);
   assert.match(source, /Veilige AI grenzen/);
+  assert.match(source, /Van losse taak naar betrouwbare workflow/);
+  assert.match(source, /Waar AI automatisering voor MKB direct verschil kan maken/);
+  assert.match(source, /Wanneer is AI automatisering beter dan standaard software\?/);
+  assert.match(source, /Veelgestelde vragen over AI automatisering/);
+  assert.match(source, /AI automatisering moet zichtbaar beter werken/);
+  assert.match(source, /loading="eager" fetchpriority="high" decoding="async"/);
   assert.match(source, /href="\/crm-systeem-op-maat"/);
   assert.match(source, /href="\/chatbot-laten-maken"/);
   assert.match(source, /href="\/voicesoftware-op-maat"/);
@@ -168,6 +186,7 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.match(source, /href="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
   assert.match(source, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
   assert.match(source, /data-softora-public-seo="internal-links"/);
+  assert.ok(countVisibleWords(source) >= 900, 'AI automatisering money page is nog te dun voor commerciële SEO.');
   assert.doesNotMatch(source, /overlay|login-box|Binnenkort beschikbaar|toegangscode/i);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
