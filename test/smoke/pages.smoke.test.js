@@ -48,8 +48,8 @@ test('page smoke: /cinematic-office-demo serves the isolated cinematic prototype
   assert.equal(response.status, 200);
   assert.match(html, /Softora Cinematic Office Demo/);
   assert.match(html, /assets\/cinematic-office-panorama-360\.png/);
-  assert.match(html, /assets\/cinematic-office-demo\.css\?v=20260525a/);
-  assert.match(html, /assets\/cinematic-office-demo\.js\?v=20260525a/);
+  assert.match(html, /assets\/cinematic-office-demo\.css\?v=20260525b/);
+  assert.match(html, /assets\/cinematic-office-demo\.js\?v=20260525b/);
   assert.match(html, /class="scene-photo scene-photo-back"/);
   assert.match(html, /class="scene-photo scene-photo-main"/);
   assert.match(html, /class="scene-photo scene-photo-detail"/);
