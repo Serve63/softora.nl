@@ -95,12 +95,12 @@ test('server app runtime bootstrap flattens env config without changing values',
       imapExtraMailboxes: ['Sent'],
       imapPollCooldownMs: 1000,
       coldmailBounceProcessingEnabled: true,
-      coldmailCampaignSendLimit: 30,
-      coldmailDailySendLimit: 30,
+      coldmailCampaignSendLimit: 9,
+      coldmailDailySendLimit: 9,
       coldmailPackageDailySendLimit: 60,
       coldmailSendDelayMs: 90000,
       coldmailSafetyPauseMs: 21600000,
-      coldmailPersonalMailboxDailyLimit: 10,
+      coldmailPersonalMailboxDailyLimit: 9,
       coldmailPersonalMailboxSendDelayMs: 180000,
       coldmailBlockPersonalMailboxDomains: false,
     },
@@ -121,7 +121,7 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.COLDMAIL_TRACKING_SECRET, 'tracking-secret');
   assert.equal(envConfig.COLDMAIL_BOUNCE_PROCESSING_ENABLED, true);
   assert.equal(envConfig.COLDMAIL_SEND_DELAY_MS, 90000);
-  assert.equal(envConfig.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT, 10);
+  assert.equal(envConfig.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT, 9);
   assert.equal(envConfig.MAIL_IMAP_MAILBOX, 'INBOX');
   assert.equal(envConfig.SECURITY_CONTACT_EMAIL, 'security@test.invalid');
 });

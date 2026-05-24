@@ -1140,7 +1140,7 @@ html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { dis
     <!-- MAIL EDITOR -->
     <div class="card">
       <div class="card-head">
-        <div class="card-title">Prompt & AI instructies</div>
+        <div class="card-title">Standaard mailtekst</div>
         <div class="mail-tab-group">
           <button class="mail-tab mail-icon-tab" type="button" onclick="toggleMailSettings(this)" aria-label="Instellingen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -1188,8 +1188,8 @@ Softora.nl | +31 6 43 26 27 92</textarea>
             </select>
           </div>
           <div class="mf-row">
-            <div class="mf-label">AI personalisatie instructies</div>
-            <textarea class="mf-ta" id="ai-instructies" style="min-height:120px">Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort — maximaal 5 zinnen. Vermijd verkooptaal.</textarea>
+            <div class="mf-label">Vaste standaardtekst</div>
+            <textarea class="mf-ta" id="ai-instructies" style="min-height:120px">Gebruik de standaard mailtekst zonder AI-variaties. Alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}} worden vervangen door databasegegevens.</textarea>
           </div>
           <div class="mf-row">
             <div class="mf-label">Beschikbare variabelen</div>
@@ -1248,9 +1248,9 @@ Softora.nl | +31 6 43 26 27 92</textarea>
       <div class="campagne-body">
         <div class="field">
           <div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen?</div>
-          <output class="field-val" id="slider-val" for="mail-slider" aria-live="polite" aria-label="Aantal bedrijven mailen">10</output>
-          <input class="slider" type="range" min="1" max="30" step="1" value="10" id="mail-slider" oninput="updateSlider(this.value)">
-          <div class="slider-row" id="campaignVolumeSliderLabels"><span>1</span><span>15</span><span>30</span></div>
+          <output class="field-val" id="slider-val" for="mail-slider" aria-live="polite" aria-label="Aantal bedrijven mailen">9</output>
+          <input class="slider" type="range" min="1" max="9" step="1" value="9" id="mail-slider" oninput="updateSlider(this.value)">
+          <div class="slider-row" id="campaignVolumeSliderLabels"><span>1</span><span>5</span><span>9</span></div>
         </div>
 
         <div class="field lead-generator-hidden-setting">
@@ -1258,9 +1258,9 @@ Softora.nl | +31 6 43 26 27 92</textarea>
           <select class="sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">
             <option value="serve@softora.nl" selected>serve@softora.nl</option>
             <option value="martijn@softora.nl">martijn@softora.nl</option>
+            <option value="servec321@gmail.com">servec321@gmail.com</option>
           </select>
         </div>
-
         <div class="field lead-generator-belmethod-field">
           <div class="field-label">Belmethode</div>
           <select class="sel" id="callDispatchMode">
@@ -1440,7 +1440,7 @@ const COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';
 const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';
-const COLDMAIL_VOLUME_CONTROL = { min: 1, max: 30, step: 1, value: 10, labels: ['1', '15', '30'] };
+const COLDMAIL_VOLUME_CONTROL = { min: 1, max: 9, step: 1, value: 9, labels: ['1', '5', '9'] };
 const COLDCALL_VOLUME_CONTROL = { min: 10, max: 500, step: 10, value: 100, labels: ['10', '250', '500'] };
 const COLDMAIL_TEST_COMPANIES = ['mcv e-commerce'];
 const COLDMAIL_AUTO_REPLY_ENABLED = false;
@@ -1905,7 +1905,7 @@ async function initColdmailingMailboxOptions() {
   const select = document.getElementById('campaignSenderEmail');
   if (!select || select.dataset.mailboxOptionsLoaded === '1') return;
   select.dataset.mailboxOptionsLoaded = '1';
-  const allowedSenderEmails = new Set(['serve@softora.nl', 'martijn@softora.nl']);
+  const allowedSenderEmails = new Set(['serve@softora.nl', 'martijn@softora.nl', 'servec321@gmail.com']);
   try {
     const response = await fetch('/api/coldmailing/mailbox-options', {
       credentials: 'same-origin',

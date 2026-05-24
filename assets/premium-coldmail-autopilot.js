@@ -57,24 +57,9 @@
   function buildSenderProfiles(payload, senderEmails) {
     const emails = Array.isArray(senderEmails) ? senderEmails.map(normEmail).filter(Boolean) : [];
     const profiles = {};
-    let settings = null;
-    const controller = global.softoraColdmailingSenderSettingsController;
-    if (controller && typeof controller.collectSettings === "function") {
-      try {
-        settings = controller.collectSettings();
-      } catch (_) {
-        settings = null;
-      }
-    }
-    const senders = settings && settings.senders && typeof settings.senders === "object" ? settings.senders : {};
+    const standardProfile = buildSenderProfileFromPayload(payload);
     emails.forEach((email) => {
-      const stored = senders[email] && typeof senders[email] === "object" ? senders[email] : null;
-      if (stored && stored.subject && stored.body) profiles[email] = {
-        subject: String(stored.subject || ""),
-        body: String(stored.body || ""),
-        aiInstructions: String(stored.aiInstructions || ""),
-        toneStyle: String(stored.toneStyle || ""),
-      };
+      if (standardProfile.subject && standardProfile.body) profiles[email] = standardProfile;
     });
     const currentSenderEmail = normEmail(payload && payload.senderEmail);
     if (currentSenderEmail && emails.includes(currentSenderEmail)) {
