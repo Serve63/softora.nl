@@ -47,8 +47,8 @@ test('page smoke: /cinematic-office-demo serves the isolated cinematic prototype
   const html = await response.text();
   assert.equal(response.status, 200);
   assert.match(html, /Softora Cinematic Office Demo/);
+  assert.match(html, /assets\/cinematic-office-command-center\.png/);
   assert.match(html, /assets\/cinematic-office-demo\.css/);
-  assert.match(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/r128\/three\.min\.js/);
   assert.match(html, /assets\/cinematic-office-demo\.js/);
   assert.match(html, /Los gebouwd\. Niks aan bestaande pagina's vast\./);
 });

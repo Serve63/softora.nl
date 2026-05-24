@@ -58,8 +58,8 @@ a {
     linear-gradient(135deg, #0a0908, #16100f 52%, #060707);
 }
 
-#officeCanvas,
-.scene-fallback,
+.scene-photo-shell,
+.scene-photo,
 .film-grain,
 .scene-vignette {
   position: absolute;
@@ -68,26 +68,25 @@ a {
   height: 100%;
 }
 
-#officeCanvas {
-  display: block;
-  z-index: 2;
-  opacity: 0;
-  transition: opacity 500ms ease;
-}
-
-body[data-cinematic-ready="true"] #officeCanvas {
-  opacity: 1;
-}
-
-.scene-fallback {
+.scene-photo-shell {
   z-index: 1;
-  object-fit: cover;
-  filter: saturate(0.86) contrast(1.05) brightness(0.62);
-  transform: scale(1.08);
+  overflow: hidden;
+  background: #070707;
 }
 
-body[data-cinematic-ready="true"] .scene-fallback {
-  opacity: 0.24;
+.scene-photo {
+  object-fit: cover;
+  object-position: 53% 50%;
+  filter: saturate(0.9) contrast(1.08) brightness(0.76);
+  opacity: 0;
+  transform: translate3d(0, 0, 0) scale(1.04);
+  transform-origin: 62% 48%;
+  transition: opacity 520ms ease;
+  will-change: transform;
+}
+
+body[data-cinematic-ready="true"] .scene-photo {
+  opacity: 1;
 }
 
 .film-grain {
@@ -350,7 +349,7 @@ h2 {
     scroll-behavior: auto;
   }
 
-  #officeCanvas,
+  .scene-photo,
   .story-copy {
     transition: none;
   }

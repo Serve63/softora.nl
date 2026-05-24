@@ -3,18 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Cinematic scroll demo met een 3D Softora kantoor-scene." />
+  <meta name="description" content="Cinematic scroll demo met een AI-gegenereerde Softora kantoor-scene." />
   <title>Softora Cinematic Office Demo</title>
-  <link rel="preload" href="/assets/home-hero-generated-v2.jpg" as="image" />
+  <link rel="preload" href="/assets/cinematic-office-command-center.png" as="image" />
   <link rel="stylesheet" href="/assets/fonts.css" />
-  <link rel="stylesheet" href="/assets/cinematic-office-demo.css?v=20260524c" />
+  <link rel="stylesheet" href="/assets/cinematic-office-demo.css?v=20260524d" />
 </head>
 <body>
   <main class="cinematic-page">
     <section class="cinematic-stage" id="cinematicStage" aria-label="Softora cinematic office demo">
       <div class="scene-pin">
-        <img class="scene-fallback" src="/assets/home-hero-generated-v2.jpg" alt="" aria-hidden="true" />
-        <canvas id="officeCanvas" aria-hidden="true"></canvas>
+        <div class="scene-photo-shell" aria-hidden="true">
+          <img
+            id="officePhoto"
+            class="scene-photo"
+            src="/assets/cinematic-office-command-center.png"
+            alt=""
+          />
+        </div>
         <div class="film-grain" aria-hidden="true"></div>
         <div class="scene-vignette" aria-hidden="true"></div>
 
@@ -65,7 +71,6 @@
     </section>
   </main>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
-  <script src="/assets/cinematic-office-demo.js?v=20260524c" defer></script>
+  <script src="/assets/cinematic-office-demo.js?v=20260524d" defer></script>
 </body>
 </html>
