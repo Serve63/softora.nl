@@ -42,6 +42,17 @@ test('page smoke: /ai-telefonist exposes the low-touch voice offer', async () =>
   assert.match(html, /250 klanten met gemiddeld €333 per maand/);
 });
 
+test('page smoke: /cinematic-office-demo serves the isolated cinematic prototype', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/cinematic-office-demo`, { cache: 'no-store' });
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(html, /Softora Cinematic Office Demo/);
+  assert.match(html, /assets\/cinematic-office-demo\.css/);
+  assert.match(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/r128\/three\.min\.js/);
+  assert.match(html, /assets\/cinematic-office-demo\.js/);
+  assert.match(html, /Los gebouwd\. Niks aan bestaande pagina's vast\./);
+});
+
 const repoRoot = path.resolve(__dirname, '..', '..');
 const unifiedPersonnelThemeTargets = [
   'premium-ai-coldmailing.html',

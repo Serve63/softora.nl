@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cinematic scroll demo met een 3D Softora kantoor-scene." />
+  <title>Softora Cinematic Office Demo</title>
+  <link rel="preload" href="/assets/home-hero-generated-v2.jpg" as="image" />
+  <link rel="stylesheet" href="/assets/fonts.css" />
+  <link rel="stylesheet" href="/assets/cinematic-office-demo.css?v=20260524c" />
+</head>
+<body>
+  <main class="cinematic-page">
+    <section class="cinematic-stage" id="cinematicStage" aria-label="Softora cinematic office demo">
+      <div class="scene-pin">
+        <img class="scene-fallback" src="/assets/home-hero-generated-v2.jpg" alt="" aria-hidden="true" />
+        <canvas id="officeCanvas" aria-hidden="true"></canvas>
+        <div class="film-grain" aria-hidden="true"></div>
+        <div class="scene-vignette" aria-hidden="true"></div>
+
+        <header class="scene-topbar">
+          <a class="brand-mark" href="/" aria-label="Terug naar Softora">Softora</a>
+          <div class="scene-status">
+            <span id="sceneStatus">bovenaanzicht</span>
+            <span id="scenePercent">00</span>
+          </div>
+        </header>
+
+        <div class="story-copy story-copy-one is-active" data-story-panel="0">
+          <p class="eyebrow">AI office flythrough</p>
+          <h1>Van boven naar absolute focus.</h1>
+          <p>Een kantoor als filmset: camera omlaag, licht aan, systemen scherp.</p>
+        </div>
+
+        <div class="story-copy story-copy-two" data-story-panel="1">
+          <p class="eyebrow">command center</p>
+          <h2>Alles draait om beweging.</h2>
+          <p>Leads, calls, dashboards en acties krijgen een scene in plaats van een standaard sectie.</p>
+        </div>
+
+        <div class="story-copy story-copy-three" data-story-panel="2">
+          <p class="eyebrow">front view</p>
+          <h2>Your business. Running sharper.</h2>
+          <p>Dit is de vibe: premium, rustig, donker en precies genoeg show.</p>
+        </div>
+
+        <div class="route-labels" aria-hidden="true">
+          <span>boven</span>
+          <span>dalen</span>
+          <span>voor kantoor</span>
+        </div>
+
+        <div class="progress-rail" aria-hidden="true">
+          <span id="sceneProgress"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing-panel" aria-label="Cinematic page einde">
+      <div>
+        <p class="eyebrow">prototype page</p>
+        <h2>Los gebouwd. Niks aan bestaande pagina's vast.</h2>
+        <p>Deze demo gebruikt een aparte HTML, CSS en JS file. Perfect om op door te pakken zonder je huidige project te verstoren.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+  <script src="/assets/cinematic-office-demo.js?v=20260524c" defer></script>
+</body>
+</html>
