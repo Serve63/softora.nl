@@ -87,15 +87,15 @@ a {
 }
 
 .scene-photo {
-  inset: -6vh -6vw;
-  width: calc(100% + 12vw);
-  height: calc(100% + 12vh);
+  inset: -8vh -46vw;
+  width: calc(100% + 92vw);
+  height: calc(100% + 16vh);
   object-fit: cover;
-  object-position: 53% 50%;
+  object-position: 50% 50%;
   filter: saturate(0.9) contrast(1.08) brightness(0.76);
   opacity: 0;
   transform: translate3d(0, 0, 0) scale(1.04);
-  transform-origin: 62% 48%;
+  transform-origin: 50% 50%;
   transition: opacity 520ms ease;
   backface-visibility: hidden;
   will-change: transform;
@@ -114,9 +114,9 @@ a {
   z-index: 3;
   opacity: 0;
   filter: saturate(1.05) contrast(1.18) brightness(1.04);
-  mask-image: radial-gradient(circle at 72% 39%, #000 0 20%, rgba(0, 0, 0, 0.72) 34%, transparent 64%);
+  mask-image: radial-gradient(circle at 51% 43%, #000 0 18%, rgba(0, 0, 0, 0.72) 35%, transparent 66%);
   mix-blend-mode: screen;
-  transform-origin: 72% 39%;
+  transform-origin: 51% 43%;
 }
 
 body[data-cinematic-ready="true"] .scene-photo-back,
@@ -475,11 +475,13 @@ h2 {
   }
 
   .scene-photo {
-    object-position: 58% 50%;
+    inset: -8vh -82vw;
+    width: calc(100% + 164vw);
+    object-position: 50% 50%;
   }
 
   .scene-photo-detail {
-    mask-image: radial-gradient(circle at 70% 44%, #000 0 18%, rgba(0, 0, 0, 0.7) 35%, transparent 64%);
+    mask-image: radial-gradient(circle at 50% 44%, #000 0 18%, rgba(0, 0, 0, 0.7) 35%, transparent 64%);
   }
 
   .depth-rail {

@@ -109,16 +109,16 @@
 
     if (mobile) {
       return {
-        back: { scale: lerp(1.04, 1.22, eased), x: lerp(-9, -17, secondHalf), y: lerp(0, -2, eased) },
-        main: { scale: lerp(1.18, 1.98, eased), x: lerp(-15, -39, secondHalf), y: lerp(1, 7, firstHalf) + lerp(0, -8, secondHalf) },
-        detail: { scale: lerp(1.28, 2.28, eased), x: lerp(-12, -46, secondHalf), y: lerp(0, -8, eased), opacity: easeSegment((progress - 0.2) / 0.58) * 0.54 },
+        back: { scale: lerp(1.02, 1.14, eased), x: lerp(18, -18, eased), y: lerp(0, -1.5, eased) },
+        main: { scale: lerp(1.08, 1.34, eased), x: lerp(30, -32, eased), y: lerp(2, 0, firstHalf) + lerp(0, -2.5, secondHalf) },
+        detail: { scale: lerp(1.16, 1.48, eased), x: lerp(24, -26, eased), y: lerp(0, -2.2, eased), opacity: easeSegment((progress - 0.2) / 0.58) * 0.5 },
       };
     }
 
     return {
-      back: { scale: lerp(1.01, 1.18, eased), x: lerp(0, -2.8, secondHalf), y: lerp(0, -1.5, eased) },
-      main: { scale: lerp(1.06, 1.58, eased), x: lerp(0, -11.5, secondHalf), y: lerp(0, 2.4, firstHalf) + lerp(0, -5.4, secondHalf) },
-      detail: { scale: lerp(1.14, 1.92, eased), x: lerp(1.5, -17, secondHalf), y: lerp(0, -4.5, eased), opacity: easeSegment((progress - 0.26) / 0.5) * 0.48 },
+      back: { scale: lerp(1, 1.1, eased), x: lerp(10, -10, eased), y: lerp(0, -0.8, eased) },
+      main: { scale: lerp(1.04, 1.28, eased), x: lerp(21, -22, eased), y: lerp(1.2, 0, firstHalf) + lerp(0, -2, secondHalf) },
+      detail: { scale: lerp(1.1, 1.42, eased), x: lerp(14, -15, eased), y: lerp(0, -1.6, eased), opacity: easeSegment((progress - 0.26) / 0.5) * 0.44 },
     };
   }
 
@@ -127,7 +127,7 @@
     panels.forEach((panel, index) => {
       panel.classList.toggle("is-active", index === active);
     });
-    statusLabel.textContent = active === 0 ? "bovenaanzicht" : active === 1 ? "camera drop" : "front view";
+    statusLabel.textContent = active === 0 ? "pan links" : active === 1 ? "command center" : "pan rechts";
     percentLabel.textContent = String(Math.round(progress * 100)).padStart(2, "0");
     progressBar.style.transform = "scaleX(" + progress.toFixed(4) + ")";
   }
