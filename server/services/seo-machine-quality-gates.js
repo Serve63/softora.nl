@@ -544,13 +544,33 @@ function auditConversionCtas({ pages = [] } = {}) {
   return issues;
 }
 
-function auditSeoImages({ pages = [] } = {}) {
+function getImageFileName(srcRaw) {
+  const src = String(srcRaw || '').split('?')[0].split('#')[0];
+  return src.split('/').pop() || '';
+}
+
+function hasDescriptiveImageFileName(fileNameRaw) {
+  const fileName = String(fileNameRaw || '').trim();
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*\.(?:jpg|jpeg|png|webp)$/i.test(fileName)) return false;
+
+  return /softora|website|ai|crm|software|chatbot|telefon|automatisering|strategie|proces|content|mkb|oisterwijk|tilburg|dashboard|workflow|lead|klant|bedrijf|mail|analytics|meeting|team|support|office|digital|growth|service|voice|wireframes/i.test(
+    fileName
+  );
+}
+
+function auditSeoImages({ pages = [], checkAllImages = false, requireLocalImages = false } = {}) {
   const issues = [];
 
   for (const page of Array.isArray(pages) ? pages : []) {
     const pathName = normalizeInternalPath(page.path);
     const html = String(page.html || '');
     const images = extractImageEntriesFromHtml(html);
+    const auditImages = checkAllImages
+      ? images.filter((image) => {
+          const src = String(image.src || '').trim();
+          return src && !/^data:/i.test(src);
+        })
+      : images.filter((image) => String(image.src || '').startsWith('/assets/seo-content/'));
     const seoImages = images.filter((image) => String(image.src || '').startsWith('/assets/seo-content/'));
 
     if (/<div\s+class=["']artikel-img["'][^>]*>/i.test(html) || /blog-card-img[^>]+style=["'][^"']*gradient/i.test(html)) {
@@ -561,24 +581,39 @@ function auditSeoImages({ pages = [] } = {}) {
       });
     }
 
-    if (seoImages.length === 0) {
+    if (!checkAllImages && seoImages.length === 0) {
       issues.push({ type: 'missing-seo-image', path: pathName, message: `${pathName} heeft geen SEO-foto.` });
       continue;
     }
 
-    for (const image of seoImages) {
+    for (const image of auditImages) {
       const src = String(image.src || '');
       const alt = String(image.alt || '');
-      const fileName = src.split('/').pop() || '';
+      const fileName = getImageFileName(src);
 
-      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*-softora\.jpg$/.test(fileName)) {
+      if (requireLocalImages && /^https?:\/\//i.test(src)) {
+        issues.push({
+          type: 'external-seo-image',
+          path: pathName,
+          message: `${pathName} gebruikt een externe afbeelding in plaats van een lokaal geoptimaliseerd asset: ${src}.`,
+        });
+      }
+      if (!checkAllImages && !/^[a-z0-9]+(?:-[a-z0-9]+)*-softora\.jpg$/.test(fileName)) {
         issues.push({
           type: 'weak-image-filename',
           path: pathName,
           message: `${pathName} gebruikt geen beschrijvende SEO-bestandsnaam voor ${src}.`,
         });
       }
-      if (alt.length < 55 || /placeholder|binnenkort|foto|image|afbeelding/i.test(alt)) {
+      if (checkAllImages && src.startsWith('/assets/') && !hasDescriptiveImageFileName(fileName)) {
+        issues.push({
+          type: 'weak-image-filename',
+          path: pathName,
+          message: `${pathName} gebruikt geen beschrijvende assetbestandsnaam voor ${src}.`,
+        });
+      }
+      const minimumAltLength = checkAllImages ? 30 : 55;
+      if (alt.length < minimumAltLength || /placeholder|binnenkort|foto|image|afbeelding/i.test(alt)) {
         issues.push({
           type: 'weak-image-alt',
           path: pathName,
