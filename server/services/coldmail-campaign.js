@@ -26,19 +26,21 @@ const DEFAULT_COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const DEFAULT_COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const DEFAULT_COLDMAIL_AUTOPILOT_SCOPE = 'premium_coldmail_autopilot';
 const DEFAULT_COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
-const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 30;
-const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 30;
+const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 9;
+const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 9;
 const DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT = 60;
 const DEFAULT_COLDMAIL_SEND_DELAY_MS = 90_000;
 const DEFAULT_COLDMAIL_SAFETY_PAUSE_MS = 6 * 60 * 60 * 1000;
-const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT = 10;
+const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT = 9;
 const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS = 180_000;
-const DEFAULT_COLDMAIL_AUTOPILOT_BATCH_SIZE = 3;
+const DEFAULT_COLDMAIL_AUTOPILOT_BATCH_SIZE = 1;
 const DEFAULT_COLDMAIL_AUTOPILOT_LOCK_MS = 12 * 60 * 1000;
 const DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE = 'Europe/Amsterdam';
-const DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR = 9;
+const DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR = 7;
 const DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR = 17;
 const DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES = 12;
+const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES = 60;
+const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES = 75;
 const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
@@ -101,11 +103,13 @@ const MARTIJN_LINKEDIN_URL =
 const COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS = new Set([
   'serve@softora.nl',
   'martijn@softora.nl',
+  'servec321@gmail.com',
 ]);
 const SENDER_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
   'martijn@softora.nl': 'Martijn van de Ven',
   'ruben@softora.nl': 'Ruben',
+  'servec321@gmail.com': 'Servé Creusen',
 };
 const COLDMAIL_LINKEDIN_CTA_BY_SENDER = Object.freeze({
   'martijn@softora.nl': {
@@ -126,10 +130,17 @@ const DEFAULT_COLDMAIL_SENDER_PROFILES = {
     aiInstructions: "Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.",
     toneStyle: 'Vriendelijk & professioneel',
   },
+  'servec321@gmail.com': {
+    subject: 'Korte vraag over uw website - Softora.nl',
+    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\nSoftora.nl | +31 6 43 26 27 92",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    toneStyle: 'Vriendelijk & professioneel',
+  },
 };
 const COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS = new Set([
   'serve@softora.nl',
   'martijn@softora.nl',
+  'servec321@gmail.com',
 ]);
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
@@ -1583,6 +1594,7 @@ function createColdmailCampaignService(deps = {}) {
           'ruben@softora.nl',
           'serve@softora.nl',
           'martijn@softora.nl',
+          'servec321@gmail.com',
         ]
           .map(normalizeEmailAddress)
           .filter(isLikelyValidEmail)
@@ -1981,6 +1993,13 @@ function createColdmailCampaignService(deps = {}) {
         ? raw.senderEmails
         : raw.senderEmail
     ).filter(isColdmailAutopilotAllowedSenderEmail);
+    if (
+      senderEmails.length &&
+      !senderEmails.includes('servec321@gmail.com') &&
+      isSenderSmtpAccountConfigured(resolveSenderSmtpAccount('servec321@gmail.com'))
+    ) {
+      senderEmails.push('servec321@gmail.com');
+    }
     const rawSenderEmail = normalizeEmailAddress(raw.senderEmail);
     const senderEmail = isColdmailAutopilotAllowedSenderEmail(rawSenderEmail)
       ? rawSenderEmail
@@ -2011,6 +2030,10 @@ function createColdmailCampaignService(deps = {}) {
 
   function normalizeColdmailAutopilotSchedule(value = {}) {
     const raw = value && typeof value === 'object' ? value : {};
+    const hasSenderMinInterval =
+      Object.prototype.hasOwnProperty.call(raw, 'senderMinIntervalMinutes') ||
+      Object.prototype.hasOwnProperty.call(raw, 'senderCooldownMinutes') ||
+      Object.prototype.hasOwnProperty.call(raw, 'mailboxIntervalMinutes');
     const startHour = parsePositiveInt(
       raw.startHour ?? raw.safeStartHour,
       DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR,
@@ -2025,13 +2048,15 @@ function createColdmailCampaignService(deps = {}) {
     );
     const senderMinIntervalMinutes = parsePositiveInt(
       raw.senderMinIntervalMinutes ?? raw.senderCooldownMinutes ?? raw.mailboxIntervalMinutes,
-      0,
+      DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES,
       0,
       240
     );
     const senderMaxIntervalMinutes = parsePositiveInt(
       raw.senderMaxIntervalMinutes ?? raw.senderCooldownMaxMinutes ?? raw.mailboxMaxIntervalMinutes,
-      senderMinIntervalMinutes,
+      hasSenderMinInterval
+        ? senderMinIntervalMinutes
+        : Math.max(senderMinIntervalMinutes, DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES),
       senderMinIntervalMinutes,
       240
     );
@@ -2143,6 +2168,20 @@ function createColdmailCampaignService(deps = {}) {
     const raw = value && typeof value === 'object' ? value : {};
     const rawConfig = raw.config && typeof raw.config === 'object' ? raw.config : {};
     const rawSchedule = raw.schedule && typeof raw.schedule === 'object' ? raw.schedule : {};
+    const hasRawSenderMinInterval =
+      Object.prototype.hasOwnProperty.call(rawSchedule, 'senderMinIntervalMinutes') ||
+      Object.prototype.hasOwnProperty.call(rawSchedule, 'senderCooldownMinutes') ||
+      Object.prototype.hasOwnProperty.call(rawSchedule, 'mailboxIntervalMinutes');
+    const hasRawSenderMaxInterval =
+      Object.prototype.hasOwnProperty.call(rawSchedule, 'senderMaxIntervalMinutes') ||
+      Object.prototype.hasOwnProperty.call(rawSchedule, 'senderCooldownMaxMinutes') ||
+      Object.prototype.hasOwnProperty.call(rawSchedule, 'mailboxMaxIntervalMinutes');
+    const mergedSchedule = { ...defaults.schedule, ...rawSchedule };
+    if (hasRawSenderMinInterval && !hasRawSenderMaxInterval) {
+      delete mergedSchedule.senderMaxIntervalMinutes;
+      delete mergedSchedule.senderCooldownMaxMinutes;
+      delete mergedSchedule.mailboxMaxIntervalMinutes;
+    }
     return {
       version: 1,
       enabled: normalizeBooleanFlag(
@@ -2150,7 +2189,7 @@ function createColdmailCampaignService(deps = {}) {
         defaults.enabled
       ),
       config: normalizeColdmailAutopilotConfig({ ...defaults.config, ...rawConfig }),
-      schedule: normalizeColdmailAutopilotSchedule({ ...defaults.schedule, ...rawSchedule }),
+      schedule: normalizeColdmailAutopilotSchedule(mergedSchedule),
       lastRunAt: normalizeString(raw.lastRunAt),
       lastStartedAt: normalizeString(raw.lastStartedAt),
       lastResult: raw.lastResult && typeof raw.lastResult === 'object' ? raw.lastResult : null,
@@ -2286,16 +2325,8 @@ function createColdmailCampaignService(deps = {}) {
     return {
       subject,
       body,
-      subjectVariants: normalizeColdmailTemplateVariants(
-        raw.subjectVariants || raw.subjects || base.subjectVariants || base.subjects,
-        subject,
-        200
-      ),
-      bodyVariants: normalizeColdmailTemplateVariants(
-        raw.bodyVariants || raw.bodies || raw.textVariants || base.bodyVariants || base.bodies,
-        body,
-        12000
-      ),
+      subjectVariants: subject ? [subject] : [],
+      bodyVariants: body ? [body] : [],
       aiInstructions: normalizeString(raw.aiInstructions || base.aiInstructions),
       toneStyle: normalizeString(raw.toneStyle || base.toneStyle || 'Vriendelijk & professioneel'),
     };
@@ -2337,6 +2368,9 @@ function createColdmailCampaignService(deps = {}) {
       : null;
     if (snapshot && snapshot.subject && snapshot.body) {
       return normalizeColdmailingSenderProfile(snapshot, fallback);
+    }
+    if (email === 'servec321@gmail.com') {
+      return normalizeColdmailingSenderProfile(fallback);
     }
     return {
       subject: '',
@@ -3154,18 +3188,7 @@ function createColdmailCampaignService(deps = {}) {
   function selectColdmailTemplateVariant(variants, row, item, senderEmail, reference, kind) {
     const list = normalizeColdmailTemplateVariants(variants);
     if (!list.length) return '';
-    if (list.length === 1) return list[0];
-    const seed = [
-      kind,
-      normalizeEmailAddress(senderEmail),
-      normalizeString(item && item.id),
-      normalizeString(getRowEmail(row)),
-      normalizeString(getRowCompany(row)),
-      normalizeString(reference),
-    ].join('|');
-    const hash = crypto.createHash('sha256').update(seed).digest().readUInt32BE(0);
-    const rowOffset = Math.max(0, Number(item && item.index) || 0);
-    return list[(hash + rowOffset) % list.length];
+    return list[0];
   }
 
   function appendColdmailOptOutText(text, unsubscribeUrl = '') {
