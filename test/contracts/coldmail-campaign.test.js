@@ -298,7 +298,7 @@ test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async
   );
 });
 
-test('coldmail campaign uses deterministic subject and body variants per recipient', async () => {
+test('coldmail campaign keeps the standard subject and body when variants are provided', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -372,8 +372,15 @@ test('coldmail campaign uses deterministic subject and body variants per recipie
 
   assert.equal(result.sent, 3);
   assert.equal(sentMessages.length, 3);
-  assert.ok(new Set(sentMessages.map((message) => message.subject)).size > 1);
-  assert.ok(new Set(sentMessages.map((message) => message.text.split('\n')[0])).size > 1);
+  assert.deepEqual(sentMessages.map((message) => message.subject), [
+    'Nieuw webdesign gemaakt voor Bakkerij Zon',
+    'Nieuw webdesign gemaakt voor Lunchroom Maan',
+    'Nieuw webdesign gemaakt voor Café Nova',
+  ]);
+  sentMessages.forEach((message) => {
+    assert.match(message.text, /Ik kwam .* tegen en heb een nieuw webdesign gemaakt\./);
+    assert.doesNotMatch(message.text, /Deze week zag ik|Vanuit enthousiasme/);
+  });
   assert.match(sentMessages[0].text, /bakkerijzon\.nl/);
   assert.match(sentMessages[1].text, /lunchroommaan\.nl/);
   assert.match(sentMessages[2].text, /cafenova\.nl/);
@@ -941,7 +948,7 @@ test('coldmail autopilot only uses explicitly configured sender emails', async (
         {
           at: '2026-04-24T09:00:00.000Z',
           senderEmail: 'serve@softora.nl',
-          count: 9,
+          count: 8,
           personalCount: 0,
         },
       ],
@@ -1184,15 +1191,13 @@ test('coldmail autopilot uses the saved dashboard profile and includes the webde
   assert.equal(result.senderEmail, 'martijn@softora.nl');
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].from, 'Martijn van de Ven <martijn@softora.nl>');
-  assert.ok([
-    'Nieuw webdesign gemaakt voor Bakkerij Zon',
-    'Ik maakte een webdesign voor Bakkerij Zon',
-  ].includes(sentMessages[0].subject));
-  assert.match(sentMessages[0].text, /actuele (dashboardtekst|variant)/);
+  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt voor Bakkerij Zon');
+  assert.match(sentMessages[0].text, /actuele dashboardtekst/);
+  assert.doesNotMatch(sentMessages[0].text, /actuele variant/);
   assert.doesNotMatch(sentMessages[0].text, /oudere tekst/);
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-prospect-1@softora');
-  assert.equal(getAutopilotState().config.senderProfiles['martijn@softora.nl'].bodyVariants.length, 2);
+  assert.equal(getAutopilotState().config.senderProfiles['martijn@softora.nl'].bodyVariants.length, 1);
 });
 
 test('coldmail autopilot skips leads without a complete webdesign mockup', async () => {
@@ -1635,8 +1640,8 @@ test('coldmail campaign adds audit bcc when configured', async () => {
   assert.equal(service.getColdmailSafetyLimits().auditBccConfigured, true);
 });
 
-test('coldmail campaign blocks private copies for Serve and Martijn senders', async () => {
-  for (const senderEmail of ['serve@softora.nl', 'martijn@softora.nl']) {
+test('coldmail campaign blocks private copies for personal senders', async () => {
+  for (const senderEmail of ['serve@softora.nl', 'martijn@softora.nl', 'servec321@gmail.com']) {
     const { service, sentMessages } = createService({
       coldmailAuditBcc: 'servec321@gmail.com',
       mailReplyTo: 'servec321@gmail.com',
@@ -2710,7 +2715,7 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
     messageId: '<incoming-1@example.test>',
     subject: 'Re: Nieuw webdesign gemaakt!',
     text: 'Hoi Servé, klinkt interessant. Wat zou dit ongeveer inhouden?',
-    from: { value: [{ address: 'servec321@gmail.com', name: 'Servec Test' }] },
+    from: { value: [{ address: 'reply@example.test', name: 'Servec Test' }] },
     to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
     cc: { value: [] },
     references: '<sent-1@softora>',
@@ -2732,7 +2737,7 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
         id: 'test-recipient',
         bedrijf: 'MCV E-commerce',
         naam: 'MCV E-commerce',
-        email: 'servec321@gmail.com',
+        email: 'reply@example.test',
         status: 'benaderbaar',
         mail: true,
       },
@@ -2771,7 +2776,7 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
   assert.equal(capturedOpenAiHeaders['OpenAI-Project'], 'proj_softora');
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
-  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
+  assert.equal(sentMessages[0].to, 'reply@example.test');
   assert.equal(sentMessages[0].subject, 'Re: Nieuw webdesign gemaakt!');
   assert.equal(sentMessages[0].inReplyTo, '<incoming-1@example.test>');
   assert.match(sentMessages[0].text, /Zullen we kort bellen/);
@@ -3919,6 +3924,7 @@ test('coldmail campaign exposes the same sender accounts as mailbox', () => {
     'ruben@softora.nl',
     'serve@softora.nl',
     'martijn@softora.nl',
+    'servec321@gmail.com',
   ]);
 });
 
@@ -3935,11 +3941,11 @@ test('coldmail campaign caps preview volume to STRATO-safe campaign limit', asyn
 
   const result = await service.getColdmailCampaignRecipients({ count: 100 });
 
-  assert.equal(result.selected, 30);
-  assert.equal(result.safetyLimits.campaignSendLimit, 30);
-  assert.equal(result.safetyLimits.dailySendLimit, 30);
+  assert.equal(result.selected, 9);
+  assert.equal(result.safetyLimits.campaignSendLimit, 9);
+  assert.equal(result.safetyLimits.dailySendLimit, 9);
   assert.equal(result.safetyLimits.packageDailySendLimit, 60);
-  assert.equal(result.safetyLimits.personalMailboxDailyLimit, 10);
+  assert.equal(result.safetyLimits.personalMailboxDailyLimit, 9);
 });
 
 test('coldmail campaign enforces daily sender guard across campaigns', async () => {
@@ -3999,14 +4005,14 @@ test('coldmail campaign does not mark daily-limit skipped rows as mailed', async
   }));
   const { service, sentMessages, getSavedState } = createService({
     rows,
-    coldmailCampaignSendLimit: 10,
-    coldmailDailySendLimit: 30,
+    coldmailCampaignSendLimit: 9,
+    coldmailDailySendLimit: 9,
     sendGuardState: {
       entries: [
         {
           at: '2026-04-24T11:00:00.000Z',
           senderEmail: 'info@softora.nl',
-          count: 28,
+          count: 7,
         },
       ],
     },

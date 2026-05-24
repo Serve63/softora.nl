@@ -20,7 +20,7 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.doesNotMatch(pageSource, /id="z4-count"/);
   assert.doesNotMatch(pageSource, /id="z5-count"/);
   assert.doesNotMatch(pageSource, /id="conv-zone-pct"/);
-  assert.match(pageSource, /<div class="card-title">Prompt & AI instructies<\/div>/);
+  assert.match(pageSource, /<div class="card-title">Standaard mailtekst<\/div>/);
   assert.match(pageSource, /<div class="campagne-title">Nieuwe Campagne<\/div>/);
   assert.match(pageSource, /Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
   assert.doesNotMatch(pageSource, /Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland/);
@@ -373,10 +373,10 @@ test('premium bevestigingsmails campaign volume uses a fixed mail company label'
   assert.doesNotMatch(pageSource, /campaign-count-mode-label/);
   assert.doesNotMatch(pageSource, /Hoeveel afspraken inplannen\?/);
   assert.match(pageSource, /<div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen\?<\/div>/);
-  assert.match(pageSource, /<output class="field-val" id="slider-val" for="mail-slider" aria-live="polite" aria-label="Aantal bedrijven mailen">10<\/output>/);
+  assert.match(pageSource, /<output class="field-val" id="slider-val" for="mail-slider" aria-live="polite" aria-label="Aantal bedrijven mailen">9<\/output>/);
   assert.doesNotMatch(pageSource, /campaign-volume-input|onfocus="this\.select\(\)"|onblur="updateSlider\(this\.value\)"/);
-  assert.match(pageSource, /<input class="slider" type="range" min="1" max="30" step="1" value="10" id="mail-slider"/);
-  assert.match(pageSource, /const COLDMAIL_VOLUME_CONTROL = \{ min: 1, max: 30, step: 1, value: 10/);
+  assert.match(pageSource, /<input class="slider" type="range" min="1" max="9" step="1" value="9" id="mail-slider"/);
+  assert.match(pageSource, /const COLDMAIL_VOLUME_CONTROL = \{ min: 1, max: 9, step: 1, value: 9/);
   assert.match(pageSource, /const COLDCALL_VOLUME_CONTROL = \{ min: 10, max: 500, step: 10, value: 100/);
   assert.match(pageSource, /campaignVolumeLabel\.textContent = 'Hoeveel bedrijven bellen\?';/);
   assert.match(pageSource, /const raw = Number\.parseInt\(v \|\| \(slider && slider\.value\) \|\| min, 10\);/);
@@ -585,10 +585,11 @@ test('premium bevestigingsmails places sender dropdown in the campaign card and 
   assert.doesNotMatch(pageSource, /<option value="ruben@softora\.nl"/);
   assert.match(pageSource, /<option value="serve@softora\.nl" selected>serve@softora\.nl<\/option>/);
   assert.match(pageSource, /<option value="martijn@softora\.nl">martijn@softora\.nl<\/option>/);
+  assert.match(pageSource, /<option value="servec321@gmail\.com">servec321@gmail\.com<\/option>/);
   assert.doesNotMatch(pageSource, /<option value="info@softora\.nl"/);
   assert.doesNotMatch(pageSource, /<option value="zakelijk@softora\.nl"/);
   assert.doesNotMatch(pageSource, /zakelijk@theimpactbox\.co/);
-  assert.match(pageSource, /const allowedSenderEmails = new Set\(\['serve@softora\.nl', 'martijn@softora\.nl'\]\);/);
+  assert.match(pageSource, /const allowedSenderEmails = new Set\(\['serve@softora\.nl', 'martijn@softora\.nl', 'servec321@gmail\.com'\]\);/);
   assert.match(pageSource, /allowedSenderEmails\.has\(String\(email \|\| ''\)\.toLowerCase\(\)\)/);
   assert.doesNotMatch(pageSource, /<div class="mf-label">Campagne afgerond na<\/div>/);
   assert.doesNotMatch(pageSource, /<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);

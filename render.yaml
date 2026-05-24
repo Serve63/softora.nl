@@ -89,6 +89,20 @@ services:
         sync: false
       - key: MAILBOX_MARTIJN_SOFTORA_NL_PASS
         sync: false
+      - key: MAILBOX_SERVEC321_GMAIL_COM_PASS
+        sync: false
+      - key: MAILBOX_GMAIL_COM_SMTP_HOST
+        value: smtp.gmail.com
+      - key: MAILBOX_GMAIL_COM_SMTP_PORT
+        value: 465
+      - key: MAILBOX_GMAIL_COM_SMTP_SECURE
+        value: true
+      - key: MAILBOX_GMAIL_COM_IMAP_HOST
+        value: imap.gmail.com
+      - key: MAILBOX_GMAIL_COM_IMAP_PORT
+        value: 993
+      - key: MAILBOX_GMAIL_COM_IMAP_SECURE
+        value: true
       - key: COLDMAIL_REPLY_FORWARD_ENABLED
         value: false
       - key: COLDMAIL_REPLY_FORWARD_FROM
@@ -101,8 +115,10 @@ services:
         sync: false
       - key: COLDMAIL_BOUNCE_PROCESSING_ENABLED
         value: true
+      - key: COLDMAIL_CAMPAIGN_SEND_LIMIT
+        value: 9
       - key: COLDMAIL_DAILY_SEND_LIMIT
-        value: 30
+        value: 9
       - key: COLDMAIL_PACKAGE_DAILY_SEND_LIMIT
         value: 60
       - key: COLDMAIL_SEND_DELAY_MS
@@ -110,11 +126,21 @@ services:
       - key: COLDMAIL_SAFETY_PAUSE_MS
         value: 21600000
       - key: COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT
-        value: 10
+        value: 9
       - key: COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS
         value: 180000
       - key: COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS
         value: false
+      - key: COLDMAIL_AUTOPILOT_BATCH_SIZE
+        value: 1
+      - key: COLDMAIL_AUTOPILOT_START_HOUR
+        value: 7
+      - key: COLDMAIL_AUTOPILOT_END_HOUR
+        value: 17
+      - key: COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES
+        value: 60
+      - key: COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES
+        value: 75
       - key: GOOGLE_CALENDAR_SYNC_ENABLED
         value: false
       - key: GOOGLE_CALENDAR_CLIENT_EMAIL
