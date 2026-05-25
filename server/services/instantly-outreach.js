@@ -1340,13 +1340,13 @@ function createInstantlyOutreachService(deps = {}) {
       const instantlyLeadId = leadIdByEmail.get(email) || normalizeString(row.instantlyLeadId);
       const historyEntry = buildHistoryEntry(
         {
-          type: 'instantly_synced',
-          label: 'Lead naar Instantly gesynchroniseerd',
+          type: 'gemaild',
+          label: 'Lead via Instantly benaderd',
           actor,
           source: 'instantly-sync',
           messageKey: `instantly-sync:${config.defaultCampaignId}:${item.id}`,
           subject: 'Instantly sync',
-          preview: 'Lead is aan de Instantly-campaign toegevoegd of bestond daar al.',
+          preview: 'Lead is aan de Instantly-campaign toegevoegd en in Softora als benaderd vastgezet.',
         },
         { normalizeString, truncateText, now }
       );
@@ -1359,10 +1359,78 @@ function createInstantlyOutreachService(deps = {}) {
         instantlyLastEventAt: syncedAt,
         lastColdmailProvider: 'instantly',
         lastColdmailProviderStatus: 'synced',
+        ...buildInstantlyApproachedFields(row, syncedAt),
         updatedAt: syncedAt,
         hist: mergeHistory(row, historyEntry, normalizeString),
       };
     });
+  }
+
+  function buildInstantlyApproachedFields(row, date) {
+    const currentStatus = normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect';
+    const nextStatus = canAdvanceContactStatus(currentStatus, 'gemaild') ? 'gemaild' : currentStatus;
+    return {
+      status: nextStatus || row.status,
+      databaseStatus: nextStatus || row.databaseStatus,
+      mail: true,
+      coldmailCampaignStartedAt: normalizeString(row.coldmailCampaignStartedAt) || date,
+      campaignType: 'webdesign',
+      campaign_type: 'webdesign',
+      outreachCampaignType: 'webdesign',
+      outreach_campaign_type: 'webdesign',
+      coldmailSpecialAction: 'webdesign',
+      outreachStatus: 'benaderd',
+      actionRequired: false,
+      outreachActionRequired: false,
+    };
+  }
+
+  function isMarkedAsInstantlyApproached(row) {
+    return (
+      normalizeContactStatus(row && (row.databaseStatus || row.status), row) === 'gemaild' &&
+      normalizeContactStatus(row && row.outreachStatus, row) === 'gemaild' &&
+      normalizeString(row && row.lastColdmailProvider).toLowerCase() === 'instantly'
+    );
+  }
+
+  function markExistingInstantlyRowsAsApproached(rows, actor) {
+    const markedAt = now().toISOString();
+    let marked = 0;
+    const nextRows = (Array.isArray(rows) ? rows : []).map((row, index) => {
+      if (!hasActiveInstantlyOutreach(row)) return row;
+      if (isMarkedAsInstantlyApproached(row)) return row;
+      const currentStatus = normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect';
+      if (!canAdvanceContactStatus(currentStatus, 'gemaild')) return row;
+
+      marked += 1;
+      const id = getRowId(row, index, normalizeString);
+      const instantlyStatus = normalizeInstantlyStatus(row.instantlyStatus, normalizeString) || 'synced';
+      const historyEntry = buildHistoryEntry(
+        {
+          type: 'gemaild',
+          label: 'Instantly-lead als benaderd bijgewerkt',
+          actor,
+          source: 'instantly-sync',
+          messageKey: `instantly-benaderd:${config.defaultCampaignId}:${id}`,
+          subject: 'Instantly status',
+          preview: 'Lead stond al in Instantly en is in Softora als benaderd vastgezet.',
+        },
+        { normalizeString, truncateText, now: () => new Date(markedAt) }
+      );
+
+      return {
+        ...row,
+        instantlyCampaignId: normalizeString(row.instantlyCampaignId) || config.defaultCampaignId,
+        instantlyLastEventAt: normalizeString(row.instantlyLastEventAt) || markedAt,
+        lastColdmailProvider: 'instantly',
+        lastColdmailProviderStatus: normalizeString(row.lastColdmailProviderStatus) || instantlyStatus,
+        ...buildInstantlyApproachedFields(row, markedAt),
+        updatedAt: markedAt,
+        hist: mergeHistory(row, historyEntry, normalizeString),
+      };
+    });
+
+    return { rows: nextRows, marked };
   }
 
   async function syncInstantlyLeads(input = {}) {
@@ -1381,7 +1449,9 @@ function createInstantlyOutreachService(deps = {}) {
     const actor = normalizeString(input.actor) || 'Instantly sync';
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
-    const rows = parseDatabaseRows(values, customerDbKey, normalizeString);
+    let rows = parseDatabaseRows(values, customerDbKey, normalizeString);
+    const existingApproached = markExistingInstantlyRowsAsApproached(rows, actor);
+    rows = existingApproached.rows;
     const syncedToday = getDailySyncCount(rows);
     const dailyRemaining = Math.max(0, config.dailyCap - syncedToday);
     const requestedLimit = clampNumber(input.limit, config.batchSize, 1, config.batchSize);
@@ -1389,11 +1459,22 @@ function createInstantlyOutreachService(deps = {}) {
     const personalizationContext = await loadPersonalizationContext(rows);
 
     if (limit <= 0) {
+      if (existingApproached.marked) {
+        await setUiStateValues(
+          customerDbScope,
+          buildCustomerRowsStateValues(values, rows, customerDbKey),
+          {
+            source: 'instantly-sync',
+            actor,
+          }
+        );
+      }
       lastSyncResult = {
         ok: true,
         skipped: true,
         reason: 'daily_cap_reached',
         synced: 0,
+        markedBenaderd: existingApproached.marked,
         syncedToday,
         dailyCap: config.dailyCap,
         finishedAt: now().toISOString(),
@@ -1408,9 +1489,20 @@ function createInstantlyOutreachService(deps = {}) {
         skipped: true,
         reason: 'no_eligible_leads',
         synced: 0,
+        markedBenaderd: existingApproached.marked,
         failed,
         finishedAt: now().toISOString(),
       };
+      if (existingApproached.marked) {
+        await setUiStateValues(
+          customerDbScope,
+          buildCustomerRowsStateValues(values, rows, customerDbKey),
+          {
+            source: 'instantly-sync',
+            actor,
+          }
+        );
+      }
       return lastSyncResult;
     }
 
@@ -1429,6 +1521,7 @@ function createInstantlyOutreachService(deps = {}) {
     lastSyncResult = {
       ok: true,
       synced: selectedRows.length,
+      markedBenaderd: existingApproached.marked + selectedRows.length,
       failed,
       campaignId: config.defaultCampaignId,
       dailyCap: config.dailyCap,
