@@ -1423,7 +1423,7 @@
                             <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
                         <div class="status-filter">
-                            <button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar</button><button class="sf-btn" data-s="alle" type="button">Alles</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
+                            <button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar</button><button class="sf-btn" data-s="alle" type="button">Alles</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="instantly" type="button">Instantly</button><button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
@@ -1576,7 +1576,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260525a"></script>
+    <script src="assets/premium-database-webdesign-action.js?v=20260526a"></script>
     <script src="assets/premium-database-import.js?v=20260521b"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260511a"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260513a"></script>
@@ -2230,11 +2230,7 @@
         function getFilteredCustomers() {
             const query = normalizeSearchValue(state.query);
             return state.klanten.filter(function (customer) {
-                if (state.activeStatus === "benaderd") {
-                    if (!hasUsedColdCalling(customer) && !hasUsedColdMailing(customer)) return false;
-                } else if (state.activeStatus !== "alle" && customer.status !== state.activeStatus) {
-                    return false;
-                }
+                if (!outreachController.matchesStatusFilter(customer, state.activeStatus, hasUsedColdCalling, hasUsedColdMailing)) return false;
                 if (!query) return true;
 
                 const haystack = [
@@ -2256,7 +2252,7 @@
         }
 
         function getSortedCustomers(customers) {
-            return state.activeStatus === "benaderd" ? outreachController.sortByRecentOutreach(customers, parseDateValue, normalizeSearchValue) : sortCustomers(customers);
+            return (state.activeStatus === "benaderd" || state.activeStatus === "instantly") ? outreachController.sortByRecentOutreach(customers, parseDateValue, normalizeSearchValue) : sortCustomers(customers);
         }
 
         function getStatusLabel(status) {
@@ -2314,7 +2310,9 @@
             if (hasUsedColdCalling(customer)) {
                 tags.push("<span class=\"k-tag k-call\">Cold calling</span>");
             }
-            if (hasUsedColdMailing(customer)) {
+            if (outreachController.hasInstantlyOutreachSignal(customer)) {
+                tags.push("<span class=\"k-tag k-mail\">Instantly</span>");
+            } else if (hasUsedColdMailing(customer)) {
                 tags.push("<span class=\"k-tag k-mail\">Cold mailing</span>");
             }
             return tags.length ? tags.join("") : "<span class=\"k-empty\">Nog geen acties</span>";
@@ -2353,7 +2351,7 @@
         }
 
         function renderTable() {
-            const filtered = getSortedCustomers(getFilteredCustomers()), showOutreachActionColumn = state.activeStatus === "benaderd", showPhotoColumn = !showOutreachActionColumn;
+            const filtered = getSortedCustomers(getFilteredCustomers()), showOutreachActionColumn = state.activeStatus === "benaderd" || state.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn;
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";

@@ -632,8 +632,40 @@
                 lastColdmailReplyPreview: normalizeString(raw && raw.lastColdmailReplyPreview),
                 lastColdmailReplyMessageKey: normalizeString(raw && raw.lastColdmailReplyMessageKey),
                 coldmailReplyIntent: normalizeString(raw && raw.coldmailReplyIntent),
+                lastColdmailProvider: normalizeString(raw && raw.lastColdmailProvider),
+                lastColdmailProviderStatus: normalizeString(raw && raw.lastColdmailProviderStatus),
+                instantlyLeadId: normalizeString(raw && raw.instantlyLeadId),
+                instantlyCampaignId: normalizeString(raw && raw.instantlyCampaignId),
+                instantlyStatus: normalizeString(raw && raw.instantlyStatus),
+                instantlySyncedAt: normalizeString(raw && raw.instantlySyncedAt),
+                instantlyLastEventAt: normalizeString(raw && raw.instantlyLastEventAt),
+                instantlyEmailSentAt: normalizeString(raw && raw.instantlyEmailSentAt),
                 statusUpdatedAt: normalizeString(raw && raw.statusUpdatedAt)
             };
+        }
+
+        function hasInstantlyOutreachSignal(customer) {
+            if (!customer) return false;
+            const provider = normalizeString(customer.lastColdmailProvider).toLowerCase();
+            if (provider === "instantly") return true;
+            return Boolean(normalizeString(customer.instantlyLeadId || customer.instantlyCampaignId || customer.instantlyStatus || customer.instantlySyncedAt || customer.instantlyLastEventAt || customer.instantlyEmailSentAt));
+        }
+
+        function isInstantlyTabCustomer(customer) {
+            if (!hasInstantlyOutreachSignal(customer)) return false;
+            const status = normalizeDatabaseStatus(customer && customer.status, customer);
+            return ["klant", "interesse", "afspraak", "afgehaakt", "geblokkeerd", "geengehoor", "buiten"].indexOf(status) === -1;
+        }
+
+        function matchesStatusFilter(customer, activeStatus, hasUsedColdCalling, hasUsedColdMailing) {
+            const status = normalizeString(activeStatus);
+            if (status === "instantly") return isInstantlyTabCustomer(customer);
+            if (status === "benaderd") {
+                const usedColdCalling = typeof hasUsedColdCalling === "function" && hasUsedColdCalling(customer);
+                const usedColdMailing = typeof hasUsedColdMailing === "function" && hasUsedColdMailing(customer);
+                return !isInstantlyTabCustomer(customer) && (usedColdCalling || usedColdMailing);
+            }
+            return status === "alle" || normalizeDatabaseStatus(customer && customer.status, customer) === status;
         }
 
         function isWebdesignOutreachCustomer(customer) {
@@ -876,7 +908,7 @@
         }
 
         ensureOutreachStyles();
-        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, isActionRequired: isActionRequired, isTrackedOutreachCustomer: isTrackedOutreachCustomer, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderDaysSinceSent: renderDaysSinceSent, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, sortByRecentOutreach: sortByRecentOutreach, updateStatus: updateStatus };
+        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, hasInstantlyOutreachSignal: hasInstantlyOutreachSignal, isActionRequired: isActionRequired, isInstantlyTabCustomer: isInstantlyTabCustomer, isTrackedOutreachCustomer: isTrackedOutreachCustomer, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, matchesStatusFilter: matchesStatusFilter, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderDaysSinceSent: renderDaysSinceSent, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, sortByRecentOutreach: sortByRecentOutreach, updateStatus: updateStatus };
     }
 
     global.SoftoraDatabaseOutreach = {
