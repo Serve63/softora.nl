@@ -173,6 +173,7 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
 
   assert.equal(result.ok, true);
   assert.equal(result.synced, 1);
+  assert.equal(result.markedBenaderd, 2);
   assert.equal(fetchCalls.length, 1);
   assert.equal(fetchCalls[0].url, 'https://api.instantly.test/api/v2/leads/add');
   assert.equal(fetchCalls[0].timeoutMs, 30_000);
@@ -200,8 +201,12 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(rows[0].instantlyLeadId, 'instantly-lead-1');
   assert.equal(rows[0].instantlyStatus, 'synced');
   assert.equal(rows[0].lastColdmailProvider, 'instantly');
-  assert.equal(rows[0].databaseStatus, undefined);
-  assert.equal(rows[0].status, 'prospect');
+  assert.equal(rows[0].databaseStatus, 'gemaild');
+  assert.equal(rows[0].status, 'gemaild');
+  assert.equal(rows[0].outreachStatus, 'benaderd');
+  assert.equal(rows[0].lastMailSentAt, undefined);
+  assert.equal(rows[2].databaseStatus, 'gemaild');
+  assert.equal(rows[2].outreachStatus, 'benaderd');
 });
 
 test('instantly sync reads and writes chunked customer database state', async () => {
@@ -238,6 +243,8 @@ test('instantly sync reads and writes chunked customer database state', async ()
     readChunkedStateValue(writes[0].values, 'softora_customers_premium_v1')
   );
   assert.equal(savedRows[0].instantlyStatus, 'synced');
+  assert.equal(savedRows[0].databaseStatus, 'gemaild');
+  assert.equal(savedRows[0].outreachStatus, 'benaderd');
   assert.equal(getRows()[0].lastColdmailProvider, 'instantly');
 });
 
@@ -281,8 +288,8 @@ test('instantly sync uses the active coldmail autopilot profile before fallback 
   assert.match(body.leads[0].custom_variables.softora_mail_body, /Deze tekst draait nu via autopilot/);
 });
 
-test('instantly sync respects the daily cap from existing synced rows', async () => {
-  const { service, fetchCalls } = createService({
+test('instantly sync respects the daily cap and backfills existing Instantly rows as approached', async () => {
+  const { service, fetchCalls, getRows, writes } = createService({
     dailyCap: 1,
     rows: [
       {
@@ -308,7 +315,12 @@ test('instantly sync respects the daily cap from existing synced rows', async ()
   assert.equal(result.ok, true);
   assert.equal(result.skipped, true);
   assert.equal(result.reason, 'daily_cap_reached');
+  assert.equal(result.markedBenaderd, 1);
   assert.equal(fetchCalls.length, 0);
+  assert.equal(writes.length, 1);
+  assert.equal(getRows()[0].databaseStatus, 'gemaild');
+  assert.equal(getRows()[0].outreachStatus, 'benaderd');
+  assert.equal(getRows()[1].status, 'prospect');
 });
 
 test('instantly email_sent webhook marks the Softora row as mailed', async () => {
