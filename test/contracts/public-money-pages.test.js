@@ -228,6 +228,34 @@ test('chatbot money page is focused on leads, support and clean follow-up', () =
   assert.ok(entry.relatedLinks.includes('/ai-telefonist'));
 });
 
+test('ai telefonist money page answers comparison and follow-up intent', () => {
+  const source = readPage('ai-telefonist.html');
+  const entry = getRegistryEntry('ai-telefonist.html');
+
+  assert.match(source, /<title>AI telefonist laten maken voor het MKB \| Softora<\/title>/);
+  assert.match(source, /<meta name="description" content="Laat een AI telefonist maken door Softora/);
+  assert.match(source, /Laat geen telefoontje meer zonder opvolging/);
+  assert.match(source, /AI telefonist, voicemail of callcenter\?/);
+  assert.match(source, /Veelgestelde vragen over een AI telefonist/);
+  assert.match(source, /Wat doet een AI telefonist na een gesprek\?/);
+  assert.match(source, /Wanneer moet een mens het overnemen\?/);
+  assert.match(source, /Past dit bij leadgeneratie voor MKB\?/);
+  assert.match(source, /href="\/voicesoftware-op-maat"/);
+  assert.match(source, /href="\/ai-automatisering"/);
+  assert.match(source, /href="\/crm-systeem-op-maat"/);
+  assert.match(source, /href="\/chatbot-laten-maken"/);
+  assert.match(source, /href="\/kennisbank\/wat-is-een-ai-telefonist"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
+  assert.doesNotMatch(source, /€[0-9]|prijzen|goedkoper dan/i);
+  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
+
+  assert.equal(entry.title, 'AI telefonist laten maken voor het MKB');
+  assert.match(entry.description, /leadkwalificatie, afspraakverzoeken en CRM-opvolging/);
+  assert.ok(entry.relatedLinks.includes('/voicesoftware-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/kennisbank/wat-is-een-ai-telefonist'));
+});
+
 test('voicesoftware money page is focused on AI telefonie, intake and CRM follow-up', () => {
   const source = readPage('premium-voicesoftware.html');
   const entry = getRegistryEntry('premium-voicesoftware.html');
