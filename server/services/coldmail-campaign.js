@@ -4866,8 +4866,7 @@ function createColdmailCampaignService(deps = {}) {
         }
       }
       const reference = buildColdmailReference(row, item.id);
-      const trackingId = createColdmailTrackingId();
-      const trackingUrl = buildColdmailOpenTrackingUrl(row, item.id, reference, trackingId, input);
+      const trackingId = '';
       const selectedBodyTemplate = selectColdmailTemplateVariant(
         bodyVariants,
         row,
@@ -4917,7 +4916,7 @@ function createColdmailCampaignService(deps = {}) {
             optOutUrl: unsubscribeUrl,
           })
         : appendColdmailOptOutHtml(htmlBase, unsubscribeUrl);
-      const html = appendColdmailOpenTrackingPixelHtml(htmlWithContent, trackingUrl);
+      const html = htmlWithContent;
       const attachments = webdesignPhoto
         ? [
             {
@@ -4969,19 +4968,13 @@ function createColdmailCampaignService(deps = {}) {
         if (rejected.includes(normalizeEmailAddress(to)) || (Array.isArray(info && info.accepted) && !accepted.length)) {
           throw new Error('SMTP accepteerde de ontvanger niet.');
         }
-        const sentCopyMail = trackingUrl
-          ? {
-              ...mail,
-              html: htmlWithContent,
-            }
-          : mail;
-        const sentCopySaved = await saveSentCopy(senderEmail, sentCopyMail, info, smtpAccount);
+        const sentCopySaved = await saveSentCopy(senderEmail, mail, info, smtpAccount);
         const sentItem = {
           id: item.id,
           bedrijf: getRowCompany(row),
           email: to,
           messageId: normalizeString(info && info.messageId),
-          trackingId: trackingUrl ? trackingId : '',
+          trackingId,
           response: truncateText(normalizeString(info && info.response), 500),
           accepted,
           rejected,
