@@ -186,7 +186,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260522b/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return state\.activeStatus === "benaderd"\s*\?\s*outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\)\s*:\s*sortCustomers\(customers\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : sortCustomers\(customers\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(state\.klanten\.concat\(\[customer\]\)\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(mergeResult\.customers\);/);
   assert.match(pageSource, /const normalizedCustomers = sortCustomers\(customers\)\.filter/);
@@ -322,7 +322,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.doesNotMatch(pageSource, /function hydrateDatabaseAuthSession\(\)/);
   assert.doesNotMatch(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
   assert.doesNotMatch(pageSource, /nodes\.myMailsFilterButton/);
-  assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd", showPhotoColumn = !showOutreachActionColumn/);
+  assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn/);
   assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn;/);
   assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return showPhotoColumn && shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoSource\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
   assert.match(pageSource, /colspan=\\"" \+ \(showOutreachActionColumn \? 8 : 9\) \+ "\\"/);
@@ -482,7 +482,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260525a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260526a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
@@ -1163,12 +1163,17 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar<\/button>\s*<button class="sf-btn" data-s="alle" type="button">Alles<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
+    /<button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar<\/button>\s*<button class="sf-btn" data-s="alle" type="button">Alles<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<button class="sf-btn" data-s="instantly" type="button">Instantly<\/button>\s*<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
   );
   assert.match(pageSource, /activeStatus: "benaderbaar"/);
   assert.match(pageSource, /<option value="benaderbaar">Beschikbaar<\/option>/);
   assert.match(pageSource, /benaderbaar: "Beschikbaar"/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
+  assert.match(pageSource, /state\.activeStatus === "instantly"/);
+  assert.match(pageSource, /outreachController\.matchesStatusFilter\(customer, state\.activeStatus, hasUsedColdCalling, hasUsedColdMailing\)/);
+  assert.match(webdesignActionSource, /function hasInstantlyOutreachSignal\(customer\)/);
+  assert.match(webdesignActionSource, /function isInstantlyTabCustomer\(customer\)/);
+  assert.match(webdesignActionSource, /return !isInstantlyTabCustomer\(customer\) && \(usedColdCalling \|\| usedColdMailing\);/);
   assert.doesNotMatch(pageSource, /data-s="reactie_ontvangen"/);
   assert.doesNotMatch(pageSource, /data-s="afgehaakt"/);
   assert.doesNotMatch(pageSource, /state\.activeStatus === "reactie_ontvangen"/);
@@ -1179,6 +1184,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /<button class="sf-btn act" data-s="alle" type="button">Alles<\/button>/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="klant"\]\.act/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="benaderd"\]\.act/);
+  assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="instantly"\]\.act/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="afgehaakt"\]\.act/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="buiten"\]\.act/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar<\/button>/);
@@ -1194,7 +1200,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /outreachController\.renderMeta\(customer, showOutreachActionColumn && outreachController\.isTrackedOutreachCustomer\(customer\)\)/);
   assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderActions\(customer\)/);
   assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
-  assert.match(pageSource, /state\.activeStatus === "benaderd"\s*\?\s*outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\)\s*:\s*sortCustomers\(customers\);/);
+  assert.match(pageSource, /\(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : sortCustomers\(customers\);/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 25%; text-align: center; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(10\), table\.outreach-action-mode tbody td:nth-child\(10\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
   assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto/);
@@ -1211,9 +1217,12 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(webdesignActionSource, /25 dagen regel actief/);
   assert.match(webdesignActionSource, /const replyMessage = normalizeString\(customer\.replyMailboxId \|\| customer\.replyThreadId \|\| customer\.replyMessageId \|\| customer\.lastColdmailReplyMessageKey\);/);
   assert.match(webdesignActionSource, /const sentMessage = normalizeString\(customer\.outreachMessageId \|\| customer\.coldmailSentMessageId\);/);
+  assert.match(webdesignActionSource, /lastColdmailProvider: normalizeString\(raw && raw\.lastColdmailProvider\)/);
+  assert.match(webdesignActionSource, /instantlySyncedAt: normalizeString\(raw && raw\.instantlySyncedAt\)/);
   assert.match(webdesignActionSource, /params\.set\("folder", replyMessage \? "inbox" : "sent"\);/);
   assert.match(webdesignActionSource, /params\.set\("select", "first"\);/);
-  assert.match(pageSource, /!hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\)/);
+  assert.match(webdesignActionSource, /const usedColdCalling = typeof hasUsedColdCalling === "function" && hasUsedColdCalling\(customer\);/);
+  assert.match(pageSource, /outreachController\.hasInstantlyOutreachSignal\(customer\)[\s\S]*tags\.push\("<span class=\\"k-tag k-mail\\">Instantly<\/span>"\)/);
   assert.match(contactStatusScriptSource, /normalizeOutreachStatusKey\(raw\.outreachStatus, helpers\) === "benaderd"/);
   assert.match(contactStatusScriptSource, /raw\.coldmailSentMessageId \|\| raw\.outreachMessageId/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gebeld" type="button">Gebeld<\/button>/);
@@ -2495,7 +2504,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260522b/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return state\.activeStatus === "benaderd"\s*\?\s*outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\)\s*:\s*sortCustomers\(customers\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : sortCustomers\(customers\);/);
   assert.match(sorterSource, /const OISTERWIJK_COORDS = \{ lat: 51\.5792, lng: 5\.1889 \};/);
   assert.match(sorterSource, /function resolveCustomerCoords\(customer\)/);
   assert.match(sorterSource, /function getDistanceKm\(customer\)/);
