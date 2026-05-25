@@ -64,6 +64,9 @@ const ACTIVE_INSTANTLY_STATUSES = new Set([
   'completed',
 ]);
 const BLOCKING_INSTANTLY_STATUSES = new Set(['bounced', 'unsubscribed', 'blocked']);
+const PRIOR_COLDMAIL_HISTORY_PATTERN =
+  /\b(gemaild|mail verstuurd|mail geopend|mailcontact|coldmail|cold mailing|open tracking|email sent|email opened|reply received|reactie ontvangen)\b/;
+const INSTANTLY_HISTORY_PATTERN = /\b(instantly|instantly sync|instantly webhook|lead via instantly)\b/;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
   'gmail.com',
@@ -1059,6 +1062,134 @@ function createInstantlyOutreachService(deps = {}) {
     return Boolean(domain && PERSONAL_MAILBOX_DOMAINS.has(domain));
   }
 
+  function normalizeHistorySearchText(value) {
+    return normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function getPriorColdmailTimestamp(row) {
+    return normalizeString(
+      row &&
+        (row.outreachSentAt ||
+          row.outreach_sent_at ||
+          row.lastColdmailSentAt ||
+          row.lastMailSentAt ||
+          row.lastMailedAt ||
+          row.coldmailCampaignStartedAt ||
+          row.coldmailOpenedAt ||
+          row.coldmailFirstOpenedAt ||
+          row.coldmailLastOpenedAt ||
+          row.outreachOpenedAt ||
+          row.lastColdmailReplyAt)
+    );
+  }
+
+  function hasPriorColdmailHistorySignal(row) {
+    const history = Array.isArray(row && row.hist) ? row.hist : [];
+    return history.some((item) => {
+      const text = getHistorySearchText(item);
+      return isPriorColdmailHistoryText(text);
+    });
+  }
+
+  function getHistorySearchText(item) {
+    return normalizeHistorySearchText(
+      [
+        item && item.type,
+        item && item.status,
+        item && item.label,
+        item && item.message,
+        item && item.title,
+        item && item.source,
+        item && item.subject,
+        item && item.preview,
+        item && item.messageKey,
+      ].join(' ')
+    );
+  }
+
+  function isPriorColdmailHistoryText(text) {
+    return PRIOR_COLDMAIL_HISTORY_PATTERN.test(normalizeHistorySearchText(text));
+  }
+
+  function isInstantlyHistoryText(text) {
+    return INSTANTLY_HISTORY_PATTERN.test(normalizeHistorySearchText(text));
+  }
+
+  function parseTimestampMs(value) {
+    const raw = normalizeString(value);
+    if (!raw) return 0;
+    const parsed = Date.parse(raw);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  function isBeforeReferenceDate(value, referenceMs) {
+    const valueMs = parseTimestampMs(value);
+    if (!referenceMs) return Boolean(valueMs);
+    return Boolean(valueMs && valueMs < referenceMs);
+  }
+
+  function hasExternalColdmailHistoryBeforeInstantly(row) {
+    const syncedAtMs = parseTimestampMs(row && row.instantlySyncedAt);
+    const history = Array.isArray(row && row.hist) ? row.hist : [];
+    if (
+      history.some((item) => {
+        const text = getHistorySearchText(item);
+        if (!isPriorColdmailHistoryText(text) || isInstantlyHistoryText(text)) return false;
+        const eventMs = parseTimestampMs(item && (item.date || item.timestamp || item.createdAt || item.created_at));
+        return !syncedAtMs || !eventMs || eventMs < syncedAtMs;
+      })
+    ) {
+      return true;
+    }
+
+    return [
+      row && row.outreachSentAt,
+      row && row.outreach_sent_at,
+      row && row.lastColdmailSentAt,
+      row && row.lastMailSentAt,
+      row && row.lastMailedAt,
+      row && row.coldmailOpenedAt,
+      row && row.coldmailFirstOpenedAt,
+      row && row.coldmailLastOpenedAt,
+      row && row.outreachOpenedAt,
+      row && row.lastColdmailReplyAt,
+    ].some((value) => isBeforeReferenceDate(value, syncedAtMs));
+  }
+
+  function hasPriorColdmailOutreach(row) {
+    if (!row || typeof row !== 'object') return false;
+    if (normalizeContactStatus(row.outreachStatus, row) === 'gemaild') return true;
+    if (getPriorColdmailTimestamp(row)) return true;
+    if (Number(row.coldmailOpenCount || row.outreachOpenCount || 0) > 0) return true;
+    if (row.coldmailOpened === true || row.outreachOpened === true) return true;
+    if (normalizeString(row.coldmailSentMessageId || row.outreachMessageId || row.sentMessageId || row.messageId)) {
+      return true;
+    }
+    return hasPriorColdmailHistorySignal(row);
+  }
+
+  function getPriorColdmailInstantlyRows(rows) {
+    return (Array.isArray(rows) ? rows : [])
+      .map((row, index) => ({
+        id: getRowId(row, index, normalizeString),
+        index,
+        row,
+        leadId: normalizeString(row && row.instantlyLeadId),
+        email: getRowEmail(row, normalizeString),
+        company: getRowCompany(row, normalizeString),
+      }))
+      .filter((item) => {
+        if (!hasActiveInstantlyOutreach(item.row)) return false;
+        if (!item.leadId) return false;
+        return hasExternalColdmailHistoryBeforeInstantly(item.row);
+      });
+  }
+
   function hasActiveInstantlyOutreach(row) {
     const status = normalizeInstantlyStatus(row && row.instantlyStatus, normalizeString);
     if (BLOCKING_INSTANTLY_STATUSES.has(status)) return false;
@@ -1162,6 +1293,15 @@ function createInstantlyOutreachService(deps = {}) {
       if (row.mail === false || row.canMail === false || row.doNotMail === true) continue;
       if (EXCLUDED_DATABASE_STATUSES.has(status)) continue;
       if (hasActiveInstantlyOutreach(row)) continue;
+      if (hasPriorColdmailOutreach(row)) {
+        failed.push({
+          id,
+          bedrijf: company,
+          email,
+          error: 'Al eerder benaderd via Softora coldmail/open-tracking; niet naar Instantly gestuurd.',
+        });
+        continue;
+      }
       if (config.blockPersonalMailboxDomains && isPersonalMailboxDomain(email)) {
         failed.push({
           id,
@@ -1329,6 +1469,37 @@ function createInstantlyOutreachService(deps = {}) {
     return data;
   }
 
+  async function deleteInstantlyLeadsByIds(leadIds) {
+    const ids = Array.from(new Set((Array.isArray(leadIds) ? leadIds : []).map(normalizeString).filter(Boolean)));
+    if (!ids.length) return { count: 0 };
+    const { response, data } = await fetchJsonWithTimeout(
+      `${config.apiBaseUrl}/leads`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify({
+          campaign_id: config.defaultCampaignId,
+          ids,
+        }),
+      },
+      30_000
+    );
+
+    if (!response || !response.ok) {
+      throw createInstantlyError(
+        `Instantly duplicate-cleanup mislukt (${response ? response.status : 'geen response'}).`,
+        'INSTANTLY_DUPLICATE_CLEANUP_FAILED',
+        response && response.status ? response.status : 502,
+        { data }
+      );
+    }
+
+    return data;
+  }
+
   function markRowsAsSynced(rows, selectedRows, data, actor) {
     const syncedAt = now().toISOString();
     const leadIdByEmail = buildLeadIdByEmail(data);
@@ -1364,6 +1535,76 @@ function createInstantlyOutreachService(deps = {}) {
         hist: mergeHistory(row, historyEntry, normalizeString),
       };
     });
+  }
+
+  function markRowsAsRemovedFromInstantly(rows, removedRows, actor) {
+    const removedAt = now().toISOString();
+    const removedByIndex = new Map(removedRows.map((item) => [item.index, item]));
+    return rows.map((row, index) => {
+      const item = removedByIndex.get(index);
+      if (!item) return row;
+      const removedLeadId = normalizeString(row.instantlyLeadId);
+      const removedCampaignId = normalizeString(row.instantlyCampaignId) || config.defaultCampaignId;
+      const historyEntry = buildHistoryEntry(
+        {
+          type: 'instantly_verwijderd',
+          label: 'Instantly duplicate verwijderd',
+          actor,
+          source: 'instantly-dedupe-cleanup',
+          messageKey: `instantly-dedupe-cleanup:${removedCampaignId}:${item.id}:${removedLeadId}`,
+          subject: 'Instantly duplicate cleanup',
+          preview:
+            'Lead had al Softora coldmail/open-tracking en is daarom uit Instantly verwijderd om dubbele outreach te voorkomen.',
+        },
+        { normalizeString, truncateText, now: () => new Date(removedAt) }
+      );
+
+      return {
+        ...row,
+        instantlyLeadId: '',
+        instantlyCampaignId: '',
+        instantlyStatus: '',
+        instantlySyncedAt: '',
+        instantlyLastEventAt: '',
+        instantlyEmailSentAt: '',
+        lastColdmailProvider:
+          normalizeString(row.lastColdmailProvider).toLowerCase() === 'instantly'
+            ? ''
+            : row.lastColdmailProvider,
+        lastColdmailProviderStatus:
+          normalizeString(row.lastColdmailProvider).toLowerCase() === 'instantly'
+            ? ''
+            : row.lastColdmailProviderStatus,
+        instantlyRemovedAt: removedAt,
+        instantlyRemovedLeadId: removedLeadId,
+        instantlyRemovedCampaignId: removedCampaignId,
+        instantlyRemovedReason: 'prior_softora_coldmail',
+        updatedAt: removedAt,
+        hist: mergeHistory(row, historyEntry, normalizeString),
+      };
+    });
+  }
+
+  async function cleanupPriorColdmailInstantlyRows(rows, actor) {
+    const riskyRows = getPriorColdmailInstantlyRows(rows);
+    if (!riskyRows.length) {
+      return {
+        rows,
+        removed: 0,
+        deletedCount: 0,
+        removedLeadIds: [],
+      };
+    }
+
+    const removedLeadIds = riskyRows.map((item) => item.leadId);
+    const data = await deleteInstantlyLeadsByIds(removedLeadIds);
+    const deletedCount = Math.max(0, Number(data && data.count) || 0);
+    return {
+      rows: markRowsAsRemovedFromInstantly(rows, riskyRows, actor),
+      removed: riskyRows.length,
+      deletedCount,
+      removedLeadIds,
+    };
   }
 
   function buildInstantlyApproachedFields(row, date) {
@@ -1450,8 +1691,34 @@ function createInstantlyOutreachService(deps = {}) {
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     let rows = parseDatabaseRows(values, customerDbKey, normalizeString);
+    const priorColdmailCleanup = await cleanupPriorColdmailInstantlyRows(rows, actor);
+    rows = priorColdmailCleanup.rows;
     const existingApproached = markExistingInstantlyRowsAsApproached(rows, actor);
     rows = existingApproached.rows;
+
+    if (priorColdmailCleanup.removed) {
+      await setUiStateValues(
+        customerDbScope,
+        buildCustomerRowsStateValues(values, rows, customerDbKey),
+        {
+          source: 'instantly-dedupe-cleanup',
+          actor,
+        }
+      );
+      lastSyncResult = {
+        ok: true,
+        skipped: true,
+        reason: 'prior_coldmail_cleanup',
+        synced: 0,
+        markedBenaderd: existingApproached.marked,
+        removedPriorColdmailFromInstantly: priorColdmailCleanup.removed,
+        instantlyDeletedCount: priorColdmailCleanup.deletedCount,
+        campaignId: config.defaultCampaignId,
+        finishedAt: now().toISOString(),
+      };
+      return lastSyncResult;
+    }
+
     const syncedToday = getDailySyncCount(rows);
     const dailyRemaining = Math.max(0, config.dailyCap - syncedToday);
     const requestedLimit = clampNumber(input.limit, config.batchSize, 1, config.batchSize);
@@ -1919,6 +2186,7 @@ function createInstantlyOutreachService(deps = {}) {
     const rows = parseDatabaseRows(values, customerDbKey, normalizeString);
     const activeInstantlyRows = rows.filter((row) => hasActiveInstantlyOutreach(row)).length;
     const approachedInstantlyRows = rows.filter((row) => isMarkedAsInstantlyApproached(row)).length;
+    const priorColdmailInstantlyRiskRows = getPriorColdmailInstantlyRows(rows).length;
     return {
       ok: true,
       enabled: config.enabled,
@@ -1937,6 +2205,7 @@ function createInstantlyOutreachService(deps = {}) {
       marksSyncedLeadsAsApproached: true,
       activeInstantlyRows,
       approachedInstantlyRows,
+      priorColdmailInstantlyRiskRows,
       syncedToday: getDailySyncCount(rows),
       nextSyncAt,
       running: Boolean(syncPromise),

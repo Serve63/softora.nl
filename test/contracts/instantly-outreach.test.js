@@ -118,6 +118,9 @@ function createService(overrides = {}) {
     },
     fetchJsonWithTimeout: async (url, options, timeoutMs) => {
       fetchCalls.push({ url, options, timeoutMs });
+      if (typeof overrides.fetchJsonWithTimeout === 'function') {
+        return overrides.fetchJsonWithTimeout(url, options, timeoutMs, fetchCalls.length);
+      }
       return {
         response: { ok: true, status: 200 },
         data:
@@ -207,6 +210,152 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(rows[0].lastMailSentAt, undefined);
   assert.equal(rows[2].databaseStatus, 'gemaild');
   assert.equal(rows[2].outreachStatus, 'benaderd');
+});
+
+test('instantly sync blocks leads with prior Softora coldmail history', async () => {
+  const { service, fetchCalls, getRows } = createService({
+    rows: [
+      {
+        id: 'opened-before',
+        bedrijf: 'Koks Bouw & Interieur',
+        email: 'info@koks-b-i.nl',
+        website: 'https://koks-b-i.nl',
+        status: 'benaderbaar',
+        mail: true,
+        hist: [
+          {
+            date: '2026-05-23T07:58:18.559Z',
+            type: 'mail_geopend',
+            label: 'Mail geopend',
+            source: 'coldmail-open-tracking',
+            messageKey: 'open-37c10e06-123e-463a-90d9-0c3be02e47f0',
+          },
+        ],
+      },
+      {
+        id: 'sent-before',
+        bedrijf: 'Kools LMB Alphen',
+        email: 'info@koolslmb.nl',
+        website: 'https://koolslmb.nl',
+        status: 'prospect',
+        mail: true,
+        coldmailSentMessageId: 'old-softora-message',
+      },
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.synced, 1);
+  assert.equal(result.failed.length, 2);
+  assert.match(result.failed[0].error, /Al eerder benaderd/);
+  assert.match(result.failed[1].error, /Al eerder benaderd/);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.leads.length, 1);
+  assert.equal(body.leads[0].email, 'ruben@example.test');
+
+  const rows = getRows();
+  assert.equal(rows[0].instantlyLeadId, undefined);
+  assert.equal(rows[0].status, 'benaderbaar');
+  assert.equal(rows[1].instantlyLeadId, undefined);
+  assert.equal(rows[1].status, 'prospect');
+  assert.equal(rows[2].instantlyStatus, 'synced');
+});
+
+test('instantly sync removes active Instantly rows with older Softora coldmail history before adding leads', async () => {
+  const { service, fetchCalls, getRows, writes } = createService({
+    rows: [
+      {
+        id: 'opened-before',
+        bedrijf: 'Koks Bouw & Interieur',
+        email: 'info@koks-b-i.nl',
+        website: 'https://koks-b-i.nl',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        outreachStatus: 'benaderd',
+        mail: true,
+        instantlyLeadId: 'instantly-koks-lead',
+        instantlyCampaignId: 'campaign-1',
+        instantlyStatus: 'synced',
+        instantlySyncedAt: '2026-05-25T21:37:23.045Z',
+        lastColdmailProvider: 'instantly',
+        hist: [
+          {
+            date: '2026-05-23T07:58:18.559Z',
+            type: 'mail_geopend',
+            label: 'Mail geopend',
+            source: 'coldmail-open-tracking',
+            messageKey: 'open-37c10e06-123e-463a-90d9-0c3be02e47f0',
+          },
+          {
+            date: '2026-05-25T21:37:23.046Z',
+            type: 'gemaild',
+            label: 'Lead via Instantly benaderd',
+            source: 'instantly-sync',
+          },
+        ],
+      },
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    fetchJsonWithTimeout: async (url, options) => {
+      if (url === 'https://api.instantly.test/api/v2/leads' && options.method === 'DELETE') {
+        return {
+          response: { ok: true, status: 200 },
+          data: { count: 1 },
+        };
+      }
+      throw new Error(`Unexpected Instantly call: ${options.method} ${url}`);
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'prior_coldmail_cleanup');
+  assert.equal(result.synced, 0);
+  assert.equal(result.removedPriorColdmailFromInstantly, 1);
+  assert.equal(result.instantlyDeletedCount, 1);
+  assert.equal(fetchCalls.length, 1);
+  const deleteBody = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(fetchCalls[0].url, 'https://api.instantly.test/api/v2/leads');
+  assert.equal(fetchCalls[0].options.method, 'DELETE');
+  assert.equal(deleteBody.campaign_id, 'campaign-1');
+  assert.deepEqual(deleteBody.ids, ['instantly-koks-lead']);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].meta.source, 'instantly-dedupe-cleanup');
+
+  const rows = getRows();
+  assert.equal(rows[0].instantlyLeadId, '');
+  assert.equal(rows[0].instantlyCampaignId, '');
+  assert.equal(rows[0].instantlyStatus, '');
+  assert.equal(rows[0].lastColdmailProvider, '');
+  assert.equal(rows[0].instantlyRemovedLeadId, 'instantly-koks-lead');
+  assert.equal(rows[0].instantlyRemovedReason, 'prior_softora_coldmail');
+  assert.equal(rows[0].status, 'gemaild');
+  assert.equal(rows[0].databaseStatus, 'gemaild');
+  assert.equal(rows[0].outreachStatus, 'benaderd');
+  assert.equal(rows[1].instantlyStatus, undefined);
+  assert.ok(rows[0].hist.some((item) => item.source === 'instantly-dedupe-cleanup'));
 });
 
 test('instantly sync reads and writes chunked customer database state', async () => {
