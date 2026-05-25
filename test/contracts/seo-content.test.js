@@ -86,6 +86,40 @@ test('seo content exposes blog and kennisbank paths for crawl and sitemap discov
   assert.ok(sitemapEntries.every((entry) => !String(entry.path).includes('premium-blog')));
 });
 
+test('seo content houdt future-dated publicaties uit routes en sitemap tot publicatiedatum', () => {
+  const beforeWeeklyBatch = new Date('2026-06-01T23:59:59.000Z');
+  const firstBatchDay = new Date('2026-06-02T12:00:00.000Z');
+  const afterWeeklyBatch = new Date('2026-06-08T12:00:00.000Z');
+  const scheduledPaths = [
+    '/blog/ai-automatisering-leadkwalificatie-mkb',
+    '/kennisbank/wat-is-leadkwalificatie',
+    '/blog/website-leadgeneratie-mkb-meten',
+    '/kennisbank/wat-is-crm-datakwaliteit',
+    '/regio/midden-brabant',
+  ];
+
+  const earlyPaths = getSeoContentPublicPaths({ now: beforeWeeklyBatch });
+  const earlySitemap = getSeoContentSitemapEntries({ now: beforeWeeklyBatch });
+  for (const pathName of scheduledPaths) {
+    assert.ok(!earlyPaths.includes(pathName), `${pathName} mag nog niet publiek zijn.`);
+    assert.ok(!earlySitemap.some((entry) => entry.path === pathName), `${pathName} mag nog niet in sitemap staan.`);
+  }
+
+  assert.ok(getSeoContentPublicPaths({ now: firstBatchDay }).includes('/blog/ai-automatisering-leadkwalificatie-mkb'));
+  assert.ok(
+    getSeoContentSitemapEntries({ now: firstBatchDay }).some(
+      (entry) => entry.path === '/blog/ai-automatisering-leadkwalificatie-mkb'
+    )
+  );
+
+  const livePaths = getSeoContentPublicPaths({ now: afterWeeklyBatch });
+  const liveSitemap = getSeoContentSitemapEntries({ now: afterWeeklyBatch });
+  for (const pathName of scheduledPaths) {
+    assert.ok(livePaths.includes(pathName), `${pathName} moet na publicatiedatum publiek zijn.`);
+    assert.ok(liveSitemap.some((entry) => entry.path === pathName), `${pathName} moet na publicatiedatum in sitemap staan.`);
+  }
+});
+
 test('seo content renders the existing blog visual language with real links', () => {
   const html = buildSeoContentIndexHtml('blog', {
     siteOrigin: 'https://www.softora.nl',
@@ -201,6 +235,11 @@ test('seo content images zijn per cluster realistisch vastgezet met metadata', (
     assert.equal(image.height, 1000, `${item.slug} mist vaste afbeeldingshoogte`);
     assert.doesNotMatch(image.alt, /placeholder|binnenkort|foto moet|later/i);
     seenImages.add(image.src);
+
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    assert.ok(fs.existsSync(imagePath), `${image.src} bestaat niet op schijf.`);
+    const dimensions = readJpegDimensions(imagePath);
+    assert.deepEqual(dimensions, { width: image.width, height: image.height }, image.src);
   }
 
   assert.ok(seenImages.size >= 6, 'Elke SEO-cluster moet een eigen herkenbare foto hebben.');
