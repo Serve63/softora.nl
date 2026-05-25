@@ -10,6 +10,7 @@ test('coldmailing exposes mail-interest follow-ups outside the coldcalling leads
 
   assert.match(routeSource, /app\.get\('\/api\/coldmailing\/replies\/follow-ups'/);
   assert.match(routeSource, /coldmailCampaignService\.listColdmailReplyFollowUps/);
+  assert.match(routeSource, /campaignType:\s*req\.query\.campaignType \|\| req\.query\.campaign \|\| req\.query\.source/);
   assert.doesNotMatch(leadsPageSource, /\/api\/coldmailing\/replies\/follow-ups/);
   assert.doesNotMatch(sidebarSource, /\/api\/coldmailing\/replies\/follow-ups/);
 });

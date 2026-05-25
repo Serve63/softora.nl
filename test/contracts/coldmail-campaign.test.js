@@ -396,6 +396,92 @@ test('webdesign outreach reply is marked action required without auto-interest s
   assert.equal(savedRows[0].replyMailboxId, 'inbox:7');
   assert.equal(savedRows[0].replyMailboxAccount, 'serve@softora.nl');
   assert.equal(savedRows[0].hist[0].type, 'reactie_ontvangen');
+
+  const { service: leadService } = createService({ rows: savedRows });
+  const leads = await leadService.listColdmailReplyFollowUps({ limit: 10, campaignType: 'webdesign' });
+  assert.equal(leads.total, 1);
+  assert.equal(leads.items[0].id, 'prospect-1');
+  assert.equal(leads.items[0].campaignType, 'webdesign');
+  assert.equal(leads.items[0].mailboxAccount, 'serve@softora.nl');
+});
+
+test('webdesign lead page uses AI intent to include positive mailbox replies', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-webdesign-ai@example.test>',
+    subject: 'Re: Nieuwe website',
+    text: 'Hoi Martijn, zullen we hier komende week even naar kijken?',
+    from: { value: [{ address: 'owner@example.test', name: 'Owner' }] },
+    to: { value: [{ address: 'martijn@softora.nl', name: 'Martijn van de Ven' }] },
+    cc: { value: [] },
+    references: '<sent-webdesign-ai@softora>',
+  };
+  let aiClassifyRequests = 0;
+  const { service, getSavedStates } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'martijn@softora.nl',
+    imapPass: 'secret',
+    openAiApiKey: 'openai-secret',
+    coldmailAutoReplyEnabled: true,
+    rows: [
+      {
+        id: 'webdesign-ai-lead',
+        bedrijf: 'Studio Groei',
+        naam: 'Owner',
+        email: 'owner@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        campaignType: 'webdesign',
+        outreachStatus: 'benaderd',
+        lastColdmailSentAt: '2026-04-24T12:00:00.000Z',
+        mail: true,
+        hist: [],
+      },
+    ],
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [9],
+      fetch: async function* () {
+        yield { uid: 9, source: 'raw-message', flags: new Set() };
+      },
+      messageFlagsAdd: async () => {},
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async (_url, request) => {
+      const body = JSON.parse(request.body);
+      if (/webdesign-outreachmail/.test(body.messages[0].content)) {
+        aiClassifyRequests += 1;
+        assert.match(body.messages[1].content, /komende week even naar kijken/);
+        return {
+          response: { ok: true, status: 200 },
+          data: {
+            choices: [{ message: { content: '{"intent":"interested"}' } }],
+          },
+        };
+      }
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          choices: [{ message: { content: 'Dank je, ik kom hier snel inhoudelijk op terug.' } }],
+        },
+      };
+    },
+  });
+
+  const sync = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+  const customerWrite = getSavedStates().find((item) => item.scope === 'premium_customers_database');
+  const savedRows = JSON.parse(customerWrite.values.softora_customers_premium_v1);
+  const { service: leadService } = createService({ rows: savedRows });
+  const leads = await leadService.listColdmailReplyFollowUps({ limit: 10, campaignType: 'webdesign' });
+
+  assert.equal(aiClassifyRequests, 1);
+  assert.equal(sync.lifecycleUpdated, 1);
+  assert.equal(leads.total, 1);
+  assert.equal(leads.items[0].id, 'webdesign-ai-lead');
+  assert.equal(leads.items[0].mailboxAccount, 'martijn@softora.nl');
+  assert.match(leads.items[0].preview, /komende week/);
 });
 
 test('webdesign outreach status action promotes lead and clears action required', async () => {
@@ -899,6 +985,83 @@ test('coldmail campaign lists interested mail replies without using the leads in
   assert.equal(result.items[0].status, 'interesse');
   assert.equal(result.items[0].messageKey, 'message:incoming-interest@example.test');
   assert.match(result.items[0].preview, /interessant/);
+});
+
+test('coldmail campaign lists only positive webdesign replies for tracked lead mailboxes', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'webdesign-serve',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        campaignType: 'webdesign',
+        outreachStatus: 'reactie_ontvangen',
+        replyMailboxAccount: 'serve@softora.nl',
+        coldmailReplyIntent: 'interested',
+        lastColdmailReplyAt: '2026-04-24T12:00:00.000Z',
+        lastColdmailReplyPreview: 'Kun je meer informatie sturen?',
+      },
+      {
+        id: 'webdesign-ruben',
+        bedrijf: 'Ruben Inbox BV',
+        email: 'ruben-inbox@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        campaignType: 'webdesign',
+        outreachStatus: 'reactie_ontvangen',
+        replyMailboxAccount: 'ruben@softora.nl',
+        coldmailReplyIntent: 'interested',
+        lastColdmailReplyAt: '2026-04-24T13:00:00.000Z',
+      },
+      {
+        id: 'webdesign-gmail',
+        bedrijf: 'Gmail Lead BV',
+        email: 'gmail-lead@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        campaignType: 'webdesign',
+        outreachStatus: 'reactie_ontvangen',
+        replyMailboxAccount: 'servec321@gmail.com',
+        coldmailReplyIntent: 'interested',
+        lastColdmailReplyAt: '2026-04-24T11:00:00.000Z',
+      },
+      {
+        id: 'webdesign-unclear',
+        bedrijf: 'Twijfel BV',
+        email: 'twijfel@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        campaignType: 'webdesign',
+        outreachStatus: 'reactie_ontvangen',
+        replyMailboxAccount: 'martijn@softora.nl',
+        coldmailReplyIntent: 'unclear',
+        lastColdmailReplyAt: '2026-04-24T14:00:00.000Z',
+      },
+      {
+        id: 'generic-interest',
+        bedrijf: 'Generic BV',
+        email: 'generic@example.test',
+        status: 'interesse',
+        databaseStatus: 'interesse',
+        coldmailReplyIntent: 'interested',
+        lastColdmailReplyAt: '2026-04-24T15:00:00.000Z',
+      },
+    ],
+  });
+
+  const result = await service.listColdmailReplyFollowUps({ limit: 10, campaignType: 'webdesign' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.total, 2);
+  assert.equal(result.items[0].id, 'webdesign-serve');
+  assert.equal(result.items[0].campaignType, 'webdesign');
+  assert.equal(result.items[0].mailboxAccount, 'serve@softora.nl');
+  assert.deepEqual(
+    result.items.map((item) => item.mailboxAccount).sort(),
+    ['serve@softora.nl', 'servec321@gmail.com']
+  );
 });
 
 test('coldmail auto-reply blocks opt-out replies without creating customer lifecycle data', async () => {

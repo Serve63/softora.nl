@@ -16,8 +16,11 @@ test('premium coldmailing lead page is its own page and uses only coldmailing fo
   assert.match(pageSource, /<h1>Lead<\/h1>/);
   assert.match(pageSource, /<div class="dashboard-layout" data-sidebar-shell="canonical">/);
   assert.match(pageSource, /<aside class="sidebar" data-sidebar-ready="false"/);
-  assert.match(pageSource, /assets\/premium-coldmailing-lead\.js\?v=20260525a/);
-  assert.match(scriptSource, /\/api\/coldmailing\/replies\/follow-ups\?limit=100/);
+  assert.match(pageSource, /Positieve reacties op webdesign-mails/);
+  assert.match(pageSource, /assets\/premium-coldmailing-lead\.js\?v=20260525b/);
+  assert.match(scriptSource, /\/api\/coldmailing\/replies\/follow-ups\?limit=100&campaignType=webdesign/);
+  assert.match(scriptSource, /Ontvangen op:/);
+  assert.match(scriptSource, /Webdesign-mail/);
   assert.match(scriptSource, /window\.__softoraColdmailingLeadPageCount/);
   assert.match(scriptSource, /<span class="lead-chip confirmed">Lead<\/span>/);
   assert.doesNotMatch(scriptSource, /\/api\/agenda\/confirmation-tasks/);

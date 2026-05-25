@@ -106,6 +106,7 @@ function registerColdmailingRoutes(app, deps = {}) {
       }
       const result = await coldmailCampaignService.listColdmailReplyFollowUps({
         limit: req.query.limit,
+        campaignType: req.query.campaignType || req.query.campaign || req.query.source,
       });
       res.json(result);
     } catch (error) {
