@@ -1779,6 +1779,45 @@ test('coldmail campaign keeps city variable to the place name when a place field
   assert.doesNotMatch(sentMessages[0].text, /\(NB\)/);
 });
 
+test('coldmail campaign removes Dutch province suffixes from city variables', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Jac Reijns Staalconstructie Alphen B.V.',
+        naam: 'Jac Reijns',
+        email: 'info@jreijns.nl',
+        stad: 'Looiersweg 7, 5131 BE Alphen (NBr.)',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'prospect-2',
+        bedrijf: 'Dutch Portugal Trading B.V.',
+        naam: 'Jan',
+        email: 'janmakker@dutchportugaltrading.nl',
+        plaats: 'Alphen NB',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 2,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}\n\n📍 {{stad}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: '',
+  });
+
+  assert.equal(result.sent, 2);
+  assert.match(sentMessages[0].text, /📍 Alphen/);
+  assert.match(sentMessages[1].text, /📍 Alphen/);
+  assert.doesNotMatch(sentMessages[0].text, /\(NBr\.\)|\bNBr\b|\bNB\b/);
+  assert.doesNotMatch(sentMessages[1].text, /\(NBr\.\)|\bNBr\b|\bNB\b/);
+});
+
 test('coldmail campaign replaces website variable from database website aliases', async () => {
   const { service, sentMessages } = createService({
     rows: [
@@ -4652,6 +4691,54 @@ test('coldmail campaign saves sent copies with the selected mailbox account imap
   assert.equal(imapConfigs[0].auth.pass, 'serve-imap-secret');
   assert.equal(appendedMessages.length, 1);
   assert.equal(appendedMessages[0].mailboxName, 'INBOX/Verzonden');
+});
+
+test('coldmail campaign does not append a duplicate sent copy for Gmail senders', async () => {
+  const appendedMessages = [];
+  const client = {
+    usable: true,
+    async connect() {},
+    async list() {
+      return [{ path: '[Gmail]/Sent Mail', specialUse: '\\Sent' }];
+    },
+    async append(mailboxName, raw, flags) {
+      appendedMessages.push({ mailboxName, raw, flags });
+      return { path: mailboxName };
+    },
+    async logout() {
+      this.usable = false;
+    },
+  };
+  const { service } = createService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'servec321@gmail.com',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.gmail.com',
+        smtpPort: 465,
+        smtpSecure: true,
+        smtpUser: 'servec321@gmail.com',
+        smtpPass: 'gmail-secret',
+        imapHost: 'imap.gmail.com',
+        imapPort: 993,
+        imapSecure: true,
+        imapUser: 'servec321@gmail.com',
+        imapPass: 'gmail-secret',
+      },
+    ]),
+    createImapClient: () => client,
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag {{naam}}',
+    senderEmail: 'servec321@gmail.com',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.sentItems[0].sentCopySaved, false);
+  assert.equal(appendedMessages.length, 0);
 });
 
 test('coldmail campaign refuses to send when SMTP is not configured', async () => {

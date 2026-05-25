@@ -854,9 +854,12 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function cleanPlaceLabel(value) {
+    const dutchProvinceSuffix =
+      '(?:N\\.?\\s?Br\\.?|N\\.?B\\.?|Noord[-\\s]?Brabant|Z\\.?H\\.?|Zuid[-\\s]?Holland|N\\.?H\\.?|Noord[-\\s]?Holland|Gld\\.?|Gelderland|Lb\\.?|Limburg|Ov\\.?|Overijssel|Dr\\.?|Drenthe|Fr\\.?|Friesland|Gr\\.?|Groningen|Fl\\.?|Flevoland|Ze\\.?|Zeeland|Ut\\.?|Utrecht)';
     return normalizeString(value)
       .replace(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b/g, '')
-      .replace(/\s*\([A-Z]{2,3}\)\s*$/i, '')
+      .replace(new RegExp(`\\s*\\(${dutchProvinceSuffix}\\)\\s*$`, 'i'), '')
+      .replace(new RegExp(`\\s+${dutchProvinceSuffix}\\s*$`, 'i'), '')
       .replace(/\b(Nederland|The Netherlands)\b/gi, '')
       .replace(/^[\s,.;-]+|[\s,.;-]+$/g, '')
       .replace(/\s+/g, ' ')
@@ -1444,6 +1447,10 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function saveSentCopy(senderEmail, mail, info, senderAccount = null) {
+    const senderDomain = normalizeEmailAddress(senderEmail).split('@').pop();
+    if (senderDomain === 'gmail.com' || senderDomain === 'googlemail.com') {
+      return false;
+    }
     return appendSentMessage({
       account: resolveSentCopyAccount(senderEmail, senderAccount),
       createImapClient,
