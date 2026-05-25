@@ -83,6 +83,8 @@ test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
     INSTANTLY_SYNC_BATCH_SIZE: '25',
     INSTANTLY_DAILY_CAP: '75',
     INSTANTLY_VERIFY_LEADS_ON_IMPORT: 'true',
+    INSTANTLY_REQUIRE_WEBDESIGN_ASSETS: 'true',
+    INSTANTLY_DEFAULT_SENDER_EMAIL: ' Serve@Softora.NL ',
   });
 
   assert.equal(runtimeEnv.instantly.enabled, true);
@@ -94,6 +96,8 @@ test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
   assert.equal(runtimeEnv.instantly.syncBatchSize, 25);
   assert.equal(runtimeEnv.instantly.dailyCap, 75);
   assert.equal(runtimeEnv.instantly.verifyLeadsOnImport, true);
+  assert.equal(runtimeEnv.instantly.requireWebdesignAssets, true);
+  assert.equal(runtimeEnv.instantly.defaultSenderEmail, 'serve@softora.nl');
 });
 
 test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () => {

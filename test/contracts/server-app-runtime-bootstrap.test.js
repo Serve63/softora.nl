@@ -114,6 +114,8 @@ test('server app runtime bootstrap flattens env config without changing values',
       syncBatchSize: 20,
       dailyCap: 50,
       verifyLeadsOnImport: true,
+      requireWebdesignAssets: true,
+      defaultSenderEmail: 'serve@softora.nl',
     },
     securityContactEmail: 'security@test.invalid',
     demoConfirmationTaskEnabled: true,
@@ -142,6 +144,8 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.INSTANTLY_SYNC_BATCH_SIZE, 20);
   assert.equal(envConfig.INSTANTLY_DAILY_CAP, 50);
   assert.equal(envConfig.INSTANTLY_VERIFY_LEADS_ON_IMPORT, true);
+  assert.equal(envConfig.INSTANTLY_REQUIRE_WEBDESIGN_ASSETS, true);
+  assert.equal(envConfig.INSTANTLY_DEFAULT_SENDER_EMAIL, 'serve@softora.nl');
   assert.equal(envConfig.MAIL_IMAP_MAILBOX, 'INBOX');
   assert.equal(envConfig.SECURITY_CONTACT_EMAIL, 'security@test.invalid');
 });

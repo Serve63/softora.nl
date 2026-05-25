@@ -157,6 +157,10 @@ services:
         value: 25
       - key: INSTANTLY_VERIFY_LEADS_ON_IMPORT
         value: false
+      - key: INSTANTLY_REQUIRE_WEBDESIGN_ASSETS
+        value: true
+      - key: INSTANTLY_DEFAULT_SENDER_EMAIL
+        value: serve@softora.nl
       - key: GOOGLE_CALENDAR_SYNC_ENABLED
         value: false
       - key: GOOGLE_CALENDAR_CLIENT_EMAIL

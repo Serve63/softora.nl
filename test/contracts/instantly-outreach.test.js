@@ -3,6 +3,9 @@ const assert = require('node:assert/strict');
 
 const { createInstantlyOutreachService } = require('../../server/services/instantly-outreach');
 
+const TINY_PNG_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+
 function createRequest({ body = {}, secret = 'webhook-secret' } = {}) {
   return {
     body,
@@ -27,6 +30,26 @@ function createService(overrides = {}) {
       mail: true,
     },
   ];
+  const photoMap = overrides.photoMap || {
+    'prospect-1': {
+      id: 'prospect-1',
+      websitePhoto: TINY_PNG_DATA_URL,
+      websiteMockup: TINY_PNG_DATA_URL,
+      websitePhotoName: 'Bakkerij Zon webdesign',
+      websiteMockupName: 'Bakkerij Zon device mockup',
+    },
+  };
+  const coldmailingSettings = overrides.coldmailingSettings || {
+    senderEmail: 'serve@softora.nl',
+    senders: {
+      'serve@softora.nl': {
+        subject: 'Nieuw webdesign gemaakt!',
+        body:
+          'Goedemorgen {{naam}}\n\nIk ben benieuwd wat je ervan vindt.\n\nMet vriendelijke groeten:\nServé Creusen\n\n📍 {{stad}}\n\n0629917185',
+      },
+    },
+  };
+  const autopilotState = overrides.autopilotState || {};
   const fetchCalls = [];
   const writes = [];
   const service = createInstantlyOutreachService({
@@ -45,12 +68,42 @@ function createService(overrides = {}) {
         overrides.blockPersonalMailboxDomains === undefined
           ? true
           : overrides.blockPersonalMailboxDomains,
+      requireWebdesignAssets:
+        overrides.requireWebdesignAssets === undefined
+          ? true
+          : overrides.requireWebdesignAssets,
+      publicBaseUrl: 'https://www.softora.nl',
+      coldmailLinkSecret: 'unsubscribe-secret',
+      defaultSenderEmail: 'serve@softora.nl',
     },
-    getUiStateValues: async () => ({
-      values: {
-        softora_customers_premium_v1: JSON.stringify(rows),
-      },
-    }),
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_database_photos') {
+        return {
+          values: {
+            softora_database_photos_v1: JSON.stringify(photoMap),
+          },
+        };
+      }
+      if (scope === 'premium_coldmailing_settings') {
+        return {
+          values: {
+            softora_coldmailing_settings_v1: JSON.stringify(coldmailingSettings),
+          },
+        };
+      }
+      if (scope === 'premium_coldmail_autopilot') {
+        return {
+          values: {
+            softora_coldmail_autopilot_v1: JSON.stringify(autopilotState),
+          },
+        };
+      }
+      return {
+        values: {
+          softora_customers_premium_v1: JSON.stringify(rows),
+        },
+      };
+    },
     setUiStateValues: async (scope, values, meta) => {
       writes.push({ scope, values, meta });
       rows = JSON.parse(values.softora_customers_premium_v1);
@@ -125,6 +178,15 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(body.leads.length, 1);
   assert.equal(body.leads[0].email, 'ruben@example.test');
   assert.equal(body.leads[0].custom_variables.softora_customer_id, 'prospect-1');
+  assert.equal(body.leads[0].custom_variables.softora_subject, 'Nieuw webdesign gemaakt!');
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Goedemorgen Ruben Bakker/);
+  assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
+  assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
+  assert.match(body.leads[0].custom_variables.softora_webdesign_image_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assert.match(body.leads[0].custom_variables.softora_webdesign_mockup_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_ready, 'true');
+  assert.equal(body.leads[0].personalization, body.leads[0].custom_variables.softora_instantly_email_body);
 
   assert.equal(writes.length, 1);
   const rows = getRows();
@@ -133,6 +195,46 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(rows[0].lastColdmailProvider, 'instantly');
   assert.equal(rows[0].databaseStatus, undefined);
   assert.equal(rows[0].status, 'prospect');
+});
+
+test('instantly sync skips webdesign leads without ready image assets', async () => {
+  const { service, fetchCalls } = createService({
+    photoMap: {},
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_eligible_leads');
+  assert.equal(result.failed.length, 1);
+  assert.match(result.failed[0].error, /Nog geen website-design klaar voor Instantly/);
+  assert.equal(fetchCalls.length, 0);
+});
+
+test('instantly sync uses the active coldmail autopilot profile before fallback settings', async () => {
+  const { service, fetchCalls } = createService({
+    autopilotState: {
+      enabled: true,
+      config: {
+        senderEmail: 'serve@softora.nl',
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Autopilot webdesign voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}},\n\nDeze tekst draait nu via autopilot in {{stad}}.',
+          },
+        },
+      },
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.leads[0].custom_variables.softora_subject, 'Autopilot webdesign voor Bakkerij Zon');
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Deze tekst draait nu via autopilot/);
 });
 
 test('instantly sync respects the daily cap from existing synced rows', async () => {

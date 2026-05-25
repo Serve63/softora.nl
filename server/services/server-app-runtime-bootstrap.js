@@ -104,6 +104,8 @@ function buildServerAppEnvConfig(runtimeEnv) {
     INSTANTLY_SYNC_BATCH_SIZE: instantly.syncBatchSize || 10,
     INSTANTLY_DAILY_CAP: instantly.dailyCap || 25,
     INSTANTLY_VERIFY_LEADS_ON_IMPORT: Boolean(instantly.verifyLeadsOnImport),
+    INSTANTLY_REQUIRE_WEBDESIGN_ASSETS: instantly.requireWebdesignAssets !== false,
+    INSTANTLY_DEFAULT_SENDER_EMAIL: instantly.defaultSenderEmail || 'serve@softora.nl',
     GOOGLE_CALENDAR_SYNC_ENABLED: Boolean(googleCalendar.enabled),
     GOOGLE_CALENDAR_CLIENT_EMAIL: googleCalendar.clientEmail || '',
     GOOGLE_CALENDAR_PRIVATE_KEY: googleCalendar.privateKey || '',

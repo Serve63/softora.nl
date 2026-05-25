@@ -6,6 +6,10 @@ function normalizeLoginEmailValue(value) {
   return normalizeString(value).toLowerCase();
 }
 
+function normalizeEmailAddress(value) {
+  return normalizeString(value).toLowerCase();
+}
+
 function readBooleanEnvFlag(value, defaultValue = false) {
   const normalized = normalizeString(value);
   if (!normalized) return Boolean(defaultValue);
@@ -336,6 +340,13 @@ function loadRuntimeEnv(env = process.env) {
         1000
       ),
       verifyLeadsOnImport: readBooleanEnvFlag(safeEnv.INSTANTLY_VERIFY_LEADS_ON_IMPORT),
+      requireWebdesignAssets: readNegatedBooleanEnvFlag(
+        safeEnv.INSTANTLY_REQUIRE_WEBDESIGN_ASSETS,
+        true
+      ),
+      defaultSenderEmail: normalizeEmailAddress(
+        safeEnv.INSTANTLY_DEFAULT_SENDER_EMAIL || 'serve@softora.nl'
+      ),
     },
     googleCalendar: {
       enabled: readBooleanEnvFlag(safeEnv.GOOGLE_CALENDAR_SYNC_ENABLED),
