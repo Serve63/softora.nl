@@ -158,6 +158,17 @@ const EXCLUDED_DATABASE_STATUSES = new Set([
   'geblokkeerd',
   'buiten',
 ]);
+const ACTIVE_INSTANTLY_COLDMAIL_STATUSES = new Set([
+  'queued',
+  'synced',
+  'sent',
+  'opened',
+  'reply_received',
+  'replied',
+  'interested',
+  'completed',
+]);
+const BLOCKING_INSTANTLY_COLDMAIL_STATUSES = new Set(['bounced', 'unsubscribed', 'blocked']);
 
 function isExpectedDnsMiss(error) {
   return Boolean(
@@ -3232,12 +3243,39 @@ function createColdmailCampaignService(deps = {}) {
     return distanceKm <= radius;
   }
 
+  function normalizeInstantlyColdmailStatus(value) {
+    const normalized = normalizeString(value)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (normalized === 'email_sent') return 'sent';
+    if (normalized === 'email_opened') return 'opened';
+    if (normalized === 'email_bounced') return 'bounced';
+    if (normalized === 'lead_unsubscribed') return 'unsubscribed';
+    if (normalized === 'lead_interested') return 'interested';
+    if (normalized === 'email_replied') return 'reply_received';
+    return normalized;
+  }
+
+  function hasActiveInstantlyColdmailOutreach(row) {
+    const status = normalizeInstantlyColdmailStatus(row && row.instantlyStatus);
+    if (BLOCKING_INSTANTLY_COLDMAIL_STATUSES.has(status)) return false;
+    if (ACTIVE_INSTANTLY_COLDMAIL_STATUSES.has(status)) return true;
+    return Boolean(
+      row &&
+        (row.instantlySyncedAt ||
+          row.instantlyCampaignId ||
+          normalizeString(row.lastColdmailProvider).toLowerCase() === 'instantly')
+    );
+  }
+
   function isEligibleColdmailRow(row, branchFilter, radiusKm, blockedEmailKeys) {
     if (isDedicatedTestModeRow(row)) return false;
     const email = getRowEmail(row);
     if (!isLikelyValidEmail(email)) return false;
     if (isEmailBlocked(email, blockedEmailKeys)) return false;
     if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
+    if (hasActiveInstantlyColdmailOutreach(row)) return false;
     if (!matchesBranch(row, branchFilter)) return false;
     if (!matchesRadius(row, radiusKm)) return false;
     if (isTestRecipientRow(row, email)) return true;

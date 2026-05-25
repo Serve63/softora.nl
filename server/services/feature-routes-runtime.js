@@ -3,6 +3,7 @@ const {
   registerColdcallingWebhookRoutes,
 } = require('../routes/coldcalling');
 const { registerColdmailingRoutes } = require('../routes/coldmailing');
+const { registerInstantlyRoutes } = require('../routes/instantly');
 const { registerAiDashboardRoutes } = require('../routes/ai-dashboard');
 const { registerAiToolRoutes } = require('../routes/ai-tools');
 const { registerWebsiteLinkRoutes } = require('../routes/website-links');
@@ -34,6 +35,7 @@ function registerFeatureRoutes(app, deps = {}) {
     premiumRouteRuntime,
     coldcalling,
     coldmailing,
+    instantly,
     aiDashboardCoordinator,
     aiToolsCoordinator,
     websiteLinkCoordinator,
@@ -77,6 +79,10 @@ function registerFeatureRoutes(app, deps = {}) {
   registerColdmailingRoutes(app, {
     ...coldmailing,
     requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
+  });
+  registerInstantlyRoutes(app, {
+    ...instantly,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerAiDashboardRoutes(app, { coordinator: aiDashboardCoordinator });

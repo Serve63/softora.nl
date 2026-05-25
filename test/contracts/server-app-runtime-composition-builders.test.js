@@ -102,6 +102,7 @@ test('server app runtime composition builders preserve feature wiring groups and
       SUPABASE_MONTHLY_BASE_COST_EUR: '25',
       CRON_SECRET: 'cron-secret',
       MAILBOX_ACCOUNTS: JSON.stringify([{ email: 'servec321@gmail.com' }]),
+      VERCEL: '1',
     },
     envConfig: {
       ACTIVE_ORDER_AUTOMATION_ENABLED: true,
@@ -137,6 +138,15 @@ test('server app runtime composition builders preserve feature wiring groups and
       MAIL_FROM_ADDRESS: 'info@softora.test',
       MAIL_FROM_NAME: 'Softora',
       MAIL_REPLY_TO: 'reply@softora.test',
+      INSTANTLY_ENABLED: true,
+      INSTANTLY_API_KEY: 'instantly-key',
+      INSTANTLY_API_BASE_URL: 'https://api.instantly.test/api/v2',
+      INSTANTLY_DEFAULT_CAMPAIGN_ID: 'campaign-1',
+      INSTANTLY_WEBHOOK_SECRET: 'webhook-secret',
+      INSTANTLY_SYNC_INTERVAL_MINUTES: 15,
+      INSTANTLY_SYNC_BATCH_SIZE: 10,
+      INSTANTLY_DAILY_CAP: 25,
+      INSTANTLY_VERIFY_LEADS_ON_IMPORT: false,
     },
     bootstrapState: {
       PREMIUM_ACTIVE_ORDERS_SCOPE: 'premium_active_orders',
@@ -388,6 +398,8 @@ test('server app runtime composition builders preserve feature wiring groups and
       .includes('servec321@gmail.com')
   );
   assert.equal(context.featureRouteOptions.coldmailing.cronSecret, 'cron-secret');
+  assert.equal(context.featureRouteOptions.instantly.instantlyOutreachService.isConfigured(), true);
+  assert.equal(typeof context.featureRouteOptions.instantly.instantlyOutreachService.getStatus, 'function');
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
     'info@softora.test',
     'servec321@gmail.com',

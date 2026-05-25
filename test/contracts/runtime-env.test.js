@@ -72,6 +72,30 @@ test('loadRuntimeEnv supports a separate coldmail tracking secret', () => {
   assert.equal(runtimeEnv.mail.coldmailTrackingSecret, 'tracking-secret');
 });
 
+test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
+  const runtimeEnv = loadRuntimeEnv({
+    INSTANTLY_ENABLED: 'true',
+    INSTANTLY_API_KEY: ' instantly-key ',
+    INSTANTLY_API_BASE_URL: ' https://api.instantly.test/api/v2 ',
+    INSTANTLY_DEFAULT_CAMPAIGN_ID: ' campaign-1 ',
+    INSTANTLY_WEBHOOK_SECRET: ' webhook-secret ',
+    INSTANTLY_SYNC_INTERVAL_MINUTES: '30',
+    INSTANTLY_SYNC_BATCH_SIZE: '25',
+    INSTANTLY_DAILY_CAP: '75',
+    INSTANTLY_VERIFY_LEADS_ON_IMPORT: 'true',
+  });
+
+  assert.equal(runtimeEnv.instantly.enabled, true);
+  assert.equal(runtimeEnv.instantly.apiKey, 'instantly-key');
+  assert.equal(runtimeEnv.instantly.apiBaseUrl, 'https://api.instantly.test/api/v2');
+  assert.equal(runtimeEnv.instantly.defaultCampaignId, 'campaign-1');
+  assert.equal(runtimeEnv.instantly.webhookSecret, 'webhook-secret');
+  assert.equal(runtimeEnv.instantly.syncIntervalMinutes, 30);
+  assert.equal(runtimeEnv.instantly.syncBatchSize, 25);
+  assert.equal(runtimeEnv.instantly.dailyCap, 75);
+  assert.equal(runtimeEnv.instantly.verifyLeadsOnImport, true);
+});
+
 test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () => {
   const fallbackRuntimeEnv = loadRuntimeEnv({
     PREMIUM_SETTINGS_CONFIRM_PIN: ' 123456 ',
