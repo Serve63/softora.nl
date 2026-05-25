@@ -157,7 +157,7 @@ const MAILBOX_TRACKING_HOST_PATTERNS = [
 ];
 const MAILBOX_IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
 const MAILBOX_COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
-const MAILBOX_WEBDESIGN_MOCKUP_CAPTION = 'Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop👇';
+const MAILBOX_WEBDESIGN_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const MAILBOX_REPLY_HEADER_PATTERNS = [
   /^op .+\bschreef\b[:\s]*$/i,
   /^on .+\bwrote\b[:\s]*$/i,
