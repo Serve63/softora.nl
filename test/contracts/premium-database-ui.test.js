@@ -186,7 +186,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260522b/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return state\.activeStatus === "benaderd"\s*\?\s*outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\)\s*:\s*sortCustomers\(customers\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(state\.klanten\.concat\(\[customer\]\)\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(mergeResult\.customers\);/);
   assert.match(pageSource, /const normalizedCustomers = sortCustomers\(customers\)\.filter/);
@@ -482,7 +482,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260521a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260525a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
@@ -1191,11 +1191,17 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(9\), table\.outreach-action-mode tbody td:nth-child\(9\) \{ display: none; \}/);
   assert.match(pageSource, /document\.getElementById\("databaseTable"\)\.classList\.toggle\("outreach-action-mode", showOutreachActionColumn\); document\.getElementById\("statusHeader"\)\.hidden = showOutreachActionColumn/);
   assert.match(pageSource, /renderUsedChannelTags\(customer\),\s*"\<\/div\>\<\/td\>",\s*"\<td\>\<div class=\\"s-wrap/);
-  assert.match(pageSource, /showOutreachActionColumn && outreachController\.isWebdesignOutreachCustomer\(customer\) \? outreachController\.renderActions\(customer\)/);
+  assert.match(pageSource, /outreachController\.renderMeta\(customer, showOutreachActionColumn && outreachController\.isTrackedOutreachCustomer\(customer\)\)/);
+  assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderActions\(customer\)/);
   assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
+  assert.match(pageSource, /state\.activeStatus === "benaderd"\s*\?\s*outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\)\s*:\s*sortCustomers\(customers\);/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 25%; text-align: center; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(10\), table\.outreach-action-mode tbody td:nth-child\(10\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
   assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto/);
+  assert.match(webdesignActionSource, /function isTrackedOutreachCustomer\(customer\)/);
+  assert.match(webdesignActionSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) === "gemaild"/);
+  assert.match(webdesignActionSource, /function sortByRecentOutreach\(customers, parseValue, normalizeValue\)/);
+  assert.match(webdesignActionSource, /return right - left;/);
   assert.match(webdesignActionSource, /function renderDaysSinceSent\(customer\)/);
   assert.match(webdesignActionSource, /\.outreach-days\{display:inline-flex;align-items:center;justify-content:center;min-width:24px/);
   assert.match(webdesignActionSource, /\.outreach-action\{box-sizing:border-box;min-width:0;min-height:34px/);
@@ -1268,6 +1274,23 @@ test('premium database outreach days column keeps benaderd rows after 25 days', 
     outreachStatus: 'benaderd',
     outreachSentAt: yesterdayLate,
   }), />1<\/span>/);
+  const legacyColdmailCustomer = {
+    id: 'customer-legacy',
+    status: 'gemaild',
+    updatedAt: yesterdayLate,
+  };
+
+  assert.match(controller.renderMeta(legacyColdmailCustomer, true), /Verstuurd vanaf onbekend mailadres/);
+  assert.match(controller.renderDaysSinceSent(legacyColdmailCustomer), />1<\/span>/);
+  assert.match(controller.renderActions(legacyColdmailCustomer), /Mail bekijken/);
+  assert.deepEqual(
+    controller.sortByRecentOutreach([
+      { id: 'older', bedrijf: 'B bedrijf', status: 'gemaild', updatedAt: '2026-05-20T10:00:00.000Z' },
+      { id: 'newer', bedrijf: 'Z bedrijf', status: 'gemaild', updatedAt: '2026-05-22T10:00:00.000Z' },
+      { id: 'same-day-alpha', bedrijf: 'A bedrijf', status: 'gemaild', updatedAt: '2026-05-22T10:00:00.000Z' },
+    ], (value) => new Date(value).getTime(), (value) => String(value || '').toLowerCase()).map((item) => item.id),
+    ['same-day-alpha', 'newer', 'older']
+  );
   const automated = controller.applyAutomation([customer]);
   assert.equal(automated.changed, false);
   assert.equal(automated.customers[0].outreachStatus, 'benaderd');
@@ -2472,7 +2495,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260522b/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return state\.activeStatus === "benaderd"\s*\?\s*outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\)\s*:\s*sortCustomers\(customers\);/);
   assert.match(sorterSource, /const OISTERWIJK_COORDS = \{ lat: 51\.5792, lng: 5\.1889 \};/);
   assert.match(sorterSource, /function resolveCustomerCoords\(customer\)/);
   assert.match(sorterSource, /function getDistanceKm\(customer\)/);
