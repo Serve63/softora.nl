@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/softora-favicon-round.png?v=20260513a">
+  <link rel="stylesheet" href="/assets/iphone-optimizations.css">
+  <title>Softora | Coldmailing Lead - Premium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
+  <script>
+    (function () {
+      document.documentElement.setAttribute("data-personnel-loading", "true");
+      document.documentElement.setAttribute("data-theme-mode", "light");
+      document.documentElement.setAttribute("data-theme", "light");
+    })();
+  </script>
+  <script src="assets/personnel-theme.js?v=20260519b" defer></script>
+  <script src="assets/premium-coldmailing-lead.js?v=20260525b" defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-primary: #080808;
+      --bg-secondary: #0d0d0d;
+      --bg-tertiary: #111;
+      --accent: #8b2252;
+      --accent-light: #a62d65;
+      --lead-business: #3b82f6;
+      --lead-chatbot: #f39c12;
+      --text-primary: #f5f5f5;
+      --text-secondary: #888;
+      --text-tertiary: #555;
+      --border: rgba(255, 255, 255, 0.06);
+      --green: #2ecc71;
+    }
+
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.6;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .dashboard-layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .main-content {
+      width: calc(100% - 280px);
+      margin-left: 280px;
+      padding: 2.5rem 3rem;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.6rem;
+    }
+
+    .topbar h1 {
+      margin-bottom: 0.32rem;
+      font-size: 2rem;
+    }
+
+    .topbar p {
+      color: var(--text-tertiary);
+      font-size: 0.9rem;
+      font-weight: 300;
+    }
+
+    .topbar-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    .lead-type-legend {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      max-width: 44rem;
+      color: var(--text-tertiary);
+      font-size: 0.74rem;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      white-space: nowrap;
+    }
+
+    .legend-swatch {
+      width: 0.58rem;
+      height: 0.58rem;
+      border-radius: 999px;
+      background: var(--accent-light);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    .legend-item.business .legend-swatch {
+      background: var(--lead-business);
+    }
+
+    .legend-item.voice .legend-swatch {
+      background: var(--green);
+    }
+
+    .legend-item.chatbot .legend-swatch {
+      background: var(--lead-chatbot);
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-secondary);
+      overflow: hidden;
+    }
+
+    .lead-status {
+      min-height: 2.2rem;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-tertiary);
+      font-size: 0.82rem;
+    }
+
+    .lead-status.error {
+      color: #f06b82;
+    }
+
+    .lead-list {
+      display: grid;
+      gap: 0.8rem;
+      padding: 1rem;
+    }
+
+    .lead-item {
+      --lead-border-color: rgba(139, 34, 82, 0.42);
+      --lead-shadow-color: rgba(139, 34, 82, 0.2);
+      --lead-chip-color: var(--accent-light);
+      --lead-chip-border-color: rgba(139, 34, 82, 0.55);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      border: 1px solid var(--lead-border-color);
+      border-radius: 10px;
+      background: var(--bg-tertiary);
+      padding: 1rem;
+      box-shadow: 0 0 0 1px transparent;
+    }
+
+    .lead-item.type-bedrijfssoftware {
+      --lead-border-color: rgba(59, 130, 246, 0.48);
+      --lead-shadow-color: rgba(59, 130, 246, 0.22);
+      --lead-chip-color: var(--lead-business);
+      --lead-chip-border-color: rgba(59, 130, 246, 0.58);
+    }
+
+    .lead-item.type-voice-software {
+      --lead-border-color: rgba(46, 204, 113, 0.48);
+      --lead-shadow-color: rgba(46, 204, 113, 0.24);
+      --lead-chip-color: var(--green);
+      --lead-chip-border-color: rgba(46, 204, 113, 0.56);
+    }
+
+    .lead-item.type-chatbot {
+      --lead-border-color: rgba(243, 156, 18, 0.55);
+      --lead-shadow-color: rgba(243, 156, 18, 0.22);
+      --lead-chip-color: var(--lead-chatbot);
+      --lead-chip-border-color: rgba(243, 156, 18, 0.62);
+    }
+
+    .lead-name {
+      margin-bottom: 0.35rem;
+      color: var(--text-primary);
+      font-family: 'Oswald', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .lead-meta {
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .lead-meta-label {
+      color: var(--text-tertiary);
+    }
+
+    .lead-chip {
+      flex: 0 0 auto;
+      align-self: flex-start;
+      border: 1px solid var(--lead-chip-border-color);
+      border-radius: 999px;
+      padding: 0.3rem 0.58rem;
+      color: var(--lead-chip-color);
+      font-family: 'Oswald', sans-serif;
+      font-size: 0.67rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .lead-chip.confirmed {
+      border-color: rgba(46, 204, 113, 0.55);
+      color: var(--green);
+    }
+
+    .lead-empty {
+      padding: 2.4rem 1rem;
+      color: var(--text-tertiary);
+      text-align: center;
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 900px) {
+      .sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+      }
+
+      .main-content {
+        width: 100%;
+        margin-left: 0;
+        padding: 1.3rem;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .topbar-actions {
+        justify-content: flex-start;
+      }
+
+      .lead-item {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout" data-sidebar-shell="canonical">
+    <aside class="sidebar" data-sidebar-ready="false" aria-label="Premium navigatie"></aside>
+
+    <main class="main-content">
+      <div class="topbar">
+        <div>
+          <h1>Lead</h1>
+          <p>Positieve reacties op webdesign-mails</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="lead-type-legend" role="note" aria-label="Legenda voor randkleur leadtypes">
+            <span class="legend-item website"><span class="legend-swatch" aria-hidden="true"></span>Website</span>
+            <span class="legend-item business"><span class="legend-swatch" aria-hidden="true"></span>Bedrijfssoftware</span>
+            <span class="legend-item voice"><span class="legend-swatch" aria-hidden="true"></span>Voicesoftware</span>
+            <span class="legend-item chatbot"><span class="legend-swatch" aria-hidden="true"></span>Chatbots</span>
+          </div>
+        </div>
+      </div>
+
+      <section class="panel" aria-live="polite">
+        <div class="lead-status" id="coldmailingLeadStatus">Leads laden...</div>
+        <div class="lead-list" id="coldmailingLeadList">
+          <div class="lead-empty">Leads laden...</div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

@@ -517,6 +517,7 @@
         if (p.indexOf("/premium-personeel-agenda") === 0) return "agenda";
         if (isLeadsPagePath(p)) return "leads";
         if (p.indexOf("/premium-ai-lead-generator") === 0) return "coldcalling";
+        if (p.indexOf("/premium-coldmailing-lead") === 0) return "coldmailing_lead";
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
         if (p.indexOf("/premium-database") === 0) return "database";
@@ -557,7 +558,6 @@
         const comingSoonAttrs = isComingSoon ? ' aria-disabled="true" tabindex="-1"' : "";
         return `<a href="${link.href}" class="${classes}" data-sidebar-key="${link.key}"${comingSoonAttrs}>${iconHtml}${labelHtml}${countBadgeHtml}</a>`;
     }
-
     function getCustomersSidebarLink() {
         return {
             key: "customers",
@@ -566,7 +566,6 @@
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>',
         };
     }
-
     function getWebsitePreviewSidebarLink() {
         return {
             key: "websitegenerator",
@@ -575,7 +574,6 @@
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg>',
         };
     }
-
     function getDatabaseSidebarLink() {
         return {
             key: "database",
@@ -584,7 +582,7 @@
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5.25" rx="6.75" ry="2.25"></ellipse><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.25v6c0 1.243 3.022 2.25 6.75 2.25s6.75-1.007 6.75-2.25v-6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 11.25v6c0 1.243 3.022 2.25 6.75 2.25s6.75-1.007 6.75-2.25v-6"></path></svg>',
         };
     }
-
+    function getColdmailingLeadSidebarLink() { return { key: "coldmailing_lead", href: "/premium-coldmailing-lead", label: "Lead", icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>' }; }
     /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
         "leads", "coldcalling", "qr_code",
@@ -798,6 +796,7 @@
                 label: "Coldcalling",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg>',
             },
+            getColdmailingLeadSidebarLink(),
             {
                 key: "coldmailing",
                 href: "/premium-bevestigingsmails",
@@ -1145,6 +1144,7 @@
 
     function stabilizePremiumStaticSidebar(sidebar, activeKey) {
         if (!sidebar) return;
+        const coldmailingLeadLink = ensureStaticSidebarLink(sidebar, "overzicht", getColdmailingLeadSidebarLink(), ["coldmailing", "database"]); if (coldmailingLeadLink) resetStaticSidebarLink(coldmailingLeadLink, getColdmailingLeadSidebarLink());
         syncStaticSidebarActiveState(sidebar, activeKey);
         decorateComingSoonSidebarLinks();
         neutralizeSidebarAnchors();
