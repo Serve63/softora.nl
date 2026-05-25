@@ -915,6 +915,96 @@ test('coldmail autopilot staggers senders by choosing the mailbox whose cooldown
   assert.equal(sentMessages[0].from, 'Servé Creusen <serve@softora.nl>');
 });
 
+test('coldmail autopilot skips only the mailbox with an active safety pause', async () => {
+  const { service, sentMessages, getSendGuardState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+      {
+        email: 'servec321@gmail.com',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.gmail.com',
+        smtpPort: 465,
+        smtpSecure: true,
+        smtpUser: 'servec321@gmail.com',
+        smtpPass: 'gmail-secret',
+      },
+    ]),
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-04-24T11:55:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 0,
+          personalCount: 0,
+          safetyPauseUntil: '2026-04-24T13:00:00.000Z',
+          safetyPauseReason: '550 5.7.1 Refused by local policy. No SPAM please!',
+        },
+      ],
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl', 'servec321@gmail.com'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+          'servec321@gmail.com': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 9,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        senderMinIntervalMinutes: 60,
+        senderMaxIntervalMinutes: 75,
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'sent');
+  assert.equal(result.senderEmail, 'servec321@gmail.com');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].from, 'Servé Creusen <servec321@gmail.com>');
+  assert.equal(
+    getSendGuardState().entries.some((entry) => entry.senderEmail === 'servec321@gmail.com' && entry.count === 1),
+    true
+  );
+});
+
 test('coldmail autopilot only uses explicitly configured sender emails', async () => {
   const { service, sentMessages } = createService({
     rows: [
