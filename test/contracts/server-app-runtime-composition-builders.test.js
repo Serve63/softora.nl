@@ -72,7 +72,16 @@ test('server app feature wiring writes data-ops scopes through the bridge first'
   assert.deepEqual(calls.map((call) => call.target), ['bridge', 'legacy']);
 });
 
-test('server app runtime composition builders preserve feature wiring groups and warmup callbacks', async () => {
+test('server app runtime composition builders preserve feature wiring groups and warmup callbacks', async (t) => {
+  const oldEnv = { ...process.env };
+  t.after(() => {
+    process.env = oldEnv;
+  });
+  process.env.MAILBOX_SERVEC321_GMAIL_COM_PASS = 'gmail-app-password';
+  process.env.MAILBOX_SERVEC321_GMAIL_COM_SMTP_HOST = 'smtp.gmail.com';
+  process.env.MAILBOX_SERVEC321_GMAIL_COM_SMTP_PORT = '465';
+  process.env.MAILBOX_SERVEC321_GMAIL_COM_SMTP_SECURE = 'true';
+  process.env.MAILBOX_SERVEC321_GMAIL_COM_SMTP_USER = 'servec321@gmail.com';
   let hydratedAttempts = 0;
   let backfillCalls = 0;
   const bridgeReads = [];
@@ -92,6 +101,7 @@ test('server app runtime composition builders preserve feature wiring groups and
       SUPABASE_PROJECT_REF: 'softora-ref',
       SUPABASE_MONTHLY_BASE_COST_EUR: '25',
       CRON_SECRET: 'cron-secret',
+      MAILBOX_ACCOUNTS: JSON.stringify([{ email: 'servec321@gmail.com' }]),
     },
     envConfig: {
       ACTIVE_ORDER_AUTOMATION_ENABLED: true,
@@ -372,15 +382,20 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(context.featureRouteOptions.supabaseCostSummary.supabaseProjectRef, 'softora-ref');
   assert.equal(context.featureRouteOptions.supabaseCostSummary.supabaseMonthlyBaseCostEur, 25);
   assert.equal(context.featureRouteOptions.coldmailing.coldmailCampaignService.isSmtpMailConfigured(), true);
+  assert.ok(
+    context.featureRouteOptions.coldmailing.coldmailCampaignService
+      .getConfiguredSenderEmails()
+      .includes('servec321@gmail.com')
+  );
   assert.equal(context.featureRouteOptions.coldmailing.cronSecret, 'cron-secret');
   assert.deepEqual(context.featureRouteOptions.coldmailing.coldmailCampaignService.getAllowedSenderEmails(), [
     'info@softora.test',
+    'servec321@gmail.com',
     'info@softora.nl',
     'zakelijk@softora.nl',
     'ruben@softora.nl',
     'serve@softora.nl',
     'martijn@softora.nl',
-    'servec321@gmail.com',
   ]);
   const testRecipients =
     await context.featureRouteOptions.coldmailing.coldmailCampaignService.getColdmailCampaignRecipients({
