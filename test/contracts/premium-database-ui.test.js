@@ -358,7 +358,7 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260521a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260525a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429c/);
@@ -719,12 +719,18 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "reactie_ontvangen"/);
   assert.match(pageSource, /Reactie ontvangen/);
-  assert.match(pageSource, /showOutreachActionColumn && outreachController\.isWebdesignOutreachCustomer\(customer\) \? outreachController\.renderActions\(customer\)/);
+  assert.match(pageSource, /outreachController\.renderMeta\(customer, showOutreachActionColumn && outreachController\.isTrackedOutreachCustomer\(customer\)\)/);
+  assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderActions\(customer\)/);
   assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""/);
+  assert.match(pageSource, /state\.activeStatus === "benaderd" \? outreachController\.sortByRecentOutreach\(sorted, parseDateValue, normalizeSearchValue\) : sortCustomers\(sorted\)/);
   assert.match(webdesignActionSource, /data-outreach-status=\\"klant_geworden\\"/);
   assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\"afgehaakt\\"/);
   assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
   assert.match(webdesignActionSource, /Mail bekijken/);
+  assert.match(webdesignActionSource, /function isTrackedOutreachCustomer\(customer\)/);
+  assert.match(webdesignActionSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) === "gemaild"/);
+  assert.match(webdesignActionSource, /function sortByRecentOutreach\(customers, parseValue, normalizeValue\)/);
+  assert.match(webdesignActionSource, /return right - left;/);
   assert.match(webdesignActionSource, /function renderDaysSinceSent\(customer\)/);
   assert.match(webdesignActionSource, /\.outreach-days/);
   assert.match(webdesignActionSource, /Blijft in Benaderd/);
@@ -776,6 +782,24 @@ test('premium database outreach days column keeps benaderd rows after 25 days', 
       outreachSentAt: yesterdayLate,
     }),
     />1<\/span>/
+  );
+
+  const legacyColdmailCustomer = {
+    id: 'customer-legacy',
+    status: 'gemaild',
+    updatedAt: yesterdayLate,
+  };
+
+  assert.match(controller.renderMeta(legacyColdmailCustomer, true), /Verstuurd vanaf onbekend mailadres/);
+  assert.match(controller.renderDaysSinceSent(legacyColdmailCustomer), />1<\/span>/);
+  assert.match(controller.renderActions(legacyColdmailCustomer), /Mail bekijken/);
+  assert.deepEqual(
+    controller.sortByRecentOutreach([
+      { id: 'older', bedrijf: 'B bedrijf', status: 'gemaild', updatedAt: '2026-05-20T10:00:00.000Z' },
+      { id: 'newer', bedrijf: 'Z bedrijf', status: 'gemaild', updatedAt: '2026-05-22T10:00:00.000Z' },
+      { id: 'same-day-alpha', bedrijf: 'A bedrijf', status: 'gemaild', updatedAt: '2026-05-22T10:00:00.000Z' },
+    ], (value) => new Date(value).getTime(), (value) => String(value || '').toLowerCase()).map((customer) => customer.id),
+    ['same-day-alpha', 'newer', 'older']
   );
 
   const automated = controller.applyAutomation([{
@@ -1672,7 +1696,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
 
   assert.match(pageSource, /assets\/premium-database-distance-sort\.js/);
   assert.match(pageSource, /window\.SoftoraDatabaseDistanceSort/);
-  assert.match(pageSource, /if \(state\.sortKey === "manual"\) return sortCustomers\(sorted\);/);
+  assert.match(pageSource, /if \(state\.sortKey === "manual"\) return state\.activeStatus === "benaderd" \? outreachController\.sortByRecentOutreach\(sorted, parseDateValue, normalizeSearchValue\) : sortCustomers\(sorted\);/);
   assert.match(sorterSource, /const center = \{ lat: 51\.5792, lng: 5\.1889 \};/);
   assert.match(sorterSource, /function resolveCustomerDistanceCoords\(customer\)/);
   assert.match(sorterSource, /function getCustomerDistanceKm\(customer\)/);

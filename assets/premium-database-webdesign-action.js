@@ -495,19 +495,46 @@
         }
 
         function getSentAt(customer) {
-            return normalizeString(customer && (customer.outreachSentAt || customer.outreach_sent_at || customer.lastColdmailSentAt || customer.lastMailSentAt));
+            const explicitSentAt = normalizeString(customer && (customer.outreachSentAt || customer.outreach_sent_at || customer.lastColdmailSentAt || customer.lastMailSentAt));
+            if (explicitSentAt) return explicitSentAt;
+            return normalizeDatabaseStatus(customer && customer.status, customer) === "gemaild"
+                ? normalizeString(customer && (customer.statusUpdatedAt || customer.updatedAt))
+                : "";
         }
 
         function getReplyAt(customer) {
             return normalizeString(customer && (customer.lastReplyAt || customer.last_reply_at || customer.lastColdmailReplyAt));
         }
 
+        function hasMailMessageReference(customer) {
+            return Boolean(normalizeString(customer && (
+                customer.replyThreadId
+                || customer.reply_thread_id
+                || customer.replyMessageId
+                || customer.replyMailboxId
+                || customer.coldmailSentMessageId
+                || customer.outreachMessageId
+                || customer.lastColdmailReplyMessageKey
+            )));
+        }
+
+        function isTrackedOutreachCustomer(customer) {
+            return Boolean(customer) && (
+                isWebdesignOutreachCustomer(customer)
+                || normalizeDatabaseStatus(customer && customer.status, customer) === "gemaild"
+                || Boolean(getSentAt(customer))
+                || Boolean(getSentFromEmail(customer))
+                || Boolean(getReplyAt(customer))
+                || hasMailMessageReference(customer)
+            );
+        }
+
         function augmentSearchHaystack(customer) {
             return [getSentFromEmail(customer), getStatusLabel(getEffectiveStatus(customer)), isActionRequired(customer) ? "reactie ontvangen actie nodig" : ""].join(" ").toLowerCase();
         }
 
-        function renderMeta(customer) {
-            if (!isWebdesignOutreachCustomer(customer)) return "";
+        function renderMeta(customer, forceOutreachMeta) {
+            if (!isWebdesignOutreachCustomer(customer) && !(forceOutreachMeta && isTrackedOutreachCustomer(customer))) return "";
             const sentAt = getSentAt(customer);
             return "<div class=\"outreach-line\">Verstuurd vanaf " + escapeHtml(getSentFromEmail(customer) || "onbekend mailadres") + (sentAt ? " · " + escapeHtml(formatDisplayDate(sentAt)) : "") + "</div>" + (isActionRequired(customer) ? "<span class=\"outreach-badge\">Reactie ontvangen</span>" : "");
         }
@@ -534,7 +561,7 @@
         }
 
         function renderDaysSinceSent(customer) {
-            if (!isWebdesignOutreachCustomer(customer)) return "";
+            if (!isTrackedOutreachCustomer(customer)) return "";
             const days = getDaysSinceSent(customer);
             if (days === null) return "";
             const label = days === 1 ? "1 dag geleden" : days + " dagen geleden";
@@ -542,9 +569,30 @@
         }
 
         function renderActions(customer) {
-            if (!isWebdesignOutreachCustomer(customer)) return "";
+            if (!isTrackedOutreachCustomer(customer)) return "";
             const id = escapeHtml(customer.id);
             return "<div class=\"outreach-actions\"><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"klant_geworden\" data-outreach-id=\"" + id + "\">Is klant geworden</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"mail\" data-outreach-id=\"" + id + "\">Mail bekijken</button></div>";
+        }
+
+        function getRecentOutreachTimestamp(customer, parseValue) {
+            const sentMs = parseValue(getSentAt(customer));
+            if (sentMs) return sentMs;
+            return Number(customer && customer.updatedMs) || parseValue(customer && customer.updatedAt) || 0;
+        }
+
+        function sortByRecentOutreach(customers, parseValue, normalizeValue) {
+            const parseTimestamp = typeof parseValue === "function" ? parseValue : function () { return 0; };
+            const normalizeName = typeof normalizeValue === "function" ? normalizeValue : normalizeOutreachValue;
+            return (Array.isArray(customers) ? customers : []).slice().sort(function (a, b) {
+                const left = getRecentOutreachTimestamp(a, parseTimestamp);
+                const right = getRecentOutreachTimestamp(b, parseTimestamp);
+                if (left !== right) return right - left;
+                const leftName = normalizeName(a && a.bedrijf);
+                const rightName = normalizeName(b && b.bedrijf);
+                if (leftName < rightName) return -1;
+                if (leftName > rightName) return 1;
+                return 0;
+            });
         }
 
         function hasAutomatedNoReplyHistory(customer) {
@@ -635,7 +683,7 @@
         }
 
         ensureOutreachStyles();
-        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, isActionRequired: isActionRequired, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderDaysSinceSent: renderDaysSinceSent, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, updateStatus: updateStatus };
+        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, isActionRequired: isActionRequired, isTrackedOutreachCustomer: isTrackedOutreachCustomer, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderDaysSinceSent: renderDaysSinceSent, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, sortByRecentOutreach: sortByRecentOutreach, updateStatus: updateStatus };
     }
 
     global.SoftoraDatabaseOutreach = {
