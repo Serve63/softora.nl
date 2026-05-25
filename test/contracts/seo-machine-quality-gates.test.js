@@ -14,6 +14,7 @@ const {
   getSeoContentClusters,
   getSeoContentCollectionPaths,
   getSeoContentItems,
+  getSeoContentPublicationPlan,
   getSeoContentPathForItem,
 } = require('../../server/services/seo-content');
 const {
@@ -84,6 +85,46 @@ test('seo machine contentkwaliteit blijft sterk genoeg om automatisch door te gr
   });
 
   assert.deepEqual(issues, []);
+});
+
+test('weekly SEO batch heeft planning, money-page links, beelden en claim-safety op orde', () => {
+  const weeklyPaths = [
+    '/blog/ai-automatisering-leadkwalificatie-mkb',
+    '/kennisbank/wat-is-leadkwalificatie',
+    '/blog/website-leadgeneratie-mkb-meten',
+    '/kennisbank/wat-is-crm-datakwaliteit',
+    '/regio/midden-brabant',
+  ];
+  const plan = getSeoContentPublicationPlan({ now: new Date('2026-06-01T12:00:00.000Z') });
+  const weeklyPlan = plan.filter((entry) => weeklyPaths.includes(entry.path));
+
+  assert.deepEqual(
+    weeklyPlan.map((entry) => `${entry.publishedAt}:${entry.status}:${entry.path}`),
+    [
+      '2026-06-02:scheduled:/blog/ai-automatisering-leadkwalificatie-mkb',
+      '2026-06-03:scheduled:/kennisbank/wat-is-leadkwalificatie',
+      '2026-06-04:scheduled:/blog/website-leadgeneratie-mkb-meten',
+      '2026-06-05:scheduled:/kennisbank/wat-is-crm-datakwaliteit',
+      '2026-06-08:scheduled:/regio/midden-brabant',
+    ]
+  );
+
+  const weeklyItems = getSeoContentItems({ now: new Date('2026-06-08T12:00:00.000Z') })
+    .filter((item) => weeklyPaths.includes(getSeoContentPathForItem(item)))
+    .map((item) => ({
+      ...item,
+      cluster: getSeoContentClusterForItem(item).key,
+    }));
+  const weeklyPages = weeklyItems.map((item) => ({
+    path: getSeoContentPathForItem(item),
+    html: buildSeoContentArticleHtml(item, { siteOrigin }),
+  }));
+
+  assert.equal(weeklyItems.length, 5);
+  assert.deepEqual(auditContentQuality({ items: weeklyItems, clusters: getSeoContentClusters() }), []);
+  assert.deepEqual(auditClaimSafety({ items: weeklyItems, pages: weeklyPages }), []);
+  assert.deepEqual(auditSeoImages({ pages: weeklyPages }), []);
+  assert.ok(weeklyPages.every((page) => /data-softora-conversion-target="service"/.test(page.html)));
 });
 
 test('seo machine blokkeert gevaarlijke of onbewezen contentclaims', () => {

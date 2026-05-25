@@ -1206,6 +1206,255 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
     ]),
   }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'ai-automatisering-leadkwalificatie-mkb',
+    title: 'AI automatisering voor leadkwalificatie in het MKB',
+    description:
+      'Hoe MKB-bedrijven AI kunnen gebruiken om leads beter voor te bereiden, te beoordelen en netjes over te dragen aan een mens.',
+    category: 'AI automatisering',
+    intent: 'Koopintentie',
+    publishedAt: '2026-06-02',
+    updatedAt: '2026-06-02',
+    image: Object.freeze({
+      src: '/assets/seo-content/ai-leadopvolging-workflow-mkb-softora.jpg',
+      alt: 'MKB-team bespreekt een AI workflow voor leadkwalificatie en opvolging aan een kantoorwerktafel.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'AI leadkwalificatie werkt vooral goed wanneer de criteria vooraf helder zijn en een medewerker de commerciële keuzes blijft controleren.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Leadkwalificatie begint met duidelijke criteria',
+        paragraphs: Object.freeze([
+          'AI kan pas nuttig helpen bij leadkwalificatie wanneer duidelijk is wat een goede aanvraag voor je bedrijf betekent. Denk aan dienst, regio, timing, budgetindicatie, urgentie, beslisser en de informatie die nodig is voor een sterke vervolgstap.',
+          'Zonder die criteria gaat AI vooral samenvatten wat er binnenkomt. Dat kan handig zijn, maar het maakt de opvolging nog niet scherper. De echte waarde ontstaat wanneer de aanvraag direct wordt vertaald naar een duidelijke status, taak of vervolgvraag.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Laat AI voorbereiden en mensen beslissen',
+        paragraphs: Object.freeze([
+          'Voor commerciële keuzes blijft menselijke controle belangrijk. AI kan signalen herkennen, ontbrekende informatie benoemen en een voorstel doen voor prioriteit, maar het team moet kunnen zien waarom die suggestie logisch is.',
+          'Daarom bouwt Softora leadflows met een duidelijke overdracht. De AI maakt een samenvatting, geeft context en zet een volgende stap klaar. Daarna kan een medewerker beoordelen of de lead direct opvolging krijgt, eerst extra vragen nodig heeft of beter naar een andere route gaat.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Koppel kwalificatie aan CRM en opvolging',
+        paragraphs: Object.freeze([
+          'Leadkwalificatie is pas waardevol als het resultaat in het werkproces landt. Een losse AI-score in een chatvenster verdwijnt snel. Een CRM-status, taak, notitie of agenda-actie maakt de informatie bruikbaar voor het team.',
+          'Voor MKB-bedrijven is dat vaak de praktische winst: minder zoeken, minder losse berichten en sneller overzicht over welke aanvragen aandacht nodig hebben. Zo ondersteunt AI de opvolging zonder dat het de commerciële verantwoordelijkheid overneemt.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({ label: 'AI leadopvolging flow', href: '/blog/ai-automatisering-leadopvolging' }),
+      Object.freeze({ label: 'Wat is leadkwalificatie?', href: '/kennisbank/wat-is-leadkwalificatie' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-leadkwalificatie',
+    title: 'Wat is leadkwalificatie?',
+    description:
+      'Een duidelijke uitleg van leadkwalificatie, waarom het belangrijk is en hoe website, CRM en AI hierbij kunnen helpen.',
+    category: 'MKB lead generation',
+    intent: 'Uitleg',
+    publishedAt: '2026-06-03',
+    updatedAt: '2026-06-03',
+    image: Object.freeze({
+      src: '/assets/seo-content/chatbot-menselijke-overdracht-klantcontact-softora.jpg',
+      alt: 'Medewerkers plannen klantcontact en leadkwalificatie met headset, laptop en praktische overdrachtsnotities.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Leadkwalificatie betekent dat je bepaalt welke aanvraag kansrijk is, welke informatie nog mist en welke opvolging logisch is.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele betekenis',
+        paragraphs: Object.freeze([
+          'Leadkwalificatie is het beoordelen van een nieuwe aanvraag. Je kijkt of de vraag past bij je dienstverlening, hoe concreet de behoefte is, hoe snel iemand geholpen wil worden en welke informatie nodig is om goed te reageren.',
+          'Voor een MKB-bedrijf voorkomt dit dat alle aanvragen op dezelfde stapel belanden. Sommige leads verdienen directe aandacht, andere vragen eerst om extra context en weer andere passen misschien niet bij de dienst.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Welke informatie je meestal nodig hebt',
+        paragraphs: Object.freeze([
+          'Goede kwalificatie vraagt niet om een ingewikkeld formulier. De basis is vaak genoeg: naam, bedrijf, contactgegevens, vraag, gewenste dienst, regio, timing en eventuele bijzonderheden.',
+          'Daarna kun je aanvullende signalen gebruiken. Komt iemand via een dienstenpagina, blog, chatbot, telefonie of WhatsApp binnen? Die context helpt om de aanvraag beter te begrijpen en sneller bij de juiste vervolgstap te krijgen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Hoe AI kan ondersteunen',
+        paragraphs: Object.freeze([
+          'AI kan helpen door tekst of gesprekken samen te vatten, ontbrekende informatie te signaleren en een voorstel te doen voor een vervolgtaak. Dat is vooral handig wanneer leads via meerdere kanalen binnenkomen.',
+          'De AI moet daarbij niet doen alsof hij alles zeker weet. De beste aanpak is dat AI voorbereidt en het team de uiteindelijke keuze maakt. Zo blijft het proces snel, maar ook controleerbaar.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'AI automatisering voor leadkwalificatie', href: '/blog/ai-automatisering-leadkwalificatie-mkb' }),
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({ label: 'Wat is een CRM systeem?', href: '/kennisbank/wat-is-een-crm-systeem' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'website-leadgeneratie-mkb-meten',
+    title: 'Website leadgeneratie voor het MKB: wat moet je meten?',
+    description:
+      'Welke signalen laten zien of een MKB-website niet alleen bezoekers krijgt, maar ook betere aanvragen en opvolging ondersteunt.',
+    category: 'Websites',
+    intent: 'Koopintentie',
+    publishedAt: '2026-06-04',
+    updatedAt: '2026-06-04',
+    image: Object.freeze({
+      src: '/assets/seo-content/website-leadgeneratie-wireframes-softora.jpg',
+      alt: 'Website wireframes en analytics op een werktafel voor het meten van MKB leadgeneratie.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Website leadgeneratie wordt pas stuurbaar wanneer je meet welke pagina’s bezoekers aantrekken, overtuigen en richting contact brengen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Begin met de route naar contact',
+        paragraphs: Object.freeze([
+          'Veel ondernemers kijken eerst naar bezoekersaantallen. Dat is nuttig, maar voor leadgeneratie is de route belangrijker: via welke pagina komt iemand binnen, welke informatie bekijkt die persoon en welke CTA krijgt aandacht?',
+          'Een MKB-website moet daarom niet alleen verkeer meten, maar ook contactklikken, formulierstarts, WhatsApp-klikken, doorkliks naar diensten en de vragen die daarna binnenkomen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Combineer SEO-data met leadkwaliteit',
+        paragraphs: Object.freeze([
+          'Google Search Console laat zien op welke zoekopdrachten en pagina’s je vertoningen en klikken krijgt. Analytics laat zien wat bezoekers daarna doen. Maar de belangrijkste feedback komt vaak uit de lead zelf: past de aanvraag bij je dienst?',
+          'Als een pagina veel verkeer krijgt maar weinig passende aanvragen, kan de zoekintentie te breed zijn of mist de pagina overtuigende uitleg. Dan moet je niet alleen meer content maken, maar vooral scherper sturen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Meet ook opvolging na de aanvraag',
+        paragraphs: Object.freeze([
+          'Leadgeneratie stopt niet bij een formulier of WhatsApp-klik. Als opvolging traag of onduidelijk is, verlies je alsnog waarde. Daarom hoort de website gekoppeld te zijn aan een proces voor intake, CRM, taakverdeling of terugbelactie.',
+          'Softora kijkt daarom naar de hele lijn: zoekvraag, pagina, CTA, aanvraag en opvolging. Pas als die route klopt, kun je gericht nieuwe blogs, kennisbankpagina’s of landingspagina’s toevoegen.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Wat is een conversiegerichte website?', href: '/kennisbank/wat-is-een-conversiegerichte-website' }),
+      Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
+      Object.freeze({ label: 'Website laten maken kosten 2026', href: '/blog/website-laten-maken-kosten-2026' }),
+      Object.freeze({ label: 'Wat is leadkwalificatie?', href: '/kennisbank/wat-is-leadkwalificatie' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-crm-datakwaliteit',
+    title: 'Wat is CRM datakwaliteit?',
+    description:
+      'Een praktische uitleg van CRM datakwaliteit: waarom klantdata schoon moet blijven en hoe betere data opvolging ondersteunt.',
+    category: 'CRM',
+    intent: 'Uitleg',
+    publishedAt: '2026-06-05',
+    updatedAt: '2026-06-05',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-datakwaliteit-klantopvolging-softora.jpg',
+      alt: 'Twee medewerkers bespreken CRM datakwaliteit en klantopvolging met dashboard en procesnotities.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'CRM datakwaliteit gaat over betrouwbare klantinformatie, duidelijke statussen en data die je team echt kan gebruiken.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'CRM-data moet dagelijks bruikbaar zijn',
+        paragraphs: Object.freeze([
+          'CRM datakwaliteit betekent dat klantgegevens, leadstatussen, notities, taken en afspraken actueel en begrijpelijk zijn. Het gaat dus niet alleen om nette velden, maar om informatie waar medewerkers op kunnen vertrouwen.',
+          'Slechte data maakt opvolging zwaarder. Leads staan dubbel in het systeem, statussen kloppen niet meer of belangrijke context zit nog in iemands mailbox. Dan wordt een CRM alsnog een plek waar mensen omheen gaan werken.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wat meestal misgaat',
+        paragraphs: Object.freeze([
+          'Veel CRM-problemen ontstaan klein. Een medewerker vult een veld anders in, een lead krijgt geen eigenaar, een afspraak wordt niet gekoppeld of een oud spreadsheet blijft naast het CRM bestaan.',
+          'Na een tijdje is niet meer duidelijk welke informatie leidend is. Daarom moet een CRM niet alleen schermen hebben, maar ook duidelijke regels voor invoer, statusovergangen en verantwoordelijkheden.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Hoe automatisering kan helpen',
+        paragraphs: Object.freeze([
+          'Automatisering kan dubbele invoer beperken, ontbrekende velden signaleren en samenvattingen klaarzetten na formulieren, telefoongesprekken of chats. Dat maakt het makkelijker om CRM-data actueel te houden.',
+          'AI kan daarbij ondersteunen, maar blijft afhankelijk van goede proceskeuzes. Softora bouwt CRM-flows daarom rond vaste statussen, duidelijke rollen en menselijke controle op belangrijke beslissingen.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Wat is een CRM systeem?', href: '/kennisbank/wat-is-een-crm-systeem' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'regio',
+    slug: 'midden-brabant',
+    schemaType: 'Service',
+    serviceType: 'Websites, CRM en AI automatisering in Midden-Brabant',
+    areaServed: 'Midden-Brabant',
+    title: 'Website, CRM en AI automatisering in Midden-Brabant',
+    description:
+      'Softora helpt MKB-bedrijven in Midden-Brabant met websites, CRM, maatwerk software en AI automatisering voor betere opvolging.',
+    category: 'Midden-Brabant',
+    intent: 'Lokale SEO',
+    publishedAt: '2026-06-08',
+    updatedAt: '2026-06-08',
+    image: Object.freeze({
+      src: '/assets/seo-content/midden-brabant-digitale-groei-softora.jpg',
+      alt: 'Ondernemer en digitale consultant bespreken een groeiplan voor websites, CRM en AI automatisering in Midden-Brabant.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Voor bedrijven in Midden-Brabant ligt de kans vaak in een betere websitebasis, duidelijke leadopvolging en automatisering die past bij het team.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Een regionale pagina moet dienstwaarde hebben',
+        paragraphs: Object.freeze([
+          'Een sterke regiopagina is meer dan een plaatsnaam met algemene tekst. Bedrijven in Midden-Brabant zoeken een partner die begrijpt hoe websites, CRM en automatisering samen de route van bezoeker naar opvolging kunnen verbeteren.',
+          'Daarom koppelt deze pagina lokale relevantie aan concrete Softora-diensten: website laten maken, AI automatisering, CRM op maat, chatbots en bedrijfssoftware.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Van Oisterwijk en Tilburg naar bredere groei',
+        paragraphs: Object.freeze([
+          'Softora heeft al lokale context rond Oisterwijk, Tilburg en Den Bosch. Midden-Brabant verbindt die route voor ondernemers die regionaal zoeken, maar vooral willen weten welke digitale stap nu verstandig is.',
+          'Voor de ene organisatie begint dat met een betere website. Voor een ander bedrijf is CRM, leadkwalificatie of AI telefonie logischer. De pagina moet helpen kiezen zonder te doen alsof één oplossing altijd past.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Praktische digitalisering voor het MKB',
+        paragraphs: Object.freeze([
+          'MKB-bedrijven hebben meestal geen behoefte aan onnodig grote systemen. Ze willen dat aanvragen beter binnenkomen, klantinformatie overzichtelijk blijft en terugkerend werk minder tijd kost.',
+          'Softora benadert dit stap voor stap: eerst de commerciële basis en meetbaarheid, daarna automatisering of software waar die echt waarde toevoegt. Zo blijft digitale groei beheersbaar en bruikbaar voor het team.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Softora in Oisterwijk', href: '/regio/oisterwijk' }),
+      Object.freeze({ label: 'Softora in Tilburg', href: '/regio/tilburg' }),
+      Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
+    ]),
+  }),
 ]);
 
 function normalizeSiteOrigin(valueRaw = DEFAULT_SITE_ORIGIN) {
@@ -1294,6 +1543,9 @@ function getSeoContentClusterForItem(item) {
 }
 
 function getSeoContentImageForItem(item) {
+  if (item && item.image && item.image.src) {
+    return item.image;
+  }
   const cluster = getSeoContentClusterForItem(item);
   return SEO_CONTENT_IMAGES_BY_CLUSTER[cluster.key] || SEO_CONTENT_IMAGES_BY_CLUSTER.websites;
 }
