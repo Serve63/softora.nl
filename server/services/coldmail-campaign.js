@@ -446,6 +446,66 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function envKeyForFullMailboxEmail(email) {
+    return normalizeEmailAddress(email)
+      .replace(/[^a-z0-9]+/gi, '_')
+      .toUpperCase();
+  }
+
+  function hasRuntimeEnvValue(key) {
+    const env = process.env || {};
+    return Boolean(normalizeString(env[key] || ''));
+  }
+
+  function getRuntimeMailboxEnvDiagnostics(senderEmail) {
+    const email = normalizeEmailAddress(senderEmail);
+    const keyGroups = {
+      full: envKeyForFullMailboxEmail(email),
+      local: envKeyForEmail(email),
+      domain: envKeyForDomain(email),
+    };
+    const describeKey = (key) => ({
+      key,
+      smtpHost: hasRuntimeEnvValue(`MAILBOX_${key}_SMTP_HOST`),
+      smtpPort: hasRuntimeEnvValue(`MAILBOX_${key}_SMTP_PORT`),
+      smtpSecure: hasRuntimeEnvValue(`MAILBOX_${key}_SMTP_SECURE`),
+      smtpUser: hasRuntimeEnvValue(`MAILBOX_${key}_SMTP_USER`),
+      smtpPass: hasRuntimeEnvValue(`MAILBOX_${key}_SMTP_PASS`),
+      sharedUser: hasRuntimeEnvValue(`MAILBOX_${key}_USER`),
+      sharedPass: hasRuntimeEnvValue(`MAILBOX_${key}_PASS`),
+    });
+    return Object.fromEntries(
+      Object.entries(keyGroups)
+        .filter(([, key]) => key)
+        .map(([group, key]) => [group, describeKey(key)])
+    );
+  }
+
+  function getSenderSmtpDiagnostic(senderEmail, account) {
+    const email = normalizeEmailAddress(senderEmail);
+    const mailboxAccount = mailboxAccountService
+      .getAccounts()
+      .find((item) => normalizeEmailAddress(item && item.email) === email);
+    return {
+      resolved: {
+        hasHost: Boolean(account && account.smtpHost),
+        hasPort: Boolean(account && Number.isFinite(Number(account.smtpPort)) && Number(account.smtpPort) > 0),
+        hasUser: Boolean(account && account.smtpUser),
+        hasPass: Boolean(account && account.smtpPass),
+        configured: isSenderSmtpAccountConfigured(account),
+      },
+      mailboxAccount: {
+        found: Boolean(mailboxAccount),
+        smtpConfigured: Boolean(mailboxAccount && mailboxAccount.smtpConfigured),
+        hasHost: Boolean(mailboxAccount && mailboxAccount.smtpHost),
+        hasUser: Boolean(mailboxAccount && mailboxAccount.smtpUser),
+        hasPass: Boolean(mailboxAccount && mailboxAccount.smtpPass),
+      },
+      mailboxAccountsRawConfigured: Boolean(normalizeString(mailboxAccountsRaw)),
+      runtimeEnv: getRuntimeMailboxEnvDiagnostics(email),
+    };
+  }
+
   function getSenderSmtpTransport(senderEmail) {
     const account = resolveSenderSmtpAccount(senderEmail);
     if (!account.smtpHost || !account.smtpUser || !account.smtpPass) return null;
@@ -2438,7 +2498,11 @@ function createColdmailCampaignService(deps = {}) {
         const senderEmail = assertSenderAllowed(candidate);
         const senderAccount = resolveSenderSmtpAccount(senderEmail);
         if (!isSenderSmtpAccountConfigured(senderAccount)) {
-          skipped.push({ senderEmail, reason: 'sender_smtp_not_configured' });
+          skipped.push({
+            senderEmail,
+            reason: 'sender_smtp_not_configured',
+            smtpDiagnostic: getSenderSmtpDiagnostic(senderEmail, senderAccount),
+          });
           continue;
         }
         const quota = await getColdmailSendQuota(senderEmail);
@@ -2585,6 +2649,10 @@ function createColdmailCampaignService(deps = {}) {
           reason: truncateText(normalizeString(item && item.reason), 120),
           readyAt: normalizeString(item && item.readyAt),
           cooldownMinutes: Math.max(0, Number(item && item.cooldownMinutes) || 0) || undefined,
+          smtpDiagnostic:
+            item && item.smtpDiagnostic && typeof item.smtpDiagnostic === 'object'
+              ? item.smtpDiagnostic
+              : undefined,
         }))
         : undefined,
       agendaBlocked: Boolean(result.agendaBlocked),

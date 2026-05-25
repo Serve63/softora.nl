@@ -676,6 +676,63 @@ test('coldmail autopilot respects a per-sender cooldown without extending the gl
   assert.equal(getAutopilotState().lastResult.senderSkips.length, 2);
 });
 
+test('coldmail autopilot reports redacted smtp diagnostics for unconfigured senders', async () => {
+  const oldEnv = { ...process.env };
+  [
+    'MAILBOX_ACCOUNTS',
+    'MAILBOX_SERVEC321_GMAIL_COM_PASS',
+    'MAILBOX_SERVEC321_GMAIL_COM_SMTP_HOST',
+    'MAILBOX_SERVEC321_GMAIL_COM_SMTP_PORT',
+    'MAILBOX_SERVEC321_GMAIL_COM_SMTP_SECURE',
+    'MAILBOX_SERVEC321_GMAIL_COM_SMTP_USER',
+    'MAILBOX_SERVEC321_GMAIL_COM_SMTP_PASS',
+    'MAILBOX_GMAIL_COM_PASS',
+    'MAILBOX_GMAIL_COM_SMTP_HOST',
+    'MAILBOX_GMAIL_COM_SMTP_PORT',
+    'MAILBOX_GMAIL_COM_SMTP_SECURE',
+    'MAILBOX_GMAIL_COM_SMTP_PASS',
+  ].forEach((key) => {
+    delete process.env[key];
+  });
+  try {
+    const { service, getAutopilotState } = createService({
+      autopilotState: {
+        enabled: true,
+        config: {
+          count: 1,
+          senderEmails: ['servec321@gmail.com'],
+          senderProfiles: {
+            'servec321@gmail.com': {
+              subject: 'Korte vraag voor {{bedrijf}}',
+              body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+            },
+          },
+          branch: 'Horeca & Restaurants',
+          specialAction: '',
+          radiusKm: 250,
+        },
+      },
+    });
+
+    const result = await service.runColdmailAutopilot({
+      publicBaseUrl: 'https://www.softora.nl',
+      actor: 'Coldmail Autopilot Cron',
+    });
+
+    assert.equal(result.reason, 'no_sender_capacity');
+    const [skip] = getAutopilotState().lastResult.senderSkips;
+    assert.equal(skip.senderEmail, 'servec321@gmail.com');
+    assert.equal(skip.reason, 'sender_smtp_not_configured');
+    assert.equal(skip.smtpDiagnostic.resolved.hasPass, false);
+    assert.equal(skip.smtpDiagnostic.mailboxAccount.found, true);
+    assert.equal(skip.smtpDiagnostic.runtimeEnv.full.sharedPass, false);
+    assert.equal(skip.smtpDiagnostic.runtimeEnv.full.smtpPass, false);
+    assert.equal(skip.smtpDiagnostic.runtimeEnv.domain.smtpHost, false);
+  } finally {
+    process.env = oldEnv;
+  }
+});
+
 test('coldmail autopilot waits a configured send jitter before sending', async () => {
   const { service, sentMessages, sleeps, getAutopilotState } = createService({
     rows: [
