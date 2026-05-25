@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var ENDPOINT = '/api/coldmailing/replies/follow-ups?limit=100';
+  var ENDPOINT = '/api/coldmailing/replies/follow-ups?limit=100&campaignType=webdesign';
   var REFRESH_INTERVAL_MS = 60000;
   var REQUEST_TIMEOUT_MS = 10000;
   var refreshTimer = null;
@@ -99,6 +99,8 @@
       subject: String(row.subject || '').trim(),
       preview: String(row.preview || '').trim(),
       replyAt: String(row.replyAt || row.createdAt || row.updatedAt || '').trim(),
+      mailboxAccount: String(row.mailboxAccount || row.replyMailboxAccount || '').trim(),
+      campaignType: String(row.campaignType || '').trim(),
       type: inferLeadType(row),
     };
   }
@@ -106,11 +108,18 @@
   function renderLeadItem(item) {
     var row = normalizeLeadItem(item);
     var meta = [
-      '<div class="lead-meta"><span class="lead-meta-label">Bron:</span> Coldmailing</div>',
-      '<div class="lead-meta"><span class="lead-meta-label">Provider:</span> ' +
+      '<div class="lead-meta"><span class="lead-meta-label">Bron:</span> Webdesign-mail</div>',
+      '<div class="lead-meta"><span class="lead-meta-label">Van:</span> ' +
         esc(row.email || 'Mailreactie') +
         '</div>',
     ];
+    if (row.mailboxAccount) {
+      meta.push(
+        '<div class="lead-meta"><span class="lead-meta-label">Ontvangen op:</span> ' +
+          esc(row.mailboxAccount) +
+          '</div>'
+      );
+    }
     var replyMeta = [row.city, formatReplyDate(row.replyAt)].filter(Boolean).join(' - ');
     if (row.preview || row.subject || replyMeta) {
       meta.push(
@@ -137,8 +146,8 @@
     var rows = (Array.isArray(items) ? items : []).map(normalizeLeadItem);
     window.__softoraColdmailingLeadPageCount = rows.length;
     if (!rows.length) {
-      els.list.innerHTML = '<div class="lead-empty">Nog geen leads gevonden.</div>';
-      setStatus('Nog geen leads gevonden.', '');
+      els.list.innerHTML = '<div class="lead-empty">Nog geen positieve webdesign-reacties gevonden.</div>';
+      setStatus('Nog geen positieve webdesign-reacties gevonden.', '');
       return;
     }
     els.list.innerHTML = rows.map(renderLeadItem).join('');
@@ -160,7 +169,7 @@
       });
       var payload = await response.json().catch(function () { return null; });
       if (!response.ok || !payload || payload.ok === false) {
-        throw new Error('Coldmailing leads laden mislukt.');
+        throw new Error('Webdesign leads laden mislukt.');
       }
       return payload;
     } finally {
@@ -180,9 +189,9 @@
     } catch (error) {
       var els = getEls();
       if (els.list) {
-        els.list.innerHTML = '<div class="lead-empty">Leads konden niet geladen worden.</div>';
+        els.list.innerHTML = '<div class="lead-empty">Webdesign leads konden niet geladen worden.</div>';
       }
-      setStatus(String(error && error.message ? error.message : 'Coldmailing leads laden mislukt.'), 'error');
+      setStatus(String(error && error.message ? error.message : 'Webdesign leads laden mislukt.'), 'error');
     } finally {
       refreshInFlight = false;
     }

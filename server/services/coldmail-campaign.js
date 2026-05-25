@@ -113,6 +113,11 @@ const SENDER_DISPLAY_NAMES = {
   'ruben@softora.nl': 'Ruben',
   'servec321@gmail.com': 'Servé Creusen',
 };
+const COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS = Object.freeze([
+  'serve@softora.nl',
+  'martijn@softora.nl',
+  'servec321@gmail.com',
+]);
 const COLDMAIL_LINKEDIN_CTA_BY_SENDER = Object.freeze({
   'martijn@softora.nl': {
     text: MARTIJN_LINKEDIN_CTA_TEXT,
@@ -1585,6 +1590,90 @@ function createColdmailCampaignService(deps = {}) {
     return { status: '', intent: 'unclear', label: 'Mailreactie zonder duidelijke lifecycle-status' };
   }
 
+  function parseColdmailReplyAiIntent(value) {
+    const raw = normalizeString(value);
+    if (!raw) return '';
+    try {
+      const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+      return normalizeString(parsed && (parsed.intent || parsed.classification || parsed.status)).toLowerCase();
+    } catch (_) {
+      const text = normalizeInboundIntentText(raw);
+      if (/\b(interested|interest|interesse|positive|positief|lead)\b/.test(text)) return 'interested';
+      if (/\b(no_interest|not_interested|geen_interesse|negative|negatief|unsubscribe|afmelden)\b/.test(text)) {
+        return 'no_interest';
+      }
+      return '';
+    }
+  }
+
+  async function classifyInboundColdmailReplyLifecycleWithAi({ row, parsedMail, inboundText }) {
+    const fallback = classifyInboundColdmailReplyLifecycle(inboundText);
+    if (!isWebdesignOutreachRow(row) || fallback.intent === 'opt_out') return fallback;
+    const apiKey = getOpenAiApiKey();
+    if (!apiKey) return fallback;
+
+    try {
+      const from = getParsedMailFromEmail(parsedMail);
+      const response = await fetchJsonWithTimeout(`${openAiApiBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: normalizeString(coldmailAutoReplyModel) || 'gpt-5.5-pro',
+          temperature: 0,
+          messages: [
+            {
+              role: 'system',
+              content: [
+                'Je classificeert Nederlandse replies op een Softora webdesign-outreachmail.',
+                'Geef alleen JSON terug: {"intent":"interested"|"no_interest"|"unclear"}.',
+                'Kies interested bij enige koopintentie, informatievraag, afspraakwens, offerte/prijsvraag of positieve opening.',
+                'Kies no_interest alleen bij duidelijke afwijzing of afmelding. Kies anders unclear.',
+              ].join(' '),
+            },
+            {
+              role: 'user',
+              content: JSON.stringify({
+                company: getRowCompany(row),
+                recipient: getRowEmail(row),
+                from: from.address,
+                subject: normalizeString(parsedMail && parsedMail.subject),
+                reply: truncateText(inboundText, 2000),
+              }),
+            },
+          ],
+        }),
+      });
+      if (!response || !response.response || !response.response.ok) return fallback;
+      const data = response && response.data;
+      const content = typeof extractOpenAiTextContent === 'function'
+        ? extractOpenAiTextContent(data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
+        : normalizeString(data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content);
+      const intent = parseColdmailReplyAiIntent(content);
+      if (intent === 'interested') {
+        return {
+          status: 'interesse',
+          intent: 'interested',
+          label: 'Interesse via AI-mailanalyse',
+          disableMail: false,
+        };
+      }
+      if (intent === 'no_interest') {
+        return {
+          status: '',
+          intent: 'no_interest',
+          label: 'Geen lead volgens AI-mailanalyse',
+          disableMail: false,
+        };
+      }
+      return fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
   function buildColdmailDeliveryFailureText(parsedMail, inboundText) {
     const from = getParsedMailFromEmail(parsedMail);
     return [
@@ -1675,7 +1764,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function resolveInboundSenderEmail(parsedMail) {
-    const allowed = new Set(getAllowedSenderEmails());
+    const allowed = new Set([...getAllowedSenderEmails(), ...COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS]);
     const recipients = [
       ...getParsedMailAddressList(parsedMail, 'to'),
       ...getParsedMailAddressList(parsedMail, 'cc'),
@@ -3345,19 +3434,50 @@ function createColdmailCampaignService(deps = {}) {
     }) || null;
   }
 
-  function hasColdmailReplyInterestSignal(row) {
+  function getColdmailReplyMailboxAccount(row) {
+    return normalizeEmailAddress(
+      row && (
+        row.replyMailboxAccount ||
+        row.replyMailbox ||
+        row.lastColdmailReplyMailboxAccount ||
+        row.outreachSentFromEmail ||
+        row.sentFromEmail ||
+        row.lastColdmailSenderEmail
+      )
+    );
+  }
+
+  function isWebdesignLeadMailbox(email) {
+    return COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS.includes(normalizeEmailAddress(email));
+  }
+
+  function hasPositiveColdmailReplySignal(row) {
     if (!row || typeof row !== 'object') return false;
     if (normalizeString(row.coldmailReplyIntent).toLowerCase() === 'interested') return true;
-    if (normalizeString(row.lastColdmailReplyAt || row.lastColdmailReplyMessageKey)) return true;
     return Boolean(getColdmailReplyHistoryEntry(row));
   }
 
-  function isColdmailReplyFollowUpRow(row) {
+  function hasColdmailReplyInterestSignal(row) {
     if (!row || typeof row !== 'object') return false;
+    if (hasPositiveColdmailReplySignal(row)) return true;
+    if (normalizeString(row.lastColdmailReplyAt || row.lastColdmailReplyMessageKey)) return true;
+    return false;
+  }
+
+  function isWebdesignLeadReplyFollowUpRow(row) {
+    return Boolean(
+      isWebdesignOutreachRow(row) &&
+      hasPositiveColdmailReplySignal(row) &&
+      isWebdesignLeadMailbox(getColdmailReplyMailboxAccount(row))
+    );
+  }
+
+  function isColdmailReplyFollowUpRow(row, options = {}) {
+    if (!row || typeof row !== 'object') return false;
+    if (options.webdesignOnly) return isWebdesignLeadReplyFollowUpRow(row);
     const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
     return status === 'interesse' && hasColdmailReplyInterestSignal(row);
   }
-
   function getColdmailReplyFollowUpTimestampMs(row) {
     const historyEntry = getColdmailReplyHistoryEntry(row);
     return Math.max(
@@ -3383,17 +3503,22 @@ function createColdmailCampaignService(deps = {}) {
       subject: truncateText(normalizeString(row.lastColdmailReplySubject || (historyEntry && historyEntry.subject)), 240),
       preview: truncateText(normalizeString(row.lastColdmailReplyPreview || (historyEntry && historyEntry.preview)), 500),
       messageKey: normalizeString(row.lastColdmailReplyMessageKey || (historyEntry && historyEntry.messageKey)),
+      mailboxAccount: getColdmailReplyMailboxAccount(row),
+      campaignType: isWebdesignOutreachRow(row) ? 'webdesign' : '',
+      outreachStatus: normalizeOutreachStatus(row.outreachStatus),
     };
   }
 
   async function listColdmailReplyFollowUps(input = {}) {
     const limit = parsePositiveInt(input.limit, 20, 1, 100);
+    const campaignType = normalizeString(input.campaignType || input.campaign || input.source).toLowerCase();
+    const webdesignOnly = ['webdesign', 'website', 'webdesign-leads', 'webdesign_replies'].includes(campaignType);
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = parseDatabaseRows(values);
     const items = rows
       .map((row, index) => ({ row, index, timestampMs: getColdmailReplyFollowUpTimestampMs(row) }))
-      .filter(({ row }) => isColdmailReplyFollowUpRow(row))
+      .filter(({ row }) => isColdmailReplyFollowUpRow(row, { webdesignOnly }))
       .sort((left, right) => right.timestampMs - left.timestampMs)
       .map(({ row, index }) => buildColdmailReplyFollowUpItem(row, index));
 
@@ -4602,8 +4727,9 @@ function createColdmailCampaignService(deps = {}) {
     mailboxId,
     mailboxFolder,
     mailboxAccount,
+    classification: providedClassification,
   }) {
-    const classification = classifyInboundColdmailReplyLifecycle(inboundText);
+    const classification = providedClassification || classifyInboundColdmailReplyLifecycle(inboundText);
     const matchedRow = match && Number.isInteger(match.index) ? rows[match.index] : null;
     const shouldPersistWebdesignReply = Boolean(matchedRow && isWebdesignOutreachRow(matchedRow));
     if (!classification.status && !shouldPersistWebdesignReply) {
@@ -5412,6 +5538,14 @@ function createColdmailCampaignService(deps = {}) {
               }
 
               stats.matched += 1;
+              const mailboxId = buildMailboxMessageId(mailboxName, message.uid);
+              const classification = deliveryFailure
+                ? deliveryFailure
+                : await classifyInboundColdmailReplyLifecycleWithAi({
+                    row: match.row,
+                    parsedMail,
+                    inboundText,
+                  });
               try {
                 if (deliveryFailure && bounceProcessingEnabled) {
                   try {
@@ -5473,9 +5607,10 @@ function createColdmailCampaignService(deps = {}) {
                     inboundText,
                     processedKey,
                     actor: 'Coldmailing',
-                    mailboxId: buildMailboxMessageId(mailboxName, message.uid),
+                    mailboxId,
                     mailboxFolder: mailboxName,
                     mailboxAccount: resolveInboundMailboxAccount(parsedMail),
+                    classification,
                   });
                   rows = lifecycle.rows;
                   if (lifecycle.persisted) {
@@ -5513,12 +5648,8 @@ function createColdmailCampaignService(deps = {}) {
                   subject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
                   model: aiReply.model,
                   messageId: normalizeString(info && info.messageId),
-                  lifecycleStatus: normalizeString(
-                    classifyInboundColdmailReplyLifecycle(inboundText).status
-                  ),
-                  lifecycleIntent: normalizeString(
-                    classifyInboundColdmailReplyLifecycle(inboundText).intent
-                  ),
+                  lifecycleStatus: normalizeString(classification.status),
+                  lifecycleIntent: normalizeString(classification.intent),
                 };
                 await saveColdmailReplyState(replyState, 'coldmail-auto-reply');
                 stats.replied += 1;
