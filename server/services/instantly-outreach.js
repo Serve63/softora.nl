@@ -1,6 +1,10 @@
 const crypto = require('node:crypto');
 const dns = require('node:dns').promises;
 const {
+  buildChunkedStatePatch,
+  readChunkedStateValue,
+} = require('./data-ops-serialization');
+const {
   canAdvanceContactStatus,
   normalizeContactStatus,
 } = require('./customer-lifecycle');
@@ -910,7 +914,7 @@ function chooseInstantlyStatus(currentStatus, nextStatus) {
 }
 
 function parseDatabaseRows(values = {}, customerDbKey = DEFAULT_CUSTOMER_DB_KEY, normalizeString = defaultNormalizeString) {
-  const raw = normalizeString(values && values[customerDbKey]);
+  const raw = normalizeString(readChunkedStateValue(values, customerDbKey));
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -918,6 +922,13 @@ function parseDatabaseRows(values = {}, customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
   } catch (_) {
     return [];
   }
+}
+
+function buildCustomerRowsStateValues(values, rows, customerDbKey = DEFAULT_CUSTOMER_DB_KEY) {
+  return {
+    ...(values && typeof values === 'object' ? values : {}),
+    ...buildChunkedStatePatch(customerDbKey, JSON.stringify(Array.isArray(rows) ? rows : [])),
+  };
 }
 
 function buildHistoryEntry({ type, label, actor, source, messageKey, subject, preview }, deps = {}) {
@@ -1408,10 +1419,7 @@ function createInstantlyOutreachService(deps = {}) {
     const nextRows = markRowsAsSynced(rows, selectedRows, data, actor);
     await setUiStateValues(
       customerDbScope,
-      {
-        ...values,
-        [customerDbKey]: JSON.stringify(nextRows),
-      },
+      buildCustomerRowsStateValues(values, nextRows, customerDbKey),
       {
         source: 'instantly-sync',
         actor,
@@ -1755,10 +1763,7 @@ function createInstantlyOutreachService(deps = {}) {
     );
     await setUiStateValues(
       customerDbScope,
-      {
-        ...values,
-        [customerDbKey]: JSON.stringify(nextRows),
-      },
+      buildCustomerRowsStateValues(values, nextRows, customerDbKey),
       {
         source: 'instantly-webhook',
         actor: 'Instantly webhook',

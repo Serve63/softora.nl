@@ -2,6 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createInstantlyOutreachService } = require('../../server/services/instantly-outreach');
+const {
+  buildChunkedStatePatch,
+  readChunkedStateValue,
+} = require('../../server/services/data-ops-serialization');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -50,6 +54,10 @@ function createService(overrides = {}) {
     },
   };
   const autopilotState = overrides.autopilotState || {};
+  let customerValues =
+    overrides.customerValues || {
+      softora_customers_premium_v1: JSON.stringify(rows),
+    };
   const fetchCalls = [];
   const writes = [];
   const service = createInstantlyOutreachService({
@@ -99,14 +107,13 @@ function createService(overrides = {}) {
         };
       }
       return {
-        values: {
-          softora_customers_premium_v1: JSON.stringify(rows),
-        },
+        values: customerValues,
       };
     },
     setUiStateValues: async (scope, values, meta) => {
       writes.push({ scope, values, meta });
-      rows = JSON.parse(values.softora_customers_premium_v1);
+      customerValues = values;
+      rows = JSON.parse(readChunkedStateValue(values, 'softora_customers_premium_v1') || '[]');
       return { ok: true };
     },
     fetchJsonWithTimeout: async (url, options, timeoutMs) => {
@@ -195,6 +202,43 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(rows[0].lastColdmailProvider, 'instantly');
   assert.equal(rows[0].databaseStatus, undefined);
   assert.equal(rows[0].status, 'prospect');
+});
+
+test('instantly sync reads and writes chunked customer database state', async () => {
+  const sourceRows = [
+    {
+      id: 'prospect-1',
+      bedrijf: 'Bakkerij Zon',
+      naam: 'Ruben Bakker',
+      email: 'ruben@example.test',
+      website: 'https://bakkerijzon.test',
+      status: 'prospect',
+      mail: true,
+    },
+  ];
+  const customerValues = buildChunkedStatePatch(
+    'softora_customers_premium_v1',
+    JSON.stringify(sourceRows)
+  );
+  customerValues.softora_customers_premium_v1 = '';
+  const { service, fetchCalls, writes, getRows } = createService({
+    rows: [],
+    customerValues,
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.synced, 1);
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(writes.length, 1);
+  assert.ok(writes[0].values.softora_customers_premium_v1_chunks_v1);
+  assert.ok(writes[0].values.softora_customers_premium_v1_chunk_0);
+  const savedRows = JSON.parse(
+    readChunkedStateValue(writes[0].values, 'softora_customers_premium_v1')
+  );
+  assert.equal(savedRows[0].instantlyStatus, 'synced');
+  assert.equal(getRows()[0].lastColdmailProvider, 'instantly');
 });
 
 test('instantly sync skips webdesign leads without ready image assets', async () => {
