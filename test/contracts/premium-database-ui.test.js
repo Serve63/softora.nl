@@ -482,7 +482,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260526a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260526b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
@@ -1292,6 +1292,18 @@ test('premium database outreach days column keeps benaderd rows after 25 days', 
   assert.match(controller.renderMeta(legacyColdmailCustomer, true), /Verstuurd vanaf onbekend mailadres/);
   assert.match(controller.renderDaysSinceSent(legacyColdmailCustomer), />1<\/span>/);
   assert.match(controller.renderActions(legacyColdmailCustomer), /Mail bekijken/);
+  const instantlyFields = outreachClient.normalizeCustomerFields({
+    lastColdmailProvider: 'instantly',
+    instantlyLeadId: 'lead-1',
+    instantlyCampaignId: 'campaign-1',
+    instantlyStatus: 'synced',
+    instantlySyncedAt: '2026-05-25T21:36:48.980Z',
+    status: 'gemaild',
+  });
+  assert.equal(instantlyFields.lastColdmailProvider, 'instantly');
+  assert.equal(controller.hasInstantlyOutreachSignal(instantlyFields), true);
+  assert.equal(controller.matchesStatusFilter(instantlyFields, 'instantly', () => false, () => true), true);
+  assert.equal(controller.matchesStatusFilter(instantlyFields, 'benaderd', () => false, () => true), false);
   assert.deepEqual(
     controller.sortByRecentOutreach([
       { id: 'older', bedrijf: 'B bedrijf', status: 'gemaild', updatedAt: '2026-05-20T10:00:00.000Z' },
