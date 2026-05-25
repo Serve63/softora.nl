@@ -323,7 +323,7 @@ test('premium mailbox behoudt mail-enters en vervangt image placeholders inline'
     '📞 0629917185',
     '',
     '[image: softora.nl webdesign]',
-    'Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop👇',
+    'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.',
     '[image: Device mockup]',
     '',
     'Geen webdesign willen ontvangen? Laat het me weten!: https://www.softora.nl/afmelden?t=abc',

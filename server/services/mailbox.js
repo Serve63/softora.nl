@@ -33,7 +33,7 @@ const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
-const COLDMAIL_MOCKUP_CAPTION = 'Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop👇';
+const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 

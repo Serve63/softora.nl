@@ -737,7 +737,7 @@ test('mailbox service recovers sent webdesign images without treating Softora li
     assert.equal(messages.length, 1);
     const phoneIndex = messages[0].body.indexOf('0629917185');
     const webdesignIndex = messages[0].body.indexOf('[image: Jaghthuijs webdesign]');
-    const captionIndex = messages[0].body.indexOf('Zo zal het design er ongeveer uit gaan zien op mobiel, tablet en laptop');
+    const captionIndex = messages[0].body.indexOf('Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.');
     const mockupIndex = messages[0].body.indexOf('[image: Jaghthuijs device mockup]');
     const optOutIndex = messages[0].body.indexOf('Geen webdesign willen ontvangen? Laat het me weten!');
     assert.ok(phoneIndex > 0);
