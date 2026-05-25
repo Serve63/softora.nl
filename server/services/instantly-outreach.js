@@ -64,6 +64,8 @@ const ACTIVE_INSTANTLY_STATUSES = new Set([
   'completed',
 ]);
 const BLOCKING_INSTANTLY_STATUSES = new Set(['bounced', 'unsubscribed', 'blocked']);
+const PRIOR_COLDMAIL_HISTORY_PATTERN =
+  /\b(gemaild|mail verstuurd|mail geopend|mailcontact|coldmail|cold mailing|open tracking|email sent|email opened|reply received|reactie ontvangen)\b/;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
   'gmail.com',
@@ -1059,6 +1061,64 @@ function createInstantlyOutreachService(deps = {}) {
     return Boolean(domain && PERSONAL_MAILBOX_DOMAINS.has(domain));
   }
 
+  function normalizeHistorySearchText(value) {
+    return normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function getPriorColdmailTimestamp(row) {
+    return normalizeString(
+      row &&
+        (row.outreachSentAt ||
+          row.outreach_sent_at ||
+          row.lastColdmailSentAt ||
+          row.lastMailSentAt ||
+          row.lastMailedAt ||
+          row.coldmailCampaignStartedAt ||
+          row.coldmailOpenedAt ||
+          row.coldmailFirstOpenedAt ||
+          row.coldmailLastOpenedAt ||
+          row.outreachOpenedAt ||
+          row.lastColdmailReplyAt)
+    );
+  }
+
+  function hasPriorColdmailHistorySignal(row) {
+    const history = Array.isArray(row && row.hist) ? row.hist : [];
+    return history.some((item) => {
+      const text = normalizeHistorySearchText(
+        [
+          item && item.type,
+          item && item.status,
+          item && item.label,
+          item && item.message,
+          item && item.title,
+          item && item.source,
+          item && item.subject,
+          item && item.preview,
+          item && item.messageKey,
+        ].join(' ')
+      );
+      return PRIOR_COLDMAIL_HISTORY_PATTERN.test(text);
+    });
+  }
+
+  function hasPriorColdmailOutreach(row) {
+    if (!row || typeof row !== 'object') return false;
+    if (normalizeContactStatus(row.outreachStatus, row) === 'gemaild') return true;
+    if (getPriorColdmailTimestamp(row)) return true;
+    if (Number(row.coldmailOpenCount || row.outreachOpenCount || 0) > 0) return true;
+    if (row.coldmailOpened === true || row.outreachOpened === true) return true;
+    if (normalizeString(row.coldmailSentMessageId || row.outreachMessageId || row.sentMessageId || row.messageId)) {
+      return true;
+    }
+    return hasPriorColdmailHistorySignal(row);
+  }
+
   function hasActiveInstantlyOutreach(row) {
     const status = normalizeInstantlyStatus(row && row.instantlyStatus, normalizeString);
     if (BLOCKING_INSTANTLY_STATUSES.has(status)) return false;
@@ -1162,6 +1222,15 @@ function createInstantlyOutreachService(deps = {}) {
       if (row.mail === false || row.canMail === false || row.doNotMail === true) continue;
       if (EXCLUDED_DATABASE_STATUSES.has(status)) continue;
       if (hasActiveInstantlyOutreach(row)) continue;
+      if (hasPriorColdmailOutreach(row)) {
+        failed.push({
+          id,
+          bedrijf: company,
+          email,
+          error: 'Al eerder benaderd via Softora coldmail/open-tracking; niet naar Instantly gestuurd.',
+        });
+        continue;
+      }
       if (config.blockPersonalMailboxDomains && isPersonalMailboxDomain(email)) {
         failed.push({
           id,

@@ -209,6 +209,67 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(rows[2].outreachStatus, 'benaderd');
 });
 
+test('instantly sync blocks leads with prior Softora coldmail history', async () => {
+  const { service, fetchCalls, getRows } = createService({
+    rows: [
+      {
+        id: 'opened-before',
+        bedrijf: 'Koks Bouw & Interieur',
+        email: 'info@koks-b-i.nl',
+        website: 'https://koks-b-i.nl',
+        status: 'benaderbaar',
+        mail: true,
+        hist: [
+          {
+            date: '2026-05-23T07:58:18.559Z',
+            type: 'mail_geopend',
+            label: 'Mail geopend',
+            source: 'coldmail-open-tracking',
+            messageKey: 'open-37c10e06-123e-463a-90d9-0c3be02e47f0',
+          },
+        ],
+      },
+      {
+        id: 'sent-before',
+        bedrijf: 'Kools LMB Alphen',
+        email: 'info@koolslmb.nl',
+        website: 'https://koolslmb.nl',
+        status: 'prospect',
+        mail: true,
+        coldmailSentMessageId: 'old-softora-message',
+      },
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.synced, 1);
+  assert.equal(result.failed.length, 2);
+  assert.match(result.failed[0].error, /Al eerder benaderd/);
+  assert.match(result.failed[1].error, /Al eerder benaderd/);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.leads.length, 1);
+  assert.equal(body.leads[0].email, 'ruben@example.test');
+
+  const rows = getRows();
+  assert.equal(rows[0].instantlyLeadId, undefined);
+  assert.equal(rows[0].status, 'benaderbaar');
+  assert.equal(rows[1].instantlyLeadId, undefined);
+  assert.equal(rows[1].status, 'prospect');
+  assert.equal(rows[2].instantlyStatus, 'synced');
+});
+
 test('instantly sync reads and writes chunked customer database state', async () => {
   const sourceRows = [
     {
