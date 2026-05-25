@@ -23,6 +23,7 @@ const pageSmokeTargets = Object.freeze([
   { path: '/premium-personeel-agenda', marker: 'Servé Digital | Agenda', allowLoginFallback: true },
   { path: '/premium-leads', marker: 'Softora | Leads Overzicht — Premium', allowLoginFallback: true },
   { path: '/premium-ai-lead-generator', marker: 'Cold Mailing', allowLoginFallback: true },
+  { path: '/premium-coldmailing-lead', marker: 'Softora | Coldmailing Lead - Premium', allowLoginFallback: true },
   { path: '/premium-actieve-opdrachten', marker: 'Softora | Actieve Opdrachten — Premium', allowLoginFallback: true },
 ]);
 
