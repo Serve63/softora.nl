@@ -47,6 +47,7 @@ const unifiedPersonnelThemeTargets = [
   'premium-ai-coldmailing.html',
   'premium-ai-lead-generator.html',
   'premium-actieve-opdrachten.html',
+  'premium-coldmailing-lead.html',
   'premium-websitegenerator.html',
   'premium-personeel-dashboard.html',
 ];
@@ -59,6 +60,7 @@ const premiumSidebarThemeVersionTargets = [
   'premium-ai-lead-generator.html',
   'premium-bevestigingsmails.html',
   'premium-boekhouding.html',
+  'premium-coldmailing-lead.html',
   'premium-database.html',
   'premium-instellingen-personeel.html',
   'premium-instellingen.html',

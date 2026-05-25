@@ -55,6 +55,7 @@ test('marketing premium landing pages are not auth-gated', () => {
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-seo.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-websitegenerator.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-bevestigingsmails.html'), true);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-coldmailing-lead.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-personeel-dashboard.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-wachtwoordenregister.html'), true);
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-instellingen.html'), true);
@@ -148,6 +149,7 @@ test('internal premium tool pages require login for anonymous visitors', async (
 
   const protectedToolPages = [
     ['premium-bevestigingsmails.html', '/premium-bevestigingsmails'],
+    ['premium-coldmailing-lead.html', '/premium-coldmailing-lead'],
     ['premium-pakketten.html', '/premium-pakketten'],
     ['premium-seo.html', '/premium-seo'],
     ['premium-websitegenerator.html', '/premium-websitegenerator'],

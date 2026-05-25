@@ -123,6 +123,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
   assert.match(themeJsSource, /function stabilizePremiumStaticSidebar\(sidebar, activeKey\) \{/);
+  assert.match(themeJsSource, /if \(p\.indexOf\("\/premium-coldmailing-lead"\) === 0\) return "coldmailing_lead";/);
+  assert.match(themeJsSource, /key:\s*"coldmailing_lead"[\s\S]*href:\s*"\/premium-coldmailing-lead"[\s\S]*label:\s*"Lead"/);
+  assert.match(themeJsSource, /getColdmailingLeadSidebarLink\(\),[\s\S]*key:\s*"coldmailing"[\s\S]*href:\s*"\/premium-bevestigingsmails"/);
+  assert.match(themeJsSource, /ensureStaticSidebarLink\(sidebar, "overzicht", getColdmailingLeadSidebarLink\(\), \["coldmailing", "database"\]\)/);
   assert.doesNotMatch(themeJsSource, /sidebar\.dataset\.staticSidebar === "1"\) \{\s*sidebar\.innerHTML/);
   assert.doesNotMatch(themeJsSource, /getWebsiteGeneratorLibrarySidebarLink/);
   assert.doesNotMatch(themeJsSource, /label:\s*"Bibliotheek"/);
