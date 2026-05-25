@@ -8,6 +8,7 @@ const { createRuntimeMemoryState } = require('./runtime-memory');
 
 function buildServerAppEnvConfig(runtimeEnv) {
   const googleCalendar = runtimeEnv.googleCalendar || {};
+  const instantly = runtimeEnv.instantly || {};
   return {
     PORT: runtimeEnv.app.port,
     IS_PRODUCTION: runtimeEnv.app.isProduction,
@@ -94,6 +95,15 @@ function buildServerAppEnvConfig(runtimeEnv) {
     COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT: runtimeEnv.mail.coldmailPersonalMailboxDailyLimit,
     COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS: runtimeEnv.mail.coldmailPersonalMailboxSendDelayMs,
     COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS: runtimeEnv.mail.coldmailBlockPersonalMailboxDomains,
+    INSTANTLY_ENABLED: Boolean(instantly.enabled),
+    INSTANTLY_API_KEY: instantly.apiKey || '',
+    INSTANTLY_API_BASE_URL: instantly.apiBaseUrl || 'https://api.instantly.ai/api/v2',
+    INSTANTLY_DEFAULT_CAMPAIGN_ID: instantly.defaultCampaignId || '',
+    INSTANTLY_WEBHOOK_SECRET: instantly.webhookSecret || '',
+    INSTANTLY_SYNC_INTERVAL_MINUTES: instantly.syncIntervalMinutes || 15,
+    INSTANTLY_SYNC_BATCH_SIZE: instantly.syncBatchSize || 10,
+    INSTANTLY_DAILY_CAP: instantly.dailyCap || 25,
+    INSTANTLY_VERIFY_LEADS_ON_IMPORT: Boolean(instantly.verifyLeadsOnImport),
     GOOGLE_CALENDAR_SYNC_ENABLED: Boolean(googleCalendar.enabled),
     GOOGLE_CALENDAR_CLIENT_EMAIL: googleCalendar.clientEmail || '',
     GOOGLE_CALENDAR_PRIVATE_KEY: googleCalendar.privateKey || '',

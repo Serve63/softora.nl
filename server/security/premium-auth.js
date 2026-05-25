@@ -11,6 +11,7 @@ const PREMIUM_PUBLIC_API_EXACT_MATCHES = new Set([
   '/api/twilio/status',
   '/api/coldmailing/open.gif',
   '/api/coldmailing/unsubscribe',
+  '/api/instantly/webhook',
   '/api/retell/webhook',
   '/api/retell/functions/agenda/availability',
   '/retell/webhook',

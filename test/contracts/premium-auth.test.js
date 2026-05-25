@@ -148,6 +148,10 @@ test('premium auth manager rejects unsafe redirects and recognizes public api pa
     true
   );
   assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'POST', originalUrl: '/api/instantly/webhook' }),
+    true
+  );
+  assert.equal(
     manager.isPremiumPublicApiRequest({
       method: 'POST',
       originalUrl: '/api/retell/functions/agenda/availability/run',

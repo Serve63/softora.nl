@@ -2,6 +2,7 @@ const {
   buildServerAppFeatureWiringContext,
 } = require('./server-app-runtime-composition-options');
 const { createColdmailCampaignService } = require('./coldmail-campaign');
+const { createInstantlyOutreachService } = require('./instantly-outreach');
 
 function createDataOpsAwareUiStateGetter(uiSeoRuntime = {}) {
   const legacyGetUiStateValues =
@@ -70,6 +71,10 @@ function buildServerAppFeatureWiringRuntimeContext({
   upsertRecentCallUpdate,
   shared,
 }) {
+  const instantlySchedulerEnabled = Boolean(
+    envConfig.INSTANTLY_ENABLED &&
+      !(env && (env.VERCEL || env.AWS_LAMBDA_FUNCTION_NAME || env.LAMBDA_TASK_ROOT))
+  );
   const dataOpsAwareUiStateGetter = createDataOpsAwareUiStateGetter(uiSeoRuntime);
   const dataOpsAwareUiStateSetter = createDataOpsAwareUiStateSetter(uiSeoRuntime);
 
@@ -341,6 +346,33 @@ function buildServerAppFeatureWiringRuntimeContext({
         backfillInsightsAndAppointmentsFromRecentCallUpdates:
           agendaSupportRuntime.backfillInsightsAndAppointmentsFromRecentCallUpdates,
         cronSecret: env.CRON_SECRET || '',
+        normalizeString: shared.normalizeString,
+        truncateText: shared.truncateText,
+      },
+      instantly: {
+        instantlyOutreachService: createInstantlyOutreachService({
+          instantlyConfig: {
+            enabled: envConfig.INSTANTLY_ENABLED,
+            schedulerEnabled: instantlySchedulerEnabled,
+            apiKey: envConfig.INSTANTLY_API_KEY,
+            apiBaseUrl: envConfig.INSTANTLY_API_BASE_URL,
+            defaultCampaignId: envConfig.INSTANTLY_DEFAULT_CAMPAIGN_ID,
+            webhookSecret: envConfig.INSTANTLY_WEBHOOK_SECRET,
+            intervalMinutes: envConfig.INSTANTLY_SYNC_INTERVAL_MINUTES,
+            batchSize: envConfig.INSTANTLY_SYNC_BATCH_SIZE,
+            dailyCap: envConfig.INSTANTLY_DAILY_CAP,
+            verifyLeadsOnImport: envConfig.INSTANTLY_VERIFY_LEADS_ON_IMPORT,
+            blockPersonalMailboxDomains: envConfig.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,
+          },
+          getUiStateValues: dataOpsAwareUiStateGetter,
+          setUiStateValues: dataOpsAwareUiStateSetter,
+          fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
+          customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
+          customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
+          normalizeString: shared.normalizeString,
+          truncateText: shared.truncateText,
+          logger: console,
+        }),
         normalizeString: shared.normalizeString,
         truncateText: shared.truncateText,
       },

@@ -5147,6 +5147,42 @@ test('coldmail campaign skips recipients whose domain does not receive mail', as
   assert.equal(savedRows[1].status, 'gemaild');
 });
 
+test('coldmail campaign skips rows that are already active in Instantly', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'instantly-active',
+        bedrijf: 'Instantly Actief BV',
+        naam: 'Ruben',
+        email: 'active@example.test',
+        status: 'prospect',
+        mail: true,
+        instantlyStatus: 'synced',
+        instantlyCampaignId: 'campaign-1',
+      },
+      {
+        id: 'normal-prospect',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 10,
+    subject: 'Test voor {{bedrijf}}',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'ruben@example.test');
+});
+
 test('coldmail campaign refuses to send when all recipient domains are invalid', async () => {
   const { service, sentMessages, getSavedState } = createService({
     rows: [

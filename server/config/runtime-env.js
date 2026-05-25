@@ -311,6 +311,32 @@ function loadRuntimeEnv(env = process.env) {
         false
       ),
     },
+    instantly: {
+      enabled: readBooleanEnvFlag(safeEnv.INSTANTLY_ENABLED),
+      apiKey: normalizeString(safeEnv.INSTANTLY_API_KEY || ''),
+      apiBaseUrl: normalizeString(safeEnv.INSTANTLY_API_BASE_URL || 'https://api.instantly.ai/api/v2'),
+      defaultCampaignId: normalizeString(safeEnv.INSTANTLY_DEFAULT_CAMPAIGN_ID || ''),
+      webhookSecret: normalizeString(safeEnv.INSTANTLY_WEBHOOK_SECRET || ''),
+      syncIntervalMinutes: readBoundedNumberEnv(
+        safeEnv.INSTANTLY_SYNC_INTERVAL_MINUTES,
+        15,
+        1,
+        24 * 60
+      ),
+      syncBatchSize: readBoundedNumberEnv(
+        safeEnv.INSTANTLY_SYNC_BATCH_SIZE,
+        10,
+        1,
+        1000
+      ),
+      dailyCap: readBoundedNumberEnv(
+        safeEnv.INSTANTLY_DAILY_CAP,
+        25,
+        1,
+        1000
+      ),
+      verifyLeadsOnImport: readBooleanEnvFlag(safeEnv.INSTANTLY_VERIFY_LEADS_ON_IMPORT),
+    },
     googleCalendar: {
       enabled: readBooleanEnvFlag(safeEnv.GOOGLE_CALENDAR_SYNC_ENABLED),
       clientEmail: normalizeString(safeEnv.GOOGLE_CALENDAR_CLIENT_EMAIL || ''),

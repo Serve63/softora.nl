@@ -104,6 +104,17 @@ test('server app runtime bootstrap flattens env config without changing values',
       coldmailPersonalMailboxSendDelayMs: 180000,
       coldmailBlockPersonalMailboxDomains: false,
     },
+    instantly: {
+      enabled: true,
+      apiKey: 'instantly-key',
+      apiBaseUrl: 'https://api.instantly.test/api/v2',
+      defaultCampaignId: 'campaign-1',
+      webhookSecret: 'webhook-secret',
+      syncIntervalMinutes: 30,
+      syncBatchSize: 20,
+      dailyCap: 50,
+      verifyLeadsOnImport: true,
+    },
     securityContactEmail: 'security@test.invalid',
     demoConfirmationTaskEnabled: true,
   });
@@ -122,6 +133,15 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.COLDMAIL_BOUNCE_PROCESSING_ENABLED, true);
   assert.equal(envConfig.COLDMAIL_SEND_DELAY_MS, 90000);
   assert.equal(envConfig.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT, 9);
+  assert.equal(envConfig.INSTANTLY_ENABLED, true);
+  assert.equal(envConfig.INSTANTLY_API_KEY, 'instantly-key');
+  assert.equal(envConfig.INSTANTLY_API_BASE_URL, 'https://api.instantly.test/api/v2');
+  assert.equal(envConfig.INSTANTLY_DEFAULT_CAMPAIGN_ID, 'campaign-1');
+  assert.equal(envConfig.INSTANTLY_WEBHOOK_SECRET, 'webhook-secret');
+  assert.equal(envConfig.INSTANTLY_SYNC_INTERVAL_MINUTES, 30);
+  assert.equal(envConfig.INSTANTLY_SYNC_BATCH_SIZE, 20);
+  assert.equal(envConfig.INSTANTLY_DAILY_CAP, 50);
+  assert.equal(envConfig.INSTANTLY_VERIFY_LEADS_ON_IMPORT, true);
   assert.equal(envConfig.MAIL_IMAP_MAILBOX, 'INBOX');
   assert.equal(envConfig.SECURITY_CONTACT_EMAIL, 'security@test.invalid');
 });

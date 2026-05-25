@@ -141,6 +141,22 @@ services:
         value: 60
       - key: COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES
         value: 75
+      - key: INSTANTLY_ENABLED
+        value: true
+      - key: INSTANTLY_API_KEY
+        sync: false
+      - key: INSTANTLY_DEFAULT_CAMPAIGN_ID
+        sync: false
+      - key: INSTANTLY_WEBHOOK_SECRET
+        sync: false
+      - key: INSTANTLY_SYNC_INTERVAL_MINUTES
+        value: 15
+      - key: INSTANTLY_SYNC_BATCH_SIZE
+        value: 10
+      - key: INSTANTLY_DAILY_CAP
+        value: 25
+      - key: INSTANTLY_VERIFY_LEADS_ON_IMPORT
+        value: false
       - key: GOOGLE_CALENDAR_SYNC_ENABLED
         value: false
       - key: GOOGLE_CALENDAR_CLIENT_EMAIL
