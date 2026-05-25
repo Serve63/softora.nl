@@ -2013,6 +2013,7 @@ function createColdmailCampaignService(deps = {}) {
 
   function pruneColdmailRecipientGuardEntries(entries) {
     const cutoffMs = now().getTime() - COLDMAIL_RECIPIENT_GUARD_WINDOW_MS;
+    const seen = new Set();
     return (Array.isArray(entries) ? entries : [])
       .filter((entry) => entry && typeof entry === 'object')
       .map((entry) => ({
@@ -2025,7 +2026,21 @@ function createColdmailCampaignService(deps = {}) {
         recipientId: normalizeColdmailGuardKeyPart(entry.recipientId),
         recipientCompany: truncateText(normalizeString(entry.recipientCompany), 120),
       }))
-      .filter((entry) => parseTimestampMs(entry.at) >= cutoffMs && hasColdmailRecipientGuardIdentity(entry));
+      .filter((entry) => {
+        if (parseTimestampMs(entry.at) < cutoffMs || !hasColdmailRecipientGuardIdentity(entry)) return false;
+        const key = [
+          entry.at,
+          entry.senderEmail,
+          entry.recipientKey,
+          entry.recipientEmail,
+          entry.recipientDomain,
+          entry.recipientCompanyKey,
+          entry.recipientId,
+        ].join('|');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
   }
 
   async function loadColdmailSendGuardState() {
