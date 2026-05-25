@@ -4180,6 +4180,79 @@ test('coldmail campaign enforces daily sender guard across campaigns', async () 
   assert.equal(sentMessages.length, 2);
 });
 
+test('coldmail campaign blocks the same recipient across different sender mailboxes', async () => {
+  const rows = [
+    {
+      id: 'de-hoevens',
+      bedrijf: 'Landgoed de Hoevens',
+      naam: 'Landgoed de Hoevens',
+      email: 'gastenverblijven@dehoevens.nl',
+      website: 'dehoevens.nl',
+      status: 'prospect',
+      mail: true,
+    },
+  ];
+  const mailboxAccountsRaw = JSON.stringify([
+    {
+      email: 'serve@softora.nl',
+      name: 'Servé Creusen',
+      smtpHost: 'smtp.strato.test',
+      smtpUser: 'serve@softora.nl',
+      smtpPass: 'serve-secret',
+    },
+    {
+      email: 'martijn@softora.nl',
+      name: 'Martijn van de Ven',
+      smtpHost: 'smtp.strato.test',
+      smtpUser: 'martijn@softora.nl',
+      smtpPass: 'martijn-secret',
+    },
+  ]);
+  const first = createService({
+    rows: JSON.parse(JSON.stringify(rows)),
+    mailboxAccountsRaw,
+  });
+
+  const firstResult = await first.service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag {{naam}}',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(firstResult.sent, 1);
+  assert.equal(first.sentMessages[0].to, 'gastenverblijven@dehoevens.nl');
+  assert.equal(first.getSendGuardState().entries[0].recipientEmail, 'gastenverblijven@dehoevens.nl');
+  assert.equal(first.getSendGuardState().entries[0].recipientDomain, 'dehoevens-nl');
+
+  const second = createService({
+    rows: JSON.parse(JSON.stringify(rows)),
+    mailboxAccountsRaw,
+    sendGuardState: first.getSendGuardState(),
+  });
+
+  const preview = await second.service.getColdmailCampaignRecipients({ count: 1 });
+  assert.equal(preview.selected, 0);
+  assert.equal(preview.failedItems[0].code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+  assert.match(preview.failedItems[0].error, /serve@softora\.nl/);
+
+  await assert.rejects(
+    () =>
+      second.service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'martijn@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+      assert.match(error.message, /recent al gemaild/);
+      return true;
+    }
+  );
+  assert.equal(second.sentMessages.length, 0);
+});
+
 test('coldmail campaign does not mark daily-limit skipped rows as mailed', async () => {
   const rows = Array.from({ length: 4 }, (_, index) => ({
     id: `prospect-${index + 1}`,

@@ -43,8 +43,10 @@ const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES = 60;
 const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES = 75;
 const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
+const COLDMAIL_RECIPIENT_GUARD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'COLDMAIL_DAILY_LIMIT_REACHED',
+  'COLDMAIL_RECIPIENT_RECENTLY_SENT',
   'COLDMAIL_SAFETY_PAUSED',
   'COLDMAIL_SEND_IN_PROGRESS',
   'EMPTY_MAIL_CONTENT',
@@ -964,6 +966,87 @@ function createColdmailCampaignService(deps = {}) {
 
   function getRowEmail(row) {
     return normalizeEmailAddress(row.email || row.contactEmail || row.mail || '');
+  }
+
+  function normalizeColdmailGuardKeyPart(value) {
+    return normalizeString(value)
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function buildColdmailRecipientGuard(row, id = '') {
+    if (!row || typeof row !== 'object') {
+      return {
+        recipientKey: '',
+        recipientEmail: '',
+        recipientDomain: '',
+        recipientCompanyKey: '',
+        recipientId: normalizeColdmailGuardKeyPart(id),
+        recipientCompany: '',
+      };
+    }
+    const recipientEmail = getRowEmail(row);
+    const recipientDomain = normalizeColdmailGuardKeyPart(getRowDomain(row));
+    const recipientCompanyKey = normalizeColdmailGuardKeyPart(getRowCompany(row));
+    const recipientId = normalizeColdmailGuardKeyPart(id || getExplicitRowId(row));
+    const recipientKey = recipientEmail
+      ? `email:${recipientEmail}`
+      : recipientDomain
+        ? `domain:${recipientDomain}`
+        : recipientId
+          ? `id:${recipientId}`
+          : '';
+    return {
+      recipientKey,
+      recipientEmail,
+      recipientDomain,
+      recipientCompanyKey,
+      recipientId,
+      recipientCompany: truncateText(getRowCompany(row), 120),
+    };
+  }
+
+  function hasColdmailRecipientGuardIdentity(entry) {
+    return Boolean(
+      entry &&
+        (entry.recipientKey ||
+          entry.recipientEmail ||
+          entry.recipientDomain ||
+          entry.recipientCompanyKey ||
+          entry.recipientId)
+    );
+  }
+
+  function getColdmailRecipientGuardMatch(item, entries = []) {
+    const guard = buildColdmailRecipientGuard(item && item.row, item && item.id);
+    return (Array.isArray(entries) ? entries : []).find((entry) => {
+      if (!entry || !hasColdmailRecipientGuardIdentity(entry)) return false;
+      if (guard.recipientKey && entry.recipientKey === guard.recipientKey) return true;
+      if (guard.recipientEmail && entry.recipientEmail === guard.recipientEmail) return true;
+      if (guard.recipientDomain && entry.recipientDomain === guard.recipientDomain) return true;
+      if (guard.recipientId && entry.recipientId === guard.recipientId) return true;
+      return false;
+    }) || null;
+  }
+
+  function buildColdmailRecipientGuardFailure(item, match) {
+    const sender = normalizeEmailAddress(match && match.senderEmail);
+    return {
+      id: item && item.id,
+      bedrijf: getRowCompany(item && item.row),
+      email: getRowEmail(item && item.row),
+      code: 'COLDMAIL_RECIPIENT_RECENTLY_SENT',
+      error: sender
+        ? `Dit bedrijf/e-mailadres is recent al gemaild via ${sender}.`
+        : 'Dit bedrijf/e-mailadres is recent al gemaild.',
+    };
+  }
+
+  function isColdmailRecipientGuardFailure(item) {
+    return normalizeString(item && item.code) === 'COLDMAIL_RECIPIENT_RECENTLY_SENT';
   }
 
   function getRowPhone(row) {
@@ -1912,6 +1995,12 @@ function createColdmailCampaignService(deps = {}) {
         senderEmail: normalizeEmailAddress(entry.senderEmail),
         count: Math.max(0, Number(entry.count || 0) || 0),
         personalCount: Math.max(0, Number(entry.personalCount || 0) || 0),
+        recipientKey: normalizeString(entry.recipientKey),
+        recipientEmail: normalizeEmailAddress(entry.recipientEmail),
+        recipientDomain: normalizeColdmailGuardKeyPart(entry.recipientDomain),
+        recipientCompanyKey: normalizeColdmailGuardKeyPart(entry.recipientCompanyKey),
+        recipientId: normalizeColdmailGuardKeyPart(entry.recipientId),
+        recipientCompany: truncateText(normalizeString(entry.recipientCompany), 120),
         safetyPauseUntil: normalizeString(entry.safetyPauseUntil || entry.until),
         safetyPauseReason: truncateText(normalizeString(entry.safetyPauseReason || entry.reason), 240),
       }))
@@ -1922,21 +2011,45 @@ function createColdmailCampaignService(deps = {}) {
       });
   }
 
+  function pruneColdmailRecipientGuardEntries(entries) {
+    const cutoffMs = now().getTime() - COLDMAIL_RECIPIENT_GUARD_WINDOW_MS;
+    return (Array.isArray(entries) ? entries : [])
+      .filter((entry) => entry && typeof entry === 'object')
+      .map((entry) => ({
+        at: normalizeString(entry.at),
+        senderEmail: normalizeEmailAddress(entry.senderEmail),
+        recipientKey: normalizeString(entry.recipientKey),
+        recipientEmail: normalizeEmailAddress(entry.recipientEmail),
+        recipientDomain: normalizeColdmailGuardKeyPart(entry.recipientDomain),
+        recipientCompanyKey: normalizeColdmailGuardKeyPart(entry.recipientCompanyKey),
+        recipientId: normalizeColdmailGuardKeyPart(entry.recipientId),
+        recipientCompany: truncateText(normalizeString(entry.recipientCompany), 120),
+      }))
+      .filter((entry) => parseTimestampMs(entry.at) >= cutoffMs && hasColdmailRecipientGuardIdentity(entry));
+  }
+
   async function loadColdmailSendGuardState() {
     const state = await getUiStateValues(coldmailSendGuardScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const parsed = safeJsonParse(values[coldmailSendGuardKey] || '{}', {});
     return {
       entries: pruneColdmailSendGuardEntries(parsed && parsed.entries),
+      recipientEntries: pruneColdmailRecipientGuardEntries([
+        ...((parsed && Array.isArray(parsed.recipientEntries)) ? parsed.recipientEntries : []),
+        ...((parsed && Array.isArray(parsed.entries)) ? parsed.entries : []),
+      ]),
     };
   }
 
   async function saveColdmailSendGuardState(sendGuardState, actor = 'coldmail-send-guard') {
     const entries = pruneColdmailSendGuardEntries(sendGuardState && sendGuardState.entries).slice(-1000);
+    const recipientEntries = pruneColdmailRecipientGuardEntries(
+      sendGuardState && sendGuardState.recipientEntries
+    ).slice(-2000);
     await setUiStateValues(
       coldmailSendGuardScope,
       {
-        [coldmailSendGuardKey]: JSON.stringify({ entries }),
+        [coldmailSendGuardKey]: JSON.stringify({ entries, recipientEntries }),
       },
       {
         source: 'coldmail-send-guard',
@@ -1972,6 +2085,7 @@ function createColdmailCampaignService(deps = {}) {
     const personalMailboxDailyLimit = getColdmailPersonalMailboxDailyLimit();
     return {
       entries,
+      recipientEntries: state.recipientEntries || [],
       senderSent,
       packageSent,
       personalMailboxSent,
@@ -2914,16 +3028,41 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
-  async function recordColdmailSendGuardEntry({ senderEmail, count, personalCount = 0, actor }) {
+  async function recordColdmailSendGuardEntry({
+    senderEmail,
+    count,
+    personalCount = 0,
+    actor,
+    recipientKey = '',
+    recipientEmail = '',
+    recipientDomain = '',
+    recipientCompanyKey = '',
+    recipientId = '',
+    recipientCompany = '',
+  }) {
     const safeCount = Math.max(0, Number(count || 0) || 0);
     if (!safeCount) return false;
     const state = await loadColdmailSendGuardState();
-    state.entries.push({
-      at: now().toISOString(),
+    const at = now().toISOString();
+    const recipientEntry = {
+      at,
       senderEmail: normalizeEmailAddress(senderEmail),
+      recipientKey: normalizeString(recipientKey),
+      recipientEmail: normalizeEmailAddress(recipientEmail),
+      recipientDomain: normalizeColdmailGuardKeyPart(recipientDomain),
+      recipientCompanyKey: normalizeColdmailGuardKeyPart(recipientCompanyKey),
+      recipientId: normalizeColdmailGuardKeyPart(recipientId),
+      recipientCompany: truncateText(normalizeString(recipientCompany), 120),
+    };
+    state.entries.push({
+      ...recipientEntry,
       count: safeCount,
       personalCount: Math.max(0, Number(personalCount || 0) || 0),
     });
+    if (hasColdmailRecipientGuardIdentity(recipientEntry)) {
+      state.recipientEntries = Array.isArray(state.recipientEntries) ? state.recipientEntries : [];
+      state.recipientEntries.push(recipientEntry);
+    }
     await saveColdmailSendGuardState(state, actor);
     return true;
   }
@@ -3073,6 +3212,8 @@ function createColdmailCampaignService(deps = {}) {
     const readyWebdesignMatcher = shouldRequireWebdesign
       ? createReadyWebdesignMatcher(customerRows, customerPhotoMap)
       : null;
+    const sendGuardState = mode === 'mail' ? await loadColdmailSendGuardState() : { recipientEntries: [] };
+    const recipientGuardEntries = sendGuardState.recipientEntries || [];
 
     const failed = [];
     const eligibleRows = rows
@@ -3100,6 +3241,11 @@ function createColdmailCampaignService(deps = {}) {
       if (mode === 'call') {
         selectedRows.push(item);
         if (selectedRows.length >= count) break;
+        continue;
+      }
+      const recipientGuardMatch = getColdmailRecipientGuardMatch(item, recipientGuardEntries);
+      if (recipientGuardMatch) {
+        failed.push(buildColdmailRecipientGuardFailure(item, recipientGuardMatch));
         continue;
       }
       const email = getRowEmail(item.row);
@@ -4820,8 +4966,9 @@ function createColdmailCampaignService(deps = {}) {
 
     if (!selectedRows.length) {
       const firstFailure = pickFailureMessage(failed, candidateRows);
+      const recipientGuardFailure = failed.length > 0 && failed.every((item) => isColdmailRecipientGuardFailure(item));
       const error = new Error(firstFailure || 'Geen geldige e-maildomeinen gevonden in de database.');
-      error.code = 'NO_VALID_RECIPIENT_DOMAINS';
+      error.code = recipientGuardFailure ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT' : 'NO_VALID_RECIPIENT_DOMAINS';
       error.failedItems = failed;
       throw error;
     }
@@ -4863,6 +5010,14 @@ function createColdmailCampaignService(deps = {}) {
             error: buildColdmailSafetyPauseMessage(safetyPause),
           });
           break;
+        }
+        const liveRecipientGuardMatch = getColdmailRecipientGuardMatch(
+          item,
+          liveQuota.recipientEntries || []
+        );
+        if (liveRecipientGuardMatch) {
+          failed.push(buildColdmailRecipientGuardFailure(item, liveRecipientGuardMatch));
+          continue;
         }
       }
       const reference = buildColdmailReference(row, item.id);
@@ -4982,10 +5137,12 @@ function createColdmailCampaignService(deps = {}) {
         };
         sent.push(sentItem);
         if (!isTestRecipientRow(row, to)) {
+          const recipientGuard = buildColdmailRecipientGuard(row, item.id);
           await recordColdmailSendGuardEntry({
             senderEmail,
             count: 1,
             personalCount: isPersonalMailboxDomain(to) ? 1 : 0,
+            ...recipientGuard,
             actor,
           });
           const updatedRows = rows.map((currentRow, rowIndex) => {
@@ -5037,13 +5194,16 @@ function createColdmailCampaignService(deps = {}) {
 
     if (!sent.length && failed.length) {
       const firstFailure = pickFailureMessage(failed, selectedRows);
+      const recipientGuardFailure = failed.every((item) => isColdmailRecipientGuardFailure(item));
       const webdesignAssetFailure = shouldIncludeWebdesignPhoto && failed.every((item) =>
         /^Geen (?:webdesign-foto|device-mockup) gevonden voor /i.test(normalizeString(item && item.error))
       );
       const error = new Error(firstFailure ? `Geen mails verzonden: ${firstFailure}` : 'Geen mails verzonden.');
       error.code = safetyPause
         ? 'COLDMAIL_SAFETY_PAUSED'
-        : webdesignAssetFailure
+        : recipientGuardFailure
+          ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT'
+          : webdesignAssetFailure
           ? 'NO_WEBDESIGN_PHOTOS'
           : 'SMTP_SEND_FAILED';
       error.failedItems = failed;
