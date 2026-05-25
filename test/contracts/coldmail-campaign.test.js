@@ -4253,6 +4253,65 @@ test('coldmail campaign blocks the same recipient across different sender mailbo
   assert.equal(second.sentMessages.length, 0);
 });
 
+test('coldmail campaign deduplicates copied recipient guard entries when saving', async () => {
+  const oldRecipient = {
+    at: '2026-04-24T11:00:00.000Z',
+    senderEmail: 'serve@softora.nl',
+    count: 1,
+    personalCount: 0,
+    recipientKey: 'email:old@example.test',
+    recipientEmail: 'old@example.test',
+    recipientDomain: 'example-test',
+    recipientCompanyKey: 'old-company',
+    recipientId: 'old-row',
+    recipientCompany: 'Old Company',
+  };
+  const { service, getSendGuardState } = createService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.strato.test',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    rows: [
+      {
+        id: 'new-row',
+        bedrijf: 'New Company',
+        naam: 'New Company',
+        email: 'new@example.test',
+        website: 'new.example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    sendGuardState: {
+      entries: [oldRecipient],
+      recipientEntries: [oldRecipient, oldRecipient],
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag {{naam}}',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  const recipientEntries = getSendGuardState().recipientEntries;
+  assert.equal(
+    recipientEntries.filter((entry) => entry.recipientEmail === 'old@example.test').length,
+    1
+  );
+  assert.equal(
+    recipientEntries.filter((entry) => entry.recipientEmail === 'new@example.test').length,
+    1
+  );
+});
+
 test('coldmail campaign does not mark daily-limit skipped rows as mailed', async () => {
   const rows = Array.from({ length: 4 }, (_, index) => ({
     id: `prospect-${index + 1}`,
