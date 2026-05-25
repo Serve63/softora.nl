@@ -57,6 +57,7 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /Bekijk eerst de website grondig op basis van de URL-scan hieronder/i);
   assert.match(prompt, /Gebruik deze scan en eventuele referentiebeelden alleen als moodboard\/context/i);
   assert.match(prompt, /Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept/i);
+  assert.match(prompt, /inhoudelijk sterk blijft aansluiten op de bronsite/i);
   assert.match(prompt, /Er zijn 2 referentiebeeld\(en\) meegegeven; behandel die uitsluitend als moodboard voor merkidentiteit, kleuren, sfeer en doelgroep\./i);
   assert.match(prompt, /Gebruik dezelfde globale structuur waar mogelijk/i);
   assert.match(prompt, /UI-ONLY OUTPUT/i);
