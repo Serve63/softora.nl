@@ -252,6 +252,14 @@ function createCustomersPageBootstrapService(deps = {}) {
       review,
       verantwoordelijk: normalizeResponsibleValue(getResponsibleSourceValue(raw)),
       datum: normalizeDate(raw && raw.datum),
+      lastColdmailProvider: normalizeString(raw && raw.lastColdmailProvider),
+      lastColdmailProviderStatus: normalizeString(raw && raw.lastColdmailProviderStatus),
+      instantlyLeadId: normalizeString(raw && raw.instantlyLeadId),
+      instantlyCampaignId: normalizeString(raw && raw.instantlyCampaignId),
+      instantlyStatus: normalizeString(raw && raw.instantlyStatus),
+      instantlySyncedAt: normalizeString(raw && raw.instantlySyncedAt),
+      instantlyLastEventAt: normalizeString(raw && raw.instantlyLastEventAt),
+      instantlyEmailSentAt: normalizeString(raw && raw.instantlyEmailSentAt),
     };
   }
 

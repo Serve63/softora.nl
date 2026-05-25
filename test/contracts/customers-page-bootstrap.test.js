@@ -37,6 +37,13 @@ test('customers page bootstrap prefers stored customer database rows', async () 
               status: 'Betaald',
               actief: 'Ja',
               datum: '2026-03-23',
+              lastColdmailProvider: 'instantly',
+              lastColdmailProviderStatus: 'synced',
+              instantlyLeadId: 'instantly-lead-1',
+              instantlyCampaignId: 'instantly-campaign-1',
+              instantlyStatus: 'synced',
+              instantlySyncedAt: '2026-05-25T21:36:48.980Z',
+              instantlyLastEventAt: '2026-05-25T21:36:48.980Z',
             },
           ]),
         },
@@ -56,6 +63,10 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   assert.equal(payload.customers[0].stad, 'Gemullehoekenweg 1, 5062 SB Oisterwijk');
   assert.equal(payload.customers[0].review, 'Nee');
   assert.equal(payload.customers[0].verantwoordelijk, 'Team');
+  assert.equal(payload.customers[0].lastColdmailProvider, 'instantly');
+  assert.equal(payload.customers[0].instantlyLeadId, 'instantly-lead-1');
+  assert.equal(payload.customers[0].instantlyCampaignId, 'instantly-campaign-1');
+  assert.equal(payload.customers[0].instantlySyncedAt, '2026-05-25T21:36:48.980Z');
   assert.equal(payload.customers[1].datum, '2026-01-07');
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
 
