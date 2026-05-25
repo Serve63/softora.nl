@@ -1917,6 +1917,8 @@ function createInstantlyOutreachService(deps = {}) {
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = parseDatabaseRows(values, customerDbKey, normalizeString);
+    const activeInstantlyRows = rows.filter((row) => hasActiveInstantlyOutreach(row)).length;
+    const approachedInstantlyRows = rows.filter((row) => isMarkedAsInstantlyApproached(row)).length;
     return {
       ok: true,
       enabled: config.enabled,
@@ -1932,6 +1934,9 @@ function createInstantlyOutreachService(deps = {}) {
       blockPersonalMailboxDomains: config.blockPersonalMailboxDomains,
       requireWebdesignAssets: config.requireWebdesignAssets,
       defaultSenderEmail: config.defaultSenderEmail,
+      marksSyncedLeadsAsApproached: true,
+      activeInstantlyRows,
+      approachedInstantlyRows,
       syncedToday: getDailySyncCount(rows),
       nextSyncAt,
       running: Boolean(syncPromise),
