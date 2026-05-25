@@ -323,6 +323,38 @@ test('instantly sync respects the daily cap and backfills existing Instantly row
   assert.equal(getRows()[1].status, 'prospect');
 });
 
+test('instantly status exposes the approached marker for production verification', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'instantly-approached',
+        bedrijf: 'Benaderd BV',
+        email: 'benaderd@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        outreachStatus: 'benaderd',
+        instantlyStatus: 'synced',
+        instantlySyncedAt: '2026-05-25T08:00:00.000Z',
+        lastColdmailProvider: 'instantly',
+      },
+      {
+        id: 'instantly-active',
+        bedrijf: 'Actief BV',
+        email: 'actief@example.test',
+        status: 'prospect',
+        instantlyStatus: 'synced',
+        instantlySyncedAt: '2026-05-25T08:05:00.000Z',
+      },
+    ],
+  });
+
+  const status = await service.getStatus();
+
+  assert.equal(status.marksSyncedLeadsAsApproached, true);
+  assert.equal(status.activeInstantlyRows, 2);
+  assert.equal(status.approachedInstantlyRows, 1);
+});
+
 test('instantly email_sent webhook marks the Softora row as mailed', async () => {
   const { service, getRows } = createService({
     rows: [
