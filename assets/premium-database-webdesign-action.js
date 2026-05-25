@@ -569,7 +569,7 @@
             if (!global.document || global.document.getElementById(STYLE_OUTREACH_ID)) return;
             const style = global.document.createElement("style");
             style.id = STYLE_OUTREACH_ID;
-            style.textContent = ".outreach-line{margin-top:4px;color:var(--light);font-size:11px;line-height:1.35;white-space:normal}.outreach-badge{display:inline-flex;align-items:center;width:fit-content;margin-top:6px;padding:3px 8px;border-radius:999px;background:rgba(22,115,60,.1);color:var(--green);font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}.outreach-reply{display:flex;flex-direction:column;gap:3px;color:var(--mid);font-size:12px;line-height:1.35}.outreach-reply strong{color:var(--dark);font-size:12px}.outreach-days{display:inline-flex;align-items:center;justify-content:center;min-width:24px;color:var(--crimson);font-weight:800;line-height:1}.outreach-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto}.outreach-action{box-sizing:border-box;min-width:0;min-height:34px;border:1px solid rgba(155,35,85,.18);border-radius:6px;background:rgba(255,255,255,.78);color:var(--crimson);cursor:pointer;font-family:Oswald,sans-serif;font-size:9px;font-weight:700;letter-spacing:.35px;line-height:1.08;overflow-wrap:anywhere;padding:6px 5px;text-align:center;text-transform:uppercase;transition:background .15s ease,border-color .15s ease,color .15s ease}.outreach-action:hover{background:rgba(155,35,85,.08);border-color:rgba(155,35,85,.34)}";
+            style.textContent = ".outreach-line{margin-top:4px;color:var(--light);font-size:11px;line-height:1.35;white-space:normal}.outreach-badge{display:inline-flex;align-items:center;width:fit-content;margin-top:6px;padding:3px 8px;border-radius:999px;background:rgba(22,115,60,.1);color:var(--green);font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}.outreach-reply{display:flex;flex-direction:column;gap:3px;color:var(--mid);font-size:12px;line-height:1.35}.outreach-reply strong{color:var(--dark);font-size:12px}.outreach-days{display:inline-flex;align-items:center;justify-content:center;min-width:24px;color:var(--crimson);font-weight:800;line-height:1}.outreach-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto}.outreach-actions--single{grid-template-columns:minmax(0,1fr);max-width:180px}.outreach-action{box-sizing:border-box;min-width:0;min-height:34px;border:1px solid rgba(155,35,85,.18);border-radius:6px;background:rgba(255,255,255,.78);color:var(--crimson);cursor:pointer;font-family:Oswald,sans-serif;font-size:9px;font-weight:700;letter-spacing:.35px;line-height:1.08;overflow-wrap:anywhere;padding:6px 5px;text-align:center;text-transform:uppercase;transition:background .15s ease,border-color .15s ease,color .15s ease}.outreach-action:hover{background:rgba(155,35,85,.08);border-color:rgba(155,35,85,.34)}";
             global.document.head.appendChild(style);
         }
 
@@ -793,10 +793,13 @@
             return "<span class=\"outreach-days\" title=\"" + escapeHtml(label) + "\">" + escapeHtml(String(days)) + "</span>";
         }
 
-        function renderActions(customer) {
+        function renderActions(customer, options) {
             if (!isTrackedOutreachCustomer(customer)) return "";
+            const settings = options && typeof options === "object" ? options : {};
             const id = escapeHtml(customer.id);
-            return "<div class=\"outreach-actions\"><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"klant_geworden\" data-outreach-id=\"" + id + "\">Is klant geworden</button><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"mail\" data-outreach-id=\"" + id + "\">Mail bekijken</button></div>";
+            const hideMailButton = Boolean(settings.hideMailButton);
+            const mailButton = hideMailButton ? "" : "<button class=\"outreach-action\" type=\"button\" data-outreach-status=\"mail\" data-outreach-id=\"" + id + "\">Mail bekijken</button>";
+            return "<div class=\"outreach-actions" + (hideMailButton ? " outreach-actions--single" : "") + "\"><button class=\"outreach-action\" type=\"button\" data-outreach-status=\"klant_geworden\" data-outreach-id=\"" + id + "\">Is klant geworden</button>" + mailButton + "</div>";
         }
 
         function getRecentOutreachTimestamp(customer, parseValue) {

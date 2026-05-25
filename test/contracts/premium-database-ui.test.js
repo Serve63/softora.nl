@@ -482,7 +482,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260526b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260526c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
@@ -1198,7 +1198,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /document\.getElementById\("databaseTable"\)\.classList\.toggle\("outreach-action-mode", showOutreachActionColumn\); document\.getElementById\("statusHeader"\)\.hidden = showOutreachActionColumn/);
   assert.match(pageSource, /renderUsedChannelTags\(customer\),\s*"\<\/div\>\<\/td\>",\s*"\<td\>\<div class=\\"s-wrap/);
   assert.match(pageSource, /outreachController\.renderMeta\(customer, showOutreachActionColumn && outreachController\.isTrackedOutreachCustomer\(customer\)\)/);
-  assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderActions\(customer\)/);
+  assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderActions\(customer, \{ hideMailButton: state\.activeStatus === "instantly" \}\)/);
   assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
   assert.match(pageSource, /\(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : sortCustomers\(customers\);/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 25%; text-align: center; \}/);
@@ -1292,6 +1292,9 @@ test('premium database outreach days column keeps benaderd rows after 25 days', 
   assert.match(controller.renderMeta(legacyColdmailCustomer, true), /Verstuurd vanaf onbekend mailadres/);
   assert.match(controller.renderDaysSinceSent(legacyColdmailCustomer), />1<\/span>/);
   assert.match(controller.renderActions(legacyColdmailCustomer), /Mail bekijken/);
+  assert.doesNotMatch(controller.renderActions(legacyColdmailCustomer, { hideMailButton: true }), /Mail bekijken/);
+  assert.match(controller.renderActions(legacyColdmailCustomer, { hideMailButton: true }), /Is klant geworden/);
+  assert.match(controller.renderActions(legacyColdmailCustomer, { hideMailButton: true }), /outreach-actions--single/);
   const instantlyFields = outreachClient.normalizeCustomerFields({
     lastColdmailProvider: 'instantly',
     instantlyLeadId: 'lead-1',
