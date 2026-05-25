@@ -268,6 +268,7 @@ function buildServerAppFeatureWiringRuntimeContext({
       },
       coldmailing: {
         coldmailCampaignService: createColdmailCampaignService({
+          mailboxAccountsRaw: env.MAILBOX_ACCOUNTS || '',
           mailConfig: {
             smtpHost: envConfig.MAIL_SMTP_HOST,
             smtpPort: envConfig.MAIL_SMTP_PORT,
