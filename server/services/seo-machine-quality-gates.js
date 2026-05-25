@@ -477,11 +477,26 @@ function hasSafeBlankTarget(attrsRaw) {
   return target.toLowerCase() === '_blank' && /\bnoopener\b/i.test(rel) && /\bnoreferrer\b/i.test(rel);
 }
 
+function hasCompleteConversionTracking(attrsRaw, expectedTarget = '') {
+  const attrs = String(attrsRaw || '');
+  const target = String(expectedTarget || '').trim().toLowerCase();
+  const conversionName = getAttrValue(attrs, 'data-softora-conversion');
+  const conversionPage = getAttrValue(attrs, 'data-softora-conversion-page');
+  const conversionTarget = getAttrValue(attrs, 'data-softora-conversion-target').toLowerCase();
+
+  if (!conversionName || !conversionPage || !conversionTarget) return false;
+  return !target || conversionTarget === target;
+}
+
+function hasWhatsappSubmitAction(attrsRaw) {
+  return getAttrValue(attrsRaw, 'data-softora-whatsapp-action').toLowerCase() === 'submit';
+}
+
 function isTrackedWhatsappButton(button) {
   const attrs = String(button?.attrs || '');
   return (
-    /data-softora-conversion=["'][^"']+["']/i.test(attrs) &&
-    /data-softora-conversion-target=["']whatsapp["']/i.test(attrs)
+    hasCompleteConversionTracking(attrs, 'whatsapp') &&
+    hasWhatsappSubmitAction(attrs)
   );
 }
 
@@ -494,7 +509,7 @@ function auditConversionCtas({ pages = [] } = {}) {
     const anchors = extractAnchorEntries(html);
     const buttons = extractButtonLikeControlEntries(html);
     const conversionLinks = anchors.filter((anchor) => isConversionHref(anchor.href));
-    const annotatedLinks = conversionLinks.filter((anchor) => /data-softora-conversion=["'][^"']+["']/i.test(anchor.attrs));
+    const annotatedLinks = conversionLinks.filter((anchor) => hasCompleteConversionTracking(anchor.attrs));
     const leadCtaButtons = buttons.filter((button) => isLeadCtaLabel(button.label));
     const trackedWhatsappButtons = leadCtaButtons.filter(isTrackedWhatsappButton);
 
