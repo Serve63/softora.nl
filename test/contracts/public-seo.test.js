@@ -265,6 +265,20 @@ test('voicesoftware page owns its internal links inside the page content', () =>
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });
 
+test('ai telefonist head metadata targets make and comparison intent', () => {
+  const source = fs.readFileSync(path.join(root, 'ai-telefonist.html'), 'utf8');
+  const html = applyPublicSeoHeadDefaults(source, 'ai-telefonist.html', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.match(html, /<title>AI telefonist laten maken voor het MKB \| Softora<\/title>/);
+  assert.match(html, /<meta name="description" content="Laat een AI telefonist maken door Softora/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/ai-telefonist">/);
+  assert.match(html, /AI telefonist, voicemail of callcenter\?/);
+  assert.match(html, /Past dit bij leadgeneratie voor MKB\?/);
+  assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
+});
+
 test('public seo url mapping exposes clean paths and keeps legacy redirects available', () => {
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-bedrijfssoftware.html'), '/bedrijfssoftware-op-maat');
   assert.equal(getIndexablePublicHtmlFileFromPath('/bedrijfssoftware-op-maat'), 'premium-bedrijfssoftware.html');

@@ -117,15 +117,16 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
     fileName: 'ai-telefonist.html',
     path: '/ai-telefonist',
-    title: 'AI telefonist voor het MKB',
+    title: 'AI telefonist laten maken voor het MKB',
     description:
-      'Softora bouwt een AI telefonist die telefoontjes opneemt, klanten kwalificeert, afspraken plant en samenvattingen doorstuurt.',
+      'Laat een AI telefonist maken door Softora voor intake, bereikbaarheid, leadkwalificatie, afspraakverzoeken en CRM-opvolging met menselijke controle.',
     kind: 'service',
     serviceName: 'AI telefonist',
     relatedLinks: [
       '/voicesoftware-op-maat',
       '/chatbot-laten-maken',
       '/ai-automatisering',
+      '/crm-systeem-op-maat',
       '/kennisbank/wat-is-een-ai-telefonist',
       '/blog/ai-automatisering-mkb-waar-beginnen',
     ],
