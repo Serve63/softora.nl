@@ -489,7 +489,6 @@ test('static premium sidebars share the same section order and public labels', (
     {
       label: "ADVERTENTIE'S",
       links: [
-        'ads_trustoo:Trustoo',
         'ads_pinterest:Pinterest',
         'ads_facebook:Facebook',
         'ads_twitter:X / Twitter',
@@ -527,6 +526,7 @@ test('static premium sidebars share the same section order and public labels', (
       `${relativePath} hoort dezelfde premium-sidebar te hebben`
     );
     const linkTargets = extractSidebarLinkTargets(pageSource);
+    assert.equal(linkTargets.ads_pinterest, '/premium-advertenties#pinterest');
     assert.equal(linkTargets.ads_facebook, '/premium-advertenties#facebook');
     assert.equal(linkTargets.social_facebook, '/premium-socialmedia#facebook');
     assert.equal(linkTargets.ads_twitter, '/premium-advertenties#twitter');
@@ -549,7 +549,6 @@ test('static premium sidebars share the same section order and public labels', (
       'coldcalling',
       'mailbox',
       'qr_code',
-      'ads_trustoo',
       'ads_pinterest',
       'ads_facebook',
       'ads_twitter',
@@ -572,6 +571,8 @@ test('static premium sidebars share the same section order and public labels', (
         assert.doesNotMatch(lockedLink[0], /data-sidebar-count-key="leads"/);
       }
     }
+    assert.doesNotMatch(pageSource, /data-sidebar-key="ads_trustoo"/);
+    assert.doesNotMatch(pageSource, /premium-advertenties#trustoo/);
     assert.doesNotMatch(pageSource, /Snapchat/);
   }
 });
@@ -581,7 +582,6 @@ test('unified premium sidebar splits ad channels from social media channels', ()
 
   assert.match(themeJsSource, /sidebar-section-label\\">ADVERTENTIE'S</);
   assert.match(themeJsSource, /sidebar-section-label">Socialmedia</);
-  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#trustoo"[\s\S]*label:\s*"Trustoo"/);
   assert.match(themeJsSource, /href:\s*"\/premium-advertenties#pinterest"[\s\S]*label:\s*"Pinterest"/);
   assert.match(themeJsSource, /key:\s*"ads_facebook"[\s\S]*href:\s*"\/premium-advertenties#facebook"[\s\S]*label:\s*"Facebook"/);
   assert.match(themeJsSource, /key:\s*"ads_twitter"[\s\S]*href:\s*"\/premium-advertenties#twitter"[\s\S]*label:\s*"X \/ Twitter"/);
@@ -592,7 +592,11 @@ test('unified premium sidebar splits ad channels from social media channels', ()
   assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#facebook"[\s\S]*label:\s*"Facebook"/);
   assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#twitter"[\s\S]*label:\s*"X \/ Twitter"/);
   assert.match(themeJsSource, /if \(hashRaw === "google"\) return "ads_google";/);
+  assert.match(themeJsSource, /return "ads_pinterest";/);
   assert.match(themeJsSource, /if \(p\.indexOf\("\/premium-socialmedia"\) === 0\) \{/);
+  assert.doesNotMatch(themeJsSource, /ads_trustoo/);
+  assert.doesNotMatch(themeJsSource, /href:\s*"\/premium-advertenties#trustoo"/);
+  assert.doesNotMatch(themeJsSource, /label:\s*"Trustoo"/);
   assert.doesNotMatch(themeJsSource, /social_google/);
   assert.doesNotMatch(themeJsSource, /href:\s*"\/premium-socialmedia#google"/);
   assert.doesNotMatch(themeJsSource, /social_snapchat/);
