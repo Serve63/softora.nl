@@ -1897,11 +1897,15 @@ function createColdmailCampaignService(deps = {}) {
     const personalMailboxSent = entries.reduce((sum, entry) => sum + entry.personalCount, 0);
     const safetyPause = entries
       .map((entry) => ({
+        senderEmail: normalizeEmailAddress(entry.senderEmail),
         until: normalizeString(entry.safetyPauseUntil),
         reason: normalizeString(entry.safetyPauseReason),
         untilMs: parseTimestampMs(entry.safetyPauseUntil),
       }))
-      .filter((entry) => entry.untilMs > nowMs)
+      .filter((entry) => {
+        if (entry.untilMs <= nowMs) return false;
+        return !entry.senderEmail || !selectedSenderEmail || entry.senderEmail === selectedSenderEmail;
+      })
       .sort((left, right) => right.untilMs - left.untilMs)[0] || null;
     const dailySendLimit = getColdmailDailySendLimit();
     const packageDailySendLimit = getColdmailPackageDailySendLimit();
