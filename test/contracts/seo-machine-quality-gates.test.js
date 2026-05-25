@@ -133,6 +133,23 @@ test('seo machine scant ook publieke SEO-pagina’s op onbewezen claims', () => 
   assert.deepEqual(auditClaimSafety({ pages }), []);
 });
 
+test('publieke losse HTML-bronnen sturen niet richting gevaarlijke claimvoorbeelden', () => {
+  const customerFacingHtmlFiles = fs
+    .readdirSync(repoRoot)
+    .filter((fileName) => fileName.endsWith('.html'))
+    .filter((fileName) => !fileName.startsWith('premium-'))
+    .filter((fileName) => !fileName.startsWith('personeel-'))
+    .sort();
+
+  const rawPublicSource = customerFacingHtmlFiles
+    .map((fileName) => fs.readFileSync(path.join(repoRoot, fileName), 'utf8'))
+    .join('\n');
+
+  assert.doesNotMatch(rawPublicSource, /\buptime\s+garantie\b/i);
+  assert.doesNotMatch(rawPublicSource, /\b(?:gegarandeerd|garantie)\b.{0,80}\b(?:leads?|omzet|conversie|ranking|google)\b/i);
+  assert.doesNotMatch(rawPublicSource, /\bAI\b.{0,80}\b(?:altijd correct|maakt geen fouten|vervangt alle medewerkers|neemt alle beslissingen)\b/i);
+});
+
 test('seo machine blokkeert harde uptimegaranties in publieke paginacopy', () => {
   const issues = auditClaimSafety({
     pages: [
