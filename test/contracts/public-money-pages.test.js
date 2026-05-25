@@ -71,7 +71,7 @@ test('website money page is focused on SEO, leads and clean internal links', () 
   const entry = getRegistryEntry('premium-websites.html');
 
   assert.match(source, /<title>Website laten maken voor meer aanvragen \| Softora<\/title>/);
-  assert.match(source, /<h1 class="hero-title">Een website<br><em>voor meer aanvragen<\/em><\/h1>/);
+  assert.match(source, /<h1 class="hero-title">Een website <br><em>voor meer aanvragen<\/em><\/h1>/);
   assert.match(source, /SEO-vriendelijke website/);
   assert.match(source, /Conversiegerichte landingspagina's/);
   assert.match(source, /Contentstructuur/);
@@ -105,7 +105,7 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   const entry = getRegistryEntry('premium-bedrijfssoftware.html');
 
   assert.match(source, /<title>Bedrijfssoftware op maat laten maken \| Softora<\/title>/);
-  assert.match(source, /Bedrijfssoftware <em>op maat<\/em>/);
+  assert.match(source, /Bedrijfssoftware <em>op maat<\/em><\/span> <br>voor jouw team/);
   assert.match(source, /CRM en klantbeheer/);
   assert.match(source, /Interne workflowtools/);
   assert.match(source, /AI automatisering/);
@@ -203,7 +203,7 @@ test('chatbot money page is focused on leads, support and clean follow-up', () =
   const entry = getRegistryEntry('premium-chatbot.html');
 
   assert.match(source, /<title>Chatbot laten maken voor leads en support \| Softora<\/title>/);
-  assert.match(source, /<h1 class="hero-title">Chatbot<br><em>die leads opvangt<\/em><\/h1>/);
+  assert.match(source, /<h1 class="hero-title">Chatbot <br><em>die leads opvangt<\/em><\/h1>/);
   assert.match(source, /Leadkwalificatie/);
   assert.match(source, /FAQ en support/);
   assert.match(source, /Offerte-intakebot/);
@@ -265,7 +265,7 @@ test('voicesoftware money page is focused on AI telefonie, intake and CRM follow
     source,
     /<meta name="description" content="Laat voicesoftware en AI telefonie op maat maken door Softora/
   );
-  assert.match(source, /<h1 class="hero-title">Voicesoftware<br><em>die opvolging regelt<\/em><\/h1>/);
+  assert.match(source, /<h1 class="hero-title">Voicesoftware <br><em>die opvolging regelt<\/em><\/h1>/);
   assert.match(source, /AI telefonist/);
   assert.match(source, /Leadkwalificatie/);
   assert.match(source, /Afspraakintake/);

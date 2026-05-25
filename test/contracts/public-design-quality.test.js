@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '../..');
 const SEO_GROWTH_CSS_VERSION = '20260520b';
+const LOW_TRUST_PUBLIC_IMAGE_PATTERN = /\/assets\/(?:home-service-[^"']*-ai|home-over-office-meeting-ai|home-hero-generated-v2)\.jpg/i;
 
 function readFile(fileName) {
   return fs.readFileSync(path.join(root, fileName), 'utf8');
@@ -105,6 +106,51 @@ test('seo-growth template images use trustworthy filenames and stable dimensions
       assert.match(tag, /\bwidth="\d+"/, `${fileName} mist vaste image width: ${tag}`);
       assert.match(tag, /\bheight="\d+"/, `${fileName} mist vaste image height: ${tag}`);
     }
+  }
+});
+
+test('public money pages avoid low-trust generated-looking image filenames', () => {
+  const pages = [
+    'premium-websites.html',
+    'premium-bedrijfssoftware.html',
+    'premium-chatbot.html',
+    'premium-voicesoftware.html',
+    'ai-automatisering.html',
+    'ai-telefonist.html',
+    'crm-systeem-op-maat.html',
+    'pakketten.html',
+    'diensten.html',
+    'premium-over-softora.html',
+  ];
+
+  for (const fileName of pages) {
+    const source = readFile(fileName);
+    assert.doesNotMatch(
+      source,
+      LOW_TRUST_PUBLIC_IMAGE_PATTERN,
+      `${fileName} gebruikt een zwakke AI/generated publieke beeldnaam`
+    );
+  }
+});
+
+test('legacy public hero line breaks keep readable text spacing', () => {
+  const pages = [
+    'premium-websites.html',
+    'premium-bedrijfssoftware.html',
+    'premium-chatbot.html',
+    'premium-voicesoftware.html',
+  ];
+
+  for (const fileName of pages) {
+    const source = readFile(fileName);
+    const h1 = source.match(/<h1 class="hero-title">([\s\S]*?)<\/h1>/)?.[1] || '';
+    const text = h1
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    assert.doesNotMatch(text, /websitevoor|maatvoor|chatbotdie|voicesoftwaredie/i, `${fileName} hero-kop plakt woorden tegen elkaar`);
   }
 });
 
