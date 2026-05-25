@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const dns = require('node:dns').promises;
 const {
   canAdvanceContactStatus,
@@ -6,10 +7,38 @@ const {
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
+const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
+const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
+const DEFAULT_COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
+const DEFAULT_COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
+const DEFAULT_COLDMAIL_AUTOPILOT_SCOPE = 'premium_coldmail_autopilot';
+const DEFAULT_COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
 const DEFAULT_API_BASE_URL = 'https://api.instantly.ai/api/v2';
 const DEFAULT_SYNC_INTERVAL_MINUTES = 15;
 const DEFAULT_SYNC_BATCH_SIZE = 10;
 const DEFAULT_DAILY_CAP = 25;
+const DEFAULT_PUBLIC_BASE_URL = 'https://www.softora.nl';
+const DEFAULT_COLDMAIL_LINK_SECRET = 'softora-coldmail';
+const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
+const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
+const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
+const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het me weten!';
+const COLDMAIL_MOCKUP_CAPTION =
+  'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
+const DEFAULT_WEBDESIGN_SUBJECT = 'Nieuw webdesign gemaakt!';
+const DEFAULT_WEBDESIGN_BODY = [
+  'Goedemorgen {{naam}},',
+  '',
+  'Ik ben benieuwd wat je ervan vindt.',
+  '',
+  'Met vriendelijke groeten:',
+  'Servé Creusen',
+  '',
+  '📍 {{stad}}',
+  '',
+  '0629917185',
+].join('\n');
+const DEFAULT_INSTANTLY_SENDER_EMAIL = 'serve@softora.nl';
 const STARTUP_SYNC_DELAY_MS = 10_000;
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
@@ -77,6 +106,7 @@ function defaultTruncateText(value, maxLength = 500) {
 }
 
 function readBool(value, fallback = false) {
+  if (typeof value === 'boolean') return value;
   const normalized = defaultNormalizeString(value);
   if (!normalized) return Boolean(fallback);
   return /^(1|true|yes)$/i.test(normalized);
@@ -86,6 +116,17 @@ function clampNumber(value, fallback, min, max) {
   const parsed = Number(value);
   const safe = Number.isFinite(parsed) ? parsed : fallback;
   return Math.max(min, Math.min(max, Math.floor(safe)));
+}
+
+function normalizePublicBaseUrl(value) {
+  const raw = defaultNormalizeString(value).replace(/\/+$/g, '');
+  if (!/^https?:\/\//i.test(raw)) return '';
+  try {
+    const parsed = new URL(raw);
+    return parsed.origin;
+  } catch (_) {
+    return '';
+  }
 }
 
 function normalizeEmailAddress(value, normalizeString = defaultNormalizeString) {
@@ -153,14 +194,684 @@ function getRowPhone(row, normalizeString = defaultNormalizeString) {
         row.tel ||
         row.telefoon ||
         row.telefoonnummer ||
+        row.telefoonNummer ||
+        row.telefoon_nummer ||
         row.mobile ||
+        row.mobilePhone ||
+        row.mobiel ||
+        row.phoneNumber ||
         row.contactPhone ||
+        row.contact_phone ||
         '')
   );
 }
 
 function getRowWebsite(row, normalizeString = defaultNormalizeString) {
-  return normalizeString(row && (row.website || row.domain || row.dom || ''));
+  return normalizeString(
+    row &&
+      (row.website ||
+        row.domain ||
+        row.dom ||
+        row.websiteUrl ||
+        row.website_url ||
+        row.url ||
+        row.site ||
+        row.domein ||
+        '')
+  );
+}
+
+function getExplicitRowId(row, normalizeString = defaultNormalizeString) {
+  return normalizeString(row && (row.id || row.customerId || row.databaseId || ''));
+}
+
+function cleanPlaceLabel(value, normalizeString = defaultNormalizeString) {
+  const dutchProvinceSuffix =
+    '(?:N\\.?\\s?Br\\.?|N\\.?B\\.?|Noord[-\\s]?Brabant|Z\\.?H\\.?|Zuid[-\\s]?Holland|N\\.?H\\.?|Noord[-\\s]?Holland|Gld\\.?|Gelderland|Lb\\.?|Limburg|Ov\\.?|Overijssel|Dr\\.?|Drenthe|Fr\\.?|Friesland|Gr\\.?|Groningen|Fl\\.?|Flevoland|Ze\\.?|Zeeland|Ut\\.?|Utrecht)';
+  return normalizeString(value)
+    .replace(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b/g, '')
+    .replace(new RegExp(`\\s*\\(${dutchProvinceSuffix}\\)\\s*$`, 'i'), '')
+    .replace(new RegExp(`\\s+${dutchProvinceSuffix}\\s*$`, 'i'), '')
+    .replace(/\b(Nederland|The Netherlands)\b/gi, '')
+    .replace(/^[\s,.;-]+|[\s,.;-]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function looksLikeStreetAddress(value, normalizeString = defaultNormalizeString) {
+  const text = normalizeString(value).toLowerCase();
+  return (
+    /\d/.test(text) &&
+    /(straat|weg|laan|plein|pad|dijk|hof|kade|markt|singel|steeg|gracht|boulevard|baan|akker|plantsoen|park)\b/.test(text)
+  );
+}
+
+function extractPlaceFromAddress(value, normalizeString = defaultNormalizeString) {
+  const text = normalizeString(value).replace(/\s+/g, ' ').replace(/\s*,\s*/g, ', ').trim();
+  if (!text) return '';
+  const postalMatch = text.match(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b\s+([A-Za-zÀ-ÿ'’.\- ]{2,})$/);
+  if (postalMatch) return cleanPlaceLabel(postalMatch[1], normalizeString);
+  const parts = text.split(/[,\n;|]/).map((part) => cleanPlaceLabel(part, normalizeString)).filter(Boolean);
+  for (let index = parts.length - 1; index >= 0; index -= 1) {
+    const candidate = parts[index];
+    if (!candidate || looksLikeStreetAddress(candidate, normalizeString) || /^\d+$/.test(candidate)) continue;
+    return candidate;
+  }
+  return cleanPlaceLabel(text, normalizeString);
+}
+
+function getRowCity(row, normalizeString = defaultNormalizeString) {
+  const explicit = [
+    row && row.plaats,
+    row && row.city,
+    row && row.gemeente,
+    row && row.locality,
+    row && row.town,
+    row && row.village,
+  ]
+    .map((value) => {
+      const cleaned = cleanPlaceLabel(value, normalizeString);
+      if (!cleaned) return '';
+      return looksLikeStreetAddress(cleaned, normalizeString)
+        ? extractPlaceFromAddress(cleaned, normalizeString)
+        : cleaned;
+    })
+    .find(Boolean);
+  if (explicit) return explicit;
+
+  return (
+    [
+      row && row.stad,
+      row && row.adres,
+      row && row.address,
+      row && row.location,
+    ]
+      .map((value) => extractPlaceFromAddress(value, normalizeString))
+      .find(Boolean) || ''
+  );
+}
+
+function normalizeWebsiteVariableValue(value, normalizeString = defaultNormalizeString) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(candidate);
+    return normalizeString(parsed.hostname).replace(/^www\./i, '') || raw;
+  } catch (_) {
+    return raw
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/\/.*$/g, '')
+      .replace(/\/+$/g, '');
+  }
+}
+
+function getRowDomain(row, normalizeString = defaultNormalizeString) {
+  return normalizeWebsiteVariableValue(
+    row && (row.dom || row.domain || row.website || row.websiteUrl || row.website_url || row.url || row.site || row.domein || ''),
+    normalizeString
+  );
+}
+
+function normalizePhoneDigits(value, normalizeString = defaultNormalizeString) {
+  return normalizeString(value).replace(/[^\d]/g, '');
+}
+
+function getComparablePhoneKeys(value, normalizeString = defaultNormalizeString) {
+  const digits = normalizePhoneDigits(value, normalizeString);
+  const keys = new Set();
+  if (!digits) return keys;
+  keys.add(digits);
+  const withoutInternationalPrefix = digits.startsWith('00') ? digits.slice(2) : digits;
+  if (withoutInternationalPrefix) keys.add(withoutInternationalPrefix);
+  if (withoutInternationalPrefix.startsWith('31') && withoutInternationalPrefix.length > 2) {
+    keys.add(`0${withoutInternationalPrefix.slice(2)}`);
+  }
+  if (withoutInternationalPrefix.startsWith('0') && withoutInternationalPrefix.length > 1) {
+    keys.add(`31${withoutInternationalPrefix.slice(1)}`);
+  }
+  if (withoutInternationalPrefix.length === 9 && withoutInternationalPrefix.startsWith('6')) {
+    keys.add(`0${withoutInternationalPrefix}`);
+    keys.add(`31${withoutInternationalPrefix}`);
+  }
+  return keys;
+}
+
+function normalizeIdentityTextPart(value, normalizeString = defaultNormalizeString) {
+  if (value === undefined || value === null) return '';
+  const text = normalizeString(value);
+  if (!text || text === 'undefined' || text === 'null') return '';
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function buildNormalizedIdentityKey(company, contact, phone, normalizeString = defaultNormalizeString) {
+  const normalizedCompany = normalizeIdentityTextPart(company, normalizeString);
+  const normalizedContact = normalizeIdentityTextPart(contact, normalizeString);
+  const normalizedPhone = normalizePhoneDigits(phone, normalizeString) || normalizeIdentityTextPart(phone, normalizeString);
+  if (!normalizedCompany && !normalizedContact && !normalizedPhone) return '';
+  return [normalizedCompany, normalizedContact, normalizedPhone].join('|');
+}
+
+function buildNormalizedIdentityKeys(company, contact, phone, normalizeString = defaultNormalizeString) {
+  const phoneKeys = Array.from(getComparablePhoneKeys(phone, normalizeString));
+  const normalizedFallbackPhone = normalizePhoneDigits(phone, normalizeString) || normalizeIdentityTextPart(phone, normalizeString);
+  if (!phoneKeys.length && normalizedFallbackPhone) phoneKeys.push(normalizedFallbackPhone);
+  const keys = phoneKeys.length
+    ? phoneKeys.map((phoneKey) => buildNormalizedIdentityKey(company, contact, phoneKey, normalizeString))
+    : [buildNormalizedIdentityKey(company, contact, '', normalizeString)];
+  return new Set(keys.filter(Boolean));
+}
+
+function normalizeStoredIdentityKeys(value, normalizeString = defaultNormalizeString) {
+  if (value === undefined || value === null) return new Set();
+  const raw = normalizeString(value);
+  if (!raw || raw === 'undefined' || raw === 'null') return new Set();
+  const parts = raw.split('|');
+  if (parts.length >= 3) {
+    return buildNormalizedIdentityKeys(parts[0], parts[1], parts.slice(2).join('|'), normalizeString);
+  }
+  return new Set([normalizeIdentityTextPart(raw, normalizeString)].filter(Boolean));
+}
+
+function getExplicitRowContact(row, normalizeString = defaultNormalizeString) {
+  return normalizeString(row && (row.naam || row.contact || row.contactName || row.clientName));
+}
+
+function buildRowIdentityKeys(row, normalizeString = defaultNormalizeString) {
+  const company = getRowCompany(row, normalizeString);
+  const explicitContact = getExplicitRowContact(row, normalizeString);
+  const fallbackContact = getRowContact(row, normalizeString) || company;
+  const phone = getRowPhone(row, normalizeString);
+  const keys = new Set();
+  [
+    [company, fallbackContact, phone],
+    [company, explicitContact, phone],
+    [company, company, phone],
+  ].forEach(([companyPart, contactPart, phonePart]) => {
+    buildNormalizedIdentityKeys(companyPart, contactPart, phonePart, normalizeString).forEach((key) => keys.add(key));
+  });
+  return keys;
+}
+
+function buildRowIdentityKey(row, normalizeString = defaultNormalizeString) {
+  return Array.from(buildRowIdentityKeys(row, normalizeString))[0] || '';
+}
+
+function getPhotoIdentityKeys(photo, normalizeString = defaultNormalizeString) {
+  const keys = new Set();
+  normalizeStoredIdentityKeys(photo && photo.identityKey, normalizeString).forEach((key) => keys.add(key));
+  normalizeStoredIdentityKeys(photo && photo.legacyMeta && photo.legacyMeta.identityKey, normalizeString).forEach((key) => keys.add(key));
+  return keys;
+}
+
+function photoRecordMatchesRowIdentity(photo, row, normalizeString = defaultNormalizeString) {
+  const photoIdentityKeys = getPhotoIdentityKeys(photo, normalizeString);
+  if (!photoIdentityKeys.size) return true;
+  const rowIdentityKeys = buildRowIdentityKeys(row, normalizeString);
+  return Array.from(rowIdentityKeys).some((key) => photoIdentityKeys.has(key));
+}
+
+function parseDataUrlImage(value, normalizeString = defaultNormalizeString) {
+  return /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(normalizeString(value));
+}
+
+function readChunkedCustomerPhoto(values, photoKey, chunkCount = 0, normalizeString = defaultNormalizeString) {
+  const key = normalizeString(photoKey);
+  if (!key) return null;
+  const count = Math.max(0, Math.min(80, Number(chunkCount || 0) || 0));
+  const chunks = [];
+  if (count) {
+    for (let index = 0; index < count; index += 1) {
+      chunks.push(normalizeString(values[`${key}_${index}`]));
+    }
+  } else {
+    for (let index = 0; index < 80; index += 1) {
+      const value = values[`${key}_${index}`];
+      if (typeof value !== 'string') break;
+      chunks.push(normalizeString(value));
+    }
+  }
+  const dataUrl = chunks.join('');
+  return parseDataUrlImage(dataUrl, normalizeString) ? { dataUrl, chunkCount: chunks.length } : null;
+}
+
+function buildCustomerPhotoDataKey(row, normalizeString = defaultNormalizeString) {
+  const id = getExplicitRowId(row, normalizeString);
+  if (!id) return '';
+  return `softora_database_photo_data_v1_${id.replace(/[^a-z0-9_-]+/gi, '_').slice(0, 80)}`;
+}
+
+function parseCustomerPhotoMap(raw, values = {}, rows = [], normalizeString = defaultNormalizeString) {
+  let parsed = {};
+  try {
+    const data = JSON.parse(normalizeString(raw) || '{}');
+    parsed = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  } catch (_) {
+    parsed = {};
+  }
+  const stateValues = values && typeof values === 'object' ? values : {};
+  Object.keys(parsed).forEach((key) => {
+    const item = parsed[key];
+    if (!item || typeof item !== 'object') return;
+    const chunked = readChunkedCustomerPhoto(stateValues, item.photoKey, item.chunkCount, normalizeString);
+    if (chunked) {
+      item.websitePhoto = chunked.dataUrl;
+      item.chunkCount = chunked.chunkCount;
+    }
+    const mockupPhotoKey = normalizeString(item.mockupPhotoKey || item.websiteMockupKey);
+    const mockupChunked = readChunkedCustomerPhoto(
+      stateValues,
+      mockupPhotoKey,
+      item.mockupChunkCount || item.websiteMockupChunkCount,
+      normalizeString
+    );
+    if (mockupChunked) {
+      item.websiteMockup = mockupChunked.dataUrl;
+      item.mockupChunkCount = mockupChunked.chunkCount;
+    }
+  });
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const id = getExplicitRowId(row, normalizeString);
+    if (!id) return;
+    const photoKey = buildCustomerPhotoDataKey(row, normalizeString);
+    const chunked = readChunkedCustomerPhoto(stateValues, photoKey, 0, normalizeString);
+    if (!chunked) return;
+    const existing = parsed[id] && typeof parsed[id] === 'object' ? parsed[id] : null;
+    if (existing && normalizeString(existing.photoKey) && parseDataUrlImage(existing.websitePhoto, normalizeString)) return;
+    parsed[id] = {
+      ...(existing || {}),
+      id,
+      identityKey: normalizeString(existing && existing.identityKey) || buildRowIdentityKey(row, normalizeString),
+      photoKey,
+      chunkCount: chunked.chunkCount,
+      websitePhoto: chunked.dataUrl,
+      websitePhotoName: normalizeString(row.websitePhotoName || row.photoName || row.websiteImageName) || 'Websitefoto',
+    };
+  });
+  return parsed;
+}
+
+function getWebdesignPhotoSource(photo, normalizeString = defaultNormalizeString) {
+  if (!photo || typeof photo !== 'object') return '';
+  return normalizeString(
+    photo.websitePhoto ||
+      photo.websitePhotoUrl ||
+      photo.signedUrl ||
+      (photo.storage && photo.storage.signedUrl)
+  );
+}
+
+function getWebdesignMockupSource(photo, normalizeString = defaultNormalizeString) {
+  if (!photo || typeof photo !== 'object') return '';
+  return normalizeString(
+    photo.websiteMockup ||
+      photo.websiteMockupUrl ||
+      photo.mockupUrl ||
+      photo.signedMockupUrl ||
+      (photo.mockupStorage && photo.mockupStorage.signedUrl)
+  );
+}
+
+function isResolvableWebsitePhotoValue(value, normalizeString = defaultNormalizeString) {
+  const text = normalizeString(value);
+  if (!text) return false;
+  return parseDataUrlImage(text, normalizeString) || /^https:\/\//i.test(text);
+}
+
+function hasReadyWebdesignAssetRecord(photo, normalizeString = defaultNormalizeString) {
+  return Boolean(
+    photo &&
+      typeof photo === 'object' &&
+      isResolvableWebsitePhotoValue(getWebdesignPhotoSource(photo, normalizeString), normalizeString) &&
+      isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo, normalizeString), normalizeString)
+  );
+}
+
+function buildPhotosByIdentity(photoMap, normalizeString = defaultNormalizeString) {
+  const photosByIdentity = new Map();
+  const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
+  Object.keys(photos).forEach((key) => {
+    const item = photos[key];
+    if (!hasReadyWebdesignAssetRecord(item, normalizeString)) return;
+    getPhotoIdentityKeys(item, normalizeString).forEach((identityKey) => {
+      if (identityKey) photosByIdentity.set(identityKey, item);
+    });
+  });
+  return photosByIdentity;
+}
+
+function findStoredPhotoRecordForRow(row, index, photoMap, photosByIdentity, normalizeString = defaultNormalizeString) {
+  const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
+  const byIdentity = photosByIdentity instanceof Map ? photosByIdentity : new Map();
+  const id = getExplicitRowId(row, normalizeString);
+  const directPhoto = id ? photos[id] : null;
+  if (directPhoto && photoRecordMatchesRowIdentity(directPhoto, row, normalizeString)) return directPhoto;
+  for (const identityKey of buildRowIdentityKeys(row, normalizeString)) {
+    const photo = byIdentity.get(identityKey);
+    if (photo) return photo;
+  }
+  return null;
+}
+
+function preferFreshRowPhotoFields(row, storedPhoto, normalizeString = defaultNormalizeString) {
+  const base = storedPhoto && typeof storedPhoto === 'object' ? { ...storedPhoto } : {};
+  const next = { ...base };
+  const rowPhotoSource = getWebdesignPhotoSource(row, normalizeString);
+  const rowMockupSource = getWebdesignMockupSource(row, normalizeString);
+  if (isResolvableWebsitePhotoValue(rowPhotoSource, normalizeString)) {
+    next.websitePhoto =
+      row.websitePhoto ||
+      row.websitePhotoUrl ||
+      row.signedUrl ||
+      (row.storage && row.storage.signedUrl) ||
+      rowPhotoSource;
+    const rowPhotoName = normalizeString(row.websitePhotoName || row.photoName || row.websiteImageName);
+    if (rowPhotoName) next.websitePhotoName = rowPhotoName;
+  }
+  if (isResolvableWebsitePhotoValue(rowMockupSource, normalizeString)) {
+    next.websiteMockup =
+      row.websiteMockup ||
+      row.websiteMockupUrl ||
+      row.mockupUrl ||
+      row.signedMockupUrl ||
+      (row.mockupStorage && row.mockupStorage.signedUrl) ||
+      rowMockupSource;
+    const rowMockupName = normalizeString(row.websiteMockupName || row.mockupName);
+    if (rowMockupName) next.websiteMockupName = rowMockupName;
+  }
+  if (!normalizeString(next.id)) next.id = getRowId(row, 0, normalizeString);
+  if (!normalizeString(next.identityKey)) next.identityKey = buildRowIdentityKey(row, normalizeString);
+  return next;
+}
+
+function getWebdesignAssetRecordForRow(row, index, context = {}, normalizeString = defaultNormalizeString) {
+  const photoMap = context.photoMap && typeof context.photoMap === 'object' ? context.photoMap : {};
+  const photosByIdentity =
+    context.photosByIdentity instanceof Map ? context.photosByIdentity : buildPhotosByIdentity(photoMap, normalizeString);
+  return preferFreshRowPhotoFields(
+    row,
+    findStoredPhotoRecordForRow(row, index, photoMap, photosByIdentity, normalizeString),
+    normalizeString
+  );
+}
+
+function personalizeTemplate(template, row, normalizeString = defaultNormalizeString) {
+  const company = getRowCompany(row, normalizeString) || 'uw bedrijf';
+  const contact = getRowContact(row, normalizeString) || company;
+  const domain = getRowDomain(row, normalizeString);
+  const city = getRowCity(row, normalizeString) || 'uw regio';
+  return normalizeString(template)
+    .replace(/\{\{\s*bedrijf\s*\}\}/gi, company)
+    .replace(/\{\{\s*naam\s*\}\}/gi, contact)
+    .replace(/\{\{\s*(stad|plaats|locatie)\s*\}\}/gi, city)
+    .replace(/\{\{\s*domein\s*\}\}/gi, domain || company)
+    .replace(/\{\{\s*website\s*\}\}/gi, domain || company);
+}
+
+function buildMailText(body, row, normalizeString = defaultNormalizeString) {
+  return personalizeTemplate(body, row, normalizeString)
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}
+
+function shouldAppendColdmailOptOutText(text, normalizeString = defaultNormalizeString) {
+  return !/(?:geen webdesign willen ontvangen\?\s*laat het me weten!?|had je liever geen webdesign willen ontvangen\?\s*laat het me hier weten!?|past dit niet\?\s*laat het me hier weten|liever geen e-mails meer ontvangen|geen e-mails meer ontvangen.*https?:\/\/|afmelden:\s*https?:\/\/|\/afmelden\?t=|\/coldmailing\/afmelden\?t=|unsubscribe:\s*https?:\/\/)/i.test(
+    normalizeString(text)
+  );
+}
+
+function appendColdmailOptOutText(text, unsubscribeUrl = '', normalizeString = defaultNormalizeString) {
+  const cleanText = normalizeString(text);
+  const cleanUrl = normalizeString(unsubscribeUrl);
+  const optOutText = cleanUrl
+    ? `${COLDMAIL_OPT_OUT_TEXT_PREFIX}: ${cleanUrl}`
+    : COLDMAIL_OPT_OUT_LABEL;
+  if (!cleanText) return optOutText;
+  if (!shouldAppendColdmailOptOutText(cleanText, normalizeString)) return cleanText;
+  return `${cleanText}\n\n${optOutText}`;
+}
+
+function firstTemplateValue(raw = {}, key, variantsKey, normalizeString = defaultNormalizeString) {
+  const direct = normalizeString(raw && raw[key]);
+  if (direct) return direct;
+  const variants = raw && Array.isArray(raw[variantsKey]) ? raw[variantsKey] : [];
+  return variants.map((value) => normalizeString(value)).find(Boolean) || '';
+}
+
+function normalizeColdmailProfile(value = {}, fallback = {}, normalizeString = defaultNormalizeString, truncateText = defaultTruncateText) {
+  const raw = value && typeof value === 'object' ? value : {};
+  const base = fallback && typeof fallback === 'object' ? fallback : {};
+  const subject = truncateText(
+    firstTemplateValue(raw, 'subject', 'subjectVariants', normalizeString) ||
+      firstTemplateValue(base, 'subject', 'subjectVariants', normalizeString) ||
+      DEFAULT_WEBDESIGN_SUBJECT,
+    200
+  );
+  const body =
+    firstTemplateValue(raw, 'body', 'bodyVariants', normalizeString) ||
+    firstTemplateValue(base, 'body', 'bodyVariants', normalizeString) ||
+    DEFAULT_WEBDESIGN_BODY;
+  return {
+    subject: subject || DEFAULT_WEBDESIGN_SUBJECT,
+    body: body || DEFAULT_WEBDESIGN_BODY,
+  };
+}
+
+function hasCompleteColdmailProfile(value = {}, normalizeString = defaultNormalizeString) {
+  const raw = value && typeof value === 'object' ? value : {};
+  return Boolean(
+    firstTemplateValue(raw, 'subject', 'subjectVariants', normalizeString) &&
+      firstTemplateValue(raw, 'body', 'bodyVariants', normalizeString)
+  );
+}
+
+function normalizeProfileMap(value = {}, normalizeString = defaultNormalizeString) {
+  const raw = value && typeof value === 'object' ? value : {};
+  const profiles = {};
+  Object.keys(raw).forEach((email) => {
+    const normalizedEmail = normalizeEmailAddress(email, normalizeString);
+    const profile = raw[email];
+    if (!normalizedEmail || !profile || typeof profile !== 'object') return;
+    profiles[normalizedEmail] = profile;
+  });
+  return profiles;
+}
+
+function pickColdmailProfileForSender(profiles = {}, senderEmails = [], normalizeString = defaultNormalizeString) {
+  const normalizedProfiles = normalizeProfileMap(profiles, normalizeString);
+  const emails = (Array.isArray(senderEmails) ? senderEmails : [senderEmails])
+    .map((email) => normalizeEmailAddress(email, normalizeString))
+    .filter(Boolean);
+  const direct = emails
+    .map((email) => normalizedProfiles[email])
+    .find((profile) => hasCompleteColdmailProfile(profile, normalizeString));
+  if (direct) return direct;
+  return Object.values(normalizedProfiles).find((profile) => hasCompleteColdmailProfile(profile, normalizeString)) || null;
+}
+
+function extractColdmailProfileFromSettings(settings, defaultSenderEmail, normalizeString = defaultNormalizeString, truncateText = defaultTruncateText) {
+  const raw = settings && typeof settings === 'object' ? settings : {};
+  const senderEmail = normalizeEmailAddress(raw.senderEmail || defaultSenderEmail, normalizeString);
+  const senderProfile = pickColdmailProfileForSender(
+    raw.senders,
+    [defaultSenderEmail, senderEmail],
+    normalizeString
+  );
+  const sourceProfile = senderProfile || (hasCompleteColdmailProfile(raw, normalizeString) ? raw : null);
+  if (!sourceProfile) return null;
+  return normalizeColdmailProfile(
+    sourceProfile,
+    { subject: DEFAULT_WEBDESIGN_SUBJECT, body: DEFAULT_WEBDESIGN_BODY },
+    normalizeString,
+    truncateText
+  );
+}
+
+function extractColdmailProfileFromAutopilotState(state, defaultSenderEmail, normalizeString = defaultNormalizeString, truncateText = defaultTruncateText) {
+  const raw = state && typeof state === 'object' ? state : {};
+  const config = raw.config && typeof raw.config === 'object' ? raw.config : raw;
+  const senderEmail = normalizeEmailAddress(config.senderEmail || defaultSenderEmail, normalizeString);
+  const senderEmails = [
+    defaultSenderEmail,
+    senderEmail,
+    ...(Array.isArray(config.senderEmails) ? config.senderEmails : []),
+  ];
+  const senderProfile = pickColdmailProfileForSender(config.senderProfiles, senderEmails, normalizeString);
+  const sourceProfile = senderProfile || (hasCompleteColdmailProfile(config, normalizeString) ? config : null);
+  if (!sourceProfile) return null;
+  return normalizeColdmailProfile(
+    sourceProfile,
+    { subject: DEFAULT_WEBDESIGN_SUBJECT, body: DEFAULT_WEBDESIGN_BODY },
+    normalizeString,
+    truncateText
+  );
+}
+
+function encodeBase64Url(value) {
+  return Buffer.from(String(value || ''), 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function signColdmailPayload(encodedPayload, secret) {
+  return crypto
+    .createHmac('sha256', defaultNormalizeString(secret) || DEFAULT_COLDMAIL_LINK_SECRET)
+    .update(defaultNormalizeString(encodedPayload))
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function buildColdmailReference(row, id, now = () => new Date(), normalizeString = defaultNormalizeString) {
+  const seed = (id || getRowCompany(row, normalizeString) || getRowEmail(row, normalizeString) || 'mail')
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-/g, '')
+    .slice(0, 8)
+    .toUpperCase();
+  const stamp = now().toISOString().slice(0, 10).replace(/-/g, '');
+  return `SF-${stamp}-${seed || 'MAIL'}`;
+}
+
+function buildColdmailToken(row, id, reference, secret, extra = {}, normalizeString = defaultNormalizeString, now = () => new Date()) {
+  const payload = {
+    v: 1,
+    id: normalizeString(id || getRowId(row, 0, normalizeString)),
+    email: getRowEmail(row, normalizeString),
+    ref: normalizeString(reference),
+    ts: now().toISOString(),
+    ...extra,
+  };
+  const encodedPayload = encodeBase64Url(JSON.stringify(payload));
+  return `${encodedPayload}.${signColdmailPayload(encodedPayload, secret)}`;
+}
+
+function buildColdmailUnsubscribeUrl(row, id, reference, config, normalizeString = defaultNormalizeString, now = () => new Date()) {
+  const token = buildColdmailToken(
+    row,
+    id,
+    reference,
+    config.coldmailLinkSecret,
+    {},
+    normalizeString,
+    now
+  );
+  return `${config.publicBaseUrl}${COLDMAIL_UNSUBSCRIBE_PATH}?t=${encodeURIComponent(token)}`;
+}
+
+function buildColdmailPreviewImageUrl(row, id, reference, config, type, normalizeString = defaultNormalizeString, now = () => new Date()) {
+  const token = buildColdmailToken(
+    row,
+    id,
+    reference,
+    config.coldmailLinkSecret,
+    { type: type === 'mockup' ? 'mockup' : 'webdesign' },
+    normalizeString,
+    now
+  );
+  return `${config.publicBaseUrl}${COLDMAIL_PREVIEW_IMAGE_PATH}?t=${encodeURIComponent(token)}`;
+}
+
+function buildInstantlyBodyWithWebdesignLinks({ baseText, webdesignImageUrl, webdesignMockupUrl, unsubscribeUrl }, normalizeString = defaultNormalizeString) {
+  const parts = [normalizeString(baseText)];
+  if (webdesignImageUrl) parts.push(webdesignImageUrl);
+  if (webdesignMockupUrl) parts.push(COLDMAIL_MOCKUP_CAPTION, webdesignMockupUrl);
+  const body = parts.filter(Boolean).join('\n\n');
+  return appendColdmailOptOutText(body, unsubscribeUrl, normalizeString);
+}
+
+function escapeHtml(value, normalizeString = defaultNormalizeString) {
+  return normalizeString(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function escapeHtmlAttribute(value, normalizeString = defaultNormalizeString) {
+  return escapeHtml(value, normalizeString).replace(/'/g, '&#39;');
+}
+
+function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString) {
+  const body = normalizeString(text)
+    .split(/\n{2,}/)
+    .map((paragraph) =>
+      `<p>${paragraph
+        .split('\n')
+        .map((line) => escapeHtml(line, normalizeString))
+        .join('<br>')}</p>`
+    )
+    .join('\n');
+  return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
+}
+
+function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defaultNormalizeString) {
+  const cleanSrc = normalizeString(src);
+  if (!cleanSrc) return '';
+  return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td style="padding:0;margin:0;width:100%;font-size:0;line-height:0;overflow:visible;"><img src="${escapeHtmlAttribute(
+    cleanSrc,
+    normalizeString
+  )}" alt="${escapeHtmlAttribute(
+    alt,
+    normalizeString
+  )}" width="640" style="display:block;width:100%;max-width:640px;height:auto;max-height:none;border:0;outline:none;text-decoration:none;border-radius:12px;object-fit:contain;" /></td></tr></table>`;
+}
+
+function buildInstantlyEmailHtml(
+  { baseText, company, webdesignImageUrl, webdesignMockupUrl, unsubscribeUrl },
+  normalizeString = defaultNormalizeString
+) {
+  const optOut = normalizeString(unsubscribeUrl)
+    ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="${escapeHtmlAttribute(
+        unsubscribeUrl,
+        normalizeString
+      )}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(
+        COLDMAIL_OPT_OUT_LABEL,
+        normalizeString
+      )}</a></p>`
+    : '';
+  const mockupHtml = webdesignMockupUrl
+    ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(
+        COLDMAIL_MOCKUP_CAPTION,
+        normalizeString
+      )}</p>${renderImageHtml(webdesignMockupUrl, `${company || 'Bedrijf'} device mockup`, '0', normalizeString)}`
+    : '';
+  return `${renderMailTextAsHtml(baseText, normalizeString)}${renderImageHtml(
+    webdesignImageUrl,
+    `${company || 'Bedrijf'} webdesign`,
+    '24px 0 0 0',
+    normalizeString
+  )}${mockupHtml}${optOut}`;
 }
 
 function normalizeInstantlyEventType(value, normalizeString = defaultNormalizeString) {
@@ -252,6 +963,12 @@ function normalizeInstantlyConfig(config = {}) {
     dailyCap: clampNumber(config.dailyCap, DEFAULT_DAILY_CAP, 1, 1000),
     verifyLeadsOnImport: readBool(config.verifyLeadsOnImport, false),
     blockPersonalMailboxDomains: readBool(config.blockPersonalMailboxDomains, true),
+    requireWebdesignAssets: readBool(config.requireWebdesignAssets, true),
+    publicBaseUrl: normalizePublicBaseUrl(config.publicBaseUrl) || DEFAULT_PUBLIC_BASE_URL,
+    coldmailLinkSecret: defaultNormalizeString(config.coldmailLinkSecret) || DEFAULT_COLDMAIL_LINK_SECRET,
+    defaultSenderEmail:
+      normalizeEmailAddress(config.defaultSenderEmail || DEFAULT_INSTANTLY_SENDER_EMAIL) ||
+      DEFAULT_INSTANTLY_SENDER_EMAIL,
   };
 }
 
@@ -272,6 +989,12 @@ function createInstantlyOutreachService(deps = {}) {
     resolveEmailDomain = resolveEmailDomainWithDns,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
+    customerPhotoScope = DEFAULT_CUSTOMER_PHOTO_SCOPE,
+    customerPhotoKey = DEFAULT_CUSTOMER_PHOTO_KEY,
+    coldmailingSettingsScope = DEFAULT_COLDMAILING_SETTINGS_SCOPE,
+    coldmailingSettingsKey = DEFAULT_COLDMAILING_SETTINGS_KEY,
+    coldmailAutopilotScope = DEFAULT_COLDMAIL_AUTOPILOT_SCOPE,
+    coldmailAutopilotKey = DEFAULT_COLDMAIL_AUTOPILOT_KEY,
     normalizeString = defaultNormalizeString,
     truncateText = defaultTruncateText,
     logger = console,
@@ -343,7 +1066,77 @@ function createInstantlyOutreachService(deps = {}) {
     return Boolean(await resolveEmailDomain(domain));
   }
 
-  async function collectEligibleRows(rows, limit) {
+  async function loadCustomerPhotoMap(rows = []) {
+    const state = await getUiStateValues(customerPhotoScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    return parseCustomerPhotoMap(values[customerPhotoKey], values, rows, normalizeString);
+  }
+
+  async function loadColdmailProfile() {
+    const [settingsState, autopilotState] = await Promise.all([
+      getUiStateValues(coldmailingSettingsScope),
+      getUiStateValues(coldmailAutopilotScope),
+    ]);
+    const settingsValues = settingsState && typeof settingsState.values === 'object' ? settingsState.values : {};
+    const autopilotValues = autopilotState && typeof autopilotState.values === 'object' ? autopilotState.values : {};
+    let settings = {};
+    let autopilot = {};
+    try {
+      const data = JSON.parse(normalizeString(settingsValues[coldmailingSettingsKey]) || '{}');
+      settings = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+    } catch (_) {
+      settings = {};
+    }
+    try {
+      const data = JSON.parse(normalizeString(autopilotValues[coldmailAutopilotKey]) || '{}');
+      autopilot = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+    } catch (_) {
+      autopilot = {};
+    }
+    return (
+      extractColdmailProfileFromAutopilotState(
+        autopilot,
+        config.defaultSenderEmail,
+        normalizeString,
+        truncateText
+      ) ||
+      extractColdmailProfileFromSettings(
+        settings,
+        config.defaultSenderEmail,
+        normalizeString,
+        truncateText
+      ) ||
+      normalizeColdmailProfile(
+        {},
+        { subject: DEFAULT_WEBDESIGN_SUBJECT, body: DEFAULT_WEBDESIGN_BODY },
+        normalizeString,
+        truncateText
+      )
+    );
+  }
+
+  async function loadPersonalizationContext(rows = []) {
+    const [photoMap, mailProfile] = await Promise.all([
+      loadCustomerPhotoMap(rows),
+      loadColdmailProfile(),
+    ]);
+    return {
+      photoMap,
+      photosByIdentity: buildPhotosByIdentity(photoMap, normalizeString),
+      mailProfile,
+    };
+  }
+
+  function getReadyWebdesignAssets(item, context) {
+    const photo = getWebdesignAssetRecordForRow(item.row, item.index, context, normalizeString);
+    const ready = hasReadyWebdesignAssetRecord(photo, normalizeString);
+    return {
+      ready,
+      photo,
+    };
+  }
+
+  async function collectEligibleRows(rows, limit, context = {}) {
     const selectedRows = [];
     const failed = [];
 
@@ -376,6 +1169,18 @@ function createInstantlyOutreachService(deps = {}) {
         });
         continue;
       }
+      if (config.requireWebdesignAssets) {
+        const assets = getReadyWebdesignAssets({ id, index, row }, context);
+        if (!assets.ready) {
+          failed.push({
+            id,
+            bedrijf: company,
+            email,
+            error: `Nog geen website-design klaar voor Instantly: ${company || email}.`,
+          });
+          continue;
+        }
+      }
 
       selectedRows.push({ id, index, row });
     }
@@ -383,25 +1188,75 @@ function createInstantlyOutreachService(deps = {}) {
     return { selectedRows, failed };
   }
 
-  function buildInstantlyLead(item) {
+  function buildInstantlyLead(item, context = {}) {
     const row = item.row;
     const email = getRowEmail(row, normalizeString);
     const company = getRowCompany(row, normalizeString);
-    const contact = getRowContact(row, normalizeString);
+    const contact = getRowContact(row, normalizeString) || company;
     const nameParts = contact.split(/\s+/).filter(Boolean);
     const firstName = normalizeString(row.firstName || row.voornaam || nameParts[0] || '');
     const lastName = normalizeString(
       row.lastName || row.achternaam || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '')
+    );
+    const reference = buildColdmailReference(row, item.id, now, normalizeString);
+    const unsubscribeUrl = buildColdmailUnsubscribeUrl(row, item.id, reference, config, normalizeString, now);
+    const subjectTemplate =
+      normalizeString(context.mailProfile && context.mailProfile.subject) || DEFAULT_WEBDESIGN_SUBJECT;
+    const bodyTemplate =
+      normalizeString(context.mailProfile && context.mailProfile.body) || DEFAULT_WEBDESIGN_BODY;
+    const city = getRowCity(row, normalizeString) || 'uw regio';
+    const subject = personalizeTemplate(subjectTemplate, row, normalizeString);
+    const baseMailBody = buildMailText(bodyTemplate, row, normalizeString);
+    const assets = getReadyWebdesignAssets(item, context);
+    const webdesignImageUrl = assets.ready
+      ? buildColdmailPreviewImageUrl(row, item.id, reference, config, 'webdesign', normalizeString, now)
+      : '';
+    const webdesignMockupUrl = assets.ready
+      ? buildColdmailPreviewImageUrl(row, item.id, reference, config, 'mockup', normalizeString, now)
+      : '';
+    const instantlyEmailBody = buildInstantlyBodyWithWebdesignLinks(
+      {
+        baseText: baseMailBody,
+        webdesignImageUrl,
+        webdesignMockupUrl,
+        unsubscribeUrl,
+      },
+      normalizeString
+    );
+    const instantlyEmailHtml = buildInstantlyEmailHtml(
+      {
+        baseText: baseMailBody,
+        company,
+        webdesignImageUrl,
+        webdesignMockupUrl,
+        unsubscribeUrl,
+      },
+      normalizeString
     );
     const customVariables = {
       softora_customer_id: item.id,
       softora_source: 'softora',
       softora_company: company,
       softora_status: normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect',
+      softora_contact_name: contact,
+      softora_city: city,
+      softora_subject: subject,
+      softora_mail_body: baseMailBody,
+      softora_mail_body_with_optout: appendColdmailOptOutText(baseMailBody, unsubscribeUrl, normalizeString),
+      softora_instantly_email_body: instantlyEmailBody,
+      softora_instantly_email_html: instantlyEmailHtml,
+      softora_reference: reference,
+      softora_unsubscribe_url: unsubscribeUrl,
+      softora_webdesign_image_url: webdesignImageUrl,
+      softora_webdesign_mockup_url: webdesignMockupUrl,
+      softora_mockup_caption: COLDMAIL_MOCKUP_CAPTION,
+      softora_website_domain: getRowDomain(row, normalizeString),
+      softora_webdesign_ready: assets.ready ? 'true' : 'false',
     };
 
     return {
       email,
+      personalization: instantlyEmailBody,
       first_name: firstName,
       last_name: lastName,
       company_name: company,
@@ -520,6 +1375,7 @@ function createInstantlyOutreachService(deps = {}) {
     const dailyRemaining = Math.max(0, config.dailyCap - syncedToday);
     const requestedLimit = clampNumber(input.limit, config.batchSize, 1, config.batchSize);
     const limit = Math.min(config.batchSize, requestedLimit, dailyRemaining);
+    const personalizationContext = await loadPersonalizationContext(rows);
 
     if (limit <= 0) {
       lastSyncResult = {
@@ -534,7 +1390,7 @@ function createInstantlyOutreachService(deps = {}) {
       return lastSyncResult;
     }
 
-    const { selectedRows, failed } = await collectEligibleRows(rows, limit);
+    const { selectedRows, failed } = await collectEligibleRows(rows, limit, personalizationContext);
     if (!selectedRows.length) {
       lastSyncResult = {
         ok: true,
@@ -547,7 +1403,7 @@ function createInstantlyOutreachService(deps = {}) {
       return lastSyncResult;
     }
 
-    const leads = selectedRows.map(buildInstantlyLead);
+    const leads = selectedRows.map((item) => buildInstantlyLead(item, personalizationContext));
     const data = await addLeadsToInstantly(leads);
     const nextRows = markRowsAsSynced(rows, selectedRows, data, actor);
     await setUiStateValues(
@@ -976,6 +1832,8 @@ function createInstantlyOutreachService(deps = {}) {
       dailyCap: config.dailyCap,
       verifyLeadsOnImport: config.verifyLeadsOnImport,
       blockPersonalMailboxDomains: config.blockPersonalMailboxDomains,
+      requireWebdesignAssets: config.requireWebdesignAssets,
+      defaultSenderEmail: config.defaultSenderEmail,
       syncedToday: getDailySyncCount(rows),
       nextSyncAt,
       running: Boolean(syncPromise),

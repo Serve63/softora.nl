@@ -363,6 +363,13 @@ function buildServerAppFeatureWiringRuntimeContext({
             dailyCap: envConfig.INSTANTLY_DAILY_CAP,
             verifyLeadsOnImport: envConfig.INSTANTLY_VERIFY_LEADS_ON_IMPORT,
             blockPersonalMailboxDomains: envConfig.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,
+            requireWebdesignAssets: envConfig.INSTANTLY_REQUIRE_WEBDESIGN_ASSETS,
+            publicBaseUrl: envConfig.PUBLIC_BASE_URL,
+            coldmailLinkSecret:
+              envConfig.COLDMAIL_UNSUBSCRIBE_SECRET ||
+              envConfig.PREMIUM_SESSION_SECRET ||
+              envConfig.MAIL_SMTP_PASS,
+            defaultSenderEmail: envConfig.INSTANTLY_DEFAULT_SENDER_EMAIL,
           },
           getUiStateValues: dataOpsAwareUiStateGetter,
           setUiStateValues: dataOpsAwareUiStateSetter,
