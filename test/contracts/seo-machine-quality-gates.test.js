@@ -413,6 +413,7 @@ test('SEO-content gebruikt echte geoptimaliseerde foto’s in plaats van placeho
       assert.equal(image.width, '1600', `${image.src} mist vaste breedte.`);
       assert.equal(image.height, '1000', `${image.src} mist vaste hoogte.`);
       assert.match(image.loading, /^(eager|lazy)$/);
+      assert.equal(image.decoding, 'async', `${image.src} mist async decoding.`);
       assert.match(image.fetchpriority, /^(high|low)$/);
     }
   }
@@ -442,7 +443,12 @@ test('SEO-image gate blokkeert foto’s zonder prestatie-attributen', () => {
 
   assert.deepEqual(
     issues.map((issue) => issue.type).sort(),
-    ['missing-image-dimensions', 'missing-image-fetch-priority', 'missing-image-loading-strategy'].sort()
+    [
+      'missing-image-decoding-strategy',
+      'missing-image-dimensions',
+      'missing-image-fetch-priority',
+      'missing-image-loading-strategy',
+    ].sort()
   );
 });
 
@@ -452,12 +458,12 @@ test('publieke SEO-image gate blokkeert externe of zwakke servicepagina-afbeeldi
       {
         path: '/website-laten-maken',
         html:
-          '<img src="https://images.unsplash.com/photo-123?auto=format" alt="Website" width="900" height="560" loading="lazy" fetchpriority="low">',
+          '<img src="https://images.unsplash.com/photo-123?auto=format" alt="Website" width="900" height="560" loading="lazy" decoding="async" fetchpriority="low">',
       },
       {
         path: '/crm-systeem-op-maat',
         html:
-          '<img src="/assets/random.jpg" alt="CRM systeem op maat voor ondernemers met klantbeheer en opvolging." width="900" height="560" loading="lazy" fetchpriority="low">',
+          '<img src="/assets/random.jpg" alt="CRM systeem op maat voor ondernemers met klantbeheer en opvolging." width="900" height="560" loading="lazy" decoding="async" fetchpriority="low">',
       },
     ],
     checkAllImages: true,

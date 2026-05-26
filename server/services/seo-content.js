@@ -11,7 +11,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   blog: Object.freeze({
     key: 'blog',
     path: '/blog',
-    title: 'Softora Blog',
+    title: 'Softora Blog over websites, software en AI groei',
     description:
       'Praktische inzichten over websites, AI automatisering, bedrijfssoftware, chatbots en digitale groei voor ondernemers.',
     eyebrow: 'Inzichten',
@@ -22,7 +22,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   kennisbank: Object.freeze({
     key: 'kennisbank',
     path: '/kennisbank',
-    title: 'Softora Kennisbank',
+    title: 'Softora Kennisbank voor digitale groei',
     description:
       'Heldere uitleg over websites, bedrijfssoftware, AI automatisering en digitale processen voor ondernemers en teams.',
     eyebrow: 'Kennisbank',
@@ -33,7 +33,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   vergelijkingen: Object.freeze({
     key: 'vergelijkingen',
     path: '/vergelijkingen',
-    title: 'Softora Vergelijkingen',
+    title: 'Softora Vergelijkingen voor websites en AI',
     description:
       'Vergelijkingspagina’s voor ondernemers die twijfelen tussen website-, software- en AI-oplossingen en een betere keuze willen maken.',
     eyebrow: 'Vergelijkingen',
@@ -44,7 +44,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   branches: Object.freeze({
     key: 'branches',
     path: '/branches',
-    title: 'Softora Branchepagina’s',
+    title: 'Softora Branchepagina’s voor digitale groei',
     description:
       'SEO-landingspagina’s per branche voor ondernemers die websites, AI automatisering en bedrijfssoftware slimmer willen inzetten.',
     eyebrow: 'Branches',
@@ -55,7 +55,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   regio: Object.freeze({
     key: 'regio',
     path: '/regio',
-    title: 'Softora Regio',
+    title: 'Softora Regio voor lokale digitale groei',
     description:
       'Lokale SEO-pagina’s voor bedrijven in Brabant die meer leads willen uit websites, AI automatisering en maatwerk software.',
     eyebrow: 'Lokale SEO',
