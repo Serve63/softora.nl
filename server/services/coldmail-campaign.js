@@ -1998,6 +1998,7 @@ function createColdmailCampaignService(deps = {}) {
     's hertogenbosch': { lat: 51.6978, lng: 5.3037 },
     waalwijk: { lat: 51.6828, lng: 5.0707 },
     boxtel: { lat: 51.5908, lng: 5.3293 },
+    helvoirt: { lat: 51.6317, lng: 5.2306 },
     udenhout: { lat: 51.6098, lng: 5.1436 },
     haaren: { lat: 51.6027, lng: 5.2222 },
     goirle: { lat: 51.5206, lng: 5.0667 },

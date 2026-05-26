@@ -3778,6 +3778,15 @@ test('coldmail campaign radius includes real customer database places near Oiste
         mail: true,
       },
       {
+        id: 'helvoirt-1',
+        bedrijf: 'Helvoirt Studio',
+        email: 'helvoirt@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Lindelaan 15, Helvoirt',
+        mail: true,
+      },
+      {
         id: 'roosendaal-1',
         bedrijf: 'Roosendaal Zaak',
         email: 'roosendaal@example.test',
@@ -3797,8 +3806,8 @@ test('coldmail campaign radius includes real customer database places near Oiste
 
   assert.equal(result.ok, true);
   assert.equal(result.radiusKm, 40);
-  assert.equal(result.selected, 2);
-  assert.deepEqual(result.recipients.map((recipient) => recipient.bedrijf), ['Chaam Winkel', 'Alphen Studio']);
+  assert.equal(result.selected, 3);
+  assert.deepEqual(result.recipients.map((recipient) => recipient.bedrijf), ['Chaam Winkel', 'Alphen Studio', 'Helvoirt Studio']);
   assert.ok(result.recipients.every((recipient) => recipient.distanceKm <= 40));
 });
 
