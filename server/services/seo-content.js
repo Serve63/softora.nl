@@ -6,7 +6,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   blog: Object.freeze({
     key: 'blog',
     path: '/blog',
-    title: 'Softora Blog',
+    title: 'Softora Blog over websites, software en AI groei',
     description:
       'Praktische inzichten over websites, AI automatisering, bedrijfssoftware, chatbots en digitale groei voor ondernemers.',
     eyebrow: 'Inzichten',
@@ -17,7 +17,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   kennisbank: Object.freeze({
     key: 'kennisbank',
     path: '/kennisbank',
-    title: 'Softora Kennisbank',
+    title: 'Softora Kennisbank voor digitale groei',
     description:
       'Heldere uitleg over websites, bedrijfssoftware, AI automatisering en digitale processen voor ondernemers en teams.',
     eyebrow: 'Kennisbank',
@@ -28,7 +28,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   vergelijkingen: Object.freeze({
     key: 'vergelijkingen',
     path: '/vergelijkingen',
-    title: 'Softora Vergelijkingen',
+    title: 'Softora Vergelijkingen voor websites en AI',
     description:
       'Vergelijkingspagina’s voor ondernemers die twijfelen tussen website-, software- en AI-oplossingen en een betere keuze willen maken.',
     eyebrow: 'Vergelijkingen',
@@ -39,7 +39,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   branches: Object.freeze({
     key: 'branches',
     path: '/branches',
-    title: 'Softora Branchepagina’s',
+    title: 'Softora Branchepagina’s voor digitale groei',
     description:
       'SEO-landingspagina’s per branche voor ondernemers die websites, AI automatisering en bedrijfssoftware slimmer willen inzetten.',
     eyebrow: 'Branches',
@@ -50,7 +50,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   regio: Object.freeze({
     key: 'regio',
     path: '/regio',
-    title: 'Softora Regio',
+    title: 'Softora Regio voor lokale digitale groei',
     description:
       'Lokale SEO-pagina’s voor bedrijven in Brabant die meer leads willen uit websites, AI automatisering en maatwerk software.',
     eyebrow: 'Lokale SEO',
@@ -2104,7 +2104,7 @@ function renderArticleCards(items) {
         `<article class="blog-card${featured ? ' featured' : ''}" data-content-cluster="${escapeHtml(cluster.key)}">`,
         `  <a href="${escapeHtml(href)}">`,
         `    <div class="blog-card-img${featured ? ' featured' : ''}">`,
-        `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="${imageLoading}" fetchpriority="${imagePriority}">`,
+        `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="${imageLoading}" decoding="async" fetchpriority="${imagePriority}">`,
         `      <div class="blog-card-img-label">${escapeHtml(item.category)}</div>`,
         '    </div>',
         '    <div class="blog-card-body">',
@@ -2323,7 +2323,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     '    </div>',
     '  </section>',
     '  <figure class="artikel-img">',
-    `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="eager" fetchpriority="high">`,
+    `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="eager" decoding="async" fetchpriority="high">`,
     `    <figcaption>${escapeHtml(item.title)}</figcaption>`,
     '  </figure>',
     '  <article class="artikel-body">',
