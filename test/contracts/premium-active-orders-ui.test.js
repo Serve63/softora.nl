@@ -30,7 +30,7 @@ function readActiveOrdersSources() {
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260511a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260526a"><\/script>/);
   assert.match(pageSource, /assets\/premium-active-order-custom-selects\.js\?v=20260526a/);
   assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260526c/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
@@ -185,7 +185,9 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(pageSource, /assets\/premium-active-order-assignment-toggle\.js\?v=20260511a/);
   assert.match(source, /const toggleId = 'myAssignmentsOnlyToggle';[\s\S]*const labelText = 'Enkel mijn toewijzingen bekijken';/);
   assert.match(source, /\.assignment-toggle-box::after \{[\s\S]*border-right:\s*2px solid #fff;[\s\S]*border-bottom:\s*2px solid #fff;/);
+  assert.match(source, /function updateOrderFilterCounts\(cards\) \{[\s\S]*window\.SoftoraActiveOrdersFilter\.shouldHideCard\(card\)\) return;[\s\S]*counts\[group\] = \(counts\[group\] \|\| 0\) \+ 1;/);
   assert.match(source, /const shouldHide = \(activeOrderFilter !== 'all' && group !== activeOrderFilter\) \|\| \(typeof window\.SoftoraActiveOrdersFilter\?\.shouldHideCard === 'function' && window\.SoftoraActiveOrdersFilter\.shouldHideCard\(card\)\);/);
+  assert.match(source, /function applyOrderFilter\(\) \{[\s\S]*updateOrderFilterCounts\(cards\);[\s\S]*renderOrdersEmptyState\(\);/);
   assert.match(source, /filter\.shouldHideCard = function shouldHideCard\(card\) \{[\s\S]*return normalizeAssignee\(getClaimInfo\(orderId\)\?\.by \|\| ''\) !== currentAssignee;/);
   assert.match(source, /topbarRight\.insertBefore\(label, topbarRight\.firstChild\);[\s\S]*if \(typeof window\.applyOrderFilter === 'function'\) window\.applyOrderFilter\(\);/);
 });

@@ -763,6 +763,7 @@ function updateOrderFilterCounts(cards) {
     const counts = { completed: 0, open_leads: 0, in_progress: 0 };
 
     cards.forEach((card) => {
+        if (typeof window.SoftoraActiveOrdersFilter?.shouldHideCard === 'function' && window.SoftoraActiveOrdersFilter.shouldHideCard(card)) return;
         const group = getOrderFilterGroupForCard(card);
         counts[group] = (counts[group] || 0) + 1;
     });
@@ -782,6 +783,7 @@ function applyOrderFilter() {
         const shouldHide = (activeOrderFilter !== 'all' && group !== activeOrderFilter) || (typeof window.SoftoraActiveOrdersFilter?.shouldHideCard === 'function' && window.SoftoraActiveOrdersFilter.shouldHideCard(card));
         card.hidden = shouldHide;
     });
+    updateOrderFilterCounts(cards);
     updateOrderFilterButtonState();
     renderOrdersEmptyState();
 }
@@ -924,8 +926,6 @@ function refreshOrderSummaryCards() {
 
     const sumDelivered = document.getElementById('sumDelivered');
     if (sumDelivered) sumDelivered.textContent = String(completedCount);
-
-    updateOrderFilterCounts(cards);
     applyOrderFilter();
 }
 
