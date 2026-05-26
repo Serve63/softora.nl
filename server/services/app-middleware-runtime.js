@@ -244,6 +244,7 @@ function applyAppMiddleware(app, deps = {}) {
       '/api/coldmailing/outreach/status',
       '/api/coldmailing/replies/sync',
       '/api/instantly/sync',
+      '/api/outreach/provider-sync',
       '/api/coldcalling/start',
       '/api/active-orders/generate-site',
       '/api/active-order-generate-site',

@@ -21,6 +21,7 @@ const DEFAULT_API_BASE_URL = 'https://api.instantly.ai/api/v2';
 const DEFAULT_SYNC_INTERVAL_MINUTES = 15;
 const DEFAULT_SYNC_BATCH_SIZE = 10;
 const DEFAULT_DAILY_CAP = 25;
+const DEFAULT_DAILY_CAP_TIME_ZONE = 'Europe/Amsterdam';
 const DEFAULT_PUBLIC_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_COLDMAIL_LINK_SECRET = 'softora-coldmail';
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
@@ -975,6 +976,7 @@ function normalizeInstantlyConfig(config = {}) {
     ),
     batchSize: clampNumber(config.batchSize, DEFAULT_SYNC_BATCH_SIZE, 1, 1000),
     dailyCap: clampNumber(config.dailyCap, DEFAULT_DAILY_CAP, 1, 1000),
+    dailyCapTimeZone: defaultNormalizeString(config.dailyCapTimeZone || DEFAULT_DAILY_CAP_TIME_ZONE),
     verifyLeadsOnImport: readBool(config.verifyLeadsOnImport, false),
     blockPersonalMailboxDomains: readBool(config.blockPersonalMailboxDomains, true),
     requireWebdesignAssets: readBool(config.requireWebdesignAssets, true),
@@ -984,6 +986,25 @@ function normalizeInstantlyConfig(config = {}) {
       normalizeEmailAddress(config.defaultSenderEmail || DEFAULT_INSTANTLY_SENDER_EMAIL) ||
       DEFAULT_INSTANTLY_SENDER_EMAIL,
   };
+}
+
+function formatDateKeyForTimeZone(value, timeZone = DEFAULT_DAILY_CAP_TIME_ZONE) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  try {
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const year = parts.find((part) => part.type === 'year')?.value;
+    const month = parts.find((part) => part.type === 'month')?.value;
+    const day = parts.find((part) => part.type === 'day')?.value;
+    return year && month && day ? `${year}-${month}-${day}` : date.toISOString().slice(0, 10);
+  } catch (_) {
+    return date.toISOString().slice(0, 10);
+  }
 }
 
 function createInstantlyError(message, code, status = 400, extra = {}) {
@@ -1050,10 +1071,10 @@ function createInstantlyOutreachService(deps = {}) {
   }
 
   function getDailySyncCount(rows) {
-    const today = now().toISOString().slice(0, 10);
+    const today = formatDateKeyForTimeZone(now(), config.dailyCapTimeZone);
     return (Array.isArray(rows) ? rows : []).filter((row) => {
       const syncedAt = normalizeString(row && row.instantlySyncedAt);
-      return syncedAt.slice(0, 10) === today;
+      return formatDateKeyForTimeZone(syncedAt, config.dailyCapTimeZone) === today;
     }).length;
   }
 
@@ -2198,6 +2219,7 @@ function createInstantlyOutreachService(deps = {}) {
       intervalMinutes: config.intervalMinutes,
       batchSize: config.batchSize,
       dailyCap: config.dailyCap,
+      dailyCapTimeZone: config.dailyCapTimeZone,
       verifyLeadsOnImport: config.verifyLeadsOnImport,
       blockPersonalMailboxDomains: config.blockPersonalMailboxDomains,
       requireWebdesignAssets: config.requireWebdesignAssets,
