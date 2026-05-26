@@ -1251,13 +1251,13 @@ Softora.nl | +31 6 43 26 27 92</textarea>
           <input class="slider" type="range" min="1" max="9" step="1" value="9" id="mail-slider" oninput="updateSlider(this.value)">
           <div class="slider-row" id="campaignVolumeSliderLabels"><span>1</span><span>5</span><span>9</span></div>
         </div>
-
         <div class="field lead-generator-hidden-setting">
           <div class="field-label">Verzenden vanaf</div>
           <select class="sel" id="campaignSenderEmail" aria-label="Verzenden vanaf e-mailadres">
             <option value="serve@softora.nl" selected>serve@softora.nl</option>
             <option value="martijn@softora.nl">martijn@softora.nl</option>
             <option value="servec321@gmail.com">servec321@gmail.com</option>
+            <option value="martijnven123@gmail.com">martijnven123@gmail.com</option>
           </select>
         </div>
         <div class="field lead-generator-belmethod-field">
@@ -1427,7 +1427,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
-<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260513a"></script><script src="assets/premium-coldmail-send-copy.js?v=20260519b"></script><script src="assets/premium-coldmail-sender-scoreboard.js?v=20260522m"></script><script src="assets/premium-coldmail-send-freeze.js?v=20260520a"></script><script src="assets/premium-coldmail-autopilot.js?v=20260522b"></script>
+<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260526a"></script><script src="assets/premium-coldmail-send-copy.js?v=20260519b"></script><script src="assets/premium-coldmail-sender-scoreboard.js?v=20260526a"></script><script src="assets/premium-coldmail-send-freeze.js?v=20260520a"></script><script src="assets/premium-coldmail-autopilot.js?v=20260522b"></script>
 <script src="assets/premium-campaign-selects.js?v=20260511a"></script>
 <script>
 // ── DATA ──
@@ -1904,7 +1904,7 @@ async function initColdmailingMailboxOptions() {
   const select = document.getElementById('campaignSenderEmail');
   if (!select || select.dataset.mailboxOptionsLoaded === '1') return;
   select.dataset.mailboxOptionsLoaded = '1';
-  const allowedSenderEmails = new Set(['serve@softora.nl', 'martijn@softora.nl', 'servec321@gmail.com']);
+  const allowedSenderEmails = new Set(['serve@softora.nl', 'martijn@softora.nl', 'servec321@gmail.com', 'martijnven123@gmail.com']);
   try {
     const response = await fetch('/api/coldmailing/mailbox-options', {
       credentials: 'same-origin',

@@ -408,6 +408,7 @@ test('server app runtime composition builders preserve feature wiring groups and
     'ruben@softora.nl',
     'serve@softora.nl',
     'martijn@softora.nl',
+    'martijnven123@gmail.com',
   ]);
   const testRecipients =
     await context.featureRouteOptions.coldmailing.coldmailCampaignService.getColdmailCampaignRecipients({
