@@ -66,6 +66,15 @@ function renderSeoContentPages() {
   ];
 }
 
+test('publieke contactknoppen gebruiken klantvriendelijke labels', () => {
+  const pages = [...renderStaticPublicPages(), ...renderSeoContentPages()];
+  const pagesWithInternalContactLabel = pages
+    .filter((page) => />\s*WhatsApp\s+Martijn\s*</i.test(page.html))
+    .map((page) => page.path);
+
+  assert.deepEqual(pagesWithInternalContactLabel, []);
+});
+
 test('seo machine contentkwaliteit blijft sterk genoeg om automatisch door te groeien', () => {
   assert.deepEqual(DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION, {
     blog: 1500,
@@ -258,7 +267,7 @@ test('leadknoppen mogen niet meer naar dode contactroutes of niet-veilige WhatsA
       {
         path: '/voorbeeld',
         html: [
-          '<a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" data-softora-conversion="public-cta" data-softora-conversion-page="/voorbeeld" data-softora-conversion-target="whatsapp">WhatsApp Martijn</a>',
+          '<a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" data-softora-conversion="public-cta" data-softora-conversion-page="/voorbeeld" data-softora-conversion-target="whatsapp">Contact</a>',
           '<a href="/#contact">Neem contact op</a>',
           '<a href="#">Stuur een bericht</a>',
         ].join('\n'),
@@ -391,7 +400,7 @@ test('SEO-content CTAs zijn meetbaar en linken terug naar commerciële pagina’
   assert.match(html, /data-softora-conversion-page="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
   assert.match(html, /data-softora-conversion-target="service"/);
   assert.match(html, /data-softora-conversion-target="whatsapp"/);
-  assert.match(html, /href="https:\/\/wa\.me\/31643262792"[^>]*>WhatsApp Martijn<\/a>/);
+  assert.match(html, /href="https:\/\/wa\.me\/31643262792"[^>]*>Contact<\/a>/);
   assert.match(html, /href="\/pakketten">Pakketten<\/a>/);
 });
 

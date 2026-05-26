@@ -1974,7 +1974,7 @@ function renderConversionCta(item) {
     '  </div>',
     '  <div class="content-cta-actions">',
     `    <a class="content-cta-primary" href="${escapeHtml(primary.href)}" data-softora-conversion="content-primary" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="service">${escapeHtml(primary.label)}</a>`,
-    `    <a class="content-cta-secondary" href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-contact" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="whatsapp">WhatsApp Martijn</a>`,
+    `    <a class="content-cta-secondary" href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-contact" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="whatsapp">Contact</a>`,
     '  </div>',
     '</section>',
   ].join('\n');
