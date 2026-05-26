@@ -1220,7 +1220,8 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(webdesignActionSource, /\.outreach-action\{box-sizing:border-box;min-width:0;min-height:34px/);
   assert.match(webdesignActionSource, /overflow-wrap:anywhere/);
   assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\\"klant_geworden\\\"\\]\{background:var\(--crimson\)/);
-  assert.match(webdesignActionSource, /Blijft in Benaderd/);
+  assert.match(webdesignActionSource, /replyAt \|\| customer\.updatedAt \|\| getSentAt\(customer\)/);
+  assert.doesNotMatch(webdesignActionSource, /Blijft in Benaderd/);
   assert.doesNotMatch(webdesignActionSource, /25 dagen regel actief/);
   assert.match(webdesignActionSource, /const replyMessage = normalizeString\(customer\.replyMailboxId \|\| customer\.replyThreadId \|\| customer\.replyMessageId \|\| customer\.lastColdmailReplyMessageKey\);/);
   assert.match(webdesignActionSource, /const sentMessage = normalizeString\(customer\.outreachMessageId \|\| customer\.coldmailSentMessageId\);/);

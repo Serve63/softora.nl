@@ -767,7 +767,7 @@
         function renderReplyInfo(customer) {
             if (!isWebdesignOutreachCustomer(customer)) return "";
             const replyAt = getReplyAt(customer);
-            return replyAt ? "<div class=\"outreach-reply\"><strong>Reactie ontvangen</strong><span>" + escapeHtml(formatDisplayDate(replyAt)) + "</span></div>" : "<div class=\"outreach-reply\"><strong>Nog geen reactie</strong><span>Blijft in Benaderd</span></div>";
+            return escapeHtml(formatDisplayDate(replyAt || customer.updatedAt || getSentAt(customer)));
         }
 
         function getLocalDateSerial(timestamp) {
