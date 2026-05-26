@@ -146,7 +146,7 @@ test('seo machine blokkeert gevaarlijke of onbewezen contentclaims', () => {
         sections: [
           {
             heading: '100% veilig en hackvrij',
-            paragraphs: ['Wij worden de grootste speler en hebben meer dan 100 klanten zonder bronvermelding.'],
+            paragraphs: ['Wij worden de grootste speler en noemen 25 klanttrajecten zonder bronvermelding.'],
           },
         ],
       },
@@ -189,6 +189,7 @@ test('publieke losse HTML-bronnen sturen niet richting gevaarlijke claimvoorbeel
   assert.doesNotMatch(rawPublicSource, /\buptime\s+garantie\b/i);
   assert.doesNotMatch(rawPublicSource, /\b(?:gegarandeerd|garantie)\b.{0,80}\b(?:leads?|omzet|conversie|ranking|google)\b/i);
   assert.doesNotMatch(rawPublicSource, /\bAI\b.{0,80}\b(?:altijd correct|maakt geen fouten|vervangt alle medewerkers|neemt alle beslissingen)\b/i);
+  assert.doesNotMatch(rawPublicSource, /\b\d{2,}\+?\s+(?:klanttrajecten|trajecten|klanten|projecten|reviews)\b/i);
 });
 
 test('seo machine blokkeert harde uptimegaranties in publieke paginacopy', () => {
