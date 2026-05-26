@@ -1,6 +1,11 @@
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/softora-office-digital-growth.jpg';
-const DEFAULT_LOGO_PATH = '/assets/61C2BCF5-70E9-4789-AFDE-FA18C862D58A.PNG';
+const DEFAULT_LOGO_PATH = '/assets/softora-favicon-round.png';
+const LOCAL_FONT_VERSION = '20260409a';
+const LOCAL_FONT_PRELOAD_LINKS = [
+  `<link rel="preload" href="/assets/fonts/inter-latin.woff2?v=${LOCAL_FONT_VERSION}" as="font" type="font/woff2" crossorigin>`,
+  `<link rel="preload" href="/assets/fonts/oswald-latin.woff2?v=${LOCAL_FONT_VERSION}" as="font" type="font/woff2" crossorigin>`,
+];
 
 const SEO_CONTENT_COLLECTIONS = Object.freeze({
   blog: Object.freeze({
@@ -1848,7 +1853,9 @@ function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', s
     '<meta name="robots" content="index, follow">',
     `<link rel="canonical" href="${escapeHtml(canonicalUrl)}">`,
     '<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260513a" sizes="any">',
-    '<link rel="stylesheet" href="/assets/fonts.css?v=20260409a">',
+    '<link rel="apple-touch-icon" href="/assets/softora-favicon-round.png?v=20260513a">',
+    ...LOCAL_FONT_PRELOAD_LINKS,
+    `<link rel="stylesheet" href="/assets/fonts.css?v=${LOCAL_FONT_VERSION}">`,
     '<link rel="stylesheet" href="/assets/seo-content.css?v=20260520c">',
     `<meta property="og:type" content="${escapeHtml(ogType)}">`,
     '<meta property="og:site_name" content="Softora">',
@@ -2104,7 +2111,7 @@ function renderArticleCards(items) {
         `<article class="blog-card${featured ? ' featured' : ''}" data-content-cluster="${escapeHtml(cluster.key)}">`,
         `  <a href="${escapeHtml(href)}">`,
         `    <div class="blog-card-img${featured ? ' featured' : ''}">`,
-        `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="${imageLoading}" fetchpriority="${imagePriority}">`,
+        `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="${imageLoading}" decoding="async" fetchpriority="${imagePriority}">`,
         `      <div class="blog-card-img-label">${escapeHtml(item.category)}</div>`,
         '    </div>',
         '    <div class="blog-card-body">',
@@ -2323,7 +2330,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     '    </div>',
     '  </section>',
     '  <figure class="artikel-img">',
-    `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="eager" fetchpriority="high">`,
+    `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="eager" decoding="async" fetchpriority="high">`,
     `    <figcaption>${escapeHtml(item.title)}</figcaption>`,
     '  </figure>',
     '  <article class="artikel-body">',

@@ -91,6 +91,7 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.match(first, /<meta name="description" content="Softora bouwt snelle websites/);
   assert.match(first, /<meta name="robots" content="index, follow">/);
   assert.match(first, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/">/);
+  assert.match(first, /"logo":"https:\/\/www\.softora\.nl\/assets\/softora-favicon-round\.png"/);
   assert.match(first, /type="application\/ld\+json" data-softora-public-seo="structured-data"/);
   assert.match(first, /data-softora-public-seo="internal-links"/);
   assert.match(first, /href="\/diensten"/);

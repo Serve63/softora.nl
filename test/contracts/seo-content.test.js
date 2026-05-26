@@ -126,6 +126,9 @@ test('seo content renders the existing blog visual language with real links', ()
   });
 
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog">/);
+  assert.match(html, /<link rel="apple-touch-icon" href="\/assets\/softora-favicon-round\.png\?v=20260513a">/);
+  assert.match(html, /<link rel="preload" href="\/assets\/fonts\/inter-latin\.woff2\?v=20260409a" as="font" type="font\/woff2" crossorigin>/);
+  assert.match(html, /<link rel="preload" href="\/assets\/fonts\/oswald-latin\.woff2\?v=20260409a" as="font" type="font\/woff2" crossorigin>/);
   assert.match(html, /<meta name="robots" content="index, follow">/);
   assert.match(html, /data-softora-public-seo="structured-data"/);
   assert.match(html, /class="hero-banner"/);
@@ -133,7 +136,7 @@ test('seo content renders the existing blog visual language with real links', ()
   assert.match(html, /class="blog-card featured"/);
   assert.match(
     html,
-    /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg" alt="Overleg aan tafel over workflow, planning en procesautomatisering voor het MKB\." width="1600" height="1000"/
+    /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg" alt="Overleg aan tafel over workflow, planning en procesautomatisering voor het MKB\." width="1600" height="1000" loading="eager" decoding="async" fetchpriority="high">/
   );
   assert.match(html, /SEO groeipijlers/);
   assert.match(html, /data-softora-public-seo="content-clusters"/);
@@ -182,7 +185,7 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /<figure class="artikel-img">/);
   assert.match(
     html,
-    /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg" alt="Overleg aan tafel over workflow, planning en procesautomatisering voor het MKB\." width="1600" height="1000"/
+    /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg" alt="Overleg aan tafel over workflow, planning en procesautomatisering voor het MKB\." width="1600" height="1000" loading="eager" decoding="async" fetchpriority="high">/
   );
   assert.match(html, /data-content-cluster="ai-automatisering"/);
   assert.match(html, /AI automatisering voor het MKB: waar begin je\?/);

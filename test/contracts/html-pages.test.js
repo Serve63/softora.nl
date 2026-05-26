@@ -178,6 +178,32 @@ test('html page coordinator renders SEO-managed html and respects handled premiu
   assert.doesNotMatch(res.body, /fonts\.gstatic\.com/);
 });
 
+test('html page coordinator preloads local fonts when the stylesheet already exists', async () => {
+  const { coordinator, pagesDir } = createFixture();
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-website.html'),
+    [
+      '<!DOCTYPE html><html><head><title>Orig</title>',
+      '<link rel="stylesheet" href="/assets/fonts.css?v=20260409a">',
+      '</head><body>Hello</body></html>',
+    ].join('')
+  );
+
+  const req = { originalUrl: '/premium-website' };
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(req, res, () => {}, 'premium-website.html');
+
+  const interPreloadIndex = res.body.indexOf('/assets/fonts/inter-latin.woff2?v=20260409a');
+  const oswaldPreloadIndex = res.body.indexOf('/assets/fonts/oswald-latin.woff2?v=20260409a');
+  const stylesheetIndex = res.body.indexOf('/assets/fonts.css?v=20260409a');
+
+  assert.ok(interPreloadIndex > -1, 'Inter font preload ontbreekt');
+  assert.ok(oswaldPreloadIndex > -1, 'Oswald font preload ontbreekt');
+  assert.ok(interPreloadIndex < stylesheetIndex, 'font preloads horen voor de stylesheet te staan');
+  assert.equal((res.body.match(/inter-latin\.woff2\?v=20260409a/g) || []).length, 1);
+});
+
 test('html page coordinator injects critical premium sidebar shell before theme stylesheet', async () => {
   const { coordinator, pagesDir } = createFixture();
   fs.writeFileSync(

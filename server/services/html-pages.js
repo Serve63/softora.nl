@@ -13,6 +13,10 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   ...LOCAL_FONT_PRELOAD_LINKS,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
+const LOCAL_FONT_PRELOAD_HREFS = [
+  `/assets/fonts/inter-latin.woff2?v=${LOCAL_FONT_VERSION}`,
+  `/assets/fonts/oswald-latin.woff2?v=${LOCAL_FONT_VERSION}`,
+];
 const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260519d';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
@@ -96,6 +100,10 @@ const PREMIUM_SIDEBAR_CONTENT_FRAME_CSP_BASE = [
   "connect-src 'self' https:",
   "media-src 'self' data: blob: https:",
 ];
+
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 function createHtmlPageCoordinator(options = {}) {
   const {
@@ -289,6 +297,22 @@ function createHtmlPageCoordinator(options = {}) {
       renderedHtml = preferHeadStart
         ? injectSnippetAfterHeadOpen(renderedHtml, LOCAL_FONT_PRELOAD_AND_STYLESHEET, LOCAL_FONT_STYLESHEET_HREF)
         : injectSnippetBeforeHeadClose(renderedHtml, LOCAL_FONT_PRELOAD_AND_STYLESHEET);
+    } else {
+      const missingPreloads = LOCAL_FONT_PRELOAD_LINKS.filter(
+        (_link, index) => !renderedHtml.includes(LOCAL_FONT_PRELOAD_HREFS[index])
+      );
+      if (missingPreloads.length) {
+        const preloadSnippet = missingPreloads.join('\n');
+        const stylesheetPattern = new RegExp(
+          `([ \\t]*<link[^>]+href=["']${escapeRegExp(LOCAL_FONT_STYLESHEET_HREF)}["'][^>]*>)`,
+          'i'
+        );
+        renderedHtml = stylesheetPattern.test(renderedHtml)
+          ? renderedHtml.replace(stylesheetPattern, `${preloadSnippet}\n$1`)
+          : preferHeadStart
+            ? injectSnippetAfterHeadOpen(renderedHtml, preloadSnippet, LOCAL_FONT_PRELOAD_HREFS[0])
+            : injectSnippetBeforeHeadClose(renderedHtml, preloadSnippet);
+      }
     }
 
     return renderedHtml;
