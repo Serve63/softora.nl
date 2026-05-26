@@ -878,10 +878,10 @@ function refreshOrderSummaryCards() {
     });
     renderSumActiveBreakdown(activeOrders.length, business, voice, chatbot);
     const openValue = cards.reduce((sum, card) => {
-        const id = Number(String(card?.id || '').replace('order-', ''));
+        const id = getOrderFilterGroupForCard(card) === 'in_progress' ? Number(String(card?.id || '').replace('order-', '')) : NaN;
         const order = orders[id];
         const ui = resolveOrderUiState(order);
-        if (ui.isPaid) return sum;
+        if (!Number.isFinite(id) || ui.isPaid) return sum;
         const amount = moneyToNumber(card.querySelector('.order-price-value')?.textContent || '');
         return sum + (Number.isFinite(amount) ? amount : 0);
     }, 0);
