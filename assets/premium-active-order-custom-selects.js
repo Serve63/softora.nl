@@ -1,5 +1,12 @@
 (function () {
-    const SELECTOR = 'select.create-order-select';
+    const SELECTOR = [
+        'select.create-order-select',
+        '.create-order-select-wrap select',
+        '.create-order-form select',
+        '.create-order-dialog select',
+        '#openLeadCreateModal select',
+        '[data-open-lead-create-modal] select'
+    ].join(', ');
     const STYLE_ID = 'premiumActiveOrderCustomSelectStyles';
     let observer = null;
 
@@ -9,11 +16,11 @@
         style.id = STYLE_ID;
         style.textContent = `
             .create-order-select-wrap:has(.site-select)::after { content: none; }
-            .create-order-select-wrap .site-select { position: relative; z-index: 30; }
-            .create-order-select-wrap .site-select.is-open { z-index: 5200; }
-            .create-order-select-wrap .site-select-trigger { position: relative; }
-            .create-order-select-wrap .site-select.is-open .site-select-trigger { opacity: 1; pointer-events: auto; }
-            .create-order-select-wrap .site-select-menu {
+            .create-order-dialog .site-select { position: relative; z-index: 30; }
+            .create-order-dialog .site-select.is-open { z-index: 5200; }
+            .create-order-dialog .site-select-trigger { position: relative; }
+            .create-order-dialog .site-select.is-open .site-select-trigger { opacity: 1; pointer-events: auto; }
+            .create-order-dialog .site-select-menu {
                 top: calc(100% + 0.45rem);
                 padding: 0.45rem;
                 border-color: rgba(139, 34, 82, 0.28);
@@ -21,11 +28,11 @@
                 box-shadow: 0 18px 45px rgba(8, 8, 12, 0.18), 0 0 0 1px rgba(139, 34, 82, 0.08);
                 max-height: min(18rem, 44vh);
             }
-            .create-order-select-wrap .site-select-option {
+            .create-order-dialog .site-select-option {
                 position: relative;
                 padding: 0.78rem 0.9rem 0.78rem 2.05rem;
             }
-            .create-order-select-wrap .site-select-option::before {
+            .create-order-dialog .site-select-option::before {
                 content: '';
                 position: absolute;
                 left: 0.78rem;
@@ -37,13 +44,13 @@
                 transform: translateY(-65%) rotate(-45deg);
                 transition: border-color 0.18s ease;
             }
-            .create-order-select-wrap .site-select-option:hover,
-            .create-order-select-wrap .site-select-option:focus-visible { background: rgba(139, 34, 82, 0.08); }
-            .create-order-select-wrap .site-select-option.is-selected {
+            .create-order-dialog .site-select-option:hover,
+            .create-order-dialog .site-select-option:focus-visible { background: rgba(139, 34, 82, 0.08); }
+            .create-order-dialog .site-select-option.is-selected {
                 color: var(--text-primary);
                 background: rgba(139, 34, 82, 0.14);
             }
-            .create-order-select-wrap .site-select-option.is-selected::before { border-color: var(--accent-light); }
+            .create-order-dialog .site-select-option.is-selected::before { border-color: var(--accent-light); }
         `;
         document.head.appendChild(style);
     }

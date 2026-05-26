@@ -192,11 +192,11 @@ test('premium actieve opdrachten tonen create-order modal zonder sample-design e
   assert.match(source, /<label class="create-order-label" for="newOrderAssignee">Toegewezen aan<\/label>/);
   assert.match(source, /<select class="create-order-select" id="newOrderAssignee" name="assignee" data-custom-select="true" required>/);
   assert.match(source, /<option value="">Kies medewerker<\/option>\s*<option value="Martijn">Martijn<\/option>\s*<option value="Servé">Servé<\/option>/);
-  assert.match(source, /const SELECTOR = 'select\.create-order-select';/);
+  assert.match(source, /const SELECTOR = \[[\s\S]*'select\.create-order-select'[\s\S]*'\.create-order-select-wrap select'[\s\S]*'\.create-order-form select'[\s\S]*'\.create-order-dialog select'[\s\S]*'#openLeadCreateModal select'[\s\S]*'\[data-open-lead-create-modal\] select'[\s\S]*\]\.join\(', '\);/);
   assert.match(source, /function hydrate\(root = document\) \{[\s\S]*select\.dataset\.customSelect = 'true';[\s\S]*window\.initCustomFormSelects\(root\);/);
   assert.match(source, /function observe\(\) \{[\s\S]*new MutationObserver\(\(mutations\) => \{[\s\S]*hydrate\(select\)\);/);
-  assert.match(source, /\.create-order-select-wrap \.site-select-menu \{[\s\S]*box-shadow:\s*0 18px 45px rgba\(8, 8, 12, 0\.18\)/);
-  assert.match(source, /\.create-order-select-wrap \.site-select-option\.is-selected::before \{[\s\S]*border-color:\s*var\(--accent-light\);/);
+  assert.match(source, /\.create-order-dialog \.site-select-menu \{[\s\S]*box-shadow:\s*0 18px 45px rgba\(8, 8, 12, 0\.18\)/);
+  assert.match(source, /\.create-order-dialog \.site-select-option\.is-selected::before \{[\s\S]*border-color:\s*var\(--accent-light\);/);
   assert.match(source, /const ORDER_ASSIGNEE_OPTIONS = Object\.freeze\(\['Martijn', 'Servé'\]\);/);
   assert.match(source, /function normalizeOrderAssignee\(value\) \{[\s\S]*const words = normalized\.split\(\/\[\^a-z\]\+\/\)\.filter\(Boolean\);[\s\S]*if \(words\.includes\('serve'\)\) return 'Servé';[\s\S]*if \(words\.includes\('martijn'\)\) return 'Martijn';/);
   assert.match(source, /function normalizeClaimEmployeeName\(value\) \{[\s\S]*const canonicalAssignee = normalizeOrderAssignee\(value\);[\s\S]*if \(canonicalAssignee\) return canonicalAssignee;/);
