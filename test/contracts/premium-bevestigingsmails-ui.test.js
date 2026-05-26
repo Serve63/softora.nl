@@ -279,9 +279,12 @@ test('premium bevestigingsmails toont geen nep-nulwaarden in verzendscore bij ee
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const scoreSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-coldmail-sender-score.js'), 'utf8');
 
-  assert.match(pageSource, /assets\/premium-coldmail-sender-score\.js\?v=20260522b/);
+  assert.match(pageSource, /assets\/premium-coldmail-sender-score\.js\?v=20260526a/);
   assert.doesNotMatch(pageSource, /data-coldmail-sender-score-count="serve@softora\.nl">0<\/span>/);
   assert.doesNotMatch(pageSource, /data-coldmail-sender-score-count="martijn@softora\.nl">0<\/span>/);
+  assert.match(scoreSource, /const SCORE_WIDGET_VISIBLE = false;/);
+  assert.match(scoreSource, /function removeRoot\(\)/);
+  assert.match(scoreSource, /if \(!SCORE_WIDGET_VISIBLE\) \{[\s\S]*removeRoot\(\);[\s\S]*return;/);
   assert.match(scoreSource, /const SENDERS = Object\.freeze\(\[/);
   assert.match(scoreSource, /count\.textContent = '\.\.\.'/);
   assert.match(scoreSource, /function appendTotalRow\(root, value\)/);

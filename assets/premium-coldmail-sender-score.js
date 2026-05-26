@@ -4,6 +4,7 @@
   const CUSTOMER_DB_SCOPE = 'premium_customers_database';
   const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
   const RETRY_DELAY_MS = 3500;
+  const SCORE_WIDGET_VISIBLE = false;
   const SENDERS = Object.freeze([
     { email: 'serve@softora.nl', label: 'Servé' },
     { email: 'martijn@softora.nl', label: 'Martijn' },
@@ -25,6 +26,7 @@
   }
 
   function ensureStyles() {
+    if (!SCORE_WIDGET_VISIBLE) return;
     if (document.getElementById('coldmailSenderScoreStyles')) return;
     const style = document.createElement('style');
     style.id = 'coldmailSenderScoreStyles';
@@ -45,6 +47,17 @@
       '@media (max-width:1024px){.topbar-right{width:100%;justify-content:flex-start}}',
     ].join('');
     document.head.appendChild(style);
+  }
+
+  function removeRoot() {
+    const root = document.getElementById('coldmailSenderScore');
+    if (!root) return;
+    const wrapper = root.closest('.topbar-right');
+    if (wrapper && wrapper.parentNode && wrapper.children.length === 1) {
+      wrapper.parentNode.removeChild(wrapper);
+      return;
+    }
+    if (root.parentNode) root.parentNode.removeChild(root);
   }
 
   function appendTotalRow(root, value) {
@@ -88,6 +101,10 @@
   }
 
   function ensureRoot() {
+    if (!SCORE_WIDGET_VISIBLE) {
+      removeRoot();
+      return null;
+    }
     ensureStyles();
     const existing = document.getElementById('coldmailSenderScore');
     if (existing) return existing;
@@ -235,6 +252,10 @@
   }
 
   function setLoading() {
+    if (!SCORE_WIDGET_VISIBLE) {
+      removeRoot();
+      return;
+    }
     const root = ensureRoot();
     if (!root) return;
     root.hidden = isLeadGeneratorAlias();
@@ -261,6 +282,10 @@
   }
 
   function render(stats) {
+    if (!SCORE_WIDGET_VISIBLE) {
+      removeRoot();
+      return;
+    }
     const root = ensureRoot();
     if (!root) return;
     if (isLeadGeneratorAlias()) {
@@ -316,6 +341,14 @@
   }
 
   async function hydrate(options = {}) {
+    if (!SCORE_WIDGET_VISIBLE) {
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      removeRoot();
+      return;
+    }
     if (isLeadGeneratorAlias()) {
       const root = ensureRoot();
       if (root) root.hidden = true;
@@ -363,11 +396,11 @@
     document.addEventListener('DOMContentLoaded', () => {
       setLoading();
       void hydrate();
-      bindRefreshTriggers();
+      if (SCORE_WIDGET_VISIBLE) bindRefreshTriggers();
     }, { once: true });
   } else {
     setLoading();
     void hydrate();
-    bindRefreshTriggers();
+    if (SCORE_WIDGET_VISIBLE) bindRefreshTriggers();
   }
 }());
