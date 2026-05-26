@@ -466,14 +466,23 @@ function createSoftoraDataOpsStore(deps = {}) {
           upsert: true,
         });
         if (uploadedMockup.error) throw uploadedMockup.error;
+        const existingMockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : {};
+        const mockupFileName = normalizeString(entry.websiteMockupName || entry.mockupFileName || `${customerId}-mockup.${mockupExt}`).slice(0, 240);
+        const generatedByCurrentRenderer = /-device-mockup-v6\.jpe?g$/i.test(mockupFileName);
+        const mockupUpdatedAt = isoNow();
         legacyMeta.mockup = {
+          ...existingMockupMeta,
           storageBucket: bucketName,
           storagePath: mockupPath,
           mimeType: mockup.mimeType,
-          fileName: normalizeString(entry.websiteMockupName || entry.mockupFileName || `${customerId}-mockup.${mockupExt}`).slice(0, 240),
+          fileName: mockupFileName,
           byteSize: mockup.buffer.length,
           contentHash: mockup.contentHash,
-          updatedAt: isoNow(),
+          renderer: normalizeString(existingMockupMeta.renderer || entry.mockupRenderer || (generatedByCurrentRenderer ? 'softora-browser-device-v6' : '')),
+          orientation: normalizeString(existingMockupMeta.orientation || entry.mockupOrientation || (generatedByCurrentRenderer ? 'upright' : '')),
+          qualityStatus: normalizeString(existingMockupMeta.qualityStatus || entry.mockupQualityStatus || (generatedByCurrentRenderer ? 'checked' : 'unverified')),
+          qualityCheckedAt: normalizeString(existingMockupMeta.qualityCheckedAt || entry.mockupQualityCheckedAt || (generatedByCurrentRenderer ? mockupUpdatedAt : '')),
+          updatedAt: mockupUpdatedAt,
         };
         legacyMeta.websiteMockupName = legacyMeta.mockup.fileName;
       }

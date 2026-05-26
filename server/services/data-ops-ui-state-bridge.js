@@ -248,6 +248,17 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     return normalizeString(dataUrl).match(/[\s\S]{1,180000}/g) || [];
   }
 
+  function getMockupMeta(entry) {
+    const legacyMeta = entry && entry.legacyMeta && typeof entry.legacyMeta === 'object' ? entry.legacyMeta : {};
+    const mockup = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : {};
+    return {
+      mockupRenderer: normalizeString(mockup.renderer || legacyMeta.mockupRenderer),
+      mockupOrientation: normalizeString(mockup.orientation || legacyMeta.mockupOrientation),
+      mockupQualityStatus: normalizeString(mockup.qualityStatus || legacyMeta.mockupQualityStatus),
+      mockupQualityCheckedAt: normalizeString(mockup.qualityCheckedAt || legacyMeta.mockupQualityCheckedAt),
+    };
+  }
+
   function buildPhotoCompatValues(entries) {
     const values = {};
     const map = {};
@@ -261,15 +272,33 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
       chunks.forEach((chunk, index) => {
         values[`${photoKey}_${index}`] = chunk;
       });
+      const mockupParsed = parseImageDataUrl(entry.websiteMockup || entry.mockup || entry.websiteMockupDataUrl || entry.mockupDataUrl);
+      const mockupPhotoKey = mockupParsed ? `${photoKey}_mockup` : '';
+      const mockupChunks = mockupParsed ? chunkPhotoDataUrl(mockupParsed.dataUrl) : [];
+      mockupChunks.forEach((chunk, index) => {
+        values[`${mockupPhotoKey}_${index}`] = chunk;
+      });
+      const mockupMeta = getMockupMeta(entry);
+      const hasMockup = Boolean(
+        mockupChunks.length ||
+          normalizeString(entry.websiteMockupUrl || entry.mockupUrl) ||
+          normalizeString(entry.websiteMockup || entry.mockup)
+      );
       map[customerId] = {
         id: customerId,
         identityKey: normalizeString(entry.identityKey),
         photoKey,
         chunkCount: chunks.length,
+        mockupPhotoKey,
+        mockupChunkCount: mockupChunks.length,
         websitePhotoUrl,
         websiteMockupUrl: normalizeString(entry.websiteMockupUrl || entry.mockupUrl),
         websitePhotoName: normalizeString(entry.fileName || entry.legacyMeta?.websitePhotoName) || 'Websitefoto',
         websiteMockupName: normalizeString(entry.websiteMockupName || entry.legacyMeta?.websiteMockupName),
+        mockupRenderer: mockupMeta.mockupRenderer,
+        mockupOrientation: mockupMeta.mockupOrientation,
+        mockupQualityStatus: mockupMeta.mockupQualityStatus || (hasMockup ? 'unverified' : ''),
+        mockupQualityCheckedAt: mockupMeta.mockupQualityCheckedAt,
         updatedAt: normalizeString(entry.legacyMeta?.updatedAt || entry.updatedAt).slice(0, 10),
         storage: {
           source: 'supabase_storage',
@@ -330,7 +359,16 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
           identityKey: normalizeString(meta && meta.identityKey),
           fileName: normalizeString(meta && meta.websitePhotoName) || 'Websitefoto',
           websiteMockupName: normalizeString(meta && meta.websiteMockupName),
-          legacyMeta: meta && typeof meta === 'object' ? meta : {},
+          legacyMeta: {
+            ...(meta && typeof meta === 'object' ? meta : {}),
+            mockup: {
+              ...(meta && meta.mockup && typeof meta.mockup === 'object' ? meta.mockup : {}),
+              renderer: normalizeString(meta && meta.mockupRenderer),
+              orientation: normalizeString(meta && meta.mockupOrientation),
+              qualityStatus: normalizeString(meta && meta.mockupQualityStatus),
+              qualityCheckedAt: normalizeString(meta && meta.mockupQualityCheckedAt),
+            },
+          },
         };
       })
       .filter(Boolean);

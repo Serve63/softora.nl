@@ -13,6 +13,34 @@ const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 const CHUNKED_PNG_DATA_URL = 'data:image/png;base64,TQ==';
 
+function withCheckedMockupMeta(item) {
+  if (!item || typeof item !== 'object' || !item.websiteMockup) return item;
+  const hasQualitySignal = Boolean(
+    item.mockupRenderer ||
+      item.websiteMockupRenderer ||
+      item.mockupOrientation ||
+      item.websiteMockupOrientation ||
+      item.mockupQualityStatus ||
+      item.websiteMockupQualityStatus ||
+      item.mockupQualityCheckedAt ||
+      item.websiteMockupQualityCheckedAt
+  );
+  if (hasQualitySignal) return item;
+  return {
+    ...item,
+    mockupRenderer: 'softora-test-device-v6',
+    mockupOrientation: 'upright',
+    mockupQualityStatus: 'checked',
+    mockupQualityCheckedAt: '2026-04-24T12:00:00.000Z',
+  };
+}
+
+function withCheckedPhotoMapMeta(photoMap) {
+  return Object.fromEntries(
+    Object.entries(photoMap || {}).map(([key, value]) => [key, withCheckedMockupMeta(value)])
+  );
+}
+
 function encodeBase64Url(value) {
   return Buffer.from(String(value || ''), 'utf8')
     .toString('base64')
@@ -53,7 +81,7 @@ function createService(overrides = {}) {
     : null;
   let autopilotState = overrides.autopilotState || {};
   let coldmailingSettings = overrides.coldmailingSettings || {};
-  let rows = overrides.rows || [
+  let rows = (overrides.rows || [
     {
       id: 'prospect-1',
       bedrijf: 'Bakkerij Zon',
@@ -71,7 +99,7 @@ function createService(overrides = {}) {
       status: 'klant',
       mail: true,
     },
-  ];
+  ]).map(withCheckedMockupMeta);
   const service = createColdmailCampaignService({
     env: overrides.env || {},
     mailConfig: {
@@ -110,7 +138,7 @@ function createService(overrides = {}) {
       if (scope === 'premium_database_photos') {
         return {
           values: overrides.photoValues || {
-            softora_database_photos_v1: JSON.stringify(overrides.photoMap || {}),
+            softora_database_photos_v1: JSON.stringify(withCheckedPhotoMapMeta(overrides.photoMap || {})),
           },
         };
       }
@@ -2185,6 +2213,50 @@ test('coldmail campaign refuses webdesign outreach when the device mockup is mis
   assert.equal(sentMessages.length, 0);
 });
 
+test('coldmail campaign refuses webdesign outreach when the device mockup is not quality checked', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Bakkerij Zon device mockup',
+        mockupOrientation: 'upside_down',
+        mockupQualityStatus: 'unverified',
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Nieuwe website voor {{bedrijf}}',
+        body: 'Goedemorgen {{naam}}',
+        senderEmail: 'info@softora.nl',
+        specialAction: 'webdesign',
+      }),
+    (error) => {
+      assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
+      assert.match(error.message, /Nog geen website-design klaar voor Bakkerij Zon/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+});
+
 test('coldmail campaign keeps the closing signature before webdesign photos', async () => {
   const { service, sentMessages } = createService({
     rows: [
@@ -2649,6 +2721,10 @@ test('coldmail campaign uses chunked webdesign photo when websitePhoto is stale'
           mockupPhotoKey,
           mockupChunkCount: 1,
           websitePhoto: TINY_PNG_DATA_URL,
+          mockupRenderer: 'softora-test-device-v6',
+          mockupOrientation: 'upright',
+          mockupQualityStatus: 'checked',
+          mockupQualityCheckedAt: '2026-04-24T12:00:00.000Z',
         },
       }),
       [`${photoKey}_0`]: CHUNKED_PNG_DATA_URL,
@@ -2693,6 +2769,10 @@ test('coldmail campaign uses recovered webdesign chunks over stale inline photo'
           websitePhotoName: 'Oude webdesign mockup',
           mockupPhotoKey,
           mockupChunkCount: 1,
+          mockupRenderer: 'softora-test-device-v6',
+          mockupOrientation: 'upright',
+          mockupQualityStatus: 'checked',
+          mockupQualityCheckedAt: '2026-04-24T12:00:00.000Z',
         },
       }),
       [`${photoKey}_0`]: CHUNKED_PNG_DATA_URL,
@@ -2715,7 +2795,7 @@ test('coldmail campaign uses recovered webdesign chunks over stale inline photo'
   assert.equal(sentMessages[0].attachments[1].content.toString('base64'), 'TQ==');
 });
 
-test('coldmail campaign prefers fresh row mockup data over stale stored photo map data', async () => {
+test('coldmail campaign prefers stored design photo records over stale row mockup copies', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -2757,8 +2837,8 @@ test('coldmail campaign prefers fresh row mockup data over stale stored photo ma
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
-  assert.equal(sentMessages[0].attachments[1].content.toString('base64'), 'TQ==');
-  assert.equal(sentMessages[0].attachments[1].filename, 'Nieuwe-mockup-achtergrond.png');
+  assert.equal(sentMessages[0].attachments[1].content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
+  assert.equal(sentMessages[0].attachments[1].filename, 'Oude-mockup-achtergrond.png');
 });
 
 test('coldmail campaign sends test recipient without marking database row as mailed', async () => {
@@ -4302,6 +4382,10 @@ test('coldmail webdesign action herkent opgeslagen website-design chunks zonder 
           photoKey: 'softora_photo_chunked_ready_1',
           mockupPhotoKey: 'softora_photo_chunked_ready_1_mockup',
           websitePhotoName: 'Chunked Design BV webdesign',
+          mockupRenderer: 'softora-test-device-v6',
+          mockupOrientation: 'upright',
+          mockupQualityStatus: 'checked',
+          mockupQualityCheckedAt: '2026-04-24T12:00:00.000Z',
         },
       }),
       softora_photo_chunked_ready_1_0: TINY_PNG_DATA_URL,

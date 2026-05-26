@@ -526,6 +526,32 @@ function getWebdesignMockupSource(photo, normalizeString = defaultNormalizeStrin
   );
 }
 
+function getWebdesignMockupQuality(photo, normalizeString = defaultNormalizeString) {
+  const meta = photo && photo.legacyMeta && typeof photo.legacyMeta === 'object' ? photo.legacyMeta : {};
+  const mockup = meta.mockup && typeof meta.mockup === 'object' ? meta.mockup : {};
+  return {
+    renderer: normalizeString(photo && (photo.mockupRenderer || photo.websiteMockupRenderer) || mockup.renderer || meta.mockupRenderer).toLowerCase(),
+    orientation: normalizeString(photo && (photo.mockupOrientation || photo.websiteMockupOrientation) || mockup.orientation || meta.mockupOrientation).toLowerCase(),
+    status: normalizeString(photo && (photo.mockupQualityStatus || photo.websiteMockupQualityStatus) || mockup.qualityStatus || meta.mockupQualityStatus).toLowerCase(),
+    checkedAt: normalizeString(photo && (photo.mockupQualityCheckedAt || photo.websiteMockupQualityCheckedAt) || mockup.qualityCheckedAt || meta.mockupQualityCheckedAt),
+  };
+}
+
+function isApprovedWebdesignMockupRecord(photo, normalizeString = defaultNormalizeString) {
+  if (!isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo, normalizeString), normalizeString)) return false;
+  const quality = getWebdesignMockupQuality(photo, normalizeString);
+  const hasQualitySignal = Boolean(quality.renderer || quality.orientation || quality.status || quality.checkedAt);
+  if (!hasQualitySignal) {
+    const meta = photo && photo.legacyMeta && typeof photo.legacyMeta === 'object' ? photo.legacyMeta : {};
+    const mockup = meta.mockup && typeof meta.mockup === 'object' ? meta.mockup : {};
+    const name = normalizeString(photo && (photo.websiteMockupName || photo.mockupName) || mockup.fileName || meta.websiteMockupName);
+    return /-device-mockup-v6\.jpe?g$/i.test(name);
+  }
+  if (quality.status !== 'checked' && quality.status !== 'verified' && quality.status !== 'ok') return false;
+  if (quality.orientation && quality.orientation !== 'upright') return false;
+  return true;
+}
+
 function isResolvableWebsitePhotoValue(value, normalizeString = defaultNormalizeString) {
   const text = normalizeString(value);
   if (!text) return false;
@@ -537,7 +563,7 @@ function hasReadyWebdesignAssetRecord(photo, normalizeString = defaultNormalizeS
     photo &&
       typeof photo === 'object' &&
       isResolvableWebsitePhotoValue(getWebdesignPhotoSource(photo, normalizeString), normalizeString) &&
-      isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo, normalizeString), normalizeString)
+      isApprovedWebdesignMockupRecord(photo, normalizeString)
   );
 }
 
@@ -572,7 +598,10 @@ function preferFreshRowPhotoFields(row, storedPhoto, normalizeString = defaultNo
   const next = { ...base };
   const rowPhotoSource = getWebdesignPhotoSource(row, normalizeString);
   const rowMockupSource = getWebdesignMockupSource(row, normalizeString);
-  if (isResolvableWebsitePhotoValue(rowPhotoSource, normalizeString)) {
+  if (
+    !isResolvableWebsitePhotoValue(getWebdesignPhotoSource(next, normalizeString), normalizeString) &&
+    isResolvableWebsitePhotoValue(rowPhotoSource, normalizeString)
+  ) {
     next.websitePhoto =
       row.websitePhoto ||
       row.websitePhotoUrl ||
@@ -582,7 +611,10 @@ function preferFreshRowPhotoFields(row, storedPhoto, normalizeString = defaultNo
     const rowPhotoName = normalizeString(row.websitePhotoName || row.photoName || row.websiteImageName);
     if (rowPhotoName) next.websitePhotoName = rowPhotoName;
   }
-  if (isResolvableWebsitePhotoValue(rowMockupSource, normalizeString)) {
+  if (
+    !isResolvableWebsitePhotoValue(getWebdesignMockupSource(next, normalizeString), normalizeString) &&
+    isResolvableWebsitePhotoValue(rowMockupSource, normalizeString)
+  ) {
     next.websiteMockup =
       row.websiteMockup ||
       row.websiteMockupUrl ||
@@ -592,6 +624,10 @@ function preferFreshRowPhotoFields(row, storedPhoto, normalizeString = defaultNo
       rowMockupSource;
     const rowMockupName = normalizeString(row.websiteMockupName || row.mockupName);
     if (rowMockupName) next.websiteMockupName = rowMockupName;
+    next.mockupRenderer = normalizeString(row.mockupRenderer || row.websiteMockupRenderer || next.mockupRenderer);
+    next.mockupOrientation = normalizeString(row.mockupOrientation || row.websiteMockupOrientation || next.mockupOrientation);
+    next.mockupQualityStatus = normalizeString(row.mockupQualityStatus || row.websiteMockupQualityStatus || next.mockupQualityStatus);
+    next.mockupQualityCheckedAt = normalizeString(row.mockupQualityCheckedAt || row.websiteMockupQualityCheckedAt || next.mockupQualityCheckedAt);
   }
   if (!normalizeString(next.id)) next.id = getRowId(row, 0, normalizeString);
   if (!normalizeString(next.identityKey)) next.identityKey = buildRowIdentityKey(row, normalizeString);

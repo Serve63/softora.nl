@@ -10,6 +10,18 @@ const {
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
+function withCheckedMockupMeta(item) {
+  if (!item || typeof item !== 'object' || !item.websiteMockup) return item;
+  if (item.mockupQualityStatus || item.mockupOrientation) return item;
+  return {
+    ...item,
+    mockupRenderer: 'softora-test-device-v6',
+    mockupOrientation: 'upright',
+    mockupQualityStatus: 'checked',
+    mockupQualityCheckedAt: '2026-04-24T12:00:00.000Z',
+  };
+}
+
 function createRequest({ body = {}, secret = 'webhook-secret' } = {}) {
   return {
     body,
@@ -34,7 +46,7 @@ function createService(overrides = {}) {
       mail: true,
     },
   ];
-  const photoMap = overrides.photoMap || {
+  const photoMap = Object.fromEntries(Object.entries(overrides.photoMap || {
     'prospect-1': {
       id: 'prospect-1',
       websitePhoto: TINY_PNG_DATA_URL,
@@ -42,7 +54,7 @@ function createService(overrides = {}) {
       websitePhotoName: 'Bakkerij Zon webdesign',
       websiteMockupName: 'Bakkerij Zon device mockup',
     },
-  };
+  }).map(([key, value]) => [key, withCheckedMockupMeta(value)]));
   const coldmailingSettings = overrides.coldmailingSettings || {
     senderEmail: 'serve@softora.nl',
     senders: {
