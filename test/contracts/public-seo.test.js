@@ -93,9 +93,11 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.match(first, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/">/);
   assert.match(first, /type="application\/ld\+json" data-softora-public-seo="structured-data"/);
   assert.match(first, /data-softora-public-seo="internal-links"/);
+  assert.match(first, /<script src="\/assets\/public-conversion-tracking\.js" defer><\/script>/);
   assert.match(first, /href="\/diensten"/);
   assert.equal((second.match(/data-softora-public-seo="structured-data"/g) || []).length, 1);
   assert.equal((second.match(/data-softora-public-seo="internal-links"/g) || []).length, 1);
+  assert.equal((second.match(/\/assets\/public-conversion-tracking\.js/g) || []).length, 1);
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-website.html'), '/');
 });
 

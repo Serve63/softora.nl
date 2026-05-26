@@ -697,6 +697,16 @@ function addConversionTrackingAttributesIfMissing(htmlRaw, entry) {
   });
 }
 
+function addPublicConversionTrackingScriptIfMissing(htmlRaw, entry) {
+  const html = String(htmlRaw || '');
+  if (!entry || entry.kind === 'legal') return html;
+  if (/\/assets\/public-conversion-tracking\.js/i.test(html)) return html;
+  return injectBeforeBodyClose(
+    html,
+    '  <script src="/assets/public-conversion-tracking.js" defer></script>'
+  );
+}
+
 function applyPublicSeoHeadDefaults(htmlRaw, fileNameRaw, { siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
   const entry = getIndexablePublicSeoPage(fileNameRaw);
   let html = String(htmlRaw || '');
@@ -723,6 +733,7 @@ function applyPublicSeoHeadDefaults(htmlRaw, fileNameRaw, { siteOrigin = DEFAULT
   html = addStructuredDataIfMissing(html, entry, siteOrigin);
   html = addInternalLinksIfMissing(html, entry);
   html = addConversionTrackingAttributesIfMissing(html, entry);
+  html = addPublicConversionTrackingScriptIfMissing(html, entry);
 
   if (!hasTag(html, /<html\b[^>]*lang=["']nl["']/i)) {
     html = html.replace(/<html\b([^>]*)>/i, '<html$1 lang="nl">');

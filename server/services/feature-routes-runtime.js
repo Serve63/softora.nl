@@ -16,6 +16,7 @@ const { registerOpenAiCostRoutes } = require('../routes/openai-costs');
 const { registerSupabaseCostRoutes } = require('../routes/supabase-costs');
 const { registerMailboxRoutes } = require('../routes/mailbox');
 const { registerPublicContactRoutes } = require('../routes/public-contact');
+const { registerPublicConversionRoutes } = require('../routes/public-conversion');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
 const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
@@ -47,6 +48,7 @@ function registerFeatureRoutes(app, deps = {}) {
     mailboxCoordinator = null,
     mailboxCronSecret = '',
     publicContactCoordinator = null,
+    publicConversionCoordinator = null,
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
@@ -66,6 +68,7 @@ function registerFeatureRoutes(app, deps = {}) {
   });
 
   registerPublicContactRoutes(app, { coordinator: publicContactCoordinator });
+  registerPublicConversionRoutes(app, { coordinator: publicConversionCoordinator });
 
   createPremiumRouteRuntime({
     app,

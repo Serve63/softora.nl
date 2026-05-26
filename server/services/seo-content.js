@@ -1923,6 +1923,7 @@ function buildContentShell({ title, description, canonicalUrl, structuredData, b
     '  <div class="seo-shell">',
     body,
     '  </div>',
+    '  <script src="/assets/public-conversion-tracking.js" defer></script>',
     '</body>',
     '</html>',
     '',

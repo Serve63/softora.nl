@@ -428,6 +428,12 @@ function buildServerAppFeatureWiringRuntimeContext({
           mailFromName: envConfig.MAIL_FROM_NAME,
         },
       },
+      publicConversion: {
+        logger: console,
+        normalizeString: shared.normalizeString,
+        truncateText: shared.truncateText,
+        appendDashboardActivity: securityRuntime.appendDashboardActivity,
+      },
       mailboxCronSecret: env.CRON_SECRET || '',
       runtimeOpsCoordinator: uiSeoRuntime.runtimeOpsCoordinator,
       runtimeDebugOpsCoordinator: uiSeoRuntime.runtimeDebugOpsCoordinator,

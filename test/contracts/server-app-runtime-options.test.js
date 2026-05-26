@@ -83,6 +83,7 @@ test('server app runtime option builders keep feature route coordinators and gua
   const websitePreviewBatchCoordinator = {};
   const openAiCostSummary = { openAiCostsApiKey: 'cost-key' };
   const supabaseCostSummary = { supabaseProjectRef: 'softora-ref' };
+  const publicConversionCoordinator = {};
   const activeOrdersCoordinator = {};
   const runtimeOpsCoordinator = {};
   const runtimeDebugOpsCoordinator = {};
@@ -100,6 +101,7 @@ test('server app runtime option builders keep feature route coordinators and gua
     websitePreviewBatchCoordinator,
     openAiCostSummary,
     supabaseCostSummary,
+    publicConversionCoordinator,
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
@@ -117,6 +119,7 @@ test('server app runtime option builders keep feature route coordinators and gua
   assert.equal(options.websitePreviewBatchCoordinator, websitePreviewBatchCoordinator);
   assert.equal(options.openAiCostSummary, openAiCostSummary);
   assert.equal(options.supabaseCostSummary, supabaseCostSummary);
+  assert.equal(options.publicConversionCoordinator, publicConversionCoordinator);
   assert.equal(options.activeOrdersCoordinator, activeOrdersCoordinator);
   assert.equal(options.runtimeOpsCoordinator, runtimeOpsCoordinator);
   assert.equal(options.runtimeDebugOpsCoordinator, runtimeDebugOpsCoordinator);

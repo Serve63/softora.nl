@@ -193,6 +193,7 @@ test('seo content article pages render Article schema and self canonicals', () =
     html,
     /href="https:\/\/wa\.me\/31643262792"[^>]*data-softora-conversion-target="whatsapp"[^>]*>WhatsApp Martijn<\/a>/
   );
+  assert.match(html, /<script src="\/assets\/public-conversion-tracking\.js" defer><\/script>/);
 
   const kennisbankHtml = buildSeoContentArticleHtml(getSeoContentItem('kennisbank', 'wat-is-een-ai-telefonist'), {
     siteOrigin: 'https://www.softora.nl',
