@@ -88,6 +88,58 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(values['softora_database_photo_data_v1_customer-1_0'], 'data:image/png;base64,AAAA');
 });
 
+test('premium database webdesign jobs retry OpenAI rate limits before failing the job', async () => {
+  let values = {};
+  let attempts = 0;
+  const retryWaits = [];
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    waitForRetry: async (ms) => {
+      retryWaits.push(ms);
+    },
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          const error = new Error('OpenAI websitegenerator mislukt (429): Rate limit reached. Please try again in 12s.');
+          error.status = 429;
+          throw error;
+        }
+        return {
+          image: { dataUrl: 'data:image/png;base64,AAAA', fileName: 'preview.png' },
+        };
+      },
+    },
+    getUiStateValues: async () => ({ values }),
+    setUiStateValues: async (_scope, nextValues) => {
+      values = nextValues;
+      return { values };
+    },
+  });
+
+  const res = createResponseRecorder();
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'serve@softora.nl', userId: 'user-1' },
+      body: {
+        jobId: 'job_ratelimit12345',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-rate-limit', bedrijf: 'Softora' },
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.body.job.status, 'done');
+  assert.equal(attempts, 2);
+  assert.deepEqual(retryWaits, [13000]);
+  assert.match(values['softora_database_photo_data_v1_customer-rate-limit_0'], /^data:image\/png;base64,AAAA$/);
+});
+
 test('premium database webdesign jobs keep status access scoped to the logged in user', async () => {
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: { error() {} },

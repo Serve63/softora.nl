@@ -40,6 +40,7 @@
         const pendingIds = new Set();
         const pendingJobs = new Map();
         const pollTimers = new Map();
+        let startQueue = Promise.resolve();
         ensureStyles();
 
         function getCustomerById(customerId) {
@@ -102,6 +103,16 @@
         function removePendingJob(customerId) {
             pendingJobs.delete(customerId);
             pendingIds.delete(customerId);
+        }
+
+        function enqueueStart(starter) {
+            const next = startQueue.catch(function () {
+                return null;
+            }).then(starter);
+            startQueue = next.catch(function () {
+                return null;
+            });
+            return next;
         }
 
         function setPendingJob(job) {
@@ -295,27 +306,12 @@
             return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div></div>";
         }
 
-        async function generateForCustomer(customerId) {
-            const target = getCustomerById(customerId);
-            if (!target) return;
-            if (isValidWebsitePhotoDataUrl(target.websitePhoto)) {
-                openWebsitePhotoPreview(customerId);
+        async function startQueuedGeneration(target, jobId) {
+            const freshTarget = getCustomerById(target.id) || target;
+            if (isValidWebsitePhotoDataUrl(freshTarget.websitePhoto)) {
+                await finishPendingJob({ customerId: target.id, jobId: jobId }, "");
                 return;
             }
-            if (pendingIds.has(target.id)) {
-                return;
-            }
-            if (isRestoringPhotos(target)) {
-                return;
-            }
-            if (!isWebdesignPhotoEligible(target)) {
-                setStatusMessage("Geen geldige website gevonden voor " + target.bedrijf + ".", "error", true);
-                return;
-            }
-            setStatusMessage("");
-            showChargeLabel();
-            const jobId = createJobId();
-            setPendingJob({ customerId: target.id, jobId: jobId, startedAt: now() });
             try {
                 const response = await fetch(JOB_ENDPOINT, {
                     method: "POST",
@@ -323,7 +319,7 @@
                     cache: "no-store",
                     keepalive: true,
                     headers: { "Content-Type": "application/json", Accept: "application/json" },
-                    body: JSON.stringify(buildJobPayload(target, jobId))
+                    body: JSON.stringify(buildJobPayload(freshTarget, jobId))
                 });
                 const payload = await response.json().catch(function () {
                     return {};
@@ -348,6 +344,32 @@
             } catch (error) {
                 await finishPendingJob({ customerId: target.id, jobId: jobId }, normalizeString(error && error.message) || "Webdesign starten is mislukt.");
             }
+        }
+
+        async function generateForCustomer(customerId) {
+            const target = getCustomerById(customerId);
+            if (!target) return;
+            if (isValidWebsitePhotoDataUrl(target.websitePhoto)) {
+                openWebsitePhotoPreview(customerId);
+                return;
+            }
+            if (pendingIds.has(target.id)) {
+                return;
+            }
+            if (isRestoringPhotos(target)) {
+                return;
+            }
+            if (!isWebdesignPhotoEligible(target)) {
+                setStatusMessage("Geen geldige website gevonden voor " + target.bedrijf + ".", "error", true);
+                return;
+            }
+            setStatusMessage("");
+            showChargeLabel();
+            const jobId = createJobId();
+            setPendingJob({ customerId: target.id, jobId: jobId, startedAt: now() });
+            return enqueueStart(function () {
+                return startQueuedGeneration(target, jobId);
+            });
         }
 
         return {

@@ -13,6 +13,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     photoKey = 'softora_database_photos_v1',
     photoDataPrefix = 'softora_database_photo_data_v1_',
     jobProcessTimeoutMs = 4 * 60 * 1000,
+    waitForRetry = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
   } = deps;
 
@@ -24,6 +25,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const MAX_STORAGE_CHUNKS = 80;
   const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
   const ADMIN_TEAM_OWNER_KEY = 'softora-admin-team';
+  const RATE_LIMIT_RETRY_ATTEMPTS = 4;
+  const RATE_LIMIT_RETRY_FALLBACK_MS = 15000;
+  const RATE_LIMIT_RETRY_MAX_MS = 65000;
   let processing = false;
 
   function pruneJobs() {
@@ -120,6 +124,32 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     } catch (_) {
       return {};
     }
+  }
+
+  function getErrorMessage(error) {
+    return [
+      error && error.message,
+      error && error.data && error.data.error && error.data.error.message,
+      error && error.data && error.data.error && error.data.error.detail,
+      error && error.data && error.data.detail,
+    ]
+      .map((value) => normalizeString(value))
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  function isRateLimitError(error) {
+    const status = Number(error && (error.status || error.statusCode)) || 0;
+    if (status === 429) return true;
+    return /rate limit|too many requests|try again in/i.test(getErrorMessage(error));
+  }
+
+  function getRateLimitRetryMs(error) {
+    const message = getErrorMessage(error);
+    const secondsMatch = message.match(/try again in\s+([0-9]+(?:\.[0-9]+)?)\s*s/i);
+    const parsedMs = secondsMatch ? Math.ceil(Number(secondsMatch[1]) * 1000) + 1000 : RATE_LIMIT_RETRY_FALLBACK_MS;
+    const safeMs = Number.isFinite(parsedMs) && parsedMs > 0 ? parsedMs : RATE_LIMIT_RETRY_FALLBACK_MS;
+    return Math.max(1000, Math.min(RATE_LIMIT_RETRY_MAX_MS, safeMs));
   }
 
   function serializeJob(job) {
@@ -288,25 +318,44 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
   }
 
+  async function generateWebsitePreviewWithRetry(job) {
+    if (!aiToolsCoordinator || typeof aiToolsCoordinator.runWebsitePreviewGeneratePipeline !== 'function') {
+      throw new Error('Websitegenerator is niet beschikbaar.');
+    }
+
+    for (let attempt = 1; attempt <= RATE_LIMIT_RETRY_ATTEMPTS; attempt += 1) {
+      try {
+        return await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, {
+          allowScanFallback: true,
+          imageSize: DATABASE_PHOTO_IMAGE_SIZE,
+          body: {
+            source: 'premium-database',
+            action: 'webdesign',
+            company: job.customer.bedrijf,
+            domain: job.customer.dom,
+          },
+        });
+      } catch (error) {
+        if (!isRateLimitError(error) || attempt >= RATE_LIMIT_RETRY_ATTEMPTS) throw error;
+        const retryMs = getRateLimitRetryMs(error);
+        if (logger && typeof logger.warn === 'function') {
+          logger.warn(
+            `[PremiumDatabaseWebdesignJobs][rate-limit] OpenAI rate limit, retry over ${Math.round(retryMs / 1000)}s`
+          );
+        }
+        await waitForRetry(retryMs);
+      }
+    }
+
+    throw new Error('Websitegenerator is mislukt.');
+  }
+
   async function processJob(job) {
     job.status = 'running';
     job.startedAt = Date.now();
     await persistJob(job);
 
-    if (!aiToolsCoordinator || typeof aiToolsCoordinator.runWebsitePreviewGeneratePipeline !== 'function') {
-      throw new Error('Websitegenerator is niet beschikbaar.');
-    }
-
-    const payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, {
-      allowScanFallback: true,
-      imageSize: DATABASE_PHOTO_IMAGE_SIZE,
-      body: {
-        source: 'premium-database',
-        action: 'webdesign',
-        company: job.customer.bedrijf,
-        domain: job.customer.dom,
-      },
-    });
+    const payload = await generateWebsitePreviewWithRetry(job);
 
     await persistGeneratedPhoto(job, payload && payload.image);
   }

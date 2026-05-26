@@ -358,7 +358,7 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260525a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260526a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260505a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260429c/);
