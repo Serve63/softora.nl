@@ -2874,6 +2874,8 @@ function createColdmailCampaignService(deps = {}) {
       at: normalizeString(result.at) || now().toISOString(),
       sent: Math.max(0, Number(result.sent || 0) || 0),
       failed: Math.max(0, Number(result.failed || 0) || 0),
+      invalidRecipientDomainsBlocked:
+        Math.max(0, Number(result.invalidRecipientDomainsBlocked || 0) || 0) || undefined,
       senderEmail: normalizeEmailAddress(result.senderEmail),
       selected: Math.max(0, Number(result.selected || 0) || 0),
       requested: Math.max(0, Number(result.requested || 0) || 0),
@@ -3131,8 +3133,14 @@ function createColdmailCampaignService(deps = {}) {
     } catch (error) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_AUTOPILOT_FAILED';
       const knownSkip = COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES.has(code);
+      const shouldKeepPreviousStartTime = code === 'NO_VALID_RECIPIENT_DOMAINS';
       return finishColdmailAutopilotRun(
-        state,
+        shouldKeepPreviousStartTime
+          ? {
+              ...state,
+              lastStartedAt: previousLastStartedAt,
+            }
+          : state,
         {
           ok: knownSkip,
           skipped: knownSkip,
@@ -3143,6 +3151,10 @@ function createColdmailCampaignService(deps = {}) {
           ),
           at: now().toISOString(),
           failedItems: Array.isArray(error && error.failedItems) ? error.failedItems : undefined,
+          invalidRecipientDomainsBlocked: Math.max(
+            0,
+            Number(error && error.invalidRecipientDomainsBlocked) || 0
+          ),
           dailyQuota: error && error.quota && typeof error.quota === 'object' ? error.quota : undefined,
         },
         actor
@@ -3411,11 +3423,14 @@ function createColdmailCampaignService(deps = {}) {
         selectedRows.push(item);
         if (selectedRows.length >= count) break;
       } else {
+        const domain = getEmailDomain(email);
         failed.push({
           id: item.id,
           bedrijf: getRowCompany(item.row),
           email,
-          error: `E-maildomein bestaat niet of ontvangt geen mail: ${getEmailDomain(email) || email}`,
+          domain,
+          code: 'invalid_email_domain',
+          error: `E-maildomein bestaat niet of ontvangt geen mail: ${domain || email}`,
         });
       }
     }
@@ -4376,6 +4391,82 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function isColdmailInvalidEmailDomainFailure(item) {
+    const code = normalizeString(item && item.code).toLowerCase();
+    if (code === 'invalid_email_domain') return true;
+    return /^E-maildomein bestaat niet of ontvangt geen mail:/i.test(normalizeString(item && item.error));
+  }
+
+  function markRowFromColdmailInvalidEmailDomain(row, failure, actor) {
+    const date = now().toISOString();
+    const currentStatus = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
+    const nextStatus = canAdvanceContactStatus(currentStatus, 'geblokkeerd')
+      ? 'geblokkeerd'
+      : currentStatus || 'geblokkeerd';
+    const email = normalizeEmailAddress(failure && failure.email) || getRowEmail(row);
+    const domain = normalizeString((failure && failure.domain) || getEmailDomain(email));
+    const reason = truncateText(
+      normalizeString(failure && failure.error) ||
+        `E-maildomein bestaat niet of ontvangt geen mail: ${domain || email}`,
+      500
+    );
+    const existingHistory = Array.isArray(row.hist) ? row.hist : [];
+    return {
+      ...row,
+      mail: false,
+      canMail: false,
+      doNotMail: true,
+      status: nextStatus,
+      databaseStatus: nextStatus,
+      coldmailInvalidEmailDomain: domain,
+      coldmailInvalidEmailDomainAt: date,
+      coldmailInvalidEmailDomainReason: reason,
+      updatedAt: date,
+      hist: [
+        {
+          type: 'geblokkeerd',
+          label: domain
+            ? `E-maildomein automatisch overgeslagen: ${domain}`
+            : 'E-maildomein automatisch overgeslagen',
+          date,
+          actor: normalizeString(actor) || 'Coldmailing',
+          source: 'coldmail-invalid-email-domain',
+          preview: reason,
+        },
+        ...existingHistory,
+      ],
+    };
+  }
+
+  async function persistColdmailInvalidEmailDomainFailures({ rows, values, failed, actor }) {
+    const invalidFailures = (Array.isArray(failed) ? failed : []).filter(isColdmailInvalidEmailDomainFailure);
+    if (!invalidFailures.length) return { rows, marked: 0 };
+    const failuresById = new Map();
+    invalidFailures.forEach((failure) => {
+      const id = normalizeString(failure && failure.id);
+      if (id && !failuresById.has(id)) failuresById.set(id, failure);
+    });
+    if (!failuresById.size) return { rows, marked: 0 };
+    let marked = 0;
+    const nextRows = rows.map((row, index) => {
+      const rowId = getRowId(row, index);
+      const failure = failuresById.get(rowId);
+      if (!failure) return row;
+      marked += 1;
+      return markRowFromColdmailInvalidEmailDomain(row, failure, actor);
+    });
+    if (!marked) return { rows, marked: 0 };
+    await setUiStateValues(
+      customerDbScope,
+      buildCustomerRowsStateValues(values, nextRows),
+      {
+        source: 'coldmail-invalid-email-domain',
+        actor,
+      }
+    );
+    return { rows: nextRows, marked };
+  }
+
   function buildColdmailReplyHistoryEntry({
     classification,
     parsedMail,
@@ -5146,6 +5237,17 @@ function createColdmailCampaignService(deps = {}) {
         return false;
       });
     }
+    let invalidRecipientDomainsBlocked = 0;
+    if (!testMode && failed.some(isColdmailInvalidEmailDomainFailure)) {
+      const persistedInvalidDomains = await persistColdmailInvalidEmailDomainFailures({
+        rows,
+        values,
+        failed,
+        actor: input.actor || 'Coldmailing',
+      });
+      rows = persistedInvalidDomains.rows;
+      invalidRecipientDomainsBlocked = persistedInvalidDomains.marked;
+    }
     const customerPhotoMap = shouldIncludeWebdesignPhoto
       ? (resolvedRecipients.customerPhotoMap || await loadCustomerPhotoMap(candidateRows))
       : {};
@@ -5156,6 +5258,7 @@ function createColdmailCampaignService(deps = {}) {
       const error = new Error(firstFailure || 'Geen geldige e-maildomeinen gevonden in de database.');
       error.code = recipientGuardFailure ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT' : 'NO_VALID_RECIPIENT_DOMAINS';
       error.failedItems = failed;
+      error.invalidRecipientDomainsBlocked = invalidRecipientDomainsBlocked;
       throw error;
     }
 
@@ -5404,6 +5507,7 @@ function createColdmailCampaignService(deps = {}) {
       sent: sent.length,
       failed: failed.length,
       persisted: persistedSentRowIds.size,
+      invalidRecipientDomainsBlocked,
       safetyLimits: getColdmailSafetyLimits(),
       dailyQuota: {
         senderSentBefore: quota.senderSent,
