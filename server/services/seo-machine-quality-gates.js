@@ -56,8 +56,8 @@ const DEFAULT_UNSUPPORTED_CLAIM_RULES = Object.freeze([
   }),
   Object.freeze({
     type: 'unsupported-scale-proof',
-    pattern: /\b(?:meer\s+dan\s+)?\d{2,}\+?\s+(?:klanten|projecten|websites|cases|reviews|bedrijven)\b/i,
-    message: 'gebruikt harde aantallen klanten, projecten, websites, cases of reviews zonder bron.',
+    pattern: /\b(?:meer\s+dan\s+)?\d{2,}\+?\s+(?:klanten|projecten|websites|cases|reviews|bedrijven|klanttrajecten|trajecten)\b/i,
+    message: 'gebruikt harde aantallen klanten, projecten, websites, cases, trajecten of reviews zonder bron.',
   }),
   Object.freeze({
     type: 'regulated-advice-claim',
