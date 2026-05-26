@@ -114,6 +114,7 @@ function extractImageEntriesFromHtml(htmlRaw) {
       width: getAttrValue(attrs, 'width'),
       height: getAttrValue(attrs, 'height'),
       loading: getAttrValue(attrs, 'loading'),
+      decoding: getAttrValue(attrs, 'decoding'),
       fetchpriority: getAttrValue(attrs, 'fetchpriority'),
     };
   });
@@ -647,6 +648,13 @@ function auditSeoImages({ pages = [], checkAllImages = false, requireLocalImages
           type: 'missing-image-loading-strategy',
           path: pathName,
           message: `${pathName} mist een expliciete loading-strategie voor ${src}.`,
+        });
+      }
+      if (!/^(async|sync|auto)$/i.test(String(image.decoding || ''))) {
+        issues.push({
+          type: 'missing-image-decoding-strategy',
+          path: pathName,
+          message: `${pathName} mist een expliciete decoding-strategie voor ${src}.`,
         });
       }
       if (!/^(high|low|auto)$/i.test(String(image.fetchpriority || ''))) {
