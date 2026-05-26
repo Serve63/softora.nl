@@ -6,6 +6,7 @@ const path = require('node:path');
 const root = path.join(__dirname, '../..');
 const SEO_GROWTH_CSS_VERSION = '20260520b';
 const LOW_TRUST_PUBLIC_IMAGE_PATTERN = /\/assets\/(?:home-service-[^"']*-ai|home-over-office-meeting-ai|home-hero-generated-v2)\.jpg/i;
+const { INDEXABLE_PUBLIC_SEO_PAGES } = require('../../server/services/public-seo');
 
 function readFile(fileName) {
   return fs.readFileSync(path.join(root, fileName), 'utf8');
@@ -109,19 +110,10 @@ test('seo-growth template images use trustworthy filenames and stable dimensions
   }
 });
 
-test('public money pages avoid low-trust generated-looking image filenames', () => {
-  const pages = [
-    'premium-websites.html',
-    'premium-bedrijfssoftware.html',
-    'premium-chatbot.html',
-    'premium-voicesoftware.html',
-    'ai-automatisering.html',
-    'ai-telefonist.html',
-    'crm-systeem-op-maat.html',
-    'pakketten.html',
-    'diensten.html',
-    'premium-over-softora.html',
-  ];
+test('indexable public SEO pages avoid low-trust generated-looking image filenames', () => {
+  const pages = INDEXABLE_PUBLIC_SEO_PAGES
+    .filter((entry) => entry.kind !== 'home')
+    .map((entry) => entry.fileName);
 
   for (const fileName of pages) {
     const source = readFile(fileName);
