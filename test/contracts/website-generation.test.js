@@ -64,6 +64,8 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /duidelijk een gerenderde desktop website-interface/i);
   assert.match(prompt, /zichtbare navigatie, hero, typografie, secties, knoppen en footer/i);
   assert.match(prompt, /Maak géén losse stockfoto, kantoorinterieur, teamfoto, lifestylebeeld, mockup-scene of fotografische sfeerplaat/i);
+  assert.match(prompt, /alle device-randen moeten exact dezelfde matte bijna-zwarte kleur hebben/i);
+  assert.match(prompt, /zonder blauwe\/navy tint/i);
   assert.match(prompt, /Fotografie mag alleen klein en ingebed binnen het website-ontwerp voorkomen/i);
   assert.match(prompt, /kies altijd de website-screenshot met duidelijke UI-elementen/i);
   assert.match(prompt, /Er zijn 2 referentiebeeld\(en\) meegegeven; behandel die uitsluitend als moodboard/i);

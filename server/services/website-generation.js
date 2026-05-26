@@ -183,6 +183,7 @@ function createWebsiteGenerationHelpers(deps = {}) {
       'Verbeter vooral de vormgeving, compositie, spacing, premium uitstraling en technische uitvoering, maar vermijd inhoudelijke wijzigingen of nieuwe dienstenclaims die niet uit de bronsite komen.',
       'Gebruik dezelfde globale structuur waar mogelijk: heldere navigation-naar-hero flow, aanbod/ diensten, vertrouwen/kenmerken, en contactafspraak of leadcall-to-action, zodat de foto niet te veel afwijkt van de broninhoud.',
       'UI-ONLY OUTPUT: de afbeelding moet duidelijk een gerenderde desktop website-interface zijn, met zichtbare navigatie, hero, typografie, secties, knoppen en footer als onderdeel van één full-page webdesign. Maak géén losse stockfoto, kantoorinterieur, teamfoto, lifestylebeeld, mockup-scene of fotografische sfeerplaat als eindresultaat. Fotografie mag alleen klein en ingebed binnen het website-ontwerp voorkomen, nooit als volledige afbeelding.',
+      'Als er toch een laptop/tablet/telefoon-deviceframe of mockup in beeld komt: alle device-randen moeten exact dezelfde matte bijna-zwarte kleur hebben (#0B0D12 of equivalent), zonder blauwe/navy tint en zonder verschillend gekleurde bezels.',
       'Als je twijfelt tussen een mooie foto en een website-screenshot: kies altijd de website-screenshot met duidelijke UI-elementen.',
       host ? `Domein of merk: ${host}.` : '',
       title ? `Huidige paginatitel: ${title}.` : '',
