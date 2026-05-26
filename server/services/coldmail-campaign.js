@@ -2107,6 +2107,7 @@ function createColdmailCampaignService(deps = {}) {
   function pruneColdmailSendGuardEntries(entries) {
     const cutoffMs = now().getTime() - COLDMAIL_SEND_GUARD_WINDOW_MS;
     const currentMs = now().getTime();
+    const seen = new Set();
     return (Array.isArray(entries) ? entries : [])
       .filter((entry) => entry && typeof entry === 'object')
       .map((entry) => ({
@@ -2126,7 +2127,23 @@ function createColdmailCampaignService(deps = {}) {
       .filter((entry) => {
         const sentRecently = entry.count > 0 && parseTimestampMs(entry.at) >= cutoffMs;
         const activePause = parseTimestampMs(entry.safetyPauseUntil) > currentMs;
-        return sentRecently || activePause;
+        if (!sentRecently && !activePause) return false;
+        const key = [
+          entry.at,
+          entry.senderEmail,
+          entry.count,
+          entry.personalCount,
+          entry.recipientKey,
+          entry.recipientEmail,
+          entry.recipientDomain,
+          entry.recipientCompanyKey,
+          entry.recipientId,
+          entry.safetyPauseUntil,
+          entry.safetyPauseReason,
+        ].join('|');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
       });
   }
 
@@ -2176,10 +2193,21 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function saveColdmailSendGuardState(sendGuardState, actor = 'coldmail-send-guard') {
-    const entries = pruneColdmailSendGuardEntries(sendGuardState && sendGuardState.entries).slice(-1000);
-    const recipientEntries = pruneColdmailRecipientGuardEntries(
-      sendGuardState && sendGuardState.recipientEntries
-    ).slice(-2000);
+    let existingState = { entries: [], recipientEntries: [] };
+    try {
+      existingState = await loadColdmailSendGuardState();
+    } catch (error) {
+      logger.warn('[ColdmailSendGuard][merge-load]', error && error.message ? error.message : error);
+    }
+    const entries = pruneColdmailSendGuardEntries([
+      ...(existingState.entries || []),
+      ...((sendGuardState && sendGuardState.entries) || []),
+    ]).slice(-1000);
+    const recipientEntries = pruneColdmailRecipientGuardEntries([
+      ...(existingState.recipientEntries || []),
+      ...((sendGuardState && sendGuardState.recipientEntries) || []),
+      ...((sendGuardState && sendGuardState.entries) || []),
+    ]).slice(-2000);
     await setUiStateValues(
       coldmailSendGuardScope,
       {

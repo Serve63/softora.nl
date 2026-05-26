@@ -48,6 +48,9 @@ function createService(overrides = {}) {
   const savedStates = [];
   let replyState = overrides.replyState || { processed: {} };
   let sendGuardState = overrides.sendGuardState || { entries: [] };
+  const sendGuardReadStates = Array.isArray(overrides.sendGuardReadStates)
+    ? overrides.sendGuardReadStates.map((state) => JSON.parse(JSON.stringify(state)))
+    : null;
   let autopilotState = overrides.autopilotState || {};
   let coldmailingSettings = overrides.coldmailingSettings || {};
   let rows = overrides.rows || [
@@ -126,6 +129,13 @@ function createService(overrides = {}) {
         };
       }
       if (scope === 'premium_coldmail_send_guard') {
+        if (sendGuardReadStates && sendGuardReadStates.length) {
+          return {
+            values: {
+              softora_coldmail_send_guard_v1: JSON.stringify(sendGuardReadStates.shift()),
+            },
+          };
+        }
         return {
           values: {
             softora_coldmail_send_guard_v1: JSON.stringify(sendGuardState),
@@ -4658,6 +4668,64 @@ test('coldmail campaign deduplicates copied recipient guard entries when saving'
     recipientEntries.filter((entry) => entry.recipientEmail === 'new@example.test').length,
     1
   );
+});
+
+test('coldmail campaign merges persisted send guard while saving after a stale read', async () => {
+  const oldRecipient = {
+    at: '2026-04-24T11:00:00.000Z',
+    senderEmail: 'serve@softora.nl',
+    count: 1,
+    personalCount: 0,
+    recipientKey: 'email:old@example.test',
+    recipientEmail: 'old@example.test',
+    recipientDomain: 'example-test',
+    recipientCompanyKey: 'old-company',
+    recipientId: 'old-row',
+    recipientCompany: 'Old Company',
+  };
+  const emptyRead = { entries: [], recipientEntries: [] };
+  const persistedRead = { entries: [oldRecipient], recipientEntries: [oldRecipient] };
+  const { service, getSendGuardState } = createService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.strato.test',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    rows: [
+      {
+        id: 'new-row',
+        bedrijf: 'New Company',
+        naam: 'New Company',
+        email: 'new@example.test',
+        website: 'new.example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    sendGuardState: persistedRead,
+    sendGuardReadStates: [
+      persistedRead,
+      persistedRead,
+      emptyRead,
+      persistedRead,
+    ],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag {{naam}}',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  const entries = getSendGuardState().entries;
+  assert.equal(entries.filter((entry) => entry.recipientEmail === 'old@example.test').length, 1);
+  assert.equal(entries.filter((entry) => entry.recipientEmail === 'new@example.test').length, 1);
 });
 
 test('coldmail campaign does not mark daily-limit skipped rows as mailed', async () => {
