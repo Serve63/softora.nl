@@ -617,13 +617,18 @@ function createSoftoraDataOpsStore(deps = {}) {
     const rows = result.data || [];
     const entries = [];
 
-    await Promise.all(
-      rows.map(async (row) => {
+    let cursor = 0;
+    const workerCount = Math.min(6, Math.max(1, rows.length));
+
+    async function signNext() {
+      while (cursor < rows.length) {
+        const row = rows[cursor];
+        cursor += 1;
         const bucket = normalizeString(row.storage_bucket || bucketName);
         const path = normalizeString(row.storage_path);
-        if (!bucket || !path) return;
+        if (!bucket || !path) continue;
         const signed = await client.storage.from(bucket).createSignedUrl(path, expiresInSeconds);
-        if (signed.error || !signed.data?.signedUrl) return;
+        if (signed.error || !signed.data?.signedUrl) continue;
         const legacyMeta = row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {};
         const mockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : null;
         let websiteMockupUrl = '';
@@ -651,8 +656,10 @@ function createSoftoraDataOpsStore(deps = {}) {
           updatedAt: normalizeString(row.updated_at),
           signedUrlExpiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
         });
-      })
-    );
+      }
+    }
+
+    await Promise.all(Array.from({ length: workerCount }, signNext));
 
     Object.defineProperty(entries, 'hadStructuredRows', {
       value: rows.length > 0,

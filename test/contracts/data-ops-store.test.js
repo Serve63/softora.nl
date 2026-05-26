@@ -204,3 +204,78 @@ test('data ops store saves webdesign and device mockup as one photo record', asy
   assert.equal(upserts[0].row.legacy_meta.mockup.storageBucket, 'softora-design-photos');
   assert.equal(upserts[0].row.legacy_meta.mockup.mimeType, 'image/jpeg');
 });
+
+test('data ops store signs design photo URLs with bounded concurrency', async () => {
+  const rows = Array.from({ length: 18 }, (_item, index) => ({
+    customer_id: `customer-${index + 1}`,
+    identity_key: `company ${index + 1}|contact|310000000${index}`,
+    storage_bucket: 'softora-design-photos',
+    storage_path: `customers/customer-${index + 1}/webdesign.png`,
+    mime_type: 'image/png',
+    file_name: `webdesign-${index + 1}.png`,
+    legacy_meta: {
+      mockup: {
+        storageBucket: 'softora-design-photos',
+        storagePath: `customers/customer-${index + 1}/mockup.jpg`,
+        fileName: `mockup-${index + 1}.jpg`,
+      },
+    },
+    updated_at: '2026-05-26T12:00:00.000Z',
+  }));
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const signedPaths = [];
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrl(path) {
+            inFlight += 1;
+            maxInFlight = Math.max(maxInFlight, inFlight);
+            signedPaths.push({ bucket, path });
+            await new Promise((resolve) => setTimeout(resolve, 2));
+            inFlight -= 1;
+            return {
+              data: { signedUrl: `https://storage.example.test/${bucket}/${path}` },
+              error: null,
+            };
+          },
+        };
+      },
+    },
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    limit(limit) {
+                      assert.equal(limit, 500);
+                      return Promise.resolve({ data: rows, error: null });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+  });
+
+  const entries = await store.listDesignPhotosWithSignedUrls({ expiresInSeconds: 120 });
+
+  assert.equal(entries.length, rows.length);
+  assert.equal(signedPaths.length, rows.length * 2);
+  assert.equal(maxInFlight <= 6, true);
+  assert.equal(entries.every((entry) => entry.websitePhotoUrl.startsWith('https://')), true);
+  assert.equal(entries.every((entry) => entry.websiteMockupUrl.startsWith('https://')), true);
+});
