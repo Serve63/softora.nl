@@ -32,7 +32,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
 
   assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260511a"><\/script>/);
   assert.match(pageSource, /assets\/premium-active-order-custom-selects\.js\?v=20260526a/);
-  assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260526b/);
+  assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260526c/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -81,6 +81,11 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /function renderOpenLeadDossier\(lead\) \{/);
   assert.match(source, /\.open-lead-action-grid \{[\s\S]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);[\s\S]*align-items:\s*stretch;/);
   assert.match(source, /\.open-lead-action-grid \.modal-btn \{[\s\S]*min-height:\s*8\.75rem;[\s\S]*height:\s*100%;/);
+  assert.match(source, /\.open-lead-card \.order-main \{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(24rem, 0\.78fr\);[\s\S]*align-items:\s*stretch;/);
+  assert.match(source, /\.open-lead-card-meta \{[\s\S]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/);
+  assert.match(source, /appendTextElement\(valueMeta, 'div', 'open-lead-card-meta-label', 'Leadwaarde'\);/);
+  assert.match(source, /appendTextElement\(statusMeta, 'div', 'open-lead-card-meta-label', 'Status'\);/);
+  assert.match(source, /appendTextElement\(assigneeMeta, 'div', 'open-lead-card-meta-label', 'Toegewezen aan'\);/);
   assert.match(source, /appendOpenLeadDossierItem\(grid, 'Notities \/ transcript', lead\.postCallNotesTranscript/);
   assert.match(source, /appendOpenLeadDossierItem\(grid, 'Bouwprompt', lead\.postCallPrompt \|\| buildPromptFromOpenLead/);
   assert.match(source, /Opname toevoegen/);

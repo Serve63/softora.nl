@@ -233,10 +233,56 @@
             .lead-convert-audio-row { display: flex; align-items: center; gap: 0.65rem; margin: 0.35rem 0 0.7rem; }
             .lead-convert-file-input { display: none; }
             .open-lead-card { cursor: pointer; }
+            .open-lead-card .order-main { grid-template-columns: minmax(0, 1fr) minmax(24rem, 0.78fr); align-items: stretch; }
+            .open-lead-card-meta {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.85rem;
+                align-items: stretch;
+                min-width: min(100%, 34rem);
+            }
+            .open-lead-card-meta-item {
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                gap: 0.34rem;
+                padding: 0.2rem 0 0.2rem 0.9rem;
+                border-left: 1px solid rgba(30,30,47,0.12);
+            }
+            .open-lead-card-meta-label {
+                color: var(--text-tertiary);
+                font-family: Oswald, sans-serif;
+                font-size: 0.64rem;
+                font-weight: 700;
+                letter-spacing: 0.15em;
+                text-transform: uppercase;
+            }
+            .open-lead-card-meta-value {
+                min-width: 0;
+                color: var(--text-secondary);
+                font-size: 0.86rem;
+                font-weight: 700;
+                line-height: 1.24;
+                overflow-wrap: anywhere;
+            }
+            .open-lead-card-meta-value.value {
+                color: var(--text-primary);
+                font-family: Oswald, sans-serif;
+                font-size: 1.45rem;
+                line-height: 1;
+            }
+            .open-lead-card-meta-value.status {
+                font-family: Oswald, sans-serif;
+                font-size: 1.02rem;
+                letter-spacing: 0.02em;
+                text-transform: uppercase;
+            }
             .open-lead-action-grid .modal-btn.primary, #openLeadConvertSubmitBtn { background: var(--accent); color: #fff; }
             .open-lead-action-grid .modal-btn.primary:hover, #openLeadConvertSubmitBtn:hover { background: var(--accent-light); box-shadow: 0 0 30px var(--accent-glow); }
+            @media (max-width: 1200px) { .open-lead-card .order-main { grid-template-columns: 1fr; } .open-lead-card-meta { width: 100%; min-width: 0; } }
             @media (max-width: 900px) { .open-lead-action-grid, .lead-convert-grid, .open-lead-dossier-grid { grid-template-columns: 1fr; } }
-            @media (max-width: 768px) { .open-lead-dossier-actions { flex-direction: column; } .open-lead-dossier-actions .modal-btn { width: 100%; min-width: 0; } }
+            @media (max-width: 768px) { .open-lead-card-meta { grid-template-columns: 1fr; } .open-lead-dossier-actions { flex-direction: column; } .open-lead-dossier-actions .modal-btn { width: 100%; min-width: 0; } }
         `;
         document.head.appendChild(style);
     }
@@ -829,20 +875,24 @@
         delivery.appendChild(document.createTextNode(getOpenLeadLineLabel(lead.productLine)));
         info.appendChild(delivery);
 
-        const price = document.createElement('div');
-        price.className = 'order-price';
-        appendTextElement(price, 'div', 'order-price-label', 'Leadwaarde');
-        appendTextElement(price, 'div', 'order-price-value', lead.value || '-');
-
-        const actions = document.createElement('div');
-        actions.className = 'order-actions';
-        const status = appendTextElement(actions, 'div', 'order-title', 'Openstaande lead');
+        const meta = document.createElement('div');
+        meta.className = 'open-lead-card-meta';
+        const valueMeta = document.createElement('div');
+        valueMeta.className = 'open-lead-card-meta-item';
+        appendTextElement(valueMeta, 'div', 'open-lead-card-meta-label', 'Leadwaarde');
+        appendTextElement(valueMeta, 'div', 'open-lead-card-meta-value value', lead.value || '-');
+        const statusMeta = document.createElement('div');
+        statusMeta.className = 'open-lead-card-meta-item';
+        appendTextElement(statusMeta, 'div', 'open-lead-card-meta-label', 'Status');
+        const status = appendTextElement(statusMeta, 'div', 'open-lead-card-meta-value status', 'Openstaande lead');
         status.style.color = color;
-        status.style.fontSize = '0.92rem';
-        const assignee = appendTextElement(actions, 'div', 'order-assignee', lead.leadOwnerName || 'Nog niet geclaimd');
-        assignee.style.textAlign = 'center';
+        const assigneeMeta = document.createElement('div');
+        assigneeMeta.className = 'open-lead-card-meta-item';
+        appendTextElement(assigneeMeta, 'div', 'open-lead-card-meta-label', 'Toegewezen aan');
+        appendTextElement(assigneeMeta, 'div', 'open-lead-card-meta-value', lead.leadOwnerName || 'Nog niet geclaimd');
+        meta.append(valueMeta, statusMeta, assigneeMeta);
 
-        main.append(info, price, actions);
+        main.append(info, meta);
         card.appendChild(main);
         return card;
     }
