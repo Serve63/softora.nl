@@ -215,6 +215,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   const webdesignMockupScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-mockup.js');
   const deepSearchScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const contactStatusScriptPath = path.join(__dirname, '../../assets/premium-database-contact-status.js');
+  const instantlySyncScriptPath = path.join(__dirname, '../../assets/premium-database-instantly-sync.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
   const photoBatchScriptSource = fs.readFileSync(photoBatchScriptPath, 'utf8');
@@ -224,6 +225,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   const webdesignMockupScriptSource = fs.readFileSync(webdesignMockupScriptPath, 'utf8');
   const deepSearchScriptSource = fs.readFileSync(deepSearchScriptPath, 'utf8');
   const contactStatusScriptSource = fs.readFileSync(contactStatusScriptPath, 'utf8');
+  const instantlySyncScriptSource = fs.readFileSync(instantlySyncScriptPath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
   assert.match(pageSource, /family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700/);
@@ -489,7 +491,10 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260513a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260526a/);
+  assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260526b/);
+  assert.match(instantlySyncScriptSource, /window\.location\.reload\(\)/);
+  assert.match(instantlySyncScriptSource, /Database wordt ververst/);
+  assert.match(instantlySyncScriptSource, /window\.alert\(text\)/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
