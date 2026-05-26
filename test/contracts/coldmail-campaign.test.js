@@ -795,6 +795,12 @@ test('coldmail autopilot reports redacted smtp diagnostics for unconfigured send
     'MAILBOX_SERVEC321_GMAIL_COM_SMTP_SECURE',
     'MAILBOX_SERVEC321_GMAIL_COM_SMTP_USER',
     'MAILBOX_SERVEC321_GMAIL_COM_SMTP_PASS',
+    'MAILBOX_MARTIJNVEN123_GMAIL_COM_PASS',
+    'MAILBOX_MARTIJNVEN123_GMAIL_COM_SMTP_HOST',
+    'MAILBOX_MARTIJNVEN123_GMAIL_COM_SMTP_PORT',
+    'MAILBOX_MARTIJNVEN123_GMAIL_COM_SMTP_SECURE',
+    'MAILBOX_MARTIJNVEN123_GMAIL_COM_SMTP_USER',
+    'MAILBOX_MARTIJNVEN123_GMAIL_COM_SMTP_PASS',
     'MAILBOX_GMAIL_COM_PASS',
     'MAILBOX_GMAIL_COM_SMTP_HOST',
     'MAILBOX_GMAIL_COM_SMTP_PORT',
@@ -1997,7 +2003,7 @@ test('coldmail campaign adds audit bcc when configured', async () => {
 });
 
 test('coldmail campaign blocks private copies for personal senders', async () => {
-  for (const senderEmail of ['serve@softora.nl', 'martijn@softora.nl', 'servec321@gmail.com']) {
+  for (const senderEmail of ['serve@softora.nl', 'martijn@softora.nl', 'servec321@gmail.com', 'martijnven123@gmail.com']) {
     const { service, sentMessages } = createService({
       coldmailAuditBcc: 'servec321@gmail.com',
       mailReplyTo: 'servec321@gmail.com',
@@ -4453,6 +4459,7 @@ test('coldmail campaign exposes the same sender accounts as mailbox', () => {
     'serve@softora.nl',
     'martijn@softora.nl',
     'servec321@gmail.com',
+    'martijnven123@gmail.com',
   ]);
 });
 

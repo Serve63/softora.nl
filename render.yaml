@@ -91,6 +91,8 @@ services:
         sync: false
       - key: MAILBOX_SERVEC321_GMAIL_COM_PASS
         sync: false
+      - key: MAILBOX_MARTIJNVEN123_GMAIL_COM_PASS
+        sync: false
       - key: MAILBOX_GMAIL_COM_SMTP_HOST
         value: smtp.gmail.com
       - key: MAILBOX_GMAIL_COM_SMTP_PORT

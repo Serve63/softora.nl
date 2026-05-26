@@ -6,6 +6,8 @@
   const SENDER_ROWS = [
     { email: 'martijn@softora.nl', displayName: 'Martijn' },
     { email: 'serve@softora.nl', displayName: 'Servé' },
+    { email: 'servec321@gmail.com', displayName: 'Servé Gmail' },
+    { email: 'martijnven123@gmail.com', displayName: 'Martijn Gmail' },
   ];
   const STYLE_ID = 'softora-coldmail-sender-scoreboard-style';
   const RETRY_DELAY_MS = 3500;

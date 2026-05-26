@@ -37,11 +37,13 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
   vm.createContext(context);
   vm.runInContext(scoreboardSource, context);
 
-  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260522m/);
+  assert.match(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js\?v=20260526a/);
   assert.match(scoreboardSource, /id = 'coldmailSenderScoreboard'/);
   assert.match(scoreboardSource, /data-coldmail-sender'/);
   assert.match(scoreboardSource, /martijn@softora\.nl/);
   assert.match(scoreboardSource, /serve@softora\.nl/);
+  assert.match(scoreboardSource, /servec321@gmail\.com/);
+  assert.match(scoreboardSource, /martijnven123@gmail\.com/);
   assert.match(scoreboardSource, /\.coldmail-sender-scoreboard-entry\.is-leading\{color:var\(--crimson\)\}/);
   assert.match(scoreboardSource, /querySelector\('#screen-dashboard \.topbar'\)/);
   assert.match(scoreboardSource, /sendColdmailCampaignNowWithSenderScoreboardRefresh/);
@@ -119,6 +121,8 @@ test('premium bevestigingsmails toont coldmail teller per afzender rechtsboven',
     JSON.stringify([
       { email: 'martijn@softora.nl', count: 3, opened: 1, openRate: 33 },
       { email: 'serve@softora.nl', count: 1, opened: 1, openRate: 100 },
+      { email: 'servec321@gmail.com', count: 0, opened: 0, openRate: 0 },
+      { email: 'martijnven123@gmail.com', count: 0, opened: 0, openRate: 0 },
     ])
   );
   assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateSenderTotal(entries), 4);
@@ -172,6 +176,8 @@ test('premium bevestigingsmails coldmail teller start na de reset-baseline', () 
     JSON.stringify([
       { email: 'martijn@softora.nl', count: 3, opened: 0, openRate: 0 },
       { email: 'serve@softora.nl', count: 2, opened: 1, openRate: 50 },
+      { email: 'servec321@gmail.com', count: 0, opened: 0, openRate: 0 },
+      { email: 'martijnven123@gmail.com', count: 0, opened: 0, openRate: 0 },
     ])
   );
   assert.equal(context.window.SoftoraColdmailSenderScoreboard.calculateSenderTotal(entries), 5);
@@ -586,10 +592,11 @@ test('premium bevestigingsmails places sender dropdown in the campaign card and 
   assert.match(pageSource, /<option value="serve@softora\.nl" selected>serve@softora\.nl<\/option>/);
   assert.match(pageSource, /<option value="martijn@softora\.nl">martijn@softora\.nl<\/option>/);
   assert.match(pageSource, /<option value="servec321@gmail\.com">servec321@gmail\.com<\/option>/);
+  assert.match(pageSource, /<option value="martijnven123@gmail\.com">martijnven123@gmail\.com<\/option>/);
   assert.doesNotMatch(pageSource, /<option value="info@softora\.nl"/);
   assert.doesNotMatch(pageSource, /<option value="zakelijk@softora\.nl"/);
   assert.doesNotMatch(pageSource, /zakelijk@theimpactbox\.co/);
-  assert.match(pageSource, /const allowedSenderEmails = new Set\(\['serve@softora\.nl', 'martijn@softora\.nl', 'servec321@gmail\.com'\]\);/);
+  assert.match(pageSource, /const allowedSenderEmails = new Set\(\['serve@softora\.nl', 'martijn@softora\.nl', 'servec321@gmail\.com', 'martijnven123@gmail\.com'\]\);/);
   assert.match(pageSource, /allowedSenderEmails\.has\(String\(email \|\| ''\)\.toLowerCase\(\)\)/);
   assert.doesNotMatch(pageSource, /<div class="mf-label">Campagne afgerond na<\/div>/);
   assert.doesNotMatch(pageSource, /<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
@@ -631,8 +638,9 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';/);
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';/);
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';/);
-  assert.match(pageSource, /assets\/premium-campaign-sender-settings\.js\?v=20260513a/);
+  assert.match(pageSource, /assets\/premium-campaign-sender-settings\.js\?v=20260526a/);
   assert.match(pageSource, /<select class="mf-sel" id="ai-tone-style">/);
+  assert.match(senderSettingsSource, /"martijnven123@gmail\.com": "Goedemorgen \{\{naam\}\}/);
   assert.match(pageSource, /function getCampaignSettingsScope\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_SCOPE : COLDMAILING_SETTINGS_SCOPE;\s*\}/);
   assert.match(pageSource, /function getCampaignSettingsKey\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_KEY : COLDMAILING_SETTINGS_KEY;\s*\}/);
   assert.match(pageSource, /function getColdmailingSettingsController\(\)/);

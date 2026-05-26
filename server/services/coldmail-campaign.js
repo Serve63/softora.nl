@@ -106,17 +106,20 @@ const COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS = new Set([
   'serve@softora.nl',
   'martijn@softora.nl',
   'servec321@gmail.com',
+  'martijnven123@gmail.com',
 ]);
 const SENDER_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
   'martijn@softora.nl': 'Martijn van de Ven',
   'ruben@softora.nl': 'Ruben',
   'servec321@gmail.com': 'Servé Creusen',
+  'martijnven123@gmail.com': 'Martijn van de Ven',
 };
 const COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS = Object.freeze([
   'serve@softora.nl',
   'martijn@softora.nl',
   'servec321@gmail.com',
+  'martijnven123@gmail.com',
 ]);
 const COLDMAIL_LINKEDIN_CTA_BY_SENDER = Object.freeze({
   'martijn@softora.nl': {
@@ -143,11 +146,18 @@ const DEFAULT_COLDMAIL_SENDER_PROFILES = {
     aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
+  'martijnven123@gmail.com': {
+    subject: 'Korte vraag over uw website - Softora.nl',
+    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\nSoftora.nl",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    toneStyle: 'Vriendelijk & professioneel',
+  },
 };
 const COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS = new Set([
   'serve@softora.nl',
   'martijn@softora.nl',
   'servec321@gmail.com',
+  'martijnven123@gmail.com',
 ]);
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
@@ -1845,6 +1855,7 @@ function createColdmailCampaignService(deps = {}) {
           'serve@softora.nl',
           'martijn@softora.nl',
           'servec321@gmail.com',
+          'martijnven123@gmail.com',
         ]
           .map(normalizeEmailAddress)
           .filter(isLikelyValidEmail)
@@ -2294,12 +2305,12 @@ function createColdmailCampaignService(deps = {}) {
         ? raw.senderEmails
         : raw.senderEmail
     ).filter(isColdmailAutopilotAllowedSenderEmail);
-    if (
-      senderEmails.length &&
-      !senderEmails.includes('servec321@gmail.com') &&
-      isSenderSmtpAccountConfigured(resolveSenderSmtpAccount('servec321@gmail.com'))
-    ) {
-      senderEmails.push('servec321@gmail.com');
+    if (senderEmails.length) {
+      ['servec321@gmail.com', 'martijnven123@gmail.com'].forEach((email) => {
+        if (!senderEmails.includes(email) && isSenderSmtpAccountConfigured(resolveSenderSmtpAccount(email))) {
+          senderEmails.push(email);
+        }
+      });
     }
     const rawSenderEmail = normalizeEmailAddress(raw.senderEmail);
     const senderEmail = isColdmailAutopilotAllowedSenderEmail(rawSenderEmail)
@@ -2670,7 +2681,7 @@ function createColdmailCampaignService(deps = {}) {
     if (snapshot && snapshot.subject && snapshot.body) {
       return normalizeColdmailingSenderProfile(snapshot, fallback);
     }
-    if (email === 'servec321@gmail.com') {
+    if (email === 'servec321@gmail.com' || email === 'martijnven123@gmail.com') {
       return normalizeColdmailingSenderProfile(fallback);
     }
     return {

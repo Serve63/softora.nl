@@ -23,11 +23,13 @@ const DEFAULT_MAILBOX_EMAILS = [
   'serve@softora.nl',
   'martijn@softora.nl',
   'servec321@gmail.com',
+  'martijnven123@gmail.com',
 ];
 const MAILBOX_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
   'martijn@softora.nl': 'Martijn van de Ven',
   'servec321@gmail.com': 'Servé Creusen',
+  'martijnven123@gmail.com': 'Martijn van de Ven',
 };
 const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
