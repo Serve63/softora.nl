@@ -10,6 +10,7 @@ test('premium agenda modal uses dossier flow for appointments that already have 
   assert.match(pageSource, /AI begrijpt en scant de dynamische agenda en houd rekening met reistijden\./);
   assert.match(pageSource, /Let op: Agenda functioneerd pas goed bij gebruik van Softora Agenda app\./);
   assert.doesNotMatch(pageSource, /Meetings ingepland door AI Lead Generator/);
+  assert.match(pageSource, /\.topbar > \.topbar-right,\s*\.topbar > \[data-agenda-owner-score\],\s*\.topbar \.coldmail-sender-score \{\s*display: none !important;/);
   assert.match(
     pageSource,
     /function getLinkedOrderIdForAppointment\(apt\)\s*\{[\s\S]*const orderId = Number\(apt\?\.activeOrderId \|\| 0\);[\s\S]*return orderId;/
