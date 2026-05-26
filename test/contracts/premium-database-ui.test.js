@@ -316,7 +316,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /class=\\"company-edit\\"/);
   assert.match(pageSource, /data-edit-id=\\"/);
   assert.match(pageSource, /<th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie<\/th>/);
-  assert.match(pageSource, /<th id="photoHeader">Foto's <span id="photoHeaderCount">\(0\)<\/span><\/th>/);
+  assert.match(pageSource, /<th id="photoHeader"><span id="photoHeaderLabel">Foto's<\/span> <span id="photoHeaderCount">\(0\)<\/span><\/th>/);
   assert.match(pageSource, /<th id="daysHeader" hidden>Dagen<\/th>/);
   assert.doesNotMatch(pageSource, /id="myMailsFilterButton"/);
   assert.doesNotMatch(pageSource, /Enkel mijn mails tonen/);
@@ -326,8 +326,8 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.doesNotMatch(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
   assert.doesNotMatch(pageSource, /nodes\.myMailsFilterButton/);
   assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn/);
-  assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn;/);
-  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ filtered\.filter\(function \(customer\) \{ return showPhotoColumn && shouldShowWebsitePhoto\(customer\) && isValidWebsitePhotoSource\(customer && customer\.websitePhoto\); \}\)\.length\.toLocaleString\("nl-NL"\) \+ "\)";/);
+  assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" \? "Mailklaar" : "Foto's";/);
+  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ getPhotoHeaderCount\(filtered, showPhotoColumn\)\.toLocaleString\("nl-NL"\) \+ "\)";/);
   assert.match(pageSource, /colspan=\\"" \+ \(showOutreachActionColumn \? 8 : 9\) \+ "\\"/);
   assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
@@ -339,6 +339,11 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /websiteMockup: normalizeString\(raw && \(raw\.websiteMockup \|\| raw\.mockup \|\| raw\.websiteMockupImage\)\)/);
   assert.match(pageSource, /function shouldShowWebsitePhoto\(customer\)/);
   assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
+  assert.match(pageSource, /function hasCompleteWebdesignAssets\(customer\)/);
+  assert.match(pageSource, /function isColdmailReadyWebdesignLead\(customer\)/);
+  assert.match(pageSource, /outreachController\.hasInstantlyOutreachSignal\(customer\)/);
+  assert.match(pageSource, /function getPhotoHeaderCount\(customers, showPhotoColumn\)/);
+  assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*filter\(isColdmailReadyWebdesignLead\)/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
   assert.match(pageSource, /return webdesignActionController\.render\(customer\);/);
   assert.match(pageSource, /window\.SoftoraDatabaseWebdesignAction\.createController\(\{/);
@@ -541,6 +546,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /if \(databaseHadBootstrapCustomers && state\.klanten\.length\) \{/);
   assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(state\.klanten\);/);
   assert.match(pageSource, /loadCustomerPhotoMap\(state\.klanten, \{ force: true \}\)/);
+  assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true \}\);/);
   assert.match(pageSource, /state\.klanten = mergeCustomersWithPhotos\(state\.klanten, photoMap, state\.klanten\);/);
   assert.match(pageSource, /else \{\s*await bootstrapCustomers\(\);\s*\}/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);/);
@@ -550,6 +556,9 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.doesNotMatch(pageSource, /releaseDatabaseBootShell\(\); void webdesignActionController\.preloadPhotoImages/);
   assert.match(pageSource, /void webdesignActionController\.resumePendingJobs\(\)\.catch/);
   assert.match(pageSource, /void bootstrapCustomers\(\)\.catch\(function \(error\) \{ console\.error\("Database sync na snelle boot mislukt:", error\); \}\);/);
+  assert.match(pageSource, /function refreshCustomerStateSilently\(\)/);
+  assert.match(pageSource, /window\.setInterval\(function \(\) \{[\s\S]*void refreshCustomerStateSilently\(\);[\s\S]*\}, CUSTOMER_DB_SYNC_INTERVAL_MS\);/);
+  assert.match(pageSource, /startCustomerStateAutoRefresh\(\);/);
   assert.doesNotMatch(pageSource, /if \(databaseHadBootstrapCustomers\) releaseDatabaseBootShell\(\); await bootstrapCustomers\(\);/);
   assert.match(webdesignActionScriptSource, /pendingIds\.add\(job\.customerId\);/);
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT/);

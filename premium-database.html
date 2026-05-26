@@ -1451,7 +1451,7 @@
                                         <th>Kanaal</th>
                                         <th data-sort-key="status" id="statusHeader">Status</th>
                                         <th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie</th>
-                                        <th id="photoHeader">Foto's <span id="photoHeaderCount">(0)</span></th><th id="daysHeader" hidden>Dagen</th>
+                                        <th id="photoHeader"><span id="photoHeaderLabel">Foto's</span> <span id="photoHeaderCount">(0)</span></th><th id="daysHeader" hidden>Dagen</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody"></tbody>
@@ -1640,7 +1640,7 @@
             addActionsMenu: document.getElementById("addActionsMenu"),
             addButton: document.getElementById("addButton"),
             photoCostLabel: document.getElementById("photoCostLabel"),
-            generatePhotosButton: document.getElementById("generatePhotosButton"),
+            generatePhotosButton: document.getElementById("generatePhotosButton"), photoHeaderLabel: document.getElementById("photoHeaderLabel"),
             deepSearchButton: document.getElementById("deepSearchButton"), manualAddButton: document.getElementById("manualAddButton"),
             importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
@@ -1876,7 +1876,7 @@
                 status: status,
                 databaseStatus: status,
                 call: raw && typeof raw.call === "boolean" ? raw.call : (status !== "geblokkeerd" && status !== "buiten"),
-                mail: raw && typeof raw.mail === "boolean" ? raw.mail : (status !== "geblokkeerd" && status !== "buiten"),
+                mail: raw && typeof raw.mail === "boolean" ? raw.mail : (status !== "geblokkeerd" && status !== "buiten"), canMail: raw && typeof raw.canMail === "boolean" ? raw.canMail : undefined, doNotMail: raw && raw.doNotMail === true,
                 hist: hist,
                 nota: normalizeString(raw && raw.nota),
                 updatedAt: updatedAt,
@@ -2327,7 +2327,7 @@
         function shouldShowWebsitePhoto(customer) {
             return normalizeDatabaseStatus(customer && customer.status, customer) !== "klant";
         }
-
+        function hasCompleteWebdesignAssets(customer) { return isValidWebsitePhotoSource(customer && customer.websitePhoto) && isValidWebsitePhotoSource(customer && customer.websiteMockup); } function isLikelyColdmailAddress(value) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizeString(value)); } function isColdmailReadyWebdesignLead(customer) { if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; return hasCompleteWebdesignAssets(customer); } function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar") return (customers || []).filter(isColdmailReadyWebdesignLead).length; return (customers || []).filter(function (customer) { return shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length; }
         function isWebdesignPhotoEligible(customer) {
             return shouldShowWebsitePhoto(customer) && !isValidWebsitePhotoSource(customer && customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
         }
@@ -2355,7 +2355,7 @@
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
-            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + filtered.filter(function (customer) { return showPhotoColumn && shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length.toLocaleString("nl-NL") + ")";
+            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel(filtered); document.getElementById("photoHeaderCount").textContent = "(" + getPhotoHeaderCount(filtered, showPhotoColumn).toLocaleString("nl-NL") + ")";
 
             if (!filtered.length) {
                 nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
@@ -3048,7 +3048,7 @@
                     applyCustomerList(mergeCustomersWithPhotos(enrichedCustomers, {}, state.klanten), !hadBootstrapCustomers);
 
                     try {
-                        const photoMap = await loadCustomerPhotoMap(enrichedCustomers);
+                        const photoMap = await loadCustomerPhotoMap(enrichedCustomers, { force: true });
                         const outreachAutomation = outreachController.applyAutomation(mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten));
                         const sortedCustomers = getSortedCustomers(outreachAutomation.customers); applyCustomerList(sortedCustomers, false); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
                     } catch (error) {
@@ -3066,6 +3066,7 @@
             setStatusMessage("");
         }
 
+        let customerStateRefreshInFlight = false; function isDatabaseInteractionOpen() { return nodes.modalBg.classList.contains("on") || nodes.panel.classList.contains("on") || nodes.photoPreview.classList.contains("on") || (photoBatchController && typeof photoBatchController.isOpen === "function" && photoBatchController.isOpen()) || (databaseDeepSearchController && typeof databaseDeepSearchController.isOpen === "function" && databaseDeepSearchController.isOpen()); } async function refreshCustomerStateSilently() { if (customerStateRefreshInFlight || document.hidden || isDatabaseInteractionOpen()) return false; customerStateRefreshInFlight = true; try { await bootstrapCustomers(); return true; } catch (error) { console.error("Database live verversen mislukt:", error); return false; } finally { customerStateRefreshInFlight = false; } } function startCustomerStateAutoRefresh() { window.setInterval(function () { void refreshCustomerStateSilently(); }, CUSTOMER_DB_SYNC_INTERVAL_MS); window.addEventListener("focus", function () { void refreshCustomerStateSilently(); }); document.addEventListener("visibilitychange", function () { if (!document.hidden) void refreshCustomerStateSilently(); }); }
         const initialBootstrapCustomers = resolveBootstrapCustomers();
         if (initialBootstrapCustomers.length) {
             state.klanten = sortCustomers(outreachController.applyAutomation(initialBootstrapCustomers).customers);
@@ -3185,8 +3186,7 @@
         nodes.generatePhotosButton.addEventListener("click", function () {
             photoBatchController.open();
         });
-        photoBatchController.bind();
-        databaseDeepSearchController.bind();
+        photoBatchController.bind(); databaseDeepSearchController.bind(); startCustomerStateAutoRefresh();
         nodes.addActionsMenu.addEventListener("click", function (event) { const actionButton = event.target.closest(".add-actions-item"); if (!actionButton) return; closeAddActions(); if (actionButton === nodes.manualAddButton) { openModal(); return; } if (actionButton === nodes.deepSearchButton) databaseDeepSearchController.open(); });
         nodes.importFileInput.addEventListener("change", databaseImportController.handleFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
