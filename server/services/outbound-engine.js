@@ -2,12 +2,12 @@
 
 const DEFAULT_OUTBOUND_POLICY = Object.freeze({
   globalDailyLimit: 500,
-  defaultInboxDailyLimit: 20,
-  maxDailyPerInbox: 25,
-  minMinutesBetweenInboxSends: 18,
+  defaultInboxDailyLimit: 9,
+  maxDailyPerInbox: 9,
+  minMinutesBetweenInboxSends: 60,
   weekdaysOnly: true,
   sendWindow: Object.freeze({
-    start: '09:00',
+    start: '07:00',
     end: '17:00',
     timeZone: 'Europe/Amsterdam',
   }),
@@ -60,7 +60,7 @@ function createOutboundDryRunPlan(input = {}) {
         availableSlots: healthCheck.availableSlots,
         warnings: healthCheck.warnings,
         planned: 0,
-        nextAvailableAt: new Date(now.getTime()),
+        nextAvailableAt: new Date(now.getTime() + inboxStaggerMinutes(inbox && inbox.email, policy) * 60 * 1000),
       });
     } else {
       blockedInboxes.push({
@@ -164,6 +164,20 @@ function createOutboundDryRunPlan(input = {}) {
       maxDailyPerInbox: policy.maxDailyPerInbox,
     },
   };
+}
+
+function inboxStaggerMinutes(email, policy) {
+  const base = hashString(normaliseEmail(email)) % Math.max(1, policy.minMinutesBetweenInboxSends);
+  return Math.min(55, Math.max(5, base));
+}
+
+function hashString(value) {
+  let hash = 0;
+  const text = String(value || '');
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
 }
 
 function evaluateInboxReadiness(inbox, domain, health, policy, now) {

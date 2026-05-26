@@ -2,6 +2,7 @@ const {
   buildServerAppFeatureWiringContext,
 } = require('./server-app-runtime-composition-options');
 const { createColdmailCampaignService } = require('./coldmail-campaign');
+const { createInstantlyOutreachService } = require('./instantly-outreach');
 
 function buildServerAppFeatureWiringRuntimeContext({
   app,
@@ -26,6 +27,11 @@ function buildServerAppFeatureWiringRuntimeContext({
   upsertRecentCallUpdate,
   shared,
 }) {
+  const instantlySchedulerEnabled = Boolean(
+    envConfig.INSTANTLY_ENABLED &&
+      !(env && (env.VERCEL || env.AWS_LAMBDA_FUNCTION_NAME || env.LAMBDA_TASK_ROOT))
+  );
+
   return buildServerAppFeatureWiringContext({
     app,
     aiDashboardOptions: {
@@ -220,7 +226,10 @@ function buildServerAppFeatureWiringRuntimeContext({
             mailFromAddress: envConfig.MAIL_FROM_ADDRESS,
             mailFromName: envConfig.MAIL_FROM_NAME,
             mailReplyTo: envConfig.MAIL_REPLY_TO,
+            publicBaseUrl: envConfig.PUBLIC_BASE_URL,
             coldmailAuditBcc: envConfig.COLDMAIL_AUDIT_BCC,
+            coldmailUnsubscribeSecret: envConfig.COLDMAIL_UNSUBSCRIBE_SECRET,
+            coldmailTrackingSecret: envConfig.COLDMAIL_TRACKING_SECRET,
             coldmailReplyForwardEnabled: envConfig.COLDMAIL_REPLY_FORWARD_ENABLED,
             coldmailReplyForwardFrom: envConfig.COLDMAIL_REPLY_FORWARD_FROM,
             coldmailReplyForwardTo: envConfig.COLDMAIL_REPLY_FORWARD_TO,
@@ -233,10 +242,20 @@ function buildServerAppFeatureWiringRuntimeContext({
             imapMailbox: envConfig.MAIL_IMAP_MAILBOX,
             imapExtraMailboxes: envConfig.MAIL_IMAP_EXTRA_MAILBOXES,
             imapPollCooldownMs: envConfig.MAIL_IMAP_POLL_COOLDOWN_MS,
+            coldmailBounceProcessingEnabled: envConfig.COLDMAIL_BOUNCE_PROCESSING_ENABLED,
             coldmailCampaignSendLimit: envConfig.COLDMAIL_CAMPAIGN_SEND_LIMIT,
             coldmailDailySendLimit: envConfig.COLDMAIL_DAILY_SEND_LIMIT,
             coldmailPackageDailySendLimit: envConfig.COLDMAIL_PACKAGE_DAILY_SEND_LIMIT,
+            coldmailSendDelayMs: envConfig.COLDMAIL_SEND_DELAY_MS,
+            coldmailSafetyPauseMs: envConfig.COLDMAIL_SAFETY_PAUSE_MS,
+            coldmailPersonalMailboxDailyLimit: envConfig.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT,
+            coldmailPersonalMailboxSendDelayMs: envConfig.COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS,
             coldmailBlockPersonalMailboxDomains: envConfig.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,
+            coldmailSendWindowStart: envConfig.COLDMAIL_SEND_WINDOW_START,
+            coldmailSendWindowEnd: envConfig.COLDMAIL_SEND_WINDOW_END,
+            coldmailSendWindowTimeZone: envConfig.COLDMAIL_SEND_WINDOW_TIMEZONE,
+            coldmailHourlyPacingEnabled: envConfig.COLDMAIL_HOURLY_PACING_ENABLED,
+            coldmailWeekdaysOnly: envConfig.COLDMAIL_WEEKDAYS_ONLY,
           },
           getOpenAiApiKey: platformRuntime.getOpenAiApiKey,
           fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
@@ -254,6 +273,33 @@ function buildServerAppFeatureWiringRuntimeContext({
           leadDbKey: 'softora_coldcalling_lead_rows_json',
           normalizeString: shared.normalizeString,
           truncateText: shared.truncateText,
+        }),
+        normalizeString: shared.normalizeString,
+        truncateText: shared.truncateText,
+      },
+      instantly: {
+        instantlyOutreachService: createInstantlyOutreachService({
+          instantlyConfig: {
+            enabled: envConfig.INSTANTLY_ENABLED,
+            schedulerEnabled: instantlySchedulerEnabled,
+            apiKey: envConfig.INSTANTLY_API_KEY,
+            apiBaseUrl: envConfig.INSTANTLY_API_BASE_URL,
+            defaultCampaignId: envConfig.INSTANTLY_DEFAULT_CAMPAIGN_ID,
+            webhookSecret: envConfig.INSTANTLY_WEBHOOK_SECRET,
+            intervalMinutes: envConfig.INSTANTLY_SYNC_INTERVAL_MINUTES,
+            batchSize: envConfig.INSTANTLY_SYNC_BATCH_SIZE,
+            dailyCap: envConfig.INSTANTLY_DAILY_CAP,
+            verifyLeadsOnImport: envConfig.INSTANTLY_VERIFY_LEADS_ON_IMPORT,
+            blockPersonalMailboxDomains: envConfig.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,
+          },
+          getUiStateValues: uiSeoRuntime.getUiStateValues,
+          setUiStateValues: uiSeoRuntime.setUiStateValues,
+          fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
+          customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
+          customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
+          normalizeString: shared.normalizeString,
+          truncateText: shared.truncateText,
+          logger: console,
         }),
         normalizeString: shared.normalizeString,
         truncateText: shared.truncateText,

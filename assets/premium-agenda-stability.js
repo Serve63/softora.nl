@@ -330,31 +330,347 @@ window.SoftoraAgendaStability = {
     },
 };
 
+const agendaModalEditBtn = document.getElementById('modalEditBtn');
+const agendaModalDeleteBtn = document.getElementById('modalDeleteBtn');
+const agendaModalFollowUpBtn = document.getElementById('modalFollowUpBtn');
+let agendaModalWorkspaceTarget = 'active_order';
+let manualAppointmentEditId = null;
+
+function isMeetingLegendChoiceForEdit(value) {
+    const choice = normalizeManualLegendChoice(value || '');
+    return choice === 'website' || choice === 'business' || choice === 'voice' || choice === 'chatbot';
+}
+
+function setAgendaTopActionState(hidden, disabled) {
+    [agendaModalEditBtn, agendaModalDeleteBtn].forEach((button) => {
+        if (!button) return;
+        button.hidden = Boolean(hidden);
+        button.disabled = Boolean(disabled || hidden);
+        button.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+    });
+}
+
+function refreshAgendaFollowUpButtonState() {
+    const apt = getActiveAppointment();
+    const linkedOrderId = Number(getLinkedOrderIdForAppointment(apt) || 0) || 0;
+    const isManualOther = isManualOtherAppointment(apt);
+
+    if (agendaModalFollowUpBtn) {
+        const hideFollowUp = !apt || modalWorkspaceMode || isManualOther || linkedOrderId > 0;
+        agendaModalFollowUpBtn.hidden = hideFollowUp;
+        agendaModalFollowUpBtn.disabled = hideFollowUp || workspaceBusy;
+    }
+
+    if (modalWorkspaceMode && agendaModalWorkspaceTarget === 'follow_up' && linkedOrderId <= 0) {
+        modalPrimaryBtn.hidden = false;
+        modalPrimaryBtn.textContent = 'Vervolg opslaan';
+        modalPrimaryBtn.disabled = workspaceBusy;
+        modalNoDealBtn.hidden = true;
+        modalNoDealBtn.disabled = true;
+        if (modalSecondaryBtn) modalSecondaryBtn.textContent = 'Terug';
+    }
+}
+
+function openAgendaFollowUpWorkspace() {
+    const apt = getActiveAppointment();
+    if (!apt || workspaceBusy || getLinkedOrderIdForAppointment(apt)) return;
+    agendaModalWorkspaceTarget = 'follow_up';
+    applyWorkspaceMode(true);
+    window.setTimeout(() => {
+        if (workspaceTranscriptEl) workspaceTranscriptEl.focus();
+    }, 30);
+    refreshWorkspacePrimaryButtonLabel();
+}
+
+async function addOpenLeadForActiveAppointment() {
+    const apt = getActiveAppointment();
+    if (!apt || workspaceBusy) return null;
+
+    const transcriptText = String(workspaceTranscriptEl && workspaceTranscriptEl.value || '').trim();
+    if (transcriptText.length < 10) {
+        setWorkspaceStatus('Vul eerst meetingnotities in (minimaal 10 tekens).', 'error');
+        if (workspaceTranscriptEl) workspaceTranscriptEl.focus();
+        return null;
+    }
+
+    const domainName = resolveWorkspaceDomainNameOrFail();
+    if (domainName === null) return null;
+
+    workspaceBusy = true;
+    refreshWorkspacePrimaryButtonLabel();
+    setWorkspaceStatus('Vervolg opslaan...', '');
+    let shouldCloseModal = false;
+
+    try {
+        const result = await postJsonWithFallback(
+            [
+                `/api/agenda/appointments/${encodeURIComponent(String(apt.id))}/post-call`,
+                `/api/agenda/appointment-post-call?appointmentId=${encodeURIComponent(String(apt.id))}`,
+            ],
+            {
+                status: 'lead_follow_up',
+                transcript: transcriptText,
+                prompt: String(workspaceDraftPrompt || '').trim(),
+                domainName,
+                referenceImages: normalizeReferenceImageList(workspaceReferenceImages),
+                actor: 'premium-personeel-agenda',
+            },
+            { timeoutMs: 20000 }
+        );
+        updateAppointmentPostCallFields(result && result.appointment || {});
+        setWorkspaceStatus('Vervolg staat bij openstaande leads.', 'success');
+        if (window.SoftoraPersonnelTheme && typeof window.SoftoraPersonnelTheme.refreshSidebarCounts === 'function') {
+            window.SoftoraPersonnelTheme.refreshSidebarCounts();
+        }
+        shouldCloseModal = true;
+        return result;
+    } catch (error) {
+        setWorkspaceStatus(`Vervolg opslaan mislukt: ${String(error && error.message || 'onbekende fout')}`, 'error');
+        return null;
+    } finally {
+        workspaceBusy = false;
+        refreshWorkspacePrimaryButtonLabel();
+        if (shouldCloseModal) {
+            applyWorkspaceMode(false);
+            closeModal();
+        }
+    }
+}
+
+function resetManualAppointmentModalChrome() {
+    const title = document.getElementById('manualAppointmentTitle');
+    if (title) title.textContent = 'Afspraak toevoegen';
+    if (manualAppointmentSubmitBtn) {
+        manualAppointmentSubmitBtn.textContent = manualAppointmentStep === 'details' ? 'Toevoegen' : 'Volgende';
+    }
+}
+
+function openManualAppointmentEditModal(apt) {
+    if (!apt || !manualAppointmentOverlay || manualAppointmentSaving) return;
+    const appointmentId = Number(apt.id || 0);
+    if (!Number.isFinite(appointmentId) || appointmentId <= 0) return;
+
+    manualAppointmentEditId = appointmentId;
+    manualAppointmentSelectedDate = normalizeManualAgendaDate(apt.date || '');
+    const title = document.getElementById('manualAppointmentTitle');
+    if (title) title.textContent = 'Afspraak wijzigen';
+    if (manualAppointmentDateLine) {
+        manualAppointmentDateLine.textContent = formatAgendaDateLongNl(manualAppointmentSelectedDate);
+    }
+
+    const legendChoice = normalizeManualLegendChoice(apt.manualLegendChoice || apt.legendChoice || '');
+    const isMeeting = isMeetingLegendChoiceForEdit(legendChoice);
+    manualAppointmentKind = isMeeting ? 'meeting' : 'overig';
+    manualAppointmentMeetingType = isMeeting ? legendChoice : '';
+    manualAppointmentWho = isMeeting
+        ? String(apt.manualLeadOwnerKey || apt.leadOwnerKey || '').trim().toLowerCase()
+        : String(apt.manualPlannerWho || apt.manualWho || 'both').trim().toLowerCase();
+    if (isMeeting && manualAppointmentWho !== 'serve' && manualAppointmentWho !== 'martijn') {
+        manualAppointmentWho = '';
+    }
+    if (!isMeeting && !manualAppointmentWho) manualAppointmentWho = 'both';
+
+    if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = String(apt.company || apt.title || apt.activity || '').trim();
+    if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = String(apt.time || apt.manualActivityTime || '').trim();
+    if (manualAppointmentActivityTimeEl) manualAppointmentActivityTimeEl.value = String(apt.manualActivityTime || apt.time || '').trim();
+    if (manualAppointmentLegendChoiceEl) manualAppointmentLegendChoiceEl.value = legendChoice;
+    if (manualAppointmentLocationEl) {
+        manualAppointmentLocationEl.value = String(apt.location || apt.appointmentLocation || '').trim();
+    }
+    if (manualAppointmentNotesEl) manualAppointmentNotesEl.value = String(apt.manualNotes || '').trim();
+
+    setManualAppointmentStep('details');
+    if (manualAppointmentSubmitBtn) manualAppointmentSubmitBtn.textContent = 'Opslaan';
+    setManualAppointmentStatus('');
+    manualAppointmentOverlay.classList.add('show');
+    manualAppointmentOverlay.setAttribute('aria-hidden', 'false');
+    focusManualAppointmentStep();
+}
+
+async function submitManualAppointmentEdit() {
+    const editId = Number(manualAppointmentEditId || 0);
+    if (!editId || manualAppointmentSaving) return;
+
+    const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : '';
+    const legendChoice = getManualAppointmentLegendChoice();
+    const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
+    const location = manualAppointmentLocationEl ? String(manualAppointmentLocationEl.value || '').trim() : '';
+    const notes = manualAppointmentNotesEl ? String(manualAppointmentNotesEl.value || '').trim() : '';
+    const isMeeting = manualAppointmentKind === 'meeting';
+    const who = isMeeting ? 'both' : String(manualAppointmentWho || '').trim();
+    const leadOwnerKey = isMeeting && (manualAppointmentWho === 'serve' || manualAppointmentWho === 'martijn') ? manualAppointmentWho : '';
+
+    if (!manualAppointmentSelectedDate) {
+        setManualAppointmentStatus('Afspraakdatum ontbreekt.', 'error');
+        return;
+    }
+    if (manualAppointmentKind !== 'meeting' && manualAppointmentKind !== 'overig') {
+        setManualAppointmentStatus('Kies eerst wat je wilt wijzigen.', 'error');
+        return;
+    }
+    if (!legendChoice) {
+        setManualAppointmentStatus('Kies welke meeting je wilt inplannen.', 'error');
+        return;
+    }
+    if (isMeeting && !leadOwnerKey) {
+        setManualAppointmentStatus('Kies wie deze lead heeft geregeld.', 'error');
+        return;
+    }
+    if (!isMeeting && who !== 'serve' && who !== 'martijn' && who !== 'both') {
+        setManualAppointmentStatus('Kies voor wie deze afspraak is.', 'error');
+        return;
+    }
+    if (!activity) {
+        setManualAppointmentStatus('Vul een titel in.', 'error');
+        return;
+    }
+    if (!timeVal || parseManualTimeToMinutes(timeVal) === null) {
+        setManualAppointmentStatus('Vul een geldig tijdstip in.', 'error');
+        return;
+    }
+    if (!location) {
+        setManualAppointmentStatus('Vul een locatie in.', 'error');
+        return;
+    }
+
+    manualAppointmentSaving = true;
+    if (manualAppointmentSubmitBtn) manualAppointmentSubmitBtn.disabled = true;
+    setManualAppointmentStatus('Opslaan...', '');
+
+    try {
+        const result = await postJsonWithFallback(
+            `/api/agenda/appointments/${encodeURIComponent(String(editId))}/manual`,
+            {
+                date: manualAppointmentSelectedDate,
+                who,
+                title: activity,
+                time: timeVal,
+                activityTime: timeVal,
+                legendChoice,
+                appointmentKind: manualAppointmentKind,
+                manualLeadOwner: leadOwnerKey,
+                leadOwnerKey,
+                activity,
+                location,
+                notes,
+                actor: 'premium-personeel-agenda',
+            },
+            { timeoutMs: 12000 }
+        );
+        const updated = result && result.appointment;
+        if (updated && mergeServerAppointments([updated])) {
+            renderCalendar();
+        }
+        await loadServerAppointments({ fresh: true, timeoutMs: 8000 });
+        renderCalendar();
+        closeManualAppointmentModal(true);
+        if (modalElement && modalElement.classList.contains('show')) {
+            await openAppointment(editId);
+        }
+    } catch (error) {
+        setManualAppointmentStatus(String(error && error.message || 'Opslaan mislukt.'), 'error');
+    } finally {
+        manualAppointmentSaving = false;
+        if (manualAppointmentSubmitBtn) manualAppointmentSubmitBtn.disabled = false;
+    }
+}
+
+async function deleteActiveAgendaAppointment() {
+    const apt = getActiveAppointment();
+    if (!apt || workspaceBusy) return;
+
+    const company = String(apt.company || 'deze afspraak').trim();
+    const confirmed = window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
+        ? await window.SoftoraDialogs.confirm(`Weet je zeker dat je ${company} wilt verwijderen?`, {
+            title: 'Afspraak verwijderen',
+            confirmText: 'Verwijderen',
+            cancelText: 'Annuleren',
+        })
+        : window.confirm(`Weet je zeker dat je ${company} wilt verwijderen?`);
+    if (!confirmed) return;
+
+    workspaceBusy = true;
+    refreshWorkspacePrimaryButtonLabel();
+    let deleted = false;
+
+    try {
+        await postJsonWithFallback(
+            `/api/agenda/appointments/${encodeURIComponent(String(apt.id))}/delete`,
+            { actor: 'premium-personeel-agenda' },
+            { timeoutMs: 12000 }
+        );
+        const idx = appointments.findIndex((item) => Number(item.id) === Number(apt.id));
+        if (idx >= 0) appointments.splice(idx, 1);
+        deleted = true;
+        activeAppointmentId = null;
+        renderCalendar();
+        if (window.SoftoraPersonnelTheme && typeof window.SoftoraPersonnelTheme.refreshSidebarCounts === 'function') {
+            window.SoftoraPersonnelTheme.refreshSidebarCounts();
+        }
+    } catch (error) {
+        if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
+            await window.SoftoraDialogs.alert(
+                `Verwijderen mislukt: ${String(error && error.message || 'onbekende fout')}`,
+                { title: 'Agenda', confirmText: 'Sluiten' }
+            );
+        }
+    } finally {
+        workspaceBusy = false;
+        refreshWorkspacePrimaryButtonLabel();
+        if (deleted) closeModal();
+    }
+}
+
 const baseSyncWorkspaceExitControls = syncWorkspaceExitControls;
 syncWorkspaceExitControls = function syncWorkspaceExitControlsStable() {
     baseSyncWorkspaceExitControls();
-    if (!modalSecondaryBtn) return;
     const hideFooterClose = !modalWorkspaceMode;
     const hideDismiss = shouldHideWorkspaceDismissControls();
     const locked = isWorkspaceExitLocked();
-    modalSecondaryBtn.hidden = hideFooterClose || hideDismiss;
-    modalSecondaryBtn.disabled = locked || hideFooterClose || hideDismiss;
+    if (modalSecondaryBtn) {
+        modalSecondaryBtn.hidden = hideFooterClose || hideDismiss;
+        modalSecondaryBtn.disabled = locked || hideFooterClose || hideDismiss;
+    }
+    setAgendaTopActionState(modalWorkspaceMode || hideDismiss || locked, locked);
 };
 
 const baseOpenManualAppointmentModal = openManualAppointmentModal;
 openManualAppointmentModal = function openManualAppointmentModalStable(dateYmd) {
+    manualAppointmentEditId = null;
+    resetManualAppointmentModalChrome();
     return baseOpenManualAppointmentModal(dateYmd);
+};
+
+const baseCloseManualAppointmentModal = closeManualAppointmentModal;
+closeManualAppointmentModal = function closeManualAppointmentModalStable(forceClose = false) {
+    const result = baseCloseManualAppointmentModal(forceClose);
+    if (!manualAppointmentOverlay || !manualAppointmentOverlay.classList.contains('show')) {
+        manualAppointmentEditId = null;
+        resetManualAppointmentModalChrome();
+    }
+    return result;
+};
+
+const baseSetManualAppointmentStep = setManualAppointmentStep;
+setManualAppointmentStep = function setManualAppointmentStepStable(step) {
+    baseSetManualAppointmentStep(step);
+    if (manualAppointmentEditId && manualAppointmentSubmitBtn && manualAppointmentStep === 'details') {
+        manualAppointmentSubmitBtn.textContent = 'Opslaan';
+    }
 };
 
 const baseSubmitManualAppointment = submitManualAppointment;
 submitManualAppointment = async function submitManualAppointmentStable() {
+    if (manualAppointmentEditId) return submitManualAppointmentEdit();
     return baseSubmitManualAppointment();
 };
 
 const baseApplyWorkspaceMode = applyWorkspaceMode;
 applyWorkspaceMode = function applyWorkspaceModeStable(enabled) {
     baseApplyWorkspaceMode(enabled);
+    if (!enabled) agendaModalWorkspaceTarget = 'active_order';
     setModalAudioBlockHidden(modalWorkspaceMode || isManualAgendaAppointment(getActiveAppointment()));
+    refreshAgendaFollowUpButtonState();
 };
 
 const baseSyncAppointmentAudio = syncAppointmentAudio;
@@ -377,6 +693,7 @@ refreshWorkspacePrimaryButtonLabel = function refreshWorkspacePrimaryButtonLabel
         modalNoDealBtn.disabled = true;
         if (modalSecondaryBtn) modalSecondaryBtn.textContent = 'Sluiten';
     }
+    refreshAgendaFollowUpButtonState();
     syncWorkspaceExitControls();
 };
 
@@ -414,8 +731,28 @@ handleModalPrimaryAction = function handleModalPrimaryActionStable() {
         void markActiveManualActivityCompleted();
         return;
     }
+    if (!modalWorkspaceMode) {
+        agendaModalWorkspaceTarget = 'active_order';
+    }
+    if (modalWorkspaceMode && agendaModalWorkspaceTarget === 'follow_up') {
+        void addOpenLeadForActiveAppointment();
+        return;
+    }
     return baseHandleModalPrimaryAction();
 };
 
+if (agendaModalEditBtn) {
+    agendaModalEditBtn.addEventListener('click', () => {
+        if (workspaceBusy || modalWorkspaceMode) return;
+        openManualAppointmentEditModal(getActiveAppointment());
+    });
+}
+if (agendaModalDeleteBtn) {
+    agendaModalDeleteBtn.addEventListener('click', () => { void deleteActiveAgendaAppointment(); });
+}
+if (agendaModalFollowUpBtn) {
+    agendaModalFollowUpBtn.addEventListener('click', openAgendaFollowUpWorkspace);
+}
 if (modalSecondaryBtn) modalSecondaryBtn.hidden = true;
 ensureAgendaAudioUploadControl();
+refreshAgendaFollowUpButtonState();

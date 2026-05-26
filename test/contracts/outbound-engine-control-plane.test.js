@@ -126,10 +126,10 @@ test('ramp forecast shows how many inboxes are needed for the 500/day target', (
     maxDailyPerInbox: 25,
   });
 
-  assert.equal(forecast.requiredInboxes, 20);
-  assert.equal(forecast.missingInboxes, 8);
-  assert.equal(forecast.currentDailyCapacity, 300);
-  assert.equal(forecast.phases.find((phase) => phase.label === 'Week 6-8').estimatedDailyVolume, 240);
+  assert.equal(forecast.requiredInboxes, 56);
+  assert.equal(forecast.missingInboxes, 44);
+  assert.equal(forecast.currentDailyCapacity, 108);
+  assert.equal(forecast.phases.find((phase) => phase.label === 'Week 6-8').estimatedDailyVolume, 108);
 });
 
 test('suppression summary counts only active entries by reason', () => {

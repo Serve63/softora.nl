@@ -37,6 +37,7 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
     MAIL_SMTP_USER: 'team@softora.nl',
     MAIL_SMTP_PASS: 'secret',
     COLDMAIL_AUDIT_BCC: ' prive@example.nl ',
+    COLDMAIL_UNSUBSCRIBE_SECRET: 'unsubscribe-secret',
   });
 
   assert.equal(runtimeEnv.mail.smtpHost, 'smtp.strato.com');
@@ -47,15 +48,61 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.imapSecure, true);
   assert.equal(runtimeEnv.mail.imapUser, 'team@softora.nl');
   assert.equal(runtimeEnv.mail.imapPass, 'secret');
-  assert.equal(runtimeEnv.mail.coldmailCampaignSendLimit, 30);
-  assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 50);
+  assert.equal(runtimeEnv.mail.coldmailCampaignSendLimit, 9);
+  assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 9);
   assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 100);
-  assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, false);
+  assert.equal(runtimeEnv.mail.coldmailSendDelayMs, 90_000);
+  assert.equal(runtimeEnv.mail.coldmailSafetyPauseMs, 6 * 60 * 60 * 1000);
+  assert.equal(runtimeEnv.mail.coldmailPersonalMailboxDailyLimit, 9);
+  assert.equal(runtimeEnv.mail.coldmailPersonalMailboxSendDelayMs, 180_000);
+  assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, true);
+  assert.equal(runtimeEnv.mail.coldmailSendWindowStart, '07:00');
+  assert.equal(runtimeEnv.mail.coldmailSendWindowEnd, '17:00');
+  assert.equal(runtimeEnv.mail.coldmailSendWindowTimeZone, 'Europe/Amsterdam');
+  assert.equal(runtimeEnv.mail.coldmailHourlyPacingEnabled, true);
+  assert.equal(runtimeEnv.mail.coldmailWeekdaysOnly, true);
+  assert.equal(runtimeEnv.mail.coldmailBounceProcessingEnabled, true);
   assert.equal(runtimeEnv.mail.coldmailAuditBcc, 'prive@example.nl');
-  assert.equal(runtimeEnv.mail.coldmailReplyForwardEnabled, true);
-  assert.equal(runtimeEnv.mail.coldmailReplyForwardFrom, 'serve@softora.nl');
-  assert.equal(runtimeEnv.mail.coldmailReplyForwardTo, 'servec321@gmail.com');
-  assert.equal(runtimeEnv.mail.coldmailReplySyncEmail, 'serve@softora.nl');
+  assert.equal(runtimeEnv.mail.coldmailUnsubscribeSecret, 'unsubscribe-secret');
+  assert.equal(runtimeEnv.mail.coldmailTrackingSecret, 'unsubscribe-secret');
+  assert.equal(runtimeEnv.mail.coldmailReplyForwardEnabled, false);
+  assert.equal(runtimeEnv.mail.coldmailReplyForwardFrom, '');
+  assert.equal(runtimeEnv.mail.coldmailReplyForwardTo, '');
+  assert.equal(runtimeEnv.mail.coldmailReplySyncEmail, 'team@softora.nl');
+});
+
+test('loadRuntimeEnv supports a separate coldmail tracking secret', () => {
+  const runtimeEnv = loadRuntimeEnv({
+    COLDMAIL_UNSUBSCRIBE_SECRET: 'unsubscribe-secret',
+    COLDMAIL_TRACKING_SECRET: 'tracking-secret',
+  });
+
+  assert.equal(runtimeEnv.mail.coldmailUnsubscribeSecret, 'unsubscribe-secret');
+  assert.equal(runtimeEnv.mail.coldmailTrackingSecret, 'tracking-secret');
+});
+
+test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
+  const runtimeEnv = loadRuntimeEnv({
+    INSTANTLY_ENABLED: 'true',
+    INSTANTLY_API_KEY: ' instantly-key ',
+    INSTANTLY_API_BASE_URL: ' https://api.instantly.test/api/v2 ',
+    INSTANTLY_DEFAULT_CAMPAIGN_ID: ' campaign-1 ',
+    INSTANTLY_WEBHOOK_SECRET: ' webhook-secret ',
+    INSTANTLY_SYNC_INTERVAL_MINUTES: '30',
+    INSTANTLY_SYNC_BATCH_SIZE: '25',
+    INSTANTLY_DAILY_CAP: '75',
+    INSTANTLY_VERIFY_LEADS_ON_IMPORT: 'true',
+  });
+
+  assert.equal(runtimeEnv.instantly.enabled, true);
+  assert.equal(runtimeEnv.instantly.apiKey, 'instantly-key');
+  assert.equal(runtimeEnv.instantly.apiBaseUrl, 'https://api.instantly.test/api/v2');
+  assert.equal(runtimeEnv.instantly.defaultCampaignId, 'campaign-1');
+  assert.equal(runtimeEnv.instantly.webhookSecret, 'webhook-secret');
+  assert.equal(runtimeEnv.instantly.syncIntervalMinutes, 30);
+  assert.equal(runtimeEnv.instantly.syncBatchSize, 25);
+  assert.equal(runtimeEnv.instantly.dailyCap, 75);
+  assert.equal(runtimeEnv.instantly.verifyLeadsOnImport, true);
 });
 
 test('loadRuntimeEnv supports private coldmail reply forward overrides', () => {
@@ -126,13 +173,31 @@ test('loadRuntimeEnv clamps coldmail safety limits for Strato-safe sending', () 
     COLDMAIL_CAMPAIGN_SEND_LIMIT: '500',
     COLDMAIL_DAILY_SEND_LIMIT: '250',
     COLDMAIL_PACKAGE_DAILY_SEND_LIMIT: '1000',
-    COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS: 'true',
+    COLDMAIL_SEND_DELAY_MS: '900000',
+    COLDMAIL_SAFETY_PAUSE_MS: '999999999',
+    COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT: '250',
+    COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS: '900000',
+    COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS: 'false',
+    COLDMAIL_BOUNCE_PROCESSING_ENABLED: 'false',
+    COLDMAIL_SEND_WINDOW_START: '07-00',
+    COLDMAIL_SEND_WINDOW_END: '17-00',
+    COLDMAIL_HOURLY_PACING_ENABLED: 'false',
+    COLDMAIL_WEEKDAYS_ONLY: 'false',
   });
 
-  assert.equal(runtimeEnv.mail.coldmailCampaignSendLimit, 50);
-  assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 50);
+  assert.equal(runtimeEnv.mail.coldmailCampaignSendLimit, 9);
+  assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 9);
   assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 100);
-  assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, true);
+  assert.equal(runtimeEnv.mail.coldmailSendDelayMs, 300_000);
+  assert.equal(runtimeEnv.mail.coldmailSafetyPauseMs, 24 * 60 * 60 * 1000);
+  assert.equal(runtimeEnv.mail.coldmailPersonalMailboxDailyLimit, 9);
+  assert.equal(runtimeEnv.mail.coldmailPersonalMailboxSendDelayMs, 300_000);
+  assert.equal(runtimeEnv.mail.coldmailBlockPersonalMailboxDomains, false);
+  assert.equal(runtimeEnv.mail.coldmailBounceProcessingEnabled, false);
+  assert.equal(runtimeEnv.mail.coldmailSendWindowStart, '07:00');
+  assert.equal(runtimeEnv.mail.coldmailSendWindowEnd, '17:00');
+  assert.equal(runtimeEnv.mail.coldmailHourlyPacingEnabled, false);
+  assert.equal(runtimeEnv.mail.coldmailWeekdaysOnly, false);
 });
 
 test('loadRuntimeEnv disables Anthropic defaults', () => {

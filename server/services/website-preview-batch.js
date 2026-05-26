@@ -20,6 +20,15 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     return `${email}::${uid}`;
   }
 
+  function hasAdminTeamAccess(req) {
+    return Boolean(req?.premiumAuth?.authenticated && req?.premiumAuth?.isAdmin);
+  }
+
+  function canAccessJob(req, job) {
+    if (!job) return false;
+    return hasAdminTeamAccess(req) || ownerKeyFromReq(req) === job.ownerKey;
+  }
+
   function ownerStubFromReq(req) {
     const pa = req?.premiumAuth;
     if (!pa || typeof pa !== 'object') return null;
@@ -102,10 +111,10 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     };
   }
 
-  function findLatestJobForOwner(ownerKey, statusSet) {
+  function findLatestJobForOwner(ownerKey, statusSet, options = {}) {
     let latest = null;
     for (const job of jobs.values()) {
-      if (job.ownerKey !== ownerKey) continue;
+      if (!options.adminTeamAccess && job.ownerKey !== ownerKey) continue;
       if (statusSet && statusSet.size && !statusSet.has(job.status)) continue;
       if (!latest || job.createdAt > latest.createdAt) {
         latest = job;
@@ -317,7 +326,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       });
     }
 
-    if (ownerKeyFromReq(req) !== job.ownerKey) {
+    if (!canAccessJob(req, job)) {
       return res.status(403).json({
         ok: false,
         error: 'Geen toegang',
@@ -337,7 +346,9 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
 
   async function getCurrentBatchResponse(req, res) {
     pruneJobs();
-    const job = findLatestJobForOwner(ownerKeyFromReq(req));
+    const job = findLatestJobForOwner(ownerKeyFromReq(req), null, {
+      adminTeamAccess: hasAdminTeamAccess(req),
+    });
     if (job && !job.processing) {
       queueJobProcessing(job.id);
     }

@@ -13,6 +13,7 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
   const openAiCostRoutes = readRepoFile('server/routes/openai-costs.js');
   const coldcallingRoutes = readRepoFile('server/routes/coldcalling.js');
   const coldmailingRoutes = readRepoFile('server/routes/coldmailing.js');
+  const instantlyRoutes = readRepoFile('server/routes/instantly.js');
 
   assert.match(featureRoutes, /requirePremiumAdminApiAccess: premiumRouteRuntime\?\.requirePremiumAdminApiAccess/);
   assert.match(mailboxRoutes, /app\.get\('\/api\/mailbox\/accounts', requireAdmin,/);
@@ -20,7 +21,12 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
   assert.match(mailboxRoutes, /app\.post\('\/api\/mailbox\/send', requireAdmin,/);
   assert.match(openAiCostRoutes, /app\.get\('\/api\/openai\/cost-summary', requireAdmin,/);
   assert.match(openAiCostRoutes, /app\.get\('\/api\/api-cost-summary', requireAdmin,/);
+  assert.match(coldmailingRoutes, /app\.post\('\/api\/coldmailing\/campaigns\/send', requirePremiumAdminApiAccess,/);
+  assert.match(coldmailingRoutes, /app\.post\('\/api\/coldmailing\/replies\/sync', requirePremiumAdminApiAccess,/);
   assert.match(coldmailingRoutes, /app\.post\('\/api\/coldmailing\/outreach\/status', requirePremiumAdminApiAccess,/);
+  assert.match(instantlyRoutes, /app\.post\('\/api\/instantly\/sync', requirePremiumAdminApiAccess,/);
+  assert.match(instantlyRoutes, /app\.get\('\/api\/instantly\/status', requirePremiumAdminApiAccess,/);
+  assert.match(instantlyRoutes, /app\.post\('\/api\/instantly\/webhook', async \(req, res\)/);
   assert.match(coldcallingRoutes, /app\.get\('\/api\/coldcalling\/recording-proxy', requireAdmin,/);
   assert.match(coldcallingRoutes, /app\.get\('\/api\/coldcalling\/cost-summary', requireAdmin,/);
 });

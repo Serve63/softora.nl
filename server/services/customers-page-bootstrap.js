@@ -65,11 +65,20 @@ function createCustomersPageBootstrapService(deps = {}) {
       .trim();
     if (normalized.includes('martijn')) return 'Martijn';
     if (normalized.includes('serve')) return 'Serve';
+    if (
+      normalized.includes('team') ||
+      normalized.includes('softora') ||
+      normalized.includes('algemeen') ||
+      normalized.includes('beide') ||
+      normalized.includes('allebei')
+    ) {
+      return 'Team';
+    }
     return '';
   }
 
   function normalizeResponsibleValue(value) {
-    return parseResponsibleValue(value) || 'Serve';
+    return parseResponsibleValue(value) || 'Team';
   }
 
   function setExplicitResponsibleMetadata(target, value) {

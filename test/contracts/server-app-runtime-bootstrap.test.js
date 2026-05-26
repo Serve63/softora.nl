@@ -80,6 +80,8 @@ test('server app runtime bootstrap flattens env config without changing values',
       fromName: 'Softora',
       replyTo: 'reply@test.invalid',
       coldmailAuditBcc: 'audit@test.invalid',
+      coldmailUnsubscribeSecret: 'unsubscribe-secret',
+      coldmailTrackingSecret: 'tracking-secret',
       coldmailReplyForwardEnabled: true,
       coldmailReplyForwardFrom: 'serve@softora.test',
       coldmailReplyForwardTo: 'private@test.invalid',
@@ -92,6 +94,31 @@ test('server app runtime bootstrap flattens env config without changing values',
       imapMailbox: 'INBOX',
       imapExtraMailboxes: ['Sent'],
       imapPollCooldownMs: 1000,
+      coldmailBounceProcessingEnabled: true,
+      coldmailCampaignSendLimit: 9,
+      coldmailDailySendLimit: 9,
+      coldmailPackageDailySendLimit: 100,
+      coldmailSendDelayMs: 90000,
+      coldmailSafetyPauseMs: 21600000,
+      coldmailPersonalMailboxDailyLimit: 9,
+      coldmailPersonalMailboxSendDelayMs: 180000,
+      coldmailBlockPersonalMailboxDomains: false,
+      coldmailSendWindowStart: '07:00',
+      coldmailSendWindowEnd: '17:00',
+      coldmailSendWindowTimeZone: 'Europe/Amsterdam',
+      coldmailHourlyPacingEnabled: true,
+      coldmailWeekdaysOnly: true,
+    },
+    instantly: {
+      enabled: true,
+      apiKey: 'instantly-key',
+      apiBaseUrl: 'https://api.instantly.test/api/v2',
+      defaultCampaignId: 'campaign-1',
+      webhookSecret: 'webhook-secret',
+      syncIntervalMinutes: 30,
+      syncBatchSize: 20,
+      dailyCap: 50,
+      verifyLeadsOnImport: true,
     },
     securityContactEmail: 'security@test.invalid',
     demoConfirmationTaskEnabled: true,
@@ -106,10 +133,30 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.AGENDA_APP_MARTIJN_EMAIL, 'martijn@softora.test');
   assert.equal(envConfig.AGENDA_APP_SESSION_TTL_DAYS, 3650);
   assert.equal(envConfig.COLDMAIL_AUDIT_BCC, 'audit@test.invalid');
+  assert.equal(envConfig.COLDMAIL_UNSUBSCRIBE_SECRET, 'unsubscribe-secret');
+  assert.equal(envConfig.COLDMAIL_TRACKING_SECRET, 'tracking-secret');
   assert.equal(envConfig.COLDMAIL_REPLY_FORWARD_ENABLED, true);
   assert.equal(envConfig.COLDMAIL_REPLY_FORWARD_FROM, 'serve@softora.test');
   assert.equal(envConfig.COLDMAIL_REPLY_FORWARD_TO, 'private@test.invalid');
   assert.equal(envConfig.COLDMAIL_REPLY_SYNC_EMAIL, 'serve@softora.test');
+  assert.equal(envConfig.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT, 9);
+  assert.equal(envConfig.COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS, 180000);
+  assert.equal(envConfig.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS, false);
+  assert.equal(envConfig.COLDMAIL_BOUNCE_PROCESSING_ENABLED, true);
+  assert.equal(envConfig.COLDMAIL_SEND_WINDOW_START, '07:00');
+  assert.equal(envConfig.COLDMAIL_SEND_WINDOW_END, '17:00');
+  assert.equal(envConfig.COLDMAIL_SEND_WINDOW_TIMEZONE, 'Europe/Amsterdam');
+  assert.equal(envConfig.COLDMAIL_HOURLY_PACING_ENABLED, true);
+  assert.equal(envConfig.COLDMAIL_WEEKDAYS_ONLY, true);
+  assert.equal(envConfig.INSTANTLY_ENABLED, true);
+  assert.equal(envConfig.INSTANTLY_API_KEY, 'instantly-key');
+  assert.equal(envConfig.INSTANTLY_API_BASE_URL, 'https://api.instantly.test/api/v2');
+  assert.equal(envConfig.INSTANTLY_DEFAULT_CAMPAIGN_ID, 'campaign-1');
+  assert.equal(envConfig.INSTANTLY_WEBHOOK_SECRET, 'webhook-secret');
+  assert.equal(envConfig.INSTANTLY_SYNC_INTERVAL_MINUTES, 30);
+  assert.equal(envConfig.INSTANTLY_SYNC_BATCH_SIZE, 20);
+  assert.equal(envConfig.INSTANTLY_DAILY_CAP, 50);
+  assert.equal(envConfig.INSTANTLY_VERIFY_LEADS_ON_IMPORT, true);
   assert.equal(envConfig.MAIL_IMAP_MAILBOX, 'INBOX');
   assert.equal(envConfig.SECURITY_CONTACT_EMAIL, 'security@test.invalid');
 });

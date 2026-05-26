@@ -52,7 +52,7 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   );
   assert.equal(payload.customers[0].service, 'website');
   assert.equal(payload.customers[0].review, 'Nee');
-  assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
+  assert.equal(payload.customers[0].verantwoordelijk, 'Team');
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
 
   const replacements = service.buildDashboardHtmlReplacements(payload);
@@ -185,7 +185,7 @@ test('customers page bootstrap falls back to deriving customers from active orde
   assert.equal(payload.customers[0].service, 'website');
   assert.equal(payload.customers[0].review, 'Nee');
   assert.equal(payload.customers[0].status, 'Betaald');
-  assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
+  assert.equal(payload.customers[0].verantwoordelijk, 'Team');
 });
 
 test('customers page bootstrap prefers explicit order customer identity fields when available', async () => {
@@ -233,7 +233,7 @@ test('customers page bootstrap prefers explicit order customer identity fields w
   assert.equal(payload.customers[0].naam, 'Servé Creusen');
   assert.equal(payload.customers[0].bedrijf, 'Softora B.V.');
   assert.equal(payload.customers[0].telefoon, '+31 6 12 34 56 78');
-  assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
+  assert.equal(payload.customers[0].verantwoordelijk, 'Team');
 });
 
 test('customers page bootstrap derives verantwoordelijke from active order claim owner', async () => {

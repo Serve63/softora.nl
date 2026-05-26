@@ -139,9 +139,23 @@ function createGoogleCalendarSyncService(deps = {}) {
 
   function resolveOwner(value) {
     const raw = normalizeString(value).toLowerCase();
-    if (raw === 'martijn') return 'martijn';
-    if (raw === 'serve' || raw === 'servé') return 'serve';
-    return 'serve';
+    if (raw === 'martijn' || raw.includes('martijn')) return 'martijn';
+    if (raw === 'serve' || raw === 'servé' || raw.includes('serve') || raw.includes('servé')) return 'serve';
+    return '';
+  }
+
+  function resolveAppointmentOwner(appointment) {
+    return resolveOwner(
+      appointment.manualPlannerWho ||
+        appointment.googleCalendarOwner ||
+        appointment.manualLeadOwner ||
+        appointment.manualLeadOwnerKey ||
+        appointment.leadOwnerKey ||
+        appointment.leadOwnerName ||
+        appointment.leadOwnerFullName ||
+        appointment.leadOwnerEmail ||
+        ''
+    );
   }
 
   function mapGoogleEventToAppointment(event, owner, calendarId) {
@@ -267,14 +281,25 @@ function createGoogleCalendarSyncService(deps = {}) {
 
   async function createGoogleCalendarEventForAppointment(appointment) {
     if (!isConfigured()) return { ok: true, skipped: true, reason: 'google_calendar_not_configured' };
-    const rawOwner = normalizeString(appointment.manualPlannerWho || appointment.googleCalendarOwner || '').toLowerCase();
+    const rawOwner = normalizeString(
+      appointment.manualPlannerWho ||
+        appointment.googleCalendarOwner ||
+        appointment.manualLeadOwner ||
+        appointment.manualLeadOwnerKey ||
+        appointment.leadOwnerKey ||
+        appointment.leadOwnerName ||
+        appointment.leadOwnerFullName ||
+        appointment.leadOwnerEmail ||
+        ''
+    ).toLowerCase();
     if (rawOwner === 'overig' || rawOwner === 'other') {
       return { ok: true, skipped: true, reason: 'calendar_not_required_for_other', owner: 'overig' };
     }
     if (rawOwner === 'both' || rawOwner === 'allebei' || rawOwner === 'beide' || rawOwner === 'serve-martijn') {
       return { ok: true, skipped: true, reason: 'calendar_owner_is_both', owner: 'both' };
     }
-    const owner = resolveOwner(appointment.manualPlannerWho || appointment.googleCalendarOwner || '');
+    const owner = resolveAppointmentOwner(appointment);
+    if (!owner) return { ok: true, skipped: true, reason: 'calendar_owner_missing', owner: '' };
     const calendarId = calendarByOwner[owner];
     if (!calendarId) return { ok: false, skipped: true, reason: 'calendar_missing_for_owner', owner };
     if (normalizeString(appointment.googleCalendarEventId || '')) {

@@ -15,9 +15,11 @@ test('premium customers core normalizes shared customer fields', () => {
 test('premium customers core keeps responsible owner labels stable', () => {
   assert.equal(customersCore.parseResponsibleValue('Serv\u00e9 Creusen'), 'Serve');
   assert.equal(customersCore.parseResponsibleValue('Martijn'), 'Martijn');
-  assert.equal(customersCore.normalizeResponsibleValue(''), 'Serve');
+  assert.equal(customersCore.parseResponsibleValue('Softora team'), 'Team');
+  assert.equal(customersCore.normalizeResponsibleValue(''), 'Team');
   assert.equal(customersCore.formatResponsibleDisplayName('serve'), 'Serv\u00e9');
   assert.equal(customersCore.formatResponsibleDisplayName('martijn'), 'Martijn');
+  assert.equal(customersCore.formatResponsibleDisplayName(''), 'Team');
   assert.equal(
     customersCore.getResponsibleSourceValue({ leadOwnerFullName: 'Martijn' }),
     'Martijn'

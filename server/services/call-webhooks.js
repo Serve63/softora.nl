@@ -59,6 +59,18 @@ function createCallWebhookRuntime(deps = {}) {
     return false;
   }
 
+  function readBooleanEnvFlag(name) {
+    return /^(1|true|yes|on)$/i.test(normalizeString(env[name]));
+  }
+
+  function isProductionRuntime() {
+    return /^(production|prod)$/i.test(normalizeString(env.NODE_ENV));
+  }
+
+  function isUnsignedRetellWebhookAllowed() {
+    return !isProductionRuntime() && readBooleanEnvFlag('SOFTORA_ALLOW_UNSIGNED_RETELL_WEBHOOKS');
+  }
+
   function parseRetellSignatureHeader(signatureHeader) {
     const raw = normalizeString(signatureHeader);
     if (!raw) return null;
@@ -109,7 +121,7 @@ function createCallWebhookRuntime(deps = {}) {
     if (hasRetellSignature) {
       return signatureAuthorized;
     }
-    return true;
+    return isUnsignedRetellWebhookAllowed();
   }
 
   function buildTwilioAllowedCallerSet() {
@@ -492,6 +504,7 @@ ${streamParameterXml}
     isTwilioSignatureValid,
     isTwilioWebhookAuthorized,
     isWebhookAuthorized,
+    isUnsignedRetellWebhookAllowed,
     mapTwilioInboundDigitToStack,
     normalizePhoneForTwilioMatch,
     parseRetellSignatureHeader,

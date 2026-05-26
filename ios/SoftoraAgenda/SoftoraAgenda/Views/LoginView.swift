@@ -73,6 +73,7 @@ struct PinAccessView: View {
                 } label: {
                     Text(option.title)
                         .font(.softoraBody(14, weight: .semibold))
+                        .textCase(.uppercase)
                         .foregroundStyle(planner == option ? Color.white : Color.softoraInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 11)
@@ -105,13 +106,12 @@ struct PinAccessView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Agenda openen...")
             }
             .font(.softoraBody(13, weight: .semibold))
             .foregroundStyle(Color.softoraMuted)
             .frame(minHeight: 20)
         } else {
-            Text(store.alertMessage ?? "")
+            Text((store.alertMessage ?? "").softoraUppercased)
                 .font(.softoraBody(12, weight: .semibold))
                 .foregroundStyle(Color.softoraDanger)
                 .multilineTextAlignment(.center)
@@ -188,7 +188,7 @@ private struct PinHeader: View {
                 .foregroundStyle(Color.softoraCrimson)
                 .padding(.top, 8)
 
-            Text("PIN invoeren")
+            Text("PIN INVOEREN")
                 .font(.softoraBody(22, weight: .semibold))
                 .foregroundStyle(Color.softoraInk)
 

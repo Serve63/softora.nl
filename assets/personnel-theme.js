@@ -606,7 +606,8 @@
     function getColdmailingLeadSidebarLink() { return { key: "coldmailing_lead", href: "/premium-coldmailing-lead", label: "Lead", icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>' }; }
     /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
-        "seo", "mailbox", "qr_code",
+        "mailbox",
+        "qr_code",
         "ads_google",
         "ads_facebook",
         "ads_linkedin",

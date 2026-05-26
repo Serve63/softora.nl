@@ -57,16 +57,26 @@ struct SoftoraAPIClient {
         let location = draft.location.trimmingCharacters(in: .whitespacesAndNewlines)
         let notes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let time = AgendaDateFormatter.time(from: draft.time)
+        let isBusinessMeeting = draft.appointmentType == .business && draft.businessKind == .meeting
+        let legendChoice = draft.appointmentType == .business
+            ? draft.businessMeetingType.apiValue
+            : "manual-overig"
         let payload = ManualAppointmentPayload(
             date: AgendaDateFormatter.ymd(from: draft.date),
-            who: draft.planner.apiValue,
+            who: isBusinessMeeting ? Planner.both.apiValue : draft.planner.apiValue,
             title: title,
             time: time,
             activityTime: time,
-            legendChoice: "manual-overig",
+            legendChoice: legendChoice,
             activity: title,
             location: location,
             notes: notes,
+            recurrence: draft.repeatChoice.apiValue,
+            repeatChoice: draft.repeatChoice.apiValue,
+            appointmentType: draft.appointmentType.apiValue,
+            appointmentKind: draft.appointmentType == .business ? draft.businessKind.apiValue : "",
+            businessMeetingType: draft.businessMeetingType.apiValue,
+            manualLeadOwner: isBusinessMeeting ? draft.planner.apiValue : "",
             actor: "softora-ios-agenda"
         )
         let response: ManualAppointmentResponse = try await post(
@@ -74,6 +84,18 @@ struct SoftoraAPIClient {
             body: payload
         )
         return response.appointment
+    }
+
+    func deleteAppointment(id: String) async throws {
+        let trimmedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let encodedID = trimmedID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? trimmedID
+        let response: DeleteAppointmentResponse = try await post(
+            "/api/agenda/appointments/\(encodedID)/delete",
+            body: DeleteAppointmentPayload(actor: "softora-ios-agenda")
+        )
+        guard response.ok else {
+            throw SoftoraAPIError.server(response.error ?? "Afspraak kon niet worden verwijderd.")
+        }
     }
 
     private func get<Response: Decodable>(_ path: String) async throws -> Response {

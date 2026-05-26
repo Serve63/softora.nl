@@ -143,6 +143,6 @@ test('ramp-up keeps new inboxes at conservative daily caps', () => {
     rampUpStartedAt: '2026-05-01T00:00:00.000Z',
   }, undefined, NOW), {
     limit: 5,
-    warnings: ['ramp_up_limit_5'],
+    warnings: ['daily_limit_capped_to_policy', 'ramp_up_limit_5'],
   });
 });

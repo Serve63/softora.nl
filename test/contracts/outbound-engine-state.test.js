@@ -57,7 +57,7 @@ test('events register domains, inboxes, campaigns, leads and audit entries', () 
 
   assert.equal(state.domains[0].name, 'softora-growth.nl');
   assert.equal(state.inboxes[0].email, 'serve@softora-growth.nl');
-  assert.equal(state.inboxes[0].dailyLimit, 25);
+  assert.equal(state.inboxes[0].dailyLimit, 9);
   assert.equal(state.campaigns[0].status, 'approved');
   assert.equal(state.leads[0].email, 'lead@voorbeeld.nl');
   assert.equal(state.auditLog.length, 4);

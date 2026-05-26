@@ -67,6 +67,14 @@ function createRuntimeOpsCoordinator(deps = {}) {
     );
   }
 
+  function resolveUiStateActor(req, body) {
+    return (
+      normalizeString(req?.premiumAuth?.displayName || '') ||
+      normalizeString(req?.premiumAuth?.email || '') ||
+      normalizeString(body?.actor || '')
+    );
+  }
+
   async function getUiStateValuesForScope(scope) {
     if (
       dataOpsUiStateBridge &&
@@ -164,9 +172,10 @@ function createRuntimeOpsCoordinator(deps = {}) {
       valuesToSave = { ...currentValues, ...patchValues };
     }
 
+    const actor = resolveUiStateActor(req, body);
     const state = await setUiStateValues(scope, valuesToSave, {
       source: normalizeString(body.source || 'frontend'),
-      actor: normalizeString(body.actor || ''),
+      actor,
     });
     if (!state) {
       return res.status(503).json({
@@ -177,7 +186,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
 
     const mirroredState = await mirrorUiStateValuesToDataOps(scope, state.values || valuesToSave, {
       source: normalizeString(body.source || 'frontend'),
-      actor: normalizeString(body.actor || ''),
+      actor,
     });
 
     return res.status(200).json({

@@ -12,6 +12,7 @@ final class AgendaStore {
     var isLoadingAppointments = false
     var isUnlocking = false
     var isSavingAppointment = false
+    var isDeletingAppointment = false
     var appointments: [AgendaAppointment] = []
     var displayName = ""
     var email = ""
@@ -112,6 +113,22 @@ final class AgendaStore {
                     .filter(\.isUpcoming)
                     .sorted { $0.sortKey < $1.sortKey }
             }
+            await loadAppointments(fresh: true)
+            return true
+        } catch {
+            alertMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func deleteAppointment(_ appointment: AgendaAppointment) async -> Bool {
+        isDeletingAppointment = true
+        alertMessage = nil
+        defer { isDeletingAppointment = false }
+
+        do {
+            try await apiClient.deleteAppointment(id: appointment.id)
+            appointments.removeAll { $0.id == appointment.id }
             await loadAppointments(fresh: true)
             return true
         } catch {

@@ -32,6 +32,12 @@ struct ManualAppointmentResponse: Decodable {
     let error: String?
 }
 
+struct DeleteAppointmentResponse: Decodable {
+    let ok: Bool
+    let deletedAppointmentId: Int?
+    let error: String?
+}
+
 struct APIErrorEnvelope: Decodable {
     let ok: Bool?
     let error: String?
@@ -46,6 +52,7 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
     let location: String
     let who: Planner
     let summary: String
+    let privacyMasked: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -61,6 +68,7 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
         case manualWho
         case who
         case summary
+        case privacyMasked
     }
 
     init(
@@ -70,7 +78,8 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
         time: String,
         location: String,
         who: Planner,
-        summary: String
+        summary: String,
+        privacyMasked: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -79,6 +88,7 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
         self.location = location
         self.who = who
         self.summary = summary
+        self.privacyMasked = privacyMasked
     }
 
     init(from decoder: Decoder) throws {
@@ -93,15 +103,17 @@ struct AgendaAppointment: Identifiable, Decodable, Hashable {
         let decodedWho = Planner(rawAPIValue: container.firstString(for: [.manualPlannerWho, .manualWho, .who]))
         let decodedSummary = container.firstString(for: [.summary])
         let decodedID = container.firstString(for: [.id])
+        let decodedPrivacyMasked = (try? container.decode(Bool.self, forKey: .privacyMasked)) ?? false
 
         self.init(
             id: decodedID.isEmpty ? "\(decodedDate)-\(decodedTime)-\(decodedTitle)" : decodedID,
-            title: decodedTitle,
+            title: decodedPrivacyMasked ? "Bezet" : decodedTitle,
             date: decodedDate,
             time: decodedTime,
             location: decodedLocation,
             who: decodedWho,
-            summary: decodedSummary
+            summary: decodedSummary,
+            privacyMasked: decodedPrivacyMasked
         )
     }
 
@@ -175,14 +187,142 @@ struct NewAppointmentDraft {
     var time = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     var location = ""
     var notes = ""
+    var repeatChoice: RepeatChoice = .none
+    var appointmentType: AppointmentType = .personal
+    var businessKind: BusinessAppointmentKind = .appointment
+    var businessMeetingType: BusinessMeetingType = .website
 
-    init(planner: Planner = .serve) {
+    init(
+        planner: Planner = .serve,
+        date: Date = Date(),
+        appointmentType: AppointmentType = .personal,
+        businessKind: BusinessAppointmentKind = .appointment,
+        businessMeetingType: BusinessMeetingType = .website
+    ) {
         self.planner = planner
+        self.date = date
+        self.appointmentType = appointmentType
+        self.businessKind = businessKind
+        self.businessMeetingType = businessMeetingType
     }
 
     var canSubmit: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+enum AppointmentType: String, CaseIterable, Identifiable {
+    case personal
+    case business
+
+    var id: String { rawValue }
+
+    var apiValue: String {
+        switch self {
+        case .personal:
+            "private"
+        case .business:
+            "business"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .personal:
+            "Privé"
+        case .business:
+            "Zakelijk"
+        }
+    }
+}
+
+enum BusinessAppointmentKind: String, Identifiable {
+    case meeting
+    case appointment
+
+    var id: String { rawValue }
+
+    var apiValue: String {
+        switch self {
+        case .meeting:
+            "meeting"
+        case .appointment:
+            "appointment"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .meeting:
+            "Meeting"
+        case .appointment:
+            "Afspraak"
+        }
+    }
+}
+
+enum BusinessMeetingType: String, CaseIterable, Identifiable {
+    case website
+    case software
+    case voice
+    case chatbot
+
+    var id: String { rawValue }
+
+    var apiValue: String {
+        switch self {
+        case .website:
+            "website"
+        case .software:
+            "business"
+        case .voice:
+            "voice"
+        case .chatbot:
+            "chatbot"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .website:
+            "Website"
+        case .software:
+            "Bedrijfssoftware"
+        case .voice:
+            "Voicesoftware"
+        case .chatbot:
+            "Chatbot"
+        }
+    }
+}
+
+enum RepeatChoice: String, CaseIterable, Identifiable {
+    case none
+    case daily
+    case weekly
+    case monthly
+    case quarterly
+    case yearly
+
+    var id: String { rawValue }
+
+    var apiValue: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .none:
+            "Nooit"
+        case .daily:
+            "Dagelijks"
+        case .weekly:
+            "Wekelijks"
+        case .monthly:
+            "Maandelijks"
+        case .quarterly:
+            "Per kwartaal"
+        case .yearly:
+            "Jaarlijks"
+        }
     }
 }
 
@@ -196,6 +336,16 @@ struct ManualAppointmentPayload: Encodable {
     let activity: String
     let location: String
     let notes: String
+    let recurrence: String
+    let repeatChoice: String
+    let appointmentType: String
+    let appointmentKind: String
+    let businessMeetingType: String
+    let manualLeadOwner: String
+    let actor: String
+}
+
+struct DeleteAppointmentPayload: Encodable {
     let actor: String
 }
 

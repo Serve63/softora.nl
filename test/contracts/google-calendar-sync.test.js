@@ -120,6 +120,46 @@ test('google calendar sync exports manual appointments to the selected owner cal
   assert.equal(setCalls[0].appointment.googleCalendarEventId, 'created-event-1');
 });
 
+test('google calendar sync exports lead-owned appointments without falling back to Serve', async () => {
+  const { fetchCalls, service } = createService();
+
+  const result = await service.createGoogleCalendarEventForAppointment({
+    id: 91,
+    callId: 'lead_91',
+    company: 'Lead Martijn',
+    date: '2026-04-29',
+    time: '16:00',
+    manualAvailableAgain: '16:30',
+    leadOwnerKey: 'martijn',
+    summary: 'Lead Martijn',
+  });
+
+  assert.equal(result.ok, true);
+  const createCall = fetchCalls.find((call) => call.request.method === 'POST' && String(call.url).includes('/events'));
+  assert.ok(createCall);
+  assert.match(String(createCall.url), /martijn-calendar%40example\.com/);
+});
+
+test('google calendar sync skips ownerless appointments instead of assigning Serve', async () => {
+  const { fetchCalls, service, setCalls } = createService();
+
+  const result = await service.createGoogleCalendarEventForAppointment({
+    id: 92,
+    callId: 'ownerless_92',
+    company: 'Ownerless',
+    date: '2026-04-29',
+    time: '16:00',
+    manualAvailableAgain: '16:30',
+    summary: 'Ownerless',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'calendar_owner_missing');
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(setCalls.length, 0);
+});
+
 test('google calendar sync skips overig manual appointments', async () => {
   const { fetchCalls, service, setCalls } = createService();
 

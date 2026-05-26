@@ -189,15 +189,15 @@ function createOutboundRampForecast(input = {}) {
   const targetDailyVolume = positiveNumber(input.targetDailyVolume, 500);
   const inboxCount = Math.max(0, Math.floor(Number(input.inboxCount || 0)));
   const maxDailyPerInbox = positiveNumber(input.maxDailyPerInbox, DEFAULT_OUTBOUND_POLICY.maxDailyPerInbox);
-  const safePerInboxTarget = Math.min(maxDailyPerInbox, 25);
+  const safePerInboxTarget = Math.min(maxDailyPerInbox, 9);
   const requiredInboxes = Math.ceil(targetDailyVolume / safePerInboxTarget);
 
   const phases = [
     { label: 'Week 1-2', perInboxDailyLimit: 0, purpose: 'Setup, DNS, inbox health en testdata.' },
-    { label: 'Week 3', perInboxDailyLimit: 5, purpose: 'Eerste kleine dry-run/pilotdruk.' },
-    { label: 'Week 4', perInboxDailyLimit: 10, purpose: 'Rustig verhogen als alles groen blijft.' },
-    { label: 'Week 5', perInboxDailyLimit: 15, purpose: 'Meer volume met strakke monitoring.' },
-    { label: 'Week 6-8', perInboxDailyLimit: 20, purpose: 'Normale veilige werksnelheid.' },
+    { label: 'Week 3', perInboxDailyLimit: 3, purpose: 'Eerste kleine dry-run/pilotdruk.' },
+    { label: 'Week 4', perInboxDailyLimit: 5, purpose: 'Rustig verhogen als alles groen blijft.' },
+    { label: 'Week 5', perInboxDailyLimit: 7, purpose: 'Meer volume met strakke monitoring.' },
+    { label: 'Week 6-8', perInboxDailyLimit: 9, purpose: 'Normale veilige werksnelheid.' },
     { label: 'Na groen licht', perInboxDailyLimit: safePerInboxTarget, purpose: 'Alleen verhogen bij blijvend groene reputatie.' },
   ];
 

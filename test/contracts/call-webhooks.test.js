@@ -140,6 +140,79 @@ test('call webhooks verify retell signatures against raw webhook payloads', () =
   });
 });
 
+test('call webhooks reject unsigned retell webhooks by default', async () => {
+  const context = createRuntime();
+  const req = createReq({
+    path: '/api/retell/webhook',
+    body: {
+      event: 'call_ended',
+      call: { call_id: 'call_unsigned' },
+    },
+  });
+  const res = createRes();
+
+  await context.runtime.handleRetellWebhook(req, res);
+
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.jsonBody?.ok, false);
+  assert.equal(context.recentWebhookEvents.length, 0);
+  assert.equal(context.upserts.length, 0);
+  assert.equal(context.automationCalls.length, 0);
+  assert.equal(context.auditEvents.length, 1);
+});
+
+test('call webhooks allow unsigned retell webhooks only with explicit non-production flag', async () => {
+  const context = createRuntime({
+    env: {
+      SOFTORA_ALLOW_UNSIGNED_RETELL_WEBHOOKS: 'true',
+    },
+  });
+  const req = createReq({
+    path: '/api/retell/webhook',
+    body: {
+      event: 'call_ended',
+      call: {
+        call_id: 'call_retell',
+        call_status: 'completed',
+        disconnection_reason: 'completed',
+      },
+    },
+  });
+  const res = createRes();
+
+  await context.runtime.handleRetellWebhook(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.jsonBody?.ok, true);
+  assert.equal(context.recentWebhookEvents.length, 1);
+  assert.equal(context.recentWebhookEvents[0].callId, 'call_retell');
+  assert.equal(context.automationCalls.length, 1);
+  assert.equal(context.automationCalls[0].callId, 'call_retell');
+});
+
+test('call webhooks ignore unsigned retell dev flag in production', async () => {
+  const context = createRuntime({
+    env: {
+      NODE_ENV: 'production',
+      SOFTORA_ALLOW_UNSIGNED_RETELL_WEBHOOKS: 'true',
+    },
+  });
+  const req = createReq({
+    path: '/api/retell/webhook',
+    body: {
+      event: 'call_ended',
+      call: { call_id: 'call_prod_unsigned' },
+    },
+  });
+  const res = createRes();
+
+  await context.runtime.handleRetellWebhook(req, res);
+
+  assert.equal(res.statusCode, 401);
+  assert.equal(context.recentWebhookEvents.length, 0);
+  assert.equal(context.automationCalls.length, 0);
+});
+
 test('call webhooks handle inbound twilio voice selection and start an inbound call update', () => {
   const context = createRuntime();
   const req = createReq({
@@ -188,7 +261,11 @@ test('call webhooks reject unauthorized twilio status callbacks and emit an audi
 });
 
 test('call webhooks store retell webhook events and trigger post-call automation', async () => {
-  const context = createRuntime();
+  const context = createRuntime({
+    env: {
+      SOFTORA_ALLOW_UNSIGNED_RETELL_WEBHOOKS: 'true',
+    },
+  });
   const req = createReq({
     path: '/api/retell/webhook',
     body: {

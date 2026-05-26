@@ -2,6 +2,8 @@ const crypto = require('crypto');
 
 const { createAgendaConfirmationPersistenceHelpers } = require('./agenda-confirmation-persistence');
 
+const { isPrivateAppointmentBlockedForViewer } = require('./agenda-read');
+
 function resolveManualPlannerLabel(body, normalizeString) {
   const raw = normalizeString(body?.who || body?.manualWho || '').toLowerCase();
   if (raw === 'serve' || raw === 'servé') return 'Servé';
@@ -10,6 +12,14 @@ function resolveManualPlannerLabel(body, normalizeString) {
     return 'Servé en Martijn';
   }
   if (raw === 'overig' || raw === 'other') return 'Overig';
+  return '';
+}
+
+function resolveManualPlannerKey(whoLabel) {
+  if (whoLabel === 'Servé') return 'serve';
+  if (whoLabel === 'Martijn') return 'martijn';
+  if (whoLabel === 'Servé en Martijn') return 'both';
+  if (whoLabel === 'Overig') return 'overig';
   return '';
 }
 
@@ -23,7 +33,13 @@ function normalizeManualLegendChoice(body, normalizeString) {
   if (raw === 'manual-overig' || raw === 'overig' || raw === 'other') return 'manual-overig';
   if (raw === 'completed' || raw === 'afgerond') return 'completed';
   if (raw === 'manual-serve' || raw === 'serve' || raw === 'servé') return 'manual-serve';
-  return raw ? '' : 'manual-serve';
+  if (raw) return '';
+  const who = normalizeString(body?.who || body?.manualWho || '').toLowerCase();
+  if (who === 'martijn') return 'manual-martijn';
+  if (who === 'both' || who === 'allebei' || who === 'beide' || who === 'serve-martijn') return 'manual-both';
+  if (who === 'overig' || who === 'other') return 'manual-overig';
+  if (who === 'serve' || who === 'servé') return 'manual-serve';
+  return '';
 }
 
 function normalizeManualLeadOwnerKey(value, normalizeString) {
@@ -260,14 +276,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       provider: 'manual',
       providerLabel: 'Handmatig',
       coldcallingStack: 'manual',
-      manualPlannerWho:
-        whoLabel === 'Martijn'
-          ? 'martijn'
-          : whoLabel === 'Servé en Martijn'
-            ? 'both'
-            : whoLabel === 'Overig'
-              ? 'overig'
-              : 'serve',
+      manualPlannerWho: resolveManualPlannerKey(whoLabel),
       manualLegendChoice: legendChoice,
       manualActivityTime: activityTime,
       manualNotes: notes,
@@ -388,11 +397,284 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       persistencePending: persistOk === 'pending',
       appointment: finalAppointment,
       googleCalendarSync,
+      });
+  }
+
+  function buildManualAppointmentMutationFields(body = {}) {
+    const appointmentDate = normalizeDateYyyyMmDd(body.date || '');
+    const allDayUnavailable = isTruthyAllDayUnavailable(body);
+    const whoLabel = resolveManualPlannerLabel(body, normalizeString);
+    const actor = truncateText(normalizeString(body.actor || body.doneBy || ''), 120);
+    const appointmentKind = normalizeString(body.appointmentKind || body.manualAppointmentKind || '').toLowerCase();
+
+    let appointmentTime;
+    let activityTime;
+    let location;
+    let activity;
+    let notes;
+    let availableAgain;
+    let legendChoice;
+
+    if (allDayUnavailable) {
+      appointmentTime = '09:00';
+      activityTime = '';
+      availableAgain = '17:00';
+      location = sanitizeAppointmentLocation('—');
+      activity = 'Gehele dag niet beschikbaar';
+      notes = '';
+      legendChoice = normalizeManualLegendChoice(body, normalizeString) || 'manual-serve';
+    } else {
+      appointmentTime = normalizeTimeHhMm(body.time || '');
+      activityTime = normalizeTimeHhMm(body.activityTime || body.activity_time || body.time || '');
+      location = sanitizeAppointmentLocation(body.location || '') || '—';
+      activity = truncateText(normalizeString(body.title || body.activity || ''), 500);
+      notes = truncateText(normalizeString(body.notes || body.opmerkingen || ''), 1000);
+      availableAgain = normalizeTimeHhMm(body.availableAgain || '');
+      legendChoice = normalizeManualLegendChoice(body, normalizeString);
+    }
+
+    const manualLeadOwner = resolveManualLeadOwner(body, normalizeString);
+    const requiresManualLeadOwner =
+      !allDayUnavailable && appointmentKind === 'meeting' && isMeetingLegendChoice(legendChoice);
+
+    if (!appointmentDate) {
+      return { ok: false, status: 400, error: 'Vul een geldige datum in (YYYY-MM-DD).' };
+    }
+    if (!whoLabel) {
+      return {
+        ok: false,
+        status: 400,
+        error: 'Kies wie de afspraak plant: Servé, Martijn of Overig.',
+      };
+    }
+    if (!allDayUnavailable) {
+      if (!appointmentTime) return { ok: false, status: 400, error: 'Vul een geldige tijd in (HH:MM).' };
+      if (!activity) return { ok: false, status: 400, error: 'Vul een titel in.' };
+      if (!activityTime) {
+        return {
+          ok: false,
+          status: 400,
+          error: 'Vul een geldig tijdstip van activiteit in (HH:MM).',
+        };
+      }
+      if (!legendChoice) {
+        return { ok: false, status: 400, error: 'Kies een geldige legenda keuze.' };
+      }
+      if (requiresManualLeadOwner && !manualLeadOwner) {
+        return { ok: false, status: 400, error: 'Kies wie deze lead heeft geregeld.' };
+      }
+    }
+
+    const summary = [
+      activity,
+      `Wie: ${whoLabel}`,
+      activityTime ? `Tijdstip activiteit: ${activityTime}` : '',
+      location && location !== '—' ? `Locatie: ${location}` : '',
+      legendChoice ? `Legenda: ${legendChoice}` : '',
+      manualLeadOwner ? `Lead geregeld door: ${manualLeadOwner.name}` : '',
+      notes ? `Opmerkingen: ${notes}` : '',
+      availableAgain ? `Weer thuis, beschikbaar voor een reis naar prospect: ${availableAgain}` : '',
+    ].filter(Boolean).join('\n\n');
+
+    return {
+      ok: true,
+      actor,
+      activity,
+      activityTime,
+      allDayUnavailable,
+      appointmentDate,
+      appointmentKind,
+      appointmentTime,
+      availableAgain,
+      legendChoice,
+      location,
+      manualLeadOwner,
+      manualPlannerWho: resolveManualPlannerKey(whoLabel),
+      notes,
+      summary,
+      whoLabel,
+    };
+  }
+
+  async function updateManualAgendaAppointmentResponse(req, res, rawId) {
+    backfillInsightsAndAppointmentsFromRecentCallUpdates();
+
+    const appointmentId = Number(rawId);
+    if (!Number.isFinite(appointmentId) || appointmentId <= 0) {
+      return res.status(400).json({ ok: false, error: 'Afspraak-id ontbreekt.' });
+    }
+
+    let idx = getGeneratedAppointmentIndexById(appointmentId);
+    if (idx < 0 && isSupabaseConfigured()) {
+      await syncRuntimeStateFromSupabaseIfNewer({ force: true, maxAgeMs: 0 }).catch(() => false);
+      idx = getGeneratedAppointmentIndexById(appointmentId);
+    }
+    if (idx < 0) {
+      return res.status(404).json({ ok: false, error: 'Afspraak niet gevonden.' });
+    }
+
+    const appointments = getGeneratedAgendaAppointments();
+    const appointment = appointments[idx] || null;
+    if (isPrivateAppointmentBlockedForViewer(appointment, req.premiumAuth || null, normalizeString)) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Je kunt een privé-afspraak van de ander niet wijzigen.',
+      });
+    }
+
+    const fields = buildManualAppointmentMutationFields(req.body || {});
+    if (!fields.ok) {
+      return res.status(fields.status || 400).json({ ok: false, error: fields.error || 'Ongeldige afspraak.' });
+    }
+
+    const runtimeSnapshot = takeRuntimeMutationSnapshot();
+    const actorLabel = fields.actor || 'premium-personeel-agenda';
+    const nowIso = new Date().toISOString();
+    const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+      idx,
+      {
+        ...appointment,
+        company: fields.activity,
+        date: fields.appointmentDate,
+        time: fields.appointmentTime,
+        location: fields.location,
+        appointmentLocation: fields.location,
+        source: normalizeString(appointment?.source || '') || 'Handmatig',
+        provider: normalizeString(appointment?.provider || '') || 'manual',
+        providerLabel: normalizeString(appointment?.providerLabel || '') || 'Handmatig',
+        coldcallingStack: normalizeString(appointment?.coldcallingStack || '') || 'manual',
+        manualPlannerWho: fields.manualPlannerWho,
+        manualLegendChoice: fields.legendChoice,
+        manualActivityTime: fields.activityTime,
+        manualNotes: fields.notes,
+        manualLeadOwnerKey: fields.manualLeadOwner?.key || '',
+        manualLeadOwnerName: fields.manualLeadOwner?.name || '',
+        leadOwnerKey: fields.manualLeadOwner?.key || '',
+        leadOwnerName: fields.manualLeadOwner?.name || '',
+        leadOwnerFullName: fields.manualLeadOwner?.fullName || '',
+        leadOwnerEmail: fields.manualLeadOwner?.email || '',
+        manualAllDayUnavailable: fields.allDayUnavailable,
+        manualAvailableAgain: fields.availableAgain,
+        summary: fields.summary,
+        summaryFormatVersion: 4,
+        updatedAt: nowIso,
+        updatedBy: actorLabel,
+      },
+      'manual_agenda_appointment_update'
+    );
+
+    if (!updatedAppointment) {
+      return res.status(500).json({ ok: false, error: 'Afspraak kon niet worden opgeslagen.' });
+    }
+
+    appendDashboardActivity(
+      {
+        type: 'manual_agenda_appointment_updated',
+        title: 'Afspraak gewijzigd',
+        detail: `${fields.activity || 'Afspraak'} op ${fields.appointmentDate} om ${fields.appointmentTime}.`,
+        company: fields.activity || 'Afspraak',
+        actor: actorLabel,
+        taskId: appointmentId,
+        callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+        source: 'premium-personeel-agenda',
+      },
+      'dashboard_activity_manual_agenda_appointment_updated'
+    );
+
+    const persistOk = await ensureLeadMutationPersistedOrRespond(
+      res,
+      runtimeSnapshot,
+      'Afspraak kon niet veilig in gedeelde opslag worden gewijzigd.',
+      {
+        allowPendingResponse: true,
+        pendingResponseAfterMs: 3000,
+        allowLocalVerifiedPending: true,
+        verifyPersisted: () =>
+          doesAgendaMutationMatchAppointment(
+            updatedAppointment,
+            resolveGeneratedAgendaAppointmentById(updatedAppointment?.id)
+          ),
+      }
+    );
+    if (!persistOk) return res;
+
+    return res.status(persistOk === 'pending' ? 202 : 200).json({
+      ok: true,
+      persistencePending: persistOk === 'pending',
+      appointment: updatedAppointment,
+    });
+  }
+
+  async function deleteAgendaAppointmentResponse(req, res, rawId) {
+    backfillInsightsAndAppointmentsFromRecentCallUpdates();
+
+    const appointmentId = Number(rawId);
+    if (!Number.isFinite(appointmentId) || appointmentId <= 0) {
+      return res.status(400).json({ ok: false, error: 'Afspraak-id ontbreekt.' });
+    }
+
+    let idx = getGeneratedAppointmentIndexById(appointmentId);
+    if (idx < 0 && isSupabaseConfigured()) {
+      await syncRuntimeStateFromSupabaseIfNewer({ force: true, maxAgeMs: 0 }).catch(() => false);
+      idx = getGeneratedAppointmentIndexById(appointmentId);
+    }
+    if (idx < 0) {
+      return res.status(404).json({ ok: false, error: 'Afspraak niet gevonden.' });
+    }
+
+    const appointments = getGeneratedAgendaAppointments();
+    const appointment = appointments[idx] || null;
+    if (isPrivateAppointmentBlockedForViewer(appointment, req.premiumAuth || null, normalizeString)) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Je kunt een privé-afspraak van de ander niet verwijderen.',
+      });
+    }
+
+    const runtimeSnapshot = takeRuntimeMutationSnapshot();
+    const removed = appointments.splice(idx, 1)[0] || null;
+    const actor = truncateText(normalizeString(req.body?.actor || req.body?.doneBy || ''), 120);
+    const actorLabel = actor || 'softora-ios-agenda';
+    const title = truncateText(normalizeString(removed?.company || removed?.title || removed?.activity || ''), 200);
+
+    appendDashboardActivity(
+      {
+        type: 'manual_agenda_appointment_deleted',
+        title: 'Afspraak verwijderd',
+        detail: `${title || 'Afspraak'} op ${removed?.date || ''}${removed?.time ? ` om ${removed.time}` : ''}.`,
+        company: title || 'Afspraak',
+        actor: actorLabel,
+        taskId: appointmentId,
+        callId: normalizeString(removed?.callId || ''),
+        source: 'softora-ios-agenda',
+      },
+      'dashboard_activity_manual_agenda_appointment_deleted'
+    );
+
+    const persistOk = await ensureLeadMutationPersistedOrRespond(
+      res,
+      runtimeSnapshot,
+      'Afspraak kon niet veilig uit gedeelde opslag worden verwijderd.',
+      {
+        allowPendingResponse: true,
+        pendingResponseAfterMs: 3000,
+        allowLocalVerifiedPending: true,
+        verifyPersisted: () => !resolveGeneratedAgendaAppointmentById(appointmentId),
+      }
+    );
+    if (!persistOk) return res;
+
+    return res.status(persistOk === 'pending' ? 202 : 200).json({
+      ok: true,
+      persistencePending: persistOk === 'pending',
+      deletedAppointmentId: appointmentId,
     });
   }
 
   return {
     createManualAgendaAppointmentResponse,
+    updateManualAgendaAppointmentResponse,
+    deleteAgendaAppointmentResponse,
   };
 }
 

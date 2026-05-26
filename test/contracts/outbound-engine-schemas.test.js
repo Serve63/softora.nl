@@ -18,7 +18,7 @@ test('outbound schemas reject protected softora.nl domains and inboxes', () => {
   assert.match(domain.errors.join(','), /protected_domain_not_allowed/);
   assert.equal(inbox.ok, false);
   assert.match(inbox.errors.join(','), /protected_sender_domain/);
-  assert.equal(inbox.value.dailyLimit, 25);
+  assert.equal(inbox.value.dailyLimit, 9);
 });
 
 test('outbound campaign validator requires approved-scale safety fields', () => {

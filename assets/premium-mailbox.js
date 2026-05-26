@@ -2,6 +2,9 @@
 "use strict";
 
 const MAILBOX_ACCOUNT_DEFAULT = 'info@softora.nl';
+const MAILBOX_LEGACY_ACCOUNT_REPLACEMENTS = Object.freeze({
+  'zakelijk@theimpactbox.co': 'zakelijk@softora.nl',
+});
 let activeMailboxAccount = MAILBOX_ACCOUNT_DEFAULT;
 let mailboxAccounts = [
   { email: 'info@softora.nl', name: 'info@softora.nl', imapConfigured: false, smtpConfigured: false },
@@ -29,6 +32,12 @@ function escapeHtml(value) {
 }
 
 const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
+const MAILBOX_SENDER_CTA_LINKS = Object.freeze({
+  'martijn@softora.nl': {
+    text: '💼 Mijn LinkedIn 👈',
+    url: 'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios',
+  },
+});
 
 function countCharacter(value, character) {
   return String(value || '').split(character).length - 1;
@@ -57,7 +66,12 @@ function isSafeMailBodyUrl(value) {
   }
 }
 
-function renderLinkedMailBody(value) {
+function getMailboxSenderCtaLink(mail) {
+  const email = String((mail && mail.email) || activeMailboxAccount || '').trim().toLowerCase();
+  return MAILBOX_SENDER_CTA_LINKS[email] || null;
+}
+
+function renderLinkedMailBody(value, mail) {
   const text = String(value == null ? '' : value);
   let html = '';
   let lastIndex = 0;
@@ -73,6 +87,12 @@ function renderLinkedMailBody(value) {
     return match;
   });
   html += escapeHtml(text.slice(lastIndex));
+  const cta = getMailboxSenderCtaLink(mail);
+  if (cta && text.includes(cta.text) && isSafeMailBodyUrl(cta.url)) {
+    const label = escapeHtml(cta.text);
+    const link = `<a href="${escapeHtml(cta.url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    html = html.split(label).join(link);
+  }
   return html;
 }
 
@@ -134,7 +154,58 @@ function normalizeText(value) {
 function normalizeEmail(value) {
   const raw = normalizeText(value).toLowerCase();
   const match = raw.match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/i);
-  return match ? match[0] : raw;
+  const email = match ? match[0] : raw;
+  return MAILBOX_LEGACY_ACCOUNT_REPLACEMENTS[email] || email;
+}
+
+function normalizeMailboxIdentityText(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9@.]+/g, ' ');
+}
+
+function resolveMailboxAccountFromSession(session, availableEmails) {
+  const available = new Set(
+    (Array.isArray(availableEmails) ? availableEmails : [])
+      .map(normalizeEmail)
+      .filter(Boolean)
+  );
+  if (!available.size) return '';
+
+  const directEmail = normalizeEmail(session && session.email);
+  if (directEmail && available.has(directEmail)) return directEmail;
+
+  const identityText = [
+    session && session.displayName,
+    session && session.firstName,
+    session && session.lastName,
+    session && session.email,
+  ].map(normalizeMailboxIdentityText).filter(Boolean).join(' ');
+
+  const candidates = [];
+  if (identityText.includes('martijn')) candidates.push('martijn@softora.nl');
+  if (identityText.includes('serve') || identityText.includes('servec') || identityText.includes('creusen')) {
+    candidates.push('serve@softora.nl');
+  }
+  if (identityText.includes('ruben')) candidates.push('ruben@softora.nl');
+
+  return candidates.map(normalizeEmail).find((email) => available.has(email)) || '';
+}
+
+async function hydrateAuthenticatedMailboxAccount(availableEmails) {
+  try {
+    const response = await fetch('/api/auth/session', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const payload = await response.json().catch(() => null);
+    return resolveMailboxAccountFromSession(payload, availableEmails);
+  } catch (_) {
+    return '';
+  }
 }
 
 function normalizeOutreachKey(value) {
@@ -324,7 +395,7 @@ function setMailboxSyncStatus(message) {
   el.textContent = text;
 }
 
-async function loadMailboxAccounts() {
+async function loadMailboxAccounts(options = {}) {
   try {
     const response = await fetch('/api/mailbox/accounts', {
       credentials: 'same-origin',
@@ -334,7 +405,13 @@ async function loadMailboxAccounts() {
     const data = await response.json().catch(() => ({}));
     if (response.ok && data?.ok && Array.isArray(data.accounts) && data.accounts.length) {
       mailboxAccounts = data.accounts;
-      if (!mailboxAccounts.some((account) => account.email === activeMailboxAccount)) {
+      const availableEmails = getMailboxAccounts();
+      const sessionAccount = options.preferSession === false
+        ? ''
+        : await hydrateAuthenticatedMailboxAccount(availableEmails);
+      if (sessionAccount) {
+        activeMailboxAccount = sessionAccount;
+      } else if (!mailboxAccounts.some((account) => account.email === activeMailboxAccount)) {
         activeMailboxAccount = mailboxAccounts[0].email;
       }
       renderMailboxAccountMenu();
@@ -553,7 +630,7 @@ function openMail(id, options = {}) {
       </div>
     </div>
     <div class="detail-body">
-      <div class="detail-body-text">${renderLinkedMailBody(detailBody)}</div>
+      <div class="detail-body-text">${renderLinkedMailBody(detailBody, m)}</div>
       ${outreachQuickbar}
     </div>`;
 
@@ -834,7 +911,7 @@ window.addEventListener('keydown', (event) => {
 (async function initMailboxAccount() {
   const intent = readMailboxUrlIntent();
   if (intent.account) activeMailboxAccount = intent.account;
-  await loadMailboxAccounts();
+  await loadMailboxAccounts({ preferSession: !intent.account });
   if (intent.account && mailboxAccounts.some((account) => account.email === intent.account)) {
     activeMailboxAccount = intent.account;
   }

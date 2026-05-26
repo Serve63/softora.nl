@@ -51,7 +51,7 @@ function validateOutboundInboxInput(body = {}, options = {}) {
       domainId,
       domain,
       status: normaliseStatus(body.status, ['pending', 'active', 'paused'], 'pending'),
-      dailyLimit: clampInteger(body.dailyLimit, 1, 25, 20),
+      dailyLimit: clampInteger(body.dailyLimit, 1, 9, 9),
       rampUpStartedAt: normaliseOptionalDate(body.rampUpStartedAt),
       sentToday: clampInteger(body.sentToday || body.alreadySentToday, 0, 10000, 0),
     },

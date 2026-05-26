@@ -212,9 +212,13 @@ test('premium agenda offers stepped manual add flow on day click', () => {
   assert.match(pageSource, /manualLeadOwner: leadOwnerKey,/);
   assert.match(pageSource, /who,/);
   assert.match(pageSource, /notes,/);
+  assert.match(pageSource, /manualLeadOwnerKey: String\(item\.manualLeadOwnerKey \|\| item\.leadOwnerKey \|\| ''\),/);
+  assert.match(pageSource, /leadOwnerKey: String\(item\.leadOwnerKey \|\| item\.manualLeadOwnerKey \|\| ''\),/);
+  assert.match(pageSource, /googleCalendarOwner: String\(item\.googleCalendarOwner \|\| ''\),/);
   assert.match(pageSource, /if \(manualLegendChoice === 'business'\) return 'appointment meeting magnetic meeting--business';/);
   assert.match(pageSource, /if \(who === 'overig'\) return 'appointment manual-overig magnetic';/);
   assert.match(pageSource, /if \(who === 'both' \|\| who === 'allebei' \|\| who === 'beide'\) return 'appointment manual-both magnetic';/);
+  assert.match(pageSource, /return 'appointment manual-both magnetic';\s*\}\s*const line = resolveAgendaMeetingProductLine/);
 });
 
 test('premium agenda handmatige afspraak-modal slaat locatie en opmerkingen op', () => {
@@ -272,6 +276,8 @@ test('premium agenda herstelt handmatige activiteitknoppen en boot-failsafe', ()
   assert.match(stabilitySource, /function isManualAgendaAppointment\(item\)/);
   assert.match(stabilitySource, /function isManualOtherAppointment\(apt\)/);
   assert.match(stabilitySource, /choice === 'manual-overig' \|\| choice === 'manual-serve' \|\| choice === 'manual-martijn' \|\| choice === 'manual-both'/);
+  assert.match(stabilitySource, /apt\.manualPlannerWho \|\| apt\.manualWho \|\| 'both'/);
+  assert.match(stabilitySource, /if \(!isMeeting && !manualAppointmentWho\) manualAppointmentWho = 'both';/);
   assert.match(stabilitySource, /modalPrimaryBtn\.textContent = completed \? 'Activiteit afgerond' : 'Activiteit afronden';/);
   assert.match(stabilitySource, /async function markActiveManualActivityCompleted\(\)/);
   assert.match(stabilitySource, /function setModalAudioBlockHidden\(hidden\)/);

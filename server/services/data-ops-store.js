@@ -216,6 +216,30 @@ function createSoftoraDataOpsStore(deps = {}) {
     return buildCustomerRow(mergedPayload, index, source);
   }
 
+  async function collectPagedRows(label, buildQuery, options = {}) {
+    const pageSize = Math.max(1, Math.min(1000, Number(options.pageSize) || 1000));
+    const maxRows = Math.max(pageSize, Math.min(25000, Number(options.maxRows) || 5000));
+    const rows = [];
+
+    for (let offset = 0; offset < maxRows; offset += pageSize) {
+      const from = offset;
+      const to = Math.min(offset + pageSize, maxRows) - 1;
+      const result = await run(`${label}-${from}-${to}`, (client) => {
+        const query = buildQuery(client);
+        if (query && typeof query.range === 'function') return query.range(from, to);
+        if (query && typeof query.limit === 'function') return query.limit(to - from + 1);
+        return query;
+      });
+      if (!result.ok) return result;
+
+      const pageRows = Array.isArray(result.data) ? result.data : [];
+      rows.push(...pageRows);
+      if (pageRows.length < to - from + 1) break;
+    }
+
+    return { ok: true, data: rows };
+  }
+
   function dedupeCustomerRowsForReplace(rows, source) {
     const output = [];
     const indexByIdentityKey = new Map();
@@ -242,8 +266,8 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   async function markMissingDeleted(table, idColumn, incomingIds, source) {
-    const current = await run(`list-${table}-ids`, (client) =>
-      client.from(table).select(idColumn).is('deleted_at', null).limit(5000)
+    const current = await collectPagedRows(`list-${table}-ids`, (client) =>
+      client.from(table).select(idColumn).is('deleted_at', null)
     );
     if (!current.ok) return current;
     const incoming = new Set(incomingIds.map(normalizeString).filter(Boolean));
@@ -264,13 +288,12 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   async function listCustomers() {
-    const result = await run('list-customers', (client) =>
+    const result = await collectPagedRows('list-customers', (client) =>
       client
         .from(TABLES.customers)
         .select('customer_id,payload,updated_at')
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
-        .limit(5000)
     );
     if (!result.ok) return null;
     return (result.data || []).map((row) => ({

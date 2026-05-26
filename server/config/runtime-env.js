@@ -28,6 +28,13 @@ function readBoundedNumberEnv(value, fallback, min, max) {
   return Math.max(min, Math.min(max, parsed));
 }
 
+function readClockEnv(value, fallback) {
+  const normalized = normalizeString(value || fallback).replace(/[.-]/g, ':');
+  const match = normalized.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return fallback;
+  return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}`;
+}
+
 function getDefaultTwilioEdgeForRegion(region) {
   const normalizedRegion = normalizeString(region).toLowerCase();
   if (normalizedRegion === 'ie1') return 'dublin';
@@ -61,6 +68,13 @@ function loadRuntimeEnv(env = process.env) {
   );
   const mailSmtpPass = normalizeString(
     safeEnv.MAIL_SMTP_PASS || safeEnv.SMTP_PASS || safeEnv.STRATO_SMTP_PASS || ''
+  );
+  const mailFromAddress = replaceLegacyMailboxEmail(
+    safeEnv.CONFIRMATION_MAIL_FROM ||
+      safeEnv.MAIL_FROM ||
+      safeEnv.STRATO_SMTP_FROM ||
+      mailSmtpUser ||
+      ''
   );
   const derivedImapHostFromSmtp = (() => {
     const host = normalizeString(mailSmtpHostSource);
@@ -204,13 +218,7 @@ function loadRuntimeEnv(env = process.env) {
       smtpSecure: readBooleanEnvFlag(
         safeEnv.MAIL_SMTP_SECURE || safeEnv.SMTP_SECURE || (mailSmtpPort === 465 ? 'true' : '')
       ),
-      fromAddress: replaceLegacyMailboxEmail(
-        safeEnv.CONFIRMATION_MAIL_FROM ||
-          safeEnv.MAIL_FROM ||
-          safeEnv.STRATO_SMTP_FROM ||
-          mailSmtpUser ||
-          ''
-      ),
+      fromAddress: mailFromAddress,
       fromName: normalizeString(
         safeEnv.CONFIRMATION_MAIL_FROM_NAME || safeEnv.MAIL_FROM_NAME || 'Softora'
       ),
@@ -220,20 +228,35 @@ function loadRuntimeEnv(env = process.env) {
       coldmailAuditBcc: replaceLegacyMailboxEmail(
         safeEnv.COLDMAIL_AUDIT_BCC || safeEnv.COLDMAIL_BCC || ''
       ),
+      coldmailUnsubscribeSecret: normalizeString(
+        safeEnv.COLDMAIL_UNSUBSCRIBE_SECRET ||
+          safeEnv.PREMIUM_SESSION_SECRET ||
+          safeEnv.CRON_SECRET ||
+          ''
+      ),
+      coldmailTrackingSecret: normalizeString(
+        safeEnv.COLDMAIL_TRACKING_SECRET ||
+          safeEnv.COLDMAIL_UNSUBSCRIBE_SECRET ||
+          safeEnv.PREMIUM_SESSION_SECRET ||
+          safeEnv.CRON_SECRET ||
+          ''
+      ),
       coldmailReplyForwardEnabled: readNegatedBooleanEnvFlag(
         safeEnv.COLDMAIL_REPLY_FORWARD_ENABLED,
-        true
+        false
       ),
       coldmailReplyForwardFrom: normalizeMailboxAccountEmail(
-        safeEnv.COLDMAIL_REPLY_FORWARD_FROM || 'serve@softora.nl'
+        safeEnv.COLDMAIL_REPLY_FORWARD_FROM || ''
       ),
       coldmailReplyForwardTo: normalizeMailboxAccountEmail(
-        safeEnv.COLDMAIL_REPLY_FORWARD_TO || 'servec321@gmail.com'
+        safeEnv.COLDMAIL_REPLY_FORWARD_TO || ''
       ),
       coldmailReplySyncEmail: normalizeMailboxAccountEmail(
         safeEnv.COLDMAIL_REPLY_SYNC_EMAIL ||
           safeEnv.COLDMAIL_REPLY_FORWARD_FROM ||
-          'serve@softora.nl'
+          mailFromAddress ||
+          mailSmtpUser ||
+          ''
       ),
       imapHost: normalizeString(
         safeEnv.MAIL_IMAP_HOST ||
@@ -262,17 +285,21 @@ function loadRuntimeEnv(env = process.env) {
         5_000,
         300_000
       ),
+      coldmailBounceProcessingEnabled: readNegatedBooleanEnvFlag(
+        safeEnv.COLDMAIL_BOUNCE_PROCESSING_ENABLED,
+        true
+      ),
       coldmailCampaignSendLimit: readBoundedNumberEnv(
         safeEnv.COLDMAIL_CAMPAIGN_SEND_LIMIT,
-        30,
+        9,
         1,
-        50
+        9
       ),
       coldmailDailySendLimit: readBoundedNumberEnv(
         safeEnv.COLDMAIL_DAILY_SEND_LIMIT,
-        50,
+        9,
         1,
-        50
+        9
       ),
       coldmailPackageDailySendLimit: readBoundedNumberEnv(
         safeEnv.COLDMAIL_PACKAGE_DAILY_SEND_LIMIT,
@@ -280,10 +307,79 @@ function loadRuntimeEnv(env = process.env) {
         1,
         100
       ),
+      coldmailSendDelayMs: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_SEND_DELAY_MS,
+        90_000,
+        0,
+        300_000
+      ),
+      coldmailSafetyPauseMs: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_SAFETY_PAUSE_MS,
+        6 * 60 * 60 * 1000,
+        60_000,
+        24 * 60 * 60 * 1000
+      ),
+      coldmailPersonalMailboxDailyLimit: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT,
+        9,
+        1,
+        9
+      ),
+      coldmailPersonalMailboxSendDelayMs: readBoundedNumberEnv(
+        safeEnv.COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS,
+        180_000,
+        0,
+        300_000
+      ),
       coldmailBlockPersonalMailboxDomains: readNegatedBooleanEnvFlag(
         safeEnv.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,
-        false
+        true
       ),
+      coldmailSendWindowStart: readClockEnv(
+        safeEnv.COLDMAIL_SEND_WINDOW_START,
+        '07:00'
+      ),
+      coldmailSendWindowEnd: readClockEnv(
+        safeEnv.COLDMAIL_SEND_WINDOW_END,
+        '17:00'
+      ),
+      coldmailSendWindowTimeZone: normalizeString(
+        safeEnv.COLDMAIL_SEND_WINDOW_TIMEZONE || 'Europe/Amsterdam'
+      ),
+      coldmailHourlyPacingEnabled: readNegatedBooleanEnvFlag(
+        safeEnv.COLDMAIL_HOURLY_PACING_ENABLED,
+        true
+      ),
+      coldmailWeekdaysOnly: readNegatedBooleanEnvFlag(
+        safeEnv.COLDMAIL_WEEKDAYS_ONLY,
+        true
+      ),
+    },
+    instantly: {
+      enabled: readBooleanEnvFlag(safeEnv.INSTANTLY_ENABLED),
+      apiKey: normalizeString(safeEnv.INSTANTLY_API_KEY || ''),
+      apiBaseUrl: normalizeString(safeEnv.INSTANTLY_API_BASE_URL || 'https://api.instantly.ai/api/v2'),
+      defaultCampaignId: normalizeString(safeEnv.INSTANTLY_DEFAULT_CAMPAIGN_ID || ''),
+      webhookSecret: normalizeString(safeEnv.INSTANTLY_WEBHOOK_SECRET || ''),
+      syncIntervalMinutes: readBoundedNumberEnv(
+        safeEnv.INSTANTLY_SYNC_INTERVAL_MINUTES,
+        15,
+        1,
+        24 * 60
+      ),
+      syncBatchSize: readBoundedNumberEnv(
+        safeEnv.INSTANTLY_SYNC_BATCH_SIZE,
+        10,
+        1,
+        1000
+      ),
+      dailyCap: readBoundedNumberEnv(
+        safeEnv.INSTANTLY_DAILY_CAP,
+        25,
+        1,
+        1000
+      ),
+      verifyLeadsOnImport: readBooleanEnvFlag(safeEnv.INSTANTLY_VERIFY_LEADS_ON_IMPORT),
     },
     googleCalendar: {
       enabled: readBooleanEnvFlag(safeEnv.GOOGLE_CALENDAR_SYNC_ENABLED),

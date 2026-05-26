@@ -131,7 +131,7 @@
       appendText(statusCell, "span", "status-text " + (customer.status === "Betaald" ? "is-paid" : "is-open"), customer.status);
       row.appendChild(statusCell);
       const assignedCell = createCell("Toegewezen aan", "muted-cell cell-assigned");
-      assignedCell.textContent = helpers.formatResponsibleDisplayName(customer.verantwoordelijk || "Serve");
+      assignedCell.textContent = helpers.formatResponsibleDisplayName(customer.verantwoordelijk || "Team");
       row.appendChild(assignedCell);
       [["Actief", customer.actief || "Ja", customer.actief === "Ja"], ["Review?", customer.review || "Nee", customer.review === "Ja"]].forEach(function (cellConfig) {
         const cell = createCell(cellConfig[0], "");

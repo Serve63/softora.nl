@@ -21,6 +21,7 @@ function registerAgendaReadRoutes(app, deps) {
       const payload = await deps.readCoordinator.listAppointments({
         limit: req.query.limit,
         freshSharedState: parseBooleanQuery(req.query.fresh),
+        viewer: req.premiumAuth || null,
       });
       return res.status(200).json(payload);
     })

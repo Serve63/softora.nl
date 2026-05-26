@@ -32,6 +32,7 @@ function createLeadOwnerService(deps = {}) {
         email: '',
       };
     }
+    if (key !== 'serve') return null;
     return {
       key: 'serve',
       displayName: 'Servé Creusen',
@@ -43,6 +44,7 @@ function createLeadOwnerService(deps = {}) {
 
   function buildLeadOwnerRecordFromUser(user, fallbackKey) {
     const fallback = buildLeadOwnerFallbackRecord(fallbackKey);
+    if (!fallback) return null;
     const fullName =
       premiumUsersStore?.buildUserDisplayName(user) || fallback.fullName;
     return {
@@ -84,11 +86,12 @@ function createLeadOwnerService(deps = {}) {
 
   function normalizeLeadOwnerRecord(value) {
     if (!value || typeof value !== 'object') return null;
-    const fallbackKey =
-      normalizeLeadOwnerKey(
-        value.key || value.displayName || value.fullName || value.email || ''
-      ) || 'serve';
+    const fallbackKey = normalizeLeadOwnerKey(
+      value.key || value.displayName || value.fullName || value.email || ''
+    );
+    if (fallbackKey !== 'serve' && fallbackKey !== 'martijn') return null;
     const fallback = buildLeadOwnerFallbackRecord(fallbackKey);
+    if (!fallback) return null;
     const rawDisplayName = truncateText(
       normalizeString(value.displayName || value.name || ''),
       80
@@ -153,6 +156,15 @@ function createLeadOwnerService(deps = {}) {
         leadOwnerFullName: existing.fullName,
         leadOwnerUserId: existing.userId,
         leadOwnerEmail: existing.email,
+      };
+    }
+    if (existingValue && typeof existingValue === 'object') {
+      return {
+        leadOwnerKey: '',
+        leadOwnerName: '',
+        leadOwnerFullName: '',
+        leadOwnerUserId: '',
+        leadOwnerEmail: '',
       };
     }
 

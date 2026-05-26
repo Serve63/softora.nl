@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eigen Land Simulatie</title>
+  <link rel="stylesheet" href="./assets/eigen-land-simulator.css" />
+</head>
+<body>
+  <main class="game-shell">
+    <header class="intro">
+      <h1>Eigen Land Simulatie</h1>
+      <p>Start met jouw eigen landinstellingen en beantwoord daarna alleen menu-keuzes.</p>
+      <p>Elke ronde geeft je een vraag met 3 beleidsopties.</p>
+    </header>
+
+    <section id="setupPanel" class="setup-panel">
+      <h2>Land opzetten</h2>
+      <form id="setupForm" class="setup-form">
+        <label>
+          <span>Naam van je land</span>
+          <input id="kingdomInput" type="text" placeholder="Bijv. Valorië" maxlength="28" required />
+        </label>
+        <label>
+          <span>Plaats / hoofdstad</span>
+          <input id="locationInput" type="text" placeholder="Bijv. Zonnedorp" maxlength="28" required />
+        </label>
+        <label>
+          <span>Ligging</span>
+          <select id="terrainSelect">
+            <option value="kust">Kust</option>
+            <option value="rivier">Rivierdelta</option>
+            <option value="berg">Bergland</option>
+            <option value="bos">Bosrand</option>
+            <option value="woestijn">Droogte-regio</option>
+          </select>
+        </label>
+        <p class="setup-help">Kies je ligging: dit beïnvloedt de startwaarden en hoe snel je uitdagingen zich ontwikkelen.</p>
+        <button id="startButton" type="submit">Start je eigen land</button>
+      </form>
+    </section>
+
+    <section class="meta-panel" aria-live="polite">
+      <p><span>Land:</span> <strong id="kingdomValue">-</strong></p>
+      <p><span>Plaats:</span> <strong id="locationValue">-</strong></p>
+      <p><span>Ligging:</span> <strong id="terrainValue">-</strong></p>
+      <p><span>Vraag:</span> <strong id="roundValue">-</strong></p>
+      <p><span>Jaar:</span> <strong id="yearValue">-</strong></p>
+      <p><strong id="statusMessage">Vul eerst je land op via het invulvenster.</strong></p>
+    </section>
+
+    <section class="stats-grid" id="statsGrid"></section>
+
+    <section class="actions">
+      <h2>Vraag</h2>
+      <p id="turnHint">Kies één optie uit het menu.</p>
+      <div id="currentQuestion" class="question-box">Vul eerst je land in om te beginnen.</div>
+      <div id="actionGrid" class="action-grid" role="list"></div>
+      <div class="advisor-block">
+        <label for="advisorPartySelect">Kies partijadviseur</label>
+        <select id="advisorPartySelect"></select>
+        <button id="advisorButton" class="advisor-button" type="button" disabled>Vraag partijadviseur om hulp</button>
+        <div id="advisorMessage" class="advisor-message hidden"></div>
+      </div>
+    </section>
+  </main>
+
+  <aside id="resultPanel" class="result-panel hidden" aria-live="polite">
+    <div class="result-content">
+      <h2 id="resultTitle">Game afgelopen</h2>
+      <p id="resultReason"></p>
+      <p id="resultScore"></p>
+      <button id="restartButton" type="button">Opnieuw beginnen</button>
+    </div>
+  </aside>
+
+  <script src="./assets/eigen-land-simulator.js" defer></script>
+</body>
+</html>

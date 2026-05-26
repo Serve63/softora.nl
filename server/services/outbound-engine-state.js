@@ -153,7 +153,7 @@ function normaliseInbox(payload) {
     email: normaliseEmail(payload.email),
     domainId: payload.domainId || normaliseDomainName(payload.domain),
     status: payload.status || 'pending',
-    dailyLimit: Math.min(Number(payload.dailyLimit || 20), 25),
+    dailyLimit: Math.min(Number(payload.dailyLimit || 9), 9),
     rampUpStartedAt: payload.rampUpStartedAt || null,
     sentToday: Number(payload.sentToday || 0),
   };

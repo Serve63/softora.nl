@@ -467,6 +467,30 @@ test('mailbox service connects softora accounts from shared mail hosts and compa
   }
 });
 
+test('mailbox service accepts full email env keys from Render blueprints', async () => {
+  const oldEnv = { ...process.env };
+  process.env.MAILBOX_SERVE_SOFTORA_NL_PASS = 'serve-secret';
+  try {
+    const service = createMailboxService({
+      mailConfig: {
+        smtpHost: 'smtp.strato.com',
+        smtpPort: 465,
+        smtpSecure: true,
+      },
+    });
+    const serve = service.getAccounts().find((account) => account.email === 'serve@softora.nl');
+
+    assert.equal(serve.smtpConfigured, true);
+    assert.equal(serve.imapConfigured, true);
+    assert.equal(serve.smtpUser, 'serve@softora.nl');
+    assert.equal(serve.smtpPass, 'serve-secret');
+    assert.equal(serve.imapUser, 'serve@softora.nl');
+    assert.equal(serve.imapPass, 'serve-secret');
+  } finally {
+    process.env = oldEnv;
+  }
+});
+
 test('mailbox service supports domain-level softora mailbox provider defaults', async () => {
   const oldEnv = { ...process.env };
   process.env.MAILBOX_SOFTORA_NL_SMTP_HOST = 'smtp.strato.com';

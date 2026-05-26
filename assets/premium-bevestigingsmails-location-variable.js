@@ -43,6 +43,20 @@
     if (normalized !== bodyInput.value) bodyInput.value = normalized;
   }
 
+  function normalizeSettingsBodies(settings) {
+    if (!settings || typeof settings !== 'object') return settings;
+    if (typeof settings.body === 'string') settings.body = normalizeBodyTemplate(settings.body);
+    if (settings.senders && typeof settings.senders === 'object') {
+      Object.keys(settings.senders).forEach((key) => {
+        const template = settings.senders[key];
+        if (template && typeof template === 'object' && typeof template.body === 'string') {
+          template.body = normalizeBodyTemplate(template.body);
+        }
+      });
+    }
+    return settings;
+  }
+
   function wrapGlobalFunction(name, createWrapper) {
     const original = window[name];
     if (typeof original !== 'function' || original.__softoraLocationVariableWrapped) return;
@@ -54,7 +68,7 @@
   function installFunctionWrappers() {
     wrapGlobalFunction('applyColdmailingSettings', (original) => function (settings) {
       const nextSettings = settings && typeof settings === 'object'
-        ? Object.assign({}, settings, { body: normalizeBodyTemplate(settings.body) })
+        ? normalizeSettingsBodies(Object.assign({}, settings))
         : settings;
       const result = original.call(this, nextSettings);
       normalizeCurrentTextarea();
@@ -63,8 +77,7 @@
 
     wrapGlobalFunction('collectColdmailingSettings', (original) => function () {
       const settings = original.apply(this, arguments);
-      if (settings && typeof settings === 'object') settings.body = normalizeBodyTemplate(settings.body);
-      return settings;
+      return normalizeSettingsBodies(settings);
     });
 
     wrapGlobalFunction('getColdmailCampaignPayload', (original) => function () {

@@ -86,7 +86,7 @@ function createInboxRows(inboxes, plan) {
       email,
       domainId: inbox.domainId || normaliseDomainName(inbox.domain),
       status: blocked ? 'blocked' : inbox.status || 'pending',
-      dailyLimit: inbox.dailyLimit || 20,
+      dailyLimit: inbox.dailyLimit || 9,
       sentToday: inbox.sentToday || 0,
       plannedToday: plannedByEmail[email] || 0,
       reasons: blocked ? blocked.reasons : [],

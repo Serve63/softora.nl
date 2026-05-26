@@ -178,6 +178,42 @@ test('runtime ops coordinator merges patches for ui-state writes', async () => {
   });
 });
 
+test('runtime ops coordinator records authenticated actor for ui-state writes', async () => {
+  const writes = [];
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: {},
+      source: 'supabase',
+      updatedAt: '2026-04-07T12:00:00.000Z',
+    }),
+    setUiStateValues: async (scope, values, meta) => {
+      writes.push({ scope, values, meta });
+      return { values, source: 'supabase', updatedAt: '2026-04-07T12:30:00.000Z' };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: {
+        authenticated: true,
+        displayName: 'Martijn van de Ven',
+        email: 'martijn@softora.nl',
+      },
+      body: {
+        values: { panel: 'mail' },
+        source: 'frontend',
+        actor: 'browser',
+      },
+    },
+    res,
+    'dashboard'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(writes[0].meta.actor, 'Martijn van de Ven');
+});
+
 test('runtime ops coordinator prefers structured data ops reads and mirrors writes safely', async () => {
   const bridgeCalls = [];
   const { coordinator } = createFixture({

@@ -19,7 +19,8 @@ function createResponseRecorder() {
 }
 
 function createFixture(overrides = {}) {
-  const appointments = [];
+  const appointments = overrides.appointments || [];
+  const activityCalls = [];
   const coordinator = createAgendaManualAppointmentCoordinator({
     isSupabaseConfigured: () => false,
     getSupabaseStateHydrated: () => true,
@@ -37,7 +38,9 @@ function createFixture(overrides = {}) {
       appointments.push(persisted);
       return persisted;
     },
-    appendDashboardActivity: () => {},
+    appendDashboardActivity: (activity, reason) => {
+      activityCalls.push({ activity, reason });
+    },
     buildRuntimeStateSnapshotPayload: () => null,
     applyRuntimeStateSnapshotPayload: () => false,
     waitForQueuedRuntimeSnapshotPersist: async () => true,
@@ -51,7 +54,7 @@ function createFixture(overrides = {}) {
     logger: { warn: () => {}, error: () => {} },
     ...overrides,
   });
-  return { appointments, coordinator };
+  return { activityCalls, appointments, coordinator };
 }
 
 test('agenda manual appointment stores legend choice and activity time', async () => {
@@ -134,6 +137,28 @@ test('agenda manual appointment can be assigned to Serve and Martijn together', 
   assert.equal(res.body.ok, true);
   assert.equal(res.body.appointment.manualPlannerWho, 'both');
   assert.match(res.body.appointment.summary, /Wie: Servé en Martijn/);
+});
+
+test('agenda manual all-day unavailable follows the selected owner instead of defaulting to Serve', async () => {
+  const { coordinator } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.createManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        who: 'martijn',
+        allDayUnavailable: true,
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.appointment.manualPlannerWho, 'martijn');
+  assert.equal(res.body.appointment.manualLegendChoice, 'manual-martijn');
+  assert.match(res.body.appointment.summary, /Wie: Martijn/);
 });
 
 test('agenda manual meeting stores the selected lead owner separately from planner visibility', async () => {
@@ -286,4 +311,120 @@ test('agenda manual appointment does not wait indefinitely for Google Calendar e
   assert.equal(res.body.ok, true);
   assert.equal(res.body.googleCalendarSync.timedOut, true);
   assert.equal(res.body.googleCalendarSync.reason, 'google_calendar_sync_timeout');
+});
+
+test('agenda manual appointment delete removes appointment after confirmation request', async () => {
+  const { activityCalls, appointments, coordinator } = createFixture({
+    appointments: [
+      {
+        id: 77,
+        callId: 'manual_77',
+        company: 'Klantbespreking',
+        date: '2026-04-28',
+        time: '11:00',
+      },
+    ],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.deleteAgendaAppointmentResponse(
+    { body: { actor: 'softora-ios-agenda' } },
+    res,
+    '77'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.deletedAppointmentId, 77);
+  assert.equal(appointments.length, 0);
+  assert.equal(activityCalls[0].reason, 'dashboard_activity_manual_agenda_appointment_deleted');
+});
+
+test('agenda manual appointment update changes existing appointment without duplicating it', async () => {
+  const { activityCalls, appointments, coordinator } = createFixture({
+    appointments: [
+      {
+        id: 78,
+        callId: 'manual_78',
+        company: 'Website meeting oud',
+        date: '2026-04-28',
+        time: '11:00',
+        location: 'Oude locatie',
+        manualLegendChoice: 'website',
+      },
+    ],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.updateManualAgendaAppointmentResponse(
+    {
+      body: {
+        date: '2026-04-28',
+        who: 'both',
+        appointmentKind: 'meeting',
+        manualLeadOwner: 'serve',
+        title: 'Website meeting nieuw',
+        time: '12:30',
+        legendChoice: 'business',
+        location: 'Nieuwe locatie',
+        notes: 'Nieuwe afspraakgegevens.',
+        actor: 'premium-personeel-agenda',
+      },
+    },
+    res,
+    '78'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(appointments.length, 1);
+  assert.equal(appointments[0].company, 'Website meeting nieuw');
+  assert.equal(appointments[0].time, '12:30');
+  assert.equal(appointments[0].location, 'Nieuwe locatie');
+  assert.equal(appointments[0].manualLegendChoice, 'business');
+  assert.equal(appointments[0].manualLeadOwnerKey, 'serve');
+  assert.match(appointments[0].summary, /Opmerkingen: Nieuwe afspraakgegevens\./);
+  assert.equal(activityCalls[0].reason, 'dashboard_activity_manual_agenda_appointment_updated');
+});
+
+test('agenda manual appointment delete returns 404 for missing appointment', async () => {
+  const { coordinator } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.deleteAgendaAppointmentResponse({ body: {} }, res, '999');
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /niet gevonden/i);
+});
+
+test('agenda manual appointment delete blocks other planner private appointments', async () => {
+  const { appointments, coordinator } = createFixture({
+    appointments: [
+      {
+        id: 88,
+        company: 'Martijn privé afspraak',
+        manualPlannerWho: 'martijn',
+        manualLegendChoice: 'manual-overig',
+        appointmentType: 'private',
+        date: '2026-05-12',
+        time: '10:30',
+      },
+    ],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.deleteAgendaAppointmentResponse(
+    {
+      body: { actor: 'softora-ios-agenda' },
+      premiumAuth: { email: 'serve@softora.nl', displayName: 'Servé Creusen' },
+    },
+    res,
+    '88'
+  );
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /privé-afspraak van de ander/i);
+  assert.equal(appointments.length, 1);
 });

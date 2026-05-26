@@ -20,7 +20,7 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.doesNotMatch(pageSource, /id="z4-count"/);
   assert.doesNotMatch(pageSource, /id="z5-count"/);
   assert.doesNotMatch(pageSource, /id="conv-zone-pct"/);
-  assert.match(pageSource, /<div class="card-title">Prompt & AI instructies<\/div>/);
+  assert.match(pageSource, /<div class="card-title">Standaard mailtekst<\/div>/);
   assert.match(pageSource, /<div class="campagne-title">Nieuwe Campagne<\/div>/);
   assert.match(pageSource, /Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
   assert.doesNotMatch(pageSource, /Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
@@ -201,8 +201,8 @@ test('premium bevestigingsmails campaign volume uses a fixed mail company label'
   assert.doesNotMatch(pageSource, /campaign-count-mode-label/);
   assert.doesNotMatch(pageSource, /Hoeveel afspraken inplannen\?/);
   assert.match(pageSource, /<div class="field-label" id="campaignVolumeLabel">Hoeveel bedrijven mailen\?<\/div>/);
-  assert.match(pageSource, /<input class="slider" type="range" min="5" max="30" step="5" value="10" id="mail-slider"/);
-  assert.match(pageSource, /const COLDMAIL_VOLUME_CONTROL = \{ min: 5, max: 30, step: 5, value: 10/);
+  assert.match(pageSource, /<input class="slider" type="range" min="1" max="9" step="1" value="9" id="mail-slider"/);
+  assert.match(pageSource, /const COLDMAIL_VOLUME_CONTROL = \{ min: 1, max: 9, step: 1, value: 9/);
   assert.match(pageSource, /const COLDCALL_VOLUME_CONTROL = \{ min: 10, max: 500, step: 10, value: 100/);
   assert.match(pageSource, /campaignVolumeLabel\.textContent = 'Hoeveel bedrijven bellen\?';/);
   assert.doesNotMatch(pageSource, /Aantal te mailen bedrijven/);
@@ -440,6 +440,8 @@ test('premium bevestigingsmails toont de locatie als zichtbare variabele', () =>
   assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-location-variable\.js\?v=20260429a"><\/script>/);
   assert.match(locationVariableSource, /\.mail-variable-note\{[\s\S]*color:var\(--crimson\);[\s\S]*border:1px solid rgba\(155,35,85,\.18\);/);
   assert.match(locationVariableSource, /function normalizeBodyTemplate\(value\)/);
+  assert.match(locationVariableSource, /function normalizeSettingsBodies\(settings\)/);
+  assert.match(locationVariableSource, /Object\.keys\(settings\.senders\)\.forEach/);
   assert.match(locationVariableSource, /📍\[ \\t\]\*\)Haaren/);
   assert.match(locationVariableSource, /note\.setAttribute\('aria-label', 'Dynamische plaats uit database'\);/);
   assert.match(locationVariableSource, /variable\.textContent = '\{\{stad\}\}';/);
@@ -459,6 +461,13 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /function getCampaignSettingsScope\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_SCOPE : COLDMAILING_SETTINGS_SCOPE;\s*\}/);
   assert.match(pageSource, /function getCampaignSettingsKey\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_KEY : COLDMAILING_SETTINGS_KEY;\s*\}/);
   assert.match(pageSource, /function collectColdmailingSettings\(\)/);
+  assert.match(pageSource, /const COLDMAILING_ALLOWED_SENDER_EMAILS = \['ruben@softora\.nl', 'serve@softora\.nl', 'martijn@softora\.nl', 'servec321@gmail\.com'\];/);
+  assert.match(pageSource, /function hydrateColdmailingAuthenticatedSenderEmail\(availableEmails\)/);
+  assert.match(pageSource, /const preferredSenderEmail = coldmailingAuthenticatedSenderEmail \|\| normalized\.senderEmail;/);
+  assert.match(pageSource, /senders,/);
+  assert.doesNotMatch(pageSource, /const canUseTopLevelTemplate = !email \|\| email === normalized\.senderEmail;/);
+  assert.doesNotMatch(pageSource, /settings\.senders\[normalizeCampaignSenderEmail\(senderEmail\)\] = normalizeColdmailingTemplate/);
+  assert.match(pageSource, /cache\.senders = \{\};/);
   assert.match(pageSource, /senderEmail: senderSelect \? senderSelect\.value : ''/);
   assert.match(pageSource, /specialAction: specialActionSelect \? specialActionSelect\.value : ''/);
   assert.match(pageSource, /coldcallingStack: stackSelect \? stackSelect\.value : ''/);
@@ -478,8 +487,9 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /\['campaignSenderEmail', 'campaignSpecialAction', 'coldcallingStack'\]/);
   assert.match(pageSource, /\['subj1', 'body1'\]/);
   assert.match(pageSource, /input\.addEventListener\('input', persistColdmailingSettingsSoon\);/);
-  assert.match(pageSource, /if \(subjectInput && normalized\.subject\) subjectInput\.value = normalized\.subject;/);
-  assert.match(pageSource, /if \(bodyInput && normalized\.body\) bodyInput\.value = normalized\.body;/);
+  assert.match(pageSource, /const template = getColdmailingTemplateForSender\(normalized, selectedSenderEmail\);/);
+  assert.match(pageSource, /if \(subjectInput\) subjectInput\.value = template\.subject;/);
+  assert.match(pageSource, /if \(bodyInput\) bodyInput\.value = template\.body;/);
   assert.match(
     pageSource,
     /initColdmailingMailboxOptions\(\)\s*\.then\(initColdmailingSettingsPersistence\)\s*\.catch\(initColdmailingSettingsPersistence\)\s*\.finally\(initCampaignSelects\)/

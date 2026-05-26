@@ -210,6 +210,8 @@ test('premium database preview lightbox toont previews zonder extra rand', () =>
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
   assert.match(pageSource, /<button class="add-actions-item" id="manualAddButton" type="button" role="menuitem">Handmatig toevoegen<\/button>/);
   assert.match(pageSource, /<button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">Bedrijven toevoegen<\/button>/);
+  assert.match(pageSource, /<button class="add-actions-item" id="instantOutreachSyncButton" type="button" role="menuitem">10 leads naar Instantly<\/button>/);
+  assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260526a/);
   assert.doesNotMatch(pageSource, /Volgende locatie doorzoeken/);
   assert.doesNotMatch(pageSource, /AI werkt de huidige plek automatisch af/);
   assert.doesNotMatch(pageSource, /100 bedrijven toevoegen/);

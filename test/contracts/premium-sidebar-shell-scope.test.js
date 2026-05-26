@@ -345,9 +345,19 @@ test('static premium sidebars share the same section order and public labels', (
     assert.equal(linkTargets.ads_linkedin, '/premium-advertenties#linkedin');
     assert.equal(linkTargets.social_linkedin, '/premium-socialmedia#linkedin');
     assert.equal(linkTargets.qr_code, '/premium-qr-code');
+    assert.equal(linkTargets.seo, '/premium-seo');
+    const seoLink = pageSource.match(
+      new RegExp('<a [^>]*data-sidebar-key="seo"[^>]*>[\\s\\S]*?<\\/a>')
+    );
+    assert.ok(seoLink, `${relativePath} mist unlocked sidebar-link seo`);
+    assert.match(seoLink[0], /href="\/premium-seo"/);
+    assert.match(seoLink[0], /<span class="sidebar-link-text">SEO<\/span>/);
+    assert.doesNotMatch(seoLink[0], /sidebar-link--coming-soon/);
+    assert.doesNotMatch(seoLink[0], /sidebar-link-lock/);
+    assert.doesNotMatch(seoLink[0], /aria-disabled/);
+    assert.doesNotMatch(seoLink[0], /tabindex="-1"/);
     for (const lockedKey of [
       'mailbox',
-      'seo',
       'qr_code',
       'ads_trustoo',
       'ads_pinterest',
@@ -373,11 +383,14 @@ test('static premium sidebars share the same section order and public labels', (
 
 test('unified premium sidebar splits ad channels from social media channels', () => {
   const themeJsSource = readRepoFile('assets/personnel-theme.js');
-
-  assert.match(
-    themeJsSource,
-    /const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*"mailbox"[\s\S]*\]\);/
+  const comingSoonSet = themeJsSource.match(
+    /const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[([\s\S]*?)\]\);/
   );
+
+  assert.ok(comingSoonSet, 'coming-soon sleutelset hoort expliciet te bestaan');
+  assert.match(comingSoonSet[1], /"mailbox"/);
+  assert.doesNotMatch(comingSoonSet[1], /"seo"/);
+  assert.match(comingSoonSet[1], /"qr_code"/);
   assert.match(themeJsSource, /sidebar-section-label\\">ADVERTENTIE'S</);
   assert.match(themeJsSource, /sidebar-section-label">Socialmedia</);
   assert.match(themeJsSource, /href:\s*"\/premium-advertenties#trustoo"[\s\S]*label:\s*"Trustoo"/);

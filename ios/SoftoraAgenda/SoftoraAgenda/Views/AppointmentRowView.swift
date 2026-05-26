@@ -10,7 +10,7 @@ struct AppointmentRowView: View {
                     .font(.headline)
                     .foregroundStyle(Color.softoraInk)
 
-                Text(AgendaDateFormatter.displayDate(appointment.date))
+                Text(AgendaDateFormatter.displayDate(appointment.date).softoraUppercased)
                     .font(.caption)
                     .foregroundStyle(Color.softoraMuted)
                     .multilineTextAlignment(.center)
@@ -18,14 +18,14 @@ struct AppointmentRowView: View {
             .frame(width: 86)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(appointment.title)
+                Text(appointment.title.softoraUppercased)
                     .font(.headline)
                     .foregroundStyle(Color.softoraInk)
 
                 HStack(spacing: 8) {
-                    Label(appointment.who.title, systemImage: "person.fill")
+                    Label(appointment.who.title.softoraUppercased, systemImage: "person.fill")
                     if !appointment.location.isEmpty, appointment.location != "—" {
-                        Label(appointment.location, systemImage: "mappin.and.ellipse")
+                        Label(appointment.location.softoraUppercased, systemImage: "mappin.and.ellipse")
                     }
                 }
                 .font(.caption)
