@@ -832,7 +832,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(importScriptSource, /resolve\(Array\.isArray\(body\.rows\) \? body\.rows : \[\]\)/);
   assert.match(pageSource, /function exportCSV\(\)/);
   assert.match(pageSource, /function renderUsedChannelTags\(customer\)/);
-  assert.match(pageSource, /const COLDMAIL_TEST_COMPANIES = \["mcv e-commerce"\];/);
+  assert.match(pageSource, /const COLDMAIL_TEST_COMPANIES = \["mcv e-commerce", "softora testmodus"\];/);
   assert.match(pageSource, /function isColdmailTestCompany\(customer\)/);
   assert.match(contactStatusScriptSource, /function hasColdmailSentSignal\(raw, helpers\)/);
   assert.match(contactStatusScriptSource, /function shouldInferMailedStatus\(storedStatus, raw, helpers\)/);

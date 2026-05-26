@@ -421,7 +421,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';/);
   assert.match(pageSource, /CUSTOMER_DB_KEY \+ '_chunks_v1'/);
   assert.match(pageSource, /CUSTOMER_DB_KEY \+ '_chunk_' \+ index/);
-  assert.match(pageSource, /const COLDMAIL_TEST_COMPANIES = \['mcv e-commerce'\];/);
+  assert.match(pageSource, /const COLDMAIL_TEST_COMPANIES = \['mcv e-commerce', 'softora testmodus'\];/);
   assert.match(pageSource, /function isDedicatedColdmailTestCampaignRow\(row\)/);
   assert.match(pageSource, /if \(!row \|\| typeof row !== 'object' \|\| isDedicatedColdmailTestCampaignRow\(row\)\) return false;/);
   assert.match(pageSource, /function isColdmailTestCampaignCompany\(row\)/);
