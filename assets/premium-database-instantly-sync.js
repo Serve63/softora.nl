@@ -3,7 +3,7 @@
   const DEFAULT_LIMIT = 10;
   const BUTTON_LABEL = '10 mockup-leads naar Instantly';
 
-  function showToast(message) {
+  function showToast(message, duration) {
     const toast = document.getElementById('toast');
     if (!toast) return;
     toast.textContent = String(message || '');
@@ -11,13 +11,35 @@
     window.clearTimeout(showToast.timer);
     showToast.timer = window.setTimeout(function () {
       toast.classList.remove('on');
-    }, 2600);
+    }, duration || 3600);
   }
 
-  function setBusy(button, busy) {
+  function setBusy(button, busy, label) {
     if (!button) return;
     button.disabled = Boolean(busy);
-    button.textContent = busy ? 'Leads worden doorgestuurd...' : BUTTON_LABEL;
+    button.textContent = label || (busy ? 'Leads worden doorgestuurd...' : BUTTON_LABEL);
+  }
+
+  function showButtonMessage(button, message) {
+    if (!button) return;
+    window.clearTimeout(showButtonMessage.timer);
+    button.textContent = message;
+    showButtonMessage.timer = window.setTimeout(function () {
+      if (!button.disabled) button.textContent = BUTTON_LABEL;
+    }, 4200);
+  }
+
+  function showBlockingError(message) {
+    const text = String(message || 'Instantly-sync mislukt');
+    showToast(text, 7000);
+    if (typeof window.alert === 'function') window.alert(text);
+  }
+
+  function reloadDatabaseSoon(button) {
+    setBusy(button, true, 'Database wordt ververst...');
+    window.setTimeout(function () {
+      window.location.reload();
+    }, 900);
   }
 
   function getMessage(payload, fallback) {
@@ -30,6 +52,7 @@
   async function syncLeads(button) {
     if (!window.confirm('10 leads met webdesign en mockup naar Instantly sturen?')) return;
     setBusy(button, true);
+    let reloadScheduled = false;
     try {
       const response = await fetch(SYNC_ENDPOINT, {
         method: 'POST',
@@ -50,14 +73,25 @@
         throw new Error(getMessage(payload, 'Instantly-sync mislukt.'));
       }
       if (payload.skipped) {
-        showToast(payload.reason === 'daily_cap_reached' ? 'Daglimiet bereikt' : 'Geen geschikte mockup-leads gevonden');
+        const message = payload.reason === 'daily_cap_reached' ? 'Daglimiet bereikt' : 'Geen geschikte mockup-leads gevonden';
+        showToast(message, 5600);
+        showButtonMessage(button, message);
         return;
       }
-      showToast('✓ ' + Number(payload.synced || 0).toLocaleString('nl-NL') + ' mockup-leads naar Instantly');
+      const syncedCount = Number(payload.synced || 0);
+      const markedCount = Number(payload.markedBenaderd || 0);
+      if (syncedCount > 0 || markedCount > 0) {
+        showToast('✓ ' + syncedCount.toLocaleString('nl-NL') + ' mockup-leads naar Instantly. Database wordt ververst...', 5600);
+        reloadScheduled = true;
+        reloadDatabaseSoon(button);
+        return;
+      }
+      showToast('Geen nieuwe mockup-leads doorgestuurd', 5600);
+      showButtonMessage(button, 'Geen nieuwe mockup-leads');
     } catch (error) {
-      showToast(error && error.message ? error.message : 'Instantly-sync mislukt');
+      showBlockingError(error && error.message ? error.message : 'Instantly-sync mislukt');
     } finally {
-      setBusy(button, false);
+      if (!reloadScheduled) setBusy(button, false);
     }
   }
 
