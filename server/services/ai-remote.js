@@ -85,7 +85,16 @@ function createAiRemoteService(deps = {}) {
     websiteGenerationTimeoutMs = 60000,
     websiteGenerationStrictAnthropic = false,
     websiteGenerationStrictHtml = false,
+    waitForOpenAiImageRetry = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    openAiImageRateLimitRetryAttempts = 8,
   } = deps;
+
+  const OPENAI_IMAGE_RATE_LIMIT_RETRY_ATTEMPTS = Math.max(
+    1,
+    Math.min(20, Number(openAiImageRateLimitRetryAttempts) || 8)
+  );
+  const OPENAI_IMAGE_RATE_LIMIT_RETRY_FALLBACK_MS = 15000;
+  const OPENAI_IMAGE_RATE_LIMIT_RETRY_MAX_MS = 90000;
 
   function parseHtmlTagAttributes(tagRaw) {
     const tag = String(tagRaw || '');
@@ -1006,6 +1015,71 @@ function createAiRemoteService(deps = {}) {
     );
   }
 
+  function getOpenAiImageErrorMessage(data) {
+    return [
+      data?.error?.message,
+      data?.error?.detail,
+      data?.error,
+      data?.message,
+      data?.detail,
+    ]
+      .map((value) => normalizeString(value))
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  function getResponseHeader(response, headerName) {
+    try {
+      if (!response || !response.headers || typeof response.headers.get !== 'function') return '';
+      return normalizeString(response.headers.get(headerName));
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function parseRetryAfterMs(value) {
+    const raw = normalizeString(value);
+    if (!raw) return 0;
+    const seconds = Number(raw);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds * 1000) + 1000;
+    const timestamp = Date.parse(raw);
+    if (Number.isFinite(timestamp)) return Math.max(0, timestamp - Date.now()) + 1000;
+    return 0;
+  }
+
+  function isOpenAiImageRateLimitResponse(response, data) {
+    const status = Number(response?.status || 0);
+    if (status === 429) return true;
+    return /rate limit|too many requests|try again in/i.test(getOpenAiImageErrorMessage(data));
+  }
+
+  function getOpenAiImageRateLimitRetryMs(response, data) {
+    const retryAfterMs = parseRetryAfterMs(getResponseHeader(response, 'retry-after'));
+    const message = getOpenAiImageErrorMessage(data);
+    const secondsMatch = message.match(/try again in\s+([0-9]+(?:\.[0-9]+)?)\s*(?:s|sec|secs|second|seconds)?/i);
+    const messageMs = secondsMatch ? Math.ceil(Number(secondsMatch[1]) * 1000) + 1000 : 0;
+    const parsedMs = retryAfterMs || messageMs || OPENAI_IMAGE_RATE_LIMIT_RETRY_FALLBACK_MS;
+    const safeMs =
+      Number.isFinite(parsedMs) && parsedMs > 0
+        ? parsedMs
+        : OPENAI_IMAGE_RATE_LIMIT_RETRY_FALLBACK_MS;
+    return Math.max(1000, Math.min(OPENAI_IMAGE_RATE_LIMIT_RETRY_MAX_MS, safeMs));
+  }
+
+  async function requestOpenAiWebsitePreviewImageGenerationWithRateLimitRetry(options) {
+    let lastResult = null;
+    for (let attempt = 1; attempt <= OPENAI_IMAGE_RATE_LIMIT_RETRY_ATTEMPTS; attempt += 1) {
+      const result = await requestOpenAiWebsitePreviewImageGeneration(options);
+      lastResult = result;
+      if (result?.response?.ok || !isOpenAiImageRateLimitResponse(result?.response, result?.data)) {
+        return result;
+      }
+      if (attempt >= OPENAI_IMAGE_RATE_LIMIT_RETRY_ATTEMPTS) return result;
+      await waitForOpenAiImageRetry(getOpenAiImageRateLimitRetryMs(result.response, result.data));
+    }
+    return lastResult;
+  }
+
   function isOpenAiImageSizeError(response, data) {
     const status = Number(response?.status || 0);
     if (status !== 400 && status !== 422) return false;
@@ -1043,7 +1117,7 @@ function createAiRemoteService(deps = {}) {
       referenceImageCount: referenceImages.length,
     });
 
-    let { response, data } = await requestOpenAiWebsitePreviewImageGeneration({
+    let { response, data } = await requestOpenAiWebsitePreviewImageGenerationWithRateLimitRetry({
       apiKey,
       imageModel,
       prompt,
@@ -1051,7 +1125,7 @@ function createAiRemoteService(deps = {}) {
       imageSize: '2160x3840',
     });
     if (!response.ok && isOpenAiImageSizeError(response, data)) {
-      ({ response, data } = await requestOpenAiWebsitePreviewImageGeneration({
+      ({ response, data } = await requestOpenAiWebsitePreviewImageGenerationWithRateLimitRetry({
         apiKey,
         imageModel,
         prompt,

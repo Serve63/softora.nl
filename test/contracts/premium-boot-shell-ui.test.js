@@ -52,7 +52,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
     assert.match(source, /class="premium-boot-shell is-booting"/, file);
     if (file !== 'premium-instellingen.html') {
       if (file === 'premium-actieve-opdrachten.html') {
-        assert.match(source, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260511a"><\/script>/, file);
+        assert.match(source, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260526a"><\/script>/, file);
         const activeOrdersPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
         const activeOrdersSource = fs.readFileSync(activeOrdersPath, 'utf8');
         assert.match(activeOrdersSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
@@ -77,7 +77,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const bookkeepingSource = fs.readFileSync(bookkeepingPath, 'utf8');
         assert.match(bookkeepingSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else if (file === 'premium-mailbox.html') {
-        assert.match(source, /<script src="assets\/premium-mailbox\.js\?v=20260520a"><\/script>/, file);
+        assert.match(source, /<script src="assets\/premium-mailbox\.js\?v=20260522a"><\/script>/, file);
         const mailboxPath = path.join(__dirname, '../../assets/premium-mailbox.js');
         const mailboxSource = fs.readFileSync(mailboxPath, 'utf8');
         assert.match(mailboxSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);

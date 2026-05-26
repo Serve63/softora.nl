@@ -185,6 +185,8 @@ function createService(overrides = {}) {
     websiteGenerationTimeoutMs: overrides.websiteGenerationTimeoutMs || 45000,
     websiteGenerationStrictAnthropic: Boolean(overrides.websiteGenerationStrictAnthropic),
     websiteGenerationStrictHtml: Boolean(overrides.websiteGenerationStrictHtml),
+    waitForOpenAiImageRetry: overrides.waitForOpenAiImageRetry,
+    openAiImageRateLimitRetryAttempts: overrides.openAiImageRateLimitRetryAttempts,
   });
 
   return {
@@ -239,6 +241,43 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.equal(result.fileName, 'softora.nl.png');
   assert.equal(result.dataUrl, 'data:image/png;base64,YWJjZA==');
   assert.equal(result.revisedPrompt, 'Verbeterde prompt');
+});
+
+test('ai remote service waits and retries OpenAI image rate limits before surfacing an error', async () => {
+  const calls = [];
+  const waits = [];
+  const { service } = createService({
+    openAiImageRateLimitRetryAttempts: 3,
+    waitForOpenAiImageRetry: async (ms) => {
+      waits.push(ms);
+    },
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      if (calls.length === 1) {
+        return {
+          response: { ok: false, status: 429, headers: { get: () => '' } },
+          data: {
+            error: {
+              message:
+                'Rate limit reached for gpt-image-2 on input-images per min. Please try again in 12s.',
+            },
+          },
+        };
+      }
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          data: [{ b64_json: 'cmV0cmllZA==' }],
+        },
+      };
+    },
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({ host: 'softora.nl' });
+
+  assert.equal(calls.length, 2);
+  assert.deepEqual(waits, [13000]);
+  assert.equal(result.dataUrl, 'data:image/png;base64,cmV0cmllZA==');
 });
 
 test('ai remote service uses OpenAI image edits with fetched website reference images when available', async () => {
