@@ -472,6 +472,37 @@ test('instantly sync respects the daily cap and backfills existing Instantly row
   assert.equal(getRows()[1].status, 'prospect');
 });
 
+test('instantly sync counts the daily cap in Amsterdam time', async () => {
+  const { service, fetchCalls } = createService({
+    dailyCap: 1,
+    now: '2026-05-25T23:30:00.000Z',
+    rows: [
+      {
+        id: 'synced-amsterdam-today',
+        bedrijf: 'Amsterdam Vandaag BV',
+        email: 'vandaag@example.test',
+        status: 'prospect',
+        mail: true,
+        instantlySyncedAt: '2026-05-25T22:30:00.000Z',
+      },
+      {
+        id: 'prospect-2',
+        bedrijf: 'Nieuwe Lead BV',
+        email: 'nieuw@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'daily_cap_reached');
+  assert.equal(fetchCalls.length, 0);
+});
+
 test('instantly status exposes the approached marker for production verification', async () => {
   const { service } = createService({
     rows: [

@@ -8,32 +8,7 @@ function registerInstantlyRoutes(app, deps = {}) {
 
   if (!instantlyOutreachService) return;
 
-  app.post('/api/instantly/webhook', async (req, res) => {
-    try {
-      if (typeof instantlyOutreachService.handleInstantlyWebhook !== 'function') {
-        res.status(404).json({
-          ok: false,
-          code: 'INSTANTLY_WEBHOOK_UNAVAILABLE',
-          message: 'Instantly webhook is niet beschikbaar.',
-        });
-        return;
-      }
-      const result = await instantlyOutreachService.handleInstantlyWebhook(req);
-      res.json(result);
-    } catch (error) {
-      res.status(error && error.status ? error.status : 400).json({
-        ok: false,
-        code: normalizeString(error && error.code) || 'INSTANTLY_WEBHOOK_FAILED',
-        message: truncateText(
-          normalizeString(error && error.message) || 'Instantly webhook kon niet worden verwerkt.',
-          500
-        ),
-        missing: Array.isArray(error && error.missing) ? error.missing : undefined,
-      });
-    }
-  });
-
-  app.post('/api/instantly/sync', requirePremiumAdminApiAccess, async (req, res) => {
+  async function handleSync(req, res) {
     try {
       if (typeof instantlyOutreachService.syncInstantlyLeads !== 'function') {
         res.status(404).json({
@@ -63,9 +38,9 @@ function registerInstantlyRoutes(app, deps = {}) {
         missing: Array.isArray(error && error.missing) ? error.missing : undefined,
       });
     }
-  });
+  }
 
-  app.get('/api/instantly/status', requirePremiumAdminApiAccess, async (_req, res) => {
+  async function handleStatus(_req, res) {
     try {
       if (typeof instantlyOutreachService.getStatus !== 'function') {
         res.status(404).json({
@@ -87,7 +62,38 @@ function registerInstantlyRoutes(app, deps = {}) {
         ),
       });
     }
+  }
+
+  app.post('/api/instantly/webhook', async (req, res) => {
+    try {
+      if (typeof instantlyOutreachService.handleInstantlyWebhook !== 'function') {
+        res.status(404).json({
+          ok: false,
+          code: 'INSTANTLY_WEBHOOK_UNAVAILABLE',
+          message: 'Instantly webhook is niet beschikbaar.',
+        });
+        return;
+      }
+      const result = await instantlyOutreachService.handleInstantlyWebhook(req);
+      res.json(result);
+    } catch (error) {
+      res.status(error && error.status ? error.status : 400).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'INSTANTLY_WEBHOOK_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Instantly webhook kon niet worden verwerkt.',
+          500
+        ),
+        missing: Array.isArray(error && error.missing) ? error.missing : undefined,
+      });
+    }
   });
+
+  app.post('/api/instantly/sync', requirePremiumAdminApiAccess, handleSync);
+  app.post('/api/outreach/provider-sync', requirePremiumAdminApiAccess, handleSync);
+
+  app.get('/api/instantly/status', requirePremiumAdminApiAccess, handleStatus);
+  app.get('/api/outreach/provider-status', requirePremiumAdminApiAccess, handleStatus);
 }
 
 module.exports = {
