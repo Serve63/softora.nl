@@ -43,12 +43,13 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /if \(nodes\.fieldResponsible\) nodes\.fieldResponsible\.value = customer\.verantwoordelijk \|\| "Serve";/);
   assert.match(pageSource, /verantwoordelijk: nodes\.fieldResponsible \? nodes\.fieldResponsible\.value : "Serve",/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
-  assert.match(pageSource, /<section class="hero">[\s\S]*<div class="hero-copy">[\s\S]*<div class="hero-side">[\s\S]*<div class="leaderboard-card" id="leaderboardCard">/);
+  assert.match(pageSource, /<section class="hero">[\s\S]*<div class="hero-copy">[\s\S]*Overzicht van al je klanten en betalingen\.[\s\S]*<\/section>/);
+  assert.doesNotMatch(pageSource, /<div class="hero-side">[\s\S]*leaderboard-card/);
+  assert.doesNotMatch(pageSource, /<div class="leaderboard-card" id="leaderboardCard">/);
+  assert.doesNotMatch(pageSource, /<div class="leaderboard-list" id="leaderboardList">/);
+  assert.doesNotMatch(pageSource, /<span class="leaderboard-entry-name">(?:Team|Servé|Martijn)<\/span>/);
+  assert.doesNotMatch(pageSource, /<span class="leaderboard-entry-count">\d+ opdrachten<\/span>/);
   assert.doesNotMatch(pageSource, /Meeste opdrachten/);
-  assert.match(
-    pageSource,
-    /<div class="leaderboard-copy">\s*<div class="leaderboard-list" id="leaderboardList">[\s\S]*Servé[\s\S]*0 opdrachten[\s\S]*Martijn[\s\S]*0 opdrachten/
-  );
   assert.match(pageSource, /leaderboardCard: document\.getElementById\("leaderboardCard"\),/);
   assert.match(pageSource, /leaderboardList: document\.getElementById\("leaderboardList"\),/);
   assert.match(pageSource, /function updateLeaderboard\(\)/);
