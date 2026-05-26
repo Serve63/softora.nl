@@ -18,6 +18,15 @@
         return String(value || '').replace(/\s+/g, ' ').trim();
     }
 
+    function normalizeOpenLeadAssignee(value) {
+        const raw = normalizeOpenLeadText(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        if (!raw) return '';
+        const words = raw.split(/[^a-z]+/).filter(Boolean);
+        if (words.includes('serve')) return 'Servé';
+        if (words.includes('martijn')) return 'Martijn';
+        return '';
+    }
+
     function joinLeadNotes() {
         return Array.from(arguments)
             .map((value) => String(value || '').trim())
@@ -87,6 +96,17 @@
         return bTs - aTs;
     }
 
+    function mergeOpenLeadOptions(manualLeads, fetchedLeads) {
+        const merged = new Map();
+        (Array.isArray(manualLeads) ? manualLeads : []).forEach((lead) => {
+            if (lead) merged.set(String(lead.id), lead);
+        });
+        (Array.isArray(fetchedLeads) ? fetchedLeads : []).forEach((lead) => {
+            if (lead) merged.set(String(lead.id), lead);
+        });
+        return Array.from(merged.values()).sort(compareAgendaLeadOptions);
+    }
+
     function normalizeLeadFollowUpStatus(value) {
         return String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
     }
@@ -94,12 +114,29 @@
     function resolveOpenLeadProductLine(item) {
         const hay = [
             item?.leadType,
+            item?.productLine,
+            item?.openLeadType,
+            item?.manualLeadType,
+            item?.manualOpenLeadType,
+            item?.manualLeadProductLine,
+            item?.serviceType,
+            item?.service,
+            item?.category,
+            item?.line,
+            item?.product,
+            item?.typeLabel,
             item?.title,
             item?.company,
             item?.summary,
+            item?.description,
+            item?.notes,
             item?.conversationSummary,
+            item?.postCallPrompt,
+            item?.postCallNotesTranscript,
             item?.coldcallingStack,
             item?.coldcallingStackLabel,
+            item?.manualLegendChoice,
+            item?.legendChoice,
             item?.providerLabel,
             item?.source
         ].map((value) => String(value || '').toLowerCase()).join(' ');
@@ -113,17 +150,27 @@
 
     function isOpenLeadFollowUpTask(item) {
         const status = [item?.type, item?.taskType, item?.confirmationTaskType, item?.postCallStatus].map(normalizeLeadFollowUpStatus).join(' ');
-        if (!status.includes('lead_follow_up')) return false;
+        const openLeadSignal = [
+            status.includes('lead_follow_up'),
+            status.includes('open_lead'),
+            status.includes('openstaande_lead'),
+            status.includes('manual_open_lead'),
+            status.includes('manual_lead'),
+            String(item?.isOpenLead || '').trim() === 'true',
+            String(item?.isManualOpenLead || '').trim() === 'true',
+            String(item?.orderFilterGroup || '').trim() === 'open_leads'
+        ].some(Boolean);
+        if (!openLeadSignal) return false;
+        if (/(uit_systeem|cancel|cancelled|completed|voltooid|afgerond|actieve_opdracht|active_order|betaald|paid)/.test(status)) return false;
         if (Number(item?.activeOrderId || 0) > 0) return false;
-        return Boolean(resolveOpenLeadProductLine(item));
+        return Boolean(resolveOpenLeadProductLine(item) || item?.isOpenLead || item?.isManualOpenLead);
     }
 
     function normalizeOpenLeadOption(item) {
         if (!item || typeof item !== 'object' || !isOpenLeadFollowUpTask(item)) return null;
         const id = Number(item?.appointmentId || item?.id);
         if (!Number.isFinite(id) || id <= 0) return null;
-        const productLine = resolveOpenLeadProductLine(item);
-        if (!productLine) return null;
+        const productLine = resolveOpenLeadProductLine(item) || 'website';
         const date = String(item?.date || '').trim();
         const time = String(item?.time || '').trim();
         return {
@@ -164,13 +211,19 @@
         if (!force && openLeadOptions.length && (now - openLeadOptionsLoadedAt) < OPEN_LEAD_CACHE_MS) return openLeadOptions;
         if (openLeadOptionsPromise) return openLeadOptionsPromise;
         openLeadOptionsPromise = (async () => {
+            const persistedManualLeads = typeof window.SoftoraManualOpenLeads?.list === 'function'
+                ? await window.SoftoraManualOpenLeads.list(force)
+                : [];
             try {
                 const response = await fetch('/api/agenda/confirmation-tasks?limit=250&quick=1&fresh=1', { cache: 'no-store' });
                 const result = await response.json().catch(() => ({}));
                 if (!response.ok || !result?.ok || !Array.isArray(result?.tasks)) throw new Error('Openstaande leads niet beschikbaar.');
-                openLeadOptions = result.tasks.map(normalizeOpenLeadOption).filter(Boolean).sort(compareAgendaLeadOptions);
+                openLeadOptions = mergeOpenLeadOptions(
+                    persistedManualLeads,
+                    result.tasks.map(normalizeOpenLeadOption).filter(Boolean)
+                );
             } catch (_) {
-                openLeadOptions = [];
+                openLeadOptions = mergeOpenLeadOptions(persistedManualLeads, []);
             } finally {
                 openLeadOptionsLoadedAt = Date.now();
             }
@@ -451,6 +504,16 @@
         if (attrs.placeholder) field.placeholder = attrs.placeholder;
         if (attrs.min) field.min = attrs.min;
         if (attrs.step) field.step = attrs.step;
+        if (tagName === 'select') {
+            field.dataset.customSelect = 'true';
+            const options = Array.isArray(attrs.options) ? attrs.options : [];
+            field.replaceChildren(...options.map((option) => {
+                const optionEl = document.createElement('option');
+                optionEl.value = option.value;
+                optionEl.textContent = option.label;
+                return optionEl;
+            }));
+        }
         wrap.append(labelEl, field);
         parent.appendChild(wrap);
         return field;
@@ -485,6 +548,14 @@
         createLeadConvertField(grid, 'openLeadConvertTitle', 'Opdracht titel', 'input', { required: true, full: true });
         createLeadConvertField(grid, 'openLeadConvertDelivery', 'Oplevertijd', 'input', { required: true });
         createLeadConvertField(grid, 'openLeadConvertAmount', 'Bedrag', 'input', { required: true, type: 'number', min: '1', step: '100' });
+        createLeadConvertField(grid, 'openLeadConvertAssignee', 'Toegewezen aan', 'select', {
+            required: true,
+            options: [
+                { value: '', label: 'Kies medewerker' },
+                { value: 'Martijn', label: 'Martijn' },
+                { value: 'Servé', label: 'Servé' }
+            ]
+        });
         createLeadConvertField(grid, 'openLeadConvertDomain', 'Domeinnaam', 'input', { placeholder: 'optioneel', full: true });
         const notes = createLeadConvertField(grid, 'openLeadConvertNotes', 'Info / notities', 'textarea', { required: true, full: true });
 
@@ -614,6 +685,7 @@
         const title = document.getElementById('openLeadConvertTitle');
         const delivery = document.getElementById('openLeadConvertDelivery');
         const amount = document.getElementById('openLeadConvertAmount');
+        const assignee = document.getElementById('openLeadConvertAssignee');
         const domain = document.getElementById('openLeadConvertDomain');
         const notes = document.getElementById('openLeadConvertNotes');
         if (company) company.value = lead.company || '';
@@ -621,10 +693,12 @@
         if (title) title.value = `${getOpenLeadLineLabel(lead.productLine)} opdracht voor ${lead.company || 'lead'}`;
         if (delivery) delivery.value = 'Volgens afspraak';
         if (amount) amount.value = String(parseOpenLeadAmount(lead.value));
+        if (assignee) assignee.value = normalizeOpenLeadAssignee(lead.leadOwnerName || '');
         if (domain) domain.value = lead.postCallDomainName || '';
         if (notes) {
             notes.value = joinLeadNotes(lead.postCallNotesTranscript, lead.summary);
         }
+        if (typeof window.initCustomFormSelects === 'function') window.initCustomFormSelects(document.getElementById('openLeadConvertModal') || document);
         const audioStatus = document.getElementById('openLeadConvertAudioStatus');
         if (audioStatus) audioStatus.textContent = '';
         setOpenLeadConversionMessage('', '');
@@ -709,9 +783,9 @@
     }
 
     function removeOpenLeadLocally(leadId) {
-        const numericId = Number(leadId);
-        openLeadOptions = openLeadOptions.filter((item) => Number(item?.id) !== numericId);
-        const card = document.getElementById(`open-lead-${numericId}`);
+        const idKey = String(leadId || '');
+        openLeadOptions = openLeadOptions.filter((item) => String(item?.id) !== idKey);
+        const card = document.getElementById(`open-lead-${idKey}`);
         if (card) card.remove();
         if (typeof window.refreshOrderSummaryCards === 'function') window.refreshOrderSummaryCards();
     }
@@ -752,14 +826,19 @@
         if (convertBtn) convertBtn.disabled = true;
         setOpenLeadActionMessage('Lead wordt uit systeem gehaald...', '');
         try {
-            await postOpenLeadJsonWithFallback(
-                [
-                    `/api/agenda/confirmation-tasks/${encodeURIComponent(String(lead.id))}/mark-cancelled`,
-                    `/api/agenda/confirmation-task-mark-cancelled?taskId=${encodeURIComponent(String(lead.id))}`
-                ],
-                { actor: 'premium-actieve-opdrachten', status: 'uit_systeem' },
-                { timeoutMs: 20000 }
-            );
+            if (lead.isManualOpenLead) {
+                if (typeof window.SoftoraManualOpenLeads?.remove !== 'function') throw new Error('Handmatige lead-opslag is niet beschikbaar.');
+                await window.SoftoraManualOpenLeads.remove(lead.id);
+            } else {
+                await postOpenLeadJsonWithFallback(
+                    [
+                        `/api/agenda/confirmation-tasks/${encodeURIComponent(String(lead.id))}/mark-cancelled`,
+                        `/api/agenda/confirmation-task-mark-cancelled?taskId=${encodeURIComponent(String(lead.id))}`
+                    ],
+                    { actor: 'premium-actieve-opdrachten', status: 'uit_systeem' },
+                    { timeoutMs: 20000 }
+                );
+            }
             removeOpenLeadLocally(lead.id);
             closeOpenLeadActionModal();
             await showOpenLeadFeedback('Lead is uit openstaande leads gehaald.', {
@@ -785,6 +864,7 @@
             title: document.getElementById('openLeadConvertTitle')?.value || '',
             delivery: document.getElementById('openLeadConvertDelivery')?.value || '',
             amount: document.getElementById('openLeadConvertAmount')?.value || '',
+            assignee: document.getElementById('openLeadConvertAssignee')?.value || '',
             domain: document.getElementById('openLeadConvertDomain')?.value || '',
             notes: document.getElementById('openLeadConvertNotes')?.value || ''
         };
@@ -794,13 +874,22 @@
         const delivery = normalizeOpenLeadText(values.delivery);
         const notes = String(values.notes || '').trim();
         const amount = parseOpenLeadAmount(values.amount);
-        if (!company || !contact || !title || !delivery || notes.length < 10) {
-            setOpenLeadConversionMessage('Vul bedrijf, contact, titel, oplevertijd en notities in.', 'error');
+        const assignee = normalizeOpenLeadAssignee(values.assignee || lead.leadOwnerName || '');
+        if (!company || !contact || !title || !delivery || !assignee || notes.length < 10) {
+            setOpenLeadConversionMessage('Vul bedrijf, contact, titel, oplevertijd, toegewezen aan en notities in.', 'error');
             return;
         }
         setOpenLeadConversionBusy(true);
         setOpenLeadConversionMessage('Dossier bijwerken en verplaatsen...', '');
         try {
+            if (lead.isManualOpenLead) {
+                if (typeof window.SoftoraManualOpenLeads?.convertToOrder !== 'function') throw new Error('Handmatige lead-opslag is niet beschikbaar.');
+                await window.SoftoraManualOpenLeads.convertToOrder(lead, { ...values, company, contact, title, delivery, amount, notes }, assignee);
+                removeOpenLeadLocally(lead.id);
+                closeOpenLeadConversionModal(true);
+                if (typeof window.setOrderFilter === 'function') window.setOrderFilter('in_progress');
+                return;
+            }
             const prompt = lead.postCallPrompt || buildPromptFromOpenLead(lead, {
                 company,
                 title,
@@ -821,7 +910,9 @@
                     amount,
                     domainName: normalizeOpenLeadText(values.domain || lead.postCallDomainName || ''),
                     transcript: joinLeadNotes(lead.postCallNotesTranscript, notes),
-                    prompt
+                    prompt,
+                    assignee,
+                    leadOwnerName: assignee
                 },
                 { timeoutMs: 30000 }
             );
@@ -910,6 +1001,10 @@
         renderOpenLeadCards();
     }
 
-    window.SoftoraActiveOrderOpenLeads = { load: loadOpenLeadCards, normalizeOpenLeadOption, resolveOpenLeadProductLine };
+    window.SoftoraActiveOrderOpenLeads = {
+        load: loadOpenLeadCards,
+        normalizeOpenLeadOption,
+        resolveOpenLeadProductLine
+    };
     window.setTimeout(() => { void loadOpenLeadCards(true); }, 450);
 })();

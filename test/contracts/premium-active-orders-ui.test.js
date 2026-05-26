@@ -9,21 +9,24 @@ function readActiveOrdersSources() {
   const assignmentToggleStylePath = path.join(__dirname, '../../assets/premium-active-order-assignment-toggle.css');
   const assignmentToggleScriptPath = path.join(__dirname, '../../assets/premium-active-order-assignment-toggle.js');
   const openLeadsScriptPath = path.join(__dirname, '../../assets/premium-active-order-open-leads.js');
+  const manualOpenLeadsScriptPath = path.join(__dirname, '../../assets/premium-active-order-manual-open-leads.js');
   const customSelectsScriptPath = path.join(__dirname, '../../assets/premium-active-order-custom-selects.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
   const assignmentToggleStyleSource = fs.readFileSync(assignmentToggleStylePath, 'utf8');
   const assignmentToggleScriptSource = fs.readFileSync(assignmentToggleScriptPath, 'utf8');
   const openLeadsScriptSource = fs.readFileSync(openLeadsScriptPath, 'utf8');
+  const manualOpenLeadsScriptSource = fs.readFileSync(manualOpenLeadsScriptPath, 'utf8');
   const customSelectsScriptSource = fs.readFileSync(customSelectsScriptPath, 'utf8');
   return {
     pageSource,
     scriptSource,
     openLeadsScriptSource,
+    manualOpenLeadsScriptSource,
     customSelectsScriptSource,
     assignmentToggleStyleSource,
     assignmentToggleScriptSource,
-    combinedSource: `${pageSource}\n${scriptSource}\n${openLeadsScriptSource}\n${customSelectsScriptSource}\n${assignmentToggleStyleSource}\n${assignmentToggleScriptSource}`,
+    combinedSource: `${pageSource}\n${scriptSource}\n${openLeadsScriptSource}\n${manualOpenLeadsScriptSource}\n${customSelectsScriptSource}\n${assignmentToggleStyleSource}\n${assignmentToggleScriptSource}`,
   };
 }
 
@@ -32,7 +35,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
 
   assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260526a"><\/script>/);
   assert.match(pageSource, /assets\/premium-active-order-custom-selects\.js\?v=20260526a/);
-  assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260526c/);
+  assert.match(pageSource, /assets\/premium-active-order-manual-open-leads\.js\?v=20260526a/);
+  assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260526d/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -72,6 +76,12 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /function normalizeOpenLeadOption\(item\) \{/);
   assert.match(source, /function isOpenLeadFollowUpTask\(item\) \{/);
   assert.match(source, /function renderOpenLeadCards\(\) \{/);
+  assert.match(source, /const MANUAL_OPEN_LEADS_KEY = 'softora_manual_open_leads_premium_v1';/);
+  assert.match(source, /function mergeOpenLeadOptions\(manualLeads, fetchedLeads\) \{/);
+  assert.match(source, /function createOpenLeadCreateModal\(\) \{/);
+  assert.match(source, /Openstaande Lead Aanmaken/);
+  assert.match(source, /function submitOpenLeadCreate\(event\) \{/);
+  assert.match(source, /window\.SoftoraManualOpenLeads = \{/);
   assert.match(source, /function openOpenLeadActionModal\(lead\) \{/);
   assert.match(source, /function submitOpenLeadConversion\(event\) \{/);
   assert.match(source, /Uit systeem halen/);
@@ -89,6 +99,8 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /appendOpenLeadDossierItem\(grid, 'Notities \/ transcript', lead\.postCallNotesTranscript/);
   assert.match(source, /appendOpenLeadDossierItem\(grid, 'Bouwprompt', lead\.postCallPrompt \|\| buildPromptFromOpenLead/);
   assert.match(source, /Opname toevoegen/);
+  assert.match(source, /window\.SoftoraManualOpenLeads\.convertToOrder\(lead, \{ \.\.\.values, company, contact, title, delivery, amount, notes \}, assignee\);/);
+  assert.match(source, /btn\.replaceChildren\(document\.createTextNode\('Aanmaken'\)\);/);
   assert.match(source, /function revealConvertedOpenLeadOrder\(order\) \{/);
   assert.match(source, /window\.appendCustomOrderCard/);
   assert.doesNotMatch(source, /sessionStorage/);
