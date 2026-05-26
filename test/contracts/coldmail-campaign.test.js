@@ -628,6 +628,75 @@ test('coldmail autopilot sends a small safe batch through the existing campaign 
   assert.equal(getSendGuardState().entries.length, 2);
 });
 
+test('coldmail autopilot blocks invalid domains without extending the send cooldown', async () => {
+  const previousLastStartedAt = '2026-04-24T11:40:00.000Z';
+  const { service, sentMessages, getAutopilotState, getSavedStates } = createService({
+    rows: [
+      {
+        id: 'bad-domain',
+        bedrijf: 'MCV E-commerce',
+        naam: 'MCV E-commerce',
+        email: 'info@mcvecommerce.nl',
+        status: 'benaderbaar',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    invalidDomains: ['mcvecommerce.nl'],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 9,
+        endHour: 17,
+        minIntervalMinutes: 12,
+      },
+      lastStartedAt: previousLastStartedAt,
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_valid_recipient_domains');
+  assert.equal(result.invalidRecipientDomainsBlocked, 1);
+  assert.equal(sentMessages.length, 0);
+  assert.equal(getAutopilotState().lastStartedAt, previousLastStartedAt);
+  assert.equal(getAutopilotState().lastResult.invalidRecipientDomainsBlocked, 1);
+
+  const customerSave = getSavedStates().find((state) => state.scope === 'premium_customers_database');
+  const savedRows = JSON.parse(customerSave.values.softora_customers_premium_v1);
+  assert.equal(savedRows[0].status, 'geblokkeerd');
+  assert.equal(savedRows[0].mail, false);
+  assert.equal(savedRows[0].canMail, false);
+  assert.equal(savedRows[0].doNotMail, true);
+  assert.equal(savedRows[0].coldmailInvalidEmailDomain, 'mcvecommerce.nl');
+});
+
 test('coldmail autopilot respects a per-sender cooldown without extending the global send clock', async () => {
   const previousLastStartedAt = '2026-04-24T11:50:00.000Z';
   const { service, sentMessages, getAutopilotState } = createService({
@@ -5143,7 +5212,13 @@ test('coldmail campaign skips recipients whose domain does not receive mail', as
   assert.equal(sentMessages[0].bcc, undefined);
 
   const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
-  assert.equal(savedRows[0].status, 'benaderbaar');
+  assert.equal(savedRows[0].status, 'geblokkeerd');
+  assert.equal(savedRows[0].databaseStatus, 'geblokkeerd');
+  assert.equal(savedRows[0].mail, false);
+  assert.equal(savedRows[0].canMail, false);
+  assert.equal(savedRows[0].doNotMail, true);
+  assert.equal(savedRows[0].coldmailInvalidEmailDomain, 'mcvecommerce.nl');
+  assert.equal(savedRows[0].hist[0].source, 'coldmail-invalid-email-domain');
   assert.equal(savedRows[1].status, 'gemaild');
 });
 
@@ -5215,5 +5290,11 @@ test('coldmail campaign refuses to send when all recipient domains are invalid',
   );
 
   assert.equal(sentMessages.length, 0);
-  assert.equal(getSavedState(), null);
+  const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
+  assert.equal(savedRows[0].status, 'geblokkeerd');
+  assert.equal(savedRows[0].mail, false);
+  assert.equal(savedRows[0].canMail, false);
+  assert.equal(savedRows[0].doNotMail, true);
+  assert.equal(savedRows[0].coldmailInvalidEmailDomain, 'mcvecommerce.nl');
+  assert.equal(savedRows[0].hist[0].source, 'coldmail-invalid-email-domain');
 });
