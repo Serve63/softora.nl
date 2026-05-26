@@ -186,10 +186,44 @@
         const style = document.createElement('style');
         style.id = 'openLeadActionStyles';
         style.textContent = `
-            .open-lead-action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin-top: 1rem; }
+            .open-lead-action-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.85rem; align-items: stretch; margin-top: 1rem; }
+            .open-lead-action-grid .modal-btn {
+                width: 100%;
+                min-width: 0;
+                min-height: 8.75rem;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 1.2rem 0.95rem;
+                line-height: 1.25;
+                text-align: center;
+                white-space: normal;
+            }
             .open-lead-action-message { min-height: 1.35rem; color: #8f8fa0; font-weight: 700; margin-top: 0.8rem; }
             .open-lead-action-message.error { color: #d24a3a; }
             .open-lead-action-message.success { color: var(--accent); }
+            .open-lead-dossier-dialog { max-width: min(920px, calc(100vw - 2rem)); }
+            .open-lead-dossier-body { display: grid; gap: 0.95rem; margin-top: 1rem; }
+            .open-lead-dossier-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; }
+            .open-lead-dossier-item {
+                border: 1px solid rgba(30,30,47,0.12);
+                background: rgba(139,34,82,0.035);
+                padding: 0.88rem 0.95rem;
+            }
+            .open-lead-dossier-item.full { grid-column: 1 / -1; }
+            .open-lead-dossier-label {
+                color: #9a9aaa;
+                font-family: Oswald, sans-serif;
+                font-size: 0.74rem;
+                font-weight: 800;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+            }
+            .open-lead-dossier-value { color: var(--text-dark); font-weight: 700; line-height: 1.55; margin-top: 0.32rem; overflow-wrap: anywhere; }
+            .open-lead-dossier-value.multiline { font-weight: 500; white-space: pre-wrap; }
+            .open-lead-dossier-actions { display: flex; justify-content: flex-end; gap: 0.7rem; margin-top: 0.2rem; }
+            .open-lead-dossier-actions .modal-btn { width: auto; min-width: 180px; margin-top: 0; }
             .lead-convert-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
             .lead-convert-field { display: flex; flex-direction: column; gap: 0.35rem; }
             .lead-convert-field.full { grid-column: 1 / -1; }
@@ -201,7 +235,8 @@
             .open-lead-card { cursor: pointer; }
             .open-lead-action-grid .modal-btn.primary, #openLeadConvertSubmitBtn { background: var(--accent); color: #fff; }
             .open-lead-action-grid .modal-btn.primary:hover, #openLeadConvertSubmitBtn:hover { background: var(--accent-light); box-shadow: 0 0 30px var(--accent-glow); }
-            @media (max-width: 768px) { .open-lead-action-grid, .lead-convert-grid { grid-template-columns: 1fr; } }
+            @media (max-width: 900px) { .open-lead-action-grid, .lead-convert-grid, .open-lead-dossier-grid { grid-template-columns: 1fr; } }
+            @media (max-width: 768px) { .open-lead-dossier-actions { flex-direction: column; } .open-lead-dossier-actions .modal-btn { width: 100%; min-width: 0; } }
         `;
         document.head.appendChild(style);
     }
@@ -245,13 +280,19 @@
         removeBtn.type = 'button';
         removeBtn.textContent = 'Uit systeem halen';
         removeBtn.addEventListener('click', () => { void removeSelectedOpenLeadFromSystem(); });
+        const dossierBtn = document.createElement('button');
+        dossierBtn.className = 'modal-btn secondary magnetic';
+        dossierBtn.id = 'openLeadDossierBtn';
+        dossierBtn.type = 'button';
+        dossierBtn.textContent = 'Bekijk dossier';
+        dossierBtn.addEventListener('click', openSelectedOpenLeadDossier);
         const convertBtn = document.createElement('button');
         convertBtn.className = 'modal-btn primary magnetic';
         convertBtn.id = 'openLeadConvertBtn';
         convertBtn.type = 'button';
         convertBtn.textContent = 'Verplaatsen naar actieve opdrachten';
         convertBtn.addEventListener('click', openSelectedLeadConversionModal);
-        grid.append(removeBtn, convertBtn);
+        grid.append(removeBtn, dossierBtn, convertBtn);
         const actionMessage = appendTextElement(modal, 'div', 'open-lead-action-message', '');
         actionMessage.id = 'openLeadActionMessage';
 
@@ -260,6 +301,90 @@
         overlay.appendChild(modal);
         overlay.addEventListener('click', (event) => {
             if (event.target === overlay) closeOpenLeadActionModal();
+        });
+        document.body.appendChild(overlay);
+    }
+
+    function appendOpenLeadDossierItem(parent, label, value, options = {}) {
+        const item = document.createElement('div');
+        item.className = 'open-lead-dossier-item' + (options.full ? ' full' : '');
+        appendTextElement(item, 'div', 'open-lead-dossier-label', label);
+        const valueEl = appendTextElement(item, 'div', 'open-lead-dossier-value' + (options.multiline ? ' multiline' : ''), String(value || '').trim() || '-');
+        if (options.multiline) valueEl.setAttribute('aria-label', label);
+        parent.appendChild(item);
+        return item;
+    }
+
+    function renderOpenLeadDossier(lead) {
+        const body = document.getElementById('openLeadDossierBody');
+        const title = document.getElementById('openLeadDossierTitle');
+        if (!body || !lead) return;
+        if (title) title.textContent = lead.company || 'Openstaande lead';
+
+        const grid = document.createElement('div');
+        grid.className = 'open-lead-dossier-grid';
+        appendOpenLeadDossierItem(grid, 'Bedrijfsnaam', lead.company);
+        appendOpenLeadDossierItem(grid, 'Contactpersoon', lead.contact);
+        appendOpenLeadDossierItem(grid, 'Type', getOpenLeadLineLabel(lead.productLine));
+        appendOpenLeadDossierItem(grid, 'Leadwaarde', lead.value || '-');
+        appendOpenLeadDossierItem(grid, 'Toegewezen aan', lead.leadOwnerName || 'Nog niet geclaimd');
+        appendOpenLeadDossierItem(grid, 'Datum', formatAgendaLeadDateTimeLabel(lead.date, lead.time) || '-');
+        appendOpenLeadDossierItem(grid, 'Telefoon', lead.phone || '-');
+        appendOpenLeadDossierItem(grid, 'E-mail', lead.contactEmail || '-');
+        appendOpenLeadDossierItem(grid, 'Domein', lead.postCallDomainName || '-', { full: true });
+        appendOpenLeadDossierItem(grid, 'Samenvatting', lead.summary || 'Nog geen samenvatting vastgelegd.', { full: true, multiline: true });
+        appendOpenLeadDossierItem(grid, 'Notities / transcript', lead.postCallNotesTranscript || 'Nog geen transcript of extra notities vastgelegd.', { full: true, multiline: true });
+        appendOpenLeadDossierItem(grid, 'Bouwprompt', lead.postCallPrompt || buildPromptFromOpenLead(lead, { company: lead.company, title: `${getOpenLeadLineLabel(lead.productLine)} opdracht voor ${lead.company || 'lead'}`, domain: lead.postCallDomainName, notes: joinLeadNotes(lead.postCallNotesTranscript, lead.summary) }), { full: true, multiline: true });
+        body.replaceChildren(grid);
+    }
+
+    function createOpenLeadDossierModal() {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'openLeadDossierModal';
+        overlay.setAttribute('aria-hidden', 'true');
+
+        const modal = document.createElement('div');
+        modal.className = 'modal create-order-dialog open-lead-dossier-dialog';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-label', 'Openstaande lead dossier');
+
+        const header = document.createElement('div');
+        header.className = 'modal-header';
+        const headerText = document.createElement('div');
+        appendTextElement(headerText, 'div', 'modal-title', 'Lead Dossier');
+        appendTextElement(headerText, 'div', 'modal-subtitle', 'Alle beschikbare informatie van deze openstaande lead.');
+        header.append(headerText, createModalCloseButton(closeOpenLeadDossierModal));
+
+        const dossierTitle = appendTextElement(modal, 'div', 'order-title', '');
+        dossierTitle.id = 'openLeadDossierTitle';
+        const body = document.createElement('div');
+        body.className = 'open-lead-dossier-body';
+        body.id = 'openLeadDossierBody';
+
+        const actions = document.createElement('div');
+        actions.className = 'open-lead-dossier-actions';
+        const backBtn = document.createElement('button');
+        backBtn.className = 'modal-btn secondary magnetic';
+        backBtn.type = 'button';
+        backBtn.textContent = 'Terug';
+        backBtn.addEventListener('click', () => {
+            closeOpenLeadDossierModal();
+            if (selectedOpenLead) setModalVisible('openLeadActionModal', true);
+        });
+        const convertBtn = document.createElement('button');
+        convertBtn.className = 'modal-btn primary magnetic';
+        convertBtn.type = 'button';
+        convertBtn.textContent = 'Verplaatsen naar actieve opdrachten';
+        convertBtn.addEventListener('click', openSelectedLeadConversionModal);
+        actions.append(backBtn, convertBtn);
+
+        modal.insertBefore(header, modal.firstChild);
+        modal.append(dossierTitle, body, actions);
+        overlay.appendChild(modal);
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay) closeOpenLeadDossierModal();
         });
         document.body.appendChild(overlay);
     }
@@ -369,6 +494,7 @@
     function ensureOpenLeadActionUi() {
         ensureOpenLeadActionStyles();
         if (!document.getElementById('openLeadActionModal')) createLeadActionModal();
+        if (!document.getElementById('openLeadDossierModal')) createOpenLeadDossierModal();
         if (!document.getElementById('openLeadConvertModal')) createLeadConversionModal();
     }
 
@@ -392,6 +518,10 @@
     function closeOpenLeadActionModal() {
         setModalVisible('openLeadActionModal', false);
         setOpenLeadActionMessage('', '');
+    }
+
+    function closeOpenLeadDossierModal() {
+        setModalVisible('openLeadDossierModal', false);
     }
 
     function closeOpenLeadConversionModal(force) {
@@ -432,6 +562,7 @@
         if (!lead) return;
         ensureOpenLeadActionUi();
         closeOpenLeadActionModal();
+        closeOpenLeadDossierModal();
         const company = document.getElementById('openLeadConvertCompany');
         const contact = document.getElementById('openLeadConvertContact');
         const title = document.getElementById('openLeadConvertTitle');
@@ -453,6 +584,15 @@
         setOpenLeadConversionMessage('', '');
         setModalVisible('openLeadConvertModal', true);
         window.setTimeout(() => notes?.focus(), 40);
+    }
+
+    function openSelectedOpenLeadDossier() {
+        const lead = selectedOpenLead;
+        if (!lead) return;
+        ensureOpenLeadActionUi();
+        renderOpenLeadDossier(lead);
+        closeOpenLeadActionModal();
+        setModalVisible('openLeadDossierModal', true);
     }
 
     function getOpenLeadAudioMimeType(file) {
@@ -559,8 +699,10 @@
         const lead = selectedOpenLead;
         if (!lead || openLeadConversionBusy) return;
         const removeBtn = document.getElementById('openLeadRemoveBtn');
+        const dossierBtn = document.getElementById('openLeadDossierBtn');
         const convertBtn = document.getElementById('openLeadConvertBtn');
         if (removeBtn) removeBtn.disabled = true;
+        if (dossierBtn) dossierBtn.disabled = true;
         if (convertBtn) convertBtn.disabled = true;
         setOpenLeadActionMessage('Lead wordt uit systeem gehaald...', '');
         try {
@@ -582,6 +724,7 @@
             setOpenLeadActionMessage(String(error?.message || 'Lead verwijderen mislukt.'), 'error');
         } finally {
             if (removeBtn) removeBtn.disabled = false;
+            if (dossierBtn) dossierBtn.disabled = false;
             if (convertBtn) convertBtn.disabled = false;
         }
     }

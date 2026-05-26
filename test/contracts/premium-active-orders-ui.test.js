@@ -32,7 +32,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
 
   assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260511a"><\/script>/);
   assert.match(pageSource, /assets\/premium-active-order-custom-selects\.js\?v=20260526a/);
-  assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260516a/);
+  assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260526b/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -75,7 +75,14 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /function openOpenLeadActionModal\(lead\) \{/);
   assert.match(source, /function submitOpenLeadConversion\(event\) \{/);
   assert.match(source, /Uit systeem halen/);
+  assert.match(source, /Bekijk dossier/);
   assert.match(source, /Verplaatsen naar actieve opdrachten/);
+  assert.match(source, /openLeadDossierModal/);
+  assert.match(source, /function renderOpenLeadDossier\(lead\) \{/);
+  assert.match(source, /\.open-lead-action-grid \{[\s\S]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);[\s\S]*align-items:\s*stretch;/);
+  assert.match(source, /\.open-lead-action-grid \.modal-btn \{[\s\S]*min-height:\s*8\.75rem;[\s\S]*height:\s*100%;/);
+  assert.match(source, /appendOpenLeadDossierItem\(grid, 'Notities \/ transcript', lead\.postCallNotesTranscript/);
+  assert.match(source, /appendOpenLeadDossierItem\(grid, 'Bouwprompt', lead\.postCallPrompt \|\| buildPromptFromOpenLead/);
   assert.match(source, /Opname toevoegen/);
   assert.match(source, /function revealConvertedOpenLeadOrder\(order\) \{/);
   assert.match(source, /window\.appendCustomOrderCard/);
