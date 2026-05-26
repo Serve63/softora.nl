@@ -9,18 +9,21 @@ function readActiveOrdersSources() {
   const assignmentToggleStylePath = path.join(__dirname, '../../assets/premium-active-order-assignment-toggle.css');
   const assignmentToggleScriptPath = path.join(__dirname, '../../assets/premium-active-order-assignment-toggle.js');
   const openLeadsScriptPath = path.join(__dirname, '../../assets/premium-active-order-open-leads.js');
+  const customSelectsScriptPath = path.join(__dirname, '../../assets/premium-active-order-custom-selects.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
   const assignmentToggleStyleSource = fs.readFileSync(assignmentToggleStylePath, 'utf8');
   const assignmentToggleScriptSource = fs.readFileSync(assignmentToggleScriptPath, 'utf8');
   const openLeadsScriptSource = fs.readFileSync(openLeadsScriptPath, 'utf8');
+  const customSelectsScriptSource = fs.readFileSync(customSelectsScriptPath, 'utf8');
   return {
     pageSource,
     scriptSource,
     openLeadsScriptSource,
+    customSelectsScriptSource,
     assignmentToggleStyleSource,
     assignmentToggleScriptSource,
-    combinedSource: `${pageSource}\n${scriptSource}\n${openLeadsScriptSource}\n${assignmentToggleStyleSource}\n${assignmentToggleScriptSource}`,
+    combinedSource: `${pageSource}\n${scriptSource}\n${openLeadsScriptSource}\n${customSelectsScriptSource}\n${assignmentToggleStyleSource}\n${assignmentToggleScriptSource}`,
   };
 }
 
@@ -28,6 +31,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   const { pageSource, scriptSource, combinedSource: source } = readActiveOrdersSources();
 
   assert.match(pageSource, /<script src="assets\/premium-actieve-opdrachten\.js\?v=20260511a"><\/script>/);
+  assert.match(pageSource, /assets\/premium-active-order-custom-selects\.js\?v=20260526a/);
   assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260516a/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
@@ -186,8 +190,13 @@ test('premium actieve opdrachten tonen create-order modal zonder sample-design e
   const { combinedSource: source } = readActiveOrdersSources();
 
   assert.match(source, /<label class="create-order-label" for="newOrderAssignee">Toegewezen aan<\/label>/);
-  assert.match(source, /<select class="create-order-select" id="newOrderAssignee" name="assignee" required>/);
+  assert.match(source, /<select class="create-order-select" id="newOrderAssignee" name="assignee" data-custom-select="true" required>/);
   assert.match(source, /<option value="">Kies medewerker<\/option>\s*<option value="Martijn">Martijn<\/option>\s*<option value="Servé">Servé<\/option>/);
+  assert.match(source, /const SELECTOR = 'select\.create-order-select';/);
+  assert.match(source, /function hydrate\(root = document\) \{[\s\S]*select\.dataset\.customSelect = 'true';[\s\S]*window\.initCustomFormSelects\(root\);/);
+  assert.match(source, /function observe\(\) \{[\s\S]*new MutationObserver\(\(mutations\) => \{[\s\S]*hydrate\(select\)\);/);
+  assert.match(source, /\.create-order-select-wrap \.site-select-menu \{[\s\S]*box-shadow:\s*0 18px 45px rgba\(8, 8, 12, 0\.18\)/);
+  assert.match(source, /\.create-order-select-wrap \.site-select-option\.is-selected::before \{[\s\S]*border-color:\s*var\(--accent-light\);/);
   assert.match(source, /const ORDER_ASSIGNEE_OPTIONS = Object\.freeze\(\['Martijn', 'Servé'\]\);/);
   assert.match(source, /function normalizeOrderAssignee\(value\) \{[\s\S]*const words = normalized\.split\(\/\[\^a-z\]\+\/\)\.filter\(Boolean\);[\s\S]*if \(words\.includes\('serve'\)\) return 'Servé';[\s\S]*if \(words\.includes\('martijn'\)\) return 'Martijn';/);
   assert.match(source, /function normalizeClaimEmployeeName\(value\) \{[\s\S]*const canonicalAssignee = normalizeOrderAssignee\(value\);[\s\S]*if \(canonicalAssignee\) return canonicalAssignee;/);
