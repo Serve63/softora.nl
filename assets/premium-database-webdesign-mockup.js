@@ -1,7 +1,7 @@
 (function (global) {
     "use strict";
 
-    const DEVICE_MOCKUP_VERSION = "v5";
+    const DEVICE_MOCKUP_VERSION = "v6";
 
     function normalizeString(value) {
         return String(value || "").trim();
@@ -11,10 +11,29 @@
         return new RegExp("-device-mockup-" + DEVICE_MOCKUP_VERSION + "\\.jpe?g$", "i").test(normalizeString(fileName));
     }
 
-    function hasCurrentMockup(customer, isValidWebsitePhotoSource) {
+    function getMockupQuality(customer) {
+        return {
+            renderer: normalizeString(customer && (customer.mockupRenderer || customer.websiteMockupRenderer)).toLowerCase(),
+            orientation: normalizeString(customer && (customer.mockupOrientation || customer.websiteMockupOrientation)).toLowerCase(),
+            status: normalizeString(customer && (customer.mockupQualityStatus || customer.websiteMockupQualityStatus)).toLowerCase(),
+            checkedAt: normalizeString(customer && (customer.mockupQualityCheckedAt || customer.websiteMockupQualityCheckedAt))
+        };
+    }
+
+    function hasApprovedMockup(customer, isValidWebsitePhotoSource) {
+        if (!customer || !isValidWebsitePhotoSource(customer.websiteMockup)) return false;
+        const quality = getMockupQuality(customer);
+        const hasQualitySignal = Boolean(quality.renderer || quality.orientation || quality.status || quality.checkedAt);
+        if (!hasQualitySignal) return false;
+        if (quality.status !== "checked" && quality.status !== "verified" && quality.status !== "ok") return false;
+        if (quality.orientation && quality.orientation !== "upright") return false;
+        return true;
+    }
+
+    function hasUsableMockup(customer, isValidWebsitePhotoSource) {
         return Boolean(customer)
             && isValidWebsitePhotoSource(customer.websiteMockup)
-            && isCurrentMockupName(customer.websiteMockupName);
+            && (isCurrentMockupName(customer.websiteMockupName) || hasApprovedMockup(customer, isValidWebsitePhotoSource));
     }
 
     function replaceExtension(fileName, suffix) {
@@ -203,17 +222,18 @@
         context.fillText("Laptop - iPad - iPhone", 94, 158);
 
         drawDevice(context, image, {
-            x: 210, y: 250, w: 920, h: 560, pad: 18, padTop: 18, padBottom: 28, radius: 28, screenRadius: 14,
-            frame: "#111827", shadow: "rgba(15,23,42,.24)", blur: 44, offsetY: 26, crop: 0,
-            base: "#e5e7eb", baseX: 120, baseY: 825, baseW: 1100, baseH: 42,
+            x: 155, y: 260, w: 930, h: 560, pad: 18, padTop: 18, padBottom: 28, radius: 28, screenRadius: 14,
+            frame: "#111827", shadow: "rgba(15,23,42,.24)", blur: 44, offsetY: 26,
+            fitMode: "viewport-width", cropTopRatio: 0,
+            base: "#e5e7eb", baseX: 105, baseY: 835, baseW: 1170, baseH: 42,
         });
         drawDevice(context, image, {
-            x: 1040, y: 210, w: 310, h: 450, pad: 14, padTop: 18, padBottom: 18, radius: 34, screenRadius: 22,
+            x: 1095, y: 220, w: 305, h: 455, pad: 14, padTop: 18, padBottom: 18, radius: 34, screenRadius: 22,
             frame: "#1f2937", shadow: "rgba(15,23,42,.22)", blur: 34, offsetY: 22,
-            fitMode: "viewport-width", cropTopRatio: 0.02,
+            fitMode: "viewport", cropTopRatio: 0, cropFocusX: 0.5, viewportHeightRatio: 1,
         });
         drawDevice(context, image, {
-            x: 1275, y: 390, w: 190, h: 390, pad: 10, padTop: 22, padBottom: 16, radius: 34, screenRadius: 20,
+            x: 1345, y: 410, w: 180, h: 380, pad: 10, padTop: 22, padBottom: 16, radius: 34, screenRadius: 20,
             frame: "#030712", shadow: "rgba(15,23,42,.28)", blur: 30, offsetY: 18,
             fitMode: "viewport", cropTopRatio: 0, cropFocusX: 0, viewportHeightRatio: 1,
         });
@@ -256,7 +276,7 @@
                 releaseReservedPending();
                 return false;
             }
-            if (!force && hasCurrentMockup(customer, isValidWebsitePhotoSource)) {
+            if (!force && hasUsableMockup(customer, isValidWebsitePhotoSource)) {
                 releaseReservedPending();
                 return true;
             }
@@ -270,10 +290,15 @@
                 const image = await loadImage(customer.websitePhoto);
                 const mockupDataUrl = createMockupDataUrl(image);
                 if (!isValidWebsitePhotoDataUrl(mockupDataUrl)) throw new Error("Device-mockup maken is mislukt.");
+                const checkedAt = new Date().toISOString();
                 const nextCustomer = normalizeCustomer({
                     ...customer,
                     websiteMockup: mockupDataUrl,
                     websiteMockupName: replaceExtension(customer.websitePhotoName || customer.dom || customer.bedrijf, "-device-mockup-" + DEVICE_MOCKUP_VERSION),
+                    mockupRenderer: "softora-browser-device-" + DEVICE_MOCKUP_VERSION,
+                    mockupOrientation: "upright",
+                    mockupQualityStatus: "checked",
+                    mockupQualityCheckedAt: checkedAt,
                     updatedAt: new Date().toISOString().slice(0, 10),
                 }, id);
                 state.klanten = sortCustomers(state.klanten.map(function (item) {
@@ -301,7 +326,7 @@
                 .filter(function (customer) {
                     const id = normalizeString(customer && customer.id);
                     return isValidWebsitePhotoSource(customer && customer.websitePhoto)
-                        && !hasCurrentMockup(customer, isValidWebsitePhotoSource)
+                        && !hasUsableMockup(customer, isValidWebsitePhotoSource)
                         && id
                         && !pendingIds.has(id);
                 })

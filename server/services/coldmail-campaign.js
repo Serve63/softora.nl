@@ -1282,12 +1282,12 @@ function createColdmailCampaignService(deps = {}) {
     const next = { ...base };
     const rowPhotoSource = getWebdesignPhotoSource(row);
     const rowMockupSource = getWebdesignMockupSource(row);
-    if (isResolvableWebsitePhotoValue(rowPhotoSource)) {
+    if (!isResolvableWebsitePhotoValue(getWebdesignPhotoSource(next)) && isResolvableWebsitePhotoValue(rowPhotoSource)) {
       next.websitePhoto = row.websitePhoto || row.websitePhotoUrl || row.signedUrl || (row.storage && row.storage.signedUrl) || rowPhotoSource;
       const rowPhotoName = normalizeString(row.websitePhotoName || row.photoName || row.websiteImageName);
       if (rowPhotoName) next.websitePhotoName = rowPhotoName;
     }
-    if (isResolvableWebsitePhotoValue(rowMockupSource)) {
+    if (!isResolvableWebsitePhotoValue(getWebdesignMockupSource(next)) && isResolvableWebsitePhotoValue(rowMockupSource)) {
       next.websiteMockup =
         row.websiteMockup ||
         row.websiteMockupUrl ||
@@ -1297,6 +1297,10 @@ function createColdmailCampaignService(deps = {}) {
         rowMockupSource;
       const rowMockupName = normalizeString(row.websiteMockupName || row.mockupName);
       if (rowMockupName) next.websiteMockupName = rowMockupName;
+      next.mockupRenderer = normalizeString(row.mockupRenderer || row.websiteMockupRenderer || next.mockupRenderer);
+      next.mockupOrientation = normalizeString(row.mockupOrientation || row.websiteMockupOrientation || next.mockupOrientation);
+      next.mockupQualityStatus = normalizeString(row.mockupQualityStatus || row.websiteMockupQualityStatus || next.mockupQualityStatus);
+      next.mockupQualityCheckedAt = normalizeString(row.mockupQualityCheckedAt || row.websiteMockupQualityCheckedAt || next.mockupQualityCheckedAt);
     }
     if (!normalizeString(next.id)) next.id = getRowId(row, 0);
     if (!normalizeString(next.identityKey)) next.identityKey = buildRowIdentityKey(row);
@@ -1315,7 +1319,7 @@ function createColdmailCampaignService(deps = {}) {
 
   function hasReadyWebdesignAssetRecord(photo) {
     if (!hasReadyWebsitePhotoRecord(photo)) return false;
-    return isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo));
+    return isApprovedWebdesignMockupRecord(photo);
   }
 
   function createReadyWebdesignMatcher(customerRows = [], photoMap = {}) {
@@ -4047,6 +4051,32 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
+  function getWebdesignMockupQuality(photo) {
+    const meta = photo && photo.legacyMeta && typeof photo.legacyMeta === 'object' ? photo.legacyMeta : {};
+    const mockup = meta.mockup && typeof meta.mockup === 'object' ? meta.mockup : {};
+    return {
+      renderer: normalizeString(photo && (photo.mockupRenderer || photo.websiteMockupRenderer) || mockup.renderer || meta.mockupRenderer).toLowerCase(),
+      orientation: normalizeString(photo && (photo.mockupOrientation || photo.websiteMockupOrientation) || mockup.orientation || meta.mockupOrientation).toLowerCase(),
+      status: normalizeString(photo && (photo.mockupQualityStatus || photo.websiteMockupQualityStatus) || mockup.qualityStatus || meta.mockupQualityStatus).toLowerCase(),
+      checkedAt: normalizeString(photo && (photo.mockupQualityCheckedAt || photo.websiteMockupQualityCheckedAt) || mockup.qualityCheckedAt || meta.mockupQualityCheckedAt),
+    };
+  }
+
+  function isApprovedWebdesignMockupRecord(photo) {
+    if (!isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo))) return false;
+    const quality = getWebdesignMockupQuality(photo);
+    const hasQualitySignal = Boolean(quality.renderer || quality.orientation || quality.status || quality.checkedAt);
+    if (!hasQualitySignal) {
+      const meta = photo && photo.legacyMeta && typeof photo.legacyMeta === 'object' ? photo.legacyMeta : {};
+      const mockup = meta.mockup && typeof meta.mockup === 'object' ? meta.mockup : {};
+      const name = normalizeString(photo && (photo.websiteMockupName || photo.mockupName) || mockup.fileName || meta.websiteMockupName);
+      return /-device-mockup-v6\.jpe?g$/i.test(name);
+    }
+    if (quality.status !== 'checked' && quality.status !== 'verified' && quality.status !== 'ok') return false;
+    if (quality.orientation && quality.orientation !== 'upright') return false;
+    return true;
+  }
+
   function appendWebdesignImageHtml(html, attachment, options = {}) {
     if (!attachment || !attachment.cid) return html;
     const optOutText = normalizeString(options.optOutText || '');
@@ -4325,7 +4355,9 @@ function createColdmailCampaignService(deps = {}) {
     const extension = getImageExtension(parsed.contentType);
     const filename = `${baseName}.${extension}`;
     const cid = `webdesign-${sanitizeFilename(getRowId(row, 0), 'image')}@softora`;
-    const mockupParsed = await resolveImageAttachment(getWebdesignMockupSource(photo));
+    const mockupParsed = isApprovedWebdesignMockupRecord(photo)
+      ? await resolveImageAttachment(getWebdesignMockupSource(photo))
+      : null;
     const mockupBaseName = sanitizeFilename(photo && (photo.websiteMockupName || `${getRowCompany(row)} device mockup`), 'device-mockup');
     const mockup = mockupParsed
       ? {
@@ -5149,7 +5181,7 @@ function createColdmailCampaignService(deps = {}) {
       findStoredPhotoRecordForRow(rows[match.index], match.index, photos, photosByIdentity)
     );
     const source = payload.type === 'mockup'
-      ? getWebdesignMockupSource(photo)
+      ? (isApprovedWebdesignMockupRecord(photo) ? getWebdesignMockupSource(photo) : '')
       : getWebdesignPhotoSource(photo);
     const image = await resolveImageAttachment(source);
     if (!image) {

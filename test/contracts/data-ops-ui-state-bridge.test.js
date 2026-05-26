@@ -176,6 +176,10 @@ test('data ops ui-state bridge stores photo chunks as structured photo entries',
           mockupPhotoKey,
           mockupChunkCount: 1,
           websiteMockupName: 'demo mockup.jpg',
+          mockupRenderer: 'softora-browser-device-v6',
+          mockupOrientation: 'upright',
+          mockupQualityStatus: 'checked',
+          mockupQualityCheckedAt: '2026-05-27T00:00:00.000Z',
         },
       }),
       [`${photoKey}_0`]: dataUrl,
@@ -190,6 +194,10 @@ test('data ops ui-state bridge stores photo chunks as structured photo entries',
   assert.equal(store.calls[0].entries[0].dataUrl, dataUrl);
   assert.equal(store.calls[0].entries[0].websiteMockup, mockupDataUrl);
   assert.equal(store.calls[0].entries[0].websiteMockupName, 'demo mockup.jpg');
+  assert.equal(store.calls[0].entries[0].legacyMeta.mockup.renderer, 'softora-browser-device-v6');
+  assert.equal(store.calls[0].entries[0].legacyMeta.mockup.orientation, 'upright');
+  assert.equal(store.calls[0].entries[0].legacyMeta.mockup.qualityStatus, 'checked');
+  assert.equal(store.calls[0].entries[0].legacyMeta.mockup.qualityCheckedAt, '2026-05-27T00:00:00.000Z');
 });
 
 test('data ops ui-state bridge reads photo rows as signed URLs without embedding image data', async () => {
@@ -207,6 +215,14 @@ test('data ops ui-state bridge reads photo rows as signed URLs without embedding
           storagePath: 'customers/cust-1/demo.png',
           fileName: 'demo.png',
           websiteMockupName: 'demo mockup.jpg',
+          legacyMeta: {
+            mockup: {
+              renderer: 'softora-native-device-v6',
+              orientation: 'upright',
+              qualityStatus: 'checked',
+              qualityCheckedAt: '2026-05-27T00:00:00.000Z',
+            },
+          },
           updatedAt: '2026-05-05T12:00:00.000Z',
         },
       ],
@@ -222,6 +238,10 @@ test('data ops ui-state bridge reads photo rows as signed URLs without embedding
   assert.equal(photoMap['cust-1'].websitePhotoUrl, signedUrl);
   assert.equal(photoMap['cust-1'].websiteMockupUrl, mockupSignedUrl);
   assert.equal(photoMap['cust-1'].websiteMockupName, 'demo mockup.jpg');
+  assert.equal(photoMap['cust-1'].mockupRenderer, 'softora-native-device-v6');
+  assert.equal(photoMap['cust-1'].mockupOrientation, 'upright');
+  assert.equal(photoMap['cust-1'].mockupQualityStatus, 'checked');
+  assert.equal(photoMap['cust-1'].mockupQualityCheckedAt, '2026-05-27T00:00:00.000Z');
   assert.equal(photoMap['cust-1'].chunkCount, 0);
   assert.equal(state.values.softora_database_photo_data_v1_cust_1_0, undefined);
 });

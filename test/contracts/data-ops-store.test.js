@@ -184,7 +184,7 @@ test('data ops store saves webdesign and device mockup as one photo record', asy
       dataUrl: 'data:image/png;base64,aGVsbG8=',
       fileName: 'softora.nl-webdesign.png',
       mockup: 'data:image/jpeg;base64,bW9ja3Vw',
-      websiteMockupName: 'softora.nl-device-mockup.jpg',
+      websiteMockupName: 'softora.nl-device-mockup-v6.jpg',
       legacyMeta: { websitePhotoName: 'softora.nl-webdesign.png' },
     },
     { source: 'premium-database-webdesign-jobs' }
@@ -199,10 +199,14 @@ test('data ops store saves webdesign and device mockup as one photo record', asy
   assert.equal(upserts[0].table, 'softora_design_photos');
   assert.equal(upserts[0].row.customer_id, 'softora-test-mode-recipient');
   assert.equal(upserts[0].row.file_name, 'softora.nl-webdesign.png');
-  assert.equal(upserts[0].row.legacy_meta.websiteMockupName, 'softora.nl-device-mockup.jpg');
-  assert.equal(upserts[0].row.legacy_meta.mockup.fileName, 'softora.nl-device-mockup.jpg');
+  assert.equal(upserts[0].row.legacy_meta.websiteMockupName, 'softora.nl-device-mockup-v6.jpg');
+  assert.equal(upserts[0].row.legacy_meta.mockup.fileName, 'softora.nl-device-mockup-v6.jpg');
   assert.equal(upserts[0].row.legacy_meta.mockup.storageBucket, 'softora-design-photos');
   assert.equal(upserts[0].row.legacy_meta.mockup.mimeType, 'image/jpeg');
+  assert.equal(upserts[0].row.legacy_meta.mockup.renderer, 'softora-browser-device-v6');
+  assert.equal(upserts[0].row.legacy_meta.mockup.orientation, 'upright');
+  assert.equal(upserts[0].row.legacy_meta.mockup.qualityStatus, 'checked');
+  assert.match(upserts[0].row.legacy_meta.mockup.qualityCheckedAt, /^\d{4}-\d{2}-\d{2}T/);
 });
 
 test('data ops store signs design photo URLs with bounded concurrency', async () => {
