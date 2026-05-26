@@ -3133,7 +3133,8 @@ function createColdmailCampaignService(deps = {}) {
     } catch (error) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_AUTOPILOT_FAILED';
       const knownSkip = COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES.has(code);
-      const shouldKeepPreviousStartTime = code === 'NO_VALID_RECIPIENT_DOMAINS';
+      const shouldKeepPreviousStartTime =
+        code === 'NO_VALID_RECIPIENT_DOMAINS' || code === 'NO_WEBDESIGN_PHOTOS';
       return finishColdmailAutopilotRun(
         shouldKeepPreviousStartTime
           ? {

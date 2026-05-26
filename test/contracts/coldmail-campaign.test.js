@@ -1555,6 +1555,67 @@ test('coldmail autopilot skips leads without a complete webdesign mockup', async
   assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-mockup-ready@softora');
 });
 
+test('coldmail autopilot does not extend cooldown when no webdesign-ready lead exists', async () => {
+  const previousLastStartedAt = '2026-04-24T11:40:00.000Z';
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'missing-design',
+        bedrijf: 'Nog Geen Design BV',
+        naam: 'Ruben',
+        email: 'mist@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Nieuw webdesign gemaakt voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}},\n\nIk heb een webdesign voor jullie gemaakt.',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: 'webdesign',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 9,
+        endHour: 17,
+        minIntervalMinutes: 12,
+      },
+      lastStartedAt: previousLastStartedAt,
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_webdesign_photos');
+  assert.equal(sentMessages.length, 0);
+  assert.equal(getAutopilotState().lastStartedAt, previousLastStartedAt);
+});
+
 test('coldmail autopilot keeps an emergency disabled state when a running batch finishes', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [
