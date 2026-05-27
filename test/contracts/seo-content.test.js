@@ -21,6 +21,10 @@ const {
   getSeoContentPublicPaths,
   getSeoContentSitemapEntries,
 } = require('../../server/services/seo-content');
+const {
+  INDEXABLE_PUBLIC_SEO_PAGES,
+  applyPublicSeoHeadDefaults,
+} = require('../../server/services/public-seo');
 
 const repoRoot = path.resolve(__dirname, '../..');
 
@@ -301,10 +305,16 @@ test('seo content renders branche en regio landingspagina’s met service schema
   assert.match(regioHtml, /href="\/branches\/zakelijke-dienstverleners"/);
 });
 
-test('live seo content keeps weak pages supported by contextual incoming links', () => {
-  const now = new Date('2026-05-20T12:00:00.000Z');
+test('current live seo content keeps weak pages supported by contextual incoming links', () => {
+  const now = new Date('2026-05-27T12:00:00.000Z');
   const collectionPaths = getSeoContentCollectionPaths();
   const pages = [
+    ...INDEXABLE_PUBLIC_SEO_PAGES.map((entry) => ({
+      path: entry.path,
+      html: applyPublicSeoHeadDefaults(fs.readFileSync(path.join(repoRoot, entry.fileName), 'utf8'), entry.fileName, {
+        siteOrigin: 'https://www.softora.nl',
+      }),
+    })),
     ...collectionPaths.map((pathName) => {
       const collection = pathName.replace(/^\//, '');
       return {
@@ -317,6 +327,7 @@ test('live seo content keeps weak pages supported by contextual incoming links',
       html: buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' }),
     })),
   ];
+  const contentArticlePaths = new Set(getSeoContentItems({ now }).map((item) => getSeoContentPathForItem(item)));
   const publicPaths = new Set(pages.map((page) => page.path));
   const incoming = new Map(pages.map((page) => [page.path, new Set()]));
 
@@ -334,7 +345,7 @@ test('live seo content keeps weak pages supported by contextual incoming links',
   }
 
   for (const page of pages) {
-    if (collectionPaths.includes(page.path)) continue;
+    if (!contentArticlePaths.has(page.path)) continue;
     assert.ok(incoming.get(page.path).size >= 2, `${page.path} heeft te weinig contextuele interne ingangen.`);
   }
 });
