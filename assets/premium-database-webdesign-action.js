@@ -108,6 +108,10 @@
             return [normalizeString(kind) || "photo", normalizeString(customerId) || "unknown", buildPhotoSourceFingerprint(source)].join("-");
         }
 
+        function isInlinePhotoSource(source) {
+            return /^data:image\//i.test(normalizeString(source));
+        }
+
         function markPhotoKeyLoaded(key) {
             const normalized = normalizeString(key);
             if (!normalized) return;
@@ -458,7 +462,7 @@
             const label = normalizeString(customer && customer.websitePhotoName) || "Websitefoto";
             const hasPhoto = isValidWebsitePhotoDataUrl(photo);
             const photoLoadKey = buildPhotoLoadKey("photo", customer && customer.id, photo);
-            const photoLoaded = !hasPhoto || loadedPhotoKeys.has(photoLoadKey);
+            const photoLoaded = !hasPhoto || isInlinePhotoSource(photo) || loadedPhotoKeys.has(photoLoadKey);
             const photoFailed = hasPhoto && failedPhotoKeys.has(photoLoadKey);
             const isPending = pendingIds.has(customer.id);
             const isRestoring = !hasPhoto && !isPending && Boolean(isRestoringPhotos(customer));
@@ -474,7 +478,7 @@
             const mockupLabel = normalizeString(customer && customer.websiteMockupName) || "Device mockup";
             const hasMockup = isValidWebsitePhotoDataUrl(mockup);
             const mockupLoadKey = buildPhotoLoadKey("mockup", customer && customer.id, mockup);
-            const mockupLoaded = !hasMockup || loadedPhotoKeys.has(mockupLoadKey);
+            const mockupLoaded = !hasMockup || isInlinePhotoSource(mockup) || loadedPhotoKeys.has(mockupLoadKey);
             const mockupFailed = hasMockup && failedPhotoKeys.has(mockupLoadKey);
             const canUseMockup = hasPhoto || hasMockup;
             const mockupLoading = isMockupPending(customer && customer.id);
