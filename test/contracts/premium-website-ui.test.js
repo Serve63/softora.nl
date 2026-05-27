@@ -457,7 +457,7 @@ test('premium website contactformulier verstuurt via server-side contact api', (
   assert.match(source, /<form id="faq-contact-form" class="faq-contact-form" novalidate>/);
   assert.match(
     source,
-    /<button type="submit" class="magnetic-btn magnetic" data-softora-conversion="public-form-submit" data-softora-conversion-page="\/" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit">Verstuur bericht<\/button>/
+    /<button type="submit" class="magnetic-btn magnetic" data-softora-conversion="public-form-submit" data-softora-conversion-page="\/" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit" data-softora-whatsapp-url="https:\/\/wa\.me\/31643262792">Verstuur bericht<\/button>/
   );
   assert.match(
     source,
