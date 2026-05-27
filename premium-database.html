@@ -1620,6 +1620,7 @@
             openId: null,
             modalEditId: null,
             photoTargetId: null, photoRestorePending: true,
+            lastMailReadyHeaderCount: null,
             messageTimer: null
         };
 
@@ -2150,8 +2151,6 @@
         });
 
         const webdesignMockupController = window.SoftoraDatabaseWebdesignMockup.createController({ state, normalizeCustomer, sortCustomers, isValidWebsitePhotoSource, isValidWebsitePhotoDataUrl, persistCustomerPhotos, renderPage, setStatusMessage, toast });
-        let mockupAutoEnsureQueued = false;
-        function scheduleVisibleMockupEnsure() { if (mockupAutoEnsureQueued || state.photoRestorePending) return; mockupAutoEnsureQueued = true; setTimeout(function () { mockupAutoEnsureQueued = false; void webdesignMockupController.ensureVisibleMockups(getSortedCustomers(getFilteredCustomers()), 24).catch(function (error) { console.error("Device-mockups automatisch maken mislukt:", error); }); }, 0); }
         const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, ensureMockupForCustomer: function (customerId) { return webdesignMockupController.ensureForCustomer(customerId); }, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, refreshPhotos: async function (context) { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true }); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); if (context && context.customerId) await webdesignMockupController.ensureForCustomer(context.customerId); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
         const outreachController = window.SoftoraDatabaseOutreach.createController({ state, nodes, escapeHtml, normalizeSearchValue, normalizeDatabaseStatus, formatDisplayDate, parseDateValue, normalizeCustomer, persistCustomerList, renderPage, setStatusMessage });
@@ -2322,7 +2321,7 @@
         function shouldShowWebsitePhoto(customer) {
             return normalizeDatabaseStatus(customer && customer.status, customer) !== "klant";
         }
-        function hasCompleteWebdesignAssets(customer) { return isValidWebsitePhotoSource(customer && customer.websitePhoto) && isValidWebsitePhotoSource(customer && customer.websiteMockup); } function isLikelyColdmailAddress(value) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizeString(value)); } function isColdmailReadyWebdesignLead(customer) { if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; return hasCompleteWebdesignAssets(customer); } function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar") return (customers || []).filter(isColdmailReadyWebdesignLead).length; return (customers || []).filter(function (customer) { return shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length; }
+        function hasApprovedWebdesignMockup(customer) { if (!customer || !isValidWebsitePhotoSource(customer.websiteMockup)) return false; const renderer = normalizeString(customer.mockupRenderer || customer.websiteMockupRenderer).toLowerCase(), orientation = normalizeString(customer.mockupOrientation || customer.websiteMockupOrientation).toLowerCase(), status = normalizeString(customer.mockupQualityStatus || customer.websiteMockupQualityStatus).toLowerCase(), checkedAt = normalizeString(customer.mockupQualityCheckedAt || customer.websiteMockupQualityCheckedAt), hasQualitySignal = Boolean(renderer || orientation || status || checkedAt); if (!hasQualitySignal) return /-device-mockup-v6\.jpe?g$/i.test(normalizeString(customer.websiteMockupName || customer.mockupName)); if (status !== "checked" && status !== "verified" && status !== "ok") return false; if (orientation && orientation !== "upright") return false; return true; } function hasCompleteWebdesignAssets(customer) { return isValidWebsitePhotoSource(customer && customer.websitePhoto) && hasApprovedWebdesignMockup(customer); } function isLikelyColdmailAddress(value) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizeString(value)); } function isColdmailReadyWebdesignLead(customer) { if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; return hasCompleteWebdesignAssets(customer); } function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar") { const count = (customers || []).filter(isColdmailReadyWebdesignLead).length; if (!state.photoRestorePending || state.lastMailReadyHeaderCount === null) state.lastMailReadyHeaderCount = count; return state.photoRestorePending && state.lastMailReadyHeaderCount !== null ? state.lastMailReadyHeaderCount : count; } return (customers || []).filter(function (customer) { return shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length; }
         function isWebdesignPhotoEligible(customer) {
             return shouldShowWebsitePhoto(customer) && !isValidWebsitePhotoSource(customer && customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
         }
@@ -2382,7 +2381,7 @@
             }).join("");
         }
 
-        function renderPage() { renderTable(); scheduleVisibleMockupEnsure(); }
+        function renderPage() { renderTable(); }
 
         function setStatus(status, button) {
             state.activeStatus = status;
@@ -3219,7 +3218,7 @@
         void (async function () {
             try {
                 state.photoRestorePending = true; renderPage(); if (databaseHadBootstrapCustomers && state.klanten.length) { try { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten); renderPage(); } catch (error) { console.error("Databasefoto's laden voor boot mislukt:", error); } } else { await bootstrapCustomers(); }
-                await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); state.photoRestorePending = false; renderPage(); releaseDatabaseBootShell(); void webdesignMockupController.ensureVisibleMockups(getSortedCustomers(getFilteredCustomers()), 12).catch(function (error) { console.error("Device-mockups maken mislukt:", error); }); void webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); }); void bootstrapCustomers().catch(function (error) { console.error("Database sync na snelle boot mislukt:", error); });
+                await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); state.photoRestorePending = false; renderPage(); releaseDatabaseBootShell(); void webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); }); void bootstrapCustomers().catch(function (error) { console.error("Database sync na snelle boot mislukt:", error); });
                 void databaseImportController.startAutoSync();
             } catch (error) { console.error("Database bootstrap mislukt:", error); state.photoRestorePending = false; renderPage(); } finally { releaseDatabaseBootShell(); }
         })();

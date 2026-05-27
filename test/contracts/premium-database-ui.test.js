@@ -342,7 +342,12 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /websiteMockup: normalizeString\(raw && \(raw\.websiteMockup \|\| raw\.mockup \|\| raw\.websiteMockupImage\)\)/);
   assert.match(pageSource, /function shouldShowWebsitePhoto\(customer\)/);
   assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
+  assert.match(pageSource, /lastMailReadyHeaderCount: null/);
+  assert.match(pageSource, /function hasApprovedWebdesignMockup\(customer\)/);
+  assert.match(pageSource, /status !== "checked" && status !== "verified" && status !== "ok"/);
+  assert.match(pageSource, /orientation && orientation !== "upright"/);
   assert.match(pageSource, /function hasCompleteWebdesignAssets\(customer\)/);
+  assert.match(pageSource, /return isValidWebsitePhotoSource\(customer && customer\.websitePhoto\) && hasApprovedWebdesignMockup\(customer\);/);
   assert.match(pageSource, /function isColdmailReadyWebdesignLead\(customer\)/);
   assert.match(pageSource, /outreachController\.hasInstantlyOutreachSignal\(customer\)/);
   assert.match(pageSource, /function getPhotoHeaderCount\(customers, showPhotoColumn\)/);
@@ -372,8 +377,8 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /const canUseMockup = hasPhoto \|\| hasMockup;/);
   assert.match(webdesignActionScriptSource, /data-can-generate=\\"" \+ \(hasMockup \? "true" : "false"\)/);
   assert.match(webdesignActionScriptSource, /data-mockup-disabled=\\"/);
-  assert.match(pageSource, /function scheduleVisibleMockupEnsure\(\)/);
-  assert.match(pageSource, /webdesignMockupController\.ensureVisibleMockups\(getSortedCustomers\(getFilteredCustomers\(\)\), 24\)/);
+  assert.doesNotMatch(pageSource, /function scheduleVisibleMockupEnsure\(\)/);
+  assert.doesNotMatch(pageSource, /webdesignMockupController\.ensureVisibleMockups\(getSortedCustomers\(getFilteredCustomers\(\)\),/);
   assert.match(pageSource, /openWebsitePhotoPreview\(state\.photoTargetId, "mockup"\);/);
   assert.doesNotMatch(pageSource, /mockupDrop\.getAttribute\("data-can-generate"\) !== "true"/);
   assert.doesNotMatch(pageSource, /webdesignMockupController\.ensureForCustomer\(state\.photoTargetId, \{ force: true \}\)/);
@@ -559,7 +564,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /else \{\s*await bootstrapCustomers\(\);\s*\}/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);[\s\S]*state\.photoRestorePending = false;[\s\S]*renderPage\(\);[\s\S]*releaseDatabaseBootShell\(\);/);
-  assert.match(pageSource, /void webdesignMockupController\.ensureVisibleMockups\(getSortedCustomers\(getFilteredCustomers\(\)\), 12\)\.catch/);
+  assert.doesNotMatch(pageSource, /void webdesignMockupController\.ensureVisibleMockups\(getSortedCustomers\(getFilteredCustomers\(\)\), 12\)\.catch/);
   assert.doesNotMatch(pageSource, /window\.setTimeout\(function \(\) \{ resolve\(false\); \}, 850\);/);
   assert.doesNotMatch(pageSource, /releaseDatabaseBootShell\(\); void webdesignActionController\.preloadPhotoImages/);
   assert.match(pageSource, /void webdesignActionController\.resumePendingJobs\(\)\.catch/);
