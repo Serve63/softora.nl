@@ -393,8 +393,14 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.doesNotMatch(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
   assert.doesNotMatch(pageSource, /nodes\.myMailsFilterButton/);
   assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn/);
+  assert.match(pageSource, /function getMailReadyCustomers\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isColdmailReadyWebdesignLead\);/);
+  assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*return state\.activeStatus === "benaderbaar" \? getMailReadyCustomers\(customers\) : \(customers \|\| \[\]\);/);
+  assert.match(pageSource, /const baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), filtered = getVisibleTableCustomers\(baseFiltered\)/);
   assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" \? "Mailklaar" : "Foto's";/);
-  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ getPhotoHeaderCount\(filtered, showPhotoColumn\)\.toLocaleString\("nl-NL"\) \+ "\)";/);
+  assert.match(pageSource, /renderPhotoCostLabel\(baseFiltered\);/);
+  assert.match(pageSource, /const photoHeaderCount = getPhotoHeaderCount\(filtered, showPhotoColumn\);/);
+  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ photoHeaderCount\.toLocaleString\("nl-NL"\) \+ "\)";/);
+  assert.match(pageSource, /logDatabaseMediaDebug\("render-table", \{ activeStatus: state\.activeStatus, databaseCount: state\.klanten\.length, filteredCount: baseFiltered\.length, renderedCount: filtered\.length, photoHeaderCount: photoHeaderCount/);
   assert.match(pageSource, /colspan=\\"" \+ \(showOutreachActionColumn \? 8 : 9\) \+ "\\"/);
   assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
@@ -421,7 +427,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(pageSource, /return buildCustomerWebdesignAssetState\(customer\)\.isMailReady;/);
   assert.match(pageSource, /outreachController\.hasInstantlyOutreachSignal\(customer\)/);
   assert.match(pageSource, /function getPhotoHeaderCount\(customers, showPhotoColumn\)/);
-  assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*filter\(isColdmailReadyWebdesignLead\)/);
+  assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*getMailReadyCustomers\(customers\)\.length/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\) \{\s*return buildCustomerWebdesignAssetState\(customer\)\.canGeneratePhoto;/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
   assert.match(pageSource, /return webdesignActionController\.render\(customer\);/);
@@ -514,6 +520,9 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignActionScriptSource, /\.photo-cell\{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0\}/);
   assert.match(webdesignActionScriptSource, /\.photo-drop\{position:relative;flex:0 0 34px;aspect-ratio:1\/1;overflow:hidden;contain:layout paint\}/);
   assert.match(webdesignActionScriptSource, /function hydratePhotoDrops\(root\)/);
+  assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_RETRY_AFTER_MS = 30000;/);
+  assert.match(webdesignActionScriptSource, /logMediaDebug\(failed \? "image-load-error" : "image-load-success", getPhotoDropDebug\(drop\)\);/);
+  assert.match(webdesignActionScriptSource, /fetchpriority=\\"high\\"/);
   assert.match(webdesignActionScriptSource, /if \(hasPhoto \|\| hasMockup\) schedulePhotoDropHydration\(\);/);
   assert.match(webdesignActionScriptSource, /const isRestoringPhotos = typeof options\.isRestoringPhotos === "function"/);
   assert.match(webdesignActionScriptSource, /state && state\.photoRestorePending/);
@@ -660,7 +669,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.doesNotMatch(pageSource, /if \(databaseHadBootstrapCustomers\) releaseDatabaseBootShell\(\); await bootstrapCustomers\(\);/);
   assert.match(webdesignActionScriptSource, /pendingIds\.add\(job\.customerId\);/);
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT/);
-  assert.match(webdesignActionScriptSource, /loading=\\"eager\\" decoding=\\"async\\"/);
+  assert.match(webdesignActionScriptSource, /loading=\\"eager\\" fetchpriority=\\"high\\" decoding=\\"async\\"/);
   assert.match(webdesignActionScriptSource, /preloadPhotoImages: preloadPhotoImages/);
   assert.match(webdesignActionScriptSource, /photos\.push\(\{ source: mockup, key: buildPhotoLoadKey\("mockup"/);
   assert.match(webdesignMockupScriptSource, /const pendingReserved = Boolean\(ensureOptions && ensureOptions\.pendingReserved\);/);
