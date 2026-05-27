@@ -379,6 +379,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         service: req.query.service,
         specialAction: req.query.specialAction,
         testMode: req.query.testMode,
+        testRecipientEmails: req.query.testRecipientEmails || req.query.testRecipients || req.query.testRecipientEmail,
         blockedPhones: req.query.blockedPhones,
         blockedEmails: req.query.blockedEmails || req.query.emailBlocklist || req.query.mailBlocklist,
       });
@@ -494,6 +495,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         senderEmail: body.senderEmail,
         specialAction: body.specialAction,
         testMode: body.testMode,
+        testRecipientEmails: body.testRecipientEmails || body.testRecipients || body.testRecipientEmail,
         durationDays: body.durationDays,
         radiusKm: body.radiusKm,
         mode: body.mode,

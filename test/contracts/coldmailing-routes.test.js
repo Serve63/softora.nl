@@ -355,12 +355,14 @@ test('coldmailing campaign send forwards sender AI instructions to the service',
     aiInstructions: 'Gebruik de afsluiting van Servé.',
     toneStyle: 'Informeel & persoonlijk',
     senderEmail: 'serve@softora.nl',
+    testRecipientEmails: ['servec321@gmail.com', 'serve@softora.nl'],
   });
 
   assert.equal(res.statusCode, 200);
   assert.equal(received.aiInstructions, 'Gebruik de afsluiting van Servé.');
   assert.equal(received.toneStyle, 'Informeel & persoonlijk');
   assert.equal(received.senderEmail, 'serve@softora.nl');
+  assert.deepEqual(received.testRecipientEmails, ['servec321@gmail.com', 'serve@softora.nl']);
 });
 
 test('coldmailing autopilot cron route requires CRON_SECRET bearer access', async () => {

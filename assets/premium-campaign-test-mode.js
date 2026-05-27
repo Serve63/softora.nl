@@ -1,7 +1,9 @@
 (function (global) {
   'use strict';
 
-  const TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
+  const TEST_RECIPIENT_EMAILS = ['servec321@gmail.com', 'serve@softora.nl'];
+  const TEST_RECIPIENT_EMAIL = TEST_RECIPIENT_EMAILS[0];
+  const TEST_RECIPIENT_LABEL = TEST_RECIPIENT_EMAILS.join(' en ');
   const TEST_CALL_PHONE = '0629917185';
 
   function isLeadGeneratorAlias() {
@@ -16,9 +18,32 @@
       };
     }
     return {
-      shortLabel: 'Testmodus aan: alleen naar ' + TEST_RECIPIENT_EMAIL,
-      toast: 'Testmodus aan: verzending gaat alleen naar ' + TEST_RECIPIENT_EMAIL + '.',
+      shortLabel: 'Testmodus aan: alleen naar ' + TEST_RECIPIENT_LABEL,
+      toast: 'Testmodus aan: verzending gaat alleen naar ' + TEST_RECIPIENT_LABEL + '.',
     };
+  }
+
+  function getMailRecipientCount() {
+    return TEST_RECIPIENT_EMAILS.length;
+  }
+
+  function getCountForMode(isCallMode) {
+    return isCallMode ? 1 : getMailRecipientCount();
+  }
+
+  function buildCountTitle(count, isCallMode) {
+    if (isCallMode) return 'Testmodus: 1 testontvanger (' + TEST_CALL_PHONE + ').';
+    return 'Testmodus: ' + count + ' testontvanger' + (count === 1 ? '' : 's') + ' (' + TEST_RECIPIENT_LABEL + ').';
+  }
+
+  function appendRecipientParams(params, isCallMode) {
+    if (!isCallMode && params && typeof params.set === 'function') {
+      params.set('testRecipientEmails', TEST_RECIPIENT_EMAILS.join(','));
+    }
+  }
+
+  function getPayloadRecipientEmails(isCallMode) {
+    return isCallMode ? undefined : TEST_RECIPIENT_EMAILS.slice();
   }
 
   function getToggleButton() {
@@ -43,7 +68,7 @@
 
   function refreshCampaignPreview() {
     if (typeof global.renderCampaignCompanyCount === 'function') {
-      global.renderCampaignCompanyCount(isEnabled() ? 1 : undefined);
+      global.renderCampaignCompanyCount(isEnabled() ? getMailRecipientCount() : undefined);
     }
     if (typeof global.hydrateCampaignCompanyCountFromSupabase === 'function') {
       void global.hydrateCampaignCompanyCountFromSupabase();
@@ -79,6 +104,13 @@
 
   global.SoftoraCampaignTestMode = {
     getRecipientEmail: function () { return TEST_RECIPIENT_EMAIL; },
+    getRecipientEmails: function () { return TEST_RECIPIENT_EMAILS.slice(); },
+    getRecipientLabel: function () { return TEST_RECIPIENT_LABEL; },
+    getMailRecipientCount,
+    getCountForMode,
+    buildCountTitle,
+    appendRecipientParams,
+    getPayloadRecipientEmails,
     getTestPhone: function () { return TEST_CALL_PHONE; },
     install,
     isEnabled,

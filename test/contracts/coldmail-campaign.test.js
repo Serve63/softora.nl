@@ -3103,6 +3103,57 @@ test('coldmail campaign test mode sends only the safe test inbox', async () => {
   assert.deepEqual(getSavedStates(), []);
 });
 
+test('coldmail campaign test mode can target the approved Serve inbox too', async () => {
+  const { service, sentMessages, getSavedState, getSavedStates } = createService({
+    rows: [
+      {
+        id: 'real-prospect',
+        bedrijf: 'Echte Klant BV',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const testRecipientEmails = ['servec321@gmail.com', 'serve@softora.nl'];
+  const preview = await service.getColdmailCampaignRecipients({
+    count: 10,
+    testMode: true,
+    testRecipientEmails,
+  });
+
+  assert.equal(preview.testMode, true);
+  assert.deepEqual(preview.testRecipientEmails, testRecipientEmails);
+  assert.equal(preview.selected, 2);
+  assert.deepEqual(
+    preview.recipients.map((recipient) => recipient.email),
+    testRecipientEmails
+  );
+
+  const result = await service.sendColdmailCampaign({
+    count: 10,
+    subject: 'Test voor {{bedrijf}}',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+    testMode: true,
+    testRecipientEmails,
+  });
+
+  assert.equal(result.testMode, true);
+  assert.equal(result.sent, 2);
+  assert.equal(result.persisted, 0);
+  assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
+  assert.deepEqual(result.testRecipientEmails, testRecipientEmails);
+  assert.deepEqual(
+    sentMessages.map((message) => message.to),
+    testRecipientEmails
+  );
+  assert.equal(getSavedState(), null);
+  assert.deepEqual(getSavedStates(), []);
+});
+
 test('coldmail campaign test mode infers webdesign assets from the mail content safely', async () => {
   const { service, sentMessages, getSavedState, getSavedStates } = createService({
     rows: [
