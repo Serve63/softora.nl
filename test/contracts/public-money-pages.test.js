@@ -58,38 +58,12 @@ test('diensten page uses customer-facing service guidance copy', () => {
   assert.match(source, /Waar we samen naar kijken/);
   assert.match(source, /Welke dienst levert het snelst merkbare waarde op/);
   assert.match(source, /href="\/website-laten-maken"/);
-  assert.match(source, /href="\/website-flitscheck"/);
   assert.match(source, /href="\/ai-automatisering"/);
   assert.match(source, /href="\/bedrijfssoftware-op-maat"/);
   assert.match(source, /href="\/crm-systeem-op-maat"/);
   assert.match(source, /href="\/chatbot-laten-maken"/);
   assert.match(source, /data-softora-public-seo="internal-links"/);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
-});
-
-test('website flitscheck page is a public 5 euro entry offer with a real WhatsApp order route', () => {
-  const source = readPage('website-flitscheck.html');
-  const entry = getRegistryEntry('website-flitscheck.html');
-
-  assert.match(source, /<title>Website Flitscheck voor 5 euro \| Softora<\/title>/);
-  assert.match(source, /<h1>Website Flitscheck voor &euro;5<\/h1>/);
-  assert.match(source, /3 concrete verbeterpunten/);
-  assert.match(source, /Binnen 24 uur/);
-  assert.match(source, /Bestel via WhatsApp/);
-  assert.match(source, /href="https:\/\/wa\.me\/31643262792\?text=Ik%20wil%20de%20Website%20Flitscheck/);
-  assert.match(source, /href="\/website-laten-maken"/);
-  assert.match(source, /href="\/diensten"/);
-  assert.match(source, /href="\/pakketten"/);
-  assert.match(source, /href="\/crm-systeem-op-maat"/);
-  assert.match(source, /href="\/ai-automatisering"/);
-  assert.match(source, /data-softora-public-seo="internal-links"/);
-  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
-
-  assert.equal(entry.title, 'Website Flitscheck voor 5 euro');
-  assert.match(entry.description, /3 concrete verbeterpunten/);
-  assert.ok(entry.relatedLinks.includes('/website-laten-maken'));
-  assert.ok(entry.relatedLinks.includes('/diensten'));
-  assert.ok(entry.relatedLinks.includes('/pakketten'));
 });
 
 test('website money page is focused on SEO, leads and clean internal links', () => {

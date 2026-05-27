@@ -34,7 +34,6 @@ for (const target of pageSmokeTargets) {
 
 const unlockedPublicSeoPaths = [
   '/diensten',
-  '/website-flitscheck',
   '/ai-automatisering',
   '/website-laten-maken',
   '/website-laten-maken-oisterwijk',

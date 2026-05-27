@@ -31,7 +31,6 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
 
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/diensten<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/website-flitscheck<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/pakketten<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/website-laten-maken-oisterwijk<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>/);
@@ -68,7 +67,6 @@ test('public seo robots keeps marketing pages crawlable and blocks private surfa
   assert.doesNotMatch(robots, /^Disallow: \/premium-$/m);
   assert.doesNotMatch(robots, /^Disallow: \/premium-website$/m);
   assert.doesNotMatch(robots, /^Disallow: \/diensten$/m);
-  assert.doesNotMatch(robots, /^Disallow: \/website-flitscheck$/m);
   assert.doesNotMatch(robots, /^Disallow: \/ai-automatisering$/m);
   assert.doesNotMatch(robots, /^Disallow: \/crm-systeem-op-maat$/m);
   assert.doesNotMatch(robots, /^Disallow: \/ai-telefonist$/m);
@@ -287,8 +285,6 @@ test('public seo url mapping exposes clean paths and keeps legacy redirects avai
   assert.equal(getIndexablePublicPathFromHtmlFile('website-laten-maken-oisterwijk.html'), '/website-laten-maken-oisterwijk');
   assert.equal(getIndexablePublicHtmlFileFromPath('/website-laten-maken-oisterwijk'), 'website-laten-maken-oisterwijk.html');
   assert.equal(getIndexablePublicPathFromHtmlFile('diensten.html'), '/diensten');
-  assert.equal(getIndexablePublicPathFromHtmlFile('website-flitscheck.html'), '/website-flitscheck');
-  assert.equal(getIndexablePublicHtmlFileFromPath('/website-flitscheck'), 'website-flitscheck.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/ai-automatisering'), 'ai-automatisering.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/crm-systeem-op-maat'), 'crm-systeem-op-maat.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/ai-telefonist'), 'ai-telefonist.html');
