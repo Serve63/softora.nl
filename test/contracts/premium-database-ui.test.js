@@ -508,7 +508,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260526c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260527a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260527a/);
