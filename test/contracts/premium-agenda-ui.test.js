@@ -322,31 +322,23 @@ test('premium agenda handmatige afspraak-modal slaat optionele telefoon, locatie
   assert.match(pageSource, /notes,/);
 });
 
-test('premium agenda toont leadscore per eigenaar in de maandheader zonder losse statistiekkaart', () => {
+test('premium agenda verbergt leadscore per eigenaar in de maandheader', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const stabilityPath = path.join(__dirname, '../../assets/premium-agenda-stability.js');
-  const scoreboardPath = path.join(__dirname, '../../assets/premium-agenda-lead-scoreboard.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const stabilitySource = fs.readFileSync(stabilityPath, 'utf8');
-  const scoreboardSource = fs.readFileSync(scoreboardPath, 'utf8');
 
   assert.match(pageSource, /manualLeadOwnerKey: String\(item\.manualLeadOwnerKey \|\| ''\)/);
   assert.match(pageSource, /leadOwnerKey: String\(item\.leadOwnerKey \|\| ''\)/);
   assert.match(pageSource, /leadOwnerFullName: String\(item\.leadOwnerFullName \|\| ''\)/);
-  assert.match(pageSource, /class="agenda-header-owners" aria-label="Leadscore agenda"/);
-  assert.match(pageSource, /data-agenda-owner="serve"/);
-  assert.match(pageSource, /data-agenda-owner="martijn"/);
-  assert.match(pageSource, /data-agenda-owner-count="serve">0<\/span>/);
-  assert.match(pageSource, /data-agenda-owner-count="martijn">0<\/span>/);
+  assert.doesNotMatch(pageSource, /class="agenda-header-owners"/);
+  assert.doesNotMatch(pageSource, /data-agenda-owner=/);
+  assert.doesNotMatch(pageSource, /data-agenda-owner-count=/);
   assert.match(pageSource, /\.month-nav\s*\{[\s\S]*gap:\s*0\.45rem;/);
   assert.match(pageSource, /\.month-label\s*\{[\s\S]*min-width:\s*auto;/);
-  assert.match(pageSource, /\.agenda-header-owners\s*\{[\s\S]*flex-direction:\s*column;/);
-  assert.match(pageSource, /\.agenda-header-owner\.is-leading\s*\{[\s\S]*color:\s*var\(--accent\);/);
-  assert.match(pageSource, /premium-agenda-lead-scoreboard\.js\?v=20260512a/);
-  assert.match(scoreboardSource, /function refreshAgendaHeaderLeadOwnerScoreboard\(\) \{[\s\S]*const counts = \{ serve: 0, martijn: 0 \};[\s\S]*\.sort\(\(a, b\) => \{[\s\S]*const countDiff = Number\(counts\[b\.ownerKey\] \|\| 0\) - Number\(counts\[a\.ownerKey\] \|\| 0\);[\s\S]*return countDiff \|\| a\.index - b\.index;/);
-  assert.match(scoreboardSource, /if \(container\) container\.appendChild\(entry\.row\);/);
-  assert.match(scoreboardSource, /row\.classList\.toggle\('is-leading', highestCount > 0 && count === highestCount\);/);
-  assert.match(scoreboardSource, /renderCalendar = function renderCalendarWithLeadScoreboard\(\) \{[\s\S]*baseRenderCalendar\(\);[\s\S]*refreshAgendaHeaderLeadOwnerScoreboard\(\);/);
+  assert.doesNotMatch(pageSource, /agenda-header-owner/);
+  assert.doesNotMatch(pageSource, /premium-agenda-lead-scoreboard\.js/);
+  assert.equal(fs.existsSync(path.join(__dirname, '../../assets/premium-agenda-lead-scoreboard.js')), false);
   assert.doesNotMatch(pageSource, /agendaManualLeadStatsCard/);
   assert.doesNotMatch(pageSource, />\s*Handmatige leads\s*</);
   assert.doesNotMatch(stabilitySource, /agendaManualLeadStatsCard/);
