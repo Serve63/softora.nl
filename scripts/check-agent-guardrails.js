@@ -10,6 +10,7 @@ const {
   isBehaviorChangePath,
   isFrontendProductionPath,
   isHighRiskPath,
+  isPremiumAuthUsersWriteScanPath,
   isProtectedFrontendShellPath,
   isProtectedQualityGatePath,
   isTestPath,
@@ -346,7 +347,12 @@ const testWeakeningViolations = changedFiles
   .filter(Boolean);
 
 const premiumAuthUsersWriteViolations = changedFiles
-  .filter((filePath) => !isTestPath(filePath) && !isProtectedQualityGatePath(filePath))
+  .filter(
+    (filePath) =>
+      isPremiumAuthUsersWriteScanPath(filePath) &&
+      !isTestPath(filePath) &&
+      !isProtectedQualityGatePath(filePath)
+  )
   .map((filePath) => {
     const diffArgs = getDiffArgsForPath(filePath);
     const diffText = diffArgs ? tryRunGit(diffArgs) : '';

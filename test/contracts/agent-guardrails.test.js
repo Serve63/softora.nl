@@ -10,6 +10,7 @@ const {
   isAllowedNewServerPath,
   isFrontendProductionPath,
   isHighRiskPath,
+  isPremiumAuthUsersWriteScanPath,
   isProtectedFrontendShellPath,
   isProtectedQualityGatePath,
   listAddedPremiumAuthUsersWriteRisks,
@@ -361,6 +362,8 @@ test('agent guardrails block direct premium auth users writes', () => {
     '+const onlyRead = true;',
   ].join('\n');
   assert.deepEqual(listAddedPremiumAuthUsersWriteRisks(allowedReadOnlyReference), []);
+  assert.equal(isPremiumAuthUsersWriteScanPath('reports/premium-login-incident-2026-05-27.md'), false);
+  assert.equal(isPremiumAuthUsersWriteScanPath('scripts/autopilot-proof.js'), true);
 
   const violations = buildGuardrailViolations({
     changedFiles: ['scripts/autopilot-proof.js', 'test/contracts/agent-guardrails.test.js'],

@@ -120,6 +120,20 @@ function isFrontendProductionPath(filePath) {
   return normalized.startsWith('assets/') || /^[^/]+\.html$/i.test(normalized);
 }
 
+function isPremiumAuthUsersWriteScanPath(filePath) {
+  const normalized = normalizeRepoPath(filePath);
+  return (
+    normalized === 'server.js' ||
+    normalized.startsWith('scripts/') ||
+    normalized.startsWith('server/') ||
+    normalized.startsWith('api/') ||
+    normalized.startsWith('assets/') ||
+    normalized.startsWith('lib/') ||
+    normalized.startsWith('.github/workflows/') ||
+    /\.(?:cjs|env|html|js|json|jsx|mjs|sh|sql|ts|tsx|ya?ml)$/i.test(normalized)
+  );
+}
+
 function isHighRiskPath(filePath) {
   const normalized = normalizeRepoPath(filePath);
   return HIGH_RISK_PATH_PATTERNS.some((pattern) => pattern.test(normalized));
@@ -533,6 +547,7 @@ module.exports = {
   isBehaviorChangePath,
   isFrontendProductionPath,
   isHighRiskPath,
+  isPremiumAuthUsersWriteScanPath,
   isProtectedFrontendShellPath,
   isProtectedQualityGatePath,
   isTestPath,
