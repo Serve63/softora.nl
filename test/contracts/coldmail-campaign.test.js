@@ -327,6 +327,23 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[1].status, 'klant');
 });
 
+test('coldmail campaign uses IPv4 SMTP transports with bounded timeouts', async () => {
+  const { service, transportConfigs } = createService();
+
+  await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedendag,\n\nIk heb een webdesign gemaakt.',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(transportConfigs.length, 1);
+  assert.equal(transportConfigs[0].family, 4);
+  assert.equal(transportConfigs[0].connectionTimeout, 45_000);
+  assert.equal(transportConfigs[0].greetingTimeout, 30_000);
+  assert.equal(transportConfigs[0].socketTimeout, 90_000);
+});
+
 test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async () => {
   const { service, sentMessages } = createService({
     mailboxAccountsRaw: JSON.stringify([
