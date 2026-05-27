@@ -3124,7 +3124,7 @@
             }
             const mockupDrop = event.target.closest("[data-mockup-photo-id]");
             if (mockupDrop) {
-                event.preventDefault(); event.stopPropagation(); state.photoTargetId = mockupDrop.getAttribute("data-mockup-photo-id"); openWebsitePhotoPreview(state.photoTargetId, "mockup");
+                event.preventDefault(); event.stopPropagation(); state.photoTargetId = mockupDrop.getAttribute("data-mockup-photo-id"); if (mockupDrop.getAttribute("data-can-generate") === "true" && mockupDrop.getAttribute("data-has-photo") !== "true") { void webdesignMockupController.ensureForCustomer(state.photoTargetId); return; } openWebsitePhotoPreview(state.photoTargetId, "mockup");
                 return;
             }
             const photoDrop = event.target.closest(".photo-drop[data-photo-id]");
