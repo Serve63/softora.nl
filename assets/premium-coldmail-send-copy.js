@@ -11,8 +11,15 @@
     return count + ' ' + (count === 1 ? 'mail' : 'mails') + ' verstuurd';
   }
 
+  function formatTestRecipientLabel(sendResult) {
+    const emails = Array.isArray(sendResult && sendResult.testRecipientEmails)
+      ? sendResult.testRecipientEmails
+      : [sendResult && sendResult.testRecipientEmail].filter(Boolean);
+    return emails.length ? emails.join(' en ') : 'servec321@gmail.com';
+  }
+
   function buildColdmailSendSuccessMessage(sendResult) {
-    if (sendResult && sendResult.testMode) return 'Testmail verstuurd naar servec321@gmail.com.';
+    if (sendResult && sendResult.testMode) return 'Testmail verstuurd naar ' + formatTestRecipientLabel(sendResult) + '.';
     const sent = Number(sendResult && sendResult.sent) || 0;
     const failed = Number(sendResult && sendResult.failed) || 0;
     if (!failed) return '✓ ' + formatColdmailSentCount(sent);
