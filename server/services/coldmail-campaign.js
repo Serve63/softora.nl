@@ -35,6 +35,9 @@ const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT = 9;
 const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS = 180_000;
 const DEFAULT_COLDMAIL_AUTOPILOT_BATCH_SIZE = 1;
 const DEFAULT_COLDMAIL_AUTOPILOT_LOCK_MS = 12 * 60 * 1000;
+const DEFAULT_COLDMAIL_SMTP_CONNECTION_TIMEOUT_MS = 45_000;
+const DEFAULT_COLDMAIL_SMTP_GREETING_TIMEOUT_MS = 30_000;
+const DEFAULT_COLDMAIL_SMTP_SOCKET_TIMEOUT_MS = 90_000;
 const DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE = 'Europe/Amsterdam';
 const DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR = 7;
 const DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR = 17;
@@ -405,15 +408,15 @@ function createColdmailCampaignService(deps = {}) {
   function getSmtpTransporter() {
     if (!isSmtpMailConfigured()) return null;
     if (smtpTransporter) return smtpTransporter;
-    smtpTransporter = createTransport({
-      host: smtpHost,
-      port: Number(smtpPort),
-      secure: Boolean(smtpSecure),
-      auth: {
+    smtpTransporter = createTransport(
+      buildSmtpTransportConfig({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
         user: smtpUser,
         pass: smtpPass,
-      },
-    });
+      })
+    );
     return smtpTransporter;
   }
 
@@ -549,20 +552,36 @@ function createColdmailCampaignService(deps = {}) {
     if (!senderSmtpTransporters.has(key)) {
       senderSmtpTransporters.set(
         key,
-        createTransport({
-          host: account.smtpHost,
-          port: Number(account.smtpPort),
-          secure: Boolean(account.smtpSecure),
-          auth: {
+        createTransport(
+          buildSmtpTransportConfig({
+            host: account.smtpHost,
+            port: account.smtpPort,
+            secure: account.smtpSecure,
             user: account.smtpUser,
             pass: account.smtpPass,
-          },
-        })
+          })
+        )
       );
     }
     return {
       account,
       transporter: senderSmtpTransporters.get(key),
+    };
+  }
+
+  function buildSmtpTransportConfig({ host, port, secure, user, pass }) {
+    return {
+      host,
+      port: Number(port),
+      secure: Boolean(secure),
+      auth: {
+        user,
+        pass,
+      },
+      family: 4,
+      connectionTimeout: DEFAULT_COLDMAIL_SMTP_CONNECTION_TIMEOUT_MS,
+      greetingTimeout: DEFAULT_COLDMAIL_SMTP_GREETING_TIMEOUT_MS,
+      socketTimeout: DEFAULT_COLDMAIL_SMTP_SOCKET_TIMEOUT_MS,
     };
   }
 
