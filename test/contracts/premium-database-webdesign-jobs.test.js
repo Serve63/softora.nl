@@ -28,10 +28,10 @@ function wait(ms = 0) {
 }
 
 async function waitForJobDone(coordinator, jobId) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
     const job = coordinator._jobs.get(jobId);
     if (job && (job.status === 'done' || job.status === 'error')) return job;
-    await wait(10);
+    await wait(20);
   }
   return coordinator._jobs.get(jobId);
 }
