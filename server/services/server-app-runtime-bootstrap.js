@@ -96,6 +96,8 @@ function buildServerAppEnvConfig(runtimeEnv) {
     COLDMAIL_PERSONAL_MAILBOX_SEND_DELAY_MS: runtimeEnv.mail.coldmailPersonalMailboxSendDelayMs,
     COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS: runtimeEnv.mail.coldmailBlockPersonalMailboxDomains,
     INSTANTLY_ENABLED: Boolean(instantly.enabled),
+    INSTANTLY_SYNC_ENABLED: Boolean(instantly.syncEnabled),
+    INSTANTLY_SCHEDULER_ENABLED: Boolean(instantly.schedulerEnabled),
     INSTANTLY_API_KEY: instantly.apiKey || '',
     INSTANTLY_API_BASE_URL: instantly.apiBaseUrl || 'https://api.instantly.ai/api/v2',
     INSTANTLY_DEFAULT_CAMPAIGN_ID: instantly.defaultCampaignId || '',

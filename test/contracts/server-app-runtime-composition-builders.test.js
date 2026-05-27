@@ -139,6 +139,8 @@ test('server app runtime composition builders preserve feature wiring groups and
       MAIL_FROM_NAME: 'Softora',
       MAIL_REPLY_TO: 'reply@softora.test',
       INSTANTLY_ENABLED: true,
+      INSTANTLY_SYNC_ENABLED: true,
+      INSTANTLY_SCHEDULER_ENABLED: false,
       INSTANTLY_API_KEY: 'instantly-key',
       INSTANTLY_API_BASE_URL: 'https://api.instantly.test/api/v2',
       INSTANTLY_DEFAULT_CAMPAIGN_ID: 'campaign-1',
