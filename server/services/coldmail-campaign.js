@@ -2535,13 +2535,6 @@ function createColdmailCampaignService(deps = {}) {
         ? raw.senderEmails
         : raw.senderEmail
     ).filter(isColdmailAutopilotAllowedSenderEmail);
-    if (senderEmails.length) {
-      ['servec321@gmail.com', 'martijnven123@gmail.com'].forEach((email) => {
-        if (!senderEmails.includes(email) && isSenderSmtpAccountConfigured(resolveSenderSmtpAccount(email))) {
-          senderEmails.push(email);
-        }
-      });
-    }
     const rawSenderEmail = normalizeEmailAddress(raw.senderEmail);
     const senderEmail = isColdmailAutopilotAllowedSenderEmail(rawSenderEmail)
       ? rawSenderEmail
