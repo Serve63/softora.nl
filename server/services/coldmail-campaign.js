@@ -101,6 +101,9 @@ const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
 const COLDMAIL_TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
 const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
+const COLDMAIL_PREVIEW_IMAGE_CACHE_TTL_MS = 30 * 60 * 1000;
+const COLDMAIL_PHOTO_MAP_CACHE_TTL_MS = 60 * 1000;
+const COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT = 120;
 const TEST_RECIPIENT_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL]);
 const TEST_RECIPIENT_LOOKUP_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL, 'servec321@gail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce', 'softora testmodus']);
@@ -320,6 +323,8 @@ function createColdmailCampaignService(deps = {}) {
   const senderSmtpTransporters = new Map();
   let coldmailCampaignSendPromise = null;
   let webdesignPreparationCoordinator = initialWebdesignPreparationCoordinator;
+  const coldmailPreviewImageCache = new Map();
+  let coldmailPhotoMapCache = null;
   const mailboxAccountService = createMailboxService({
     mailConfig: {
       smtpHost,
@@ -4152,6 +4157,42 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
+  function getPreviewImageCacheKey(token, type = '') {
+    const cleanToken = normalizeString(token);
+    if (!cleanToken) return '';
+    return `${cleanToken}|${normalizeString(type).toLowerCase()}`;
+  }
+
+  function getCachedPreviewImage(cacheKey) {
+    const entry = coldmailPreviewImageCache.get(cacheKey);
+    if (!entry) return null;
+    if (Date.now() - entry.cachedAt > COLDMAIL_PREVIEW_IMAGE_CACHE_TTL_MS) {
+      coldmailPreviewImageCache.delete(cacheKey);
+      return null;
+    }
+    coldmailPreviewImageCache.delete(cacheKey);
+    coldmailPreviewImageCache.set(cacheKey, entry);
+    return {
+      ...entry.image,
+      content: Buffer.from(entry.image.content),
+    };
+  }
+
+  function rememberPreviewImage(cacheKey, image) {
+    if (!cacheKey || !image || !Buffer.isBuffer(image.content)) return;
+    coldmailPreviewImageCache.set(cacheKey, {
+      cachedAt: Date.now(),
+      image: {
+        ...image,
+        content: Buffer.from(image.content),
+      },
+    });
+    while (coldmailPreviewImageCache.size > COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT) {
+      const oldestKey = coldmailPreviewImageCache.keys().next().value;
+      coldmailPreviewImageCache.delete(oldestKey);
+    }
+  }
+
   function getImageExtension(contentType) {
     if (contentType === 'image/jpeg' || contentType === 'image/jpg') return 'jpg';
     if (contentType === 'image/webp') return 'webp';
@@ -4505,6 +4546,25 @@ function createColdmailCampaignService(deps = {}) {
     const state = await getUiStateValues(customerPhotoScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     return parseCustomerPhotoMap(values[customerPhotoKey], values, rows);
+  }
+
+  async function loadCustomerPhotoMapCached(rows = []) {
+    const canReuseRows = !Array.isArray(rows) || rows.length === 0;
+    if (
+      canReuseRows &&
+      coldmailPhotoMapCache &&
+      Date.now() - coldmailPhotoMapCache.cachedAt <= COLDMAIL_PHOTO_MAP_CACHE_TTL_MS
+    ) {
+      return coldmailPhotoMapCache.map;
+    }
+    const map = await loadCustomerPhotoMap(rows);
+    if (canReuseRows) {
+      coldmailPhotoMapCache = {
+        cachedAt: Date.now(),
+        map,
+      };
+    }
+    return map;
   }
 
   async function resolveRowWebdesignPhoto(row, photoMap) {
@@ -5324,7 +5384,12 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function getColdmailPreviewImage(input = {}) {
-    const payload = verifyColdmailPreviewImageToken(input.token || input.t);
+    const token = normalizeString(input.token || input.t);
+    const payload = verifyColdmailPreviewImageToken(token);
+    const cacheKey = getPreviewImageCacheKey(token, payload.type);
+    const cachedImage = getCachedPreviewImage(cacheKey);
+    if (cachedImage) return cachedImage;
+
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = parseDatabaseRows(values);
@@ -5335,7 +5400,7 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
 
-    const photoMap = await loadCustomerPhotoMap();
+    const photoMap = await loadCustomerPhotoMapCached();
     const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
     const photosByIdentity = new Map();
     Object.keys(photos).forEach((key) => {
@@ -5361,13 +5426,15 @@ function createColdmailCampaignService(deps = {}) {
     const baseName = payload.type === 'mockup'
       ? normalizeString(photo && photo.websiteMockupName) || `${company} device mockup`
       : normalizeString(photo && photo.websitePhotoName) || `${company} webdesign`;
-    return {
+    const result = {
       ok: true,
       type: payload.type,
       content: image.content,
       contentType: image.contentType,
       filename: `${sanitizeFilename(baseName, payload.type === 'mockup' ? 'device-mockup' : 'webdesign')}.${getImageExtension(image.contentType)}`,
     };
+    rememberPreviewImage(cacheKey, result);
+    return result;
   }
 
   async function sendColdmailCampaign(input = {}) {
