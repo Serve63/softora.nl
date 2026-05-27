@@ -14,6 +14,7 @@ const {
   isProtectedQualityGatePath,
   isTestPath,
   listAddedBrowserStorageApis,
+  listAddedPremiumAuthUsersWriteRisks,
   listAddedTestWeakeningPatterns,
   normalizeRepoPath,
 } = require('./lib/agent-guardrails-core');
@@ -344,6 +345,17 @@ const testWeakeningViolations = changedFiles
   })
   .filter(Boolean);
 
+const premiumAuthUsersWriteViolations = changedFiles
+  .filter((filePath) => !isTestPath(filePath) && !isProtectedQualityGatePath(filePath))
+  .map((filePath) => {
+    const diffArgs = getDiffArgsForPath(filePath);
+    const diffText = diffArgs ? tryRunGit(diffArgs) : '';
+    const hits = listAddedPremiumAuthUsersWriteRisks(diffText);
+    if (hits.length === 0) return '';
+    return `${filePath} (${hits.join(', ')})`;
+  })
+  .filter(Boolean);
+
 const inlineScriptLimit = Number(process.env.GUARDRAILS_MAX_INLINE_SCRIPT_ADDITIONS || 80);
 const largeInlineScriptViolations = changedFiles
   .filter((filePath) => /^[^/]+\.html$/i.test(filePath))
@@ -416,6 +428,7 @@ const violations = buildGuardrailViolations({
   protectedFrontendShellFiles,
   protectedQualityGateFiles,
   qualityBaselineViolations: getQualityBaselineViolations(),
+  premiumAuthUsersWriteViolations,
   behaviorDiffLineCount,
   maxBehaviorDiffLineCount: Number(process.env.GUARDRAILS_MAX_BEHAVIOR_DIFF_LINES || 900),
   allowUntestedChanges: toBooleanEnv('ALLOW_UNTESTED_CHANGES'),
