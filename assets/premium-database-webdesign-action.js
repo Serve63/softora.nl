@@ -43,6 +43,7 @@
         const refreshPhotos = options.refreshPhotos;
         const ensureMockupForCustomer = typeof options.ensureMockupForCustomer === "function" ? options.ensureMockupForCustomer : async function () {};
         const isMockupPending = typeof options.isMockupPending === "function" ? options.isMockupPending : function () { return false; };
+        const getAssetState = typeof options.getAssetState === "function" ? options.getAssetState : null;
         const isRestoringPhotos = typeof options.isRestoringPhotos === "function" ? options.isRestoringPhotos : function (customer) { return Boolean(state && state.photoRestorePending) && shouldShowWebsitePhoto(customer); };
         const costEur = Math.max(0, Number(options.costEur) || 0);
         const pendingIds = new Set();
@@ -50,6 +51,7 @@
         const pollTimers = new Map();
         const loadedPhotoKeys = getSharedLoadedPhotoKeys();
         const failedPhotoKeys = new Set();
+        const failedMockupIds = new Set();
         const autoMockupQueuedIds = new Set();
         const autoMockupQueue = [];
         let photoHydrationQueued = false;
@@ -247,10 +249,20 @@
             if (!id) return;
             autoMockupRunning = true;
             Promise.resolve(ensureMockupForCustomer(id, { silent: true, source: "database-visible-pair" }))
-                .catch(function () {})
+                .then(function (ok) {
+                    if (ok) {
+                        failedMockupIds.delete(id);
+                    } else {
+                        failedMockupIds.add(id);
+                    }
+                })
+                .catch(function () {
+                    failedMockupIds.add(id);
+                })
                 .finally(function () {
                     autoMockupRunning = false;
                     autoMockupQueuedIds.delete(id);
+                    if (typeof renderPage === "function") renderPage();
                     if (autoMockupQueue.length) scheduleAutoMockupQueue();
                 });
         }
@@ -259,6 +271,40 @@
             return (state.klanten || []).find(function (item) {
                 return item.id === customerId;
             }) || null;
+        }
+
+        function hasApprovedMockup(customer) {
+            if (!customer || !isValidWebsitePhotoDataUrl(customer.websiteMockup)) return false;
+            const status = normalizeString(customer.mockupQualityStatus || customer.websiteMockupQualityStatus).toLowerCase();
+            const orientation = normalizeString(customer.mockupOrientation || customer.websiteMockupOrientation).toLowerCase();
+            const renderer = normalizeString(customer.mockupRenderer || customer.websiteMockupRenderer);
+            const checkedAt = normalizeString(customer.mockupQualityCheckedAt || customer.websiteMockupQualityCheckedAt);
+            if (!(status || orientation || renderer || checkedAt)) return false;
+            if (status !== "checked" && status !== "verified" && status !== "ok") return false;
+            return !orientation || orientation === "upright";
+        }
+
+        function isMockupFailed(customerId) {
+            const id = normalizeString(customerId);
+            if (!id || !failedMockupIds.has(id)) return false;
+            return !hasApprovedMockup(getCustomerById(id));
+        }
+
+        function queueVisibleMissingMockupRepairs(customers, limit) {
+            const max = Math.max(0, Number(limit) || 0);
+            if (!max) return 0;
+            let queued = 0;
+            (Array.isArray(customers) ? customers : []).some(function (customer) {
+                const id = normalizeString(customer && customer.id);
+                if (!id || autoMockupQueuedIds.has(id) || isMockupPending(id) || isMockupFailed(id)) return false;
+                const assetState = getAssetState ? getAssetState(customer) : null;
+                const shouldRepair = assetState ? assetState.canRepairMockup : (isValidWebsitePhotoDataUrl(customer && customer.websitePhoto) && !isValidWebsitePhotoDataUrl(customer && customer.websiteMockup));
+                if (!shouldRepair) return false;
+                scheduleMissingMockupPair(id);
+                queued += 1;
+                return queued >= max;
+            });
+            return queued;
         }
 
         function now() {
@@ -503,9 +549,10 @@
 
         function render(customer) {
             if (!shouldShowWebsitePhoto(customer)) return "";
+            const assetState = getAssetState ? getAssetState(customer) : null;
             const photo = normalizeString(customer && customer.websitePhoto);
             const label = normalizeString(customer && customer.websitePhotoName) || "Websitefoto";
-            const hasPhoto = isValidWebsitePhotoDataUrl(photo);
+            const hasPhoto = assetState ? assetState.hasPhoto : isValidWebsitePhotoDataUrl(photo);
             const photoLoadKey = buildPhotoLoadKey("photo", customer && customer.id, photo);
             const photoLoaded = !hasPhoto || isInlinePhotoSource(photo) || loadedPhotoKeys.has(photoLoadKey);
             const photoFailed = hasPhoto && failedPhotoKeys.has(photoLoadKey);
@@ -521,19 +568,19 @@
             const title = ariaLabel;
             const mockup = normalizeString(customer && customer.websiteMockup);
             const mockupLabel = normalizeString(customer && customer.websiteMockupName) || "Device mockup";
-            const hasMockup = isValidWebsitePhotoDataUrl(mockup);
+            const hasMockup = assetState ? assetState.hasMockup : isValidWebsitePhotoDataUrl(mockup);
             const mockupLoadKey = buildPhotoLoadKey("mockup", customer && customer.id, mockup);
             const mockupLoaded = !hasMockup || isInlinePhotoSource(mockup) || loadedPhotoKeys.has(mockupLoadKey);
-            const mockupFailed = hasMockup && failedPhotoKeys.has(mockupLoadKey);
-            const canUseMockup = hasPhoto || hasMockup;
-            const mockupLoading = isMockupPending(customer && customer.id);
-            const canGenerateMockup = hasPhoto && !hasMockup && !mockupLoading;
-            if (canGenerateMockup) scheduleMissingMockupPair(customer && customer.id);
+            const mockupImageFailed = hasMockup && failedPhotoKeys.has(mockupLoadKey);
+            const mockupGenerationFailed = isMockupFailed(customer && customer.id);
+            const mockupFailed = mockupImageFailed || mockupGenerationFailed;
+            const mockupLoading = assetState ? assetState.mockupPending : isMockupPending(customer && customer.id);
+            const canGenerateMockup = assetState ? assetState.canRepairMockup : (hasPhoto && !hasMockup && !mockupLoading);
             const mockupInner = hasMockup
-                ? (mockupFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" decoding=\"async\">")
+                ? (mockupImageFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" decoding=\"async\">")
                 : (mockupLoading ? LOADING_ICON : MOCKUP_ICON);
-            const mockupAriaLabel = hasMockup ? (mockupFailed ? "Device mockup kon niet geladen worden" : "Device mockup bekijken") : (mockupLoading ? "Device mockup wordt gemaakt" : (canGenerateMockup ? "Device mockup maken" : "Device mockup nog niet beschikbaar"));
-            const mockupTitle = hasMockup ? mockupLabel : (mockupLoading ? "Device mockup wordt gemaakt" : (canGenerateMockup ? "Klik om device mockup te maken" : "Maak eerst een webdesign"));
+            const mockupAriaLabel = hasMockup ? (mockupImageFailed ? "Device mockup kon niet geladen worden" : (canGenerateMockup ? "Device mockup opnieuw maken" : "Device mockup bekijken")) : (mockupLoading ? "Device mockup wordt gemaakt" : (mockupGenerationFailed ? "Device mockup maken is mislukt" : (canGenerateMockup ? "Device mockup maken" : "Device mockup nog niet beschikbaar")));
+            const mockupTitle = hasMockup ? (canGenerateMockup ? "Klik om device mockup opnieuw te maken" : mockupLabel) : (mockupLoading ? "Device mockup wordt gemaakt" : (mockupGenerationFailed ? "Mockup maken is mislukt. Klik om opnieuw te proberen." : (canGenerateMockup ? "Klik om device mockup te maken" : "Maak eerst een webdesign")));
             const mockupSlot = "<div class=\"photo-drop photo-drop--mockup" + (mockupLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-mockup-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasMockup ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(mockupLoadKey) + "\" data-photo-loaded=\"" + (mockupLoaded || mockupFailed ? "true" : "false") + "\" data-photo-error=\"" + (mockupFailed ? "true" : "false") + "\" data-can-generate=\"" + (canGenerateMockup ? "true" : "false") + "\" data-mockup-disabled=\"" + (hasMockup || canGenerateMockup ? "false" : "true") + "\" aria-label=\"" + escapeHtml(mockupAriaLabel) + "\" title=\"" + escapeHtml(mockupTitle) + "\">" + mockupInner + "</div>";
             if (hasPhoto || hasMockup) schedulePhotoDropHydration();
             return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(photoLoadKey) + "\" data-photo-loaded=\"" + (photoLoaded || photoFailed ? "true" : "false") + "\" data-photo-error=\"" + (photoFailed ? "true" : "false") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + "</div>";
@@ -596,7 +643,9 @@
         return {
             generateForCustomer: generateForCustomer,
             hydratePhotoDrops: hydratePhotoDrops,
+            isMockupFailed: isMockupFailed,
             preloadPhotoImages: preloadPhotoImages,
+            queueVisibleMissingMockupRepairs: queueVisibleMissingMockupRepairs,
             render: render,
             resumePendingJobs: resumePendingJobs
         };
