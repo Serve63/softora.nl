@@ -177,7 +177,9 @@ function registerColdmailingRoutes(app, deps = {}) {
   }
 
   app.get('/coldmailing/webdesign-foto', async (req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     try {
       if (typeof coldmailCampaignService.getColdmailPreviewImage !== 'function') {
