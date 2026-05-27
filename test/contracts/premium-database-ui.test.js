@@ -52,6 +52,14 @@ function loadDatabasePhotoStorageClient() {
   return sandbox.window.SoftoraDatabasePhotoStorage;
 }
 
+function loadDatabaseWebdesignAssetStateClient() {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-asset-state.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const sandbox = { window: { URL }, URL };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseWebdesignAssetState;
+}
+
 function loadDatabaseWebdesignActionClient(options = {}) {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
@@ -205,10 +213,65 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.equal(contactStatusClient.getColdmailSentAt({ lastColdmailSentAt: '2026-05-19T17:02:00Z' }), '2026-05-19T17:02:00Z');
 });
 
+test('premium database webdesign asset state keeps mail-ready and photo-target definitions separated', () => {
+  const assetStateClient = loadDatabaseWebdesignAssetStateClient();
+  const helpers = {
+    shouldShowWebsitePhoto: (customer) => customer.status !== 'klant',
+    isValidWebsitePhotoSource: (value) => /^(data:image\/|https:\/\/)/.test(String(value || '')),
+    resolveCustomerWebsiteUrl: (customer) => customer.website || customer.dom || '',
+    isMailLeadEligible: (customer) => Boolean(customer.email && !customer.doNotMail),
+    isMockupPending: () => false,
+    isMockupFailed: () => false,
+  };
+  const base = {
+    id: 'customer-1',
+    status: 'benaderbaar',
+    email: 'info@example.nl',
+    website: 'https://example.nl',
+  };
+
+  const photoWithoutMockup = assetStateClient.buildWebdesignAssetState({
+    ...base,
+    websitePhoto: 'data:image/png;base64,AAA',
+    websiteMockup: '',
+  }, helpers);
+  assert.equal(photoWithoutMockup.hasPhoto, true);
+  assert.equal(photoWithoutMockup.hasMockup, false);
+  assert.equal(photoWithoutMockup.isMailReady, false);
+  assert.equal(photoWithoutMockup.canRepairMockup, true);
+
+  const approvedMockup = assetStateClient.buildWebdesignAssetState({
+    ...base,
+    websitePhoto: 'data:image/png;base64,AAA',
+    websiteMockup: 'data:image/jpeg;base64,BBB',
+    mockupQualityStatus: 'checked',
+    mockupOrientation: 'upright',
+  }, helpers);
+  assert.equal(approvedMockup.isMailReady, true);
+  assert.equal(approvedMockup.hasCompleteAssets, true);
+
+  const oldMockupWithoutQuality = assetStateClient.buildWebdesignAssetState({
+    ...base,
+    websitePhoto: 'data:image/png;base64,AAA',
+    websiteMockup: 'data:image/jpeg;base64,BBB',
+  }, helpers);
+  assert.equal(oldMockupWithoutQuality.hasMockup, true);
+  assert.equal(oldMockupWithoutQuality.mockupApproved, false);
+  assert.equal(oldMockupWithoutQuality.canRepairMockup, true);
+
+  const missingPhoto = assetStateClient.buildWebdesignAssetState({
+    ...base,
+    websitePhoto: '',
+  }, helpers);
+  assert.equal(missingPhoto.canGeneratePhoto, true);
+  assert.equal(missingPhoto.isMailReady, false);
+});
+
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const importScriptPath = path.join(__dirname, '../../assets/premium-database-import.js');
   const photoBatchScriptPath = path.join(__dirname, '../../assets/premium-database-photo-batch.js');
+  const webdesignAssetStateScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-asset-state.js');
   const webdesignActionScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
   const apiCostLedgerScriptPath = path.join(__dirname, '../../assets/softora-api-cost-ledger.js');
   const photoStorageScriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
@@ -219,6 +282,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
   const photoBatchScriptSource = fs.readFileSync(photoBatchScriptPath, 'utf8');
+  const webdesignAssetStateScriptSource = fs.readFileSync(webdesignAssetStateScriptPath, 'utf8');
   const webdesignActionScriptSource = fs.readFileSync(webdesignActionScriptPath, 'utf8');
   const apiCostLedgerScriptSource = fs.readFileSync(apiCostLedgerScriptPath, 'utf8');
   const photoStorageScriptSource = fs.readFileSync(photoStorageScriptPath, 'utf8');
@@ -343,18 +407,26 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /function shouldShowWebsitePhoto\(customer\)/);
   assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
+  assert.match(pageSource, /lastPhotoHeaderCount: null/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260527a/);
+  assert.match(webdesignAssetStateScriptSource, /function buildWebdesignAssetState\(customer, helpers, runtimeState\)/);
+  assert.match(webdesignAssetStateScriptSource, /mockupApproved: mockupApproved/);
+  assert.match(webdesignAssetStateScriptSource, /canGeneratePhoto: canGeneratePhoto/);
+  assert.match(webdesignAssetStateScriptSource, /isMailReady: isMailReady/);
   assert.match(pageSource, /function hasApprovedWebdesignMockup\(customer\)/);
-  assert.match(pageSource, /status !== "checked" && status !== "verified" && status !== "ok"/);
-  assert.match(pageSource, /orientation && orientation !== "upright"/);
+  assert.match(pageSource, /return buildCustomerWebdesignAssetState\(customer\)\.mockupApproved;/);
   assert.match(pageSource, /function hasCompleteWebdesignAssets\(customer\)/);
-  assert.match(pageSource, /return isValidWebsitePhotoSource\(customer && customer\.websitePhoto\) && hasApprovedWebdesignMockup\(customer\);/);
+  assert.match(pageSource, /return buildCustomerWebdesignAssetState\(customer\)\.hasCompleteAssets;/);
   assert.match(pageSource, /function isColdmailReadyWebdesignLead\(customer\)/);
+  assert.match(pageSource, /return buildCustomerWebdesignAssetState\(customer\)\.isMailReady;/);
   assert.match(pageSource, /outreachController\.hasInstantlyOutreachSignal\(customer\)/);
   assert.match(pageSource, /function getPhotoHeaderCount\(customers, showPhotoColumn\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*filter\(isColdmailReadyWebdesignLead\)/);
+  assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\) \{\s*return buildCustomerWebdesignAssetState\(customer\)\.canGeneratePhoto;/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
   assert.match(pageSource, /return webdesignActionController\.render\(customer\);/);
   assert.match(pageSource, /window\.SoftoraDatabaseWebdesignAction\.createController\(\{/);
+  assert.match(pageSource, /getAssetState: buildCustomerWebdesignAssetState/);
   assert.match(pageSource, /photoRestorePending: true/);
   assert.match(webdesignActionScriptSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-drop/);
@@ -376,19 +448,19 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /Klik om device mockup te maken/);
   assert.doesNotMatch(webdesignActionScriptSource, /Device mockup maken zonder extra API-kosten/);
   assert.doesNotMatch(webdesignActionScriptSource, /const mockupSlot = hasPhoto \?/);
-  assert.match(webdesignActionScriptSource, /const canUseMockup = hasPhoto \|\| hasMockup;/);
-  assert.match(webdesignActionScriptSource, /const canGenerateMockup = hasPhoto && !hasMockup && !mockupLoading;/);
-  assert.match(webdesignActionScriptSource, /if \(canGenerateMockup\) scheduleMissingMockupPair\(customer && customer\.id\);/);
+  assert.match(webdesignActionScriptSource, /function queueVisibleMissingMockupRepairs\(customers, limit\)/);
+  assert.match(webdesignActionScriptSource, /const canGenerateMockup = assetState \? assetState\.canRepairMockup : \(hasPhoto && !hasMockup && !mockupLoading\);/);
+  assert.doesNotMatch(webdesignActionScriptSource, /if \(canGenerateMockup\) scheduleMissingMockupPair\(customer && customer\.id\);/);
   assert.match(webdesignActionScriptSource, /ensureMockupForCustomer\(id, \{ silent: true, source: "database-visible-pair" \}\)/);
   assert.match(webdesignActionScriptSource, /data-can-generate=\\"" \+ \(canGenerateMockup \? "true" : "false"\)/);
   assert.match(webdesignActionScriptSource, /data-mockup-disabled=\\"/);
   assert.doesNotMatch(pageSource, /function scheduleVisibleMockupEnsure\(\)/);
   assert.doesNotMatch(pageSource, /webdesignMockupController\.ensureVisibleMockups\(getSortedCustomers\(getFilteredCustomers\(\)\),/);
+  assert.match(pageSource, /webdesignActionController\.queueVisibleMissingMockupRepairs\(filtered, 4\)/);
   assert.match(pageSource, /openWebsitePhotoPreview\(state\.photoTargetId, "mockup"\);/);
-  assert.match(pageSource, /mockupDrop\.getAttribute\("data-can-generate"\) === "true" && mockupDrop\.getAttribute\("data-has-photo"\) !== "true"/);
-  assert.match(pageSource, /webdesignMockupController\.ensureForCustomer\(state\.photoTargetId\)/);
+  assert.match(pageSource, /mockupDrop\.getAttribute\("data-can-generate"\) === "true"/);
+  assert.match(pageSource, /webdesignMockupController\.ensureForCustomer\(state\.photoTargetId, \{ force: true \}\)/);
   assert.doesNotMatch(pageSource, /mockupDrop\.getAttribute\("data-can-generate"\) !== "true"/);
-  assert.doesNotMatch(pageSource, /webdesignMockupController\.ensureForCustomer\(state\.photoTargetId, \{ force: true \}\)/);
   assert.match(webdesignMockupScriptSource, /global\.SoftoraDatabaseWebdesignMockup =/);
   assert.match(webdesignMockupScriptSource, /const DEVICE_MOCKUP_VERSION = "v6";/);
   assert.match(webdesignMockupScriptSource, /gradient\.addColorStop\(0, "#f7f9fc"\);/);
@@ -479,9 +551,11 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(photoStorageScriptSource, /function mergePhotoMaps\(existing, current, removeIds\)/);
   assert.match(pageSource, /function persistCustomerPhotos\(customers, options\)/);
   assert.match(pageSource, /function mergeCustomersWithPhotos\(customers, photoMap, fallbackCustomers\)/);
-  assert.match(pageSource, /fallbackPhotosById/);
-  assert.match(pageSource, /websiteMockup: normalizeString\(photo\.websiteMockup \|\| normalized\.websiteMockup\)/);
-  assert.match(pageSource, /mergeCustomersWithPhotos\(enrichedCustomers, photoMap, state\.klanten\)/);
+  assert.match(webdesignAssetStateScriptSource, /fallbackPhotosById/);
+  assert.match(webdesignAssetStateScriptSource, /websiteMockup: websiteMockup/);
+  assert.match(webdesignAssetStateScriptSource, /firstValidSource\(photo && photo\.websiteMockup, fallbackPhoto && fallbackPhoto\.websiteMockup, normalized\.websiteMockup\)/);
+  assert.match(pageSource, /customersWithFallbackMedia = mergeCustomersWithPhotos\(enrichedCustomers, \{\}, state\.klanten\)/);
+  assert.match(pageSource, /mergeCustomersWithPhotos\(enrichedCustomers, photoMap, customersWithFallbackMedia\)/);
   assert.match(pageSource, /function loadCustomerPhotoMap\(customers, options\)/);
   assert.match(pageSource, /function serializeWebsitePhotoForDiff\(value\)/);
   assert.match(pageSource, /isValidWebsitePhotoUrl\(photo\) \? "url" : ""/);
@@ -514,10 +588,10 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260527c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260527d/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260527b/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260527b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260527c/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260526b/);
@@ -571,7 +645,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(state\.klanten\);/);
   assert.match(pageSource, /loadCustomerPhotoMap\(state\.klanten, \{ force: true \}\)/);
   assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true \}\);/);
-  assert.match(pageSource, /state\.klanten = mergeCustomersWithPhotos\(state\.klanten, photoMap, state\.klanten\);/);
+  assert.match(pageSource, /applyCustomerList\(mergeCustomersWithPhotos\(state\.klanten, photoMap, state\.klanten\), false\);/);
   assert.match(pageSource, /else \{\s*await bootstrapCustomers\(\);\s*\}/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);[\s\S]*state\.photoRestorePending = false;[\s\S]*renderPage\(\);[\s\S]*releaseDatabaseBootShell\(\);/);
@@ -579,7 +653,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.doesNotMatch(pageSource, /window\.setTimeout\(function \(\) \{ resolve\(false\); \}, 850\);/);
   assert.doesNotMatch(pageSource, /releaseDatabaseBootShell\(\); void webdesignActionController\.preloadPhotoImages/);
   assert.match(pageSource, /void webdesignActionController\.resumePendingJobs\(\)\.catch/);
-  assert.match(pageSource, /void bootstrapCustomers\(\)\.catch\(function \(error\) \{ console\.error\("Database sync na snelle boot mislukt:", error\); \}\);/);
+  assert.doesNotMatch(pageSource, /void bootstrapCustomers\(\)\.catch\(function \(error\) \{ console\.error\("Database sync na snelle boot mislukt:", error\); \}\);/);
   assert.match(pageSource, /function refreshCustomerStateSilently\(\)/);
   assert.match(pageSource, /window\.setInterval\(function \(\) \{[\s\S]*void refreshCustomerStateSilently\(\);[\s\S]*\}, CUSTOMER_DB_SYNC_INTERVAL_MS\);/);
   assert.match(pageSource, /startCustomerStateAutoRefresh\(\);/);
@@ -959,7 +1033,7 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.doesNotMatch(html, /data-photo-loaded="false"/);
 });
 
-test('premium database webdesign action automatically pairs a missing mockup with an existing design', async () => {
+test('premium database webdesign action queues missing mockup repairs outside render', async () => {
   const webdesignActionClient = loadDatabaseWebdesignActionClient();
   const ensured = [];
   const customer = {
@@ -977,6 +1051,14 @@ test('premium database webdesign action automatically pairs a missing mockup wit
     resolveCustomerWebsiteUrl: () => '',
     isWebdesignPhotoEligible: () => false,
     openWebsitePhotoPreview() {},
+    getAssetState(item) {
+      return {
+        hasPhoto: /^data:image\//.test(String(item.websitePhoto || '')),
+        hasMockup: /^data:image\//.test(String(item.websiteMockup || '')),
+        mockupPending: false,
+        canRepairMockup: /^data:image\//.test(String(item.websitePhoto || '')) && !/^data:image\//.test(String(item.websiteMockup || '')),
+      };
+    },
     ensureMockupForCustomer(customerId, ensureOptions) {
       ensured.push({ customerId, ensureOptions });
       return true;
@@ -991,6 +1073,13 @@ test('premium database webdesign action automatically pairs a missing mockup wit
   await Promise.resolve();
 
   assert.match(html, /data-can-generate="true"/);
+  assert.equal(ensured.length, 0);
+
+  assert.equal(controller.queueVisibleMissingMockupRepairs([customer], 4), 1);
+  assert.equal(controller.queueVisibleMissingMockupRepairs([customer], 4), 0);
+  await Promise.resolve();
+  await Promise.resolve();
+
   assert.equal(ensured.length, 1);
   assert.equal(ensured[0].customerId, 'customer-1');
   assert.equal(ensured[0].ensureOptions.silent, true);
@@ -1668,9 +1757,17 @@ test('premium database photo storage saves one changed photo without resending o
             photoKey: 'photo_customer1',
             chunkCount: 1,
             websitePhotoName: 'Websitefoto oud',
+            mockupPhotoKey: 'photo_customer1_mockup',
+            mockupChunkCount: 1,
+            websiteMockupName: 'Device mockup oud',
+            mockupRenderer: 'softora-browser-device-v6',
+            mockupOrientation: 'upright',
+            mockupQualityStatus: 'checked',
+            mockupQualityCheckedAt: '2026-05-26T10:00:00.000Z',
           },
         }),
         photo_customer1_0: 'data:image/png;base64,AAA',
+        photo_customer1_mockup_0: 'data:image/jpeg;base64,OLD',
       },
     }),
     setUiState: async (_scope, payload) => {
@@ -1690,18 +1787,26 @@ test('premium database photo storage saves one changed photo without resending o
 
   await controller.persist([
     { id: 'customer1', websitePhoto: 'data:image/png;base64,AAA', websitePhotoName: 'Websitefoto oud' },
-    { id: 'customer2', websitePhoto: 'data:image/png;base64,BBB', websitePhotoName: 'Websitefoto nieuw', websiteMockup: 'data:image/jpeg;base64,CCC', websiteMockupName: 'Device mockup nieuw' },
+    { id: 'customer2', websitePhoto: 'data:image/png;base64,BBB', websitePhotoName: 'Websitefoto nieuw', websiteMockup: 'data:image/jpeg;base64,CCC', websiteMockupName: 'Device mockup nieuw', mockupRenderer: 'softora-browser-device-v6', mockupOrientation: 'upright', mockupQualityStatus: 'checked', mockupQualityCheckedAt: '2026-05-27T10:00:00.000Z' },
   ], { onlyCustomerIds: ['customer2'] });
 
   assert.equal(patches.length, 1);
   assert.equal(patches[0].photo_customer1_0, undefined);
+  assert.equal(patches[0].photo_customer1_mockup_0, undefined);
   assert.equal(patches[0].photo_customer2_0, 'data:image/png;base64,BBB');
   assert.equal(patches[0].photo_customer2_mockup_0, 'data:image/jpeg;base64,CCC');
   const storedMap = JSON.parse(patches[0].photos);
   assert.equal(storedMap.customer1.photoKey, 'photo_customer1');
+  assert.equal(storedMap.customer1.mockupPhotoKey, 'photo_customer1_mockup');
+  assert.equal(storedMap.customer1.websiteMockupName, 'Device mockup oud');
+  assert.equal(storedMap.customer1.mockupQualityStatus, 'checked');
   assert.equal(storedMap.customer2.photoKey, 'photo_customer2');
   assert.equal(storedMap.customer2.mockupPhotoKey, 'photo_customer2_mockup');
   assert.equal(storedMap.customer2.websiteMockupName, 'Device mockup nieuw');
+  assert.equal(storedMap.customer2.mockupRenderer, 'softora-browser-device-v6');
+  assert.equal(storedMap.customer2.mockupOrientation, 'upright');
+  assert.equal(storedMap.customer2.mockupQualityStatus, 'checked');
+  assert.equal(storedMap.customer2.mockupQualityCheckedAt, '2026-05-27T10:00:00.000Z');
 });
 
 test('premium database photo storage retries Supabase reads before saving photos', async () => {

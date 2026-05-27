@@ -1571,10 +1571,10 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-action.js?v=20260527c"></script>
+    <script src="assets/premium-database-webdesign-asset-state.js?v=20260527a"></script><script src="assets/premium-database-webdesign-action.js?v=20260527d"></script>
     <script src="assets/premium-database-import.js?v=20260521b"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
-    <script src="assets/premium-database-photo-storage.js?v=20260511a"></script>
-    <script src="assets/premium-database-webdesign-mockup.js?v=20260527b"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260527b"></script>
+    <script src="assets/premium-database-webdesign-mockup.js?v=20260527c"></script>
     <script src="assets/premium-database-deep-search-helpers.js?v=20260521b"></script><script src="assets/premium-database-target-coords.js?v=20260522a"></script><script src="assets/premium-database-deep-search.js?v=20260521d"></script><script src="assets/premium-database-distance.js?v=20260522b"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
@@ -1621,6 +1621,7 @@
             modalEditId: null,
             photoTargetId: null, photoRestorePending: true,
             lastMailReadyHeaderCount: null,
+            lastPhotoHeaderCount: null,
             messageTimer: null
         };
 
@@ -2151,34 +2152,10 @@
         });
 
         const webdesignMockupController = window.SoftoraDatabaseWebdesignMockup.createController({ state, normalizeCustomer, sortCustomers, isValidWebsitePhotoSource, isValidWebsitePhotoDataUrl, persistCustomerPhotos, renderPage, setStatusMessage, toast });
-        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, ensureMockupForCustomer: function (customerId, ensureOptions) { return webdesignMockupController.ensureForCustomer(customerId, ensureOptions); }, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, refreshPhotos: async function (context) { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true }); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); if (context && context.customerId) await webdesignMockupController.ensureForCustomer(context.customerId); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
+        const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, getAssetState: buildCustomerWebdesignAssetState, ensureMockupForCustomer: function (customerId, ensureOptions) { return webdesignMockupController.ensureForCustomer(customerId, ensureOptions); }, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, refreshPhotos: async function (context) { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true }); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); renderPage(); if (context && context.customerId) await webdesignMockupController.ensureForCustomer(context.customerId); }, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
         const outreachController = window.SoftoraDatabaseOutreach.createController({ state, nodes, escapeHtml, normalizeSearchValue, normalizeDatabaseStatus, formatDisplayDate, parseDateValue, normalizeCustomer, persistCustomerList, renderPage, setStatusMessage });
-        function mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers) {
-            const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
-            const photosByIdentity = new Map();
-            const fallbackPhotosById = new Map();
-            const fallbackPhotosByIdentity = new Map();
-            Object.keys(photos).forEach(function (key) { const item = photos[key]; const identityKey = normalizeString(item && item.identityKey); if (identityKey && isValidWebsitePhotoSource(item && item.websitePhoto)) photosByIdentity.set(identityKey, item); });
-            (Array.isArray(fallbackCustomers) ? fallbackCustomers : []).forEach(function (customer) { const normalized = normalizeCustomer(customer); if (!isValidWebsitePhotoSource(normalized.websitePhoto)) return; fallbackPhotosById.set(normalized.id, normalized); const identityKey = buildCustomerIdentityKey(normalized); if (identityKey) fallbackPhotosByIdentity.set(identityKey, normalized); });
-
-            return sortCustomers((customers || []).map(function (customer, index) {
-                const normalized = normalizeCustomer(customer, "photo-merge-" + index);
-                if (!shouldShowWebsitePhoto(normalized)) {
-                    return { ...normalized, websitePhoto: "", websitePhotoName: "", websiteMockup: "", websiteMockupName: "" };
-                }
-                const identityKey = buildCustomerIdentityKey(normalized);
-                const photo = photos[normalized.id] || photosByIdentity.get(identityKey) || fallbackPhotosById.get(normalized.id) || fallbackPhotosByIdentity.get(identityKey) || null;
-                if (!photo || !isValidWebsitePhotoSource(photo.websitePhoto)) return normalized;
-                return {
-                    ...normalized,
-                    websitePhoto: normalizeString(photo.websitePhoto),
-                    websitePhotoName: normalizeString(photo.websitePhotoName) || normalized.websitePhotoName || "Websitefoto",
-                    websiteMockup: normalizeString(photo.websiteMockup || normalized.websiteMockup),
-                    websiteMockupName: normalizeString(photo.websiteMockupName || normalized.websiteMockupName) || "Device mockup", mockupRenderer: normalizeString(photo.mockupRenderer || normalized.mockupRenderer), mockupOrientation: normalizeString(photo.mockupOrientation || normalized.mockupOrientation), mockupQualityStatus: normalizeString(photo.mockupQualityStatus || normalized.mockupQualityStatus), mockupQualityCheckedAt: normalizeString(photo.mockupQualityCheckedAt || normalized.mockupQualityCheckedAt)
-                };
-            }));
-        }
+        function mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers) { return window.SoftoraDatabaseWebdesignAssetState.mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers, { normalizeCustomer, sortCustomers, shouldShowWebsitePhoto, isValidWebsitePhotoSource, buildCustomerIdentityKey }); }
 
         function loadCustomerPhotoMap(customers, options) {
             return customerPhotoStorageController.load(customers || state.klanten, options);
@@ -2321,10 +2298,14 @@
         function shouldShowWebsitePhoto(customer) {
             return normalizeDatabaseStatus(customer && customer.status, customer) !== "klant";
         }
-        function hasApprovedWebdesignMockup(customer) { if (!customer || !isValidWebsitePhotoSource(customer.websiteMockup)) return false; const renderer = normalizeString(customer.mockupRenderer || customer.websiteMockupRenderer).toLowerCase(), orientation = normalizeString(customer.mockupOrientation || customer.websiteMockupOrientation).toLowerCase(), status = normalizeString(customer.mockupQualityStatus || customer.websiteMockupQualityStatus).toLowerCase(), checkedAt = normalizeString(customer.mockupQualityCheckedAt || customer.websiteMockupQualityCheckedAt), hasQualitySignal = Boolean(renderer || orientation || status || checkedAt); if (!hasQualitySignal) return /-device-mockup-v6\.jpe?g$/i.test(normalizeString(customer.websiteMockupName || customer.mockupName)); if (status !== "checked" && status !== "verified" && status !== "ok") return false; if (orientation && orientation !== "upright") return false; return true; } function hasCompleteWebdesignAssets(customer) { return isValidWebsitePhotoSource(customer && customer.websitePhoto) && hasApprovedWebdesignMockup(customer); } function isLikelyColdmailAddress(value) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizeString(value)); } function isColdmailReadyWebdesignLead(customer) { if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; return hasCompleteWebdesignAssets(customer); } function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar") { const count = (customers || []).filter(isColdmailReadyWebdesignLead).length; if (!state.photoRestorePending || state.lastMailReadyHeaderCount === null) state.lastMailReadyHeaderCount = count; return state.photoRestorePending && state.lastMailReadyHeaderCount !== null ? state.lastMailReadyHeaderCount : count; } return (customers || []).filter(function (customer) { return shouldShowWebsitePhoto(customer) && isValidWebsitePhotoSource(customer && customer.websitePhoto); }).length; }
-        function isWebdesignPhotoEligible(customer) {
-            return shouldShowWebsitePhoto(customer) && !isValidWebsitePhotoSource(customer && customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
-        }
+        function isLikelyColdmailAddress(value) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizeString(value)); }
+        function isColdmailBaseLeadEligible(customer) { if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; return true; }
+        function buildCustomerWebdesignAssetState(customer) { return window.SoftoraDatabaseWebdesignAssetState.buildWebdesignAssetState(customer, { shouldShowWebsitePhoto: shouldShowWebsitePhoto, isValidWebsitePhotoSource: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl: resolveCustomerWebsiteUrl, isMailLeadEligible: isColdmailBaseLeadEligible, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, isMockupFailed: function (customerId) { return webdesignActionController.isMockupFailed(customerId); } }, state); }
+        function hasApprovedWebdesignMockup(customer) { return buildCustomerWebdesignAssetState(customer).mockupApproved; }
+        function hasCompleteWebdesignAssets(customer) { return buildCustomerWebdesignAssetState(customer).hasCompleteAssets; }
+        function isColdmailReadyWebdesignLead(customer) { return buildCustomerWebdesignAssetState(customer).isMailReady; }
+        function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar") { if (state.photoRestorePending && state.lastMailReadyHeaderCount !== null) return state.lastMailReadyHeaderCount; const count = (customers || []).filter(isColdmailReadyWebdesignLead).length; state.lastMailReadyHeaderCount = count; return count; } if (state.photoRestorePending && state.lastPhotoHeaderCount !== null) return state.lastPhotoHeaderCount; const photoCount = (customers || []).filter(function (customer) { return buildCustomerWebdesignAssetState(customer).hasPhoto; }).length; state.lastPhotoHeaderCount = photoCount; return photoCount; }
+        function isWebdesignPhotoEligible(customer) { return buildCustomerWebdesignAssetState(customer).canGeneratePhoto; }
 
         function formatEuroCost(value) {
             return "€" + Number(value || 0).toLocaleString("nl-NL", {
@@ -2379,6 +2360,9 @@
                     "</tr>"
                 ].join("");
             }).join("");
+            if (showPhotoColumn && !state.photoRestorePending) {
+                webdesignActionController.queueVisibleMissingMockupRepairs(filtered, 4);
+            }
         }
 
         function renderPage() { renderTable(); }
@@ -3039,15 +3023,16 @@
                         console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
                     }
 
-                    applyCustomerList(mergeCustomersWithPhotos(enrichedCustomers, {}, state.klanten), !hadBootstrapCustomers);
-
+                    const customersWithFallbackMedia = mergeCustomersWithPhotos(enrichedCustomers, {}, state.klanten);
+                    let customersWithPhotos = customersWithFallbackMedia;
                     try {
                         const photoMap = await loadCustomerPhotoMap(enrichedCustomers, { force: true });
-                        const outreachAutomation = outreachController.applyAutomation(mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten));
-                        const sortedCustomers = getSortedCustomers(outreachAutomation.customers); applyCustomerList(sortedCustomers, false); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
+                        customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, customersWithFallbackMedia);
                     } catch (error) {
                         console.error("Databasefoto's laden via Supabase mislukt:", error);
                     }
+                    const outreachAutomation = outreachController.applyAutomation(customersWithPhotos);
+                    const sortedCustomers = getSortedCustomers(outreachAutomation.customers); applyCustomerList(sortedCustomers, !hadBootstrapCustomers); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
 
                     setStatusMessage("");
                     return;
@@ -3124,7 +3109,7 @@
             }
             const mockupDrop = event.target.closest("[data-mockup-photo-id]");
             if (mockupDrop) {
-                event.preventDefault(); event.stopPropagation(); state.photoTargetId = mockupDrop.getAttribute("data-mockup-photo-id"); if (mockupDrop.getAttribute("data-can-generate") === "true" && mockupDrop.getAttribute("data-has-photo") !== "true") { void webdesignMockupController.ensureForCustomer(state.photoTargetId); return; } openWebsitePhotoPreview(state.photoTargetId, "mockup");
+                event.preventDefault(); event.stopPropagation(); state.photoTargetId = mockupDrop.getAttribute("data-mockup-photo-id"); if (mockupDrop.getAttribute("data-can-generate") === "true") { void webdesignMockupController.ensureForCustomer(state.photoTargetId, { force: true }); return; } openWebsitePhotoPreview(state.photoTargetId, "mockup");
                 return;
             }
             const photoDrop = event.target.closest(".photo-drop[data-photo-id]");
@@ -3217,8 +3202,8 @@
 
         void (async function () {
             try {
-                state.photoRestorePending = true; renderPage(); if (databaseHadBootstrapCustomers && state.klanten.length) { try { const photoMap = await loadCustomerPhotoMap(state.klanten); state.klanten = mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten); renderPage(); } catch (error) { console.error("Databasefoto's laden voor boot mislukt:", error); } } else { await bootstrapCustomers(); }
-                await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); state.photoRestorePending = false; renderPage(); releaseDatabaseBootShell(); void webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); }); void bootstrapCustomers().catch(function (error) { console.error("Database sync na snelle boot mislukt:", error); });
+                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { try { const photoMap = await loadCustomerPhotoMap(state.klanten); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { console.error("Databasefoto's laden voor boot mislukt:", error); } } else { await bootstrapCustomers(); }
+                await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); state.photoRestorePending = false; renderPage(); releaseDatabaseBootShell(); void webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); });
                 void databaseImportController.startAutoSync();
             } catch (error) { console.error("Database bootstrap mislukt:", error); state.photoRestorePending = false; renderPage(); } finally { releaseDatabaseBootShell(); }
         })();

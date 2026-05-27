@@ -94,6 +94,10 @@
                 mockupChunkCount: clampCount(item && (item.mockupChunkCount || item.websiteMockupChunkCount), 0),
                 websiteMockupUrl: normalizeString(item && (item.websiteMockupUrl || item.mockupUrl || item.signedMockupUrl || (item.mockupStorage && item.mockupStorage.signedUrl))),
                 websiteMockupName: normalizeString(item && item.websiteMockupName) || "",
+                mockupRenderer: normalizeString(item && (item.mockupRenderer || item.websiteMockupRenderer)),
+                mockupOrientation: normalizeString(item && (item.mockupOrientation || item.websiteMockupOrientation)),
+                mockupQualityStatus: normalizeString(item && (item.mockupQualityStatus || item.websiteMockupQualityStatus)),
+                mockupQualityCheckedAt: normalizeString(item && (item.mockupQualityCheckedAt || item.websiteMockupQualityCheckedAt)),
                 updatedAt: normalizeString(item && item.updatedAt) || ""
             };
         }
@@ -137,6 +141,10 @@
                     websitePhotoName: normalized.websitePhotoName || "Websitefoto",
                     websiteMockup: normalized.websiteMockup || "",
                     websiteMockupName: normalized.websiteMockupName || "",
+                    mockupRenderer: normalized.mockupRenderer || "",
+                    mockupOrientation: normalized.mockupOrientation || "",
+                    mockupQualityStatus: normalized.mockupQualityStatus || "",
+                    mockupQualityCheckedAt: normalized.mockupQualityCheckedAt || "",
                     updatedAt: normalized.updatedAt || "",
                     websitePhoto: chunked.dataUrl
                 };
@@ -154,9 +162,11 @@
                 if (!normalized.id || !shouldShowWebsitePhoto(normalized) || !isValidWebsitePhotoDataUrl(normalized.websitePhoto)) return;
                 const photoKey = buildDataKey(normalized.id);
                 const chunks = normalizeString(normalized.websitePhoto).match(new RegExp("[\\s\\S]{1," + chunkSize + "}", "g")) || [];
-                const hasMockup = isValidWebsitePhotoDataUrl(normalized.websiteMockup);
-                const mockupPhotoKey = hasMockup ? buildDataKey(normalized.id + "_mockup") : "";
-                const mockupChunks = hasMockup ? normalizeString(normalized.websiteMockup).match(new RegExp("[\\s\\S]{1," + chunkSize + "}", "g")) || [] : [];
+                const mockupSource = normalizeString(normalized.websiteMockup);
+                const hasMockupDataUrl = isValidWebsitePhotoDataUrl(mockupSource);
+                const hasMockupUrl = !hasMockupDataUrl && isValidWebsitePhotoSource(mockupSource);
+                const mockupPhotoKey = hasMockupDataUrl ? buildDataKey(normalized.id + "_mockup") : "";
+                const mockupChunks = hasMockupDataUrl ? mockupSource.match(new RegExp("[\\s\\S]{1," + chunkSize + "}", "g")) || [] : [];
                 chunks.forEach(function (chunk, chunkIndex) {
                     patch[photoKey + "_" + chunkIndex] = chunk;
                 });
@@ -171,7 +181,12 @@
                     websitePhotoName: normalized.websitePhotoName || "Websitefoto",
                     mockupPhotoKey: mockupPhotoKey,
                     mockupChunkCount: mockupChunks.length,
+                    websiteMockupUrl: hasMockupUrl ? mockupSource : "",
                     websiteMockupName: normalized.websiteMockupName || "",
+                    mockupRenderer: normalized.mockupRenderer || "",
+                    mockupOrientation: normalized.mockupOrientation || "",
+                    mockupQualityStatus: normalized.mockupQualityStatus || "",
+                    mockupQualityCheckedAt: normalized.mockupQualityCheckedAt || "",
                     updatedAt: normalized.updatedAt || formatDateForStorage(new Date())
                 };
             });
@@ -181,13 +196,36 @@
         function mergePhotoMaps(existing, current, removeIds) {
             const removed = new Set((removeIds || []).map(normalizeString).filter(Boolean));
             const merged = {};
+            function mergeMeta(existingMeta, currentMeta) {
+                const base = stripPhotoMeta(existingMeta || {});
+                const next = stripPhotoMeta(currentMeta || {});
+                return stripPhotoMeta({
+                    ...base,
+                    ...next,
+                    id: next.id || base.id,
+                    identityKey: next.identityKey || base.identityKey,
+                    photoKey: next.photoKey || base.photoKey,
+                    chunkCount: next.chunkCount || base.chunkCount,
+                    websitePhotoUrl: next.websitePhotoUrl || base.websitePhotoUrl,
+                    websitePhotoName: next.websitePhotoName || base.websitePhotoName || "Websitefoto",
+                    mockupPhotoKey: next.mockupPhotoKey || base.mockupPhotoKey,
+                    mockupChunkCount: next.mockupChunkCount || base.mockupChunkCount,
+                    websiteMockupUrl: next.websiteMockupUrl || base.websiteMockupUrl,
+                    websiteMockupName: next.websiteMockupName || base.websiteMockupName,
+                    mockupRenderer: next.mockupRenderer || base.mockupRenderer,
+                    mockupOrientation: next.mockupOrientation || base.mockupOrientation,
+                    mockupQualityStatus: next.mockupQualityStatus || base.mockupQualityStatus,
+                    mockupQualityCheckedAt: next.mockupQualityCheckedAt || base.mockupQualityCheckedAt,
+                    updatedAt: next.updatedAt || base.updatedAt
+                });
+            }
             Object.keys(existing || {}).forEach(function (id) {
                 const meta = stripPhotoMeta(existing[id]);
                 if (!meta.id || removed.has(meta.id) || !meta.photoKey || !meta.chunkCount) return;
                 merged[meta.id] = meta;
             });
             Object.keys(current || {}).forEach(function (id) {
-                const meta = stripPhotoMeta(current[id]);
+                const meta = mergeMeta(merged[id], current[id]);
                 if (!meta.id || removed.has(meta.id) || !meta.photoKey || !meta.chunkCount) return;
                 merged[meta.id] = meta;
             });

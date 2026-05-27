@@ -33,7 +33,7 @@
     function hasUsableMockup(customer, isValidWebsitePhotoSource) {
         return Boolean(customer)
             && isValidWebsitePhotoSource(customer.websiteMockup)
-            && (isCurrentMockupName(customer.websiteMockupName) || hasApprovedMockup(customer, isValidWebsitePhotoSource));
+            && hasApprovedMockup(customer, isValidWebsitePhotoSource);
     }
 
     function replaceExtension(fileName, suffix) {
