@@ -327,7 +327,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[1].status, 'klant');
 });
 
-test('coldmail campaign uses IPv4 SMTP transports with bounded timeouts', async () => {
+test('coldmail campaign uses standard SMTP transports with bounded timeouts', async () => {
   const { service, transportConfigs } = createService();
 
   await service.sendColdmailCampaign({
@@ -338,9 +338,9 @@ test('coldmail campaign uses IPv4 SMTP transports with bounded timeouts', async 
   });
 
   assert.equal(transportConfigs.length, 1);
-  assert.equal(transportConfigs[0].family, 4);
-  assert.equal(typeof transportConfigs[0].lookup, 'function');
-  assert.equal(typeof transportConfigs[0].getSocket, 'function');
+  assert.equal(transportConfigs[0].family, undefined);
+  assert.equal(transportConfigs[0].lookup, undefined);
+  assert.equal(transportConfigs[0].getSocket, undefined);
   assert.equal(transportConfigs[0].connectionTimeout, 45_000);
   assert.equal(transportConfigs[0].greetingTimeout, 30_000);
   assert.equal(transportConfigs[0].socketTimeout, 90_000);
