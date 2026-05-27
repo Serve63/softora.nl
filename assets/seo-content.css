@@ -814,6 +814,18 @@ nav {
     font-size: 1.6rem;
   }
 
+  .nav-links {
+    flex-wrap: wrap;
+    gap: 0.55rem 0.75rem;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .nav-links a {
+    font-size: 11px;
+    letter-spacing: 0.7px;
+  }
+
   .featured-row,
   .blog-grid,
   .pillar-grid,
@@ -854,16 +866,23 @@ nav {
   }
 
   .filter-bar {
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .filter-bar::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow-x: visible;
+    padding-bottom: 20px;
   }
 
   .filter-tab {
-    flex: 0 0 auto;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    flex: 0 1 auto;
+    margin-bottom: 0;
+    padding: 9px 13px;
+  }
+
+  .filter-tab.active {
+    background: rgba(155, 35, 85, 0.08);
   }
 
   .artikel-hero,
@@ -889,7 +908,7 @@ nav {
   }
 
   .nav-links {
-    gap: 1rem;
+    gap: 0.5rem 0.6rem;
   }
 
   .filter-tab {

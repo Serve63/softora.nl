@@ -156,6 +156,26 @@ test('seo-growth mobile navigation keeps the contact CTA in the visible flow', (
   );
 });
 
+test('seo content mobile navigation keeps public route links in visible flow', () => {
+  const css = readFile('assets/seo-content.css');
+
+  assert.match(
+    css,
+    /@media \(max-width:\s*980px\)\s*\{[\s\S]*\.nav-links\s*\{(?=[\s\S]*?width:\s*100%;)(?=[\s\S]*?flex-wrap:\s*wrap;)(?=[\s\S]*?justify-content:\s*flex-start;)[\s\S]*?\}/s,
+    'mobiele contentnavigatie mag geen losse rechts zwevende route overhouden'
+  );
+  assert.match(
+    css,
+    /@media \(max-width:\s*980px\)\s*\{[\s\S]*\.filter-bar\s*\{[\s\S]*flex-wrap:\s*wrap;[\s\S]*overflow-x:\s*visible;[\s\S]*padding-bottom:\s*20px;/s,
+    'mobiele contentfilters moeten zichtbaar wrappen in plaats van route-links te verbergen'
+  );
+  assert.match(
+    css,
+    /@media \(max-width:\s*980px\)\s*\{[\s\S]*\.filter-tab\s*\{[\s\S]*border:\s*1px solid var\(--border\);[\s\S]*border-radius:\s*999px;/s,
+    'mobiele contentfilters moeten als duidelijke tabs/chips herkenbaar blijven'
+  );
+});
+
 test('diensten hero keeps the secondary insight CTA in the button system', () => {
   const source = readFile('diensten.html');
 
