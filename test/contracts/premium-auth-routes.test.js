@@ -35,10 +35,13 @@ function createPremiumUsersStoreStub(initialUsers = [], source = 'supabase', opt
   }));
   const bootstrapUsers = Array.isArray(options.bootstrapUsers) ? options.bootstrapUsers : [];
   const persistCalls = [];
+  const hydrationCalls = [];
 
   return {
+    hydrationCalls,
     persistCalls,
-    async ensureUsersHydrated() {
+    async ensureUsersHydrated(hydrationOptions = {}) {
+      hydrationCalls.push(hydrationOptions);
       return { source, users };
     },
     async persistUsersCollection(nextUsers) {
@@ -428,6 +431,20 @@ test('premium auth login requires credentials and rejects invalid passwords', as
 
   assert.equal(invalidRes.statusCode, 401);
   assert.equal(invalidRes.body.error, 'Ongeldige inloggegevens.');
+});
+
+test('premium auth login forces a fresh user hydrate before password checks', async () => {
+  const fixture = createFixture();
+  const req = createRequest({
+    body: { email: 'admin@softora.nl', password: 'secret123' },
+  });
+  const res = createResponseRecorder();
+
+  await fixture.coordinator.loginResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(fixture.premiumUsersStore.hydrationCalls.length, 1);
+  assert.deepEqual(fixture.premiumUsersStore.hydrationCalls[0], { force: true });
 });
 
 test('premium auth login recovers stale stored hashes from bootstrap credentials', async () => {

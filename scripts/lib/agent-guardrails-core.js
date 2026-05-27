@@ -80,6 +80,19 @@ const TEST_WEAKENING_PATTERNS = Object.freeze([
   },
 ]);
 
+const PREMIUM_AUTH_USERS_APPROVED_WRITE_SOURCES = Object.freeze([
+  'bootstrap_env',
+  'premium_profile_update',
+  'premium_users_api_create',
+  'premium_users_api_delete',
+  'premium_users_api_update',
+]);
+
+const PREMIUM_AUTH_USERS_TARGET_PATTERN = /\bpremium_auth_users\b/i;
+const PREMIUM_AUTH_USERS_WRITE_CONTEXT_PATTERN =
+  /\b(?:delete|insert|patch|persist|post|put|update|upsert|write)\b|(?:state_key|stateKey)\s*[:=]|\/rest\/v1\/|\.from\s*\(/i;
+const META_SOURCE_PATTERN = /\bsource\s*:\s*['"`]([^'"`]+)['"`]/g;
+
 function normalizeRepoPath(filePath) {
   return String(filePath || '').replace(/\\/g, '/').replace(/^\.\/+/, '');
 }
@@ -105,6 +118,20 @@ function isBehaviorChangePath(filePath) {
 function isFrontendProductionPath(filePath) {
   const normalized = normalizeRepoPath(filePath);
   return normalized.startsWith('assets/') || /^[^/]+\.html$/i.test(normalized);
+}
+
+function isPremiumAuthUsersWriteScanPath(filePath) {
+  const normalized = normalizeRepoPath(filePath);
+  return (
+    normalized === 'server.js' ||
+    normalized.startsWith('scripts/') ||
+    normalized.startsWith('server/') ||
+    normalized.startsWith('api/') ||
+    normalized.startsWith('assets/') ||
+    normalized.startsWith('lib/') ||
+    normalized.startsWith('.github/workflows/') ||
+    /\.(?:cjs|env|html|js|json|jsx|mjs|sh|sql|ts|tsx|ya?ml)$/i.test(normalized)
+  );
 }
 
 function isHighRiskPath(filePath) {
@@ -191,6 +218,48 @@ function listAddedTestWeakeningPatterns(diffText = '') {
     });
 
   return Array.from(hits).sort();
+}
+
+function getAddedSourceLinesFromDiff(diffText = '') {
+  return String(diffText || '')
+    .split('\n')
+    .filter((line) => /^\+(?!\+\+\+)/.test(line))
+    .map((line) => line.slice(1));
+}
+
+function listAddedPremiumAuthUsersWriteRisks(diffText = '') {
+  const addedLines = getAddedSourceLinesFromDiff(diffText);
+  if (addedLines.length === 0) return [];
+
+  const addedText = addedLines.join('\n');
+  if (!PREMIUM_AUTH_USERS_TARGET_PATTERN.test(addedText)) return [];
+
+  const risks = new Set();
+  const targetLines = addedLines.filter((line) => PREMIUM_AUTH_USERS_TARGET_PATTERN.test(line));
+  const hasDirectWriteTarget = targetLines.some((line) =>
+    PREMIUM_AUTH_USERS_WRITE_CONTEXT_PATTERN.test(line)
+  );
+  const hasWriteContext = PREMIUM_AUTH_USERS_WRITE_CONTEXT_PATTERN.test(addedText);
+  if (!hasDirectWriteTarget && !hasWriteContext) return [];
+
+  if (hasDirectWriteTarget) {
+    risks.add('direct-write-target');
+  }
+  if (hasWriteContext) {
+    risks.add('direct-write-context');
+  }
+
+  META_SOURCE_PATTERN.lastIndex = 0;
+  let sourceMatch;
+  while ((sourceMatch = META_SOURCE_PATTERN.exec(addedText))) {
+    const source = String(sourceMatch[1] || '').trim();
+    if (!source) continue;
+    if (!PREMIUM_AUTH_USERS_APPROVED_WRITE_SOURCES.includes(source)) {
+      risks.add(`unapproved-source:${source}`);
+    }
+  }
+
+  return Array.from(risks).sort();
 }
 
 function getAddedLineNumbersFromDiff(diffText = '') {
@@ -318,6 +387,7 @@ function buildGuardrailViolations(options = {}) {
     protectedFrontendShellFiles = [],
     protectedQualityGateFiles = [],
     qualityBaselineViolations = [],
+    premiumAuthUsersWriteViolations = [],
     behaviorDiffLineCount = 0,
     maxBehaviorDiffLineCount = 900,
     allowUntestedChanges = false,
@@ -346,6 +416,12 @@ function buildGuardrailViolations(options = {}) {
   if (qualityBaselineViolations.length > 0) {
     violations.push(
       `[guardrails] Quality-baseline is verzwakt of incompleet: ${qualityBaselineViolations.join('; ')}. Herstel de automatische checks voordat je afrondt.`
+    );
+  }
+
+  if (premiumAuthUsersWriteViolations.length > 0) {
+    violations.push(
+      `[guardrails] Directe of ongeautoriseerde premium_auth_users-write gedetecteerd: ${premiumAuthUsersWriteViolations.join(', ')}. Gebruik uitsluitend de officiële premium-gebruikersroutes/store en goedgekeurde meta sources.`
     );
   }
 
@@ -471,9 +547,11 @@ module.exports = {
   isBehaviorChangePath,
   isFrontendProductionPath,
   isHighRiskPath,
+  isPremiumAuthUsersWriteScanPath,
   isProtectedFrontendShellPath,
   isProtectedQualityGatePath,
   isTestPath,
+  listAddedPremiumAuthUsersWriteRisks,
   listAddedBrowserStorageApis,
   listAddedTestWeakeningPatterns,
   normalizeRepoPath,

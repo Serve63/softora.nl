@@ -144,7 +144,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
   }
 
   async function loadUsersForLogin() {
-    const attempts = [{ force: false }, { force: true }];
+    const attempts = [{ force: true }, { force: false }];
     let lastHydrated = null;
 
     for (const options of attempts) {

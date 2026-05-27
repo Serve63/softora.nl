@@ -10,8 +10,10 @@ const {
   isAllowedNewServerPath,
   isFrontendProductionPath,
   isHighRiskPath,
+  isPremiumAuthUsersWriteScanPath,
   isProtectedFrontendShellPath,
   isProtectedQualityGatePath,
+  listAddedPremiumAuthUsersWriteRisks,
   listAddedBrowserStorageApis,
   listAddedTestWeakeningPatterns,
 } = require('../../scripts/lib/agent-guardrails-core');
@@ -334,6 +336,53 @@ test('agent guardrails block test weakening and quality-baseline regressions', (
   assert.equal(violations.length, 2);
   assert.match(violations[0], /Quality-baseline is verzwakt/i);
   assert.match(violations[1], /Test-verzwakking gedetecteerd/i);
+});
+
+test('agent guardrails block direct premium auth users writes', () => {
+  const diffText = [
+    '@@ -10,0 +11,8 @@',
+    "+const row = {",
+    "+  state_key: 'premium_auth_users',",
+    "+  payload: { users: nextUsers },",
+    "+  meta: { source: 'codex_autopilot_test' },",
+    '+};',
+    '+await upsertSupabaseRowViaRest(row);',
+    '+const unrelated = true;',
+  ].join('\n');
+
+  assert.deepEqual(listAddedPremiumAuthUsersWriteRisks(diffText), [
+    'direct-write-context',
+    'direct-write-target',
+    'unapproved-source:codex_autopilot_test',
+  ]);
+
+  const allowedReadOnlyReference = [
+    '@@ -10,0 +11,2 @@',
+    "+const rowKey = 'premium_auth_users';",
+    '+const onlyRead = true;',
+  ].join('\n');
+  assert.deepEqual(listAddedPremiumAuthUsersWriteRisks(allowedReadOnlyReference), []);
+  assert.equal(isPremiumAuthUsersWriteScanPath('reports/premium-login-incident-2026-05-27.md'), false);
+  assert.equal(isPremiumAuthUsersWriteScanPath('scripts/autopilot-proof.js'), true);
+
+  const violations = buildGuardrailViolations({
+    changedFiles: ['scripts/autopilot-proof.js', 'test/contracts/agent-guardrails.test.js'],
+    addedFiles: [],
+    changedTests: ['test/contracts/agent-guardrails.test.js'],
+    highRiskFiles: [],
+    behaviorFiles: ['scripts/autopilot-proof.js'],
+    premiumAuthUsersWriteViolations: [
+      'scripts/autopilot-proof.js (direct-write-context, direct-write-target, unapproved-source:codex_autopilot_test)',
+    ],
+    newestBackupAgeMs: 5 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 7200,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(violations.length, 1);
+  assert.match(violations[0], /premium_auth_users-write gedetecteerd/i);
+  assert.match(violations[0], /officiële premium-gebruikersroutes\/store/i);
 });
 
 test('agent guardrails block broad behavior changes in one step', () => {
