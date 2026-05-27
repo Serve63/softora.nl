@@ -571,6 +571,7 @@ test('coldmailing preview image route serves linked webdesign photos inline', as
   assert.equal(received.token, 'signed-image-token');
   assert.equal(res.headers['content-type'], 'image/png');
   assert.equal(res.headers['content-disposition'], 'inline; filename="Bakkerij-Zon-device-mockup.png"');
+  assert.equal(res.headers['content-length'], String(Buffer.byteLength('mockup-image')));
   assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
   assert.equal(res.headers['cache-control'], 'public, max-age=31536000, immutable');
   assert.equal(res.headers['access-control-allow-origin'], '*');
