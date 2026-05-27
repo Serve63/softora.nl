@@ -404,6 +404,7 @@ test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
   assert.match(scriptSource, /const MAIL_BODY_URL_PATTERN = \/https\?:\\\/\\\/\[\^\\s<>"'\]\+\/gi;/);
   assert.match(readDisplayScript(), /const SENDER_CTA_LINKS = Object\.freeze/);
   assert.match(readDisplayScript(), /'martijn@softora\.nl': \{\s*text: '💼 Mijn LinkedIn 👈',\s*url: 'https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&utm_content=profile&utm_medium=member_ios'/);
+  assert.match(readDisplayScript(), /'martijnven123@gmail\.com': \{\s*text: '💼 Mijn LinkedIn 👈',\s*url: 'https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&utm_content=profile&utm_medium=member_ios'/);
   assert.match(readDisplayScript(), /function getSenderCtaLink\(options\)/);
   assert.match(scriptSource, /function isSafeMailBodyUrl\(value\)/);
   assert.match(scriptSource, /const parsed = new URL\(value\);/);
@@ -414,6 +415,11 @@ test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
   const linkedCtaHtml = renderMailboxBodyForTest('💼 Mijn LinkedIn 👈', [], { senderEmail: 'martijn@softora.nl' });
   assert.match(
     linkedCtaHtml,
+    /<a href="https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios" target="_blank" rel="noopener noreferrer">💼 Mijn LinkedIn 👈<\/a>/
+  );
+  const linkedGmailCtaHtml = renderMailboxBodyForTest('💼 Mijn LinkedIn 👈', [], { senderEmail: 'martijnven123@gmail.com' });
+  assert.match(
+    linkedGmailCtaHtml,
     /<a href="https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios" target="_blank" rel="noopener noreferrer">💼 Mijn LinkedIn 👈<\/a>/
   );
 });

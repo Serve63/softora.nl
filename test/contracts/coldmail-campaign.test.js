@@ -347,40 +347,43 @@ test('coldmail campaign uses standard SMTP transports with bounded timeouts', as
 });
 
 test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async () => {
-  const { service, sentMessages } = createService({
-    mailboxAccountsRaw: JSON.stringify([
-      {
-        email: 'martijn@softora.nl',
-        name: 'Martijn van de Ven',
-        smtpHost: 'smtp.strato.com',
-        smtpUser: 'martijn@softora.nl',
-        smtpPass: 'martijn-secret',
-      },
-    ]),
-  });
+  for (const senderEmail of ['martijn@softora.nl', 'martijnven123@gmail.com']) {
+    const { service, sentMessages } = createService({
+      mailboxAccountsRaw: JSON.stringify([
+        {
+          email: senderEmail,
+          name: 'Martijn van de Ven',
+          smtpHost: senderEmail.endsWith('@gmail.com') ? 'smtp.gmail.com' : 'smtp.strato.com',
+          smtpUser: senderEmail,
+          smtpPass: 'martijn-secret',
+        },
+      ]),
+    });
 
-  const result = await service.sendColdmailCampaign({
-    count: 1,
-    subject: 'Nieuwe website voor {{bedrijf}}',
-    body: [
-      'Goedemorgen {{naam}},',
-      '',
-      'Zou u openstaan voor webdesign?',
-      '',
-      'Met vriendelijke groet,',
-      'Martijn',
-      '💼 Mijn LinkedIn 👈',
-      'Softora.nl',
-    ].join('\n'),
-    senderEmail: 'martijn@softora.nl',
-  });
+    const result = await service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Nieuwe website voor {{bedrijf}}',
+      body: [
+        'Goedemorgen {{naam}},',
+        '',
+        'Zou u openstaan voor webdesign?',
+        '',
+        'Met vriendelijke groet,',
+        'Martijn',
+        '💼 Mijn LinkedIn 👈',
+        'Softora.nl',
+      ].join('\n'),
+      senderEmail,
+    });
 
-  assert.equal(result.sent, 1);
-  assert.match(sentMessages[0].text, /💼 Mijn LinkedIn 👈/);
-  assert.match(
-    sentMessages[0].html,
-    /<a href="https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">💼 Mijn LinkedIn 👈<\/a>/
-  );
+    assert.equal(result.sent, 1, senderEmail);
+    assert.match(sentMessages[0].text, /💼 Mijn LinkedIn 👈/);
+    assert.match(
+      sentMessages[0].html,
+      /<a href="https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">💼 Mijn LinkedIn 👈<\/a>/,
+      senderEmail
+    );
+  }
 });
 
 test('coldmail campaign keeps the standard subject and body when variants are provided', async () => {
