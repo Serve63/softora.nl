@@ -429,6 +429,9 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /const failedPhotoKeys = new Set\(\);/);
   assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_FALLBACK_MS = 1800;/);
   assert.match(webdesignActionScriptSource, /function buildPhotoLoadKey\(kind, customerId, source\)/);
+  assert.match(webdesignActionScriptSource, /function isInlinePhotoSource\(source\)/);
+  assert.match(webdesignActionScriptSource, /isInlinePhotoSource\(photo\) \|\| loadedPhotoKeys\.has\(photoLoadKey\)/);
+  assert.match(webdesignActionScriptSource, /isInlinePhotoSource\(mockup\) \|\| loadedPhotoKeys\.has\(mockupLoadKey\)/);
   assert.match(webdesignActionScriptSource, /data-photo-key=\\"/);
   assert.match(webdesignActionScriptSource, /data-photo-error=\\"/);
   assert.match(webdesignActionScriptSource, /photo-drop-loader\{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;/);
@@ -508,7 +511,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260527a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260527b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260511a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260527a/);
@@ -879,7 +882,7 @@ test('premium database webdesign action keeps loaded photo slots stable across r
   const webdesignActionClient = loadDatabaseWebdesignActionClient();
   const customer = {
     id: 'customer-1',
-    websitePhoto: 'data:image/png;base64,AAA',
+    websitePhoto: 'https://assets.softora.test/customer-1.png',
     websitePhotoName: 'Websitefoto',
     websiteMockup: '',
     websiteMockupName: '',
@@ -888,7 +891,7 @@ test('premium database webdesign action keeps loaded photo slots stable across r
     state: { klanten: [] },
     escapeHtml: (value) => String(value),
     shouldShowWebsitePhoto: () => true,
-    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    isValidWebsitePhotoDataUrl: (value) => /^(data:image\/|https:\/\/)/.test(String(value || '')),
     resolveCustomerWebsiteUrl: () => '',
     isWebdesignPhotoEligible: () => false,
     openWebsitePhotoPreview() {},
@@ -924,11 +927,40 @@ test('premium database webdesign action keeps loaded photo slots stable across r
   assert.match(controller.render(customer), /data-photo-loaded="true"/);
 });
 
-test('premium database webdesign action remembers loaded photos when the page controller is recreated', () => {
+test('premium database webdesign action renders stored inline photos as ready without a reload flash', () => {
   const webdesignActionClient = loadDatabaseWebdesignActionClient();
   const customer = {
     id: 'customer-1',
     websitePhoto: 'data:image/png;base64,AAA',
+    websitePhotoName: 'Websitefoto',
+    websiteMockup: 'data:image/jpeg;base64,BBB',
+    websiteMockupName: 'Device mockup',
+  };
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [] },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => '',
+    isWebdesignPhotoEligible: () => false,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+
+  const html = controller.render(customer);
+  const loadedFlags = html.match(/data-photo-loaded="true"/g) || [];
+
+  assert.equal(loadedFlags.length, 2);
+  assert.doesNotMatch(html, /data-photo-loaded="false"/);
+});
+
+test('premium database webdesign action remembers loaded photos when the page controller is recreated', () => {
+  const webdesignActionClient = loadDatabaseWebdesignActionClient();
+  const customer = {
+    id: 'customer-1',
+    websitePhoto: 'https://assets.softora.test/customer-1.png',
     websitePhotoName: 'Websitefoto',
     websiteMockup: '',
     websiteMockupName: '',
@@ -937,7 +969,7 @@ test('premium database webdesign action remembers loaded photos when the page co
     state: { klanten: [] },
     escapeHtml: (value) => String(value),
     shouldShowWebsitePhoto: () => true,
-    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    isValidWebsitePhotoDataUrl: (value) => /^(data:image\/|https:\/\/)/.test(String(value || '')),
     resolveCustomerWebsiteUrl: () => '',
     isWebdesignPhotoEligible: () => false,
     openWebsitePhotoPreview() {},
@@ -974,7 +1006,7 @@ test('premium database webdesign action keeps loaded photo memory for large data
     state: { klanten: [] },
     escapeHtml: (value) => String(value),
     shouldShowWebsitePhoto: () => true,
-    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    isValidWebsitePhotoDataUrl: (value) => /^(data:image\/|https:\/\/)/.test(String(value || '')),
     resolveCustomerWebsiteUrl: () => '',
     isWebdesignPhotoEligible: () => false,
     openWebsitePhotoPreview() {},
@@ -984,7 +1016,7 @@ test('premium database webdesign action keeps loaded photo memory for large data
   });
   const customers = Array.from({ length: 800 }, (_, index) => ({
     id: `customer-${index}`,
-    websitePhoto: `data:image/png;base64,PHOTO${index}`,
+    websitePhoto: `https://assets.softora.test/customer-${index}.png`,
     websitePhotoName: 'Websitefoto',
     websiteMockup: '',
     websiteMockupName: '',
@@ -1084,7 +1116,7 @@ test('premium database webdesign action remembers failed photo slots as a quiet 
   const webdesignActionClient = loadDatabaseWebdesignActionClient();
   const customer = {
     id: 'customer-1',
-    websitePhoto: 'data:image/png;base64,AAA',
+    websitePhoto: 'https://assets.softora.test/customer-1.png',
     websitePhotoName: 'Websitefoto',
     websiteMockup: '',
     websiteMockupName: '',
@@ -1093,7 +1125,7 @@ test('premium database webdesign action remembers failed photo slots as a quiet 
     state: { klanten: [] },
     escapeHtml: (value) => String(value),
     shouldShowWebsitePhoto: () => true,
-    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    isValidWebsitePhotoDataUrl: (value) => /^(data:image\/|https:\/\/)/.test(String(value || '')),
     resolveCustomerWebsiteUrl: () => '',
     isWebdesignPhotoEligible: () => false,
     openWebsitePhotoPreview() {},
