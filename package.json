@@ -40,5 +40,9 @@
   },
   "overrides": {
     "path-to-regexp": "0.1.13"
+  },
+  "optionalDependencies": {
+    "@img/sharp-libvips-linux-arm64": "^1.2.4",
+    "@img/sharp-linux-arm64": "^0.34.5"
   }
 }

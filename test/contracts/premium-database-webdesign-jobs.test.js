@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   createPremiumDatabaseWebdesignJobsCoordinator,
@@ -26,6 +29,37 @@ function createResponseRecorder() {
 function wait(ms = 0) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+test('premium database webdesign jobs do not break app bootstrap when sharp is unavailable', () => {
+  const repoRoot = path.join(__dirname, '../..');
+  const script = `
+    const Module = require('module');
+    const originalLoad = Module._load;
+    Module._load = function patchedLoad(request) {
+      if (request === 'sharp') throw new Error('sharp linux binary missing');
+      return originalLoad.apply(this, arguments);
+    };
+    require('./server/services/premium-database-webdesign-jobs');
+    process.stdout.write('loaded');
+  `;
+  const result = spawnSync(process.execPath, ['-e', script], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(result.stdout, 'loaded');
+});
+
+test('premium database webdesign jobs keep Vercel sharp linux arm64 install explicit', () => {
+  const repoRoot = path.join(__dirname, '../..');
+  const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+  const vercelConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, 'vercel.json'), 'utf8'));
+
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.34.5');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.2.4');
+  assert.equal(vercelConfig.installCommand, 'npm ci --include=optional');
+});
 
 async function waitForJobDone(coordinator, jobId) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
