@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const crypto = require('node:crypto');
-const dns = require('node:dns').promises;
+const dnsNative = require('node:dns');
+const dns = dnsNative.promises;
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const { buildChunkedStatePatch, readChunkedStateValue } = require('./data-ops-serialization');
@@ -579,10 +580,15 @@ function createColdmailCampaignService(deps = {}) {
         pass,
       },
       family: 4,
+      lookup: lookupSmtpHostnameIpv4,
       connectionTimeout: DEFAULT_COLDMAIL_SMTP_CONNECTION_TIMEOUT_MS,
       greetingTimeout: DEFAULT_COLDMAIL_SMTP_GREETING_TIMEOUT_MS,
       socketTimeout: DEFAULT_COLDMAIL_SMTP_SOCKET_TIMEOUT_MS,
     };
+  }
+
+  function lookupSmtpHostnameIpv4(hostname, options, callback) {
+    return dnsNative.lookup(hostname, { ...options, family: 4, all: false }, callback);
   }
 
   function normalizeDatabaseStatus(value, row = {}) {
