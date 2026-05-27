@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('node:crypto');
 const dnsNative = require('node:dns');
 const dns = dnsNative.promises;
+const net = require('node:net');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const { buildChunkedStatePatch, readChunkedStateValue } = require('./data-ops-serialization');
@@ -581,6 +582,7 @@ function createColdmailCampaignService(deps = {}) {
       },
       family: 4,
       lookup: lookupSmtpHostnameIpv4,
+      getSocket: buildSmtpIpv4SocketFactory(host, port),
       connectionTimeout: DEFAULT_COLDMAIL_SMTP_CONNECTION_TIMEOUT_MS,
       greetingTimeout: DEFAULT_COLDMAIL_SMTP_GREETING_TIMEOUT_MS,
       socketTimeout: DEFAULT_COLDMAIL_SMTP_SOCKET_TIMEOUT_MS,
@@ -588,7 +590,61 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function lookupSmtpHostnameIpv4(hostname, options, callback) {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
+    }
     return dnsNative.lookup(hostname, { ...options, family: 4, all: false }, callback);
+  }
+
+  function buildSmtpIpv4SocketFactory(defaultHost, defaultPort) {
+    const fallbackHost = normalizeString(defaultHost);
+    const fallbackPort = Number(defaultPort) || 587;
+    return (options, callback) => {
+      const hostname = normalizeString(options && options.host) || fallbackHost;
+      const portNumber = Number(options && options.port) || fallbackPort;
+      const localAddress = normalizeString(options && options.localAddress);
+      const openSocket = (address) => {
+        const connection = net.connect({
+          host: address,
+          port: portNumber,
+          ...(localAddress ? { localAddress } : {}),
+        });
+        let settled = false;
+        const fail = (error) => {
+          if (settled) return;
+          settled = true;
+          connection.destroy();
+          callback(error);
+        };
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          connection.setTimeout(0);
+          connection.removeListener('error', fail);
+          callback(null, { connection });
+        };
+        connection.once('error', fail);
+        connection.setTimeout(DEFAULT_COLDMAIL_SMTP_CONNECTION_TIMEOUT_MS, () => {
+          fail(new Error(`SMTP IPv4 connection timeout for ${hostname}:${portNumber}`));
+        });
+        connection.once('connect', done);
+      };
+      dnsNative.resolve4(hostname, (resolveError, addresses) => {
+        const address = Array.isArray(addresses) ? addresses.find(Boolean) : '';
+        if (address) {
+          openSocket(address);
+          return;
+        }
+        dnsNative.lookup(hostname, { family: 4, all: false }, (lookupError, lookupAddress) => {
+          if (lookupError) {
+            callback(resolveError || lookupError);
+            return;
+          }
+          openSocket(lookupAddress);
+        });
+      });
+    };
   }
 
   function normalizeDatabaseStatus(value, row = {}) {
