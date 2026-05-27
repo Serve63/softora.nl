@@ -774,6 +774,7 @@ function createColdmailCampaignService(deps = {}) {
   function buildColdmailTestRecipientRow(mode = 'mail', databaseRow = null, recipientEmail = COLDMAIL_TEST_RECIPIENT_EMAIL, recipientIndex = 0) {
     const row = databaseRow && typeof databaseRow === 'object' ? { ...databaseRow } : {};
     const email = normalizeEmailAddress(recipientEmail) || COLDMAIL_TEST_RECIPIENT_EMAIL;
+    const sourceRowId = normalizeString(row.id || row.customerId || row.databaseId);
     const fallbackId = recipientIndex === 0
       ? COLDMAIL_TEST_RECIPIENT_ID
       : `${COLDMAIL_TEST_RECIPIENT_ID}-${email.replace(/[^a-z0-9]+/g, '-')}`;
@@ -782,6 +783,7 @@ function createColdmailCampaignService(deps = {}) {
       id: recipientIndex === 0
         ? normalizeString(row.id || row.customerId || row.databaseId) || fallbackId
         : fallbackId,
+      testModeSourceRowId: sourceRowId || undefined,
       bedrijf: normalizeString(row.bedrijf || row.company || row.companyName) || 'Softora Testmodus',
       naam: normalizeString(row.naam || row.contact || row.contactName) || 'Servé',
       email,
@@ -1464,10 +1466,17 @@ function createColdmailCampaignService(deps = {}) {
   function findStoredPhotoRecordForRow(row, index, photoMap, photosByIdentity) {
     const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
     const byIdentity = photosByIdentity instanceof Map ? photosByIdentity : new Map();
-    const id = getExplicitRowId(row);
-    const directPhoto = id ? photos[id] : null;
-    if (directPhoto && (photoRecordMatchesRowIdentity(directPhoto, row) || isDedicatedTestModeRow(row))) {
-      return directPhoto;
+    const directIds = Array.from(
+      new Set([
+        getExplicitRowId(row),
+        normalizeString(row && row.testModeSourceRowId),
+      ].filter(Boolean))
+    );
+    for (const id of directIds) {
+      const directPhoto = photos[id];
+      if (directPhoto && (photoRecordMatchesRowIdentity(directPhoto, row) || isDedicatedTestModeRow(row))) {
+        return directPhoto;
+      }
     }
     for (const identityKey of buildRowIdentityKeys(row)) {
       const photo = byIdentity.get(identityKey);
@@ -1700,7 +1709,10 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function isDedicatedTestModeRow(row) {
-    return normalizeString(row && (row.id || row.customerId || row.databaseId)).toLowerCase() === COLDMAIL_TEST_RECIPIENT_ID;
+    return [
+      normalizeString(row && (row.id || row.customerId || row.databaseId)),
+      normalizeString(row && row.testModeSourceRowId),
+    ].some((id) => id.toLowerCase() === COLDMAIL_TEST_RECIPIENT_ID);
   }
 
   function getImapMailboxesForSync() {
