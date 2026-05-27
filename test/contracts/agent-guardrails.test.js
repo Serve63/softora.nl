@@ -357,6 +357,7 @@ test('agent guardrails block broad behavior changes in one step', () => {
 
 test('agent guardrails keep local cleanliness checks in the critical path', () => {
   const packageJson = JSON.parse(readRepoFile('package.json'));
+  const vercelConfig = JSON.parse(readRepoFile('vercel.json'));
   const verifyCriticalSource = readRepoFile('scripts/verify-critical.js');
   const hygieneSource = readRepoFile('scripts/check-repo-hygiene.sh');
   const cleanSource = readRepoFile('scripts/clean-local-artifacts.sh');
@@ -378,6 +379,9 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.match(packageJson.dependencies.sharp, /^\^0\.34\./);
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.34.5');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.2.4');
+  assert.equal(vercelConfig.installCommand, 'npm ci --include=optional');
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);
   assert.match(hygieneSource, /\.vercel\/output/);

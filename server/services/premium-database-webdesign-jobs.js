@@ -1,7 +1,13 @@
 const { randomUUID } = require('crypto');
-const sharp = require('sharp');
 
 const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v6';
+let cachedSharp = null;
+
+function loadSharpModule() {
+  if (cachedSharp) return cachedSharp;
+  cachedSharp = require('sharp');
+  return cachedSharp;
+}
 
 function escapeSvgText(value) {
   return String(value || '')
@@ -26,9 +32,10 @@ function replaceImageFileSuffix(value, suffix) {
   return `${clean}${suffix}.jpg`;
 }
 
-async function createDeviceMockupDataUrl(imageDataUrl, customer = {}) {
+async function createDeviceMockupDataUrl(imageDataUrl, customer = {}, options = {}) {
   const parsed = parseImageDataUrl(imageDataUrl);
   if (!parsed) throw new Error('De webdesignfoto is niet geschikt voor een device-mockup.');
+  const sharp = typeof options.loadSharpImpl === 'function' ? options.loadSharpImpl() : loadSharpModule();
   const embeddedImage = `data:${parsed.mimeType};base64,${parsed.base64}`;
   const companyName = escapeSvgText(customer.bedrijf || customer.company || 'Webdesign');
   const svg = `
@@ -89,6 +96,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     photoDataPrefix = 'softora_database_photo_data_v1_',
     jobProcessTimeoutMs = 10 * 60 * 1000,
     processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
+    loadSharpImpl = loadSharpModule,
   } = deps;
 
   const jobs = new Map();
@@ -278,7 +286,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
 
     const customer = job.customer;
-    const mockupDataUrl = await createDeviceMockupDataUrl(dataUrl, customer);
+    const mockupDataUrl = await createDeviceMockupDataUrl(dataUrl, customer, { loadSharpImpl });
     const checkedAt = new Date().toISOString();
     const websitePhotoName =
       truncateText(normalizeString(image.fileName || `${customer.dom || customer.bedrijf || 'webdesign'}-webdesign.png`), 180) ||
@@ -652,5 +660,6 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 }
 
 module.exports = {
+  createDeviceMockupDataUrl,
   createPremiumDatabaseWebdesignJobsCoordinator,
 };
