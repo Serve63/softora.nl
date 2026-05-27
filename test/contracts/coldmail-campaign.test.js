@@ -1262,6 +1262,12 @@ test('coldmail autopilot only uses explicitly configured sender emails', async (
         smtpUser: 'zakelijk@theimpactbox.co',
         smtpPass: 'impact-secret',
       },
+      {
+        email: 'servec321@gmail.com',
+        smtpHost: 'smtp.gmail.com',
+        smtpUser: 'servec321@gmail.com',
+        smtpPass: 'gmail-secret',
+      },
     ]),
     sendGuardState: {
       entries: [
@@ -1283,6 +1289,10 @@ test('coldmail autopilot only uses explicitly configured sender emails', async (
         'zakelijk@theimpactbox.co': {
           subject: 'Impact vraag voor {{bedrijf}}',
           body: 'Impact body',
+        },
+        'servec321@gmail.com': {
+          subject: 'Gmail vraag voor {{bedrijf}}',
+          body: 'Gmail body',
         },
       },
     },
