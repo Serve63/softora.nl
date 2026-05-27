@@ -54,16 +54,54 @@
     };
   }
 
+  function hasLocationVariable(value) {
+    return /📍/.test(String(value || "")) || /\{\{\s*(stad|plaats|locatie)\s*\}\}/i.test(String(value || ""));
+  }
+
+  function ensureLocationLine(value) {
+    const body = String(value || "").replace(/\s+$/g, "");
+    if (!body || hasLocationVariable(body)) return body;
+    return body + "\n\n📍 {{stad}}";
+  }
+
+  function normalizeAutopilotProfile(profile) {
+    const raw = profile && typeof profile === "object" ? profile : {};
+    const normalized = buildSenderProfileFromPayload(raw);
+    normalized.body = ensureLocationLine(normalized.body);
+    return normalized;
+  }
+
+  function hasProfileContent(profile) {
+    return Boolean(profile && String(profile.subject || "").trim() && String(profile.body || "").trim());
+  }
+
+  function getStoredSenderProfiles() {
+    try {
+      const controller = typeof global.getColdmailingSettingsController === "function"
+        ? global.getColdmailingSettingsController()
+        : null;
+      const settings = controller && typeof controller.collectSettings === "function"
+        ? controller.collectSettings()
+        : null;
+      return settings && settings.senders && typeof settings.senders === "object" ? settings.senders : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
   function buildSenderProfiles(payload, senderEmails) {
     const emails = Array.isArray(senderEmails) ? senderEmails.map(normEmail).filter(Boolean) : [];
     const profiles = {};
-    const standardProfile = buildSenderProfileFromPayload(payload);
+    const storedProfiles = getStoredSenderProfiles();
+    const standardProfile = normalizeAutopilotProfile(payload);
     emails.forEach((email) => {
-      if (standardProfile.subject && standardProfile.body) profiles[email] = standardProfile;
+      const storedProfile = storedProfiles[email];
+      const selectedProfile = hasProfileContent(storedProfile) ? storedProfile : standardProfile;
+      if (hasProfileContent(selectedProfile)) profiles[email] = normalizeAutopilotProfile(selectedProfile);
     });
     const currentSenderEmail = normEmail(payload && payload.senderEmail);
     if (currentSenderEmail && emails.includes(currentSenderEmail)) {
-      profiles[currentSenderEmail] = buildSenderProfileFromPayload(payload);
+      profiles[currentSenderEmail] = normalizeAutopilotProfile(payload);
     }
     return profiles;
   }
