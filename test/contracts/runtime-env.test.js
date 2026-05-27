@@ -75,6 +75,8 @@ test('loadRuntimeEnv supports a separate coldmail tracking secret', () => {
 test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
   const runtimeEnv = loadRuntimeEnv({
     INSTANTLY_ENABLED: 'true',
+    INSTANTLY_SYNC_ENABLED: 'true',
+    INSTANTLY_SCHEDULER_ENABLED: 'true',
     INSTANTLY_API_KEY: ' instantly-key ',
     INSTANTLY_API_BASE_URL: ' https://api.instantly.test/api/v2 ',
     INSTANTLY_DEFAULT_CAMPAIGN_ID: ' campaign-1 ',
@@ -88,6 +90,8 @@ test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
   });
 
   assert.equal(runtimeEnv.instantly.enabled, true);
+  assert.equal(runtimeEnv.instantly.syncEnabled, true);
+  assert.equal(runtimeEnv.instantly.schedulerEnabled, true);
   assert.equal(runtimeEnv.instantly.apiKey, 'instantly-key');
   assert.equal(runtimeEnv.instantly.apiBaseUrl, 'https://api.instantly.test/api/v2');
   assert.equal(runtimeEnv.instantly.defaultCampaignId, 'campaign-1');

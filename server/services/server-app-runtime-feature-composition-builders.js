@@ -71,8 +71,10 @@ function buildServerAppFeatureWiringRuntimeContext({
   upsertRecentCallUpdate,
   shared,
 }) {
+  const instantlySyncEnabled = Boolean(envConfig.INSTANTLY_ENABLED && envConfig.INSTANTLY_SYNC_ENABLED);
   const instantlySchedulerEnabled = Boolean(
-    envConfig.INSTANTLY_ENABLED &&
+    instantlySyncEnabled &&
+      envConfig.INSTANTLY_SCHEDULER_ENABLED &&
       !(env && (env.VERCEL || env.AWS_LAMBDA_FUNCTION_NAME || env.LAMBDA_TASK_ROOT))
   );
   const dataOpsAwareUiStateGetter = createDataOpsAwareUiStateGetter(uiSeoRuntime);
@@ -353,6 +355,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         instantlyOutreachService: createInstantlyOutreachService({
           instantlyConfig: {
             enabled: envConfig.INSTANTLY_ENABLED,
+            syncEnabled: instantlySyncEnabled,
             schedulerEnabled: instantlySchedulerEnabled,
             apiKey: envConfig.INSTANTLY_API_KEY,
             apiBaseUrl: envConfig.INSTANTLY_API_BASE_URL,

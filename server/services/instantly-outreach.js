@@ -999,6 +999,7 @@ function mergeHistory(row, entry, normalizeString = defaultNormalizeString) {
 function normalizeInstantlyConfig(config = {}) {
   return {
     enabled: readBool(config.enabled, false),
+    syncEnabled: readBool(config.syncEnabled, false),
     schedulerEnabled: readBool(config.schedulerEnabled, false),
     apiKey: defaultNormalizeString(config.apiKey),
     apiBaseUrl: defaultNormalizeString(config.apiBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/g, ''),
@@ -1102,6 +1103,17 @@ function createInstantlyOutreachService(deps = {}) {
         'INSTANTLY_NOT_CONFIGURED',
         503,
         { missing }
+      );
+    }
+  }
+
+  function assertSyncAllowed() {
+    assertConfigured();
+    if (!config.syncEnabled) {
+      throw createInstantlyError(
+        'Instantly-sync staat bewust uit.',
+        'INSTANTLY_SYNC_DISABLED',
+        503
       );
     }
   }
@@ -1742,7 +1754,7 @@ function createInstantlyOutreachService(deps = {}) {
   }
 
   async function syncInstantlyLeadsUnlocked(input = {}) {
-    assertConfigured();
+    assertSyncAllowed();
 
     const actor = normalizeString(input.actor) || 'Instantly sync';
     const state = await getUiStateValues(customerDbScope);
@@ -2203,7 +2215,7 @@ function createInstantlyOutreachService(deps = {}) {
       syncTimer = null;
     }
     nextSyncAt = '';
-    if (!config.enabled || !config.schedulerEnabled || !isConfigured()) return;
+    if (!config.enabled || !config.syncEnabled || !config.schedulerEnabled || !isConfigured()) return;
     const safeDelay = Math.max(1000, Math.min(delayMs, 24 * 60 * 60 * 1000));
     nextSyncAt = new Date(now().getTime() + safeDelay).toISOString();
     syncTimer = scheduleTask(() => {
@@ -2247,6 +2259,7 @@ function createInstantlyOutreachService(deps = {}) {
     return {
       ok: true,
       enabled: config.enabled,
+      syncEnabled: config.syncEnabled,
       configured: isConfigured(),
       missing: getMissingConfig(),
       campaignId: config.defaultCampaignId,
@@ -2271,7 +2284,7 @@ function createInstantlyOutreachService(deps = {}) {
     };
   }
 
-  if (config.enabled && config.schedulerEnabled) {
+  if (config.enabled && config.syncEnabled && config.schedulerEnabled) {
     startAutopilot();
   }
 

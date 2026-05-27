@@ -144,7 +144,11 @@ services:
       - key: COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES
         value: 75
       - key: INSTANTLY_ENABLED
-        value: true
+        value: false
+      - key: INSTANTLY_SYNC_ENABLED
+        value: false
+      - key: INSTANTLY_SCHEDULER_ENABLED
+        value: false
       - key: INSTANTLY_API_KEY
         sync: false
       - key: INSTANTLY_DEFAULT_CAMPAIGN_ID

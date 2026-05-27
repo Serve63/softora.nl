@@ -106,6 +106,8 @@ test('server app runtime bootstrap flattens env config without changing values',
     },
     instantly: {
       enabled: true,
+      syncEnabled: true,
+      schedulerEnabled: false,
       apiKey: 'instantly-key',
       apiBaseUrl: 'https://api.instantly.test/api/v2',
       defaultCampaignId: 'campaign-1',
@@ -136,6 +138,8 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.COLDMAIL_SEND_DELAY_MS, 90000);
   assert.equal(envConfig.COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT, 9);
   assert.equal(envConfig.INSTANTLY_ENABLED, true);
+  assert.equal(envConfig.INSTANTLY_SYNC_ENABLED, true);
+  assert.equal(envConfig.INSTANTLY_SCHEDULER_ENABLED, false);
   assert.equal(envConfig.INSTANTLY_API_KEY, 'instantly-key');
   assert.equal(envConfig.INSTANTLY_API_BASE_URL, 'https://api.instantly.test/api/v2');
   assert.equal(envConfig.INSTANTLY_DEFAULT_CAMPAIGN_ID, 'campaign-1');

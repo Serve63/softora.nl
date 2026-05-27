@@ -75,6 +75,7 @@ function createService(overrides = {}) {
   const service = createInstantlyOutreachService({
     instantlyConfig: {
       enabled: true,
+      syncEnabled: overrides.syncEnabled === undefined ? true : overrides.syncEnabled,
       schedulerEnabled: false,
       apiKey: 'instantly-key',
       apiBaseUrl: 'https://api.instantly.test/api/v2',
@@ -222,6 +223,32 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(rows[0].lastMailSentAt, undefined);
   assert.equal(rows[2].databaseStatus, 'gemaild');
   assert.equal(rows[2].outreachStatus, 'benaderd');
+});
+
+test('instantly sync is blocked unless the explicit sync flag is enabled', async () => {
+  const { service, fetchCalls, getRows } = createService({ syncEnabled: false });
+
+  await assert.rejects(
+    () => service.syncInstantlyLeads({ actor: 'Test' }),
+    (error) => {
+      assert.equal(error.code, 'INSTANTLY_SYNC_DISABLED');
+      assert.equal(error.status, 503);
+      return true;
+    }
+  );
+
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(getRows()[0].status, 'prospect');
+});
+
+test('instantly status exposes whether sync is explicitly enabled', async () => {
+  const { service } = createService({ syncEnabled: false });
+
+  const status = await service.getStatus();
+
+  assert.equal(status.enabled, true);
+  assert.equal(status.syncEnabled, false);
+  assert.equal(status.schedulerEnabled, false);
 });
 
 test('instantly sync blocks leads with prior Softora coldmail history', async () => {

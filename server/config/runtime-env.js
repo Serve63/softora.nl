@@ -317,6 +317,8 @@ function loadRuntimeEnv(env = process.env) {
     },
     instantly: {
       enabled: readBooleanEnvFlag(safeEnv.INSTANTLY_ENABLED),
+      syncEnabled: readBooleanEnvFlag(safeEnv.INSTANTLY_SYNC_ENABLED, false),
+      schedulerEnabled: readBooleanEnvFlag(safeEnv.INSTANTLY_SCHEDULER_ENABLED, false),
       apiKey: normalizeString(safeEnv.INSTANTLY_API_KEY || ''),
       apiBaseUrl: normalizeString(safeEnv.INSTANTLY_API_BASE_URL || 'https://api.instantly.ai/api/v2'),
       defaultCampaignId: normalizeString(safeEnv.INSTANTLY_DEFAULT_CAMPAIGN_ID || ''),
