@@ -6,6 +6,7 @@
     const PENDING_TTL_MS = 6 * 60 * 60 * 1000;
     const POLL_INTERVAL_MS = 2200;
     const PHOTO_LOAD_FALLBACK_MS = 6000;
+    const PHOTO_LOAD_RETRY_AFTER_MS = 30000;
     const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";
     const PHOTO_LOAD_CACHE_LIMIT = 2500;
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
@@ -41,6 +42,7 @@
         const setStatusMessage = options.setStatusMessage;
         const renderPage = options.renderPage;
         const refreshPhotos = options.refreshPhotos;
+        const logMediaDebug = typeof options.logMediaDebug === "function" ? options.logMediaDebug : function () {};
         const ensureMockupForCustomer = typeof options.ensureMockupForCustomer === "function" ? options.ensureMockupForCustomer : async function () {};
         const isMockupPending = typeof options.isMockupPending === "function" ? options.isMockupPending : function () { return false; };
         const getAssetState = typeof options.getAssetState === "function" ? options.getAssetState : null;
@@ -51,6 +53,7 @@
         const pollTimers = new Map();
         const loadedPhotoKeys = getSharedLoadedPhotoKeys();
         const failedPhotoKeys = new Set();
+        const failedPhotoKeyTimes = new Map();
         const failedMockupIds = new Set();
         const autoMockupQueuedIds = new Set();
         const autoMockupQueue = [];
@@ -122,6 +125,7 @@
             const normalized = normalizeString(key);
             if (!normalized) return;
             failedPhotoKeys.delete(normalized);
+            failedPhotoKeyTimes.delete(normalized);
             loadedPhotoKeys.add(normalized);
             trimLoadedPhotoKeys();
         }
@@ -131,6 +135,31 @@
             if (!normalized) return;
             loadedPhotoKeys.delete(normalized);
             failedPhotoKeys.add(normalized);
+            failedPhotoKeyTimes.set(normalized, now());
+        }
+
+        function shouldRetryFailedPhotoKey(key) {
+            const normalized = normalizeString(key);
+            if (!normalized || !failedPhotoKeys.has(normalized)) return false;
+            const failedAt = Number(failedPhotoKeyTimes.get(normalized)) || 0;
+            return !failedAt || (now() - failedAt) >= PHOTO_LOAD_RETRY_AFTER_MS;
+        }
+
+        function clearFailedPhotoKey(key) {
+            const normalized = normalizeString(key);
+            if (!normalized) return;
+            failedPhotoKeys.delete(normalized);
+            failedPhotoKeyTimes.delete(normalized);
+        }
+
+        function getPhotoDropDebug(drop) {
+            if (!drop || typeof drop.getAttribute !== "function") return {};
+            const isMockup = Boolean(drop.classList && typeof drop.classList.contains === "function" && drop.classList.contains("photo-drop--mockup"));
+            return {
+                customerId: normalizeString(drop.getAttribute(isMockup ? "data-mockup-photo-id" : "data-photo-id")),
+                kind: isMockup ? "mockup" : "webdesign",
+                key: normalizeString(drop.getAttribute("data-photo-key"))
+            };
         }
 
         function markPhotoDropReady(drop, failed) {
@@ -140,6 +169,7 @@
                 if (failed) markPhotoKeyFailed(key);
                 else markPhotoKeyLoaded(key);
             }
+            logMediaDebug(failed ? "image-load-error" : "image-load-success", getPhotoDropDebug(drop));
             drop.setAttribute("data-photo-loaded", "true");
             if (failed) drop.setAttribute("data-photo-error", "true");
             else drop.setAttribute("data-photo-error", "false");
@@ -162,12 +192,14 @@
                 markPhotoDropReady(drop, false);
                 return;
             }
-            if (key && failedPhotoKeys.has(key)) {
+            if (key && failedPhotoKeys.has(key) && !shouldRetryFailedPhotoKey(key)) {
                 markPhotoDropReady(drop, true);
                 return;
             }
+            if (key && shouldRetryFailedPhotoKey(key)) clearFailedPhotoKey(key);
             let fallbackTimer = null;
             let finished = false;
+            logMediaDebug("image-load-start", getPhotoDropDebug(drop));
             const finishReady = function (failed) {
                 if (finished) return;
                 finished = true;
@@ -554,6 +586,7 @@
             const label = normalizeString(customer && customer.websitePhotoName) || "Websitefoto";
             const hasPhoto = assetState ? assetState.hasPhoto : isValidWebsitePhotoDataUrl(photo);
             const photoLoadKey = buildPhotoLoadKey("photo", customer && customer.id, photo);
+            if (hasPhoto && shouldRetryFailedPhotoKey(photoLoadKey)) clearFailedPhotoKey(photoLoadKey);
             const photoLoaded = !hasPhoto || isInlinePhotoSource(photo) || loadedPhotoKeys.has(photoLoadKey);
             const photoFailed = hasPhoto && failedPhotoKeys.has(photoLoadKey);
             const isPending = pendingIds.has(customer.id);
@@ -561,7 +594,7 @@
             const isLoading = isPending || isRestoring;
             const canGenerate = !hasPhoto && !isLoading && Boolean(resolveCustomerWebsiteUrl(customer));
             const inner = hasPhoto
-                ? (photoFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"eager\" decoding=\"async\">")
+                ? (photoFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"eager\" fetchpriority=\"high\" decoding=\"async\">")
                 : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
             const remove = hasPhoto ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>" : "";
             const ariaLabel = hasPhoto ? (photoFailed ? "Websitefoto kon niet geladen worden" : "Websitefoto bekijken") : (isLoading ? (isPending ? "Webdesign wordt gemaakt" : "Websitefoto's worden hersteld") : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden"));
@@ -570,6 +603,7 @@
             const mockupLabel = normalizeString(customer && customer.websiteMockupName) || "Device mockup";
             const hasMockup = assetState ? assetState.hasMockup : isValidWebsitePhotoDataUrl(mockup);
             const mockupLoadKey = buildPhotoLoadKey("mockup", customer && customer.id, mockup);
+            if (hasMockup && shouldRetryFailedPhotoKey(mockupLoadKey)) clearFailedPhotoKey(mockupLoadKey);
             const mockupLoaded = !hasMockup || isInlinePhotoSource(mockup) || loadedPhotoKeys.has(mockupLoadKey);
             const mockupImageFailed = hasMockup && failedPhotoKeys.has(mockupLoadKey);
             const mockupGenerationFailed = isMockupFailed(customer && customer.id);
@@ -577,7 +611,7 @@
             const mockupLoading = assetState ? assetState.mockupPending : isMockupPending(customer && customer.id);
             const canGenerateMockup = assetState ? assetState.canRepairMockup : (hasPhoto && !hasMockup && !mockupLoading);
             const mockupInner = hasMockup
-                ? (mockupImageFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" decoding=\"async\">")
+                ? (mockupImageFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" fetchpriority=\"high\" decoding=\"async\">")
                 : (mockupLoading ? LOADING_ICON : MOCKUP_ICON);
             const mockupAriaLabel = hasMockup ? (mockupImageFailed ? "Device mockup kon niet geladen worden" : (canGenerateMockup ? "Device mockup opnieuw maken" : "Device mockup bekijken")) : (mockupLoading ? "Device mockup wordt gemaakt" : (mockupGenerationFailed ? "Device mockup maken is mislukt" : (canGenerateMockup ? "Device mockup maken" : "Device mockup nog niet beschikbaar")));
             const mockupTitle = hasMockup ? (canGenerateMockup ? "Klik om device mockup opnieuw te maken" : mockupLabel) : (mockupLoading ? "Device mockup wordt gemaakt" : (mockupGenerationFailed ? "Mockup maken is mislukt. Klik om opnieuw te proberen." : (canGenerateMockup ? "Klik om device mockup te maken" : "Maak eerst een webdesign")));
