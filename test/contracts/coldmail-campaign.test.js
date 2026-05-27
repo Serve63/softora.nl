@@ -12,6 +12,14 @@ const {
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 const CHUNKED_PNG_DATA_URL = 'data:image/png;base64,TQ==';
+const TEST_MODE_RECIPIENT_EMAILS = ['serve@softora.nl', 'servec321@gmail.com'];
+
+function assertTestModeRecipientEmails(messages) {
+  assert.deepEqual(
+    messages.map((message) => message.to).sort(),
+    TEST_MODE_RECIPIENT_EMAILS.slice().sort()
+  );
+}
 
 function withCheckedMockupMeta(item) {
   if (!item || typeof item !== 'object' || !item.websiteMockup) return item;
@@ -3023,12 +3031,15 @@ test('coldmail campaign prefers stored design photo records over stale row mocku
     testMode: true,
   });
 
-  assert.equal(result.sent, 1);
-  assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].attachments.length, 2);
-  assert.equal(sentMessages[0].attachments[0].content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
-  assert.equal(sentMessages[0].attachments[1].content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
-  assert.equal(sentMessages[0].attachments[1].filename, 'Oude-mockup-achtergrond.png');
+  assert.equal(result.sent, 2);
+  assert.equal(sentMessages.length, 2);
+  assertTestModeRecipientEmails(sentMessages);
+  sentMessages.forEach((message) => {
+    assert.equal(message.attachments.length, 2);
+    assert.equal(message.attachments[0].content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
+    assert.equal(message.attachments[1].content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
+    assert.equal(message.attachments[1].filename, 'Oude-mockup-achtergrond.png');
+  });
 });
 
 test('coldmail campaign sends test recipient without marking database row as mailed', async () => {
@@ -3059,7 +3070,7 @@ test('coldmail campaign sends test recipient without marking database row as mai
   assert.equal(getSavedState(), null);
 });
 
-test('coldmail campaign test mode sends only the safe test inbox', async () => {
+test('coldmail campaign test mode sends only the safe test inboxes', async () => {
   const { service, sentMessages, getSavedState, getSavedStates } = createService({
     rows: [
       {
@@ -3079,8 +3090,11 @@ test('coldmail campaign test mode sends only the safe test inbox', async () => {
   });
 
   assert.equal(preview.testMode, true);
-  assert.equal(preview.selected, 1);
-  assert.equal(preview.recipients[0].email, 'servec321@gmail.com');
+  assert.equal(preview.selected, 2);
+  assert.deepEqual(
+    preview.recipients.map((recipient) => recipient.email).sort(),
+    TEST_MODE_RECIPIENT_EMAILS.slice().sort()
+  );
   assert.equal(preview.recipients[0].website, 'softora.nl');
 
   const result = await service.sendColdmailCampaign({
@@ -3092,13 +3106,16 @@ test('coldmail campaign test mode sends only the safe test inbox', async () => {
   });
 
   assert.equal(result.testMode, true);
-  assert.equal(result.sent, 1);
+  assert.equal(result.sent, 2);
   assert.equal(result.persisted, 0);
   assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
-  assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
-  assert.match(sentMessages[0].subject, /Softora Testmodus/);
-  assert.equal(sentMessages[0].attachments, undefined);
+  assert.deepEqual(result.testRecipientEmails, TEST_MODE_RECIPIENT_EMAILS);
+  assert.equal(sentMessages.length, 2);
+  assertTestModeRecipientEmails(sentMessages);
+  sentMessages.forEach((message) => {
+    assert.match(message.subject, /Softora Testmodus/);
+    assert.equal(message.attachments, undefined);
+  });
   assert.equal(getSavedState(), null);
   assert.deepEqual(getSavedStates(), []);
 });
@@ -3155,22 +3172,25 @@ test('coldmail campaign test mode infers webdesign assets from the mail content 
   });
 
   assert.equal(result.testMode, true);
-  assert.equal(result.sent, 1);
+  assert.equal(result.sent, 2);
   assert.equal(result.persisted, 0);
   assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
-  assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
-  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt!');
-  assert.doesNotMatch(sentMessages[0].subject, /\(test \d{8}T\d{6}Z\)/);
-  assert.match(sentMessages[0].text, /website softora\.nl tegen/);
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
-  assert.match(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
-  assert.doesNotMatch(sentMessages[0].html, /border-top\s*:\s*1px\s+dashed/i);
-  assert.doesNotMatch(sentMessages[0].html, /detail-mail-section-signature/);
-  assert.equal(sentMessages[0].attachments.length, 2);
-  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-softora-test-mode-recipient@softora');
-  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-softora-test-mode-recipient@softora');
+  assert.deepEqual(result.testRecipientEmails, TEST_MODE_RECIPIENT_EMAILS);
+  assert.equal(sentMessages.length, 2);
+  assertTestModeRecipientEmails(sentMessages);
+  sentMessages.forEach((message) => {
+    assert.equal(message.subject, 'Nieuw webdesign gemaakt!');
+    assert.doesNotMatch(message.subject, /\(test \d{8}T\d{6}Z\)/);
+    assert.match(message.text, /website softora\.nl tegen/);
+    assert.match(message.html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
+    assert.match(message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
+    assert.match(message.html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
+    assert.doesNotMatch(message.html, /border-top\s*:\s*1px\s+dashed/i);
+    assert.doesNotMatch(message.html, /detail-mail-section-signature/);
+    assert.equal(message.attachments.length, 2);
+    assert.equal(message.attachments[0].cid, 'webdesign-softora-test-mode-recipient@softora');
+    assert.equal(message.attachments[1].cid, 'webdesign-mockup-softora-test-mode-recipient@softora');
+  });
   assert.equal(getSavedState(), null);
   assert.deepEqual(getSavedStates(), []);
 });
@@ -3215,11 +3235,14 @@ test('coldmail campaign test mode can send Softora webdesign attachment safely',
   });
 
   assert.equal(preview.testMode, true);
-  assert.equal(preview.selected, 1);
+  assert.equal(preview.selected, 2);
   assert.equal(preview.failedItems.length, 0);
   assert.equal(preview.recipients[0].id, 'softora-test-mode-recipient');
   assert.equal(preview.recipients[0].bedrijf, 'Softora Testmodus');
-  assert.equal(preview.recipients[0].email, 'servec321@gmail.com');
+  assert.deepEqual(
+    preview.recipients.map((recipient) => recipient.email).sort(),
+    TEST_MODE_RECIPIENT_EMAILS.slice().sort()
+  );
   assert.equal(preview.recipients[0].website, 'softora.nl');
 
   const result = await service.sendColdmailCampaign({
@@ -3232,20 +3255,23 @@ test('coldmail campaign test mode can send Softora webdesign attachment safely',
   });
 
   assert.equal(result.testMode, true);
-  assert.equal(result.sent, 1);
+  assert.equal(result.sent, 2);
   assert.equal(result.persisted, 0);
   assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
-  assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
-  assert.equal(sentMessages[0].subject, 'Test voor softora.nl');
-  assert.doesNotMatch(sentMessages[0].subject, /\(test \d{8}T\d{6}Z\)/);
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
-  assert.equal(sentMessages[0].attachments.length, 2);
-  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-softora-test-mode-recipient@softora');
-  assert.equal(sentMessages[0].attachments[0].contentType, 'image/png');
-  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-softora-test-mode-recipient@softora');
-  assert.equal(sentMessages[0].attachments[1].contentType, 'image/png');
+  assert.deepEqual(result.testRecipientEmails, TEST_MODE_RECIPIENT_EMAILS);
+  assert.equal(sentMessages.length, 2);
+  assertTestModeRecipientEmails(sentMessages);
+  sentMessages.forEach((message) => {
+    assert.equal(message.subject, 'Test voor softora.nl');
+    assert.doesNotMatch(message.subject, /\(test \d{8}T\d{6}Z\)/);
+    assert.match(message.html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
+    assert.match(message.html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
+    assert.equal(message.attachments.length, 2);
+    assert.equal(message.attachments[0].cid, 'webdesign-softora-test-mode-recipient@softora');
+    assert.equal(message.attachments[0].contentType, 'image/png');
+    assert.equal(message.attachments[1].cid, 'webdesign-mockup-softora-test-mode-recipient@softora');
+    assert.equal(message.attachments[1].contentType, 'image/png');
+  });
   assert.equal(getSavedState(), null);
   assert.deepEqual(getSavedStates(), []);
 });
@@ -3290,10 +3316,13 @@ test('coldmail campaign test mode uses the ready Gmail design row when the dedic
   });
 
   assert.equal(preview.testMode, true);
-  assert.equal(preview.selected, 1);
+  assert.equal(preview.selected, 2);
   assert.equal(preview.failedItems.length, 0);
   assert.equal(preview.recipients[0].id, 'serve-ready-design');
-  assert.equal(preview.recipients[0].email, 'servec321@gmail.com');
+  assert.deepEqual(
+    preview.recipients.map((recipient) => recipient.email).sort(),
+    TEST_MODE_RECIPIENT_EMAILS.slice().sort()
+  );
 
   const result = await service.sendColdmailCampaign({
     count: 10,
@@ -3305,17 +3334,20 @@ test('coldmail campaign test mode uses the ready Gmail design row when the dedic
   });
 
   assert.equal(result.testMode, true);
-  assert.equal(result.sent, 1);
+  assert.equal(result.sent, 2);
   assert.equal(result.persisted, 0);
   assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
-  assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
-  assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt!');
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-serve-ready-design@softora"/);
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-serve-ready-design@softora"/);
-  assert.equal(sentMessages[0].attachments.length, 2);
-  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-serve-ready-design@softora');
-  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-serve-ready-design@softora');
+  assert.deepEqual(result.testRecipientEmails, TEST_MODE_RECIPIENT_EMAILS);
+  assert.equal(sentMessages.length, 2);
+  assertTestModeRecipientEmails(sentMessages);
+  sentMessages.forEach((message) => {
+    assert.equal(message.subject, 'Nieuw webdesign gemaakt!');
+    assert.match(message.html, /<img src="cid:webdesign-serve-ready-design@softora"/);
+    assert.match(message.html, /<img src="cid:webdesign-mockup-serve-ready-design@softora"/);
+    assert.equal(message.attachments.length, 2);
+    assert.equal(message.attachments[0].cid, 'webdesign-serve-ready-design@softora');
+    assert.equal(message.attachments[1].cid, 'webdesign-mockup-serve-ready-design@softora');
+  });
   assert.equal(getSavedState(), null);
   assert.deepEqual(getSavedStates(), []);
 });
@@ -3355,12 +3387,15 @@ test('coldmail campaign test mode can look up a ready design row with the common
   });
 
   assert.equal(result.testMode, true);
-  assert.equal(result.sent, 1);
+  assert.equal(result.sent, 2);
   assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
-  assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-serve-ready-design-typo@softora"/);
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-serve-ready-design-typo@softora"/);
+  assert.deepEqual(result.testRecipientEmails, TEST_MODE_RECIPIENT_EMAILS);
+  assert.equal(sentMessages.length, 2);
+  assertTestModeRecipientEmails(sentMessages);
+  sentMessages.forEach((message) => {
+    assert.match(message.html, /<img src="cid:webdesign-serve-ready-design-typo@softora"/);
+    assert.match(message.html, /<img src="cid:webdesign-mockup-serve-ready-design-typo@softora"/);
+  });
 });
 
 test('coldmail campaign test mode keeps the dedicated test design when identity metadata changed', async () => {
@@ -3400,12 +3435,15 @@ test('coldmail campaign test mode keeps the dedicated test design when identity 
   });
 
   assert.equal(result.testMode, true);
-  assert.equal(result.sent, 1);
+  assert.equal(result.sent, 2);
   assert.equal(result.testRecipientEmail, 'servec321@gmail.com');
-  assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].to, 'servec321@gmail.com');
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
+  assert.deepEqual(result.testRecipientEmails, TEST_MODE_RECIPIENT_EMAILS);
+  assert.equal(sentMessages.length, 2);
+  assertTestModeRecipientEmails(sentMessages);
+  sentMessages.forEach((message) => {
+    assert.match(message.html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
+    assert.match(message.html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
+  });
 });
 
 test('coldmail campaign keeps the dedicated Softora test row out of normal campaigns', async () => {

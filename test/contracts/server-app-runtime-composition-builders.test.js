@@ -423,8 +423,11 @@ test('server app runtime composition builders preserve feature wiring groups and
       specialAction: 'webdesign',
       testMode: true,
     });
-  assert.equal(testRecipients.selected, 1);
-  assert.equal(testRecipients.recipients[0].email, 'servec321@gmail.com');
+  assert.equal(testRecipients.selected, 2);
+  assert.deepEqual(
+    testRecipients.recipients.map((recipient) => recipient.email).sort(),
+    ['serve@softora.nl', 'servec321@gmail.com'].sort()
+  );
   assert.deepEqual(bridgeReads, ['premium_customers', 'premium_database_photos']);
   const outreachUpdate =
     await context.featureRouteOptions.coldmailing.coldmailCampaignService.updateWebdesignOutreachStatus({

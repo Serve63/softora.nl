@@ -1,7 +1,8 @@
 (function (global) {
   'use strict';
 
-  const TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
+  const TEST_RECIPIENT_EMAILS = Object.freeze(['serve@softora.nl', 'servec321@gmail.com']);
+  const TEST_RECIPIENT_LABEL = TEST_RECIPIENT_EMAILS.join(' en ');
   const TEST_CALL_PHONE = '0629917185';
 
   function isLeadGeneratorAlias() {
@@ -16,8 +17,8 @@
       };
     }
     return {
-      shortLabel: 'Testmodus aan: alleen naar ' + TEST_RECIPIENT_EMAIL,
-      toast: 'Testmodus aan: verzending gaat alleen naar ' + TEST_RECIPIENT_EMAIL + '.',
+      shortLabel: 'Testmodus aan: alleen naar ' + TEST_RECIPIENT_LABEL,
+      toast: 'Testmodus aan: verzending gaat alleen naar ' + TEST_RECIPIENT_LABEL + '.',
     };
   }
 
@@ -28,6 +29,10 @@
   function isEnabled() {
     const button = getToggleButton();
     return Boolean(button && button.getAttribute('aria-pressed') === 'true');
+  }
+
+  function getSelectedCount() {
+    return isLeadGeneratorAlias() ? 1 : TEST_RECIPIENT_EMAILS.length;
   }
 
   function setToggleState(enabled) {
@@ -43,7 +48,7 @@
 
   function refreshCampaignPreview() {
     if (typeof global.renderCampaignCompanyCount === 'function') {
-      global.renderCampaignCompanyCount(isEnabled() ? 1 : undefined);
+      global.renderCampaignCompanyCount(isEnabled() ? getSelectedCount() : undefined);
     }
     if (typeof global.hydrateCampaignCompanyCountFromSupabase === 'function') {
       void global.hydrateCampaignCompanyCountFromSupabase();
@@ -78,8 +83,11 @@
   }
 
   global.SoftoraCampaignTestMode = {
-    getRecipientEmail: function () { return TEST_RECIPIENT_EMAIL; },
+    getRecipientEmail: function () { return TEST_RECIPIENT_LABEL; },
+    getRecipientEmails: function () { return TEST_RECIPIENT_EMAILS.slice(); },
+    getRecipientLabel: function () { return TEST_RECIPIENT_LABEL; },
     getTestPhone: function () { return TEST_CALL_PHONE; },
+    getSelectedCount,
     install,
     isEnabled,
     setEnabled,

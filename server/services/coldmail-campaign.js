@@ -100,12 +100,16 @@ const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
 const COLDMAIL_TEST_RECIPIENT_EMAIL = 'servec321@gmail.com';
+const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
+  'serve@softora.nl',
+  COLDMAIL_TEST_RECIPIENT_EMAIL,
+]);
 const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
 const COLDMAIL_PREVIEW_IMAGE_CACHE_TTL_MS = 30 * 60 * 1000;
 const COLDMAIL_PHOTO_MAP_CACHE_TTL_MS = 60 * 1000;
 const COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT = 120;
-const TEST_RECIPIENT_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL]);
-const TEST_RECIPIENT_LOOKUP_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL, 'servec321@gail.com']);
+const TEST_RECIPIENT_EMAILS = new Set(COLDMAIL_TEST_RECIPIENT_EMAILS);
+const TEST_RECIPIENT_LOOKUP_EMAILS = new Set([...COLDMAIL_TEST_RECIPIENT_EMAILS, 'servec321@gail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce', 'softora testmodus']);
 const MARTIJN_LINKEDIN_CTA_TEXT = '💼 Mijn LinkedIn 👈';
 const MARTIJN_LINKEDIN_URL =
@@ -730,14 +734,15 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
-  function buildColdmailTestRecipientRow(mode = 'mail', databaseRow = null) {
+  function buildColdmailTestRecipientRow(mode = 'mail', databaseRow = null, recipientEmail = COLDMAIL_TEST_RECIPIENT_EMAIL) {
     const row = databaseRow && typeof databaseRow === 'object' ? { ...databaseRow } : {};
+    const email = normalizeEmailAddress(recipientEmail) || COLDMAIL_TEST_RECIPIENT_EMAIL;
     return {
       ...row,
       id: normalizeString(row.id || row.customerId || row.databaseId) || COLDMAIL_TEST_RECIPIENT_ID,
       bedrijf: normalizeString(row.bedrijf || row.company || row.companyName) || 'Softora Testmodus',
       naam: normalizeString(row.naam || row.contact || row.contactName) || 'Servé',
-      email: COLDMAIL_TEST_RECIPIENT_EMAIL,
+      email,
       phone: normalizeString(row.phone || row.telefoon || row.tel) || '+31000000000',
       telefoon: normalizeString(row.telefoon || row.phone || row.tel) || '+31000000000',
       website: normalizeString(row.website || row.websiteUrl || row.dom || row.domain) || 'softora.nl',
@@ -756,16 +761,30 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function buildResolvedColdmailTestRecipients(input = {}, mode = 'mail', count = 1, customerRows = [], customerPhotoMap = {}) {
-    const row = buildColdmailTestRecipientRow(mode, findColdmailTestRecipientRow(customerRows));
-    const item = { row, index: 0, id: getRowId(row, 0) };
+    const databaseRow = findColdmailTestRecipientRow(customerRows);
+    const testRecipientEmails = mode === 'call'
+      ? [COLDMAIL_TEST_RECIPIENT_EMAIL]
+      : COLDMAIL_TEST_RECIPIENT_EMAILS;
+    const testItems = testRecipientEmails.map((recipientEmail, index) => {
+      const row = buildColdmailTestRecipientRow(mode, databaseRow, recipientEmail);
+      const rowId = getRowId(row, index);
+      return {
+        row,
+        index,
+        id: index === 0 ? rowId : `${rowId}-${index + 1}`,
+      };
+    });
     const failed = [];
     const selectedRows = [];
     const shouldRequireWebdesign = shouldUseWebdesignAssets(input, mode);
     if (shouldRequireWebdesign) {
-      const readyWebdesignMatcher = createReadyWebdesignMatcher([row], customerPhotoMap);
-      if (readyWebdesignMatcher.hasRow(row, 0)) {
-        selectedRows.push(item);
-      } else {
+      const readyWebdesignMatcher = createReadyWebdesignMatcher(testItems.map((item) => item.row), customerPhotoMap);
+      testItems.forEach((item) => {
+        const row = item.row;
+        if (readyWebdesignMatcher.hasRow(row, item.index)) {
+          selectedRows.push(item);
+          return;
+        }
         failed.push({
           id: item.id,
           bedrijf: getRowCompany(row),
@@ -773,9 +792,9 @@ function createColdmailCampaignService(deps = {}) {
           phone: getRowPhone(row),
           error: `Nog geen website-design klaar voor ${getRowCompany(row) || 'Softora Testmodus'}.`,
         });
-      }
+      });
     } else {
-      selectedRows.push(item);
+      selectedRows.push(...testItems);
     }
     return {
       count,
@@ -783,9 +802,9 @@ function createColdmailCampaignService(deps = {}) {
       radiusKm: parseRadiusKm(input.radiusKm),
       values: {},
       customerValues: {},
-      customerRows: [row],
-      rows: [row],
-      candidateRows: [item],
+      customerRows: testItems.map((item) => item.row),
+      rows: testItems.map((item) => item.row),
+      candidateRows: testItems,
       selectedRows,
       failed,
       customerPhotoMap: customerPhotoMap && typeof customerPhotoMap === 'object' ? customerPhotoMap : {},
@@ -5843,6 +5862,7 @@ function createColdmailCampaignService(deps = {}) {
       senderEmail,
       testMode,
       testRecipientEmail: testMode ? COLDMAIL_TEST_RECIPIENT_EMAIL : undefined,
+      testRecipientEmails: testMode ? COLDMAIL_TEST_RECIPIENT_EMAILS : undefined,
       specialAction: normalizeString(input.specialAction || ''),
       sentItems: sent,
       failedItems: failed,

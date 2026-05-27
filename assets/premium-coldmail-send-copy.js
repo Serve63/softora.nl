@@ -12,7 +12,12 @@
   }
 
   function buildColdmailSendSuccessMessage(sendResult) {
-    if (sendResult && sendResult.testMode) return 'Testmail verstuurd naar servec321@gmail.com.';
+    if (sendResult && sendResult.testMode) {
+      const recipients = Array.isArray(sendResult.testRecipientEmails)
+        ? sendResult.testRecipientEmails.filter(Boolean)
+        : [];
+      return 'Testmail verstuurd naar ' + (recipients.length ? recipients.join(' en ') : 'servec321@gmail.com') + '.';
+    }
     const sent = Number(sendResult && sendResult.sent) || 0;
     const failed = Number(sendResult && sendResult.failed) || 0;
     if (!failed) return '✓ ' + formatColdmailSentCount(sent);

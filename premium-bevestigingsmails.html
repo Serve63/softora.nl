@@ -1229,7 +1229,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
     <div class="campagne-card">
       <div class="campagne-head">
         <div class="campagne-title">Nieuwe Campagne</div>
-        <div class="campaign-recipient-menu-wrap" id="campaignRecipientMenuWrap"><button class="campaign-company-count campaign-test-mode-toggle" id="campaignTestModeToggle" type="button" aria-label="Testmodus uit: normale campagne" aria-pressed="false" title="Testmodus: stuur alleen naar servec321@gmail.com"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M9 3h6"></path><path d="M10 3v5.5l-4.4 7.7A3 3 0 0 0 8.2 21h7.6a3 3 0 0 0 2.6-4.8L14 8.5V3"></path><path d="M8 16h8"></path></svg></button>
+        <div class="campaign-recipient-menu-wrap" id="campaignRecipientMenuWrap"><button class="campaign-company-count campaign-test-mode-toggle" id="campaignTestModeToggle" type="button" aria-label="Testmodus uit: normale campagne" aria-pressed="false" title="Testmodus: stuur alleen naar serve@softora.nl en servec321@gmail.com"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M9 3h6"></path><path d="M10 3v5.5l-4.4 7.7A3 3 0 0 0 8.2 21h7.6a3 3 0 0 0 2.6-4.8L14 8.5V3"></path><path d="M8 16h8"></path></svg></button>
           <button class="campaign-company-count" id="campaignCompanyCount" type="button" aria-label="Toon geselecteerde ontvangers" aria-expanded="false" onclick="toggleCampaignRecipientsList(event)">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true">
               <path d="M3.75 21h16.5"></path>
@@ -1427,7 +1427,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
-<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260511a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260527a"></script><script src="assets/premium-coldmail-send-copy.js?v=20260519b"></script><script src="assets/premium-coldmail-sender-scoreboard.js?v=20260526a"></script><script src="assets/premium-coldmail-send-freeze.js?v=20260520a"></script><script src="assets/premium-coldmail-autopilot.js?v=20260527a"></script>
+<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260527a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260527a"></script><script src="assets/premium-coldmail-send-copy.js?v=20260527a"></script><script src="assets/premium-coldmail-sender-scoreboard.js?v=20260526a"></script><script src="assets/premium-coldmail-send-freeze.js?v=20260520a"></script><script src="assets/premium-coldmail-autopilot.js?v=20260527a"></script>
 <script src="assets/premium-campaign-selects.js?v=20260511a"></script>
 <script>
 // ── DATA ──
@@ -1632,11 +1632,11 @@ function renderCampaignCompanyCount(countOverride) {
   if (!valueEl || !wrap) return;
   const requestedCount = getCampaignRequestedCompanyCount();
   const testMode = window.SoftoraCampaignTestMode && typeof window.SoftoraCampaignTestMode.isEnabled === 'function' && window.SoftoraCampaignTestMode.isEnabled();
-  const count = testMode ? 1 : Number.isFinite(Number(countOverride))
+  const testRecipientCount = window.SoftoraCampaignTestMode && typeof window.SoftoraCampaignTestMode.getSelectedCount === 'function' ? window.SoftoraCampaignTestMode.getSelectedCount() : 1, testRecipientLabel = window.SoftoraCampaignTestMode && typeof window.SoftoraCampaignTestMode.getRecipientLabel === 'function' ? window.SoftoraCampaignTestMode.getRecipientLabel() : window.SoftoraCampaignTestMode.getRecipientEmail(), count = testMode ? testRecipientCount : Number.isFinite(Number(countOverride))
     ? Math.max(0, Number(countOverride))
     : Math.max(0, requestedCount);
   valueEl.textContent = String(count);
-  wrap.title = testMode ? 'Testmodus: 1 testontvanger (' + window.SoftoraCampaignTestMode.getRecipientEmail() + ').' : count + ' ' + (count === 1 ? 'bedrijf wordt' : 'bedrijven worden') + (isPremiumAiLeadGeneratorPath() ? ' gebeld.' : ' gemaild.');
+  wrap.title = testMode ? 'Testmodus: ' + count + ' ' + (count === 1 ? 'testontvanger' : 'testontvangers') + ' (' + testRecipientLabel + ').' : count + ' ' + (count === 1 ? 'bedrijf wordt' : 'bedrijven worden') + (isPremiumAiLeadGeneratorPath() ? ' gebeld.' : ' gemaild.');
   wrap.setAttribute('aria-label', wrap.title);
 }
 

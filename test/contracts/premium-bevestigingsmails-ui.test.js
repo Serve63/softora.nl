@@ -402,7 +402,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /<div class="campagne-head">[\s\S]*<div class="campagne-title">Nieuwe Campagne<\/div>[\s\S]*id="campaignCompanyCount"/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/softora-dossier-loader\.css\?v=20260424a">/);
   assert.match(pageSource, /<script src="assets\/premium-campaign-radius\.js\?v=20260501a"><\/script>/);
-  assert.match(pageSource, /assets\/premium-campaign-test-mode\.js\?v=20260511a/);
+  assert.match(pageSource, /assets\/premium-campaign-test-mode\.js\?v=20260527a/);
   assert.match(pageSource, /<main class="main-content is-premium-boot-host">/);
   assert.match(pageSource, /<div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">/);
   assert.match(pageSource, /<div class="premium-boot-shell is-booting" aria-busy="true">/);
@@ -481,8 +481,8 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /const specialActionSelect = document\.getElementById\('campaignSpecialAction'\), serviceKey = normalizeLowerText\(serviceSelect && serviceSelect\.value\)[\s\S]*specialAction = \(specialActionSelect && specialActionSelect\.value\) \|\| \(!isPremiumAiLeadGeneratorPath\(\) && \(serviceKey === 'websites' \|\| serviceKey === 'website'\) \? 'webdesign' : ''\);/);
   assert.match(pageSource, /specialAction,\s*durationDays: getSelectedCampaignDurationDays\(\),/);
   assert.match(pageSource, /radiusKm: getSelectedCampaignRadiusKm\(\), testMode: Boolean\(window\.SoftoraCampaignTestMode && window\.SoftoraCampaignTestMode\.isEnabled\(\)\),/);
-  assert.match(sendCopySource, /if \(sendResult && sendResult\.testMode\) return 'Testmail verstuurd naar servec321@gmail\.com\.';/);
-  assert.match(testModeSource, /const TEST_RECIPIENT_EMAIL = 'servec321@gmail\.com';/);
+  assert.match(sendCopySource, /Testmail verstuurd naar ' \+ \(recipients\.length \? recipients\.join\(' en '\) : 'servec321@gmail\.com'\) \+ '\.'/);
+  assert.match(testModeSource, /const TEST_RECIPIENT_EMAILS = Object\.freeze\(\['serve@softora\.nl', 'servec321@gmail\.com'\]\);/);
   assert.match(testModeSource, /button\.addEventListener\('click'/);
   assert.match(testModeSource, /hydrateCampaignCompanyCountFromSupabase/);
   assert.doesNotMatch(pageSource, /renderCampaignCompanyCount\(\);\s*void hydrateCampaignCompanyCountFromSupabase\(\);/);
@@ -826,7 +826,7 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
   assert.match(pageSource, /function buildSendErrorMessage\(defaultMessage\)/);
   assert.match(pageSource, /payload && Array\.isArray\(payload\.failedItems\) && payload\.failedItems\[0\]/);
   assert.match(pageSource, /if \(!payload\.sent && payload\.failed\) \{/);
-  assert.match(pageSource, /assets\/premium-coldmail-send-copy\.js\?v=20260519b/);
+  assert.match(pageSource, /assets\/premium-coldmail-send-copy\.js\?v=20260527a/);
   assert.doesNotMatch(pageSource, /function buildColdmailSendSuccessMessage\(sendResult\)/);
   assert.match(pageSource, /showToast\(buildColdmailSendSuccessMessage\(sendResult\)\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
   assert.match(pageSource, /showScreen\('screen-campaign'\);/);
@@ -912,8 +912,8 @@ test('premium campaign test mode keeps mail copy and switches to call copy on th
   assert.match(testModeSource, /const TEST_CALL_PHONE = '0629917185';/);
   assert.match(testModeSource, /shortLabel: 'Testmodus aan: testoproep naar ' \+ TEST_CALL_PHONE/);
   assert.match(testModeSource, /toast: 'Testmodus aan: testoproep gaat naar ' \+ TEST_CALL_PHONE \+ '\.'/);
-  assert.match(testModeSource, /shortLabel: 'Testmodus aan: alleen naar ' \+ TEST_RECIPIENT_EMAIL/);
-  assert.match(testModeSource, /toast: 'Testmodus aan: verzending gaat alleen naar ' \+ TEST_RECIPIENT_EMAIL \+ '\.'/);
+  assert.match(testModeSource, /shortLabel: 'Testmodus aan: alleen naar ' \+ TEST_RECIPIENT_LABEL/);
+  assert.match(testModeSource, /toast: 'Testmodus aan: verzending gaat alleen naar ' \+ TEST_RECIPIENT_LABEL \+ '\.'/);
   assert.doesNotMatch(testModeSource, /verzending gaat alleen naar '\s*\+\s*TEST_CALL_PHONE/);
   assert.doesNotMatch(testModeSource, /testoproep naar '\s*\+\s*TEST_RECIPIENT_EMAIL/);
 });
