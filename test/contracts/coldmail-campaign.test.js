@@ -340,6 +340,7 @@ test('coldmail campaign uses IPv4 SMTP transports with bounded timeouts', async 
   assert.equal(transportConfigs.length, 1);
   assert.equal(transportConfigs[0].family, 4);
   assert.equal(typeof transportConfigs[0].lookup, 'function');
+  assert.equal(typeof transportConfigs[0].getSocket, 'function');
   assert.equal(transportConfigs[0].connectionTimeout, 45_000);
   assert.equal(transportConfigs[0].greetingTimeout, 30_000);
   assert.equal(transportConfigs[0].socketTimeout, 90_000);
