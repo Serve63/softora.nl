@@ -27,26 +27,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/bedrijfssoftware-op-maat',
       '/crm-systeem-op-maat',
       '/maatwerk-platform',
-      '/website-flitscheck',
       '/pakketten',
       '/over-softora',
-    ],
-  },
-  {
-    fileName: 'website-flitscheck.html',
-    path: '/website-flitscheck',
-    title: 'Website Flitscheck voor 5 euro',
-    description:
-      'Bestel de Softora Website Flitscheck voor 5 euro en ontvang 3 concrete verbeterpunten voor vertrouwen, uitstraling en meer aanvragen.',
-    kind: 'service',
-    serviceName: 'Website Flitscheck',
-    relatedLinks: [
-      '/website-laten-maken',
-      '/diensten',
-      '/pakketten',
-      '/crm-systeem-op-maat',
-      '/ai-automatisering',
-      '/blog/website-laten-maken-kosten-2026',
     ],
   },
   {
@@ -607,7 +589,6 @@ const PUBLIC_SEO_INTERNAL_LINK_STYLE = [
 const PUBLIC_SEO_LINK_LABELS = Object.freeze({
   '/': 'Home',
   '/diensten': 'Alle diensten',
-  '/website-flitscheck': 'Website Flitscheck',
   '/website-laten-maken': 'Website laten maken',
   '/website-laten-maken-oisterwijk': 'Website laten maken Oisterwijk',
   '/bedrijfssoftware-op-maat': 'Bedrijfssoftware op maat',
