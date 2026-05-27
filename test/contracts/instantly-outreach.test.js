@@ -204,6 +204,9 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(body.leads[0].custom_variables.softora_customer_id, 'prospect-1');
   assert.equal(body.leads[0].custom_variables.softora_subject, 'Nieuw webdesign gemaakt!');
   assert.match(body.leads[0].custom_variables.softora_mail_body, /Goedemorgen Ruben Bakker/);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Servé Creusen/);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /📍 uw regio/);
+  assert.equal(body.leads[0].custom_variables.softora_city_with_pin, '📍 uw regio');
   assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
@@ -223,6 +226,47 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(rows[0].lastMailSentAt, undefined);
   assert.equal(rows[2].databaseStatus, 'gemaild');
   assert.equal(rows[2].outreachStatus, 'benaderd');
+});
+
+test('instantly sync normalizes Serve accent and pins the city line', async () => {
+  const { service, fetchCalls } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        plaats: 'Alphen',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    coldmailingSettings: {
+      senderEmail: 'serve@softora.nl',
+      senders: {
+        'serve@softora.nl': {
+          subject: 'Kleine vraag over jullie website',
+          body:
+            'Goedendag,\n\nIk ben benieuwd wat je ervan vindt.\n\nMet vriendelijke groet,\nServe Creusen\n\n{{stad}}',
+        },
+      },
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  const variables = body.leads[0].custom_variables;
+  assert.match(variables.softora_mail_body, /Servé Creusen/);
+  assert.doesNotMatch(variables.softora_mail_body, /Serve Creusen/);
+  assert.match(variables.softora_mail_body, /📍 Alphen/);
+  assert.doesNotMatch(variables.softora_mail_body, /\nAlphen$/);
+  assert.equal(variables.softora_city, 'Alphen');
+  assert.equal(variables.softora_city_with_pin, '📍 Alphen');
+  assert.match(variables.softora_instantly_email_html, /📍 Alphen/);
 });
 
 test('instantly sync is blocked unless the explicit sync flag is enabled', async () => {

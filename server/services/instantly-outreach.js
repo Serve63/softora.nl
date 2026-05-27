@@ -665,6 +665,35 @@ function buildMailText(body, row, normalizeString = defaultNormalizeString) {
     .trim();
 }
 
+function normalizeSenderNameInMailText(text, normalizeString = defaultNormalizeString) {
+  return normalizeString(text).replace(/\bServe Creusen\b/g, 'Servé Creusen');
+}
+
+function formatPinnedCity(city, normalizeString = defaultNormalizeString) {
+  const cleanCity = normalizeString(city);
+  return cleanCity ? `📍 ${cleanCity}` : '';
+}
+
+function ensurePinnedCityInMailText(text, city, normalizeString = defaultNormalizeString) {
+  const cleanText = normalizeString(text);
+  const cleanCity = normalizeString(city);
+  if (!cleanText || !cleanCity || /📍/.test(cleanText)) return cleanText;
+  const cityPattern = cleanCity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const trailingCityLine = new RegExp(`(^|\\n)\\s*${cityPattern}\\s*$`, 'i');
+  if (trailingCityLine.test(cleanText)) {
+    return cleanText.replace(trailingCityLine, `$1${formatPinnedCity(cleanCity, normalizeString)}`);
+  }
+  return `${cleanText}\n\n${formatPinnedCity(cleanCity, normalizeString)}`;
+}
+
+function normalizeInstantlyMailText(text, city, normalizeString = defaultNormalizeString) {
+  return ensurePinnedCityInMailText(
+    normalizeSenderNameInMailText(text, normalizeString),
+    city,
+    normalizeString
+  );
+}
+
 function shouldAppendColdmailOptOutText(text, normalizeString = defaultNormalizeString) {
   return !/(?:geen webdesign willen ontvangen\?\s*laat het me weten!?|had je liever geen webdesign willen ontvangen\?\s*laat het me hier weten!?|past dit niet\?\s*laat het me hier weten|liever geen e-mails meer ontvangen|geen e-mails meer ontvangen.*https?:\/\/|afmelden:\s*https?:\/\/|\/afmelden\?t=|\/coldmailing\/afmelden\?t=|unsubscribe:\s*https?:\/\/)/i.test(
     normalizeString(text)
@@ -1426,7 +1455,11 @@ function createInstantlyOutreachService(deps = {}) {
       normalizeString(context.mailProfile && context.mailProfile.body) || DEFAULT_WEBDESIGN_BODY;
     const city = getRowCity(row, normalizeString) || 'uw regio';
     const subject = personalizeTemplate(subjectTemplate, row, normalizeString);
-    const baseMailBody = buildMailText(bodyTemplate, row, normalizeString);
+    const baseMailBody = normalizeInstantlyMailText(
+      buildMailText(bodyTemplate, row, normalizeString),
+      city,
+      normalizeString
+    );
     const assets = getReadyWebdesignAssets(item, context);
     const webdesignImageUrl = assets.ready
       ? buildColdmailPreviewImageUrl(row, item.id, reference, config, 'webdesign', normalizeString, now)
@@ -1460,6 +1493,7 @@ function createInstantlyOutreachService(deps = {}) {
       softora_status: normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect',
       softora_contact_name: contact,
       softora_city: city,
+      softora_city_with_pin: formatPinnedCity(city, normalizeString),
       softora_subject: subject,
       softora_mail_body: baseMailBody,
       softora_mail_body_with_optout: appendColdmailOptOutText(baseMailBody, unsubscribeUrl, normalizeString),
