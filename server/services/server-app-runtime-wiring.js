@@ -42,6 +42,14 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     setUiStateValues: featureRouteOptions.setUiStateValues,
     dataOpsStore: featureRouteOptions.dataOpsStore,
   });
+  const coldmailCampaignService =
+    featureRouteOptions.coldmailing && featureRouteOptions.coldmailing.coldmailCampaignService;
+  if (
+    coldmailCampaignService &&
+    typeof coldmailCampaignService.setWebdesignPreparationCoordinator === 'function'
+  ) {
+    coldmailCampaignService.setWebdesignPreparationCoordinator(premiumDatabaseWebdesignJobsCoordinator);
+  }
   const mailboxCoordinator = createMailboxService(featureRouteOptions.mailbox || {});
   const publicContactCoordinator = createPublicContactService(
     featureRouteOptions.publicContact || {}

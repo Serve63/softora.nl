@@ -377,6 +377,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['check:live-production-version:wait'], 'node scripts/wait-live-production-version.js');
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
+  assert.match(packageJson.dependencies.sharp, /^\^0\.34\./);
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);
   assert.match(hygieneSource, /\.vercel\/output/);

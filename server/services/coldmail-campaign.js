@@ -57,6 +57,7 @@ const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'SENDER_SMTP_NOT_CONFIGURED',
   'SMTP_NOT_CONFIGURED',
   'SMTP_TRANSPORT_UNAVAILABLE',
+  'WEBDESIGN_PREPARATION_QUEUED',
 ]);
 const COLDMAIL_SMTP_SAFETY_STOP_PATTERN =
   /\b(transmit rate limit|rate limited|too many recipients|too many messages|too many concurrent|no spam please|b-url|b-text|b-score|b-ex|suspected phishing|spam detected|spamverdacht|spam complaint|mailbox is blocked|mailbox is disabled|mailbox restricted|account restricted|account suspended|not allowed to send|sender not authorized|no authorization to send|mailversand gesperrt|versand gesperrt|versandlimit|sperrung|verzendlimiet|verzendblokkade|geblokkeerd|blokkade|dmarc|spf failed|spf|insufficient privacy|tls required)\b/i;
@@ -272,6 +273,7 @@ function createColdmailCampaignService(deps = {}) {
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     now = () => new Date(),
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    webdesignPreparationCoordinator: initialWebdesignPreparationCoordinator = null,
   } = deps;
 
   const {
@@ -309,6 +311,7 @@ function createColdmailCampaignService(deps = {}) {
   let smtpTransporter = null;
   const senderSmtpTransporters = new Map();
   let coldmailCampaignSendPromise = null;
+  let webdesignPreparationCoordinator = initialWebdesignPreparationCoordinator;
   const mailboxAccountService = createMailboxService({
     mailConfig: {
       smtpHost,
@@ -993,6 +996,37 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
+  function normalizeWebdesignPreparationUrl(value) {
+    const raw = normalizeString(value);
+    if (!raw) return '';
+    const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+      if (!parsed.hostname || parsed.hostname.indexOf('.') === -1) return '';
+      return parsed.toString();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function getRowWebdesignPreparationUrl(row) {
+    return normalizeWebdesignPreparationUrl(
+      row &&
+        (
+          row.website ||
+          row.websiteUrl ||
+          row.website_url ||
+          row.url ||
+          row.dom ||
+          row.domain ||
+          row.site ||
+          row.domein ||
+          ''
+        )
+    );
+  }
+
   function getRowEmail(row) {
     return normalizeEmailAddress(row.email || row.contactEmail || row.mail || '');
   }
@@ -1076,6 +1110,89 @@ function createColdmailCampaignService(deps = {}) {
 
   function isColdmailRecipientGuardFailure(item) {
     return normalizeString(item && item.code) === 'COLDMAIL_RECIPIENT_RECENTLY_SENT';
+  }
+
+  async function getPreWebdesignColdmailBlock(item, recipientGuardEntries = []) {
+    const recipientGuardMatch = getColdmailRecipientGuardMatch(item, recipientGuardEntries);
+    if (recipientGuardMatch) return buildColdmailRecipientGuardFailure(item, recipientGuardMatch);
+    const email = getRowEmail(item && item.row);
+    if (!isTestRecipientRow(item && item.row, email) && shouldBlockPersonalMailboxDomains() && isPersonalMailboxDomain(email)) {
+      return {
+        id: item && item.id,
+        bedrijf: getRowCompany(item && item.row),
+        email,
+        error: `Persoonlijke mailbox overgeslagen voor coldmail: ${getEmailDomain(email)}.`,
+      };
+    }
+    if (!(await isDeliverableEmailDomain(email))) {
+      const domain = getEmailDomain(email);
+      return {
+        id: item && item.id,
+        bedrijf: getRowCompany(item && item.row),
+        email,
+        domain,
+        code: 'invalid_email_domain',
+        error: `E-maildomein bestaat niet of ontvangt geen mail: ${domain || email}`,
+      };
+    }
+    return null;
+  }
+
+  function buildWebdesignPreparationCustomer(item) {
+    const row = item && item.row ? item.row : {};
+    const websiteUrl = getRowWebdesignPreparationUrl(row);
+    return {
+      id: item && item.id,
+      bedrijf: getRowCompany(row),
+      naam: getRowContact(row),
+      tel: getRowPhone(row),
+      dom: getRowDomain(row) || websiteUrl,
+      website: websiteUrl,
+    };
+  }
+
+  function buildWebdesignPreparationJobId(item) {
+    const row = item && item.row ? item.row : {};
+    const seed = [
+      item && item.id,
+      getRowEmail(row),
+      getRowCompany(row),
+      getRowDomain(row),
+    ].map(normalizeString).join('|');
+    const hash = crypto.createHash('sha256').update(seed || `${Date.now()}`).digest('hex').slice(0, 24);
+    return `coldmail_webdesign_${hash}_${Date.now().toString(36)}`;
+  }
+
+  async function queueWebdesignPreparationForRecipient(item) {
+    if (
+      !item ||
+      !webdesignPreparationCoordinator ||
+      typeof webdesignPreparationCoordinator.startJob !== 'function'
+    ) {
+      return null;
+    }
+    const row = item.row || {};
+    const websiteUrl = getRowWebdesignPreparationUrl(row);
+    if (!websiteUrl) return null;
+    const customer = buildWebdesignPreparationCustomer(item);
+    if (!customer.id || !customer.bedrijf) return null;
+    const result = await webdesignPreparationCoordinator.startJob({
+      ownerKey: 'coldmail-autopilot::system',
+      jobId: buildWebdesignPreparationJobId(item),
+      customer,
+      websiteUrl,
+      source: 'coldmail-autopilot',
+    });
+    if (!result || result.ok === false) return null;
+    return {
+      queued: true,
+      existing: Boolean(result.existing),
+      customerId: customer.id,
+      bedrijf: customer.bedrijf,
+      email: getRowEmail(row),
+      websiteUrl,
+      job: result.job || null,
+    };
   }
 
   function getRowPhone(row) {
@@ -2937,6 +3054,24 @@ function createColdmailCampaignService(deps = {}) {
               : undefined,
         }))
         : undefined,
+      webdesignPreparation:
+        result.webdesignPreparation && typeof result.webdesignPreparation === 'object'
+          ? {
+              queued: Boolean(result.webdesignPreparation.queued),
+              existing: Boolean(result.webdesignPreparation.existing),
+              customerId: truncateText(normalizeString(result.webdesignPreparation.customerId), 120),
+              bedrijf: truncateText(normalizeString(result.webdesignPreparation.bedrijf), 160),
+              email: normalizeEmailAddress(result.webdesignPreparation.email),
+              websiteUrl: truncateText(normalizeString(result.webdesignPreparation.websiteUrl), 300),
+              job: result.webdesignPreparation.job && typeof result.webdesignPreparation.job === 'object'
+                ? {
+                    id: truncateText(normalizeString(result.webdesignPreparation.job.id), 120),
+                    status: truncateText(normalizeString(result.webdesignPreparation.job.status), 80),
+                    customerId: truncateText(normalizeString(result.webdesignPreparation.job.customerId), 120),
+                  }
+                : undefined,
+            }
+          : undefined,
       agendaBlocked: Boolean(result.agendaBlocked),
     };
   }
@@ -3178,7 +3313,9 @@ function createColdmailCampaignService(deps = {}) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_AUTOPILOT_FAILED';
       const knownSkip = COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES.has(code);
       const shouldKeepPreviousStartTime =
-        code === 'NO_VALID_RECIPIENT_DOMAINS' || code === 'NO_WEBDESIGN_PHOTOS';
+        code === 'NO_VALID_RECIPIENT_DOMAINS' ||
+        code === 'NO_WEBDESIGN_PHOTOS' ||
+        code === 'WEBDESIGN_PREPARATION_QUEUED';
       return finishColdmailAutopilotRun(
         shouldKeepPreviousStartTime
           ? {
@@ -3196,6 +3333,10 @@ function createColdmailCampaignService(deps = {}) {
           ),
           at: now().toISOString(),
           failedItems: Array.isArray(error && error.failedItems) ? error.failedItems : undefined,
+          webdesignPreparation:
+            error && error.webdesignPreparation && typeof error.webdesignPreparation === 'object'
+              ? error.webdesignPreparation
+              : undefined,
           invalidRecipientDomainsBlocked: Math.max(
             0,
             Number(error && error.invalidRecipientDomainsBlocked) || 0
@@ -3431,9 +3572,18 @@ function createColdmailCampaignService(deps = {}) {
       );
     const candidateRows = [];
     const selectedRows = [];
+    let webdesignPreparationCandidate = null;
 
     for (const item of eligibleRows) {
       if (readyWebdesignMatcher && !readyWebdesignMatcher.hasRow(item.row, item.index)) {
+        if (mode === 'mail' && !webdesignPreparationCandidate) {
+          const preWebdesignBlock = await getPreWebdesignColdmailBlock(item, recipientGuardEntries);
+          if (preWebdesignBlock) {
+            failed.push(preWebdesignBlock);
+            continue;
+          }
+          webdesignPreparationCandidate = item;
+        }
         failed.push({
           id: item.id,
           bedrijf: getRowCompany(item.row),
@@ -3492,6 +3642,7 @@ function createColdmailCampaignService(deps = {}) {
       selectedRows,
       failed,
       customerPhotoMap,
+      webdesignPreparationCandidate,
     };
   }
 
@@ -5259,6 +5410,20 @@ function createColdmailCampaignService(deps = {}) {
     const shouldIncludeWebdesignPhoto = shouldUseWebdesignAssets(input, 'mail');
 
     if (!candidateRows.length) {
+      const preparation = shouldIncludeWebdesignPhoto
+        ? await queueWebdesignPreparationForRecipient(resolvedRecipients.webdesignPreparationCandidate)
+        : null;
+      if (preparation && preparation.queued) {
+        const error = new Error(
+          preparation.existing
+            ? `Geen mailklare webdesigns meer. Er loopt al een voorbereiding voor ${preparation.bedrijf}.`
+            : `Geen mailklare webdesigns meer. Voorbereiding gestart voor ${preparation.bedrijf}.`
+        );
+        error.code = 'WEBDESIGN_PREPARATION_QUEUED';
+        error.failedItems = resolvedRecipients.failed;
+        error.webdesignPreparation = preparation;
+        throw error;
+      }
       const firstFailure = pickFailureMessage(resolvedRecipients.failed);
       const error = new Error(firstFailure || 'Geen geschikte e-mailadressen gevonden in de database.');
       error.code = shouldIncludeWebdesignPhoto && firstFailure ? 'NO_WEBDESIGN_PHOTOS' : 'NO_RECIPIENTS';
@@ -5929,6 +6094,10 @@ function createColdmailCampaignService(deps = {}) {
     recordColdmailOpen,
     runColdmailAutopilot,
     sendColdmailCampaign,
+    setWebdesignPreparationCoordinator: (coordinator) => {
+      webdesignPreparationCoordinator = coordinator || null;
+      return webdesignPreparationCoordinator;
+    },
     syncInboundColdmailRepliesFromImap,
     unsubscribeColdmailRecipient,
     updateColdmailAutopilotSettings,

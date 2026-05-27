@@ -1,4 +1,78 @@
 const { randomUUID } = require('crypto');
+const sharp = require('sharp');
+
+const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v6';
+
+function escapeSvgText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function parseImageDataUrl(value) {
+  const match = String(value || '').trim().match(/^data:image\/(png|jpe?g|webp);base64,([a-z0-9+/=\s]+)$/i);
+  if (!match) return null;
+  return {
+    mimeType: `image/${match[1].toLowerCase() === 'jpg' ? 'jpeg' : match[1].toLowerCase()}`,
+    base64: match[2].replace(/\s+/g, ''),
+  };
+}
+
+function replaceImageFileSuffix(value, suffix) {
+  const raw = String(value || '').trim() || 'webdesign-preview.png';
+  const clean = raw.replace(/\.[a-z0-9]+$/i, '');
+  return `${clean}${suffix}.jpg`;
+}
+
+async function createDeviceMockupDataUrl(imageDataUrl, customer = {}) {
+  const parsed = parseImageDataUrl(imageDataUrl);
+  if (!parsed) throw new Error('De webdesignfoto is niet geschikt voor een device-mockup.');
+  const embeddedImage = `data:${parsed.mimeType};base64,${parsed.base64}`;
+  const companyName = escapeSvgText(customer.bedrijf || customer.company || 'Webdesign');
+  const svg = `
+    <svg width="1600" height="1000" viewBox="0 0 1600 1000" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+          <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#0f172a" flood-opacity="0.18"/>
+        </filter>
+        <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#475569" flood-opacity="0.16"/>
+        </filter>
+        <clipPath id="laptopScreen"><rect x="332" y="375" width="880" height="430" rx="16"/></clipPath>
+        <clipPath id="tabletScreen"><rect x="1124" y="325" width="246" height="410" rx="12"/></clipPath>
+        <clipPath id="phoneScreen"><rect x="1306" y="462" width="162" height="340" rx="14"/></clipPath>
+      </defs>
+      <rect width="1600" height="1000" fill="#f8fbff"/>
+      <circle cx="1270" cy="155" r="330" fill="#e8f0ff"/>
+      <circle cx="220" cy="880" r="290" fill="#eef3f8"/>
+      <text x="145" y="150" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="800" fill="#111827">WEBDESIGN PREVIEW</text>
+      <text x="147" y="195" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#7b8494">Laptop - iPad - iPhone</text>
+      <g filter="url(#shadow)">
+        <rect x="290" y="335" width="964" height="520" rx="36" fill="#111827"/>
+        <rect x="332" y="375" width="880" height="430" rx="16" fill="#ffffff"/>
+        <image href="${embeddedImage}" x="332" y="375" width="880" height="430" preserveAspectRatio="xMidYMin slice" clip-path="url(#laptopScreen)"/>
+        <rect x="260" y="855" width="1030" height="54" rx="22" fill="#e4ebf4"/>
+        <rect x="620" y="864" width="270" height="18" rx="9" fill="#c6d1df"/>
+      </g>
+      <g filter="url(#softShadow)">
+        <rect x="1095" y="285" width="306" height="498" rx="34" fill="#111827"/>
+        <rect x="1124" y="325" width="246" height="410" rx="12" fill="#ffffff"/>
+        <image href="${embeddedImage}" x="1124" y="325" width="246" height="410" preserveAspectRatio="xMidYMin slice" clip-path="url(#tabletScreen)"/>
+        <rect x="1198" y="300" width="96" height="10" rx="5" fill="#64748b"/>
+      </g>
+      <g filter="url(#softShadow)">
+        <rect x="1278" y="424" width="218" height="432" rx="36" fill="#111827"/>
+        <rect x="1306" y="462" width="162" height="340" rx="14" fill="#ffffff"/>
+        <image href="${embeddedImage}" x="1306" y="462" width="162" height="340" preserveAspectRatio="xMidYMin slice" clip-path="url(#phoneScreen)"/>
+        <rect x="1346" y="442" width="82" height="9" rx="5" fill="#64748b"/>
+      </g>
+      <text x="145" y="942" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#cbd5e1">${companyName}</text>
+    </svg>`;
+  const buffer = await sharp(Buffer.from(svg)).jpeg({ quality: 88 }).toBuffer();
+  return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+}
 
 function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const {
@@ -204,17 +278,35 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
 
     const customer = job.customer;
+    const mockupDataUrl = await createDeviceMockupDataUrl(dataUrl, customer);
+    const checkedAt = new Date().toISOString();
+    const websitePhotoName =
+      truncateText(normalizeString(image.fileName || `${customer.dom || customer.bedrijf || 'webdesign'}-webdesign.png`), 180) ||
+      'Websitefoto';
+    const websiteMockupName = truncateText(replaceImageFileSuffix(websitePhotoName, '-device-mockup-v6'), 180);
+    const identityKey = buildCustomerIdentityKey(customer);
     if (dataOpsStore && typeof dataOpsStore.uploadDesignPhoto === 'function') {
       const structured = await dataOpsStore.uploadDesignPhoto(
         {
           customerId: customer.id,
           dataUrl,
-          identityKey: buildCustomerIdentityKey(customer),
-          fileName: truncateText(normalizeString(image.fileName || `${customer.dom || customer.bedrijf || 'webdesign'}-webdesign.png`), 180),
+          websiteMockup: mockupDataUrl,
+          websiteMockupName,
+          mockupRenderer: DEVICE_MOCKUP_RENDERER,
+          mockupOrientation: 'upright',
+          mockupQualityStatus: 'checked',
+          mockupQualityCheckedAt: checkedAt,
+          identityKey,
+          fileName: websitePhotoName,
           legacyMeta: {
             id: customer.id,
-            identityKey: buildCustomerIdentityKey(customer),
-            websitePhotoName: truncateText(normalizeString(image.fileName || `${customer.dom || customer.bedrijf || 'webdesign'}-webdesign.png`), 180) || 'Websitefoto',
+            identityKey,
+            websitePhotoName,
+            websiteMockupName,
+            mockupRenderer: DEVICE_MOCKUP_RENDERER,
+            mockupOrientation: 'upright',
+            mockupQualityStatus: 'checked',
+            mockupQualityCheckedAt: checkedAt,
             updatedAt: new Date().toISOString().slice(0, 10),
           },
         },
@@ -233,8 +325,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       .filter(Boolean)
       .filter((id) => id !== customer.id);
     const photoDataKey = buildDataKey(customer.id);
+    const mockupPhotoDataKey = buildDataKey(`${customer.id}_mockup`);
     const chunks = dataUrl.match(new RegExp(`[\\s\\S]{1,${CHUNK_SIZE}}`, 'g')) || [];
-    if (chunks.length > MAX_STORAGE_CHUNKS) {
+    const mockupChunks = mockupDataUrl.match(new RegExp(`[\\s\\S]{1,${CHUNK_SIZE}}`, 'g')) || [];
+    if (chunks.length > MAX_STORAGE_CHUNKS || mockupChunks.length > MAX_STORAGE_CHUNKS) {
       throw new Error('De AI-foto was te groot om betrouwbaar op te slaan. Probeer het opnieuw.');
     }
     const patch = {};
@@ -242,23 +336,35 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     chunks.forEach((chunk, index) => {
       patch[`${photoDataKey}_${index}`] = chunk;
     });
+    mockupChunks.forEach((chunk, index) => {
+      patch[`${mockupPhotoDataKey}_${index}`] = chunk;
+    });
 
     const existingMeta = existingMap[customer.id];
     const oldChunkCount = Math.max(0, Number(existingMeta && existingMeta.chunkCount) || 0);
     for (let index = chunks.length; index < oldChunkCount; index += 1) {
       patch[`${photoDataKey}_${index}`] = '';
     }
+    const oldMockupChunkCount = Math.max(0, Number(existingMeta && existingMeta.mockupChunkCount) || 0);
+    for (let index = mockupChunks.length; index < oldMockupChunkCount; index += 1) {
+      patch[`${mockupPhotoDataKey}_${index}`] = '';
+    }
 
     const mergedMap = {
       ...existingMap,
       [customer.id]: {
         id: customer.id,
-        identityKey: buildCustomerIdentityKey(customer),
+        identityKey,
         photoKey: photoDataKey,
         chunkCount: chunks.length,
-        websitePhotoName:
-          truncateText(normalizeString(image.fileName || `${customer.dom || customer.bedrijf || 'webdesign'}-webdesign.png`), 180) ||
-          'Websitefoto',
+        mockupPhotoKey: mockupPhotoDataKey,
+        mockupChunkCount: mockupChunks.length,
+        websitePhotoName,
+        websiteMockupName,
+        mockupRenderer: DEVICE_MOCKUP_RENDERER,
+        mockupOrientation: 'upright',
+        mockupQualityStatus: 'checked',
+        mockupQualityCheckedAt: checkedAt,
         updatedAt: new Date().toISOString().slice(0, 10),
       },
     };
@@ -385,52 +491,58 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     });
   }
 
-  async function startJobResponse(req, res) {
+  async function startJob(input = {}) {
     pruneJobs();
-    const ownerKey = ownerKeyFromReq(req);
+    const ownerKey = normalizeString(input.ownerKey);
     if (!ownerKey) {
-      return res.status(401).json({
+      return {
         ok: false,
+        statusCode: 401,
         error: 'Niet ingelogd',
         detail: "Log in om webdesignfoto's te maken.",
-      });
+      };
     }
 
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const customer = normalizeCustomer(body.customer || body);
-    const websiteUrl = normalizeWebsiteUrl(body.websiteUrl || customer.website || customer.dom);
+    const customer = normalizeCustomer(input.customer || input);
+    const websiteUrl = normalizeWebsiteUrl(input.websiteUrl || customer.website || customer.dom);
     if (!customer.id || !customer.bedrijf || !websiteUrl) {
-      return res.status(400).json({
+      return {
         ok: false,
+        statusCode: 400,
         error: 'Onvolledige webdesign-opdracht',
         detail: 'Stuur minimaal customer.id, customer.bedrijf en websiteUrl mee.',
-      });
+      };
     }
 
     const existing = await findRunningJobForCustomer(ownerKey, customer.id);
     if (existing) {
-      return res.status(202).json({
+      return {
         ok: true,
+        statusCode: 202,
         job: serializeJob(existing),
-      });
+        existing: true,
+      };
     }
 
-    const requestedJobId = normalizeJobId(body.jobId);
+    const requestedJobId = normalizeJobId(input.jobId);
     const jobId = requestedJobId || randomUUID();
     const existingById = jobs.get(jobId) || await loadPersistentJob(jobId);
     if (existingById) {
       jobs.set(existingById.id, existingById);
       if (existingById.ownerKey !== ownerKey) {
-        return res.status(403).json({
+        return {
           ok: false,
+          statusCode: 403,
           error: 'Geen toegang',
           detail: 'Deze webdesign-opdracht hoort bij een andere sessie.',
-        });
+        };
       }
-      return res.status(202).json({
+      return {
         ok: true,
+        statusCode: 202,
         job: serializeJob(existingById),
-      });
+        existing: true,
+      };
     }
 
     const job = {
@@ -450,10 +562,23 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       queueProcessing();
     }
 
-    return res.status(202).json({
+    return {
       ok: true,
+      statusCode: 202,
       job: serializeJob(job),
+      existing: false,
+    };
+  }
+
+  async function startJobResponse(req, res) {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const result = await startJob({
+      ...body,
+      ownerKey: ownerKeyFromReq(req),
+      customer: body.customer || body,
     });
+    const statusCode = Math.max(100, Math.min(599, Number(result.statusCode) || (result.ok ? 202 : 500)));
+    return res.status(statusCode).json(result);
   }
 
   async function getJobResponse(req, res) {
@@ -520,6 +645,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   return {
     getJobResponse,
     listJobsResponse,
+    startJob,
     startJobResponse,
     _jobs: jobs,
   };
