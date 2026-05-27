@@ -254,6 +254,7 @@ test('publieke SEO-pagina CTAs zijn meetbaar van landing tot leadactie', () => {
   assert.match(homepage.html, /data-softora-conversion-page="\/"/);
   assert.match(homepage.html, /data-softora-conversion="public-form-submit"/);
   assert.match(homepage.html, /data-softora-whatsapp-action="submit"/);
+  assert.match(homepage.html, /data-softora-whatsapp-url="https:\/\/wa\.me\/31643262792"/);
 });
 
 test('leadknoppen mogen niet meer naar dode contactroutes of niet-veilige WhatsApp-routes wijzen', () => {
@@ -302,7 +303,7 @@ test('leadknoppen mogen niet meer naar dode contactroutes of niet-veilige WhatsA
 
 test('zichtbare contactform-buttons moeten expliciet als WhatsApp-conversie gemarkeerd zijn', () => {
   const buttons = extractButtonEntries(
-    '<button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/contact" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit">Verstuur bericht</button>'
+    '<button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/contact" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit" data-softora-whatsapp-url="https://wa.me/31643262792">Verstuur bericht</button>'
   );
   assert.equal(buttons.length, 1);
   assert.equal(buttons[0].label, 'Verstuur bericht');
@@ -316,7 +317,12 @@ test('zichtbare contactform-buttons moeten expliciet als WhatsApp-conversie gema
       {
         path: '/formulier-met-whatsapp',
         html:
-          '<form><button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/formulier-met-whatsapp" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit">Verstuur bericht</button></form>',
+          '<form><button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/formulier-met-whatsapp" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit" data-softora-whatsapp-url="https://wa.me/31643262792">Verstuur bericht</button></form>',
+      },
+      {
+        path: '/formulier-zonder-expliciete-whatsapp-url',
+        html:
+          '<form><button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/formulier-zonder-expliciete-whatsapp-url" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit">Verstuur bericht</button></form>',
       },
     ],
   });
@@ -326,6 +332,8 @@ test('zichtbare contactform-buttons moeten expliciet als WhatsApp-conversie gema
     [
       '/formulier-zonder-whatsapp:lead-button-not-whatsapp',
       '/formulier-zonder-whatsapp:missing-conversion-link',
+      '/formulier-zonder-expliciete-whatsapp-url:lead-button-not-whatsapp',
+      '/formulier-zonder-expliciete-whatsapp-url:missing-conversion-link',
     ].sort()
   );
 });
@@ -380,7 +388,7 @@ test('button-like lead controls zonder WhatsApp-route worden geblokkeerd', () =>
           '<a class="seo-growth-button">Vraag advies</a>',
           '<div role="button" class="hero-cta">Start project</div>',
           '<span onclick="openContact()" aria-label="WhatsApp"></span>',
-          '<button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/button-like-controls" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit">Verstuur bericht</button>',
+          '<button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/button-like-controls" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit" data-softora-whatsapp-url="https://wa.me/31643262792">Verstuur bericht</button>',
         ].join('\n'),
       },
     ],

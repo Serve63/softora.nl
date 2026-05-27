@@ -493,11 +493,16 @@ function hasWhatsappSubmitAction(attrsRaw) {
   return getAttrValue(attrsRaw, 'data-softora-whatsapp-action').toLowerCase() === 'submit';
 }
 
+function hasMartijnWhatsappSubmitDestination(attrsRaw) {
+  return isMartijnWhatsappHref(getAttrValue(attrsRaw, 'data-softora-whatsapp-url'));
+}
+
 function isTrackedWhatsappButton(button) {
   const attrs = String(button?.attrs || '');
   return (
     hasCompleteConversionTracking(attrs, 'whatsapp') &&
-    hasWhatsappSubmitAction(attrs)
+    hasWhatsappSubmitAction(attrs) &&
+    hasMartijnWhatsappSubmitDestination(attrs)
   );
 }
 
