@@ -91,18 +91,6 @@
     return price;
   }
 
-  function renderLeaderboard(target, entries) {
-    target.replaceChildren();
-    entries.forEach(function (entry, index) {
-      const row = document.createElement("div");
-      row.className = index === 0 ? "leaderboard-entry is-leading" : "leaderboard-entry";
-      const assignmentLabel = entry.count === 1 ? "opdracht" : "opdrachten";
-      appendText(row, "span", "leaderboard-entry-name", entry.displayName);
-      appendText(row, "span", "leaderboard-entry-count", entry.count + " " + assignmentLabel);
-      target.appendChild(row);
-    });
-  }
-
   function renderRows(target, customers, helpers) {
     target.replaceChildren();
     const normalizeString = helpers.normalizeString || normalize;
@@ -152,5 +140,5 @@
     target.appendChild(fragment);
   }
 
-  global.SoftoraCustomersRenderers = { renderLeaderboard: renderLeaderboard, renderRows: renderRows };
+  global.SoftoraCustomersRenderers = { renderRows: renderRows };
 })(window);

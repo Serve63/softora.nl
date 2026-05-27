@@ -380,77 +380,6 @@
             flex-wrap: wrap;
         }
 
-        .leaderboard-card {
-            display: inline-flex;
-            align-items: flex-start;
-            gap: 0.8rem;
-            min-width: 0;
-            width: min(320px, 100%);
-            padding: 0;
-            border: none;
-            background: transparent;
-        }
-
-        .leaderboard-icon {
-            width: 32px;
-            height: 32px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            background: rgba(139, 34, 82, 0.14);
-            color: var(--accent);
-            flex-shrink: 0;
-        }
-
-        .leaderboard-icon svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        .leaderboard-copy {
-            display: grid;
-            gap: 0.45rem;
-            min-width: 0;
-            width: 100%;
-        }
-
-        .leaderboard-list {
-            display: grid;
-            gap: 0.42rem;
-        }
-
-        .leaderboard-entry {
-            display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: 0.8rem;
-        }
-
-        .leaderboard-entry.is-leading .leaderboard-entry-name {
-            color: var(--accent);
-        }
-
-        .leaderboard-entry-name {
-            color: var(--text-primary);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.94rem;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            line-height: 1.1;
-            white-space: nowrap;
-        }
-
-        .leaderboard-entry-count {
-            color: var(--text-secondary);
-            font-size: 0.78rem;
-            font-weight: 500;
-            line-height: 1.2;
-            text-align: right;
-            white-space: nowrap;
-        }
-
         .btn-primary,
         .btn-secondary,
         .btn-danger,
@@ -938,10 +867,6 @@
                 justify-content: flex-start;
             }
 
-            .leaderboard-card {
-                width: 100%;
-            }
-
             .search-wrap {
                 max-width: none;
             }
@@ -1120,17 +1045,6 @@
                     <div class="hero-copy">
                         <h1 class="hero-title">Klanten</h1>
                         <p class="hero-text">Overzicht van al je klanten en betalingen.</p>
-                    </div>
-                    <div class="hero-side">
-                        <div class="leaderboard-card" id="leaderboardCard">
-                            <div class="leaderboard-copy">
-                                <div class="leaderboard-list" id="leaderboardList">
-                                    <div class="leaderboard-entry is-leading"><span class="leaderboard-entry-name">Team</span><span class="leaderboard-entry-count">0 opdrachten</span></div>
-                                    <div class="leaderboard-entry"><span class="leaderboard-entry-name">Servé</span><span class="leaderboard-entry-count">0 opdrachten</span></div>
-                                    <div class="leaderboard-entry"><span class="leaderboard-entry-name">Martijn</span><span class="leaderboard-entry-count">0 opdrachten</span></div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </section>
 
@@ -1341,8 +1255,6 @@
             empty: document.getElementById("emptyState"),
             search: document.getElementById("searchInput"),
             statusBanner: document.getElementById("statusBanner"),
-            leaderboardCard: document.getElementById("leaderboardCard"),
-            leaderboardList: document.getElementById("leaderboardList"),
             modalOverlay: document.getElementById("modalOverlay"),
             modalTitle: document.getElementById("modalTitle"),
             modalError: document.getElementById("modalError"),
@@ -1888,34 +1800,6 @@
             });
         }
 
-        function updateLeaderboard() {
-            if (!nodes.leaderboardCard || !nodes.leaderboardList) return;
-
-            const counts = state.klanten.reduce(function (result, customer) {
-                const responsible = normalizeResponsibleValue(customer && customer.verantwoordelijk);
-                if (responsible === "Team" || responsible === "Serve" || responsible === "Martijn") {
-                    result[responsible] = (result[responsible] || 0) + 1;
-                }
-                return result;
-            }, { Team: 0, Serve: 0, Martijn: 0 });
-
-            const entries = [
-                { name: "Team", displayName: formatResponsibleDisplayName("Team"), count: Number(counts.Team || 0) },
-                { name: "Serve", displayName: formatResponsibleDisplayName("Serve"), count: Number(counts.Serve || 0) },
-                { name: "Martijn", displayName: formatResponsibleDisplayName("Martijn"), count: Number(counts.Martijn || 0) }
-            ].sort(function (a, b) {
-                if (b.count !== a.count) return b.count - a.count;
-                return a.displayName.localeCompare(b.displayName, "nl");
-            });
-
-            nodes.leaderboardCard.hidden = false;
-            window.SoftoraCustomersRenderers.renderLeaderboard(nodes.leaderboardList, entries);
-        }
-
-        function updateStats() {
-            updateLeaderboard();
-        }
-
         function renderTable() {
             const filtered = getFilteredCustomers();
 
@@ -1939,7 +1823,6 @@
         }
 
         function renderPage() {
-            updateStats();
             renderTable();
         }
 

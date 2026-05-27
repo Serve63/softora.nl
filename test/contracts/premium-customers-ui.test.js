@@ -46,35 +46,21 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /if \(nodes\.fieldResponsible\) nodes\.fieldResponsible\.value = customer\.verantwoordelijk \|\| "Team";/);
   assert.match(pageSource, /verantwoordelijk: nodes\.fieldResponsible \? nodes\.fieldResponsible\.value : "Team",/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
-  assert.match(pageSource, /<section class="hero">[\s\S]*<div class="hero-copy">[\s\S]*<div class="hero-side">[\s\S]*<div class="leaderboard-card" id="leaderboardCard">/);
-  assert.doesNotMatch(pageSource, /Meeste opdrachten/);
-  assert.match(
-    pageSource,
-    /<div class="leaderboard-copy">\s*<div class="leaderboard-list" id="leaderboardList">[\s\S]*Team[\s\S]*0 opdrachten[\s\S]*Servé[\s\S]*0 opdrachten[\s\S]*Martijn[\s\S]*0 opdrachten/
-  );
-  assert.match(pageSource, /leaderboardCard: document\.getElementById\("leaderboardCard"\),/);
-  assert.match(pageSource, /leaderboardList: document\.getElementById\("leaderboardList"\),/);
-  assert.match(pageSource, /function updateLeaderboard\(\)/);
-  assert.match(pageSource, /const counts = state\.klanten\.reduce\(function \(result, customer\)/);
-  assert.match(pageSource, /displayName: formatResponsibleDisplayName\("Team"\)/);
-  assert.match(pageSource, /displayName: formatResponsibleDisplayName\("Serve"\)/);
-  assert.match(pageSource, /displayName: formatResponsibleDisplayName\("Martijn"\)/);
+  assert.match(pageSource, /<section class="hero">[\s\S]*<div class="hero-copy">/);
+  assert.doesNotMatch(pageSource, /leaderboard-card/);
+  assert.doesNotMatch(pageSource, /leaderboardList/);
+  assert.doesNotMatch(pageSource, /function updateLeaderboard\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-customers-renderers\.js\?v=20260427a"><\/script>/);
-  assert.match(pageSource, /window\.SoftoraCustomersRenderers\.renderLeaderboard\(nodes\.leaderboardList, entries\);/);
   assert.match(pageSource, /window\.SoftoraCustomersRenderers\.renderRows\(nodes\.body, filtered, \{/);
-  assert.match(rendererSource, /function renderLeaderboard\(target, entries\) \{/);
-  assert.match(rendererSource, /target\.replaceChildren\(\);/);
-  assert.match(rendererSource, /row\.className = index === 0 \? "leaderboard-entry is-leading" : "leaderboard-entry";/);
-  assert.match(rendererSource, /appendText\(row, "span", "leaderboard-entry-name", entry\.displayName\);/);
+  assert.doesNotMatch(rendererSource, /renderLeaderboard/);
   assert.match(rendererSource, /function createCell\(label, className\) \{/);
   assert.match(rendererSource, /function renderRows\(target, customers, helpers\) \{/);
   assert.match(pageSource, /nodes\.body\.replaceChildren\(\);/);
   assert.match(rendererSource, /fragment\.appendChild\(row\);/);
   assert.doesNotMatch(pageSource, /nodes\.body\.innerHTML/);
-  assert.doesNotMatch(pageSource, /nodes\.leaderboardList\.innerHTML/);
   assert.doesNotMatch(rendererSource, /\.innerHTML\s*=/);
   assert.doesNotMatch(pageSource, /function escapeHtml\(value\)/);
-  assert.match(pageSource, /function updateStats\(\) \{[\s\S]*updateLeaderboard\(\);[\s\S]*\}/);
+  assert.match(pageSource, /function renderPage\(\) \{[\s\S]*renderTable\(\);[\s\S]*\}/);
 });
 
 test('premium customers onderhoudsprijs is alleen actief wanneer onderhoud ja is gekozen', () => {
