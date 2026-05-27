@@ -5,6 +5,9 @@ const {
   createPremiumDatabaseWebdesignJobsCoordinator,
 } = require('../../server/services/premium-database-webdesign-jobs');
 
+const TINY_PNG_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+
 function createResponseRecorder() {
   return {
     statusCode: null,
@@ -49,7 +52,7 @@ test('premium database webdesign jobs generate and persist a customer photo in t
           ok: true,
           site: { host: new URL(url).hostname },
           image: {
-            dataUrl: 'data:image/png;base64,AAAA',
+            dataUrl: TINY_PNG_DATA_URL,
             fileName: `${options.body.company}-webdesign.png`,
           },
         };
@@ -91,7 +94,12 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   const photoMap = JSON.parse(values.softora_database_photos_v1);
   assert.equal(photoMap['customer-1'].id, 'customer-1');
   assert.equal(photoMap['customer-1'].identityKey, 'softora|serve|31612345678');
-  assert.equal(values['softora_database_photo_data_v1_customer-1_0'], 'data:image/png;base64,AAAA');
+  assert.equal(values['softora_database_photo_data_v1_customer-1_0'], TINY_PNG_DATA_URL);
+  assert.match(values['softora_database_photo_data_v1_customer-1_mockup_0'], /^data:image\/jpeg;base64,/);
+  assert.equal(photoMap['customer-1'].websiteMockupName, 'Softora-webdesign-device-mockup-v6.jpg');
+  assert.equal(photoMap['customer-1'].mockupRenderer, 'softora-server-device-v6');
+  assert.equal(photoMap['customer-1'].mockupOrientation, 'upright');
+  assert.equal(photoMap['customer-1'].mockupQualityStatus, 'checked');
   assert.deepEqual(JSON.parse(values.softora_database_photos_removed_v1), []);
   assert.equal(pipelineCalls[0].options.imageSize, '1024x1536');
   assert.equal(pipelineCalls[0].options.disableReferenceImages, true);
@@ -106,7 +114,7 @@ test('premium database webdesign jobs keep status access scoped to the logged in
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     aiToolsCoordinator: {
       runWebsitePreviewGeneratePipeline: async () => ({
-        image: { dataUrl: 'data:image/png;base64,AAAA', fileName: 'preview.png' },
+        image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' },
       }),
     },
     getUiStateValues: async () => ({ values: {} }),
@@ -166,7 +174,7 @@ test('premium database webdesign jobs persist status and generated photos throug
     dataOpsStore,
     aiToolsCoordinator: {
       runWebsitePreviewGeneratePipeline: async () => ({
-        image: { dataUrl: 'data:image/png;base64,AAAA', fileName: 'preview.png' },
+        image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' },
       }),
     },
     getUiStateValues: async () => {
@@ -208,6 +216,11 @@ test('premium database webdesign jobs persist status and generated photos throug
   assert.equal(statusRes.body.job.status, 'done');
   assert.deepEqual(persistedJobs, ['queued', 'running', 'done']);
   assert.equal(uploadedPhotos[0].entry.customerId, 'customer-persist');
+  assert.match(uploadedPhotos[0].entry.websiteMockup, /^data:image\/jpeg;base64,/);
+  assert.equal(uploadedPhotos[0].entry.websiteMockupName, 'preview-device-mockup-v6.jpg');
+  assert.equal(uploadedPhotos[0].entry.mockupRenderer, 'softora-server-device-v6');
+  assert.equal(uploadedPhotos[0].entry.mockupOrientation, 'upright');
+  assert.equal(uploadedPhotos[0].entry.mockupQualityStatus, 'checked');
   assert.equal(uploadedPhotos[0].meta.source, 'premium-database-webdesign-jobs');
 
   const resumedCoordinator = createPremiumDatabaseWebdesignJobsCoordinator({
@@ -237,7 +250,7 @@ test('premium database webdesign jobs list running jobs for the current user', a
     aiToolsCoordinator: {
       runWebsitePreviewGeneratePipeline: async () => {
         await wait(50);
-        return { image: { dataUrl: 'data:image/png;base64,AAAA', fileName: 'preview.png' } };
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } };
       },
     },
     getUiStateValues: async () => ({ values: {} }),

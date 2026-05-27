@@ -264,6 +264,7 @@ function createService(overrides = {}) {
     },
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    webdesignPreparationCoordinator: overrides.webdesignPreparationCoordinator,
   });
 
   return {
@@ -1660,6 +1661,90 @@ test('coldmail autopilot does not extend cooldown when no webdesign-ready lead e
   assert.equal(getAutopilotState().lastStartedAt, previousLastStartedAt);
 });
 
+test('coldmail autopilot queues the next webdesign job when ready stock is empty', async () => {
+  const previousLastStartedAt = '2026-04-24T11:40:00.000Z';
+  const preparedJobs = [];
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'missing-design',
+        bedrijf: 'Nog Geen Design BV',
+        naam: 'Ruben',
+        email: 'info@noggeendesign.nl',
+        website: 'noggeendesign.nl',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    webdesignPreparationCoordinator: {
+      startJob: async (payload) => {
+        preparedJobs.push(payload);
+        return {
+          ok: true,
+          job: {
+            id: payload.jobId,
+            status: 'queued',
+            customerId: payload.customer.id,
+          },
+        };
+      },
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Nieuw webdesign gemaakt voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}},\n\nIk heb een webdesign voor jullie gemaakt.',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: 'webdesign',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 9,
+        endHour: 17,
+        minIntervalMinutes: 12,
+      },
+      lastStartedAt: previousLastStartedAt,
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'webdesign_preparation_queued');
+  assert.equal(sentMessages.length, 0);
+  assert.equal(preparedJobs.length, 1);
+  assert.equal(preparedJobs[0].ownerKey, 'coldmail-autopilot::system');
+  assert.equal(preparedJobs[0].customer.id, 'missing-design');
+  assert.equal(preparedJobs[0].customer.bedrijf, 'Nog Geen Design BV');
+  assert.equal(preparedJobs[0].websiteUrl, 'https://noggeendesign.nl/');
+  assert.match(preparedJobs[0].jobId, /^coldmail_webdesign_[a-f0-9]{24}_[a-z0-9]+$/);
+  assert.equal(result.webdesignPreparation.customerId, 'missing-design');
+  assert.equal(result.webdesignPreparation.job.status, 'queued');
+  assert.equal(getAutopilotState().lastStartedAt, previousLastStartedAt);
+});
+
 test('coldmail autopilot keeps an emergency disabled state when a running batch finishes', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [
@@ -2557,6 +2642,79 @@ test('coldmail campaign refuses webdesign action when no ready website-design is
 
   assert.equal(sentMessages.length, 0);
   assert.equal(getSavedState(), null);
+});
+
+test('coldmail campaign starts webdesign preparation for the exact next mailable lead when stock is empty', async () => {
+  const preparedJobs = [];
+  const { service, sentMessages, getSavedState } = createService({
+    rows: [
+      {
+        id: 'recently-mailed',
+        bedrijf: 'Recent Gemaild BV',
+        naam: 'Ruben',
+        email: 'recent@example.test',
+        website: 'recent.example.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'prospect-no-photo',
+        bedrijf: 'Bakkerij Zonder Foto',
+        naam: 'Ruben',
+        email: 'info@zonderfoto.nl',
+        website: 'zonderfoto.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    sendGuardState: {
+      recipientEntries: [
+        {
+          at: '2026-04-24T10:00:00.000Z',
+          recipientEmail: 'recent@example.test',
+          recipientId: 'recently-mailed',
+          senderEmail: 'serve@softora.nl',
+        },
+      ],
+    },
+    webdesignPreparationCoordinator: {
+      startJob: async (payload) => {
+        preparedJobs.push(payload);
+        return {
+          ok: true,
+          job: {
+            id: payload.jobId,
+            status: 'queued',
+            customerId: payload.customer.id,
+          },
+        };
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Nieuwe website voor {{bedrijf}}',
+        body: 'Goedemorgen {{naam}}',
+        senderEmail: 'info@softora.nl',
+        specialAction: 'webdesign',
+      }),
+    (error) => {
+      assert.equal(error.code, 'WEBDESIGN_PREPARATION_QUEUED');
+      assert.match(error.message, /Voorbereiding gestart voor Bakkerij Zonder Foto/);
+      assert.equal(error.webdesignPreparation.customerId, 'prospect-no-photo');
+      assert.equal(error.webdesignPreparation.job.status, 'queued');
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+  assert.equal(getSavedState(), null);
+  assert.equal(preparedJobs.length, 1);
+  assert.equal(preparedJobs[0].customer.id, 'prospect-no-photo');
+  assert.equal(preparedJobs[0].websiteUrl, 'https://zonderfoto.nl/');
 });
 
 test('coldmail campaign preview only lists webdesign recipients with a generated photo', async () => {

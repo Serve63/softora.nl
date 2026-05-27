@@ -15,6 +15,7 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
   let capturedAiOptions = null;
   let capturedRouteApp = null;
   let capturedRouteOptions = null;
+  let capturedWebdesignPreparationCoordinator = null;
 
   const result = createServerAppFeatureWiring(
     {
@@ -31,6 +32,13 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
         handleRetellWebhook: () => null,
         premiumRouteRuntime: { sessionSecret: 'secret' },
         coldcalling: { openAiModel: 'gpt-test' },
+        coldmailing: {
+          coldmailCampaignService: {
+            setWebdesignPreparationCoordinator: (coordinator) => {
+              capturedWebdesignPreparationCoordinator = coordinator;
+            },
+          },
+        },
         mailbox: { mailConfig: {} },
         websiteLinkCoordinator: { scope: 'website-link' },
         websitePreviewLibraryCoordinator: { scope: 'website-preview-library' },
@@ -72,6 +80,7 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
   assert.ok(capturedRouteOptions.websitePreviewBatchCoordinator);
   assert.equal(typeof capturedRouteOptions.websitePreviewBatchCoordinator.startBatchResponse, 'function');
   assert.ok(capturedRouteOptions.premiumDatabaseWebdesignJobsCoordinator);
+  assert.equal(capturedWebdesignPreparationCoordinator, capturedRouteOptions.premiumDatabaseWebdesignJobsCoordinator);
   assert.equal(
     typeof capturedRouteOptions.premiumDatabaseWebdesignJobsCoordinator.startJobResponse,
     'function'

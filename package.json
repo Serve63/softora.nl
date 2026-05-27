@@ -35,7 +35,8 @@
     "helmet": "^8.0.0",
     "imapflow": "^1.2.18",
     "mailparser": "^3.9.6",
-    "nodemailer": "^8.0.4"
+    "nodemailer": "^8.0.4",
+    "sharp": "^0.34.5"
   },
   "overrides": {
     "path-to-regexp": "0.1.13"
