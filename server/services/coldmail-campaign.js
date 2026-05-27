@@ -131,6 +131,10 @@ const COLDMAIL_LINKEDIN_CTA_BY_SENDER = Object.freeze({
     text: MARTIJN_LINKEDIN_CTA_TEXT,
     url: MARTIJN_LINKEDIN_URL,
   },
+  'martijnven123@gmail.com': {
+    text: MARTIJN_LINKEDIN_CTA_TEXT,
+    url: MARTIJN_LINKEDIN_URL,
+  },
 });
 const DEFAULT_COLDMAIL_SENDER_PROFILES = {
   'serve@softora.nl': {

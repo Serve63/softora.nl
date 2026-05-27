@@ -5,7 +5,7 @@
     const JOB_ENDPOINT = "/api/premium-database/webdesign-photo-jobs";
     const PENDING_TTL_MS = 6 * 60 * 60 * 1000;
     const POLL_INTERVAL_MS = 2200;
-    const PHOTO_LOAD_FALLBACK_MS = 1800;
+    const PHOTO_LOAD_FALLBACK_MS = 6000;
     const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";
     const PHOTO_LOAD_CACHE_LIMIT = 2500;
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
@@ -26,7 +26,7 @@
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
         const style = global.document.createElement("style");
         style.id = STYLE_ID;
-        style.textContent = ".photo-cell{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0}.photo-drop{flex:0 0 34px;aspect-ratio:1/1;contain:layout paint}.photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating,.photo-drop.is-restoring,.photo-drop[data-has-photo=\"true\"][data-photo-loaded=\"false\"]{cursor:wait}.photo-drop[data-photo-error=\"true\"]{background:rgba(155,35,85,.06);cursor:default}.photo-drop--mockup{border-style:solid;background:rgba(20,24,45,.04)}.photo-drop-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.84);opacity:1;pointer-events:none;transition:opacity .16s ease;z-index:1}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-loader{opacity:0}.photo-drop-image{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-image{opacity:1}.photo-fallback-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;background:rgba(155,35,85,.1);color:var(--crimson);font:800 12px/1 Inter,sans-serif}.photo-generate-icon,.photo-mockup-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon,.photo-drop:hover .photo-mockup-icon,.photo-drop:focus-visible .photo-mockup-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
+        style.textContent = ".photo-cell{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0}.photo-drop{position:relative;flex:0 0 34px;aspect-ratio:1/1;overflow:hidden;contain:layout paint}.photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating,.photo-drop.is-restoring,.photo-drop[data-has-photo=\"true\"][data-photo-loaded=\"false\"]{cursor:wait}.photo-drop[data-photo-error=\"true\"]{background:rgba(155,35,85,.06);cursor:default}.photo-drop[data-photo-error=\"true\"] .photo-drop-image,.photo-drop[data-photo-error=\"true\"] .photo-drop-loader{display:none}.photo-drop--mockup{border-style:solid;background:rgba(20,24,45,.04)}.photo-drop-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.84);opacity:1;pointer-events:none;transition:opacity .16s ease;z-index:1}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-loader{opacity:0}.photo-drop-image{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-image{opacity:1}.photo-fallback-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;background:rgba(155,35,85,.1);color:var(--crimson);font:800 12px/1 Inter,sans-serif}.photo-generate-icon,.photo-mockup-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon,.photo-drop:hover .photo-mockup-icon,.photo-drop:focus-visible .photo-mockup-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
         global.document.head.appendChild(style);
     }
 
@@ -50,7 +50,11 @@
         const pollTimers = new Map();
         const loadedPhotoKeys = getSharedLoadedPhotoKeys();
         const failedPhotoKeys = new Set();
+        const autoMockupQueuedIds = new Set();
+        const autoMockupQueue = [];
         let photoHydrationQueued = false;
+        let autoMockupScheduled = false;
+        let autoMockupRunning = false;
         ensureStyles();
 
         function getSharedLoadedPhotoKeys() {
@@ -138,6 +142,9 @@
             if (failed) drop.setAttribute("data-photo-error", "true");
             else drop.setAttribute("data-photo-error", "false");
             drop.removeAttribute("data-photo-loading-bound");
+            if (failed && typeof drop.querySelector === "function" && !drop.querySelector(".photo-fallback-icon") && typeof drop.insertAdjacentHTML === "function") {
+                drop.insertAdjacentHTML("beforeend", FALLBACK_ICON);
+            }
         }
 
         function bindPhotoDropLoading(drop) {
@@ -169,7 +176,10 @@
             const fail = function () { finishReady(true); };
             const startFallbackTimer = function () {
                 if (fallbackTimer || typeof global.setTimeout !== "function") return;
-                fallbackTimer = global.setTimeout(finish, PHOTO_LOAD_FALLBACK_MS);
+                fallbackTimer = global.setTimeout(function () {
+                    if (image.complete && Number(image.naturalWidth) > 0) finishReady(false);
+                    else finishReady(true);
+                }, PHOTO_LOAD_FALLBACK_MS);
             };
             const onLoad = function () {
                 startFallbackTimer();
@@ -181,6 +191,10 @@
             };
             if (image.complete && Number(image.naturalWidth) > 0) {
                 onLoad();
+                return;
+            }
+            if (image.complete && Number(image.naturalWidth) <= 0) {
+                fail();
                 return;
             }
             if (drop.getAttribute("data-photo-loading-bound") === "true") return;
@@ -203,6 +217,42 @@
                 photoHydrationQueued = false;
                 hydratePhotoDrops(global.document);
             });
+        }
+
+        function scheduleAutoMockupQueue() {
+            if (autoMockupScheduled) return;
+            autoMockupScheduled = true;
+            const run = function () {
+                autoMockupScheduled = false;
+                processAutoMockupQueue();
+            };
+            if (typeof global.queueMicrotask === "function") {
+                global.queueMicrotask(run);
+                return;
+            }
+            Promise.resolve().then(run);
+        }
+
+        function scheduleMissingMockupPair(customerId) {
+            const id = normalizeString(customerId);
+            if (!id || autoMockupQueuedIds.has(id) || isMockupPending(id)) return;
+            autoMockupQueuedIds.add(id);
+            autoMockupQueue.push(id);
+            scheduleAutoMockupQueue();
+        }
+
+        function processAutoMockupQueue() {
+            if (autoMockupRunning) return;
+            const id = autoMockupQueue.shift();
+            if (!id) return;
+            autoMockupRunning = true;
+            Promise.resolve(ensureMockupForCustomer(id, { silent: true, source: "database-visible-pair" }))
+                .catch(function () {})
+                .finally(function () {
+                    autoMockupRunning = false;
+                    autoMockupQueuedIds.delete(id);
+                    if (autoMockupQueue.length) scheduleAutoMockupQueue();
+                });
         }
 
         function getCustomerById(customerId) {
@@ -406,13 +456,13 @@
                 }
                 const image = new global.Image();
                 let finished = false;
-                const timer = global.setTimeout(function () { finish(true); }, Math.max(250, Number(timeoutMs) || 900));
-                function finish(markReady) {
+                const timer = global.setTimeout(function () { finish(false); }, Math.max(250, Number(timeoutMs) || 900));
+                function finish(wasLoaded) {
                     if (finished) return;
                     finished = true;
-                    if (markReady && loadKey) markPhotoKeyLoaded(loadKey);
+                    if (wasLoaded && loadKey) markPhotoKeyLoaded(loadKey);
                     global.clearTimeout(timer);
-                    resolve(true);
+                    resolve(Boolean(wasLoaded));
                 }
                 function fail() {
                     if (loadKey) markPhotoKeyFailed(loadKey);
@@ -420,15 +470,10 @@
                 }
                 image.onload = function () {
                     if (typeof image.decode === "function") {
-                        image.decode().then(function () {
-                            if (loadKey) markPhotoKeyLoaded(loadKey);
-                        }).catch(function () {
-                            if (loadKey) markPhotoKeyLoaded(loadKey);
-                        }).finally(function () { finish(false); });
+                        image.decode().catch(function () {}).finally(function () { finish(true); });
                         return;
                     }
-                    if (loadKey) markPhotoKeyLoaded(loadKey);
-                    finish(false);
+                    finish(true);
                 };
                 image.onerror = fail;
                 image.src = source;
@@ -483,6 +528,7 @@
             const canUseMockup = hasPhoto || hasMockup;
             const mockupLoading = isMockupPending(customer && customer.id);
             const canGenerateMockup = hasPhoto && !hasMockup && !mockupLoading;
+            if (canGenerateMockup) scheduleMissingMockupPair(customer && customer.id);
             const mockupInner = hasMockup
                 ? (mockupFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" decoding=\"async\">")
                 : (mockupLoading ? LOADING_ICON : MOCKUP_ICON);

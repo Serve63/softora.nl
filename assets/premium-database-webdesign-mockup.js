@@ -260,6 +260,7 @@
         async function ensureForCustomer(customerId, ensureOptions) {
             const id = normalizeString(customerId);
             const force = Boolean(ensureOptions && ensureOptions.force);
+            const silent = Boolean(ensureOptions && ensureOptions.silent);
             const pendingReserved = Boolean(ensureOptions && ensureOptions.pendingReserved);
             const releaseReservedPending = function () {
                 if (!pendingReserved) return;
@@ -282,7 +283,7 @@
             }
 
             if (!pendingReserved) pendingIds.add(id);
-            if (force && !isValidWebsitePhotoSource(customer && customer.websiteMockup)) {
+            if (force && !silent && !isValidWebsitePhotoSource(customer && customer.websiteMockup)) {
                 toast("Device mockup wordt lokaal gemaakt, geen extra API-kosten");
             }
             if (!pendingReserved && typeof renderPage === "function") renderPage();
