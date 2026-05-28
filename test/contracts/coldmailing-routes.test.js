@@ -580,9 +580,11 @@ test('coldmailing preview image route serves linked webdesign photos inline', as
 
 test('coldmail preview image lookup caches resolved images for email clients', () => {
   const serviceSource = fs.readFileSync(path.join(__dirname, '../../server/services/coldmail-campaign.js'), 'utf8');
+  const cacheSource = fs.readFileSync(path.join(__dirname, '../../server/services/coldmail-preview-image-cache.js'), 'utf8');
 
   assert.match(serviceSource, /COLDMAIL_PREVIEW_IMAGE_CACHE_TTL_MS/);
-  assert.match(serviceSource, /const coldmailPreviewImageCache = new Map\(\)/);
+  assert.match(serviceSource, /const previewImageCache = require\('\.\/coldmail-preview-image-cache'\)/);
+  assert.match(cacheSource, /const previewImageCache = new Map\(\)/);
   assert.match(serviceSource, /const cachedImage = getCachedPreviewImage\(cacheKey\)/);
   assert.match(serviceSource, /const photoMap = await loadCustomerPhotoMapCached\(\)/);
   assert.match(serviceSource, /rememberPreviewImage\(cacheKey, result\)/);

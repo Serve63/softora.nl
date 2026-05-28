@@ -8,6 +8,10 @@ const {
   canAdvanceContactStatus,
   normalizeContactStatus,
 } = require('./customer-lifecycle');
+const {
+  getPreviewImageCacheKey,
+  rememberPreviewImage,
+} = require('./coldmail-preview-image-cache');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -35,6 +39,9 @@ const COLDMAIL_IMAGE_VISIBILITY_PS =
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?)/i;
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
+const COLDMAIL_PREVIEW_IMAGE_OPTIMIZE_MIN_BYTES = 128 * 1024;
+const COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH = 960;
+const COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY = 82;
 const MARTIJN_LINKEDIN_CTA_TEXT = '💼 Mijn LinkedIn 👈';
 const MARTIJN_LINKEDIN_URL =
   'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios';
@@ -114,6 +121,17 @@ const INSTANTLY_STATUS_PRIORITY = Object.freeze({
   unsubscribed: 80,
   blocked: 80,
 });
+let cachedInstantlyPreviewSharp = null;
+
+function loadInstantlyPreviewSharp() {
+  if (cachedInstantlyPreviewSharp) return cachedInstantlyPreviewSharp;
+  try {
+    cachedInstantlyPreviewSharp = require('sharp');
+  } catch (_error) {
+    cachedInstantlyPreviewSharp = null;
+  }
+  return cachedInstantlyPreviewSharp;
+}
 
 function defaultNormalizeString(value) {
   return String(value || '').trim();
@@ -459,8 +477,132 @@ function photoRecordMatchesRowIdentity(photo, row, normalizeString = defaultNorm
   return Array.from(rowIdentityKeys).some((key) => photoIdentityKeys.has(key));
 }
 
+function parseImageDataUrl(value, normalizeString = defaultNormalizeString) {
+  const match = normalizeString(value).match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-z0-9+/=\s]+)$/i);
+  if (!match) return null;
+  const content = Buffer.from(match[2].replace(/\s+/g, ''), 'base64');
+  if (!content.length) return null;
+  return {
+    content,
+    contentType: match[1].toLowerCase(),
+  };
+}
+
 function parseDataUrlImage(value, normalizeString = defaultNormalizeString) {
-  return /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(normalizeString(value));
+  return Boolean(parseImageDataUrl(value, normalizeString));
+}
+
+function readPngDimensions(content) {
+  if (
+    !Buffer.isBuffer(content) ||
+    content.length < 24 ||
+    content[0] !== 0x89 ||
+    content[1] !== 0x50 ||
+    content[2] !== 0x4e ||
+    content[3] !== 0x47
+  ) {
+    return null;
+  }
+  const width = content.readUInt32BE(16);
+  const height = content.readUInt32BE(20);
+  return width > 0 && height > 0 ? { width, height } : null;
+}
+
+function readJpegDimensions(content) {
+  if (!Buffer.isBuffer(content) || content.length < 4 || content[0] !== 0xff || content[1] !== 0xd8) return null;
+  let offset = 2;
+  while (offset + 8 < content.length) {
+    if (content[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = content[offset + 1];
+    if (marker === 0xd9 || marker === 0xda) break;
+    const length = content.readUInt16BE(offset + 2);
+    if (!Number.isFinite(length) || length < 2 || offset + 2 + length > content.length) break;
+    if (
+      (marker >= 0xc0 && marker <= 0xc3) ||
+      (marker >= 0xc5 && marker <= 0xc7) ||
+      (marker >= 0xc9 && marker <= 0xcb) ||
+      (marker >= 0xcd && marker <= 0xcf)
+    ) {
+      const height = content.readUInt16BE(offset + 5);
+      const width = content.readUInt16BE(offset + 7);
+      return width > 0 && height > 0 ? { width, height } : null;
+    }
+    offset += 2 + length;
+  }
+  return null;
+}
+
+function getImageDimensions(image) {
+  const contentType = defaultNormalizeString(image && image.contentType).split(';')[0].toLowerCase();
+  const content = image && image.content;
+  if (!Buffer.isBuffer(content)) return null;
+  if (contentType === 'image/png') return readPngDimensions(content);
+  if (contentType === 'image/jpeg' || contentType === 'image/jpg') return readJpegDimensions(content);
+  return null;
+}
+
+function scaleEmailImageDimensions(dimensions) {
+  const sourceWidth = Number(dimensions && dimensions.width) || 0;
+  const sourceHeight = Number(dimensions && dimensions.height) || 0;
+  if (sourceWidth <= 0 || sourceHeight <= 0) return null;
+  const height = Math.max(1, Math.round((sourceHeight / sourceWidth) * COLDMAIL_EMAIL_IMAGE_WIDTH));
+  return {
+    width: COLDMAIL_EMAIL_IMAGE_WIDTH,
+    height,
+  };
+}
+
+function getImageExtension(contentType) {
+  const normalized = defaultNormalizeString(contentType).split(';')[0].toLowerCase();
+  if (normalized === 'image/jpeg' || normalized === 'image/jpg') return 'jpg';
+  if (normalized === 'image/webp') return 'webp';
+  if (normalized === 'image/gif') return 'gif';
+  return 'png';
+}
+
+async function optimizeInstantlyPreviewImageForEmail(image) {
+  const contentType = defaultNormalizeString(image && image.contentType).split(';')[0].toLowerCase();
+  const content = image && image.content;
+  if (
+    !Buffer.isBuffer(content) ||
+    content.length < COLDMAIL_PREVIEW_IMAGE_OPTIMIZE_MIN_BYTES ||
+    !/^image\/(?:png|jpe?g|webp)$/i.test(contentType)
+  ) {
+    return image;
+  }
+
+  try {
+    const sharp = loadInstantlyPreviewSharp();
+    if (typeof sharp !== 'function') return image;
+    const metadata = await sharp(content, { limitInputPixels: 45_000_000 }).metadata();
+    const sourceWidth = Number(metadata && metadata.width) || 0;
+    const shouldResize = sourceWidth > COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH;
+    const transformer = sharp(content, { limitInputPixels: 45_000_000 }).rotate();
+    if (shouldResize) {
+      transformer.resize({
+        width: COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH,
+        withoutEnlargement: true,
+      });
+    }
+    const optimized = await transformer
+      .jpeg({
+        quality: COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY,
+        mozjpeg: true,
+      })
+      .toBuffer();
+    if (!Buffer.isBuffer(optimized) || !optimized.length) return image;
+    if (!shouldResize && contentType === 'image/jpeg' && optimized.length >= content.length) return image;
+    return {
+      ...image,
+      content: optimized,
+      contentType: 'image/jpeg',
+    };
+  } catch (_error) {
+    return image;
+  }
 }
 
 function readChunkedCustomerPhoto(values, photoKey, chunkCount = 0, normalizeString = defaultNormalizeString) {
@@ -977,7 +1119,7 @@ function buildColdmailUnsubscribeUrl(row, id, reference, config, normalizeString
   return `${config.publicBaseUrl}${COLDMAIL_UNSUBSCRIBE_PATH}?t=${encodeURIComponent(token)}`;
 }
 
-function buildColdmailPreviewImageUrl(row, id, reference, config, type, normalizeString = defaultNormalizeString, now = () => new Date()) {
+function buildColdmailPreviewImageLink(row, id, reference, config, type, normalizeString = defaultNormalizeString, now = () => new Date()) {
   const token = buildColdmailToken(
     row,
     id,
@@ -987,7 +1129,16 @@ function buildColdmailPreviewImageUrl(row, id, reference, config, type, normaliz
     normalizeString,
     now
   );
-  return `${config.publicBaseUrl}${COLDMAIL_PREVIEW_IMAGE_PATH}?t=${encodeURIComponent(token)}`;
+  const normalizedType = type === 'mockup' ? 'mockup' : 'webdesign';
+  return {
+    token,
+    type: normalizedType,
+    url: `${config.publicBaseUrl}${COLDMAIL_PREVIEW_IMAGE_PATH}?t=${encodeURIComponent(token)}`,
+  };
+}
+
+function buildColdmailPreviewImageUrl(row, id, reference, config, type, normalizeString = defaultNormalizeString, now = () => new Date()) {
+  return buildColdmailPreviewImageLink(row, id, reference, config, type, normalizeString, now).url;
 }
 
 function buildInstantlyBodyWithWebdesignLinks({ baseText, webdesignImageUrl, webdesignMockupUrl, unsubscribeUrl }, normalizeString = defaultNormalizeString) {
@@ -1043,21 +1194,23 @@ function normalizeInstantlyImageAlt(value, normalizeString = defaultNormalizeStr
   return clean === 'mockup' ? 'Mockup' : 'Webdesign';
 }
 
-function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defaultNormalizeString) {
+function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defaultNormalizeString, dimensions = null) {
   const cleanSrc = normalizeString(src);
   if (!cleanSrc) return '';
   const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
+  const emailDimensions = scaleEmailImageDimensions(dimensions);
+  const heightAttribute = emailDimensions && emailDimensions.height ? ` height="${emailDimensions.height}"` : '';
   return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;"><img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
   )}" alt="${escapeHtmlAttribute(
     cleanAlt,
     normalizeString
-  )}" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;max-height:none;border:0;outline:none;text-decoration:none;border-radius:14px;background:#f3f6fb;color:#8a94a6;font-family:Arial,sans-serif;font-size:22px;line-height:1.2;font-weight:700;text-align:center;" /></td></tr></table>`;
+  )}" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}"${heightAttribute} loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
 }
 
 function buildInstantlyEmailHtml(
-  { baseText, company, webdesignImageUrl, webdesignMockupUrl, unsubscribeUrl },
+  { baseText, company, webdesignImageUrl, webdesignMockupUrl, webdesignImageDimensions, webdesignMockupDimensions, unsubscribeUrl },
   normalizeString = defaultNormalizeString
 ) {
   const optOut = normalizeString(unsubscribeUrl)
@@ -1073,14 +1226,41 @@ function buildInstantlyEmailHtml(
     ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(
         COLDMAIL_MOCKUP_CAPTION,
         normalizeString
-      )}</p>${renderImageHtml(webdesignMockupUrl, 'Mockup', '0', normalizeString)}`
+      )}</p>${renderImageHtml(webdesignMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
     : '';
   return `${renderMailTextAsHtml(baseText, normalizeString)}${renderImageHtml(
     webdesignImageUrl,
     'Webdesign',
     '24px 0 0 0',
-    normalizeString
+    normalizeString,
+    webdesignImageDimensions
   )}${mockupHtml}${optOut}`;
+}
+
+async function warmInstantlyPreviewImageCache(
+  { link, photo, type, company },
+  normalizeString = defaultNormalizeString
+) {
+  if (!link || !link.token || !photo || typeof photo !== 'object') return { dimensions: null };
+  const source = type === 'mockup'
+    ? getWebdesignMockupSource(photo, normalizeString)
+    : getWebdesignPhotoSource(photo, normalizeString);
+  const parsed = parseImageDataUrl(source, normalizeString);
+  if (!parsed) return { dimensions: null };
+  const optimized = await optimizeInstantlyPreviewImageForEmail(parsed);
+  const dimensions = getImageDimensions(optimized) || getImageDimensions(parsed);
+  const baseName =
+    type === 'mockup'
+      ? normalizeString(photo.websiteMockupName || photo.mockupName) || `${normalizeString(company) || 'Softora'} device mockup`
+      : normalizeString(photo.websitePhotoName || photo.photoName || photo.websiteImageName) || `${normalizeString(company) || 'Softora'} webdesign`;
+  rememberPreviewImage(getPreviewImageCacheKey(link.token, link.type || type), {
+    ok: true,
+    type: link.type || type,
+    content: optimized.content,
+    contentType: optimized.contentType,
+    filename: `${baseName}.${getImageExtension(optimized.contentType)}`,
+  });
+  return { dimensions };
 }
 
 function normalizeInstantlyEventType(value, normalizeString = defaultNormalizeString) {
@@ -1573,7 +1753,7 @@ function createInstantlyOutreachService(deps = {}) {
     return { selectedRows, failed };
   }
 
-  function buildInstantlyLead(item, context = {}) {
+  async function buildInstantlyLead(item, context = {}) {
     const row = item.row;
     const email = getRowEmail(row, normalizeString);
     const company = getRowCompany(row, normalizeString);
@@ -1597,12 +1777,20 @@ function createInstantlyOutreachService(deps = {}) {
       normalizeString
     );
     const assets = getReadyWebdesignAssets(item, context);
-    const webdesignImageUrl = assets.ready
-      ? buildColdmailPreviewImageUrl(row, item.id, reference, config, 'webdesign', normalizeString, now)
-      : '';
-    const webdesignMockupUrl = assets.ready
-      ? buildColdmailPreviewImageUrl(row, item.id, reference, config, 'mockup', normalizeString, now)
-      : '';
+    const webdesignLink = assets.ready
+      ? buildColdmailPreviewImageLink(row, item.id, reference, config, 'webdesign', normalizeString, now)
+      : null;
+    const webdesignMockupLink = assets.ready
+      ? buildColdmailPreviewImageLink(row, item.id, reference, config, 'mockup', normalizeString, now)
+      : null;
+    const webdesignCache = assets.ready
+      ? await warmInstantlyPreviewImageCache({ link: webdesignLink, photo: assets.photo, type: 'webdesign', company }, normalizeString)
+      : { dimensions: null };
+    const webdesignMockupCache = assets.ready
+      ? await warmInstantlyPreviewImageCache({ link: webdesignMockupLink, photo: assets.photo, type: 'mockup', company }, normalizeString)
+      : { dimensions: null };
+    const webdesignImageUrl = webdesignLink ? webdesignLink.url : '';
+    const webdesignMockupUrl = webdesignMockupLink ? webdesignMockupLink.url : '';
     const instantlyEmailBody = buildInstantlyBodyWithWebdesignLinks(
       {
         baseText: baseMailBody,
@@ -1618,6 +1806,8 @@ function createInstantlyOutreachService(deps = {}) {
         company,
         webdesignImageUrl,
         webdesignMockupUrl,
+        webdesignImageDimensions: webdesignCache.dimensions,
+        webdesignMockupDimensions: webdesignMockupCache.dimensions,
         unsubscribeUrl,
       },
       normalizeString
@@ -1804,7 +1994,7 @@ function createInstantlyOutreachService(deps = {}) {
     const candidates = getExistingInstantlyRowsForVariableRefresh(rows, limit);
     let refreshed = 0;
     for (const item of candidates) {
-      const lead = buildInstantlyLead(item, context);
+      const lead = await buildInstantlyLead(item, context);
       await patchInstantlyLeadById(item.leadId, lead);
       refreshed += 1;
     }
@@ -2119,7 +2309,10 @@ function createInstantlyOutreachService(deps = {}) {
       return lastSyncResult;
     }
 
-    const leads = selectedRows.map((item) => buildInstantlyLead(item, personalizationContext));
+    const leads = [];
+    for (const item of selectedRows) {
+      leads.push(await buildInstantlyLead(item, personalizationContext));
+    }
     const data = await addLeadsToInstantly(leads);
     const nextRows = markRowsAsSynced(rows, selectedRows, data, actor);
     await setUiStateValues(

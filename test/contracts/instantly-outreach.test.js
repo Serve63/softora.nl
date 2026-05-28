@@ -6,6 +6,11 @@ const {
   buildChunkedStatePatch,
   readChunkedStateValue,
 } = require('../../server/services/data-ops-serialization');
+const {
+  clearPreviewImageCache,
+  getCachedPreviewImage,
+  getPreviewImageCacheKey,
+} = require('../../server/services/coldmail-preview-image-cache');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -34,7 +39,34 @@ function createRequest({ body = {}, secret = 'webhook-secret' } = {}) {
   };
 }
 
+function extractPreviewImageTokens(html) {
+  const matches = [...String(html || '').matchAll(/\/coldmailing\/webdesign-foto\?t=([^"&\s]+)/g)];
+  return matches.map((match) => decodeURIComponent(match[1]));
+}
+
+function extractImageTags(html) {
+  return [...String(html || '').matchAll(/<img\b[^>]*>/gi)].map((match) => match[0]);
+}
+
+function assertInstantlyImageTagsUseNaturalLayout(html) {
+  const imageTags = extractImageTags(html);
+  assert.equal(imageTags.length, 2);
+  assert.match(imageTags[0], /alt="Webdesign" width="640" height="640" loading="eager" decoding="async" fetchpriority="high"/);
+  assert.match(imageTags[1], /alt="Mockup" width="640" height="640" loading="eager" decoding="async" fetchpriority="high"/);
+  for (const imageTag of imageTags) {
+    assert.match(
+      imageTag,
+      /style="display:block;width:100%;max-width:640px;height:auto;border:0;outline:none;text-decoration:none;"/
+    );
+    assert.doesNotMatch(
+      imageTag,
+      /min-height|max-height|height="(?:220|360)"|height:(?:220|360)px|object-fit|border-radius|background:|font-family|font-size|font-weight|text-align/
+    );
+  }
+}
+
 function createService(overrides = {}) {
+  clearPreviewImageCache();
   let rows = overrides.rows || [
     {
       id: 'prospect-1',
@@ -217,11 +249,13 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   );
   assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
-  assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /alt="Webdesign" width="640" loading="eager" decoding="async" fetchpriority="high"/);
-  assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /alt="Mockup" width="640" loading="eager" decoding="async" fetchpriority="high"/);
-  assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /height:auto;max-height:none/);
-  assert.doesNotMatch(body.leads[0].custom_variables.softora_instantly_email_html, /min-height|height="(?:220|360)"|height:(?:220|360)px|object-fit/);
+  assertInstantlyImageTagsUseNaturalLayout(body.leads[0].custom_variables.softora_instantly_email_html);
   assert.doesNotMatch(body.leads[0].custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
+  const previewTokens = extractPreviewImageTokens(body.leads[0].custom_variables.softora_instantly_email_html);
+  assert.equal(previewTokens.length, 2);
+  assert.notEqual(previewTokens[0], previewTokens[1]);
+  assert.equal(getCachedPreviewImage(getPreviewImageCacheKey(previewTokens[0], 'webdesign')).contentType, 'image/png');
+  assert.equal(getCachedPreviewImage(getPreviewImageCacheKey(previewTokens[1], 'mockup')).contentType, 'image/png');
   assert.match(body.leads[0].custom_variables.softora_webdesign_image_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(body.leads[0].custom_variables.softora_webdesign_mockup_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.equal(body.leads[0].custom_variables.softora_webdesign_ready, 'true');
@@ -469,10 +503,8 @@ test('instantly sync can refresh existing lead variables without adding duplicat
   assert.equal(fetchCalls[0].options.method, 'PATCH');
   const body = JSON.parse(fetchCalls[0].options.body);
   assert.match(body.personalization, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
-  assert.match(body.personalization, /alt="Webdesign" width="640" loading="eager" decoding="async" fetchpriority="high"/);
-  assert.match(body.personalization, /height:auto;max-height:none/);
+  assertInstantlyImageTagsUseNaturalLayout(body.personalization);
   assert.match(body.custom_variables.softora_mail_body, /📍 Boxtel\n\n💼 Mijn LinkedIn 👈/);
-  assert.doesNotMatch(body.custom_variables.softora_instantly_email_html, /min-height|height="(?:220|360)"|height:(?:220|360)px|object-fit/);
   assert.doesNotMatch(body.custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
 });
 

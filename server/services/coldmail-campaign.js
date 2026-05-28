@@ -12,6 +12,7 @@ const {
 } = require('./customer-lifecycle');
 const { appendSentMessage } = require('./mailbox-sent-copy');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
+const previewImageCache = require('./coldmail-preview-image-cache');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -343,7 +344,6 @@ function createColdmailCampaignService(deps = {}) {
   const senderSmtpTransporters = new Map();
   let coldmailCampaignSendPromise = null;
   let webdesignPreparationCoordinator = initialWebdesignPreparationCoordinator;
-  const coldmailPreviewImageCache = new Map();
   let coldmailPhotoMapCache = null;
   const mailboxAccountService = createMailboxService({
     mailConfig: {
@@ -4404,39 +4404,19 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function getPreviewImageCacheKey(token, type = '') {
-    const cleanToken = normalizeString(token);
-    if (!cleanToken) return '';
-    return `${cleanToken}|${normalizeString(type).toLowerCase()}`;
+    return previewImageCache.getPreviewImageCacheKey(token, type);
   }
 
   function getCachedPreviewImage(cacheKey) {
-    const entry = coldmailPreviewImageCache.get(cacheKey);
-    if (!entry) return null;
-    if (Date.now() - entry.cachedAt > COLDMAIL_PREVIEW_IMAGE_CACHE_TTL_MS) {
-      coldmailPreviewImageCache.delete(cacheKey);
-      return null;
-    }
-    coldmailPreviewImageCache.delete(cacheKey);
-    coldmailPreviewImageCache.set(cacheKey, entry);
-    return {
-      ...entry.image,
-      content: Buffer.from(entry.image.content),
-    };
+    return previewImageCache.getCachedPreviewImage(cacheKey, {
+      ttlMs: COLDMAIL_PREVIEW_IMAGE_CACHE_TTL_MS,
+    });
   }
 
   function rememberPreviewImage(cacheKey, image) {
-    if (!cacheKey || !image || !Buffer.isBuffer(image.content)) return;
-    coldmailPreviewImageCache.set(cacheKey, {
-      cachedAt: Date.now(),
-      image: {
-        ...image,
-        content: Buffer.from(image.content),
-      },
+    return previewImageCache.rememberPreviewImage(cacheKey, image, {
+      limit: COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT,
     });
-    while (coldmailPreviewImageCache.size > COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT) {
-      const oldestKey = coldmailPreviewImageCache.keys().next().value;
-      coldmailPreviewImageCache.delete(oldestKey);
-    }
   }
 
   function getImageExtension(contentType) {
