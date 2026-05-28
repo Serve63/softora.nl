@@ -34,6 +34,8 @@ const COLDMAIL_IMAGE_VISIBILITY_PS =
   'PS: Zie je het webdesign niet? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?)/i;
+const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
+const COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT = 360;
 const DEFAULT_WEBDESIGN_SUBJECT = 'Nieuw webdesign gemaakt!';
 const DEFAULT_WEBDESIGN_BODY = [
   'Goedemorgen {{naam}},',
@@ -968,7 +970,7 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   )}" alt="${escapeHtmlAttribute(
     alt,
     normalizeString
-  )}" width="640" style="display:block;width:100%;max-width:640px;height:auto;max-height:none;border:0;outline:none;text-decoration:none;border-radius:12px;object-fit:contain;" /></td></tr></table>`;
+  )}" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" height="${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;max-height:none;border:0;outline:none;text-decoration:none;border-radius:12px;object-fit:contain;" /></td></tr></table>`;
 }
 
 function buildInstantlyEmailHtml(
@@ -988,11 +990,11 @@ function buildInstantlyEmailHtml(
     ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(
         COLDMAIL_MOCKUP_CAPTION,
         normalizeString
-      )}</p>${renderImageHtml(webdesignMockupUrl, `${company || 'Bedrijf'} device mockup`, '0', normalizeString)}`
+      )}</p>${renderImageHtml(webdesignMockupUrl, 'Mockup', '0', normalizeString)}`
     : '';
   return `${renderMailTextAsHtml(baseText, normalizeString)}${renderImageHtml(
     webdesignImageUrl,
-    `${company || 'Bedrijf'} webdesign`,
+    'Webdesign',
     '24px 0 0 0',
     normalizeString
   )}${mockupHtml}${optOut}`;
