@@ -138,6 +138,41 @@ test('public webdesign preview resolves current database ids through customer id
   assert.equal(preview.mockupSource, 'https://cdn.softora.test/aagje-current-mockup.jpg');
 });
 
+test('public webdesign preview reads structured data ops storage before ui-state fallback', async () => {
+  let uiStateReads = 0;
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      uiStateReads += 1;
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'manual-import-aagje-eu-0070',
+          bedrijf: 'Aagje van Os',
+          naam: 'Aagje van Os',
+          tel: '06 20 10 00 50',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-aagje-eu-0070',
+          identityKey: 'aagje van os|aagje van os|06 20 10 00 50',
+          websitePhotoUrl: 'https://signed.softora.test/aagje-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/aagje-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+
+  const preview = await service.resolvePreview('aagje-van-os');
+
+  assert.equal(uiStateReads, 0);
+  assert.equal(preview.id, 'manual-import-aagje-eu-0070');
+  assert.equal(preview.photoSource, 'https://signed.softora.test/aagje-webdesign.png?token=test');
+  assert.equal(preview.mockupSource, 'https://signed.softora.test/aagje-mockup.jpg?token=test');
+});
+
 test('public webdesign preview route exposes the shareable webdesign page', () => {
   const routes = [];
   const app = {
@@ -163,5 +198,6 @@ test('public webdesign preview is wired into feature routes', () => {
   );
 
   assert.match(featureRoutes, /createPublicWebdesignPreviewService/);
+  assert.match(featureRoutes, /dataOpsStore: deps\.dataOpsStore/);
   assert.match(featureRoutes, /registerPublicWebdesignPreviewRoutes/);
 });

@@ -66,6 +66,7 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   const publicWebdesignPreviewCoordinator = createPublicWebdesignPreviewService({
     getUiStateValues: deps.getUiStateValues,
+    dataOpsStore: deps.dataOpsStore,
   });
 
   registerColdcallingWebhookRoutes(app, {
