@@ -21,6 +21,8 @@ function registerInstantlyRoutes(app, deps = {}) {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const result = await instantlyOutreachService.syncInstantlyLeads({
         limit: body.limit,
+        refreshExistingVariables: body.refreshExistingVariables,
+        refreshExistingLimit: body.refreshExistingLimit,
         actor:
           normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
           normalizeString(body.actor) ||
