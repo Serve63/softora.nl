@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 
 const {
+  CUSTOMER_KEY,
+  CUSTOMER_SCOPE,
   PHOTO_KEY,
   PHOTO_SCOPE,
   createPublicWebdesignPreviewService,
@@ -93,7 +95,50 @@ test('public webdesign preview can read legacy chunked image data', async () => 
   assert.equal(preview.mockupSource, mockup);
 });
 
-test('public webdesign preview route exposes the shareable mailklaar page', () => {
+test('public webdesign preview resolves current database ids through customer identity keys', async () => {
+  const requestedScopes = [];
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues(scope) {
+      requestedScopes.push(scope);
+      if (scope === CUSTOMER_SCOPE) {
+        return {
+          values: {
+            [CUSTOMER_KEY]: JSON.stringify([{
+              id: 'manual-import-aagje-eu-0070',
+              bedrijf: 'Aagje van Os',
+              naam: 'Aagje van Os',
+              tel: '0612345678',
+            }]),
+          },
+        };
+      }
+      return {
+        values: {
+          [PHOTO_KEY]: JSON.stringify({
+            'manual-import-aagje-eu-0070': {
+              id: 'manual-import-aagje-eu-0070',
+              websitePhotoUrl: 'https://cdn.softora.test/incomplete-direct-photo.png',
+            },
+            'old-photo-row': {
+              id: 'old-photo-row',
+              identityKey: 'aagje van os|aagje van os|0612345678',
+              websitePhotoUrl: 'https://cdn.softora.test/aagje-current-webdesign.png',
+              websiteMockupUrl: 'https://cdn.softora.test/aagje-current-mockup.jpg',
+            },
+          }),
+        },
+      };
+    },
+  });
+
+  const preview = await service.resolvePreview('aagje-van-os');
+
+  assert.deepEqual(requestedScopes, [PHOTO_SCOPE, CUSTOMER_SCOPE]);
+  assert.equal(preview.photoSource, 'https://cdn.softora.test/aagje-current-webdesign.png');
+  assert.equal(preview.mockupSource, 'https://cdn.softora.test/aagje-current-mockup.jpg');
+});
+
+test('public webdesign preview route exposes the shareable webdesign page', () => {
   const routes = [];
   const app = {
     get(path, handler) {
@@ -106,6 +151,7 @@ test('public webdesign preview route exposes the shareable mailklaar page', () =
   });
 
   assert.deepEqual(routes.map((route) => [route.method, route.path]), [
+    ['GET', '/webdesign/:companySlug'],
     ['GET', '/mailklaar/:customerId'],
   ]);
 });
