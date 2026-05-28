@@ -535,7 +535,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_CACHE_LIMIT = 2500;/);
   assert.match(webdesignActionScriptSource, /function trimLoadedPhotoKeys\(\)/);
   assert.match(webdesignActionScriptSource, /const failedPhotoKeys = new Set\(\);/);
-  assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_FALLBACK_MS = 6000;/);
+  assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_FALLBACK_MS = 20000;/);
   assert.match(webdesignActionScriptSource, /function buildPhotoLoadKey\(kind, customerId, source\)/);
   assert.match(webdesignActionScriptSource, /function isInlinePhotoSource\(source\)/);
   assert.match(webdesignActionScriptSource, /isInlinePhotoSource\(photo\) \|\| loadedPhotoKeys\.has\(photoLoadKey\)/);
@@ -550,7 +550,10 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignActionScriptSource, /function hydratePhotoDrops\(root\)/);
   assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_RETRY_AFTER_MS = 30000;/);
   assert.match(webdesignActionScriptSource, /logMediaDebug\(failed \? "image-load-error" : "image-load-success", getPhotoDropDebug\(drop\)\);/);
-  assert.match(webdesignActionScriptSource, /fetchpriority=\\"high\\"/);
+  assert.match(webdesignActionScriptSource, /fetchpriority=\\"low\\"/);
+  assert.match(webdesignActionScriptSource, /function createPhotoLoadBinding\(drop, key\)/);
+  assert.match(webdesignActionScriptSource, /data-photo-load-binding/);
+  assert.match(webdesignActionScriptSource, /image-load-stale/);
   assert.match(webdesignActionScriptSource, /if \(hasPhoto \|\| hasMockup\) schedulePhotoDropHydration\(\);/);
   assert.match(webdesignActionScriptSource, /const isRestoringPhotos = typeof options\.isRestoringPhotos === "function"/);
   assert.match(webdesignActionScriptSource, /state && state\.photoRestorePending/);
@@ -702,7 +705,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.doesNotMatch(pageSource, /if \(databaseHadBootstrapCustomers\) releaseDatabaseBootShell\(\); await bootstrapCustomers\(\);/);
   assert.match(webdesignActionScriptSource, /pendingIds\.add\(job\.customerId\);/);
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT/);
-  assert.match(webdesignActionScriptSource, /loading=\\"eager\\" fetchpriority=\\"high\\" decoding=\\"async\\"/);
+  assert.match(webdesignActionScriptSource, /loading=\\"lazy\\" fetchpriority=\\"low\\" decoding=\\"async\\" width=\\"34\\" height=\\"34\\"/);
   assert.match(webdesignActionScriptSource, /preloadPhotoImages: preloadPhotoImages/);
   assert.match(webdesignActionScriptSource, /photos\.push\(\{ source: mockup, key: buildPhotoLoadKey\("mockup"/);
   assert.match(webdesignMockupScriptSource, /const pendingReserved = Boolean\(ensureOptions && ensureOptions\.pendingReserved\);/);
@@ -1333,6 +1336,22 @@ test('premium database webdesign action remembers failed photo slots as a quiet 
   assert.equal(attrs.get('data-photo-loaded'), 'true');
   assert.equal(attrs.get('data-photo-error'), 'true');
   assert.match(controller.render(customer), /class="photo-fallback-icon"/);
+
+  const fallbackAttrs = new Map([
+    ['data-photo-key', key],
+    ['data-photo-loaded', 'true'],
+    ['data-photo-error', 'true'],
+  ]);
+  const fallbackDrop = {
+    querySelector: () => null,
+    getAttribute: (name) => fallbackAttrs.get(name) || '',
+    setAttribute: (name, value) => fallbackAttrs.set(name, String(value)),
+    removeAttribute: (name) => fallbackAttrs.delete(name),
+  };
+  controller.hydratePhotoDrops({ querySelectorAll: () => [fallbackDrop] });
+
+  assert.equal(fallbackAttrs.get('data-photo-error'), 'true');
+  assert.match(controller.render(customer), /class="photo-fallback-icon"/);
 });
 
 test('premium database webdesign action hides stalled saved photos behind a quiet fallback', () => {
@@ -1391,6 +1410,71 @@ test('premium database webdesign action hides stalled saved photos behind a quie
   assert.equal(attrs.get('data-photo-error'), 'true');
   assert.equal(clearedTimer, 42);
   assert.match(controller.render(customer), /class="photo-fallback-icon"/);
+});
+
+test('premium database webdesign action ignores stale fallback timers from replaced photo nodes', () => {
+  const timers = [];
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    setTimeout(handler) {
+      timers.push(handler);
+      return timers.length;
+    },
+    clearTimeout() {},
+  });
+  const customer = {
+    id: 'customer-1',
+    websitePhoto: 'https://assets.softora.test/customer-1.png?token=old',
+    websitePhotoName: 'Websitefoto',
+    websiteMockup: '',
+    websiteMockupName: '',
+  };
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [] },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^(data:image\/|https:\/\/)/.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => '',
+    isWebdesignPhotoEligible: () => false,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+  const html = controller.render(customer);
+  const key = html.match(/data-photo-key="([^"]+)"/)[1];
+  const createDrop = (image, isConnected = true) => {
+    const attrs = new Map([
+      ['data-photo-key', key],
+      ['data-photo-loaded', 'false'],
+      ['data-photo-error', 'false'],
+      ['data-photo-id', 'customer-1'],
+    ]);
+    return {
+      isConnected,
+      querySelector: (selector) => selector === '.photo-drop-image' ? image : null,
+      getAttribute: (name) => attrs.get(name) || '',
+      setAttribute: (name, value) => attrs.set(name, String(value)),
+      removeAttribute: (name) => attrs.delete(name),
+      insertAdjacentHTML() {},
+    };
+  };
+  const oldDrop = createDrop({ complete: false, naturalWidth: 0, addEventListener() {} });
+  const currentDrop = createDrop({ complete: true, naturalWidth: 24, addEventListener() {} });
+
+  controller.hydratePhotoDrops({ querySelectorAll: () => [oldDrop] });
+  controller.hydratePhotoDrops({ querySelectorAll: () => [currentDrop] });
+  oldDrop.isConnected = false;
+
+  assert.equal(currentDrop.getAttribute('data-photo-loaded'), 'true');
+  assert.equal(timers.length, 2);
+  timers[0]();
+
+  const refreshedHtml = controller.render({
+    ...customer,
+    websitePhoto: 'https://assets.softora.test/customer-1.png?token=new',
+  });
+  assert.doesNotMatch(refreshedHtml, /class="photo-fallback-icon"/);
+  assert.match(refreshedHtml, /data-photo-loaded="true"/);
 });
 
 test('premium database page combines contact filters into one benaderd step', () => {

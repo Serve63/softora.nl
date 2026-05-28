@@ -1,13 +1,22 @@
 # Premium Database media-stabiliteit: onderzoekskaart
 
-Datum: 2026-05-28  
-Status: onderzoek, nog geen fix uitgevoerd  
-Repo-basis na laatste sync: `25c7056e3577d3944325ce4b68c9dd009cda45da`  
-Live productie tijdens de eerste media-metingen: `cc652782d2fad10922973dddc205dadf14c9a07e`  
-Live productie na afrondende wait-check: `25c7056e3577d3944325ce4b68c9dd009cda45da`  
+Datum: 2026-05-28
+Status: onderzoek + fixfase gestart op dezelfde branch
+Repo-basis na laatste sync: `25c7056e3577d3944325ce4b68c9dd009cda45da`
+Live productie tijdens de eerste media-metingen: `cc652782d2fad10922973dddc205dadf14c9a07e`
+Live productie na afrondende wait-check: `25c7056e3577d3944325ce4b68c9dd009cda45da`
 Scope: `/premium-database`, vooral foto-vakken, mockups, herladen, fallback `!`, loaders en UI-stabiliteit.
 
 Let op: tijdens afronding schoof `origin/main` door naar PR #558. Een directe live-check zag productie kort nog op `cc652782...`, daarna trok de wait-check groen naar `25c7056...`. PR #558 raakt coldmail image-frame code, niet de onderzochte premium-database media-controller.
+
+Fix-update: na dit onderzoek is op dezelfde branch de eerste structurele fix aangebracht:
+
+- Foto-loads krijgen een actieve binding/generatie-id, zodat oude timers van vervangen DOM-nodes geen nieuwe foto-status meer kunnen overschrijven.
+- De fallback-timer is verruimd van 6s naar 20s, zodat zware maar geldige afbeeldingen minder snel vals op `!` vallen.
+- Tabelafbeeldingen gebruiken nu lazy/low-priority loading met vaste 34x34 image-attributen.
+- Nieuwe Supabase Storage uploads krijgen expliciete cache headers.
+- Signed URLs worden per storage-pad hergebruikt zolang ze nog fris zijn.
+- Regressietests bewijzen dat een oude detached fallback-timer geen actuele loaded foto meer kan omzetten naar fallback.
 
 ## Conclusie in gewone taal
 

@@ -21,6 +21,9 @@ const TABLES = Object.freeze({
   mailboxMessages: 'softora_mailbox_messages',
   mailboxSyncState: 'softora_mailbox_sync_state',
 });
+const DESIGN_PHOTO_CACHE_CONTROL_SECONDS = '31536000';
+const SIGNED_URL_CACHE_LIMIT = 1500;
+const SIGNED_URL_CACHE_MIN_FRESH_MS = 60 * 1000;
 
 function createSoftoraDataOpsStore(deps = {}) {
   const {
@@ -30,6 +33,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     bucketName = 'softora-design-photos',
     now = () => new Date(),
   } = deps;
+  const signedUrlCache = new Map();
 
   function getClient() {
     if (!isSupabaseConfigured()) return null;
@@ -66,6 +70,13 @@ function createSoftoraDataOpsStore(deps = {}) {
 
   function isoNow() {
     return now().toISOString();
+  }
+
+  function currentTimeMs() {
+    const value = now();
+    if (value instanceof Date) return value.getTime();
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : Date.now();
   }
 
   function normalizeCustomerPayload(raw = {}, index = 0) {
@@ -448,6 +459,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         `${parsed.contentHash}.${ext}`,
       ].join('/');
       const uploaded = await client.storage.from(bucketName).upload(path, parsed.buffer, {
+        cacheControl: DESIGN_PHOTO_CACHE_CONTROL_SECONDS,
         contentType: parsed.mimeType,
         upsert: true,
       });
@@ -462,6 +474,7 @@ function createSoftoraDataOpsStore(deps = {}) {
           `${mockup.contentHash}-mockup.${mockupExt}`,
         ].join('/');
         const uploadedMockup = await client.storage.from(bucketName).upload(mockupPath, mockup.buffer, {
+          cacheControl: DESIGN_PHOTO_CACHE_CONTROL_SECONDS,
           contentType: mockup.mimeType,
           upsert: true,
         });
@@ -626,6 +639,52 @@ function createSoftoraDataOpsStore(deps = {}) {
     const rows = result.data || [];
     const entries = [];
 
+    function buildSignedUrlCacheKey(bucket, path, signOptions) {
+      return JSON.stringify([
+        normalizeString(bucket),
+        normalizeString(path),
+        Math.floor(expiresInSeconds),
+        signOptions && typeof signOptions === 'object' ? signOptions : null,
+      ]);
+    }
+
+    function readCachedSignedUrl(cacheKey) {
+      const cached = signedUrlCache.get(cacheKey);
+      if (!cached || !cached.signedUrl) return '';
+      const minimumFreshMs = Math.min(
+        SIGNED_URL_CACHE_MIN_FRESH_MS,
+        Math.max(1000, expiresInSeconds * 1000 / 4)
+      );
+      if (Number(cached.expiresAtMs || 0) - currentTimeMs() > minimumFreshMs) {
+        signedUrlCache.delete(cacheKey);
+        signedUrlCache.set(cacheKey, cached);
+        return cached.signedUrl;
+      }
+      signedUrlCache.delete(cacheKey);
+      return '';
+    }
+
+    function rememberSignedUrl(cacheKey, signedUrl) {
+      if (!signedUrl) return;
+      signedUrlCache.set(cacheKey, {
+        signedUrl,
+        expiresAtMs: currentTimeMs() + expiresInSeconds * 1000,
+      });
+      while (signedUrlCache.size > SIGNED_URL_CACHE_LIMIT) {
+        const oldestKey = signedUrlCache.keys().next().value;
+        signedUrlCache.delete(oldestKey);
+      }
+    }
+
+    async function createCachedSignedUrl(bucket, path, signOptions) {
+      const cacheKey = buildSignedUrlCacheKey(bucket, path, signOptions);
+      const cached = readCachedSignedUrl(cacheKey);
+      if (cached) return { data: { signedUrl: cached }, error: null, cached: true };
+      const signed = await client.storage.from(bucket).createSignedUrl(path, expiresInSeconds, signOptions);
+      if (!signed.error && signed.data?.signedUrl) rememberSignedUrl(cacheKey, normalizeString(signed.data.signedUrl));
+      return signed;
+    }
+
     let cursor = 0;
     const workerCount = Math.min(6, Math.max(1, rows.length));
 
@@ -636,7 +695,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         const bucket = normalizeString(row.storage_bucket || bucketName);
         const path = normalizeString(row.storage_path);
         if (!bucket || !path) continue;
-        const signed = await client.storage.from(bucket).createSignedUrl(path, expiresInSeconds);
+        const signed = await createCachedSignedUrl(bucket, path);
         if (signed.error || !signed.data?.signedUrl) continue;
         const legacyMeta = row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {};
         const mockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : null;
@@ -645,7 +704,7 @@ function createSoftoraDataOpsStore(deps = {}) {
           const mockupBucket = normalizeString(mockupMeta.storageBucket || bucketName);
           const mockupPath = normalizeString(mockupMeta.storagePath);
           if (mockupBucket && mockupPath) {
-            const mockupSigned = await client.storage.from(mockupBucket).createSignedUrl(mockupPath, expiresInSeconds);
+            const mockupSigned = await createCachedSignedUrl(mockupBucket, mockupPath);
             if (!mockupSigned.error && mockupSigned.data?.signedUrl) {
               websiteMockupUrl = normalizeString(mockupSigned.data.signedUrl);
             }
@@ -663,7 +722,7 @@ function createSoftoraDataOpsStore(deps = {}) {
           identityKey: normalizeString(row.identity_key),
           legacyMeta,
           updatedAt: normalizeString(row.updated_at),
-          signedUrlExpiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+          signedUrlExpiresAt: new Date(currentTimeMs() + expiresInSeconds * 1000).toISOString(),
         });
       }
     }
