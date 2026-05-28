@@ -217,7 +217,9 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   );
   assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
-  assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
+  assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /alt="Webdesign" width="640" height="360"/);
+  assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /alt="Mockup" width="640" height="360"/);
+  assert.doesNotMatch(body.leads[0].custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
   assert.match(body.leads[0].custom_variables.softora_webdesign_image_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(body.leads[0].custom_variables.softora_webdesign_mockup_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.equal(body.leads[0].custom_variables.softora_webdesign_ready, 'true');
