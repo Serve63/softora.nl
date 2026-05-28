@@ -719,6 +719,27 @@ function createSoftoraDataOpsStore(deps = {}) {
     return Number.isFinite(parsed) ? parsed : null;
   }
 
+  function normalizeWebdesignJobRetryPayload(value = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      attempts: Math.max(0, Math.floor(Number(source.attempts || 0) || 0)),
+      nextAttemptAt: Math.max(0, Number(source.nextAttemptAt || 0) || 0) || null,
+      lastRetryAt: Math.max(0, Number(source.lastRetryAt || 0) || 0) || null,
+      lastRetryReason: normalizeString(source.lastRetryReason || '').slice(0, 500),
+    };
+  }
+
+  function buildWebdesignJobPayload(job = {}) {
+    const retry = normalizeWebdesignJobRetryPayload(job.retry);
+    const payload = {
+      customer: job.customer && typeof job.customer === 'object' ? job.customer : {},
+    };
+    if (retry.attempts || retry.nextAttemptAt || retry.lastRetryAt || retry.lastRetryReason) {
+      payload.retry = retry;
+    }
+    return payload;
+  }
+
   function buildWebdesignJobRow(job = {}) {
     return {
       job_id: normalizeString(job.id),
@@ -727,9 +748,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       website_url: normalizeString(job.websiteUrl).slice(0, 500),
       status: normalizeString(job.status || 'queued').toLowerCase(),
       error: normalizeString(job.error || '').slice(0, 1000) || null,
-      payload: {
-        customer: job.customer && typeof job.customer === 'object' ? job.customer : {},
-      },
+      payload: buildWebdesignJobPayload(job),
       created_at: toIsoFromMaybeMs(job.createdAt) || isoNow(),
       started_at: toIsoFromMaybeMs(job.startedAt),
       finished_at: toIsoFromMaybeMs(job.finishedAt),
@@ -749,6 +768,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       createdAt: toMsFromIso(row.created_at) || Date.now(),
       startedAt: toMsFromIso(row.started_at),
       finishedAt: toMsFromIso(row.finished_at),
+      retry: normalizeWebdesignJobRetryPayload(payload.retry),
     };
   }
 

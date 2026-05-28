@@ -440,6 +440,14 @@
             pollTimers.set(jobId, timer);
         }
 
+        function resolveJobPollDelay(job) {
+            const nextAttemptAt = Math.max(0, Number(job && job.nextAttemptAt) || 0);
+            if (nextAttemptAt > now()) {
+                return Math.max(POLL_INTERVAL_MS, Math.min(nextAttemptAt - now(), POLL_INTERVAL_MS * 12));
+            }
+            return POLL_INTERVAL_MS;
+        }
+
         async function finishPendingJob(job, message) {
             clearPollTimer(job.jobId);
             removePendingJob(job.customerId);
@@ -484,7 +492,7 @@
                     await finishPendingJob(storedJob, normalizeString(job.error) || "Webdesign maken is mislukt.");
                     return;
                 }
-                schedulePoll(jobId, POLL_INTERVAL_MS);
+                schedulePoll(jobId, resolveJobPollDelay(job));
             } catch (error) {
                 schedulePoll(jobId, POLL_INTERVAL_MS * 2);
             }

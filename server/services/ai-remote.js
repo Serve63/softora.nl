@@ -1035,6 +1035,80 @@ function createAiRemoteService(deps = {}) {
     return /abort|timeout|timed out|fetch failed|terminated|econnreset|socket/i.test(message);
   }
 
+  function parseOpenAiRetryDurationMs(value, options = {}) {
+    const raw = normalizeString(value || '');
+    if (!raw) return 0;
+
+    if (options.retryAfterHeader) {
+      const seconds = Number(raw);
+      if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+      const dateMs = Date.parse(raw);
+      if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
+    }
+
+    if (options.milliseconds) {
+      const milliseconds = Number(raw);
+      return Number.isFinite(milliseconds) && milliseconds >= 0 ? milliseconds : 0;
+    }
+
+    let totalMs = 0;
+    const pattern = /(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|secs?|seconds?|m|mins?|minutes?)/gi;
+    let match;
+    while ((match = pattern.exec(raw))) {
+      const amount = Number(match[1]);
+      const unit = normalizeString(match[2]).toLowerCase();
+      if (!Number.isFinite(amount) || amount < 0) continue;
+      if (unit === 'ms' || unit.startsWith('millisecond')) totalMs += amount;
+      else if (unit === 'm' || unit.startsWith('min')) totalMs += amount * 60 * 1000;
+      else totalMs += amount * 1000;
+    }
+    return totalMs;
+  }
+
+  function parseOpenAiRetryMessageMs(value) {
+    const raw = normalizeString(value || '');
+    const match = raw.match(/(?:try again|retry|probeer opnieuw|opnieuw proberen)\s*(?:in|after|over)?\s*([0-9][^.;,\n]*)/i);
+    return match ? parseOpenAiRetryDurationMs(match[1]) : 0;
+  }
+
+  function clampOpenAiRetryDelayMs(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+    return Math.max(1000, Math.min(60000, Math.ceil(numeric)));
+  }
+
+  function resolveOpenAiImageRetryAfterMs(response, upstreamDetail) {
+    const retryAfterMs = parseOpenAiRetryDurationMs(extractResponseHeader(response, 'retry-after-ms'), {
+      milliseconds: true,
+    });
+    if (retryAfterMs > 0) return clampOpenAiRetryDelayMs(retryAfterMs);
+
+    const retryAfter = parseOpenAiRetryDurationMs(extractResponseHeader(response, 'retry-after'), {
+      retryAfterHeader: true,
+    });
+    if (retryAfter > 0) return clampOpenAiRetryDelayMs(retryAfter);
+
+    const messageDelay = parseOpenAiRetryMessageMs(upstreamDetail);
+    if (messageDelay > 0) return clampOpenAiRetryDelayMs(messageDelay);
+
+    const resetHeaders = [
+      'x-ratelimit-reset-input-images',
+      'x-ratelimit-reset-images',
+      'x-ratelimit-reset-requests',
+      'x-ratelimit-reset-tokens',
+    ];
+    for (const headerName of resetHeaders) {
+      const delay = parseOpenAiRetryDurationMs(extractResponseHeader(response, headerName));
+      if (delay > 0) return clampOpenAiRetryDelayMs(delay);
+    }
+    return 0;
+  }
+
+  function isOpenAiImageRetryableResponse(response) {
+    const status = Number(response?.status || 0);
+    return status === 408 || status === 429 || status === 502 || status === 503 || status === 504 || status >= 500;
+  }
+
   function resolveOpenAiImageGenerationTimeoutMs() {
     const explicit = Number(env.OPENAI_IMAGE_GENERATION_TIMEOUT_MS || env.WEBSITE_PREVIEW_IMAGE_TIMEOUT_MS || 0) || 0;
     const fallback = Math.max(Number(websiteGenerationTimeoutMs) || 0, 9 * 60 * 1000);
@@ -1051,6 +1125,7 @@ function createAiRemoteService(deps = {}) {
     );
     err.status = 504;
     err.cause = error;
+    err.retryableOpenAiImage = true;
     throw err;
   }
 
@@ -1143,6 +1218,10 @@ function createAiRemoteService(deps = {}) {
       err.status = response.status;
       err.data = data;
       err.model = usedImageModel;
+      if (isOpenAiImageRetryableResponse(response)) {
+        err.retryableOpenAiImage = true;
+        err.retryAfterMs = resolveOpenAiImageRetryAfterMs(response, upstreamDetail);
+      }
       throw err;
     }
 

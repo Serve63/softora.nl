@@ -597,7 +597,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260527d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260528a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260527b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260527c/);
@@ -619,13 +619,15 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(pageSource, /function generateWebdesignPhotos\(limit, options\)/);
   assert.match(pageSource, /const progressSilent = Boolean\(options && options\.silentProgress\);/);
   assert.match(pageSource, /return isWebdesignPhotoEligible\(customer\);/);
-  assert.match(pageSource, /Promise\.allSettled\(targets\.map\(function \(target\) \{/);
-  assert.match(pageSource, /return webdesignActionController\.generateForCustomer\(target\.id\);/);
+  assert.doesNotMatch(pageSource, /Promise\.allSettled\(targets\.map\(function \(target\) \{/);
+  assert.match(pageSource, /for \(const target of targets\) \{/);
+  assert.match(pageSource, /await webdesignActionController\.generateForCustomer\(target\.id\);/);
+  assert.doesNotMatch(pageSource, /return webdesignActionController\.generateForCustomer\(target\.id\);/);
   assert.doesNotMatch(pageSource, /Webdesign maken voor " \+ target\.bedrijf/);
   assert.doesNotMatch(pageSource, /AI-foto maken voor " \+ target\.bedrijf/);
   assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten, \{ onlyCustomerIds: \[customerId\] \}\);/);
   assert.doesNotMatch(pageSource, /onlyCustomerIds: \[target\.id\]/);
-  assert.match(pageSource, /setStatusMessage\(""\);[\s\S]*Promise\.allSettled/);
+  assert.match(pageSource, /setStatusMessage\(""\);[\s\S]*for \(const target of targets\)/);
   assert.doesNotMatch(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
@@ -639,6 +641,8 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignActionScriptSource, /function resumePendingJobs\(\)/);
   assert.match(webdesignActionScriptSource, /return firstLoad;/);
   assert.match(webdesignActionScriptSource, /async function loadRunningJobs\(\)/);
+  assert.match(webdesignActionScriptSource, /function resolveJobPollDelay\(job\)/);
+  assert.match(webdesignActionScriptSource, /schedulePoll\(jobId, resolveJobPollDelay\(job\)\);/);
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT,/);
   assert.doesNotMatch(webdesignActionScriptSource, /localStorage/);
   assert.doesNotMatch(webdesignActionScriptSource, /sessionStorage/);

@@ -97,22 +97,30 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     jobProcessTimeoutMs = 10 * 60 * 1000,
     processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
     loadSharpImpl = loadSharpModule,
+    now = () => Date.now(),
+    random = Math.random,
+    retryJitter = true,
   } = deps;
 
   const jobs = new Map();
   const JOB_TTL_MS = 6 * 60 * 60 * 1000;
   const JOB_PROCESS_TIMEOUT_MS = Math.max(100, Math.min(10 * 60 * 1000, Number(jobProcessTimeoutMs) || 0));
   const MAX_JOBS = 500;
+  const MAX_RETRY_ATTEMPTS = 6;
+  const RETRY_DELAY_MIN_MS = 5000;
+  const RETRY_DELAY_MAX_MS = 60000;
   const CHUNK_SIZE = 180000;
   const MAX_STORAGE_CHUNKS = 80;
   const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
   let processing = false;
+  let processingWakeTimer = null;
+  let processingWakeAt = 0;
   const inlineProcessingJobIds = new Set();
 
   function pruneJobs() {
-    const now = Date.now();
+    const currentTime = now();
     for (const [id, job] of jobs.entries()) {
-      if (now - job.createdAt > JOB_TTL_MS) jobs.delete(id);
+      if (currentTime - job.createdAt > JOB_TTL_MS) jobs.delete(id);
     }
     while (jobs.size > MAX_JOBS) {
       let oldestId = null;
@@ -207,7 +215,148 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
   }
 
+  function normalizeRetryState(value = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      attempts: Math.max(0, Math.floor(Number(source.attempts || 0) || 0)),
+      nextAttemptAt: Math.max(0, Number(source.nextAttemptAt || 0) || 0) || null,
+      lastRetryAt: Math.max(0, Number(source.lastRetryAt || 0) || 0) || null,
+      lastRetryReason: truncateText(normalizeString(source.lastRetryReason || ''), 500),
+    };
+  }
+
+  function getRetryState(job) {
+    if (!job || typeof job !== 'object') return normalizeRetryState();
+    job.retry = normalizeRetryState(job.retry);
+    return job.retry;
+  }
+
+  function clearRetryState(job) {
+    if (!job || typeof job !== 'object') return;
+    job.retry = normalizeRetryState();
+  }
+
+  function parseRetryDurationMs(value, options = {}) {
+    const raw = normalizeString(value || '');
+    if (!raw) return 0;
+
+    if (options.retryAfterHeader) {
+      const seconds = Number(raw);
+      if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+      const dateMs = Date.parse(raw);
+      if (Number.isFinite(dateMs)) return Math.max(0, dateMs - now());
+    }
+
+    if (options.milliseconds) {
+      const milliseconds = Number(raw);
+      return Number.isFinite(milliseconds) && milliseconds >= 0 ? milliseconds : 0;
+    }
+
+    let totalMs = 0;
+    const pattern = /(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|secs?|seconds?|m|mins?|minutes?)/gi;
+    let match;
+    while ((match = pattern.exec(raw))) {
+      const amount = Number(match[1]);
+      const unit = normalizeString(match[2]).toLowerCase();
+      if (!Number.isFinite(amount) || amount < 0) continue;
+      if (unit === 'ms' || unit.startsWith('millisecond')) totalMs += amount;
+      else if (unit === 'm' || unit.startsWith('min')) totalMs += amount * 60 * 1000;
+      else totalMs += amount * 1000;
+    }
+    return totalMs;
+  }
+
+  function parseRetryMessageMs(value) {
+    const raw = normalizeString(value || '');
+    const match = raw.match(/(?:try again|retry|probeer opnieuw|opnieuw proberen)\s*(?:in|after|over)?\s*([0-9][^.;,\n]*)/i);
+    return match ? parseRetryDurationMs(match[1]) : 0;
+  }
+
+  function clampRetryDelayMs(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+    return Math.max(1000, Math.min(RETRY_DELAY_MAX_MS, Math.ceil(numeric)));
+  }
+
+  function resolveRetryDelayMs(error, failedAttemptCount) {
+    const explicit = clampRetryDelayMs(error && error.retryAfterMs);
+    if (explicit > 0) return explicit;
+
+    const detail = [
+      error && error.message,
+      error?.data?.error?.message,
+      error?.data?.error?.detail,
+      error?.data?.detail,
+    ].map(normalizeString).filter(Boolean).join(' ');
+    const messageDelay = clampRetryDelayMs(parseRetryMessageMs(detail));
+    if (messageDelay > 0) return messageDelay;
+
+    const retryAfter = clampRetryDelayMs(parseRetryDurationMs(error?.retryAfter, { retryAfterHeader: true }));
+    if (retryAfter > 0) return retryAfter;
+
+    const baseDelay = Math.min(
+      RETRY_DELAY_MAX_MS,
+      RETRY_DELAY_MIN_MS * Math.pow(2, Math.max(0, Number(failedAttemptCount || 1) - 1))
+    );
+    if (retryJitter === false) return baseDelay;
+    const jitterFactor = 0.8 + Math.max(0, Math.min(1, Number(random()) || 0)) * 0.4;
+    return Math.min(RETRY_DELAY_MAX_MS, Math.max(1000, Math.round(baseDelay * jitterFactor)));
+  }
+
+  function isRetryableWebdesignError(error) {
+    const status = Number(error && error.status) || 0;
+    const message = normalizeString(error && error.message).toLowerCase();
+    const upstreamMessage = normalizeString(
+      error?.data?.error?.message || error?.data?.error?.detail || error?.data?.detail || ''
+    ).toLowerCase();
+    const combined = `${message} ${upstreamMessage}`;
+
+    if (
+      /openai_api_key ontbreekt|image-model ongeldig|organization must be verified|not verified|billing|quota|credits|monthly usage|maximum monthly spend|invalid authentication|incorrect api key/.test(combined)
+    ) {
+      return false;
+    }
+    if (status === 401 || status === 403 || status === 400 || status === 422) return false;
+    if (error && error.retryableOpenAiImage === true) return true;
+    if (status === 408 || status === 429 || status === 502 || status === 503 || status === 504 || status >= 500) {
+      return true;
+    }
+    return /abort|timeout|timed out|duurde te lang|fetch failed|terminated|econnreset|socket|netwerkfout/i.test(combined);
+  }
+
+  function isJobReadyToProcess(job) {
+    if (!job || job.status !== 'queued') return false;
+    const retry = getRetryState(job);
+    return !retry.nextAttemptAt || retry.nextAttemptAt <= now();
+  }
+
+  function getSoonestQueuedRetryAt() {
+    let soonest = Infinity;
+    for (const job of jobs.values()) {
+      if (!job || job.status !== 'queued') continue;
+      const retry = getRetryState(job);
+      if (retry.nextAttemptAt && retry.nextAttemptAt > now()) {
+        soonest = Math.min(soonest, retry.nextAttemptAt);
+      }
+    }
+    return Number.isFinite(soonest) ? soonest : 0;
+  }
+
+  function scheduleProcessingWake(delayMs) {
+    const delay = Math.max(0, Math.min(RETRY_DELAY_MAX_MS, Number(delayMs) || 0));
+    const wakeAt = now() + delay;
+    if (processingWakeTimer && processingWakeAt && processingWakeAt <= wakeAt) return;
+    if (processingWakeTimer) clearTimeout(processingWakeTimer);
+    processingWakeAt = wakeAt;
+    processingWakeTimer = setTimeout(() => {
+      processingWakeTimer = null;
+      processingWakeAt = 0;
+      queueProcessing();
+    }, delay);
+  }
+
   function serializeJob(job) {
+    const retry = getRetryState(job);
     return {
       id: job.id,
       status: job.status,
@@ -217,6 +366,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       createdAt: job.createdAt,
       startedAt: job.startedAt || null,
       finishedAt: job.finishedAt || null,
+      nextAttemptAt: retry.nextAttemptAt || null,
+      retryAttempts: retry.attempts,
     };
   }
 
@@ -398,7 +549,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function processJob(job) {
     job.status = 'running';
-    job.startedAt = Date.now();
+    job.startedAt = now();
     await persistJob(job);
 
     if (!aiToolsCoordinator || typeof aiToolsCoordinator.runWebsitePreviewGeneratePipeline !== 'function') {
@@ -424,7 +575,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   function withJobProcessTimeout(job, promise) {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error(`Webdesign maken duurde te lang (${Math.round(JOB_PROCESS_TIMEOUT_MS / 1000)}s). Probeer het opnieuw.`));
+        const error = new Error(`Webdesign maken duurde te lang (${Math.round(JOB_PROCESS_TIMEOUT_MS / 1000)}s). Probeer het opnieuw.`);
+        error.status = 504;
+        error.retryableOpenAiImage = true;
+        reject(error);
       }, JOB_PROCESS_TIMEOUT_MS);
       Promise.resolve(promise).then(
         (value) => {
@@ -444,12 +598,42 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       await withJobProcessTimeout(job, processJob(job));
       job.status = 'done';
       job.error = null;
-      job.finishedAt = Date.now();
+      job.finishedAt = now();
+      clearRetryState(job);
       await persistJob(job);
     } catch (error) {
+      if (isRetryableWebdesignError(error)) {
+        const retry = getRetryState(job);
+        const failedAttemptCount = retry.attempts + 1;
+        if (failedAttemptCount < MAX_RETRY_ATTEMPTS) {
+          const retryDelayMs = resolveRetryDelayMs(error, failedAttemptCount);
+          job.status = 'queued';
+          job.error = null;
+          job.startedAt = null;
+          job.finishedAt = null;
+          job.retry = {
+            attempts: failedAttemptCount,
+            nextAttemptAt: now() + retryDelayMs,
+            lastRetryAt: now(),
+            lastRetryReason: truncateText(normalizeString(error && error.message) || 'Tijdelijke OpenAI-limiet.', 500),
+          };
+          if (typeof logger.warn === 'function') {
+            logger.warn(
+              `[PremiumDatabaseWebdesignJobs][retry] ${job.id} wacht ${Math.round(retryDelayMs / 1000)}s na tijdelijke OpenAI-fout`
+            );
+          }
+          await persistJob(job);
+          return job;
+        }
+      }
       job.status = 'error';
       job.error = truncateText(normalizeString(error && error.message) || 'Webdesign maken is mislukt.', 500);
-      job.finishedAt = Date.now();
+      job.finishedAt = now();
+      const retry = getRetryState(job);
+      job.retry = {
+        ...retry,
+        nextAttemptAt: null,
+      };
       logger.error('[PremiumDatabaseWebdesignJobs][process]', error && error.message ? error.message : error);
       await persistJob(job);
     }
@@ -460,34 +644,41 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     if (!job || job.status !== 'running') return false;
     const startedAt = Number(job.startedAt) || 0;
     if (!startedAt) return true;
-    return Date.now() - startedAt > JOB_PROCESS_TIMEOUT_MS + 30 * 1000;
+    return now() - startedAt > JOB_PROCESS_TIMEOUT_MS + 30 * 1000;
   }
 
   async function processJobForStatusRequest(job) {
     if (!processJobsInline || !job) return job;
-    const shouldProcess = job.status === 'queued' || isStaleRunningJob(job);
-    if (!shouldProcess || inlineProcessingJobIds.has(job.id)) return job;
+    const shouldProcess = (job.status === 'queued' && isJobReadyToProcess(job)) || isStaleRunningJob(job);
+    if (!shouldProcess || processing || inlineProcessingJobIds.has(job.id)) return job;
 
     if (job.status === 'running') {
       job.status = 'queued';
       job.error = null;
       job.startedAt = null;
       job.finishedAt = null;
+      clearRetryState(job);
       await persistJob(job);
     }
 
+    processing = true;
     inlineProcessingJobIds.add(job.id);
     try {
       return await settleJob(job);
     } finally {
       inlineProcessingJobIds.delete(job.id);
+      processing = false;
     }
   }
 
   function queueProcessing() {
     if (processing) return;
-    const next = Array.from(jobs.values()).find((job) => job.status === 'queued');
-    if (!next) return;
+    const next = Array.from(jobs.values()).find(isJobReadyToProcess);
+    if (!next) {
+      const nextRetryAt = getSoonestQueuedRetryAt();
+      if (nextRetryAt) scheduleProcessingWake(nextRetryAt - now());
+      return;
+    }
 
     processing = true;
     setImmediate(() => {
@@ -560,9 +751,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       websiteUrl,
       status: 'queued',
       error: null,
-      createdAt: Date.now(),
+      createdAt: now(),
       startedAt: null,
       finishedAt: null,
+      retry: normalizeRetryState(),
     };
     jobs.set(job.id, job);
     await persistJob(job);

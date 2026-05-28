@@ -1571,7 +1571,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-asset-state.js?v=20260527a"></script><script src="assets/premium-database-webdesign-action.js?v=20260527d"></script>
+    <script src="assets/premium-database-webdesign-asset-state.js?v=20260527a"></script><script src="assets/premium-database-webdesign-action.js?v=20260528a"></script>
     <script src="assets/premium-database-import.js?v=20260521b"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260527b"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260527c"></script>
@@ -2686,11 +2686,9 @@
                     return;
                 }
                 setStatusMessage("");
-                const results = await Promise.allSettled(targets.map(function (target) {
-                    return webdesignActionController.generateForCustomer(target.id);
-                }));
-                const failed = results.filter(function (result) { return result.status === "rejected"; }).length;
-                if (!progressSilent) toast((targets.length - failed) + " webdesign" + (targets.length - failed === 1 ? "" : "s") + " gestart");
+                let started = 0, failed = 0;
+                for (const target of targets) { try { await webdesignActionController.generateForCustomer(target.id); started += 1; } catch (error) { failed += 1; } }
+                if (!progressSilent) toast(started + " webdesign" + (started === 1 ? "" : "s") + (failed ? " gestart, " + failed + " niet gestart" : " gestart"));
             } finally {
                 nodes.generatePhotosButton.disabled = false;
             }
