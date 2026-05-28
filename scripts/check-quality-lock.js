@@ -178,7 +178,7 @@ function listQualityLockViolations(options = {}) {
 
   if (trackedFileSet.has('scripts/deploy-production-safe.js')) {
     const safeDeploySource = readFile('scripts/deploy-production-safe.js');
-    ['assertSafeProductionDeploySource()', "projectName: 'softora-nl'", "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'", 'check:live-production-version'].forEach(
+    ['assertSafeProductionDeploySource()', "projectName: 'softora-nl'", "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'", 'installVercelSharpLinuxArm64Output()', '@img/sharp-linux-arm64', '@img/sharp-libvips-linux-arm64', 'check:live-production-version'].forEach(
       (requiredText) => {
         if (!safeDeploySource.includes(requiredText)) {
           violations.push(`[quality-lock] deploy-production-safe.js mist "${requiredText}".`);

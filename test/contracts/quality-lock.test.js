@@ -62,6 +62,9 @@ test('quality lock blocks CI bypasses and static test weakening', () => {
       'assertSafeProductionDeploySource()',
       "projectName: 'softora-nl'",
       "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'",
+      'installVercelSharpLinuxArm64Output()',
+      '@img/sharp-linux-arm64',
+      '@img/sharp-libvips-linux-arm64',
       'check:live-production-version',
     ].join('\n'),
     'scripts/check-live-production-version.js': [
@@ -171,6 +174,9 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
       'assertSafeProductionDeploySource()',
       "projectName: 'softora-nl'",
       "projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl'",
+      'installVercelSharpLinuxArm64Output()',
+      '@img/sharp-linux-arm64',
+      '@img/sharp-libvips-linux-arm64',
       'check:live-production-version',
     ].join('\n'),
     'scripts/check-live-production-version.js': [

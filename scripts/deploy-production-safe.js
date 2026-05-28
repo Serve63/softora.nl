@@ -6,12 +6,18 @@ const { assertSafeProductionDeploySource } = require('./guard-production-deploy-
 
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const tarCmd = process.platform === 'win32' ? 'tar.exe' : 'tar';
 const EXPECTED_VERCEL_PROJECT = Object.freeze({
   projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl',
   orgId: 'team_LFd5fMyc9TMAoLasBzDgdhuT',
   projectName: 'softora-nl',
 });
 const vercelProjectPath = path.join(process.cwd(), '.vercel', 'project.json');
+const vercelOutputFunctionsPath = path.join(process.cwd(), '.vercel', 'output', 'functions');
+const SHARP_LINUX_ARM64_PACKAGES = Object.freeze([
+  { name: '@img/sharp-linux-arm64', version: '0.34.5', tarball: 'img-sharp-linux-arm64-0.34.5.tgz' },
+  { name: '@img/sharp-libvips-linux-arm64', version: '1.2.4', tarball: 'img-sharp-libvips-linux-arm64-1.2.4.tgz' },
+]);
 
 function readVercelProjectLink() {
   try {
@@ -54,6 +60,81 @@ function run(label, command, args) {
   }
 }
 
+function runQuiet(label, command, args) {
+  const result = spawnSync(command, args, {
+    stdio: 'pipe',
+    env: process.env,
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) {
+    const stderr = String(result.stderr || '').trim();
+    const stdout = String(result.stdout || '').trim();
+    throw new Error(`[production-deploy] ${label} mislukt.\n${stderr || stdout}`);
+  }
+  return result;
+}
+
+function listVercelFunctionDirs(rootDir) {
+  const result = [];
+
+  function walk(dir) {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    entries.forEach((entry) => {
+      const fullPath = path.join(dir, entry.name);
+      if (!entry.isDirectory()) return;
+      if (/\.func$/i.test(entry.name)) {
+        result.push(fullPath);
+        return;
+      }
+      walk(fullPath);
+    });
+  }
+
+  walk(rootDir);
+  return result;
+}
+
+function installVercelSharpLinuxArm64Output() {
+  console.log('\n[production-deploy] Linux sharp-binaries in Vercel output controleren');
+  const functionDirs = listVercelFunctionDirs(vercelOutputFunctionsPath);
+  if (!functionDirs.length) {
+    throw new Error('[production-deploy] Geen Vercel function output gevonden; productie-deploy geblokkeerd.');
+  }
+
+  const tempDir = fs.mkdtempSync(path.join(process.cwd(), '.vercel-sharp-linux-'));
+  try {
+    SHARP_LINUX_ARM64_PACKAGES.forEach((pkg) => {
+      runQuiet(`npm pack ${pkg.name}`, npmCmd, [
+        'pack',
+        `${pkg.name}@${pkg.version}`,
+        '--pack-destination',
+        tempDir,
+      ]);
+    });
+
+    let installed = 0;
+    functionDirs.forEach((functionDir) => {
+      SHARP_LINUX_ARM64_PACKAGES.forEach((pkg) => {
+        const packageDir = path.join(functionDir, 'node_modules', ...pkg.name.split('/'));
+        if (fs.existsSync(path.join(packageDir, 'package.json'))) return;
+        fs.mkdirSync(packageDir, { recursive: true });
+        runQuiet(`extract ${pkg.name}`, tarCmd, [
+          '-xzf',
+          path.join(tempDir, pkg.tarball),
+          '-C',
+          packageDir,
+          '--strip-components=1',
+        ]);
+        installed += 1;
+      });
+    });
+    console.log(`[production-deploy] Linux sharp-binaries klaar (${installed} pakketkopieën toegevoegd).`);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 try {
   assertSafeProductionDeploySource();
   console.log('[production-deploy] Bron is veilig: schoon en exact gelijk aan origin/main.');
@@ -67,5 +148,6 @@ ensureExpectedVercelProjectLink();
 run('Vercel productieomgeving ophalen', npxCmd, ['vercel', 'pull', '--yes', '--environment=production']);
 assertExpectedVercelProjectLink();
 run('Vercel productie-build', npxCmd, ['vercel', 'build', '--prod']);
+installVercelSharpLinuxArm64Output();
 run('Vercel productie-deploy', npxCmd, ['vercel', 'deploy', '--prebuilt', '--prod', '--yes']);
 run('live productieversie controleren', npmCmd, ['run', 'check:live-production-version']);
