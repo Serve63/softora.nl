@@ -37,6 +37,8 @@ const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
 const COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT = 360;
 const MARTIJN_LINKEDIN_CTA_TEXT = '💼 Mijn LinkedIn 👈';
+const MARTIJN_LINKEDIN_URL =
+  'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios';
 const DEFAULT_WEBDESIGN_SUBJECT = 'Nieuw webdesign gemaakt!';
 const DEFAULT_WEBDESIGN_BODY = [
   'Goedemorgen {{naam}},',
@@ -51,6 +53,13 @@ const DEFAULT_WEBDESIGN_BODY = [
   '0629917185',
 ].join('\n');
 const DEFAULT_INSTANTLY_SENDER_EMAIL = 'serve@softora.nl';
+const INSTANTLY_SENDER_PROFILE_ALIASES = Object.freeze({
+  'serve@websoftora.com': ['serve@softora.nl', 'servec321@gmail.com'],
+  'servecreusen@websoftora.com': ['serve@softora.nl', 'servec321@gmail.com'],
+  'martijn@websoftora.com': ['martijn@softora.nl', 'martijnven123@gmail.com'],
+  'martijnven@websoftora.com': ['martijn@softora.nl', 'martijnven123@gmail.com'],
+  'martijnvandeven@websoftora.com': ['martijn@softora.nl', 'martijnven123@gmail.com'],
+});
 const STARTUP_SYNC_DELAY_MS = 10_000;
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
@@ -154,6 +163,25 @@ function normalizeEmailAddress(value, normalizeString = defaultNormalizeString) 
     .replace(/[.,;:!?]+$/g, '')
     .trim();
   return normalizeMailboxAccountEmail(cleaned);
+}
+
+function getInstantlySenderProfileEmailCandidates(value, normalizeString = defaultNormalizeString) {
+  const email = normalizeEmailAddress(value, normalizeString);
+  if (!email) return [];
+  return [email, ...(INSTANTLY_SENDER_PROFILE_ALIASES[email] || [])];
+}
+
+function getInstantlySenderProfileEmailCandidateList(values = [], normalizeString = defaultNormalizeString) {
+  const seen = new Set();
+  const candidates = [];
+  (Array.isArray(values) ? values : [values]).forEach((value) => {
+    getInstantlySenderProfileEmailCandidates(value, normalizeString).forEach((candidate) => {
+      if (!candidate || seen.has(candidate)) return;
+      seen.add(candidate);
+      candidates.push(candidate);
+    });
+  });
+  return candidates;
 }
 
 function isLikelyValidEmail(value, normalizeString = defaultNormalizeString) {
@@ -858,7 +886,7 @@ function extractColdmailProfileFromSettings(settings, defaultSenderEmail, normal
   const senderEmail = normalizeEmailAddress(raw.senderEmail || defaultSenderEmail, normalizeString);
   const senderProfile = pickColdmailProfileForSender(
     raw.senders,
-    [defaultSenderEmail, senderEmail],
+    getInstantlySenderProfileEmailCandidateList([defaultSenderEmail, senderEmail], normalizeString),
     normalizeString
   );
   const sourceProfile = senderProfile || (hasCompleteColdmailProfile(raw, normalizeString) ? raw : null);
@@ -880,7 +908,11 @@ function extractColdmailProfileFromAutopilotState(state, defaultSenderEmail, nor
     senderEmail,
     ...(Array.isArray(config.senderEmails) ? config.senderEmails : []),
   ];
-  const senderProfile = pickColdmailProfileForSender(config.senderProfiles, senderEmails, normalizeString);
+  const senderProfile = pickColdmailProfileForSender(
+    config.senderProfiles,
+    getInstantlySenderProfileEmailCandidateList(senderEmails, normalizeString),
+    normalizeString
+  );
   const sourceProfile = senderProfile || (hasCompleteColdmailProfile(config, normalizeString) ? config : null);
   if (!sourceProfile) return null;
   return normalizeColdmailProfile(
@@ -990,6 +1022,15 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString) {
           if (cleanLine === COLDMAIL_IMAGE_VISIBILITY_PS) {
             return `<em style="font-style:italic;">${escapeHtml(cleanLine, normalizeString)}</em>`;
           }
+          if (cleanLine === MARTIJN_LINKEDIN_CTA_TEXT) {
+            return `<a href="${escapeHtmlAttribute(
+              MARTIJN_LINKEDIN_URL,
+              normalizeString
+            )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">${escapeHtml(
+              cleanLine,
+              normalizeString
+            )}</a>`;
+          }
           return escapeHtml(cleanLine, normalizeString);
         })
         .join('<br>')}</p>`
@@ -998,16 +1039,22 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString) {
   return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
 }
 
+function normalizeInstantlyImageAlt(value, normalizeString = defaultNormalizeString) {
+  const clean = normalizeString(value).toLowerCase();
+  return clean === 'mockup' ? 'Mockup' : 'Webdesign';
+}
+
 function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defaultNormalizeString) {
   const cleanSrc = normalizeString(src);
   if (!cleanSrc) return '';
-  return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td style="padding:0;margin:0;width:100%;font-size:0;line-height:0;overflow:visible;"><img src="${escapeHtmlAttribute(
+  const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
+  return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;"><table role="presentation" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}px;border:1px solid #d8dee9;border-radius:14px;background:#f3f6fb;overflow:hidden;"><tr><td align="center" valign="middle" style="padding:0;margin:0;width:100%;height:${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}px;background:#f3f6fb;color:#8a94a6;font-family:Arial,sans-serif;font-size:22px;line-height:${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}px;font-weight:700;text-align:center;"><img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
   )}" alt="${escapeHtmlAttribute(
-    alt,
+    cleanAlt,
     normalizeString
-  )}" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" height="${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;max-height:none;border:0;outline:none;text-decoration:none;border-radius:12px;object-fit:contain;" /></td></tr></table>`;
+  )}" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" height="${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}px;line-height:${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}px;max-height:none;border:0;outline:none;text-decoration:none;border-radius:14px;object-fit:contain;background:#f3f6fb;color:#8a94a6;font-family:Arial,sans-serif;font-size:22px;font-weight:700;text-align:center;" /></td></tr></table></td></tr></table>`;
 }
 
 function buildInstantlyEmailHtml(
@@ -1587,6 +1634,7 @@ function createInstantlyOutreachService(deps = {}) {
       softora_subject: subject,
       softora_mail_body: baseMailBody,
       softora_mail_body_with_optout: appendColdmailOptOutText(baseMailBody, unsubscribeUrl, normalizeString),
+      softora_instantly_email_text: instantlyEmailBody,
       softora_instantly_email_body: instantlyEmailBody,
       softora_instantly_email_html: instantlyEmailHtml,
       softora_image_visibility_ps: COLDMAIL_IMAGE_VISIBILITY_PS,
@@ -1601,7 +1649,7 @@ function createInstantlyOutreachService(deps = {}) {
 
     return {
       email,
-      personalization: instantlyEmailBody,
+      personalization: instantlyEmailHtml,
       first_name: firstName,
       last_name: lastName,
       company_name: company,
@@ -1692,6 +1740,79 @@ function createInstantlyOutreachService(deps = {}) {
     }
 
     return data;
+  }
+
+  function buildInstantlyLeadPatchPayload(lead) {
+    return {
+      personalization: lead.personalization || null,
+      website: lead.website || null,
+      last_name: lead.last_name || null,
+      first_name: lead.first_name || null,
+      company_name: lead.company_name || null,
+      phone: lead.phone || null,
+      custom_variables: lead.custom_variables || {},
+    };
+  }
+
+  async function patchInstantlyLeadById(leadId, lead) {
+    const cleanLeadId = normalizeString(leadId);
+    if (!cleanLeadId) return null;
+    const { response, data } = await fetchJsonWithTimeout(
+      `${config.apiBaseUrl}/leads/${encodeURIComponent(cleanLeadId)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify(buildInstantlyLeadPatchPayload(lead)),
+      },
+      30_000
+    );
+
+    if (!response || !response.ok) {
+      throw createInstantlyError(
+        `Instantly lead-update mislukt (${response ? response.status : 'geen response'}).`,
+        'INSTANTLY_LEAD_UPDATE_FAILED',
+        response && response.status ? response.status : 502,
+        { data }
+      );
+    }
+
+    return data;
+  }
+
+  function getExistingInstantlyRowsForVariableRefresh(rows, limit) {
+    const safeLimit = clampNumber(limit, config.batchSize, 1, Math.max(config.batchSize, 50));
+    return (Array.isArray(rows) ? rows : [])
+      .map((row, index) => ({
+        id: getRowId(row, index, normalizeString),
+        index,
+        row,
+        leadId: normalizeString(row && row.instantlyLeadId),
+        campaignId: normalizeString(row && row.instantlyCampaignId),
+      }))
+      .filter((item) => {
+        if (!item.leadId) return false;
+        if (!hasActiveInstantlyOutreach(item.row)) return false;
+        if (item.campaignId && item.campaignId !== config.defaultCampaignId) return false;
+        return true;
+      })
+      .slice(0, safeLimit);
+  }
+
+  async function refreshExistingInstantlyLeadVariables(rows, context, limit) {
+    const candidates = getExistingInstantlyRowsForVariableRefresh(rows, limit);
+    let refreshed = 0;
+    for (const item of candidates) {
+      const lead = buildInstantlyLead(item, context);
+      await patchInstantlyLeadById(item.leadId, lead);
+      refreshed += 1;
+    }
+    return {
+      refreshed,
+      attempted: candidates.length,
+    };
   }
 
   function markRowsAsSynced(rows, selectedRows, data, actor) {
@@ -1918,6 +2039,13 @@ function createInstantlyOutreachService(deps = {}) {
     const requestedLimit = clampNumber(input.limit, config.batchSize, 1, config.batchSize);
     const limit = Math.min(config.batchSize, requestedLimit, dailyRemaining);
     const personalizationContext = await loadPersonalizationContext(rows);
+    const existingVariableRefresh = readBool(input.refreshExistingVariables, false)
+      ? await refreshExistingInstantlyLeadVariables(
+          rows,
+          personalizationContext,
+          input.refreshExistingLimit || config.batchSize
+        )
+      : { refreshed: 0, attempted: 0 };
 
     if (limit <= 0) {
       if (existingApproached.marked) {
@@ -1936,6 +2064,8 @@ function createInstantlyOutreachService(deps = {}) {
         reason: 'daily_cap_reached',
         synced: 0,
         markedBenaderd: existingApproached.marked,
+        refreshedExistingVariables: existingVariableRefresh.refreshed,
+        attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
         syncedToday,
         dailyCap: config.dailyCap,
         finishedAt: now().toISOString(),
@@ -1951,6 +2081,8 @@ function createInstantlyOutreachService(deps = {}) {
         reason: 'no_eligible_leads',
         synced: 0,
         markedBenaderd: existingApproached.marked,
+        refreshedExistingVariables: existingVariableRefresh.refreshed,
+        attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
         failed,
         finishedAt: now().toISOString(),
       };
@@ -1983,6 +2115,8 @@ function createInstantlyOutreachService(deps = {}) {
       ok: true,
       synced: selectedRows.length,
       markedBenaderd: existingApproached.marked + selectedRows.length,
+      refreshedExistingVariables: existingVariableRefresh.refreshed,
+      attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
       failed,
       campaignId: config.defaultCampaignId,
       dailyCap: config.dailyCap,

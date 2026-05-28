@@ -95,7 +95,7 @@ function createService(overrides = {}) {
           : overrides.requireWebdesignAssets,
       publicBaseUrl: 'https://www.softora.nl',
       coldmailLinkSecret: 'unsubscribe-secret',
-      defaultSenderEmail: 'serve@softora.nl',
+      defaultSenderEmail: overrides.defaultSenderEmail || 'serve@softora.nl',
     },
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
@@ -217,13 +217,15 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   );
   assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /height:360px/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /alt="Webdesign" width="640" height="360"/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /alt="Mockup" width="640" height="360"/);
   assert.doesNotMatch(body.leads[0].custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
   assert.match(body.leads[0].custom_variables.softora_webdesign_image_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(body.leads[0].custom_variables.softora_webdesign_mockup_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.equal(body.leads[0].custom_variables.softora_webdesign_ready, 'true');
-  assert.equal(body.leads[0].personalization, body.leads[0].custom_variables.softora_instantly_email_body);
+  assert.equal(body.leads[0].custom_variables.softora_instantly_email_text, body.leads[0].custom_variables.softora_instantly_email_body);
+  assert.equal(body.leads[0].personalization, body.leads[0].custom_variables.softora_instantly_email_html);
 
   assert.equal(writes.length, 1);
   const rows = getRows();
@@ -337,6 +339,137 @@ test('instantly sync places Martijn location above the LinkedIn CTA', async () =
     variables.softora_instantly_email_html.indexOf('📍 Boxtel') <
       variables.softora_instantly_email_html.indexOf('💼 Mijn LinkedIn 👈')
   );
+  assert.match(
+    variables.softora_instantly_email_html,
+    /<a href="https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">💼 Mijn LinkedIn 👈<\/a>/
+  );
+});
+
+test('instantly sync maps websoftora Martijn sender aliases to the Martijn coldmail profile', async () => {
+  const { service, fetchCalls } = createService({
+    defaultSenderEmail: 'martijn@websoftora.com',
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        plaats: 'Boxtel',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    coldmailingSettings: {
+      senderEmail: 'serve@softora.nl',
+      senders: {
+        'serve@softora.nl': {
+          subject: 'Kleine vraag over jullie website',
+          body: [
+            'Goedendag,',
+            '',
+            'Ik ben benieuwd wat je ervan vindt.',
+            '',
+            'Met vriendelijke groet,',
+            'Serve Creusen',
+            '',
+            '{{stad}}',
+          ].join('\n'),
+        },
+        'martijn@softora.nl': {
+          subject: 'Kleine vraag over jullie website',
+          body: [
+            'Goedendag,',
+            '',
+            'Ik ben benieuwd wat je ervan vindt.',
+            '',
+            'Met vriendelijke groet,',
+            'Martijn van de Ven',
+            '',
+            '💼 Mijn LinkedIn 👈',
+            '',
+            '{{stad}}',
+          ].join('\n'),
+        },
+      },
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  const variables = body.leads[0].custom_variables;
+  assert.match(variables.softora_mail_body, /Martijn van de Ven/);
+  assert.match(variables.softora_mail_body, /📍 Boxtel\n\n💼 Mijn LinkedIn 👈/);
+  assert.doesNotMatch(variables.softora_mail_body, /Servé Creusen/);
+  assert.match(variables.softora_instantly_email_html, /Martijn van de Ven/);
+  assert.match(variables.softora_instantly_email_html, /📍 Boxtel/);
+  assert.match(variables.softora_instantly_email_html, /💼 Mijn LinkedIn 👈/);
+});
+
+test('instantly sync can refresh existing lead variables without adding duplicate leads', async () => {
+  const { service, fetchCalls } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        plaats: 'Boxtel',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        outreachStatus: 'benaderd',
+        mail: true,
+        instantlyLeadId: 'lead-1',
+        instantlyCampaignId: 'campaign-1',
+        instantlyStatus: 'synced',
+        lastColdmailProvider: 'instantly',
+      },
+    ],
+    coldmailingSettings: {
+      senderEmail: 'martijn@softora.nl',
+      senders: {
+        'martijn@softora.nl': {
+          subject: 'Kleine vraag over jullie website',
+          body: [
+            'Goedendag,',
+            '',
+            'Ik ben benieuwd wat je ervan vindt.',
+            '',
+            'Met vriendelijke groet,',
+            'Martijn van de Ven',
+            '',
+            '💼 Mijn LinkedIn 👈',
+            '',
+            '{{stad}}',
+          ].join('\n'),
+        },
+      },
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({
+    actor: 'Test',
+    refreshExistingVariables: true,
+    refreshExistingLimit: 1,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.synced, 0);
+  assert.equal(result.refreshedExistingVariables, 1);
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(fetchCalls[0].url, 'https://api.instantly.test/api/v2/leads/lead-1');
+  assert.equal(fetchCalls[0].options.method, 'PATCH');
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.match(body.personalization, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assert.match(body.personalization, /alt="Webdesign" width="640" height="360"/);
+  assert.match(body.custom_variables.softora_mail_body, /📍 Boxtel\n\n💼 Mijn LinkedIn 👈/);
+  assert.match(body.custom_variables.softora_instantly_email_html, /height:360px/);
+  assert.doesNotMatch(body.custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
 });
 
 test('instantly sync is blocked unless the explicit sync flag is enabled', async () => {
