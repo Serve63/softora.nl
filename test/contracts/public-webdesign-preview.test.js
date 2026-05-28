@@ -62,6 +62,10 @@ test('public webdesign preview renders only the two images for a stored mail-rea
   assert.equal(response.headers['Cache-Control'], 'no-store');
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/aagje-webdesign\.png/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/aagje-mockup\.jpg/);
+  assert.match(response.body, /website-frame/);
+  assert.match(response.body, /mockup-frame/);
+  assert.match(response.body, /background:transparent/);
+  assert.doesNotMatch(response.body, /background:#fff/);
   assert.doesNotMatch(response.body, /Aagje van Os/);
   assert.doesNotMatch(response.body, /· naast elkaar/);
 });
