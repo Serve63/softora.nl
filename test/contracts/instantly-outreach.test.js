@@ -145,6 +145,7 @@ function createService(overrides = {}) {
       softora_customers_premium_v1: JSON.stringify(rows),
     };
   const fetchCalls = [];
+  const publicImageFetchCalls = [];
   const writes = [];
   const service = createInstantlyOutreachService({
     instantlyConfig: {
@@ -167,6 +168,10 @@ function createService(overrides = {}) {
         overrides.requireWebdesignAssets === undefined
           ? true
           : overrides.requireWebdesignAssets,
+      prewarmPublicImageUrls:
+        overrides.prewarmPublicImageUrls === undefined
+          ? true
+          : overrides.prewarmPublicImageUrls,
       publicBaseUrl: overrides.publicBaseUrl || 'https://www.softora.nl',
       previewImageBaseUrl: overrides.previewImageBaseUrl,
       coldmailLinkSecret: 'unsubscribe-secret',
@@ -219,6 +224,13 @@ function createService(overrides = {}) {
       };
     },
     fetchImageWithTimeout: overrides.fetchImageWithTimeout,
+    fetchPublicPreviewImage: async (url, timeoutMs) => {
+      publicImageFetchCalls.push({ url, timeoutMs });
+      if (typeof overrides.fetchPublicPreviewImage === 'function') {
+        return overrides.fetchPublicPreviewImage(url, timeoutMs, publicImageFetchCalls.length);
+      }
+      return { ok: true, status: 200, contentType: 'image/jpeg', bytes: 1234 };
+    },
     resolveEmailDomain: async (domain) => !new Set(overrides.invalidDomains || []).has(domain),
     now: () => new Date(overrides.now || '2026-05-25T10:00:00.000Z'),
   });
@@ -226,6 +238,7 @@ function createService(overrides = {}) {
   return {
     service,
     fetchCalls,
+    publicImageFetchCalls,
     getRows: () => rows,
     writes,
   };
@@ -387,7 +400,8 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
 
 test('instantly sync prewarms HTTPS webdesign images so the first email open does not rebuild them', async () => {
   const imageFetchCalls = [];
-  const { service, fetchCalls } = createService({
+  const publicPrewarmOrder = [];
+  const { service, fetchCalls, publicImageFetchCalls } = createService({
     photoMap: {
       'prospect-1': {
         id: 'prospect-1',
@@ -404,6 +418,19 @@ test('instantly sync prewarms HTTPS webdesign images so the first email open doe
         contentType: 'image/png',
       };
     },
+    fetchPublicPreviewImage: async (url, timeoutMs, index) => {
+      publicPrewarmOrder.push(`public-${index}`);
+      assert.equal(timeoutMs, 30_000);
+      assert.match(url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+      return { ok: true, status: 200, contentType: 'image/jpeg', bytes: 116340 };
+    },
+    fetchJsonWithTimeout: async () => {
+      publicPrewarmOrder.push('instantly-add');
+      return {
+        response: { ok: true, status: 200 },
+        data: { created_leads: [{ id: 'instantly-lead-1', email: 'ruben@example.test' }] },
+      };
+    },
   });
 
   const result = await service.syncInstantlyLeads({ actor: 'Test' });
@@ -414,13 +441,40 @@ test('instantly sync prewarms HTTPS webdesign images so the first email open doe
     'https://cdn.softora.test/prospect-mockup.png',
   ]);
   assert.equal(fetchCalls.length, 1);
+  assert.deepEqual(publicPrewarmOrder, ['public-1', 'public-2', 'instantly-add']);
   const body = JSON.parse(fetchCalls[0].options.body);
   const html = body.leads[0].custom_variables.softora_instantly_email_html;
   assertInstantlyImageTagsUseNaturalLayout(html);
   const previewTokens = extractPreviewImageTokens(html);
   assert.equal(previewTokens.length, 2);
+  assert.notEqual(previewTokens[0], previewTokens[1]);
+  assert.deepEqual(
+    publicImageFetchCalls.map((call) => call.url),
+    [
+      body.leads[0].custom_variables.softora_webdesign_image_url,
+      body.leads[0].custom_variables.softora_webdesign_mockup_url,
+    ]
+  );
   assert.equal(getCachedPreviewImage(getPreviewImageCacheKey(previewTokens[0], 'webdesign')).contentType, 'image/png');
   assert.equal(getCachedPreviewImage(getPreviewImageCacheKey(previewTokens[1], 'mockup')).contentType, 'image/png');
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_image_prewarmed, 'true');
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_mockup_prewarmed, 'true');
+});
+
+test('instantly sync keeps sending lead data when public image prewarm fails', async () => {
+  const { service, fetchCalls, publicImageFetchCalls } = createService({
+    fetchPublicPreviewImage: async () => ({ ok: false, reason: 'timeout' }),
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(publicImageFetchCalls.length, 2);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_image_prewarmed, 'false');
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_mockup_prewarmed, 'false');
+  assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
 });
 
 test('instantly sync caches a stripped webdesign image instead of the decorative placeholder frame', async () => {
