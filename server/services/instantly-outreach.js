@@ -1423,15 +1423,13 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   const cleanSrc = normalizeString(src);
   if (!cleanSrc) return '';
   const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
-  const emailDimensions = scaleEmailImageDimensions(dimensions);
-  const heightAttribute = emailDimensions && emailDimensions.height ? ` height="${emailDimensions.height}"` : '';
   return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;"><img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
   )}" alt="${escapeHtmlAttribute(
     cleanAlt,
     normalizeString
-  )}" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}"${heightAttribute} loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
+  )}" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
 }
 
 function buildInstantlyEmailHtml(

@@ -93,8 +93,8 @@ function extractImageTags(html) {
 function assertInstantlyImageTagsUseNaturalLayout(html) {
   const imageTags = extractImageTags(html);
   assert.equal(imageTags.length, 2);
-  assert.match(imageTags[0], /alt="Webdesign" width="640" height="\d+" loading="eager" decoding="async" fetchpriority="high"/);
-  assert.match(imageTags[1], /alt="Mockup" width="640" height="\d+" loading="eager" decoding="async" fetchpriority="high"/);
+  assert.match(imageTags[0], /alt="Webdesign" width="640" loading="eager" decoding="async" fetchpriority="high"/);
+  assert.match(imageTags[1], /alt="Mockup" width="640" loading="eager" decoding="async" fetchpriority="high"/);
   for (const imageTag of imageTags) {
     assert.match(
       imageTag,
@@ -102,7 +102,7 @@ function assertInstantlyImageTagsUseNaturalLayout(html) {
     );
     assert.doesNotMatch(
       imageTag,
-      /min-height|max-height|height="(?:220|360)"|height:(?:220|360)px|object-fit|border-radius|background:|font-family|font-size|font-weight|text-align/
+      /height="|min-height|max-height|height:(?:220|360)px|object-fit|border-radius|background:|font-family|font-size|font-weight|text-align/
     );
   }
 }
