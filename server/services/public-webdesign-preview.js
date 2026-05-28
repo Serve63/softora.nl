@@ -232,19 +232,20 @@ function buildPreviewHtml(preview) {
   <title>Webdesign preview | Softora</title>
   <style>
     *{box-sizing:border-box}
-    html,body{margin:0;min-height:100%;background:#161616;color:#fff;font-family:Inter,Arial,sans-serif}
-    main{min-height:100vh;display:grid;place-items:center;padding:clamp(12px,2vw,28px)}
-    .preview-grid{width:min(1800px,100%);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:clamp(10px,1.3vw,18px);align-items:start}
-    .preview-frame{min-width:0;display:flex;align-items:flex-start;justify-content:center}
-    img{display:block;width:100%;height:auto;max-height:94vh;object-fit:contain;background:#fff}
-    @media(max-width:820px){main{place-items:start center}.preview-grid{grid-template-columns:1fr}img{max-height:none}}
+    html,body{margin:0;min-height:100%;background:#121212;color:#fff;font-family:Inter,Arial,sans-serif}
+    main{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:clamp(18px,2.8vw,46px)}
+    .preview-grid{width:min(1660px,100%);height:min(920px,calc(100svh - clamp(36px,5.6vw,92px)));display:grid;grid-template-columns:minmax(280px,.78fr) minmax(420px,1.12fr);gap:clamp(22px,2.4vw,42px);align-items:center}
+    .preview-frame{min-width:0;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .preview-frame img{display:block;width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;background:transparent}
+    .mockup-frame img{width:100%;max-height:86%}
+    @media(max-width:900px){main{min-height:100vh;align-items:flex-start;padding:14px}.preview-grid{width:100%;height:auto;grid-template-columns:1fr;gap:14px}.preview-frame{height:auto;overflow:visible}.preview-frame img,.mockup-frame img{width:100%;max-height:none}}
   </style>
 </head>
 <body>
   <main>
     <div class="preview-grid" aria-label="Webdesign en device mockup naast elkaar">
-      <div class="preview-frame"><img src="${photoSource}" alt="Webdesign"></div>
-      <div class="preview-frame"><img src="${mockupSource}" alt="Device mockup"></div>
+      <div class="preview-frame website-frame"><img src="${photoSource}" alt="Webdesign"></div>
+      <div class="preview-frame mockup-frame"><img src="${mockupSource}" alt="Device mockup"></div>
     </div>
   </main>
 </body>
