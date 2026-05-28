@@ -35,7 +35,6 @@ const COLDMAIL_IMAGE_VISIBILITY_PS =
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?)/i;
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
-const COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT = 220;
 const MARTIJN_LINKEDIN_CTA_TEXT = '💼 Mijn LinkedIn 👈';
 const MARTIJN_LINKEDIN_URL =
   'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios';
@@ -1048,13 +1047,13 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   const cleanSrc = normalizeString(src);
   if (!cleanSrc) return '';
   const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
-  return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;"><table role="presentation" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" height="${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;min-height:${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}px;border:1px solid #d8dee9;border-radius:14px;background:#f3f6fb;overflow:hidden;"><tr><td align="center" valign="middle" height="${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}" style="padding:0;margin:0;width:100%;min-height:${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}px;background:#f3f6fb;color:#8a94a6;font-family:Arial,sans-serif;font-size:22px;line-height:1.2;font-weight:700;text-align:center;"><img src="${escapeHtmlAttribute(
+  return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;"><img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
   )}" alt="${escapeHtmlAttribute(
     cleanAlt,
     normalizeString
-  )}" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;max-height:none;border:0;outline:none;text-decoration:none;border-radius:14px;background:#f3f6fb;color:#8a94a6;font-family:Arial,sans-serif;font-size:22px;line-height:1.2;font-weight:700;text-align:center;" /></td></tr></table></td></tr></table>`;
+  )}" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;max-height:none;border:0;outline:none;text-decoration:none;border-radius:14px;background:#f3f6fb;color:#8a94a6;font-family:Arial,sans-serif;font-size:22px;line-height:1.2;font-weight:700;text-align:center;" /></td></tr></table>`;
 }
 
 function buildInstantlyEmailHtml(
