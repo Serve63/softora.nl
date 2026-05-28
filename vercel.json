@@ -1,59 +1,59 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "npm ci --include=optional",
+  "installCommand": "npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.34.5 @img/sharp-linux-arm64@0.34.5 @img/sharp-libvips-linux-arm64@1.2.4",
   "functions": {
     "api/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/index.js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/agenda/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/auth/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/ai/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/coldcalling/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/dashboard/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/retell/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/twilio/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/debug/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/seo/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/ui-state/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     },
     "api/premium-users/[...path].js": {
       "maxDuration": 800,
-      "includeFiles": "*.html"
+      "includeFiles": "{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}"
     }
   },
   "crons": [
