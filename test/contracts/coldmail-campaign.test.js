@@ -1729,7 +1729,9 @@ test('coldmail autopilot skips leads without a complete webdesign mockup', async
   assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt voor Mockup Klaar BV');
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-mockup-ready@softora');
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
   assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-mockup-ready@softora');
+  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'inline');
 });
 
 test('coldmail autopilot does not extend cooldown when no webdesign-ready lead exists', async () => {
@@ -2409,7 +2411,13 @@ test('coldmail campaign uses remote webdesign photo and device mockup URLs by de
     sentMessages[0].html.indexOf('>Geen webdesign willen ontvangen? Laat het me weten!</a>') >
       sentMessages[0].html.lastIndexOf('/coldmailing/webdesign-foto?t=')
   );
-  assert.equal(sentMessages[0].attachments, undefined);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
+  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'attachment');
+  assert.equal(sentMessages[0].attachments[0].cid, undefined);
+  assert.equal(sentMessages[0].attachments[1].cid, undefined);
+  assert.match(sentMessages[0].attachments[0].filename, /Bakkerij-Zon-webdesign\.(?:png|jpg)$/);
+  assert.match(sentMessages[0].attachments[1].filename, /Bakkerij-Zon-device-mockup\.(?:png|jpg)$/);
   const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
   assert.equal(savedRows[0].campaignType, 'webdesign');
   assert.equal(savedRows[0].outreachStatus, 'benaderd');

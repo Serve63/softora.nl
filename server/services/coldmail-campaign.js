@@ -112,9 +112,15 @@ const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
 ]);
 const COLDMAIL_TEST_RECIPIENT_EMAIL = COLDMAIL_TEST_RECIPIENT_EMAILS[0];
 const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
-const COLDMAIL_PREVIEW_IMAGE_CACHE_TTL_MS = 30 * 60 * 1000;
+const COLDMAIL_PREVIEW_IMAGE_CACHE_TTL_MS = Math.max(
+  30 * 60 * 1000,
+  Number(process.env.COLDMAIL_PREVIEW_IMAGE_CACHE_TTL_MS) || 48 * 60 * 60 * 1000
+);
 const COLDMAIL_PHOTO_MAP_CACHE_TTL_MS = 60 * 1000;
-const COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT = 120;
+const COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT = Math.max(
+  120,
+  Number(process.env.COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT) || 800
+);
 const COLDMAIL_PREVIEW_IMAGE_OPTIMIZE_MIN_BYTES = 128 * 1024;
 const COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH = 960;
 const COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY = 82;
@@ -4436,6 +4442,52 @@ function createColdmailCampaignService(deps = {}) {
     return normalized || fallback;
   }
 
+  function filenameForImage(originalFilename, contentType, fallback = 'webdesign') {
+    return `${sanitizeFilename(originalFilename, fallback)}.${getImageExtension(contentType)}`;
+  }
+
+  async function preparePreviewImageForEmail(image, type = 'webdesign') {
+    if (!image || !Buffer.isBuffer(image.content)) return image;
+    const prepared = type === 'mockup'
+      ? image
+      : await removeDecorativeWebdesignFrameForEmail(image);
+    return optimizePreviewImageForEmail(prepared);
+  }
+
+  function mergePreparedImage(original, prepared, fallbackName = 'webdesign') {
+    if (!original || !prepared || !Buffer.isBuffer(prepared.content)) return original;
+    return {
+      ...original,
+      ...prepared,
+      filename: filenameForImage(original.filename || fallbackName, prepared.contentType, fallbackName),
+      alt: original.alt,
+      cid: original.cid,
+    };
+  }
+
+  function buildWebdesignImageAttachments(webdesignPhoto, options = {}) {
+    if (!webdesignPhoto || !Buffer.isBuffer(webdesignPhoto.content)) return undefined;
+    const inline = options.inline === true;
+    const webdesignImage = options.webdesignImage || webdesignPhoto;
+    const mockupImage = options.mockupImage || webdesignPhoto.mockup;
+    const buildAttachment = (image, original, fallbackName) => {
+      if (!image || !Buffer.isBuffer(image.content)) return null;
+      const attachment = {
+        filename: image.filename || filenameForImage(fallbackName, image.contentType, fallbackName),
+        content: image.content,
+        contentType: image.contentType,
+        contentDisposition: inline ? 'inline' : 'attachment',
+      };
+      if (inline && original && original.cid) attachment.cid = original.cid;
+      return attachment;
+    };
+    const attachments = [
+      buildAttachment(webdesignImage, webdesignPhoto, 'webdesign'),
+      buildAttachment(mockupImage, webdesignPhoto.mockup, 'device-mockup'),
+    ].filter(Boolean);
+    return attachments.length ? attachments : undefined;
+  }
+
   function renderColdmailHtmlLine(line, options = {}) {
     const cleanLine = normalizeString(line);
     if (cleanLine === COLDMAIL_IMAGE_VISIBILITY_PS) {
@@ -5655,10 +5707,7 @@ function createColdmailCampaignService(deps = {}) {
       error.code = 'PREVIEW_IMAGE_NOT_FOUND';
       throw error;
     }
-    const preparedImage = payload.type === 'mockup'
-      ? image
-      : await removeDecorativeWebdesignFrameForEmail(image);
-    const optimizedImage = await optimizePreviewImageForEmail(preparedImage);
+    const optimizedImage = await preparePreviewImageForEmail(image, payload.type);
 
     const company = getRowCompany(rows[match.index]) || 'Softora webdesign';
     const baseName = payload.type === 'mockup'
@@ -5914,22 +5963,32 @@ function createColdmailCampaignService(deps = {}) {
         continue;
       }
       let webdesignPhotoForHtml = webdesignPhoto;
+      let remoteWebdesignAttachment = null;
+      let remoteMockupAttachment = null;
       if (webdesignPhoto && webdesignImageDelivery === 'remote') {
         const webdesignLink = buildColdmailPreviewImageLink(row, item.id, reference, input, 'webdesign');
         const mockupLink = buildColdmailPreviewImageLink(row, item.id, reference, input, 'mockup');
+        const preparedWebdesignImage = await preparePreviewImageForEmail(webdesignPhoto, 'webdesign');
+        const preparedMockupImage = webdesignPhoto.mockup
+          ? await preparePreviewImageForEmail(webdesignPhoto.mockup, 'mockup')
+          : null;
+        remoteWebdesignAttachment = mergePreparedImage(webdesignPhoto, preparedWebdesignImage, 'webdesign');
+        remoteMockupAttachment = webdesignPhoto.mockup
+          ? mergePreparedImage(webdesignPhoto.mockup, preparedMockupImage, 'device-mockup')
+          : null;
         rememberPreviewImage(getPreviewImageCacheKey(webdesignLink.token, 'webdesign'), {
           ok: true,
           type: 'webdesign',
-          content: webdesignPhoto.content,
-          contentType: webdesignPhoto.contentType,
-          filename: webdesignPhoto.filename,
+          content: remoteWebdesignAttachment.content,
+          contentType: remoteWebdesignAttachment.contentType,
+          filename: remoteWebdesignAttachment.filename,
         });
         rememberPreviewImage(getPreviewImageCacheKey(mockupLink.token, 'mockup'), {
           ok: true,
           type: 'mockup',
-          content: webdesignPhoto.mockup.content,
-          contentType: webdesignPhoto.mockup.contentType,
-          filename: webdesignPhoto.mockup.filename,
+          content: remoteMockupAttachment.content,
+          contentType: remoteMockupAttachment.contentType,
+          filename: remoteMockupAttachment.filename,
         });
         webdesignPhotoForHtml = {
           ...webdesignPhoto,
@@ -5950,25 +6009,17 @@ function createColdmailCampaignService(deps = {}) {
           })
         : appendColdmailOptOutHtml(htmlBase, unsubscribeUrl);
       const html = htmlWithContent;
-      const attachments = webdesignPhoto && webdesignImageDelivery === 'cid'
-        ? [
-            {
-              filename: webdesignPhoto.filename,
-              content: webdesignPhoto.content,
-              contentType: webdesignPhoto.contentType,
-              cid: webdesignPhoto.cid,
-              contentDisposition: 'inline',
-            },
-            ...(webdesignPhoto.mockup
-              ? [{
-                  filename: webdesignPhoto.mockup.filename,
-                  content: webdesignPhoto.mockup.content,
-                  contentType: webdesignPhoto.mockup.contentType,
-                  cid: webdesignPhoto.mockup.cid,
-                  contentDisposition: 'inline',
-                }]
-              : []),
-          ]
+      const attachments = webdesignPhoto
+        ? buildWebdesignImageAttachments(
+            webdesignPhoto,
+            webdesignImageDelivery === 'cid'
+              ? { inline: true }
+              : {
+                  inline: false,
+                  webdesignImage: remoteWebdesignAttachment || webdesignPhoto,
+                  mockupImage: remoteMockupAttachment || webdesignPhoto.mockup,
+                }
+          )
         : undefined;
       try {
         const mail = {
