@@ -12,6 +12,9 @@ const { registerWebsitePreviewBatchRoutes } = require('../routes/website-preview
 const {
   registerPremiumDatabaseWebdesignJobRoutes,
 } = require('../routes/premium-database-webdesign-jobs');
+const {
+  registerPublicWebdesignPreviewRoutes,
+} = require('../routes/public-webdesign-preview');
 const { registerOpenAiCostRoutes } = require('../routes/openai-costs');
 const { registerSupabaseCostRoutes } = require('../routes/supabase-costs');
 const { registerMailboxRoutes } = require('../routes/mailbox');
@@ -25,6 +28,9 @@ const { registerSeoWriteRoutes } = require('../routes/seo-write');
 const {
   createPremiumDatabaseImportCoordinator,
 } = require('./premium-database-import');
+const {
+  createPublicWebdesignPreviewService,
+} = require('./public-webdesign-preview');
 const { createPremiumRouteRuntime } = require('./premium-route-runtime');
 
 function registerFeatureRoutes(app, deps = {}) {
@@ -57,6 +63,9 @@ function registerFeatureRoutes(app, deps = {}) {
   const premiumDatabaseImportCoordinator = createPremiumDatabaseImportCoordinator({
     getUiStateValues: deps.getUiStateValues,
     setUiStateValues: deps.setUiStateValues,
+  });
+  const publicWebdesignPreviewCoordinator = createPublicWebdesignPreviewService({
+    getUiStateValues: deps.getUiStateValues,
   });
 
   registerColdcallingWebhookRoutes(app, {
@@ -92,6 +101,9 @@ function registerFeatureRoutes(app, deps = {}) {
   registerWebsitePreviewBatchRoutes(app, { coordinator: websitePreviewBatchCoordinator });
   registerPremiumDatabaseWebdesignJobRoutes(app, {
     coordinator: premiumDatabaseWebdesignJobsCoordinator,
+  });
+  registerPublicWebdesignPreviewRoutes(app, {
+    coordinator: publicWebdesignPreviewCoordinator,
   });
   registerOpenAiCostRoutes(app, {
     ...(openAiCostSummary || {}),

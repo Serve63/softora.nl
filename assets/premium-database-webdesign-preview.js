@@ -63,6 +63,7 @@
         if (!refs) return;
         refs.card.classList.remove("is-comparison");
         if (nodes && nodes.photoPreviewImage) nodes.photoPreviewImage.hidden = false;
+        if (nodes && nodes.photoPreviewMeta) nodes.photoPreviewMeta.hidden = false;
         refs.compare.hidden = true;
         [refs.photo, refs.mockup].forEach(function (image) {
             if (!image) return;
@@ -97,7 +98,7 @@
         refs.mockup.src = mockup;
         refs.mockup.alt = mockupLabel;
         refs.mockupCaption.textContent = mockupLabel;
-        if (nodes.photoPreviewMeta) nodes.photoPreviewMeta.textContent = customer.bedrijf ? customer.bedrijf + " · naast elkaar" : "Naast elkaar";
+        if (nodes.photoPreviewMeta) { nodes.photoPreviewMeta.hidden = true; nodes.photoPreviewMeta.textContent = ""; }
         if (nodes.photoPreview) {
             nodes.photoPreview.classList.add("on");
             nodes.photoPreview.setAttribute("aria-hidden", "false");
@@ -107,8 +108,9 @@
 
     function renderLink(customer, options) {
         const escapeHtml = options && typeof options.escapeHtml === "function" ? options.escapeHtml : function (value) { return String(value || ""); };
-        if (!options || !options.show) return "";
-        return "<a class=\"photo-compare-link\" href=\"#website-preview-" + escapeHtml(customer && customer.id) + "\" data-photo-compare-id=\"" + escapeHtml(customer && customer.id) + "\" aria-label=\"Webdesign en mockup naast elkaar bekijken\" title=\"Bekijk naast elkaar\">" + COMPARE_ICON + "</a>";
+        const id = normalizeString(customer && customer.id);
+        if (!options || !options.show || !id) return "";
+        return "<a class=\"photo-compare-link\" href=\"/mailklaar/" + escapeHtml(encodeURIComponent(id)) + "\" target=\"_blank\" rel=\"noopener\" data-public-preview-id=\"" + escapeHtml(id) + "\" aria-label=\"Open openbare previewpagina\" title=\"Open openbare pagina\">" + COMPARE_ICON + "</a>";
     }
 
     ensureStyles();
