@@ -1,5 +1,12 @@
 const PHOTO_SCOPE = 'premium_database_photos';
 const PHOTO_KEY = 'softora_database_photos_v1';
+const CUSTOMER_SCOPE = 'premium_customers_database';
+const CUSTOMER_KEY = 'softora_customers_premium_v1';
+
+const {
+  buildCustomerIdentityKey,
+  readChunkedStateValue,
+} = require('./data-ops-serialization');
 
 function normalizeString(value) {
   return String(value || '').trim();
@@ -20,6 +27,15 @@ function safeParseObject(value) {
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch (_error) {
     return {};
+  }
+}
+
+function safeParseArray(value) {
+  try {
+    const parsed = JSON.parse(String(value || '[]'));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    return [];
   }
 }
 
@@ -51,6 +67,36 @@ function readChunkedDataUrl(values, photoKey, chunkCount) {
   return /^data:image\//i.test(dataUrl) ? dataUrl : '';
 }
 
+function normalizeCustomerId(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  try {
+    return normalizeString(decodeURIComponent(raw));
+  } catch (_error) {
+    return raw;
+  }
+}
+
+function slugifyCompanyName(value, fallback = '') {
+  const normalized = normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  const slug = normalized.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 90);
+  return slug || fallback;
+}
+
+function findPhotoRecordByIdentity(photoMap, identityKeys = []) {
+  const identities = new Set((Array.isArray(identityKeys) ? identityKeys : []).map(normalizeString).filter(Boolean));
+  if (!identities.size) return null;
+  return Object.keys(photoMap || {}).reduce((match, key) => {
+    if (match) return match;
+    const item = photoMap[key];
+    if (!item || typeof item !== 'object') return null;
+    return identities.has(normalizeString(item.identityKey)) ? { ...item, id: normalizeString(item.id || key) } : null;
+  }, null);
+}
+
 function findPhotoRecord(photoMap, customerId) {
   const id = normalizeString(customerId);
   if (!id) return null;
@@ -60,8 +106,57 @@ function findPhotoRecord(photoMap, customerId) {
     if (match) return match;
     const item = photoMap[key];
     if (!item || typeof item !== 'object') return null;
-    return normalizeString(item.id || key) === id ? { ...item, id } : null;
+    if (normalizeString(item.id || key) === id) return { ...item, id };
+    return null;
   }, null);
+}
+
+function parseCustomerRows(values) {
+  const stateValues = values && typeof values === 'object' ? values : {};
+  return safeParseArray(readChunkedStateValue(stateValues, CUSTOMER_KEY));
+}
+
+function findCustomerById(customers, customerId) {
+  const id = normalizeString(customerId);
+  const lowerId = id.toLowerCase();
+  if (!id) return null;
+  return (Array.isArray(customers) ? customers : []).find((customer) => {
+    const candidateId = normalizeString(customer && (customer.id || customer.customerId || customer.databaseId));
+    return candidateId === id || candidateId.toLowerCase() === lowerId;
+  }) || null;
+}
+
+function findCustomerCandidates(customers, identifier) {
+  const id = normalizeString(identifier);
+  const slug = slugifyCompanyName(id);
+  const rows = Array.isArray(customers) ? customers : [];
+  const direct = [];
+  const bySlug = [];
+  rows.forEach((customer) => {
+    const candidateId = normalizeString(customer && (customer.id || customer.customerId || customer.databaseId));
+    if (candidateId === id || candidateId.toLowerCase() === id.toLowerCase()) {
+      direct.push(customer);
+      return;
+    }
+    const companySlug = slugifyCompanyName(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam));
+    if (companySlug && companySlug === slug) bySlug.push(customer);
+  });
+  return direct.concat(bySlug);
+}
+
+function getCustomerIdentityKeys(customer) {
+  if (!customer || typeof customer !== 'object') return [];
+  return Array.from(new Set([
+    normalizeString(customer.identityKey),
+    buildCustomerIdentityKey(customer),
+  ].filter(Boolean)));
+}
+
+function buildPreviewFromRecord(id, values, record) {
+  const photoSource = resolvePreviewSource(values, record, 'photo');
+  const mockupSource = resolvePreviewSource(values, record, 'mockup');
+  if (!isValidImageSource(photoSource) || !isValidImageSource(mockupSource)) return null;
+  return { id, photoSource, mockupSource };
 }
 
 function resolvePreviewSource(values, record, type) {
@@ -141,21 +236,35 @@ function buildNotFoundHtml() {
 function createPublicWebdesignPreviewService(options = {}) {
   const getUiStateValues = typeof options.getUiStateValues === 'function' ? options.getUiStateValues : async () => ({ values: {} });
 
-  async function resolvePreview(customerId) {
-    const id = normalizeString(customerId);
-    if (!/^[a-z0-9_-]{3,160}$/i.test(id)) return null;
+  async function resolvePreview(identifier) {
+    const id = normalizeCustomerId(identifier);
+    if (!/^[a-z0-9_-]{2,160}$/i.test(id)) return null;
     const state = await getUiStateValues(PHOTO_SCOPE);
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const photoMap = safeParseObject(values[PHOTO_KEY]);
-    const record = findPhotoRecord(photoMap, id);
-    const photoSource = resolvePreviewSource(values, record, 'photo');
-    const mockupSource = resolvePreviewSource(values, record, 'mockup');
-    if (!isValidImageSource(photoSource) || !isValidImageSource(mockupSource)) return null;
-    return { id, photoSource, mockupSource };
+    let record = findPhotoRecord(photoMap, id);
+    let preview = buildPreviewFromRecord(id, values, record);
+    if (!preview) {
+      const customerState = await getUiStateValues(CUSTOMER_SCOPE);
+      const customerValues = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
+      const customers = parseCustomerRows(customerValues);
+      const directCustomer = findCustomerById(customers, id);
+      const matchedCustomers = findCustomerCandidates(customers, id);
+      const candidates = directCustomer
+        ? [directCustomer].concat(matchedCustomers.filter((customer) => customer !== directCustomer))
+        : matchedCustomers;
+      for (const customer of candidates) {
+        const candidateId = normalizeString(customer && (customer.id || customer.customerId || customer.databaseId)) || id;
+        record = findPhotoRecordByIdentity(photoMap, getCustomerIdentityKeys(customer)) || findPhotoRecord(photoMap, candidateId) || record;
+        preview = buildPreviewFromRecord(candidateId, values, record);
+        if (preview) break;
+      }
+    }
+    return preview;
   }
 
   async function getPreviewPageResponse(req, res) {
-    const preview = await resolvePreview(req && req.params && req.params.customerId);
+    const preview = await resolvePreview(req && req.params && (req.params.companySlug || req.params.customerId));
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -170,6 +279,8 @@ function createPublicWebdesignPreviewService(options = {}) {
 }
 
 module.exports = {
+  CUSTOMER_KEY,
+  CUSTOMER_SCOPE,
   PHOTO_KEY,
   PHOTO_SCOPE,
   createPublicWebdesignPreviewService,

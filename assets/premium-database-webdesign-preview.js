@@ -8,6 +8,12 @@
         return String(value || "").trim();
     }
 
+    function slugifyPublicPreview(value, fallback) {
+        const normalized = normalizeString(value).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const slug = normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 90);
+        return slug || fallback || "webdesign";
+    }
+
     function ensureStyles() {
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
         const style = global.document.createElement("style");
@@ -110,7 +116,8 @@
         const escapeHtml = options && typeof options.escapeHtml === "function" ? options.escapeHtml : function (value) { return String(value || ""); };
         const id = normalizeString(customer && customer.id);
         if (!options || !options.show || !id) return "";
-        return "<a class=\"photo-compare-link\" href=\"/mailklaar/" + escapeHtml(encodeURIComponent(id)) + "\" target=\"_blank\" rel=\"noopener\" data-public-preview-id=\"" + escapeHtml(id) + "\" aria-label=\"Open openbare previewpagina\" title=\"Open openbare pagina\">" + COMPARE_ICON + "</a>";
+        const slug = slugifyPublicPreview(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam), encodeURIComponent(id));
+        return "<a class=\"photo-compare-link\" href=\"/webdesign/" + escapeHtml(slug) + "\" target=\"_blank\" rel=\"noopener\" data-public-preview-id=\"" + escapeHtml(id) + "\" aria-label=\"Open openbare previewpagina\" title=\"Open openbare pagina\">" + COMPARE_ICON + "</a>";
     }
 
     ensureStyles();
