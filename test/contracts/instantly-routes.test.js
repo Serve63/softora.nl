@@ -54,7 +54,9 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.ok(statusRoute, 'safe status alias should be registered');
 
   const response = createResponseRecorder();
-  const request = { body: { limit: 10, refreshExistingVariables: true, refreshExistingLimit: 4 } };
+  const request = {
+    body: { limit: 10, refreshExistingVariables: true, refreshExistingLimit: 4, refreshExistingOnly: true },
+  };
   syncRoute[2][0](request, response, () => {});
   await syncRoute[2][1](request, response);
 
@@ -64,5 +66,6 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.equal(syncInput.limit, 10);
   assert.equal(syncInput.refreshExistingVariables, true);
   assert.equal(syncInput.refreshExistingLimit, 4);
+  assert.equal(syncInput.refreshExistingOnly, true);
   assert.equal(syncInput.actor, 'serve@softora.nl');
 });
