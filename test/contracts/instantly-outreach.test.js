@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const sharp = require('sharp');
 
 const { createInstantlyOutreachService } = require('../../server/services/instantly-outreach');
 const {
@@ -14,6 +15,46 @@ const {
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+
+async function createFramedWebdesignDataUrl() {
+  const inner = await sharp({
+    create: {
+      width: 336,
+      height: 252,
+      channels: 4,
+      background: '#ffffff',
+    },
+  })
+    .composite([
+      {
+        input: Buffer.from(
+          `<svg width="336" height="252" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="0" width="336" height="252" fill="#ffffff"/>
+            <rect x="24" y="20" width="92" height="14" fill="#008a78"/>
+            <rect x="24" y="54" width="170" height="32" fill="#172554"/>
+            <rect x="24" y="108" width="288" height="42" fill="#eef7f4"/>
+            <rect x="24" y="174" width="288" height="46" fill="#f7fafc"/>
+          </svg>`
+        ),
+        left: 0,
+        top: 0,
+      },
+    ])
+    .png()
+    .toBuffer();
+  const framed = await sharp({
+    create: {
+      width: 400,
+      height: 300,
+      channels: 4,
+      background: '#eef3fb',
+    },
+  })
+    .composite([{ input: inner, left: 32, top: 24 }])
+    .png()
+    .toBuffer();
+  return `data:image/png;base64,${framed.toString('base64')}`;
+}
 
 function withCheckedMockupMeta(item) {
   if (!item || typeof item !== 'object' || !item.websiteMockup) return item;
@@ -51,8 +92,8 @@ function extractImageTags(html) {
 function assertInstantlyImageTagsUseNaturalLayout(html) {
   const imageTags = extractImageTags(html);
   assert.equal(imageTags.length, 2);
-  assert.match(imageTags[0], /alt="Webdesign" width="640" height="640" loading="eager" decoding="async" fetchpriority="high"/);
-  assert.match(imageTags[1], /alt="Mockup" width="640" height="640" loading="eager" decoding="async" fetchpriority="high"/);
+  assert.match(imageTags[0], /alt="Webdesign" width="640" height="\d+" loading="eager" decoding="async" fetchpriority="high"/);
+  assert.match(imageTags[1], /alt="Mockup" width="640" height="\d+" loading="eager" decoding="async" fetchpriority="high"/);
   for (const imageTag of imageTags) {
     assert.match(
       imageTag,
@@ -322,6 +363,37 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
     variables.softora_instantly_email_html,
     /<em style="font-style:italic;">PS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊<\/em>/
   );
+});
+
+test('instantly sync caches a stripped webdesign image instead of the decorative placeholder frame', async () => {
+  const framedWebdesign = await createFramedWebdesignDataUrl();
+  const { service, fetchCalls } = createService({
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: framedWebdesign,
+        websiteMockup: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockupName: 'Bakkerij Zon device mockup',
+      },
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  const html = body.leads[0].custom_variables.softora_instantly_email_html;
+  assertInstantlyImageTagsUseNaturalLayout(html);
+  assert.doesNotMatch(html, /border-radius|object-fit|background:#eef3fb|min-height|max-height/);
+  const previewTokens = extractPreviewImageTokens(html);
+  assert.equal(previewTokens.length, 2);
+  const webdesignImage = getCachedPreviewImage(getPreviewImageCacheKey(previewTokens[0], 'webdesign'));
+  assert.equal(webdesignImage.contentType, 'image/jpeg');
+  const metadata = await sharp(webdesignImage.content).metadata();
+  assert.equal(metadata.width, 328);
+  assert.equal(metadata.height, 244);
 });
 
 test('instantly sync places Martijn location above the LinkedIn CTA', async () => {
