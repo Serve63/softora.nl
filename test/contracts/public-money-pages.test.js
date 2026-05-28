@@ -293,7 +293,7 @@ test('over softora page is customer-facing and explains the company clearly', ()
   const entry = getRegistryEntry('premium-over-softora.html');
 
   assert.match(source, /<title>Over Softora \| Websites, software en AI voor het MKB<\/title>/);
-  assert.match(source, /\/assets\/seo-growth-pages\.css\?v=20260520b/);
+  assert.match(source, /\/assets\/seo-growth-pages\.css\?v=20260528a/);
   assert.match(source, /<h1>Digitale groei zonder ruis<\/h1>/);
   assert.match(source, /digitaal bouwbureau uit Oisterwijk/);
   assert.match(source, /meer aanvragen, slimmere processen en betere opvolging/);

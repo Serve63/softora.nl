@@ -4,9 +4,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '../..');
-const SEO_GROWTH_CSS_VERSION = '20260520b';
+const SEO_GROWTH_CSS_VERSION = '20260528a';
 const LOW_TRUST_PUBLIC_IMAGE_PATTERN = /\/assets\/(?:home-service-[^"']*-ai|home-over-office-meeting-ai|home-hero-generated-v2)\.jpg/i;
 const { INDEXABLE_PUBLIC_SEO_PAGES } = require('../../server/services/public-seo');
+const {
+  buildSeoContentArticleHtml,
+  buildSeoContentIndexHtml,
+  getSeoContentCollectionPaths,
+  getSeoContentItems,
+} = require('../../server/services/seo-content');
 
 function readFile(fileName) {
   return fs.readFileSync(path.join(root, fileName), 'utf8');
@@ -61,6 +67,16 @@ test('seo-growth hero keeps titles broad and hero secondary CTAs visible', () =>
     css,
     /\.seo-growth-hero \.seo-growth-button\.secondary:hover\s*\{[\s\S]*background:\s*rgba\(255,255,255,\.18\);[\s\S]*color:\s*#fff;/s,
     'hero secondary CTA moet ook bij hover zichtbaar blijven'
+  );
+  assert.match(
+    css,
+    /@media \(max-width:\s*860px\)\s*\{[\s\S]*\.seo-growth-hero-content\s*\{[\s\S]*width:\s*100%;/s,
+    'mobiele hero content moet de volle breedte benutten tegen onnodige titelbreuken'
+  );
+  assert.match(
+    css,
+    /@media \(max-width:\s*520px\)\s*\{[\s\S]*\.seo-growth-hero h1\s*\{[\s\S]*font-size:\s*clamp\(42px,\s*11vw,\s*48px\);[\s\S]*line-height:\s*1;/s,
+    'mobiele hero H1 moet compacter worden voordat titels in vijf regels vallen'
   );
 });
 
@@ -191,7 +207,7 @@ test('over softora page keeps headline, quote and CTA layout polished', () => {
 
   assert.match(
     source,
-    /\/assets\/seo-growth-pages\.css\?v=20260520b/,
+    /\/assets\/seo-growth-pages\.css\?v=20260528a/,
     'Over Softora moet de gedeelde SEO-growth template blijven gebruiken'
   );
   assert.doesNotMatch(
@@ -240,4 +256,26 @@ test('design protocol protects the homepage and public templates', () => {
   assert.match(source, /CTA/i);
   assert.match(source, /contrast/i);
   assert.match(source, /geen losse SEO-blokken/i);
+});
+
+test('rendered public SEO content avoids internal planning language', () => {
+  const forbiddenPublicCopy = /komt later|SEO-machine|contentlaag krijgt straks|volgende contentblokken|verder lezen per onderwerp|foto volgt later/i;
+  const now = new Date('2026-05-28T12:00:00.000Z');
+  const collectionPaths = getSeoContentCollectionPaths();
+  const pages = [
+    ...collectionPaths.map((collectionPath) => ({
+      label: collectionPath,
+      html: buildSeoContentIndexHtml(collectionPath.replace(/^\//, ''), { now }),
+    })),
+    ...getSeoContentItems({ now }).map((item) => ({
+      label: `${item.collection}/${item.slug}`,
+      html: buildSeoContentArticleHtml(item),
+    })),
+  ];
+
+  assert.ok(pages.length > collectionPaths.length, 'verwacht renderbare publieke SEO-contentpagina’s');
+
+  for (const page of pages) {
+    assert.doesNotMatch(page.html, forbiddenPublicCopy, `${page.label} bevat interne planningstaal`);
+  }
 });

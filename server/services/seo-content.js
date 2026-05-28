@@ -1712,7 +1712,7 @@ function buildSeoContentPerformanceSections(item) {
       paragraphs: Object.freeze([
         `De beste eerste stap is meestal niet de grootste stap, maar de stap die het snelst duidelijkheid geeft. Bij ${topic} betekent dat: kies één concrete route, maak de informatie volledig genoeg om vertrouwen te winnen en koppel de pagina aan een meetbare actie. Zo kun je zien of bezoekers begrijpen wat je aanbiedt en of ze doorklikken naar de juiste vervolgstap.`,
         `Daarna wordt opschalen veel veiliger. Je kunt extra artikelen, kennisbankvragen, vergelijkingen of lokale pagina’s toevoegen zonder dat de site rommelig wordt. Elke nieuwe publicatie moet dan een duidelijke taak hebben: een vraag beantwoorden, een bezwaar wegnemen, een money page versterken of een betere lead naar WhatsApp of een intakeflow brengen.`,
-        `Als die taak niet scherp is, publiceren we liever niet. Dat klinkt streng, maar het houdt de SEO-machine gezond: minder losse pagina’s, meer inhoud die echt helpt, en meer kans dat nieuwe vertoningen uiteindelijk verkeer en betere aanvragen voor Softora worden in de praktijk.`,
+        `Als die taak niet scherp is, publiceren we liever niet. Dat klinkt streng, maar het houdt de contentstrategie gezond: minder losse pagina’s, meer inhoud die echt helpt, en meer kans dat nieuwe vertoningen uiteindelijk verkeer en betere aanvragen voor Softora worden in de praktijk.`,
       ]),
     }),
   ]);
