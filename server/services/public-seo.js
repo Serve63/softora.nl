@@ -697,7 +697,7 @@ function classifyConversionTarget(hrefRaw) {
 
 function addConversionTrackingAttributesIfMissing(htmlRaw, entry) {
   const html = String(htmlRaw || '');
-  if (!entry || entry.kind === 'legal') return html;
+  if (!entry) return html;
 
   return html.replace(/<a\b([^>]*\bhref=["']([^"']+)["'][^>]*)>/gi, (match, attrs, href) => {
     if (/data-softora-conversion=/i.test(attrs)) return match;

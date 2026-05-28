@@ -241,10 +241,11 @@ test('seo machine houdt money pages ondersteund met interne links', () => {
 
 test('publieke SEO-pagina CTAs zijn meetbaar van landing tot leadactie', () => {
   const pages = renderStaticPublicPages();
-  const conversionPages = pages.filter((page) => page.kind !== 'legal');
-  const issues = auditConversionCtas({ pages: conversionPages });
+  const issues = auditConversionCtas({ pages });
   const diensten = pages.find((page) => page.path === '/diensten');
   const homepage = pages.find((page) => page.path === '/');
+  const algemeneVoorwaarden = pages.find((page) => page.path === '/algemene-voorwaarden');
+  const privacybeleid = pages.find((page) => page.path === '/privacybeleid');
 
   assert.deepEqual(issues, []);
   assert.match(diensten.html, /data-softora-conversion="public-cta"/);
@@ -255,6 +256,10 @@ test('publieke SEO-pagina CTAs zijn meetbaar van landing tot leadactie', () => {
   assert.match(homepage.html, /data-softora-conversion="public-form-submit"/);
   assert.match(homepage.html, /data-softora-whatsapp-action="submit"/);
   assert.match(homepage.html, /data-softora-whatsapp-url="https:\/\/wa\.me\/31643262792"/);
+  assert.match(algemeneVoorwaarden.html, /data-softora-conversion-page="\/algemene-voorwaarden"/);
+  assert.match(algemeneVoorwaarden.html, /data-softora-conversion-target="whatsapp"/);
+  assert.match(privacybeleid.html, /data-softora-conversion-page="\/privacybeleid"/);
+  assert.match(privacybeleid.html, /href="https:\/\/wa\.me\/31643262792"/);
 });
 
 test('leadknoppen mogen niet meer naar dode contactroutes of niet-veilige WhatsApp-routes wijzen', () => {
