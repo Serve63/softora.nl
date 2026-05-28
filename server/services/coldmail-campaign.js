@@ -104,7 +104,6 @@ const COLDMAIL_IMAGE_VISIBILITY_PS =
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?)/i;
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
-const COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT = 360;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
   'serve@softora.nl',
@@ -4467,13 +4466,13 @@ function createColdmailCampaignService(deps = {}) {
         src
       )}" alt="${escapeHtml(
         alt
-      )}" width="${emailImageMaxWidth}" height="${COLDMAIL_EMAIL_IMAGE_PLACEHOLDER_HEIGHT}" style="display:block;width:100%;max-width:${emailImageMaxWidth}px;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
+      )}" width="${emailImageMaxWidth}" style="display:block;width:100%;max-width:${emailImageMaxWidth}px;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
     };
-    const previewBlockHtml = renderEmailImageTable(attachment, 'Webdesign', '24px 0 0 0');
+    const previewBlockHtml = renderEmailImageTable(attachment, attachment.alt || 'Webdesign', '24px 0 0 0');
     const mockupHtml = attachment.mockup && normalizeString(attachment.mockup.src || (attachment.mockup.cid ? `cid:${attachment.mockup.cid}` : ''))
       ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(mockupCaption)}</p>${renderEmailImageTable(
           attachment.mockup,
-          'Mockup',
+          attachment.mockup.alt || 'Device mockup',
           '0'
         )}`
       : '';
