@@ -360,6 +360,17 @@ test('coldmail campaign uses standard SMTP transports with bounded timeouts', as
 test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async () => {
   for (const senderEmail of ['martijn@softora.nl', 'martijnven123@gmail.com']) {
     const { service, sentMessages } = createService({
+      rows: [
+        {
+          id: 'prospect-1',
+          bedrijf: 'Bakkerij Zon',
+          naam: 'Ruben',
+          email: 'ruben@example.test',
+          plaats: 'Boxtel',
+          status: 'prospect',
+          mail: true,
+        },
+      ],
       mailboxAccountsRaw: JSON.stringify([
         {
           email: senderEmail,
@@ -380,9 +391,11 @@ test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async
         'Zou u openstaan voor webdesign?',
         '',
         'Met vriendelijke groet,',
-        'Martijn',
+        'Martijn van de Ven',
+        '',
         '💼 Mijn LinkedIn 👈',
-        'Softora.nl',
+        '',
+        '📍 {{stad}}',
       ].join('\n'),
       senderEmail,
     });
@@ -390,8 +403,17 @@ test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async
     assert.equal(result.sent, 1, senderEmail);
     assert.match(sentMessages[0].text, /💼 Mijn LinkedIn 👈/);
     assert.match(
+      sentMessages[0].text,
+      /Martijn van de Ven\n\n📍 Boxtel\n\n💼 Mijn LinkedIn 👈\n\nPS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊/,
+      senderEmail
+    );
+    assert.match(
       sentMessages[0].html,
       /<a href="https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">💼 Mijn LinkedIn 👈<\/a>/,
+      senderEmail
+    );
+    assert.ok(
+      sentMessages[0].html.indexOf('📍 Boxtel') < sentMessages[0].html.indexOf('💼 Mijn LinkedIn 👈'),
       senderEmail
     );
   }
