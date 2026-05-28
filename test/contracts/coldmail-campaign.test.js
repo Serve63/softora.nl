@@ -79,6 +79,25 @@ function buildColdmailOpenTrackingToken(input = {}, secret = 'tracking-secret') 
   return `${encodedPayload}.${signature}`;
 }
 
+function buildColdmailPreviewImageToken(input = {}, secret = 'unsubscribe-secret') {
+  const encodedPayload = encodeBase64Url(JSON.stringify({
+    v: 1,
+    id: String(input.id || '').trim(),
+    email: String(input.email || '').trim().toLowerCase(),
+    ref: String(input.reference || '').trim(),
+    type: String(input.type || 'webdesign').trim().toLowerCase() === 'mockup' ? 'mockup' : 'webdesign',
+    ts: String(input.ts || '2026-04-24T12:00:00.000Z').trim(),
+  }));
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(encodedPayload)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+  return `${encodedPayload}.${signature}`;
+}
+
 function createService(overrides = {}) {
   const sentMessages = [];
   const transportConfigs = [];
@@ -268,6 +287,7 @@ function createService(overrides = {}) {
       return true;
     },
     now: overrides.now || (() => new Date('2026-04-24T12:00:00.000Z')),
+    loadPreviewImageSharp: overrides.loadPreviewImageSharp,
     sleep: async (ms) => {
       sleeps.push(ms);
       if (typeof overrides.sleep === 'function') return overrides.sleep(ms);
@@ -2356,6 +2376,75 @@ test('coldmail campaign uses remote webdesign photo and device mockup URLs by de
   assert.equal(savedRows[0].outreachSentAt, '2026-04-24T12:00:00.000Z');
   assert.equal(savedRows[0].coldmailSentMessageId, 'msg-1');
   assert.equal(savedRows[0].actionRequired, false);
+});
+
+test('coldmail preview image route optimizes large images for faster email loading', async () => {
+  const largePngDataUrl = `data:image/png;base64,${Buffer.alloc(160 * 1024, 7).toString('base64')}`;
+  const optimizedBuffer = Buffer.from('optimized-email-image');
+  const sharpCalls = [];
+  const fakeSharp = () => {
+    const pipeline = {
+      async metadata() {
+        return { width: 1800 };
+      },
+      rotate() {
+        sharpCalls.push(['rotate']);
+        return this;
+      },
+      resize(options) {
+        sharpCalls.push(['resize', options]);
+        return this;
+      },
+      jpeg(options) {
+        sharpCalls.push(['jpeg', options]);
+        return this;
+      },
+      async toBuffer() {
+        return optimizedBuffer;
+      },
+    };
+    return pipeline;
+  };
+  const token = buildColdmailPreviewImageToken({
+    id: 'prospect-1',
+    email: 'ruben@example.test',
+    reference: 'SF-20260424-TEST',
+    type: 'webdesign',
+  });
+  const { service } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: largePngDataUrl,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+      },
+    },
+    loadPreviewImageSharp: () => fakeSharp,
+  });
+
+  const image = await service.getColdmailPreviewImage({ token });
+
+  assert.equal(image.type, 'webdesign');
+  assert.equal(image.contentType, 'image/jpeg');
+  assert.equal(image.filename, 'Bakkerij-Zon-webdesign.jpg');
+  assert.equal(image.content.toString(), optimizedBuffer.toString());
+  assert.deepEqual(sharpCalls.find((call) => call[0] === 'resize')[1], {
+    width: 960,
+    withoutEnlargement: true,
+  });
+  assert.deepEqual(sharpCalls.find((call) => call[0] === 'jpeg')[1], {
+    quality: 82,
+    mozjpeg: true,
+  });
 });
 
 test('coldmail campaign keeps CID webdesign images when explicitly configured', async () => {
