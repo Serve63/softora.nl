@@ -454,11 +454,13 @@ test('instantly sync can refresh existing lead variables without adding duplicat
   const result = await service.syncInstantlyLeads({
     actor: 'Test',
     refreshExistingVariables: true,
+    refreshExistingOnly: true,
     refreshExistingLimit: 1,
   });
 
   assert.equal(result.ok, true);
   assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'refreshed_existing_variables');
   assert.equal(result.synced, 0);
   assert.equal(result.refreshedExistingVariables, 1);
   assert.equal(fetchCalls.length, 1);

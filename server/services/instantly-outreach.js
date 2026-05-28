@@ -2006,6 +2006,27 @@ function createInstantlyOutreachService(deps = {}) {
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     let rows = parseDatabaseRows(values, customerDbKey, normalizeString);
+    if (readBool(input.refreshExistingOnly, false)) {
+      const personalizationContext = await loadPersonalizationContext(rows);
+      const existingVariableRefresh = await refreshExistingInstantlyLeadVariables(
+        rows,
+        personalizationContext,
+        input.refreshExistingLimit || config.batchSize
+      );
+      lastSyncResult = {
+        ok: true,
+        skipped: true,
+        reason: 'refreshed_existing_variables',
+        synced: 0,
+        markedBenaderd: 0,
+        refreshedExistingVariables: existingVariableRefresh.refreshed,
+        attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
+        campaignId: config.defaultCampaignId,
+        finishedAt: now().toISOString(),
+      };
+      return lastSyncResult;
+    }
+
     const priorColdmailCleanup = await cleanupPriorColdmailInstantlyRows(rows, actor);
     rows = priorColdmailCleanup.rows;
     const existingApproached = markExistingInstantlyRowsAsApproached(rows, actor);
