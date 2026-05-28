@@ -2,7 +2,6 @@
     "use strict";
 
     const DEVICE_MOCKUP_VERSION = "v6";
-    const SUSPECT_MOCKUP_RENDERERS = new Set(["softora-server-device-v6"]);
 
     function normalizeString(value) {
         return String(value || "").trim();
@@ -26,7 +25,6 @@
         const quality = getMockupQuality(customer);
         const hasQualitySignal = Boolean(quality.renderer || quality.orientation || quality.status || quality.checkedAt);
         if (!hasQualitySignal) return false;
-        if (quality.renderer && SUSPECT_MOCKUP_RENDERERS.has(quality.renderer)) return false;
         if (quality.status !== "checked" && quality.status !== "verified" && quality.status !== "ok") return false;
         if (quality.orientation && quality.orientation !== "upright") return false;
         return true;
