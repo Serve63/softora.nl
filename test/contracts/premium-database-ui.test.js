@@ -553,7 +553,8 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignActionScriptSource, /\.photo-cell\{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0\}/);
   assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:98px;min-width:98px\}/);
   assert.match(webdesignPreviewScriptSource, /const COMPARE_ICON = "<svg class=\\"photo-compare-icon\\"/);
-  assert.match(webdesignPreviewScriptSource, /data-photo-compare-id=\\"/);
+  assert.match(webdesignPreviewScriptSource, /href=\\"\/mailklaar\//);
+  assert.match(webdesignPreviewScriptSource, /data-public-preview-id=\\"/);
   assert.match(webdesignPreviewScriptSource, /nodes\.photoPreviewMeta\.hidden = true/);
   assert.doesNotMatch(webdesignPreviewScriptSource, /customer\.bedrijf \+ " · naast elkaar"/);
   assert.match(webdesignActionScriptSource, /\.photo-drop\{position:relative;flex:0 0 34px;aspect-ratio:1\/1;overflow:hidden;contain:layout paint\}/);
@@ -622,7 +623,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignPreviewScriptSource, /"photoPreviewCompareMockup", "photoPreviewCompareMockupCaption"/);
   assert.match(pageSource, /kind === "compare"/);
   assert.match(pageSource, /window\.SoftoraDatabaseWebdesignPreview\.openComparison\(nodes, customer/);
-  assert.match(pageSource, /openWebsitePhotoPreview\(comparePhotoLink\.getAttribute\("data-photo-compare-id"\), "compare"\)/);
+  assert.doesNotMatch(pageSource, /comparePhotoLink/);
   const photoPreviewImageRule = pageSource.match(/\.photo-preview-image \{([\s\S]*?)\n\s*\}/);
   assert.ok(photoPreviewImageRule, 'photo preview image styling should be present');
   assert.match(photoPreviewImageRule[1], /display: block;/);
@@ -648,7 +649,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260528c/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260527b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260528c/);
@@ -1096,8 +1097,10 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.equal(loadedFlags.length, 2);
   assert.doesNotMatch(html, /data-photo-loaded="false"/);
   assert.match(html, /class="photo-compare-link"/);
-  assert.match(html, /data-photo-compare-id="customer-1"/);
-  assert.match(html, /aria-label="Webdesign en mockup naast elkaar bekijken"/);
+  assert.match(html, /href="\/mailklaar\/customer-1"/);
+  assert.match(html, /target="_blank"/);
+  assert.match(html, /data-public-preview-id="customer-1"/);
+  assert.match(html, /aria-label="Open openbare previewpagina"/);
 });
 
 test('premium database webdesign action queues missing mockup repairs outside render', async () => {
