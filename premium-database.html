@@ -1571,7 +1571,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-asset-state.js?v=20260528c"></script><script src="assets/premium-database-webdesign-action.js?v=20260528c"></script>
+    <script src="assets/premium-database-webdesign-asset-state.js?v=20260528c"></script><script src="assets/premium-database-webdesign-action.js?v=20260529a"></script><script src="assets/premium-database-webdesign-preview.js?v=20260529a"></script>
     <script src="assets/premium-database-import.js?v=20260521b"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260527b"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260528c"></script>
@@ -2547,12 +2547,12 @@
             const customer = state.klanten.find(function (item) {
                 return item.id === customerId;
             });
-            const isMockup = kind === "mockup";
+            const isMockup = kind === "mockup"; if (kind === "compare" && window.SoftoraDatabaseWebdesignPreview.openComparison(nodes, customer, { normalizeString: normalizeString, isValidWebsitePhotoSource: isValidWebsitePhotoSource })) return true;
             const photo = normalizeString(customer && (isMockup ? customer.websiteMockup : customer.websitePhoto));
             if (!customer || !isValidWebsitePhotoSource(photo)) return false;
 
             const label = normalizeString(isMockup ? customer.websiteMockupName : customer.websitePhotoName) || (isMockup ? "Device mockup" : "Websitefoto");
-            nodes.photoPreviewImage.src = photo;
+            window.SoftoraDatabaseWebdesignPreview.reset(nodes); nodes.photoPreviewImage.src = photo;
             nodes.photoPreviewImage.alt = label;
             nodes.photoPreviewMeta.textContent = customer.bedrijf ? customer.bedrijf + " · " + label : label;
             nodes.photoPreview.classList.add("on");
@@ -2562,7 +2562,7 @@
 
         function closeWebsitePhotoPreview() {
             nodes.photoPreview.classList.remove("on");
-            nodes.photoPreview.setAttribute("aria-hidden", "true");
+            nodes.photoPreview.setAttribute("aria-hidden", "true"); window.SoftoraDatabaseWebdesignPreview.reset(nodes);
             nodes.photoPreviewImage.removeAttribute("src");
             nodes.photoPreviewImage.alt = "";
             nodes.photoPreviewMeta.textContent = "";
@@ -3102,7 +3102,7 @@
                 event.stopPropagation();
                 void removeWebsitePhotoForCustomer(removePhotoButton.getAttribute("data-remove-photo-id"));
                 return;
-            }
+            } const comparePhotoLink = event.target.closest(".photo-compare-link[data-photo-compare-id]"); if (comparePhotoLink) { event.preventDefault(); event.stopPropagation(); openWebsitePhotoPreview(comparePhotoLink.getAttribute("data-photo-compare-id"), "compare"); return; }
             const mockupDrop = event.target.closest("[data-mockup-photo-id]");
             if (mockupDrop) {
                 event.preventDefault(); event.stopPropagation(); state.photoTargetId = mockupDrop.getAttribute("data-mockup-photo-id"); if (mockupDrop.getAttribute("data-can-generate") === "true") { void webdesignMockupController.ensureForCustomer(state.photoTargetId, { force: true }); return; } openWebsitePhotoPreview(state.photoTargetId, "mockup");
