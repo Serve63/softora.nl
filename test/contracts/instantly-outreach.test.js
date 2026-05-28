@@ -287,6 +287,58 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   );
 });
 
+test('instantly sync places Martijn location above the LinkedIn CTA', async () => {
+  const { service, fetchCalls } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        plaats: 'Boxtel',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    coldmailingSettings: {
+      senderEmail: 'martijn@softora.nl',
+      senders: {
+        'martijn@softora.nl': {
+          subject: 'Kleine vraag over jullie website',
+          body: [
+            'Goedendag,',
+            '',
+            'Ik ben benieuwd wat je ervan vindt.',
+            '',
+            'Met vriendelijke groet,',
+            'Martijn van de Ven',
+            '',
+            '💼 Mijn LinkedIn 👈',
+            '',
+            '{{stad}}',
+          ].join('\n'),
+        },
+      },
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  const variables = body.leads[0].custom_variables;
+  assert.match(
+    variables.softora_mail_body,
+    /Martijn van de Ven\n\n📍 Boxtel\n\n💼 Mijn LinkedIn 👈\n\nPS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊/
+  );
+  assert.ok(
+    variables.softora_instantly_email_html.indexOf('📍 Boxtel') <
+      variables.softora_instantly_email_html.indexOf('💼 Mijn LinkedIn 👈')
+  );
+});
+
 test('instantly sync is blocked unless the explicit sync flag is enabled', async () => {
   const { service, fetchCalls, getRows } = createService({ syncEnabled: false });
 

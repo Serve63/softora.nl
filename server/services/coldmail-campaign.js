@@ -3954,10 +3954,45 @@ function createColdmailCampaignService(deps = {}) {
     return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
+  function ensureLinkedinCtaAfterPinnedCity(text, city) {
+    const cleanText = normalizeString(text);
+    if (!cleanText || !cleanText.includes(MARTIJN_LINKEDIN_CTA_TEXT)) return cleanText;
+    const cleanCity = normalizeString(city);
+    const pinnedCity = formatPinnedCity(cleanCity);
+    const cityMatchers = [pinnedCity, cleanCity]
+      .filter(Boolean)
+      .map((value) => new RegExp(`^\\s*${escapeRegexText(value)}\\s*$`, 'i'));
+    if (!cityMatchers.length) return cleanText;
+
+    const lines = cleanText.split('\n');
+    let hadCta = false;
+    const withoutCta = lines.filter((line) => {
+      if (normalizeString(line) !== MARTIJN_LINKEDIN_CTA_TEXT) return true;
+      hadCta = true;
+      return false;
+    });
+    if (!hadCta) return cleanText;
+
+    let insertAt = -1;
+    for (let index = withoutCta.length - 1; index >= 0; index -= 1) {
+      if (cityMatchers.some((matcher) => matcher.test(withoutCta[index]))) {
+        insertAt = index + 1;
+        break;
+      }
+    }
+    if (insertAt === -1) return cleanText;
+
+    withoutCta.splice(insertAt, 0, '', MARTIJN_LINKEDIN_CTA_TEXT);
+    return withoutCta.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
   function normalizeColdmailMailText(text, row) {
     const city = getRowCity(row) || 'uw regio';
-    return ensureImageVisibilityPsInMailText(
-      ensurePinnedCityInMailText(normalizeSenderNameInMailText(text), city),
+    return ensureLinkedinCtaAfterPinnedCity(
+      ensureImageVisibilityPsInMailText(
+        ensurePinnedCityInMailText(normalizeSenderNameInMailText(text), city),
+        city
+      ),
       city
     );
   }
