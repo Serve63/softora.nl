@@ -206,7 +206,15 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.match(body.leads[0].custom_variables.softora_mail_body, /Goedemorgen Ruben Bakker/);
   assert.match(body.leads[0].custom_variables.softora_mail_body, /Servé Creusen/);
   assert.match(body.leads[0].custom_variables.softora_mail_body, /📍 uw regio/);
+  assert.match(
+    body.leads[0].custom_variables.softora_mail_body,
+    /📍 uw regio\nPS: Als het webdesign niet zichtbaar is, klik op 'afbeeldingen tonen' ergens in het scherm\./
+  );
   assert.equal(body.leads[0].custom_variables.softora_city_with_pin, '📍 uw regio');
+  assert.equal(
+    body.leads[0].custom_variables.softora_image_visibility_ps,
+    "PS: Als het webdesign niet zichtbaar is, klik op 'afbeeldingen tonen' ergens in het scherm."
+  );
   assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
@@ -263,10 +271,15 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   assert.match(variables.softora_mail_body, /Servé Creusen/);
   assert.doesNotMatch(variables.softora_mail_body, /Serve Creusen/);
   assert.match(variables.softora_mail_body, /📍 Alphen/);
+  assert.match(
+    variables.softora_mail_body,
+    /📍 Alphen\nPS: Als het webdesign niet zichtbaar is, klik op 'afbeeldingen tonen' ergens in het scherm\./
+  );
   assert.doesNotMatch(variables.softora_mail_body, /\nAlphen$/);
   assert.equal(variables.softora_city, 'Alphen');
   assert.equal(variables.softora_city_with_pin, '📍 Alphen');
   assert.match(variables.softora_instantly_email_html, /📍 Alphen/);
+  assert.match(variables.softora_instantly_email_html, /PS: Als het webdesign niet zichtbaar is, klik op/);
 });
 
 test('instantly sync is blocked unless the explicit sync flag is enabled', async () => {

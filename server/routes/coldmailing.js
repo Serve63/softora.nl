@@ -192,6 +192,9 @@ function registerColdmailingRoutes(app, deps = {}) {
       const safeFilename = normalizeString(image && image.filename).replace(/["\r\n]/g, '') || 'webdesign-foto.png';
       res.setHeader('Content-Type', normalizeString(image && image.contentType) || 'application/octet-stream');
       res.setHeader('Content-Disposition', `inline; filename="${safeFilename}"`);
+      if (image && image.content && Number.isFinite(Number(image.content.length))) {
+        res.setHeader('Content-Length', String(image.content.length));
+      }
       res.status(200).send(image.content);
     } catch (error) {
       const status = normalizeString(error && error.code) === 'INVALID_UNSUBSCRIBE_TOKEN' ? 400 : 404;

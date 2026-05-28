@@ -30,6 +30,8 @@ const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me wet
 const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
+const COLDMAIL_IMAGE_VISIBILITY_PS =
+  "PS: Als het webdesign niet zichtbaar is, klik op 'afbeeldingen tonen' ergens in het scherm.";
 const DEFAULT_WEBDESIGN_SUBJECT = 'Nieuw webdesign gemaakt!';
 const DEFAULT_WEBDESIGN_BODY = [
   'Goedemorgen {{naam}},',
@@ -669,6 +671,10 @@ function normalizeSenderNameInMailText(text, normalizeString = defaultNormalizeS
   return normalizeString(text).replace(/\bServe Creusen\b/g, 'Servé Creusen');
 }
 
+function escapeRegexText(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function formatPinnedCity(city, normalizeString = defaultNormalizeString) {
   const cleanCity = normalizeString(city);
   return cleanCity ? `📍 ${cleanCity}` : '';
@@ -686,9 +692,44 @@ function ensurePinnedCityInMailText(text, city, normalizeString = defaultNormali
   return `${cleanText}\n\n${formatPinnedCity(cleanCity, normalizeString)}`;
 }
 
+function hasImageVisibilityPs(text, normalizeString = defaultNormalizeString) {
+  return /als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm/i.test(
+    normalizeString(text)
+  );
+}
+
+function ensureImageVisibilityPsInMailText(text, city, normalizeString = defaultNormalizeString) {
+  const cleanText = normalizeString(text);
+  if (!cleanText || hasImageVisibilityPs(cleanText, normalizeString)) return cleanText;
+  const cleanCity = normalizeString(city);
+  const pinnedCity = formatPinnedCity(cleanCity, normalizeString);
+  const lines = cleanText.split('\n');
+  const cityMatchers = [pinnedCity, cleanCity]
+    .filter(Boolean)
+    .map((value) => new RegExp(`^\\s*${escapeRegexText(value)}\\s*$`, 'i'));
+  let insertAt = -1;
+  if (cityMatchers.length) {
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      if (cityMatchers.some((matcher) => matcher.test(lines[index]))) {
+        insertAt = index + 1;
+        break;
+      }
+    }
+  }
+  if (insertAt === -1) {
+    return `${cleanText}\n\n${COLDMAIL_IMAGE_VISIBILITY_PS}`;
+  }
+  lines.splice(insertAt, 0, COLDMAIL_IMAGE_VISIBILITY_PS);
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function normalizeInstantlyMailText(text, city, normalizeString = defaultNormalizeString) {
-  return ensurePinnedCityInMailText(
-    normalizeSenderNameInMailText(text, normalizeString),
+  return ensureImageVisibilityPsInMailText(
+    ensurePinnedCityInMailText(
+      normalizeSenderNameInMailText(text, normalizeString),
+      city,
+      normalizeString
+    ),
     city,
     normalizeString
   );
@@ -1499,6 +1540,7 @@ function createInstantlyOutreachService(deps = {}) {
       softora_mail_body_with_optout: appendColdmailOptOutText(baseMailBody, unsubscribeUrl, normalizeString),
       softora_instantly_email_body: instantlyEmailBody,
       softora_instantly_email_html: instantlyEmailHtml,
+      softora_image_visibility_ps: COLDMAIL_IMAGE_VISIBILITY_PS,
       softora_reference: reference,
       softora_unsubscribe_url: unsubscribeUrl,
       softora_webdesign_image_url: webdesignImageUrl,
