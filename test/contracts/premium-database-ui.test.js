@@ -250,6 +250,31 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.equal(approvedMockup.isMailReady, true);
   assert.equal(approvedMockup.hasCompleteAssets, true);
 
+  const suspectServerMockup = assetStateClient.buildWebdesignAssetState({
+    ...base,
+    websitePhoto: 'data:image/png;base64,AAA',
+    websiteMockup: 'data:image/jpeg;base64,BBB',
+    mockupRenderer: 'softora-server-device-v6',
+    mockupQualityStatus: 'checked',
+    mockupOrientation: 'upright',
+  }, helpers);
+  assert.equal(suspectServerMockup.hasMockup, true);
+  assert.equal(suspectServerMockup.mockupApproved, false);
+  assert.equal(suspectServerMockup.canRepairMockup, true);
+  assert.equal(suspectServerMockup.isMailReady, false);
+  assert.equal(suspectServerMockup.mockupState, 'repair');
+
+  const fixedServerMockup = assetStateClient.buildWebdesignAssetState({
+    ...base,
+    websitePhoto: 'data:image/png;base64,AAA',
+    websiteMockup: 'data:image/jpeg;base64,BBB',
+    mockupRenderer: 'softora-server-device-v7',
+    mockupQualityStatus: 'checked',
+    mockupOrientation: 'upright',
+  }, helpers);
+  assert.equal(fixedServerMockup.mockupApproved, true);
+  assert.equal(fixedServerMockup.isMailReady, true);
+
   const oldMockupWithoutQuality = assetStateClient.buildWebdesignAssetState({
     ...base,
     websitePhoto: 'data:image/png;base64,AAA',
@@ -414,8 +439,11 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260527a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260528a/);
   assert.match(webdesignAssetStateScriptSource, /function buildWebdesignAssetState\(customer, helpers, runtimeState\)/);
+  assert.match(webdesignAssetStateScriptSource, /const SUSPECT_MOCKUP_RENDERERS = new Set\(\["softora-server-device-v6"\]\);/);
+  assert.match(webdesignActionScriptSource, /const SUSPECT_MOCKUP_RENDERERS = new Set\(\["softora-server-device-v6"\]\);/);
+  assert.match(webdesignMockupScriptSource, /const SUSPECT_MOCKUP_RENDERERS = new Set\(\["softora-server-device-v6"\]\);/);
   assert.match(webdesignAssetStateScriptSource, /mockupApproved: mockupApproved/);
   assert.match(webdesignAssetStateScriptSource, /canGeneratePhoto: canGeneratePhoto/);
   assert.match(webdesignAssetStateScriptSource, /isMailReady: isMailReady/);
@@ -597,10 +625,11 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260527d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260528a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260528b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260527b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260527c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260528a/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260526b/);
@@ -619,13 +648,15 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(pageSource, /function generateWebdesignPhotos\(limit, options\)/);
   assert.match(pageSource, /const progressSilent = Boolean\(options && options\.silentProgress\);/);
   assert.match(pageSource, /return isWebdesignPhotoEligible\(customer\);/);
-  assert.match(pageSource, /Promise\.allSettled\(targets\.map\(function \(target\) \{/);
-  assert.match(pageSource, /return webdesignActionController\.generateForCustomer\(target\.id\);/);
+  assert.doesNotMatch(pageSource, /Promise\.allSettled\(targets\.map\(function \(target\) \{/);
+  assert.match(pageSource, /for \(const target of targets\) \{/);
+  assert.match(pageSource, /await webdesignActionController\.generateForCustomer\(target\.id\);/);
+  assert.doesNotMatch(pageSource, /return webdesignActionController\.generateForCustomer\(target\.id\);/);
   assert.doesNotMatch(pageSource, /Webdesign maken voor " \+ target\.bedrijf/);
   assert.doesNotMatch(pageSource, /AI-foto maken voor " \+ target\.bedrijf/);
   assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten, \{ onlyCustomerIds: \[customerId\] \}\);/);
   assert.doesNotMatch(pageSource, /onlyCustomerIds: \[target\.id\]/);
-  assert.match(pageSource, /setStatusMessage\(""\);[\s\S]*Promise\.allSettled/);
+  assert.match(pageSource, /setStatusMessage\(""\);[\s\S]*for \(const target of targets\)/);
   assert.doesNotMatch(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
@@ -639,6 +670,8 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignActionScriptSource, /function resumePendingJobs\(\)/);
   assert.match(webdesignActionScriptSource, /return firstLoad;/);
   assert.match(webdesignActionScriptSource, /async function loadRunningJobs\(\)/);
+  assert.match(webdesignActionScriptSource, /function resolveJobPollDelay\(job\)/);
+  assert.match(webdesignActionScriptSource, /schedulePoll\(jobId, resolveJobPollDelay\(job\)\);/);
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT,/);
   assert.doesNotMatch(webdesignActionScriptSource, /localStorage/);
   assert.doesNotMatch(webdesignActionScriptSource, /sessionStorage/);

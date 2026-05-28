@@ -453,6 +453,31 @@ test('ai remote service includes OpenAI upstream detail in image generation erro
   );
 });
 
+test('ai remote service marks OpenAI image rate limits as retryable with retry timing', async () => {
+  const { service } = createService({
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: false, status: 429 },
+      data: {
+        error: {
+          message:
+            'Rate limit reached for gpt-image-2 on input-images per min: Limit 20, Used 20, Requested 1. Please try again in 3s.',
+        },
+      },
+    }),
+  });
+
+  await assert.rejects(
+    () => service.generateWebsitePreviewImageWithAi({ host: 'softora.nl', imageSize: '1024x1536' }),
+    (error) => {
+      assert.equal(error.status, 429);
+      assert.equal(error.model, 'gpt-image-2');
+      assert.equal(error.retryableOpenAiImage, true);
+      assert.equal(error.retryAfterMs, 3000);
+      return true;
+    }
+  );
+});
+
 test('ai remote service keeps b64_json response format for legacy dall-e image models', async () => {
   const calls = [];
   const { service } = createService({

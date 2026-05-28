@@ -1,7 +1,13 @@
+const fs = require('fs');
+const path = require('path');
 const { randomUUID } = require('crypto');
 
-const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v6';
+const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v7';
+const DEVICE_MOCKUP_FILE_VERSION = 'v7';
+const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set(['softora-server-device-v6']);
+const APPROVED_MOCKUP_QUALITY_STATUSES = new Set(['checked', 'verified', 'ok']);
 let cachedSharp = null;
+let cachedMockupFontCss = null;
 
 function loadSharpModule() {
   if (cachedSharp) return cachedSharp;
@@ -19,10 +25,12 @@ function escapeSvgText(value) {
 
 function parseImageDataUrl(value) {
   const match = String(value || '').trim().match(/^data:image\/(png|jpe?g|webp);base64,([a-z0-9+/=\s]+)$/i);
+  const base64 = match ? match[2].replace(/\s+/g, '') : '';
   if (!match) return null;
   return {
     mimeType: `image/${match[1].toLowerCase() === 'jpg' ? 'jpeg' : match[1].toLowerCase()}`,
-    base64: match[2].replace(/\s+/g, ''),
+    base64,
+    buffer: Buffer.from(base64, 'base64'),
   };
 }
 
@@ -32,53 +40,329 @@ function replaceImageFileSuffix(value, suffix) {
   return `${clean}${suffix}.jpg`;
 }
 
-async function createDeviceMockupDataUrl(imageDataUrl, customer = {}, options = {}) {
+function loadMockupFontCss() {
+  if (cachedMockupFontCss !== null) return cachedMockupFontCss;
+  const fontDir = path.join(__dirname, '../../assets/fonts');
+  try {
+    const oswald = fs.readFileSync(path.join(fontDir, 'oswald-latin.woff2')).toString('base64');
+    const inter = fs.readFileSync(path.join(fontDir, 'inter-latin.woff2')).toString('base64');
+    cachedMockupFontCss = [
+      '@font-face{font-family:SoftoraMockupOswald;src:url(data:font/woff2;base64,',
+      oswald,
+      ") format('woff2');font-weight:400 700;font-style:normal;}",
+      '@font-face{font-family:SoftoraMockupInter;src:url(data:font/woff2;base64,',
+      inter,
+      ") format('woff2');font-weight:300 800;font-style:normal;}",
+    ].join('');
+  } catch (_) {
+    cachedMockupFontCss = '';
+  }
+  return cachedMockupFontCss;
+}
+
+function normalizeFiniteNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function buildDeviceSpec(definition) {
+  return {
+    ...definition,
+    screen: {
+      x: definition.x + definition.pad,
+      y: definition.y + definition.padTop,
+      width: definition.w - definition.pad * 2,
+      height: definition.h - definition.padTop - definition.padBottom,
+      radius: definition.screenRadius,
+      frame: {
+        left: definition.pad,
+        right: definition.pad,
+        top: definition.padTop,
+        bottom: definition.padBottom,
+      },
+    },
+  };
+}
+
+function getDeviceMockupRendererSpec() {
+  return {
+    renderer: DEVICE_MOCKUP_RENDERER,
+    fileVersion: DEVICE_MOCKUP_FILE_VERSION,
+    canvas: { width: 1600, height: 1000 },
+    title: {
+      text: 'WEBDESIGN PREVIEW',
+      x: 92,
+      y: 118,
+      fontSize: 42,
+      fontFamily: 'SoftoraMockupOswald',
+    },
+    subtitle: {
+      text: 'Laptop - iPad - iPhone',
+      x: 94,
+      y: 158,
+      fontSize: 24,
+      fontFamily: 'SoftoraMockupInter',
+    },
+    devices: [
+      buildDeviceSpec({
+        id: 'laptop',
+        x: 155,
+        y: 260,
+        w: 930,
+        h: 560,
+        pad: 18,
+        padTop: 18,
+        padBottom: 28,
+        radius: 28,
+        screenRadius: 14,
+        frame: '#111827',
+        shadow: 'rgba(15,23,42,.24)',
+        blur: 44,
+        offsetY: 26,
+        fitMode: 'viewport-width',
+        cropTopRatio: 0,
+        base: '#e5e7eb',
+        baseX: 105,
+        baseY: 835,
+        baseW: 1170,
+        baseH: 42,
+      }),
+      buildDeviceSpec({
+        id: 'tablet',
+        x: 1095,
+        y: 220,
+        w: 305,
+        h: 455,
+        pad: 14,
+        padTop: 18,
+        padBottom: 18,
+        radius: 34,
+        screenRadius: 22,
+        frame: '#1f2937',
+        shadow: 'rgba(15,23,42,.22)',
+        blur: 34,
+        offsetY: 22,
+        fitMode: 'viewport',
+        cropTopRatio: 0,
+        cropFocusX: 0.5,
+        viewportHeightRatio: 1,
+      }),
+      buildDeviceSpec({
+        id: 'phone',
+        x: 1345,
+        y: 410,
+        w: 180,
+        h: 380,
+        pad: 10,
+        padTop: 22,
+        padBottom: 16,
+        radius: 34,
+        screenRadius: 20,
+        frame: '#030712',
+        shadow: 'rgba(15,23,42,.28)',
+        blur: 30,
+        offsetY: 18,
+        fitMode: 'viewport',
+        cropTopRatio: 0,
+        cropFocusX: 0,
+        viewportHeightRatio: 1,
+      }),
+    ],
+  };
+}
+
+function resolveViewportCrop(sourceSize, screen, device) {
+  const sourceWidth = Math.max(1, normalizeFiniteNumber(sourceSize.width, 1));
+  const sourceHeight = Math.max(1, normalizeFiniteNumber(sourceSize.height, 1));
+  const targetRatio = screen.width / screen.height;
+  const viewportHeightRatio = clampNumber(normalizeFiniteNumber(device.viewportHeightRatio, 0.68), 0.38, 1);
+  let sh = Math.max(1, sourceHeight * viewportHeightRatio);
+  let sw = sh * targetRatio;
+  if (sw > sourceWidth) {
+    sw = sourceWidth;
+    sh = sw / targetRatio;
+  }
+  sh = Math.min(sh, sourceHeight);
+  sw = Math.min(sw, sourceWidth);
+  const focusX = clampNumber(normalizeFiniteNumber(device.cropFocusX, 0.5), 0, 1);
+  const cropTopRatio = clampNumber(normalizeFiniteNumber(device.cropTopRatio, 0), 0, 1);
+  return {
+    sx: clampNumber((sourceWidth - sw) * focusX, 0, Math.max(0, sourceWidth - sw)),
+    sy: clampNumber((sourceHeight - sh) * cropTopRatio, 0, Math.max(0, sourceHeight - sh)),
+    sw,
+    sh,
+  };
+}
+
+function renderDeviceImageSvg(device, sourceSize, embeddedImage) {
+  const screen = device.screen;
+  const sourceWidth = Math.max(1, normalizeFiniteNumber(sourceSize.width, 1));
+  const sourceHeight = Math.max(1, normalizeFiniteNumber(sourceSize.height, 1));
+  if (device.fitMode === 'viewport-width') {
+    const scale = screen.width / sourceWidth;
+    const renderedHeight = sourceHeight * scale;
+    if (renderedHeight <= screen.height) {
+      return `<image href="${embeddedImage}" x="${screen.x}" y="${screen.y}" width="${screen.width}" height="${renderedHeight}" preserveAspectRatio="none" clip-path="url(#${device.id}Screen)"/>`;
+    }
+    const visibleSourceHeight = Math.max(1, screen.height / scale);
+    const cropTopRatio = clampNumber(normalizeFiniteNumber(device.cropTopRatio, 0), 0, 1);
+    const sy = clampNumber((sourceHeight - visibleSourceHeight) * cropTopRatio, 0, Math.max(0, sourceHeight - visibleSourceHeight));
+    return `<svg x="${screen.x}" y="${screen.y}" width="${screen.width}" height="${screen.height}" viewBox="0 ${sy} ${sourceWidth} ${visibleSourceHeight}" preserveAspectRatio="none" overflow="hidden" clip-path="url(#${device.id}Screen)"><image href="${embeddedImage}" x="0" y="0" width="${sourceWidth}" height="${sourceHeight}"/></svg>`;
+  }
+  const crop = resolveViewportCrop(sourceSize, screen, device);
+  return `<svg x="${screen.x}" y="${screen.y}" width="${screen.width}" height="${screen.height}" viewBox="${crop.sx} ${crop.sy} ${crop.sw} ${crop.sh}" preserveAspectRatio="none" overflow="hidden" clip-path="url(#${device.id}Screen)"><image href="${embeddedImage}" x="0" y="0" width="${sourceWidth}" height="${sourceHeight}"/></svg>`;
+}
+
+function renderDeviceSvg(device, sourceSize, embeddedImage) {
+  const screen = device.screen;
+  const notch = device.id === 'tablet'
+    ? '<rect x="1198" y="300" width="96" height="10" rx="5" fill="#64748b"/>'
+    : device.id === 'phone'
+      ? '<rect x="1346" y="442" width="82" height="9" rx="5" fill="#64748b"/>'
+      : '';
+  const base = device.base
+    ? `<rect x="${device.baseX}" y="${device.baseY}" width="${device.baseW}" height="${device.baseH}" rx="16" fill="${device.base}"/>`
+    : '';
+  const filter = device.id === 'laptop' ? 'shadow' : 'softShadow';
+  return `
+      <g filter="url(#${filter})">
+        <rect x="${device.x}" y="${device.y}" width="${device.w}" height="${device.h}" rx="${device.radius}" fill="${device.frame}"/>
+        <rect x="${screen.x}" y="${screen.y}" width="${screen.width}" height="${screen.height}" rx="${screen.radius}" fill="#ffffff"/>
+        ${renderDeviceImageSvg(device, sourceSize, embeddedImage)}
+        ${base}
+        ${notch}
+      </g>`;
+}
+
+async function buildDeviceMockupSvg(imageDataUrl, customer = {}, options = {}) {
   const parsed = parseImageDataUrl(imageDataUrl);
   if (!parsed) throw new Error('De webdesignfoto is niet geschikt voor een device-mockup.');
   const sharp = typeof options.loadSharpImpl === 'function' ? options.loadSharpImpl() : loadSharpModule();
+  const metadata = await sharp(parsed.buffer).metadata();
+  const sourceSize = {
+    width: Math.max(1, Number(metadata.width) || 1024),
+    height: Math.max(1, Number(metadata.height) || 1536),
+  };
   const embeddedImage = `data:${parsed.mimeType};base64,${parsed.base64}`;
-  const companyName = escapeSvgText(customer.bedrijf || customer.company || 'Webdesign');
-  const svg = `
+  const spec = getDeviceMockupRendererSpec();
+  return `
     <svg width="1600" height="1000" viewBox="0 0 1600 1000" xmlns="http://www.w3.org/2000/svg">
       <defs>
+        <style>${loadMockupFontCss()}</style>
         <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
-          <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#0f172a" flood-opacity="0.18"/>
+          <feDropShadow dx="0" dy="26" stdDeviation="44" flood-color="#0f172a" flood-opacity="0.24"/>
         </filter>
         <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
-          <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#475569" flood-opacity="0.16"/>
+          <feDropShadow dx="0" dy="22" stdDeviation="34" flood-color="#0f172a" flood-opacity="0.22"/>
         </filter>
-        <clipPath id="laptopScreen"><rect x="332" y="375" width="880" height="430" rx="16"/></clipPath>
-        <clipPath id="tabletScreen"><rect x="1124" y="325" width="246" height="410" rx="12"/></clipPath>
-        <clipPath id="phoneScreen"><rect x="1306" y="462" width="162" height="340" rx="14"/></clipPath>
+        ${spec.devices.map((device) => `<clipPath id="${device.id}Screen"><rect x="${device.screen.x}" y="${device.screen.y}" width="${device.screen.width}" height="${device.screen.height}" rx="${device.screen.radius}"/></clipPath>`).join('')}
       </defs>
-      <rect width="1600" height="1000" fill="#f8fbff"/>
-      <circle cx="1270" cy="155" r="330" fill="#e8f0ff"/>
-      <circle cx="220" cy="880" r="290" fill="#eef3f8"/>
-      <text x="145" y="150" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="800" fill="#111827">WEBDESIGN PREVIEW</text>
-      <text x="147" y="195" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#7b8494">Laptop - iPad - iPhone</text>
-      <g filter="url(#shadow)">
-        <rect x="290" y="335" width="964" height="520" rx="36" fill="#111827"/>
-        <rect x="332" y="375" width="880" height="430" rx="16" fill="#ffffff"/>
-        <image href="${embeddedImage}" x="332" y="375" width="880" height="430" preserveAspectRatio="xMidYMin slice" clip-path="url(#laptopScreen)"/>
-        <rect x="260" y="855" width="1030" height="54" rx="22" fill="#e4ebf4"/>
-        <rect x="620" y="864" width="270" height="18" rx="9" fill="#c6d1df"/>
-      </g>
-      <g filter="url(#softShadow)">
-        <rect x="1095" y="285" width="306" height="498" rx="34" fill="#111827"/>
-        <rect x="1124" y="325" width="246" height="410" rx="12" fill="#ffffff"/>
-        <image href="${embeddedImage}" x="1124" y="325" width="246" height="410" preserveAspectRatio="xMidYMin slice" clip-path="url(#tabletScreen)"/>
-        <rect x="1198" y="300" width="96" height="10" rx="5" fill="#64748b"/>
-      </g>
-      <g filter="url(#softShadow)">
-        <rect x="1278" y="424" width="218" height="432" rx="36" fill="#111827"/>
-        <rect x="1306" y="462" width="162" height="340" rx="14" fill="#ffffff"/>
-        <image href="${embeddedImage}" x="1306" y="462" width="162" height="340" preserveAspectRatio="xMidYMin slice" clip-path="url(#phoneScreen)"/>
-        <rect x="1346" y="442" width="82" height="9" rx="5" fill="#64748b"/>
-      </g>
-      <text x="145" y="942" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#cbd5e1">${companyName}</text>
+      <linearGradient id="backgroundGradient" x1="0" y1="0" x2="1600" y2="1000" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#f7f9fc"/>
+        <stop offset="0.48" stop-color="#ffffff"/>
+        <stop offset="1" stop-color="#e8edf5"/>
+      </linearGradient>
+      <rect width="1600" height="1000" fill="url(#backgroundGradient)"/>
+      <circle cx="1260" cy="160" r="340" fill="#3b82f6" fill-opacity="0.10"/>
+      <circle cx="280" cy="820" r="300" fill="#0f172a" fill-opacity="0.08"/>
+      <text x="${spec.title.x}" y="${spec.title.y}" font-family="SoftoraMockupOswald, Oswald, Arial, sans-serif" font-size="${spec.title.fontSize}" font-weight="700" fill="#14182d">${escapeSvgText(spec.title.text)}</text>
+      <text x="${spec.subtitle.x}" y="${spec.subtitle.y}" font-family="SoftoraMockupInter, Inter, Arial, sans-serif" font-size="${spec.subtitle.fontSize}" font-weight="500" fill="#14182d" fill-opacity="0.56">${escapeSvgText(spec.subtitle.text)}</text>
+      ${spec.devices.map((device) => renderDeviceSvg(device, sourceSize, embeddedImage)).join('')}
     </svg>`;
+}
+
+async function createDeviceMockupDataUrl(imageDataUrl, customer = {}, options = {}) {
+  const sharp = typeof options.loadSharpImpl === 'function' ? options.loadSharpImpl() : loadSharpModule();
+  const svg = await buildDeviceMockupSvg(imageDataUrl, customer, { loadSharpImpl: () => sharp });
   const buffer = await sharp(Buffer.from(svg)).jpeg({ quality: 88 }).toBuffer();
   return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+}
+
+function getMockupRecordQuality(entry = {}) {
+  const legacyMeta = entry.legacyMeta && typeof entry.legacyMeta === 'object' ? entry.legacyMeta : {};
+  const mockup = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : {};
+  return {
+    renderer: String(
+      entry.mockupRenderer ||
+        entry.websiteMockupRenderer ||
+        mockup.renderer ||
+        legacyMeta.mockupRenderer ||
+        ''
+    ).trim().toLowerCase(),
+    orientation: String(
+      entry.mockupOrientation ||
+        entry.websiteMockupOrientation ||
+        mockup.orientation ||
+        legacyMeta.mockupOrientation ||
+        ''
+    ).trim().toLowerCase(),
+    status: String(
+      entry.mockupQualityStatus ||
+        entry.websiteMockupQualityStatus ||
+        mockup.qualityStatus ||
+        legacyMeta.mockupQualityStatus ||
+        ''
+    ).trim().toLowerCase(),
+    checkedAt: String(
+      entry.mockupQualityCheckedAt ||
+        entry.websiteMockupQualityCheckedAt ||
+        mockup.qualityCheckedAt ||
+        legacyMeta.mockupQualityCheckedAt ||
+        ''
+    ).trim(),
+  };
+}
+
+function isSuspectWebdesignMockupRenderer(renderer) {
+  return SUSPECT_DEVICE_MOCKUP_RENDERERS.has(String(renderer || '').trim().toLowerCase());
+}
+
+function diagnoseWebdesignMockupRecord(entry = {}) {
+  const legacyMeta = entry.legacyMeta && typeof entry.legacyMeta === 'object' ? entry.legacyMeta : {};
+  const mockup = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : {};
+  const quality = getMockupRecordQuality(entry);
+  const websiteMockupName = String(
+    entry.websiteMockupName ||
+      entry.mockupName ||
+      mockup.fileName ||
+      legacyMeta.websiteMockupName ||
+      ''
+  ).trim();
+  const hasMockup = Boolean(
+    entry.websiteMockup ||
+      entry.websiteMockupUrl ||
+      entry.mockupUrl ||
+      entry.signedMockupUrl ||
+      mockup.storagePath ||
+      mockup.fileName
+  );
+  const reasons = [];
+  if (!hasMockup) reasons.push('missing_mockup');
+  if (isSuspectWebdesignMockupRenderer(quality.renderer)) reasons.push('suspect_server_renderer_v6');
+  if (!quality.status && hasMockup) reasons.push('missing_quality_status');
+  if (quality.status && !APPROVED_MOCKUP_QUALITY_STATUSES.has(quality.status)) reasons.push('unapproved_quality_status');
+  if (quality.orientation && quality.orientation !== 'upright') reasons.push('non_upright_orientation');
+  if (quality.status === 'checked' && isSuspectWebdesignMockupRenderer(quality.renderer)) {
+    reasons.push('checked_before_visual_renderer_gate');
+  }
+  return {
+    customerId: String(entry.customerId || entry.id || '').trim(),
+    company: String(entry.company || entry.bedrijf || legacyMeta.company || legacyMeta.bedrijf || '').trim(),
+    websitePhotoName: String(entry.websitePhotoName || entry.fileName || legacyMeta.websitePhotoName || '').trim(),
+    websiteMockupName,
+    mockupRenderer: quality.renderer,
+    mockupOrientation: quality.orientation,
+    mockupQualityStatus: quality.status,
+    mockupQualityCheckedAt: quality.checkedAt,
+    updatedAt: String(entry.updatedAt || legacyMeta.updatedAt || '').trim(),
+    storageSource: String(entry.storageSource || entry.source || legacyMeta.source || '').trim(),
+    status: reasons.length ? 'needs_review' : 'ok',
+    reasons,
+  };
 }
 
 function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
@@ -97,22 +381,30 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     jobProcessTimeoutMs = 10 * 60 * 1000,
     processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
     loadSharpImpl = loadSharpModule,
+    now = () => Date.now(),
+    random = Math.random,
+    retryJitter = true,
   } = deps;
 
   const jobs = new Map();
   const JOB_TTL_MS = 6 * 60 * 60 * 1000;
   const JOB_PROCESS_TIMEOUT_MS = Math.max(100, Math.min(10 * 60 * 1000, Number(jobProcessTimeoutMs) || 0));
   const MAX_JOBS = 500;
+  const MAX_RETRY_ATTEMPTS = 6;
+  const RETRY_DELAY_MIN_MS = 5000;
+  const RETRY_DELAY_MAX_MS = 60000;
   const CHUNK_SIZE = 180000;
   const MAX_STORAGE_CHUNKS = 80;
   const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
   let processing = false;
+  let processingWakeTimer = null;
+  let processingWakeAt = 0;
   const inlineProcessingJobIds = new Set();
 
   function pruneJobs() {
-    const now = Date.now();
+    const currentTime = now();
     for (const [id, job] of jobs.entries()) {
-      if (now - job.createdAt > JOB_TTL_MS) jobs.delete(id);
+      if (currentTime - job.createdAt > JOB_TTL_MS) jobs.delete(id);
     }
     while (jobs.size > MAX_JOBS) {
       let oldestId = null;
@@ -207,7 +499,148 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
   }
 
+  function normalizeRetryState(value = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      attempts: Math.max(0, Math.floor(Number(source.attempts || 0) || 0)),
+      nextAttemptAt: Math.max(0, Number(source.nextAttemptAt || 0) || 0) || null,
+      lastRetryAt: Math.max(0, Number(source.lastRetryAt || 0) || 0) || null,
+      lastRetryReason: truncateText(normalizeString(source.lastRetryReason || ''), 500),
+    };
+  }
+
+  function getRetryState(job) {
+    if (!job || typeof job !== 'object') return normalizeRetryState();
+    job.retry = normalizeRetryState(job.retry);
+    return job.retry;
+  }
+
+  function clearRetryState(job) {
+    if (!job || typeof job !== 'object') return;
+    job.retry = normalizeRetryState();
+  }
+
+  function parseRetryDurationMs(value, options = {}) {
+    const raw = normalizeString(value || '');
+    if (!raw) return 0;
+
+    if (options.retryAfterHeader) {
+      const seconds = Number(raw);
+      if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+      const dateMs = Date.parse(raw);
+      if (Number.isFinite(dateMs)) return Math.max(0, dateMs - now());
+    }
+
+    if (options.milliseconds) {
+      const milliseconds = Number(raw);
+      return Number.isFinite(milliseconds) && milliseconds >= 0 ? milliseconds : 0;
+    }
+
+    let totalMs = 0;
+    const pattern = /(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|secs?|seconds?|m|mins?|minutes?)/gi;
+    let match;
+    while ((match = pattern.exec(raw))) {
+      const amount = Number(match[1]);
+      const unit = normalizeString(match[2]).toLowerCase();
+      if (!Number.isFinite(amount) || amount < 0) continue;
+      if (unit === 'ms' || unit.startsWith('millisecond')) totalMs += amount;
+      else if (unit === 'm' || unit.startsWith('min')) totalMs += amount * 60 * 1000;
+      else totalMs += amount * 1000;
+    }
+    return totalMs;
+  }
+
+  function parseRetryMessageMs(value) {
+    const raw = normalizeString(value || '');
+    const match = raw.match(/(?:try again|retry|probeer opnieuw|opnieuw proberen)\s*(?:in|after|over)?\s*([0-9][^.;,\n]*)/i);
+    return match ? parseRetryDurationMs(match[1]) : 0;
+  }
+
+  function clampRetryDelayMs(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+    return Math.max(1000, Math.min(RETRY_DELAY_MAX_MS, Math.ceil(numeric)));
+  }
+
+  function resolveRetryDelayMs(error, failedAttemptCount) {
+    const explicit = clampRetryDelayMs(error && error.retryAfterMs);
+    if (explicit > 0) return explicit;
+
+    const detail = [
+      error && error.message,
+      error?.data?.error?.message,
+      error?.data?.error?.detail,
+      error?.data?.detail,
+    ].map(normalizeString).filter(Boolean).join(' ');
+    const messageDelay = clampRetryDelayMs(parseRetryMessageMs(detail));
+    if (messageDelay > 0) return messageDelay;
+
+    const retryAfter = clampRetryDelayMs(parseRetryDurationMs(error?.retryAfter, { retryAfterHeader: true }));
+    if (retryAfter > 0) return retryAfter;
+
+    const baseDelay = Math.min(
+      RETRY_DELAY_MAX_MS,
+      RETRY_DELAY_MIN_MS * Math.pow(2, Math.max(0, Number(failedAttemptCount || 1) - 1))
+    );
+    if (retryJitter === false) return baseDelay;
+    const jitterFactor = 0.8 + Math.max(0, Math.min(1, Number(random()) || 0)) * 0.4;
+    return Math.min(RETRY_DELAY_MAX_MS, Math.max(1000, Math.round(baseDelay * jitterFactor)));
+  }
+
+  function isRetryableWebdesignError(error) {
+    const status = Number(error && error.status) || 0;
+    const message = normalizeString(error && error.message).toLowerCase();
+    const upstreamMessage = normalizeString(
+      error?.data?.error?.message || error?.data?.error?.detail || error?.data?.detail || ''
+    ).toLowerCase();
+    const combined = `${message} ${upstreamMessage}`;
+
+    if (
+      /openai_api_key ontbreekt|image-model ongeldig|organization must be verified|not verified|billing|quota|credits|monthly usage|maximum monthly spend|invalid authentication|incorrect api key/.test(combined)
+    ) {
+      return false;
+    }
+    if (status === 401 || status === 403 || status === 400 || status === 422) return false;
+    if (error && error.retryableOpenAiImage === true) return true;
+    if (status === 408 || status === 429 || status === 502 || status === 503 || status === 504 || status >= 500) {
+      return true;
+    }
+    return /abort|timeout|timed out|duurde te lang|fetch failed|terminated|econnreset|socket|netwerkfout/i.test(combined);
+  }
+
+  function isJobReadyToProcess(job) {
+    if (!job || job.status !== 'queued') return false;
+    const retry = getRetryState(job);
+    return !retry.nextAttemptAt || retry.nextAttemptAt <= now();
+  }
+
+  function getSoonestQueuedRetryAt() {
+    let soonest = Infinity;
+    for (const job of jobs.values()) {
+      if (!job || job.status !== 'queued') continue;
+      const retry = getRetryState(job);
+      if (retry.nextAttemptAt && retry.nextAttemptAt > now()) {
+        soonest = Math.min(soonest, retry.nextAttemptAt);
+      }
+    }
+    return Number.isFinite(soonest) ? soonest : 0;
+  }
+
+  function scheduleProcessingWake(delayMs) {
+    const delay = Math.max(0, Math.min(RETRY_DELAY_MAX_MS, Number(delayMs) || 0));
+    const wakeAt = now() + delay;
+    if (processingWakeTimer && processingWakeAt && processingWakeAt <= wakeAt) return;
+    if (processingWakeTimer) clearTimeout(processingWakeTimer);
+    processingWakeAt = wakeAt;
+    processingWakeTimer = setTimeout(() => {
+      processingWakeTimer = null;
+      processingWakeAt = 0;
+      queueProcessing();
+    }, delay);
+  }
+
   function serializeJob(job) {
+    const retry = getRetryState(job);
     return {
       id: job.id,
       status: job.status,
@@ -217,6 +650,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       createdAt: job.createdAt,
       startedAt: job.startedAt || null,
       finishedAt: job.finishedAt || null,
+      nextAttemptAt: retry.nextAttemptAt || null,
+      retryAttempts: retry.attempts,
     };
   }
 
@@ -291,7 +726,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const websitePhotoName =
       truncateText(normalizeString(image.fileName || `${customer.dom || customer.bedrijf || 'webdesign'}-webdesign.png`), 180) ||
       'Websitefoto';
-    const websiteMockupName = truncateText(replaceImageFileSuffix(websitePhotoName, '-device-mockup-v6'), 180);
+    const websiteMockupName = truncateText(replaceImageFileSuffix(websitePhotoName, `-device-mockup-${DEVICE_MOCKUP_FILE_VERSION}`), 180);
     const identityKey = buildCustomerIdentityKey(customer);
     if (dataOpsStore && typeof dataOpsStore.uploadDesignPhoto === 'function') {
       const structured = await dataOpsStore.uploadDesignPhoto(
@@ -398,7 +833,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function processJob(job) {
     job.status = 'running';
-    job.startedAt = Date.now();
+    job.startedAt = now();
     await persistJob(job);
 
     if (!aiToolsCoordinator || typeof aiToolsCoordinator.runWebsitePreviewGeneratePipeline !== 'function') {
@@ -424,7 +859,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   function withJobProcessTimeout(job, promise) {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error(`Webdesign maken duurde te lang (${Math.round(JOB_PROCESS_TIMEOUT_MS / 1000)}s). Probeer het opnieuw.`));
+        const error = new Error(`Webdesign maken duurde te lang (${Math.round(JOB_PROCESS_TIMEOUT_MS / 1000)}s). Probeer het opnieuw.`);
+        error.status = 504;
+        error.retryableOpenAiImage = true;
+        reject(error);
       }, JOB_PROCESS_TIMEOUT_MS);
       Promise.resolve(promise).then(
         (value) => {
@@ -444,12 +882,42 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       await withJobProcessTimeout(job, processJob(job));
       job.status = 'done';
       job.error = null;
-      job.finishedAt = Date.now();
+      job.finishedAt = now();
+      clearRetryState(job);
       await persistJob(job);
     } catch (error) {
+      if (isRetryableWebdesignError(error)) {
+        const retry = getRetryState(job);
+        const failedAttemptCount = retry.attempts + 1;
+        if (failedAttemptCount < MAX_RETRY_ATTEMPTS) {
+          const retryDelayMs = resolveRetryDelayMs(error, failedAttemptCount);
+          job.status = 'queued';
+          job.error = null;
+          job.startedAt = null;
+          job.finishedAt = null;
+          job.retry = {
+            attempts: failedAttemptCount,
+            nextAttemptAt: now() + retryDelayMs,
+            lastRetryAt: now(),
+            lastRetryReason: truncateText(normalizeString(error && error.message) || 'Tijdelijke OpenAI-limiet.', 500),
+          };
+          if (typeof logger.warn === 'function') {
+            logger.warn(
+              `[PremiumDatabaseWebdesignJobs][retry] ${job.id} wacht ${Math.round(retryDelayMs / 1000)}s na tijdelijke OpenAI-fout`
+            );
+          }
+          await persistJob(job);
+          return job;
+        }
+      }
       job.status = 'error';
       job.error = truncateText(normalizeString(error && error.message) || 'Webdesign maken is mislukt.', 500);
-      job.finishedAt = Date.now();
+      job.finishedAt = now();
+      const retry = getRetryState(job);
+      job.retry = {
+        ...retry,
+        nextAttemptAt: null,
+      };
       logger.error('[PremiumDatabaseWebdesignJobs][process]', error && error.message ? error.message : error);
       await persistJob(job);
     }
@@ -460,34 +928,41 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     if (!job || job.status !== 'running') return false;
     const startedAt = Number(job.startedAt) || 0;
     if (!startedAt) return true;
-    return Date.now() - startedAt > JOB_PROCESS_TIMEOUT_MS + 30 * 1000;
+    return now() - startedAt > JOB_PROCESS_TIMEOUT_MS + 30 * 1000;
   }
 
   async function processJobForStatusRequest(job) {
     if (!processJobsInline || !job) return job;
-    const shouldProcess = job.status === 'queued' || isStaleRunningJob(job);
-    if (!shouldProcess || inlineProcessingJobIds.has(job.id)) return job;
+    const shouldProcess = (job.status === 'queued' && isJobReadyToProcess(job)) || isStaleRunningJob(job);
+    if (!shouldProcess || processing || inlineProcessingJobIds.has(job.id)) return job;
 
     if (job.status === 'running') {
       job.status = 'queued';
       job.error = null;
       job.startedAt = null;
       job.finishedAt = null;
+      clearRetryState(job);
       await persistJob(job);
     }
 
+    processing = true;
     inlineProcessingJobIds.add(job.id);
     try {
       return await settleJob(job);
     } finally {
       inlineProcessingJobIds.delete(job.id);
+      processing = false;
     }
   }
 
   function queueProcessing() {
     if (processing) return;
-    const next = Array.from(jobs.values()).find((job) => job.status === 'queued');
-    if (!next) return;
+    const next = Array.from(jobs.values()).find(isJobReadyToProcess);
+    if (!next) {
+      const nextRetryAt = getSoonestQueuedRetryAt();
+      if (nextRetryAt) scheduleProcessingWake(nextRetryAt - now());
+      return;
+    }
 
     processing = true;
     setImmediate(() => {
@@ -560,9 +1035,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       websiteUrl,
       status: 'queued',
       error: null,
-      createdAt: Date.now(),
+      createdAt: now(),
       startedAt: null,
       finishedAt: null,
+      retry: normalizeRetryState(),
     };
     jobs.set(job.id, job);
     await persistJob(job);
@@ -660,6 +1136,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 }
 
 module.exports = {
+  buildDeviceMockupSvg,
   createDeviceMockupDataUrl,
   createPremiumDatabaseWebdesignJobsCoordinator,
+  diagnoseWebdesignMockupRecord,
+  getDeviceMockupRendererSpec,
+  isSuspectWebdesignMockupRenderer,
 };
