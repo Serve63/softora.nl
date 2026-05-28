@@ -113,6 +113,9 @@ const COLDMAIL_TEST_RECIPIENT_ID = 'softora-test-mode-recipient';
 const COLDMAIL_PREVIEW_IMAGE_CACHE_TTL_MS = 30 * 60 * 1000;
 const COLDMAIL_PHOTO_MAP_CACHE_TTL_MS = 60 * 1000;
 const COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT = 120;
+const COLDMAIL_PREVIEW_IMAGE_OPTIMIZE_MIN_BYTES = 128 * 1024;
+const COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH = 960;
+const COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY = 82;
 const TEST_RECIPIENT_EMAILS = new Set(COLDMAIL_TEST_RECIPIENT_EMAILS);
 const TEST_RECIPIENT_LOOKUP_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL, 'servec321@gail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce', 'softora testmodus']);
@@ -148,6 +151,13 @@ const COLDMAIL_LINKEDIN_CTA_BY_SENDER = Object.freeze({
     url: MARTIJN_LINKEDIN_URL,
   },
 });
+let cachedColdmailPreviewSharp = null;
+
+function loadColdmailPreviewSharpModule() {
+  if (cachedColdmailPreviewSharp) return cachedColdmailPreviewSharp;
+  cachedColdmailPreviewSharp = require('sharp');
+  return cachedColdmailPreviewSharp;
+}
 const DEFAULT_COLDMAIL_SENDER_PROFILES = {
   'serve@softora.nl': {
     subject: 'Korte vraag over uw website - Softora.nl',
@@ -294,6 +304,7 @@ function createColdmailCampaignService(deps = {}) {
     now = () => new Date(),
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     webdesignPreparationCoordinator: initialWebdesignPreparationCoordinator = null,
+    loadPreviewImageSharp = loadColdmailPreviewSharpModule,
   } = deps;
 
   const {
@@ -4349,6 +4360,49 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
+  async function optimizePreviewImageForEmail(image) {
+    const contentType = normalizeString(image && image.contentType).split(';')[0].toLowerCase();
+    const content = image && image.content;
+    if (
+      !Buffer.isBuffer(content) ||
+      content.length < COLDMAIL_PREVIEW_IMAGE_OPTIMIZE_MIN_BYTES ||
+      !/^image\/(?:png|jpe?g|webp)$/i.test(contentType) ||
+      typeof loadPreviewImageSharp !== 'function'
+    ) {
+      return image;
+    }
+
+    try {
+      const sharp = loadPreviewImageSharp();
+      if (typeof sharp !== 'function') return image;
+      const metadata = await sharp(content, { limitInputPixels: 45_000_000 }).metadata();
+      const sourceWidth = Number(metadata && metadata.width) || 0;
+      const shouldResize = sourceWidth > COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH;
+      const transformer = sharp(content, { limitInputPixels: 45_000_000 }).rotate();
+      if (shouldResize) {
+        transformer.resize({
+          width: COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH,
+          withoutEnlargement: true,
+        });
+      }
+      const optimized = await transformer
+        .jpeg({
+          quality: COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY,
+          mozjpeg: true,
+        })
+        .toBuffer();
+      if (!Buffer.isBuffer(optimized) || !optimized.length) return image;
+      if (!shouldResize && contentType === 'image/jpeg' && optimized.length >= content.length) return image;
+      return {
+        ...image,
+        content: optimized,
+        contentType: 'image/jpeg',
+      };
+    } catch (error) {
+      return image;
+    }
+  }
+
   function getPreviewImageCacheKey(token, type = '') {
     const cleanToken = normalizeString(token);
     if (!cleanToken) return '';
@@ -5620,6 +5674,7 @@ function createColdmailCampaignService(deps = {}) {
       error.code = 'PREVIEW_IMAGE_NOT_FOUND';
       throw error;
     }
+    const optimizedImage = await optimizePreviewImageForEmail(image);
 
     const company = getRowCompany(rows[match.index]) || 'Softora webdesign';
     const baseName = payload.type === 'mockup'
@@ -5628,9 +5683,9 @@ function createColdmailCampaignService(deps = {}) {
     const result = {
       ok: true,
       type: payload.type,
-      content: image.content,
-      contentType: image.contentType,
-      filename: `${sanitizeFilename(baseName, payload.type === 'mockup' ? 'device-mockup' : 'webdesign')}.${getImageExtension(image.contentType)}`,
+      content: optimizedImage.content,
+      contentType: optimizedImage.contentType,
+      filename: `${sanitizeFilename(baseName, payload.type === 'mockup' ? 'device-mockup' : 'webdesign')}.${getImageExtension(optimizedImage.contentType)}`,
     };
     rememberPreviewImage(cacheKey, result);
     return result;
