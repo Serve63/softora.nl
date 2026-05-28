@@ -67,10 +67,10 @@ test('premium database webdesign jobs keep Vercel sharp linux arm64 install expl
     'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.34.5 @img/sharp-linux-arm64@0.34.5 @img/sharp-libvips-linux-arm64@1.2.4'
   );
   Object.values(vercelConfig.functions).forEach((functionConfig) => {
-    assert.ok(functionConfig.includeFiles.includes('node_modules/sharp/**/*'));
-    assert.ok(functionConfig.includeFiles.includes('node_modules/@img/sharp-linux-arm64/**/*'));
-    assert.ok(functionConfig.includeFiles.includes('node_modules/@img/sharp-libvips-linux-arm64/**/*'));
-    assert.ok(functionConfig.includeFiles.includes('assets/fonts/**'));
+    assert.equal(
+      functionConfig.includeFiles,
+      '{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}'
+    );
   });
 });
 
