@@ -15,6 +15,7 @@ const {
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+const TINY_PNG_BUFFER = Buffer.from(TINY_PNG_DATA_URL.split(',')[1], 'base64');
 
 async function createFramedWebdesignDataUrl() {
   const inner = await sharp({
@@ -215,6 +216,7 @@ function createService(overrides = {}) {
           },
       };
     },
+    fetchImageWithTimeout: overrides.fetchImageWithTimeout,
     resolveEmailDomain: async (domain) => !new Set(overrides.invalidDomains || []).has(domain),
     now: () => new Date(overrides.now || '2026-05-25T10:00:00.000Z'),
   });
@@ -363,6 +365,44 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
     variables.softora_instantly_email_html,
     /<em style="font-style:italic;">PS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊<\/em>/
   );
+});
+
+test('instantly sync prewarms HTTPS webdesign images so the first email open does not rebuild them', async () => {
+  const imageFetchCalls = [];
+  const { service, fetchCalls } = createService({
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: 'https://cdn.softora.test/prospect-webdesign.png',
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockup: 'https://cdn.softora.test/prospect-mockup.png',
+        websiteMockupName: 'Bakkerij Zon device mockup',
+      },
+    },
+    fetchImageWithTimeout: async (url) => {
+      imageFetchCalls.push(url);
+      return {
+        content: TINY_PNG_BUFFER,
+        contentType: 'image/png',
+      };
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(imageFetchCalls, [
+    'https://cdn.softora.test/prospect-webdesign.png',
+    'https://cdn.softora.test/prospect-mockup.png',
+  ]);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  const html = body.leads[0].custom_variables.softora_instantly_email_html;
+  assertInstantlyImageTagsUseNaturalLayout(html);
+  const previewTokens = extractPreviewImageTokens(html);
+  assert.equal(previewTokens.length, 2);
+  assert.equal(getCachedPreviewImage(getPreviewImageCacheKey(previewTokens[0], 'webdesign')).contentType, 'image/png');
+  assert.equal(getCachedPreviewImage(getPreviewImageCacheKey(previewTokens[1], 'mockup')).contentType, 'image/png');
 });
 
 test('instantly sync caches a stripped webdesign image instead of the decorative placeholder frame', async () => {

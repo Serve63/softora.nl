@@ -42,6 +42,8 @@ const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
 const COLDMAIL_PREVIEW_IMAGE_OPTIMIZE_MIN_BYTES = 128 * 1024;
 const COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH = 720;
 const COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY = 82;
+const COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT = 800;
+const COLDMAIL_PREVIEW_IMAGE_FETCH_TIMEOUT_MS = 9000;
 const INSTANTLY_WEBDESIGN_FRAME_CROP_MIN_SIZE = 80;
 const INSTANTLY_WEBDESIGN_FRAME_CROP_MAX_MARGIN_RATIO = 0.12;
 const INSTANTLY_WEBDESIGN_FRAME_CROP_THRESHOLD = 12;
@@ -495,6 +497,38 @@ function parseImageDataUrl(value, normalizeString = defaultNormalizeString) {
 
 function parseDataUrlImage(value, normalizeString = defaultNormalizeString) {
   return Boolean(parseImageDataUrl(value, normalizeString));
+}
+
+async function defaultFetchImageWithTimeout(url, timeoutMs = COLDMAIL_PREVIEW_IMAGE_FETCH_TIMEOUT_MS) {
+  const cleanUrl = defaultNormalizeString(url);
+  if (!/^https:\/\//i.test(cleanUrl) || typeof fetch !== 'function') return null;
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), Math.max(1, Number(timeoutMs) || COLDMAIL_PREVIEW_IMAGE_FETCH_TIMEOUT_MS)) : null;
+  try {
+    const response = await fetch(cleanUrl, {
+      method: 'GET',
+      cache: 'no-store',
+      signal: controller ? controller.signal : undefined,
+    });
+    if (!response.ok) return null;
+    const contentType = defaultNormalizeString(response.headers && response.headers.get && response.headers.get('content-type')).split(';')[0].toLowerCase();
+    if (!/^image\/(?:png|jpe?g|webp|gif)$/i.test(contentType)) return null;
+    const content = Buffer.from(await response.arrayBuffer());
+    if (!content.length || content.length > 10 * 1024 * 1024) return null;
+    return { content, contentType };
+  } catch (_error) {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function resolveInstantlyPreviewImageSource(source, normalizeString = defaultNormalizeString, fetchImageWithTimeout = defaultFetchImageWithTimeout) {
+  const parsed = parseImageDataUrl(source, normalizeString);
+  if (parsed) return parsed;
+  const cleanSource = normalizeString(source);
+  if (!/^https:\/\//i.test(cleanSource) || typeof fetchImageWithTimeout !== 'function') return null;
+  return fetchImageWithTimeout(cleanSource, COLDMAIL_PREVIEW_IMAGE_FETCH_TIMEOUT_MS);
 }
 
 function readPngDimensions(content) {
@@ -1423,14 +1457,14 @@ function buildInstantlyEmailHtml(
 }
 
 async function warmInstantlyPreviewImageCache(
-  { link, photo, type, company },
+  { link, photo, type, company, fetchImageWithTimeout },
   normalizeString = defaultNormalizeString
 ) {
   if (!link || !link.token || !photo || typeof photo !== 'object') return { dimensions: null };
   const source = type === 'mockup'
     ? getWebdesignMockupSource(photo, normalizeString)
     : getWebdesignPhotoSource(photo, normalizeString);
-  const parsed = parseImageDataUrl(source, normalizeString);
+  const parsed = await resolveInstantlyPreviewImageSource(source, normalizeString, fetchImageWithTimeout);
   if (!parsed) return { dimensions: null };
   const prepared = type === 'mockup'
     ? parsed
@@ -1447,6 +1481,8 @@ async function warmInstantlyPreviewImageCache(
     content: optimized.content,
     contentType: optimized.contentType,
     filename: `${baseName}.${getImageExtension(optimized.contentType)}`,
+  }, {
+    limit: COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT,
   });
   return { dimensions };
 }
@@ -1591,6 +1627,7 @@ function createInstantlyOutreachService(deps = {}) {
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
     fetchJsonWithTimeout = async () => ({ response: { ok: false, status: 500 }, data: null }),
+    fetchImageWithTimeout = defaultFetchImageWithTimeout,
     resolveEmailDomain = resolveEmailDomainWithDns,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
@@ -1972,10 +2009,10 @@ function createInstantlyOutreachService(deps = {}) {
       ? buildColdmailPreviewImageLink(row, item.id, reference, config, 'mockup', normalizeString, now)
       : null;
     const webdesignCache = assets.ready
-      ? await warmInstantlyPreviewImageCache({ link: webdesignLink, photo: assets.photo, type: 'webdesign', company }, normalizeString)
+      ? await warmInstantlyPreviewImageCache({ link: webdesignLink, photo: assets.photo, type: 'webdesign', company, fetchImageWithTimeout }, normalizeString)
       : { dimensions: null };
     const webdesignMockupCache = assets.ready
-      ? await warmInstantlyPreviewImageCache({ link: webdesignMockupLink, photo: assets.photo, type: 'mockup', company }, normalizeString)
+      ? await warmInstantlyPreviewImageCache({ link: webdesignMockupLink, photo: assets.photo, type: 'mockup', company, fetchImageWithTimeout }, normalizeString)
       : { dimensions: null };
     const webdesignImageUrl = webdesignLink ? webdesignLink.url : '';
     const webdesignMockupUrl = webdesignMockupLink ? webdesignMockupLink.url : '';
