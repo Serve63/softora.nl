@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Administratieportaal landing page rebuild">
+    <title>Administratieportaal - Online boekhouden</title>
+    <link rel="stylesheet" href="assets/css/styles.css?v=20260528-1450">
+  </head>
+  <body>
+    <header class="site-header" aria-label="Hoofdnavigatie">
+      <a class="brand" href="#" aria-label="Administratieportaal home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">
+          <span>Administratie</span>
+          <strong>portaal</strong>
+        </span>
+      </a>
+
+      <nav class="main-nav" aria-label="Menu">
+        <a href="#boekhouden">Online boekhouden <span aria-hidden="true">⌄</span></a>
+        <a href="#salaris">Salarisadministratie</a>
+        <a href="#advies">Fiscaal advies</a>
+        <a href="#coaching">Coaching en advies</a>
+        <a href="#contact">Contact</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="icon-button" type="button" aria-label="Mijn account">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="3.5"></circle>
+            <path d="M5.8 19.2c1.1-3.4 3.2-5.1 6.2-5.1s5.1 1.7 6.2 5.1"></path>
+          </svg>
+        </button>
+        <a class="button button-primary button-small" href="#contact">
+          Ja, ik wil meer informatie
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg>
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" id="home">
+        <img class="hero-photo" src="assets/img/hero-consultation.png?v=20260528-1450" alt="">
+        <div class="hero-shade" aria-hidden="true"></div>
+        <div class="hero-content">
+          <p class="eyebrow">Online boekhouden voor ondernemers</p>
+          <h1>Online boekhouden<br>met <span>rust en overzicht</span></h1>
+          <p class="hero-copy">24/7 inzicht in je administratie, zonder gedoe.<br>met persoonlijk advies.</p>
+          <div class="hero-buttons">
+            <a class="button button-primary" href="#contact">
+              Ja, ik wil meer informatie
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg>
+            </a>
+            <a class="button button-secondary" href="#werkwijze">
+              Bekijk werkwijze
+              <span class="play-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M9 7.5v9l7-4.5z"></path></svg>
+              </span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="services" id="boekhouden" aria-label="Diensten">
+        <svg class="service-lines" viewBox="0 0 1728 520" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M166 91 C 135 225 196 276 353 228 C 455 196 526 174 622 215"></path>
+          <path d="M1066 92 C 1035 226 1095 276 1253 230 C 1361 198 1434 188 1513 259"></path>
+        </svg>
+        <div class="service-dot dot-left" aria-hidden="true"></div>
+        <div class="service-dot dot-right" aria-hidden="true"></div>
+
+        <article class="service-card service-top-left">
+          <span class="service-icon">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+              <rect x="6" y="8" width="20" height="14" rx="1.5"></rect>
+              <path d="M10 19l4-4 3 3 5-6M16 22v4M11 26h10"></path>
+            </svg>
+          </span>
+          <div>
+            <h2>Online boekhouden</h2>
+            <p>Facturen, bonnetjes en bank. Alles op één plek en altijd actueel. Direct zien wat er moet gebeuren.</p>
+          </div>
+        </article>
+
+        <article class="service-card service-bottom-left" id="salaris">
+          <span class="service-icon">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+              <circle cx="11" cy="12" r="4"></circle>
+              <circle cx="21" cy="12" r="4"></circle>
+              <path d="M4 25c1.2-5 3.5-7.5 7-7.5s5.8 2.5 7 7.5M14 25c1.2-5 3.5-7.5 7-7.5s5.8 2.5 7 7.5"></path>
+            </svg>
+          </span>
+          <div>
+            <h2>Salarisadministratie</h2>
+            <p>Salarissen, loonstroken en aangiftes. Correct geregeld, op tijd en zonder zorgen.</p>
+          </div>
+        </article>
+
+        <div class="invoice-wrap" aria-hidden="true">
+          <div class="invoice-paper">
+            <div class="invoice-head">
+              <span>[ap]</span>
+              <strong>FACTUUR</strong>
+            </div>
+            <div class="invoice-row wide"></div>
+            <div class="invoice-row medium"></div>
+            <div class="invoice-grid">
+              <span></span><span></span><span></span>
+              <span></span><span></span><span></span>
+              <span></span><span></span><span></span>
+              <span></span><span></span><span></span>
+            </div>
+            <div class="invoice-total">€ 2.450,00</div>
+          </div>
+        </div>
+
+        <article class="service-card service-top-right" id="advies">
+          <span class="service-icon">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+              <path d="M10 5h10l5 5v17H10z"></path>
+              <path d="M20 5v6h6M15 22h9M20 16c-3.4 0-5.8 2.7-5.8 5.8 0 1.4.4 2.6 1.2 3.6"></path>
+              <path d="M23.8 19.5h-5.3"></path>
+            </svg>
+          </span>
+          <div>
+            <h2>Fiscaal advies</h2>
+            <p>Belastingoptimalisatie en fiscale vraagstukken. Wij denken mee en geven helder advies.</p>
+          </div>
+        </article>
+
+        <article class="service-card service-bottom-right" id="coaching">
+          <span class="service-icon">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+              <circle cx="16" cy="16" r="10"></circle>
+              <path d="M20.5 11.5 17.2 19l-7.7 3.5 3.3-7.6z"></path>
+            </svg>
+          </span>
+          <div>
+            <h2>Coaching en advies</h2>
+            <p>Strategisch meedenken over groei, winst en de toekomst van jouw onderneming.</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="process" id="werkwijze">
+        <div class="process-intro">
+          <p class="eyebrow">Zo werken wij</p>
+          <h2>Eenvoudig, overzichtelijk<br>en altijd up-to-date</h2>
+          <p>Wij combineren slimme software met persoonlijke begeleiding. Zo houd jij tijd over voor wat er echt toe doet.</p>
+          <a class="button button-outline" href="#contact">
+            Ontdek onze werkwijze
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg>
+          </a>
+        </div>
+
+        <div class="steps" aria-label="Werkwijze stappen">
+          <article class="step-card">
+            <span class="step-number">1</span>
+            <div class="receipt-stack" aria-hidden="true">
+              <div class="receipt-card">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+            <h3>Aanleveren</h3>
+            <p>Bonnen scannen, facturen insturen of koppelingen activeren.</p>
+          </article>
+
+          <article class="step-card">
+            <span class="step-number">2</span>
+            <div class="mini-dashboard" aria-hidden="true">
+              <span>Omzet (YTD)</span>
+              <strong>€ 128.540</strong>
+              <em>↗ 12,5% t.o.v. vorig jaar</em>
+              <svg viewBox="0 0 180 56">
+                <path d="M4 42 C 24 20, 42 44, 62 30 S 102 37, 122 19 S 154 33, 176 12"></path>
+              </svg>
+            </div>
+            <h3>Wij regelen</h3>
+            <p>Wij verwerken en controleren en houden alles up-to-date in Yuki.</p>
+          </article>
+
+          <article class="step-card">
+            <span class="step-number">3</span>
+            <div class="donut-card" aria-hidden="true">
+              <div class="donut"></div>
+              <div class="legend"><span></span>Gereed <span></span>Bewaren</div>
+            </div>
+            <h3>Jij hebt inzicht</h3>
+            <p>24/7 inzicht in je cijfers via je persoonlijke dashboard en rapportages.</p>
+          </article>
+
+          <article class="step-card">
+            <span class="step-number">4</span>
+            <div class="chat-card" aria-hidden="true">
+              <span class="avatar"></span>
+              <p>Hoe kan ik je helpen?</p>
+            </div>
+            <h3>Advies &amp; groei</h3>
+            <p>Je vaste adviseur denkt met je mee en helpt je verder groeien.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="testimonial" aria-label="Klantreactie">
+        <div class="portrait-block">
+          <span class="dot-grid" aria-hidden="true"></span>
+          <span class="orange-tab tab-a" aria-hidden="true"></span>
+          <span class="orange-tab tab-b" aria-hidden="true"></span>
+          <img src="assets/img/testimonial-advisor.png?v=20260528-1450" alt="Adviseur in een lichte kantoorruimte">
+          <span class="signature" aria-hidden="true">Johan</span>
+        </div>
+
+        <article class="quote-block">
+          <p class="eyebrow">Wat onze klanten zeggen</p>
+          <h2>Accuraat en bereikbaar</h2>
+          <div class="quote-text">
+            <span aria-hidden="true">“</span>
+            <p>Wij zijn zeer tevreden over Administratieportaal. Niet alleen omdat ze altijd de tijd nemen om je te woord te staan. Maar ook omdat het contact laagdrempelig is. Kortom: Administratieportaal denkt met je mee en adviseert je goed.</p>
+          </div>
+          <div class="rating" aria-label="Vijf sterren">
+            <span>★ ★ ★ ★ ★</span>
+            <strong>Frans van Tuijl</strong>
+            <em>Van Tuijl Auto's</em>
+          </div>
+          <div class="quote-arrows" aria-hidden="true">
+            <button type="button">←</button>
+            <button type="button">→</button>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer" id="contact">
+      <section class="footer-cta" aria-label="Contact opnemen">
+        <div class="phone-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M7.1 4.5 10 8.2 8.5 10c1.1 2.4 2.9 4.2 5.4 5.4l1.8-1.5 3.8 2.9c.4.3.5.8.3 1.2-.7 1.4-1.9 2.3-3.5 2.3-6.9-.4-12.2-5.7-12.6-12.6 0-1.6.9-2.8 2.3-3.5.4-.2.9-.1 1.1.3z"></path></svg>
+        </div>
+        <div class="cta-copy">
+          <h2>Klaar voor meer tijd en overzicht?</h2>
+          <p>Plan een vrijblijvend gesprek. We laten je graag zien wat we voor jou kunnen betekenen.</p>
+        </div>
+        <address class="cta-contact">
+          <a href="tel:+31411850887">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.1 4.5 10 8.2 8.5 10c1.1 2.4 2.9 4.2 5.4 5.4l1.8-1.5 3.8 2.9"></path></svg>
+            0411 - 85 08 87
+          </a>
+          <a href="mailto:office@administratieportaal.nl">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v11H4z"></path><path d="m4 8 8 6 8-6"></path></svg>
+            office@administratieportaal.nl
+          </a>
+        </address>
+        <a class="button button-primary" href="mailto:office@administratieportaal.nl">
+          Plan een vrijblijvend gesprek
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg>
+        </a>
+      </section>
+
+      <section class="footer-main">
+        <div class="footer-brand">
+          <a class="brand" href="#">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span class="brand-text">
+              <span>Administratie</span>
+              <strong>portaal</strong>
+            </span>
+          </a>
+          <p>Online boekhouden, 24/7 inzicht en persoonlijk advies. Dat is ondernemen zonder gedoe.</p>
+          <div class="socials" aria-label="Social media">
+            <a href="#" aria-label="LinkedIn">in</a>
+            <a href="#" aria-label="Facebook">f</a>
+            <a href="#" aria-label="Instagram">◎</a>
+          </div>
+        </div>
+
+        <nav class="footer-column" aria-label="Diensten">
+          <h3>Diensten</h3>
+          <a href="#boekhouden">Online boekhouden</a>
+          <a href="#salaris">Salarisadministratie</a>
+          <a href="#advies">Fiscaal advies</a>
+          <a href="#coaching">Coaching en advies</a>
+          <a href="#">FAQ Yuki</a>
+        </nav>
+
+        <nav class="footer-column" aria-label="Over ons">
+          <h3>Over ons</h3>
+          <a href="#werkwijze">Onze werkwijze</a>
+          <a href="#">Klantverhalen</a>
+          <a href="#">Kennis &amp; inspiratie</a>
+          <a href="#">Werken bij ons</a>
+          <a href="#contact">Contact</a>
+        </nav>
+
+        <nav class="footer-column" aria-label="Support">
+          <h3>Support</h3>
+          <a href="#">Help &amp; contact</a>
+          <a href="#">Veelgestelde vragen</a>
+          <a href="#">Privacyverklaring</a>
+          <a href="#">Algemene voorwaarden</a>
+        </nav>
+
+        <address class="footer-column footer-contact">
+          <h3>Contact</h3>
+          <a href="tel:+31411850887">0411 - 85 08 87</a>
+          <a href="mailto:office@administratieportaal.nl">office@administratieportaal.nl</a>
+          <span>Heuvelstraat 34<br>5076 EJ Haaren</span>
+        </address>
+      </section>
+
+      <section class="footer-bottom">
+        <p>© 2024 Administratieportaal B.V. Alle rechten voorbehouden.</p>
+        <p>Een Yuki partner <strong>yuki</strong></p>
+      </section>
+    </footer>
+  </body>
+</html>
