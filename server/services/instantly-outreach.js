@@ -46,6 +46,7 @@ const COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH = 720;
 const COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY = 82;
 const COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT = 800;
 const COLDMAIL_PREVIEW_IMAGE_FETCH_TIMEOUT_MS = 9000;
+const INSTANTLY_PUBLIC_IMAGE_PREWARM_TIMEOUT_MS = 30_000;
 const INSTANTLY_WEBDESIGN_FRAME_CROP_MIN_SIZE = 80;
 const INSTANTLY_WEBDESIGN_FRAME_CROP_MAX_MARGIN_RATIO = 0.12;
 const INSTANTLY_WEBDESIGN_FRAME_CROP_THRESHOLD = 12;
@@ -520,6 +521,39 @@ async function defaultFetchImageWithTimeout(url, timeoutMs = COLDMAIL_PREVIEW_IM
     return { content, contentType };
   } catch (_error) {
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function defaultFetchPublicPreviewImageWithTimeout(url, timeoutMs = INSTANTLY_PUBLIC_IMAGE_PREWARM_TIMEOUT_MS) {
+  const cleanUrl = defaultNormalizeString(url);
+  if (!/^https:\/\//i.test(cleanUrl) || typeof fetch !== 'function') return { ok: false, reason: 'invalid_url' };
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), Math.max(1, Number(timeoutMs) || INSTANTLY_PUBLIC_IMAGE_PREWARM_TIMEOUT_MS)) : null;
+  try {
+    const response = await fetch(cleanUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5',
+      },
+      signal: controller ? controller.signal : undefined,
+    });
+    if (!response || !response.ok) {
+      return { ok: false, status: response ? response.status : 0 };
+    }
+    const contentType = defaultNormalizeString(response.headers && response.headers.get && response.headers.get('content-type')).split(';')[0].toLowerCase();
+    if (!/^image\/(?:png|jpe?g|webp|gif)$/i.test(contentType)) {
+      return { ok: false, status: response.status, contentType };
+    }
+    const content = Buffer.from(await response.arrayBuffer());
+    return { ok: content.length > 0, status: response.status, contentType, bytes: content.length };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error && error.name === 'AbortError' ? 'timeout' : 'fetch_failed',
+    };
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -1491,6 +1525,22 @@ async function warmInstantlyPreviewImageCache(
   return { dimensions };
 }
 
+async function prewarmInstantlyPublicPreviewImage(
+  { link, fetchPublicPreviewImage },
+  normalizeString = defaultNormalizeString
+) {
+  const url = normalizeString(link && link.url);
+  if (!/^https:\/\//i.test(url) || typeof fetchPublicPreviewImage !== 'function') {
+    return { ok: false, reason: 'disabled' };
+  }
+  try {
+    const result = await fetchPublicPreviewImage(url, INSTANTLY_PUBLIC_IMAGE_PREWARM_TIMEOUT_MS);
+    return result && typeof result === 'object' ? result : { ok: Boolean(result) };
+  } catch (_error) {
+    return { ok: false, reason: 'failed' };
+  }
+}
+
 function normalizeInstantlyEventType(value, normalizeString = defaultNormalizeString) {
   const normalized = normalizeString(value)
     .toLowerCase()
@@ -1590,6 +1640,7 @@ function normalizeInstantlyConfig(config = {}) {
     verifyLeadsOnImport: readBool(config.verifyLeadsOnImport, false),
     blockPersonalMailboxDomains: readBool(config.blockPersonalMailboxDomains, true),
     requireWebdesignAssets: readBool(config.requireWebdesignAssets, true),
+    prewarmPublicImageUrls: readBool(config.prewarmPublicImageUrls, true),
     publicBaseUrl: normalizePublicBaseUrl(config.publicBaseUrl) || DEFAULT_PUBLIC_BASE_URL,
     previewImageBaseUrl:
       normalizePublicBaseUrl(config.previewImageBaseUrl) || DEFAULT_PREVIEW_IMAGE_BASE_URL,
@@ -1636,6 +1687,7 @@ function createInstantlyOutreachService(deps = {}) {
     setUiStateValues = async () => null,
     fetchJsonWithTimeout = async () => ({ response: { ok: false, status: 500 }, data: null }),
     fetchImageWithTimeout = defaultFetchImageWithTimeout,
+    fetchPublicPreviewImage = defaultFetchPublicPreviewImageWithTimeout,
     resolveEmailDomain = resolveEmailDomainWithDns,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
@@ -2022,6 +2074,19 @@ function createInstantlyOutreachService(deps = {}) {
     const webdesignMockupCache = assets.ready
       ? await warmInstantlyPreviewImageCache({ link: webdesignMockupLink, photo: assets.photo, type: 'mockup', company, fetchImageWithTimeout }, normalizeString)
       : { dimensions: null };
+    const [webdesignPublicPrewarm, webdesignMockupPublicPrewarm] =
+      assets.ready && config.prewarmPublicImageUrls
+        ? await Promise.all([
+            prewarmInstantlyPublicPreviewImage(
+              { link: webdesignLink, fetchPublicPreviewImage },
+              normalizeString
+            ),
+            prewarmInstantlyPublicPreviewImage(
+              { link: webdesignMockupLink, fetchPublicPreviewImage },
+              normalizeString
+            ),
+          ])
+        : [{ ok: false, reason: 'disabled' }, { ok: false, reason: 'disabled' }];
     const webdesignImageUrl = webdesignLink ? webdesignLink.url : '';
     const webdesignMockupUrl = webdesignMockupLink ? webdesignMockupLink.url : '';
     const instantlyEmailBody = buildInstantlyBodyWithWebdesignLinks(
@@ -2064,6 +2129,8 @@ function createInstantlyOutreachService(deps = {}) {
       softora_unsubscribe_url: unsubscribeUrl,
       softora_webdesign_image_url: webdesignImageUrl,
       softora_webdesign_mockup_url: webdesignMockupUrl,
+      softora_webdesign_image_prewarmed: webdesignPublicPrewarm && webdesignPublicPrewarm.ok ? 'true' : 'false',
+      softora_webdesign_mockup_prewarmed: webdesignMockupPublicPrewarm && webdesignMockupPublicPrewarm.ok ? 'true' : 'false',
       softora_mockup_caption: COLDMAIL_MOCKUP_CAPTION,
       softora_website_domain: getRowDomain(row, normalizeString),
       softora_webdesign_ready: assets.ready ? 'true' : 'false',
@@ -2977,6 +3044,7 @@ function createInstantlyOutreachService(deps = {}) {
       verifyLeadsOnImport: config.verifyLeadsOnImport,
       blockPersonalMailboxDomains: config.blockPersonalMailboxDomains,
       requireWebdesignAssets: config.requireWebdesignAssets,
+      prewarmPublicImageUrls: config.prewarmPublicImageUrls,
       defaultSenderEmail: config.defaultSenderEmail,
       marksSyncedLeadsAsApproached: true,
       activeInstantlyRows,
