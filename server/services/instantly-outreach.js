@@ -31,7 +31,9 @@ const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het 
 const COLDMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_IMAGE_VISIBILITY_PS =
-  "PS: Als het webdesign niet zichtbaar is, klik op 'afbeeldingen tonen' ergens in het scherm.";
+  'PS: Zie je het webdesign niet? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊';
+const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
+  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?)/i;
 const DEFAULT_WEBDESIGN_SUBJECT = 'Nieuw webdesign gemaakt!';
 const DEFAULT_WEBDESIGN_BODY = [
   'Goedemorgen {{naam}},',
@@ -693,13 +695,15 @@ function ensurePinnedCityInMailText(text, city, normalizeString = defaultNormali
 }
 
 function hasImageVisibilityPs(text, normalizeString = defaultNormalizeString) {
-  return /als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm/i.test(
-    normalizeString(text)
-  );
+  return COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(normalizeString(text));
+}
+
+function normalizeImageVisibilityPsInMailText(text, normalizeString = defaultNormalizeString) {
+  return normalizeString(text).replace(COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN, COLDMAIL_IMAGE_VISIBILITY_PS);
 }
 
 function ensureImageVisibilityPsInMailText(text, city, normalizeString = defaultNormalizeString) {
-  const cleanText = normalizeString(text);
+  const cleanText = normalizeImageVisibilityPsInMailText(text, normalizeString);
   if (!cleanText || hasImageVisibilityPs(cleanText, normalizeString)) return cleanText;
   const cleanCity = normalizeString(city);
   const pinnedCity = formatPinnedCity(cleanCity, normalizeString);
@@ -719,7 +723,7 @@ function ensureImageVisibilityPsInMailText(text, city, normalizeString = default
   if (insertAt === -1) {
     return `${cleanText}\n\n${COLDMAIL_IMAGE_VISIBILITY_PS}`;
   }
-  lines.splice(insertAt, 0, COLDMAIL_IMAGE_VISIBILITY_PS);
+  lines.splice(insertAt, 0, '', COLDMAIL_IMAGE_VISIBILITY_PS);
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -942,7 +946,13 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString) {
     .map((paragraph) =>
       `<p>${paragraph
         .split('\n')
-        .map((line) => escapeHtml(line, normalizeString))
+        .map((line) => {
+          const cleanLine = normalizeString(line);
+          if (cleanLine === COLDMAIL_IMAGE_VISIBILITY_PS) {
+            return `<em style="font-style:italic;">${escapeHtml(cleanLine, normalizeString)}</em>`;
+          }
+          return escapeHtml(cleanLine, normalizeString);
+        })
         .join('<br>')}</p>`
     )
     .join('\n');
