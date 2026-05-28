@@ -41,6 +41,8 @@ const COLDMAIL_IMAGE_VISIBILITY_PS =
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?)/i;
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
+const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
+const INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT = 1536;
 const COLDMAIL_PREVIEW_IMAGE_OPTIMIZE_MIN_BYTES = 128 * 1024;
 const COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH = 720;
 const COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY = 82;
@@ -1457,13 +1459,16 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   const cleanSrc = normalizeString(src);
   if (!cleanSrc) return '';
   const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
+  const imageWidth = cleanAlt === 'Webdesign' ? INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH : COLDMAIL_EMAIL_IMAGE_WIDTH;
+  const imageHeight = cleanAlt === 'Webdesign' ? INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT : 0;
+  const heightAttribute = imageHeight > 0 ? ` height="${imageHeight}"` : '';
   return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;"><img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
   )}" alt="${escapeHtmlAttribute(
     cleanAlt,
     normalizeString
-  )}" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
+  )}" width="${imageWidth}"${heightAttribute} loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
 }
 
 function buildInstantlyEmailHtml(
