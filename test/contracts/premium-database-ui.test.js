@@ -554,6 +554,8 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:98px;min-width:98px\}/);
   assert.match(webdesignPreviewScriptSource, /const COMPARE_ICON = "<svg class=\\"photo-compare-icon\\"/);
   assert.match(webdesignPreviewScriptSource, /data-photo-compare-id=\\"/);
+  assert.match(webdesignPreviewScriptSource, /nodes\.photoPreviewMeta\.hidden = true/);
+  assert.doesNotMatch(webdesignPreviewScriptSource, /customer\.bedrijf \+ " · naast elkaar"/);
   assert.match(webdesignActionScriptSource, /\.photo-drop\{position:relative;flex:0 0 34px;aspect-ratio:1\/1;overflow:hidden;contain:layout paint\}/);
   assert.match(webdesignActionScriptSource, /function hydratePhotoDrops\(root\)/);
   assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_RETRY_AFTER_MS = 30000;/);

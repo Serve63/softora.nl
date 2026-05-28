@@ -63,6 +63,7 @@
         if (!refs) return;
         refs.card.classList.remove("is-comparison");
         if (nodes && nodes.photoPreviewImage) nodes.photoPreviewImage.hidden = false;
+        if (nodes && nodes.photoPreviewMeta) nodes.photoPreviewMeta.hidden = false;
         refs.compare.hidden = true;
         [refs.photo, refs.mockup].forEach(function (image) {
             if (!image) return;
@@ -97,7 +98,7 @@
         refs.mockup.src = mockup;
         refs.mockup.alt = mockupLabel;
         refs.mockupCaption.textContent = mockupLabel;
-        if (nodes.photoPreviewMeta) nodes.photoPreviewMeta.textContent = customer.bedrijf ? customer.bedrijf + " · naast elkaar" : "Naast elkaar";
+        if (nodes.photoPreviewMeta) { nodes.photoPreviewMeta.hidden = true; nodes.photoPreviewMeta.textContent = ""; }
         if (nodes.photoPreview) {
             nodes.photoPreview.classList.add("on");
             nodes.photoPreview.setAttribute("aria-hidden", "false");
