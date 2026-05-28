@@ -2272,9 +2272,15 @@ test('coldmail campaign uses remote webdesign photo and device mockup URLs by de
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].text, /Servé Creusen/);
   assert.doesNotMatch(sentMessages[0].text, /Serve Creusen/);
-  assert.match(sentMessages[0].text, /📍 Alphen\nPS: Als het webdesign niet zichtbaar is, klik op 'afbeeldingen tonen' ergens in het scherm\./);
+  assert.match(
+    sentMessages[0].text,
+    /📍 Alphen\n\nPS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊/
+  );
   assert.match(sentMessages[0].html, /📍 Alphen/);
-  assert.match(sentMessages[0].html, /PS: Als het webdesign niet zichtbaar is, klik op 'afbeeldingen tonen' ergens in het scherm\./);
+  assert.match(
+    sentMessages[0].html,
+    /<em style="font-style:italic;">PS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊<\/em>/
+  );
   assert.match(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.match(sentMessages[0].html, /<table role="presentation" width="100%"/);
   assert.match(sentMessages[0].html, /<td style="[^"]*overflow:visible;"/);

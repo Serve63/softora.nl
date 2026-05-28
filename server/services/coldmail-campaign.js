@@ -100,7 +100,9 @@ const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'remote';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_IMAGE_VISIBILITY_PS =
-  "PS: Als het webdesign niet zichtbaar is, klik op 'afbeeldingen tonen' ergens in het scherm.";
+  'PS: Zie je het webdesign niet? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊';
+const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
+  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?)/i;
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
@@ -3920,13 +3922,15 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function hasImageVisibilityPs(text) {
-    return /als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm/i.test(
-      normalizeString(text)
-    );
+    return COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(normalizeString(text));
+  }
+
+  function normalizeImageVisibilityPsInMailText(text) {
+    return normalizeString(text).replace(COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN, COLDMAIL_IMAGE_VISIBILITY_PS);
   }
 
   function ensureImageVisibilityPsInMailText(text, city) {
-    const cleanText = normalizeString(text);
+    const cleanText = normalizeImageVisibilityPsInMailText(text);
     if (!cleanText || hasImageVisibilityPs(cleanText)) return cleanText;
     const cleanCity = normalizeString(city);
     const pinnedCity = formatPinnedCity(cleanCity);
@@ -3946,7 +3950,7 @@ function createColdmailCampaignService(deps = {}) {
     if (insertAt === -1) {
       return `${cleanText}\n\n${COLDMAIL_IMAGE_VISIBILITY_PS}`;
     }
-    lines.splice(insertAt, 0, COLDMAIL_IMAGE_VISIBILITY_PS);
+    lines.splice(insertAt, 0, '', COLDMAIL_IMAGE_VISIBILITY_PS);
     return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
@@ -4364,6 +4368,9 @@ function createColdmailCampaignService(deps = {}) {
 
   function renderColdmailHtmlLine(line, options = {}) {
     const cleanLine = normalizeString(line);
+    if (cleanLine === COLDMAIL_IMAGE_VISIBILITY_PS) {
+      return `<em style="font-style:italic;">${escapeHtml(cleanLine)}</em>`;
+    }
     const senderEmail = normalizeEmailAddress(options.senderEmail || '');
     const cta = COLDMAIL_LINKEDIN_CTA_BY_SENDER[senderEmail];
     if (!cta || !cleanLine.includes(cta.text)) return escapeHtml(cleanLine);
