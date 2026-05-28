@@ -159,6 +159,41 @@ function buildPreviewFromRecord(id, values, record) {
   return { id, photoSource, mockupSource };
 }
 
+function buildPhotoMapFromStructuredEntries(entries) {
+  return (Array.isArray(entries) ? entries : []).reduce((map, entry) => {
+    const id = normalizeString(entry && (entry.customerId || entry.id));
+    if (!id) return map;
+    map[id] = {
+      ...(entry && typeof entry === 'object' ? entry : {}),
+      id,
+      websitePhotoUrl: normalizeString(entry && (entry.websitePhotoUrl || entry.signedUrl)),
+      websiteMockupUrl: normalizeString(entry && (entry.websiteMockupUrl || entry.mockupUrl)),
+      websitePhotoName: normalizeString(entry && (entry.websitePhotoName || entry.fileName)),
+      identityKey: normalizeString(entry && entry.identityKey),
+    };
+    return map;
+  }, {});
+}
+
+function resolvePreviewFromMaps(id, values, photoMap, customers) {
+  let record = findPhotoRecord(photoMap, id);
+  let preview = buildPreviewFromRecord(id, values, record);
+  if (preview) return preview;
+
+  const directCustomer = findCustomerById(customers, id);
+  const matchedCustomers = findCustomerCandidates(customers, id);
+  const candidates = directCustomer
+    ? [directCustomer].concat(matchedCustomers.filter((customer) => customer !== directCustomer))
+    : matchedCustomers;
+  for (const customer of candidates) {
+    const candidateId = normalizeString(customer && (customer.id || customer.customerId || customer.databaseId)) || id;
+    record = findPhotoRecordByIdentity(photoMap, getCustomerIdentityKeys(customer)) || findPhotoRecord(photoMap, candidateId) || record;
+    preview = buildPreviewFromRecord(candidateId, values, record);
+    if (preview) return preview;
+  }
+  return null;
+}
+
 function resolvePreviewSource(values, record, type) {
   if (!record || typeof record !== 'object') return '';
   if (type === 'mockup') {
@@ -235,30 +270,37 @@ function buildNotFoundHtml() {
 
 function createPublicWebdesignPreviewService(options = {}) {
   const getUiStateValues = typeof options.getUiStateValues === 'function' ? options.getUiStateValues : async () => ({ values: {} });
+  const dataOpsStore = options.dataOpsStore && typeof options.dataOpsStore === 'object' ? options.dataOpsStore : null;
+
+  async function resolveStructuredPreview(id) {
+    if (
+      !dataOpsStore ||
+      typeof dataOpsStore.listCustomers !== 'function' ||
+      typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function'
+    ) {
+      return null;
+    }
+    const [customers, photoEntries] = await Promise.all([
+      dataOpsStore.listCustomers(),
+      dataOpsStore.listDesignPhotosWithSignedUrls({ expiresInSeconds: 60 * 60 }),
+    ]);
+    return resolvePreviewFromMaps(id, {}, buildPhotoMapFromStructuredEntries(photoEntries), customers);
+  }
 
   async function resolvePreview(identifier) {
     const id = normalizeCustomerId(identifier);
     if (!/^[a-z0-9_-]{2,160}$/i.test(id)) return null;
+    const structuredPreview = await resolveStructuredPreview(id);
+    if (structuredPreview) return structuredPreview;
+
     const state = await getUiStateValues(PHOTO_SCOPE);
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const photoMap = safeParseObject(values[PHOTO_KEY]);
-    let record = findPhotoRecord(photoMap, id);
-    let preview = buildPreviewFromRecord(id, values, record);
+    let preview = buildPreviewFromRecord(id, values, findPhotoRecord(photoMap, id));
     if (!preview) {
       const customerState = await getUiStateValues(CUSTOMER_SCOPE);
       const customerValues = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
-      const customers = parseCustomerRows(customerValues);
-      const directCustomer = findCustomerById(customers, id);
-      const matchedCustomers = findCustomerCandidates(customers, id);
-      const candidates = directCustomer
-        ? [directCustomer].concat(matchedCustomers.filter((customer) => customer !== directCustomer))
-        : matchedCustomers;
-      for (const customer of candidates) {
-        const candidateId = normalizeString(customer && (customer.id || customer.customerId || customer.databaseId)) || id;
-        record = findPhotoRecordByIdentity(photoMap, getCustomerIdentityKeys(customer)) || findPhotoRecord(photoMap, candidateId) || record;
-        preview = buildPreviewFromRecord(candidateId, values, record);
-        if (preview) break;
-      }
+      preview = resolvePreviewFromMaps(id, values, photoMap, parseCustomerRows(customerValues));
     }
     return preview;
   }
