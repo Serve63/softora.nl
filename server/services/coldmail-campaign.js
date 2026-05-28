@@ -13,6 +13,7 @@ const {
 const { appendSentMessage } = require('./mailbox-sent-copy');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const previewImageCache = require('./coldmail-preview-image-cache');
+const { removeDecorativeWebdesignFrameForEmail } = require('./coldmail-image-frame');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -5654,7 +5655,10 @@ function createColdmailCampaignService(deps = {}) {
       error.code = 'PREVIEW_IMAGE_NOT_FOUND';
       throw error;
     }
-    const optimizedImage = await optimizePreviewImageForEmail(image);
+    const preparedImage = payload.type === 'mockup'
+      ? image
+      : await removeDecorativeWebdesignFrameForEmail(image);
+    const optimizedImage = await optimizePreviewImageForEmail(preparedImage);
 
     const company = getRowCompany(rows[match.index]) || 'Softora webdesign';
     const baseName = payload.type === 'mockup'

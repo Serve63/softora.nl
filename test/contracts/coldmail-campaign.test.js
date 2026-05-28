@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { simpleParser } = require('mailparser');
+const sharp = require('sharp');
 
 const { createColdmailCampaignService } = require('../../server/services/coldmail-campaign');
 const {
@@ -12,6 +13,46 @@ const {
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 const CHUNKED_PNG_DATA_URL = 'data:image/png;base64,TQ==';
+
+async function createFramedWebdesignDataUrl() {
+  const inner = await sharp({
+    create: {
+      width: 336,
+      height: 252,
+      channels: 4,
+      background: '#ffffff',
+    },
+  })
+    .composite([
+      {
+        input: Buffer.from(
+          `<svg width="336" height="252" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="0" width="336" height="252" fill="#ffffff"/>
+            <rect x="24" y="20" width="92" height="14" fill="#008a78"/>
+            <rect x="24" y="54" width="170" height="32" fill="#172554"/>
+            <rect x="24" y="108" width="288" height="42" fill="#eef7f4"/>
+            <rect x="24" y="174" width="288" height="46" fill="#f7fafc"/>
+          </svg>`
+        ),
+        left: 0,
+        top: 0,
+      },
+    ])
+    .png()
+    .toBuffer();
+  const framed = await sharp({
+    create: {
+      width: 400,
+      height: 300,
+      channels: 4,
+      background: '#eef3fb',
+    },
+  })
+    .composite([{ input: inner, left: 32, top: 24 }])
+    .png()
+    .toBuffer();
+  return `data:image/png;base64,${framed.toString('base64')}`;
+}
 
 function withCheckedMockupMeta(item) {
   if (!item || typeof item !== 'object' || !item.websiteMockup) return item;
@@ -2445,6 +2486,42 @@ test('coldmail preview image route optimizes large images for faster email loadi
     quality: 82,
     mozjpeg: true,
   });
+});
+
+test('coldmail preview image route strips decorative webdesign frames for existing email tokens', async () => {
+  const framedWebdesign = await createFramedWebdesignDataUrl();
+  const token = buildColdmailPreviewImageToken({
+    id: 'prospect-frame',
+    email: 'frame@example.test',
+    reference: 'SF-20260424-FRAME',
+    type: 'webdesign',
+  });
+  const { service } = createService({
+    rows: [
+      {
+        id: 'prospect-frame',
+        bedrijf: 'Bakkerij Zon',
+        email: 'frame@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-frame': {
+        id: 'prospect-frame',
+        websitePhoto: framedWebdesign,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+      },
+    },
+  });
+
+  const image = await service.getColdmailPreviewImage({ token });
+
+  assert.equal(image.type, 'webdesign');
+  assert.equal(image.contentType, 'image/jpeg');
+  const metadata = await sharp(image.content).metadata();
+  assert.equal(metadata.width, 328);
+  assert.equal(metadata.height, 244);
 });
 
 test('coldmail campaign keeps CID webdesign images when explicitly configured', async () => {
