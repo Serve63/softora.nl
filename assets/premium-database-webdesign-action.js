@@ -5,7 +5,7 @@
     const JOB_ENDPOINT = "/api/premium-database/webdesign-photo-jobs";
     const PENDING_TTL_MS = 6 * 60 * 60 * 1000;
     const POLL_INTERVAL_MS = 2200;
-    const PHOTO_LOAD_FALLBACK_MS = 6000;
+    const PHOTO_LOAD_FALLBACK_MS = 20000;
     const PHOTO_LOAD_RETRY_AFTER_MS = 30000;
     const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";
     const PHOTO_LOAD_CACHE_LIMIT = 2500;
@@ -57,6 +57,8 @@
         const failedMockupIds = new Set();
         const autoMockupQueuedIds = new Set();
         const autoMockupQueue = [];
+        const activePhotoLoadBindings = new Map();
+        let photoLoadBindingCounter = 0;
         let photoHydrationQueued = false;
         let autoMockupScheduled = false;
         let autoMockupRunning = false;
@@ -152,6 +154,28 @@
             failedPhotoKeyTimes.delete(normalized);
         }
 
+        function createPhotoLoadBinding(drop, key) {
+            const normalized = normalizeString(key);
+            const bindingId = [normalized || "photo", (++photoLoadBindingCounter).toString(36)].join(":");
+            if (normalized) activePhotoLoadBindings.set(normalized, bindingId);
+            if (drop && typeof drop.setAttribute === "function") drop.setAttribute("data-photo-load-binding", bindingId);
+            return bindingId;
+        }
+
+        function isPhotoDropConnected(drop) {
+            return !drop || typeof drop.isConnected !== "boolean" || drop.isConnected;
+        }
+
+        function isPhotoLoadBindingCurrent(drop, key, bindingId) {
+            const normalized = normalizeString(key);
+            const activeBinding = normalized ? normalizeString(activePhotoLoadBindings.get(normalized)) : "";
+            if (!bindingId) return isPhotoDropConnected(drop);
+            if (!isPhotoDropConnected(drop)) return false;
+            if (drop && typeof drop.getAttribute === "function" && normalizeString(drop.getAttribute("data-photo-load-binding")) !== bindingId) return false;
+            if (normalized && activeBinding && activeBinding !== bindingId) return false;
+            return true;
+        }
+
         function getPhotoDropDebug(drop) {
             if (!drop || typeof drop.getAttribute !== "function") return {};
             const isMockup = Boolean(drop.classList && typeof drop.classList.contains === "function" && drop.classList.contains("photo-drop--mockup"));
@@ -162,9 +186,13 @@
             };
         }
 
-        function markPhotoDropReady(drop, failed) {
+        function markPhotoDropReady(drop, failed, bindingId) {
             if (!drop || typeof drop.setAttribute !== "function") return;
             const key = normalizeString(drop.getAttribute("data-photo-key"));
+            if (!isPhotoLoadBindingCurrent(drop, key, bindingId)) {
+                logMediaDebug("image-load-stale", getPhotoDropDebug(drop));
+                return;
+            }
             if (key) {
                 if (failed) markPhotoKeyFailed(key);
                 else markPhotoKeyLoaded(key);
@@ -183,17 +211,23 @@
             if (!drop || typeof drop.querySelector !== "function") return;
             const image = drop.querySelector(".photo-drop-image");
             if (!image) {
+                if (drop.getAttribute("data-photo-error") === "true") return;
                 markPhotoDropReady(drop);
                 return;
             }
-            if (drop.getAttribute("data-photo-loaded") === "true") return;
             const key = normalizeString(drop.getAttribute("data-photo-key"));
+            if (drop.getAttribute("data-photo-loading-bound") === "true" && normalizeString(drop.getAttribute("data-photo-load-binding"))) return;
+            const bindingId = createPhotoLoadBinding(drop, key);
+            if (drop.getAttribute("data-photo-loaded") === "true" && image.complete && Number(image.naturalWidth) > 0) {
+                markPhotoDropReady(drop, false, bindingId);
+                return;
+            }
             if (key && loadedPhotoKeys.has(key)) {
-                markPhotoDropReady(drop, false);
+                markPhotoDropReady(drop, false, bindingId);
                 return;
             }
             if (key && failedPhotoKeys.has(key) && !shouldRetryFailedPhotoKey(key)) {
-                markPhotoDropReady(drop, true);
+                markPhotoDropReady(drop, true, bindingId);
                 return;
             }
             if (key && shouldRetryFailedPhotoKey(key)) clearFailedPhotoKey(key);
@@ -204,7 +238,7 @@
                 if (finished) return;
                 finished = true;
                 if (fallbackTimer && typeof global.clearTimeout === "function") global.clearTimeout(fallbackTimer);
-                markPhotoDropReady(drop, failed);
+                markPhotoDropReady(drop, failed, bindingId);
             };
             const finish = function () { finishReady(false); };
             const fail = function () { finishReady(true); };
@@ -602,7 +636,7 @@
             const isLoading = isPending || isRestoring;
             const canGenerate = !hasPhoto && !isLoading && Boolean(resolveCustomerWebsiteUrl(customer));
             const inner = hasPhoto
-                ? (photoFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"eager\" fetchpriority=\"high\" decoding=\"async\">")
+                ? (photoFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"lazy\" fetchpriority=\"low\" decoding=\"async\" width=\"34\" height=\"34\">")
                 : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
             const remove = hasPhoto ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>" : "";
             const ariaLabel = hasPhoto ? (photoFailed ? "Websitefoto kon niet geladen worden" : "Websitefoto bekijken") : (isLoading ? (isPending ? "Webdesign wordt gemaakt" : "Websitefoto's worden hersteld") : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden"));
@@ -619,7 +653,7 @@
             const mockupLoading = assetState ? assetState.mockupPending : isMockupPending(customer && customer.id);
             const canGenerateMockup = assetState ? assetState.canRepairMockup : (hasPhoto && !hasMockup && !mockupLoading);
             const mockupInner = hasMockup
-                ? (mockupImageFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"eager\" fetchpriority=\"high\" decoding=\"async\">")
+                ? (mockupImageFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"lazy\" fetchpriority=\"low\" decoding=\"async\" width=\"34\" height=\"34\">")
                 : (mockupLoading ? LOADING_ICON : MOCKUP_ICON);
             const mockupAriaLabel = hasMockup ? (mockupImageFailed ? "Device mockup kon niet geladen worden" : (canGenerateMockup ? "Device mockup opnieuw maken" : "Device mockup bekijken")) : (mockupLoading ? "Device mockup wordt gemaakt" : (mockupGenerationFailed ? "Device mockup maken is mislukt" : (canGenerateMockup ? "Device mockup maken" : "Device mockup nog niet beschikbaar")));
             const mockupTitle = hasMockup ? (canGenerateMockup ? "Klik om device mockup opnieuw te maken" : mockupLabel) : (mockupLoading ? "Device mockup wordt gemaakt" : (mockupGenerationFailed ? "Mockup maken is mislukt. Klik om opnieuw te proberen." : (canGenerateMockup ? "Klik om device mockup te maken" : "Maak eerst een webdesign")));

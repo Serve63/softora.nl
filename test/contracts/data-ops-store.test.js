@@ -156,7 +156,13 @@ test('data ops store saves webdesign and device mockup as one photo record', asy
       from(bucket) {
         return {
           upload: async (path, buffer, options) => {
-            uploads.push({ bucket, path, byteLength: buffer.length, contentType: options.contentType });
+            uploads.push({
+              bucket,
+              path,
+              byteLength: buffer.length,
+              cacheControl: options.cacheControl,
+              contentType: options.contentType,
+            });
             return { data: { path }, error: null };
           },
         };
@@ -192,6 +198,8 @@ test('data ops store saves webdesign and device mockup as one photo record', asy
 
   assert.equal(result.ok, true);
   assert.equal(uploads.length, 2);
+  assert.equal(uploads[0].cacheControl, '31536000');
+  assert.equal(uploads[1].cacheControl, '31536000');
   assert.equal(uploads[0].contentType, 'image/png');
   assert.equal(uploads[1].contentType, 'image/jpeg');
   assert.match(uploads[1].path, /mockup\.jpg$/);
@@ -282,4 +290,72 @@ test('data ops store signs design photo URLs with bounded concurrency', async ()
   assert.equal(maxInFlight <= 6, true);
   assert.equal(entries.every((entry) => entry.websitePhotoUrl.startsWith('https://')), true);
   assert.equal(entries.every((entry) => entry.websiteMockupUrl.startsWith('https://')), true);
+});
+
+test('data ops store reuses fresh signed design photo URLs per storage path', async () => {
+  const rows = [{
+    customer_id: 'customer-1',
+    identity_key: 'company|contact|3100000000',
+    storage_bucket: 'softora-design-photos',
+    storage_path: 'customers/customer-1/webdesign.png',
+    mime_type: 'image/png',
+    file_name: 'webdesign.png',
+    legacy_meta: {
+      mockup: {
+        storageBucket: 'softora-design-photos',
+        storagePath: 'customers/customer-1/mockup.jpg',
+        fileName: 'mockup.jpg',
+      },
+    },
+    updated_at: '2026-05-26T12:00:00.000Z',
+  }];
+  let signCount = 0;
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrl(path, expiresInSeconds) {
+            signCount += 1;
+            return {
+              data: { signedUrl: `https://storage.example.test/${bucket}/${path}?signed=${signCount}&ttl=${expiresInSeconds}` },
+              error: null,
+            };
+          },
+        };
+      },
+    },
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    limit(limit) {
+                      assert.equal(limit, 500);
+                      return Promise.resolve({ data: rows, error: null });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+  });
+
+  const first = await store.listDesignPhotosWithSignedUrls({ expiresInSeconds: 600 });
+  const second = await store.listDesignPhotosWithSignedUrls({ expiresInSeconds: 600 });
+
+  assert.equal(signCount, 2);
+  assert.equal(first[0].websitePhotoUrl, second[0].websitePhotoUrl);
+  assert.equal(first[0].websiteMockupUrl, second[0].websiteMockupUrl);
 });
