@@ -368,10 +368,15 @@ function buildServerAppFeatureWiringRuntimeContext({
             blockPersonalMailboxDomains: envConfig.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,
             requireWebdesignAssets: envConfig.INSTANTLY_REQUIRE_WEBDESIGN_ASSETS,
             publicBaseUrl: envConfig.PUBLIC_BASE_URL,
+            previewImageBaseUrl:
+              env.INSTANTLY_PREVIEW_IMAGE_BASE_URL ||
+              env.COLDMAIL_PREVIEW_IMAGE_BASE_URL ||
+              '',
             coldmailLinkSecret:
               envConfig.COLDMAIL_UNSUBSCRIBE_SECRET ||
               envConfig.PREMIUM_SESSION_SECRET ||
               envConfig.MAIL_SMTP_PASS,
+            coldmailPreviewImageSecret: env.COLDMAIL_PREVIEW_IMAGE_SECRET || '',
             defaultSenderEmail: envConfig.INSTANTLY_DEFAULT_SENDER_EMAIL,
           },
           getUiStateValues: dataOpsAwareUiStateGetter,

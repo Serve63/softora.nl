@@ -167,8 +167,10 @@ function createService(overrides = {}) {
         overrides.requireWebdesignAssets === undefined
           ? true
           : overrides.requireWebdesignAssets,
-      publicBaseUrl: 'https://www.softora.nl',
+      publicBaseUrl: overrides.publicBaseUrl || 'https://www.softora.nl',
+      previewImageBaseUrl: overrides.previewImageBaseUrl,
       coldmailLinkSecret: 'unsubscribe-secret',
+      coldmailPreviewImageSecret: overrides.coldmailPreviewImageSecret,
       defaultSenderEmail: overrides.defaultSenderEmail || 'serve@softora.nl',
     },
     getUiStateValues: async (scope) => {
@@ -316,6 +318,22 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(rows[0].lastMailSentAt, undefined);
   assert.equal(rows[2].databaseStatus, 'gemaild');
   assert.equal(rows[2].outreachStatus, 'benaderd');
+});
+
+test('instantly sync uses the public Softora image host even when the app base url is Render', async () => {
+  const { service, fetchCalls } = createService({
+    publicBaseUrl: 'https://softora-nl-final.onrender.com',
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  const variables = body.leads[0].custom_variables;
+  assert.match(variables.softora_unsubscribe_url, /^https:\/\/softora-nl-final\.onrender\.com\/afmelden\?t=/);
+  assert.match(variables.softora_webdesign_image_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assert.match(variables.softora_webdesign_mockup_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assert.match(variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
 });
 
 test('instantly sync normalizes Serve accent and pins the city line', async () => {

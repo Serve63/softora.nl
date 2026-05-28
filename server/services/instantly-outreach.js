@@ -27,7 +27,9 @@ const DEFAULT_SYNC_BATCH_SIZE = 10;
 const DEFAULT_DAILY_CAP = 25;
 const DEFAULT_DAILY_CAP_TIME_ZONE = 'Europe/Amsterdam';
 const DEFAULT_PUBLIC_BASE_URL = 'https://www.softora.nl';
+const DEFAULT_PREVIEW_IMAGE_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_COLDMAIL_LINK_SECRET = 'softora-coldmail';
+const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
@@ -1343,8 +1345,12 @@ function buildColdmailPreviewImageLink(row, id, reference, config, type, normali
     row,
     id,
     reference,
-    config.coldmailLinkSecret,
-    { type: type === 'mockup' ? 'mockup' : 'webdesign' },
+    config.coldmailPreviewImageSecret,
+    {
+      pv: 2,
+      scope: 'preview-image',
+      type: type === 'mockup' ? 'mockup' : 'webdesign',
+    },
     normalizeString,
     now
   );
@@ -1352,7 +1358,7 @@ function buildColdmailPreviewImageLink(row, id, reference, config, type, normali
   return {
     token,
     type: normalizedType,
-    url: `${config.publicBaseUrl}${COLDMAIL_PREVIEW_IMAGE_PATH}?t=${encodeURIComponent(token)}`,
+    url: `${config.previewImageBaseUrl}${COLDMAIL_PREVIEW_IMAGE_PATH}?t=${encodeURIComponent(token)}`,
   };
 }
 
@@ -1587,7 +1593,11 @@ function normalizeInstantlyConfig(config = {}) {
     blockPersonalMailboxDomains: readBool(config.blockPersonalMailboxDomains, true),
     requireWebdesignAssets: readBool(config.requireWebdesignAssets, true),
     publicBaseUrl: normalizePublicBaseUrl(config.publicBaseUrl) || DEFAULT_PUBLIC_BASE_URL,
+    previewImageBaseUrl:
+      normalizePublicBaseUrl(config.previewImageBaseUrl) || DEFAULT_PREVIEW_IMAGE_BASE_URL,
     coldmailLinkSecret: defaultNormalizeString(config.coldmailLinkSecret) || DEFAULT_COLDMAIL_LINK_SECRET,
+    coldmailPreviewImageSecret:
+      defaultNormalizeString(config.coldmailPreviewImageSecret) || DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET,
     defaultSenderEmail:
       normalizeEmailAddress(config.defaultSenderEmail || DEFAULT_INSTANTLY_SENDER_EMAIL) ||
       DEFAULT_INSTANTLY_SENDER_EMAIL,

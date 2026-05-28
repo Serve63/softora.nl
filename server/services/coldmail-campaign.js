@@ -100,6 +100,7 @@ const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het 
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'remote';
+const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_IMAGE_VISIBILITY_PS =
   'PS: Zie je het webdesign niet? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊';
@@ -4069,9 +4070,23 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeString(coldmailTrackingSecret || coldmailUnsubscribeSecret || smtpPass || imapPass || mailFromAddress || 'softora-coldmail-open');
   }
 
+  function getColdmailPreviewImageSecret() {
+    return normalizeString(env.COLDMAIL_PREVIEW_IMAGE_SECRET || DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET);
+  }
+
   function signColdmailUnsubscribePayload(encodedPayload) {
     return crypto
       .createHmac('sha256', getColdmailUnsubscribeSecret())
+      .update(normalizeString(encodedPayload))
+      .digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  }
+
+  function signColdmailPreviewImagePayload(encodedPayload) {
+    return crypto
+      .createHmac('sha256', getColdmailPreviewImageSecret())
       .update(normalizeString(encodedPayload))
       .digest('base64')
       .replace(/\+/g, '-')
@@ -4128,6 +4143,38 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
     const expected = signColdmailUnsubscribePayload(parts[0]);
+    const expectedBuffer = Buffer.from(expected);
+    const actualBuffer = Buffer.from(parts[1]);
+    if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
+      const error = new Error('Deze afmeldlink is ongeldig.');
+      error.code = 'INVALID_UNSUBSCRIBE_TOKEN';
+      throw error;
+    }
+    const payload = safeJsonParse(decodeBase64Url(parts[0]), {});
+    const email = normalizeEmailAddress(payload && payload.email);
+    if (!payload || typeof payload !== 'object' || !email) {
+      const error = new Error('Deze afmeldlink is ongeldig.');
+      error.code = 'INVALID_UNSUBSCRIBE_TOKEN';
+      throw error;
+    }
+    return {
+      v: Number(payload.v || 1),
+      id: normalizeString(payload.id),
+      email,
+      ref: normalizeString(payload.ref),
+      ts: normalizeString(payload.ts),
+    };
+  }
+
+  function verifyColdmailPreviewImageSignature(token) {
+    const cleanToken = normalizeString(token);
+    const parts = cleanToken.split('.');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      const error = new Error('Deze afmeldlink is ongeldig.');
+      error.code = 'INVALID_UNSUBSCRIBE_TOKEN';
+      throw error;
+    }
+    const expected = signColdmailPreviewImagePayload(parts[0]);
     const expectedBuffer = Buffer.from(expected);
     const actualBuffer = Buffer.from(parts[1]);
     if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
@@ -4248,20 +4295,24 @@ function createColdmailCampaignService(deps = {}) {
 
   function buildColdmailPreviewImageToken(row, id, reference, type = 'webdesign') {
     const payload = {
-      v: 1,
+      v: 2,
       id: normalizeString(id || getRowId(row, 0)),
       email: getRowEmail(row),
       ref: normalizeString(reference),
+      pv: 2,
+      scope: 'preview-image',
       type: normalizeString(type || 'webdesign').toLowerCase() === 'mockup' ? 'mockup' : 'webdesign',
       ts: now().toISOString(),
     };
     const encodedPayload = encodeBase64Url(JSON.stringify(payload));
-    return `${encodedPayload}.${signColdmailUnsubscribePayload(encodedPayload)}`;
+    return `${encodedPayload}.${signColdmailPreviewImagePayload(encodedPayload)}`;
   }
 
   function verifyColdmailPreviewImageToken(token) {
-    const payload = verifyColdmailUnsubscribeToken(token);
     const decoded = safeJsonParse(decodeBase64Url(normalizeString(token).split('.')[0]), {});
+    const payload = normalizeString(decoded && decoded.scope) === 'preview-image'
+      ? verifyColdmailPreviewImageSignature(token)
+      : verifyColdmailUnsubscribeToken(token);
     const type = normalizeString(decoded && decoded.type).toLowerCase();
     return {
       ...payload,

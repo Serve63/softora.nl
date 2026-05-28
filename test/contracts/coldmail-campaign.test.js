@@ -139,6 +139,27 @@ function buildColdmailPreviewImageToken(input = {}, secret = 'unsubscribe-secret
   return `${encodedPayload}.${signature}`;
 }
 
+function buildColdmailPreviewImageV2Token(input = {}, secret = 'softora-coldmail-preview-image-v2') {
+  const encodedPayload = encodeBase64Url(JSON.stringify({
+    v: 2,
+    id: String(input.id || '').trim(),
+    email: String(input.email || '').trim().toLowerCase(),
+    ref: String(input.reference || '').trim(),
+    pv: 2,
+    scope: 'preview-image',
+    type: String(input.type || 'webdesign').trim().toLowerCase() === 'mockup' ? 'mockup' : 'webdesign',
+    ts: String(input.ts || '2026-04-24T12:00:00.000Z').trim(),
+  }));
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(encodedPayload)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+  return `${encodedPayload}.${signature}`;
+}
+
 function createService(overrides = {}) {
   const sentMessages = [];
   const transportConfigs = [];
@@ -2494,6 +2515,40 @@ test('coldmail preview image route optimizes large images for faster email loadi
     quality: 82,
     mozjpeg: true,
   });
+});
+
+test('coldmail preview image route accepts portable v2 image tokens across hosts', async () => {
+  const token = buildColdmailPreviewImageV2Token({
+    id: 'prospect-1',
+    email: 'ruben@example.test',
+    reference: 'SF-20260424-TEST',
+    type: 'webdesign',
+  });
+  const { service } = createService({
+    coldmailUnsubscribeSecret: 'a-different-host-secret',
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+      },
+    },
+  });
+
+  const image = await service.getColdmailPreviewImage({ token });
+
+  assert.equal(image.type, 'webdesign');
+  assert.equal(image.contentType, 'image/png');
+  assert.equal(image.filename, 'Bakkerij-Zon-webdesign.png');
 });
 
 test('coldmail preview image route strips decorative webdesign frames for existing email tokens', async () => {
