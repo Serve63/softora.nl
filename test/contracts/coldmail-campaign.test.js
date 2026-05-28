@@ -2288,10 +2288,9 @@ test('coldmail campaign uses remote webdesign photo and device mockup URLs by de
     sentMessages[0].html,
     /margin:24px 0 0 0;"><tr><td style="[^"]*"><img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
   );
-  assert.match(sentMessages[0].html, /alt="Webdesign" width="640" height="360" style="display:block;width:100%;max-width:640px;height:auto;border:0;outline:none;text-decoration:none;"/);
-  assert.match(sentMessages[0].html, /alt="Mockup" width="640" height="360" style="display:block;width:100%;max-width:640px;height:auto;border:0;outline:none;text-decoration:none;"/);
-  assert.doesNotMatch(sentMessages[0].html, /alt="Bakkerij Zon webdesign"/);
-  assert.doesNotMatch(sentMessages[0].html, /alt="Bakkerij Zon device mockup"/);
+  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" width="640" style="display:block;width:100%;max-width:640px;height:auto;border:0;outline:none;text-decoration:none;"/);
+  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" width="640" style="display:block;width:100%;max-width:640px;height:auto;border:0;outline:none;text-decoration:none;"/);
+  assert.doesNotMatch(sentMessages[0].html, /height="360"/);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
   assert.doesNotMatch(sentMessages[0].html, /data:image\//);
   assert.doesNotMatch(sentMessages[0].html, /background-image/i);
