@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="stylesheet" href="/assets/iphone-optimizations.css">
+        <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
 <title>Softora | Software & Database Oplossingen</title>
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -26,15 +23,15 @@
             --accent-dark: #0f0f1a;
             --accent-glow: rgba(26, 26, 46, 0.15);
             --accent-light: #2d2d5e;
-            --accent-color: #4a5fd7;
-            --accent-color-glow: rgba(74, 95, 215, 0.2);
+            --accent-color: #8b2252;
+            --accent-color-glow: rgba(139, 34, 82, 0.2);
             --nav-cta: var(--accent-color);
-            --nav-cta-hover: #3d4eb8;
+            --nav-cta-hover: #a62d65;
             --text-primary: #1a1a2e;
             --text-secondary: #6b6b7b;
             --text-tertiary: #a0a0b0;
             --border: rgba(0, 0, 0, 0.08);
-            --border-hover: rgba(74, 95, 215, 0.4);
+            --border-hover: rgba(139, 34, 82, 0.4);
             
             --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
             --ease-power: cubic-bezier(0.87, 0, 0.13, 1);
@@ -50,7 +47,12 @@
             color: var(--text-primary);
             line-height: 1.6;
             overflow-x: hidden;
-            cursor: none;
+            cursor: auto;
+        }
+
+        a,
+        button {
+            cursor: pointer;
         }
 
         h1, h2, h3, h4 {
@@ -137,37 +139,6 @@
             transform-origin: left;
             transform: scaleX(0);
             box-shadow: 0 0 20px var(--accent-color-glow);
-        }
-
-        .ambient-bg {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            overflow: hidden;
-        }
-
-        .ambient-blob {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(120px);
-            opacity: 0.15;
-        }
-
-        .blob-1 {
-            width: 800px;
-            height: 800px;
-            background: radial-gradient(circle, var(--accent-color-glow), transparent 60%);
-            top: -300px;
-            right: -300px;
-            animation: pulse 8s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.15; }
-            50% { transform: scale(1.2); opacity: 0.25; }
         }
 
         /* Navigation */
@@ -263,7 +234,6 @@
             font-weight: 500;
             position: relative;
             padding: 0.5rem 0;
-            cursor: none;
             transition: color 0.3s;
         }
 
@@ -302,7 +272,7 @@
             letter-spacing: 0.05em;
             text-transform: uppercase;
             border: none;
-            cursor: none;
+            cursor: pointer;
             overflow: hidden;
             transition: all 0.3s var(--ease-out-expo);
             clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
@@ -337,7 +307,7 @@
 
         .magnetic-btn.secondary:hover {
             border-color: var(--accent-color);
-            background: rgba(74, 95, 215, 0.05);
+            background: rgba(139, 34, 82, 0.05);
             box-shadow: 0 0 30px var(--accent-color-glow);
         }
 
@@ -386,7 +356,7 @@
             position: absolute;
             inset: 0;
             background: linear-gradient(to right, var(--bg-primary), transparent 30%),
-                        linear-gradient(135deg, rgba(74,95,215,0.1), transparent 50%);
+                        linear-gradient(135deg, rgba(139,34,82,0.1), transparent 50%);
         }
 
         .eyebrow {
@@ -431,6 +401,15 @@
             opacity: 0;
             transform: translateY(20px);
             animation: fadeInUp 1s var(--ease-out-expo) 0.6s forwards;
+        }
+
+        .hero .eyebrow,
+        .hero h1,
+        .hero p,
+        .hero-buttons {
+            opacity: 1;
+            transform: none;
+            animation: none;
         }
 
         @keyframes fadeInUp {
@@ -549,7 +528,7 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(135deg, transparent 40%, rgba(74,95,215,0.05), transparent 60%);
+            background: linear-gradient(135deg, transparent 40%, rgba(139,34,82,0.05), transparent 60%);
             opacity: 0;
             transform: translateX(-100%);
             transition: all 0.6s;
@@ -631,7 +610,7 @@
             position: absolute;
             inset: 0;
             background: linear-gradient(to bottom, var(--bg-primary) 0%, transparent 15%, transparent 85%, var(--bg-primary) 100%),
-                        linear-gradient(135deg, rgba(74,95,215,0.15), transparent);
+                        linear-gradient(135deg, rgba(139,34,82,0.15), transparent);
         }
 
         .quote-text {
@@ -657,7 +636,7 @@
         }
 
         .quote-accent {
-            color: #7b8ef8;
+            color: #d64f8c;
             font-weight: 700;
         }
 
@@ -682,7 +661,7 @@
         }
 
         .stat-item:hover {
-            background: linear-gradient(90deg, rgba(74,95,215,0.04), transparent);
+            background: linear-gradient(90deg, rgba(139,34,82,0.04), transparent);
             padding-left: 3rem;
         }
 
@@ -741,7 +720,7 @@
             position: absolute;
             inset: 0;
             background: linear-gradient(to right, transparent 60%, var(--bg-tertiary)),
-                        linear-gradient(135deg, rgba(74,95,215,0.1), transparent);
+                        linear-gradient(135deg, rgba(139,34,82,0.1), transparent);
         }
 
         .content-side {
@@ -773,7 +752,7 @@
         }
 
         .pricing-card.featured {
-            background: linear-gradient(135deg, rgba(74,95,215,0.08), rgba(74,95,215,0.01));
+            background: linear-gradient(135deg, rgba(139,34,82,0.08), rgba(139,34,82,0.01));
             border-color: var(--accent-color);
             transform: translateY(-20px) scale(1.05);
             box-shadow: 0 30px 60px rgba(0,0,0,0.1), 0 0 100px var(--accent-color-glow);
@@ -891,7 +870,7 @@
             font-size: 1.3rem;
             font-weight: 500;
             text-align: left;
-            cursor: none;
+            cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 0.02em;
             transition: color 0.3s;
@@ -988,7 +967,7 @@
             position: absolute;
             inset: 0;
             background: radial-gradient(circle at center, transparent 0%, rgba(26,26,46,0.9) 70%),
-                        linear-gradient(135deg, rgba(74,95,215,0.1), transparent);
+                        linear-gradient(135deg, rgba(139,34,82,0.1), transparent);
         }
 
         .cta-content {
@@ -1078,7 +1057,7 @@
             margin-bottom: 0.42rem;
             font-size: 0.82rem;
             transition: all 0.3s;
-            cursor: none;
+            cursor: pointer;
             font-weight: 300;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -1086,7 +1065,7 @@
         }
 
         .footer-links a:hover {
-            color: #7b8ef8;
+            color: #d64f8c;
             transform: translateX(5px);
         }
 
@@ -1122,7 +1101,7 @@
         @media (max-width: 1024px) {
             .hero { grid-template-columns: 1fr; }
             .hero-image { display: none; }
-            .hero-content { padding: 10rem 2rem; max-width: 100%; }
+            .hero-content { padding: 9rem 2rem 5rem; max-width: 100%; }
             .grid-3, .pricing-grid { grid-template-columns: 1fr; flex-direction: column; }
             .grid-2, .image-text-section { grid-template-columns: 1fr; }
             .image-side { clip-path: none; height: 400px; }
@@ -1136,6 +1115,18 @@
 
         @media (max-width: 768px) {
             .nav-links { display: none; }
+            .hero-buttons {
+                align-items: stretch;
+                flex-direction: column;
+                max-width: 320px;
+            }
+            .hero-buttons .magnetic-btn {
+                justify-content: center;
+                min-height: 56px;
+                padding: 1rem 1.15rem;
+                text-align: center;
+                width: 100%;
+            }
             .footer-grid { grid-template-columns: 1fr; gap: 2rem; }
             .footer-contact {
                 justify-self: start;
@@ -1157,14 +1148,10 @@
     <div class="cursor-dot"></div>
     <div class="scroll-progress"></div>
 
-    <div class="ambient-bg">
-        <div class="ambient-blob blob-1"></div>
-    </div>
-
     <nav id="navbar">
         <a href="/" class="logo">SOFTORA.NL</a>
         <div class="nav-links">
-            <a rel="noopener noreferrer" target="_blank" href="https://wa.me/31643262792" class="nav-start-btn">Start Project</a>
+            <a rel="noopener noreferrer" target="_blank" href="https://wa.me/31643262792" class="nav-start-btn">Contact</a>
         </div>
     </nav>
 
@@ -1440,7 +1427,7 @@
             <span class="eyebrow fade-up" style="border: none; padding: 0; color: rgba(255,255,255,0.5); font-size: 0.9rem; display: inline-block; margin-bottom: 2rem;">Laten We Bouwen</span>
             <h2 class="cta-title fade-up">
                 Klaar Voor<br>
-                <span style="color: #7b8ef8;">Serieuze Software</span>?
+                <span style="color: #d64f8c;">Serieuze Software</span>?
             </h2>
             <p class="fade-up" style="color: rgba(255,255,255,0.5); max-width: 500px; margin: 0 auto 3rem; font-size: 1.1rem; font-weight: 300;">
                 Plan een technisch gesprek en ontdek hoe wij jouw software-uitdaging oplossen.
