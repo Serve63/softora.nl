@@ -175,6 +175,7 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.match(source, /Van losse taak naar betrouwbare workflow/);
   assert.match(source, /Waar AI automatisering voor MKB direct verschil kan maken/);
   assert.match(source, /Wanneer is AI automatisering beter dan standaard software\?/);
+  assert.match(source, /AI automatisering, CRM of chatbot\?/);
   assert.match(source, /Veelgestelde vragen over AI automatisering/);
   assert.match(source, /AI automatisering moet zichtbaar beter werken/);
   assert.match(source, /loading="eager" fetchpriority="high" decoding="async"/);
@@ -184,6 +185,7 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.match(source, /href="\/ai-telefonist"/);
   assert.match(source, /href="\/bedrijfssoftware-op-maat"/);
   assert.match(source, /href="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
+  assert.match(source, /href="\/blog\/ai-automatisering-leadopvolging"/);
   assert.match(source, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
   assert.match(source, /data-softora-public-seo="internal-links"/);
   assert.ok(countVisibleWords(source) >= 900, 'AI automatisering money page is nog te dun voor commerciële SEO.');
@@ -196,6 +198,7 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
   assert.ok(entry.relatedLinks.includes('/voicesoftware-op-maat'));
   assert.ok(entry.relatedLinks.includes('/bedrijfssoftware-op-maat'));
+  assert.ok(entry.relatedLinks.includes('/blog/ai-automatisering-leadopvolging'));
 });
 
 test('chatbot money page is focused on leads, support and clean follow-up', () => {

@@ -112,6 +112,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/bedrijfssoftware-op-maat',
       '/kennisbank/wat-is-ai-automatisering',
       '/blog/ai-automatisering-mkb-waar-beginnen',
+      '/blog/ai-automatisering-leadopvolging',
     ],
   },
   {
