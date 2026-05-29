@@ -99,13 +99,14 @@ const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me wet
 const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
+const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'remote';
 const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
-const COLDMAIL_IMAGE_VISIBILITY_PS =
-  'PS: Zie je het webdesign niet? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊';
+const COLDMAIL_IMAGE_VISIBILITY_PS_PREFIX =
+  'PS: Wordt het webdesign niet zichtbaar? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link:';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?)/i;
+  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?)/i;
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
@@ -984,6 +985,33 @@ function createColdmailCampaignService(deps = {}) {
 
   function getRowCompany(row) {
     return normalizeString(row.bedrijf || row.company || row.companyName || row.naam || row.name);
+  }
+
+  function slugifyWebdesignCompany(value, fallback = 'uw-bedrijf') {
+    const slug = normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 90);
+    return slug || fallback;
+  }
+
+  function buildPublicWebdesignPreviewPath(row, id) {
+    const slug = slugifyWebdesignCompany(getRowCompany(row), slugifyWebdesignCompany(id, 'uw-bedrijf'));
+    return `/webdesign/${slug}`;
+  }
+
+  function buildPublicWebdesignPreviewUrl(row, id, input = {}) {
+    const baseUrl =
+      normalizePublicBaseUrl(input.webdesignPublicBaseUrl) ||
+      DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
+    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id)}`;
+  }
+
+  function buildImageVisibilityPs(row, id, input = {}) {
+    return `${COLDMAIL_IMAGE_VISIBILITY_PS_PREFIX} ${buildPublicWebdesignPreviewUrl(row, id, input)} 👈`;
   }
 
   function getRowContact(row) {
@@ -3906,13 +3934,15 @@ function createColdmailCampaignService(deps = {}) {
       .replace(/\{\{\s*website\s*\}\}/gi, domain || company);
   }
 
-  function buildMailText(body, row) {
+  function buildMailText(body, row, id, input = {}) {
     return normalizeColdmailMailText(
       personalizeTemplate(body, row)
         .replace(/\r\n?/g, '\n')
         .replace(/[ \t]+\n/g, '\n')
         .trim(),
-      row
+      row,
+      id,
+      input
     );
   }
 
@@ -3944,12 +3974,15 @@ function createColdmailCampaignService(deps = {}) {
     return COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(normalizeString(text));
   }
 
-  function normalizeImageVisibilityPsInMailText(text) {
-    return normalizeString(text).replace(COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN, COLDMAIL_IMAGE_VISIBILITY_PS);
+  function normalizeImageVisibilityPsInMailText(text, row, id, input = {}) {
+    return normalizeString(text).replace(
+      COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN,
+      buildImageVisibilityPs(row, id, input)
+    );
   }
 
-  function ensureImageVisibilityPsInMailText(text, city) {
-    const cleanText = normalizeImageVisibilityPsInMailText(text);
+  function ensureImageVisibilityPsInMailText(text, city, row, id, input = {}) {
+    const cleanText = normalizeImageVisibilityPsInMailText(text, row, id, input);
     if (!cleanText || hasImageVisibilityPs(cleanText)) return cleanText;
     const cleanCity = normalizeString(city);
     const pinnedCity = formatPinnedCity(cleanCity);
@@ -3967,9 +4000,9 @@ function createColdmailCampaignService(deps = {}) {
       }
     }
     if (insertAt === -1) {
-      return `${cleanText}\n\n${COLDMAIL_IMAGE_VISIBILITY_PS}`;
+      return `${cleanText}\n\n${buildImageVisibilityPs(row, id, input)}`;
     }
-    lines.splice(insertAt, 0, '', COLDMAIL_IMAGE_VISIBILITY_PS);
+    lines.splice(insertAt, 0, '', buildImageVisibilityPs(row, id, input));
     return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
@@ -4005,12 +4038,15 @@ function createColdmailCampaignService(deps = {}) {
     return withoutCta.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  function normalizeColdmailMailText(text, row) {
+  function normalizeColdmailMailText(text, row, id, input = {}) {
     const city = getRowCity(row) || 'uw regio';
     return ensureLinkedinCtaAfterPinnedCity(
       ensureImageVisibilityPsInMailText(
         ensurePinnedCityInMailText(normalizeSenderNameInMailText(text), city),
-        city
+        city,
+        row,
+        id,
+        input
       ),
       city
     );
@@ -4539,10 +4575,45 @@ function createColdmailCampaignService(deps = {}) {
     return attachments.length ? attachments : undefined;
   }
 
+  function extractPublicWebdesignPreviewLinkFromPs(line) {
+    const cleanLine = normalizeString(line);
+    const match = cleanLine.match(/(https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+|\/?webdesign\/[a-z0-9-]+)/i);
+    if (!match) return null;
+    const rawHref = match[1].replace(/[),.;!?]+$/g, '');
+    const href = /^https?:\/\//i.test(rawHref)
+      ? rawHref
+      : `https://www.softora.nl/${rawHref.replace(/^\/+/, '')}`;
+    let label = rawHref.replace(/^https?:\/\/[^/]+\//i, '').replace(/^\/+/, '');
+    try {
+      label = new URL(href).pathname.replace(/^\/+/, '') || label;
+    } catch (_) {}
+    return {
+      href,
+      label,
+      start: match.index || 0,
+      end: (match.index || 0) + match[1].length,
+    };
+  }
+
+  function renderImageVisibilityPsHtmlLine(line) {
+    const cleanLine = normalizeString(line);
+    const publicLink = extractPublicWebdesignPreviewLinkFromPs(cleanLine);
+    if (!publicLink) {
+      return `<em style="font-style:italic;">${escapeHtml(cleanLine)}</em>`;
+    }
+    const before = cleanLine.slice(0, publicLink.start).replace(/\s+$/g, '');
+    const after = cleanLine.slice(publicLink.end).replace(/^\s+/g, '');
+    return `<em style="font-style:italic;">${escapeHtml(before)} <a href="${escapeHtmlAttribute(
+      publicLink.href
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">${escapeHtml(
+      publicLink.label
+    )}</a>${after ? ` ${escapeHtml(after)}` : ''}</em>`;
+  }
+
   function renderColdmailHtmlLine(line, options = {}) {
     const cleanLine = normalizeString(line);
-    if (cleanLine === COLDMAIL_IMAGE_VISIBILITY_PS) {
-      return `<em style="font-style:italic;">${escapeHtml(cleanLine)}</em>`;
+    if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
+      return renderImageVisibilityPsHtmlLine(cleanLine);
     }
     const senderEmail = normalizeEmailAddress(options.senderEmail || '');
     const cta = COLDMAIL_LINKEDIN_CTA_BY_SENDER[senderEmail];
@@ -6001,7 +6072,7 @@ function createColdmailCampaignService(deps = {}) {
         reference,
         'subject'
       ) || subjectTemplate;
-      const baseText = buildMailText(selectedBodyTemplate, row);
+      const baseText = buildMailText(selectedBodyTemplate, row, item.id, input);
       const shouldAppendOptOut = shouldAppendColdmailOptOutText(baseText);
       const unsubscribeUrl = shouldAppendOptOut
         ? buildColdmailUnsubscribeUrl(row, item.id, reference, input)
