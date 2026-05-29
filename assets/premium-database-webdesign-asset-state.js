@@ -2,6 +2,11 @@
     "use strict";
 
     const APPROVED_MOCKUP_STATUSES = new Set(["checked", "verified", "ok"]);
+    const SUSPECT_MOCKUP_RENDERERS = new Set([
+        "softora-browser-device-v6",
+        "softora-server-device-v6",
+        "softora-server-device-v7"
+    ]);
     function normalizeString(value) {
         return String(value || "").trim();
     }
@@ -19,11 +24,15 @@
     }
 
     function isApprovedMockupQuality(customer) {
+        const fileName = normalizeString(customer && (customer.websiteMockupName || customer.mockupName));
+        const inferredRenderer = fileName.match(/-device-mockup-v([0-9]+)\.jpe?g$/i);
+        const renderer = (normalizeString(customer && (customer.mockupRenderer || customer.websiteMockupRenderer)) || (inferredRenderer ? "softora-server-device-v" + inferredRenderer[1] : "")).toLowerCase();
         const status = normalizeString(customer && (customer.mockupQualityStatus || customer.websiteMockupQualityStatus)).toLowerCase();
         const orientation = normalizeString(customer && (customer.mockupOrientation || customer.websiteMockupOrientation)).toLowerCase();
         const checkedAt = normalizeString(customer && (customer.mockupQualityCheckedAt || customer.websiteMockupQualityCheckedAt));
-        const hasQualitySignal = Boolean(status || orientation || checkedAt || normalizeString(customer && (customer.mockupRenderer || customer.websiteMockupRenderer)));
+        const hasQualitySignal = Boolean(status || orientation || checkedAt || renderer);
         if (!hasQualitySignal) return false;
+        if (SUSPECT_MOCKUP_RENDERERS.has(renderer)) return false;
         if (!APPROVED_MOCKUP_STATUSES.has(status)) return false;
         if (orientation && orientation !== "upright") return false;
         return true;

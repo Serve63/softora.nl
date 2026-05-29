@@ -69,7 +69,7 @@ function withCheckedMockupMeta(item) {
   if (hasQualitySignal) return item;
   return {
     ...item,
-    mockupRenderer: 'softora-test-device-v6',
+    mockupRenderer: 'softora-test-device-v8',
     mockupOrientation: 'upright',
     mockupQualityStatus: 'checked',
     mockupQualityCheckedAt: '2026-04-24T12:00:00.000Z',
@@ -2717,6 +2717,52 @@ test('coldmail campaign refuses webdesign outreach when the device mockup is not
   assert.equal(sentMessages.length, 0);
 });
 
+test('coldmail campaign refuses webdesign outreach when the mockup renderer can contain tofu text', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Bakkerij Zon-device-mockup-v7.jpg',
+        mockupRenderer: 'softora-server-device-v7',
+        mockupOrientation: 'upright',
+        mockupQualityStatus: 'checked',
+        mockupQualityCheckedAt: '2026-05-28T23:00:00.000Z',
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Nieuwe website voor {{bedrijf}}',
+        body: 'Goedemorgen {{naam}}',
+        senderEmail: 'info@softora.nl',
+        specialAction: 'webdesign',
+      }),
+    (error) => {
+      assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
+      assert.match(error.message, /Nog geen website-design klaar voor Bakkerij Zon/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+});
+
 test('coldmail campaign keeps the closing signature before webdesign photos', async () => {
   const { service, sentMessages } = createService({
     env: {
@@ -3260,7 +3306,7 @@ test('coldmail campaign uses chunked webdesign photo when websitePhoto is stale'
           mockupPhotoKey,
           mockupChunkCount: 1,
           websitePhoto: TINY_PNG_DATA_URL,
-          mockupRenderer: 'softora-test-device-v6',
+          mockupRenderer: 'softora-test-device-v8',
           mockupOrientation: 'upright',
           mockupQualityStatus: 'checked',
           mockupQualityCheckedAt: '2026-04-24T12:00:00.000Z',
@@ -3311,7 +3357,7 @@ test('coldmail campaign uses recovered webdesign chunks over stale inline photo'
           websitePhotoName: 'Oude webdesign mockup',
           mockupPhotoKey,
           mockupChunkCount: 1,
-          mockupRenderer: 'softora-test-device-v6',
+          mockupRenderer: 'softora-test-device-v8',
           mockupOrientation: 'upright',
           mockupQualityStatus: 'checked',
           mockupQualityCheckedAt: '2026-04-24T12:00:00.000Z',
@@ -5073,7 +5119,7 @@ test('coldmail webdesign action herkent opgeslagen website-design chunks zonder 
           photoKey: 'softora_photo_chunked_ready_1',
           mockupPhotoKey: 'softora_photo_chunked_ready_1_mockup',
           websitePhotoName: 'Chunked Design BV webdesign',
-          mockupRenderer: 'softora-test-device-v6',
+          mockupRenderer: 'softora-test-device-v8',
           mockupOrientation: 'upright',
           mockupQualityStatus: 'checked',
           mockupQualityCheckedAt: '2026-04-24T12:00:00.000Z',

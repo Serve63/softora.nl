@@ -74,16 +74,14 @@ test('premium database webdesign jobs keep Vercel sharp linux arm64 install expl
   });
 });
 
-test('premium database server mockup renderer matches the browser layout and embeds readable title fonts', async () => {
+test('premium database server mockup renderer matches the browser layout without fragile text labels', async () => {
   const spec = getDeviceMockupRendererSpec();
   const laptop = spec.devices.find((device) => device.id === 'laptop');
   const tablet = spec.devices.find((device) => device.id === 'tablet');
   const phone = spec.devices.find((device) => device.id === 'phone');
 
-  assert.equal(spec.renderer, 'softora-server-device-v7');
-  assert.equal(spec.fileVersion, 'v7');
-  assert.equal(spec.title.text, 'WEBDESIGN PREVIEW');
-  assert.equal(spec.subtitle.text, 'Laptop - iPad - iPhone');
+  assert.equal(spec.renderer, 'softora-server-device-v8');
+  assert.equal(spec.fileVersion, 'v8');
   assert.equal(laptop.screen.frame.left, 18);
   assert.equal(laptop.screen.frame.right, 18);
   assert.equal(laptop.screen.frame.top, 18);
@@ -93,24 +91,23 @@ test('premium database server mockup renderer matches the browser layout and emb
   assert.equal(phone.screen.frame.left, 10);
 
   const svg = await buildDeviceMockupSvg(TINY_PNG_DATA_URL, { bedrijf: 'Softora' });
-  assert.match(svg, /WEBDESIGN PREVIEW/);
-  assert.match(svg, /Laptop - iPad - iPhone/);
-  assert.match(svg, /SoftoraMockupOswald/);
-  assert.match(svg, /SoftoraMockupInter/);
-  assert.match(svg, /data:font\/woff2;base64,/);
-  assert.match(svg, /x="155" y="260" width="930" height="560"/);
-  assert.match(svg, /x="173" y="278" width="894" height="514"/);
+  assert.doesNotMatch(svg, /WEBDESIGN PREVIEW/);
+  assert.doesNotMatch(svg, /Laptop - iPad - iPhone/);
+  assert.doesNotMatch(svg, /<text\b/);
+  assert.doesNotMatch(svg, /data:font\/woff2;base64,/);
+  assert.match(svg, /x="155" y="200" width="930" height="560"/);
+  assert.match(svg, /x="173" y="218" width="894" height="514"/);
   assert.doesNotMatch(svg, /x="290" y="335" width="964" height="520"/);
   assert.doesNotMatch(svg, /x="332" y="375" width="880" height="430"/);
 });
 
-test('premium database mockup diagnostics flag old server-rendered checked mockups for repair', () => {
+test('premium database mockup diagnostics flag text-label renderers for repair', () => {
   const suspect = diagnoseWebdesignMockupRecord({
     customerId: 'customer-bad',
     fileName: 'Bergman Transport B.V. webdesign.png',
-    websiteMockupName: 'Bergman Transport B.V.-device-mockup-v6.jpg',
+    websiteMockupName: 'Bergman Transport B.V.-device-mockup-v7.jpg',
     websiteMockupUrl: 'https://example.test/mockup.jpg',
-    mockupRenderer: 'softora-server-device-v6',
+    mockupRenderer: 'softora-server-device-v7',
     mockupOrientation: 'upright',
     mockupQualityStatus: 'checked',
     mockupQualityCheckedAt: '2026-05-28T16:02:12.000Z',
@@ -119,20 +116,22 @@ test('premium database mockup diagnostics flag old server-rendered checked mocku
   const fixed = diagnoseWebdesignMockupRecord({
     customerId: 'customer-good',
     fileName: 'PLUS Ammerlaan webdesign.png',
-    websiteMockupName: 'PLUS Ammerlaan-device-mockup-v7.jpg',
+    websiteMockupName: 'PLUS Ammerlaan-device-mockup-v8.jpg',
     websiteMockupUrl: 'https://example.test/mockup-good.jpg',
-    mockupRenderer: 'softora-server-device-v7',
+    mockupRenderer: 'softora-server-device-v8',
     mockupOrientation: 'upright',
     mockupQualityStatus: 'checked',
     mockupQualityCheckedAt: '2026-05-28T16:02:17.000Z',
   });
 
+  assert.equal(isSuspectWebdesignMockupRenderer('softora-browser-device-v6'), true);
   assert.equal(isSuspectWebdesignMockupRenderer('softora-server-device-v6'), true);
-  assert.equal(isSuspectWebdesignMockupRenderer('softora-server-device-v7'), false);
+  assert.equal(isSuspectWebdesignMockupRenderer('softora-server-device-v7'), true);
+  assert.equal(isSuspectWebdesignMockupRenderer('softora-server-device-v8'), false);
   assert.equal(suspect.status, 'needs_review');
-  assert.deepEqual(suspect.reasons, ['suspect_server_renderer_v6', 'checked_before_visual_renderer_gate']);
+  assert.deepEqual(suspect.reasons, ['suspect_softora_server_device_v7', 'checked_before_visual_renderer_gate']);
   assert.equal(suspect.websitePhotoName, 'Bergman Transport B.V. webdesign.png');
-  assert.equal(suspect.websiteMockupName, 'Bergman Transport B.V.-device-mockup-v6.jpg');
+  assert.equal(suspect.websiteMockupName, 'Bergman Transport B.V.-device-mockup-v7.jpg');
   assert.equal(fixed.status, 'ok');
   assert.deepEqual(fixed.reasons, []);
 });
@@ -206,8 +205,8 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(photoMap['customer-1'].identityKey, 'softora|serve|31612345678');
   assert.equal(values['softora_database_photo_data_v1_customer-1_0'], TINY_PNG_DATA_URL);
   assert.match(values['softora_database_photo_data_v1_customer-1_mockup_0'], /^data:image\/jpeg;base64,/);
-  assert.equal(photoMap['customer-1'].websiteMockupName, 'Softora-webdesign-device-mockup-v7.jpg');
-  assert.equal(photoMap['customer-1'].mockupRenderer, 'softora-server-device-v7');
+  assert.equal(photoMap['customer-1'].websiteMockupName, 'Softora-webdesign-device-mockup-v8.jpg');
+  assert.equal(photoMap['customer-1'].mockupRenderer, 'softora-server-device-v8');
   assert.equal(photoMap['customer-1'].mockupOrientation, 'upright');
   assert.equal(photoMap['customer-1'].mockupQualityStatus, 'checked');
   assert.deepEqual(JSON.parse(values.softora_database_photos_removed_v1), []);
@@ -327,8 +326,8 @@ test('premium database webdesign jobs persist status and generated photos throug
   assert.deepEqual(persistedJobs, ['queued', 'running', 'done']);
   assert.equal(uploadedPhotos[0].entry.customerId, 'customer-persist');
   assert.match(uploadedPhotos[0].entry.websiteMockup, /^data:image\/jpeg;base64,/);
-  assert.equal(uploadedPhotos[0].entry.websiteMockupName, 'preview-device-mockup-v7.jpg');
-  assert.equal(uploadedPhotos[0].entry.mockupRenderer, 'softora-server-device-v7');
+  assert.equal(uploadedPhotos[0].entry.websiteMockupName, 'preview-device-mockup-v8.jpg');
+  assert.equal(uploadedPhotos[0].entry.mockupRenderer, 'softora-server-device-v8');
   assert.equal(uploadedPhotos[0].entry.mockupOrientation, 'upright');
   assert.equal(uploadedPhotos[0].entry.mockupQualityStatus, 'checked');
   assert.equal(uploadedPhotos[0].meta.source, 'premium-database-webdesign-jobs');

@@ -1,7 +1,12 @@
 (function (global) {
     "use strict";
 
-    const DEVICE_MOCKUP_VERSION = "v6";
+    const DEVICE_MOCKUP_VERSION = "v8";
+    const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set([
+        "softora-browser-device-v6",
+        "softora-server-device-v6",
+        "softora-server-device-v7"
+    ]);
 
     function normalizeString(value) {
         return String(value || "").trim();
@@ -12,8 +17,10 @@
     }
 
     function getMockupQuality(customer) {
+        const fileName = normalizeString(customer && (customer.websiteMockupName || customer.mockupName));
+        const inferredRenderer = fileName.match(/-device-mockup-v([0-9]+)\.jpe?g$/i);
         return {
-            renderer: normalizeString(customer && (customer.mockupRenderer || customer.websiteMockupRenderer)).toLowerCase(),
+            renderer: (normalizeString(customer && (customer.mockupRenderer || customer.websiteMockupRenderer)) || (inferredRenderer ? "softora-server-device-v" + inferredRenderer[1] : "")).toLowerCase(),
             orientation: normalizeString(customer && (customer.mockupOrientation || customer.websiteMockupOrientation)).toLowerCase(),
             status: normalizeString(customer && (customer.mockupQualityStatus || customer.websiteMockupQualityStatus)).toLowerCase(),
             checkedAt: normalizeString(customer && (customer.mockupQualityCheckedAt || customer.websiteMockupQualityCheckedAt))
@@ -25,6 +32,7 @@
         const quality = getMockupQuality(customer);
         const hasQualitySignal = Boolean(quality.renderer || quality.orientation || quality.status || quality.checkedAt);
         if (!hasQualitySignal) return false;
+        if (SUSPECT_DEVICE_MOCKUP_RENDERERS.has(quality.renderer)) return false;
         if (quality.status !== "checked" && quality.status !== "verified" && quality.status !== "ok") return false;
         if (quality.orientation && quality.orientation !== "upright") return false;
         return true;
@@ -213,27 +221,19 @@
         context.arc(280, 820, 300, 0, Math.PI * 2);
         context.fill();
 
-        context.fillStyle = "#14182d";
-        context.font = "700 42px Oswald, Arial, sans-serif";
-        context.letterSpacing = "0px";
-        context.fillText("WEBDESIGN PREVIEW", 92, 118);
-        context.fillStyle = "rgba(20, 24, 45, 0.56)";
-        context.font = "500 24px Inter, Arial, sans-serif";
-        context.fillText("Laptop - iPad - iPhone", 94, 158);
-
         drawDevice(context, image, {
-            x: 155, y: 260, w: 930, h: 560, pad: 18, padTop: 18, padBottom: 28, radius: 28, screenRadius: 14,
+            x: 155, y: 200, w: 930, h: 560, pad: 18, padTop: 18, padBottom: 28, radius: 28, screenRadius: 14,
             frame: "#111827", shadow: "rgba(15,23,42,.24)", blur: 44, offsetY: 26,
             fitMode: "viewport-width", cropTopRatio: 0,
-            base: "#e5e7eb", baseX: 105, baseY: 835, baseW: 1170, baseH: 42,
+            base: "#e5e7eb", baseX: 105, baseY: 775, baseW: 1170, baseH: 42,
         });
         drawDevice(context, image, {
-            x: 1095, y: 220, w: 305, h: 455, pad: 14, padTop: 18, padBottom: 18, radius: 34, screenRadius: 22,
+            x: 1095, y: 160, w: 305, h: 455, pad: 14, padTop: 18, padBottom: 18, radius: 34, screenRadius: 22,
             frame: "#1f2937", shadow: "rgba(15,23,42,.22)", blur: 34, offsetY: 22,
             fitMode: "viewport", cropTopRatio: 0, cropFocusX: 0.5, viewportHeightRatio: 1,
         });
         drawDevice(context, image, {
-            x: 1345, y: 410, w: 180, h: 380, pad: 10, padTop: 22, padBottom: 16, radius: 34, screenRadius: 20,
+            x: 1345, y: 350, w: 180, h: 380, pad: 10, padTop: 22, padBottom: 16, radius: 34, screenRadius: 20,
             frame: "#030712", shadow: "rgba(15,23,42,.28)", blur: 30, offsetY: 18,
             fitMode: "viewport", cropTopRatio: 0, cropFocusX: 0, viewportHeightRatio: 1,
         });
