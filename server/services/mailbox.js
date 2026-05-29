@@ -35,8 +35,12 @@ const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
+const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar? open het via hier 👈';
+const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
+  /PS:\s*(?=.*webdesign)(?=.*(?:afbeeldingen\s+tonen|zichtbaar|open\s+het|deze\s+link|via\s+hier))/i;
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const FOLDER_ALIASES = {
@@ -116,6 +120,18 @@ function decodeBasicHtmlEntities(value) {
     .replace(/&#39;|&apos;/gi, "'")
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>');
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function escapeHtmlAttribute(value) {
+  return escapeHtml(value).replace(/'/g, '&#39;');
 }
 
 function getHtmlAttribute(tag, name) {
@@ -347,6 +363,9 @@ function isColdmailOptOutUrl(value) {
 
 function extractColdmailOptOutUrlFromText(text) {
   const label = COLDMAIL_OPT_OUT_LABEL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const markdownPattern = new RegExp(`\\[${label}\\]\\((https?:\\/\\/[^)\\s]+)\\)`, 'i');
+  const markdownMatch = String(text || '').match(markdownPattern);
+  if (isColdmailOptOutUrl(markdownMatch && markdownMatch[1])) return markdownMatch[1];
   const pattern = new RegExp(`${label}:?\\s*(?:\\[(https?:\\/\\/[^\\]]+)\\]|(https?:\\/\\/\\S+))`, 'i');
   const match = String(text || '').match(pattern);
   const url = match && (match[1] || match[2] || '');
@@ -797,6 +816,53 @@ function createMailboxService(deps = {}) {
     return normalizeString(row.id || row.customerId || row.databaseId || row.key || row.uuid || `customer-${index}`);
   }
 
+  function getCustomerCompany(row = {}) {
+    return normalizeString(
+      row.bedrijf ||
+        row.company ||
+        row.companyName ||
+        row.businessName ||
+        row.naam ||
+        row.name ||
+        row.contactName
+    );
+  }
+
+  function slugifyWebdesignCompany(value, fallback = 'uw-bedrijf') {
+    const normalized = normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 90);
+    return normalized || fallback;
+  }
+
+  function getPublicWebdesignPreviewBaseUrl() {
+    const raw = normalizeString(
+      env.SOFTORA_PUBLIC_BASE_URL ||
+        env.PUBLIC_BASE_URL ||
+        env.WEBDESIGN_PUBLIC_BASE_URL ||
+        DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL
+    ).replace(/\/+$/g, '');
+    return /^https?:\/\//i.test(raw) ? raw : DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
+  }
+
+  function buildPublicWebdesignPreviewUrl(row, id) {
+    const fallbackSlug = slugifyWebdesignCompany(id, 'uw-bedrijf');
+    const slug = slugifyWebdesignCompany(getCustomerCompany(row), fallbackSlug);
+    const customerId = normalizeString(id || getCustomerId(row, 0));
+    try {
+      const url = new URL(`/webdesign/${slug}`, getPublicWebdesignPreviewBaseUrl());
+      if (customerId) url.searchParams.set('cid', customerId);
+      return url.toString();
+    } catch (_) {
+      const query = customerId ? `?cid=${encodeURIComponent(customerId)}` : '';
+      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}${query}`;
+    }
+  }
+
   function parseCustomerRows(values = {}) {
     return safeParseJsonArray(readChunkedStateValue(values, customerDbKey))
       .map((entry) => (entry && entry.row && typeof entry.row === 'object' ? entry.row : entry))
@@ -951,6 +1017,245 @@ function createMailboxService(deps = {}) {
     );
     if (mockupImage) images.push(mockupImage);
     return images;
+  }
+
+  function isMailboxImageVisibilityPsLine(line) {
+    const cleanLine = normalizeString(line);
+    return Boolean(cleanLine && COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine));
+  }
+
+  function normalizeMailboxWebdesignText(text) {
+    const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+    let replaced = false;
+    const normalizedLines = lines.map((line) => {
+      if (!isMailboxImageVisibilityPsLine(line)) return line;
+      replaced = true;
+      return COLDMAIL_IMAGE_VISIBILITY_PS;
+    });
+    if (!replaced) {
+      const optOutIndex = normalizedLines.findIndex((line) => normalizeString(line).includes(COLDMAIL_OPT_OUT_LABEL));
+      const insertIndex = optOutIndex >= 0 ? optOutIndex : normalizedLines.length;
+      const insertLines = insertIndex > 0 && normalizeString(normalizedLines[insertIndex - 1])
+        ? ['', COLDMAIL_IMAGE_VISIBILITY_PS]
+        : [COLDMAIL_IMAGE_VISIBILITY_PS];
+      normalizedLines.splice(insertIndex, 0, ...insertLines);
+    }
+    return normalizedLines
+      .join('\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function extractPublicWebdesignPreviewUrlFromText(text) {
+    const source = String(text || '');
+    const match = source.match(/(https?:\/\/[^\s)\]]*\/webdesign\/[a-z0-9-]+(?:\?[^)\s\]]*)?|(?:^|[\s([])(\/?webdesign\/[a-z0-9-]+(?:\?[^)\s\]]*)?))/i);
+    const rawUrl = normalizeString(match && (match[2] || match[1] || ''));
+    if (!rawUrl) return '';
+    return /^https?:\/\//i.test(rawUrl)
+      ? rawUrl.replace(/[),.;!?]+$/g, '')
+      : `${getPublicWebdesignPreviewBaseUrl()}/${rawUrl.replace(/^\/+/, '').replace(/[),.;!?]+$/g, '')}`;
+  }
+
+  function isColdmailOptOutTextLine(line) {
+    const cleanLine = normalizeString(line);
+    return Boolean(cleanLine && cleanLine.includes(COLDMAIL_OPT_OUT_LABEL));
+  }
+
+  function stripColdmailOptOutLines(text) {
+    return String(text || '')
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .filter((line) => !isColdmailOptOutTextLine(line))
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function renderInlineMarkdownLinks(line) {
+    const source = String(line || '');
+    const pattern = /\[([^\]\n]{1,180})\]\((https?:\/\/[^)\s]+)\)/g;
+    let html = '';
+    let lastIndex = 0;
+    for (const match of source.matchAll(pattern)) {
+      html += escapeHtml(source.slice(lastIndex, match.index));
+      html += `<a href="${escapeHtmlAttribute(match[2])}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">${escapeHtml(match[1])}</a>`;
+      lastIndex = (match.index || 0) + match[0].length;
+    }
+    html += escapeHtml(source.slice(lastIndex));
+    return html;
+  }
+
+  function renderImageVisibilityPsHtmlLine(webdesignPreviewUrl) {
+    const href = normalizeString(webdesignPreviewUrl);
+    if (!href) return `<em style="font-style:italic;">${escapeHtml(COLDMAIL_IMAGE_VISIBILITY_PS)}</em>`;
+    return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar? open het via <a href="${escapeHtmlAttribute(
+      href
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈</em>`;
+  }
+
+  function renderMailboxWebdesignLineHtml(line, options = {}) {
+    const cleanLine = normalizeString(line);
+    if (isMailboxImageVisibilityPsLine(cleanLine)) {
+      return renderImageVisibilityPsHtmlLine(options.webdesignPreviewUrl);
+    }
+    return renderInlineMarkdownLinks(line);
+  }
+
+  function mailboxImageExtension(contentType) {
+    const normalized = normalizeString(contentType).toLowerCase();
+    if (normalized === 'image/png') return 'png';
+    if (normalized === 'image/webp') return 'webp';
+    if (normalized === 'image/gif') return 'gif';
+    return 'jpg';
+  }
+
+  function mailboxImageFilename(alt, type, contentType) {
+    const name = normalizeImageLabel(alt || type || 'webdesign')
+      .replace(/\s+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 70) || type || 'webdesign';
+    return `${name}.${mailboxImageExtension(contentType)}`;
+  }
+
+  function prepareMailboxInlineWebdesignImages(images, customerId) {
+    const entries = (Array.isArray(images) ? images : [])
+      .map((image, index) => ({ image, index }))
+      .filter((entry) => entry.image && entry.image.dataUrl);
+    if (!entries.length) return [];
+    const mainEntry = entries.find((entry) => !isMockupBodyImage(entry.image)) || entries[0];
+    const mockupEntry = entries.find((entry) => entry !== mainEntry && isMockupBodyImage(entry.image)) ||
+      entries.find((entry) => entry !== mainEntry);
+    const selected = [
+      mainEntry ? { ...mainEntry, type: 'webdesign' } : null,
+      mockupEntry ? { ...mockupEntry, type: 'mockup' } : null,
+    ].filter(Boolean);
+    const cidSeed = normalizeImageLabel(customerId || 'webdesign').replace(/\s+/g, '-').slice(0, 60) || 'webdesign';
+    return selected
+      .map((entry, orderIndex) => {
+        const parsed = parseImageDataUrl(entry.image.dataUrl);
+        if (!parsed || !parsed.buffer.length || parsed.buffer.length > MAX_STORED_BODY_IMAGE_BYTES) return null;
+        const cid = `${entry.type}-${cidSeed}-${orderIndex + 1}@softora`;
+        const alt = cleanImageAlt(entry.image.alt) || (entry.type === 'mockup' ? 'Device mockup' : 'Webdesign');
+        return {
+          type: entry.type,
+          cid,
+          src: `cid:${cid}`,
+          alt,
+          attachment: {
+            filename: mailboxImageFilename(alt, entry.type, parsed.mimeType),
+            content: parsed.buffer,
+            contentType: parsed.mimeType,
+            contentDisposition: 'inline',
+            cid,
+          },
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function renderMailboxEmailImage(image, margin) {
+    if (!image || !image.src) return '';
+    return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td style="padding:0;margin:0;width:100%;font-size:0;line-height:0;"><img src="${escapeHtmlAttribute(
+      image.src
+    )}" alt="${escapeHtmlAttribute(
+      image.alt
+    )}" width="640" style="display:block;width:100%;max-width:640px;height:auto;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;" /></td></tr></table>`;
+  }
+
+  function renderMailboxWebdesignHtml(text, options = {}) {
+    const bodyText = stripColdmailOptOutLines(text);
+    const paragraphs = bodyText
+      .split(/\n{2,}/)
+      .map((paragraph) => normalizeString(paragraph))
+      .filter(Boolean)
+      .map((paragraph) =>
+        `<p style="margin:0 0 18px 0;">${paragraph
+          .split('\n')
+          .map((line) => renderMailboxWebdesignLineHtml(line, options))
+          .join('<br>')}</p>`
+      )
+      .join('\n');
+    const inlineImages = Array.isArray(options.inlineImages) ? options.inlineImages : [];
+    const mainImage = inlineImages.find((image) => image.type === 'webdesign');
+    const mockupImage = inlineImages.find((image) => image.type === 'mockup');
+    const imagesHtml = [
+      renderMailboxEmailImage(mainImage, '22px 0 0 0'),
+      mockupImage
+        ? `\n<p style="margin:22px 0 8px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(
+            COLDMAIL_MOCKUP_CAPTION
+          )}</p>${renderMailboxEmailImage(mockupImage, '0')}`
+        : '',
+    ].join('');
+    const optOutUrl = normalizeString(options.optOutUrl);
+    const optOutHtml = optOutUrl
+      ? `\n<p style="margin:18px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="${escapeHtmlAttribute(
+          optOutUrl
+        )}" target="_blank" rel="noopener noreferrer" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(
+          COLDMAIL_OPT_OUT_LABEL
+        )}</a></p>`
+      : '';
+    return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${paragraphs}${imagesHtml}${optOutHtml}</div>`;
+  }
+
+  async function buildMailboxWebdesignSendParts({ to, subject, text }) {
+    const rawText = normalizeString(text);
+    const parsed = {
+      subject: normalizeString(subject),
+      to: { value: [{ address: normalizeEmail(to) }] },
+      html: '',
+    };
+    if (!rawText || !looksLikeWebdesignOutreach(parsed, rawText)) return null;
+
+    const normalizedText = normalizeMailboxWebdesignText(rawText);
+    try {
+      const [photoState, customerState] = await Promise.all([
+        getUiStateValues(customerPhotoScope),
+        getUiStateValues(customerDbScope),
+      ]);
+      const photoValues = photoState && photoState.values && typeof photoState.values === 'object' ? photoState.values : {};
+      const customerValues = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
+      const photoMap = safeParseJsonObject(photoValues[customerPhotoKey]);
+      const photoByIdentity = buildPhotoByIdentity(photoMap);
+      const customerRows = parseCustomerRows(customerValues);
+      const matches = findCustomerRowsForMail(parsed, rawText, customerRows);
+
+      let matchedRow = null;
+      let matchedId = '';
+      let images = [];
+      for (const { row, index } of matches) {
+        const id = getCustomerId(row, index);
+        const candidateImages = await imagesFromPhotoMeta(
+          photoValues,
+          getPhotoMetaForRow(row, index, photoMap, photoByIdentity),
+          `${getCustomerCompany(row) || getCustomerDomain(row) || 'Webdesign'} webdesign`
+        );
+        if (!candidateImages.length) continue;
+        matchedRow = row;
+        matchedId = id;
+        images = candidateImages;
+        break;
+      }
+
+      const previewUrl = matchedRow
+        ? buildPublicWebdesignPreviewUrl(matchedRow, matchedId)
+        : extractPublicWebdesignPreviewUrlFromText(rawText);
+      const inlineImages = prepareMailboxInlineWebdesignImages(images, matchedId);
+      if (!previewUrl && !inlineImages.length) return { text: normalizedText };
+
+      return {
+        text: normalizedText,
+        html: renderMailboxWebdesignHtml(normalizedText, {
+          webdesignPreviewUrl: previewUrl,
+          inlineImages,
+          optOutUrl: extractColdmailOptOutUrlFromText(rawText) || extractColdmailOptOutUrlFromText(normalizedText),
+        }),
+        attachments: inlineImages.map((image) => image.attachment),
+      };
+    } catch (error) {
+      logger.warn('[Mailbox][webdesign-send]', error && error.message ? error.message : error);
+      return { text: normalizedText };
+    }
   }
 
   function directPhotoMetaMatchesMail(id, meta, parsed, text) {
@@ -1517,12 +1822,22 @@ function createMailboxService(deps = {}) {
       secure: account.smtpSecure,
       auth: { user: account.smtpUser, pass: account.smtpPass },
     });
+    const normalizedText = normalizeString(text);
+    const webdesignParts = await buildMailboxWebdesignSendParts({
+      to,
+      subject: cleanSubject,
+      text: normalizedText,
+    });
     const mail = {
       from: account.name ? `${account.name} <${account.email}>` : account.email,
       to: normalizeEmail(to),
       subject: cleanSubject,
-      text: normalizeString(text),
+      text: webdesignParts?.text || normalizedText,
     };
+    if (webdesignParts?.html) mail.html = webdesignParts.html;
+    if (Array.isArray(webdesignParts?.attachments) && webdesignParts.attachments.length) {
+      mail.attachments = webdesignParts.attachments;
+    }
     const info = await transporter.sendMail(mail);
     const sentCopySaved = await appendSentMessage({
       account,

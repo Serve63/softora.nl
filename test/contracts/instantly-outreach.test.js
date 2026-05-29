@@ -94,16 +94,17 @@ function assertInstantlyImageTagsUseNaturalLayout(html) {
   const imageTags = extractImageTags(html);
   assert.equal(imageTags.length, 2);
   assert.match(imageTags[0], /alt="Webdesign" width="1024" height="1536" loading="eager" decoding="async" fetchpriority="high"/);
-  assert.match(imageTags[1], /alt="Mockup" width="640" loading="eager" decoding="async" fetchpriority="high"/);
-  assert.doesNotMatch(imageTags[1], /height="/);
+  assert.match(imageTags[0], /aspect-ratio:1024\/1536/);
+  assert.match(imageTags[1], /alt="Mockup" width="1600" height="1000" loading="eager" decoding="async" fetchpriority="high"/);
+  assert.match(imageTags[1], /aspect-ratio:1600\/1000/);
   for (const imageTag of imageTags) {
     assert.match(
       imageTag,
-      /style="display:block;width:100%;max-width:640px;height:auto;border:0;outline:none;text-decoration:none;"/
+      /style="display:block;width:100%;max-width:640px;height:auto;aspect-ratio:\d+\/\d+;border:0;outline:none;text-decoration:none;"/
     );
     assert.doesNotMatch(
       imageTag,
-      /min-height|max-height|height:(?:220|360)px|object-fit|border-radius|background:|font-family|font-size|font-weight|text-align/
+      /min-height|max-height|height:(?:220|360)px|object-fit|border-radius|font-family|font-size|font-weight|text-align/
     );
   }
 }
@@ -307,7 +308,7 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
     'PS: Wordt het webdesign niet zichtbaar? open het via hier 👈'
   );
   assert.equal(body.leads[0].custom_variables.softora_webdesign_public_path, '/webdesign/bakkerij-zon');
-  assert.equal(body.leads[0].custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon');
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon?cid=prospect-1');
   assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assertInstantlyImageTagsUseNaturalLayout(body.leads[0].custom_variables.softora_instantly_email_html);
@@ -347,7 +348,7 @@ test('instantly sync uses the public Softora image host even when the app base u
   const body = JSON.parse(fetchCalls[0].options.body);
   const variables = body.leads[0].custom_variables;
   assert.match(variables.softora_unsubscribe_url, /^https:\/\/softora-nl-final\.onrender\.com\/afmelden\?t=/);
-  assert.equal(variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon');
+  assert.equal(variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon?cid=prospect-1');
   assert.match(variables.softora_webdesign_image_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(variables.softora_webdesign_mockup_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
@@ -398,7 +399,7 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   assert.match(variables.softora_instantly_email_html, /📍 Alphen/);
   assert.match(
     variables.softora_instantly_email_html,
-    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? open het via <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
+    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? open het via <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
   );
 });
 
@@ -919,7 +920,7 @@ test('instantly sync skips webdesign leads without ready image assets', async ()
   assert.equal(fetchCalls.length, 0);
 });
 
-test('instantly sync skips webdesign leads with tofu-prone mockup renderers', async () => {
+test('instantly sync accepts legacy mockup renderers when a mockup image exists', async () => {
   const { service, fetchCalls } = createService({
     photoMap: {
       'prospect-1': {
@@ -939,11 +940,11 @@ test('instantly sync skips webdesign leads with tofu-prone mockup renderers', as
   const result = await service.syncInstantlyLeads({ actor: 'Test' });
 
   assert.equal(result.ok, true);
-  assert.equal(result.skipped, true);
-  assert.equal(result.reason, 'no_eligible_leads');
-  assert.equal(result.failed.length, 1);
-  assert.match(result.failed[0].error, /Nog geen website-design klaar voor Instantly/);
-  assert.equal(fetchCalls.length, 0);
+  assert.equal(result.synced, 1);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.leads.length, 1);
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_ready, 'true');
 });
 
 test('instantly sync uses the active coldmail autopilot profile before fallback settings', async () => {

@@ -208,6 +208,36 @@ test('public webdesign preview resolves sent company links from photo identity w
   assert.equal(preview.mockupSource, 'https://signed.softora.test/cdenouden-mockup.jpg?token=test');
 });
 
+test('public webdesign preview rescues compact BV slugs from stored photo filenames', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-pckbv-eu-privacy-0583',
+          websitePhotoUrl: 'https://signed.softora.test/pckbv-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/pckbv-mockup.jpg?token=test',
+          fileName: 'pckbv.eu-preview.png',
+          legacyMeta: {
+            websitePhotoName: 'pckbv.eu-preview.png',
+          },
+        }];
+      },
+    },
+  });
+
+  const preview = await service.resolvePreview('pck-b-v');
+
+  assert.equal(preview.id, 'manual-import-pckbv-eu-privacy-0583');
+  assert.equal(preview.photoSource, 'https://signed.softora.test/pckbv-webdesign.png?token=test');
+  assert.equal(preview.mockupSource, 'https://signed.softora.test/pckbv-mockup.jpg?token=test');
+});
+
 test('public webdesign preview lets hidden customer id query rescue a company slug link', async () => {
   const service = createPublicWebdesignPreviewService({
     async getUiStateValues() {

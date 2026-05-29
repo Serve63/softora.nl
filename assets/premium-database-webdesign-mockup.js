@@ -2,46 +2,16 @@
     "use strict";
 
     const DEVICE_MOCKUP_VERSION = "v8";
-    const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set([
-        "softora-browser-device-v6",
-        "softora-server-device-v6",
-        "softora-server-device-v7"
-    ]);
-
     function normalizeString(value) {
         return String(value || "").trim();
     }
 
-    function isCurrentMockupName(fileName) {
-        return new RegExp("-device-mockup-" + DEVICE_MOCKUP_VERSION + "\\.jpe?g$", "i").test(normalizeString(fileName));
-    }
-
-    function getMockupQuality(customer) {
-        const fileName = normalizeString(customer && (customer.websiteMockupName || customer.mockupName));
-        const inferredRenderer = fileName.match(/-device-mockup-v([0-9]+)\.jpe?g$/i);
-        return {
-            renderer: (normalizeString(customer && (customer.mockupRenderer || customer.websiteMockupRenderer)) || (inferredRenderer ? "softora-server-device-v" + inferredRenderer[1] : "")).toLowerCase(),
-            orientation: normalizeString(customer && (customer.mockupOrientation || customer.websiteMockupOrientation)).toLowerCase(),
-            status: normalizeString(customer && (customer.mockupQualityStatus || customer.websiteMockupQualityStatus)).toLowerCase(),
-            checkedAt: normalizeString(customer && (customer.mockupQualityCheckedAt || customer.websiteMockupQualityCheckedAt))
-        };
-    }
-
     function hasApprovedMockup(customer, isValidWebsitePhotoSource) {
-        if (!customer || !isValidWebsitePhotoSource(customer.websiteMockup)) return false;
-        const quality = getMockupQuality(customer);
-        const hasQualitySignal = Boolean(quality.renderer || quality.orientation || quality.status || quality.checkedAt);
-        if (!hasQualitySignal) return false;
-        if (SUSPECT_DEVICE_MOCKUP_RENDERERS.has(quality.renderer)) return false;
-        if (quality.status !== "checked" && quality.status !== "verified" && quality.status !== "ok") return false;
-        if (quality.orientation && quality.orientation !== "upright") return false;
-        return true;
+        return Boolean(customer && isValidWebsitePhotoSource(customer.websiteMockup));
     }
 
     function hasUsableMockup(customer, isValidWebsitePhotoSource) {
-        return Boolean(customer)
-            && isValidWebsitePhotoSource(customer.websiteMockup)
-            && hasApprovedMockup(customer, isValidWebsitePhotoSource);
+        return hasApprovedMockup(customer, isValidWebsitePhotoSource);
     }
 
     function replaceExtension(fileName, suffix) {

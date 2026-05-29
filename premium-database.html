@@ -1571,7 +1571,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
-    <script src="assets/premium-database-webdesign-asset-state.js?v=20260529d"></script><script src="assets/premium-database-webdesign-action.js?v=20260529d"></script><script src="assets/premium-database-webdesign-preview.js?v=20260529b"></script>
+    <script src="assets/premium-database-webdesign-asset-state.js?v=20260529d"></script><script src="assets/premium-database-webdesign-action.js?v=20260529d"></script><script src="assets/premium-database-webdesign-preview.js?v=20260529c"></script>
     <script src="assets/premium-database-import.js?v=20260521b"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260527b"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
@@ -2199,7 +2199,7 @@
         function getFilteredCustomers() {
             const query = normalizeSearchValue(state.query);
             return state.klanten.filter(function (customer) {
-                if (!outreachController.matchesStatusFilter(customer, state.activeStatus, hasUsedColdCalling, hasUsedColdMailing)) return false;
+                if (state.activeStatus !== "benaderbaar" && !outreachController.matchesStatusFilter(customer, state.activeStatus, hasUsedColdCalling, hasUsedColdMailing)) return false;
                 if (!query) return true;
 
                 const haystack = [
@@ -2291,7 +2291,7 @@
             return normalizeDatabaseStatus(customer && customer.status, customer) !== "klant";
         }
         function isLikelyColdmailAddress(value) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizeString(value)); }
-        function isColdmailBaseLeadEligible(customer) { if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; return true; }
+        function isColdmailBaseLeadEligible(customer) { if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; if (hasUsedColdMailing(customer)) return false; return true; }
         function buildCustomerWebdesignAssetState(customer) { return window.SoftoraDatabaseWebdesignAssetState.buildWebdesignAssetState(customer, { shouldShowWebsitePhoto: shouldShowWebsitePhoto, isValidWebsitePhotoSource: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl: resolveCustomerWebsiteUrl, isMailLeadEligible: isColdmailBaseLeadEligible, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, isMockupFailed: function (customerId) { return webdesignActionController.isMockupFailed(customerId); } }, state); }
         function hasApprovedWebdesignMockup(customer) { return buildCustomerWebdesignAssetState(customer).mockupApproved; }
         function hasCompleteWebdesignAssets(customer) { return buildCustomerWebdesignAssetState(customer).hasCompleteAssets; }
