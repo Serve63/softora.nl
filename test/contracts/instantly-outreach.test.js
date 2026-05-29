@@ -920,6 +920,31 @@ test('instantly sync skips webdesign leads without ready image assets', async ()
   assert.equal(fetchCalls.length, 0);
 });
 
+test('instantly sync blocks leads when required Softora variables are incomplete', async () => {
+  const { service, fetchCalls } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_eligible_leads');
+  assert.equal(result.failed.length, 1);
+  assert.match(result.failed[0].error, /mist verplichte Softora-variabelen/);
+  assert.deepEqual(result.failed[0].missing, ['softora_website_domain']);
+  assert.equal(fetchCalls.length, 0);
+});
+
 test('instantly sync accepts legacy mockup renderers when a mockup image exists', async () => {
   const { service, fetchCalls } = createService({
     photoMap: {
