@@ -59,9 +59,11 @@ test('public webdesign preview renders only the two images for a stored mail-rea
 
   assert.equal(requestedScope, PHOTO_SCOPE);
   assert.equal(response.statusCode, 200);
-  assert.equal(response.headers['Cache-Control'], 'no-store');
+  assert.match(response.headers['Cache-Control'], /s-maxage=900/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/aagje-webdesign\.png/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/aagje-mockup\.jpg/);
+  assert.match(response.body, /rel="preload" as="image"/);
+  assert.match(response.body, /fetchpriority="high"/);
   assert.match(response.body, /website-frame/);
   assert.match(response.body, /mockup-frame/);
   assert.match(response.body, /background:transparent/);
@@ -144,6 +146,8 @@ test('public webdesign preview resolves current database ids through customer id
 
 test('public webdesign preview reads structured data ops storage before ui-state fallback', async () => {
   let uiStateReads = 0;
+  let customerReads = 0;
+  const signedOptions = [];
   const service = createPublicWebdesignPreviewService({
     async getUiStateValues() {
       uiStateReads += 1;
@@ -151,6 +155,7 @@ test('public webdesign preview reads structured data ops storage before ui-state
     },
     dataOpsStore: {
       async listCustomers() {
+        customerReads += 1;
         return [{
           id: 'manual-import-aagje-eu-0070',
           bedrijf: 'Aagje van Os',
@@ -158,7 +163,8 @@ test('public webdesign preview reads structured data ops storage before ui-state
           tel: '06 20 10 00 50',
         }];
       },
-      async listDesignPhotosWithSignedUrls() {
+      async listDesignPhotosWithSignedUrls(options) {
+        signedOptions.push(options);
         return [{
           customerId: 'manual-import-aagje-eu-0070',
           identityKey: 'aagje van os|aagje van os|06 20 10 00 50',
@@ -172,9 +178,51 @@ test('public webdesign preview reads structured data ops storage before ui-state
   const preview = await service.resolvePreview('aagje-van-os');
 
   assert.equal(uiStateReads, 0);
+  assert.equal(customerReads, 0);
+  assert.deepEqual(signedOptions.map((options) => options.identifiers), [['aagje-van-os']]);
+  assert.equal(signedOptions[0].expiresInSeconds, 24 * 60 * 60);
   assert.equal(preview.id, 'manual-import-aagje-eu-0070');
   assert.equal(preview.photoSource, 'https://signed.softora.test/aagje-webdesign.png?token=test');
   assert.equal(preview.mockupSource, 'https://signed.softora.test/aagje-mockup.jpg?token=test');
+});
+
+test('public webdesign preview signs only targeted structured candidates after customer lookup', async () => {
+  const signedOptions = [];
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'manual-import-rvh-nl-0123',
+          bedrijf: 'R VH Montage Constructie Reparatie',
+          website: 'rvhmontage.nl',
+          tel: '0612345678',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls(options) {
+        signedOptions.push(options);
+        if (signedOptions.length === 1) return [];
+        assert.equal(options.maxMatches, 12);
+        assert.ok(options.identifiers.includes('manual-import-rvh-nl-0123'));
+        assert.ok(options.identifiers.includes('R VH Montage Constructie Reparatie'));
+        return [{
+          customerId: 'manual-import-rvh-nl-0123',
+          identityKey: 'r vh montage constructie reparatie||0612345678',
+          websitePhotoUrl: 'https://signed.softora.test/rvh-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/rvh-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+
+  const preview = await service.resolvePreview('r-vh-montage-constructie-reparatie');
+
+  assert.equal(preview.id, 'manual-import-rvh-nl-0123');
+  assert.equal(preview.photoSource, 'https://signed.softora.test/rvh-webdesign.png?token=test');
+  assert.equal(preview.mockupSource, 'https://signed.softora.test/rvh-mockup.jpg?token=test');
+  assert.equal(signedOptions.length, 2);
 });
 
 test('public webdesign preview resolves sent company links from photo identity when customer stock is gone', async () => {

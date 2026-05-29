@@ -2,6 +2,8 @@ const PHOTO_SCOPE = 'premium_database_photos';
 const PHOTO_KEY = 'softora_database_photos_v1';
 const CUSTOMER_SCOPE = 'premium_customers_database';
 const CUSTOMER_KEY = 'softora_customers_premium_v1';
+const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
+const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
 
 const {
   buildCustomerIdentityKey,
@@ -252,11 +254,30 @@ function getCustomerIdentityKeys(customer) {
   ].filter(Boolean)));
 }
 
+function collectCustomerStructuredPreviewIdentifiers(customer) {
+  if (!customer || typeof customer !== 'object') return [];
+  return Array.from(new Set([
+    normalizeString(customer.id || customer.customerId || customer.databaseId),
+    normalizeString(customer.bedrijf || customer.company || customer.companyName || customer.naam),
+    normalizeString(customer.website || customer.websiteUrl || customer.domain || customer.domein),
+    domainNameCandidate(customer.website || customer.websiteUrl || customer.domain || customer.domein),
+    ...getCustomerIdentityKeys(customer),
+  ].filter(Boolean)));
+}
+
 function buildPreviewFromRecord(id, values, record) {
   const photoSource = resolvePreviewSource(values, record, 'photo');
   const mockupSource = resolvePreviewSource(values, record, 'mockup');
   if (!isValidImageSource(photoSource) || !isValidImageSource(mockupSource)) return null;
   return { id, photoSource, mockupSource };
+}
+
+function getUrlOrigin(value) {
+  try {
+    return new URL(normalizeString(value)).origin;
+  } catch (_error) {
+    return '';
+  }
 }
 
 function buildPhotoMapFromStructuredEntries(entries) {
@@ -329,12 +350,21 @@ function resolvePreviewSource(values, record, type) {
 function buildPreviewHtml(preview) {
   const photoSource = escapeHtml(preview.photoSource);
   const mockupSource = escapeHtml(preview.mockupSource);
+  const preconnectTags = Array.from(new Set([
+    getUrlOrigin(preview.photoSource),
+    getUrlOrigin(preview.mockupSource),
+  ].filter(Boolean)))
+    .map((origin) => `  <link rel="preconnect" href="${escapeHtml(origin)}" crossorigin>`)
+    .join('\n');
   return `<!doctype html>
 <html lang="nl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
+${preconnectTags}
+  <link rel="preload" as="image" href="${photoSource}" fetchpriority="high">
+  <link rel="preload" as="image" href="${mockupSource}">
   <title>Webdesign preview | Softora</title>
   <style>
     *{box-sizing:border-box}
@@ -350,8 +380,8 @@ function buildPreviewHtml(preview) {
 <body>
   <main>
     <div class="preview-grid" aria-label="Webdesign en device mockup naast elkaar">
-      <div class="preview-frame website-frame"><img src="${photoSource}" alt="Webdesign"></div>
-      <div class="preview-frame mockup-frame"><img src="${mockupSource}" alt="Device mockup"></div>
+      <div class="preview-frame website-frame"><img src="${photoSource}" alt="Webdesign" loading="eager" decoding="async" fetchpriority="high"></div>
+      <div class="preview-frame mockup-frame"><img src="${mockupSource}" alt="Device mockup" loading="eager" decoding="async"></div>
     </div>
   </main>
 </body>
@@ -387,11 +417,33 @@ function createPublicWebdesignPreviewService(options = {}) {
     ) {
       return null;
     }
-    const [customers, photoEntries] = await Promise.all([
-      dataOpsStore.listCustomers(),
-      dataOpsStore.listDesignPhotosWithSignedUrls({ expiresInSeconds: 60 * 60 }),
-    ]);
-    return resolvePreviewFromMaps(id, {}, buildPhotoMapFromStructuredEntries(photoEntries), customers);
+
+    const directPhotoEntries = await dataOpsStore.listDesignPhotosWithSignedUrls({
+      expiresInSeconds: STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS,
+      identifiers: [id],
+      maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
+    });
+    let preview = resolvePreviewFromMaps(id, {}, buildPhotoMapFromStructuredEntries(directPhotoEntries), []);
+    if (preview) return preview;
+
+    const customers = await dataOpsStore.listCustomers();
+    const candidates = findCustomerCandidates(customers, id);
+    const identifiers = Array.from(new Set([
+      id,
+      ...candidates.flatMap(collectCustomerStructuredPreviewIdentifiers),
+    ].filter(Boolean)));
+
+    if (identifiers.length > 1) {
+      const photoEntries = await dataOpsStore.listDesignPhotosWithSignedUrls({
+        expiresInSeconds: STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS,
+        identifiers,
+        maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
+      });
+      preview = resolvePreviewFromMaps(id, {}, buildPhotoMapFromStructuredEntries(photoEntries), candidates);
+      if (preview) return preview;
+    }
+
+    return null;
   }
 
   async function resolvePreview(identifier) {
@@ -434,7 +486,7 @@ function createPublicWebdesignPreviewService(options = {}) {
       req && req.params && (req.params.companySlug || req.params.customerId),
     ]);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     if (!preview) return res.status(404).send(buildNotFoundHtml());
     return res.status(200).send(buildPreviewHtml(preview));

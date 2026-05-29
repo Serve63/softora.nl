@@ -25,6 +25,116 @@ const DESIGN_PHOTO_CACHE_CONTROL_SECONDS = '31536000';
 const SIGNED_URL_CACHE_LIMIT = 1500;
 const SIGNED_URL_CACHE_MIN_FRESH_MS = 60 * 1000;
 
+function slugifyDesignPhotoMatchText(value) {
+  return normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function compactDesignPhotoSlug(value) {
+  return slugifyDesignPhotoMatchText(value).replace(/-/g, '');
+}
+
+function stripKnownDomainSuffix(value) {
+  return slugifyDesignPhotoMatchText(value).replace(/-(?:nl|eu|com|be|de|net|org|info|io|co|bv)$/i, '');
+}
+
+function stripImageNameSuffix(value) {
+  return normalizeString(value)
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[-_\s]*(?:website|webdesign|preview|device|mockup|screenshot|foto|image|afbeelding)(?:[-_\s]*(?:v[0-9]+|[0-9]+))?$/i, '')
+    .replace(/[-_\s]+$/g, '');
+}
+
+function domainNameCandidate(value) {
+  const raw = normalizeString(value)
+    .replace(/^<|>$/g, '')
+    .replace(/[),.;!?]+$/g, '');
+  if (!raw) return '';
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    return normalizeString(new URL(candidate).hostname)
+      .replace(/^www\./i, '')
+      .split('.')[0];
+  } catch (_error) {
+    return raw
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .split(/[/?#]/)[0]
+      .split('.')[0];
+  }
+}
+
+function designPhotoSlugMatchesIdentifier(candidate, identifier) {
+  const candidateSlug = slugifyDesignPhotoMatchText(candidate);
+  const identifierSlug = slugifyDesignPhotoMatchText(identifier);
+  if (!candidateSlug || !identifierSlug) return false;
+  if (candidateSlug === identifierSlug) return true;
+  const candidateCompact = compactDesignPhotoSlug(candidateSlug);
+  const identifierCompact = compactDesignPhotoSlug(identifierSlug);
+  if (candidateCompact && candidateCompact === identifierCompact) return true;
+  const candidateRootCompact = compactDesignPhotoSlug(stripKnownDomainSuffix(candidateSlug));
+  const identifierRootCompact = compactDesignPhotoSlug(stripKnownDomainSuffix(identifierSlug));
+  if (
+    identifierCompact.length >= 4 &&
+    candidateCompact.length >= 4 &&
+    (candidateCompact.startsWith(identifierCompact) || candidateRootCompact.startsWith(identifierCompact))
+  ) {
+    return true;
+  }
+  return Boolean(
+    candidateRootCompact &&
+      identifierRootCompact &&
+      (candidateRootCompact === identifierCompact ||
+        candidateCompact === identifierRootCompact ||
+        candidateRootCompact === identifierRootCompact)
+  );
+}
+
+function collectDesignPhotoRowMatchCandidates(row) {
+  if (!row || typeof row !== 'object') return [];
+  const legacyMeta = row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {};
+  const mockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : {};
+  const identityCompany = normalizeString(row.identity_key).split('|')[0];
+  const fileName = stripImageNameSuffix(row.file_name);
+  const legacyPhotoName = stripImageNameSuffix(legacyMeta.websitePhotoName || legacyMeta.fileName);
+  const mockupName = stripImageNameSuffix(mockupMeta.fileName || legacyMeta.websiteMockupName);
+  return Array.from(new Set([
+    normalizeString(row.customer_id),
+    normalizeString(row.identity_key),
+    identityCompany,
+    fileName,
+    legacyPhotoName,
+    mockupName,
+    domainNameCandidate(fileName),
+    domainNameCandidate(legacyPhotoName),
+    domainNameCandidate(mockupName),
+  ].filter(Boolean)));
+}
+
+function designPhotoRowMatchesIdentifiers(row, identifiers = []) {
+  const directIdentifiers = new Set(
+    (Array.isArray(identifiers) ? identifiers : [])
+      .map((value) => normalizeString(value).toLowerCase())
+      .filter(Boolean)
+  );
+  if (!directIdentifiers.size) return true;
+
+  const rowCustomerId = normalizeString(row && row.customer_id).toLowerCase();
+  const rowIdentityKey = normalizeString(row && row.identity_key).toLowerCase();
+  if ((rowCustomerId && directIdentifiers.has(rowCustomerId)) || (rowIdentityKey && directIdentifiers.has(rowIdentityKey))) {
+    return true;
+  }
+
+  const candidates = collectDesignPhotoRowMatchCandidates(row);
+  return Array.from(directIdentifiers).some((identifier) =>
+    candidates.some((candidate) => designPhotoSlugMatchesIdentifier(candidate, identifier))
+  );
+}
+
 function createSoftoraDataOpsStore(deps = {}) {
   const {
     isSupabaseConfigured = () => false,
@@ -626,6 +736,12 @@ function createSoftoraDataOpsStore(deps = {}) {
       60,
       Math.min(24 * 60 * 60, Number(options.expiresInSeconds) || 60 * 60)
     );
+    const identifiers = Array.from(new Set(
+      (Array.isArray(options.identifiers) ? options.identifiers : [])
+        .map(normalizeString)
+        .filter(Boolean)
+    ));
+    const maxMatches = Math.max(1, Math.min(500, Number(options.maxMatches) || (identifiers.length ? 12 : 500)));
     const result = await run('list-design-photos-signed-urls', (client) =>
       client
         .from(TABLES.designPhotos)
@@ -636,7 +752,9 @@ function createSoftoraDataOpsStore(deps = {}) {
     );
     if (!result.ok) return null;
     const client = getClient();
-    const rows = result.data || [];
+    const rows = (result.data || [])
+      .filter((row) => designPhotoRowMatchesIdentifiers(row, identifiers))
+      .slice(0, maxMatches);
     const entries = [];
 
     function buildSignedUrlCacheKey(bucket, path, signOptions) {
@@ -730,7 +848,11 @@ function createSoftoraDataOpsStore(deps = {}) {
     await Promise.all(Array.from({ length: workerCount }, signNext));
 
     Object.defineProperty(entries, 'hadStructuredRows', {
-      value: rows.length > 0,
+      value: (result.data || []).length > 0,
+      enumerable: false,
+    });
+    Object.defineProperty(entries, 'targetedIdentifiersApplied', {
+      value: identifiers.length > 0,
       enumerable: false,
     });
     return entries;
