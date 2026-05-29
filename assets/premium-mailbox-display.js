@@ -1,14 +1,5 @@
 (function (global) {
-  const SENDER_CTA_LINKS = Object.freeze({
-    'martijn@softora.nl': {
-      text: '💼 Mijn LinkedIn 👈',
-      url: 'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios',
-    },
-    'martijnven123@gmail.com': {
-      text: '💼 Mijn LinkedIn 👈',
-      url: 'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios',
-    },
-  });
+  const SENDER_CTA_LINKS = Object.freeze({});
 
   function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();

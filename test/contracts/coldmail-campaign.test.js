@@ -439,7 +439,7 @@ test('coldmail campaign uses standard SMTP transports with bounded timeouts', as
   assert.equal(transportConfigs[0].socketTimeout, 90_000);
 });
 
-test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async () => {
+test('coldmail campaign removes Martijn LinkedIn CTA before sending', async () => {
   for (const senderEmail of ['martijn@softora.nl', 'martijnven123@gmail.com']) {
     const { service, sentMessages } = createService({
       rows: [
@@ -483,21 +483,13 @@ test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async
     });
 
     assert.equal(result.sent, 1, senderEmail);
-    assert.match(sentMessages[0].text, /💼 Mijn LinkedIn 👈/);
+    assert.doesNotMatch(sentMessages[0].text, /Mijn LinkedIn|linkedin\.com/i);
     assert.match(
       sentMessages[0].text,
-      /Martijn van de Ven\n\n📍 Boxtel\n\n💼 Mijn LinkedIn 👈\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/,
+      /Martijn van de Ven\n\n📍 Boxtel\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/,
       senderEmail
     );
-    assert.match(
-      sentMessages[0].html,
-      /<a href="https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">💼 Mijn LinkedIn 👈<\/a>/,
-      senderEmail
-    );
-    assert.ok(
-      sentMessages[0].html.indexOf('📍 Boxtel') < sentMessages[0].html.indexOf('💼 Mijn LinkedIn 👈'),
-      senderEmail
-    );
+    assert.doesNotMatch(sentMessages[0].html, /Mijn LinkedIn|linkedin\.com/i, senderEmail);
   }
 });
 

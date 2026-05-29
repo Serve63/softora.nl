@@ -512,7 +512,7 @@ test('instantly sync caches a stripped webdesign image instead of the decorative
   assert.equal(metadata.height, 244);
 });
 
-test('instantly sync places Martijn location above the LinkedIn CTA', async () => {
+test('instantly sync removes Martijn LinkedIn CTA before syncing', async () => {
   const { service, fetchCalls } = createService({
     rows: [
       {
@@ -556,16 +556,10 @@ test('instantly sync places Martijn location above the LinkedIn CTA', async () =
   const variables = body.leads[0].custom_variables;
   assert.match(
     variables.softora_mail_body,
-    /Martijn van de Ven\n\n📍 Boxtel\n\n💼 Mijn LinkedIn 👈\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/
+    /Martijn van de Ven\n\n📍 Boxtel\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/
   );
-  assert.ok(
-    variables.softora_instantly_email_html.indexOf('📍 Boxtel') <
-      variables.softora_instantly_email_html.indexOf('💼 Mijn LinkedIn 👈')
-  );
-  assert.match(
-    variables.softora_instantly_email_html,
-    /<a href="https:\/\/www\.linkedin\.com\/in\/martijn-van-de-ven-51a5b61ba\?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">💼 Mijn LinkedIn 👈<\/a>/
-  );
+  assert.doesNotMatch(variables.softora_mail_body, /Mijn LinkedIn|linkedin\.com/i);
+  assert.doesNotMatch(variables.softora_instantly_email_html, /Mijn LinkedIn|linkedin\.com/i);
 });
 
 test('instantly sync maps websoftora Martijn sender aliases to the Martijn coldmail profile', async () => {
@@ -625,11 +619,12 @@ test('instantly sync maps websoftora Martijn sender aliases to the Martijn coldm
   const body = JSON.parse(fetchCalls[0].options.body);
   const variables = body.leads[0].custom_variables;
   assert.match(variables.softora_mail_body, /Martijn van de Ven/);
-  assert.match(variables.softora_mail_body, /📍 Boxtel\n\n💼 Mijn LinkedIn 👈/);
+  assert.match(variables.softora_mail_body, /📍 Boxtel\n\nPS:/);
+  assert.doesNotMatch(variables.softora_mail_body, /Mijn LinkedIn|linkedin\.com/i);
   assert.doesNotMatch(variables.softora_mail_body, /Servé Creusen/);
   assert.match(variables.softora_instantly_email_html, /Martijn van de Ven/);
   assert.match(variables.softora_instantly_email_html, /📍 Boxtel/);
-  assert.match(variables.softora_instantly_email_html, /💼 Mijn LinkedIn 👈/);
+  assert.doesNotMatch(variables.softora_instantly_email_html, /Mijn LinkedIn|linkedin\.com/i);
 });
 
 test('instantly sync can refresh existing lead variables without adding duplicate leads', async () => {
@@ -692,7 +687,9 @@ test('instantly sync can refresh existing lead variables without adding duplicat
   const body = JSON.parse(fetchCalls[0].options.body);
   assert.match(body.personalization, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assertInstantlyImageTagsUseNaturalLayout(body.personalization);
-  assert.match(body.custom_variables.softora_mail_body, /📍 Boxtel\n\n💼 Mijn LinkedIn 👈/);
+  assert.match(body.custom_variables.softora_mail_body, /📍 Boxtel\n\nPS:/);
+  assert.doesNotMatch(body.custom_variables.softora_mail_body, /Mijn LinkedIn|linkedin\.com/i);
+  assert.doesNotMatch(body.custom_variables.softora_instantly_email_html, /Mijn LinkedIn|linkedin\.com/i);
   assert.doesNotMatch(body.custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
 });
 

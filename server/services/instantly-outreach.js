@@ -55,9 +55,7 @@ const INSTANTLY_WEBDESIGN_FRAME_CROP_MAX_MARGIN_RATIO = 0.12;
 const INSTANTLY_WEBDESIGN_FRAME_CROP_THRESHOLD = 12;
 const INSTANTLY_WEBDESIGN_FRAME_CORNER_TOLERANCE = 32;
 const INSTANTLY_WEBDESIGN_FRAME_EDGE_INSET_PX = 4;
-const MARTIJN_LINKEDIN_CTA_TEXT = '💼 Mijn LinkedIn 👈';
-const MARTIJN_LINKEDIN_URL =
-  'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios';
+const MARTIJN_LINKEDIN_CTA_PATTERN = /(?:💼\s*)?mijn\s+linkedin\s*👈?|linkedin\.com\/in\/martijn-van-de-ven/i;
 const DEFAULT_WEBDESIGN_SUBJECT = 'Nieuw webdesign gemaakt!';
 const DEFAULT_WEBDESIGN_BODY = [
   'Goedemorgen {{naam}},',
@@ -1203,53 +1201,27 @@ function ensureImageVisibilityPsInMailText(text, city, row, id, config, normaliz
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function ensureLinkedinCtaAfterPinnedCity(text, city, normalizeString = defaultNormalizeString) {
+function removeLinkedinCtaFromMailText(text, normalizeString = defaultNormalizeString) {
   const cleanText = normalizeString(text);
-  if (!cleanText || !cleanText.includes(MARTIJN_LINKEDIN_CTA_TEXT)) return cleanText;
-  const cleanCity = normalizeString(city);
-  const pinnedCity = formatPinnedCity(cleanCity, normalizeString);
-  const cityMatchers = [pinnedCity, cleanCity]
-    .filter(Boolean)
-    .map((value) => new RegExp(`^\\s*${escapeRegexText(value)}\\s*$`, 'i'));
-  if (!cityMatchers.length) return cleanText;
-
-  const lines = cleanText.split('\n');
-  let hadCta = false;
-  const withoutCta = lines.filter((line) => {
-    if (normalizeString(line) !== MARTIJN_LINKEDIN_CTA_TEXT) return true;
-    hadCta = true;
-    return false;
-  });
-  if (!hadCta) return cleanText;
-
-  let insertAt = -1;
-  for (let index = withoutCta.length - 1; index >= 0; index -= 1) {
-    if (cityMatchers.some((matcher) => matcher.test(withoutCta[index]))) {
-      insertAt = index + 1;
-      break;
-    }
-  }
-  if (insertAt === -1) return cleanText;
-
-  withoutCta.splice(insertAt, 0, '', MARTIJN_LINKEDIN_CTA_TEXT);
-  return withoutCta.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (!cleanText || !MARTIJN_LINKEDIN_CTA_PATTERN.test(cleanText)) return cleanText;
+  return cleanText
+    .split('\n')
+    .filter((line) => !MARTIJN_LINKEDIN_CTA_PATTERN.test(normalizeString(line)))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function normalizeInstantlyMailText(text, city, row, id, config, normalizeString = defaultNormalizeString) {
-  return ensureLinkedinCtaAfterPinnedCity(
-    ensureImageVisibilityPsInMailText(
-      ensurePinnedCityInMailText(
-        normalizeSenderNameInMailText(text, normalizeString),
-        city,
-        normalizeString
-      ),
-      city,
-      row,
-      id,
-      config,
+  return ensureImageVisibilityPsInMailText(
+    removeLinkedinCtaFromMailText(
+      ensurePinnedCityInMailText(normalizeSenderNameInMailText(text, normalizeString), city, normalizeString),
       normalizeString
     ),
     city,
+    row,
+    id,
+    config,
     normalizeString
   );
 }
@@ -1519,15 +1491,6 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString) {
           const cleanLine = normalizeString(line);
           if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
             return renderImageVisibilityPsHtmlLine(cleanLine, normalizeString);
-          }
-          if (cleanLine === MARTIJN_LINKEDIN_CTA_TEXT) {
-            return `<a href="${escapeHtmlAttribute(
-              MARTIJN_LINKEDIN_URL,
-              normalizeString
-            )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">${escapeHtml(
-              cleanLine,
-              normalizeString
-            )}</a>`;
           }
           return escapeHtml(cleanLine, normalizeString);
         })
