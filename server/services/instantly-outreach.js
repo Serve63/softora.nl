@@ -273,13 +273,9 @@ function buildPublicWebdesignPreviewPath(row, id, normalizeString = defaultNorma
 function buildPublicWebdesignPreviewUrl(row, id, config, normalizeString = defaultNormalizeString) {
   const baseUrl = normalizePublicBaseUrl(config && config.webdesignPublicBaseUrl) || DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
   try {
-    const url = new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl);
-    const customerId = normalizeString(id || getRowId(row, 0, normalizeString));
-    if (customerId) url.searchParams.set('cid', customerId);
-    return url.toString();
+    return new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl).toString();
   } catch (_error) {
-    const customerId = normalizeString(id || getRowId(row, 0, normalizeString));
-    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}${customerId ? `?cid=${encodeURIComponent(customerId)}` : ''}`;
+    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}`;
   }
 }
 

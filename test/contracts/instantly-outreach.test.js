@@ -308,7 +308,7 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
     'PS: Wordt het webdesign niet zichtbaar? open het via hier 👈'
   );
   assert.equal(body.leads[0].custom_variables.softora_webdesign_public_path, '/webdesign/bakkerij-zon');
-  assert.equal(body.leads[0].custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon?cid=prospect-1');
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon');
   assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assertInstantlyImageTagsUseNaturalLayout(body.leads[0].custom_variables.softora_instantly_email_html);
@@ -348,7 +348,7 @@ test('instantly sync uses the public Softora image host even when the app base u
   const body = JSON.parse(fetchCalls[0].options.body);
   const variables = body.leads[0].custom_variables;
   assert.match(variables.softora_unsubscribe_url, /^https:\/\/softora-nl-final\.onrender\.com\/afmelden\?t=/);
-  assert.equal(variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon?cid=prospect-1');
+  assert.equal(variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon');
   assert.match(variables.softora_webdesign_image_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(variables.softora_webdesign_mockup_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
@@ -399,7 +399,7 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   assert.match(variables.softora_instantly_email_html, /📍 Alphen/);
   assert.match(
     variables.softora_instantly_email_html,
-    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? open het via <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
+    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? open het via <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
   );
 });
 
