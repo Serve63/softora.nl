@@ -300,6 +300,99 @@ test('data ops store signs design photo URLs with bounded concurrency', async ()
   assert.equal(entries.every((entry) => entry.websiteMockupUrl.startsWith('https://')), true);
 });
 
+test('data ops store signs only matching design photo rows for targeted preview lookups', async () => {
+  const rows = [
+    {
+      customer_id: 'customer-nope',
+      identity_key: 'ander bedrijf||3100000000',
+      storage_bucket: 'softora-design-photos',
+      storage_path: 'customers/customer-nope/webdesign.png',
+      mime_type: 'image/png',
+      file_name: 'anderbedrijf.nl-webdesign.png',
+      legacy_meta: {
+        mockup: {
+          storageBucket: 'softora-design-photos',
+          storagePath: 'customers/customer-nope/mockup.jpg',
+          fileName: 'anderbedrijf-device-mockup-v8.jpg',
+        },
+      },
+      updated_at: '2026-05-26T12:00:00.000Z',
+    },
+    {
+      customer_id: 'manual-import-rvh-nl-0123',
+      identity_key: 'r vh montage constructie reparatie||0612345678',
+      storage_bucket: 'softora-design-photos',
+      storage_path: 'customers/manual-import-rvh/webdesign.png',
+      mime_type: 'image/png',
+      file_name: 'rvhmontage.nl-webdesign.png',
+      legacy_meta: {
+        websitePhotoName: 'rvhmontage.nl-webdesign.png',
+        mockup: {
+          storageBucket: 'softora-design-photos',
+          storagePath: 'customers/manual-import-rvh/mockup.jpg',
+          fileName: 'rvhmontage.nl-device-mockup-v8.jpg',
+        },
+      },
+      updated_at: '2026-05-26T12:01:00.000Z',
+    },
+  ];
+  const signedPaths = [];
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrl(path) {
+            signedPaths.push({ bucket, path });
+            return {
+              data: { signedUrl: `https://storage.example.test/${bucket}/${path}` },
+              error: null,
+            };
+          },
+        };
+      },
+    },
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    limit(limit) {
+                      assert.equal(limit, 500);
+                      return Promise.resolve({ data: rows, error: null });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+  });
+
+  const entries = await store.listDesignPhotosWithSignedUrls({
+    identifiers: ['r-vh-montage-constructie-reparatie'],
+    expiresInSeconds: 24 * 60 * 60,
+  });
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].customerId, 'manual-import-rvh-nl-0123');
+  assert.deepEqual(
+    signedPaths.map((item) => item.path),
+    ['customers/manual-import-rvh/webdesign.png', 'customers/manual-import-rvh/mockup.jpg']
+  );
+  assert.equal(entries.targetedIdentifiersApplied, true);
+});
+
 test('data ops store reuses fresh signed design photo URLs per storage path', async () => {
   const rows = [{
     customer_id: 'customer-1',
