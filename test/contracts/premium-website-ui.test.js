@@ -470,6 +470,9 @@ test('premium website contactformulier verstuurt via server-side contact api', (
   assert.doesNotMatch(source, /mailto:info@softora\.nl/);
   assert.match(scriptSource, /MARTIJN_WHATSAPP_URL = 'https:\/\/wa\.me\/31643262792'/);
   assert.match(scriptSource, /function buildWhatsappUrl\(name, email, message\)/);
+  assert.match(scriptSource, /__softoraPublicConversionLanding/);
+  assert.match(scriptSource, /Landingspagina: /);
+  assert.match(scriptSource, /CTA-pagina: /);
   assert.match(scriptSource, /window\.open\(url, '_blank', 'noopener,noreferrer'\)/);
   assert.match(scriptSource, /fetch\('\/api\/public-contact',\s*\{/);
   assert.match(scriptSource, /method:\s*'POST'/);

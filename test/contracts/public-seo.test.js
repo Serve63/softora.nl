@@ -93,9 +93,11 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.match(first, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/">/);
   assert.match(first, /type="application\/ld\+json" data-softora-public-seo="structured-data"/);
   assert.match(first, /data-softora-public-seo="internal-links"/);
+  assert.match(first, /<script src="\/assets\/public-conversion-tracking\.js\?v=20260529a" defer><\/script>/);
   assert.match(first, /href="\/diensten"/);
   assert.equal((second.match(/data-softora-public-seo="structured-data"/g) || []).length, 1);
   assert.equal((second.match(/data-softora-public-seo="internal-links"/g) || []).length, 1);
+  assert.equal((second.match(/\/assets\/public-conversion-tracking\.js/g) || []).length, 1);
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-website.html'), '/');
 });
 
@@ -138,6 +140,30 @@ test('public seo pages do not render fallback internal link bars', () => {
 
     assert.doesNotMatch(html, /softora-seo-footer-links/, `${entry.path} gebruikt nog fallback SEO-links.`);
     assert.doesNotMatch(html, /href="\/premium-[^"]*"/i, `${entry.path} linkt nog naar premium routes.`);
+  }
+});
+
+test('public seo pages load first-party conversion tracking once', () => {
+  const trackerSource = fs.readFileSync(path.join(root, 'assets/public-conversion-tracking.js'), 'utf8');
+
+  assert.match(trackerSource, /MARTIJN_WHATSAPP_URL = 'https:\/\/wa\.me\/31643262792'/);
+  assert.match(trackerSource, /softora:public-conversion/);
+  assert.match(trackerSource, /Landingspagina: /);
+  assert.match(trackerSource, /CTA-pagina: /);
+  assert.match(trackerSource, /Referrer: /);
+  assert.doesNotMatch(trackerSource, /localStorage|sessionStorage/);
+
+  for (const entry of INDEXABLE_PUBLIC_SEO_PAGES) {
+    const source = fs.readFileSync(path.join(root, entry.fileName), 'utf8');
+    const html = applyPublicSeoHeadDefaults(source, entry.fileName, {
+      siteOrigin: 'https://www.softora.nl',
+    });
+
+    assert.equal(
+      (html.match(/\/assets\/public-conversion-tracking\.js/g) || []).length,
+      1,
+      `${entry.path} mist de publieke conversietracker.`
+    );
   }
 });
 
