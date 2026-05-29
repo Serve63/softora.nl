@@ -177,6 +177,67 @@ test('public webdesign preview reads structured data ops storage before ui-state
   assert.equal(preview.mockupSource, 'https://signed.softora.test/aagje-mockup.jpg?token=test');
 });
 
+test('public webdesign preview resolves sent company links from photo identity when customer stock is gone', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-cdenoudenmontage-nl-0041',
+          identityKey: 'C. den Ouden Montage|Cor den Ouden|06 11 22 33 44',
+          websitePhotoUrl: 'https://signed.softora.test/cdenouden-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/cdenouden-mockup.jpg?token=test',
+          fileName: 'cdenoudenmontage.nl-webdesign.png',
+          legacyMeta: {
+            websitePhotoName: 'cdenoudenmontage.nl-webdesign.png',
+          },
+        }];
+      },
+    },
+  });
+
+  const preview = await service.resolvePreview('c-den-ouden-montage');
+
+  assert.equal(preview.id, 'manual-import-cdenoudenmontage-nl-0041');
+  assert.equal(preview.photoSource, 'https://signed.softora.test/cdenouden-webdesign.png?token=test');
+  assert.equal(preview.mockupSource, 'https://signed.softora.test/cdenouden-mockup.jpg?token=test');
+});
+
+test('public webdesign preview lets hidden customer id query rescue a company slug link', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-aagje-eu-0070',
+          websitePhotoUrl: 'https://signed.softora.test/aagje-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/aagje-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getPreviewPageResponse(
+    { params: { companySlug: 'verkeerde-bedrijfsnaam' }, query: { cid: 'manual-import-aagje-eu-0070' } },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /aagje-webdesign\.png\?token=test/);
+  assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
+});
+
 test('public webdesign preview route exposes the shareable webdesign page', () => {
   const routes = [];
   const app = {

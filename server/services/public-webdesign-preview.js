@@ -86,6 +86,29 @@ function slugifyCompanyName(value, fallback = '') {
   return slug || fallback;
 }
 
+function stripImageNameSuffix(value) {
+  return normalizeString(value)
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[-_\s]*(?:website|webdesign|preview|device|mockup|screenshot|foto|image|afbeelding)(?:[-_\s]*(?:v[0-9]+|[0-9]+))?$/i, '')
+    .replace(/[-_\s]+$/g, '');
+}
+
+function collectPhotoRecordSlugCandidates(record) {
+  if (!record || typeof record !== 'object') return [];
+  const legacyMeta = record.legacyMeta && typeof record.legacyMeta === 'object' ? record.legacyMeta : {};
+  const identityCompany = normalizeString(record.identityKey || legacyMeta.identityKey).split('|')[0];
+  return Array.from(new Set([
+    normalizeString(record.id || record.customerId),
+    identityCompany,
+    normalizeString(record.bedrijf || record.company || record.companyName),
+    normalizeString(legacyMeta.bedrijf || legacyMeta.company || legacyMeta.companyName),
+    stripImageNameSuffix(record.websitePhotoName || record.fileName || legacyMeta.websitePhotoName),
+    stripImageNameSuffix(legacyMeta.fileName),
+  ]
+    .map((value) => slugifyCompanyName(value))
+    .filter(Boolean)));
+}
+
 function findPhotoRecordByIdentity(photoMap, identityKeys = []) {
   const identities = new Set((Array.isArray(identityKeys) ? identityKeys : []).map(normalizeString).filter(Boolean));
   if (!identities.size) return null;
@@ -94,6 +117,18 @@ function findPhotoRecordByIdentity(photoMap, identityKeys = []) {
     const item = photoMap[key];
     if (!item || typeof item !== 'object') return null;
     return identities.has(normalizeString(item.identityKey)) ? { ...item, id: normalizeString(item.id || key) } : null;
+  }, null);
+}
+
+function findPhotoRecordBySlug(photoMap, slug) {
+  const cleanSlug = slugifyCompanyName(slug);
+  if (!cleanSlug) return null;
+  return Object.keys(photoMap || {}).reduce((match, key) => {
+    if (match) return match;
+    const item = photoMap[key];
+    if (!item || typeof item !== 'object') return null;
+    const record = { ...item, id: normalizeString(item.id || item.customerId || key) };
+    return collectPhotoRecordSlugCandidates(record).includes(cleanSlug) ? record : null;
   }, null);
 }
 
@@ -163,13 +198,15 @@ function buildPhotoMapFromStructuredEntries(entries) {
   return (Array.isArray(entries) ? entries : []).reduce((map, entry) => {
     const id = normalizeString(entry && (entry.customerId || entry.id));
     if (!id) return map;
+    const legacyMeta = entry.legacyMeta && typeof entry.legacyMeta === 'object' ? entry.legacyMeta : {};
     map[id] = {
       ...(entry && typeof entry === 'object' ? entry : {}),
       id,
       websitePhotoUrl: normalizeString(entry && (entry.websitePhotoUrl || entry.signedUrl)),
       websiteMockupUrl: normalizeString(entry && (entry.websiteMockupUrl || entry.mockupUrl)),
-      websitePhotoName: normalizeString(entry && (entry.websitePhotoName || entry.fileName)),
+      websitePhotoName: normalizeString(entry && (entry.websitePhotoName || entry.fileName || legacyMeta.websitePhotoName)),
       identityKey: normalizeString(entry && entry.identityKey),
+      legacyMeta,
     };
     return map;
   }, {});
@@ -178,6 +215,10 @@ function buildPhotoMapFromStructuredEntries(entries) {
 function resolvePreviewFromMaps(id, values, photoMap, customers) {
   let record = findPhotoRecord(photoMap, id);
   let preview = buildPreviewFromRecord(id, values, record);
+  if (preview) return preview;
+
+  record = findPhotoRecordBySlug(photoMap, id);
+  preview = buildPreviewFromRecord(normalizeString(record && (record.id || record.customerId)) || id, values, record);
   if (preview) return preview;
 
   const directCustomer = findCustomerById(customers, id);
@@ -307,7 +348,13 @@ function createPublicWebdesignPreviewService(options = {}) {
   }
 
   async function getPreviewPageResponse(req, res) {
-    const preview = await resolvePreview(req && req.params && (req.params.companySlug || req.params.customerId));
+    const query = req && req.query && typeof req.query === 'object' ? req.query : {};
+    const preview = await resolvePreview(
+      query.cid ||
+        query.customerId ||
+        query.id ||
+        (req && req.params && (req.params.companySlug || req.params.customerId))
+    );
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
