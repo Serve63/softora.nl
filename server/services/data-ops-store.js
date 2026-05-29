@@ -481,7 +481,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         if (uploadedMockup.error) throw uploadedMockup.error;
         const existingMockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : {};
         const mockupFileName = normalizeString(entry.websiteMockupName || entry.mockupFileName || `${customerId}-mockup.${mockupExt}`).slice(0, 240);
-        const generatedByCurrentRenderer = /-device-mockup-v6\.jpe?g$/i.test(mockupFileName);
+        const generatedByCurrentRenderer = /-device-mockup-v8\.jpe?g$/i.test(mockupFileName);
         const mockupUpdatedAt = isoNow();
         legacyMeta.mockup = {
           ...existingMockupMeta,
@@ -491,10 +491,10 @@ function createSoftoraDataOpsStore(deps = {}) {
           fileName: mockupFileName,
           byteSize: mockup.buffer.length,
           contentHash: mockup.contentHash,
-          renderer: normalizeString(existingMockupMeta.renderer || entry.mockupRenderer || (generatedByCurrentRenderer ? 'softora-browser-device-v6' : '')),
-          orientation: normalizeString(existingMockupMeta.orientation || entry.mockupOrientation || (generatedByCurrentRenderer ? 'upright' : '')),
-          qualityStatus: normalizeString(existingMockupMeta.qualityStatus || entry.mockupQualityStatus || (generatedByCurrentRenderer ? 'checked' : 'unverified')),
-          qualityCheckedAt: normalizeString(existingMockupMeta.qualityCheckedAt || entry.mockupQualityCheckedAt || (generatedByCurrentRenderer ? mockupUpdatedAt : '')),
+          renderer: normalizeString(entry.mockupRenderer || (generatedByCurrentRenderer ? 'softora-browser-device-v8' : existingMockupMeta.renderer || '')),
+          orientation: normalizeString(entry.mockupOrientation || (generatedByCurrentRenderer ? 'upright' : existingMockupMeta.orientation || '')),
+          qualityStatus: normalizeString(entry.mockupQualityStatus || (generatedByCurrentRenderer ? 'checked' : existingMockupMeta.qualityStatus || 'unverified')),
+          qualityCheckedAt: normalizeString(entry.mockupQualityCheckedAt || (generatedByCurrentRenderer ? mockupUpdatedAt : existingMockupMeta.qualityCheckedAt || '')),
           updatedAt: mockupUpdatedAt,
         };
         legacyMeta.websiteMockupName = legacyMeta.mockup.fileName;

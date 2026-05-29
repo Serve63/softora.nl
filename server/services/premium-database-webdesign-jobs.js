@@ -1,26 +1,19 @@
-const fs = require('fs');
-const path = require('path');
 const { randomUUID } = require('crypto');
 
-const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v7';
-const DEVICE_MOCKUP_FILE_VERSION = 'v7';
-const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set(['softora-server-device-v6']);
+const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
+const DEVICE_MOCKUP_FILE_VERSION = 'v8';
+const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set([
+  'softora-browser-device-v6',
+  'softora-server-device-v6',
+  'softora-server-device-v7',
+]);
 const APPROVED_MOCKUP_QUALITY_STATUSES = new Set(['checked', 'verified', 'ok']);
 let cachedSharp = null;
-let cachedMockupFontCss = null;
 
 function loadSharpModule() {
   if (cachedSharp) return cachedSharp;
   cachedSharp = require('sharp');
   return cachedSharp;
-}
-
-function escapeSvgText(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 function parseImageDataUrl(value) {
@@ -38,26 +31,6 @@ function replaceImageFileSuffix(value, suffix) {
   const raw = String(value || '').trim() || 'webdesign-preview.png';
   const clean = raw.replace(/\.[a-z0-9]+$/i, '');
   return `${clean}${suffix}.jpg`;
-}
-
-function loadMockupFontCss() {
-  if (cachedMockupFontCss !== null) return cachedMockupFontCss;
-  const fontDir = path.join(__dirname, '../../assets/fonts');
-  try {
-    const oswald = fs.readFileSync(path.join(fontDir, 'oswald-latin.woff2')).toString('base64');
-    const inter = fs.readFileSync(path.join(fontDir, 'inter-latin.woff2')).toString('base64');
-    cachedMockupFontCss = [
-      '@font-face{font-family:SoftoraMockupOswald;src:url(data:font/woff2;base64,',
-      oswald,
-      ") format('woff2');font-weight:400 700;font-style:normal;}",
-      '@font-face{font-family:SoftoraMockupInter;src:url(data:font/woff2;base64,',
-      inter,
-      ") format('woff2');font-weight:300 800;font-style:normal;}",
-    ].join('');
-  } catch (_) {
-    cachedMockupFontCss = '';
-  }
-  return cachedMockupFontCss;
 }
 
 function normalizeFiniteNumber(value, fallback) {
@@ -93,25 +66,11 @@ function getDeviceMockupRendererSpec() {
     renderer: DEVICE_MOCKUP_RENDERER,
     fileVersion: DEVICE_MOCKUP_FILE_VERSION,
     canvas: { width: 1600, height: 1000 },
-    title: {
-      text: 'WEBDESIGN PREVIEW',
-      x: 92,
-      y: 118,
-      fontSize: 42,
-      fontFamily: 'SoftoraMockupOswald',
-    },
-    subtitle: {
-      text: 'Laptop - iPad - iPhone',
-      x: 94,
-      y: 158,
-      fontSize: 24,
-      fontFamily: 'SoftoraMockupInter',
-    },
     devices: [
       buildDeviceSpec({
         id: 'laptop',
         x: 155,
-        y: 260,
+        y: 200,
         w: 930,
         h: 560,
         pad: 18,
@@ -127,14 +86,14 @@ function getDeviceMockupRendererSpec() {
         cropTopRatio: 0,
         base: '#e5e7eb',
         baseX: 105,
-        baseY: 835,
+        baseY: 775,
         baseW: 1170,
         baseH: 42,
       }),
       buildDeviceSpec({
         id: 'tablet',
         x: 1095,
-        y: 220,
+        y: 160,
         w: 305,
         h: 455,
         pad: 14,
@@ -154,7 +113,7 @@ function getDeviceMockupRendererSpec() {
       buildDeviceSpec({
         id: 'phone',
         x: 1345,
-        y: 410,
+        y: 350,
         w: 180,
         h: 380,
         pad: 10,
@@ -252,7 +211,6 @@ async function buildDeviceMockupSvg(imageDataUrl, customer = {}, options = {}) {
   return `
     <svg width="1600" height="1000" viewBox="0 0 1600 1000" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <style>${loadMockupFontCss()}</style>
         <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
           <feDropShadow dx="0" dy="26" stdDeviation="44" flood-color="#0f172a" flood-opacity="0.24"/>
         </filter>
@@ -269,8 +227,6 @@ async function buildDeviceMockupSvg(imageDataUrl, customer = {}, options = {}) {
       <rect width="1600" height="1000" fill="url(#backgroundGradient)"/>
       <circle cx="1260" cy="160" r="340" fill="#3b82f6" fill-opacity="0.10"/>
       <circle cx="280" cy="820" r="300" fill="#0f172a" fill-opacity="0.08"/>
-      <text x="${spec.title.x}" y="${spec.title.y}" font-family="SoftoraMockupOswald, Oswald, Arial, sans-serif" font-size="${spec.title.fontSize}" font-weight="700" fill="#14182d">${escapeSvgText(spec.title.text)}</text>
-      <text x="${spec.subtitle.x}" y="${spec.subtitle.y}" font-family="SoftoraMockupInter, Inter, Arial, sans-serif" font-size="${spec.subtitle.fontSize}" font-weight="500" fill="#14182d" fill-opacity="0.56">${escapeSvgText(spec.subtitle.text)}</text>
       ${spec.devices.map((device) => renderDeviceSvg(device, sourceSize, embeddedImage)).join('')}
     </svg>`;
 }
@@ -321,6 +277,11 @@ function isSuspectWebdesignMockupRenderer(renderer) {
   return SUSPECT_DEVICE_MOCKUP_RENDERERS.has(String(renderer || '').trim().toLowerCase());
 }
 
+function inferWebdesignMockupRendererFromName(fileName) {
+  const match = String(fileName || '').trim().match(/-device-mockup-v([0-9]+)\.jpe?g$/i);
+  return match ? `softora-server-device-v${match[1]}` : '';
+}
+
 function diagnoseWebdesignMockupRecord(entry = {}) {
   const legacyMeta = entry.legacyMeta && typeof entry.legacyMeta === 'object' ? entry.legacyMeta : {};
   const mockup = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : {};
@@ -332,6 +293,7 @@ function diagnoseWebdesignMockupRecord(entry = {}) {
       legacyMeta.websiteMockupName ||
       ''
   ).trim();
+  const resolvedRenderer = quality.renderer || inferWebdesignMockupRendererFromName(websiteMockupName);
   const hasMockup = Boolean(
     entry.websiteMockup ||
       entry.websiteMockupUrl ||
@@ -342,11 +304,11 @@ function diagnoseWebdesignMockupRecord(entry = {}) {
   );
   const reasons = [];
   if (!hasMockup) reasons.push('missing_mockup');
-  if (isSuspectWebdesignMockupRenderer(quality.renderer)) reasons.push('suspect_server_renderer_v6');
+  if (isSuspectWebdesignMockupRenderer(resolvedRenderer)) reasons.push(`suspect_${resolvedRenderer.replace(/[^a-z0-9]+/gi, '_')}`);
   if (!quality.status && hasMockup) reasons.push('missing_quality_status');
   if (quality.status && !APPROVED_MOCKUP_QUALITY_STATUSES.has(quality.status)) reasons.push('unapproved_quality_status');
   if (quality.orientation && quality.orientation !== 'upright') reasons.push('non_upright_orientation');
-  if (quality.status === 'checked' && isSuspectWebdesignMockupRenderer(quality.renderer)) {
+  if (quality.status === 'checked' && isSuspectWebdesignMockupRenderer(resolvedRenderer)) {
     reasons.push('checked_before_visual_renderer_gate');
   }
   return {
@@ -354,7 +316,7 @@ function diagnoseWebdesignMockupRecord(entry = {}) {
     company: String(entry.company || entry.bedrijf || legacyMeta.company || legacyMeta.bedrijf || '').trim(),
     websitePhotoName: String(entry.websitePhotoName || entry.fileName || legacyMeta.websitePhotoName || '').trim(),
     websiteMockupName,
-    mockupRenderer: quality.renderer,
+    mockupRenderer: resolvedRenderer,
     mockupOrientation: quality.orientation,
     mockupQualityStatus: quality.status,
     mockupQualityCheckedAt: quality.checkedAt,

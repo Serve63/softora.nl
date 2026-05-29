@@ -262,21 +262,32 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
     mockupOrientation: 'upright',
   }, helpers);
   assert.equal(legacyServerMockup.hasMockup, true);
-  assert.equal(legacyServerMockup.mockupApproved, true);
-  assert.equal(legacyServerMockup.canRepairMockup, false);
-  assert.equal(legacyServerMockup.isMailReady, true);
-  assert.equal(legacyServerMockup.mockupState, 'ready');
+  assert.equal(legacyServerMockup.mockupApproved, false);
+  assert.equal(legacyServerMockup.canRepairMockup, true);
+  assert.equal(legacyServerMockup.isMailReady, false);
+  assert.equal(legacyServerMockup.mockupState, 'repair');
 
   const fixedServerMockup = assetStateClient.buildWebdesignAssetState({
     ...base,
     websitePhoto: 'data:image/png;base64,AAA',
     websiteMockup: 'data:image/jpeg;base64,BBB',
-    mockupRenderer: 'softora-server-device-v7',
+    mockupRenderer: 'softora-server-device-v8',
     mockupQualityStatus: 'checked',
     mockupOrientation: 'upright',
   }, helpers);
   assert.equal(fixedServerMockup.mockupApproved, true);
   assert.equal(fixedServerMockup.isMailReady, true);
+
+  const visuallyBadV7Mockup = assetStateClient.buildWebdesignAssetState({
+    ...base,
+    websitePhoto: 'data:image/png;base64,AAA',
+    websiteMockup: 'data:image/jpeg;base64,BBB',
+    websiteMockupName: 'Demo-device-mockup-v7.jpg',
+    mockupQualityStatus: 'checked',
+    mockupOrientation: 'upright',
+  }, helpers);
+  assert.equal(visuallyBadV7Mockup.mockupApproved, false);
+  assert.equal(visuallyBadV7Mockup.canRepairMockup, true);
 
   const oldMockupWithoutQuality = assetStateClient.buildWebdesignAssetState({
     ...base,
@@ -444,11 +455,13 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260528c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(webdesignAssetStateScriptSource, /function buildWebdesignAssetState\(customer, helpers, runtimeState\)/);
-  assert.doesNotMatch(webdesignAssetStateScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
-  assert.doesNotMatch(webdesignActionScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
-  assert.doesNotMatch(webdesignMockupScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
+  assert.match(webdesignAssetStateScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
+  assert.match(webdesignActionScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
+  assert.match(webdesignMockupScriptSource, /SUSPECT_DEVICE_MOCKUP_RENDERERS/);
   assert.match(webdesignAssetStateScriptSource, /mockupApproved: mockupApproved/);
   assert.match(webdesignAssetStateScriptSource, /canGeneratePhoto: canGeneratePhoto/);
   assert.match(webdesignAssetStateScriptSource, /isMailReady: isMailReady/);
@@ -501,7 +514,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(pageSource, /webdesignMockupController\.ensureForCustomer\(state\.photoTargetId, \{ force: true \}\)/);
   assert.doesNotMatch(pageSource, /mockupDrop\.getAttribute\("data-can-generate"\) !== "true"/);
   assert.match(webdesignMockupScriptSource, /global\.SoftoraDatabaseWebdesignMockup =/);
-  assert.match(webdesignMockupScriptSource, /const DEVICE_MOCKUP_VERSION = "v6";/);
+  assert.match(webdesignMockupScriptSource, /const DEVICE_MOCKUP_VERSION = "v8";/);
   assert.match(webdesignMockupScriptSource, /gradient\.addColorStop\(0, "#f7f9fc"\);/);
   assert.match(webdesignMockupScriptSource, /rgba\(59, 130, 246, 0\.10\)/);
   assert.doesNotMatch(webdesignMockupScriptSource, /rgba\(139, 34, 82, 0\.08\)/);
@@ -518,7 +531,9 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignMockupScriptSource, /function hasUsableMockup\(customer, isValidWebsitePhotoSource\)/);
   assert.match(webdesignMockupScriptSource, /mockupQualityStatus: "checked"/);
   assert.match(webdesignMockupScriptSource, /mockupOrientation: "upright"/);
-  assert.match(webdesignMockupScriptSource, /Laptop - iPad - iPhone/);
+  assert.doesNotMatch(webdesignMockupScriptSource, /WEBDESIGN PREVIEW/);
+  assert.doesNotMatch(webdesignMockupScriptSource, /Laptop - iPad - iPhone/);
+  assert.match(webdesignMockupScriptSource, /softora-server-device-v7/);
   assert.match(webdesignMockupScriptSource, /ensureVisibleMockups/);
   assert.match(webdesignMockupScriptSource, /toast\("Device mockup wordt lokaal gemaakt, geen extra API-kosten"\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /\.photo-drop:hover \.photo-generate-cost/);
@@ -647,12 +662,12 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260528c/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260527b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260528c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260526b/);

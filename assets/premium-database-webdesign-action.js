@@ -14,6 +14,11 @@
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
     const FALLBACK_ICON = "<span class=\"photo-fallback-icon\" aria-hidden=\"true\">!</span>";
     const PHOTO_READY_SELECTOR = ".photo-drop[data-has-photo=\"true\"], .photo-drop--mockup[data-has-photo=\"true\"]";
+    const SUSPECT_MOCKUP_RENDERERS = new Set([
+        "softora-browser-device-v6",
+        "softora-server-device-v6",
+        "softora-server-device-v7"
+    ]);
 
     function normalizeString(value) {
         return String(value || "").trim();
@@ -343,9 +348,12 @@
             if (!customer || !isValidWebsitePhotoDataUrl(customer.websiteMockup)) return false;
             const status = normalizeString(customer.mockupQualityStatus || customer.websiteMockupQualityStatus).toLowerCase();
             const orientation = normalizeString(customer.mockupOrientation || customer.websiteMockupOrientation).toLowerCase();
-            const renderer = normalizeString(customer.mockupRenderer || customer.websiteMockupRenderer);
+            const fileName = normalizeString(customer.websiteMockupName || customer.mockupName);
+            const inferredRenderer = fileName.match(/-device-mockup-v([0-9]+)\.jpe?g$/i);
+            const renderer = (normalizeString(customer.mockupRenderer || customer.websiteMockupRenderer) || (inferredRenderer ? "softora-server-device-v" + inferredRenderer[1] : "")).toLowerCase();
             const checkedAt = normalizeString(customer.mockupQualityCheckedAt || customer.websiteMockupQualityCheckedAt);
             if (!(status || orientation || renderer || checkedAt)) return false;
+            if (SUSPECT_MOCKUP_RENDERERS.has(renderer)) return false;
             if (status !== "checked" && status !== "verified" && status !== "ok") return false;
             return !orientation || orientation === "upright";
         }

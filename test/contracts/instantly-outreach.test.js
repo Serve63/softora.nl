@@ -62,7 +62,7 @@ function withCheckedMockupMeta(item) {
   if (item.mockupQualityStatus || item.mockupOrientation) return item;
   return {
     ...item,
-    mockupRenderer: 'softora-test-device-v6',
+    mockupRenderer: 'softora-test-device-v8',
     mockupOrientation: 'upright',
     mockupQualityStatus: 'checked',
     mockupQualityCheckedAt: '2026-04-24T12:00:00.000Z',
@@ -907,6 +907,33 @@ test('instantly sync reads and writes chunked customer database state', async ()
 test('instantly sync skips webdesign leads without ready image assets', async () => {
   const { service, fetchCalls } = createService({
     photoMap: {},
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_eligible_leads');
+  assert.equal(result.failed.length, 1);
+  assert.match(result.failed[0].error, /Nog geen website-design klaar voor Instantly/);
+  assert.equal(fetchCalls.length, 0);
+});
+
+test('instantly sync skips webdesign leads with tofu-prone mockup renderers', async () => {
+  const { service, fetchCalls } = createService({
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockupName: 'Bakkerij Zon-device-mockup-v7.jpg',
+        mockupRenderer: 'softora-server-device-v7',
+        mockupOrientation: 'upright',
+        mockupQualityStatus: 'checked',
+        mockupQualityCheckedAt: '2026-05-28T23:00:00.000Z',
+      },
+    },
   });
 
   const result = await service.syncInstantlyLeads({ actor: 'Test' });
