@@ -489,7 +489,7 @@ test('coldmail campaign removes Martijn LinkedIn CTA before sending', async () =
     assert.doesNotMatch(sentMessages[0].text, /Mijn LinkedIn|linkedin\.com/i);
     assert.match(
       sentMessages[0].text,
-      /Martijn van de Ven\n\n📍 Boxtel\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/,
+      /Martijn van de Ven\n\n📍 Boxtel\n\nPS: Wordt het webdesign niet zichtbaar\? open het via hier 👈/,
       senderEmail
     );
     assert.doesNotMatch(sentMessages[0].html, /Mijn LinkedIn|linkedin\.com/i, senderEmail);
@@ -2379,12 +2379,12 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   assert.doesNotMatch(sentMessages[0].text, /Serve Creusen/);
   assert.match(
     sentMessages[0].text,
-    /📍 Alphen\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/
+    /📍 Alphen\n\nPS: Wordt het webdesign niet zichtbaar\? open het via hier 👈/
   );
   assert.match(sentMessages[0].html, /📍 Alphen/);
   assert.match(
     sentMessages[0].html,
-    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">webdesign\/bakkerij-zon<\/a> 👈<\/em>/
+    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? open het via <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
   );
   assert.match(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.match(sentMessages[0].html, /<table role="presentation" width="100%"/);

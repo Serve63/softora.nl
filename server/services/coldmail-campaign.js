@@ -103,10 +103,9 @@ const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'cid';
 const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
-const COLDMAIL_IMAGE_VISIBILITY_PS_PREFIX =
-  'PS: Wordt het webdesign niet zichtbaar? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link:';
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar? open het via hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?)/i;
+  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
@@ -999,7 +998,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function buildImageVisibilityPs(row, id, input = {}) {
-    return `${COLDMAIL_IMAGE_VISIBILITY_PS_PREFIX} ${buildPublicWebdesignPreviewUrl(row, id, input)} 👈`;
+    return COLDMAIL_IMAGE_VISIBILITY_PS;
   }
 
   function getRowContact(row) {
@@ -4573,25 +4572,23 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function renderImageVisibilityPsHtmlLine(line) {
+  function renderImageVisibilityPsHtmlLine(line, options = {}) {
     const cleanLine = normalizeString(line);
-    const publicLink = extractPublicWebdesignPreviewLinkFromPs(cleanLine);
-    if (!publicLink) {
+    const publicLink = extractPublicWebdesignPreviewLinkFromPs(cleanLine) || {
+      href: normalizeString(options.webdesignPreviewUrl),
+    };
+    if (!publicLink.href) {
       return `<em style="font-style:italic;">${escapeHtml(cleanLine)}</em>`;
     }
-    const before = cleanLine.slice(0, publicLink.start).replace(/\s+$/g, '');
-    const after = cleanLine.slice(publicLink.end).replace(/^\s+/g, '');
-    return `<em style="font-style:italic;">${escapeHtml(before)} <a href="${escapeHtmlAttribute(
+    return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar? open het via <a href="${escapeHtmlAttribute(
       publicLink.href
-    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">${escapeHtml(
-      publicLink.label
-    )}</a>${after ? ` ${escapeHtml(after)}` : ''}</em>`;
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈</em>`;
   }
 
   function renderColdmailHtmlLine(line, options = {}) {
     const cleanLine = normalizeString(line);
     if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
-      return renderImageVisibilityPsHtmlLine(cleanLine);
+      return renderImageVisibilityPsHtmlLine(cleanLine, options);
     }
     return escapeHtml(cleanLine);
   }
@@ -6108,7 +6105,13 @@ function createColdmailCampaignService(deps = {}) {
           },
         };
       }
-      const htmlBase = appendHiddenColdmailReferenceHtml(toHtml(baseText, { senderEmail }), reference);
+      const htmlBase = appendHiddenColdmailReferenceHtml(
+        toHtml(baseText, {
+          senderEmail,
+          webdesignPreviewUrl: buildPublicWebdesignPreviewUrl(row, item.id, input),
+        }),
+        reference
+      );
       const htmlWithContent = webdesignPhoto
         ? appendWebdesignImageHtml(htmlBase, webdesignPhotoForHtml, {
             optOutText: shouldAppendOptOut ? COLDMAIL_OPT_OUT_LABEL : '',

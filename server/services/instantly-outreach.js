@@ -37,10 +37,9 @@ const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me wet
 const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
-const COLDMAIL_IMAGE_VISIBILITY_PS_PREFIX =
-  'PS: Wordt het webdesign niet zichtbaar? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link:';
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar? open het via hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?)/i;
+  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT = 1536;
@@ -275,7 +274,7 @@ function buildPublicWebdesignPreviewUrl(row, id, config, normalizeString = defau
 }
 
 function buildImageVisibilityPs(row, id, config, normalizeString = defaultNormalizeString) {
-  return `${COLDMAIL_IMAGE_VISIBILITY_PS_PREFIX} ${buildPublicWebdesignPreviewUrl(row, id, config, normalizeString)} 👈`;
+  return COLDMAIL_IMAGE_VISIBILITY_PS;
 }
 
 function getRowContact(row, normalizeString = defaultNormalizeString) {
@@ -1464,24 +1463,21 @@ function extractPublicWebdesignPreviewLinkFromPs(line, normalizeString = default
   };
 }
 
-function renderImageVisibilityPsHtmlLine(line, normalizeString = defaultNormalizeString) {
+function renderImageVisibilityPsHtmlLine(line, normalizeString = defaultNormalizeString, options = {}) {
   const cleanLine = normalizeString(line);
-  const publicLink = extractPublicWebdesignPreviewLinkFromPs(cleanLine, normalizeString);
-  if (!publicLink) {
+  const publicLink = extractPublicWebdesignPreviewLinkFromPs(cleanLine, normalizeString) || {
+    href: normalizeString(options.webdesignPreviewUrl),
+  };
+  if (!publicLink.href) {
     return `<em style="font-style:italic;">${escapeHtml(cleanLine, normalizeString)}</em>`;
   }
-  const before = cleanLine.slice(0, publicLink.start).replace(/\s+$/g, '');
-  const after = cleanLine.slice(publicLink.end).replace(/^\s+/g, '');
-  return `<em style="font-style:italic;">${escapeHtml(before, normalizeString)} <a href="${escapeHtmlAttribute(
+  return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar? open het via <a href="${escapeHtmlAttribute(
     publicLink.href,
     normalizeString
-  )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">${escapeHtml(
-    publicLink.label,
-    normalizeString
-  )}</a>${after ? ` ${escapeHtml(after, normalizeString)}` : ''}</em>`;
+  )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈</em>`;
 }
 
-function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString) {
+function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString, options = {}) {
   const body = normalizeString(text)
     .split(/\n{2,}/)
     .map((paragraph) =>
@@ -1490,7 +1486,7 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString) {
         .map((line) => {
           const cleanLine = normalizeString(line);
           if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
-            return renderImageVisibilityPsHtmlLine(cleanLine, normalizeString);
+            return renderImageVisibilityPsHtmlLine(cleanLine, normalizeString, options);
           }
           return escapeHtml(cleanLine, normalizeString);
         })
@@ -1522,7 +1518,16 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
 }
 
 function buildInstantlyEmailHtml(
-  { baseText, company, webdesignImageUrl, webdesignMockupUrl, webdesignImageDimensions, webdesignMockupDimensions, unsubscribeUrl },
+  {
+    baseText,
+    company,
+    webdesignImageUrl,
+    webdesignMockupUrl,
+    webdesignImageDimensions,
+    webdesignMockupDimensions,
+    webdesignPublicUrl,
+    unsubscribeUrl,
+  },
   normalizeString = defaultNormalizeString
 ) {
   const optOut = normalizeString(unsubscribeUrl)
@@ -1540,7 +1545,9 @@ function buildInstantlyEmailHtml(
         normalizeString
       )}</p>${renderImageHtml(webdesignMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
     : '';
-  return `${renderMailTextAsHtml(baseText, normalizeString)}${renderImageHtml(
+  return `${renderMailTextAsHtml(baseText, normalizeString, {
+    webdesignPreviewUrl: webdesignPublicUrl,
+  })}${renderImageHtml(
     webdesignImageUrl,
     'Webdesign',
     '24px 0 0 0',
@@ -2166,6 +2173,7 @@ function createInstantlyOutreachService(deps = {}) {
         webdesignMockupUrl,
         webdesignImageDimensions: webdesignCache.dimensions,
         webdesignMockupDimensions: webdesignMockupCache.dimensions,
+        webdesignPublicUrl,
         unsubscribeUrl,
       },
       normalizeString
