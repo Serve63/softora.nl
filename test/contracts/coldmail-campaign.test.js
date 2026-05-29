@@ -486,7 +486,7 @@ test('coldmail campaign links Martijn LinkedIn CTA in the HTML mail body', async
     assert.match(sentMessages[0].text, /💼 Mijn LinkedIn 👈/);
     assert.match(
       sentMessages[0].text,
-      /Martijn van de Ven\n\n📍 Boxtel\n\n💼 Mijn LinkedIn 👈\n\nPS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊/,
+      /Martijn van de Ven\n\n📍 Boxtel\n\n💼 Mijn LinkedIn 👈\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/,
       senderEmail
     );
     assert.match(
@@ -2088,7 +2088,7 @@ test('coldmail campaign unsubscribe link marks the database row as no interest',
     senderEmail: 'info@softora.nl',
   });
 
-  const unsubscribeUrl = sentMessages[0].html.match(/href="([^"]+)"/)[1].replace(/&amp;/g, '&');
+  const unsubscribeUrl = sentMessages[0].html.match(/href="([^"]*\/afmelden\?t=[^"]+)"/)[1].replace(/&amp;/g, '&');
   const token = new URL(unsubscribeUrl).searchParams.get('t');
   const preview = await service.getColdmailUnsubscribePreview({ token });
 
@@ -2380,12 +2380,12 @@ test('coldmail campaign uses remote webdesign photo and device mockup URLs by de
   assert.doesNotMatch(sentMessages[0].text, /Serve Creusen/);
   assert.match(
     sentMessages[0].text,
-    /📍 Alphen\n\nPS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊/
+    /📍 Alphen\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/
   );
   assert.match(sentMessages[0].html, /📍 Alphen/);
   assert.match(
     sentMessages[0].html,
-    /<em style="font-style:italic;">PS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊<\/em>/
+    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">webdesign\/bakkerij-zon<\/a> 👈<\/em>/
   );
   assert.match(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.match(sentMessages[0].html, /<table role="presentation" width="100%"/);

@@ -27,6 +27,7 @@ const DEFAULT_SYNC_BATCH_SIZE = 10;
 const DEFAULT_DAILY_CAP = 25;
 const DEFAULT_DAILY_CAP_TIME_ZONE = 'Europe/Amsterdam';
 const DEFAULT_PUBLIC_BASE_URL = 'https://www.softora.nl';
+const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_PREVIEW_IMAGE_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_COLDMAIL_LINK_SECRET = 'softora-coldmail';
 const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
@@ -36,10 +37,10 @@ const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me wet
 const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
-const COLDMAIL_IMAGE_VISIBILITY_PS =
-  'PS: Zie je het webdesign niet? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊';
+const COLDMAIL_IMAGE_VISIBILITY_PS_PREFIX =
+  'PS: Wordt het webdesign niet zichtbaar? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link:';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?)/i;
+  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?)/i;
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT = 1536;
@@ -248,6 +249,35 @@ function getRowId(row, index, normalizeString = defaultNormalizeString) {
 
 function getRowCompany(row, normalizeString = defaultNormalizeString) {
   return normalizeString(row && (row.bedrijf || row.company || row.companyName || row.naam || row.name));
+}
+
+function slugifyWebdesignCompany(value, fallback = 'uw-bedrijf', normalizeString = defaultNormalizeString) {
+  const slug = normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 90);
+  return slug || fallback;
+}
+
+function buildPublicWebdesignPreviewPath(row, id, normalizeString = defaultNormalizeString) {
+  const slug = slugifyWebdesignCompany(
+    getRowCompany(row, normalizeString),
+    slugifyWebdesignCompany(id, 'uw-bedrijf', normalizeString),
+    normalizeString
+  );
+  return `/webdesign/${slug}`;
+}
+
+function buildPublicWebdesignPreviewUrl(row, id, config, normalizeString = defaultNormalizeString) {
+  const baseUrl = normalizePublicBaseUrl(config && config.webdesignPublicBaseUrl) || DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
+  return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}`;
+}
+
+function buildImageVisibilityPs(row, id, config, normalizeString = defaultNormalizeString) {
+  return `${COLDMAIL_IMAGE_VISIBILITY_PS_PREFIX} ${buildPublicWebdesignPreviewUrl(row, id, config, normalizeString)} 👈`;
 }
 
 function getRowContact(row, normalizeString = defaultNormalizeString) {
@@ -1141,12 +1171,15 @@ function hasImageVisibilityPs(text, normalizeString = defaultNormalizeString) {
   return COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(normalizeString(text));
 }
 
-function normalizeImageVisibilityPsInMailText(text, normalizeString = defaultNormalizeString) {
-  return normalizeString(text).replace(COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN, COLDMAIL_IMAGE_VISIBILITY_PS);
+function normalizeImageVisibilityPsInMailText(text, row, id, config, normalizeString = defaultNormalizeString) {
+  return normalizeString(text).replace(
+    COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN,
+    buildImageVisibilityPs(row, id, config, normalizeString)
+  );
 }
 
-function ensureImageVisibilityPsInMailText(text, city, normalizeString = defaultNormalizeString) {
-  const cleanText = normalizeImageVisibilityPsInMailText(text, normalizeString);
+function ensureImageVisibilityPsInMailText(text, city, row, id, config, normalizeString = defaultNormalizeString) {
+  const cleanText = normalizeImageVisibilityPsInMailText(text, row, id, config, normalizeString);
   if (!cleanText || hasImageVisibilityPs(cleanText, normalizeString)) return cleanText;
   const cleanCity = normalizeString(city);
   const pinnedCity = formatPinnedCity(cleanCity, normalizeString);
@@ -1164,9 +1197,9 @@ function ensureImageVisibilityPsInMailText(text, city, normalizeString = default
     }
   }
   if (insertAt === -1) {
-    return `${cleanText}\n\n${COLDMAIL_IMAGE_VISIBILITY_PS}`;
+    return `${cleanText}\n\n${buildImageVisibilityPs(row, id, config, normalizeString)}`;
   }
-  lines.splice(insertAt, 0, '', COLDMAIL_IMAGE_VISIBILITY_PS);
+  lines.splice(insertAt, 0, '', buildImageVisibilityPs(row, id, config, normalizeString));
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -1202,7 +1235,7 @@ function ensureLinkedinCtaAfterPinnedCity(text, city, normalizeString = defaultN
   return withoutCta.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function normalizeInstantlyMailText(text, city, normalizeString = defaultNormalizeString) {
+function normalizeInstantlyMailText(text, city, row, id, config, normalizeString = defaultNormalizeString) {
   return ensureLinkedinCtaAfterPinnedCity(
     ensureImageVisibilityPsInMailText(
       ensurePinnedCityInMailText(
@@ -1211,6 +1244,9 @@ function normalizeInstantlyMailText(text, city, normalizeString = defaultNormali
         normalizeString
       ),
       city,
+      row,
+      id,
+      config,
       normalizeString
     ),
     city,
@@ -1436,6 +1472,43 @@ function escapeHtmlAttribute(value, normalizeString = defaultNormalizeString) {
   return escapeHtml(value, normalizeString).replace(/'/g, '&#39;');
 }
 
+function extractPublicWebdesignPreviewLinkFromPs(line, normalizeString = defaultNormalizeString) {
+  const cleanLine = normalizeString(line);
+  const match = cleanLine.match(/(https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+|\/?webdesign\/[a-z0-9-]+)/i);
+  if (!match) return null;
+  const rawHref = match[1].replace(/[),.;!?]+$/g, '');
+  const href = /^https?:\/\//i.test(rawHref)
+    ? rawHref
+    : `https://www.softora.nl/${rawHref.replace(/^\/+/, '')}`;
+  let label = rawHref.replace(/^https?:\/\/[^/]+\//i, '').replace(/^\/+/, '');
+  try {
+    label = new URL(href).pathname.replace(/^\/+/, '') || label;
+  } catch (_) {}
+  return {
+    href,
+    label,
+    start: match.index || 0,
+    end: (match.index || 0) + match[1].length,
+  };
+}
+
+function renderImageVisibilityPsHtmlLine(line, normalizeString = defaultNormalizeString) {
+  const cleanLine = normalizeString(line);
+  const publicLink = extractPublicWebdesignPreviewLinkFromPs(cleanLine, normalizeString);
+  if (!publicLink) {
+    return `<em style="font-style:italic;">${escapeHtml(cleanLine, normalizeString)}</em>`;
+  }
+  const before = cleanLine.slice(0, publicLink.start).replace(/\s+$/g, '');
+  const after = cleanLine.slice(publicLink.end).replace(/^\s+/g, '');
+  return `<em style="font-style:italic;">${escapeHtml(before, normalizeString)} <a href="${escapeHtmlAttribute(
+    publicLink.href,
+    normalizeString
+  )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">${escapeHtml(
+    publicLink.label,
+    normalizeString
+  )}</a>${after ? ` ${escapeHtml(after, normalizeString)}` : ''}</em>`;
+}
+
 function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString) {
   const body = normalizeString(text)
     .split(/\n{2,}/)
@@ -1444,8 +1517,8 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString) {
         .split('\n')
         .map((line) => {
           const cleanLine = normalizeString(line);
-          if (cleanLine === COLDMAIL_IMAGE_VISIBILITY_PS) {
-            return `<em style="font-style:italic;">${escapeHtml(cleanLine, normalizeString)}</em>`;
+          if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
+            return renderImageVisibilityPsHtmlLine(cleanLine, normalizeString);
           }
           if (cleanLine === MARTIJN_LINKEDIN_CTA_TEXT) {
             return `<a href="${escapeHtmlAttribute(
@@ -2069,6 +2142,8 @@ function createInstantlyOutreachService(deps = {}) {
     );
     const reference = buildColdmailReference(row, item.id, now, normalizeString);
     const unsubscribeUrl = buildColdmailUnsubscribeUrl(row, item.id, reference, config, normalizeString, now);
+    const webdesignPublicPath = buildPublicWebdesignPreviewPath(row, item.id, normalizeString);
+    const webdesignPublicUrl = buildPublicWebdesignPreviewUrl(row, item.id, config, normalizeString);
     const subjectTemplate =
       normalizeString(context.mailProfile && context.mailProfile.subject) || DEFAULT_WEBDESIGN_SUBJECT;
     const bodyTemplate =
@@ -2078,6 +2153,9 @@ function createInstantlyOutreachService(deps = {}) {
     const baseMailBody = normalizeInstantlyMailText(
       buildMailText(bodyTemplate, row, normalizeString),
       city,
+      row,
+      item.id,
+      config,
       normalizeString
     );
     const assets = getReadyWebdesignAssets(item, context);
@@ -2143,9 +2221,11 @@ function createInstantlyOutreachService(deps = {}) {
       softora_instantly_email_text: instantlyEmailBody,
       softora_instantly_email_body: instantlyEmailBody,
       softora_instantly_email_html: instantlyEmailHtml,
-      softora_image_visibility_ps: COLDMAIL_IMAGE_VISIBILITY_PS,
+      softora_image_visibility_ps: buildImageVisibilityPs(row, item.id, config, normalizeString),
       softora_reference: reference,
       softora_unsubscribe_url: unsubscribeUrl,
+      softora_webdesign_public_path: webdesignPublicPath,
+      softora_webdesign_public_url: webdesignPublicUrl,
       softora_webdesign_image_url: webdesignImageUrl,
       softora_webdesign_mockup_url: webdesignMockupUrl,
       softora_webdesign_image_prewarmed: webdesignPublicPrewarm && webdesignPublicPrewarm.ok ? 'true' : 'false',

@@ -299,13 +299,15 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.match(body.leads[0].custom_variables.softora_mail_body, /📍 uw regio/);
   assert.match(
     body.leads[0].custom_variables.softora_mail_body,
-    /📍 uw regio\n\nPS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊/
+    /📍 uw regio\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/
   );
   assert.equal(body.leads[0].custom_variables.softora_city_with_pin, '📍 uw regio');
   assert.equal(
     body.leads[0].custom_variables.softora_image_visibility_ps,
-    'PS: Zie je het webdesign niet? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊'
+    'PS: Wordt het webdesign niet zichtbaar? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https://www.softora.nl/webdesign/bakkerij-zon 👈'
   );
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_public_path, '/webdesign/bakkerij-zon');
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon');
   assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
   assert.match(body.leads[0].custom_variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assertInstantlyImageTagsUseNaturalLayout(body.leads[0].custom_variables.softora_instantly_email_html);
@@ -345,6 +347,7 @@ test('instantly sync uses the public Softora image host even when the app base u
   const body = JSON.parse(fetchCalls[0].options.body);
   const variables = body.leads[0].custom_variables;
   assert.match(variables.softora_unsubscribe_url, /^https:\/\/softora-nl-final\.onrender\.com\/afmelden\?t=/);
+  assert.equal(variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon');
   assert.match(variables.softora_webdesign_image_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(variables.softora_webdesign_mockup_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(variables.softora_instantly_email_html, /<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
@@ -387,7 +390,7 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   assert.match(variables.softora_mail_body, /📍 Alphen/);
   assert.match(
     variables.softora_mail_body,
-    /📍 Alphen\n\nPS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊/
+    /📍 Alphen\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/
   );
   assert.doesNotMatch(variables.softora_mail_body, /\nAlphen$/);
   assert.equal(variables.softora_city, 'Alphen');
@@ -395,7 +398,7 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   assert.match(variables.softora_instantly_email_html, /📍 Alphen/);
   assert.match(
     variables.softora_instantly_email_html,
-    /<em style="font-style:italic;">PS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊<\/em>/
+    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">webdesign\/bakkerij-zon<\/a> 👈<\/em>/
   );
 });
 
@@ -553,7 +556,7 @@ test('instantly sync places Martijn location above the LinkedIn CTA', async () =
   const variables = body.leads[0].custom_variables;
   assert.match(
     variables.softora_mail_body,
-    /Martijn van de Ven\n\n📍 Boxtel\n\n💼 Mijn LinkedIn 👈\n\nPS: Zie je het webdesign niet\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊/
+    /Martijn van de Ven\n\n📍 Boxtel\n\n💼 Mijn LinkedIn 👈\n\nPS: Wordt het webdesign niet zichtbaar\? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm, of open het via deze link: https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon 👈/
   );
   assert.ok(
     variables.softora_instantly_email_html.indexOf('📍 Boxtel') <
