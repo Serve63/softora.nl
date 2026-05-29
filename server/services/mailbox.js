@@ -863,6 +863,29 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  function getPhotoMetaCompany(meta = {}) {
+    const identityCompany = normalizeString(meta.identityKey).split('|')[0];
+    const imageName = cleanImageAlt(meta.websitePhotoName || meta.fileName || '');
+    return normalizeString(
+      meta.bedrijf ||
+        meta.company ||
+        meta.companyName ||
+        meta.businessName ||
+        identityCompany ||
+        imageName
+    );
+  }
+
+  function buildPublicWebdesignPreviewUrlForMatch(row, meta, id) {
+    const previewId = normalizeString(meta && (meta.id || meta.customerId)) || normalizeString(id || getCustomerId(row, 0));
+    const previewRow = row && typeof row === 'object'
+      ? row
+      : {
+          bedrijf: getPhotoMetaCompany(meta) || previewId,
+        };
+    return buildPublicWebdesignPreviewUrl(previewRow, previewId);
+  }
+
   function parseCustomerRows(values = {}) {
     return safeParseJsonArray(readChunkedStateValue(values, customerDbKey))
       .map((entry) => (entry && entry.row && typeof entry.row === 'object' ? entry.row : entry))
@@ -1222,23 +1245,44 @@ function createMailboxService(deps = {}) {
 
       let matchedRow = null;
       let matchedId = '';
+      let matchedMeta = null;
       let images = [];
       for (const { row, index } of matches) {
         const id = getCustomerId(row, index);
+        const photoMeta = getPhotoMetaForRow(row, index, photoMap, photoByIdentity);
         const candidateImages = await imagesFromPhotoMeta(
           photoValues,
-          getPhotoMetaForRow(row, index, photoMap, photoByIdentity),
+          photoMeta,
           `${getCustomerCompany(row) || getCustomerDomain(row) || 'Webdesign'} webdesign`
         );
         if (!candidateImages.length) continue;
         matchedRow = row;
-        matchedId = id;
+        matchedMeta = photoMeta;
+        matchedId = normalizeString(photoMeta && (photoMeta.id || photoMeta.customerId)) || id;
         images = candidateImages;
         break;
       }
 
+      if (!images.length) {
+        for (const [id, meta] of Object.entries(photoMap)) {
+          if (!directPhotoMetaMatchesMail(id, meta, parsed, rawText)) continue;
+          const candidateMeta = {
+            ...(meta && typeof meta === 'object' ? meta : {}),
+            id: normalizeString(meta && (meta.id || meta.customerId)) || id,
+          };
+          const candidateImages = await imagesFromPhotoMeta(photoValues, candidateMeta, candidateMeta.websitePhotoName);
+          if (!candidateImages.length) continue;
+          matchedMeta = candidateMeta;
+          matchedId = normalizeString(candidateMeta.id || candidateMeta.customerId || id);
+          images = candidateImages;
+          break;
+        }
+      }
+
       const previewUrl = matchedRow
-        ? buildPublicWebdesignPreviewUrl(matchedRow, matchedId)
+        ? buildPublicWebdesignPreviewUrlForMatch(matchedRow, matchedMeta, matchedId)
+        : matchedMeta
+          ? buildPublicWebdesignPreviewUrlForMatch(null, matchedMeta, matchedId)
         : extractPublicWebdesignPreviewUrlFromText(rawText);
       const inlineImages = prepareMailboxInlineWebdesignImages(images, matchedId);
       if (!previewUrl && !inlineImages.length) return { text: normalizedText };

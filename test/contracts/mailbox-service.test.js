@@ -261,6 +261,81 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
   );
 });
 
+test('mailbox service enriches webdesign sends from stored photo metadata when customer row is unavailable', async () => {
+  const sent = [];
+  const customerId = 'import-309-db-mohsau65-wp5f4v';
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    async getUiStateValues(scope) {
+      if (scope === 'premium_database_photos') {
+        return {
+          values: {
+            softora_database_photos_v1: JSON.stringify({
+              [customerId]: {
+                id: customerId,
+                company: 'Podotherapi3 Vissers',
+                websitePhoto: TINY_PNG_DATA_URL,
+                websiteMockup: TINY_PNG_DATA_URL,
+                websitePhotoName: 'podotherapi3-vissers-webdesign.png',
+                websiteMockupName: 'podotherapi3-vissers-device-mockup.png',
+              },
+            }),
+          },
+        };
+      }
+      return { values: {} };
+    },
+    createTransport: (config) => ({
+      sendMail: async (message) => {
+        sent.push({ config, message });
+        return { messageId: 'm-1', accepted: [message.to], rejected: [] };
+      },
+    }),
+  });
+
+  await service.sendMessage({
+    accountEmail: 'serve@softora.nl',
+    to: 'info@podotherapi3.nl',
+    subject: 'Kleine vraag over jullie website',
+    text: [
+      'Goedendag,',
+      '',
+      'Afgelopen week kwam ik jullie website (podotherapi3.nl) tegen. Vanuit enthousiasme heb ik een fris webdesign gemaakt.',
+      '',
+      'Met vriendelijke groet,',
+      'Servé Creusen',
+      '',
+      'PS: Wordt het webdesign niet zichtbaar? open het via hier 👈',
+    ].join('\n'),
+  });
+
+  assert.equal(sent.length, 1);
+  assert.match(
+    sent[0].message.html,
+    /href="https:\/\/www\.softora\.nl\/webdesign\/podotherapi3-vissers\?cid=import-309-db-mohsau65-wp5f4v"/
+  );
+  assert.match(sent[0].message.html, /<img src="cid:webdesign-import-309-db-mohsau65-wp5f4v-1@softora"/);
+  assert.match(sent[0].message.html, /<img src="cid:mockup-import-309-db-mohsau65-wp5f4v-2@softora"/);
+  assert.equal(sent[0].message.attachments.length, 2);
+  assert.deepEqual(
+    sent[0].message.attachments.map((attachment) => [attachment.cid, attachment.contentDisposition]),
+    [
+      ['webdesign-import-309-db-mohsau65-wp5f4v-1@softora', 'inline'],
+      ['mockup-import-309-db-mohsau65-wp5f4v-2@softora', 'inline'],
+    ]
+  );
+});
+
 test('mailbox service sends Martijn mail with the full display name', async () => {
   const sent = [];
   const service = createMailboxService({
