@@ -429,7 +429,7 @@ test('coldmail campaign uses standard SMTP transports with bounded timeouts', as
   await service.sendColdmailCampaign({
     count: 1,
     subject: 'Nieuwe website voor {{bedrijf}}',
-    body: 'Goedendag,\n\nIk heb een webdesign gemaakt.',
+    body: 'Goedendag,\n\nIk heb een korte vraag over jullie website.',
     senderEmail: 'info@softora.nl',
   });
 
@@ -489,9 +489,10 @@ test('coldmail campaign removes Martijn LinkedIn CTA before sending', async () =
     assert.doesNotMatch(sentMessages[0].text, /Mijn LinkedIn|linkedin\.com/i);
     assert.match(
       sentMessages[0].text,
-      /Martijn van de Ven\n\n📍 Boxtel\n\nPS: Wordt het webdesign niet zichtbaar\? open het via hier 👈/,
+      /Martijn van de Ven\n\n📍 Boxtel/,
       senderEmail
     );
+    assert.doesNotMatch(sentMessages[0].text, /Wordt het webdesign niet zichtbaar/i, senderEmail);
     assert.doesNotMatch(sentMessages[0].html, /Mijn LinkedIn|linkedin\.com/i, senderEmail);
   }
 });
@@ -1646,6 +1647,158 @@ test('coldmail autopilot uses the saved dashboard profile and includes the webde
   assert.equal(getAutopilotState().config.senderProfiles['martijn@softora.nl'].bodyVariants.length, 1);
 });
 
+test('coldmail autopilot treats fris webdesign dashboard text as a real image-backed webdesign send', async () => {
+  const { service, sentMessages, getSavedStates } = createService({
+    env: {
+      COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'remote',
+    },
+    rows: [
+      {
+        id: 'import-5-db-mpfntuzo-cifdr3',
+        bedrijf: 'Rolsteiger.net',
+        naam: 'Ruben',
+        email: 'info@rolsteiger.net',
+        website: 'rolsteiger.net',
+        status: 'benaderbaar',
+        stad: 'Etten-Leur',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'import-5-db-mpfntuzo-cifdr3': {
+        id: 'import-5-db-mpfntuzo-cifdr3',
+        identityKey: 'Rolsteiger.net|Ruben|',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'rolsteiger-net-webdesign.png',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'rolsteiger-net-device-mockup.png',
+      },
+    },
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'servec321@gmail.com',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.gmail.com',
+        smtpUser: 'servec321@gmail.com',
+        smtpPass: 'gmail-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['servec321@gmail.com'],
+        senderProfiles: {
+          'servec321@gmail.com': {
+            subject: 'Kleine vraag over jullie website',
+            body: [
+              'Goedendag,',
+              '',
+              'Afgelopen week kwam ik jullie website ({{website}}) tegen. Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+              '',
+              'Met vriendelijke groet,',
+              'Servé Creusen',
+            ].join('\n'),
+          },
+        },
+        specialAction: '',
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(result.senderEmail, 'servec321@gmail.com');
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].text, /PS: Wordt het webdesign niet zichtbaar\? open het via hier 👈/);
+  assert.match(
+    sentMessages[0].html,
+    /href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\?cid=import-5-db-mpfntuzo-cifdr3"/
+  );
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-import-5-db-mpfntuzo-cifdr3@softora"/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-import-5-db-mpfntuzo-cifdr3@softora"/);
+  assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
+  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'inline');
+
+  const customerSave = getSavedStates().find((entry) => entry.scope === 'premium_customers_database');
+  const savedRows = JSON.parse(customerSave.values.softora_customers_premium_v1);
+  assert.equal(savedRows[0].coldmailSpecialAction, 'webdesign');
+  assert.equal(savedRows[0].outreachCampaignType, 'webdesign');
+});
+
+test('coldmail autopilot does not send fris webdesign mail when no design assets are ready', async () => {
+  const preparedJobs = [];
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'import-5-db-mpfntuzo-cifdr3',
+        bedrijf: 'Rolsteiger.net',
+        naam: 'Ruben',
+        email: 'info@rolsteiger.net',
+        website: 'rolsteiger.net',
+        status: 'benaderbaar',
+        stad: 'Etten-Leur',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'servec321@gmail.com',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.gmail.com',
+        smtpUser: 'servec321@gmail.com',
+        smtpPass: 'gmail-secret',
+      },
+    ]),
+    webdesignPreparationCoordinator: {
+      startJob: async (payload) => {
+        preparedJobs.push(payload);
+        return {
+          ok: true,
+          job: {
+            id: payload.jobId,
+            status: 'queued',
+            customerId: payload.customer.id,
+          },
+        };
+      },
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['servec321@gmail.com'],
+        senderProfiles: {
+          'servec321@gmail.com': {
+            subject: 'Kleine vraag over jullie website',
+            body:
+              'Afgelopen week kwam ik jullie website ({{website}}) tegen. Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+          },
+        },
+        specialAction: '',
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'webdesign_preparation_queued');
+  assert.equal(sentMessages.length, 0);
+  assert.equal(preparedJobs.length, 1);
+  assert.equal(preparedJobs[0].customer.id, 'import-5-db-mpfntuzo-cifdr3');
+});
+
 test('coldmail autopilot skips leads without a complete webdesign mockup', async () => {
   const { service, sentMessages } = createService({
     env: {
@@ -2371,6 +2524,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
     body: 'Goedemorgen {{naam}}\n\nMet vriendelijke groet,\nServe Creusen\n\n{{stad}}',
     senderEmail: 'info@softora.nl',
     specialAction: 'webdesign',
+    webdesignImageDelivery: 'remote',
   });
 
   assert.equal(result.sent, 1);

@@ -700,7 +700,7 @@ function createColdmailCampaignService(deps = {}) {
     const body = normalizeCampaignService(input.body || input.text || input.content || '');
     const combined = `${subject} ${body}`.replace(/\bwebsite design\b/g, 'webdesign');
     if (!/\bwebdesign\b/.test(combined)) return false;
-    return /\bnieuw(?:e)? webdesign\b/.test(combined) && /\bgemaakt\b/.test(combined);
+    return /\bgemaakt\b/.test(combined) || /\bontwerp\b/.test(combined);
   }
 
   function shouldUseWebdesignAssets(input = {}, mode = 'mail') {
@@ -4030,13 +4030,11 @@ function createColdmailCampaignService(deps = {}) {
 
   function normalizeColdmailMailText(text, row, id, input = {}) {
     const city = getRowCity(row) || 'uw regio';
-    return ensureImageVisibilityPsInMailText(
-      removeLinkedinCtaFromMailText(ensurePinnedCityInMailText(normalizeSenderNameInMailText(text), city)),
-      city,
-      row,
-      id,
-      input
+    const cleanText = removeLinkedinCtaFromMailText(
+      ensurePinnedCityInMailText(normalizeSenderNameInMailText(text), city)
     );
+    if (!shouldUseWebdesignAssets(input, 'mail') && !hasImageVisibilityPs(cleanText)) return cleanText;
+    return ensureImageVisibilityPsInMailText(cleanText, city, row, id, input);
   }
 
   function selectColdmailTemplateVariant(variants, row, item, senderEmail, reference, kind) {
@@ -4359,8 +4357,9 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function getColdmailWebdesignImageDelivery() {
-    const value = normalizeString(env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY || DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY).toLowerCase();
+  function getColdmailWebdesignImageDelivery(input = {}) {
+    const explicit = normalizeString(input.webdesignImageDelivery || input.imageDelivery).toLowerCase();
+    const value = explicit || DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
     return value === 'remote' ? 'remote' : DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
   }
 
@@ -4936,6 +4935,10 @@ function createColdmailCampaignService(deps = {}) {
     const photo = preferFreshRowPhotoFields(row, findStoredPhotoRecordForRow(row, 0, photos, photosByIdentity));
     const parsed = await resolveImageAttachment(getWebdesignPhotoSource(photo));
     if (!parsed) return null;
+    const previewCustomerId =
+      normalizeString(photo && (photo.customerId || photo.customer_id || photo.id)) ||
+      getExplicitRowId(row) ||
+      getRowId(row, 0);
     const baseName = sanitizeFilename(photo.websitePhotoName || `${getRowCompany(row)} webdesign`, 'webdesign');
     const extension = getImageExtension(parsed.contentType);
     const filename = `${baseName}.${extension}`;
@@ -4957,6 +4960,7 @@ function createColdmailCampaignService(deps = {}) {
       filename,
       cid,
       alt: `${getRowCompany(row) || 'Bedrijf'} webdesign`,
+      previewCustomerId,
       mockup,
     };
   }
@@ -5854,7 +5858,7 @@ function createColdmailCampaignService(deps = {}) {
     const failed = resolvedRecipients.failed;
 
     const shouldIncludeWebdesignPhoto = shouldUseWebdesignAssets(input, 'mail');
-    const webdesignImageDelivery = getColdmailWebdesignImageDelivery();
+    const webdesignImageDelivery = getColdmailWebdesignImageDelivery(input);
 
     if (!candidateRows.length) {
       const preparation = shouldIncludeWebdesignPhoto
@@ -6038,6 +6042,9 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
+      const effectiveSpecialAction = shouldIncludeWebdesignPhoto ? 'webdesign' : input.specialAction;
+      const publicWebdesignPreviewId =
+        normalizeString(webdesignPhoto && webdesignPhoto.previewCustomerId) || item.id;
       let webdesignPhotoForHtml = webdesignPhoto;
       let remoteWebdesignAttachment = null;
       let remoteMockupAttachment = null;
@@ -6080,7 +6087,7 @@ function createColdmailCampaignService(deps = {}) {
       const htmlBase = appendHiddenColdmailReferenceHtml(
         toHtml(baseText, {
           senderEmail,
-          webdesignPreviewUrl: buildPublicWebdesignPreviewUrl(row, item.id, input),
+          webdesignPreviewUrl: buildPublicWebdesignPreviewUrl(row, publicWebdesignPreviewId, input),
         }),
         reference
       );
@@ -6161,7 +6168,7 @@ function createColdmailCampaignService(deps = {}) {
             if (rowId !== item.id) return currentRow;
             return markRowAsMailed(currentRow, actor, input.durationDays, {
               senderEmail,
-              specialAction: input.specialAction,
+              specialAction: effectiveSpecialAction,
               messageId: sentItem.messageId,
               trackingId: sentItem.trackingId,
             });
