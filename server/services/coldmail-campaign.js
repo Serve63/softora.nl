@@ -129,9 +129,7 @@ const COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY = 82;
 const TEST_RECIPIENT_EMAILS = new Set(COLDMAIL_TEST_RECIPIENT_EMAILS);
 const TEST_RECIPIENT_LOOKUP_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL, 'servec321@gail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce', 'softora testmodus']);
-const MARTIJN_LINKEDIN_CTA_TEXT = '💼 Mijn LinkedIn 👈';
-const MARTIJN_LINKEDIN_URL =
-  'https://www.linkedin.com/in/martijn-van-de-ven-51a5b61ba?utm_source=share_via&utm_content=profile&utm_medium=member_ios';
+const MARTIJN_LINKEDIN_CTA_PATTERN = /(?:💼\s*)?mijn\s+linkedin\s*👈?|linkedin\.com\/in\/martijn-van-de-ven/i;
 const COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS = new Set([
   'serve@softora.nl',
   'martijn@softora.nl',
@@ -151,16 +149,6 @@ const COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
   'martijnven123@gmail.com',
 ]);
-const COLDMAIL_LINKEDIN_CTA_BY_SENDER = Object.freeze({
-  'martijn@softora.nl': {
-    text: MARTIJN_LINKEDIN_CTA_TEXT,
-    url: MARTIJN_LINKEDIN_URL,
-  },
-  'martijnven123@gmail.com': {
-    text: MARTIJN_LINKEDIN_CTA_TEXT,
-    url: MARTIJN_LINKEDIN_URL,
-  },
-});
 let cachedColdmailPreviewSharp = null;
 
 function loadColdmailPreviewSharpModule() {
@@ -4006,49 +3994,25 @@ function createColdmailCampaignService(deps = {}) {
     return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  function ensureLinkedinCtaAfterPinnedCity(text, city) {
+  function removeLinkedinCtaFromMailText(text) {
     const cleanText = normalizeString(text);
-    if (!cleanText || !cleanText.includes(MARTIJN_LINKEDIN_CTA_TEXT)) return cleanText;
-    const cleanCity = normalizeString(city);
-    const pinnedCity = formatPinnedCity(cleanCity);
-    const cityMatchers = [pinnedCity, cleanCity]
-      .filter(Boolean)
-      .map((value) => new RegExp(`^\\s*${escapeRegexText(value)}\\s*$`, 'i'));
-    if (!cityMatchers.length) return cleanText;
-
-    const lines = cleanText.split('\n');
-    let hadCta = false;
-    const withoutCta = lines.filter((line) => {
-      if (normalizeString(line) !== MARTIJN_LINKEDIN_CTA_TEXT) return true;
-      hadCta = true;
-      return false;
-    });
-    if (!hadCta) return cleanText;
-
-    let insertAt = -1;
-    for (let index = withoutCta.length - 1; index >= 0; index -= 1) {
-      if (cityMatchers.some((matcher) => matcher.test(withoutCta[index]))) {
-        insertAt = index + 1;
-        break;
-      }
-    }
-    if (insertAt === -1) return cleanText;
-
-    withoutCta.splice(insertAt, 0, '', MARTIJN_LINKEDIN_CTA_TEXT);
-    return withoutCta.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    if (!cleanText || !MARTIJN_LINKEDIN_CTA_PATTERN.test(cleanText)) return cleanText;
+    return cleanText
+      .split('\n')
+      .filter((line) => !MARTIJN_LINKEDIN_CTA_PATTERN.test(normalizeString(line)))
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 
   function normalizeColdmailMailText(text, row, id, input = {}) {
     const city = getRowCity(row) || 'uw regio';
-    return ensureLinkedinCtaAfterPinnedCity(
-      ensureImageVisibilityPsInMailText(
-        ensurePinnedCityInMailText(normalizeSenderNameInMailText(text), city),
-        city,
-        row,
-        id,
-        input
-      ),
-      city
+    return ensureImageVisibilityPsInMailText(
+      removeLinkedinCtaFromMailText(ensurePinnedCityInMailText(normalizeSenderNameInMailText(text), city)),
+      city,
+      row,
+      id,
+      input
     );
   }
 
@@ -4615,18 +4579,7 @@ function createColdmailCampaignService(deps = {}) {
     if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
       return renderImageVisibilityPsHtmlLine(cleanLine);
     }
-    const senderEmail = normalizeEmailAddress(options.senderEmail || '');
-    const cta = COLDMAIL_LINKEDIN_CTA_BY_SENDER[senderEmail];
-    if (!cta || !cleanLine.includes(cta.text)) return escapeHtml(cleanLine);
-    const link = `<a href="${escapeHtmlAttribute(
-      cta.url
-    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:600;">${escapeHtml(
-      cta.text
-    )}</a>`;
-    return cleanLine
-      .split(cta.text)
-      .map((part) => escapeHtml(part))
-      .join(link);
+    return escapeHtml(cleanLine);
   }
 
   function toHtml(text, options = {}) {
