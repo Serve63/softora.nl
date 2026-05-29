@@ -133,6 +133,22 @@ const INSTANTLY_STATUS_PRIORITY = Object.freeze({
   unsubscribed: 80,
   blocked: 80,
 });
+const REQUIRED_INSTANTLY_CUSTOM_VARIABLES = Object.freeze([
+  'softora_customer_id',
+  'softora_source',
+  'softora_company',
+  'softora_subject',
+  'softora_mail_body',
+  'softora_instantly_email_html',
+  'softora_city',
+  'softora_city_with_pin',
+  'softora_website_domain',
+  'softora_unsubscribe_url',
+  'softora_webdesign_public_path',
+  'softora_webdesign_public_url',
+  'softora_mockup_caption',
+  'softora_webdesign_ready',
+]);
 let cachedInstantlyPreviewSharp = null;
 
 function loadInstantlyPreviewSharp() {
@@ -273,13 +289,9 @@ function buildPublicWebdesignPreviewPath(row, id, normalizeString = defaultNorma
 function buildPublicWebdesignPreviewUrl(row, id, config, normalizeString = defaultNormalizeString) {
   const baseUrl = normalizePublicBaseUrl(config && config.webdesignPublicBaseUrl) || DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
   try {
-    const url = new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl);
-    const customerId = normalizeString(id || getRowId(row, 0, normalizeString));
-    if (customerId) url.searchParams.set('cid', customerId);
-    return url.toString();
+    return new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl).toString();
   } catch (_error) {
-    const customerId = normalizeString(id || getRowId(row, 0, normalizeString));
-    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}${customerId ? `?cid=${encodeURIComponent(customerId)}` : ''}`;
+    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}`;
   }
 }
 
@@ -2192,6 +2204,34 @@ function createInstantlyOutreachService(deps = {}) {
     };
   }
 
+  function getMissingInstantlyCustomVariables(lead) {
+    const variables = lead && lead.custom_variables && typeof lead.custom_variables === 'object'
+      ? lead.custom_variables
+      : {};
+    const missing = REQUIRED_INSTANTLY_CUSTOM_VARIABLES.filter((key) => !normalizeString(variables[key]));
+    if (normalizeString(variables.softora_source).toLowerCase() !== 'softora') {
+      missing.push('softora_source=softora');
+    }
+    if (normalizeString(variables.softora_webdesign_ready).toLowerCase() !== 'true') {
+      missing.push('softora_webdesign_ready=true');
+    }
+    if (!/^📍\s+\S+/u.test(normalizeString(variables.softora_city_with_pin))) {
+      missing.push('softora_city_with_pin');
+    }
+    return Array.from(new Set(missing));
+  }
+
+  function assertInstantlyLeadReady(lead) {
+    const missing = getMissingInstantlyCustomVariables(lead);
+    if (!missing.length) return lead;
+    throw createInstantlyError(
+      `Instantly-lead mist verplichte Softora-variabelen: ${missing.join(', ')}. Stuur leads via de Softora-sync.`,
+      'INSTANTLY_LEAD_VARIABLES_INCOMPLETE',
+      400,
+      { missing }
+    );
+  }
+
   function extractInstantlyLeadItems(data) {
     if (Array.isArray(data)) return data;
     if (Array.isArray(data && data.leads)) return data.leads;
@@ -2213,6 +2253,7 @@ function createInstantlyOutreachService(deps = {}) {
   }
 
   async function addLeadsToInstantly(leads) {
+    (Array.isArray(leads) ? leads : []).forEach(assertInstantlyLeadReady);
     const { response, data } = await fetchJsonWithTimeout(
       `${config.apiBaseUrl}/leads/add`,
       {
@@ -2290,6 +2331,7 @@ function createInstantlyOutreachService(deps = {}) {
   async function patchInstantlyLeadById(leadId, lead) {
     const cleanLeadId = normalizeString(leadId);
     if (!cleanLeadId) return null;
+    assertInstantlyLeadReady(lead);
     const { response, data } = await fetchJsonWithTimeout(
       `${config.apiBaseUrl}/leads/${encodeURIComponent(cleanLeadId)}`,
       {
@@ -2337,14 +2379,28 @@ function createInstantlyOutreachService(deps = {}) {
   async function refreshExistingInstantlyLeadVariables(rows, context, limit) {
     const candidates = getExistingInstantlyRowsForVariableRefresh(rows, limit);
     let refreshed = 0;
+    const failed = [];
     for (const item of candidates) {
-      const lead = await buildInstantlyLead(item, context);
-      await patchInstantlyLeadById(item.leadId, lead);
-      refreshed += 1;
+      try {
+        const lead = await buildInstantlyLead(item, context);
+        await patchInstantlyLeadById(item.leadId, lead);
+        refreshed += 1;
+      } catch (error) {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row, normalizeString),
+          email: getRowEmail(item.row, normalizeString),
+          error:
+            normalizeString(error && error.message) ||
+            'Instantly-lead mist verplichte Softora-variabelen.',
+          missing: Array.isArray(error && error.missing) ? error.missing : undefined,
+        });
+      }
     }
     return {
       refreshed,
       attempted: candidates.length,
+      failed,
     };
   }
 
@@ -2554,6 +2610,7 @@ function createInstantlyOutreachService(deps = {}) {
         markedBenaderd: 0,
         refreshedExistingVariables: existingVariableRefresh.refreshed,
         attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
+        failed: existingVariableRefresh.failed || [],
         campaignId: config.defaultCampaignId,
         finishedAt: now().toISOString(),
       };
@@ -2620,6 +2677,7 @@ function createInstantlyOutreachService(deps = {}) {
         markedBenaderd: existingApproached.marked,
         refreshedExistingVariables: existingVariableRefresh.refreshed,
         attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
+        failed: existingVariableRefresh.failed || [],
         syncedToday,
         dailyCap: config.dailyCap,
         finishedAt: now().toISOString(),
@@ -2654,11 +2712,50 @@ function createInstantlyOutreachService(deps = {}) {
     }
 
     const leads = [];
+    const sendableRows = [];
     for (const item of selectedRows) {
-      leads.push(await buildInstantlyLead(item, personalizationContext));
+      try {
+        const lead = assertInstantlyLeadReady(await buildInstantlyLead(item, personalizationContext));
+        leads.push(lead);
+        sendableRows.push(item);
+      } catch (error) {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row, normalizeString),
+          email: getRowEmail(item.row, normalizeString),
+          error:
+            normalizeString(error && error.message) ||
+            'Instantly-lead mist verplichte Softora-variabelen.',
+          missing: Array.isArray(error && error.missing) ? error.missing : undefined,
+        });
+      }
+    }
+    if (!leads.length) {
+      lastSyncResult = {
+        ok: true,
+        skipped: true,
+        reason: 'no_eligible_leads',
+        synced: 0,
+        markedBenaderd: existingApproached.marked,
+        refreshedExistingVariables: existingVariableRefresh.refreshed,
+        attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
+        failed,
+        finishedAt: now().toISOString(),
+      };
+      if (existingApproached.marked) {
+        await setUiStateValues(
+          customerDbScope,
+          buildCustomerRowsStateValues(values, rows, customerDbKey),
+          {
+            source: 'instantly-sync',
+            actor,
+          }
+        );
+      }
+      return lastSyncResult;
     }
     const data = await addLeadsToInstantly(leads);
-    const nextRows = markRowsAsSynced(rows, selectedRows, data, actor);
+    const nextRows = markRowsAsSynced(rows, sendableRows, data, actor);
     await setUiStateValues(
       customerDbScope,
       buildCustomerRowsStateValues(values, nextRows, customerDbKey),
@@ -2670,14 +2767,14 @@ function createInstantlyOutreachService(deps = {}) {
 
     lastSyncResult = {
       ok: true,
-      synced: selectedRows.length,
-      markedBenaderd: existingApproached.marked + selectedRows.length,
+      synced: sendableRows.length,
+      markedBenaderd: existingApproached.marked + sendableRows.length,
       refreshedExistingVariables: existingVariableRefresh.refreshed,
       attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
       failed,
       campaignId: config.defaultCampaignId,
       dailyCap: config.dailyCap,
-      syncedToday: syncedToday + selectedRows.length,
+      syncedToday: syncedToday + sendableRows.length,
       finishedAt: now().toISOString(),
     };
     return lastSyncResult;

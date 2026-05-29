@@ -104,6 +104,15 @@ function slugMatchesIdentifier(candidate, identifier) {
   if (candidateCompact && candidateCompact === identifierCompact) return true;
   const candidateRootCompact = compactCompanySlug(stripKnownDomainSuffix(candidateSlug));
   const identifierRootCompact = compactCompanySlug(stripKnownDomainSuffix(identifierSlug));
+  const identifierLooksSpecific = identifierCompact.length >= 4;
+  const candidateLooksSpecific = candidateCompact.length >= 4;
+  if (
+    identifierLooksSpecific &&
+    candidateLooksSpecific &&
+    (candidateCompact.startsWith(identifierCompact) || candidateRootCompact.startsWith(identifierCompact))
+  ) {
+    return true;
+  }
   return Boolean(
     candidateRootCompact &&
       identifierRootCompact &&
@@ -403,14 +412,27 @@ function createPublicWebdesignPreviewService(options = {}) {
     return preview;
   }
 
+  async function resolveFirstPreview(identifiers) {
+    const seen = new Set();
+    for (const identifier of identifiers) {
+      const id = normalizeCustomerId(identifier);
+      const key = id.toLowerCase();
+      if (!id || seen.has(key)) continue;
+      seen.add(key);
+      const preview = await resolvePreview(id);
+      if (preview) return preview;
+    }
+    return null;
+  }
+
   async function getPreviewPageResponse(req, res) {
     const query = req && req.query && typeof req.query === 'object' ? req.query : {};
-    const preview = await resolvePreview(
+    const preview = await resolveFirstPreview([
       query.cid ||
         query.customerId ||
-        query.id ||
-        (req && req.params && (req.params.companySlug || req.params.customerId))
-    );
+        query.id,
+      req && req.params && (req.params.companySlug || req.params.customerId),
+    ]);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
