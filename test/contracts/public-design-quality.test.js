@@ -248,6 +248,31 @@ test('over softora page keeps headline, quote and CTA layout polished', () => {
   assert.doesNotMatch(source, /class="big-title"|class="intro"|class="quote-wrap"/);
 });
 
+test('maatwerk platform hero stays immediately visible and on-brand on mobile', () => {
+  const source = readFile('maatwerk-platform.html');
+
+  assert.match(
+    source,
+    /<link rel="stylesheet" href="\/assets\/fonts\.css\?v=20260409a">/,
+    'maatwerk-platform moet de lokale Softora fonts gebruiken'
+  );
+  assert.doesNotMatch(source, /fonts\.googleapis|fonts\.gstatic/i, 'publieke maatwerkpagina mag geen losse Google font template houden');
+  assert.match(source, /--accent-color:\s*#8b2252;/, 'maatwerk-platform moet de Softora accentkleur gebruiken');
+  assert.doesNotMatch(source, /#4a5fd7|#3d4eb8|#7b8ef8|74,\s*95,\s*215/i, 'oude blauwe one-off accenten mogen niet terugkomen');
+  assert.doesNotMatch(source, /cursor:\s*none;/i, 'publieke links en knoppen mogen geen verborgen cursor afdwingen');
+  assert.doesNotMatch(source, /ambient-blob|blob-1/i, 'publieke maatwerkpagina mag geen losse gradient-blob decoratie houden');
+  assert.match(
+    source,
+    /\.hero \.eyebrow,\s*\.hero h1,\s*\.hero p,\s*\.hero-buttons\s*\{[\s\S]*opacity:\s*1;[\s\S]*transform:\s*none;[\s\S]*animation:\s*none;/s,
+    'boven-de-vouw hero-copy mag niet eerst onzichtbaar animeren'
+  );
+  assert.match(
+    source,
+    /@media \(max-width:\s*768px\)\s*\{[\s\S]*\.hero-buttons\s*\{[\s\S]*flex-direction:\s*column;[\s\S]*max-width:\s*320px;[\s\S]*\.hero-buttons \.magnetic-btn\s*\{[\s\S]*width:\s*100%;/s,
+    'mobiele hero-knoppen moeten leesbaar stapelen zonder woordbreuken'
+  );
+});
+
 test('design protocol protects the homepage and public templates', () => {
   const source = readFile('docs/public-design-quality.md');
 
