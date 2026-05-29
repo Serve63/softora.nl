@@ -593,10 +593,10 @@ test('coldmail preview image lookup caches resolved images for email clients', (
 test('coldmail preview image lookup reuses the fresh mockup preference logic', () => {
   const serviceSource = fs.readFileSync(path.join(__dirname, '../../server/services/coldmail-campaign.js'), 'utf8');
 
-  assert.match(
-    serviceSource,
-    /const photo = preferFreshRowPhotoFields\(\s*rows\[match\.index\],\s*findStoredPhotoRecordForRow\(rows\[match\.index\], match\.index, photos, photosByIdentity\)\s*\);/
-  );
+  assert.match(serviceSource, /const row = match && rows\[match\.index\] \? rows\[match\.index\] : null/);
+  assert.match(serviceSource, /row\s*\?\s*preferFreshRowPhotoFields\(/);
+  assert.match(serviceSource, /findStoredPhotoRecordForRow\(row, match\.index, photos, photosByIdentity\)/);
+  assert.match(serviceSource, /findStoredPhotoRecordById\(payload\.id, photos\)/);
 });
 
 test('coldmailing exposes mail-interest follow-ups outside the coldcalling leads inbox', () => {

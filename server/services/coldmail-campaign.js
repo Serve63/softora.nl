@@ -100,7 +100,7 @@ const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het 
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
-const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'remote';
+const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'cid';
 const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PREFIX =
@@ -1523,6 +1523,22 @@ function createColdmailCampaignService(deps = {}) {
       if (photo) return photo;
     }
     return null;
+  }
+
+  function findStoredPhotoRecordById(id, photoMap) {
+    const cleanId = normalizeString(id);
+    if (!cleanId) return null;
+    const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
+    const direct = photos[cleanId];
+    if (direct && typeof direct === 'object') return { ...direct, id: normalizeString(direct.id || direct.customerId) || cleanId };
+    const lowerId = cleanId.toLowerCase();
+    return Object.keys(photos).reduce((match, key) => {
+      if (match) return match;
+      const item = photos[key];
+      if (!item || typeof item !== 'object') return null;
+      const itemId = normalizeString(item.id || item.customerId || key);
+      return itemId && itemId.toLowerCase() === lowerId ? { ...item, id: itemId } : null;
+    }, null);
   }
 
   function preferFreshRowPhotoFields(row, storedPhoto) {
@@ -4337,10 +4353,8 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function getColdmailWebdesignImageDelivery() {
-    return normalizeString(env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY || DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY)
-      .toLowerCase() === 'cid'
-      ? 'cid'
-      : DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
+    const value = normalizeString(env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY || DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY).toLowerCase();
+    return value === 'remote' ? 'remote' : DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
   }
 
   function appendColdmailReference(text, reference) {
@@ -5765,16 +5779,6 @@ function createColdmailCampaignService(deps = {}) {
     const cachedImage = getCachedPreviewImage(cacheKey);
     if (cachedImage) return cachedImage;
 
-    const state = await getUiStateValues(customerDbScope);
-    const values = state && typeof state.values === 'object' ? state.values : {};
-    const rows = parseDatabaseRows(values);
-    const match = findColdmailUnsubscribeRow(payload, rows);
-    if (!match || !rows[match.index]) {
-      const error = new Error('Deze foto hoort niet meer bij een bekende ontvanger.');
-      error.code = 'PREVIEW_IMAGE_TARGET_NOT_FOUND';
-      throw error;
-    }
-
     const photoMap = await loadCustomerPhotoMapCached();
     const photos = photoMap && typeof photoMap === 'object' ? photoMap : {};
     const photosByIdentity = new Map();
@@ -5783,10 +5787,24 @@ function createColdmailCampaignService(deps = {}) {
       const identityKey = normalizeString(item && item.identityKey).toLowerCase();
       if (identityKey) photosByIdentity.set(identityKey, item);
     });
-    const photo = preferFreshRowPhotoFields(
-      rows[match.index],
-      findStoredPhotoRecordForRow(rows[match.index], match.index, photos, photosByIdentity)
-    );
+
+    const state = await getUiStateValues(customerDbScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const rows = parseDatabaseRows(values);
+    const match = findColdmailUnsubscribeRow(payload, rows);
+    const row = match && rows[match.index] ? rows[match.index] : null;
+    const photo = row
+      ? preferFreshRowPhotoFields(
+          row,
+          findStoredPhotoRecordForRow(row, match.index, photos, photosByIdentity)
+        )
+      : findStoredPhotoRecordById(payload.id, photos);
+
+    if (!photo) {
+      const error = new Error('Deze foto hoort niet meer bij een bekende ontvanger.');
+      error.code = 'PREVIEW_IMAGE_TARGET_NOT_FOUND';
+      throw error;
+    }
     const source = payload.type === 'mockup'
       ? (isApprovedWebdesignMockupRecord(photo) ? getWebdesignMockupSource(photo) : '')
       : getWebdesignPhotoSource(photo);
@@ -5798,7 +5816,7 @@ function createColdmailCampaignService(deps = {}) {
     }
     const optimizedImage = await preparePreviewImageForEmail(image, payload.type);
 
-    const company = getRowCompany(rows[match.index]) || 'Softora webdesign';
+    const company = (row ? getRowCompany(row) : '') || 'Softora webdesign';
     const baseName = payload.type === 'mockup'
       ? normalizeString(photo && photo.websiteMockupName) || `${company} device mockup`
       : normalizeString(photo && photo.websitePhotoName) || `${company} webdesign`;

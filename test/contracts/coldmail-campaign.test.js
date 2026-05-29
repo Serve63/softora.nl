@@ -6,6 +6,9 @@ const sharp = require('sharp');
 
 const { createColdmailCampaignService } = require('../../server/services/coldmail-campaign');
 const {
+  clearPreviewImageCache,
+} = require('../../server/services/coldmail-preview-image-cache');
+const {
   buildChunkedStatePatch,
   readChunkedStateValue,
 } = require('../../server/services/data-ops-serialization');
@@ -2318,9 +2321,12 @@ test('coldmail campaign ignores invalid audit bcc configuration', async () => {
   assert.equal(service.getColdmailSafetyLimits().auditBccConfigured, false);
 });
 
-test('coldmail campaign uses remote webdesign photo and device mockup URLs by default', async () => {
+test('coldmail campaign can use durable remote webdesign photo and device mockup URLs', async () => {
   let setup;
   const overrides = {
+    env: {
+      COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'remote',
+    },
     rows: [
       {
         id: 'prospect-1',
@@ -2344,8 +2350,9 @@ test('coldmail campaign uses remote webdesign photo and device mockup URLs by de
     onSendMail: async ({ message }) => {
       const tokens = extractPreviewImageTokens(message.html);
       assert.equal(tokens.length, 2);
-      overrides.photoValues = {
-        softora_database_photos_v1: JSON.stringify({}),
+      clearPreviewImageCache();
+      overrides.customerValues = {
+        softora_customers_premium_v1: JSON.stringify([]),
       };
       const webdesignImage = await setup.service.getColdmailPreviewImage({ token: tokens[0] });
       const mockupImage = await setup.service.getColdmailPreviewImage({ token: tokens[1] });
@@ -2579,11 +2586,8 @@ test('coldmail preview image route strips decorative webdesign frames for existi
   assert.equal(metadata.height, 244);
 });
 
-test('coldmail campaign keeps CID webdesign images when explicitly configured', async () => {
+test('coldmail campaign keeps CID webdesign images inline by default for owned mailbox sends', async () => {
   const { service, sentMessages } = createService({
-    env: {
-      COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'cid',
-    },
     rows: [
       {
         id: 'prospect-1',
