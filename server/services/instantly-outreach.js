@@ -43,6 +43,8 @@ const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT = 1536;
+const INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH = 1600;
+const INSTANTLY_MOCKUP_PLACEHOLDER_HEIGHT = 1000;
 const COLDMAIL_PREVIEW_IMAGE_OPTIMIZE_MIN_BYTES = 128 * 1024;
 const COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH = 720;
 const COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY = 82;
@@ -270,7 +272,15 @@ function buildPublicWebdesignPreviewPath(row, id, normalizeString = defaultNorma
 
 function buildPublicWebdesignPreviewUrl(row, id, config, normalizeString = defaultNormalizeString) {
   const baseUrl = normalizePublicBaseUrl(config && config.webdesignPublicBaseUrl) || DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
-  return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}`;
+  try {
+    const url = new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl);
+    const customerId = normalizeString(id || getRowId(row, 0, normalizeString));
+    if (customerId) url.searchParams.set('cid', customerId);
+    return url.toString();
+  } catch (_error) {
+    const customerId = normalizeString(id || getRowId(row, 0, normalizeString));
+    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}${customerId ? `?cid=${encodeURIComponent(customerId)}` : ''}`;
+  }
 }
 
 function buildImageVisibilityPs(row, id, config, normalizeString = defaultNormalizeString) {
@@ -986,44 +996,8 @@ function getWebdesignMockupSource(photo, normalizeString = defaultNormalizeStrin
   );
 }
 
-const SUSPECT_WEBDESIGN_MOCKUP_RENDERERS = new Set([
-  'softora-browser-device-v6',
-  'softora-server-device-v6',
-  'softora-server-device-v7',
-]);
-
-function getWebdesignMockupName(photo, normalizeString = defaultNormalizeString) {
-  const meta = photo && photo.legacyMeta && typeof photo.legacyMeta === 'object' ? photo.legacyMeta : {};
-  const mockup = meta.mockup && typeof meta.mockup === 'object' ? meta.mockup : {};
-  return normalizeString(photo && (photo.websiteMockupName || photo.mockupName) || mockup.fileName || meta.websiteMockupName);
-}
-
-function inferWebdesignMockupRendererFromName(fileName, normalizeString = defaultNormalizeString) {
-  const match = normalizeString(fileName).match(/-device-mockup-v([0-9]+)\.jpe?g$/i);
-  return match ? `softora-server-device-v${match[1]}` : '';
-}
-
-function getWebdesignMockupQuality(photo, normalizeString = defaultNormalizeString) {
-  const meta = photo && photo.legacyMeta && typeof photo.legacyMeta === 'object' ? photo.legacyMeta : {};
-  const mockup = meta.mockup && typeof meta.mockup === 'object' ? meta.mockup : {};
-  const renderer = normalizeString(photo && (photo.mockupRenderer || photo.websiteMockupRenderer) || mockup.renderer || meta.mockupRenderer).toLowerCase();
-  return {
-    renderer: renderer || inferWebdesignMockupRendererFromName(getWebdesignMockupName(photo, normalizeString), normalizeString),
-    orientation: normalizeString(photo && (photo.mockupOrientation || photo.websiteMockupOrientation) || mockup.orientation || meta.mockupOrientation).toLowerCase(),
-    status: normalizeString(photo && (photo.mockupQualityStatus || photo.websiteMockupQualityStatus) || mockup.qualityStatus || meta.mockupQualityStatus).toLowerCase(),
-    checkedAt: normalizeString(photo && (photo.mockupQualityCheckedAt || photo.websiteMockupQualityCheckedAt) || mockup.qualityCheckedAt || meta.mockupQualityCheckedAt),
-  };
-}
-
 function isApprovedWebdesignMockupRecord(photo, normalizeString = defaultNormalizeString) {
-  if (!isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo, normalizeString), normalizeString)) return false;
-  const quality = getWebdesignMockupQuality(photo, normalizeString);
-  const hasQualitySignal = Boolean(quality.renderer || quality.orientation || quality.status || quality.checkedAt);
-  if (!hasQualitySignal) return false;
-  if (SUSPECT_WEBDESIGN_MOCKUP_RENDERERS.has(quality.renderer)) return false;
-  if (quality.status !== 'checked' && quality.status !== 'verified' && quality.status !== 'ok') return false;
-  if (quality.orientation && quality.orientation !== 'upright') return false;
-  return true;
+  return isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo, normalizeString), normalizeString);
 }
 
 function isResolvableWebsitePhotoValue(value, normalizeString = defaultNormalizeString) {
@@ -1445,7 +1419,7 @@ function escapeHtmlAttribute(value, normalizeString = defaultNormalizeString) {
 
 function extractPublicWebdesignPreviewLinkFromPs(line, normalizeString = defaultNormalizeString) {
   const cleanLine = normalizeString(line);
-  const match = cleanLine.match(/(https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+|\/?webdesign\/[a-z0-9-]+)/i);
+  const match = cleanLine.match(/(https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+(?:\?[^)\s<>"']*)?|\/?webdesign\/[a-z0-9-]+(?:\?[^)\s<>"']*)?)/i);
   if (!match) return null;
   const rawHref = match[1].replace(/[),.;!?]+$/g, '');
   const href = /^https?:\/\//i.test(rawHref)
@@ -1505,16 +1479,16 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   const cleanSrc = normalizeString(src);
   if (!cleanSrc) return '';
   const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
-  const imageWidth = cleanAlt === 'Webdesign' ? INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH : COLDMAIL_EMAIL_IMAGE_WIDTH;
-  const imageHeight = cleanAlt === 'Webdesign' ? INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT : 0;
-  const heightAttribute = imageHeight > 0 ? ` height="${imageHeight}"` : '';
-  return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;"><img src="${escapeHtmlAttribute(
+  const isWebdesign = cleanAlt === 'Webdesign';
+  const imageWidth = isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH : INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH;
+  const imageHeight = isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT : INSTANTLY_MOCKUP_PLACEHOLDER_HEIGHT;
+  return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;background:#f3f6fb;border:1px solid #dbe3f0;"><img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
   )}" alt="${escapeHtmlAttribute(
     cleanAlt,
     normalizeString
-  )}" width="${imageWidth}"${heightAttribute} loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
+  )}" width="${imageWidth}" height="${imageHeight}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;aspect-ratio:${imageWidth}/${imageHeight};border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
 }
 
 function buildInstantlyEmailHtml(

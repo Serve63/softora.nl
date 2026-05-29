@@ -2384,7 +2384,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   assert.match(sentMessages[0].html, /📍 Alphen/);
   assert.match(
     sentMessages[0].html,
-    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? open het via <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
+    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? open het via <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
   );
   assert.match(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.match(sentMessages[0].html, /<table role="presentation" width="100%"/);
@@ -2669,7 +2669,7 @@ test('coldmail campaign refuses webdesign outreach when the device mockup is mis
   assert.equal(sentMessages.length, 0);
 });
 
-test('coldmail campaign refuses webdesign outreach when the device mockup is not quality checked', async () => {
+test('coldmail campaign accepts a webdesign mockup without quality approval metadata', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -2694,26 +2694,20 @@ test('coldmail campaign refuses webdesign outreach when the device mockup is not
     },
   });
 
-  await assert.rejects(
-    () =>
-      service.sendColdmailCampaign({
-        count: 1,
-        subject: 'Nieuwe website voor {{bedrijf}}',
-        body: 'Goedemorgen {{naam}}',
-        senderEmail: 'info@softora.nl',
-        specialAction: 'webdesign',
-      }),
-    (error) => {
-      assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
-      assert.match(error.message, /Nog geen website-design klaar voor Bakkerij Zon/);
-      return true;
-    }
-  );
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+  });
 
-  assert.equal(sentMessages.length, 0);
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].html, /cid:webdesign-mockup-prospect-1@softora/);
 });
 
-test('coldmail campaign refuses webdesign outreach when the mockup renderer can contain tofu text', async () => {
+test('coldmail campaign accepts a legacy webdesign mockup renderer when a mockup image exists', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -2740,23 +2734,17 @@ test('coldmail campaign refuses webdesign outreach when the mockup renderer can 
     },
   });
 
-  await assert.rejects(
-    () =>
-      service.sendColdmailCampaign({
-        count: 1,
-        subject: 'Nieuwe website voor {{bedrijf}}',
-        body: 'Goedemorgen {{naam}}',
-        senderEmail: 'info@softora.nl',
-        specialAction: 'webdesign',
-      }),
-    (error) => {
-      assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
-      assert.match(error.message, /Nog geen website-design klaar voor Bakkerij Zon/);
-      return true;
-    }
-  );
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+  });
 
-  assert.equal(sentMessages.length, 0);
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].html, /cid:webdesign-mockup-prospect-1@softora/);
 });
 
 test('coldmail campaign keeps the closing signature before webdesign photos', async () => {

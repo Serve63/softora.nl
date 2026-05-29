@@ -1,12 +1,6 @@
 (function (global) {
     "use strict";
 
-    const APPROVED_MOCKUP_STATUSES = new Set(["checked", "verified", "ok"]);
-    const SUSPECT_MOCKUP_RENDERERS = new Set([
-        "softora-browser-device-v6",
-        "softora-server-device-v6",
-        "softora-server-device-v7"
-    ]);
     function normalizeString(value) {
         return String(value || "").trim();
     }
@@ -23,19 +17,9 @@
         }
     }
 
-    function isApprovedMockupQuality(customer) {
-        const fileName = normalizeString(customer && (customer.websiteMockupName || customer.mockupName));
-        const inferredRenderer = fileName.match(/-device-mockup-v([0-9]+)\.jpe?g$/i);
-        const renderer = (normalizeString(customer && (customer.mockupRenderer || customer.websiteMockupRenderer)) || (inferredRenderer ? "softora-server-device-v" + inferredRenderer[1] : "")).toLowerCase();
-        const status = normalizeString(customer && (customer.mockupQualityStatus || customer.websiteMockupQualityStatus)).toLowerCase();
-        const orientation = normalizeString(customer && (customer.mockupOrientation || customer.websiteMockupOrientation)).toLowerCase();
-        const checkedAt = normalizeString(customer && (customer.mockupQualityCheckedAt || customer.websiteMockupQualityCheckedAt));
-        const hasQualitySignal = Boolean(status || orientation || checkedAt || renderer);
-        if (!hasQualitySignal) return false;
-        if (SUSPECT_MOCKUP_RENDERERS.has(renderer)) return false;
-        if (!APPROVED_MOCKUP_STATUSES.has(status)) return false;
-        if (orientation && orientation !== "upright") return false;
-        return true;
+    function isApprovedMockupQuality(customer, isValidWebsitePhotoSource) {
+        const isValidSource = typeof isValidWebsitePhotoSource === "function" ? isValidWebsitePhotoSource : defaultIsValidPhotoSource;
+        return isValidSource(customer && (customer.websiteMockup || customer.mockup || customer.websiteMockupImage));
     }
 
     function buildWebdesignAssetState(customer, helpers, runtimeState) {
@@ -51,12 +35,13 @@
         const visible = Boolean(customer) && shouldShowWebsitePhoto(customer);
         const hasPhoto = visible && isValidWebsitePhotoSource(customer && customer.websitePhoto);
         const hasMockup = visible && isValidWebsitePhotoSource(customer && customer.websiteMockup);
-        const mockupApproved = hasMockup && isApprovedMockupQuality(customer);
+        const mockupApproved = hasMockup;
         const mockupPending = Boolean(id) && (Boolean(isMockupPending(id)) || Boolean(runtime.pendingMockupIds && runtime.pendingMockupIds.has && runtime.pendingMockupIds.has(id)));
         const mockupFailed = Boolean(id) && (Boolean(isMockupFailed(id)) || Boolean(runtime.failedMockupIds && runtime.failedMockupIds.has && runtime.failedMockupIds.has(id)));
-        const canGeneratePhoto = visible && !hasPhoto && Boolean(resolveCustomerWebsiteUrl(customer));
-        const canRepairMockup = hasPhoto && !mockupApproved && !mockupPending;
-        const isMailReady = visible && Boolean(isMailLeadEligible(customer)) && hasPhoto && mockupApproved;
+        const leadEligible = Boolean(isMailLeadEligible(customer));
+        const canGeneratePhoto = visible && leadEligible && !hasPhoto && Boolean(resolveCustomerWebsiteUrl(customer));
+        const canRepairMockup = hasPhoto && !hasMockup && !mockupPending;
+        const isMailReady = visible && leadEligible && hasPhoto && hasMockup;
 
         return {
             visible: visible,
@@ -68,9 +53,9 @@
             isMailReady: isMailReady,
             canGeneratePhoto: canGeneratePhoto,
             canRepairMockup: canRepairMockup,
-            hasCompleteAssets: hasPhoto && mockupApproved,
+            hasCompleteAssets: hasPhoto && hasMockup,
             mockupSlotVisible: hasPhoto || hasMockup || mockupPending || mockupFailed,
-            mockupState: hasMockup ? (mockupApproved ? "ready" : "repair") : (mockupPending ? "pending" : (mockupFailed ? "failed" : (hasPhoto ? "missing" : "empty")))
+            mockupState: hasMockup ? "ready" : (mockupPending ? "pending" : (mockupFailed ? "failed" : (hasPhoto ? "missing" : "empty")))
         };
     }
 

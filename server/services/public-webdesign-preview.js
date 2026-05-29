@@ -86,6 +86,52 @@ function slugifyCompanyName(value, fallback = '') {
   return slug || fallback;
 }
 
+function compactCompanySlug(value) {
+  return slugifyCompanyName(value).replace(/-/g, '');
+}
+
+function stripKnownDomainSuffix(value) {
+  return slugifyCompanyName(value).replace(/-(?:nl|eu|com|be|de|net|org|info|io|co|bv)$/i, '');
+}
+
+function slugMatchesIdentifier(candidate, identifier) {
+  const candidateSlug = slugifyCompanyName(candidate);
+  const identifierSlug = slugifyCompanyName(identifier);
+  if (!candidateSlug || !identifierSlug) return false;
+  if (candidateSlug === identifierSlug) return true;
+  const candidateCompact = compactCompanySlug(candidateSlug);
+  const identifierCompact = compactCompanySlug(identifierSlug);
+  if (candidateCompact && candidateCompact === identifierCompact) return true;
+  const candidateRootCompact = compactCompanySlug(stripKnownDomainSuffix(candidateSlug));
+  const identifierRootCompact = compactCompanySlug(stripKnownDomainSuffix(identifierSlug));
+  return Boolean(
+    candidateRootCompact &&
+      identifierRootCompact &&
+      (candidateRootCompact === identifierCompact ||
+        candidateCompact === identifierRootCompact ||
+        candidateRootCompact === identifierRootCompact)
+  );
+}
+
+function domainNameCandidate(value) {
+  const raw = normalizeString(value)
+    .replace(/^<|>$/g, '')
+    .replace(/[),.;!?]+$/g, '');
+  if (!raw) return '';
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    return normalizeString(new URL(candidate).hostname)
+      .replace(/^www\./i, '')
+      .split('.')[0];
+  } catch (_error) {
+    return raw
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .split(/[/?#]/)[0]
+      .split('.')[0];
+  }
+}
+
 function stripImageNameSuffix(value) {
   return normalizeString(value)
     .replace(/\.[a-z0-9]+$/i, '')
@@ -97,13 +143,19 @@ function collectPhotoRecordSlugCandidates(record) {
   if (!record || typeof record !== 'object') return [];
   const legacyMeta = record.legacyMeta && typeof record.legacyMeta === 'object' ? record.legacyMeta : {};
   const identityCompany = normalizeString(record.identityKey || legacyMeta.identityKey).split('|')[0];
+  const imageName = stripImageNameSuffix(record.websitePhotoName || record.fileName || legacyMeta.websitePhotoName);
+  const legacyImageName = stripImageNameSuffix(legacyMeta.fileName);
   return Array.from(new Set([
     normalizeString(record.id || record.customerId),
     identityCompany,
     normalizeString(record.bedrijf || record.company || record.companyName),
     normalizeString(legacyMeta.bedrijf || legacyMeta.company || legacyMeta.companyName),
-    stripImageNameSuffix(record.websitePhotoName || record.fileName || legacyMeta.websitePhotoName),
-    stripImageNameSuffix(legacyMeta.fileName),
+    normalizeString(record.website || record.websiteUrl || record.domain || record.domein),
+    normalizeString(legacyMeta.website || legacyMeta.websiteUrl || legacyMeta.domain || legacyMeta.domein),
+    imageName,
+    legacyImageName,
+    domainNameCandidate(imageName),
+    domainNameCandidate(legacyImageName),
   ]
     .map((value) => slugifyCompanyName(value))
     .filter(Boolean)));
@@ -128,7 +180,7 @@ function findPhotoRecordBySlug(photoMap, slug) {
     const item = photoMap[key];
     if (!item || typeof item !== 'object') return null;
     const record = { ...item, id: normalizeString(item.id || item.customerId || key) };
-    return collectPhotoRecordSlugCandidates(record).includes(cleanSlug) ? record : null;
+    return collectPhotoRecordSlugCandidates(record).some((candidate) => slugMatchesIdentifier(candidate, cleanSlug)) ? record : null;
   }, null);
 }
 
@@ -173,8 +225,12 @@ function findCustomerCandidates(customers, identifier) {
       direct.push(customer);
       return;
     }
-    const companySlug = slugifyCompanyName(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam));
-    if (companySlug && companySlug === slug) bySlug.push(customer);
+    const candidates = [
+      customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam),
+      customer && (customer.website || customer.websiteUrl || customer.domain || customer.domein),
+      domainNameCandidate(customer && (customer.website || customer.websiteUrl || customer.domain || customer.domein)),
+    ].filter(Boolean);
+    if (candidates.some((candidate) => slugMatchesIdentifier(candidate, slug))) bySlug.push(customer);
   });
   return direct.concat(bySlug);
 }

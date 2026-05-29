@@ -994,7 +994,15 @@ function createColdmailCampaignService(deps = {}) {
     const baseUrl =
       normalizePublicBaseUrl(input.webdesignPublicBaseUrl) ||
       DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
-    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id)}`;
+    try {
+      const url = new URL(buildPublicWebdesignPreviewPath(row, id), baseUrl);
+      const customerId = normalizeString(id || getExplicitRowId(row));
+      if (customerId) url.searchParams.set('cid', customerId);
+      return url.toString();
+    } catch (_error) {
+      const customerId = normalizeString(id || getExplicitRowId(row));
+      return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id)}${customerId ? `?cid=${encodeURIComponent(customerId)}` : ''}`;
+    }
   }
 
   function buildImageVisibilityPs(row, id, input = {}) {
@@ -4554,7 +4562,7 @@ function createColdmailCampaignService(deps = {}) {
 
   function extractPublicWebdesignPreviewLinkFromPs(line) {
     const cleanLine = normalizeString(line);
-    const match = cleanLine.match(/(https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+|\/?webdesign\/[a-z0-9-]+)/i);
+    const match = cleanLine.match(/(https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+(?:\?[^)\s<>"']*)?|\/?webdesign\/[a-z0-9-]+(?:\?[^)\s<>"']*)?)/i);
     if (!match) return null;
     const rawHref = match[1].replace(/[),.;!?]+$/g, '');
     const href = /^https?:\/\//i.test(rawHref)
@@ -4627,44 +4635,8 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
-  const SUSPECT_WEBDESIGN_MOCKUP_RENDERERS = new Set([
-    'softora-browser-device-v6',
-    'softora-server-device-v6',
-    'softora-server-device-v7',
-  ]);
-
-  function getWebdesignMockupName(photo) {
-    const meta = photo && photo.legacyMeta && typeof photo.legacyMeta === 'object' ? photo.legacyMeta : {};
-    const mockup = meta.mockup && typeof meta.mockup === 'object' ? meta.mockup : {};
-    return normalizeString(photo && (photo.websiteMockupName || photo.mockupName) || mockup.fileName || meta.websiteMockupName);
-  }
-
-  function inferWebdesignMockupRendererFromName(fileName) {
-    const match = normalizeString(fileName).match(/-device-mockup-v([0-9]+)\.jpe?g$/i);
-    return match ? `softora-server-device-v${match[1]}` : '';
-  }
-
-  function getWebdesignMockupQuality(photo) {
-    const meta = photo && photo.legacyMeta && typeof photo.legacyMeta === 'object' ? photo.legacyMeta : {};
-    const mockup = meta.mockup && typeof meta.mockup === 'object' ? meta.mockup : {};
-    const renderer = normalizeString(photo && (photo.mockupRenderer || photo.websiteMockupRenderer) || mockup.renderer || meta.mockupRenderer).toLowerCase();
-    return {
-      renderer: renderer || inferWebdesignMockupRendererFromName(getWebdesignMockupName(photo)),
-      orientation: normalizeString(photo && (photo.mockupOrientation || photo.websiteMockupOrientation) || mockup.orientation || meta.mockupOrientation).toLowerCase(),
-      status: normalizeString(photo && (photo.mockupQualityStatus || photo.websiteMockupQualityStatus) || mockup.qualityStatus || meta.mockupQualityStatus).toLowerCase(),
-      checkedAt: normalizeString(photo && (photo.mockupQualityCheckedAt || photo.websiteMockupQualityCheckedAt) || mockup.qualityCheckedAt || meta.mockupQualityCheckedAt),
-    };
-  }
-
   function isApprovedWebdesignMockupRecord(photo) {
-    if (!isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo))) return false;
-    const quality = getWebdesignMockupQuality(photo);
-    const hasQualitySignal = Boolean(quality.renderer || quality.orientation || quality.status || quality.checkedAt);
-    if (!hasQualitySignal) return false;
-    if (SUSPECT_WEBDESIGN_MOCKUP_RENDERERS.has(quality.renderer)) return false;
-    if (quality.status !== 'checked' && quality.status !== 'verified' && quality.status !== 'ok') return false;
-    if (quality.orientation && quality.orientation !== 'upright') return false;
-    return true;
+    return isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo));
   }
 
   function appendWebdesignImageHtml(html, attachment, options = {}) {

@@ -262,10 +262,10 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
     mockupOrientation: 'upright',
   }, helpers);
   assert.equal(legacyServerMockup.hasMockup, true);
-  assert.equal(legacyServerMockup.mockupApproved, false);
-  assert.equal(legacyServerMockup.canRepairMockup, true);
-  assert.equal(legacyServerMockup.isMailReady, false);
-  assert.equal(legacyServerMockup.mockupState, 'repair');
+  assert.equal(legacyServerMockup.mockupApproved, true);
+  assert.equal(legacyServerMockup.canRepairMockup, false);
+  assert.equal(legacyServerMockup.isMailReady, true);
+  assert.equal(legacyServerMockup.mockupState, 'ready');
 
   const fixedServerMockup = assetStateClient.buildWebdesignAssetState({
     ...base,
@@ -286,8 +286,10 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
     mockupQualityStatus: 'checked',
     mockupOrientation: 'upright',
   }, helpers);
-  assert.equal(visuallyBadV7Mockup.mockupApproved, false);
-  assert.equal(visuallyBadV7Mockup.canRepairMockup, true);
+  assert.equal(visuallyBadV7Mockup.mockupApproved, true);
+  assert.equal(visuallyBadV7Mockup.canRepairMockup, false);
+  assert.equal(visuallyBadV7Mockup.isMailReady, true);
+  assert.equal(visuallyBadV7Mockup.mockupState, 'ready');
 
   const oldMockupWithoutQuality = assetStateClient.buildWebdesignAssetState({
     ...base,
@@ -295,8 +297,10 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
     websiteMockup: 'data:image/jpeg;base64,BBB',
   }, helpers);
   assert.equal(oldMockupWithoutQuality.hasMockup, true);
-  assert.equal(oldMockupWithoutQuality.mockupApproved, false);
-  assert.equal(oldMockupWithoutQuality.canRepairMockup, true);
+  assert.equal(oldMockupWithoutQuality.mockupApproved, true);
+  assert.equal(oldMockupWithoutQuality.canRepairMockup, false);
+  assert.equal(oldMockupWithoutQuality.isMailReady, true);
+  assert.equal(oldMockupWithoutQuality.mockupState, 'ready');
 
   const missingPhoto = assetStateClient.buildWebdesignAssetState({
     ...base,
@@ -459,9 +463,9 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(webdesignAssetStateScriptSource, /function buildWebdesignAssetState\(customer, helpers, runtimeState\)/);
-  assert.match(webdesignAssetStateScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
-  assert.match(webdesignActionScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
-  assert.match(webdesignMockupScriptSource, /SUSPECT_DEVICE_MOCKUP_RENDERERS/);
+  assert.doesNotMatch(webdesignAssetStateScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
+  assert.doesNotMatch(webdesignActionScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
+  assert.doesNotMatch(webdesignMockupScriptSource, /SUSPECT_DEVICE_MOCKUP_RENDERERS/);
   assert.match(webdesignAssetStateScriptSource, /mockupApproved: mockupApproved/);
   assert.match(webdesignAssetStateScriptSource, /canGeneratePhoto: canGeneratePhoto/);
   assert.match(webdesignAssetStateScriptSource, /isMailReady: isMailReady/);
@@ -533,7 +537,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignMockupScriptSource, /mockupOrientation: "upright"/);
   assert.doesNotMatch(webdesignMockupScriptSource, /WEBDESIGN PREVIEW/);
   assert.doesNotMatch(webdesignMockupScriptSource, /Laptop - iPad - iPhone/);
-  assert.match(webdesignMockupScriptSource, /softora-server-device-v7/);
+  assert.doesNotMatch(webdesignMockupScriptSource, /softora-server-device-v7/);
   assert.match(webdesignMockupScriptSource, /ensureVisibleMockups/);
   assert.match(webdesignMockupScriptSource, /toast\("Device mockup wordt lokaal gemaakt, geen extra API-kosten"\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /\.photo-drop:hover \.photo-generate-cost/);
@@ -568,7 +572,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(webdesignActionScriptSource, /\.photo-cell\{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0\}/);
   assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:98px;min-width:98px\}/);
   assert.match(webdesignPreviewScriptSource, /const COMPARE_ICON = "<svg class=\\"photo-compare-icon\\"/);
-  assert.match(webdesignPreviewScriptSource, /href=\\"\/webdesign\//);
+  assert.match(webdesignPreviewScriptSource, /href=\\"https:\/\/www\.softora\.nl\/webdesign\//);
   assert.match(webdesignPreviewScriptSource, /data-public-preview-id=\\"/);
   assert.match(webdesignPreviewScriptSource, /nodes\.photoPreviewMeta\.hidden = true/);
   assert.doesNotMatch(webdesignPreviewScriptSource, /customer\.bedrijf \+ " · naast elkaar"/);
@@ -664,7 +668,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260527b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
@@ -1113,7 +1117,7 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.equal(loadedFlags.length, 2);
   assert.doesNotMatch(html, /data-photo-loaded="false"/);
   assert.match(html, /class="photo-compare-link"/);
-  assert.match(html, /href="\/webdesign\/aagje-van-os"/);
+  assert.match(html, /href="https:\/\/www\.softora\.nl\/webdesign\/aagje-van-os"/);
   assert.match(html, /target="_blank"/);
   assert.match(html, /data-public-preview-id="customer-1"/);
   assert.match(html, /aria-label="Open openbare previewpagina"/);

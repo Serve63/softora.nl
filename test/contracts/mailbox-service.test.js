@@ -166,6 +166,101 @@ test('mailbox service sends mail through selected account smtp', async () => {
   assert.equal(sent[0].message.to, 'klant@example.nl');
 });
 
+test('mailbox service enriches normal webdesign sends with public link and inline images', async () => {
+  const sent = [];
+  const customerId = 'manual-import-pckbv-eu-privacy-0583';
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    async getUiStateValues(scope) {
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              {
+                id: customerId,
+                bedrijf: 'PCK B.V.',
+                naam: 'PCK',
+                email: 'info@pckbv.eu',
+                website: 'https://pckbv.eu',
+              },
+            ]),
+          },
+        };
+      }
+      if (scope === 'premium_database_photos') {
+        return {
+          values: {
+            softora_database_photos_v1: JSON.stringify({
+              [customerId]: {
+                id: customerId,
+                identityKey: 'pck b v|pck|',
+                websitePhoto: TINY_PNG_DATA_URL,
+                websiteMockup: TINY_PNG_DATA_URL,
+                websitePhotoName: 'PCK B.V. webdesign.png',
+                websiteMockupName: 'PCK B.V. device mockup.jpg',
+              },
+            }),
+          },
+        };
+      }
+      return { values: {} };
+    },
+    createTransport: (config) => ({
+      sendMail: async (message) => {
+        sent.push({ config, message });
+        return { messageId: 'm-1', accepted: [message.to], rejected: [] };
+      },
+    }),
+  });
+
+  await service.sendMessage({
+    accountEmail: 'serve@softora.nl',
+    to: 'info@pckbv.eu',
+    subject: 'Kleine vraag over jullie website',
+    text: [
+      'Goedendag,',
+      '',
+      'Afgelopen week kwam ik jullie website (pckbv.eu) tegen. Vanuit enthousiasme heb ik een fris webdesign gemaakt.',
+      '',
+      'Met vriendelijke groet,',
+      'Servé Creusen',
+      '',
+      'PS: Zie je het webdesign niet? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊',
+      '',
+      '[Geen webdesign willen ontvangen? Laat het me weten!](https://www.softora.nl/afmelden?t=abc)',
+    ].join('\n'),
+  });
+
+  assert.equal(sent.length, 1);
+  assert.match(
+    sent[0].message.text,
+    /PS: Wordt het webdesign niet zichtbaar\? open het via hier 👈/
+  );
+  assert.doesNotMatch(sent[0].message.text, /afbeeldingen tonen/i);
+  assert.match(
+    sent[0].message.html,
+    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? open het via <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\?cid=manual-import-pckbv-eu-privacy-0583" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
+  );
+  assert.match(sent[0].message.html, /cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora/);
+  assert.match(sent[0].message.html, /cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora/);
+  assert.match(sent[0].message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
+  assert.equal(sent[0].message.attachments.length, 2);
+  assert.deepEqual(
+    sent[0].message.attachments.map((attachment) => attachment.contentDisposition),
+    ['inline', 'inline']
+  );
+});
+
 test('mailbox service sends Martijn mail with the full display name', async () => {
   const sent = [];
   const service = createMailboxService({
