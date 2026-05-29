@@ -300,12 +300,12 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.match(body.leads[0].custom_variables.softora_mail_body, /📍 uw regio/);
   assert.match(
     body.leads[0].custom_variables.softora_mail_body,
-    /📍 uw regio\n\nPS: Wordt het webdesign niet zichtbaar\? open het via hier 👈/
+    /📍 uw regio\n\nPS: Wordt het webdesign niet zichtbaar\?\nOpen het via hier 👈/
   );
   assert.equal(body.leads[0].custom_variables.softora_city_with_pin, '📍 uw regio');
   assert.equal(
     body.leads[0].custom_variables.softora_image_visibility_ps,
-    'PS: Wordt het webdesign niet zichtbaar? open het via hier 👈'
+    'PS: Wordt het webdesign niet zichtbaar?\nOpen het via hier 👈'
   );
   assert.equal(body.leads[0].custom_variables.softora_webdesign_public_path, '/webdesign/bakkerij-zon');
   assert.equal(body.leads[0].custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon');
@@ -391,7 +391,7 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   assert.match(variables.softora_mail_body, /📍 Alphen/);
   assert.match(
     variables.softora_mail_body,
-    /📍 Alphen\n\nPS: Wordt het webdesign niet zichtbaar\? open het via hier 👈/
+    /📍 Alphen\n\nPS: Wordt het webdesign niet zichtbaar\?\nOpen het via hier 👈/
   );
   assert.doesNotMatch(variables.softora_mail_body, /\nAlphen$/);
   assert.equal(variables.softora_city, 'Alphen');
@@ -399,7 +399,7 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   assert.match(variables.softora_instantly_email_html, /📍 Alphen/);
   assert.match(
     variables.softora_instantly_email_html,
-    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\? open het via <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
+    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\?<br>Open het via <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
   );
 });
 
@@ -557,7 +557,7 @@ test('instantly sync removes Martijn LinkedIn CTA before syncing', async () => {
   const variables = body.leads[0].custom_variables;
   assert.match(
     variables.softora_mail_body,
-    /Martijn van de Ven\n\n📍 Boxtel\n\nPS: Wordt het webdesign niet zichtbaar\? open het via hier 👈/
+    /Martijn van de Ven\n\n📍 Boxtel\n\nPS: Wordt het webdesign niet zichtbaar\?\nOpen het via hier 👈/
   );
   assert.doesNotMatch(variables.softora_mail_body, /Mijn LinkedIn|linkedin\.com/i);
   assert.doesNotMatch(variables.softora_instantly_email_html, /Mijn LinkedIn|linkedin\.com/i);

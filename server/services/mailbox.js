@@ -38,9 +38,9 @@ const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar? open het via hier 👈';
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nOpen het via hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?=.*webdesign)(?=.*(?:afbeeldingen\s+tonen|zichtbaar|open\s+het|deze\s+link|via\s+hier))/i;
+  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const FOLDER_ALIASES = {
@@ -1048,13 +1048,10 @@ function createMailboxService(deps = {}) {
   }
 
   function normalizeMailboxWebdesignText(text) {
-    const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
-    let replaced = false;
-    const normalizedLines = lines.map((line) => {
-      if (!isMailboxImageVisibilityPsLine(line)) return line;
-      replaced = true;
-      return COLDMAIL_IMAGE_VISIBILITY_PS;
-    });
+    const source = String(text || '').replace(/\r\n?/g, '\n');
+    const normalizedSource = source.replace(COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN, COLDMAIL_IMAGE_VISIBILITY_PS);
+    const replaced = normalizedSource !== source;
+    const normalizedLines = normalizedSource.split('\n');
     if (!replaced) {
       const optOutIndex = normalizedLines.findIndex((line) => normalizeString(line).includes(COLDMAIL_OPT_OUT_LABEL));
       const insertIndex = optOutIndex >= 0 ? optOutIndex : normalizedLines.length;
@@ -1111,8 +1108,8 @@ function createMailboxService(deps = {}) {
 
   function renderImageVisibilityPsHtmlLine(webdesignPreviewUrl) {
     const href = normalizeString(webdesignPreviewUrl);
-    if (!href) return `<em style="font-style:italic;">${escapeHtml(COLDMAIL_IMAGE_VISIBILITY_PS)}</em>`;
-    return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar? open het via <a href="${escapeHtmlAttribute(
+    if (!href) return `<em style="font-style:italic;">${escapeHtml(COLDMAIL_IMAGE_VISIBILITY_PS).replace(/\n/g, '<br>')}</em>`;
+    return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar?<br>Open het via <a href="${escapeHtmlAttribute(
       href
     )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈</em>`;
   }
@@ -1192,12 +1189,15 @@ function createMailboxService(deps = {}) {
       .split(/\n{2,}/)
       .map((paragraph) => normalizeString(paragraph))
       .filter(Boolean)
-      .map((paragraph) =>
-        `<p style="margin:0 0 18px 0;">${paragraph
-          .split('\n')
-          .map((line) => renderMailboxWebdesignLineHtml(line, options))
-          .join('<br>')}</p>`
-      )
+      .map((paragraph) => {
+        if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(paragraph)) {
+          return `<p style="margin:0 0 18px 0;">${renderImageVisibilityPsHtmlLine(options.webdesignPreviewUrl)}</p>`;
+        }
+        return `<p style="margin:0 0 18px 0;">${paragraph
+            .split('\n')
+            .map((line) => renderMailboxWebdesignLineHtml(line, options))
+            .join('<br>')}</p>`;
+      })
       .join('\n');
     const inlineImages = Array.isArray(options.inlineImages) ? options.inlineImages : [];
     const mainImage = inlineImages.find((image) => image.type === 'webdesign');
