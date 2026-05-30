@@ -71,8 +71,12 @@ test('publieke contactknoppen gebruiken klantvriendelijke labels', () => {
   const pagesWithInternalContactLabel = pages
     .filter((page) => />\s*WhatsApp\s+Martijn\s*</i.test(page.html))
     .map((page) => page.path);
+  const visibleWhatsappCtaIssues = auditConversionCtas({ pages })
+    .filter((issue) => issue.type === 'public-cta-visible-whatsapp-label')
+    .map((issue) => issue.path);
 
   assert.deepEqual(pagesWithInternalContactLabel, []);
+  assert.deepEqual(visibleWhatsappCtaIssues, []);
 });
 
 test('seo machine contentkwaliteit blijft sterk genoeg om automatisch door te groeien', () => {
@@ -303,7 +307,13 @@ test('leadknoppen mogen niet meer naar dode contactroutes of niet-veilige WhatsA
 
   assert.deepEqual(
     strictWhatsappIssues.map((issue) => issue.type).sort(),
-    ['lead-cta-not-whatsapp', 'non-whatsapp-conversion-link', 'whatsapp-link-missing-new-tab-safety'].sort()
+    [
+      'lead-cta-not-whatsapp',
+      'non-whatsapp-conversion-link',
+      'public-cta-visible-whatsapp-label',
+      'public-cta-visible-whatsapp-label',
+      'whatsapp-link-missing-new-tab-safety',
+    ].sort()
   );
 
   const prefilledWhatsappIssues = auditConversionCtas({
@@ -377,6 +387,7 @@ test('WhatsApp-conversies tellen pas met pagina, target en submit-route', () => 
   assert.deepEqual(
     issues.map((issue) => `${issue.path}:${issue.type}`).sort(),
     [
+      '/half-gemeten-link:public-cta-visible-whatsapp-label',
       '/half-gemeten-formulier:lead-button-not-whatsapp',
       '/half-gemeten-formulier:missing-conversion-link',
       '/half-gemeten-link:untracked-conversion-link',
@@ -414,7 +425,7 @@ test('button-like lead controls zonder WhatsApp-route worden geblokkeerd', () =>
     ],
   });
 
-  assert.deepEqual(issues.map((issue) => issue.type), ['lead-button-not-whatsapp']);
+  assert.deepEqual(issues.map((issue) => issue.type).sort(), ['lead-button-not-whatsapp', 'public-cta-visible-whatsapp-label'].sort());
 });
 
 test('SEO-content CTAs zijn meetbaar en linken terug naar commerciële pagina’s', () => {
