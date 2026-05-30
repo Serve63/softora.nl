@@ -90,14 +90,22 @@ function extractImageTags(html) {
   return [...String(html || '').matchAll(/<img\b[^>]*>/gi)].map((match) => match[0]);
 }
 
-function assertInstantlyImageTagsUseNaturalLayout(html) {
+function assertInstantlyImageTagsUseNaturalLayout(
+  html,
+  expected = [
+    { alt: 'Webdesign', width: 640, height: 640 },
+    { alt: 'Mockup', width: 640, height: 640 },
+  ]
+) {
   const imageTags = extractImageTags(html);
   assert.equal(imageTags.length, 2);
-  assert.match(imageTags[0], /alt="Webdesign" width="1024" height="1536" loading="eager" decoding="async" fetchpriority="high"/);
-  assert.match(imageTags[0], /aspect-ratio:1024\/1536/);
-  assert.match(imageTags[1], /alt="Mockup" width="1600" height="1000" loading="eager" decoding="async" fetchpriority="high"/);
-  assert.match(imageTags[1], /aspect-ratio:1600\/1000/);
-  for (const imageTag of imageTags) {
+  expected.forEach((item, index) => {
+    const imageTag = imageTags[index];
+    assert.match(
+      imageTag,
+      new RegExp(`alt="${item.alt}" width="${item.width}" height="${item.height}" loading="eager" decoding="async" fetchpriority="high"`)
+    );
+    assert.match(imageTag, new RegExp(`aspect-ratio:${item.width}\\/${item.height}`));
     assert.match(
       imageTag,
       /style="display:block;width:100%;max-width:640px;height:auto;aspect-ratio:\d+\/\d+;border:0;outline:none;text-decoration:none;"/
@@ -106,7 +114,7 @@ function assertInstantlyImageTagsUseNaturalLayout(html) {
       imageTag,
       /min-height|max-height|height:(?:220|360)px|object-fit|border-radius|font-family|font-size|font-weight|text-align/
     );
-  }
+  });
 }
 
 function createService(overrides = {}) {
@@ -511,7 +519,10 @@ test('instantly sync caches a stripped webdesign image instead of the decorative
   assert.equal(fetchCalls.length, 1);
   const body = JSON.parse(fetchCalls[0].options.body);
   const html = body.leads[0].custom_variables.softora_instantly_email_html;
-  assertInstantlyImageTagsUseNaturalLayout(html);
+  assertInstantlyImageTagsUseNaturalLayout(html, [
+    { alt: 'Webdesign', width: 640, height: 476 },
+    { alt: 'Mockup', width: 640, height: 640 },
+  ]);
   assert.doesNotMatch(html, /border-radius|object-fit|background:#eef3fb|min-height|max-height/);
   const previewTokens = extractPreviewImageTokens(html);
   assert.equal(previewTokens.length, 2);
