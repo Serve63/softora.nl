@@ -104,9 +104,11 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   const source = readPage('premium-bedrijfssoftware.html');
   const entry = getRegistryEntry('premium-bedrijfssoftware.html');
 
-  assert.match(source, /<title>Bedrijfssoftware op maat laten maken \| Softora<\/title>/);
+  assert.match(source, /<title>Bedrijfssoftware laten maken voor CRM en dashboards \| Softora<\/title>/);
   assert.match(source, /Bedrijfssoftware <em>op maat<\/em><\/span> <br>voor jouw team/);
-  assert.match(source, /CRM en klantbeheer/);
+  assert.match(source, /CRM en klantportaal/);
+  assert.match(source, /Dashboard laten ontwikkelen/);
+  assert.match(source, /CRM offerte systeem/);
   assert.match(source, /Interne workflowtools/);
   assert.match(source, /AI automatisering/);
   assert.match(source, /href="\/crm-systeem-op-maat"/);
@@ -117,8 +119,8 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.doesNotMatch(source, /Website Tool|AI Website Generator/);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
-  assert.equal(entry.title, 'Bedrijfssoftware op maat laten maken');
-  assert.match(entry.description, /CRM, dashboards, klantbeheer/);
+  assert.equal(entry.title, 'Bedrijfssoftware laten maken voor CRM en dashboards');
+  assert.match(entry.description, /CRM, dashboard, klantportaal/);
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
 });
@@ -127,12 +129,14 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   const source = readPage('crm-systeem-op-maat.html');
   const entry = getRegistryEntry('crm-systeem-op-maat.html');
 
-  assert.match(source, /<title>CRM systeem op maat laten maken \| Softora<\/title>/);
-  assert.match(source, /<meta name="description" content="Laat een CRM systeem op maat maken door Softora/);
-  assert.match(source, /<h1>CRM systeem voor leads, klanten en opvolging<\/h1>/);
+  assert.match(source, /<title>CRM op maat laten maken voor MKB \| Softora<\/title>/);
+  assert.match(source, /<meta name="description" content="Laat een CRM op maat maken voor leadpipeline/);
+  assert.match(source, /<h1>CRM op maat voor leads, offertes en klantportaal<\/h1>/);
   assert.match(source, /Leadpipeline/);
   assert.match(source, /Klantbeheer/);
-  assert.match(source, /Offerteflow/);
+  assert.match(source, /CRM offerte systeem/);
+  assert.match(source, /Klantportaal laten maken/);
+  assert.match(source, /Dashboard laten ontwikkelen/);
   assert.match(source, /Reminders en taken/);
   assert.match(source, /AI-samenvattingen/);
   assert.match(source, /Dashboards/);
@@ -146,8 +150,8 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   assert.doesNotMatch(source, /overlay|login-box|Binnenkort beschikbaar|toegangscode/i);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
-  assert.equal(entry.title, 'CRM systeem op maat laten maken');
-  assert.match(entry.description, /leadpipeline, klantbeheer, offertes, dashboards/);
+  assert.equal(entry.title, 'CRM op maat laten maken voor MKB');
+  assert.match(entry.description, /leadpipeline, klantbeheer, crm offerte systeem/);
   assert.ok(entry.relatedLinks.includes('/bedrijfssoftware-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
   assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
@@ -161,7 +165,7 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.match(source, /<title>AI automatisering laten maken voor MKB \| Softora<\/title>/);
   assert.match(
     source,
-    /<meta name="description" content="Laat AI automatisering maken door Softora voor leadopvolging/
+    /<meta name="description" content="Laat AI automatisering maken voor leadopvolging, processen automatiseren met AI/
   );
   assert.match(source, /<h1>AI automatisering voor leads, taken en opvolging<\/h1>/);
   assert.match(source, /Leadopvolging/);
@@ -193,7 +197,7 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
   assert.equal(entry.title, 'AI automatisering laten maken voor MKB');
-  assert.match(entry.description, /leadopvolging, intake, mailbox, CRM-flows/);
+  assert.match(entry.description, /leadopvolging, processen automatiseren met AI/);
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
   assert.ok(entry.relatedLinks.includes('/voicesoftware-op-maat'));

@@ -64,9 +64,9 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-bedrijfssoftware.html',
     path: '/bedrijfssoftware-op-maat',
     legacyPaths: ['/premium-bedrijfssoftware'],
-    title: 'Bedrijfssoftware op maat laten maken',
+    title: 'Bedrijfssoftware laten maken voor CRM en dashboards',
     description:
-      'Laat bedrijfssoftware op maat maken voor CRM, dashboards, klantbeheer, offertes, planning en AI automatisering die dagelijks werk versnelt.',
+      'Laat bedrijfssoftware maken voor CRM, dashboard, klantportaal, offerteflow, planning en AI automatisering die dagelijks werk versnelt.',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
     relatedLinks: [
@@ -80,9 +80,9 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
     fileName: 'crm-systeem-op-maat.html',
     path: '/crm-systeem-op-maat',
-    title: 'CRM systeem op maat laten maken',
+    title: 'CRM op maat laten maken voor MKB',
     description:
-      'Laat een CRM systeem op maat maken door Softora voor leadpipeline, klantbeheer, offertes, dashboards, reminders en AI-opvolging.',
+      'Laat een CRM op maat maken voor leadpipeline, klantbeheer, crm offerte systeem, klantportaal, dashboards, reminders en AI-opvolging.',
     kind: 'service',
     serviceName: 'CRM systeem op maat',
     relatedLinks: [
@@ -101,7 +101,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     path: '/ai-automatisering',
     title: 'AI automatisering laten maken voor MKB',
     description:
-      'Laat AI automatisering maken door Softora voor leadopvolging, intake, mailbox, CRM-flows, rapportages en veilige menselijke controle.',
+      'Laat AI automatisering maken voor leadopvolging, processen automatiseren met AI, intake, mailbox, CRM-flows, rapportages en veilige controle.',
     kind: 'service',
     serviceName: 'AI automatisering',
     relatedLinks: [
