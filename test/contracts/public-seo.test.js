@@ -277,6 +277,35 @@ test('crm page owns its internal links inside the page content', () => {
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });
 
+test('money pages verwerken actuele GSC-zoeksignalen in normale content', () => {
+  const pages = [
+    {
+      fileName: 'crm-systeem-op-maat.html',
+      terms: ['crm op maat', 'crm offerte systeem', 'klantportaal', 'dashboard laten ontwikkelen'],
+    },
+    {
+      fileName: 'premium-bedrijfssoftware.html',
+      terms: ['bedrijfssoftware laten maken', 'dashboard laten ontwikkelen', 'klantportaal', 'crm offerte systeem'],
+    },
+    {
+      fileName: 'ai-automatisering.html',
+      terms: ['ai automatisering', 'processen automatiseren met ai'],
+    },
+  ];
+
+  for (const page of pages) {
+    const source = fs.readFileSync(path.join(root, page.fileName), 'utf8');
+    const html = applyPublicSeoHeadDefaults(source, page.fileName, {
+      siteOrigin: 'https://www.softora.nl',
+    });
+    const normalized = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').toLowerCase();
+
+    for (const term of page.terms) {
+      assert.ok(normalized.includes(term), `${page.fileName} mist GSC-signaal "${term}"`);
+    }
+  }
+});
+
 test('voicesoftware page owns its internal links inside the page content', () => {
   const source = fs.readFileSync(path.join(root, 'premium-voicesoftware.html'), 'utf8');
   const html = applyPublicSeoHeadDefaults(source, 'premium-voicesoftware.html', {
