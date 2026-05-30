@@ -13,7 +13,10 @@ const {
 const { appendSentMessage } = require('./mailbox-sent-copy');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const previewImageCache = require('./coldmail-preview-image-cache');
-const { removeDecorativeWebdesignFrameForEmail } = require('./coldmail-image-frame');
+const {
+  fitWebdesignPreviewForEmail,
+  removeDecorativeWebdesignFrameForEmail,
+} = require('./coldmail-image-frame');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -4642,9 +4645,12 @@ function createColdmailCampaignService(deps = {}) {
 
   async function preparePreviewImageForEmail(image, type = 'webdesign') {
     if (!image || !Buffer.isBuffer(image.content)) return image;
-    const prepared = type === 'mockup'
+    const framed = type === 'mockup'
       ? image
       : await removeDecorativeWebdesignFrameForEmail(image);
+    const prepared = type === 'mockup'
+      ? framed
+      : await fitWebdesignPreviewForEmail(framed);
     return optimizePreviewImageForEmail(prepared);
   }
 
@@ -4786,7 +4792,7 @@ function createColdmailCampaignService(deps = {}) {
         src
       )}" alt="${escapeHtml(
         alt
-      )}" width="${emailImageMaxWidth}" style="display:block;width:100%;max-width:${emailImageMaxWidth}px;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
+      )}" width="${emailImageMaxWidth}" style="display:block;width:100%;max-width:${emailImageMaxWidth}px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
     };
     const previewBlockHtml = renderEmailImageTable(attachment, attachment.alt || 'Webdesign', '24px 0 0 0');
     const mockupHtml = attachment.mockup && normalizeString(attachment.mockup.src || (attachment.mockup.cid ? `cid:${attachment.mockup.cid}` : ''))
@@ -6173,19 +6179,30 @@ function createColdmailCampaignService(deps = {}) {
       const publicWebdesignPreviewId =
         normalizeString(webdesignPhoto && webdesignPhoto.previewCustomerId) || item.id;
       let webdesignPhotoForHtml = webdesignPhoto;
+      let preparedWebdesignAttachment = null;
+      let preparedMockupAttachment = null;
       let remoteWebdesignAttachment = null;
       let remoteMockupAttachment = null;
-      if (webdesignPhoto && webdesignImageDelivery === 'remote') {
-        const webdesignLink = buildColdmailPreviewImageLink(row, item.id, reference, input, 'webdesign');
-        const mockupLink = buildColdmailPreviewImageLink(row, item.id, reference, input, 'mockup');
+      if (webdesignPhoto) {
         const preparedWebdesignImage = await preparePreviewImageForEmail(webdesignPhoto, 'webdesign');
         const preparedMockupImage = webdesignPhoto.mockup
           ? await preparePreviewImageForEmail(webdesignPhoto.mockup, 'mockup')
           : null;
-        remoteWebdesignAttachment = mergePreparedImage(webdesignPhoto, preparedWebdesignImage, 'webdesign');
-        remoteMockupAttachment = webdesignPhoto.mockup
+        preparedWebdesignAttachment = mergePreparedImage(webdesignPhoto, preparedWebdesignImage, 'webdesign');
+        preparedMockupAttachment = webdesignPhoto.mockup
           ? mergePreparedImage(webdesignPhoto.mockup, preparedMockupImage, 'device-mockup')
           : null;
+        webdesignPhotoForHtml = {
+          ...webdesignPhoto,
+          ...preparedWebdesignAttachment,
+          mockup: preparedMockupAttachment || webdesignPhoto.mockup,
+        };
+      }
+      if (webdesignPhoto && webdesignImageDelivery === 'remote') {
+        const webdesignLink = buildColdmailPreviewImageLink(row, item.id, reference, input, 'webdesign');
+        const mockupLink = buildColdmailPreviewImageLink(row, item.id, reference, input, 'mockup');
+        remoteWebdesignAttachment = preparedWebdesignAttachment;
+        remoteMockupAttachment = preparedMockupAttachment;
         rememberPreviewImage(getPreviewImageCacheKey(webdesignLink.token, 'webdesign'), {
           ok: true,
           type: 'webdesign',
@@ -6229,7 +6246,11 @@ function createColdmailCampaignService(deps = {}) {
         ? buildWebdesignImageAttachments(
             webdesignPhoto,
             webdesignImageDelivery === 'cid'
-              ? { inline: true }
+              ? {
+                  inline: true,
+                  webdesignImage: preparedWebdesignAttachment || webdesignPhoto,
+                  mockupImage: preparedMockupAttachment || webdesignPhoto.mockup,
+                }
               : {
                   inline: false,
                   webdesignImage: remoteWebdesignAttachment || webdesignPhoto,

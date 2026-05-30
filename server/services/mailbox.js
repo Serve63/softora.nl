@@ -14,6 +14,7 @@ const {
   safeParseJsonArray,
   safeParseJsonObject,
 } = require('./data-ops-serialization');
+const { fitWebdesignPreviewForEmail } = require('./coldmail-image-frame');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 
 const DEFAULT_MAILBOX_EMAILS = [
@@ -1138,7 +1139,7 @@ function createMailboxService(deps = {}) {
     return `${name}.${mailboxImageExtension(contentType)}`;
   }
 
-  function prepareMailboxInlineWebdesignImages(images, customerId) {
+  async function prepareMailboxInlineWebdesignImages(images, customerId) {
     const entries = (Array.isArray(images) ? images : [])
       .map((image, index) => ({ image, index }))
       .filter((entry) => entry.image && entry.image.dataUrl);
@@ -1151,27 +1152,39 @@ function createMailboxService(deps = {}) {
       mockupEntry ? { ...mockupEntry, type: 'mockup' } : null,
     ].filter(Boolean);
     const cidSeed = normalizeImageLabel(customerId || 'webdesign').replace(/\s+/g, '-').slice(0, 60) || 'webdesign';
-    return selected
-      .map((entry, orderIndex) => {
-        const parsed = parseImageDataUrl(entry.image.dataUrl);
-        if (!parsed || !parsed.buffer.length || parsed.buffer.length > MAX_STORED_BODY_IMAGE_BYTES) return null;
-        const cid = `${entry.type}-${cidSeed}-${orderIndex + 1}@softora`;
-        const alt = cleanImageAlt(entry.image.alt) || (entry.type === 'mockup' ? 'Device mockup' : 'Webdesign');
-        return {
-          type: entry.type,
-          cid,
-          src: `cid:${cid}`,
-          alt,
-          attachment: {
-            filename: mailboxImageFilename(alt, entry.type, parsed.mimeType),
+    const prepared = await Promise.all(selected.map(async (entry, orderIndex) => {
+      const parsed = parseImageDataUrl(entry.image.dataUrl);
+      if (!parsed || !parsed.buffer.length || parsed.buffer.length > MAX_STORED_BODY_IMAGE_BYTES) return null;
+      const preparedImage = entry.type === 'webdesign'
+        ? await fitWebdesignPreviewForEmail({
             content: parsed.buffer,
             contentType: parsed.mimeType,
-            contentDisposition: 'inline',
-            cid,
-          },
-        };
-      })
-      .filter(Boolean);
+          })
+        : {
+            content: parsed.buffer,
+            contentType: parsed.mimeType,
+          };
+      const content = Buffer.isBuffer(preparedImage && preparedImage.content)
+        ? preparedImage.content
+        : parsed.buffer;
+      const contentType = normalizeString(preparedImage && preparedImage.contentType) || parsed.mimeType;
+      const cid = `${entry.type}-${cidSeed}-${orderIndex + 1}@softora`;
+      const alt = cleanImageAlt(entry.image.alt) || (entry.type === 'mockup' ? 'Device mockup' : 'Webdesign');
+      return {
+        type: entry.type,
+        cid,
+        src: `cid:${cid}`,
+        alt,
+        attachment: {
+          filename: mailboxImageFilename(alt, entry.type, contentType),
+          content,
+          contentType,
+          contentDisposition: 'inline',
+          cid,
+        },
+      };
+    }));
+    return prepared.filter(Boolean);
   }
 
   function renderMailboxEmailImage(image, margin) {
@@ -1180,7 +1193,7 @@ function createMailboxService(deps = {}) {
       image.src
     )}" alt="${escapeHtmlAttribute(
       image.alt
-    )}" width="640" style="display:block;width:100%;max-width:640px;height:auto;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;" /></td></tr></table>`;
+    )}" width="640" style="display:block;width:100%;max-width:640px;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;" /></td></tr></table>`;
   }
 
   function renderMailboxWebdesignHtml(text, options = {}) {
@@ -1284,7 +1297,7 @@ function createMailboxService(deps = {}) {
         : matchedMeta
           ? buildPublicWebdesignPreviewUrlForMatch(null, matchedMeta, matchedId)
         : extractPublicWebdesignPreviewUrlFromText(rawText);
-      const inlineImages = prepareMailboxInlineWebdesignImages(images, matchedId);
+      const inlineImages = await prepareMailboxInlineWebdesignImages(images, matchedId);
       if (!previewUrl && !inlineImages.length) return { text: normalizedText };
 
       return {

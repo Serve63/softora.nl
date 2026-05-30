@@ -253,6 +253,7 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
   );
   assert.match(sent[0].message.html, /cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora/);
   assert.match(sent[0].message.html, /cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora/);
+  assert.match(sent[0].message.html, /max-height:960px;height:auto;object-fit:contain/);
   assert.match(sent[0].message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.equal(sent[0].message.attachments.length, 2);
   assert.deepEqual(
