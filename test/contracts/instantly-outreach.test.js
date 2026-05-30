@@ -1001,6 +1001,32 @@ test('instantly sync backfills remote campaign leads before normal mailbox sendi
   assert.equal(rows[0].outreachStatus, 'benaderd');
 });
 
+test('instantly sync can run remote reconciliation without importing new leads', async () => {
+  const { service, fetchCalls, getRows, writes } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test', reconcileOnly: true });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'reconcile_only');
+  assert.equal(result.synced, 0);
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].status, 'prospect');
+});
+
 test('instantly sync reads and writes chunked customer database state', async () => {
   const sourceRows = [
     {
