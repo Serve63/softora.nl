@@ -1216,6 +1216,17 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
+  function isPermanentColdmailRecipientGuardEntry(entry) {
+    if (!entry || typeof entry !== 'object') return false;
+    if (entry.permanent === true) return true;
+    if (normalizeString(entry.permanent).toLowerCase() === 'true') return true;
+    const source = normalizeString(entry.source || entry.reason || '').toLowerCase();
+    const provider = normalizeString(entry.provider || entry.lastColdmailProvider || '').toLowerCase();
+    const senderEmail = normalizeEmailAddress(entry.senderEmail);
+    if (source.includes('instantly') || provider === 'instantly') return true;
+    return senderEmail.endsWith('@websoftora.com');
+  }
+
   function getColdmailRecipientGuardMatch(item, entries = []) {
     const guard = buildColdmailRecipientGuard(item && item.row, item && item.id);
     return (Array.isArray(entries) ? entries : []).find((entry) => {
@@ -1235,9 +1246,13 @@ function createColdmailCampaignService(deps = {}) {
       bedrijf: getRowCompany(item && item.row),
       email: getRowEmail(item && item.row),
       code: 'COLDMAIL_RECIPIENT_RECENTLY_SENT',
-      error: sender
-        ? `Dit bedrijf/e-mailadres is recent al gemaild via ${sender}.`
-        : 'Dit bedrijf/e-mailadres is recent al gemaild.',
+      error: isPermanentColdmailRecipientGuardEntry(match)
+        ? sender
+          ? `Dit bedrijf/e-mailadres is al eerder gemaild via ${sender}.`
+          : 'Dit bedrijf/e-mailadres is al eerder gemaild.'
+        : sender
+          ? `Dit bedrijf/e-mailadres is recent al gemaild via ${sender}.`
+          : 'Dit bedrijf/e-mailadres is recent al gemaild.',
     };
   }
 
@@ -2441,9 +2456,15 @@ function createColdmailCampaignService(deps = {}) {
         recipientCompanyKey: normalizeColdmailGuardKeyPart(entry.recipientCompanyKey),
         recipientId: normalizeColdmailGuardKeyPart(entry.recipientId),
         recipientCompany: truncateText(normalizeString(entry.recipientCompany), 120),
+        permanent: isPermanentColdmailRecipientGuardEntry(entry),
+        source: truncateText(normalizeString(entry.source), 120),
+        provider: truncateText(normalizeString(entry.provider || entry.lastColdmailProvider), 80),
+        campaignId: truncateText(normalizeString(entry.campaignId || entry.instantlyCampaignId), 160),
+        leadId: truncateText(normalizeString(entry.leadId || entry.instantlyLeadId), 160),
       }))
       .filter((entry) => {
-        if (parseTimestampMs(entry.at) < cutoffMs || !hasColdmailRecipientGuardIdentity(entry)) return false;
+        if (!entry.permanent && parseTimestampMs(entry.at) < cutoffMs) return false;
+        if (!hasColdmailRecipientGuardIdentity(entry)) return false;
         const key = [
           entry.at,
           entry.senderEmail,
@@ -2452,6 +2473,11 @@ function createColdmailCampaignService(deps = {}) {
           entry.recipientDomain,
           entry.recipientCompanyKey,
           entry.recipientId,
+          entry.permanent ? 'permanent' : '',
+          entry.source,
+          entry.provider,
+          entry.campaignId,
+          entry.leadId,
         ].join('|');
         if (seen.has(key)) return false;
         seen.add(key);
