@@ -2933,6 +2933,35 @@ function createInstantlyOutreachService(deps = {}) {
       return lastSyncResult;
     }
 
+    if (readBool(input.reconcileOnly || input.cleanupOnly, false)) {
+      if (existingApproached.marked) {
+        await setUiStateValues(
+          customerDbScope,
+          buildCustomerRowsStateValues(values, rows, customerDbKey),
+          {
+            source: 'instantly-remote-reconcile',
+            actor,
+          }
+        );
+      }
+      lastSyncResult = {
+        ok: true,
+        skipped: true,
+        reason: 'reconcile_only',
+        synced: 0,
+        markedBenaderd: existingApproached.marked,
+        remoteInstantlyLeadCount: remoteReconcile.remoteLeadCount,
+        remoteInstantlyUnmatchedCount: remoteReconcile.unmatched,
+        removedRemoteInstantlyLeads: 0,
+        backfilledRemoteInstantlyLeads: 0,
+        removedPriorColdmailFromInstantly: 0,
+        instantlyDeletedCount: 0,
+        campaignId: config.defaultCampaignId,
+        finishedAt: now().toISOString(),
+      };
+      return lastSyncResult;
+    }
+
     const syncedToday = getDailySyncCount(rows);
     const dailyRemaining = Math.max(0, config.dailyCap - syncedToday);
     const requestedLimit = clampNumber(input.limit, config.batchSize, 1, config.batchSize);
