@@ -4,6 +4,9 @@ const FRAME_CROP_THRESHOLD = 12;
 const FRAME_CORNER_TOLERANCE = 32;
 const FRAME_EDGE_INSET_PX = 4;
 const EMAIL_IMAGE_JPEG_QUALITY = 82;
+const EMAIL_WEBDESIGN_MAX_WIDTH = 960;
+const EMAIL_WEBDESIGN_MAX_HEIGHT = 1440;
+const EMAIL_WEBDESIGN_MAX_RATIO = EMAIL_WEBDESIGN_MAX_HEIGHT / EMAIL_WEBDESIGN_MAX_WIDTH;
 
 let cachedSharp = null;
 
@@ -187,6 +190,58 @@ async function removeDecorativeWebdesignFrameForEmail(image) {
   }
 }
 
+async function fitWebdesignPreviewForEmail(image) {
+  const contentType = normalizeString(image && image.contentType).split(';')[0].toLowerCase();
+  const content = image && image.content;
+  if (!Buffer.isBuffer(content) || !/^image\/(?:png|jpe?g|webp)$/i.test(contentType)) return image;
+  try {
+    const sharp = loadSharp();
+    if (typeof sharp !== 'function') return image;
+    const metadata = await sharp(content, { limitInputPixels: 45_000_000 }).metadata();
+    const width = Number(metadata && metadata.width) || 0;
+    const height = Number(metadata && metadata.height) || 0;
+    if (width <= 0 || height <= 0) return image;
+    const ratio = height / width;
+    const isOversized = width > EMAIL_WEBDESIGN_MAX_WIDTH || height > EMAIL_WEBDESIGN_MAX_HEIGHT;
+    const isTooTallForMail = ratio > EMAIL_WEBDESIGN_MAX_RATIO + 0.01;
+    if (!isOversized && !isTooTallForMail) return image;
+
+    let transformer = sharp(content, { limitInputPixels: 45_000_000 })
+      .rotate()
+      .flatten({ background: '#ffffff' });
+    if (isTooTallForMail) {
+      transformer = transformer.resize({
+        width: EMAIL_WEBDESIGN_MAX_WIDTH,
+        height: EMAIL_WEBDESIGN_MAX_HEIGHT,
+        fit: 'contain',
+        background: '#ffffff',
+      });
+    } else {
+      transformer = transformer.resize({
+        width: EMAIL_WEBDESIGN_MAX_WIDTH,
+        height: EMAIL_WEBDESIGN_MAX_HEIGHT,
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
+    }
+    const fitted = await transformer
+      .jpeg({
+        quality: EMAIL_IMAGE_JPEG_QUALITY,
+        mozjpeg: true,
+      })
+      .toBuffer();
+    if (!Buffer.isBuffer(fitted) || !fitted.length) return image;
+    return {
+      ...image,
+      content: fitted,
+      contentType: 'image/jpeg',
+    };
+  } catch (_error) {
+    return image;
+  }
+}
+
 module.exports = {
+  fitWebdesignPreviewForEmail,
   removeDecorativeWebdesignFrameForEmail,
 };

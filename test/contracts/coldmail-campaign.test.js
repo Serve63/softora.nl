@@ -57,6 +57,24 @@ async function createFramedWebdesignDataUrl() {
   return `data:image/png;base64,${framed.toString('base64')}`;
 }
 
+async function createTestWebdesignDataUrl(width, height) {
+  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="${width}" height="${height}" fill="#f8fafc"/>
+    <rect x="0" y="0" width="180" height="180" fill="#102a43"/>
+    <rect x="${width - 180}" y="0" width="180" height="180" fill="#f97316"/>
+    <rect x="0" y="${height - 180}" width="180" height="180" fill="#0ea5e9"/>
+    <rect x="${width - 180}" y="${height - 180}" width="180" height="180" fill="#1e3a8a"/>
+    <rect x="${Math.round(width * 0.08)}" y="${Math.round(height * 0.06)}" width="${Math.round(width * 0.84)}" height="${Math.round(height * 0.16)}" rx="34" fill="#ffffff"/>
+    <rect x="${Math.round(width * 0.11)}" y="${Math.round(height * 0.1)}" width="${Math.round(width * 0.3)}" height="62" rx="12" fill="#1d4ed8"/>
+    <rect x="${Math.round(width * 0.11)}" y="${Math.round(height * 0.3)}" width="${Math.round(width * 0.78)}" height="${Math.round(height * 0.18)}" rx="32" fill="#dbeafe"/>
+    <rect x="${Math.round(width * 0.11)}" y="${Math.round(height * 0.54)}" width="${Math.round(width * 0.34)}" height="${Math.round(height * 0.12)}" rx="28" fill="#ffffff"/>
+    <rect x="${Math.round(width * 0.55)}" y="${Math.round(height * 0.54)}" width="${Math.round(width * 0.34)}" height="${Math.round(height * 0.12)}" rx="28" fill="#ffffff"/>
+    <rect x="${Math.round(width * 0.11)}" y="${Math.round(height * 0.75)}" width="${Math.round(width * 0.78)}" height="${Math.round(height * 0.13)}" rx="30" fill="#0f172a"/>
+  </svg>`;
+  const buffer = await sharp(Buffer.from(svg)).png().toBuffer();
+  return `data:image/png;base64,${buffer.toString('base64')}`;
+}
+
 function withCheckedMockupMeta(item) {
   if (!item || typeof item !== 'object' || !item.websiteMockup) return item;
   const hasQualitySignal = Boolean(
@@ -2703,8 +2721,8 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
     sentMessages[0].html,
     /margin:24px 0 0 0;"><tr><td style="[^"]*"><img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
   );
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" width="640" style="display:block;width:100%;max-width:640px;height:auto;border:0;outline:none;text-decoration:none;"/);
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" width="640" style="display:block;width:100%;max-width:640px;height:auto;border:0;outline:none;text-decoration:none;"/);
+  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" width="640" style="display:block;width:100%;max-width:640px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
+  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" width="640" style="display:block;width:100%;max-width:640px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
   assert.doesNotMatch(sentMessages[0].html, /height="360"/);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
   assert.doesNotMatch(sentMessages[0].html, /data:image\//);
@@ -4000,6 +4018,54 @@ test('coldmail campaign test mode can send Softora webdesign attachment safely',
   assert.equal(sentMessages[0].attachments[1].contentType, 'image/png');
   assert.equal(getSavedState(), null);
   assert.deepEqual(getSavedStates(), []);
+});
+
+test('coldmail campaign makes tall webdesign CID attachments mail-safe before sending', async () => {
+  const tallWebdesign = await createTestWebdesignDataUrl(2160, 3840);
+  const deviceMockup = await createTestWebdesignDataUrl(1600, 1000);
+  const { service, sentMessages } = createService({
+    env: {
+      COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'cid',
+    },
+    rows: [
+      {
+        id: 'tall-design',
+        bedrijf: 'Tall Design BV',
+        naam: 'Servé',
+        email: 'serve@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'tall-design': {
+        id: 'tall-design',
+        websitePhoto: tallWebdesign,
+        websitePhotoName: 'Tall Design BV webdesign.png',
+        websiteMockup: deviceMockup,
+        websiteMockupName: 'Tall Design BV device mockup.png',
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuw webdesign',
+    body: 'Hoi {{naam}}, ik heb een nieuw webdesign gemaakt.',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].html, /max-height:960px;height:auto;object-fit:contain/);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  const webdesignAttachment = sentMessages[0].attachments[0];
+  assert.equal(webdesignAttachment.contentType, 'image/jpeg');
+  const metadata = await sharp(webdesignAttachment.content).metadata();
+  assert.equal(metadata.width, 960);
+  assert.equal(metadata.height, 1440);
+  assert.ok(webdesignAttachment.content.length < 1024 * 1024);
 });
 
 test('coldmail campaign test mode can send Softora webdesign attachment to all approved test inboxes', async () => {
