@@ -1497,8 +1497,11 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   if (!cleanSrc) return '';
   const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
   const isWebdesign = cleanAlt === 'Webdesign';
-  const imageWidth = isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH : INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH;
-  const imageHeight = isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT : INSTANTLY_MOCKUP_PLACEHOLDER_HEIGHT;
+  const fallbackWidth = isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH : INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH;
+  const fallbackHeight = isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT : INSTANTLY_MOCKUP_PLACEHOLDER_HEIGHT;
+  const scaledDimensions = scaleEmailImageDimensions(dimensions);
+  const imageWidth = scaledDimensions ? scaledDimensions.width : fallbackWidth;
+  const imageHeight = scaledDimensions ? scaledDimensions.height : fallbackHeight;
   return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;background:#f3f6fb;border:1px solid #dbe3f0;"><img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
