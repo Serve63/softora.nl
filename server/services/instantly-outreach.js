@@ -25,6 +25,7 @@ const DEFAULT_API_BASE_URL = 'https://api.instantly.ai/api/v2';
 const DEFAULT_SYNC_INTERVAL_MINUTES = 15;
 const DEFAULT_SYNC_BATCH_SIZE = 10;
 const DEFAULT_DAILY_CAP = 25;
+const DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT = 1000;
 const DEFAULT_DAILY_CAP_TIME_ZONE = 'Europe/Amsterdam';
 const DEFAULT_PUBLIC_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
@@ -1618,6 +1619,25 @@ function normalizeInstantlyStatus(value, normalizeString = defaultNormalizeStrin
   return normalized;
 }
 
+function normalizeRemoteInstantlyLeadStatus(lead, normalizeString = defaultNormalizeString) {
+  if (!lead || typeof lead !== 'object') return 'synced';
+  if (Number(lead.email_reply_count || 0) > 0 || normalizeString(lead.timestamp_last_reply)) {
+    return 'reply_received';
+  }
+  if (Number(lead.email_open_count || 0) > 0 || normalizeString(lead.timestamp_last_open)) {
+    return 'opened';
+  }
+  if (
+    normalizeString(lead.timestamp_last_contact) ||
+    normalizeString(lead.last_step_timestamp_executed) ||
+    normalizeString(lead.status_summary && lead.status_summary.lastStep && lead.status_summary.lastStep.timestamp_executed)
+  ) {
+    return 'sent';
+  }
+  const status = normalizeInstantlyStatus(lead.status, normalizeString);
+  return status && !/^-?\d+$/.test(status) ? status : 'synced';
+}
+
 function chooseInstantlyStatus(currentStatus, nextStatus) {
   const current = normalizeInstantlyStatus(currentStatus);
   const next = normalizeInstantlyStatus(nextStatus);
@@ -1884,15 +1904,14 @@ function createInstantlyOutreachService(deps = {}) {
     return Boolean(valueMs && valueMs < referenceMs);
   }
 
-  function hasExternalColdmailHistoryBeforeInstantly(row) {
-    const syncedAtMs = parseTimestampMs(row && row.instantlySyncedAt);
+  function hasExternalColdmailHistoryBeforeReference(row, referenceMs) {
     const history = Array.isArray(row && row.hist) ? row.hist : [];
     if (
       history.some((item) => {
         const text = getHistorySearchText(item);
         if (!isPriorColdmailHistoryText(text) || isInstantlyHistoryText(text)) return false;
         const eventMs = parseTimestampMs(item && (item.date || item.timestamp || item.createdAt || item.created_at));
-        return !syncedAtMs || !eventMs || eventMs < syncedAtMs;
+        return !referenceMs || !eventMs || eventMs < referenceMs;
       })
     ) {
       return true;
@@ -1909,7 +1928,11 @@ function createInstantlyOutreachService(deps = {}) {
       row && row.coldmailLastOpenedAt,
       row && row.outreachOpenedAt,
       row && row.lastColdmailReplyAt,
-    ].some((value) => isBeforeReferenceDate(value, syncedAtMs));
+    ].some((value) => isBeforeReferenceDate(value, referenceMs));
+  }
+
+  function hasExternalColdmailHistoryBeforeInstantly(row) {
+    return hasExternalColdmailHistoryBeforeReference(row, parseTimestampMs(row && row.instantlySyncedAt));
   }
 
   function hasPriorColdmailOutreach(row) {
@@ -2320,6 +2343,255 @@ function createInstantlyOutreachService(deps = {}) {
     return data;
   }
 
+  async function listInstantlyCampaignLeads(limit = DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT) {
+    const safeLimit = clampNumber(limit, DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT, 1, 5000);
+    const items = [];
+    let startingAfter = '';
+
+    for (let page = 0; page < Math.ceil(safeLimit / 100); page += 1) {
+      const remaining = safeLimit - items.length;
+      if (remaining <= 0) break;
+      const body = {
+        campaign: config.defaultCampaignId,
+        limit: Math.min(100, remaining),
+      };
+      if (startingAfter) body.starting_after = startingAfter;
+
+      const { response, data } = await fetchJsonWithTimeout(
+        `${config.apiBaseUrl}/leads/list`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${config.apiKey}`,
+          },
+          body: JSON.stringify(body),
+        },
+        30_000
+      );
+
+      if (!response || !response.ok) {
+        throw createInstantlyError(
+          `Instantly campagne-check mislukt (${response ? response.status : 'geen response'}).`,
+          'INSTANTLY_CAMPAIGN_LEAD_LIST_FAILED',
+          response && response.status ? response.status : 502,
+          { data }
+        );
+      }
+
+      const batch = extractInstantlyLeadItems(data);
+      items.push(...batch);
+      startingAfter = normalizeString(data && data.next_starting_after);
+      if (!startingAfter || !batch.length) break;
+    }
+
+    return items;
+  }
+
+  function getRemoteLeadPayload(lead) {
+    if (!lead || typeof lead !== 'object') return {};
+    if (lead.payload && typeof lead.payload === 'object') return lead.payload;
+    if (lead.custom_variables && typeof lead.custom_variables === 'object') return lead.custom_variables;
+    return {};
+  }
+
+  function normalizeRemoteInstantlyLead(lead) {
+    const payload = getRemoteLeadPayload(lead);
+    const leadId = normalizeString(lead && (lead.id || lead.lead_id || lead.instantly_lead_id));
+    return {
+      raw: lead,
+      leadId,
+      campaignId: normalizeString(lead && (lead.campaign || lead.campaign_id)) || config.defaultCampaignId,
+      customerId: normalizeString(
+        payload.softora_customer_id ||
+          payload.softoraCustomerId ||
+          payload.customer_id ||
+          payload.customerId
+      ),
+      email: normalizeEmailAddress(
+        lead && (lead.email || lead.contact || lead.lead_email || payload.email || payload.softora_email),
+        normalizeString
+      ),
+      company: normalizeString(
+        lead && (lead.company_name || lead.companyName || payload.softora_company || payload.companyName)
+      ),
+      softoraStatus: normalizeContactStatus(payload.softora_status || payload.softoraStatus, {}),
+      softoraSource: normalizeString(payload.softora_source || payload.softoraSource).toLowerCase(),
+      status: normalizeRemoteInstantlyLeadStatus(lead, normalizeString),
+      timestampCreated: normalizeString(lead && (lead.timestamp_created || lead.created_at)),
+      timestampUpdated: normalizeString(lead && (lead.timestamp_updated || lead.updated_at)),
+      timestampLastContact: normalizeString(
+        lead &&
+          (lead.timestamp_last_contact ||
+            lead.last_step_timestamp_executed ||
+            (lead.status_summary &&
+              lead.status_summary.lastStep &&
+              lead.status_summary.lastStep.timestamp_executed))
+      ),
+    };
+  }
+
+  function buildCustomerRowLookup(rows) {
+    const byId = new Map();
+    const byEmail = new Map();
+    (Array.isArray(rows) ? rows : []).forEach((row, index) => {
+      const id = getRowId(row, index, normalizeString);
+      const email = getRowEmail(row, normalizeString);
+      if (id && !byId.has(id)) byId.set(id, { id, index, row });
+      if (email && !byEmail.has(email)) byEmail.set(email, { id, index, row });
+    });
+    return { byId, byEmail };
+  }
+
+  function getLocalMatchForRemoteInstantlyLead(lead, lookup) {
+    if (!lead || !lookup) return null;
+    if (lead.customerId && lookup.byId.has(lead.customerId)) return lookup.byId.get(lead.customerId);
+    if (lead.email && lookup.byEmail.has(lead.email)) return lookup.byEmail.get(lead.email);
+    return null;
+  }
+
+  function hasNonInstantlyColdmailSignal(row) {
+    if (!row || typeof row !== 'object') return false;
+    const provider = normalizeString(row.lastColdmailProvider).toLowerCase();
+    if (provider && provider !== 'instantly') return true;
+    if (provider === 'instantly') return false;
+    if (normalizeContactStatus(row.outreachStatus, row) === 'gemaild') return true;
+    if (getPriorColdmailTimestamp(row)) return true;
+    if (Number(row.coldmailOpenCount || row.outreachOpenCount || 0) > 0) return true;
+    if (row.coldmailOpened === true || row.outreachOpened === true) return true;
+    if (normalizeString(row.coldmailSentMessageId || row.outreachMessageId || row.sentMessageId || row.messageId)) {
+      return true;
+    }
+    const history = Array.isArray(row.hist) ? row.hist : [];
+    return history.some((item) => {
+      const text = getHistorySearchText(item);
+      return isPriorColdmailHistoryText(text) && !isInstantlyHistoryText(text);
+    });
+  }
+
+  function shouldRemoveRemoteInstantlyLead(match, remote) {
+    const row = match && match.row;
+    if (!row || typeof row !== 'object') return false;
+    if (row.mail === false || row.canMail === false || row.doNotMail === true) return true;
+    const remoteReferenceMs = parseTimestampMs(
+      remote && (remote.timestampCreated || remote.timestampLastContact || remote.timestampUpdated)
+    );
+    if (hasExternalColdmailHistoryBeforeReference(row, remoteReferenceMs)) return true;
+    const status = normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect';
+    const provider = normalizeString(row.lastColdmailProvider).toLowerCase();
+    if (EXCLUDED_DATABASE_STATUSES.has(status) && provider !== 'instantly') return true;
+    if (EXCLUDED_DATABASE_STATUSES.has(status) && !hasActiveInstantlyOutreach(row)) return true;
+    return hasNonInstantlyColdmailSignal(row);
+  }
+
+  function getRemoteInstantlyReconcilePlan(rows, remoteLeads) {
+    const lookup = buildCustomerRowLookup(rows);
+    const seenRemoveLeadIds = new Set();
+    const seenBackfillRows = new Set();
+    const remove = [];
+    const backfill = [];
+    const unmatched = [];
+
+    (Array.isArray(remoteLeads) ? remoteLeads : []).forEach((rawLead) => {
+      const remote = normalizeRemoteInstantlyLead(rawLead);
+      if (!remote.leadId) return;
+      const match = getLocalMatchForRemoteInstantlyLead(remote, lookup);
+      if (!match) {
+        unmatched.push(remote);
+        return;
+      }
+      const item = {
+        ...match,
+        leadId: remote.leadId,
+        campaignId: remote.campaignId,
+        remote,
+      };
+      if (shouldRemoveRemoteInstantlyLead(match, remote)) {
+        if (!seenRemoveLeadIds.has(remote.leadId)) {
+          seenRemoveLeadIds.add(remote.leadId);
+          remove.push(item);
+        }
+        return;
+      }
+      if (!hasActiveInstantlyOutreach(match.row) && !seenBackfillRows.has(match.index)) {
+        seenBackfillRows.add(match.index);
+        backfill.push(item);
+      }
+    });
+
+    return { remove, backfill, unmatched };
+  }
+
+  function markRowsAsBackfilledFromRemoteInstantly(rows, backfillRows, actor) {
+    const markedAt = now().toISOString();
+    const backfillByIndex = new Map(backfillRows.map((item) => [item.index, item]));
+    return rows.map((row, index) => {
+      const item = backfillByIndex.get(index);
+      if (!item) return row;
+      const remote = item.remote || {};
+      const syncedAt = normalizeString(row.instantlySyncedAt) || remote.timestampCreated || markedAt;
+      const lastEventAt = remote.timestampLastContact || remote.timestampUpdated || syncedAt;
+      const nextStatus = chooseInstantlyStatus(row.instantlyStatus, remote.status || 'synced');
+      const historyEntry = buildHistoryEntry(
+        {
+          type: 'gemaild',
+          label: 'Instantly-lead teruggevonden',
+          actor,
+          source: 'instantly-remote-reconcile',
+          messageKey: `instantly-remote-reconcile:${item.campaignId}:${item.id}:${item.leadId}`,
+          subject: 'Instantly reconciliatie',
+          preview:
+            'Lead stond al in de Instantly-campaign en is in Softora vastgezet zodat eigen mailboxen hem niet opnieuw pakken.',
+        },
+        { normalizeString, truncateText, now: () => new Date(markedAt) }
+      );
+      return {
+        ...row,
+        instantlyLeadId: item.leadId,
+        instantlyCampaignId: item.campaignId || config.defaultCampaignId,
+        instantlyStatus: nextStatus || 'synced',
+        instantlySyncedAt: syncedAt,
+        instantlyLastEventAt: lastEventAt,
+        instantlyEmailSentAt:
+          normalizeString(row.instantlyEmailSentAt) ||
+          (nextStatus === 'sent' || nextStatus === 'opened' || nextStatus === 'reply_received'
+            ? remote.timestampLastContact
+            : ''),
+        lastColdmailProvider: 'instantly',
+        lastColdmailProviderStatus: nextStatus || 'synced',
+        ...buildInstantlyApproachedFields(row, syncedAt),
+        updatedAt: markedAt,
+        hist: mergeHistory(row, historyEntry, normalizeString),
+      };
+    });
+  }
+
+  async function reconcileRemoteInstantlyCampaignRows(rows, actor) {
+    const remoteLeads = await listInstantlyCampaignLeads();
+    const plan = getRemoteInstantlyReconcilePlan(rows, remoteLeads);
+    let nextRows = rows;
+    let deletedCount = 0;
+
+    if (plan.remove.length) {
+      const data = await deleteInstantlyLeadsByIds(plan.remove.map((item) => item.leadId));
+      deletedCount = Math.max(0, Number(data && data.count) || 0);
+      nextRows = markRowsAsRemovedFromInstantly(nextRows, plan.remove, actor);
+    }
+    if (plan.backfill.length) {
+      nextRows = markRowsAsBackfilledFromRemoteInstantly(nextRows, plan.backfill, actor);
+    }
+
+    return {
+      rows: nextRows,
+      remoteLeadCount: remoteLeads.length,
+      removed: plan.remove.length,
+      deletedCount,
+      removedLeadIds: plan.remove.map((item) => item.leadId),
+      backfilled: plan.backfill.length,
+      unmatched: plan.unmatched.length,
+    };
+  }
+
   function buildInstantlyLeadPatchPayload(lead) {
     return {
       personalization: lead.personalization || null,
@@ -2451,8 +2723,9 @@ function createInstantlyOutreachService(deps = {}) {
     return rows.map((row, index) => {
       const item = removedByIndex.get(index);
       if (!item) return row;
-      const removedLeadId = normalizeString(row.instantlyLeadId);
-      const removedCampaignId = normalizeString(row.instantlyCampaignId) || config.defaultCampaignId;
+      const removedLeadId = normalizeString(item.leadId) || normalizeString(row.instantlyLeadId);
+      const removedCampaignId =
+        normalizeString(item.campaignId) || normalizeString(row.instantlyCampaignId) || config.defaultCampaignId;
       const historyEntry = buildHistoryEntry(
         {
           type: 'instantly_verwijderd',
@@ -2621,28 +2894,39 @@ function createInstantlyOutreachService(deps = {}) {
       return lastSyncResult;
     }
 
+    const remoteReconcile = await reconcileRemoteInstantlyCampaignRows(rows, actor);
+    rows = remoteReconcile.rows;
     const priorColdmailCleanup = await cleanupPriorColdmailInstantlyRows(rows, actor);
     rows = priorColdmailCleanup.rows;
     const existingApproached = markExistingInstantlyRowsAsApproached(rows, actor);
     rows = existingApproached.rows;
 
-    if (priorColdmailCleanup.removed) {
+    if (remoteReconcile.removed || remoteReconcile.backfilled || priorColdmailCleanup.removed) {
       await setUiStateValues(
         customerDbScope,
         buildCustomerRowsStateValues(values, rows, customerDbKey),
         {
-          source: 'instantly-dedupe-cleanup',
+          source: remoteReconcile.removed || remoteReconcile.backfilled
+            ? 'instantly-remote-reconcile'
+            : 'instantly-dedupe-cleanup',
           actor,
         }
       );
       lastSyncResult = {
         ok: true,
         skipped: true,
-        reason: 'prior_coldmail_cleanup',
+        reason:
+          remoteReconcile.removed || remoteReconcile.backfilled
+            ? 'remote_instantly_reconcile'
+            : 'prior_coldmail_cleanup',
         synced: 0,
         markedBenaderd: existingApproached.marked,
+        remoteInstantlyLeadCount: remoteReconcile.remoteLeadCount,
+        remoteInstantlyUnmatchedCount: remoteReconcile.unmatched,
+        removedRemoteInstantlyLeads: remoteReconcile.removed,
+        backfilledRemoteInstantlyLeads: remoteReconcile.backfilled,
         removedPriorColdmailFromInstantly: priorColdmailCleanup.removed,
-        instantlyDeletedCount: priorColdmailCleanup.deletedCount,
+        instantlyDeletedCount: remoteReconcile.deletedCount + priorColdmailCleanup.deletedCount,
         campaignId: config.defaultCampaignId,
         finishedAt: now().toISOString(),
       };
@@ -2679,6 +2963,8 @@ function createInstantlyOutreachService(deps = {}) {
         reason: 'daily_cap_reached',
         synced: 0,
         markedBenaderd: existingApproached.marked,
+        remoteInstantlyLeadCount: remoteReconcile.remoteLeadCount,
+        remoteInstantlyUnmatchedCount: remoteReconcile.unmatched,
         refreshedExistingVariables: existingVariableRefresh.refreshed,
         attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
         failed: existingVariableRefresh.failed || [],
@@ -2697,6 +2983,8 @@ function createInstantlyOutreachService(deps = {}) {
         reason: 'no_eligible_leads',
         synced: 0,
         markedBenaderd: existingApproached.marked,
+        remoteInstantlyLeadCount: remoteReconcile.remoteLeadCount,
+        remoteInstantlyUnmatchedCount: remoteReconcile.unmatched,
         refreshedExistingVariables: existingVariableRefresh.refreshed,
         attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
         failed,
@@ -2741,6 +3029,8 @@ function createInstantlyOutreachService(deps = {}) {
         reason: 'no_eligible_leads',
         synced: 0,
         markedBenaderd: existingApproached.marked,
+        remoteInstantlyLeadCount: remoteReconcile.remoteLeadCount,
+        remoteInstantlyUnmatchedCount: remoteReconcile.unmatched,
         refreshedExistingVariables: existingVariableRefresh.refreshed,
         attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
         failed,
@@ -2773,6 +3063,8 @@ function createInstantlyOutreachService(deps = {}) {
       ok: true,
       synced: sendableRows.length,
       markedBenaderd: existingApproached.marked + sendableRows.length,
+      remoteInstantlyLeadCount: remoteReconcile.remoteLeadCount,
+      remoteInstantlyUnmatchedCount: remoteReconcile.unmatched,
       refreshedExistingVariables: existingVariableRefresh.refreshed,
       attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
       failed,

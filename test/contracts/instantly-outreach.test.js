@@ -213,6 +213,15 @@ function createService(overrides = {}) {
       return { ok: true };
     },
     fetchJsonWithTimeout: async (url, options, timeoutMs) => {
+      if (url === 'https://api.instantly.test/api/v2/leads/list') {
+        return {
+          response: { ok: true, status: 200 },
+          data: {
+            items: Array.isArray(overrides.remoteInstantlyLeads) ? overrides.remoteInstantlyLeads : [],
+            next_starting_after: '',
+          },
+        };
+      }
       fetchCalls.push({ url, options, timeoutMs });
       if (typeof overrides.fetchJsonWithTimeout === 'function') {
         return overrides.fetchJsonWithTimeout(url, options, timeoutMs, fetchCalls.length);
@@ -864,6 +873,132 @@ test('instantly sync removes active Instantly rows with older Softora coldmail h
   assert.equal(rows[0].outreachStatus, 'benaderd');
   assert.equal(rows[1].instantlyStatus, undefined);
   assert.ok(rows[0].hist.some((item) => item.source === 'instantly-dedupe-cleanup'));
+});
+
+test('instantly sync removes remote campaign leads that were already mailed outside Instantly', async () => {
+  const { service, fetchCalls, getRows, writes } = createService({
+    rows: [
+      {
+        id: 'manual-import-gubbels-nl-0024',
+        bedrijf: 'Gubbels Beheer B.V.',
+        email: 'info@gubbels.nl',
+        website: 'https://gubbels.nl',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        mail: true,
+        hist: [
+          {
+            type: 'gemaild',
+            label: 'Mail verstuurd',
+            date: '2026-05-27',
+          },
+        ],
+      },
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    remoteInstantlyLeads: [
+      {
+        id: 'instantly-gubbels-lead',
+        campaign: 'campaign-1',
+        email: 'info@gubbels.nl',
+        company_name: 'Gubbels Beheer B.V.',
+        timestamp_last_contact: '2026-05-30T06:37:51.884000Z',
+        payload: {
+          softora_customer_id: 'manual-import-gubbels-nl-0024',
+          softora_source: 'softora',
+          softora_status: 'benaderbaar',
+          softora_company: 'Gubbels Beheer B.V.',
+        },
+      },
+    ],
+    fetchJsonWithTimeout: async (url, options) => {
+      if (url === 'https://api.instantly.test/api/v2/leads' && options.method === 'DELETE') {
+        return {
+          response: { ok: true, status: 200 },
+          data: { count: 1 },
+        };
+      }
+      throw new Error(`Unexpected Instantly call: ${options.method} ${url}`);
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'remote_instantly_reconcile');
+  assert.equal(result.removedRemoteInstantlyLeads, 1);
+  assert.equal(result.instantlyDeletedCount, 1);
+  assert.equal(fetchCalls.length, 1);
+  const deleteBody = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(fetchCalls[0].url, 'https://api.instantly.test/api/v2/leads');
+  assert.equal(fetchCalls[0].options.method, 'DELETE');
+  assert.deepEqual(deleteBody.ids, ['instantly-gubbels-lead']);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].meta.source, 'instantly-remote-reconcile');
+
+  const rows = getRows();
+  assert.equal(rows[0].status, 'gemaild');
+  assert.equal(rows[0].databaseStatus, 'gemaild');
+  assert.equal(rows[0].instantlyRemovedLeadId, 'instantly-gubbels-lead');
+  assert.equal(rows[0].instantlyRemovedReason, 'prior_softora_coldmail');
+  assert.equal(rows[1].instantlyStatus, undefined);
+});
+
+test('instantly sync backfills remote campaign leads before normal mailbox sending can select them', async () => {
+  const { service, fetchCalls, getRows, writes } = createService({
+    rows: [
+      {
+        id: 'remote-only',
+        bedrijf: 'Remote Only BV',
+        email: 'remote@example.test',
+        website: 'https://remote.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    remoteInstantlyLeads: [
+      {
+        id: 'instantly-remote-only',
+        campaign: 'campaign-1',
+        email: 'remote@example.test',
+        company_name: 'Remote Only BV',
+        timestamp_created: '2026-05-25T08:00:00.000Z',
+        payload: {
+          softora_customer_id: 'remote-only',
+          softora_source: 'softora',
+          softora_status: 'prospect',
+        },
+      },
+    ],
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'remote_instantly_reconcile');
+  assert.equal(result.backfilledRemoteInstantlyLeads, 1);
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].meta.source, 'instantly-remote-reconcile');
+
+  const rows = getRows();
+  assert.equal(rows[0].instantlyLeadId, 'instantly-remote-only');
+  assert.equal(rows[0].instantlyCampaignId, 'campaign-1');
+  assert.equal(rows[0].instantlyStatus, 'synced');
+  assert.equal(rows[0].lastColdmailProvider, 'instantly');
+  assert.equal(rows[0].status, 'gemaild');
+  assert.equal(rows[0].databaseStatus, 'gemaild');
+  assert.equal(rows[0].outreachStatus, 'benaderd');
 });
 
 test('instantly sync reads and writes chunked customer database state', async () => {
